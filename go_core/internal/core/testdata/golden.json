@@ -1,0 +1,160 @@
+[
+  {
+    "name": "injected 2d10 strong success",
+    "request": {
+      "api_version": "v1",
+      "operation": "check.resolve",
+      "idempotency_key": "fixture-check-001",
+      "actor_id": "42",
+      "expected_version": 7,
+      "payload": {"dice": [10, 6], "modifier": 3, "tn": 14}
+    },
+    "expected": {
+      "api_version": "v1",
+      "operation": "check.resolve",
+      "idempotency_key": "fixture-check-001",
+      "state_version": 8,
+      "result": {
+        "die1": 10,
+        "die2": 6,
+        "modifier": 3,
+        "tn": 14,
+        "total": 19,
+        "margin": 5,
+        "success": true,
+        "degree": "Strong Success"
+      }
+    }
+  },
+  {
+    "name": "relationship dimensions remain bounded",
+    "request": {
+      "api_version": "v1",
+      "operation": "relationship.update",
+      "idempotency_key": "fixture-relationship-001",
+      "actor_id": "42",
+      "expected_version": 2,
+      "payload": {
+        "current": {
+          "trust": 95,
+          "respect": 40,
+          "fear": 0,
+          "affection": 5,
+          "debt": 1,
+          "grudge": -95,
+          "encounter_count": 2
+        },
+        "deltas": {"trust": 20, "respect": 3, "grudge": -20},
+        "summary": "The cultivator repaid an old debt."
+      }
+    },
+    "expected": {
+      "api_version": "v1",
+      "operation": "relationship.update",
+      "idempotency_key": "fixture-relationship-001",
+      "state_version": 3,
+      "result": {
+        "trust": 100,
+        "respect": 43,
+        "fear": 0,
+        "affection": 5,
+        "debt": 1,
+        "grudge": -100,
+        "encounter_count": 3,
+        "last_summary": "The cultivator repaid an old debt."
+      }
+    }
+  },
+  {
+    "name": "quest progress matches target case-insensitively",
+    "request": {
+      "api_version": "v1",
+      "operation": "quest.progress",
+      "idempotency_key": "fixture-quest-001",
+      "actor_id": "42",
+      "expected_version": 11,
+      "payload": {
+        "progress": {"explore": 1, "talk": 0, "checks": 1},
+        "objectives": [
+          {"id": "explore", "type": "explore", "count": 1},
+          {"id": "talk", "type": "talk", "target": "Elder Pine", "count": 1},
+          {"id": "checks", "type": "check", "count": 2}
+        ],
+        "objective_type": "talk",
+        "target": "elder pine",
+        "amount": 1
+      }
+    },
+    "expected": {
+      "api_version": "v1",
+      "operation": "quest.progress",
+      "idempotency_key": "fixture-quest-001",
+      "state_version": 12,
+      "result": {
+        "progress": {"explore": 1, "talk": 1, "checks": 1},
+        "touched": true,
+        "complete": false
+      }
+    }
+  },
+  {
+    "name": "scene transition preserves physical location",
+    "request": {
+      "api_version": "v1",
+      "operation": "scene.transition",
+      "idempotency_key": "fixture-scene-001",
+      "actor_id": "42",
+      "expected_version": 4,
+      "payload": {
+        "physical_location": "Greenriver Town",
+        "scene_type": "expedition",
+        "scene_key": "expedition:42",
+        "scene_label": "Greenriver Expedition",
+        "channel_id": 123456789012345678,
+        "metadata": {"guild_id": 987654321098765432}
+      }
+    },
+    "expected": {
+      "api_version": "v1",
+      "operation": "scene.transition",
+      "idempotency_key": "fixture-scene-001",
+      "state_version": 5,
+      "result": {
+        "physical_location": "Greenriver Town",
+        "scene_type": "expedition",
+        "scene_key": "expedition:42",
+        "scene_label": "Greenriver Expedition",
+        "channel_id": 123456789012345678,
+        "metadata": {"guild_id": 987654321098765432}
+      }
+    }
+  },
+  {
+    "name": "quest progress defaults to one",
+    "request": {
+      "api_version": "v1",
+      "operation": "quest.progress",
+      "idempotency_key": "fixture-quest-default-001",
+      "actor_id": "42",
+      "expected_version": 0,
+      "payload": {
+        "progress": {"visits": 0},
+        "objectives": [
+          {"id": "visits", "type": "explore", "count": 2}
+        ],
+        "objective_type": "explore"
+      }
+    },
+    "expected": {
+      "api_version": "v1",
+      "operation": "quest.progress",
+      "idempotency_key": "fixture-quest-default-001",
+      "state_version": 1,
+      "result": {
+        "progress": {"visits": 1},
+        "touched": true,
+        "complete": false
+      }
+    }
+  }
+]

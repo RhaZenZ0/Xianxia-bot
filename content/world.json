@@ -1,0 +1,6639 @@
+{
+  "world_name": "Jade Meridian Realm",
+  "starting_location": "Greenriver Town",
+  "realms": [
+    {
+      "world": "Mortal World",
+      "name": "Body Tempering",
+      "phase_costs": [
+        50,
+        62,
+        77,
+        95,
+        118,
+        147,
+        182,
+        225,
+        279
+      ],
+      "base_tn": 10
+    },
+    {
+      "world": "Mortal World",
+      "name": "Qi Refining",
+      "phase_costs": [
+        90,
+        112,
+        138,
+        172,
+        213,
+        264,
+        327,
+        406,
+        503
+      ],
+      "base_tn": 11
+    },
+    {
+      "world": "Mortal World",
+      "name": "Foundation Establishment",
+      "phase_costs": [
+        180,
+        223,
+        277,
+        343,
+        426,
+        528,
+        654,
+        811,
+        1006
+      ],
+      "base_tn": 12
+    },
+    {
+      "world": "Mortal World",
+      "name": "Core Formation",
+      "phase_costs": [
+        350,
+        434,
+        538,
+        667,
+        827,
+        1026,
+        1272,
+        1578,
+        1956
+      ],
+      "base_tn": 13
+    },
+    {
+      "world": "Mortal World",
+      "name": "Nascent Soul",
+      "phase_costs": [
+        700,
+        868,
+        1076,
+        1335,
+        1655,
+        2052,
+        2545,
+        3155,
+        3913
+      ],
+      "base_tn": 14
+    },
+    {
+      "world": "Mortal World",
+      "name": "Soul Formation",
+      "phase_costs": [
+        1300,
+        1612,
+        1999,
+        2479,
+        3073,
+        3811,
+        4726,
+        5860,
+        7266
+      ],
+      "base_tn": 15
+    },
+    {
+      "world": "Mortal World",
+      "name": "Divine Transformation",
+      "phase_costs": [
+        2054,
+        2547,
+        3158,
+        3916,
+        4856,
+        6022,
+        7467,
+        9259,
+        11481
+      ],
+      "base_tn": 16
+    },
+    {
+      "world": "Mortal World",
+      "name": "Ascension Realm",
+      "phase_costs": [
+        3245,
+        4024,
+        4990,
+        6187,
+        7672,
+        9513,
+        11796,
+        14627,
+        18138
+      ],
+      "base_tn": 17
+    },
+    {
+      "world": "Spiritual World",
+      "name": "Spirit Body Transformation",
+      "phase_costs": [
+        5128,
+        6359,
+        7885,
+        9777,
+        12124,
+        15033,
+        18641,
+        23115,
+        28663
+      ],
+      "base_tn": 18
+    },
+    {
+      "world": "Spiritual World",
+      "name": "Soul Transformation",
+      "phase_costs": [
+        8102,
+        10046,
+        12458,
+        15447,
+        19155,
+        23752,
+        29453,
+        36521,
+        45286
+      ],
+      "base_tn": 19
+    },
+    {
+      "world": "Spiritual World",
+      "name": "Spirit Transformation",
+      "phase_costs": [
+        12801,
+        15873,
+        19683,
+        24407,
+        30264,
+        37528,
+        46534,
+        57703,
+        71551
+      ],
+      "base_tn": 20
+    },
+    {
+      "world": "Spiritual World",
+      "name": "Nirvana",
+      "phase_costs": [
+        20225,
+        25079,
+        31098,
+        38561,
+        47816,
+        59292,
+        73522,
+        91168,
+        113048
+      ],
+      "base_tn": 21
+    },
+    {
+      "world": "Spiritual World",
+      "name": "Law Manifestation",
+      "phase_costs": [
+        31955,
+        39624,
+        49134,
+        60926,
+        75548,
+        93680,
+        116163,
+        144042,
+        178613
+      ],
+      "base_tn": 22
+    },
+    {
+      "world": "Spiritual World",
+      "name": "Dao Comprehension",
+      "phase_costs": [
+        50489,
+        62606,
+        77632,
+        96264,
+        119367,
+        148015,
+        183538,
+        227588,
+        282209
+      ],
+      "base_tn": 23
+    },
+    {
+      "world": "Spiritual World",
+      "name": "Dao Integration",
+      "phase_costs": [
+        79773,
+        98919,
+        122659,
+        152097,
+        188600,
+        233865,
+        289992,
+        359590,
+        445892
+      ],
+      "base_tn": 24
+    },
+    {
+      "world": "Spiritual World",
+      "name": "Transcendence Realm",
+      "phase_costs": [
+        126042,
+        156292,
+        193802,
+        240315,
+        297990,
+        369508,
+        458190,
+        568155,
+        704513
+      ],
+      "base_tn": 25
+    },
+    {
+      "world": "Immortal World",
+      "name": "True Immortal",
+      "phase_costs": [
+        199146,
+        246941,
+        306207,
+        379697,
+        470824,
+        583821,
+        723939,
+        897684,
+        1113128
+      ],
+      "base_tn": 26
+    },
+    {
+      "world": "Immortal World",
+      "name": "Earth Immortal",
+      "phase_costs": [
+        314650,
+        390166,
+        483806,
+        599919,
+        743900,
+        922436,
+        1143820,
+        1418337,
+        1758738
+      ],
+      "base_tn": 27
+    },
+    {
+      "world": "Immortal World",
+      "name": "Sky Immortal",
+      "phase_costs": [
+        497148,
+        616464,
+        764415,
+        947874,
+        1175364,
+        1457452,
+        1807240,
+        2240977,
+        2778812
+      ],
+      "base_tn": 28
+    },
+    {
+      "world": "Immortal World",
+      "name": "Star Immortal",
+      "phase_costs": [
+        785493,
+        974011,
+        1207774,
+        1497640,
+        1857073,
+        2302771,
+        2855436,
+        3540741,
+        4390518
+      ],
+      "base_tn": 29
+    },
+    {
+      "world": "Immortal World",
+      "name": "Golden Immortal",
+      "phase_costs": [
+        1241080,
+        1538939,
+        1908285,
+        2366273,
+        2934178,
+        3638381,
+        4511593,
+        5594375,
+        6937025
+      ],
+      "base_tn": 30
+    },
+    {
+      "world": "Immortal World",
+      "name": "Void Immortal",
+      "phase_costs": [
+        1960906,
+        2431523,
+        3015089,
+        3738710,
+        4636001,
+        5748641,
+        7128315,
+        8839111,
+        10960497
+      ],
+      "base_tn": 31
+    },
+    {
+      "world": "Immortal World",
+      "name": "Chaos Immortal",
+      "phase_costs": [
+        3098231,
+        3841806,
+        4763840,
+        5907162,
+        7324880,
+        9082852,
+        11262736,
+        13965793,
+        17317583
+      ],
+      "base_tn": 32
+    },
+    {
+      "world": "Immortal World",
+      "name": "Immortal Sovereign",
+      "phase_costs": [
+        4895205,
+        6070054,
+        7526867,
+        9333315,
+        11573311,
+        14350906,
+        17795123,
+        22065953,
+        27361781
+      ],
+      "base_tn": 32
+    },
+    {
+      "world": "Celestial World",
+      "name": "Celestial",
+      "phase_costs": [
+        7734425,
+        9590687,
+        11892452,
+        14746640,
+        18285834,
+        22674434,
+        28116298,
+        34864210,
+        43231620
+      ],
+      "base_tn": 32
+    },
+    {
+      "world": "Celestial World",
+      "name": "Celestial Duke",
+      "phase_costs": [
+        12220391,
+        15153285,
+        18790073,
+        23299691,
+        28891617,
+        35825605,
+        44423750,
+        55085450,
+        68305957
+      ],
+      "base_tn": 32,
+      "gendered_names": {
+        "female": "Celestial Duchess"
+      }
+    },
+    {
+      "world": "Celestial World",
+      "name": "Celestial Lord",
+      "phase_costs": [
+        19308217,
+        23942189,
+        29688314,
+        36813510,
+        45648752,
+        56604453,
+        70189522,
+        87035007,
+        107923408
+      ],
+      "base_tn": 32,
+      "gendered_names": {
+        "female": "Celestial Lady"
+      }
+    },
+    {
+      "world": "Celestial World",
+      "name": "Celestial King",
+      "phase_costs": [
+        30506983,
+        37828659,
+        46907537,
+        58165346,
+        72125029,
+        89435036,
+        110899445,
+        137515311,
+        170518986
+      ],
+      "base_tn": 32,
+      "gendered_names": {
+        "female": "Celestial Queen"
+      }
+    },
+    {
+      "world": "Celestial World",
+      "name": "Celestial Emperor",
+      "phase_costs": [
+        48201034,
+        59769282,
+        74113910,
+        91901248,
+        113957548,
+        141307359,
+        175221126,
+        217274196,
+        269420003
+      ],
+      "base_tn": 32,
+      "gendered_names": {
+        "female": "Celestial Empress"
+      }
+    },
+    {
+      "world": "Celestial World",
+      "name": "Celestial Ancestor",
+      "phase_costs": [
+        76157633,
+        94435465,
+        117099977,
+        145203971,
+        180052924,
+        223265626,
+        276849376,
+        343293226,
+        425683600
+      ],
+      "base_tn": 32
+    },
+    {
+      "world": "Celestial World",
+      "name": "Dao Saint",
+      "phase_costs": [
+        120329061,
+        149208036,
+        185017964,
+        229422276,
+        284483622,
+        352759691,
+        437422017,
+        542403301,
+        672580093
+      ],
+      "base_tn": 32,
+      "gendered_names": {
+        "female": "Dao Saintess"
+      }
+    },
+    {
+      "world": "Celestial World",
+      "name": "Dao Sovereign",
+      "phase_costs": [
+        190119916,
+        235748696,
+        292328383,
+        362487195,
+        449484121,
+        557360311,
+        691126785,
+        856997214,
+        1062676545
+      ],
+      "base_tn": 32
+    }
+  ],
+  "paths": {
+    "Sword Cultivator": {
+      "body": 2,
+      "agility": 3,
+      "spirit": 2,
+      "insight": 1,
+      "will": 3,
+      "presence": 1,
+      "skill": "Sword"
+    },
+    "Qi Refiner": {
+      "body": 1,
+      "agility": 2,
+      "spirit": 3,
+      "insight": 3,
+      "will": 2,
+      "presence": 1,
+      "skill": "Spiritual Arts"
+    },
+    "Body Refiner": {
+      "body": 3,
+      "agility": 2,
+      "spirit": 1,
+      "insight": 1,
+      "will": 3,
+      "presence": 2,
+      "skill": "Martial Arts"
+    },
+    "Soul Cultivator": {
+      "body": 1,
+      "agility": 1,
+      "spirit": 3,
+      "insight": 2,
+      "will": 3,
+      "presence": 2,
+      "skill": "Soul Arts"
+    },
+    "Beast Binder": {
+      "body": 2,
+      "agility": 2,
+      "spirit": 3,
+      "insight": 1,
+      "will": 1,
+      "presence": 3,
+      "skill": "Beastcraft"
+    },
+    "Formation Adept": {
+      "body": 1,
+      "agility": 2,
+      "spirit": 2,
+      "insight": 3,
+      "will": 2,
+      "presence": 2,
+      "skill": "Formations"
+    }
+  },
+  "roots": [
+    "Fire",
+    "Water",
+    "Wood",
+    "Earth",
+    "Metal",
+    "Lightning",
+    "Wind",
+    "Ice",
+    "Yin",
+    "Yang",
+    "Mortal Root",
+    "Void",
+    "Chaos"
+  ],
+  "spiritual_root_system": {
+    "elements": [
+      "Fire",
+      "Water",
+      "Wood",
+      "Earth",
+      "Metal",
+      "Lightning",
+      "Wind",
+      "Ice",
+      "Yin",
+      "Yang",
+      "Void",
+      "Chaos"
+    ],
+    "grades": [
+      {
+        "name": "Mortal",
+        "min_roll": 0,
+        "cultivation_mult": 0.88,
+        "breakthrough_bonus": -1,
+        "secondary_chance": 2,
+        "tertiary_chance": 0,
+        "mutation_chance": 0,
+        "min_realm_to_evolve": 0
+      },
+      {
+        "name": "Common",
+        "min_roll": 250,
+        "cultivation_mult": 1.0,
+        "breakthrough_bonus": 0,
+        "secondary_chance": 10,
+        "tertiary_chance": 0,
+        "mutation_chance": 1,
+        "min_realm_to_evolve": 0
+      },
+      {
+        "name": "Refined",
+        "min_roll": 610,
+        "cultivation_mult": 1.07,
+        "breakthrough_bonus": 0,
+        "secondary_chance": 24,
+        "tertiary_chance": 3,
+        "mutation_chance": 3,
+        "min_realm_to_evolve": 2
+      },
+      {
+        "name": "Earth",
+        "min_roll": 825,
+        "cultivation_mult": 1.14,
+        "breakthrough_bonus": 1,
+        "secondary_chance": 40,
+        "tertiary_chance": 8,
+        "mutation_chance": 6,
+        "min_realm_to_evolve": 5
+      },
+      {
+        "name": "Heaven",
+        "min_roll": 945,
+        "cultivation_mult": 1.23,
+        "breakthrough_bonus": 2,
+        "secondary_chance": 58,
+        "tertiary_chance": 18,
+        "mutation_chance": 12,
+        "min_realm_to_evolve": 8
+      },
+      {
+        "name": "Immortal",
+        "min_roll": 993,
+        "cultivation_mult": 1.34,
+        "breakthrough_bonus": 3,
+        "secondary_chance": 75,
+        "tertiary_chance": 35,
+        "mutation_chance": 20,
+        "min_realm_to_evolve": 16
+      }
+    ],
+    "path_affinities": {
+      "Sword Cultivator": [
+        "Metal",
+        "Wind",
+        "Lightning",
+        "Yang"
+      ],
+      "Qi Refiner": [
+        "Fire",
+        "Water",
+        "Wood",
+        "Earth",
+        "Metal",
+        "Lightning",
+        "Wind",
+        "Ice",
+        "Yin",
+        "Yang",
+        "Void",
+        "Chaos"
+      ],
+      "Body Refiner": [
+        "Earth",
+        "Metal",
+        "Yang",
+        "Lightning"
+      ],
+      "Soul Cultivator": [
+        "Yin",
+        "Void",
+        "Water",
+        "Ice"
+      ],
+      "Beast Binder": [
+        "Wood",
+        "Earth",
+        "Water",
+        "Wind"
+      ],
+      "Formation Adept": [
+        "Earth",
+        "Metal",
+        "Wood",
+        "Void",
+        "Chaos"
+      ]
+    },
+    "mutations": {
+      "heavenly_flame": {
+        "name": "Heavenly Flame Root",
+        "requires_any": [
+          "Fire",
+          "Yang"
+        ],
+        "favored_paths": [
+          "Qi Refiner",
+          "Body Refiner"
+        ],
+        "modifiers": [
+          {
+            "stat": "cultivation_gain",
+            "operation": "mul",
+            "value": 1.04
+          },
+          {
+            "stat": "combat_bonus",
+            "operation": "add",
+            "value": 1
+          }
+        ]
+      },
+      "frost_moon": {
+        "name": "Frost-Moon Root",
+        "requires_any": [
+          "Water",
+          "Ice",
+          "Yin"
+        ],
+        "favored_paths": [
+          "Soul Cultivator",
+          "Sword Cultivator"
+        ],
+        "modifiers": [
+          {
+            "stat": "will",
+            "operation": "add",
+            "value": 1
+          },
+          {
+            "stat": "sense_precision",
+            "operation": "add",
+            "value": 1
+          }
+        ]
+      },
+      "storm": {
+        "name": "Storm Root",
+        "requires_any": [
+          "Lightning",
+          "Wind",
+          "Water"
+        ],
+        "favored_paths": [
+          "Sword Cultivator",
+          "Qi Refiner"
+        ],
+        "modifiers": [
+          {
+            "stat": "agility",
+            "operation": "add",
+            "value": 1
+          },
+          {
+            "stat": "combat_bonus",
+            "operation": "add",
+            "value": 1
+          }
+        ]
+      },
+      "life": {
+        "name": "Life Root",
+        "requires_any": [
+          "Wood",
+          "Water",
+          "Yang"
+        ],
+        "favored_paths": [
+          "Beast Binder",
+          "Qi Refiner"
+        ],
+        "modifiers": [
+          {
+            "stat": "body",
+            "operation": "add",
+            "value": 1
+          },
+          {
+            "stat": "cultivation_gain",
+            "operation": "mul",
+            "value": 1.03
+          }
+        ]
+      },
+      "magnetic": {
+        "name": "Magnetic Origin Root",
+        "requires_any": [
+          "Metal",
+          "Earth",
+          "Lightning"
+        ],
+        "favored_paths": [
+          "Formation Adept",
+          "Sword Cultivator"
+        ],
+        "modifiers": [
+          {
+            "stat": "insight",
+            "operation": "add",
+            "value": 1
+          },
+          {
+            "stat": "combat_bonus",
+            "operation": "add",
+            "value": 1
+          }
+        ]
+      },
+      "primordial": {
+        "name": "Primordial Root",
+        "requires_any": [
+          "Void",
+          "Chaos"
+        ],
+        "favored_paths": [
+          "Formation Adept",
+          "Soul Cultivator"
+        ],
+        "modifiers": [
+          {
+            "stat": "insight",
+            "operation": "add",
+            "value": 1
+          },
+          {
+            "stat": "breakthrough_bonus",
+            "operation": "add",
+            "value": 1
+          }
+        ]
+      }
+    }
+  },
+  "bloodlines": {
+    "azure_wolf": {
+      "name": "Azure Wolf Bloodline",
+      "affinity": "Body",
+      "trait": "Tracking instinct, endurance and coordinated hunting",
+      "awakening_min_purity": 20,
+      "awakening_min_realm": 0,
+      "evolutions": [
+        {
+          "name": "Awakened Wolf Blood",
+          "min_purity": 20,
+          "min_realm": 0,
+          "modifiers": [
+            {
+              "stat": "body",
+              "operation": "add",
+              "value": 1
+            },
+            {
+              "stat": "agility",
+              "operation": "add",
+              "value": 1
+            }
+          ]
+        },
+        {
+          "name": "Moon-Pack True Lineage",
+          "min_purity": 50,
+          "min_realm": 3,
+          "modifiers": [
+            {
+              "stat": "body",
+              "operation": "add",
+              "value": 2
+            },
+            {
+              "stat": "agility",
+              "operation": "add",
+              "value": 1
+            },
+            {
+              "stat": "combat_bonus",
+              "operation": "add",
+              "value": 1
+            }
+          ]
+        },
+        {
+          "name": "Azure Wolf Ancestor",
+          "min_purity": 78,
+          "min_realm": 8,
+          "modifiers": [
+            {
+              "stat": "body",
+              "operation": "add",
+              "value": 3
+            },
+            {
+              "stat": "agility",
+              "operation": "add",
+              "value": 2
+            },
+            {
+              "stat": "combat_bonus",
+              "operation": "add",
+              "value": 2
+            }
+          ]
+        }
+      ],
+      "ancestral_techniques": [
+        {
+          "name": "Hundred-Li Scent",
+          "stage": 1,
+          "min_purity": 25
+        },
+        {
+          "name": "Pack Sovereign Howl",
+          "stage": 2,
+          "min_purity": 55
+        },
+        {
+          "name": "Moon-Hunting Avatar",
+          "stage": 3,
+          "min_purity": 82
+        }
+      ]
+    },
+    "vermilion_bird": {
+      "name": "Vermilion Bird Emberline",
+      "affinity": "Fire",
+      "trait": "Fire affinity and resilience to heat",
+      "awakening_min_purity": 22,
+      "awakening_min_realm": 0,
+      "evolutions": [
+        {
+          "name": "Kindled Emberline",
+          "min_purity": 22,
+          "min_realm": 0,
+          "modifiers": [
+            {
+              "stat": "spirit",
+              "operation": "add",
+              "value": 1
+            },
+            {
+              "stat": "cultivation_gain",
+              "operation": "mul",
+              "value": 1.03
+            }
+          ]
+        },
+        {
+          "name": "Vermilion True Flame",
+          "min_purity": 52,
+          "min_realm": 3,
+          "modifiers": [
+            {
+              "stat": "spirit",
+              "operation": "add",
+              "value": 2
+            },
+            {
+              "stat": "cultivation_gain",
+              "operation": "mul",
+              "value": 1.06
+            },
+            {
+              "stat": "combat_bonus",
+              "operation": "add",
+              "value": 1
+            }
+          ]
+        },
+        {
+          "name": "Undying Vermilion Ancestor",
+          "min_purity": 80,
+          "min_realm": 8,
+          "modifiers": [
+            {
+              "stat": "spirit",
+              "operation": "add",
+              "value": 3
+            },
+            {
+              "stat": "cultivation_gain",
+              "operation": "mul",
+              "value": 1.1
+            },
+            {
+              "stat": "combat_bonus",
+              "operation": "add",
+              "value": 2
+            }
+          ]
+        }
+      ],
+      "ancestral_techniques": [
+        {
+          "name": "Ember-Wing Guard",
+          "stage": 1,
+          "min_purity": 25
+        },
+        {
+          "name": "Vermilion Skyfire",
+          "stage": 2,
+          "min_purity": 58
+        },
+        {
+          "name": "Ashes Rebirth",
+          "stage": 3,
+          "min_purity": 85
+        }
+      ]
+    },
+    "black_tortoise": {
+      "name": "Black Tortoise Marrowline",
+      "affinity": "Earth",
+      "trait": "Defense, vitality and patient cultivation",
+      "awakening_min_purity": 18,
+      "awakening_min_realm": 0,
+      "evolutions": [
+        {
+          "name": "Tortoise Marrow",
+          "min_purity": 18,
+          "min_realm": 0,
+          "modifiers": [
+            {
+              "stat": "body",
+              "operation": "add",
+              "value": 1
+            },
+            {
+              "stat": "will",
+              "operation": "add",
+              "value": 1
+            }
+          ]
+        },
+        {
+          "name": "Black Tortoise True Shell",
+          "min_purity": 48,
+          "min_realm": 3,
+          "modifiers": [
+            {
+              "stat": "body",
+              "operation": "add",
+              "value": 2
+            },
+            {
+              "stat": "will",
+              "operation": "add",
+              "value": 2
+            },
+            {
+              "stat": "body_cultivation_gain",
+              "operation": "mul",
+              "value": 1.05
+            }
+          ]
+        },
+        {
+          "name": "Northern Tortoise Ancestor",
+          "min_purity": 76,
+          "min_realm": 8,
+          "modifiers": [
+            {
+              "stat": "body",
+              "operation": "add",
+              "value": 4
+            },
+            {
+              "stat": "will",
+              "operation": "add",
+              "value": 2
+            },
+            {
+              "stat": "body_cultivation_gain",
+              "operation": "mul",
+              "value": 1.1
+            }
+          ]
+        }
+      ],
+      "ancestral_techniques": [
+        {
+          "name": "Black-Shell Guard",
+          "stage": 1,
+          "min_purity": 22
+        },
+        {
+          "name": "Northern Water Aegis",
+          "stage": 2,
+          "min_purity": 54
+        },
+        {
+          "name": "World-Bearing Carapace",
+          "stage": 3,
+          "min_purity": 82
+        }
+      ]
+    },
+    "white_tiger": {
+      "name": "White Tiger Warline",
+      "affinity": "Metal",
+      "trait": "Battle instinct, killing intent and weapon affinity",
+      "awakening_min_purity": 22,
+      "awakening_min_realm": 0,
+      "evolutions": [
+        {
+          "name": "Awakened War Blood",
+          "min_purity": 22,
+          "min_realm": 0,
+          "modifiers": [
+            {
+              "stat": "presence",
+              "operation": "add",
+              "value": 1
+            },
+            {
+              "stat": "combat_bonus",
+              "operation": "add",
+              "value": 1
+            }
+          ]
+        },
+        {
+          "name": "White Tiger True Lineage",
+          "min_purity": 54,
+          "min_realm": 3,
+          "modifiers": [
+            {
+              "stat": "presence",
+              "operation": "add",
+              "value": 2
+            },
+            {
+              "stat": "combat_bonus",
+              "operation": "add",
+              "value": 2
+            }
+          ]
+        },
+        {
+          "name": "Western Tiger Ancestor",
+          "min_purity": 82,
+          "min_realm": 8,
+          "modifiers": [
+            {
+              "stat": "presence",
+              "operation": "add",
+              "value": 3
+            },
+            {
+              "stat": "body",
+              "operation": "add",
+              "value": 2
+            },
+            {
+              "stat": "combat_bonus",
+              "operation": "add",
+              "value": 3
+            }
+          ]
+        }
+      ],
+      "ancestral_techniques": [
+        {
+          "name": "Tiger-King Killing Intent",
+          "stage": 1,
+          "min_purity": 28
+        },
+        {
+          "name": "White Metal Rend",
+          "stage": 2,
+          "min_purity": 60
+        },
+        {
+          "name": "Western War-God Descent",
+          "stage": 3,
+          "min_purity": 88
+        }
+      ]
+    },
+    "moon_serpent": {
+      "name": "Moon Serpent Yin Line",
+      "affinity": "Water",
+      "trait": "Yin sensitivity, concealment and poison resistance",
+      "awakening_min_purity": 20,
+      "awakening_min_realm": 0,
+      "evolutions": [
+        {
+          "name": "Moon-Scale Blood",
+          "min_purity": 20,
+          "min_realm": 0,
+          "modifiers": [
+            {
+              "stat": "agility",
+              "operation": "add",
+              "value": 1
+            },
+            {
+              "stat": "sense_precision",
+              "operation": "add",
+              "value": 1
+            }
+          ]
+        },
+        {
+          "name": "Yin Serpent True Lineage",
+          "min_purity": 50,
+          "min_realm": 3,
+          "modifiers": [
+            {
+              "stat": "agility",
+              "operation": "add",
+              "value": 2
+            },
+            {
+              "stat": "sense_precision",
+              "operation": "add",
+              "value": 2
+            },
+            {
+              "stat": "will",
+              "operation": "add",
+              "value": 1
+            }
+          ]
+        },
+        {
+          "name": "Eclipsing Serpent Ancestor",
+          "min_purity": 78,
+          "min_realm": 8,
+          "modifiers": [
+            {
+              "stat": "agility",
+              "operation": "add",
+              "value": 3
+            },
+            {
+              "stat": "sense_precision",
+              "operation": "add",
+              "value": 3
+            },
+            {
+              "stat": "combat_bonus",
+              "operation": "add",
+              "value": 2
+            }
+          ]
+        }
+      ],
+      "ancestral_techniques": [
+        {
+          "name": "Moon-Scale Veil",
+          "stage": 1,
+          "min_purity": 24
+        },
+        {
+          "name": "Yin Venom Gaze",
+          "stage": 2,
+          "min_purity": 56
+        },
+        {
+          "name": "Eclipse Serpent Domain",
+          "stage": 3,
+          "min_purity": 84
+        }
+      ]
+    },
+    "thunder_roc": {
+      "name": "Thunder Roc Lineage",
+      "affinity": "Lightning",
+      "trait": "Speed, lightning affinity and aerial techniques",
+      "awakening_min_purity": 24,
+      "awakening_min_realm": 0,
+      "evolutions": [
+        {
+          "name": "Thunder-Feather Blood",
+          "min_purity": 24,
+          "min_realm": 0,
+          "modifiers": [
+            {
+              "stat": "agility",
+              "operation": "add",
+              "value": 2
+            }
+          ]
+        },
+        {
+          "name": "Storm Roc True Lineage",
+          "min_purity": 56,
+          "min_realm": 3,
+          "modifiers": [
+            {
+              "stat": "agility",
+              "operation": "add",
+              "value": 3
+            },
+            {
+              "stat": "combat_bonus",
+              "operation": "add",
+              "value": 1
+            }
+          ]
+        },
+        {
+          "name": "Heaven-Rending Roc Ancestor",
+          "min_purity": 84,
+          "min_realm": 8,
+          "modifiers": [
+            {
+              "stat": "agility",
+              "operation": "add",
+              "value": 5
+            },
+            {
+              "stat": "combat_bonus",
+              "operation": "add",
+              "value": 3
+            }
+          ]
+        }
+      ],
+      "ancestral_techniques": [
+        {
+          "name": "Thunder-Feather Step",
+          "stage": 1,
+          "min_purity": 30
+        },
+        {
+          "name": "Stormwing Traverse",
+          "stage": 2,
+          "min_purity": 62
+        },
+        {
+          "name": "Heaven-Rending Roc Form",
+          "stage": 3,
+          "min_purity": 90
+        }
+      ]
+    },
+    "jade_river": {
+      "name": "Jade River Spirit Line",
+      "affinity": "Water",
+      "trait": "Water affinity, healing intuition and river-sense",
+      "awakening_min_purity": 18,
+      "awakening_min_realm": 0,
+      "evolutions": [
+        {
+          "name": "Jade River Blood",
+          "min_purity": 18,
+          "min_realm": 0,
+          "modifiers": [
+            {
+              "stat": "spirit",
+              "operation": "add",
+              "value": 1
+            },
+            {
+              "stat": "insight",
+              "operation": "add",
+              "value": 1
+            }
+          ]
+        },
+        {
+          "name": "River Spirit True Lineage",
+          "min_purity": 48,
+          "min_realm": 3,
+          "modifiers": [
+            {
+              "stat": "spirit",
+              "operation": "add",
+              "value": 2
+            },
+            {
+              "stat": "insight",
+              "operation": "add",
+              "value": 2
+            },
+            {
+              "stat": "cultivation_gain",
+              "operation": "mul",
+              "value": 1.04
+            }
+          ]
+        },
+        {
+          "name": "Jade River Ancestor",
+          "min_purity": 76,
+          "min_realm": 8,
+          "modifiers": [
+            {
+              "stat": "spirit",
+              "operation": "add",
+              "value": 3
+            },
+            {
+              "stat": "insight",
+              "operation": "add",
+              "value": 3
+            },
+            {
+              "stat": "cultivation_gain",
+              "operation": "mul",
+              "value": 1.08
+            }
+          ]
+        }
+      ],
+      "ancestral_techniques": [
+        {
+          "name": "Jade Current Mending",
+          "stage": 1,
+          "min_purity": 22
+        },
+        {
+          "name": "Ten-Thousand River Pulse",
+          "stage": 2,
+          "min_purity": 54
+        },
+        {
+          "name": "Ancestral River Incarnation",
+          "stage": 3,
+          "min_purity": 82
+        }
+      ]
+    },
+    "stone_bear": {
+      "name": "Stone Bear Ancestry",
+      "affinity": "Earth",
+      "trait": "Powerful physique, endurance and mountain survival",
+      "awakening_min_purity": 18,
+      "awakening_min_realm": 0,
+      "evolutions": [
+        {
+          "name": "Stone-Bear Blood",
+          "min_purity": 18,
+          "min_realm": 0,
+          "modifiers": [
+            {
+              "stat": "body",
+              "operation": "add",
+              "value": 2
+            },
+            {
+              "stat": "agility",
+              "operation": "add",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "name": "Mountain Bear True Lineage",
+          "min_purity": 48,
+          "min_realm": 3,
+          "modifiers": [
+            {
+              "stat": "body",
+              "operation": "add",
+              "value": 3
+            },
+            {
+              "stat": "body_cultivation_gain",
+              "operation": "mul",
+              "value": 1.05
+            },
+            {
+              "stat": "agility",
+              "operation": "add",
+              "value": -1
+            }
+          ]
+        },
+        {
+          "name": "World-Shaking Bear Ancestor",
+          "min_purity": 76,
+          "min_realm": 8,
+          "modifiers": [
+            {
+              "stat": "body",
+              "operation": "add",
+              "value": 5
+            },
+            {
+              "stat": "body_cultivation_gain",
+              "operation": "mul",
+              "value": 1.1
+            },
+            {
+              "stat": "combat_bonus",
+              "operation": "add",
+              "value": 2
+            }
+          ]
+        }
+      ],
+      "ancestral_techniques": [
+        {
+          "name": "Stone-Hide Stance",
+          "stage": 1,
+          "min_purity": 22
+        },
+        {
+          "name": "Mountain-Rooted Smash",
+          "stage": 2,
+          "min_purity": 54
+        },
+        {
+          "name": "World-Shaking Bear Form",
+          "stage": 3,
+          "min_purity": 82
+        }
+      ]
+    }
+  },
+  "physiques": {
+    "ordinary_mortal_body": {
+      "name": "Ordinary Mortal Body",
+      "advantage": "No innate special-body advantage.",
+      "drawback": "No innate special-body burden.",
+      "evolutions": []
+    },
+    "nine_yang_solar_body": {
+      "name": "Nine-Yang Solar Body",
+      "favored_paths": [
+        "Body Refiner",
+        "Qi Refiner"
+      ],
+      "favored_roots": [
+        "Fire",
+        "Yang"
+      ],
+      "awakening_min_body_realm": 0,
+      "advantage": "Explosive yang vitality and fire-compatible body refinement.",
+      "drawback": "Excess yang scorches the meridians and makes Yin cultivation harder.",
+      "drawback_modifiers": [
+        {
+          "stat": "sense_precision",
+          "operation": "add",
+          "value": -1
+        }
+      ],
+      "evolutions": [
+        {
+          "name": "Solar Vessel",
+          "min_body_realm": 0,
+          "min_stability": 35,
+          "modifiers": [
+            {
+              "stat": "body",
+              "operation": "add",
+              "value": 1
+            },
+            {
+              "stat": "body_cultivation_gain",
+              "operation": "mul",
+              "value": 1.04
+            }
+          ]
+        },
+        {
+          "name": "Nine-Yang Furnace",
+          "min_body_realm": 3,
+          "min_stability": 45,
+          "modifiers": [
+            {
+              "stat": "body",
+              "operation": "add",
+              "value": 3
+            },
+            {
+              "stat": "body_cultivation_gain",
+              "operation": "mul",
+              "value": 1.08
+            },
+            {
+              "stat": "combat_bonus",
+              "operation": "add",
+              "value": 1
+            }
+          ]
+        },
+        {
+          "name": "Great-Sun Sacred Body",
+          "min_body_realm": 8,
+          "min_stability": 60,
+          "modifiers": [
+            {
+              "stat": "body",
+              "operation": "add",
+              "value": 5
+            },
+            {
+              "stat": "body_cultivation_gain",
+              "operation": "mul",
+              "value": 1.14
+            },
+            {
+              "stat": "combat_bonus",
+              "operation": "add",
+              "value": 2
+            }
+          ]
+        }
+      ]
+    },
+    "extreme_yin_moon_vessel": {
+      "name": "Extreme-Yin Moon Vessel",
+      "favored_paths": [
+        "Soul Cultivator",
+        "Qi Refiner"
+      ],
+      "favored_roots": [
+        "Yin",
+        "Ice",
+        "Water"
+      ],
+      "awakening_min_body_realm": 0,
+      "advantage": "Exceptional Yin perception, soul stability and cold affinity.",
+      "drawback": "Cold meridians hinder explosive physical force.",
+      "drawback_modifiers": [
+        {
+          "stat": "body",
+          "operation": "add",
+          "value": -1
+        }
+      ],
+      "evolutions": [
+        {
+          "name": "Moon Vessel",
+          "min_body_realm": 0,
+          "min_stability": 35,
+          "modifiers": [
+            {
+              "stat": "will",
+              "operation": "add",
+              "value": 1
+            },
+            {
+              "stat": "sense_precision",
+              "operation": "add",
+              "value": 1
+            }
+          ]
+        },
+        {
+          "name": "Extreme-Yin Spirit Body",
+          "min_body_realm": 3,
+          "min_stability": 45,
+          "modifiers": [
+            {
+              "stat": "will",
+              "operation": "add",
+              "value": 2
+            },
+            {
+              "stat": "sense_precision",
+              "operation": "add",
+              "value": 3
+            },
+            {
+              "stat": "cultivation_gain",
+              "operation": "mul",
+              "value": 1.05
+            }
+          ]
+        },
+        {
+          "name": "Lunar Sacred Vessel",
+          "min_body_realm": 8,
+          "min_stability": 60,
+          "modifiers": [
+            {
+              "stat": "will",
+              "operation": "add",
+              "value": 4
+            },
+            {
+              "stat": "sense_precision",
+              "operation": "add",
+              "value": 5
+            },
+            {
+              "stat": "cultivation_gain",
+              "operation": "mul",
+              "value": 1.1
+            }
+          ]
+        }
+      ]
+    },
+    "vajra_bone_body": {
+      "name": "Vajra Bone Body",
+      "favored_paths": [
+        "Body Refiner",
+        "Sword Cultivator"
+      ],
+      "favored_roots": [
+        "Earth",
+        "Metal",
+        "Yang"
+      ],
+      "awakening_min_body_realm": 0,
+      "advantage": "Dense bones, great endurance and resistance to direct impact.",
+      "drawback": "Heavy bones reduce agility and make movement arts harder.",
+      "drawback_modifiers": [
+        {
+          "stat": "agility",
+          "operation": "add",
+          "value": -1
+        }
+      ],
+      "evolutions": [
+        {
+          "name": "Iron Bone",
+          "min_body_realm": 0,
+          "min_stability": 35,
+          "modifiers": [
+            {
+              "stat": "body",
+              "operation": "add",
+              "value": 2
+            }
+          ]
+        },
+        {
+          "name": "Vajra Frame",
+          "min_body_realm": 3,
+          "min_stability": 45,
+          "modifiers": [
+            {
+              "stat": "body",
+              "operation": "add",
+              "value": 4
+            },
+            {
+              "stat": "body_cultivation_gain",
+              "operation": "mul",
+              "value": 1.06
+            }
+          ]
+        },
+        {
+          "name": "Indestructible Vajra Body",
+          "min_body_realm": 8,
+          "min_stability": 60,
+          "modifiers": [
+            {
+              "stat": "body",
+              "operation": "add",
+              "value": 6
+            },
+            {
+              "stat": "body_cultivation_gain",
+              "operation": "mul",
+              "value": 1.12
+            },
+            {
+              "stat": "combat_bonus",
+              "operation": "add",
+              "value": 2
+            }
+          ]
+        }
+      ]
+    },
+    "myriad_poison_vessel": {
+      "name": "Myriad-Poison Vessel",
+      "favored_paths": [
+        "Body Refiner",
+        "Soul Cultivator"
+      ],
+      "favored_roots": [
+        "Wood",
+        "Water",
+        "Yin"
+      ],
+      "awakening_min_body_realm": 0,
+      "advantage": "Poisons can be refined into resistance and cultivated strength.",
+      "drawback": "The vessel is chronically toxic and socially feared.",
+      "drawback_modifiers": [
+        {
+          "stat": "presence",
+          "operation": "add",
+          "value": -1
+        }
+      ],
+      "evolutions": [
+        {
+          "name": "Poison Vessel",
+          "min_body_realm": 0,
+          "min_stability": 35,
+          "modifiers": [
+            {
+              "stat": "will",
+              "operation": "add",
+              "value": 1
+            },
+            {
+              "stat": "body",
+              "operation": "add",
+              "value": 1
+            }
+          ]
+        },
+        {
+          "name": "Hundred-Venom Body",
+          "min_body_realm": 3,
+          "min_stability": 45,
+          "modifiers": [
+            {
+              "stat": "will",
+              "operation": "add",
+              "value": 2
+            },
+            {
+              "stat": "body",
+              "operation": "add",
+              "value": 2
+            },
+            {
+              "stat": "combat_bonus",
+              "operation": "add",
+              "value": 1
+            }
+          ]
+        },
+        {
+          "name": "Myriad-Poison Sacred Body",
+          "min_body_realm": 8,
+          "min_stability": 60,
+          "modifiers": [
+            {
+              "stat": "will",
+              "operation": "add",
+              "value": 4
+            },
+            {
+              "stat": "body",
+              "operation": "add",
+              "value": 3
+            },
+            {
+              "stat": "combat_bonus",
+              "operation": "add",
+              "value": 2
+            }
+          ]
+        }
+      ]
+    },
+    "innate_sword_embryo": {
+      "name": "Innate Sword Embryo",
+      "favored_paths": [
+        "Sword Cultivator"
+      ],
+      "favored_roots": [
+        "Metal",
+        "Wind",
+        "Lightning"
+      ],
+      "awakening_min_body_realm": 0,
+      "advantage": "The body naturally resonates with swords and sharp intent.",
+      "drawback": "Its meridians reject blunt, beast and heavy-body methods.",
+      "drawback_modifiers": [
+        {
+          "stat": "body_cultivation_gain",
+          "operation": "mul",
+          "value": 0.96
+        }
+      ],
+      "evolutions": [
+        {
+          "name": "Sword Embryo",
+          "min_body_realm": 0,
+          "min_stability": 35,
+          "modifiers": [
+            {
+              "stat": "agility",
+              "operation": "add",
+              "value": 1
+            },
+            {
+              "stat": "combat_bonus",
+              "operation": "add",
+              "value": 1
+            }
+          ]
+        },
+        {
+          "name": "Sword-Heart Body",
+          "min_body_realm": 3,
+          "min_stability": 45,
+          "modifiers": [
+            {
+              "stat": "agility",
+              "operation": "add",
+              "value": 2
+            },
+            {
+              "stat": "will",
+              "operation": "add",
+              "value": 1
+            },
+            {
+              "stat": "combat_bonus",
+              "operation": "add",
+              "value": 2
+            }
+          ]
+        },
+        {
+          "name": "Innate Sword Saint Body",
+          "min_body_realm": 8,
+          "min_stability": 60,
+          "modifiers": [
+            {
+              "stat": "agility",
+              "operation": "add",
+              "value": 4
+            },
+            {
+              "stat": "will",
+              "operation": "add",
+              "value": 2
+            },
+            {
+              "stat": "combat_bonus",
+              "operation": "add",
+              "value": 3
+            }
+          ]
+        }
+      ]
+    },
+    "heavenly_lightning_meridians": {
+      "name": "Heavenly-Lightning Meridians",
+      "favored_paths": [
+        "Qi Refiner",
+        "Sword Cultivator"
+      ],
+      "favored_roots": [
+        "Lightning",
+        "Wind"
+      ],
+      "awakening_min_body_realm": 0,
+      "advantage": "Lightning-fast circulation and explosive movement.",
+      "drawback": "Unstable surges strain concentration and inner calm.",
+      "drawback_modifiers": [
+        {
+          "stat": "will",
+          "operation": "add",
+          "value": -1
+        }
+      ],
+      "evolutions": [
+        {
+          "name": "Lightning Meridians",
+          "min_body_realm": 0,
+          "min_stability": 35,
+          "modifiers": [
+            {
+              "stat": "agility",
+              "operation": "add",
+              "value": 2
+            }
+          ]
+        },
+        {
+          "name": "Heavenly Circuit",
+          "min_body_realm": 3,
+          "min_stability": 45,
+          "modifiers": [
+            {
+              "stat": "agility",
+              "operation": "add",
+              "value": 3
+            },
+            {
+              "stat": "cultivation_gain",
+              "operation": "mul",
+              "value": 1.05
+            },
+            {
+              "stat": "combat_bonus",
+              "operation": "add",
+              "value": 1
+            }
+          ]
+        },
+        {
+          "name": "Tribulation Lightning Body",
+          "min_body_realm": 8,
+          "min_stability": 60,
+          "modifiers": [
+            {
+              "stat": "agility",
+              "operation": "add",
+              "value": 5
+            },
+            {
+              "stat": "cultivation_gain",
+              "operation": "mul",
+              "value": 1.1
+            },
+            {
+              "stat": "combat_bonus",
+              "operation": "add",
+              "value": 2
+            }
+          ]
+        }
+      ]
+    },
+    "five_elements_dao_body": {
+      "name": "Five-Elements Dao Body",
+      "favored_paths": [
+        "Formation Adept",
+        "Qi Refiner"
+      ],
+      "favored_roots": [
+        "Fire",
+        "Water",
+        "Wood",
+        "Earth",
+        "Metal",
+        "Chaos"
+      ],
+      "awakening_min_body_realm": 0,
+      "advantage": "Broad elemental compatibility and exceptional formation balance.",
+      "drawback": "Every advance requires balancing several conflicting energies.",
+      "drawback_modifiers": [
+        {
+          "stat": "breakthrough_bonus",
+          "operation": "add",
+          "value": -1
+        }
+      ],
+      "evolutions": [
+        {
+          "name": "Five-Element Vessel",
+          "min_body_realm": 0,
+          "min_stability": 40,
+          "modifiers": [
+            {
+              "stat": "insight",
+              "operation": "add",
+              "value": 1
+            },
+            {
+              "stat": "cultivation_gain",
+              "operation": "mul",
+              "value": 1.03
+            }
+          ]
+        },
+        {
+          "name": "Five-Phase Dao Body",
+          "min_body_realm": 3,
+          "min_stability": 55,
+          "modifiers": [
+            {
+              "stat": "insight",
+              "operation": "add",
+              "value": 3
+            },
+            {
+              "stat": "cultivation_gain",
+              "operation": "mul",
+              "value": 1.07
+            }
+          ]
+        },
+        {
+          "name": "Primordial Five-Elements Body",
+          "min_body_realm": 8,
+          "min_stability": 70,
+          "modifiers": [
+            {
+              "stat": "insight",
+              "operation": "add",
+              "value": 5
+            },
+            {
+              "stat": "cultivation_gain",
+              "operation": "mul",
+              "value": 1.13
+            },
+            {
+              "stat": "combat_bonus",
+              "operation": "add",
+              "value": 2
+            }
+          ]
+        }
+      ]
+    },
+    "void_meridian_body": {
+      "name": "Void-Meridian Body",
+      "favored_paths": [
+        "Soul Cultivator",
+        "Formation Adept"
+      ],
+      "favored_roots": [
+        "Void",
+        "Chaos",
+        "Yin"
+      ],
+      "awakening_min_body_realm": 0,
+      "advantage": "Unusual spatial perception and concealment within the void.",
+      "drawback": "Fragile physical meridians make direct body tempering dangerous.",
+      "drawback_modifiers": [
+        {
+          "stat": "body",
+          "operation": "add",
+          "value": -1
+        },
+        {
+          "stat": "body_cultivation_gain",
+          "operation": "mul",
+          "value": 0.94
+        }
+      ],
+      "evolutions": [
+        {
+          "name": "Hollow Meridians",
+          "min_body_realm": 0,
+          "min_stability": 35,
+          "modifiers": [
+            {
+              "stat": "sense_precision",
+              "operation": "add",
+              "value": 2
+            },
+            {
+              "stat": "insight",
+              "operation": "add",
+              "value": 1
+            }
+          ]
+        },
+        {
+          "name": "Void-Spirit Body",
+          "min_body_realm": 3,
+          "min_stability": 45,
+          "modifiers": [
+            {
+              "stat": "sense_precision",
+              "operation": "add",
+              "value": 4
+            },
+            {
+              "stat": "insight",
+              "operation": "add",
+              "value": 2
+            },
+            {
+              "stat": "agility",
+              "operation": "add",
+              "value": 1
+            }
+          ]
+        },
+        {
+          "name": "Formless Void Body",
+          "min_body_realm": 8,
+          "min_stability": 60,
+          "modifiers": [
+            {
+              "stat": "sense_precision",
+              "operation": "add",
+              "value": 6
+            },
+            {
+              "stat": "insight",
+              "operation": "add",
+              "value": 4
+            },
+            {
+              "stat": "agility",
+              "operation": "add",
+              "value": 2
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "locations": {
+    "Greenriver Town": {
+      "description": "A mortal town beneath the Azure Reed Sect, surrounded by rice terraces, spirit-herb gardens and the misty Jade River.",
+      "encounters": [
+        "A wounded spirit fox watches from beneath a broken shrine.",
+        "A merchant argues that his spirit-stone crate was replaced with river rocks.",
+        "An old fisherman hears a bronze bell ringing below the river.",
+        "A group of outer disciples accuse a villager of stealing a medicinal herb.",
+        "A night-blooming spirit orchid opens beside an abandoned grave.",
+        "A traveling storyteller claims a sealed ruin has appeared in the eastern hills."
+      ],
+      "sense_hints": [
+        "Several mortal life-signs cluster around the market and river docks.",
+        "The old city gate carries faint spiritual residue from years of cultivator traffic."
+      ],
+      "world": "Mortal World",
+      "min_realm_index": 0,
+      "safe_zone": false
+    },
+    "Cloudspine Foothills": {
+      "description": "Steep cedar forests and broken stone paths leading toward old cultivation caves and abandoned formation towers.",
+      "encounters": [
+        "A damaged formation repeats the same birdsong every seven breaths.",
+        "Three iron-horn boars uproot spirit herbs near a cliff path.",
+        "A rival sect scouting party demands to know why you crossed their marker stones.",
+        "A cave entrance exhales cold spiritual mist despite the summer heat.",
+        "A sword embedded in a boulder hums when cultivators approach."
+      ],
+      "sense_hints": [
+        "Thin formation fluctuations drift between the cliffs.",
+        "Spirit-beast auras appear and vanish among the higher ridges."
+      ],
+      "world": "Mortal World",
+      "min_realm_index": 0,
+      "safe_zone": false
+    },
+    "Moonfen Marsh": {
+      "description": "A dangerous wetland rich in medicinal plants, poisonous insects, ghost-lotus flowers and hidden alchemist camps.",
+      "encounters": [
+        "Blue ghost-lotus petals drift upstream against the current.",
+        "A poisoned herb gatherer collapses near a stand of black reeds.",
+        "A giant marsh crane guards a patch of rare medicinal moss.",
+        "A masked alchemist offers to trade an unnamed pill for fresh beast blood.",
+        "Pale lights circle an old grave mound without casting reflections."
+      ],
+      "sense_hints": [
+        "Water and Yin qi interfere with precise spiritual scanning.",
+        "Something beneath the mud occasionally disturbs the local spiritual current."
+      ],
+      "world": "Mortal World",
+      "min_realm_index": 0,
+      "safe_zone": false
+    },
+    "Golden Pavilion Auction House": {
+      "description": "A many-tiered auction pavilion protected by ancient formations and discreet hidden experts. Violence inside is forbidden; the protection ends at the front doors.",
+      "world": "Mortal World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "auction_house": "golden_pavilion",
+      "outside_location": "Greenriver Town"
+    },
+    "Azure Crown Imperial City": {
+      "description": "The capital of the dominant mortal dynasty, filled with noble clans, ministries, sect envoys and imperial guards.",
+      "world": "Mortal World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "realm_hub": true,
+      "meeting_channel_slug": "mortal-world-capital",
+      "encounters": [
+        "Sect envoys argue beneath a bronze ranking stele while wandering cultivators trade rumors nearby.",
+        "A public challenge ring draws a crowd, but imperial law keeps killing intent suppressed.",
+        "A merchant consortium opens a temporary stall of formation paper, spirit ink and travel supplies.",
+        "Young masters from rival clans compare auction rumors outside a crowded teahouse.",
+        "An imperial notice board announces sect missions, caravan routes and wanted cultivators."
+      ],
+      "sense_hints": [
+        "Thousands of mortal and cultivator auras overlap behind the capital formations.",
+        "Several guarded spiritual signatures move between the palace, clan districts and sect embassies."
+      ]
+    },
+    "Spirit Jade Capital": {
+      "description": "A vast Spiritual World capital built around a jade ley-line nexus where ascended sects and ancient families bargain for influence.",
+      "world": "Spiritual World",
+      "min_realm_index": 8,
+      "safe_zone": true,
+      "realm_hub": true,
+      "meeting_channel_slug": "spiritual-world-capital",
+      "encounters": [
+        "Ascended cultivators gather around a jade plaza where sect representatives recruit proven juniors.",
+        "An ancient family convoy arrives beneath a canopy of spirit banners and protective formations.",
+        "A formation scholar demonstrates a temporary qi array to a crowd of artisans.",
+        "Rumors spread that an underworld broker changed meeting places somewhere in the capital district.",
+        "A public law-stele flickers as several cultivators compare comprehension insights."
+      ],
+      "sense_hints": [
+        "A jade ley-line nexus makes spiritual sense unusually vivid but crowded.",
+        "High-level auras are common enough here that individual experts are difficult to isolate."
+      ]
+    },
+    "Nine-Heavens Immortal Court": {
+      "description": "The central court of an Immortal World domain, suspended above immortal clouds and guarded by law formations.",
+      "world": "Immortal World",
+      "min_realm_index": 16,
+      "safe_zone": true,
+      "realm_hub": true,
+      "meeting_channel_slug": "immortal-world-court",
+      "encounters": [
+        "Immortal clan delegates debate a territorial petition beneath floating law tablets.",
+        "A cloud-market convoy docks at the court and unloads rare immortal-grade materials.",
+        "Formation masters inspect damage to a public transit array linking distant domains.",
+        "An immortal official quietly asks for witnesses to a recent forbidden-art incident.",
+        "Cultivators gather at a star-viewing terrace to exchange rumors about secret realms and heavenly phenomena."
+      ],
+      "sense_hints": [
+        "Immortal law formations layer space so densely that distant courtyards feel only a step apart.",
+        "The strongest auras are deliberately veiled by court etiquette and defensive arrays."
+      ]
+    },
+    "Celestial Mandate Palace": {
+      "description": "A palace-city at the heart of the Celestial World, where sovereign decrees can redirect the fate of entire star regions.",
+      "world": "Celestial World",
+      "min_realm_index": 24,
+      "safe_zone": true,
+      "realm_hub": true,
+      "meeting_channel_slug": "celestial-world-palace",
+      "encounters": [
+        "Celestial envoys arrive through a sovereign gate carrying decrees from distant star regions.",
+        "A heavenly market opens beneath a rotating constellation array for only a few hours.",
+        "Law cultivators gather around a mandate stele to debate the consequences of a recent cosmic omen.",
+        "A great clan requests neutral witnesses for negotiations that could alter several celestial territories.",
+        "The palace formations briefly resonate with a distant tribulation, drawing powerful cultivators into the plazas."
+      ],
+      "sense_hints": [
+        "Sovereign law formations suppress hostile intent without dulling spiritual perception.",
+        "Countless celestial signatures overlap with traces of fate, law and ancient bloodlines."
+      ]
+    },
+    "Spirit Jade Rebirth Enclave": {
+      "description": "A protected lower district in the Spiritual World where mortal-born descendants, reincarnated souls and weak juniors can survive beneath stabilizing formations.",
+      "world": "Spiritual World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "sense_hints": [
+        "Layered formations soften the Spiritual World pressure around newborn souls."
+      ]
+    },
+    "Nine-Heavens Rebirth Terrace": {
+      "description": "A sheltered Immortal World terrace maintained for newborn clan members and reincarnated souls whose bodies have not yet rebuilt immortal cultivation.",
+      "world": "Immortal World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "sense_hints": [
+        "Immortal qi is filtered through ancient cradle formations so fragile bodies are not destroyed."
+      ]
+    },
+    "Celestial Cradle Province": {
+      "description": "A rare Celestial World province protected by sovereign law formations, allowing reincarnated souls to begin again in mortal-strength bodies without being crushed by the realm itself.",
+      "world": "Celestial World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "sense_hints": [
+        "The local laws bend gently around newborn souls, suppressing otherwise lethal celestial pressure."
+      ]
+    },
+    "Azure Cloud Mountain Gate": {
+      "description": "A white-stone stairway climbs through cloud-wrapped pines to the public mountain gate of the Azure Cloud Sect. Sword marks left by generations of applicants cover the testing plaza.",
+      "world": "Mortal World",
+      "min_realm_index": 0,
+      "safe_zone": true
+    },
+    "Crimson Furnace Valley": {
+      "description": "Red cliffs surround a furnace valley veined with fire-aspected qi. Herb terraces, pill halls and bronze examination furnaces mark the Crimson Furnace Sect recruitment grounds.",
+      "world": "Mortal World",
+      "min_realm_index": 0,
+      "safe_zone": true
+    },
+    "Frozen Moon Terrace": {
+      "description": "A high terrace above a cold mirror-lake where frost formations glow beneath moonstone tiles. Frozen Moon Palace tests patience, control and formation sense here.",
+      "world": "Mortal World",
+      "min_realm_index": 0,
+      "safe_zone": true
+    },
+    "Black Serpent Ravine": {
+      "description": "A humid ravine of black bamboo, beast pens and poison gardens. The Black Serpent Clan judges recruits by fieldcraft, nerve and their respect for dangerous creatures.",
+      "world": "Mortal World",
+      "min_realm_index": 0,
+      "safe_zone": false
+    },
+    "Blood River Gorge": {
+      "description": "A hidden gorge where iron-red water cuts through dark stone. Blood River banners appear only to those who have been shown the correct trail or survived long enough to be noticed.",
+      "world": "Mortal World",
+      "min_realm_index": 0,
+      "safe_zone": false,
+      "private": true
+    },
+    "Corpse Lantern Necropolis": {
+      "description": "A concealed funerary complex lit by blue soul-lanterns. Names of the dead are carved into black tablets while quiet archivists test whether visitors can face death without losing themselves.",
+      "world": "Mortal World",
+      "min_realm_index": 0,
+      "safe_zone": false,
+      "private": true
+    }
+  },
+  "npcs": {
+    "Elder Su Yan": {
+      "role": "Azure Reed Sect elder and mentor",
+      "realm": "Foundation Establishment",
+      "personality": "Dry, observant, restrained, values difficult questions over blind obedience.",
+      "speech": "Calm and precise, rarely more words than necessary.",
+      "want": "Prevent another sect war.",
+      "fear": "The peace was built on a lie from his youth.",
+      "secret": "He helped conceal damage to an ancient world-meridian seal.",
+      "location": "Cloudspine Foothills",
+      "schedule": {
+        "Dawn": "Cloudspine Foothills",
+        "Morning": "Cloudspine Foothills",
+        "Afternoon": "Cloudspine Foothills",
+        "Evening": "Cloudspine Foothills",
+        "Night": "Cloudspine Foothills"
+      }
+    },
+    "Yan Kuo": {
+      "role": "Crimson Saber Hall rival disciple",
+      "realm": "Qi Refining",
+      "personality": "Competitive, blunt, proud, unexpectedly loyal to worthy rivals.",
+      "speech": "Direct and provocative, often turning conversation into a challenge.",
+      "want": "Become the youngest Foundation cultivator of his generation.",
+      "fear": "His success comes more from clan wealth than talent.",
+      "secret": "His family purchased a banned breakthrough catalyst.",
+      "location": "Cloudspine Foothills",
+      "schedule": {
+        "Dawn": "Cloudspine Foothills",
+        "Morning": "Cloudspine Foothills",
+        "Afternoon": "Cloudspine Foothills",
+        "Evening": "Greenriver Town",
+        "Night": "Greenriver Town"
+      }
+    },
+    "Madam Pei Suyin": {
+      "role": "Black Tide merchant and information broker",
+      "realm": "Foundation Establishment",
+      "personality": "Warm, exacting, patient, treats every favor as a future contract.",
+      "speech": "Polite, layered, commercially minded.",
+      "want": "Control the trade in Hollow Jade.",
+      "fear": "An artifact in her vault is awakening.",
+      "secret": "Her best informant belongs to a forbidden lineage.",
+      "location": "Greenriver Town",
+      "schedule": {
+        "Dawn": "Greenriver Town",
+        "Morning": "Greenriver Town",
+        "Afternoon": "Golden Pavilion Auction House",
+        "Evening": "Golden Pavilion Auction House",
+        "Night": "Greenriver Town"
+      }
+    },
+    "Abbess Lianhua": {
+      "role": "Wandering healer",
+      "realm": "Core Formation",
+      "personality": "Compassionate without being soft, insists mercy and accountability can coexist.",
+      "speech": "Measured, humane, occasionally severe.",
+      "want": "Discover why spiritual diseases are spreading along the Jade River.",
+      "fear": "The disease is actually a deliberate transformation.",
+      "secret": "She once treated a survivor of the ancient Meridian War.",
+      "location": "Moonfen Marsh",
+      "schedule": {
+        "Dawn": "Moonfen Marsh",
+        "Morning": "Moonfen Marsh",
+        "Afternoon": "Greenriver Town",
+        "Evening": "Greenriver Town",
+        "Night": "Moonfen Marsh"
+      }
+    },
+    "Magistrate Xu Wenbo": {
+      "role": "Mortal magistrate of Greenriver",
+      "realm": "Mortal",
+      "personality": "Polite, exhausted, stubbornly practical.",
+      "speech": "Formal but weary, accustomed to cultivators ignoring mortal problems.",
+      "want": "Keep cultivator conflicts from destroying his district.",
+      "fear": "The sect will discover evidence he concealed.",
+      "secret": "Twelve villagers listed as flood victims vanished without bodies.",
+      "location": "Greenriver Town",
+      "schedule": {
+        "Dawn": "Greenriver Town",
+        "Morning": "Greenriver Town",
+        "Afternoon": "Greenriver Town",
+        "Evening": "Greenriver Town",
+        "Night": "Greenriver Town"
+      }
+    },
+    "Old Beggar Chen": {
+      "role": "Apparently harmless old beggar who sleeps near Greenriver Town gate",
+      "realm": "No detectable cultivation",
+      "personality": "Lazy, eccentric, observant, dislikes arrogance and forced flattery.",
+      "speech": "Dry jokes, short corrections, and seemingly nonsensical advice that sometimes proves useful.",
+      "want": "Observe whether the younger generation still contains cultivators worth teaching.",
+      "fear": "Repeating the mistakes that destroyed his former disciples.",
+      "secret": "He is Chen Tianxu, the Void Sword Venerable, a Celestial Ancestor Stage 7 who has hidden his true identity for centuries.",
+      "location": "Greenriver Town",
+      "hidden_master": {
+        "kind": "real",
+        "true_name": "Chen Tianxu",
+        "true_title": "Void Sword Venerable",
+        "true_realm_index": 29,
+        "true_stage": 7,
+        "concealment": 72,
+        "deception": 18,
+        "public_threat": "Apparently harmless",
+        "sense_false_reading": "No detectable cultivation",
+        "mentor_tags": [
+          "Sword Cultivator",
+          "Perfect Realm",
+          "humility",
+          "dao insight"
+        ]
+      },
+      "schedule": {
+        "Dawn": "Greenriver Town",
+        "Morning": "Greenriver Town",
+        "Afternoon": "Greenriver Town",
+        "Evening": "Greenriver Town",
+        "Night": "Greenriver Town"
+      }
+    },
+    "Old Gou": {
+      "role": "Wandering self-proclaimed hidden expert and seller of mysterious manuals",
+      "realm": "Suppressed aura",
+      "personality": "Confident, theatrical, shamelessly opportunistic, but surprisingly knowledgeable about cultivation rumors.",
+      "speech": "Grandiose titles, dramatic pauses, and constant hints that ordinary people cannot understand his depth.",
+      "want": "Earn spirit stones and cultivate a reputation large enough that people stop checking his claims.",
+      "fear": "Meeting a real senior who recognizes his tricks.",
+      "secret": "He is a Qi Refining Stage 3 cultivator using an aura-projection talisman and excellent acting. Some of his cultivation knowledge is genuinely useful.",
+      "location": "Greenriver Town",
+      "hidden_master": {
+        "kind": "fake",
+        "true_name": "Gou Shun",
+        "true_title": "None",
+        "true_realm_index": 1,
+        "true_stage": 3,
+        "concealment": 9,
+        "deception": 31,
+        "projected_realm_index": 5,
+        "projected_stage": 6,
+        "public_threat": "Mysterious senior",
+        "sense_false_reading": "A powerful but strangely uneven aura surrounds him",
+        "fraud_item": "Aura-Projection Talisman"
+      },
+      "schedule": {
+        "Dawn": "Greenriver Town",
+        "Morning": "Greenriver Town",
+        "Afternoon": "Golden Pavilion Auction House",
+        "Evening": "Greenriver Town",
+        "Night": "Greenriver Town"
+      }
+    },
+    "Old Lin the Janitor": {
+      "role": "Quiet janitor who sweeps unused courtyards near an old sect outpost",
+      "realm": "Mortal",
+      "personality": "Patient, absent-minded in appearance, deeply attentive in reality.",
+      "speech": "Simple observations about sweeping, weather, tea, and balance.",
+      "want": "See whether anyone can learn without being told what the lesson is.",
+      "fear": "His old enemies discovering the sect descendants he quietly protects.",
+      "secret": "He is Lin Wuchen, a retired Immortal Sovereign Stage 2 formation expert whose damaged Dao prevents him from returning to his former peak.",
+      "location": "Cloudspine Foothills",
+      "hidden_master": {
+        "kind": "real",
+        "true_name": "Lin Wuchen",
+        "true_title": "Dustless Formation Sovereign",
+        "true_realm_index": 23,
+        "true_stage": 2,
+        "concealment": 64,
+        "deception": 8,
+        "public_threat": "Ordinary old janitor",
+        "sense_false_reading": "Mortal, perhaps unusually calm",
+        "mentor_tags": [
+          "Formation Adept",
+          "patience",
+          "observation"
+        ]
+      },
+      "schedule": {
+        "Dawn": "Cloudspine Foothills",
+        "Morning": "Cloudspine Foothills",
+        "Afternoon": "Cloudspine Foothills",
+        "Evening": "Cloudspine Foothills",
+        "Night": "Cloudspine Foothills"
+      }
+    },
+    "Emperor Zhao Tianming": {
+      "role": "Public ruler of the Mortal World",
+      "location": "Azure Crown Imperial City",
+      "realm": "Ascension Realm",
+      "stage": 9,
+      "title": "Azure Crown Emperor",
+      "speech": "Measured, authoritative and politically careful.",
+      "want": "Preserve the stability of the realm while containing rival great powers.",
+      "fear": "A hidden ancestor, calamity, or succession crisis breaking the existing balance.",
+      "public_family": "The ruling house has heirs, consorts and rival branches whose alliances can shift court politics.",
+      "schedule": {
+        "Dawn": "Azure Crown Imperial City",
+        "Morning": "Azure Crown Imperial City",
+        "Afternoon": "Azure Crown Imperial City",
+        "Evening": "Azure Crown Imperial City",
+        "Night": "Azure Crown Imperial City"
+      }
+    },
+    "Jade Sovereign Lian Xue": {
+      "role": "Public ruler of the Spiritual World",
+      "location": "Spirit Jade Capital",
+      "realm": "Transcendence Realm",
+      "stage": 9,
+      "title": "Jade Spirit Sovereign",
+      "speech": "Measured, authoritative and politically careful.",
+      "want": "Preserve the stability of the realm while containing rival great powers.",
+      "fear": "A hidden ancestor, calamity, or succession crisis breaking the existing balance.",
+      "public_family": "The ruling house has heirs, consorts and rival branches whose alliances can shift court politics.",
+      "schedule": {
+        "Dawn": "Spirit Jade Capital",
+        "Morning": "Spirit Jade Capital",
+        "Afternoon": "Spirit Jade Capital",
+        "Evening": "Spirit Jade Capital",
+        "Night": "Spirit Jade Capital"
+      }
+    },
+    "Immortal Emperor Shen Wuji": {
+      "role": "Public ruler of the Immortal World",
+      "location": "Nine-Heavens Immortal Court",
+      "realm": "Immortal Sovereign",
+      "stage": 9,
+      "title": "Lord of the Nine Heavens",
+      "speech": "Measured, authoritative and politically careful.",
+      "want": "Preserve the stability of the realm while containing rival great powers.",
+      "fear": "A hidden ancestor, calamity, or succession crisis breaking the existing balance.",
+      "public_family": "The ruling house has heirs, consorts and rival branches whose alliances can shift court politics.",
+      "schedule": {
+        "Dawn": "Nine-Heavens Immortal Court",
+        "Morning": "Nine-Heavens Immortal Court",
+        "Afternoon": "Nine-Heavens Immortal Court",
+        "Evening": "Nine-Heavens Immortal Court",
+        "Night": "Nine-Heavens Immortal Court"
+      }
+    },
+    "Celestial Empress Ji Yue": {
+      "role": "Public ruler of the Celestial World",
+      "location": "Celestial Mandate Palace",
+      "realm": "Dao Sovereign",
+      "stage": 9,
+      "title": "Bearer of the Celestial Mandate",
+      "speech": "Measured, authoritative and politically careful.",
+      "want": "Preserve the stability of the realm while containing rival great powers.",
+      "fear": "A hidden ancestor, calamity, or succession crisis breaking the existing balance.",
+      "public_family": "The ruling house has heirs, consorts and rival branches whose alliances can shift court politics.",
+      "schedule": {
+        "Dawn": "Celestial Mandate Palace",
+        "Morning": "Celestial Mandate Palace",
+        "Afternoon": "Celestial Mandate Palace",
+        "Evening": "Celestial Mandate Palace",
+        "Night": "Celestial Mandate Palace"
+      }
+    },
+    "Steward Qiao": {
+      "role": "Golden Pavilion auction steward",
+      "location": "Golden Pavilion Auction House",
+      "realm": "Core Formation",
+      "stage": 6,
+      "speech": "Polite, exact and absolutely neutral while business remains inside the Pavilion.",
+      "want": "Keep auctions profitable and orderly.",
+      "fear": "The Pavilion losing its reputation for neutrality.",
+      "schedule": {
+        "Dawn": "Golden Pavilion Auction House",
+        "Morning": "Golden Pavilion Auction House",
+        "Afternoon": "Golden Pavilion Auction House",
+        "Evening": "Golden Pavilion Auction House",
+        "Night": "Golden Pavilion Auction House"
+      }
+    },
+    "Elder Xue Hong": {
+      "role": "Blood River Sect elder and executioner",
+      "realm": "Core Formation",
+      "stage": 6,
+      "personality": "Patient, predatory, respects resolve and despises waste.",
+      "speech": "Soft-spoken threats and practical cultivation advice.",
+      "want": "Recruit cultivators willing to survive the orthodox manhunt.",
+      "fear": "The Blood River ancestor awakening hungry.",
+      "secret": "He secretly destroys manuals that consume disciples faster than they can mature.",
+      "location": "Moonfen Marsh",
+      "alignment": "Demonic",
+      "public_family": "Blood River Sect considers strength a form of kinship.",
+      "schedule": {
+        "Dawn": "Moonfen Marsh",
+        "Morning": "Moonfen Marsh",
+        "Afternoon": "Moonfen Marsh",
+        "Evening": "Greenriver Town",
+        "Night": "Moonfen Marsh"
+      },
+      "sect_affiliation": "Blood River Sect",
+      "can_recommend": true,
+      "recommendation_tn": 13,
+      "recommendation_bonus": 3
+    },
+    "Lantern Keeper Mo": {
+      "role": "Corpse Lantern Pavilion soul archivist",
+      "realm": "Foundation Establishment",
+      "stage": 8,
+      "personality": "Ceremonial, eerie, meticulous about debts to the dead.",
+      "speech": "Speaks as though every conversation is a funeral rite.",
+      "want": "Recover stolen soul-lantern names.",
+      "fear": "A bound ancestor remembering who imprisoned it.",
+      "secret": "Several lantern spirits volunteered before death, contradicting orthodox accusations.",
+      "location": "Moonfen Marsh",
+      "alignment": "Demonic",
+      "public_family": "No blood family is acknowledged; pavilion disciples inherit funeral names.",
+      "schedule": {
+        "Dawn": "Moonfen Marsh",
+        "Morning": "Moonfen Marsh",
+        "Afternoon": "Moonfen Marsh",
+        "Evening": "Moonfen Marsh",
+        "Night": "Greenriver Town"
+      },
+      "sect_affiliation": "Corpse Lantern Pavilion",
+      "can_recommend": true,
+      "recommendation_tn": 14,
+      "recommendation_bonus": 3
+    },
+    "Inquisitor Shen Rui": {
+      "role": "Azure Cloud Sect forbidden-arts inquisitor",
+      "realm": "Core Formation",
+      "stage": 4,
+      "personality": "Disciplined, suspicious, willing to spare those who surrender dangerous inheritances.",
+      "speech": "Formal questions phrased like indictments.",
+      "want": "Keep predatory cultivation methods from spreading through mortal settlements.",
+      "fear": "Condemning an innocent cultivator on fabricated evidence.",
+      "secret": "He once used a blood art to survive a massacre and never confessed it.",
+      "location": "Greenriver Town",
+      "alignment": "Orthodox",
+      "public_family": "Born to a minor Shen martial family now dependent on Azure Cloud protection.",
+      "schedule": {
+        "Dawn": "Greenriver Town",
+        "Morning": "Greenriver Town",
+        "Afternoon": "Cloudspine Foothills",
+        "Evening": "Greenriver Town",
+        "Night": "Greenriver Town"
+      },
+      "sect_affiliation": "Azure Cloud Sect",
+      "can_recommend": true,
+      "recommendation_tn": 14,
+      "recommendation_bonus": 2
+    },
+    "Mei Yeguang": {
+      "role": "Independent black-market manual broker",
+      "realm": "Foundation Establishment",
+      "stage": 5,
+      "personality": "Amused, cautious, never sells without learning why the buyer wants power.",
+      "speech": "Playful bargains with exact hidden conditions.",
+      "want": "Build a library no sect can monopolize.",
+      "fear": "A customer releasing the thing sealed beneath her archive.",
+      "secret": "She keeps orthodox and demonic manuals side by side and has protected refugees from both camps.",
+      "location": "Golden Pavilion Auction House",
+      "alignment": "Neutral",
+      "public_family": "Claims no clan, though several merchant families owe her favors.",
+      "schedule": {
+        "Dawn": "Greenriver Town",
+        "Morning": "Golden Pavilion Auction House",
+        "Afternoon": "Golden Pavilion Auction House",
+        "Evening": "Golden Pavilion Auction House",
+        "Night": "Greenriver Town"
+      }
+    },
+    "Apothecary Huo Lan": {
+      "role": "Crimson Furnace Sect traveling apothecary and recruitment recommender",
+      "location": "Greenriver Town",
+      "realm": "Foundation Establishment",
+      "stage": 4,
+      "personality": "Practical, warm toward careful students, impatient with wasteful pill use.",
+      "speech": "Uses medicinal analogies and asks precise questions about ingredients and intent.",
+      "want": "Find disciplined alchemy candidates who respect both medicine and fire.",
+      "fear": "Recruiting reckless pill-chasers who poison themselves and blame the sect.",
+      "secret": "She failed her own first furnace examination and quietly remembers every promising applicant who admits a mistake.",
+      "alignment": "Orthodox",
+      "public_family": "A collateral Huo branch supplies herbs to Crimson Furnace Sect.",
+      "sect_affiliation": "Crimson Furnace Sect",
+      "can_recommend": true,
+      "recommendation_tn": 13,
+      "recommendation_bonus": 2,
+      "schedule": {
+        "Dawn": "Greenriver Town",
+        "Morning": "Greenriver Town",
+        "Afternoon": "Greenriver Town",
+        "Evening": "Crimson Furnace Valley",
+        "Night": "Greenriver Town"
+      }
+    },
+    "Disciple Bai Shuang": {
+      "role": "Frozen Moon Palace outer disciple and traveling formation surveyor",
+      "location": "Cloudspine Foothills",
+      "realm": "Foundation Establishment",
+      "stage": 3,
+      "personality": "Reserved, observant and quietly competitive.",
+      "speech": "Short, exact statements followed by long pauses before judgment.",
+      "want": "Find recruits who can remain composed when formations distort their senses.",
+      "fear": "A talented but unstable recruit damaging the palace arrays.",
+      "secret": "She maintains a list of applicants she believes deserved a second chance.",
+      "alignment": "Orthodox",
+      "public_family": "A minor Bai scholar household sent her to the palace as a child.",
+      "sect_affiliation": "Frozen Moon Palace",
+      "can_recommend": true,
+      "recommendation_tn": 14,
+      "recommendation_bonus": 2,
+      "schedule": {
+        "Dawn": "Frozen Moon Terrace",
+        "Morning": "Cloudspine Foothills",
+        "Afternoon": "Cloudspine Foothills",
+        "Evening": "Frozen Moon Terrace",
+        "Night": "Frozen Moon Terrace"
+      }
+    },
+    "Handler She Fen": {
+      "role": "Black Serpent Clan beast handler and field recruiter",
+      "location": "Moonfen Marsh",
+      "realm": "Foundation Establishment",
+      "stage": 5,
+      "personality": "Dry-humored, wary and more impressed by restraint than bravado.",
+      "speech": "Blunt field advice, often addressed to his beasts before the cultivator.",
+      "want": "Recruit people who understand venom, beasts and ambush terrain without panicking.",
+      "fear": "Hotheaded outsiders provoking a clan-beast stampede.",
+      "secret": "He releases weak wild beasts instead of selling them to cruel buyers.",
+      "alignment": "Neutral",
+      "public_family": "A cadet She branch keeps serpent pens for the main clan.",
+      "sect_affiliation": "Black Serpent Clan",
+      "can_recommend": true,
+      "recommendation_tn": 13,
+      "recommendation_bonus": 2,
+      "schedule": {
+        "Dawn": "Black Serpent Ravine",
+        "Morning": "Moonfen Marsh",
+        "Afternoon": "Moonfen Marsh",
+        "Evening": "Black Serpent Ravine",
+        "Night": "Moonfen Marsh"
+      }
+    },
+    "Gate Elder Jian Mu": {
+      "role": "Azure Cloud Sect gate elder and entrance examiner",
+      "location": "Azure Cloud Mountain Gate",
+      "realm": "Core Formation",
+      "stage": 3,
+      "personality": "Severe but fair, values stable foundations over flashy talent.",
+      "speech": "Formal, concise and framed around discipline and responsibility.",
+      "want": "Admit cultivators who will strengthen the sect without staining its name.",
+      "fear": "A gifted recruit hiding unstable or predatory methods.",
+      "secret": "He failed his first inner-disciple promotion and has sympathy for applicants who recover from mistakes.",
+      "alignment": "Orthodox",
+      "sect_affiliation": "Azure Cloud Sect",
+      "public_family": "A long-serving Jian branch has guarded the Azure Cloud gate for three generations.",
+      "schedule": {
+        "Dawn": "Azure Cloud Mountain Gate",
+        "Morning": "Azure Cloud Mountain Gate",
+        "Afternoon": "Azure Cloud Mountain Gate",
+        "Evening": "Azure Cloud Mountain Gate",
+        "Night": "Azure Cloud Mountain Gate"
+      }
+    },
+    "Furnace Examiner Huo Ren": {
+      "role": "Crimson Furnace Sect entrance examiner and furnace master",
+      "location": "Crimson Furnace Valley",
+      "realm": "Core Formation",
+      "stage": 2,
+      "personality": "Meticulous, sharp-eyed and pleased by careful improvisation.",
+      "speech": "Questions arrive like recipe steps: short, ordered and difficult to bluff.",
+      "want": "Find recruits who understand that medicine, flame and patience are one discipline.",
+      "fear": "Careless alchemists turning the sect into a pill-addicted marketplace.",
+      "secret": "He quietly gives failed candidates a list of basic mistakes if they showed genuine restraint.",
+      "alignment": "Orthodox",
+      "sect_affiliation": "Crimson Furnace Sect",
+      "public_family": "A senior Huo furnace lineage adopted him after his original household collapsed.",
+      "schedule": {
+        "Dawn": "Crimson Furnace Valley",
+        "Morning": "Crimson Furnace Valley",
+        "Afternoon": "Crimson Furnace Valley",
+        "Evening": "Crimson Furnace Valley",
+        "Night": "Crimson Furnace Valley"
+      }
+    },
+    "Moon Warden Lin Yue": {
+      "role": "Frozen Moon Palace entrance warden and formation examiner",
+      "location": "Frozen Moon Terrace",
+      "realm": "Core Formation",
+      "stage": 3,
+      "personality": "Calm, unreadable and attentive to how applicants behave under discomfort.",
+      "speech": "Soft observations that often reveal more than direct questions.",
+      "want": "Admit disciplined cultivators who can remain clear inside deceptive formations.",
+      "fear": "An unstable prodigy damaging the palace wards or endangering junior disciples.",
+      "secret": "She deliberately leaves one harmless flaw in each trial array to see who notices without exploiting it recklessly.",
+      "alignment": "Orthodox",
+      "sect_affiliation": "Frozen Moon Palace",
+      "public_family": "The Lin branch has served as formation wardens rather than political elders.",
+      "schedule": {
+        "Dawn": "Frozen Moon Terrace",
+        "Morning": "Frozen Moon Terrace",
+        "Afternoon": "Frozen Moon Terrace",
+        "Evening": "Frozen Moon Terrace",
+        "Night": "Frozen Moon Terrace"
+      }
+    },
+    "Handler She Ruo": {
+      "role": "Black Serpent Clan entrance handler and field examiner",
+      "location": "Black Serpent Ravine",
+      "realm": "Core Formation",
+      "stage": 1,
+      "personality": "Unsparing, practical and fiercely protective of trained beasts.",
+      "speech": "Dry instructions punctuated by warnings about venom, scent and terrain.",
+      "want": "Recruit survivors who can control themselves around dangerous beasts and poisons.",
+      "fear": "Braggarts mistaking cruelty for strength and ruining generations of breeding work.",
+      "secret": "She has disqualified strong applicants for harming a beast after the test was already won.",
+      "alignment": "Neutral",
+      "sect_affiliation": "Black Serpent Clan",
+      "public_family": "A direct She clan branch oversees the ravine beast pens.",
+      "schedule": {
+        "Dawn": "Black Serpent Ravine",
+        "Morning": "Black Serpent Ravine",
+        "Afternoon": "Black Serpent Ravine",
+        "Evening": "Black Serpent Ravine",
+        "Night": "Black Serpent Ravine"
+      }
+    },
+    "Blood Gatekeeper Yan Luo": {
+      "role": "Blood River Sect hidden-gate examiner",
+      "location": "Blood River Gorge",
+      "realm": "Core Formation",
+      "stage": 4,
+      "personality": "Cold, patient and interested in whether fear sharpens or breaks an applicant.",
+      "speech": "Low questions with long silences and no theatrical cruelty.",
+      "want": "Admit recruits capable of surviving the enemies their affiliation will create.",
+      "fear": "Weak initiates exposing the hidden gorge under interrogation.",
+      "secret": "He considers needless sacrifice evidence of poor judgment rather than devotion.",
+      "alignment": "Demonic",
+      "sect_affiliation": "Blood River Sect",
+      "public_family": "No public blood family is acknowledged at the hidden gate.",
+      "schedule": {
+        "Dawn": "Blood River Gorge",
+        "Morning": "Blood River Gorge",
+        "Afternoon": "Blood River Gorge",
+        "Evening": "Blood River Gorge",
+        "Night": "Blood River Gorge"
+      }
+    },
+    "Lantern Registrar Wu Ming": {
+      "role": "Corpse Lantern Pavilion entrance registrar and vigil examiner",
+      "location": "Corpse Lantern Necropolis",
+      "realm": "Core Formation",
+      "stage": 2,
+      "personality": "Ceremonial, patient and more interested in identity than bravado.",
+      "speech": "Quiet ritual language followed by unexpectedly practical questions.",
+      "want": "Find cultivators who can face death, grief and spiritual echoes without surrendering their own mind.",
+      "fear": "An applicant confusing obsession with soul cultivation and becoming a danger to the archive.",
+      "secret": "He refuses to bind unwilling spirits even when higher-ranked pavilion members pressure him.",
+      "alignment": "Demonic",
+      "sect_affiliation": "Corpse Lantern Pavilion",
+      "public_family": "Pavilion registrars inherit office names rather than blood-line titles.",
+      "schedule": {
+        "Dawn": "Corpse Lantern Necropolis",
+        "Morning": "Corpse Lantern Necropolis",
+        "Afternoon": "Corpse Lantern Necropolis",
+        "Evening": "Corpse Lantern Necropolis",
+        "Night": "Corpse Lantern Necropolis"
+      }
+    }
+  },
+  "items": {
+    "spirit_herb": {
+      "name": "Spirit Herb",
+      "description": "A common medicinal herb used in basic alchemy.",
+      "sect_value": 2
+    },
+    "beast_core": {
+      "name": "Low Beast Core",
+      "description": "A crystallized knot of spiritual energy from a low-rank beast.",
+      "sect_value": 5
+    },
+    "spirit_iron": {
+      "name": "Spirit Iron",
+      "description": "Iron ore with a faint spiritual resonance, suitable for beginner forging.",
+      "sect_value": 3
+    },
+    "recovery_pill": {
+      "name": "Recovery Pill",
+      "description": "A basic pill that restores vitality after injury.",
+      "sect_value": 8,
+      "use": {
+        "instant": {
+          "vitality_restore": 8
+        },
+        "consume": true
+      }
+    },
+    "qi_pill": {
+      "name": "Qi Nourishing Pill",
+      "description": "A basic cultivation pill that can improve meditation gains.",
+      "sect_value": 8,
+      "use": {
+        "effect_key": "qi_nourishment",
+        "name": "Qi Nourishment",
+        "duration_game_minutes": 240,
+        "consume": true,
+        "effect": {
+          "description": "Medicinal qi makes cultivation more efficient for a short period.",
+          "modifiers": [
+            {
+              "stat": "cultivation_gain",
+              "operation": "mul",
+              "value": 1.2
+            }
+          ],
+          "tags": [
+            "pill",
+            "cultivation"
+          ]
+        }
+      }
+    },
+    "spirit_iron_sword": {
+      "name": "Spirit-Iron Sword",
+      "description": "A low-grade sword capable of carrying qi.",
+      "sect_value": 8
+    },
+    "formation_flags": {
+      "name": "Formation Flags",
+      "description": "A reusable set of simple formation anchors.",
+      "sect_value": 8
+    },
+    "ice_spirit_blazing_grass": {
+      "name": "Ice Spirit Blazing Grass",
+      "description": "A rare fire-and-ice spiritual herb used in high-grade dual-element alchemy.",
+      "sect_value": 8,
+      "auction_interest": "special",
+      "door_event_chance": 30,
+      "hunter_realm_bonus": 0
+    },
+    "twin_extremes_fruit": {
+      "name": "Twin Extremes Ice-Fire Fruit",
+      "description": "A perfectly balanced red-white fruit holding opposing fire and ice essences.",
+      "sect_value": 8,
+      "auction_interest": "special",
+      "door_event_chance": 38,
+      "hunter_realm_bonus": 1
+    },
+    "fire_spirit_root_herb": {
+      "name": "Fire Spirit Root",
+      "description": "A medicinal root rich in fire-affinity energy; prized by fire cultivators.",
+      "sect_value": 8
+    },
+    "heart_calming_pill": {
+      "name": "Heart Calming Pill",
+      "description": "Settles the mind, aids insight and suppresses heart-demon disturbances.",
+      "sect_value": 8,
+      "use": {
+        "effect_key": "heart_calm",
+        "name": "Heart-Calming State",
+        "duration_game_minutes": 360,
+        "consume": true,
+        "effect": {
+          "description": "The mind becomes tranquil and resistant to disturbance.",
+          "modifiers": [
+            {
+              "stat": "will",
+              "operation": "add",
+              "value": 2
+            },
+            {
+              "stat": "insight_gain",
+              "operation": "mul",
+              "value": 1.15
+            },
+            {
+              "stat": "heart_demon_resistance",
+              "operation": "add",
+              "value": 25
+            }
+          ],
+          "tags": [
+            "pill",
+            "mental"
+          ]
+        }
+      }
+    },
+    "qi_replenishment_pill": {
+      "name": "Qi Replenishment Pill",
+      "description": "Rapidly restores expended qi during dangerous adventures.",
+      "sect_value": 8,
+      "use": {
+        "instant": {
+          "qi_restore": 12
+        },
+        "consume": true
+      }
+    },
+    "purging_phoenix_pill": {
+      "name": "Purging Phoenix Pill",
+      "description": "Incinerates poison with phoenix-like medicinal flame; dangerous without cooling medicine.",
+      "sect_value": 8,
+      "use": {
+        "effect_key": "phoenix_purge",
+        "name": "Purging Phoenix Flame",
+        "duration_game_minutes": 120,
+        "consume": true,
+        "effect": {
+          "description": "Medicinal flame burns through toxins; without cooling support it may scorch meridians.",
+          "modifiers": [
+            {
+              "stat": "detox_power",
+              "operation": "add",
+              "value": 40
+            },
+            {
+              "stat": "fire_resistance",
+              "operation": "add",
+              "value": 10
+            }
+          ],
+          "tags": [
+            "pill",
+            "detox",
+            "fire",
+            "risky"
+          ]
+        }
+      }
+    },
+    "lesser_stygian_seal": {
+      "name": "Lesser Stygian Seal",
+      "description": "A soul relic that can influence weak restless dead nearby.",
+      "sect_value": 8,
+      "auction_interest": "special",
+      "door_event_chance": 42,
+      "hunter_realm_bonus": 1
+    },
+    "cloud_stepping_boots": {
+      "name": "Cloud-Stepping Boots",
+      "description": "A movement relic allowing passive levitation and qi-powered flight.",
+      "sect_value": 8,
+      "auction_interest": "special",
+      "door_event_chance": 32,
+      "hunter_realm_bonus": 0
+    },
+    "bone_comb": {
+      "name": "The Bone Comb",
+      "description": "A cursed beauty relic from the Eighteen Hells. Its gift always leaves a social and spiritual price.",
+      "sect_value": 8,
+      "auction_interest": "special",
+      "door_event_chance": 36,
+      "hunter_realm_bonus": 1
+    },
+    "cracked_nether_mirror": {
+      "name": "Cracked Nether Mirror",
+      "description": "A cursed divination mirror that can seek distant people while revealing the user in return.",
+      "sect_value": 8,
+      "auction_interest": "special",
+      "door_event_chance": 45,
+      "hunter_realm_bonus": 1
+    },
+    "verdant_furnace_jade_slip": {
+      "name": "Verdant Furnace Jade Slip",
+      "description": "An inheritance slip containing fragments of the Verdant Immortal's alchemy path.",
+      "sect_value": 8,
+      "auction_interest": "legendary",
+      "door_event_chance": 62,
+      "hunter_realm_bonus": 2
+    },
+    "nine_echo_sword_tablet": {
+      "name": "Nine-Echo Sword Tablet",
+      "description": "A sword inheritance tablet carrying nine layers of resonant sword intent.",
+      "sect_value": 8,
+      "auction_interest": "legendary",
+      "door_event_chance": 68,
+      "hunter_realm_bonus": 2
+    },
+    "stygian_ghost_scripture": {
+      "name": "Stygian Ghost Scripture",
+      "description": "A dangerous soul inheritance for sensing, restraining and negotiating with the dead.",
+      "sect_value": 8,
+      "auction_interest": "legendary",
+      "door_event_chance": 70,
+      "hunter_realm_bonus": 2
+    },
+    "spatial_pouch": {
+      "name": "Common Spatial Pouch",
+      "description": "A small dimensional pouch. It stores many stacks of nonliving items while remaining light on the belt.",
+      "sect_value": 20,
+      "storage_upgrade": {
+        "container_id": "common_spatial_pouch",
+        "grade": "Mortal",
+        "slot_capacity": 24,
+        "living_space": false
+      }
+    },
+    "spatial_ring": {
+      "name": "Earth-Grade Spatial Ring",
+      "description": "A refined spatial ring with a much larger internal volume. This model still cannot safely hold living beings.",
+      "sect_value": 120,
+      "storage_upgrade": {
+        "container_id": "earth_spatial_ring",
+        "grade": "Earth",
+        "slot_capacity": 80,
+        "living_space": false
+      }
+    },
+    "living_world_ring": {
+      "name": "Living World Ring",
+      "description": "A legendary spatial treasure with stabilized inner land capable of temporarily sustaining living beings.",
+      "sect_value": 5000,
+      "storage_upgrade": {
+        "container_id": "living_world_ring",
+        "grade": "Immortal",
+        "slot_capacity": 500,
+        "living_space": true
+      },
+      "auction_interest": "legendary",
+      "door_event_chance": 75,
+      "hunter_realm_bonus": 3
+    },
+    "nine_echo_spatial_token": {
+      "name": "Nine-Echo Spatial Token",
+      "description": "A sword-marked spatial token that can force open the entrance to the Sword Grave of Nine Echoes for a short time.",
+      "sect_value": 900,
+      "spatial_key": {
+        "secret_realm_id": "sword_grave",
+        "open_hours": 2,
+        "consumed": true
+      }
+    },
+    "verdant_grotto_key": {
+      "name": "Verdant Grotto Key",
+      "description": "A jade key carrying the spatial coordinates of the Verdant Immortal Grotto.",
+      "sect_value": 700,
+      "spatial_key": {
+        "secret_realm_id": "verdant_grotto",
+        "open_hours": 2,
+        "consumed": true
+      }
+    },
+    "stygian_tomb_token": {
+      "name": "Stygian Lantern Token",
+      "description": "A cold black token that resonates with the sealed Stygian Lantern Tomb.",
+      "sect_value": 1200,
+      "spatial_key": {
+        "secret_realm_id": "stygian_tomb",
+        "open_hours": 2,
+        "consumed": true
+      }
+    },
+    "longevity_pill": {
+      "name": "Longevity Pill",
+      "description": "A refined life-extension pill that replenishes fading vitality and permanently adds ten years to natural lifespan.",
+      "sect_value": 120,
+      "use": {
+        "lifespan_years": 10,
+        "consume": true
+      }
+    },
+    "jade_life_herb": {
+      "name": "Jade Life Herb",
+      "description": "A rare life-aspected herb. Consuming it directly permanently adds five years to natural lifespan.",
+      "sect_value": 90,
+      "use": {
+        "lifespan_years": 5,
+        "consume": true
+      },
+      "auction_interest": "special",
+      "door_event_chance": 30,
+      "hunter_realm_bonus": 0
+    },
+    "hundred_year_peach": {
+      "name": "Hundred-Year Longevity Peach",
+      "description": "A legendary spirit fruit rich in life essence. A complete fruit permanently extends lifespan by fifty years.",
+      "sect_value": 1500,
+      "use": {
+        "lifespan_years": 50,
+        "consume": true
+      },
+      "auction_interest": "legendary",
+      "door_event_chance": 65,
+      "hunter_realm_bonus": 2
+    },
+    "blood_sea_scripture_manual": {
+      "name": "Blood Sea Scripture — Jade Manual",
+      "type": "manual",
+      "manual_id": "blood_sea_scripture",
+      "sect_value": 30,
+      "base_price": 180,
+      "description": "A sealed jade manual exuding a faint smell of iron.",
+      "legal_status": "forbidden",
+      "market_excluded": true
+    },
+    "soul_devouring_codex_manual": {
+      "name": "Soul-Devouring Codex — Black Jade",
+      "type": "manual",
+      "manual_id": "soul_devouring_codex",
+      "sect_value": 45,
+      "base_price": 320,
+      "description": "A black jade codex that feels cold to divine sense.",
+      "legal_status": "forbidden",
+      "market_excluded": true
+    },
+    "white_bone_demon_manual": {
+      "name": "White Bone Demon Manual",
+      "type": "manual",
+      "manual_id": "white_bone_demon_manual",
+      "sect_value": 28,
+      "base_price": 160,
+      "description": "Bone-white pages inscribed with corpse-yin diagrams.",
+      "legal_status": "forbidden",
+      "market_excluded": true
+    },
+    "ten_thousand_venoms_manual": {
+      "name": "Ten Thousand Venoms Record",
+      "type": "manual",
+      "manual_id": "ten_thousand_venoms_record",
+      "sect_value": 35,
+      "base_price": 220,
+      "description": "A lacquered poison manual whose margins list antidotes and failures.",
+      "legal_status": "forbidden",
+      "market_excluded": true
+    },
+    "heart_demon_whispering_manual": {
+      "name": "Heart-Demon Whispering Art",
+      "type": "manual",
+      "manual_id": "heart_demon_whispering_art",
+      "sect_value": 80,
+      "base_price": 700,
+      "auction_interest": "special",
+      "description": "A forbidden inheritance sealed behind seven mental wards.",
+      "legal_status": "forbidden",
+      "market_excluded": true
+    },
+    "netherworld_sacrificial_manual": {
+      "name": "Netherworld Sacrificial Sutra",
+      "type": "manual",
+      "manual_id": "netherworld_sacrificial_sutra",
+      "sect_value": 120,
+      "base_price": 1200,
+      "auction_interest": "legendary",
+      "description": "A taboo sutra recording sacrificial exchanges of life, karma and power.",
+      "legal_status": "forbidden",
+      "market_excluded": true
+    },
+    "spirit_iron_armor": {
+      "name": "Spirit-Iron Lamellar",
+      "description": "Layered spirit-iron plates etched with simple qi-dispersing channels.",
+      "sect_value": 10
+    },
+    "talisman_paper": {
+      "name": "Spirit Talisman Paper",
+      "description": "Formation-treated paper that can hold a short-lived inscription.",
+      "sect_value": 2,
+      "base_price": 3
+    },
+    "spirit_ink": {
+      "name": "Spirit Ink",
+      "description": "Mineral-and-herb ink used for talismans, seals and formation inscriptions.",
+      "sect_value": 3,
+      "base_price": 5
+    },
+    "array_disk_blank": {
+      "name": "Blank Formation Disk",
+      "description": "A reusable-looking but sacrificial formation substrate prepared for one deployed array.",
+      "sect_value": 6,
+      "base_price": 10
+    },
+    "swift_wind_talisman": {
+      "name": "Swift-Wind Talisman",
+      "description": "A movement talisman that lightens the body and sharpens footwork for a short time.",
+      "sect_value": 8,
+      "base_price": 18,
+      "use": {
+        "effect_key": "swift_wind_talisman",
+        "name": "Swift-Wind Talisman",
+        "duration_game_minutes": 180,
+        "consume": true,
+        "effect": {
+          "description": "Inscribed wind qi accelerates movement.",
+          "modifiers": [
+            {
+              "stat": "agility",
+              "operation": "add",
+              "value": 2
+            }
+          ],
+          "tags": [
+            "talisman",
+            "movement",
+            "formation"
+          ]
+        }
+      }
+    },
+    "stone_skin_talisman": {
+      "name": "Stone-Skin Talisman",
+      "description": "A defensive talisman that reinforces flesh and steadies qi under impact.",
+      "sect_value": 9,
+      "base_price": 20,
+      "use": {
+        "effect_key": "stone_skin_talisman",
+        "name": "Stone-Skin Talisman",
+        "duration_game_minutes": 180,
+        "consume": true,
+        "effect": {
+          "description": "Earth-aspected inscription reinforces the body.",
+          "modifiers": [
+            {
+              "stat": "body",
+              "operation": "add",
+              "value": 2
+            },
+            {
+              "stat": "combat_bonus",
+              "operation": "add",
+              "value": 1
+            }
+          ],
+          "tags": [
+            "talisman",
+            "defense",
+            "formation"
+          ]
+        }
+      }
+    },
+    "spirit_focus_talisman": {
+      "name": "Spirit-Focus Talisman",
+      "description": "A meditation talisman that clears distracting qi patterns and sharpens insight.",
+      "sect_value": 10,
+      "base_price": 24,
+      "use": {
+        "effect_key": "spirit_focus_talisman",
+        "name": "Spirit-Focus Talisman",
+        "duration_game_minutes": 180,
+        "consume": true,
+        "effect": {
+          "description": "The inscription steadies spiritual perception and comprehension.",
+          "modifiers": [
+            {
+              "stat": "insight",
+              "operation": "add",
+              "value": 2
+            },
+            {
+              "stat": "breakthrough_bonus",
+              "operation": "add",
+              "value": 1
+            }
+          ],
+          "tags": [
+            "talisman",
+            "insight",
+            "formation"
+          ]
+        }
+      }
+    },
+    "minor_qi_gathering_array_disk": {
+      "name": "Minor Qi-Gathering Array Disk",
+      "description": "A single-use deployment disk that creates a temporary shared qi-gathering formation at the current location.",
+      "sect_value": 18,
+      "base_price": 45,
+      "array_deploy": "minor_qi_gathering_array_disk"
+    },
+    "minor_warding_array_disk": {
+      "name": "Minor Warding Array Disk",
+      "description": "A single-use deployment disk that creates a temporary shared defensive formation at the current location.",
+      "sect_value": 20,
+      "base_price": 50,
+      "array_deploy": "minor_warding_array_disk"
+    }
+  },
+  "recipes": {
+    "Recovery Pill": {
+      "profession": "Alchemy",
+      "tn": 12,
+      "cost": {
+        "spirit_herb": 2,
+        "beast_core": 1
+      },
+      "output": {
+        "recovery_pill": 1
+      }
+    },
+    "Qi Nourishing Pill": {
+      "profession": "Alchemy",
+      "tn": 14,
+      "cost": {
+        "spirit_herb": 3,
+        "beast_core": 1
+      },
+      "output": {
+        "qi_pill": 1
+      }
+    },
+    "Spirit-Iron Sword": {
+      "profession": "Forging",
+      "tn": 14,
+      "cost": {
+        "spirit_iron": 3,
+        "beast_core": 1
+      },
+      "output": {
+        "spirit_iron_sword": 1
+      }
+    },
+    "Heart Calming Pill": {
+      "profession": "Alchemy",
+      "tn": 16,
+      "cost": {
+        "spirit_herb": 3,
+        "twin_extremes_fruit": 1
+      },
+      "output": {
+        "heart_calming_pill": 1
+      }
+    },
+    "Qi Replenishment Pill": {
+      "profession": "Alchemy",
+      "tn": 15,
+      "cost": {
+        "spirit_herb": 2,
+        "beast_core": 1
+      },
+      "output": {
+        "qi_replenishment_pill": 1
+      }
+    },
+    "Longevity Pill": {
+      "profession": "Alchemy",
+      "tn": 18,
+      "cost": {
+        "spirit_herb": 5,
+        "beast_core": 2,
+        "jade_life_herb": 1
+      },
+      "output": {
+        "longevity_pill": 1
+      }
+    },
+    "Spirit-Iron Lamellar": {
+      "profession": "Forging",
+      "tn": 16,
+      "cost": {
+        "spirit_iron": 5,
+        "beast_core": 1
+      },
+      "output": {
+        "spirit_iron_armor": 1
+      }
+    },
+    "Swift-Wind Talisman": {
+      "profession": "Formation",
+      "tn": 12,
+      "cost": {
+        "talisman_paper": 1,
+        "spirit_ink": 1
+      },
+      "output": {
+        "swift_wind_talisman": 1
+      }
+    },
+    "Stone-Skin Talisman": {
+      "profession": "Formation",
+      "tn": 13,
+      "cost": {
+        "talisman_paper": 1,
+        "spirit_ink": 1,
+        "spirit_iron": 1
+      },
+      "output": {
+        "stone_skin_talisman": 1
+      }
+    },
+    "Spirit-Focus Talisman": {
+      "profession": "Formation",
+      "tn": 14,
+      "cost": {
+        "talisman_paper": 1,
+        "spirit_ink": 1,
+        "spirit_herb": 1
+      },
+      "output": {
+        "spirit_focus_talisman": 1
+      }
+    },
+    "Minor Qi-Gathering Array Disk": {
+      "profession": "Formation",
+      "tn": 15,
+      "cost": {
+        "array_disk_blank": 1,
+        "spirit_ink": 2,
+        "beast_core": 1
+      },
+      "output": {
+        "minor_qi_gathering_array_disk": 1
+      }
+    },
+    "Minor Warding Array Disk": {
+      "profession": "Formation",
+      "tn": 15,
+      "cost": {
+        "array_disk_blank": 1,
+        "spirit_ink": 2,
+        "spirit_iron": 2
+      },
+      "output": {
+        "minor_warding_array_disk": 1
+      }
+    }
+  },
+  "perfection": {
+    "training_cap": 20,
+    "quest_progress": [
+      8,
+      10,
+      10,
+      12,
+      12,
+      14,
+      14
+    ],
+    "quests": [
+      {
+        "title": "Nine Cycles of Purification",
+        "description": "Refine the impurities left in your {realm} cultivation until only the purest qi remains.",
+        "preparation_required": 3,
+        "attribute": "spirit",
+        "tn": 13,
+        "clue": "Purity is gained by repeatedly discarding what is unworthy."
+      },
+      {
+        "title": "Twelve Meridian Tempering",
+        "description": "Temper the major meridians so your {root} qi can circulate without hidden weakness.",
+        "preparation_required": 4,
+        "attribute": "body",
+        "tn": 14,
+        "clue": "A perfect vessel cannot have a single weak channel."
+      },
+      {
+        "title": "A Worthy Opponent",
+        "description": "Seek pressure appropriate to a {path}; perfection needs adversity, not safe meditation alone.",
+        "preparation_required": 4,
+        "attribute": "agility",
+        "tn": 15,
+        "clue": "Without pressure, flaws remain invisible."
+      },
+      {
+        "title": "Heaven-and-Earth Resonance",
+        "description": "Find a place where natural qi resonates with your {root} spiritual root and comprehend its rhythm.",
+        "preparation_required": 5,
+        "attribute": "insight",
+        "tn": 15,
+        "clue": "The world is the oldest cultivation manual."
+      },
+      {
+        "title": "The Unbroken Foundation",
+        "description": "Repair hidden instabilities accumulated through the entire {realm} realm.",
+        "preparation_required": 5,
+        "attribute": "will",
+        "tn": 16,
+        "clue": "Perfection is often repair rather than accumulation."
+      },
+      {
+        "title": "Heart Demon Reflection",
+        "description": "Confront an inner contradiction before it grows into a future heart demon.",
+        "preparation_required": 5,
+        "attribute": "will",
+        "tn": 17,
+        "clue": "A flaw denied becomes a chain."
+      },
+      {
+        "title": "Touch the Realm Limit",
+        "description": "Compress body, qi, spirit and intent until you can sense the boundary mortals call impossible.",
+        "preparation_required": 6,
+        "attribute": "insight",
+        "tn": 18,
+        "clue": "The final wall only appears after every lesser flaw is removed."
+      }
+    ],
+    "final_trials": [
+      {
+        "name": "Qi Compression",
+        "attribute": "spirit",
+        "tn": 17
+      },
+      {
+        "name": "Meridian Stability",
+        "attribute": "body",
+        "tn": 17
+      },
+      {
+        "name": "Heart-Demon Resolve",
+        "attribute": "will",
+        "tn": 18
+      }
+    ]
+  },
+  "inheritances": {
+    "verdant_furnace_legacy": {
+      "name": "Verdant Furnace Legacy",
+      "description": "A lost alchemical inheritance teaching medicinal harmony, flame restraint and adaptive pill formulas.",
+      "preferred_paths": [
+        "Qi Refiner",
+        "Formation Adept"
+      ],
+      "bonuses": {
+        "qi_max": 2,
+        "vitality_max": 0,
+        "insight_xp": 35
+      },
+      "item": "verdant_furnace_jade_slip"
+    },
+    "nine_echo_sword_legacy": {
+      "name": "Nine-Echo Sword Legacy",
+      "description": "Nine sword echoes that teach intent, timing and how one strike can contain many answers.",
+      "preferred_paths": [
+        "Sword Cultivator"
+      ],
+      "bonuses": {
+        "qi_max": 1,
+        "vitality_max": 2,
+        "insight_xp": 40
+      },
+      "item": "nine_echo_sword_tablet"
+    },
+    "stygian_keeper_legacy": {
+      "name": "Stygian Keeper Legacy",
+      "description": "A forbidden soul inheritance dealing with ghosts, corpse echoes and the boundary between life and death.",
+      "preferred_paths": [
+        "Soul Cultivator"
+      ],
+      "bonuses": {
+        "qi_max": 2,
+        "vitality_max": 1,
+        "insight_xp": 45
+      },
+      "item": "stygian_ghost_scripture"
+    }
+  },
+  "secret_realms": {
+    "verdant_immortal_grotto": {
+      "name": "Verdant Immortal Grotto",
+      "location": "Moonfen Marsh",
+      "min_realm_index": 0,
+      "open_hours": 12,
+      "inheritance_id": "verdant_furnace_legacy",
+      "description": "A sealed medicinal grotto where an ancient alchemist cultivated a garden that has continued growing without sunlight.",
+      "rooms": [
+        {
+          "name": "The Door of Withered Vines",
+          "description": "Dead vines awaken as a living formation and test whether intruders can read the flow of medicinal qi.",
+          "attribute": "insight",
+          "tn": 13,
+          "preferred_paths": [
+            "Formation Adept",
+            "Qi Refiner"
+          ],
+          "cultivation": 10,
+          "spirit_stones": 5,
+          "insight_xp": 4,
+          "items": {
+            "spirit_herb": 2
+          }
+        },
+        {
+          "name": "Frostfire Garden",
+          "description": "Fire and ice spiritual plants grow intertwined while a territorial spirit beast sleeps among them.",
+          "attribute": "agility",
+          "tn": 15,
+          "preferred_roots": [
+            "Fire",
+            "Ice"
+          ],
+          "cultivation": 14,
+          "spirit_stones": 6,
+          "insight_xp": 5,
+          "items": {
+            "ice_spirit_blazing_grass": 1,
+            "jade_life_herb": 1
+          }
+        },
+        {
+          "name": "Broken Pill Hall",
+          "description": "Hundreds of failed pills litter the floor. The surviving furnace still contains a dangerous natural flame spark.",
+          "attribute": "spirit",
+          "tn": 16,
+          "preferred_paths": [
+            "Qi Refiner"
+          ],
+          "cultivation": 16,
+          "spirit_stones": 8,
+          "insight_xp": 7,
+          "items": {
+            "heart_calming_pill": 1
+          }
+        },
+        {
+          "name": "Verdant Inheritance Chamber",
+          "description": "A jade furnace floats above a dry spiritual spring. The final trial asks whether the cultivator understands restraint rather than raw heat.",
+          "attribute": "insight",
+          "tn": 18,
+          "preferred_paths": [
+            "Qi Refiner",
+            "Formation Adept"
+          ],
+          "cultivation": 20,
+          "spirit_stones": 12,
+          "insight_xp": 12,
+          "items": {}
+        }
+      ]
+    },
+    "sword_grave_nine_echoes": {
+      "name": "Sword Grave of Nine Echoes",
+      "location": "Cloudspine Foothills",
+      "min_realm_index": 0,
+      "open_hours": 8,
+      "inheritance_id": "nine_echo_sword_legacy",
+      "description": "A drifting graveyard of broken swords where every footstep returns as a blade-like echo.",
+      "rooms": [
+        {
+          "name": "Field of Broken Blades",
+          "description": "Thousands of abandoned weapons resonate with hostile intent.",
+          "attribute": "will",
+          "tn": 13,
+          "preferred_paths": [
+            "Sword Cultivator"
+          ],
+          "cultivation": 12,
+          "spirit_stones": 4,
+          "insight_xp": 5,
+          "items": {
+            "spirit_iron": 2
+          }
+        },
+        {
+          "name": "Echo Bridge",
+          "description": "Invisible sword intent cuts across a narrow stone bridge in repeating patterns.",
+          "attribute": "agility",
+          "tn": 15,
+          "preferred_paths": [
+            "Sword Cultivator"
+          ],
+          "cultivation": 15,
+          "spirit_stones": 7,
+          "insight_xp": 6,
+          "items": {}
+        },
+        {
+          "name": "Hall of the Unswung Sword",
+          "description": "The strongest pressure comes from a sword that has never once left its sheath.",
+          "attribute": "will",
+          "tn": 17,
+          "preferred_paths": [
+            "Sword Cultivator"
+          ],
+          "cultivation": 18,
+          "spirit_stones": 9,
+          "insight_xp": 8,
+          "items": {}
+        },
+        {
+          "name": "Nine-Echo Tablet",
+          "description": "Nine ancient sword marks ask for a response not of strength but of intent.",
+          "attribute": "insight",
+          "tn": 19,
+          "preferred_paths": [
+            "Sword Cultivator"
+          ],
+          "cultivation": 22,
+          "spirit_stones": 12,
+          "insight_xp": 12,
+          "items": {}
+        }
+      ]
+    },
+    "stygian_lantern_tomb": {
+      "name": "Stygian Lantern Tomb",
+      "location": "Greenriver Town",
+      "min_realm_index": 1,
+      "open_hours": 6,
+      "inheritance_id": "stygian_keeper_legacy",
+      "description": "A tomb that appears beneath old graves only when nine corpse-lanterns burn with blue fire.",
+      "rooms": [
+        {
+          "name": "Whispering Stair",
+          "description": "The dead murmur truths and lies in equal measure while the staircase changes behind you.",
+          "attribute": "will",
+          "tn": 15,
+          "preferred_paths": [
+            "Soul Cultivator"
+          ],
+          "cultivation": 14,
+          "spirit_stones": 5,
+          "insight_xp": 7,
+          "items": {}
+        },
+        {
+          "name": "Hall of Borrowed Faces",
+          "description": "Funeral masks repeat the voices of people the intruder once knew.",
+          "attribute": "presence",
+          "tn": 16,
+          "preferred_paths": [
+            "Soul Cultivator"
+          ],
+          "cultivation": 17,
+          "spirit_stones": 7,
+          "insight_xp": 8,
+          "items": {
+            "cracked_nether_mirror": 1
+          }
+        },
+        {
+          "name": "River Without Water",
+          "description": "A black river of memory must be crossed without surrendering identity to the dead.",
+          "attribute": "spirit",
+          "tn": 18,
+          "preferred_paths": [
+            "Soul Cultivator"
+          ],
+          "cultivation": 20,
+          "spirit_stones": 10,
+          "insight_xp": 10,
+          "items": {}
+        },
+        {
+          "name": "Keeper's Seal",
+          "description": "A lesser seal of the underworld floats above a coffin whose owner is still speaking.",
+          "attribute": "will",
+          "tn": 20,
+          "preferred_paths": [
+            "Soul Cultivator"
+          ],
+          "cultivation": 24,
+          "spirit_stones": 14,
+          "insight_xp": 14,
+          "items": {
+            "lesser_stygian_seal": 1
+          }
+        }
+      ]
+    }
+  },
+  "unexpected_events": [
+    {
+      "id": "qi_storm",
+      "title": "Sudden Spiritual Qi Storm",
+      "category": "Heavenly Phenomenon",
+      "kind": "world_event",
+      "weight": 4,
+      "duration_hours": 2,
+      "severity": 5,
+      "description": "The local spiritual currents overturn without warning, making cultivation dangerous but unusually rich.",
+      "consequence_text": "Spirit resources swell while unstable currents unsettle settlements and local markets.",
+      "world_effect": {
+        "history": "A sudden spiritual qi storm enriched the local veins and disrupted ordinary life.",
+        "region": {
+          "prosperity": -1,
+          "security": -2,
+          "spirit_resources": 8,
+          "unrest": 3
+        },
+        "market": {
+          "supply": -3,
+          "demand": 8,
+          "price_index": 0.08
+        }
+      },
+      "player_reward": {
+        "cultivation": 8,
+        "spirit_stones": 0,
+        "insight_xp": 3,
+        "items": {}
+      }
+    },
+    {
+      "id": "heavenly_herb_bloom",
+      "title": "Heavenly Herb Bloom",
+      "category": "Heavenly Treasure",
+      "kind": "world_event",
+      "weight": 3,
+      "duration_hours": 3,
+      "severity": 3,
+      "description": "A rare medicinal plant matures early under a brief heaven-and-earth phenomenon.",
+      "consequence_text": "Medicinal abundance draws gatherers, raises resource prosperity, and temporarily shifts herb demand.",
+      "world_effect": {
+        "history": "A heavenly herb bloom drew medicine gatherers and enriched the region.",
+        "region": {
+          "prosperity": 3,
+          "spirit_resources": 5,
+          "unrest": 1
+        },
+        "market": {
+          "supply": 8,
+          "demand": 5,
+          "price_index": -0.04
+        }
+      },
+      "player_reward": {
+        "cultivation": 0,
+        "spirit_stones": 4,
+        "insight_xp": 2,
+        "items": {
+          "fire_spirit_root_herb": 1
+        }
+      }
+    },
+    {
+      "id": "wounded_wandering_senior",
+      "title": "A Wounded Wandering Senior",
+      "category": "Mysterious Person",
+      "kind": "personal",
+      "weight": 3,
+      "description": "A badly wounded cultivator appears where no traveler should be, refusing to reveal who is hunting them.",
+      "player_reward": {
+        "cultivation": 4,
+        "spirit_stones": 3,
+        "insight_xp": 4,
+        "items": {}
+      }
+    },
+    {
+      "id": "cursed_relic_whisper",
+      "title": "Whisper of a Cursed Relic",
+      "category": "Fate Encounter",
+      "kind": "personal",
+      "weight": 2,
+      "description": "A buried object calls directly to the cultivator through dreams that last only a heartbeat.",
+      "player_reward": {
+        "cultivation": 0,
+        "spirit_stones": 0,
+        "insight_xp": 5,
+        "items": {
+          "bone_comb": 1
+        }
+      }
+    },
+    {
+      "id": "beast_migration",
+      "title": "Spirit-Beast Migration",
+      "category": "Beast Tide",
+      "kind": "world_event",
+      "weight": 3,
+      "duration_hours": 2,
+      "severity": 6,
+      "description": "Spirit beasts flee through the region in numbers, suggesting something stronger is moving behind them.",
+      "consequence_text": "Fleeing beasts strain roads and food stores while beast materials enter local trade.",
+      "world_effect": {
+        "history": "A mass spirit-beast migration damaged roads, strained food stores, and flooded hunters' markets.",
+        "region": {
+          "population_percent": -0.5,
+          "security": -5,
+          "food_supply": -4,
+          "migration_pressure": 7,
+          "unrest": 5
+        },
+        "market": {
+          "supply": 6,
+          "demand": 8,
+          "price_index": 0.05
+        }
+      },
+      "player_reward": {
+        "cultivation": 5,
+        "spirit_stones": 2,
+        "insight_xp": 2,
+        "items": {
+          "beast_core": 1
+        }
+      }
+    },
+    {
+      "id": "secret_verdant",
+      "title": "A Medicinal Rift Opens",
+      "category": "Spatial Rift",
+      "kind": "secret_realm",
+      "weight": 2,
+      "secret_realm_id": "verdant_immortal_grotto",
+      "description": "Space folds around the scent of ancient medicine. A hidden grotto is opening."
+    },
+    {
+      "id": "secret_sword",
+      "title": "Nine Sword Echoes Ring",
+      "category": "Inheritance",
+      "kind": "secret_realm",
+      "weight": 2,
+      "secret_realm_id": "sword_grave_nine_echoes",
+      "description": "Nine sword cries sound from nowhere, and a broken stone gate appears between the cliffs."
+    },
+    {
+      "id": "secret_stygian",
+      "title": "Nine Corpse-Lanterns Ignite",
+      "category": "Ancient Ruin",
+      "kind": "secret_realm",
+      "weight": 1,
+      "secret_realm_id": "stygian_lantern_tomb",
+      "description": "Blue corpse-fire appears beneath old graves. A tomb that should not exist is becoming reachable."
+    },
+    {
+      "id": "ancient_ruin_appears",
+      "title": "Ancient Ruin Appears",
+      "category": "Ancient Ruin",
+      "kind": "secret_realm",
+      "weight": 3,
+      "secret_realm_id": "sword_grave_nine_echoes",
+      "description": "A hidden palace of broken pagodas rises from the cliffs, exposing a gate into an ancient sword grave."
+    },
+    {
+      "id": "heavenly_treasure_descends",
+      "title": "Heavenly Treasure Descends",
+      "category": "Heavenly Treasure",
+      "kind": "world_event",
+      "weight": 2,
+      "duration_hours": 4,
+      "severity": 6,
+      "description": "Golden clouds split as a sealed treasure falls from the heavens. Cultivators, clans, and hidden experts converge before anyone can identify it.",
+      "consequence_text": "Spirit resources rise, but treasure-seekers destabilize the area and drive up demand.",
+      "world_effect": {
+        "history": "A heavenly treasure descended, enriching local spirit currents and drawing dangerous competition.",
+        "region": {
+          "spirit_resources": 8,
+          "prosperity": 2,
+          "migration_pressure": 5,
+          "unrest": 6
+        },
+        "market": {
+          "supply": -4,
+          "demand": 15,
+          "price_index": 0.15
+        }
+      },
+      "player_reward": {
+        "cultivation": 6,
+        "spirit_stones": 8,
+        "insight_xp": 5,
+        "items": {
+          "formation_flags": 1
+        }
+      },
+      "fate_delta": 1
+    },
+    {
+      "id": "sect_recruitment_delegation",
+      "title": "Major Sect Recruitment",
+      "category": "Sect Recruitment",
+      "kind": "world_event",
+      "weight": 4,
+      "duration_hours": 6,
+      "severity": 3,
+      "worlds": [
+        "Mortal World",
+        "Spiritual World"
+      ],
+      "description": "A major sect delegation raises testing platforms and examines spiritual roots, physiques, bloodlines, discipline, and character.",
+      "consequence_text": "Migration and recruitment pressure increase while sects spend resources competing for talent.",
+      "world_effect": {
+        "history": "Sect recruitment platforms drew ambitious youths and their families into the region.",
+        "region": {
+          "prosperity": 3,
+          "security": 2,
+          "migration_pressure": 5
+        },
+        "market": {
+          "supply": -2,
+          "demand": 7,
+          "price_index": 0.05
+        },
+        "sect": {
+          "resources": -2,
+          "recruitment_pressure": 15,
+          "doctrine_pressure": 3
+        }
+      },
+      "player_reward": {
+        "cultivation": 4,
+        "spirit_stones": 4,
+        "insight_xp": 4,
+        "items": {}
+      }
+    },
+    {
+      "id": "beast_tide",
+      "title": "Beast Tide",
+      "category": "Beast Tide",
+      "kind": "world_event",
+      "weight": 2,
+      "duration_hours": 8,
+      "severity": 9,
+      "worlds": [
+        "Mortal World",
+        "Spiritual World"
+      ],
+      "description": "Thousands of demonic beasts surge from the wilderness toward walls, roads, farms, and spirit-resource sites.",
+      "consequence_text": "The tide causes casualties, food shortages, migration, insecurity, and a regional market shock even without player intervention.",
+      "world_effect": {
+        "history": "A demonic beast tide struck the region, damaging settlements, roads, farms, and spirit-resource sites.",
+        "region": {
+          "population_percent": -1.5,
+          "prosperity": -6,
+          "security": -10,
+          "spirit_resources": -3,
+          "food_supply": -8,
+          "migration_pressure": 12,
+          "unrest": 15
+        },
+        "market": {
+          "supply": -10,
+          "demand": 12,
+          "price_index": 0.12
+        }
+      },
+      "player_reward": {
+        "cultivation": 8,
+        "spirit_stones": 10,
+        "insight_xp": 5,
+        "items": {
+          "beast_core": 2
+        }
+      }
+    },
+    {
+      "id": "secret_inheritance_tomb",
+      "title": "Secret Inheritance Revealed",
+      "category": "Inheritance",
+      "kind": "secret_realm",
+      "weight": 2,
+      "secret_realm_id": "verdant_immortal_grotto",
+      "description": "A collapsed tomb reveals an ancient jade furnace and a trial-path leading toward a sealed inheritance chamber."
+    },
+    {
+      "id": "lightning_tribulation_nearby",
+      "title": "Lightning Tribulation",
+      "category": "Tribulation",
+      "kind": "world_event",
+      "weight": 3,
+      "duration_hours": 3,
+      "severity": 7,
+      "description": "A nearby breakthrough summons layered heavenly lightning. Every bolt scars the land and enriches the surviving spirit currents.",
+      "consequence_text": "Security falls around the strike zone while damaged terrain becomes unusually rich in spiritual energy.",
+      "world_effect": {
+        "history": "A cultivator's lightning tribulation scarred the land and transformed the local spiritual currents.",
+        "region": {
+          "security": -5,
+          "spirit_resources": 8,
+          "unrest": 3
+        },
+        "market": {
+          "supply": -3,
+          "demand": 5,
+          "price_index": 0.05
+        }
+      },
+      "player_reward": {
+        "cultivation": 5,
+        "spirit_stones": 3,
+        "insight_xp": 8,
+        "items": {
+          "spirit_iron": 1
+        }
+      }
+    },
+    {
+      "id": "demonic_village_ritual",
+      "title": "Demonic Cultivator Incident",
+      "category": "Demon Incident",
+      "kind": "world_event",
+      "weight": 2,
+      "duration_hours": 6,
+      "severity": 7,
+      "worlds": [
+        "Mortal World",
+        "Spiritual World"
+      ],
+      "description": "An apparently ordinary settlement is exposed as the center of a forbidden ritual fed by missing travelers and stolen vitality.",
+      "consequence_text": "The discovery raises unrest, reduces security, and disrupts nearby trade.",
+      "world_effect": {
+        "history": "A forbidden demonic ritual was exposed inside an ordinary settlement.",
+        "region": {
+          "population_percent": -0.5,
+          "prosperity": -4,
+          "security": -9,
+          "migration_pressure": 5,
+          "unrest": 12
+        },
+        "market": {
+          "supply": -5,
+          "demand": 6,
+          "price_index": 0.07
+        },
+        "sect": {
+          "cohesion": -1,
+          "resources": -3,
+          "doctrine_pressure": 6
+        }
+      },
+      "player_reward": {
+        "cultivation": 5,
+        "spirit_stones": 7,
+        "insight_xp": 7,
+        "items": {
+          "heart_calming_pill": 1
+        }
+      }
+    },
+    {
+      "id": "auction_house_chaos",
+      "title": "Auction House Chaos",
+      "category": "Auction House",
+      "kind": "world_event",
+      "weight": 5,
+      "duration_hours": 3,
+      "severity": 5,
+      "locations": [
+        "Golden Pavilion Auction House"
+      ],
+      "description": "A supposedly worthless lot reveals a hidden treasure aura. Bids explode, private rooms unseal, and every faction begins calculating who must not leave with it.",
+      "consequence_text": "Auction speculation increases prosperity and unrest while distorting local prices and demand.",
+      "world_effect": {
+        "history": "A misidentified auction lot triggered a bidding war and intense faction speculation.",
+        "region": {
+          "prosperity": 4,
+          "security": -2,
+          "unrest": 5
+        },
+        "market": {
+          "supply": -3,
+          "demand": 20,
+          "price_index": 0.2
+        }
+      },
+      "player_reward": {
+        "cultivation": 0,
+        "spirit_stones": 12,
+        "insight_xp": 5,
+        "items": {}
+      }
+    },
+    {
+      "id": "young_master_confrontation",
+      "title": "Young Master Confrontation",
+      "category": "Fate Encounter",
+      "kind": "personal",
+      "weight": 5,
+      "duration_hours": 2,
+      "description": "An arrogant heir takes offense over a seat, treasure, companion, beast, or even a patch of grass. Their retainers make certain the misunderstanding escalates spectacularly.",
+      "player_reward": {
+        "cultivation": 5,
+        "spirit_stones": 3,
+        "insight_xp": 4,
+        "items": {}
+      }
+    },
+    {
+      "id": "mysterious_old_beggar",
+      "title": "Mysterious Old Beggar",
+      "category": "Mysterious Person",
+      "kind": "personal",
+      "weight": 3,
+      "duration_hours": 2,
+      "description": "A ragged old beggar asks for food and courtesy. The pressure hidden behind their clouded eyes suggests an ancient expert testing character rather than wealth.",
+      "karma_delta": 2,
+      "player_reward": {
+        "cultivation": 2,
+        "spirit_stones": 0,
+        "insight_xp": 7,
+        "items": {
+          "heart_calming_pill": 1
+        }
+      },
+      "fate_delta": 1
+    },
+    {
+      "id": "celestial_descendant_disguise",
+      "title": "Celestial Descendant in Disguise",
+      "category": "Mysterious Person",
+      "kind": "personal",
+      "weight": 2,
+      "duration_hours": 2,
+      "description": "A quiet traveler with impossible manners and a concealed lineage asks seemingly ordinary questions while hidden guardians watch from beyond spiritual sense.",
+      "player_reward": {
+        "cultivation": 4,
+        "spirit_stones": 5,
+        "insight_xp": 8,
+        "items": {
+          "qi_pill": 1
+        }
+      }
+    },
+    {
+      "id": "spatial_rift",
+      "title": "Spatial Rift",
+      "category": "Spatial Rift",
+      "kind": "secret_realm",
+      "weight": 2,
+      "secret_realm_id": "stygian_lantern_tomb",
+      "description": "A crack in reality begins swallowing loose objects, beasts, and pieces of nearby structures. Blue lantern-light flickers beyond the tear."
+    },
+    {
+      "id": "bloodline_awakening_omen",
+      "title": "Ancient Bloodline Awakening",
+      "category": "Bloodline Awakening",
+      "kind": "personal",
+      "weight": 2,
+      "duration_hours": 2,
+      "description": "A nearby cultivator suddenly manifests the aura of an ancient divine bloodline, causing dormant lineage marks in the crowd to tremble in response.",
+      "player_reward": {
+        "cultivation": 4,
+        "spirit_stones": 0,
+        "insight_xp": 9,
+        "items": {}
+      }
+    },
+    {
+      "id": "sect_tournament",
+      "title": "Sect Tournament",
+      "category": "Tournament",
+      "kind": "world_event",
+      "weight": 4,
+      "duration_hours": 8,
+      "severity": 4,
+      "worlds": [
+        "Mortal World",
+        "Spiritual World"
+      ],
+      "description": "Sect disciples gather to fight for rankings, resources, weapons, prestige, and qualification for future secret-realm expeditions.",
+      "consequence_text": "Visitors enrich the region while sect competition consumes resources and increases recruitment pressure.",
+      "world_effect": {
+        "history": "A sect tournament drew disciples, merchants, scouts, and rival elders into the region.",
+        "region": {
+          "prosperity": 5,
+          "security": 2,
+          "migration_pressure": 4,
+          "unrest": 2
+        },
+        "market": {
+          "supply": -4,
+          "demand": 10,
+          "price_index": 0.08
+        },
+        "sect": {
+          "cohesion": -2,
+          "resources": -4,
+          "recruitment_pressure": 10
+        }
+      },
+      "player_reward": {
+        "cultivation": 7,
+        "spirit_stones": 8,
+        "insight_xp": 5,
+        "items": {
+          "recovery_pill": 1
+        }
+      }
+    },
+    {
+      "id": "spirit_herb_mutation",
+      "title": "Spirit Herb Mutation",
+      "category": "Heavenly Treasure",
+      "kind": "personal",
+      "weight": 4,
+      "duration_hours": 2,
+      "description": "A common medicinal plant absorbs an abnormal qi current and transforms into a treasure with centuries of condensed vitality.",
+      "player_reward": {
+        "cultivation": 2,
+        "spirit_stones": 3,
+        "insight_xp": 3,
+        "items": {
+          "spirit_herb": 3,
+          "fire_spirit_root_herb": 1
+        }
+      }
+    },
+    {
+      "id": "meteor_from_heavens",
+      "title": "Meteor from the Heavens",
+      "category": "Heavenly Treasure",
+      "kind": "world_event",
+      "weight": 2,
+      "duration_hours": 5,
+      "severity": 6,
+      "description": "A burning object crashes beyond the horizon. Within the crater may be an artifact, corpse, egg, sealed remnant, or imprisoned being.",
+      "consequence_text": "The impact enriches spirit resources but damages security and draws treasure hunters.",
+      "world_effect": {
+        "history": "A heavenly meteor struck nearby, creating a resource-rich crater contested by treasure hunters.",
+        "region": {
+          "security": -4,
+          "spirit_resources": 12,
+          "migration_pressure": 7,
+          "unrest": 8
+        },
+        "market": {
+          "supply": -5,
+          "demand": 12,
+          "price_index": 0.1
+        }
+      },
+      "player_reward": {
+        "cultivation": 5,
+        "spirit_stones": 6,
+        "insight_xp": 6,
+        "items": {
+          "spirit_iron": 2
+        }
+      }
+    },
+    {
+      "id": "soul_possession",
+      "title": "Ancient Soul Possession",
+      "category": "Mysterious Person",
+      "kind": "personal",
+      "weight": 2,
+      "duration_hours": 2,
+      "description": "An ancient cultivator's remnant soul wakes inside an apparently ordinary person, leaking memories and a pressure that does not belong to this era.",
+      "player_effect": {
+        "effect_key": "remnant_soul_echo",
+        "name": "Remnant Soul Echo",
+        "description": "Foreign memories sharpen spiritual perception but strain the will.",
+        "category": "Soul",
+        "severity": 3,
+        "duration_game_minutes": 360,
+        "modifiers": [
+          {
+            "stat": "spirit",
+            "operation": "add",
+            "value": 1
+          },
+          {
+            "stat": "will",
+            "operation": "add",
+            "value": -1
+          }
+        ],
+        "tags": [
+          "soul",
+          "remnant",
+          "random_event"
+        ]
+      },
+      "player_reward": {
+        "cultivation": 0,
+        "spirit_stones": 0,
+        "insight_xp": 10,
+        "items": {}
+      }
+    },
+    {
+      "id": "demon_invasion",
+      "title": "Demon Invasion",
+      "category": "Demon Invasion",
+      "kind": "world_event",
+      "weight": 1,
+      "duration_hours": 12,
+      "severity": 10,
+      "worlds": [
+        "Mortal World",
+        "Spiritual World"
+      ],
+      "description": "Demonic forces cross a weakened boundary and attack settlements, sect outposts, resource sites, and transport routes.",
+      "consequence_text": "Population, security, food, resources, sect treasuries, and market supply all suffer a severe persistent shock.",
+      "world_effect": {
+        "history": "A demonic invasion crossed into the region and overwhelmed settlements, roads, and sect defenses.",
+        "region": {
+          "population_percent": -2,
+          "prosperity": -10,
+          "security": -15,
+          "spirit_resources": -6,
+          "food_supply": -10,
+          "migration_pressure": 15,
+          "unrest": 20
+        },
+        "market": {
+          "supply": -18,
+          "demand": 20,
+          "price_index": 0.25
+        },
+        "sect": {
+          "influence": -3,
+          "cohesion": 4,
+          "resources": -8,
+          "doctrine_pressure": 5
+        }
+      },
+      "player_reward": {
+        "cultivation": 10,
+        "spirit_stones": 15,
+        "insight_xp": 8,
+        "items": {
+          "recovery_pill": 2,
+          "qi_replenishment_pill": 1
+        }
+      }
+    },
+    {
+      "id": "heavenly_phenomenon",
+      "title": "Nine-Colored Heavenly Phenomenon",
+      "category": "Tribulation",
+      "kind": "world_event",
+      "weight": 2,
+      "duration_hours": 4,
+      "severity": 5,
+      "description": "Nine-colored clouds, golden lotuses, divine music, and impossible stars announce that someone nearby achieved an absurd breakthrough.",
+      "consequence_text": "The phenomenon enriches local qi and attracts cultivators, merchants, and sect scouts.",
+      "world_effect": {
+        "history": "A nine-colored heavenly phenomenon announced an extraordinary breakthrough.",
+        "region": {
+          "prosperity": 4,
+          "spirit_resources": 10,
+          "migration_pressure": 5
+        },
+        "market": {
+          "demand": 5,
+          "price_index": 0.05
+        },
+        "sect": {
+          "influence": 2,
+          "recruitment_pressure": 4
+        }
+      },
+      "player_reward": {
+        "cultivation": 8,
+        "spirit_stones": 2,
+        "insight_xp": 9,
+        "items": {}
+      }
+    },
+    {
+      "id": "marriage_arrangement",
+      "title": "Political Marriage Arrangement",
+      "category": "Fate Encounter",
+      "kind": "personal",
+      "weight": 3,
+      "duration_hours": 3,
+      "description": "Two sects or martial clans attempt to bind bloodlines and interests through a political marriage. Every polite sentence conceals an alliance calculation.",
+      "player_reward": {
+        "cultivation": 2,
+        "spirit_stones": 8,
+        "insight_xp": 4,
+        "items": {}
+      }
+    },
+    {
+      "id": "cultivation_market_scam",
+      "title": "Cultivation Market Scam",
+      "category": "Auction House",
+      "kind": "personal",
+      "weight": 4,
+      "duration_hours": 2,
+      "description": "A merchant sells a cheap-looking object as worthless junk. Beneath the grime is a fragment of an ancient formation secret the seller never recognized.",
+      "player_reward": {
+        "cultivation": 0,
+        "spirit_stones": 2,
+        "insight_xp": 6,
+        "items": {
+          "formation_flags": 1
+        }
+      }
+    },
+    {
+      "id": "time_distortion",
+      "title": "Time-Distortion Formation",
+      "category": "Spatial Rift",
+      "kind": "world_event",
+      "weight": 1,
+      "duration_hours": 3,
+      "severity": 6,
+      "description": "A damaged formation creates a pocket where hours outside feel like years of meditation inside, though memory and qi strain remain real.",
+      "consequence_text": "The formation enriches local spatial qi; participants can claim a temporary cultivation afterglow once.",
+      "world_effect": {
+        "history": "A time-distortion formation destabilized local space and enriched spatial qi.",
+        "region": {
+          "spirit_resources": 5,
+          "unrest": 2
+        }
+      },
+      "player_effect": {
+        "effect_key": "time_distortion_afterglow",
+        "name": "Time-Distortion Afterglow",
+        "description": "Compressed meditation memories briefly improve cultivation efficiency.",
+        "category": "Spatial",
+        "severity": 2,
+        "duration_game_minutes": 360,
+        "modifiers": [
+          {
+            "stat": "cultivation_gain",
+            "operation": "mul",
+            "value": 1.2
+          }
+        ],
+        "tags": [
+          "time",
+          "spatial",
+          "random_event"
+        ]
+      },
+      "player_reward": {
+        "cultivation": 4,
+        "spirit_stones": 0,
+        "insight_xp": 6,
+        "items": {}
+      }
+    },
+    {
+      "id": "dead_city",
+      "title": "The Dead City",
+      "category": "Demon Incident",
+      "kind": "world_event",
+      "weight": 1,
+      "duration_hours": 10,
+      "severity": 9,
+      "worlds": [
+        "Mortal World",
+        "Spiritual World"
+      ],
+      "description": "Travelers find an entire city standing silent and intact, yet every inhabitant vanished overnight without signs of flight or battle.",
+      "consequence_text": "Population collapses locally, trade avoids the region, and fear drives migration and unrest.",
+      "world_effect": {
+        "history": "An inhabited district became a dead city overnight, with its population missing and no clear cause.",
+        "region": {
+          "population_percent": -4,
+          "prosperity": -12,
+          "security": -14,
+          "food_supply": -5,
+          "migration_pressure": 18,
+          "unrest": 20
+        },
+        "market": {
+          "supply": -20,
+          "demand": -8,
+          "price_index": 0.18
+        }
+      },
+      "player_reward": {
+        "cultivation": 2,
+        "spirit_stones": 5,
+        "insight_xp": 12,
+        "items": {
+          "heart_calming_pill": 1
+        }
+      }
+    },
+    {
+      "id": "dragon_appears",
+      "title": "A Dragon Appears",
+      "category": "Beast Tide",
+      "kind": "world_event",
+      "weight": 1,
+      "duration_hours": 8,
+      "severity": 10,
+      "description": "A true dragon descends through the clouds. Its intent is unreadable, its presence crushes weaker beasts, and it is very much not necessarily friendly.",
+      "consequence_text": "The dragon's aura disrupts security and trade while awakening nearby spirit veins.",
+      "world_effect": {
+        "history": "A dragon appeared over the region, suppressing beasts and cultivators while awakening local spirit veins.",
+        "region": {
+          "population_percent": -1,
+          "prosperity": -5,
+          "security": -12,
+          "spirit_resources": 8,
+          "migration_pressure": 10,
+          "unrest": 15
+        },
+        "market": {
+          "supply": -10,
+          "demand": 14,
+          "price_index": 0.16
+        }
+      },
+      "player_reward": {
+        "cultivation": 8,
+        "spirit_stones": 10,
+        "insight_xp": 10,
+        "items": {
+          "beast_core": 1
+        }
+      }
+    },
+    {
+      "id": "fate_encounter",
+      "title": "Fate Encounter",
+      "category": "Fate Encounter",
+      "kind": "personal",
+      "weight": 4,
+      "duration_hours": 2,
+      "description": "A stranger in need may later become a hidden expert, future ruler, reincarnator, benefactor, or terrifying enemy. The choice to help is recorded by fate.",
+      "karma_delta": 2,
+      "player_reward": {
+        "cultivation": 3,
+        "spirit_stones": 2,
+        "insight_xp": 6,
+        "items": {}
+      },
+      "fate_delta": 1
+    },
+    {
+      "id": "heavens_chosen_appears",
+      "title": "Heaven's Chosen Appears",
+      "category": "Tournament",
+      "kind": "world_event",
+      "weight": 2,
+      "duration_hours": 5,
+      "severity": 4,
+      "description": "A ridiculously talented young cultivator arrives, shatters local records, attracts every sect's attention, and immediately becomes everyone's political problem.",
+      "consequence_text": "Sect recruitment and doctrine pressure rise as factions compete to claim or contain the prodigy.",
+      "world_effect": {
+        "history": "A Heaven's Chosen shattered local records and triggered fierce sect competition.",
+        "region": {
+          "prosperity": 3,
+          "migration_pressure": 4,
+          "unrest": 5
+        },
+        "market": {
+          "demand": 8,
+          "price_index": 0.06
+        },
+        "sect": {
+          "recruitment_pressure": 12,
+          "doctrine_pressure": 6,
+          "cohesion": -2
+        }
+      },
+      "player_reward": {
+        "cultivation": 5,
+        "spirit_stones": 4,
+        "insight_xp": 8,
+        "items": {}
+      }
+    },
+    {
+      "id": "forbidden_zone_opens",
+      "title": "Forbidden Zone Opens",
+      "category": "Ancient Ruin",
+      "kind": "secret_realm",
+      "weight": 1,
+      "secret_realm_id": "stygian_lantern_tomb",
+      "description": "A prohibition seal that endured for thousands of years breaks. Corpse-lanterns reveal a route into the forbidden tomb below."
+    },
+    {
+      "id": "reincarnated_expert_awakens",
+      "title": "Reincarnated Expert Awakens",
+      "category": "Mysterious Person",
+      "kind": "personal",
+      "weight": 2,
+      "duration_hours": 2,
+      "description": "An unremarkable cultivator suddenly remembers a previous life, recognizes ancient techniques at a glance, and begins rebuilding with frightening efficiency.",
+      "player_reward": {
+        "cultivation": 4,
+        "spirit_stones": 0,
+        "insight_xp": 10,
+        "items": {}
+      }
+    },
+    {
+      "id": "artifact_chooses_master",
+      "title": "Artifact Chooses Its Master",
+      "category": "Heavenly Treasure",
+      "kind": "personal",
+      "weight": 1,
+      "duration_hours": 2,
+      "description": "A legendary artifact rejects every acclaimed genius, then flies into the hands of the person nobody expected it to acknowledge.",
+      "player_reward": {
+        "cultivation": 3,
+        "spirit_stones": 0,
+        "insight_xp": 8,
+        "items": {
+          "cloud_stepping_boots": 1
+        }
+      },
+      "fate_delta": 1
+    },
+    {
+      "id": "heavenly_punishment",
+      "title": "Heavenly Punishment",
+      "category": "Tribulation",
+      "kind": "personal",
+      "weight": 1,
+      "duration_hours": 2,
+      "description": "An ancient rule is violated by accident. Dark clouds gather around the offender alone, and the heavens mark the debt before the first bolt falls.",
+      "player_effect": {
+        "effect_key": "heavenly_punishment_mark",
+        "name": "Heavenly Punishment Mark",
+        "description": "Heavenly pressure hinders cultivation and tests resolve until the mark fades.",
+        "category": "Tribulation",
+        "severity": 6,
+        "duration_game_minutes": 720,
+        "modifiers": [
+          {
+            "stat": "cultivation_gain",
+            "operation": "mul",
+            "value": 0.85
+          },
+          {
+            "stat": "will",
+            "operation": "add",
+            "value": -1
+          }
+        ],
+        "tags": [
+          "heaven",
+          "tribulation",
+          "random_event"
+        ]
+      },
+      "player_reward": {
+        "cultivation": 0,
+        "spirit_stones": 0,
+        "insight_xp": 7,
+        "items": {}
+      }
+    },
+    {
+      "id": "cultivation_festival",
+      "title": "Cultivation World's Festival",
+      "category": "Tournament",
+      "kind": "world_event",
+      "weight": 4,
+      "duration_hours": 10,
+      "severity": 2,
+      "description": "Cultivators gather for trading, poetry, music, drinking, friendly competitions, matchmaking, and the statistically inevitable trouble.",
+      "consequence_text": "The festival improves prosperity and security while increasing trade, demand, and sect recruitment.",
+      "world_effect": {
+        "history": "A cultivation festival filled the region with trade, performances, competitions, and new alliances.",
+        "region": {
+          "prosperity": 7,
+          "security": 3,
+          "food_supply": -2,
+          "migration_pressure": 5,
+          "unrest": -4
+        },
+        "market": {
+          "supply": 8,
+          "demand": 12,
+          "price_index": 0.04
+        },
+        "sect": {
+          "influence": 2,
+          "resources": 1,
+          "recruitment_pressure": 8
+        }
+      },
+      "player_reward": {
+        "cultivation": 3,
+        "spirit_stones": 6,
+        "insight_xp": 5,
+        "items": {
+          "qi_pill": 1
+        }
+      }
+    }
+  ],
+  "body_realms": [
+    {
+      "world": "Mortal World",
+      "name": "Skin Tempering",
+      "phase_costs": [
+        57,
+        71,
+        89,
+        111,
+        139,
+        174,
+        217,
+        272,
+        340
+      ],
+      "base_tn": 11
+    },
+    {
+      "world": "Mortal World",
+      "name": "Flesh Tempering",
+      "phase_costs": [
+        103,
+        129,
+        161,
+        201,
+        251,
+        314,
+        393,
+        491,
+        614
+      ],
+      "base_tn": 12
+    },
+    {
+      "world": "Mortal World",
+      "name": "Bone Forging",
+      "phase_costs": [
+        207,
+        259,
+        323,
+        404,
+        505,
+        632,
+        790,
+        987,
+        1234
+      ],
+      "base_tn": 13
+    },
+    {
+      "world": "Mortal World",
+      "name": "Meridian Tempering",
+      "phase_costs": [
+        402,
+        502,
+        628,
+        785,
+        981,
+        1227,
+        1534,
+        1917,
+        2396
+      ],
+      "base_tn": 14
+    },
+    {
+      "world": "Mortal World",
+      "name": "Blood Refining",
+      "phase_costs": [
+        805,
+        1006,
+        1258,
+        1572,
+        1965,
+        2457,
+        3071,
+        3839,
+        4798
+      ],
+      "base_tn": 15
+    },
+    {
+      "world": "Mortal World",
+      "name": "Organ Tempering",
+      "phase_costs": [
+        1495,
+        1869,
+        2336,
+        2920,
+        3650,
+        4562,
+        5703,
+        7129,
+        8911
+      ],
+      "base_tn": 16
+    },
+    {
+      "world": "Mortal World",
+      "name": "Marrow Rebirth",
+      "phase_costs": [
+        2362,
+        2952,
+        3691,
+        4613,
+        5767,
+        7208,
+        9010,
+        11263,
+        14079
+      ],
+      "base_tn": 17
+    },
+    {
+      "world": "Mortal World",
+      "name": "Mortal Body Ascension",
+      "phase_costs": [
+        3732,
+        4665,
+        5831,
+        7289,
+        9111,
+        11389,
+        14236,
+        17796,
+        22244
+      ],
+      "base_tn": 18
+    },
+    {
+      "world": "Spiritual World",
+      "name": "Spirit Body Transformation",
+      "phase_costs": [
+        5897,
+        7371,
+        9214,
+        11518,
+        14397,
+        17996,
+        22495,
+        28119,
+        35149
+      ],
+      "base_tn": 19
+    },
+    {
+      "world": "Spiritual World",
+      "name": "Spirit Bone Reforging",
+      "phase_costs": [
+        9317,
+        11646,
+        14558,
+        18197,
+        22747,
+        28433,
+        35542,
+        44427,
+        55534
+      ],
+      "base_tn": 20
+    },
+    {
+      "world": "Spiritual World",
+      "name": "Spirit Blood Rebirth",
+      "phase_costs": [
+        14721,
+        18401,
+        23002,
+        28752,
+        35940,
+        44925,
+        56156,
+        70195,
+        87744
+      ],
+      "base_tn": 21
+    },
+    {
+      "world": "Spiritual World",
+      "name": "Nirvana Body",
+      "phase_costs": [
+        23259,
+        29074,
+        36342,
+        45428,
+        56785,
+        70981,
+        88726,
+        110908,
+        138634
+      ],
+      "base_tn": 22
+    },
+    {
+      "world": "Spiritual World",
+      "name": "Law Body",
+      "phase_costs": [
+        36748,
+        45935,
+        57419,
+        71773,
+        89717,
+        112146,
+        140182,
+        175228,
+        219035
+      ],
+      "base_tn": 23
+    },
+    {
+      "world": "Spiritual World",
+      "name": "Dao Body",
+      "phase_costs": [
+        58062,
+        72578,
+        90722,
+        113402,
+        141753,
+        177191,
+        221489,
+        276861,
+        346076
+      ],
+      "base_tn": 24
+    },
+    {
+      "world": "Spiritual World",
+      "name": "Indestructible Body",
+      "phase_costs": [
+        91739,
+        114674,
+        143342,
+        179178,
+        223972,
+        279965,
+        349957,
+        437446,
+        546807
+      ],
+      "base_tn": 25
+    },
+    {
+      "world": "Spiritual World",
+      "name": "Transcendent Body",
+      "phase_costs": [
+        144948,
+        181185,
+        226481,
+        283102,
+        353877,
+        442346,
+        552933,
+        691166,
+        863957
+      ],
+      "base_tn": 26
+    },
+    {
+      "world": "Immortal World",
+      "name": "Immortal Body",
+      "phase_costs": [
+        229018,
+        286272,
+        357841,
+        447301,
+        559126,
+        698907,
+        873634,
+        1092043,
+        1365054
+      ],
+      "base_tn": 27
+    },
+    {
+      "world": "Immortal World",
+      "name": "Earth Immortal Body",
+      "phase_costs": [
+        361848,
+        452310,
+        565388,
+        706734,
+        883418,
+        1104272,
+        1380341,
+        1725426,
+        2156782
+      ],
+      "base_tn": 28
+    },
+    {
+      "world": "Immortal World",
+      "name": "Sky Immortal Body",
+      "phase_costs": [
+        571720,
+        714650,
+        893312,
+        1116641,
+        1395801,
+        1744751,
+        2180939,
+        2726173,
+        3407717
+      ],
+      "base_tn": 29
+    },
+    {
+      "world": "Immortal World",
+      "name": "Starforged Body",
+      "phase_costs": [
+        903317,
+        1129146,
+        1411433,
+        1764291,
+        2205364,
+        2756705,
+        3445881,
+        4307351,
+        5384189
+      ],
+      "base_tn": 30
+    },
+    {
+      "world": "Immortal World",
+      "name": "Golden Immortal Body",
+      "phase_costs": [
+        1427242,
+        1784052,
+        2230066,
+        2787582,
+        3484478,
+        4355597,
+        5444496,
+        6805620,
+        8507025
+      ],
+      "base_tn": 31
+    },
+    {
+      "world": "Immortal World",
+      "name": "Void Body",
+      "phase_costs": [
+        2255042,
+        2818802,
+        3523503,
+        4404379,
+        5505474,
+        6881842,
+        8602303,
+        10752878,
+        13441098
+      ],
+      "base_tn": 32
+    },
+    {
+      "world": "Immortal World",
+      "name": "Chaos Body",
+      "phase_costs": [
+        3562966,
+        4453708,
+        5567134,
+        6958918,
+        8698647,
+        10873309,
+        13591637,
+        16989546,
+        21236932
+      ],
+      "base_tn": 33
+    },
+    {
+      "world": "Immortal World",
+      "name": "Immortal Body Sovereign",
+      "phase_costs": [
+        5629486,
+        7036858,
+        8796072,
+        10995090,
+        13743862,
+        17179828,
+        21474785,
+        26843481,
+        33554351
+      ],
+      "base_tn": 33
+    },
+    {
+      "world": "Celestial World",
+      "name": "Celestial Body",
+      "phase_costs": [
+        8894589,
+        11118236,
+        13897795,
+        17372244,
+        21715305,
+        27144131,
+        33930164,
+        42412705,
+        53015882
+      ],
+      "base_tn": 33
+    },
+    {
+      "world": "Celestial World",
+      "name": "Celestial Body Duke",
+      "phase_costs": [
+        14053450,
+        17566812,
+        21958516,
+        27448145,
+        34310181,
+        42887726,
+        53609657,
+        67012072,
+        83765090
+      ],
+      "base_tn": 33,
+      "gendered_names": {
+        "female": "Celestial Body Duchess"
+      }
+    },
+    {
+      "world": "Celestial World",
+      "name": "Celestial Body Lord",
+      "phase_costs": [
+        22204450,
+        27755562,
+        34694453,
+        43368066,
+        54210083,
+        67762604,
+        84703255,
+        105879068,
+        132348835
+      ],
+      "base_tn": 33,
+      "gendered_names": {
+        "female": "Celestial Body Lady"
+      }
+    },
+    {
+      "world": "Celestial World",
+      "name": "Celestial Body King",
+      "phase_costs": [
+        35083030,
+        43853788,
+        54817234,
+        68521543,
+        85651929,
+        107064911,
+        133831139,
+        167288923,
+        209111154
+      ],
+      "base_tn": 33,
+      "gendered_names": {
+        "female": "Celestial Body Queen"
+      }
+    },
+    {
+      "world": "Celestial World",
+      "name": "Celestial Body Emperor",
+      "phase_costs": [
+        55431189,
+        69288986,
+        86611233,
+        108264041,
+        135330051,
+        169162564,
+        211453205,
+        264316506,
+        330395633
+      ],
+      "base_tn": 33,
+      "gendered_names": {
+        "female": "Celestial Body Empress"
+      }
+    },
+    {
+      "world": "Celestial World",
+      "name": "Celestial Body Ancestor",
+      "phase_costs": [
+        87581278,
+        109476598,
+        136845747,
+        171057184,
+        213821479,
+        267276849,
+        334096062,
+        417620077,
+        522025096
+      ],
+      "base_tn": 33
+    },
+    {
+      "world": "Celestial World",
+      "name": "Body Saint",
+      "phase_costs": [
+        138378420,
+        172973025,
+        216216281,
+        270270352,
+        337837939,
+        422297424,
+        527871780,
+        659839725,
+        824799657
+      ],
+      "base_tn": 33,
+      "gendered_names": {
+        "female": "Body Saintess"
+      }
+    },
+    {
+      "world": "Celestial World",
+      "name": "Body Sovereign",
+      "phase_costs": [
+        218637903,
+        273297379,
+        341621723,
+        427027154,
+        533783943,
+        667229929,
+        834037411,
+        1042546763,
+        1303183454
+      ],
+      "base_tn": 33
+    }
+  ],
+  "body_perfection": {
+    "training_cap": 20,
+    "quest_progress": [
+      8,
+      10,
+      10,
+      12,
+      12,
+      13,
+      15
+    ],
+    "quests": [
+      {
+        "title": "Skin Without Flaw",
+        "description": "Temper the outer body until ordinary weakness has nowhere left to hide in your {realm}.",
+        "preparation_required": 4,
+        "attribute": "body",
+        "tn": 13,
+        "clue": "Endurance begins where comfort ends."
+      },
+      {
+        "title": "Bones Like Spirit Iron",
+        "description": "Reforge the framework of the body through pressure, impact, and medicinal tempering.",
+        "preparation_required": 4,
+        "attribute": "will",
+        "tn": 14,
+        "clue": "A body that fears pain can never become unbreakable."
+      },
+      {
+        "title": "Twelve Meridian Furnace",
+        "description": "Drive blood and body essence through every major meridian without tearing them.",
+        "preparation_required": 4,
+        "attribute": "body",
+        "tn": 15,
+        "clue": "The meridians are roads; perfection demands that none remain narrow."
+      },
+      {
+        "title": "Blood Roars Like Thunder",
+        "description": "Condense vitality until each heartbeat carries the force of your cultivation path.",
+        "preparation_required": 5,
+        "attribute": "will",
+        "tn": 16,
+        "clue": "Blood is not merely life; it is the army that carries life."
+      },
+      {
+        "title": "Marrow Rebirth",
+        "description": "Purge old weakness from the deepest parts of the body and regrow stronger marrow.",
+        "preparation_required": 5,
+        "attribute": "body",
+        "tn": 17,
+        "clue": "To be reborn, the old body must first be surpassed."
+      },
+      {
+        "title": "Body and Dao in Accord",
+        "description": "Use insight to make your physical form resonate with the principles you cultivate.",
+        "preparation_required": 5,
+        "attribute": "insight",
+        "tn": 18,
+        "clue": "The strongest body is one that agrees with its Dao."
+      },
+      {
+        "title": "A Worthy Vessel",
+        "description": "Prove through battle, hardship, or impossible exertion that your body can contain greater power.",
+        "preparation_required": 6,
+        "attribute": "body",
+        "tn": 19,
+        "clue": "Power without a vessel becomes self-destruction."
+      }
+    ],
+    "final_trials": [
+      {
+        "name": "Flesh Trial",
+        "attribute": "body",
+        "tn": 18
+      },
+      {
+        "name": "Will Trial",
+        "attribute": "will",
+        "tn": 18
+      },
+      {
+        "name": "Harmony Trial",
+        "attribute": "insight",
+        "tn": 17
+      }
+    ]
+  },
+  "currencies": {
+    "low_spirit_stone": {
+      "name": "Low-Grade Spirit Stone",
+      "world": "Mortal World",
+      "tier": 1
+    },
+    "mid_spirit_stone": {
+      "name": "Mid-Grade Spirit Stone",
+      "world": "Mortal World",
+      "tier": 2,
+      "base_ratio": 100
+    },
+    "high_spirit_stone": {
+      "name": "High-Grade Spirit Stone",
+      "world": "Mortal World",
+      "tier": 3,
+      "base_ratio": 10000
+    },
+    "peak_spirit_stone": {
+      "name": "Peak-Grade Spirit Stone",
+      "world": "Mortal World",
+      "tier": 4,
+      "base_ratio": 1000000
+    },
+    "low_spirit_crystal": {
+      "name": "Low Spirit Crystal",
+      "world": "Spiritual World",
+      "tier": 1
+    },
+    "mid_spirit_crystal": {
+      "name": "Mid Spirit Crystal",
+      "world": "Spiritual World",
+      "tier": 2,
+      "base_ratio": 100
+    },
+    "high_spirit_crystal": {
+      "name": "High Spirit Crystal",
+      "world": "Spiritual World",
+      "tier": 3,
+      "base_ratio": 10000
+    },
+    "peak_spirit_crystal": {
+      "name": "Peak Spirit Crystal",
+      "world": "Spiritual World",
+      "tier": 4,
+      "base_ratio": 1000000
+    },
+    "low_immortal_stone": {
+      "name": "Low-Grade Immortal Stone",
+      "world": "Immortal World",
+      "tier": 1
+    },
+    "mid_immortal_stone": {
+      "name": "Mid-Grade Immortal Stone",
+      "world": "Immortal World",
+      "tier": 2,
+      "base_ratio": 100
+    },
+    "high_immortal_stone": {
+      "name": "High-Grade Immortal Stone",
+      "world": "Immortal World",
+      "tier": 3,
+      "base_ratio": 10000
+    },
+    "peak_immortal_stone": {
+      "name": "Peak-Grade Immortal Stone",
+      "world": "Immortal World",
+      "tier": 4,
+      "base_ratio": 1000000
+    },
+    "low_celestial_crystal": {
+      "name": "Low Celestial Crystal",
+      "world": "Celestial World",
+      "tier": 1
+    },
+    "mid_celestial_crystal": {
+      "name": "Mid Celestial Crystal",
+      "world": "Celestial World",
+      "tier": 2,
+      "base_ratio": 100
+    },
+    "high_celestial_crystal": {
+      "name": "High Celestial Crystal",
+      "world": "Celestial World",
+      "tier": 3,
+      "base_ratio": 10000
+    },
+    "peak_celestial_crystal": {
+      "name": "Peak Celestial Crystal",
+      "world": "Celestial World",
+      "tier": 4,
+      "base_ratio": 1000000
+    }
+  },
+  "sect_system": {
+    "ranks": [
+      {
+        "name": "Outer Disciple",
+        "level": 10
+      },
+      {
+        "name": "Inner Disciple",
+        "level": 20
+      },
+      {
+        "name": "Core Disciple",
+        "level": 30
+      },
+      {
+        "name": "Deacon",
+        "level": 40
+      },
+      {
+        "name": "Elder",
+        "level": 50
+      },
+      {
+        "name": "Grand Elder",
+        "level": 60
+      },
+      {
+        "name": "Sect Master",
+        "level": 70
+      },
+      {
+        "name": "Ancestor",
+        "level": 80
+      }
+    ],
+    "resource_policy": "Sect members donate materials for contribution points. Higher ranks and accumulated influence determine political weight; contribution points can be exchanged for stocked sect resources."
+  },
+  "sects": {
+    "Azure Cloud Sect": {
+      "alignment": "Orthodox",
+      "specialty": "Sword cultivation and balanced foundations",
+      "recruitment": {
+        "location": "Azure Cloud Mountain Gate",
+        "examiner": "Gate Elder Jian Mu",
+        "public_route": true,
+        "trial_name": "Cloud-Sword Entrance Examination",
+        "primary_attribute": "spirit",
+        "secondary_attribute": "insight",
+        "base_tn": 14,
+        "description": "Applicants demonstrate stable foundations, qi control and the judgment expected of an orthodox sword sect.",
+        "path_bonuses": {
+          "Sword Cultivator": 2,
+          "Qi Refiner": 1
+        },
+        "root_affinities": [
+          "Metal",
+          "Wind",
+          "Wood"
+        ],
+        "karma_preference": "righteous",
+        "recommendation_bonus": 2
+      }
+    },
+    "Crimson Furnace Sect": {
+      "alignment": "Orthodox",
+      "specialty": "Alchemy and fire cultivation",
+      "recruitment": {
+        "location": "Crimson Furnace Valley",
+        "examiner": "Furnace Examiner Huo Ren",
+        "public_route": true,
+        "trial_name": "Three-Flame Furnace Examination",
+        "primary_attribute": "insight",
+        "secondary_attribute": "spirit",
+        "base_tn": 14,
+        "description": "Applicants identify medicinal materials, stabilize furnace flame and prove that their qi will not ruin a batch under pressure.",
+        "path_bonuses": {
+          "Qi Refiner": 1,
+          "Formation Adept": 1
+        },
+        "root_affinities": [
+          "Fire",
+          "Wood"
+        ],
+        "family_archetype_bonus": {
+          "alchemy_family": 2
+        },
+        "karma_preference": "neutral",
+        "recommendation_bonus": 2
+      }
+    },
+    "Frozen Moon Palace": {
+      "alignment": "Orthodox",
+      "specialty": "Ice techniques and formations",
+      "recruitment": {
+        "location": "Frozen Moon Terrace",
+        "examiner": "Moon Warden Lin Yue",
+        "public_route": true,
+        "trial_name": "Still-Moon Formation Trial",
+        "primary_attribute": "will",
+        "secondary_attribute": "insight",
+        "base_tn": 14,
+        "description": "Applicants cross a cold formation while preserving clarity, restraint and precise control of spiritual energy.",
+        "path_bonuses": {
+          "Formation Adept": 2,
+          "Soul Cultivator": 1,
+          "Qi Refiner": 1
+        },
+        "root_affinities": [
+          "Water",
+          "Ice"
+        ],
+        "karma_preference": "righteous",
+        "recommendation_bonus": 2
+      }
+    },
+    "Black Serpent Clan": {
+      "alignment": "Neutral",
+      "specialty": "Poisons, beast blood and ambush arts",
+      "recruitment": {
+        "location": "Black Serpent Ravine",
+        "examiner": "Handler She Ruo",
+        "public_route": true,
+        "trial_name": "Venom-Ravine Field Trial",
+        "primary_attribute": "agility",
+        "secondary_attribute": "body",
+        "base_tn": 14,
+        "description": "Applicants navigate venomous terrain, read beast behavior and prove they can survive without wasting valuable creatures.",
+        "path_bonuses": {
+          "Beast Binder": 2,
+          "Body Refiner": 1
+        },
+        "root_affinities": [
+          "Wood",
+          "Earth",
+          "Water"
+        ],
+        "karma_preference": "neutral",
+        "recommendation_bonus": 2
+      }
+    },
+    "Blood River Sect": {
+      "alignment": "Demonic",
+      "specialty": "Blood refinement, sacrificial arts and battlefield harvesting",
+      "recruitment": {
+        "location": "Blood River Gorge",
+        "examiner": "Blood Gatekeeper Yan Luo",
+        "public_route": false,
+        "trial_name": "Red-Gorge Resolve Trial",
+        "primary_attribute": "body",
+        "secondary_attribute": "will",
+        "base_tn": 15,
+        "description": "Only invited or discovered applicants reach the gorge. The test values survival instinct, resolve and willingness to bear the consequences of a hunted path.",
+        "path_bonuses": {
+          "Body Refiner": 2,
+          "Soul Cultivator": 1
+        },
+        "root_affinities": [
+          "Fire",
+          "Water",
+          "Yin"
+        ],
+        "karma_preference": "demonic",
+        "recommendation_bonus": 3
+      }
+    },
+    "Corpse Lantern Pavilion": {
+      "alignment": "Demonic",
+      "specialty": "Soul lanterns, corpse refinement, ghost techniques and forbidden inscriptions",
+      "recruitment": {
+        "location": "Corpse Lantern Necropolis",
+        "examiner": "Lantern Registrar Wu Ming",
+        "public_route": false,
+        "trial_name": "Thousand-Lantern Vigil",
+        "primary_attribute": "will",
+        "secondary_attribute": "insight",
+        "base_tn": 15,
+        "description": "Invited applicants keep vigil among bound memories and must distinguish fear, grief and spiritual deception without losing their own identity.",
+        "path_bonuses": {
+          "Soul Cultivator": 2,
+          "Formation Adept": 1
+        },
+        "root_affinities": [
+          "Yin",
+          "Water",
+          "Earth"
+        ],
+        "karma_preference": "demonic",
+        "recommendation_bonus": 3
+      }
+    }
+  },
+  "auction_houses": {
+    "golden_pavilion": {
+      "name": "Golden Pavilion Auction House",
+      "location": "Golden Pavilion Auction House",
+      "entrance_location": "Greenriver Town",
+      "protected_interior": true,
+      "door_rule": true,
+      "default_currency": "low_spirit_stone",
+      "description": "Violence is suppressed by formations and hidden guards inside. Once a bidder leaves through the doors, the Pavilion no longer guarantees protection."
+    }
+  },
+  "world_rulers": {
+    "Mortal World": "Emperor Zhao Tianming",
+    "Spiritual World": "Jade Sovereign Lian Xue",
+    "Immortal World": "Immortal Emperor Shen Wuji",
+    "Celestial World": "Celestial Empress Ji Yue"
+  },
+  "law_system": {
+    "stages": [
+      {
+        "index": 0,
+        "name": "Unawakened",
+        "min": 0
+      },
+      {
+        "index": 1,
+        "name": "Memorization (Mind)",
+        "min": 1
+      },
+      {
+        "index": 2,
+        "name": "Body Integration",
+        "min": 25
+      },
+      {
+        "index": 3,
+        "name": "Bone/Marrow Inscription",
+        "min": 50
+      },
+      {
+        "index": 4,
+        "name": "Domain Creation",
+        "min": 75
+      },
+      {
+        "index": 5,
+        "name": "Essence/Origin",
+        "min": 100
+      }
+    ],
+    "laws": {
+      "fire": {
+        "name": "Law of Fire",
+        "dao": "Great Dao of Fire",
+        "category": "Elemental",
+        "supreme": false,
+        "affinity_roots": [
+          "Fire Root"
+        ]
+      },
+      "water": {
+        "name": "Law of Water",
+        "dao": "Great Dao of Water",
+        "category": "Elemental",
+        "supreme": false,
+        "affinity_roots": [
+          "Water Root",
+          "Ice Root"
+        ]
+      },
+      "sword": {
+        "name": "Law of the Sword",
+        "dao": "Sword Dao",
+        "category": "Conceptual",
+        "supreme": false,
+        "affinity_paths": [
+          "Sword Cultivator"
+        ]
+      },
+      "space": {
+        "name": "Law of Space",
+        "dao": "Dao of Space",
+        "category": "Supreme",
+        "supreme": true,
+        "affinity_roots": [
+          "Void Root",
+          "Chaos Root"
+        ]
+      },
+      "time": {
+        "name": "Law of Time",
+        "dao": "Dao of Time",
+        "category": "Supreme",
+        "supreme": true,
+        "affinity_roots": [
+          "Chaos Root"
+        ]
+      },
+      "karma": {
+        "name": "Law of Karma",
+        "dao": "Dao of Karma",
+        "category": "Supreme",
+        "supreme": true,
+        "affinity_roots": [
+          "Chaos Root"
+        ]
+      },
+      "fate": {
+        "name": "Law of Fate",
+        "dao": "Dao of Fate",
+        "category": "Supreme",
+        "supreme": true,
+        "affinity_roots": [
+          "Chaos Root"
+        ]
+      },
+      "life": {
+        "name": "Law of Life",
+        "dao": "Dao of Life",
+        "category": "Supreme",
+        "supreme": true,
+        "affinity_roots": [
+          "Wood Root",
+          "Chaos Root"
+        ]
+      },
+      "death": {
+        "name": "Law of Death",
+        "dao": "Dao of Death",
+        "category": "Supreme",
+        "supreme": true,
+        "affinity_roots": [
+          "Void Root",
+          "Chaos Root"
+        ]
+      },
+      "chaos": {
+        "name": "Law of Chaos",
+        "dao": "Great Dao of Chaos",
+        "category": "Primordial",
+        "supreme": true,
+        "affinity_roots": [
+          "Chaos Root"
+        ]
+      },
+      "void": {
+        "name": "Law of the Void",
+        "dao": "Great Dao of Void",
+        "category": "Primordial",
+        "supreme": true,
+        "affinity_roots": [
+          "Void Root",
+          "Chaos Root"
+        ]
+      }
+    },
+    "techniques": {
+      "folded_step": {
+        "name": "Folded Step",
+        "law": "space",
+        "requires_stage": 2,
+        "min_realm_index": 12,
+        "description": "Fold a short span of space to reposition instantly."
+      },
+      "spatial_lockdown": {
+        "name": "Spatial Lockdown",
+        "law": "space",
+        "requires_stage": 2,
+        "min_realm_index": 12,
+        "description": "Freeze local space around an opponent, suppressing movement and escape.",
+        "effect": "spatial_lockdown"
+      },
+      "spatial_strangulation": {
+        "name": "Spatial Strangulation",
+        "law": "space",
+        "requires_stage": 3,
+        "min_realm_index": 13,
+        "description": "Compress the space surrounding a target into a crushing prison.",
+        "effect": "spatial_strangulation"
+      },
+      "space_domain": {
+        "name": "Space Dominion",
+        "law": "space",
+        "requires_stage": 4,
+        "min_realm_index": 14,
+        "description": "Project a domain in which the user controls distance, direction, and spatial stability.",
+        "effect": "space_domain"
+      },
+      "world_collapse": {
+        "name": "World Collapse",
+        "law": "space",
+        "requires_stage": 5,
+        "min_realm_index": 30,
+        "description": "Use a stabilized personal world as a conceptual weapon against another domain.",
+        "effect": "world_collapse"
+      }
+    },
+    "comprehend_cooldown_minutes": 120,
+    "normal_min_realm_index": 6,
+    "supreme_min_realm_index": 11
+  },
+  "special_effects": {
+    "spatial_lockdown": {
+      "name": "Spatial Lockdown",
+      "category": "Law Control",
+      "description": "Local space is frozen. Movement, flight, and escape are suppressed.",
+      "tags": [
+        "law",
+        "space",
+        "control"
+      ],
+      "severity": 3,
+      "modifiers": [
+        {
+          "stat": "agility",
+          "operation": "add",
+          "value": -3
+        },
+        {
+          "stat": "escape_bonus",
+          "operation": "add",
+          "value": -5
+        }
+      ]
+    },
+    "spatial_strangulation": {
+      "name": "Spatial Strangulation",
+      "category": "Law Control",
+      "description": "Space compresses inward, bypassing ordinary physical positioning and crushing the target.",
+      "tags": [
+        "law",
+        "space",
+        "control",
+        "damage"
+      ],
+      "severity": 4,
+      "modifiers": [
+        {
+          "stat": "body",
+          "operation": "add",
+          "value": -2
+        }
+      ]
+    },
+    "space_domain": {
+      "name": "Space Dominion",
+      "category": "Domain",
+      "description": "Within this domain, distance and direction bend toward the cultivator’s will.",
+      "tags": [
+        "law",
+        "space",
+        "domain"
+      ],
+      "severity": 5,
+      "modifiers": [
+        {
+          "stat": "combat_bonus",
+          "operation": "add",
+          "value": 4
+        },
+        {
+          "stat": "sense_power_bonus",
+          "operation": "add",
+          "value": 5
+        }
+      ]
+    },
+    "abode_cultivation_focus": {
+      "name": "Cave Abode Cultivation Focus",
+      "category": "Home",
+      "description": "A stabilized cultivation chamber improves local qi circulation.",
+      "tags": [
+        "home",
+        "cultivation"
+      ],
+      "severity": 1,
+      "modifiers": [
+        {
+          "stat": "cultivation_gain",
+          "operation": "mul",
+          "value": 1.15
+        }
+      ]
+    },
+    "forge_inspiration": {
+      "name": "Forge Inspiration",
+      "category": "Home",
+      "description": "The private forge and formation-fed furnace improve forging control.",
+      "tags": [
+        "home",
+        "forging"
+      ],
+      "severity": 1,
+      "modifiers": [
+        {
+          "stat": "forging_bonus",
+          "operation": "add",
+          "value": 2
+        }
+      ]
+    },
+    "alchemy_inspiration": {
+      "name": "Alchemy Inspiration",
+      "category": "Home",
+      "description": "A private medicine room improves flame and medicinal-energy control.",
+      "tags": [
+        "home",
+        "alchemy"
+      ],
+      "severity": 1,
+      "modifiers": [
+        {
+          "stat": "alchemy_bonus",
+          "operation": "add",
+          "value": 2
+        }
+      ]
+    }
+  },
+  "teleport_arrays": {
+    "greenriver_imperial": {
+      "name": "Greenriver–Imperial Transit Array",
+      "from": "Greenriver Town",
+      "to": "Azure Crown Imperial City",
+      "currency": "low_spirit_stone",
+      "cost": 10,
+      "min_realm_index": 1
+    },
+    "imperial_spirit": {
+      "name": "Ascendant Jade Gate",
+      "from": "Azure Crown Imperial City",
+      "to": "Spirit Jade Capital",
+      "currency": "low_spirit_crystal",
+      "cost": 1,
+      "min_realm_index": 8
+    },
+    "spirit_immortal": {
+      "name": "Immortal Cloud Crossing",
+      "from": "Spirit Jade Capital",
+      "to": "Nine-Heavens Immortal Court",
+      "currency": "low_immortal_stone",
+      "cost": 1,
+      "min_realm_index": 16
+    },
+    "immortal_celestial": {
+      "name": "Celestial Mandate Gate",
+      "from": "Nine-Heavens Immortal Court",
+      "to": "Celestial Mandate Palace",
+      "currency": "low_celestial_crystal",
+      "cost": 1,
+      "min_realm_index": 24
+    }
+  },
+  "abode_system": {
+    "facilities": [
+      "cultivation",
+      "alchemy",
+      "forge",
+      "formation",
+      "defense",
+      "storage",
+      "herb_garden",
+      "beast_pen",
+      "merchant"
+    ],
+    "max_level": 9,
+    "upgrade_base_cost": 100,
+    "currency": "low_spirit_stone",
+    "property_types": {
+      "cave_abode": {
+        "name": "Cave Abode",
+        "emoji": "🏡",
+        "description": "A secluded cultivation residence balanced around cultivation, storage and formations.",
+        "defaults": {
+          "cultivation": 1,
+          "storage": 1
+        }
+      },
+      "alchemy_estate": {
+        "name": "Alchemy Estate",
+        "emoji": "⚗️",
+        "description": "A private estate centered on pill refinement, medicinal herbs and secure storage.",
+        "defaults": {
+          "alchemy": 1,
+          "herb_garden": 1,
+          "storage": 1
+        }
+      },
+      "spirit_herb_estate": {
+        "name": "Spirit Herb Estate",
+        "emoji": "🌿",
+        "description": "A spiritual garden estate specializing in herb cultivation and medicinal preparation.",
+        "defaults": {
+          "herb_garden": 2,
+          "alchemy": 1,
+          "storage": 1
+        }
+      },
+      "spirit_beast_ranch": {
+        "name": "Spirit Beast Ranch",
+        "emoji": "🐉",
+        "description": "A protected private holding for contracted beasts, training and recovery.",
+        "defaults": {
+          "beast_pen": 2,
+          "defense": 1,
+          "storage": 1
+        }
+      },
+      "merchant_pavilion": {
+        "name": "Merchant Pavilion",
+        "emoji": "🏪",
+        "description": "A player-owned commercial residence with expanded storage and merchant facilities.",
+        "defaults": {
+          "merchant": 1,
+          "storage": 2,
+          "defense": 1
+        }
+      },
+      "clan_estate": {
+        "name": "Clan Estate",
+        "emoji": "🏯",
+        "description": "A fortified family estate suited to cultivation, guests, formations and long-term clan scenes.",
+        "defaults": {
+          "cultivation": 1,
+          "formation": 1,
+          "defense": 1,
+          "storage": 2
+        }
+      }
+    }
+  },
+  "world_rules": {
+    "forbidden_arts": {
+      "orthodox_public_use": {
+        "karma_multiplier": 1,
+        "regional_unrest": 2,
+        "family_stability_loss": 2,
+        "sect_cohesion_loss": 2
+      },
+      "demonic_public_use": {
+        "karma_multiplier": 1,
+        "regional_unrest": 1,
+        "family_stability_loss": 1,
+        "sect_cohesion_loss": 0
+      },
+      "concealed_use_reduces_exposure": true,
+      "description": "Blood, soul-devouring, corpse, sacrificial and predatory cultivation arts are forbidden by most orthodox jurisdictions. Public use creates evidence and political consequences; demonic factions may approve of the same act."
+    },
+    "faction_attitudes": {
+      "Orthodox": {
+        "forbidden_arts": -35,
+        "murder": -30,
+        "mercy": 15
+      },
+      "Neutral": {
+        "forbidden_arts": -5,
+        "murder": -10,
+        "mercy": 5
+      },
+      "Demonic": {
+        "forbidden_arts": 20,
+        "murder": 5,
+        "mercy": -5
+      }
+    },
+    "family_principles": [
+      "Families protect bloodline survival and reputation before abstract ideology.",
+      "A publicly exposed forbidden cultivator can cost their family alliances, stability and face.",
+      "Powerful families may hide a useful demonic heir while weak families may disown them to survive.",
+      "Blood feuds and succession crises persist across player deaths and reincarnations."
+    ],
+    "npc_principles": [
+      "NPCs act according to faction, fear, ambition, memory and local law rather than player convenience.",
+      "Orthodox witnesses can report forbidden arts; demonic witnesses may respect or recruit the user.",
+      "NPC death is canonical and may weaken families, sects, markets and regional security."
+    ],
+    "sect_principles": [
+      "Orthodox sects punish exposed forbidden arts unless leadership chooses secrecy or expediency.",
+      "Demonic sects reward effective forbidden cultivation but punish weakness and resource waste.",
+      "Sect policy, cohesion, resources and internal factions continue changing during player seclusion."
+    ]
+  },
+  "technique_system": {
+    "mastery_levels": [
+      "Learned",
+      "Practiced",
+      "Proficient",
+      "Mastered",
+      "Perfected"
+    ],
+    "manuals": {
+      "blood_sea_scripture": {
+        "name": "Blood Sea Scripture",
+        "item_id": "blood_sea_scripture_manual",
+        "alignment": "Demonic",
+        "path": "Blood",
+        "grade": "Earth",
+        "min_realm_index": 1,
+        "description": "Refines blood essence into violent crimson qi. Fast, potent, and corrosive to the Dao Heart.",
+        "techniques": [
+          "blood_sea_palm",
+          "scarlet_rebirth"
+        ]
+      },
+      "soul_devouring_codex": {
+        "name": "Soul-Devouring Codex",
+        "item_id": "soul_devouring_codex_manual",
+        "alignment": "Demonic",
+        "path": "Soul",
+        "grade": "Earth",
+        "min_realm_index": 2,
+        "description": "A forbidden soul path that tears loose fragments of spiritual consciousness.",
+        "techniques": [
+          "soul_rend",
+          "ghost_lantern_bind"
+        ]
+      },
+      "white_bone_demon_manual": {
+        "name": "White Bone Demon Manual",
+        "item_id": "white_bone_demon_manual",
+        "alignment": "Demonic",
+        "path": "Body",
+        "grade": "Spirit",
+        "min_realm_index": 1,
+        "description": "Tempers bones with corpse-yin and death qi until the body resembles an undead treasure.",
+        "techniques": [
+          "white_bone_claw",
+          "corpse_armor"
+        ]
+      },
+      "ten_thousand_venoms_record": {
+        "name": "Ten Thousand Venoms Record",
+        "item_id": "ten_thousand_venoms_manual",
+        "alignment": "Unorthodox",
+        "path": "Poison",
+        "grade": "Earth",
+        "min_realm_index": 1,
+        "description": "Turns poisons into cultivation resources and the body into a mobile poison furnace.",
+        "techniques": [
+          "black_miasma_finger",
+          "venomous_meridian_seal"
+        ]
+      },
+      "heart_demon_whispering_art": {
+        "name": "Heart-Demon Whispering Art",
+        "item_id": "heart_demon_whispering_manual",
+        "alignment": "Demonic",
+        "path": "Illusion",
+        "grade": "Heaven",
+        "min_realm_index": 3,
+        "description": "Invades fear, regret and obsession to cultivate power from another being’s inner demons.",
+        "techniques": [
+          "heart_demon_whisper",
+          "seven_emotion_collapse"
+        ]
+      },
+      "netherworld_sacrificial_sutra": {
+        "name": "Netherworld Sacrificial Sutra",
+        "item_id": "netherworld_sacrificial_manual",
+        "alignment": "Demonic",
+        "path": "Sacrifice",
+        "grade": "Heaven",
+        "min_realm_index": 4,
+        "description": "Burns vitality, lifespan and karmic fortune for terrifying temporary strength.",
+        "techniques": [
+          "life_burning_demon_flame",
+          "netherworld_descent"
+        ]
+      }
+    },
+    "techniques": {
+      "blood_sea_palm": {
+        "name": "Blood Sea Palm",
+        "manual": "blood_sea_scripture",
+        "min_mastery": 0,
+        "qi_cost": 3,
+        "vitality_cost": 1,
+        "damage": 6,
+        "karma_cost": 2,
+        "exposure": 4,
+        "tags": [
+          "blood",
+          "forbidden",
+          "melee"
+        ],
+        "description": "A palm strike carrying corrosive blood qi."
+      },
+      "scarlet_rebirth": {
+        "name": "Scarlet Rebirth",
+        "manual": "blood_sea_scripture",
+        "min_mastery": 1,
+        "qi_cost": 5,
+        "vitality_cost": 2,
+        "heal": 5,
+        "karma_cost": 3,
+        "exposure": 5,
+        "tags": [
+          "blood",
+          "forbidden",
+          "recovery"
+        ],
+        "description": "Burns blood essence to force wounds closed."
+      },
+      "soul_rend": {
+        "name": "Soul Rend",
+        "manual": "soul_devouring_codex",
+        "min_mastery": 0,
+        "qi_cost": 5,
+        "damage": 8,
+        "karma_cost": 4,
+        "exposure": 7,
+        "tags": [
+          "soul",
+          "forbidden",
+          "ranged"
+        ],
+        "description": "A spiritual tear aimed directly at the opponent’s soul."
+      },
+      "ghost_lantern_bind": {
+        "name": "Ghost Lantern Bind",
+        "manual": "soul_devouring_codex",
+        "min_mastery": 1,
+        "qi_cost": 4,
+        "damage": 3,
+        "suppress_turns": 2,
+        "karma_cost": 3,
+        "exposure": 6,
+        "tags": [
+          "soul",
+          "control",
+          "forbidden"
+        ],
+        "description": "Ghost-fire chains suppress the target’s actions."
+      },
+      "white_bone_claw": {
+        "name": "White Bone Claw",
+        "manual": "white_bone_demon_manual",
+        "min_mastery": 0,
+        "qi_cost": 2,
+        "vitality_cost": 1,
+        "damage": 7,
+        "karma_cost": 2,
+        "exposure": 5,
+        "tags": [
+          "body",
+          "corpse",
+          "forbidden"
+        ],
+        "description": "Corpse-yin hardens the fingers into tearing bone claws."
+      },
+      "corpse_armor": {
+        "name": "Corpse Armor",
+        "manual": "white_bone_demon_manual",
+        "min_mastery": 1,
+        "qi_cost": 3,
+        "heal": 3,
+        "suppress_turns": 1,
+        "karma_cost": 2,
+        "exposure": 5,
+        "tags": [
+          "body",
+          "corpse",
+          "defense",
+          "forbidden"
+        ],
+        "description": "Death qi temporarily seals flesh and deadens pain."
+      },
+      "black_miasma_finger": {
+        "name": "Black Miasma Finger",
+        "manual": "ten_thousand_venoms_record",
+        "min_mastery": 0,
+        "qi_cost": 3,
+        "damage": 5,
+        "karma_cost": 1,
+        "exposure": 3,
+        "tags": [
+          "poison",
+          "unorthodox"
+        ],
+        "description": "Condenses poisonous qi into a piercing finger strike."
+      },
+      "venomous_meridian_seal": {
+        "name": "Venomous Meridian Seal",
+        "manual": "ten_thousand_venoms_record",
+        "min_mastery": 1,
+        "qi_cost": 4,
+        "damage": 2,
+        "suppress_turns": 2,
+        "karma_cost": 2,
+        "exposure": 4,
+        "tags": [
+          "poison",
+          "control",
+          "unorthodox"
+        ],
+        "description": "Poison qi clogs the target’s meridian circulation."
+      },
+      "heart_demon_whisper": {
+        "name": "Heart-Demon Whisper",
+        "manual": "heart_demon_whispering_art",
+        "min_mastery": 0,
+        "qi_cost": 6,
+        "damage": 7,
+        "suppress_turns": 1,
+        "karma_cost": 5,
+        "exposure": 8,
+        "tags": [
+          "illusion",
+          "soul",
+          "forbidden"
+        ],
+        "description": "A whisper that turns unresolved fear into a weapon."
+      },
+      "seven_emotion_collapse": {
+        "name": "Seven-Emotion Collapse",
+        "manual": "heart_demon_whispering_art",
+        "min_mastery": 2,
+        "qi_cost": 9,
+        "vitality_cost": 2,
+        "damage": 12,
+        "karma_cost": 7,
+        "exposure": 9,
+        "tags": [
+          "illusion",
+          "soul",
+          "forbidden"
+        ],
+        "description": "Overloads the seven emotions until mind and qi collapse together."
+      },
+      "life_burning_demon_flame": {
+        "name": "Life-Burning Demon Flame",
+        "manual": "netherworld_sacrificial_sutra",
+        "min_mastery": 0,
+        "qi_cost": 4,
+        "vitality_cost": 4,
+        "damage": 13,
+        "karma_cost": 6,
+        "exposure": 10,
+        "tags": [
+          "sacrifice",
+          "fire",
+          "forbidden"
+        ],
+        "description": "Sacrifices life force to ignite black-red demonic flame."
+      },
+      "netherworld_descent": {
+        "name": "Netherworld Descent",
+        "manual": "netherworld_sacrificial_sutra",
+        "min_mastery": 3,
+        "qi_cost": 12,
+        "vitality_cost": 6,
+        "damage": 18,
+        "suppress_turns": 2,
+        "karma_cost": 10,
+        "exposure": 10,
+        "tags": [
+          "sacrifice",
+          "domain",
+          "forbidden"
+        ],
+        "description": "Briefly overlays the battlefield with a predatory netherworld domain."
+      }
+    }
+  }
+}

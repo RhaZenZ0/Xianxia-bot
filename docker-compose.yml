@@ -1,0 +1,79 @@
+services:
+  xianxia-engine:
+    build:
+      context: .
+      dockerfile: go_core/Dockerfile
+    container_name: xianxia-game-engine
+    labels:
+      xianxia.release: "0.13"
+    restart: unless-stopped
+    environment:
+      ENGINE_ADDR: ":8081"
+      DATABASE_PATH: "/data/xianxia.sqlite3"
+      WORLD_DATA_PATH: "/app/content/world.json"
+    volumes:
+      - ./data:/data
+    expose:
+      - "8081"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8081/readyz"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 5s
+
+  xianxia-db-init:
+    build: .
+    container_name: xianxia-db-init
+    restart: "no"
+    env_file:
+      - .env
+    depends_on:
+      xianxia-engine:
+        condition: service_healthy
+    environment:
+      GAME_ENGINE_URL: "http://xianxia-engine:8081"
+    command: ["python", "-m", "app.database_bootstrap"]
+
+  xianxia-bot:
+    build: .
+    container_name: xianxia-roleplay-bot
+    labels:
+      xianxia.release: "0.13"
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      xianxia-engine:
+        condition: service_healthy
+      xianxia-db-init:
+        condition: service_completed_successfully
+    environment:
+      GAME_ENGINE_URL: "http://xianxia-engine:8081"
+    expose:
+      - "8080"
+
+  xianxia-dashboard:
+    build: .
+    container_name: xianxia-rp-dashboard
+    profiles:
+      - dashboard
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      xianxia-engine:
+        condition: service_healthy
+      xianxia-db-init:
+        condition: service_completed_successfully
+    environment:
+      GAME_ENGINE_URL: "http://xianxia-engine:8081"
+    command: ["python", "-m", "app.dashboard"]
+    ports:
+      - "${DASHBOARD_BIND_ADDRESS:-127.0.0.1}:${DASHBOARD_PORT:-8090}:8090"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8090/livez', timeout=2).read()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s

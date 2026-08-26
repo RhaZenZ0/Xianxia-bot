@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Xianxia RP — GM World Dashboard</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <div class="eyebrow">GM ONLY · ADMIN CONTROL</div>
+      <h1>Xianxia RP</h1>
+      <div class="subtitle">Authoritative world control & observability</div>
+    </div>
+    <div class="clockbox"><span id="worldClock">Loading world time…</span><small id="schema">SQLite</small></div>
+  </header>
+
+  <nav id="nav" class="nav">
+    <button data-view="overview" class="active">Overview</button>
+    <button data-view="timeline">Timeline</button>
+    <button data-view="npcs">NPCs</button>
+    <button data-view="families">Families</button>
+    <button data-view="sects">Sect Politics</button>
+    <button data-view="conflicts">Conflicts</button>
+    <button data-view="events">World Events</button>
+    <button data-view="players">Player Activity</button>
+    <button data-view="rag">RAG Memory</button>
+    <button data-view="decisions">Autonomous Decisions</button>
+    <button data-view="admin" class="admin-tab">Admin Console</button>
+  </nav>
+
+  <main id="app"><div class="loading">Loading dashboard…</div></main>
+  <div id="drawer" class="drawer hidden"><div class="drawer-card"><button id="closeDrawer" class="close">×</button><div id="drawerBody"></div></div></div>
+  <script src="/app.js"></script>
+</body>
+</html>
