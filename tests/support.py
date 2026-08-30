@@ -5,11 +5,15 @@ also run in a minimal Python environment where aiosqlite is unavailable.
 """
 
 import importlib.util
+import json
+import secrets
+import time
 import importlib.machinery
 import sqlite3
 import sys
 import types
 from pathlib import Path
+from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
@@ -138,3 +142,230 @@ def install_openai_shim() -> None:
     shim.__spec__ = importlib.machinery.ModuleSpec("openai", loader=None)
     shim.AsyncOpenAI = _AsyncOpenAI
     sys.modules["openai"] = shim
+
+
+async def seed_simulation_fixture(db, world_data: dict, game_minute: int = 0) -> None:
+    """Seed read-model simulation rows for Python tests without gameplay authority."""
+    systems = {
+        "npc_civilization": 1440,
+        "npc_life": 10080,
+        "dynamic_economy": 1440,
+        "black_markets": 4320,
+        "sect_politics": 10080,
+        "clan_dynamics": 43200,
+        "autonomous_world_events": 1440,
+    }
+    async with db._connect() as conn:
+        for name, interval in systems.items():
+            await conn.execute(
+                """INSERT INTO world_simulation_state(
+                       system,last_game_minute,interval_game_minutes,last_run_real,runs
+                   ) VALUES(?,?,?,?,0) ON CONFLICT(system) DO NOTHING""",
+                (name, int(game_minute), int(interval), 0.0),
+            )
+        for location, data in dict(world_data.get("locations") or {}).items():
+            world_name = str(data.get("world") or "Mortal World")
+            await conn.execute(
+                """INSERT INTO civilization_regions(
+                       location,world_name,population,prosperity,security,spirit_resources,
+                       food_supply,migration_pressure,unrest,last_game_minute,updated_at
+                   ) VALUES(?,?,?,?,?,?,?,?,?,?,?)
+                   ON CONFLICT(location) DO NOTHING""",
+                (str(location), world_name, 10000, 50, 50, 50, 50, 0, 0, int(game_minute), 0.0),
+            )
+        for npc_name, data in dict(world_data.get("npcs") or {}).items():
+            location = str(data.get("location") or "Greenriver Town")
+            world_name = str((world_data.get("locations") or {}).get(location, {}).get("world") or "Mortal World")
+            await conn.execute(
+                """INSERT INTO npc_civilization_state(
+                       npc_name,home_location,current_location,world_name,profession,faction,
+                       wealth,influence,ambition,realm_index,phase,status,activity,last_game_minute,updated_at
+                   ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                   ON CONFLICT(npc_name) DO NOTHING""",
+                (
+                    str(npc_name), location, location, world_name, str(data.get("role") or "NPC"),
+                    "Independent", 10, 10, 10, 0, 1, "alive", "Fixture state", int(game_minute), 0.0,
+                ),
+            )
+        await conn.commit()
+
+
+# Test-only fixture seeding. This intentionally bypasses production gameplay authority.
+async def seed_character(
+    db_obj,
+    *,
+    user_id: int,
+    discord_name: str,
+    name: str,
+    origin: str,
+    path: str,
+    spiritual_root: str,
+    concept: str,
+    location: str,
+    attributes: dict[str, int],
+    qi_max: int,
+    vitality_max: int,
+    created_game_minute: int = 0,
+    age_at_creation_years: int = 18,
+    natural_lifespan_years: int = 75,
+    gender: str = "neutral",
+    birth_family_profile: dict[str, Any] | None = None,
+    aptitude_profile: dict[str, Any] | None = None,
+) -> bool:
+    gender = str(gender or "neutral").strip().lower()
+    if gender not in {"male", "female", "neutral"}:
+        gender = "neutral"
+    now = time.time()
+    try:
+        async with db_obj._connect() as db:
+            await db.execute("PRAGMA foreign_keys=ON;")
+            await db.execute(
+                """
+                INSERT INTO characters (
+                    user_id, discord_name, name, origin, path, spiritual_root, concept, gender,
+                    age_at_creation_years, created_game_minute, natural_lifespan_years, life_extension_years, life_status,
+                    realm_index, phase, cultivation, qi, qi_max, vitality, vitality_max,
+                    spirit_stones, insight_xp, location, attributes_json, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'alive', 0, 1, 0, ?, ?, ?, ?, 25, 0, ?, ?, ?, ?)
+                """,
+                (
+                    user_id,
+                    discord_name,
+                    name,
+                    origin,
+                    path,
+                    spiritual_root,
+                    concept,
+                    gender,
+                    max(0, int(age_at_creation_years)),
+                    max(0, int(created_game_minute)),
+                    max(1, int(natural_lifespan_years)),
+                    qi_max,
+                    qi_max,
+                    vitality_max,
+                    vitality_max,
+                    location,
+                    json.dumps(attributes),
+                    now,
+                    now,
+                ),
+            )
+            # Small starter crafting kit so the systems are usable immediately.
+            for item_id, qty in {"spirit_herb": 2, "spirit_iron": 1}.items():
+                await db.execute(
+                    "INSERT INTO inventory(user_id, item_id, quantity) VALUES (?, ?, ?)",
+                    (user_id, item_id, qty),
+                )
+            await db.execute(
+                "INSERT INTO currency_wallets(user_id,currency_id,balance) VALUES(?,?,?)",
+                (user_id, "low_spirit_stone", 25),
+            )
+            await db.execute(
+                """INSERT INTO storage_containers(
+                       user_id,container_id,name,grade,slot_capacity,living_space,updated_at
+                   ) VALUES(?,?,?,?,?,?,?)""",
+                (user_id, "common_spatial_pouch", "Common Spatial Pouch", "Mortal", 24, 0, now),
+            )
+            await db.execute(
+                """INSERT OR IGNORE INTO character_location_discoveries(
+                       user_id,location,discovery_kind,discovered_game_minute,created_at
+                   ) VALUES(?,?,?,?,?)""",
+                (user_id, str(location), "birthplace", max(0, int(created_game_minute)), now),
+            )
+            await db.execute(
+                "INSERT INTO event_log(user_id, event_type, payload_json, created_at) VALUES (?, ?, ?, ?)",
+                (user_id, "character_created", json.dumps({
+                    "name": name, "path": path, "spiritual_root": spiritual_root, "gender": gender,
+                    "origin": origin, "location": location,
+                    "family_archetype": str((birth_family_profile or {}).get("id") or (birth_family_profile or {}).get("archetype") or ""),
+                }), now),
+            )
+            family_id: int | None = None
+            if birth_family_profile:
+                fp = birth_family_profile
+                cur = await db.execute(
+                    """INSERT INTO birth_families(
+                           family_name,surname,archetype,tier,wealth,influence,stability,alignment_bias,location,
+                           head_name,head_gender,head_title,head_realm_index,head_phase,treasury_balance,generation,
+                           created_game_minute,last_simulated_game_minute,history_json,
+                           clan_structure,bloodline_name,bloodline_affinity,bloodline_trait,bloodline_purity,branch_count,retainer_count,confederacy_name,
+                           created_at,updated_at
+                       ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    (str(fp['family_name']),str(fp['surname']),str(fp['id']),int(fp.get('tier',1)),int(fp.get('wealth',20)),
+                     int(fp.get('influence',10)),int(fp.get('stability',60)),int(fp.get('alignment_bias',0)),str(fp.get('location',location)),
+                     str(fp.get('head_name','Family Head')),str(fp.get('head_gender','neutral')),str(fp.get('head_title','Family Head')),
+                     int(fp.get('head_realm_index',0)),int(fp.get('head_phase',1)),max(0,int(fp.get('wealth',20))*4),1,
+                     max(0,int(created_game_minute)),max(0,int(created_game_minute)),json.dumps([f"{fp['family_name']} welcomed {name} into the household."]),
+                     str(fp.get('clan_structure','extended_household')),str(fp.get('bloodline_name','None')),str(fp.get('bloodline_affinity','None')),
+                     str(fp.get('bloodline_trait','No awakened ancestral bloodline')),max(0,min(100,int(fp.get('bloodline_purity',0)))),
+                     max(1,int(fp.get('branch_count',1))),max(0,int(fp.get('retainer_count',0))),str(fp.get('confederacy_name','None')),now,now)
+                )
+                family_id=int(cur.lastrowid)
+                await db.execute(
+                    "INSERT INTO character_birth_family(user_id,family_id,birth_order,generation,last_support_game_minute) VALUES(?,?,?,?,?)",
+                    (user_id,family_id,max(1,int(fp.get('birth_order',1))),1,-999999999)
+                )
+                for rel in list(fp.get('relatives',[])):
+                    age=max(1,int(rel.get('age',30)))
+                    birth_min=max(0,int(created_game_minute)-age*518400)
+                    rel_realm=int(rel.get('realm_index',0)); rel_phase=int(rel.get('phase',1))
+                    rel_natural=max(1,int(rel.get('natural_lifespan_years',75)))
+                    await db.execute(
+                        """INSERT INTO birth_family_npcs(family_id,name,relation,gender,age_at_creation,birth_game_minute,natural_lifespan_years,status,spiritual_root,realm_index,phase,personality,created_at)
+                           VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                        (family_id,str(rel.get('name','Relative')),str(rel.get('relation','Relative')),str(rel.get('gender','neutral')),age,birth_min,rel_natural,'alive','Mortal Root',rel_realm,rel_phase,'Family member',now)
+                    )
+            aptitude = dict(aptitude_profile or {})
+            root = dict(aptitude.get("root") or {
+                "grade": "Common", "purity": 50, "elements": [spiritual_root],
+                "mutation": "", "stability": 100, "refinement_progress": 0, "compatibility": 50,
+            })
+            await db.execute(
+                """INSERT INTO character_spiritual_roots(
+                       user_id,grade,purity,elements_json,mutation,stability,refinement_progress,compatibility,updated_at
+                   ) VALUES(?,?,?,?,?,?,?,?,?)""",
+                (
+                    user_id, str(root.get("grade", "Common")), max(1, min(100, int(root.get("purity", 50)))),
+                    json.dumps(list(root.get("elements") or [spiritual_root])), str(root.get("mutation", "")),
+                    max(0, min(100, int(root.get("stability", 100)))),
+                    max(0, min(100, int(root.get("refinement_progress", 0)))),
+                    max(0, min(100, int(root.get("compatibility", 50)))), now,
+                ),
+            )
+            bloodline = aptitude.get("bloodline")
+            if bloodline:
+                await db.execute(
+                    """INSERT INTO character_bloodlines(
+                           user_id,bloodline_id,name,affinity,purity,state,evolution_stage,progress,rejection,mutation,
+                           primary_lineage,source_family_id,unlocked_techniques_json,updated_at
+                       ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    (
+                        user_id, str(bloodline.get("bloodline_id", "legacy_family_bloodline")),
+                        str(bloodline.get("name", "Ancestral Bloodline")), str(bloodline.get("affinity", "None")),
+                        max(0, min(100, int(bloodline.get("purity", 0)))), str(bloodline.get("state", "dormant")),
+                        max(0, int(bloodline.get("evolution_stage", 0))), max(0, min(100, int(bloodline.get("progress", 0)))),
+                        max(0, min(100, int(bloodline.get("rejection", 0)))), str(bloodline.get("mutation", "")),
+                        1 if bloodline.get("primary_lineage", 1) else 0, family_id,
+                        json.dumps(list(bloodline.get("unlocked_techniques") or [])), now,
+                    ),
+                )
+            physique = dict(aptitude.get("physique") or {
+                "physique_id": "ordinary_mortal_body", "name": "Ordinary Mortal Body", "state": "ordinary",
+                "evolution_stage": 0, "progress": 0, "stability": 100, "instability": 0,
+            })
+            await db.execute(
+                """INSERT INTO character_physiques(
+                       user_id,physique_id,name,state,evolution_stage,progress,stability,instability,updated_at
+                   ) VALUES(?,?,?,?,?,?,?,?,?)""",
+                (
+                    user_id, str(physique.get("physique_id", "ordinary_mortal_body")),
+                    str(physique.get("name", "Ordinary Mortal Body")), str(physique.get("state", "ordinary")),
+                    max(0, int(physique.get("evolution_stage", 0))), max(0, min(100, int(physique.get("progress", 0)))),
+                    max(0, min(100, int(physique.get("stability", 100)))),
+                    max(0, min(100, int(physique.get("instability", 0)))), now,
+                ),
+            )
+            await db.commit()
+        return True
+    except sqlite3.IntegrityError:
+        return False

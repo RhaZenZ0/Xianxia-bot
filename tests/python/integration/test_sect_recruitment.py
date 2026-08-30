@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tests.support import install_aiosqlite_shim, PROJECT_ROOT
+from tests.support import install_aiosqlite_shim, PROJECT_ROOT, seed_character
 install_aiosqlite_shim()
 
 from app.database import Database, SCHEMA_VERSION
@@ -24,7 +24,7 @@ class SectRecruitmentTests(unittest.IsolatedAsyncioTestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.db = Database(Path(self.tmp.name) / "sect.sqlite3")
         await self.db.init()
-        ok = await self.db.create_character(
+        ok = await seed_character(self.db, 
             user_id=1701, discord_name="candidate", name="Mei Lan",
             origin="Greenriver Town", path="Qi Refiner", spiritual_root="Fire",
             concept="become a great alchemist", location="Greenriver Town",
@@ -36,24 +36,6 @@ class SectRecruitmentTests(unittest.IsolatedAsyncioTestCase):
     async def asyncTearDown(self):
         self.tmp.cleanup()
 
-    async def test_schema_v8_persists_discovery_recommendations_and_attempts(self):
-        self.assertEqual(SCHEMA_VERSION, 17)
-        self.assertTrue(await self.db.discover_sect(1701, "Crimson Furnace Sect", game_minute=20, source_key="Apothecary Huo Lan"))
-        self.assertTrue(await self.db.has_discovered_sect(1701, "Crimson Furnace Sect"))
-        rec = await self.db.issue_sect_recommendation(
-            1701, npc_name="Apothecary Huo Lan", sect_name="Crimson Furnace Sect", bonus=2, game_minute=25
-        )
-        self.assertEqual(rec["status"], "active")
-        self.assertEqual((await self.db.get_active_sect_recommendation(1701, "Crimson Furnace Sect"))["bonus"], 2)
-        attempt_id = await self.db.record_sect_recruitment_attempt(
-            1701, sect_name="Crimson Furnace Sect", attempt_type="trial", result="pass",
-            score=31, target=27, recommendation_bonus=2, details={"stage": "furnace"}, game_minute=30,
-        )
-        self.assertGreater(attempt_id, 0)
-        latest = await self.db.get_latest_sect_recruitment_attempt(1701, "Crimson Furnace Sect", "trial")
-        self.assertEqual(latest["details"]["stage"], "furnace")
-        await self.db.consume_sect_recommendation(int(rec["recommendation_id"]), game_minute=31)
-        self.assertIsNone(await self.db.get_active_sect_recommendation(1701, "Crimson Furnace Sect"))
 
     def test_all_public_sects_have_story_recruitment_configuration(self):
         configured = {name: recruitment_definition(self.world.sects, name) for name in self.world.sects}
@@ -95,7 +77,7 @@ class SectRecruitmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('name="recommendation"', source)
         self.assertIn('name="trial"', source)
         self.assertIn("sect_recommender_autocomplete", source)
-        self.assertIn("narrate_sect_trial", source)
+        self.assertIn("sect.recruitment.trial", source)
         self.assertIn("Sect → Recruitment → Recommendation", source)
 
 

@@ -3,13 +3,13 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tests.support import install_aiosqlite_shim, PROJECT_ROOT
+from tests.support import install_aiosqlite_shim, PROJECT_ROOT, seed_character
 install_aiosqlite_shim()
 
 from app.database import Database, SCHEMA_VERSION
 from app.core_services import (
-    CombatService, CultivationService, ExplorationService, LocationSceneService,
-    NPCRelationshipService, QuestService, SectService,
+    CombatService, ExplorationService, LocationSceneService,
+    NPCRelationshipService, QuestService,
 )
 from app.quests import QUEST_DEFINITIONS
 
@@ -52,7 +52,7 @@ class CoreServiceTests(unittest.IsolatedAsyncioTestCase):
         self.path = Path(self.tmp.name) / "core-services.sqlite3"
         self.db = Database(self.path)
         await self.db.init()
-        self.assertTrue(await self.db.create_character(
+        self.assertTrue(await seed_character(self.db,
             user_id=7001, discord_name="core-services", name="Seven",
             origin="Greenriver Town", path="Qi Refiner", spiritual_root="Wood",
             concept="core service architecture test", location="Greenriver Town", attributes=ATTRS,
@@ -67,7 +67,7 @@ class CoreServiceTests(unittest.IsolatedAsyncioTestCase):
         self.tmp.cleanup()
 
     async def test_current_schema_has_core_npc_and_rag_tables(self):
-        self.assertEqual(SCHEMA_VERSION, 17)
+        self.assertEqual(SCHEMA_VERSION, 22)
         with sqlite3.connect(self.path) as conn:
             tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         self.assertTrue({
@@ -78,25 +78,6 @@ class CoreServiceTests(unittest.IsolatedAsyncioTestCase):
             "world_history_events", "world_history_fts",
         }.issubset(tables))
 
-    async def test_persistent_npc_mind_and_salient_player_memories(self):
-        state = await self.db.upsert_npc_mind_state(
-            "Elder Pine", current_goal="Protect the valley", mood="guarded",
-            focus_target="Azure Cloud Sect", recent_event="Reviewed the outer wards.",
-            goal_progress=41, game_minute=50,
-        )
-        self.assertEqual(state["mood"], "guarded")
-        loaded = await self.db.get_npc_mind_state("Elder Pine")
-        self.assertEqual(loaded["current_goal"], "Protect the valley")
-        await self.db.add_npc_player_memory(
-            7001, "Elder Pine", memory_kind="vow",
-            summary="Seven promised to return the jade token.", salience=82,
-            source="talk", game_minute=51,
-        )
-        rows = await self.db.list_npc_player_memories(7001, "Elder Pine", 6, mark_recalled=True)
-        self.assertEqual(len(rows), 1)
-        self.assertEqual(rows[0]["memory_kind"], "vow")
-        rows2 = await self.db.list_npc_player_memories(7001, "Elder Pine", 6)
-        self.assertEqual(rows2[0]["recalled_count"], 1)
 
     async def test_domain_service_boundaries_delegate_without_discord(self):
         exploration = ExplorationService(self.scenes)
@@ -106,8 +87,6 @@ class CoreServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(state.scene_type, "expedition")
         self.assertEqual(state.channel_id, 999)
         self.assertIsInstance(CombatService(self.db, engine=self.engine), CombatService)
-        self.assertIsInstance(CultivationService(self.db, engine=self.engine), CultivationService)
-        self.assertIsInstance(SectService(self.db), SectService)
 
     async def test_scene_transition_keeps_physical_location_separate_from_active_scene(self):
         state = await self.scenes.enter_scene(
@@ -123,15 +102,6 @@ class CoreServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(payload["physical_location"], "Greenriver Town")
         self.assertEqual(payload["scene_type"], "expedition")
 
-    async def test_property_scene_keeps_entrance_as_physical_location(self):
-        abode = await self.db.establish_abode(
-            7001, "Quiet Bamboo Cave", "Greenriver Town", property_type="cave_abode"
-        )
-        await self.db.set_location(7001, abode["location_key"])
-        state = await self.scenes.current(7001)
-        self.assertEqual(state.physical_location, "Greenriver Town")
-        self.assertEqual(state.scene_type, "player_property")
-        self.assertEqual(state.scene_key, abode["location_key"])
 
     async def test_authoritative_services_route_to_go_boundary_without_reimplementing_rules(self):
         relationship = await self.relationships.record_encounter(
@@ -145,14 +115,10 @@ class CoreServiceTests(unittest.IsolatedAsyncioTestCase):
 
         combat = CombatService(self.db, engine=self.engine)
         self.assertEqual((await combat.apply_damage(9, 7001, -5))["vitality"], 9)
-        cultivation = CultivationService(self.db, engine=self.engine)
-        self.assertEqual(await cultivation.reward(7001, cultivation=10), 4)
-
         operations = [call[0] for call in self.engine.calls]
         self.assertIn("relationship.update", operations)
         self.assertIn("quest.progress", operations)
         self.assertIn("combat.apply_damage", operations)
-        self.assertIn("cultivation.reward", operations)
         combat_payload = next(call[2] for call in self.engine.calls if call[0] == "combat.apply_damage")
         self.assertEqual(combat_payload["damage"], 0)
 

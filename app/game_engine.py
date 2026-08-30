@@ -33,15 +33,52 @@ class GameEngineClient:
                 detail = response.json()
             except Exception:
                 detail = response.text
-            raise GameEngineError(f"Go engine request failed ({response.status_code}): {detail}")
+            if isinstance(detail, dict) and detail.get("message"):
+                detail = str(detail["message"])
+            raise GameEngineError(str(detail))
         return dict(response.json())
 
-    async def action(self, operation: str, actor_id: int, payload: dict[str, Any]) -> Any:
-        data = await self._post(
-            "/v1/game/action",
-            {"operation": str(operation), "actor_id": int(actor_id), "payload": dict(payload)},
-        )
+    async def action(
+        self, operation: str, actor_id: int, payload: dict[str, Any], *,
+        action_id: str | None = None, expected_version: int | None = None,
+    ) -> Any:
+        request: dict[str, Any] = {
+            "api_version": "v1",
+            "operation": str(operation),
+            "actor_id": int(actor_id),
+            "payload": dict(payload),
+        }
+        if action_id is not None:
+            request["action_id"] = str(action_id)
+        if expected_version is not None:
+            request["expected_version"] = int(expected_version)
+        data = await self._post("/v1/game/action", request)
         return data.get("result")
+
+    async def authoritative_action(
+        self, operation: str, actor_id: int, payload: dict[str, Any], *,
+        action_id: str, expected_version: int | None = None,
+    ) -> dict[str, Any]:
+        if "game_minute" in payload:
+            raise ValueError(
+                "authoritative action payloads must not include game_minute; Go owns current world time"
+            )
+        request: dict[str, Any] = {
+            "api_version": "v1",
+            "action_id": str(action_id),
+            "operation": str(operation),
+            "actor_id": int(actor_id),
+            "payload": dict(payload),
+        }
+        if expected_version is not None:
+            request["expected_version"] = int(expected_version)
+        return await self._post("/v1/game/action", request)
+
+    async def bootstrap_simulation(self, game_minute: int) -> dict[str, Any]:
+        return await self._post(
+            "/v1/simulation/bootstrap",
+            {"game_minute": int(game_minute)},
+        )
 
     async def run_due_simulation(self, game_minute: int, automation: dict[str, bool]) -> list[dict[str, Any]]:
         data = await self._post(

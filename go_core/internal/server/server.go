@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -21,6 +22,7 @@ import (
 
 type Server struct {
 	databasePath string
+	worldPath    string
 	sessions     *storage.SessionManager
 	simulation   *simulation.Runner
 	requests     atomic.Uint64
@@ -47,7 +49,7 @@ func New(databasePath string, worldPath string) (*Server, error) {
 	if err != nil {
 		return nil, fmt.Errorf("load world catalog: %w", err)
 	}
-	return &Server{databasePath: databasePath, sessions: storage.NewSessionManager(databasePath), simulation: runner}, nil
+	return &Server{databasePath: databasePath, worldPath: worldPath, sessions: storage.NewSessionManager(databasePath), simulation: runner}, nil
 }
 
 func (s *Server) Close() { s.sessions.CloseAll() }
@@ -63,7 +65,21 @@ func writeJSON(w http.ResponseWriter, status int, payload any) {
 func decodeJSON(r *http.Request, dst any) error {
 	decoder := json.NewDecoder(r.Body)
 	decoder.UseNumber()
-	return decoder.Decode(dst)
+	if err := decoder.Decode(dst); err != nil {
+		return err
+	}
+	var extra any
+	if err := decoder.Decode(&extra); !errors.Is(err, io.EOF) {
+		if err == nil {
+			return errors.New("request body must contain exactly one JSON value")
+		}
+		return err
+	}
+	return nil
+}
+
+func limitJSONBody(w http.ResponseWriter, r *http.Request, maxBytes int64) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxBytes)
 }
 
 func method(w http.ResponseWriter, r *http.Request, expected string) bool {
@@ -79,6 +95,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/livez", s.livez)
 	mux.HandleFunc("/readyz", s.readyz)
 	mux.HandleFunc("/v1/game/action", s.gameAction)
+	mux.HandleFunc("/v1/simulation/bootstrap", s.simulationBootstrap)
 	mux.HandleFunc("/v1/simulation/run-due", s.simulationRunDue)
 	mux.HandleFunc("/v1/simulation/force", s.simulationForce)
 	mux.HandleFunc("/v1/db/session", s.dbSession)
@@ -121,13 +138,13 @@ func (s *Server) gameAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer r.Body.Close()
-	r.Body = http.MaxBytesReader(w, r.Body, 2<<20)
+	limitJSONBody(w, r, 2<<20)
 	var input game.ActionRequest
 	if err := decodeJSON(r, &input); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid_json", "message": err.Error()})
 		return
 	}
-	response, err := game.Apply(s.databasePath, input)
+	response, err := game.ApplyWithWorld(s.databasePath, s.worldPath, input)
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "game_action_failed", "message": err.Error()})
 		return
@@ -135,10 +152,31 @@ func (s *Server) gameAction(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, response)
 }
 
+func (s *Server) simulationBootstrap(w http.ResponseWriter, r *http.Request) {
+	if !method(w, r, http.MethodPost) {
+		return
+	}
+	defer r.Body.Close()
+	limitJSONBody(w, r, 1<<20)
+	var input simulation.BootstrapRequest
+	if err := decodeJSON(r, &input); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid_json", "message": err.Error()})
+		return
+	}
+	result, err := s.simulation.Bootstrap(input)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "simulation_bootstrap_failed", "message": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
 func (s *Server) simulationRunDue(w http.ResponseWriter, r *http.Request) {
 	if !method(w, r, http.MethodPost) {
 		return
 	}
+	defer r.Body.Close()
+	limitJSONBody(w, r, 1<<20)
 	var input simulation.RunDueRequest
 	if err := decodeJSON(r, &input); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid_json", "message": err.Error()})
@@ -156,6 +194,8 @@ func (s *Server) simulationForce(w http.ResponseWriter, r *http.Request) {
 	if !method(w, r, http.MethodPost) {
 		return
 	}
+	defer r.Body.Close()
+	limitJSONBody(w, r, 1<<20)
 	var input simulation.ForceRequest
 	if err := decodeJSON(r, &input); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid_json", "message": err.Error()})
@@ -221,6 +261,8 @@ func (s *Server) dbSessionAction(w http.ResponseWriter, r *http.Request) {
 		if !method(w, r, http.MethodPost) {
 			return
 		}
+		defer r.Body.Close()
+		limitJSONBody(w, r, 4<<20)
 		var input executeRequest
 		if err := decodeJSON(r, &input); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid_json"})
@@ -236,6 +278,8 @@ func (s *Server) dbSessionAction(w http.ResponseWriter, r *http.Request) {
 		if !method(w, r, http.MethodPost) {
 			return
 		}
+		defer r.Body.Close()
+		limitJSONBody(w, r, 4<<20)
 		var input scriptRequest
 		if err := decodeJSON(r, &input); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid_json"})
@@ -282,6 +326,8 @@ func (s *Server) dbBatch(w http.ResponseWriter, r *http.Request) {
 	if !method(w, r, http.MethodPost) {
 		return
 	}
+	defer r.Body.Close()
+	limitJSONBody(w, r, 16<<20)
 	var input batchRequest
 	if err := decodeJSON(r, &input); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid_json"})
@@ -353,6 +399,8 @@ func (s *Server) dbMaintenance(w http.ResponseWriter, r *http.Request) {
 	if !method(w, r, http.MethodPost) {
 		return
 	}
+	defer r.Body.Close()
+	limitJSONBody(w, r, 64<<10)
 	var input maintenanceRequest
 	if err := decodeJSON(r, &input); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid_json"})

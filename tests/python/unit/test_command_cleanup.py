@@ -80,12 +80,12 @@ class CommandCleanupTests(unittest.TestCase):
         self.assertIn("@app_commands.default_permissions(administrator=True)", source)
         self.assertNotIn("bot.tree.add_command(admin_group, guild=GUILD)", source)
 
-    def test_base_channel_provisioning_omits_none_overwrites(self):
+    def test_stage7_bot_never_provisions_server_channels(self):
         source = BOT.read_text(encoding="utf-8")
-        self.assertIn('create_kwargs: dict[str, Any]', source)
-        self.assertIn('create_kwargs["overwrites"] = {', source)
-        self.assertIn('guild.create_text_channel(name, **create_kwargs)', source)
-        self.assertNotIn('overwrites=overwrites', source)
+        self.assertNotIn("guild.create_text_channel", source)
+        self.assertNotIn("guild.create_category", source)
+        self.assertIn("Discord channel creation is dashboard-owned", source)
+        self.assertIn("the bot will not provision channels", source)
 
     def test_deleted_configured_channels_are_treated_as_stale(self):
         source = BOT.read_text(encoding="utf-8")
@@ -161,12 +161,15 @@ class CommandCleanupTests(unittest.TestCase):
         begin_end = source.index("GENDER_CHOICES", begin_start)
         self.assertIn("ephemeral=True", source[begin_start:begin_end])
 
-    def test_bot_log_privacy_checks_manage_roles_before_overwrites(self):
+    def test_stage7_dashboard_owned_channels_do_not_apply_setup_overwrites(self):
         source = BOT.read_text(encoding="utf-8")
-        self.assertIn("can_manage_overwrites = bool(guild.me.guild_permissions.manage_roles)", source)
-        self.assertIn('if can_manage_overwrites and name == "bot-logs":', source)
-        self.assertIn("if can_manage_overwrites:", source)
-        self.assertIn("Grant **Manage Roles**", source)
+        setup_start = source.index("async def ensure_base_xianxia_channels")
+        setup_end = source.index("@registered_group_command(admin_server_group, name=\"basechannels\"", setup_start)
+        setup_block = source[setup_start:setup_end]
+        self.assertNotIn("set_permissions(", setup_block)
+        self.assertNotIn("PermissionOverwrite(", setup_block)
+        self.assertIn("Discord channel creation is dashboard-owned", source)
+        self.assertIn("the bot will not provision channels", source)
 
     def test_reusable_hub_framework_enforces_owner_and_uses_registered_handlers(self):
         source = HUBS.read_text(encoding="utf-8")

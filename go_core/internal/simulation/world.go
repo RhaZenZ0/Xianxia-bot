@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"xianxia/core/internal/gamerng"
+	lifespanmodel "xianxia/core/internal/lifespan"
 	"xianxia/core/internal/storage"
 )
 
@@ -21,34 +23,94 @@ const (
 )
 
 var SystemIntervals = map[string]int64{
-	"npc_civilization": minutesPerDay,
-	"npc_life":         7 * minutesPerDay,
-	"dynamic_economy":  minutesPerDay,
-	"black_markets":    blackMarketRotation,
-	"sect_politics":    7 * minutesPerDay,
-	"clan_dynamics":    30 * minutesPerDay,
+	"npc_civilization":        minutesPerDay,
+	"npc_life":                7 * minutesPerDay,
+	"dynamic_economy":         minutesPerDay,
+	"black_markets":           blackMarketRotation,
+	"sect_politics":           7 * minutesPerDay,
+	"clan_dynamics":           30 * minutesPerDay,
+	"autonomous_world_events": minutesPerDay,
 }
 
-var orderedSystems = []string{"npc_civilization", "npc_life", "dynamic_economy", "black_markets", "sect_politics", "clan_dynamics"}
+var orderedSystems = []string{"npc_civilization", "npc_life", "dynamic_economy", "black_markets", "sect_politics", "clan_dynamics", "autonomous_world_events"}
 
 type Location struct {
 	World        string `json:"world"`
 	SafeZone     bool   `json:"safe_zone"`
+	Private      bool   `json:"private"`
 	AuctionHouse any    `json:"auction_house"`
 }
+type NPC struct {
+	Role         string         `json:"role"`
+	Personality  string         `json:"personality"`
+	Location     string         `json:"location"`
+	Realm        string         `json:"realm"`
+	Stage        int64          `json:"stage"`
+	Want         string         `json:"want"`
+	HiddenMaster map[string]any `json:"hidden_master"`
+}
+
+type Sect struct {
+	Alignment string `json:"alignment"`
+	Specialty string `json:"specialty"`
+}
+
 type Item struct {
 	Name            string `json:"name"`
 	SectValue       int64  `json:"sect_value"`
 	BasePrice       int64  `json:"base_price"`
 	LegalStatus     string `json:"legal_status"`
 	AuctionInterest string `json:"auction_interest"`
+	DoorEventChance int64  `json:"door_event_chance"`
 	Type            string `json:"type"`
 	MarketExcluded  bool   `json:"market_excluded"`
 	SpatialKey      any    `json:"spatial_key"`
 }
+type Realm struct {
+	Name       string  `json:"name"`
+	PhaseCosts []int64 `json:"phase_costs"`
+}
+
 type Catalog struct {
-	Locations map[string]Location `json:"locations"`
-	Items     map[string]Item     `json:"items"`
+	Locations        map[string]Location `json:"locations"`
+	NPCs             map[string]NPC      `json:"npcs"`
+	Sects            map[string]Sect     `json:"sects"`
+	Items            map[string]Item     `json:"items"`
+	UnexpectedEvents []UnexpectedEvent   `json:"unexpected_events"`
+	Realms           []Realm             `json:"realms"`
+	BodyRealms       []Realm             `json:"body_realms"`
+}
+
+type UnexpectedEvent struct {
+	ID              string         `json:"id"`
+	Title           string         `json:"title"`
+	Category        string         `json:"category"`
+	Kind            string         `json:"kind"`
+	Weight          int            `json:"weight"`
+	DurationHours   int64          `json:"duration_hours"`
+	Severity        int64          `json:"severity"`
+	Description     string         `json:"description"`
+	ConsequenceText string         `json:"consequence_text"`
+	Locations       []string       `json:"locations"`
+	Worlds          []string       `json:"worlds"`
+	PlayerReward    map[string]any `json:"player_reward"`
+	PlayerEffect    map[string]any `json:"player_effect"`
+	KarmaDelta      int64          `json:"karma_delta"`
+	FateDelta       int64          `json:"fate_delta"`
+	WorldEffect     map[string]any `json:"world_effect"`
+}
+
+type SpawnedWorldEvent struct {
+	EventKey        string   `json:"event_key"`
+	EventID         string   `json:"event_id"`
+	Title           string   `json:"title"`
+	Category        string   `json:"category"`
+	Description     string   `json:"description"`
+	ConsequenceText string   `json:"consequence_text"`
+	Location        string   `json:"location"`
+	Severity        int64    `json:"severity"`
+	ExpiresAt       float64  `json:"expires_at"`
+	Impacts         []string `json:"impacts,omitempty"`
 }
 
 type Runner struct {
@@ -56,10 +118,11 @@ type Runner struct {
 	Catalog      Catalog
 }
 type Run struct {
-	System       string `json:"system"`
-	DueSteps     int64  `json:"due_steps"`
-	AppliedSteps int64  `json:"applied_steps"`
-	Summary      string `json:"summary"`
+	System       string              `json:"system"`
+	DueSteps     int64               `json:"due_steps"`
+	AppliedSteps int64               `json:"applied_steps"`
+	Summary      string              `json:"summary"`
+	Events       []SpawnedWorldEvent `json:"events,omitempty"`
 }
 type RunDueRequest struct {
 	GameMinute int64           `json:"game_minute"`
@@ -72,7 +135,7 @@ type ForceRequest struct {
 }
 
 func NewRunner(databasePath, worldPath string) (*Runner, error) {
-	r := &Runner{DatabasePath: databasePath, Catalog: Catalog{Locations: map[string]Location{}, Items: map[string]Item{}}}
+	r := &Runner{DatabasePath: databasePath, Catalog: Catalog{Locations: map[string]Location{}, NPCs: map[string]NPC{}, Sects: map[string]Sect{}, Items: map[string]Item{}, UnexpectedEvents: []UnexpectedEvent{}}}
 	if strings.TrimSpace(worldPath) == "" {
 		return r, nil
 	}
@@ -176,14 +239,19 @@ func (r *Runner) RunDue(req RunDueRequest) ([]Run, error) {
 			applied = 120
 		}
 		processed := last + applied*interval
-		summary, err := r.runSystem(conn, system, applied, processed)
+		summary, events, err := r.runSystem(conn, system, applied, processed)
 		if err != nil {
 			return runs, fmt.Errorf("%s: %w", system, err)
 		}
 		if due > applied {
 			summary += fmt.Sprintf("; %d interval(s) remain queued for catch-up", due-applied)
 		}
-		runs = append(runs, Run{System: system, DueSteps: due, AppliedSteps: applied, Summary: summary})
+		runs = append(runs, Run{System: system, DueSteps: due, AppliedSteps: applied, Summary: summary, Events: events})
+	}
+	if maintenance, changed, err := r.advancedMaintenance(conn, req.GameMinute, req.Automation); err != nil {
+		return runs, fmt.Errorf("advanced_world: %w", err)
+	} else if changed {
+		runs = append(runs, maintenance)
 	}
 	return runs, nil
 }
@@ -203,16 +271,16 @@ func (r *Runner) Force(req ForceRequest) (Run, error) {
 		return Run{}, err
 	}
 	defer conn.Close()
-	summary, err := r.runSystem(conn, req.System, req.Steps, req.GameMinute)
+	summary, events, err := r.runSystem(conn, req.System, req.Steps, req.GameMinute)
 	if err != nil {
 		return Run{}, err
 	}
-	return Run{System: req.System, DueSteps: req.Steps, AppliedSteps: req.Steps, Summary: summary}, nil
+	return Run{System: req.System, DueSteps: req.Steps, AppliedSteps: req.Steps, Summary: summary, Events: events}, nil
 }
 
-func (r *Runner) runSystem(conn *storage.Conn, system string, steps, gameMinute int64) (string, error) {
+func (r *Runner) runSystem(conn *storage.Conn, system string, steps, gameMinute int64) (string, []SpawnedWorldEvent, error) {
 	if err := conn.ExecScript("BEGIN IMMEDIATE;"); err != nil {
-		return "", err
+		return "", nil, err
 	}
 	ok := false
 	defer func() {
@@ -221,6 +289,7 @@ func (r *Runner) runSystem(conn *storage.Conn, system string, steps, gameMinute 
 		}
 	}()
 	var summary string
+	var events []SpawnedWorldEvent
 	var err error
 	switch system {
 	case "npc_civilization":
@@ -235,21 +304,23 @@ func (r *Runner) runSystem(conn *storage.Conn, system string, steps, gameMinute 
 		summary, err = r.sects(conn, steps, gameMinute)
 	case "clan_dynamics":
 		summary, err = r.clans(conn, steps, gameMinute)
+	case "autonomous_world_events":
+		summary, events, err = r.autonomousWorldEvents(conn, steps, gameMinute)
 	default:
 		err = fmt.Errorf("unknown system %s", system)
 	}
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 	_, err = conn.Execute(`UPDATE world_simulation_state SET last_game_minute=?,last_run_real=?,runs=runs+? WHERE system=?`, []any{gameMinute, nowFloat(), steps, system})
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 	if err = conn.Commit(); err != nil {
-		return "", err
+		return "", nil, err
 	}
 	ok = true
-	return summary, nil
+	return summary, events, nil
 }
 
 func (r *Runner) civilization(conn *storage.Conn, steps, gm int64) (string, error) {
@@ -299,11 +370,23 @@ func (r *Runner) npcLife(conn *storage.Conn, steps, gm int64) (string, error) {
 		return "", err
 	}
 	// Realm extends NPC lifespan modestly. Age is based entirely on canonical game time.
-	deathRes, err := conn.Execute(`SELECT l.npc_name FROM npc_life_state l JOIN npc_civilization_state c ON c.npc_name=l.npc_name WHERE c.status='alive' AND (l.age_at_creation_years + MAX(0,?-l.birth_game_minute)/?) >= (l.natural_lifespan_years + c.realm_index*20)`, []any{gm, minutesPerYear})
+	deathRes, err := conn.Execute(`SELECT l.npc_name,l.birth_game_minute,l.age_at_creation_years,l.natural_lifespan_years,c.* FROM npc_life_state l JOIN npc_civilization_state c ON c.npc_name=l.npc_name WHERE c.status='alive'`, nil)
 	if err != nil {
 		return "", err
 	}
-	deaths := maps(deathRes)
+	deaths := []map[string]any{}
+	for _, row := range maps(deathRes) {
+		subject := lifespanmodel.Subject{
+			RealmIndex:         i64(row["realm_index"]),
+			Phase:              i64(row["phase"]),
+			NaturalYears:       i64(row["natural_lifespan_years"]),
+			BirthGameMinute:    i64(row["birth_game_minute"]),
+			AgeAtCreationYears: i64(row["age_at_creation_years"]),
+		}
+		if lifespanmodel.OldAgeExpired(subject, gm) {
+			deaths = append(deaths, row)
+		}
+	}
 	for _, row := range deaths {
 		name := fmt.Sprint(row["npc_name"])
 		_, err = conn.Execute(`UPDATE npc_life_state SET health=0,death_game_minute=?,cause_of_death='natural lifespan exhausted',updated_at=? WHERE npc_name=?`, []any{gm, now, name})
@@ -525,4 +608,225 @@ func min64(a, b int64) int64 {
 		return a
 	}
 	return b
+}
+
+func simTableExists(conn *storage.Conn, name string) bool {
+	res, err := conn.Execute(`SELECT 1 FROM sqlite_master WHERE type='table' AND name=? LIMIT 1`, []any{name})
+	return err == nil && len(res.Rows) > 0
+}
+
+func simMap(v any) map[string]any {
+	if m, ok := v.(map[string]any); ok {
+		return m
+	}
+	return map[string]any{}
+}
+
+func simFloat(v any) float64 {
+	switch x := v.(type) {
+	case float64:
+		return x
+	case int64:
+		return float64(x)
+	case int:
+		return float64(x)
+	default:
+		var f float64
+		_, _ = fmt.Sscan(fmt.Sprint(v), &f)
+		return f
+	}
+}
+
+func simClampFloat(v, lo, hi float64) float64 {
+	if v < lo {
+		return lo
+	}
+	if v > hi {
+		return hi
+	}
+	return v
+}
+
+func stringIn(values []string, needle string) bool {
+	for _, v := range values {
+		if v == needle {
+			return true
+		}
+	}
+	return false
+}
+
+func (r *Runner) applyAutonomousWorldEffect(conn *storage.Conn, event UnexpectedEvent, location string, gm int64, now float64) ([]string, error) {
+	effect := event.WorldEffect
+	if len(effect) == 0 {
+		return nil, nil
+	}
+	impacts := []string{}
+	history := strings.TrimSpace(fmt.Sprint(effect["history"]))
+	if history == "" || history == "<nil>" {
+		history = event.Title + " changed the region."
+	}
+	sev := clamp(event.Severity, 1, 10)
+	region := simMap(effect["region"])
+	if len(region) > 0 && simTableExists(conn, "civilization_regions") {
+		res, err := conn.Execute(`SELECT population,prosperity,security,spirit_resources,food_supply,migration_pressure,unrest FROM civilization_regions WHERE location=?`, []any{location})
+		if err != nil {
+			return nil, err
+		}
+		if len(res.Rows) > 0 {
+			row := res.Rows[0]
+			pct := simClampFloat(simFloat(region["population_percent"]), -25, 25)
+			pop := int64(math.Round(float64(i64(row[0])) * (1 + pct/100)))
+			if pop < 0 {
+				pop = 0
+			}
+			pros := clamp(i64(row[1])+i64(region["prosperity"]), 0, 100)
+			sec := clamp(i64(row[2])+i64(region["security"]), 0, 100)
+			spirit := clamp(i64(row[3])+i64(region["spirit_resources"]), 0, 100)
+			food := clamp(i64(row[4])+i64(region["food_supply"]), 0, 100)
+			migration := clamp(i64(row[5])+i64(region["migration_pressure"]), 0, 100)
+			unrest := clamp(i64(row[6])+i64(region["unrest"]), 0, 100)
+			if _, err = conn.Execute(`UPDATE civilization_regions SET population=?,prosperity=?,security=?,spirit_resources=?,food_supply=?,migration_pressure=?,unrest=?,last_game_minute=?,updated_at=? WHERE location=?`, []any{pop, pros, sec, spirit, food, migration, unrest, gm, now, location}); err != nil {
+				return nil, err
+			}
+			if simTableExists(conn, "civilization_events") {
+				if _, err = conn.Execute(`INSERT INTO civilization_events(location,event_text,severity,game_minute,created_at) VALUES(?,?,?,?,?)`, []any{location, history, sev, gm, now}); err != nil {
+					return nil, err
+				}
+			}
+			impacts = append(impacts, "regional population, security, resources, or unrest changed")
+		}
+	}
+	market := simMap(effect["market"])
+	if len(market) > 0 && simTableExists(conn, "economy_markets") {
+		res, err := conn.Execute(`UPDATE economy_markets SET supply=MIN(9999,MAX(1,supply+?)),demand=MIN(500,MAX(1,demand+?)),price_index=MIN(5.0,MAX(0.25,price_index+?)),updated_at=? WHERE location=?`, []any{clamp(i64(market["supply"]), -200, 200), clamp(i64(market["demand"]), -200, 200), simClampFloat(simFloat(market["price_index"]), -1.5, 1.5), now, location})
+		if err != nil {
+			return nil, err
+		}
+		if res.RowsAffected > 0 {
+			if simTableExists(conn, "economy_events") {
+				if _, err = conn.Execute(`INSERT INTO economy_events(location,item_id,event_text,game_minute,created_at) VALUES(?,NULL,?,?,?)`, []any{location, history, gm, now}); err != nil {
+					return nil, err
+				}
+			}
+			impacts = append(impacts, "local supply, demand, and prices shifted")
+		}
+	}
+	sect := simMap(effect["sect"])
+	if len(sect) > 0 && simTableExists(conn, "sect_politics_state") {
+		if _, err := conn.Execute(`UPDATE sect_politics_state SET influence=MIN(100,MAX(0,influence+?)),cohesion=MIN(100,MAX(0,cohesion+?)),resources=MIN(100,MAX(0,resources+?)),recruitment_pressure=MIN(100,MAX(0,recruitment_pressure+?)),doctrine_pressure=MIN(100,MAX(0,doctrine_pressure+?)),updated_at=?`, []any{i64(sect["influence"]), i64(sect["cohesion"]), i64(sect["resources"]), i64(sect["recruitment_pressure"]), i64(sect["doctrine_pressure"]), now}); err != nil {
+			return nil, err
+		}
+		rows, err := conn.Execute(`SELECT sect_name FROM sect_politics_state ORDER BY sect_name`, nil)
+		if err != nil {
+			return nil, err
+		}
+		if simTableExists(conn, "sect_politics_events") {
+			for _, row := range rows.Rows {
+				if len(row) > 0 {
+					if _, err = conn.Execute(`INSERT INTO sect_politics_events(sect_name,event_text,severity,game_minute,created_at) VALUES(?,?,?,?,?)`, []any{fmt.Sprint(row[0]), history, sev, gm, now}); err != nil {
+						return nil, err
+					}
+				}
+			}
+		}
+		if len(rows.Rows) > 0 {
+			impacts = append(impacts, "sect influence, cohesion, resources, or recruitment pressure changed")
+		}
+	}
+	return impacts, nil
+}
+
+func (r *Runner) autonomousWorldEvents(conn *storage.Conn, steps, gm int64) (string, []SpawnedWorldEvent, error) {
+	_ = steps
+	if !simTableExists(conn, "world_events") {
+		return "world-event table unavailable", nil, nil
+	}
+	roll, err := gamerng.Intn(100)
+	if err != nil {
+		return "", nil, err
+	}
+	if roll >= 45 {
+		return "no autonomous world event manifested", nil, nil
+	}
+	type candidate struct {
+		location string
+		event    UnexpectedEvent
+	}
+	candidates := []candidate{}
+	for location, loc := range r.Catalog.Locations {
+		if loc.Private || strings.HasPrefix(location, "abode:") || strings.HasPrefix(location, "personal_world:") || (loc.AuctionHouse != nil && strings.TrimSpace(fmt.Sprint(loc.AuctionHouse)) != "") {
+			continue
+		}
+		for _, event := range r.Catalog.UnexpectedEvents {
+			if event.Kind != "world_event" {
+				continue
+			}
+			if len(event.Locations) > 0 && !stringIn(event.Locations, location) {
+				continue
+			}
+			if len(event.Worlds) > 0 && !stringIn(event.Worlds, loc.World) {
+				continue
+			}
+			weight := event.Weight
+			if weight < 1 {
+				weight = 1
+			}
+			for i := 0; i < weight; i++ {
+				candidates = append(candidates, candidate{location, event})
+			}
+		}
+	}
+	if len(candidates) == 0 {
+		return "no eligible autonomous world events", nil, nil
+	}
+	idx, err := gamerng.Intn(len(candidates))
+	if err != nil {
+		return "", nil, err
+	}
+	pick := candidates[idx]
+	now := nowFloat()
+	if _, err = conn.Execute(`UPDATE world_events SET active=0 WHERE active=1 AND ends_at<=?`, []any{now}); err != nil {
+		return "", nil, err
+	}
+	dedupe := "random:" + pick.event.ID
+	existing, err := conn.Execute(`SELECT 1 FROM world_events WHERE dedupe_key=? AND location=? AND active=1 AND ends_at>? LIMIT 1`, []any{dedupe, pick.location, now})
+	if err != nil {
+		return "", nil, err
+	}
+	if len(existing.Rows) > 0 {
+		return "eligible autonomous event already active; duplicate suppressed", nil, nil
+	}
+	rnd, err := gamerng.Intn(1_000_000_000)
+	if err != nil {
+		return "", nil, err
+	}
+	eventKey := fmt.Sprintf("auto:%s:%d:%d", pick.event.ID, gm, rnd)
+	duration := pick.event.DurationHours
+	if duration < 1 {
+		duration = 2
+	}
+	ends := now + float64(duration)*3600
+	payload := map[string]any{"definition_id": pick.event.ID, "category": pick.event.Category, "severity": pick.event.Severity, "consequence_text": pick.event.ConsequenceText, "player_reward": pick.event.PlayerReward, "player_effect": pick.event.PlayerEffect, "karma_delta": pick.event.KarmaDelta, "fate_delta": pick.event.FateDelta, "world_effect": pick.event.WorldEffect, "autonomous": true}
+	enc, _ := json.Marshal(payload)
+	if _, err = conn.Execute(`INSERT INTO world_events(event_key,dedupe_key,event_type,title,location,payload_json,active,starts_at,ends_at) VALUES(?,?,?,?,?,?,1,?,?)`, []any{eventKey, dedupe, "random_event", pick.event.Title, pick.location, string(enc), now, ends}); err != nil {
+		return "", nil, err
+	}
+	impacts, err := r.applyAutonomousWorldEffect(conn, pick.event, pick.location, gm, now)
+	if err != nil {
+		return "", nil, err
+	}
+	if simTableExists(conn, "world_history_events") {
+		summary := fmt.Sprintf("A server-wide %s manifested at %s. %s", pick.event.Category, pick.location, pick.event.Description)
+		if len(impacts) > 0 {
+			summary += " Persistent effects: " + strings.Join(impacts, "; ") + "."
+		}
+		meta, _ := json.Marshal(map[string]any{"impacts": impacts, "severity": pick.event.Severity, "autonomous": true})
+		_, err = conn.Execute(`INSERT INTO world_history_events(source_key,event_type,title,summary,significance,visibility,location,world_name,faction,actor_type,actor_key,actor_name,target_type,target_key,target_name,related_user_id,related_npc_name,tags,game_minute,metadata_json,created_at,updated_at) VALUES(?,?,?,?,?,'public',?,'','',?,?,?,'location',?,?,NULL,'',?,?,?, ?,?) ON CONFLICT(source_key) DO NOTHING`, []any{"world_event:" + eventKey + ":history", "world_event", pick.event.Title, summary, min64(95, 50+pick.event.Severity*5), pick.location, "world", pick.event.ID, "World phenomenon", pick.location, pick.location, "world event " + pick.event.Category + " " + pick.event.ID, gm, string(meta), now, now})
+		if err != nil {
+			return "", nil, err
+		}
+	}
+	evt := SpawnedWorldEvent{EventKey: eventKey, EventID: pick.event.ID, Title: pick.event.Title, Category: pick.event.Category, Description: pick.event.Description, ConsequenceText: pick.event.ConsequenceText, Location: pick.location, Severity: pick.event.Severity, ExpiresAt: ends, Impacts: impacts}
+	return "spawned autonomous world event " + pick.event.Title, []SpawnedWorldEvent{evt}, nil
 }

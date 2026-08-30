@@ -17,7 +17,7 @@ func main() {
 		address = os.Getenv("CORE_ADDR")
 	}
 	if address == "" {
-		address = ":8081"
+		address = "127.0.0.1:8081"
 	}
 	databasePath := os.Getenv("DATABASE_PATH")
 	if databasePath == "" {

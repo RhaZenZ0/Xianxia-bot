@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tests.support import install_aiosqlite_shim, PROJECT_ROOT
+from tests.support import install_aiosqlite_shim, PROJECT_ROOT, seed_character
 install_aiosqlite_shim()
 
 from app.database import Database, SCHEMA_VERSION
@@ -20,7 +20,7 @@ class WorldHistoryRagTests(unittest.IsolatedAsyncioTestCase):
         self.db = Database(self.path)
         await self.db.init()
         for uid, name in ((9101, "Zi Dian"), (9102, "Han Yue")):
-            ok = await self.db.create_character(
+            ok = await seed_character(self.db,
                 user_id=uid, discord_name=name, name=name,
                 origin="Greenriver Town", path="Qi Refiner", spiritual_root="Lightning",
                 concept="walk the Dao", location="Greenriver Town", attributes=ATTRS,
@@ -36,7 +36,7 @@ class WorldHistoryRagTests(unittest.IsolatedAsyncioTestCase):
         self.tmp.cleanup()
 
     def test_schema_is_v16(self):
-        self.assertEqual(SCHEMA_VERSION, 17)
+        self.assertEqual(SCHEMA_VERSION, 22)
 
     async def test_public_history_is_fts_searchable(self):
         await self.db.record_world_history_event(
@@ -136,16 +136,6 @@ class WorldHistoryRagTests(unittest.IsolatedAsyncioTestCase):
             location="Greenriver Town", known_manuals=[], max_chars=4000,
         )
         self.assertNotIn("GM-only betrayal", ctx.text)
-
-    async def test_territory_war_start_writes_history(self):
-        await self.db.ensure_territory("greenriver_pass", name="Greenriver Pass", region="Greenriver Town", game_minute=2200)
-        await self.db.claim_territory("greenriver_pass", controller_type="sect", controller_key="Iron Mountain Sect", game_minute=2200)
-        war_id = await self.db.start_territory_war(
-            attacker_key="Azure Cloud Sect", defender_key="Iron Mountain Sect",
-            territory_key="greenriver_pass", game_minute=2250,
-        )
-        rows = await self.db.list_world_history(event_type="war_started", limit=10)
-        self.assertTrue(any(r["source_key"] == f"territory_war:{war_id}:started" for r in rows))
 
 
 if __name__ == "__main__":

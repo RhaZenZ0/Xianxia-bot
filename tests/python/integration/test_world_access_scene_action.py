@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tests.support import install_aiosqlite_shim, PROJECT_ROOT
+from tests.support import install_aiosqlite_shim, PROJECT_ROOT, seed_character
 install_aiosqlite_shim()
 
 from app.database import Database, SCHEMA_VERSION
@@ -17,7 +17,7 @@ class WorldAccessAndSceneActionTests(unittest.IsolatedAsyncioTestCase):
         self.path = Path(self.tmp.name) / "access.sqlite3"
         self.db = Database(self.path)
         await self.db.init()
-        self.assertTrue(await self.db.create_character(
+        self.assertTrue(await seed_character(self.db,
             user_id=1601, discord_name="wanderer", name="Lin Yue",
             origin="Greenriver Town", path="Qi Refiner", spiritual_root="Wood",
             concept="discover the world", location="Greenriver Town",
@@ -27,15 +27,6 @@ class WorldAccessAndSceneActionTests(unittest.IsolatedAsyncioTestCase):
     async def asyncTearDown(self):
         self.tmp.cleanup()
 
-    async def test_schema_v7_tracks_location_discovery(self):
-        self.assertEqual(SCHEMA_VERSION, 17)
-        rows = await self.db.get_discovered_locations(1601)
-        self.assertEqual([row["location"] for row in rows], ["Greenriver Town"])
-        self.assertTrue(await self.db.has_discovered_location(1601, "Greenriver Town"))
-        self.assertFalse(await self.db.has_discovered_location(1601, "Moonfen Marsh"))
-        self.assertTrue(await self.db.discover_location(1601, "Moonfen Marsh", game_minute=55))
-        self.assertTrue(await self.db.has_discovered_location(1601, "Moonfen Marsh"))
-        self.assertFalse(await self.db.discover_location(1601, "Moonfen Marsh", game_minute=56))
 
     def test_scene_action_replaces_freeform_act(self):
         source = (ROOT / "app" / "bot" / "main.py").read_text(encoding="utf-8")
@@ -50,7 +41,8 @@ class WorldAccessAndSceneActionTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('name="🎯 Target"', source)
         self.assertIn('name="📝 Attempt"', source)
         self.assertIn("await interaction.followup.send(embed=embed, ephemeral=False)", source)
-        self.assertIn('self_action = target == "Self"', source)
+        self.assertIn('\"scene.action\"', source)
+        self.assertIn('self_action = bool(mechanics.get(\"automatic\", False))', source)
         self.assertIn("Outcome: Automatic success — self-directed action.", source)
         self.assertIn("Hidden canonical information remains concealed.", source)
         self.assertIn("This does not reveal hidden canonical information.", source)

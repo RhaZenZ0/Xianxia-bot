@@ -97,6 +97,29 @@ INSERT INTO npc_life_state VALUES('Old Master',0,90,70,100,'',0,0,'single','',0,
 	}
 }
 
+func TestNPCLifeUsesCanonicalHighRealmCeiling(t *testing.T) {
+	path := setupSimulationDB(t, `
+CREATE TABLE world_simulation_state(system TEXT PRIMARY KEY,last_game_minute INTEGER,interval_game_minutes INTEGER,last_run_real REAL,runs INTEGER);
+CREATE TABLE npc_civilization_state(npc_name TEXT PRIMARY KEY,current_location TEXT,realm_index INTEGER,status TEXT,activity TEXT,last_game_minute INTEGER,updated_at REAL);
+CREATE TABLE npc_life_state(npc_name TEXT PRIMARY KEY,birth_game_minute INTEGER,age_at_creation_years INTEGER,natural_lifespan_years INTEGER,health INTEGER,injury TEXT,injury_severity INTEGER,career_progress INTEGER,relationship_status TEXT,spouse_name TEXT,children_count INTEGER,last_social_game_minute INTEGER,last_cultivation_game_minute INTEGER,death_game_minute INTEGER,cause_of_death TEXT,updated_at REAL);
+CREATE TABLE npc_social_relations(npc_a TEXT,npc_b TEXT,affinity INTEGER,trust INTEGER,grudge INTEGER,relation_type TEXT,status TEXT,started_game_minute INTEGER,last_interaction_game_minute INTEGER,updated_at REAL,PRIMARY KEY(npc_a,npc_b));
+INSERT INTO world_simulation_state VALUES('npc_life',0,10080,0,0);
+INSERT INTO npc_civilization_state VALUES('Nascent Elder','Greenriver Town',4,'alive','Cultivating',0,0);
+INSERT INTO npc_life_state VALUES('Nascent Elder',0,1000,75,100,'',0,0,'single','',0,0,0,NULL,'',0);
+`)
+	runner, _ := NewRunner(path, "")
+	run, err := runner.Force(ForceRequest{System: "npc_life", Steps: 1, GameMinute: 7 * minutesPerDay})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(run.Summary, "1 natural death") {
+		t.Fatalf("summary=%q", run.Summary)
+	}
+	if got := simScalar(t, path, "SELECT status FROM npc_civilization_state WHERE npc_name='Nascent Elder'"); got != "alive" {
+		t.Fatalf("status=%v", got)
+	}
+}
+
 func TestNPCLifeBatchCanCreateMarriageInOneTransaction(t *testing.T) {
 	path := setupSimulationDB(t, `
 CREATE TABLE world_simulation_state(system TEXT PRIMARY KEY,last_game_minute INTEGER,interval_game_minutes INTEGER,last_run_real REAL,runs INTEGER);
@@ -150,5 +173,52 @@ INSERT INTO economy_markets VALUES('Greenriver Town','ore',20,40,1.0,0,0);
 	}
 	if got := storage.ParseInt(simScalar(t, path, "SELECT runs FROM world_simulation_state WHERE system='dynamic_economy'")); got != 4 {
 		t.Fatalf("runs=%d", got)
+	}
+}
+
+func TestBootstrapOwnsNPCMoodAndClanInitialization(t *testing.T) {
+	path := setupSimulationDB(t, `
+CREATE TABLE world_simulation_state(system TEXT PRIMARY KEY,last_game_minute INTEGER,interval_game_minutes INTEGER,last_run_real REAL,runs INTEGER);
+CREATE TABLE npc_civilization_state(npc_name TEXT PRIMARY KEY,profession TEXT,activity TEXT);
+CREATE TABLE npc_mind_state(npc_name TEXT PRIMARY KEY,current_goal TEXT,mood TEXT,focus_target TEXT,recent_event TEXT,goal_progress INTEGER,last_game_minute INTEGER,updated_at REAL);
+CREATE TABLE birth_families(family_id INTEGER PRIMARY KEY,family_name TEXT,surname TEXT,tier INTEGER,head_name TEXT,head_realm_index INTEGER,branch_count INTEGER,retainer_count INTEGER,line_status TEXT);
+CREATE TABLE martial_clan_branches(branch_id INTEGER PRIMARY KEY AUTOINCREMENT,family_id INTEGER,branch_name TEXT,branch_type TEXT,leader_name TEXT,members_estimate INTEGER,martial_strength INTEGER,wealth_share INTEGER,loyalty INTEGER,status TEXT,updated_at REAL);
+CREATE TABLE martial_clan_retainers(retainer_id INTEGER PRIMARY KEY AUTOINCREMENT,family_id INTEGER,group_name TEXT,leader_name TEXT,role TEXT,members INTEGER,realm_index INTEGER,loyalty INTEGER,upkeep INTEGER,status TEXT,updated_at REAL);
+CREATE TABLE martial_clan_relations(relation_id INTEGER PRIMARY KEY AUTOINCREMENT,family_id INTEGER,partner_family_id INTEGER,partner_name TEXT,relation_type TEXT,relation_score INTEGER,active INTEGER,started_game_minute INTEGER,updated_at REAL);
+CREATE TABLE world_history_events(history_id INTEGER PRIMARY KEY AUTOINCREMENT,source_key TEXT NOT NULL UNIQUE,event_type TEXT NOT NULL,title TEXT NOT NULL,summary TEXT NOT NULL,significance INTEGER NOT NULL,visibility TEXT NOT NULL,location TEXT NOT NULL,world_name TEXT NOT NULL,faction TEXT NOT NULL,actor_type TEXT NOT NULL,actor_key TEXT NOT NULL,actor_name TEXT NOT NULL,target_type TEXT NOT NULL,target_key TEXT NOT NULL,target_name TEXT NOT NULL,related_user_id INTEGER,related_npc_name TEXT NOT NULL,tags TEXT NOT NULL,game_minute INTEGER NOT NULL,metadata_json TEXT NOT NULL,created_at REAL NOT NULL,updated_at REAL NOT NULL);
+INSERT INTO npc_civilization_state VALUES('Elder Test','Azure Reed Sect elder','Following established routine');
+INSERT INTO npc_mind_state VALUES('Elder Test','Protect the sect','pending','','',0,0,0);
+INSERT INTO birth_families VALUES(1,'Han Family','Han',3,'Han Rui',2,3,10,'active');
+`)
+	runner, err := NewRunner(path, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := runner.Bootstrap(BootstrapRequest{GameMinute: 777})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.NPCMoodsInitialized != 1 || result.ClanBranchesCreated != 3 || result.ClanRelationsCreated != 1 {
+		t.Fatalf("bootstrap=%+v", result)
+	}
+	if got := fmt.Sprint(simScalar(t, path, "SELECT mood FROM npc_mind_state WHERE npc_name='Elder Test'")); got == "pending" || got == "" {
+		t.Fatalf("mood=%q", got)
+	}
+	if got := storage.ParseInt(simScalar(t, path, "SELECT COUNT(*) FROM martial_clan_branches WHERE family_id=1")); got != 3 {
+		t.Fatalf("branches=%d", got)
+	}
+	if got := storage.ParseInt(simScalar(t, path, "SELECT COALESCE(SUM(members),0) FROM martial_clan_retainers WHERE family_id=1 AND status='active'")); got != 10 {
+		t.Fatalf("retainers=%d", got)
+	}
+	if got := storage.ParseInt(simScalar(t, path, "SELECT COUNT(*) FROM martial_clan_relations WHERE family_id=1 AND active=1")); got != 1 {
+		t.Fatalf("relations=%d", got)
+	}
+
+	second, err := runner.Bootstrap(BootstrapRequest{GameMinute: 778})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if second.NPCMoodsInitialized != 0 || second.ClanBranchesCreated != 0 || second.RetainerGroupsCreated != 0 || second.ClanRelationsCreated != 0 {
+		t.Fatalf("bootstrap was not idempotent: %+v", second)
 	}
 }

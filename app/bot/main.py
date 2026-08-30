@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import secrets
+import os
 import time
 from functools import wraps
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import discord
@@ -19,7 +20,6 @@ from ..version import RELEASE_VERSION
 from ..aptitudes import (
     aptitude_effects,
     bloodline_definition,
-    generate_aptitude_bundle,
     grade_index,
     progression_requirements,
     root_compatibility,
@@ -30,14 +30,12 @@ from ..health import HealthServer, HealthState
 from ..operations import AlertDispatcher
 from ..core_services import (
     CombatService,
-    CultivationService,
     ExplorationService,
     LocationSceneService,
     NPCRelationshipService,
     QuestService,
-    SectService,
 )
-from ..game_engine import GameEngineClient
+from ..game_engine import GameEngineClient, GameEngineError
 from ..quests import QUEST_DEFINITIONS
 from ..performance import AsyncWorkQueue
 from ..advanced_runtime import BOSS_TEMPLATES, EQUIPMENT_DEFINITIONS, FORMATION_POSITIONS, FORMATION_STANCES, ERA_CYCLE
@@ -46,33 +44,21 @@ from ..effects import aggregate_modifiers, medicine_toxicity_effect, normalize_e
 from ..alchemy import (
     alchemy_output, alchemy_quality, is_pill, pill_toxicity_value, toxicity_band,
 )
-from ..forbidden_arts import ForbiddenArtsService, manual_is_forbidden
 from ..birthfamily import (
-    generate_family_options, generate_samsara_family, family_tier_name,
-    family_profession_bonus, family_forage_bonus,
-    karma_label, karma_description, inherited_root,
+    family_tier_name,
+    family_profession_bonus,
+    karma_label, karma_description,
 )
-from ..game import World, roll_2d10
+from ..game import World
 from ..samsara import soul_legacy_modifiers
-from ..sense import (
-    approximate_realm,
-    concealment_power,
-    hidden_npc_names,
-    sense_hidden_npc,
-    sense_precision_check,
-    sense_result_tier,
-    spiritual_sense_stats,
-)
+from ..sense import hidden_npc_names
 from ..seclusion import seclusion_daily_gain, seclusion_environment_multiplier
 from ..ai_router import AITaskRouter
 from ..narrator import Narrator, canonical_location_reply, is_current_location_question, roll_npc_memory
 from ..narrator_context import NarratorContextBuilder
 from ..worldtime import cultivation_cycle_summary, cultivation_speed_modifiers, from_game_minutes, MINUTES_PER_YEAR, MINUTES_PER_MONTH
 from ..simulation import WorldSimulator, MINUTES_PER_DAY
-from ..lifespan import (
-    CHILD_CULTIVATION_AWAKENING_AGE,
-    status as lifespan_status,
-)
+CHILD_CULTIVATION_AWAKENING_AGE = 12
 from .hubs import (
     HubDefinition,
     HubDynamicOption,
@@ -84,7 +70,6 @@ from .hubs import (
 from ..creation_ui import (
     cultivation_style_profile, family_emoji, family_root_tendencies,
     family_status_summary, location_theme, origin_vignette, recommended_cultivation_styles,
-    roll_family_spiritual_root,
 )
 from ..progression_systems import (
     ascension_gate,
@@ -92,6 +77,7 @@ from ..progression_systems import (
     condition_effect,
     profession_rank,
     profession_xp_needed,
+    craft_quality,
     tribulation_tns,
 )
 from ..sect_recruitment import (
@@ -132,11 +118,8 @@ NPC_RELATIONSHIPS = NPCRelationshipService(DB, engine=ENGINE)
 QUESTS = QuestService(DB, QUEST_DEFINITIONS, engine=ENGINE)
 EXPLORATION = ExplorationService(SCENES)
 COMBAT = CombatService(DB, engine=ENGINE)
-CULTIVATION = CultivationService(DB, engine=ENGINE)
-SECTS = SectService(DB)
 NARRATOR_QUEUE = AsyncWorkQueue(max_concurrency=2)
 SIM = WorldSimulator(DB, WORLD.data, engine=ENGINE)
-FORBIDDEN_ARTS = ForbiddenArtsService(DB, SIM)
 AI_ROUTER = AITaskRouter(
     api_key=SETTINGS.openrouter_api_key,
     base_url=SETTINGS.openrouter_base_url,
@@ -236,67 +219,25 @@ async def settle_seclusion_for_user(user_id: int, current_game_minute: int | Non
     automation = await DB.get_automation_settings()
     if not automation.get("background_seclusion", True):
         return state
-    c = await DB.get_character(int(user_id))
-    if not c or str(c.get("life_status", "alive")) != "alive":
-        if current_game_minute is None:
-            current_game_minute = (await current_world_time()).total_minutes
-        await DB.end_seclusion(int(user_id), current_game_minute=int(current_game_minute), reason="incarnation unavailable")
-        return await DB.get_seclusion(int(user_id), active_only=False)
     if current_game_minute is None:
         current_game_minute = (await current_world_time()).total_minutes
-    end_minute = int(state["ends_game_minute"])
-    last = int(state["last_settled_game_minute"])
-    target = min(int(current_game_minute), end_minute)
-    full_days = max(0, (target - last) // MINUTES_PER_DAY)
-    awarded = 0
-    settled_to = last
-    if full_days > 0:
-        soul = await DB.get_soul_legacy(int(user_id))
-        soul_mult = float(soul_legacy_modifiers(soul)["cultivation_mult"])
-        daily = seclusion_daily_gain(
-            c, mode=str(state["mode"]), environment_mult=float(state.get("environment_mult", 1.0)),
-            soul_cultivation_mult=soul_mult,
+    try:
+        await ENGINE.authoritative_action(
+            "seclusion.settle",
+            int(user_id),
+            {"minutes_per_day": MINUTES_PER_DAY, "force_end": False, "end_reason": ""},
+            action_id=f"seclusion:auto:{int(user_id)}:{int(current_game_minute)}",
         )
-        aptitude_bundle = await DB.get_aptitudes(int(user_id))
-        innate_mods = aggregate_modifiers(aptitude_effects(
-            aptitude_bundle,
-            path=str(c.get("path", "")),
-            root_system=WORLD.spiritual_root_system,
-            bloodline_definitions=WORLD.bloodlines,
-            physique_definitions=WORLD.physiques,
-        ))
-        innate_key = "body_cultivation_gain_mult" if str(state["mode"]) == "body" else "cultivation_gain_mult"
-        daily = max(1, int(round(daily * float(innate_mods.get(innate_key, 1.0)))))
-        attempted = int(daily) * int(full_days)
-        if str(state["mode"]) == "body":
-            cap = WORLD.body_phase_cost(int(c.get("body_realm_index", 0)), int(c.get("body_phase", 1)))
-            awarded = await DB.reward_body_cultivation(
-                int(user_id), attempted, cultivation_cap=cap, event_type="seclusion_body",
-            )
-        else:
-            cap = WORLD.phase_cost(int(c.get("realm_index", 0)), int(c.get("phase", 1)))
-            awarded = await CULTIVATION.reward(
-                int(user_id), cultivation=attempted, cultivation_cap=cap, event_type="seclusion_qi",
-            )
-        settled_to = last + int(full_days) * MINUTES_PER_DAY
-    completed = bool(int(current_game_minute) >= end_minute and settled_to >= end_minute)
-    refreshed = await DB.advance_seclusion(
-        int(user_id), settled_game_minute=settled_to, awarded_gain=awarded,
-        completed=completed, ended_reason="planned seclusion completed",
-    )
-    if refreshed is not None:
-        refreshed["awarded_now"] = awarded
-        refreshed["settled_days_now"] = full_days
-    return refreshed
+    except GameEngineError as exc:
+        if "no active seclusion" not in str(exc).lower():
+            raise
+    return await DB.get_seclusion(int(user_id), active_only=False)
 
 
 async def settle_all_seclusions(current_game_minute: int) -> int:
-    count = 0
-    for state in await DB.list_active_seclusions():
-        result = await settle_seclusion_for_user(int(state["user_id"]), int(current_game_minute))
-        if result is not None:
-            count += 1
-    return count
+    # Background settlement is owned by Go's simulation runner. Retained as a read-only
+    # compatibility helper for callers outside the production worker.
+    return len(await DB.list_active_seclusions())
 
 
 def serialized_user_action(func):
@@ -400,21 +341,20 @@ async def current_npc_location(npc_name: str, period: str | None = None) -> str 
 
 
 async def current_effect_modifiers(user_id: int) -> tuple[list[dict], dict[str, float], object]:
-    wt = await current_world_time()
-    # Settle medicinal residue against canonical world time before resolving
-    # modifiers, so toxicity naturally weakens even when the player never opens
-    # the Alchemy panel. The shared effect row is then kept in sync.
-    alchemy_state = await DB.get_alchemy_state(user_id, game_minute=wt.total_minutes)
-    payload = medicine_toxicity_effect(int(alchemy_state.get("pill_toxicity", 0)))
-    if payload is None:
-        await DB.remove_effect(user_id, effect_key="pill_toxicity", source_type="alchemy", source_id="pill_toxicity")
-    else:
-        await DB.apply_effect(
-            user_id, effect_key="pill_toxicity", name="Pill Toxicity", source_type="alchemy",
-            source_id="pill_toxicity", effect=normalize_effect_payload(payload), starts_game_minute=wt.total_minutes,
-            duration_game_minutes=None,
-        )
+    authority = dict(await ENGINE.action("effects.current", int(user_id), {}))
+    wt = from_game_minutes(int(authority.get("game_minute", 0)))
     effects = await DB.get_active_effects(user_id, wt.total_minutes)
+    effects = [
+        effect for effect in effects
+        if not (
+            str(effect.get("effect_key", "")) == "pill_toxicity"
+            and str(effect.get("source_type", "")) == "alchemy"
+            and str(effect.get("source_id", "")) == "pill_toxicity"
+        )
+    ]
+    toxicity_effect = authority.get("pill_toxicity_effect")
+    if isinstance(toxicity_effect, dict):
+        effects.append(dict(toxicity_effect))
     character = await DB.get_character(user_id)
     if character:
         aptitudes = await DB.get_aptitudes(user_id)
@@ -587,107 +527,27 @@ async def _sync_realm_access_roles(
         log.exception("Could not synchronize realm access roles for user %s", member.id)
 
 
-def _realm_channel_overwrites(
-    guild: discord.Guild,
-    access_role: discord.Role,
-) -> dict[discord.abc.Snowflake, discord.PermissionOverwrite]:
-    """Build safe atomic overwrites without locking the bot out."""
-    overwrites: dict[discord.abc.Snowflake, discord.PermissionOverwrite] = {
-        guild.default_role: discord.PermissionOverwrite(view_channel=False),
-        access_role: discord.PermissionOverwrite(
-            view_channel=True,
-            send_messages=True,
-            read_message_history=True,
-        ),
-    }
-    if guild.me is not None:
-        overwrites[guild.me] = discord.PermissionOverwrite(
-            view_channel=True,
-            send_messages=True,
-            read_message_history=True,
-            manage_channels=True,
-            manage_threads=True,
-        )
-    return overwrites
-
-
-async def _apply_realm_channel_permissions(
-    guild: discord.Guild,
-    channel: discord.TextChannel,
-    access_role: discord.Role,
-) -> None:
-    """Repair realm visibility in a lockout-safe order."""
-    if guild.me is not None:
-        await channel.set_permissions(
-            guild.me,
-            view_channel=True,
-            send_messages=True,
-            read_message_history=True,
-            manage_channels=True,
-            manage_threads=True,
-            reason="Keep Xianxia bot access to realm hub",
-        )
-    await channel.set_permissions(
-        access_role,
-        view_channel=True,
-        send_messages=True,
-        read_message_history=True,
-        reason="Allow unlocked Xianxia realm world",
-    )
-    # Deny @everyone only after both positive overwrites are in place.
-    await channel.set_permissions(
-        guild.default_role,
-        view_channel=False,
-        reason="Hide locked Xianxia realm world",
-    )
-
-
 async def ensure_realm_hub_channels(guild: discord.Guild, *, category_name: str = "🌌 Realm Capitals") -> list[dict[str, Any]]:
-    """Provision the four canonical realm-capital meeting channels when permitted."""
-    if not guild.me or not guild.me.guild_permissions.manage_channels:
-        return await DB.get_realm_hub_channels(guild.id)
-    existing={str(r['world_name']):r for r in await DB.get_realm_hub_channels(guild.id)}
-    category=next((x for x in guild.categories if x.name==category_name),None)
-    if category is None:
-        category=await guild.create_category(category_name,reason="Xianxia realm-capital meeting hubs")
-    realm_roles = await _ensure_realm_access_roles(guild)
-    for world,hub in REALM_HUBS.items():
-        access_role = realm_roles.get(world)
-        row=existing.get(world); channel=guild.get_channel(int(row['channel_id'])) if row else None
-        if not isinstance(channel,discord.TextChannel):
-            channel=next((x for x in guild.text_channels if x.name==str(hub['channel_name'])),None)
-        created=False
+    """Bind existing realm-capital channels; Discord layout is admin-dashboard owned."""
+    existing = {str(row["world_name"]): row for row in await DB.get_realm_hub_channels(guild.id)}
+    category = next((item for item in guild.categories if item.name == category_name), None)
+    for world, hub in REALM_HUBS.items():
+        row = existing.get(world)
+        channel = guild.get_channel(int(row["channel_id"])) if row else None
+        if not isinstance(channel, discord.TextChannel):
+            channel = next(
+                (item for item in guild.text_channels if item.name == str(hub["channel_name"])),
+                None,
+            )
         if channel is None:
-            create_kwargs: dict[str, Any] = {
-                "category": category,
-                "topic": str(hub["topic"])[:1024],
-                "reason": f"Xianxia {world} public meeting hub",
-            }
-            if access_role is not None:
-                create_kwargs["overwrites"] = _realm_channel_overwrites(guild, access_role)
-            channel=await guild.create_text_channel(str(hub['channel_name']),**create_kwargs)
-            created=True
-        else:
-            changes={}
-            if channel.category_id!=category.id:changes['category']=category
-            if channel.topic!=str(hub['topic']):changes['topic']=str(hub['topic'])[:1024]
-            if changes: await channel.edit(reason="Repair Xianxia realm-capital meeting hub",**changes)
-        if access_role is not None:
-            try:
-                await _apply_realm_channel_permissions(guild, channel, access_role)
-            except discord.HTTPException:
-                log.exception("Could not apply realm visibility permissions to %s", channel.name)
-        await DB.set_realm_hub_channel(guild_id=guild.id,world_name=world,location=str(hub['location']),channel_id=channel.id,category_id=category.id)
-        if created:
-            try:
-                await channel.send(
-                    f"🏙️ **{hub['display_name']} — {world}**\n"
-                    f"This public channel is bound to the canonical location **{hub['location']}**. "
-                    "Use **/travel → Realm Capitals → Go** to arrive before roleplaying here. "
-                    "Cultivators can meet, organize parties, trade, and hold public scenes in this shared city."
-                )
-            except discord.HTTPException:
-                pass
+            continue
+        await DB.set_realm_hub_channel(
+            guild_id=guild.id,
+            world_name=world,
+            location=str(hub["location"]),
+            channel_id=channel.id,
+            category_id=channel.category_id if channel.category_id is not None else (category.id if category else None),
+        )
     return await DB.get_realm_hub_channels(guild.id)
 
 
@@ -797,6 +657,54 @@ async def ensure_expedition_thread(interaction: discord.Interaction, character: 
         return None
 
 
+
+async def ensure_birth_family_household_thread(
+    interaction: discord.Interaction, family: dict[str, Any]
+) -> discord.Thread | None:
+    """Create/recover one shared private Discord scene for a canonical birth household."""
+    guild = interaction.guild
+    if guild is None:
+        return None
+    family_id = int(family.get("family_id") or 0)
+    if family_id <= 0:
+        return None
+    row = await DB.get_birth_family_household_thread(guild.id, family_id)
+    if row:
+        thread = await _get_thread(guild, row.get("thread_id"))
+        if thread is not None:
+            try:
+                await thread.add_user(interaction.user)
+            except (discord.Forbidden, discord.HTTPException):
+                pass
+            return thread
+    parent = await home_scene_channel(interaction)
+    if parent is None:
+        return None
+    family_name = str(family.get("family_name") or "Birth Family")
+    base_location = str(family.get("location") or "Unknown")
+    try:
+        thread = await parent.create_thread(
+            name=(f"🏠 {family_name} Household")[:100],
+            type=discord.ChannelType.private_thread,
+            auto_archive_duration=_event_archive_minutes(),
+            reason=f"Shared Xianxia birth household for family {family_id}",
+        )
+        await thread.add_user(interaction.user)
+        await DB.set_birth_family_household_thread(
+            guild.id, family_id, thread_id=thread.id, parent_channel_id=parent.id
+        )
+        await thread.send(
+            f"🏠 **{family_name} — Shared Household**\n"
+            f"Home region: **{base_location}**\n\n"
+            "Every player born into this same canonical household uses this scene. "
+            "When multiple household members are inside at the same time, they can talk, roleplay, and target one another with guided Scene Actions here. "
+            "Use **/family leave** to return to the household's home region."
+        )
+        return thread
+    except (discord.Forbidden, discord.HTTPException):
+        log.exception("Could not create shared birth-household thread for family %s", family_id)
+        return None
+
 def _sect_abode_name(character_name: str, sect_name: str, rank_name: str = "Outer Disciple") -> str:
     rank = str(rank_name or "Disciple")
     if "Ancestor" in rank or "Master" in rank:
@@ -863,8 +771,14 @@ async def _private_scene_for_thread(guild: discord.Guild, thread_id: int, user_i
     expedition = await DB.get_expedition_thread_by_thread(thread_id)
     if expedition and int(expedition.get("user_id", 0)) == int(user_id):
         current_location = str(character.get("location") or "")
-        if not current_location.startswith(("abode:", "sect_abode:", "personal_world:")):
+        if not current_location.startswith(("abode:", "sect_abode:", "personal_world:", "birth_family:")):
             return "expedition", expedition
+    household = await DB.get_birth_family_household_thread_by_thread(thread_id)
+    if household:
+        family = await DB.get_birth_family(user_id)
+        expected_location = f"birth_family:{int(household.get('family_id') or 0)}"
+        if family and int(family.get("family_id") or 0) == int(household.get("family_id") or 0) and str(character.get("location") or "") == expected_location:
+            return "birth_family_household", household
     abode = await DB.get_abode_by_thread(thread_id)
     if abode and str(character.get("location") or "") == str(abode.get("location_key") or ""):
         if await DB.can_access_abode(int(abode["user_id"]), int(user_id)):
@@ -880,6 +794,10 @@ async def active_private_location_thread(interaction: discord.Interaction, chara
     if guild is None:
         return None
     location = str(character.get("location") or "")
+    if location.startswith("birth_family:"):
+        family = await DB.get_birth_family(interaction.user.id)
+        if family and location == f"birth_family:{int(family.get('family_id') or 0)}":
+            return await ensure_birth_family_household_thread(interaction, family)
     if location.startswith("abode:"):
         abode = await DB.get_abode_by_location(location)
         if abode:
@@ -1143,35 +1061,36 @@ class EventSceneView(discord.ui.View):
         if not c:return
         rule=EVENT_ACTION_RULES.get(action_key,EVENT_ACTION_RULES["observe"])
         wt=await current_world_time()
-        if action_key=="withdraw":
-            if self.event_key:
-                await DB.record_world_event_action(event_key=self.event_key,user_id=interaction.user.id,action_key="withdraw",stance="withdrawn",success=True,detail="Withdrew from active participation.",game_minute=wt.total_minutes)
-            await interaction.response.send_message("↩️ You withdraw from active involvement. The event continues without forcing another action from you.",ephemeral=False); return
-        attr=str(rule.get("attribute") or "insight"); attrs=dict(c.get("attributes") or {})
-        _,mods,_=await current_effect_modifiers(interaction.user.id)
-        bonus=effective_attribute(c,attr,int(mods.get(f"{attr}_bonus",0)))
-        tn=int(rule.get("tn",12))+max(0,self.severity-2)//2
-        result=roll_2d10(bonus,tn); success=bool(result.success)
-        contribution=int(rule.get("contribution",0)) if success else min(0,int(rule.get("contribution",0)))
-        investigation=int(rule.get("investigation",0)) if success else 0
-        support=int(rule.get("support",0)) if success else 0
-        interference=int(rule.get("interference",0)) if success else 0
-        state={}
-        if self.event_key:
-            state=await DB.record_world_event_action(
-                event_key=self.event_key,user_id=interaction.user.id,action_key=action_key,stance=action_key,target=self.title,
-                attribute=attr,total=int(result.total),tn=tn,success=success,contribution_delta=contribution,
-                investigation_delta=investigation,support_delta=support,interference_delta=interference,
-                detail=f"{rule['label']} {'succeeded' if success else 'failed'} against severity {self.severity}.",game_minute=wt.total_minutes,
+        if not self.event_key:
+            await interaction.response.send_message("This event scene is missing its canonical event key.",ephemeral=False); return
+        try:
+            envelope=await ENGINE.authoritative_action(
+                "world_event.act",interaction.user.id,{"event_key":self.event_key,"action_key":action_key},
+                action_id=f"discord:{interaction.id}:world_event.act:{self.event_key}:{action_key}",
             )
-            event=await self._event_record(); payload=dict(event.get("payload") or {})
-            if success and await DB.claim_world_event(interaction.user.id,self.event_key):
-                reward_details=await _apply_event_participation(interaction.user.id,c,payload,event_type=f"world_event_{payload.get('definition_id','participation')}")
-            else: reward_details=[]
-        else: reward_details=[]
-        lines=[f"{rule['emoji']} **{rule['label']} — {'SUCCESS' if success else 'FAILURE'}**",roll_line(result)]
+        except GameEngineError as exc:
+            await interaction.response.send_message(f"Event action failed: {exc}",ephemeral=False); return
+        outcome=dict(envelope.get("result") or {})
+        if action_key=="withdraw":
+            await interaction.response.send_message("↩️ You withdraw from active involvement. The event continues without forcing another action from you.",ephemeral=False); return
+        success=bool(outcome.get("success")); state=dict(outcome.get("state") or {}); roll=dict(outcome.get("roll") or {})
+        sign="+" if int(roll.get("modifier",0))>=0 else ""
+        roll_text=(f"2d10 ({int(roll.get('die1',0))}+{int(roll.get('die2',0))}) {sign}{int(roll.get('modifier',0))} = "
+                   f"**{int(roll.get('total',0))}** vs TN **{int(roll.get('tn',0))}** — **{roll.get('degree','Result')}**")
+        lines=[f"{rule['emoji']} **{rule['label']} — {'SUCCESS' if success else 'FAILURE'}**",roll_text]
         if state:
             lines.append(f"Event contribution **{int(state.get('contribution',0)):+d}** • investigation **{int(state.get('investigation',0))}** • support **{int(state.get('support',0))}** • interference **{int(state.get('interference',0))}**")
+        first=dict(outcome.get("first_participation") or {})
+        reward_details=[]
+        if int(first.get("cultivation_awarded",0)): reward_details.append(f"Cultivation +{int(first['cultivation_awarded'])}")
+        if int(first.get("spirit_stones",0)): reward_details.append(f"Spirit Stones +{int(first['spirit_stones'])}")
+        if int(first.get("insight_xp",0)): reward_details.append(f"Insight +{int(first['insight_xp'])}")
+        items=dict(first.get("items") or {})
+        if items: reward_details.append(WORLD.item_names(items))
+        effect=dict(first.get("effect") or {})
+        if effect: reward_details.append(f"Effect: {effect.get('name','Event effect')}")
+        if int(first.get("karma_delta",0)): reward_details.append(f"Karma {int(first['karma_delta']):+d} → {int(first.get('karma_score',0)):+d}")
+        if int(first.get("fate_delta",0)): reward_details.append(f"Fate {int(first['fate_delta']):+d} → {int(first.get('fate',0))}/9")
         if reward_details: lines.append("First-participation outcome: "+" • ".join(reward_details))
         await interaction.response.send_message("\n".join(lines),ephemeral=False)
 
@@ -1429,6 +1348,43 @@ async def spawn_system_event_thread(
     return thread
 
 
+async def authoritative_lifespan(user_id: int) -> SimpleNamespace:
+    result = await ENGINE.action("character.lifespan", int(user_id), {})
+    return SimpleNamespace(**dict(result or {}))
+
+
+async def _record_true_death_history(user_id: int, death: dict[str, Any], game_minute: int) -> None:
+    """Persist descriptive world history after Go commits the lifecycle transition."""
+    name = str(death.get("name") or "A cultivator")
+    location = str(death.get("location") or "")
+    reason = str(death.get("reason") or "unknown")
+    target_world = str(death.get("target_world") or "Mortal World")
+    try:
+        await DB.record_world_history_event(
+            event_type="death",
+            title=f"True death of {name}",
+            summary=f"{name} suffered true death at {location or 'an unknown place'}. Recorded cause: {reason}. The soul entered Samsara toward {target_world}.",
+            significance=92,
+            visibility="participant",
+            location=location,
+            actor_type="player",
+            actor_key=str(int(user_id)),
+            actor_name=name,
+            target_type="life",
+            target_key=str(int(user_id)),
+            target_name=name,
+            related_user_id=int(user_id),
+            tags=("death", "true death", "samsara", "reincarnation"),
+            game_minute=int(game_minute),
+            metadata={"reason": reason, "target_world": target_world, "previous_realm_index": int(death.get("previous_realm_index", 0))},
+            source_key=f"player_death:{int(user_id)}:{int(game_minute)}",
+        )
+    except Exception:
+        # History is descriptive; it must never roll back or counterfeit the already
+        # committed authoritative life-state transition.
+        log.exception("Could not mirror authoritative true death into world history")
+
+
 async def require_character(interaction: discord.Interaction, *, allow_deceased: bool = False) -> dict | None:
     character = await DB.get_character(interaction.user.id)
     if character is None:
@@ -1438,15 +1394,30 @@ async def require_character(interaction: discord.Interaction, *, allow_deceased:
         )
         return None
     wt = await current_world_time()
-    life = lifespan_status(character, wt.total_minutes)
+    life = await authoritative_lifespan(interaction.user.id)
     if not life.ageless and life.total_years is not None and life.age_years >= life.total_years:
         if character.get("life_status") != "deceased":
-            await DB.record_true_death(
-                interaction.user.id, current_game_minute=wt.total_minutes, reason="old_age",
-                minutes_per_year=MINUTES_PER_YEAR,
-                base_samsara_years=SETTINGS.reincarnation_base_samsara_years,
-                max_wait_seconds=SETTINGS.reincarnation_max_wait_seconds,
-            )
+            try:
+                envelope = await ENGINE.authoritative_action(
+                    "lifecycle.true_death",
+                    interaction.user.id,
+                    {
+                        
+                        "reason": "old_age",
+                        "minutes_per_year": MINUTES_PER_YEAR,
+                        "base_samsara_years": SETTINGS.reincarnation_base_samsara_years,
+                        "max_wait_seconds": SETTINGS.reincarnation_max_wait_seconds,
+                    },
+                    action_id=f"lifecycle:old-age:{interaction.user.id}:{wt.total_minutes}",
+                )
+            except GameEngineError as exc:
+                await interaction.response.send_message(f"❌ Lifecycle authority rejected the old-age transition: {exc}", ephemeral=False)
+                return None
+            death = dict(envelope.get("result") or {})
+            # The descriptive history mirror is source-key idempotent, so replay it
+            # too: this repairs a prior best-effort history write without duplicating
+            # or changing the already-authoritative lifecycle transition.
+            await _record_true_death_history(interaction.user.id, death, wt.total_minutes)
             character["life_status"] = "deceased"
     if character.get("life_status") == "deceased" and not allow_deceased:
         await interaction.response.send_message(
@@ -1460,7 +1431,6 @@ async def require_character(interaction: discord.Interaction, *, allow_deceased:
     except Exception:
         log.exception("Realm access role synchronization failed")
     return character
-
 
 async def _report_game_ui_error(
     interaction: discord.Interaction,
@@ -1497,10 +1467,11 @@ class CharacterModal(discord.ui.Modal):
     and hidden lineage data, then revealed on the completed character sheet.
     """
 
-    def __init__(self, birth_family: dict[str, Any], selected_style: str, selected_gender: str):
+    def __init__(self, birth_family: dict[str, Any], selected_style: str, selected_gender: str, offer_state_version: int):
         self.birth_family = dict(birth_family)
         self.selected_style = selected_style if selected_style in WORLD.paths else next(iter(WORLD.paths))
         self.selected_gender = selected_gender if selected_gender in {"male", "female"} else "male"
+        self.offer_state_version = int(offer_state_version)
         location = str(self.birth_family.get("location") or WORLD.starting_location)
         family_name = str(self.birth_family.get("family_name") or "Family")
         super().__init__(title=f"{family_name} • {location}"[:45])
@@ -1531,39 +1502,25 @@ class CharacterModal(discord.ui.Modal):
             return
 
         family = self.birth_family
-        rolled_root = roll_family_spiritual_root(family, tuple(WORLD.roots))
-        normalized_root = WORLD.normalize_root(rolled_root) or "Mortal Root"
-        attrs, qi_max, vitality_max = WORLD.starting_stats(normalized_path)
         wt = await current_world_time()
-        natural_lifespan = 70 + secrets.randbelow(11)
-        aptitude_profile = generate_aptitude_bundle(
-            base_root=normalized_root,
-            path=normalized_path,
-            family=family,
-            root_system=WORLD.spiritual_root_system,
-            bloodline_definitions=WORLD.bloodlines,
-            physique_definitions=WORLD.physiques,
+        creation_envelope = await ENGINE.authoritative_action(
+            "character.create",
+            interaction.user.id,
+            {
+                "discord_name": interaction.user.display_name,
+                "name": str(self.name_input.value).strip(),
+                "concept": str(self.concept_input.value).strip(),
+                "gender": self.selected_gender,
+                "path": normalized_path,
+                "family_choice_id": str(family.get("choice_id") or ""),
+                
+                "age_at_creation_years": 18,
+            },
+            action_id=f"discord:{interaction.id}:character.create",
+            expected_version=self.offer_state_version,
         )
-        origin = f"{family['family_name']} — {family['name']}, {family.get('location') or WORLD.starting_location}"
-        created = await DB.create_character(
-            user_id=interaction.user.id,
-            discord_name=interaction.user.display_name,
-            name=str(self.name_input.value).strip(),
-            origin=origin,
-            path=normalized_path,
-            spiritual_root=normalized_root,
-            concept=str(self.concept_input.value).strip(),
-            gender=self.selected_gender,
-            location=str(family.get("location") or WORLD.starting_location),
-            attributes=attrs,
-            qi_max=qi_max,
-            vitality_max=vitality_max,
-            created_game_minute=wt.total_minutes,
-            age_at_creation_years=18,
-            natural_lifespan_years=natural_lifespan,
-            birth_family_profile=family,
-            aptitude_profile=aptitude_profile,
-        )
+        creation = dict(creation_envelope.get("result") or {})
+        created = bool(creation.get("created"))
         if not created:
             await interaction.response.send_message(
                 "You already have a character. Use **/character → Overview** to view it.",
@@ -1571,12 +1528,15 @@ class CharacterModal(discord.ui.Modal):
             )
             return
         try:
-            await SIM.ensure_all_clans(wt.total_minutes)
+            await ENGINE.bootstrap_simulation(wt.total_minutes)
         except Exception:
-            log.exception("Could not initialize martial-clan records after character creation")
+            log.exception("Could not initialize Go-owned simulation bootstrap after character creation")
 
-        name = str(self.name_input.value).strip()
-        location = str(family.get("location") or WORLD.starting_location)
+        name = str(creation.get("name") or self.name_input.value).strip()
+        location = str(creation.get("location") or family.get("location") or WORLD.starting_location)
+        normalized_root = str(creation.get("spiritual_root") or "Mortal Root")
+        natural_lifespan = int(creation.get("natural_lifespan_years") or 75)
+        aptitude_profile = dict(creation.get("aptitudes") or {})
         theme = location_theme(location)
         style_profile = cultivation_style_profile(normalized_path)
         location_description = str(WORLD.locations.get(location, {}).get("description") or theme.get("mood") or "")
@@ -1863,15 +1823,16 @@ class BirthFamilyConfirmButton(discord.ui.Button):
             await interaction.response.send_message("Choose Male or Female from the birth-sex dropdown first.", ephemeral=True)
             return
         await interaction.response.send_modal(CharacterModal(
-            view.families[view.selected_index], view.selected_style, view.selected_gender
+            view.families[view.selected_index], view.selected_style, view.selected_gender, view.offer_state_version
         ))
 
 
 class BirthFamilyView(discord.ui.View):
-    def __init__(self, user_id: int, families: list[dict[str, Any]]):
+    def __init__(self, user_id: int, families: list[dict[str, Any]], offer_state_version: int):
         super().__init__(timeout=300)
         self.user_id = int(user_id)
         self.families = list(families)
+        self.offer_state_version = int(offer_state_version)
         self.current_index = 0
         self.selected_index: int | None = None
         self.selected_style: str | None = None
@@ -1941,10 +1902,21 @@ class XianxiaBot(commands.Bot):
             ),
         )
         self.health_state = HealthState(supported_schema_version=SCHEMA_VERSION)
+        control_token = os.getenv("BOT_CONTROL_TOKEN", "").strip() or os.getenv("DASHBOARD_TOKEN", "").strip()
         self.health_server = HealthServer(
-            self.health_state, host=SETTINGS.health_host, port=SETTINGS.health_port
+            self.health_state,
+            host=SETTINGS.health_host,
+            port=SETTINGS.health_port,
+            control_handler=self._dashboard_discord_control if control_token else None,
+            control_token=control_token,
         )
         self.operational_health_task: asyncio.Task | None = None
+
+    async def _dashboard_discord_control(self, action: str, payload: dict[str, Any]) -> dict[str, Any]:
+        # The handler is intentionally hosted by the Discord process. The GM
+        # dashboard can request Discord setup work, but only discord.py owns
+        # guild/channel/role mutations. Game mechanics remain in Go.
+        return await dashboard_discord_control(self, action, payload)
 
     async def _mark_startup_phase(self, phase: str, detail: dict | None = None) -> None:
         first_ready = self.health_state.mark_phase(phase, detail=detail or {})
@@ -2158,70 +2130,25 @@ class XianxiaBot(commands.Bot):
                     if automation.get("event_expiry", True):
                         for record in await DB.get_expired_event_threads():
                             await self.close_event_scene(record)
-                    if automation.get("auction_settlement", True):
-                        finalized = await DB.finalize_expired_auctions()
-                        if finalized:
-                            for lot in finalized:
-                                winner = lot.get("current_bidder_user_id")
-                                profile = WORLD.auction_door_profile(str(lot.get("item_id", "")))
-                                if winner and profile:
-                                    await DB.add_auction_door_risk(user_id=int(winner),auction_id=int(lot["auction_id"]),item_id=str(lot["item_id"]),risk_level=str(profile["level"]),chance_percent=int(profile["chance_percent"]))
-                            log.info("Finalized %s expired auctions", len(finalized))
                     wt = await current_world_time()
-                    if automation.get("autonomous_world_events", True):
-                        bucket = int(wt.total_minutes) // MINUTES_PER_DAY
-                        if await DB.claim_periodic_bucket("autonomous_world_events", bucket) and secrets.randbelow(100) < 45:
-                            locations = [
-                                name for name,data in WORLD.locations.items()
-                                if not str(name).startswith(("abode:","personal_world:")) and not WORLD.auction_house_at(str(name))
-                                and not bool(data.get("private",False))
-                            ]
-                            secrets.SystemRandom().shuffle(locations)
-                            candidates=[]
-                            for location in locations:
-                                for event in WORLD.eligible_unexpected_events(location=location,character=None):
-                                    if str(event.get("kind"))=="world_event":
-                                        candidates.extend([(location,event)]*max(1,int(event.get("weight",1))))
-                            if candidates:
-                                location,event=secrets.choice(candidates)
-                                event_key=f"auto:{event['id']}:{time.time_ns()}"
-                                ends_at=time.time()+int(event.get("duration_hours",2))*3600
-                                payload={
-                                    "definition_id":event["id"],"category":event.get("category","Phenomenon"),
-                                    "severity":int(event.get("severity",1)),"consequence_text":event.get("consequence_text",""),
-                                    "player_reward":event.get("player_reward",{}),"player_effect":event.get("player_effect",{}),
-                                    "karma_delta":int(event.get("karma_delta",0)),"fate_delta":int(event.get("fate_delta",0)),
-                                    "world_effect":event.get("world_effect",{}),"autonomous":True,
-                                }
-                                activated=await DB.activate_world_event(
-                                    event_key=event_key,event_type="random_event",title=str(event["title"]),location=location,
-                                    payload=payload,ends_at=ends_at,dedupe_key=f"random:{event.get('dedupe_group') or event['id']}",
-                                )
-                                if activated:
-                                    impacts=await SIM.apply_random_event(
-                                        event_id=str(event['id']),title=str(event['title']),location=location,game_minute=wt.total_minutes,
-                                        severity=int(event.get('severity',1)),effect=dict(event.get('world_effect') or {}),
-                                    )
-                                    guild=self.get_guild(SETTINGS.guild_id)
-                                    if guild:
-                                        await spawn_system_event_thread(
-                                            guild,title=str(event['title']),event_type="random_event",event_key=event_key,expires_at=ends_at,
-                                            announcement=(
-                                                f"⚡ **AUTONOMOUS WORLD EVENT — {event['title']}**\n📍 **{location}**\n{event['description']}"
-                                                + (f"\n\n**Persistent consequence:** {event.get('consequence_text')}" if event.get('consequence_text') else "")
-                                                + (f"\n**Systems changed:** {'; '.join(impacts)}" if impacts else "")
-                                            ),
-                                        )
+                    # Autonomous world-event selection, activation, RNG and persistent consequences are Go-owned.
                     simulation_runs = await SIM.run_due(wt.total_minutes, automation)
                     for sim_run in simulation_runs:
                         log.info("World simulation %s: %s", sim_run.system, sim_run.summary)
-                    advanced = await DB.advance_advanced_world_systems(wt.total_minutes)
-                    if any(int(advanced.get(k, 0)) > 0 for k in ("bounty_hunters_spawned", "bounty_hunters_updated", "wars_updated", "occupations_resolved", "caravans_resolved")) or advanced.get("era_changed"):
-                        log.info("ADVANCED_WORLD_TICK %s", advanced)
-                    if automation.get("background_seclusion", True):
-                        settled = await settle_all_seclusions(wt.total_minutes)
-                        if settled:
-                            log.info("Settled %s active seclusion session(s)", settled)
+                        for event in sim_run.events:
+                            guild=self.get_guild(SETTINGS.guild_id)
+                            if not guild: continue
+                            impacts=[str(x) for x in list(event.get("impacts") or [])]
+                            consequence=str(event.get("consequence_text") or "").strip()
+                            await spawn_system_event_thread(
+                                guild,title=str(event.get("title") or "World Event"),event_type="random_event",
+                                event_key=str(event.get("event_key") or ""),expires_at=float(event.get("expires_at") or time.time()+7200),
+                                announcement=(
+                                    f"⚡ **AUTONOMOUS WORLD EVENT — {event.get('title','World Event')}**\n📍 **{event.get('location','Unknown')}**\n{event.get('description','')}"
+                                    + (f"\n\n**Persistent consequence:** {consequence}" if consequence else "")
+                                    + (f"\n**Systems changed:** {'; '.join(impacts)}" if impacts else "")
+                                ),
+                            )
                     if automation.get("maintenance_cleanup", True) and int(time.time()) % 3600 < 30:
                         await DB.maintenance_cleanup(wt.total_minutes)
                 except Exception:
@@ -2249,18 +2176,6 @@ class XianxiaBot(commands.Bot):
         }
         await self._mark_startup_phase("DISCORD_READY", detail)
         self.health_state.set_check("discord_gateway", True, guild_id=SETTINGS.guild_id)
-        guild=self.get_guild(SETTINGS.guild_id)
-        if guild is not None:
-            try:
-                rows=await DB.get_realm_hub_channels(guild.id)
-                if len(rows)<len(REALM_HUBS):
-                    provisioned=await ensure_realm_hub_channels(guild)
-                    if len(provisioned)==len(REALM_HUBS):
-                        log.info("Provisioned %s realm-capital meeting channels",len(provisioned))
-            except (discord.Forbidden,discord.HTTPException):
-                log.warning("Could not auto-provision realm-capital channels; use /admin server realmhubs after granting Manage Channels")
-            except Exception:
-                log.exception("Realm-capital channel auto-provisioning failed")
         log.info(
             "Logged in as %s (%s). Narrator: %s",
             self.user,
@@ -2494,14 +2409,16 @@ async def audit_admin(
     before: dict | None = None,
     after: dict | None = None,
     reason: str = "",
+    database_log: bool = True,
 ) -> None:
-    try:
-        await DB.log_admin_action(
-            admin_user_id=interaction.user.id, action=action, target=target,
-            before=before, after=after, reason=reason,
-        )
-    except Exception:
-        log.exception("Could not write admin audit entry for %s", action)
+    if database_log:
+        try:
+            await DB.log_admin_action(
+                admin_user_id=interaction.user.id, action=action, target=target,
+                before=before, after=after, reason=reason,
+            )
+        except Exception:
+            log.exception("Could not write admin audit entry for %s", action)
     try:
         await post_server_log(
             interaction.guild,
@@ -2666,7 +2583,7 @@ async def admin_status(interaction: discord.Interaction) -> None:
 
 
 BASE_CHANNEL_SETUP_CHOICES = [
-    app_commands.Choice(name="Create / repair all base Xianxia channels", value="create"),
+    app_commands.Choice(name="Validate / bind existing base Xianxia channels", value="bind"),
     app_commands.Choice(name="Show base-channel status", value="status"),
 ]
 
@@ -2696,7 +2613,7 @@ def _base_channel_bindings(cfg: dict[str, Any]) -> dict[str, Any]:
 
 def _xianxia_info_guide_text() -> str:
     return (
-        "📖 **Xianxia Realm Guide — v0.13**\n"
+        f"📖 **Xianxia Realm Guide — v{RELEASE_VERSION}**\n"
         "This channel is **read-only** and is **not** a game location. Use the guide menu below for detailed help.\n\n"
         "🌱 **Start** — `/begin` in `#begin-here`\n"
         "🧭 **Explore** — private expedition journal under `#expeditions`\n"
@@ -2711,7 +2628,7 @@ def _xianxia_info_guide_text() -> str:
 XIANXIA_INFO_PAGES: dict[str, tuple[str, str]] = {
     "getting_started": ("🌱 Getting Started", "Use `/begin` in `#begin-here`, then `/me` to see your current state. Exploration happens in your private expedition thread; main realm-capital channels remain shared social spaces."),
     "character": ("🧬 Character & Cultivation", "Your family, spiritual root, cultivation path, realms, resources, Karma, Fate, Dao Heart and effects remain canonical game state. The AI router narrates results but cannot change mechanics."),
-    "exploration": ("🧭 Exploration & Scenes", "The v0.13 scene engine separates **physical location** from **active scene**. Wilderness uses your expedition journal. Player properties and sect abodes use persistent private threads. Main cities remain shared channels."),
+    "exploration": ("🧭 Exploration & Scenes", "The v0.18 scene engine separates **physical location** from **active scene**. Wilderness uses your expedition journal. Player properties and sect abodes use persistent private threads. Main cities remain shared channels."),
     "sects": ("🏯 Sects", "Discover a sect route, speak with affiliated NPCs, earn recommendations, take a sect-specific trial, and join only after a canonical success. Membership can grant a private sect residence."),
     "properties": ("🏡 Player-Owned Locations", "Properties are real database-backed locations with private threads, facilities and guest permissions. Guests must be invited and physically reach the entrance before gaining access."),
     "relationships": ("🤝 NPC Relationships", "Persistent NPC state tracks trust, respect, fear, affection, debt, grudge and encounter history. Narration may describe those relationships but never owns the underlying numbers."),
@@ -2764,154 +2681,38 @@ async def ensure_xianxia_info_guide(guild: discord.Guild, channel: discord.TextC
 async def ensure_base_xianxia_channels(
     guild: discord.Guild, *, category_name: str = "📜 Xianxia RP"
 ) -> dict[str, Any]:
-    """Create/repair the canonical base Discord layout without replying to an interaction."""
-    if not guild.me or not guild.me.guild_permissions.manage_channels:
-        raise PermissionError("Manage Channels is required")
-
+    """Validate and bind existing base channels without creating Discord channels."""
     cfg = await DB.get_server_config(guild.id)
     bindings = _base_channel_bindings(cfg)
-    can_manage_overwrites = bool(guild.me.guild_permissions.manage_roles)
-    warnings: list[str] = []
-    if not can_manage_overwrites:
-        warnings.append(
-            "Grant **Manage Roles** so the bot can enforce private/read-only permission overwrites automatically."
-        )
-
-    category = next((x for x in guild.categories if x.name == category_name), None)
-    if category is None:
-        category = await guild.create_category(category_name, reason="Xianxia base server channels")
-
+    category = next((item for item in guild.categories if item.name == category_name), None)
     channels: dict[str, discord.TextChannel] = {}
-    created: list[str] = []
-    repaired: list[str] = []
-    created_names: set[str] = set()
-    for name, topic in BASE_CHANNEL_SPECS.items():
+    warnings: list[str] = []
+
+    for name in BASE_CHANNEL_SPECS:
         configured = await _resolve_text_channel(guild, bindings.get(name))
-        channel = configured or next((x for x in guild.text_channels if x.name == name), None)
+        channel = configured or next((item for item in guild.text_channels if item.name == name), None)
         if channel is None:
-            create_kwargs: dict[str, Any] = {
-                "category": category,
-                "topic": topic[:1024],
-                "reason": "Xianxia base server channel provisioning",
-            }
-            if can_manage_overwrites and name == "bot-logs":
-                create_kwargs["overwrites"] = {
-                    guild.default_role: discord.PermissionOverwrite(view_channel=False),
-                    guild.me: discord.PermissionOverwrite(
-                        view_channel=True, send_messages=True, read_message_history=True
-                    ),
-                }
-            elif can_manage_overwrites and name in READ_ONLY_BASE_CHANNELS:
-                create_kwargs["overwrites"] = {
-                    guild.default_role: discord.PermissionOverwrite(
-                        view_channel=True, send_messages=False, create_public_threads=False,
-                        create_private_threads=False, send_messages_in_threads=True, read_message_history=True,
-                    ),
-                    guild.me: discord.PermissionOverwrite(
-                        view_channel=True, send_messages=True, create_private_threads=True,
-                        send_messages_in_threads=True, manage_threads=True, read_message_history=True,
-                    ),
-                }
-            channel = await guild.create_text_channel(name, **create_kwargs)
-            created.append(channel.mention)
-            created_names.add(name)
-        else:
-            changes: dict[str, Any] = {}
-            if channel.category_id != category.id:
-                changes["category"] = category
-            if channel.topic != topic[:1024]:
-                changes["topic"] = topic[:1024]
-            if changes:
-                try:
-                    await channel.edit(reason="Repair Xianxia base server channel", **changes)
-                    repaired.append(channel.mention)
-                except discord.HTTPException:
-                    log.exception("Could not repair base channel %s", name)
+            warnings.append(
+                f"Missing **#{name}**. Create/bind it from the admin dashboard; the bot will not provision channels."
+            )
+            continue
         channels[name] = channel
 
-    if can_manage_overwrites:
-        try:
-            await channels["bot-logs"].set_permissions(
-                guild.default_role, view_channel=False, reason="Private Xianxia operational logs"
-            )
-            await channels["bot-logs"].set_permissions(
-                guild.me, view_channel=True, send_messages=True, read_message_history=True,
-                reason="Allow Xianxia bot to write operational logs",
-            )
-        except (discord.Forbidden, discord.HTTPException):
-            log.exception("Could not enforce private permissions on bot-logs")
-            warnings.append("Discord rejected the private overwrite for #bot-logs; check Manage Roles and bot role position.")
-
-        for read_only_name in sorted(READ_ONLY_BASE_CHANNELS):
-            try:
-                await channels[read_only_name].set_permissions(
-                    guild.default_role, view_channel=True, send_messages=False,
-                    create_public_threads=False, create_private_threads=False,
-                    send_messages_in_threads=True, read_message_history=True,
-                    reason="Read-only Xianxia system anchor",
-                )
-                await channels[read_only_name].set_permissions(
-                    guild.me, view_channel=True, send_messages=True, create_private_threads=True,
-                    send_messages_in_threads=True, manage_threads=True, read_message_history=True,
-                    reason="Allow Xianxia bot to manage private scenes and information",
-                )
-            except (discord.Forbidden, discord.HTTPException):
-                log.exception("Could not enforce read-only permissions on %s", read_only_name)
-                warnings.append(f"Discord rejected read-only permissions for #{read_only_name}; set it read-only manually.")
-
-    await DB.set_server_channels(
-        guild.id,
-        announcement_channel_id=channels["world-events"].id,
-        event_scene_channel_id=channels["event-scenes"].id,
-        home_scene_channel_id=channels["player-homes"].id,
-        log_channel_id=channels["bot-logs"].id,
-        begin_channel_id=channels["begin-here"].id,
-        info_channel_id=channels["xianxia-info"].id,
-        exploration_channel_id=channels["expeditions"].id,
-    )
-
-    if "begin-here" in created_names:
-        try:
-            await channels["begin-here"].send(
-                "🌱 **Begin Your Cultivation Journey**\n"
-                "Use **/begin** in this channel to choose your birth family and create your cultivator. "
-                "After creation, use **/character** and **/world** to continue."
-            )
-        except discord.HTTPException:
-            log.exception("Could not post begin-channel welcome message")
-
-    await ensure_xianxia_info_guide(guild, channels["xianxia-info"])
-
-    if "expeditions" in created_names:
-        try:
-            await channels["expeditions"].send(
-                "🧭 **Private Expeditions**\n"
-                "This anchor channel is read-only. The bot creates one **private expedition thread per cultivator**. "
-                "Exploration results, choices and guided Scene Actions remain visible inside the private journal; other players cannot enter it."
-            )
-        except discord.HTTPException:
-            log.exception("Could not post expedition-channel guide")
-
-    if "player-homes" in created_names:
-        try:
-            await channels["player-homes"].send(
-                "🏡 **Private Player Locations**\n"
-                "This anchor channel is read-only. Player-owned properties and sect residences are represented by persistent **private threads** here. "
-                "The thread never replaces world travel: owners/guests must be at the property's physical entrance before entering the private scene."
-            )
-        except discord.HTTPException:
-            log.exception("Could not post player-home anchor guide")
+    info_channel = channels.get("xianxia-info")
+    if info_channel is not None:
+        await ensure_xianxia_info_guide(guild, info_channel)
 
     return {
         "category": category,
         "channels": channels,
-        "created": created,
-        "repaired": repaired,
+        "created": [],
+        "repaired": [],
         "warnings": warnings,
+        "dashboard_owned": True,
     }
 
 
-@registered_group_command(admin_server_group, name="basechannels", description="Create or inspect the base Xianxia Discord channels")
+@registered_group_command(admin_server_group, name="basechannels", description="Inspect dashboard-managed base Xianxia Discord channels")
 @app_commands.choices(action=BASE_CHANNEL_SETUP_CHOICES)
 async def admin_base_channels(
     interaction: discord.Interaction,
@@ -2937,21 +2738,19 @@ async def admin_base_channels(
         await interaction.response.send_message("\n".join(lines), ephemeral=False)
         return
 
-    if not guild.me or not guild.me.guild_permissions.manage_channels:
-        await interaction.response.send_message(
-            "❌ I need **Manage Channels** to create or repair the base Xianxia channels.", ephemeral=False
-        )
-        return
-
     await interaction.response.defer(ephemeral=False)
     try:
         result = await ensure_base_xianxia_channels(guild, category_name=category_name)
     except (discord.Forbidden, discord.HTTPException) as exc:
-        await interaction.followup.send(f"❌ Could not create/repair the base Discord layout: {exc}", ephemeral=False)
+        await interaction.followup.send(f"❌ Could not validate the configured base Discord layout: {exc}", ephemeral=False)
         return
     await audit_admin(
         interaction, "server.basechannels", target=f"guild:{guild.id}",
-        after={"category_id": result["category"].id, "created": result["created"], "repaired": result["repaired"]},
+        after={
+            "category_id": result["category"].id if result["category"] else None,
+            "created": result["created"],
+            "repaired": result["repaired"],
+        },
     )
     warning_text = "".join(f"\n⚠️ {warning}" for warning in result["warnings"])
     await interaction.followup.send(
@@ -2982,18 +2781,19 @@ def _server_permission_report(guild: discord.Guild) -> tuple[list[str], list[str
         return ["❌ Bot member state is unavailable."], ["Discord did not expose the bot member for this guild."]
 
     perms = me.guild_permissions
+    lines: list[str] = [
+        f"{'✅' if perms.manage_channels else 'ℹ️'} **Manage Channels** — optional; channel creation and layout are owned by the admin dashboard."
+    ]
     checks = (
-        ("Manage Channels", perms.manage_channels, "Server Setup/Repair cannot create, move or repair channels."),
         ("Manage Threads", perms.manage_threads, "Private expedition/property threads cannot be reliably recovered or archived."),
         ("Create Private Threads", perms.create_private_threads, "Private expedition and player-location threads cannot be created."),
         ("Send Messages in Threads", perms.send_messages_in_threads, "The bot cannot narrate or update private scene threads."),
-        ("Manage Roles", perms.manage_roles, "Realm-role syncing and automatic private/read-only permission repair will not work."),
+        ("Manage Roles", perms.manage_roles, "Realm-role creation and synchronization will not work."),
         ("View Channels", perms.view_channel, "The bot cannot resolve configured game channels."),
         ("Send Messages", perms.send_messages, "The bot cannot post setup guides, events or normal game responses."),
         ("Read Message History", perms.read_message_history, "Persistent scene and guide recovery may be incomplete."),
         ("Embed Links", perms.embed_links, "Some game panels and rich status responses will be degraded."),
     )
-    lines: list[str] = []
     warnings: list[str] = []
     for label, ok, consequence in checks:
         lines.append(f"{'✅' if ok else '❌'} **{label}**" + ("" if ok else f"\n   {consequence}"))
@@ -3099,11 +2899,215 @@ async def _sync_all_realm_access_roles(guild: discord.Guild) -> dict[str, int]:
 
 
 async def _run_complete_server_setup(guild: discord.Guild) -> tuple[dict[str, Any], list[dict[str, Any]]]:
-    if not guild.me or not guild.me.guild_permissions.manage_channels:
-        raise PermissionError("Manage Channels is required")
     base_result = await ensure_base_xianxia_channels(guild, category_name=SERVER_BASE_CATEGORY)
     realm_rows = await ensure_realm_hub_channels(guild, category_name=SERVER_REALM_CATEGORY)
     return base_result, realm_rows
+
+
+async def _dashboard_discord_snapshot(client: XianxiaBot, guild: discord.Guild) -> dict[str, Any]:
+    cfg = await DB.get_server_config(guild.id)
+    bindings = _base_channel_bindings(cfg)
+    base_channels: list[dict[str, Any]] = []
+    for name in BASE_CHANNEL_SPECS:
+        channel_id = bindings.get(name)
+        channel = await _resolve_text_channel(guild, channel_id)
+        base_channels.append({
+            "key": name,
+            "configured_id": int(channel_id) if channel_id else None,
+            "channel_id": channel.id if channel else None,
+            "name": channel.name if channel else None,
+            "status": "ready" if channel else ("stale" if channel_id else "missing"),
+        })
+
+    realm_rows = {str(row["world_name"]): row for row in await DB.get_realm_hub_channels(guild.id)}
+    realm_hubs: list[dict[str, Any]] = []
+    for world, hub in REALM_HUBS.items():
+        row = realm_rows.get(world)
+        channel = guild.get_channel(int(row["channel_id"])) if row else None
+        role = discord.utils.get(guild.roles, name=_realm_access_role_name(world))
+        realm_hubs.append({
+            "world": world,
+            "display_name": str(hub.get("display_name") or world),
+            "channel_id": channel.id if isinstance(channel, discord.TextChannel) else None,
+            "channel_name": channel.name if isinstance(channel, discord.TextChannel) else None,
+            "role_id": role.id if role else None,
+            "role_name": role.name if role else None,
+            "ready": isinstance(channel, discord.TextChannel) and role is not None,
+        })
+
+    me = guild.me
+    permission_specs = (
+        ("manage_channels", "Manage Channels", "Optional; channel creation and layout are admin-dashboard owned.", False),
+        ("manage_threads", "Manage Threads", "Recover/archive private expedition and property threads.", True),
+        ("create_private_threads", "Create Private Threads", "Create private expedition and player-location threads.", True),
+        ("send_messages_in_threads", "Send Messages in Threads", "Narrate and update private scenes.", True),
+        ("manage_roles", "Manage Roles", "Create/sync realm visibility roles.", True),
+        ("view_channel", "View Channels", "Resolve configured game channels.", True),
+        ("send_messages", "Send Messages", "Post guides, events and game responses.", True),
+        ("read_message_history", "Read Message History", "Recover persistent scene and guide messages.", True),
+        ("embed_links", "Embed Links", "Render rich game/status panels.", True),
+    )
+    permissions: list[dict[str, Any]] = []
+    for attr, label, purpose, required in permission_specs:
+        ok = bool(me and getattr(me.guild_permissions, attr, False))
+        permissions.append({"key": attr, "label": label, "ok": ok, "purpose": purpose, "required": required})
+
+    blocked_roles: list[str] = []
+    if me and me.guild_permissions.manage_roles:
+        for row in realm_hubs:
+            role = guild.get_role(int(row["role_id"])) if row.get("role_id") else None
+            if role is not None and me.top_role.position <= role.position:
+                blocked_roles.append(role.name)
+
+    all_channels = [
+        {
+            "id": channel.id,
+            "name": channel.name,
+            "category": channel.category.name if channel.category else "Uncategorized",
+        }
+        for channel in sorted(guild.text_channels, key=lambda c: ((c.category.position if c.category else -1), c.position, c.name))
+    ]
+    ready_base = sum(1 for row in base_channels if row["status"] == "ready")
+    ready_realms = sum(1 for row in realm_hubs if row["ready"])
+    warnings = [row["label"] for row in permissions if row["required"] and not row["ok"]]
+    if blocked_roles:
+        warnings.append("Bot role must be moved above: " + ", ".join(blocked_roles))
+
+    return {
+        "connected": True,
+        "guild": {"id": guild.id, "name": guild.name, "member_count": guild.member_count},
+        "bot": {
+            "id": client.user.id if client.user else None,
+            "name": str(client.user) if client.user else "Xianxia RP",
+            "administrator": bool(me and me.guild_permissions.administrator),
+            "top_role": me.top_role.name if me else None,
+        },
+        "permissions": permissions,
+        "permission_warnings": warnings,
+        "base_channels": base_channels,
+        "base_ready": ready_base,
+        "base_total": len(base_channels),
+        "realm_hubs": realm_hubs,
+        "realm_ready": ready_realms,
+        "realm_total": len(realm_hubs),
+        "text_channels": all_channels,
+        "info_message_id": cfg.get("info_message_id"),
+        "registered_commands": len(client.tree.get_commands(guild=GUILD)),
+        "setup_ready": ready_base == len(base_channels) and ready_realms == len(realm_hubs) and not warnings,
+    }
+
+
+async def _audit_dashboard_discord(action: str, guild: discord.Guild, *, after: dict[str, Any] | None = None, reason: str = "GM dashboard") -> None:
+    await DB.log_admin_action(
+        admin_user_id=0,
+        action=f"dashboard.discord.{action}",
+        target=f"guild:{guild.id}",
+        after=after or {},
+        reason=reason[:500],
+    )
+
+
+async def dashboard_discord_control(client: XianxiaBot, action: str, payload: dict[str, Any]) -> dict[str, Any]:
+    """Private dashboard -> discord.py control surface.
+
+    This endpoint never performs game mechanics. It validates dashboard-owned
+    Discord layout, binds existing channels, and stores Discord IDs through the
+    normal Go-owned database boundary.
+    """
+    action = str(action or "status").strip().lower()
+    guild = client.get_guild(SETTINGS.guild_id)
+    if guild is None:
+        raise RuntimeError(f"Configured Discord guild {SETTINGS.guild_id} is not connected")
+    reason = str(payload.get("reason") or "GM dashboard")[:500]
+
+    if action in {"status", "permissions", "configuration"}:
+        return {"ok": True, "action": action, "result": await _dashboard_discord_snapshot(client, guild)}
+
+    if action in {"setup", "repair"}:
+        base_result, realm_rows = await _run_complete_server_setup(guild)
+        info_channel = base_result["channels"].get("xianxia-info")
+        info_message = await ensure_xianxia_info_guide(guild, info_channel) if info_channel else None
+        role_sync: dict[str, int] | None = None
+        if guild.me.guild_permissions.manage_roles:
+            role_sync = await _sync_all_realm_access_roles(guild)
+        synced = await client.tree.sync(guild=GUILD)
+        result = {
+            "mode": action,
+            "created": list(base_result["created"]),
+            "repaired": list(base_result["repaired"]),
+            "warnings": list(base_result["warnings"]),
+            "realm_hubs": len(realm_rows),
+            "info_message_id": info_message.id if info_message else None,
+            "realm_role_sync": role_sync,
+            "synced_commands": len(synced),
+        }
+        await _audit_dashboard_discord(action, guild, after=result, reason=reason)
+        return {"ok": True, "action": action, "result": result, "status": await _dashboard_discord_snapshot(client, guild)}
+
+    if action == "sync_roles":
+        counts = await _sync_all_realm_access_roles(guild)
+        await _audit_dashboard_discord(action, guild, after=counts, reason=reason)
+        return {"ok": True, "action": action, "result": counts, "status": await _dashboard_discord_snapshot(client, guild)}
+
+    if action == "rebuild_info":
+        channel = await configured_info_channel(guild)
+        if channel is None:
+            raise ValueError("#xianxia-info is not configured. Run Full Setup or Repair first.")
+        message = await ensure_xianxia_info_guide(guild, channel)
+        if message is None:
+            raise RuntimeError("Discord rejected the info-guide update")
+        result = {"channel_id": channel.id, "message_id": message.id}
+        await _audit_dashboard_discord(action, guild, after=result, reason=reason)
+        return {"ok": True, "action": action, "result": result}
+
+    if action == "sync_commands":
+        synced = await client.tree.sync(guild=GUILD)
+        result = {"synced_commands": len(synced), "guild_id": guild.id}
+        await _audit_dashboard_discord(action, guild, after=result, reason=reason)
+        return {"ok": True, "action": action, "result": result}
+
+    if action == "bind_channels":
+        cfg = await DB.get_server_config(guild.id)
+        mapping = {
+            "announcement_channel_id": "announcements",
+            "event_scene_channel_id": "scenes",
+            "home_scene_channel_id": "homes",
+            "log_channel_id": "logs",
+            "begin_channel_id": "begin",
+            "info_channel_id": "info",
+            "exploration_channel_id": "exploration",
+        }
+        values: dict[str, int | None] = {}
+        for db_key, payload_key in mapping.items():
+            raw = payload.get(payload_key)
+            if raw in {None, ""}:
+                values[db_key] = cfg.get(db_key)
+                continue
+            try:
+                channel_id = int(raw)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"Invalid channel id for {payload_key}") from exc
+            channel = guild.get_channel(channel_id)
+            if not isinstance(channel, discord.TextChannel):
+                raise ValueError(f"Selected {payload_key} channel is not a text channel in {guild.name}")
+            values[db_key] = channel_id
+        if not values.get("announcement_channel_id") or not values.get("event_scene_channel_id"):
+            raise ValueError("World-events and event-scenes channels must be selected before saving bindings")
+        await DB.set_server_channels(guild.id, **values)
+        await _audit_dashboard_discord(action, guild, after=values, reason=reason)
+        return {"ok": True, "action": action, "result": values, "status": await _dashboard_discord_snapshot(client, guild)}
+
+    if action == "test_announcement":
+        cfg = await DB.get_server_config(guild.id)
+        channel = await _resolve_text_channel(guild, cfg.get("announcement_channel_id"))
+        if channel is None:
+            raise ValueError("No announcement channel is configured")
+        message = await channel.send("🧪 **Xianxia RP GM Dashboard test** — Discord server integration is working.")
+        result = {"channel_id": channel.id, "message_id": message.id}
+        await _audit_dashboard_discord(action, guild, after=result, reason=reason)
+        return {"ok": True, "action": action, "result": result}
+
+    raise ValueError(f"Unsupported Discord dashboard action: {action}")
 
 
 @registered_group_command(admin_server_group, name="setup", description="Install, repair and diagnose the complete Xianxia Discord server")
@@ -3185,17 +3189,8 @@ async def admin_setup_server(
         )
         return
 
-    # Setup and Repair are intentionally idempotent. Setup is the initial installer;
-    # Repair safely re-applies the same canonical bindings, topics and permission
-    # overwrites without deleting player threads, game data or custom unrelated channels.
-    if not guild.me or not guild.me.guild_permissions.manage_channels:
-        lines, _ = _server_permission_report(guild)
-        await interaction.response.send_message(
-            "❌ **Manage Channels** is required for Setup/Repair.\n\n" + "\n".join(lines),
-            ephemeral=False,
-        )
-        return
-
+    # Discord channel creation is dashboard-owned. Bot setup only validates bindings
+    # and refreshes game-side metadata for channels that already exist.
     await interaction.response.defer(ephemeral=False)
     try:
         base_result, realm_rows = await _run_complete_server_setup(guild)
@@ -3225,7 +3220,7 @@ async def admin_setup_server(
     await audit_admin(
         interaction, audit_action, target=f"guild:{guild.id}",
         after={
-            "base_category_id": base_result["category"].id,
+            "base_category_id": base_result["category"].id if base_result["category"] else None,
             "base_created": base_result["created"],
             "base_repaired": base_result["repaired"],
             "realm_hubs": {str(row["world_name"]): int(row["channel_id"]) for row in realm_rows},
@@ -3238,8 +3233,8 @@ async def admin_setup_server(
     await interaction.followup.send(
         f"✅ **Xianxia Server {mode} complete.**\n"
         f"Base channels connected: **{len(base_result['channels'])}**\n"
-        f"New base channels: **{len(base_result['created'])}**\n"
-        f"Repaired base channels: **{len(base_result['repaired'])}**\n"
+        f"Bot-created base channels: **0 (disabled)**\n"
+        f"Dashboard-owned bindings validated: **{len(base_result['channels'])}**\n"
         f"Realm-capital channels connected: **{len(realm_rows)}**\n"
         f"Info guide: **{'ready' if info_message else 'needs attention'}**\n"
         + (f"Realm-role reconciliation: **{role_sync_counts['synced']} member(s)**\n" if role_sync_counts is not None else "Realm-role reconciliation: **skipped**\n")
@@ -3250,83 +3245,34 @@ async def admin_setup_server(
 
 
 REALM_HUB_SETUP_CHOICES = [
-    app_commands.Choice(name="Create / repair all realm-capital channels", value="create"),
+    app_commands.Choice(name="Refresh dashboard bindings", value="refresh"),
     app_commands.Choice(name="Show realm-capital channel status", value="status"),
 ]
 
 
-@registered_group_command(admin_server_group, name="realmhubs", description="Create or inspect the four public realm-capital meeting channels")
+@registered_group_command(admin_server_group, name="realmhubs", description="Inspect dashboard-managed realm-capital channel bindings")
 @app_commands.choices(action=REALM_HUB_SETUP_CHOICES)
 async def admin_realm_hubs(interaction: discord.Interaction, action: app_commands.Choice[str], category_name: str = "🌌 Realm Capitals") -> None:
     if not await require_admin(interaction):
         return
-    guild=interaction.guild
-    if guild is None:return
-    existing={str(r['world_name']):r for r in await DB.get_realm_hub_channels(guild.id)}
-    if action.value=="status":
-        lines=["🏙️ **Realm-Capital Meeting Channels**"]
-        for world,hub in REALM_HUBS.items():
-            row=existing.get(world); channel=guild.get_channel(int(row['channel_id'])) if row else None
-            lines.append(f"• **{world} — {hub['display_name']}**: {channel.mention if isinstance(channel,discord.TextChannel) else '*not provisioned*'}")
-        if guild.me:
-            lines.append(f"\nManage Channels permission: **{'yes' if guild.me.guild_permissions.manage_channels else 'NO'}**")
-        await interaction.response.send_message("\n".join(lines),ephemeral=False);return
-    if not guild.me or not guild.me.guild_permissions.manage_channels:
-        await interaction.response.send_message("❌ I need **Manage Channels** to create or repair the realm-capital meeting channels.",ephemeral=False);return
-    await interaction.response.defer(ephemeral=False)
-    realm_roles = await _ensure_realm_access_roles(guild)
-    category=next((x for x in guild.categories if x.name==category_name),None)
-    if category is None:
-        try: category=await guild.create_category(category_name,reason="Xianxia realm-capital meeting hubs")
-        except discord.HTTPException as exc:
-            await interaction.followup.send(f"❌ Could not create realm-hub category: {exc}",ephemeral=False);return
-    created=[]; repaired=[]
-    for world,hub in REALM_HUBS.items():
-        access_role = realm_roles.get(world)
-        row=existing.get(world); channel=guild.get_channel(int(row['channel_id'])) if row else None
-        if not isinstance(channel,discord.TextChannel):
-            channel=next((x for x in guild.text_channels if x.name==str(hub['channel_name'])),None)
-        if channel is None:
-            create_kwargs: dict[str, Any] = {
-                "category": category,
-                "topic": str(hub["topic"])[:1024],
-                "reason": f"Xianxia {world} public meeting hub",
-            }
-            if access_role is not None:
-                create_kwargs["overwrites"] = _realm_channel_overwrites(guild, access_role)
-            channel=await guild.create_text_channel(str(hub['channel_name']),**create_kwargs)
-            created.append(channel.mention)
-            try:
-                await channel.send(
-                    f"🏙️ **{hub['display_name']} — {world}**\n"
-                    f"This channel is mechanically bound to **{hub['location']}**. Use **/travel → Realm Capitals → Go** to arrive. "
-                    "Players here can meet, speak, trade, form parties and roleplay in the same canonical city."
-                )
-            except discord.HTTPException:
-                pass
-        else:
-            changes={}
-            if channel.category_id!=category.id:changes['category']=category
-            if channel.topic!=str(hub['topic']):changes['topic']=str(hub['topic'])[:1024]
-            if changes:
-                try: await channel.edit(reason="Repair Xianxia realm-capital meeting hub",**changes); repaired.append(channel.mention)
-                except discord.HTTPException: pass
-        if access_role is not None:
-            try:
-                await _apply_realm_channel_permissions(guild, channel, access_role)
-            except discord.HTTPException:
-                log.exception("Could not apply realm visibility permissions to %s", channel.name)
-        await DB.set_realm_hub_channel(guild_id=guild.id,world_name=world,location=str(hub['location']),channel_id=channel.id,category_id=category.id)
-    await audit_admin(interaction,"server.realmhubs",target=f"guild:{guild.id}",after={"category_id":category.id,"created":created,"repaired":repaired})
-    rows=await DB.get_realm_hub_channels(guild.id)
-    visibility_note = (
-        "\n🔐 Higher-world channels are hidden behind cultivation access roles."
-        if len(realm_roles) == len(REALM_HUBS)
-        else "\n⚠️ Realm channels were created, but automatic visibility gating needs **Manage Roles** and a bot role above the generated access roles."
-    )
-    await interaction.followup.send(
-        "✅ **Realm capitals are connected to Discord.**\n"+"\n".join(f"• **{r['world_name']}** → <#{int(r['channel_id'])}>" for r in rows)+visibility_note,ephemeral=False
-    )
+    guild = interaction.guild
+    if guild is None:
+        return
+    if action.value == "refresh":
+        await ensure_realm_hub_channels(guild, category_name=category_name)
+    existing = {str(row["world_name"]): row for row in await DB.get_realm_hub_channels(guild.id)}
+    lines = [
+        "🏙️ **Realm-Capital Meeting Channels**",
+        "Discord channel creation is disabled in the bot; configure channel IDs in the admin dashboard.",
+    ]
+    for world, hub in REALM_HUBS.items():
+        row = existing.get(world)
+        channel = guild.get_channel(int(row["channel_id"])) if row else None
+        lines.append(
+            f"• **{world} — {hub['display_name']}**: "
+            f"{channel.mention if isinstance(channel, discord.TextChannel) else '*not bound*'}"
+        )
+    await interaction.response.send_message("\n".join(lines), ephemeral=False)
 
 
 @registered_group_command(admin_server_group, name="observability", description="Inspect slow-query telemetry, runtime metrics and external-alert history")
@@ -3515,8 +3461,23 @@ async def begin(interaction: discord.Interaction) -> None:
             )
             return
 
-    families = generate_family_options()
-    view = BirthFamilyView(interaction.user.id, families)
+    wt = await current_world_time()
+    try:
+        offer_envelope = await ENGINE.authoritative_action(
+            "character.family_options",
+            interaction.user.id,
+            {"world_name": "Mortal World"},
+            action_id=f"discord:{interaction.id}:character.family_options",
+        )
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ Could not generate canonical birth families: {exc}", ephemeral=True)
+        return
+    offer_result = dict(offer_envelope.get("result") or {})
+    families = [dict(row) for row in offer_result.get("families", [])]
+    if not families:
+        await interaction.response.send_message("No canonical birth families are available. Try **/begin** again.", ephemeral=True)
+        return
+    view = BirthFamilyView(interaction.user.id, families, int(offer_envelope.get("state_version", 0)))
     await interaction.response.send_message(
         embed=view.current_embed(),
         view=view,
@@ -3569,7 +3530,7 @@ async def sheet(interaction: discord.Interaction) -> None:
     aptitudes = await DB.get_aptitudes(interaction.user.id)
     a = c["attributes"]
     wt = await current_world_time()
-    life = lifespan_status(c, wt.total_minutes)
+    life = await authoritative_lifespan(interaction.user.id)
     embed = discord.Embed(title=f"{c['name']} — {realm}", description=c["concept"][:4096])
     embed.add_field(
         name="Qi Cultivation",
@@ -3617,6 +3578,9 @@ async def sheet(interaction: discord.Interaction) -> None:
             f"Age **{life.age_years:.1f}** / **{life.total_years} years**\n"
             f"Natural {life.natural_years} + cultivation {life.cultivation_bonus_years} + medicine {life.extension_years}"
         )
+    if getattr(life, "aging_paused", False):
+        paused_years = float(getattr(life, "paused_game_minutes", 0) or 0) / float(MINUTES_PER_YEAR)
+        life_text += f"\n⏸️ **Inactive aging paused** • {paused_years:,.1f} game-years protected"
     if c.get("life_status") == "deceased":
         life_text += "\n🕯️ **Deceased — lifespan exhausted**"
     embed.add_field(name="Age & Lifespan", value=life_text, inline=False)
@@ -3629,15 +3593,20 @@ async def sheet(interaction: discord.Interaction) -> None:
         ),
         inline=True,
     )
-    sense_stats = spiritual_sense_stats(c)
-    embed.add_field(
-        name="Spiritual Sense",
-        value=(
-            f"Power **{sense_stats['power']}** • Precision **{sense_stats['precision']}**\n"
-            f"Range **{sense_stats['range_m']:,} m** • Concealment **{'Active' if c.get('concealment_active') else 'Off'}**"
-        ),
-        inline=False,
-    )
+    if c.get("life_status") == "alive":
+        try:
+            sense_stats = dict(await ENGINE.action(
+                "sense.status", interaction.user.id, {},
+            ) or {})
+            sense_text = (
+                f"Power **{int(sense_stats.get('power', 0))}** • Precision **{int(sense_stats.get('precision', 0))}**\n"
+                f"Range **{int(sense_stats.get('range_m', 0)):,} m** • Concealment **{'Active' if sense_stats.get('concealment_active') else 'Off'}**"
+            )
+        except GameEngineError:
+            sense_text = "Spiritual Sense data is temporarily unavailable."
+    else:
+        sense_text = "Dormant while the soul turns through Samsara."
+    embed.add_field(name="Spiritual Sense", value=sense_text, inline=False)
     if WORLD.dual_resonance_active(c):
         embed.add_field(
             name="☯ Dual Cultivation Resonance",
@@ -3859,48 +3828,33 @@ async def aptitude_temper(interaction: discord.Interaction, target: app_commands
     c = await require_character(interaction)
     if not c:
         return
-    bundle = await DB.get_aptitudes(interaction.user.id)
-    record = bundle.get(target.value)
-    if target.value == "bloodline" and not record:
-        await interaction.response.send_message("You do not carry a recognized bloodline.", ephemeral=False)
-        return
-    if target.value == "physique" and str((record or {}).get("physique_id", "ordinary_mortal_body")) == "ordinary_mortal_body":
-        await interaction.response.send_message("An ordinary body has no dormant special physique to temper.", ephemeral=False)
-        return
-    progress_key = "refinement_progress" if target.value == "root" else "progress"
-    if int((record or {}).get(progress_key, 0)) >= 100:
-        await interaction.response.send_message(
-            f"Your {target.name.lower()} progress is already **100%**. Use **/cultivation → Aptitudes → {'evolve' if target.value == 'root' or int((record or {}).get('evolution_stage',0)) else 'awaken'}**.",
-            ephemeral=False,
-        )
-        return
-    remaining = await DB.cooldown_remaining(interaction.user.id, f"aptitude_temper:{target.value}")
-    if remaining:
-        await interaction.response.send_message(f"Your innate channels must settle for **{human_duration(remaining)}**.", ephemeral=False)
-        return
-    if target.value == "physique":
-        stage_cost = WORLD.body_phase_cost(int(c.get("body_realm_index", 0)), int(c.get("body_phase", 1)))
-        relevant = int(c["attributes"].get("body", 0))
-        realm = int(c.get("body_realm_index", 0))
-    else:
-        stage_cost = WORLD.phase_cost(int(c.get("realm_index", 0)), int(c.get("phase", 1)))
-        relevant = int(c["attributes"].get("insight" if target.value == "root" else "will", 0))
-        realm = int(c.get("realm_index", 0))
-    cost = max(3, stage_cost // 12)
-    gain = min(20, 5 + secrets.randbelow(7) + max(0, relevant // 2) + realm // 3)
+    wt = await current_world_time()
     try:
-        result = await DB.train_aptitude(interaction.user.id, target=target.value, essence_cost=cost, progress_gain=gain)
-    except ValueError as exc:
+        envelope = await ENGINE.authoritative_action(
+            "aptitude.temper",
+            interaction.user.id,
+            {
+                "target": target.value,
+                
+                "cooldown_seconds": max(300, SETTINGS.cultivate_cooldown_minutes * 60),
+            },
+            action_id=f"discord:{interaction.id}:aptitude.temper:{target.value}",
+        )
+    except GameEngineError as exc:
         await interaction.response.send_message(f"❌ {exc}", ephemeral=False)
         return
-    await DB.set_cooldown(interaction.user.id, f"aptitude_temper:{target.value}", max(300, SETTINGS.cultivate_cooldown_minutes * 60))
-    updated = result.get(target.value) or {}
-    progress = int(updated.get(progress_key, 0))
+    result = dict(envelope.get("result") or {})
+    bundle = dict(result.get("aptitudes") or {})
+    record = dict(bundle.get(target.value) or {})
+    progress_key = "refinement_progress" if target.value == "root" else "progress"
+    progress = int(record.get(progress_key, 0))
+    awarded = int(result.get("awarded", 0))
+    cost = int(result.get("cost", 0))
     await interaction.response.send_message(
-        f"🔥 **{target.name} Tempering**\nSpent **{result['cost']}** essence and gained **+{result['awarded']}%** progress.\n"
-        f"Progress: **{progress}% / 100%**" + ("\n✨ The aptitude is ready for its next awakening/evolution attempt." if progress >= 100 else "")
+        f"🔥 **{target.name} Tempering**\nSpent **{cost}** essence and gained **+{awarded}%** progress.\n"
+        f"Progress: **{progress}% / 100%**"
+        + ("\n✨ The aptitude is ready for its next awakening/evolution attempt." if progress >= 100 else "")
     )
-
 
 @registered_group_command(aptitude_group, name="awaken", description="Attempt to awaken a prepared bloodline or physique")
 @app_commands.choices(target=AWAKEN_TARGET_CHOICES)
@@ -3909,57 +3863,28 @@ async def aptitude_awaken(interaction: discord.Interaction, target: app_commands
     c = await require_character(interaction)
     if not c:
         return
-    bundle = await DB.get_aptitudes(interaction.user.id)
-    problems = progression_requirements(
-        target.value, bundle, c,
-        root_system=WORLD.spiritual_root_system,
-        bloodline_definitions=WORLD.bloodlines,
-        physique_definitions=WORLD.physiques,
-        action="awaken",
-    )
-    if problems:
-        await interaction.response.send_message("❌ " + "\n❌ ".join(problems), ephemeral=False)
+    wt = await current_world_time()
+    try:
+        envelope = await ENGINE.authoritative_action(
+            "aptitude.awaken",
+            interaction.user.id,
+            {"target": target.value},
+            action_id=f"discord:{interaction.id}:aptitude.awaken:{target.value}",
+        )
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}", ephemeral=False)
         return
-    remaining = await DB.cooldown_remaining(interaction.user.id, f"aptitude_awaken:{target.value}")
-    if remaining:
-        await interaction.response.send_message(f"The failed resonance cannot be attempted again for **{human_duration(remaining)}**.", ephemeral=False)
-        return
-    _, mods, _ = await current_effect_modifiers(interaction.user.id)
-    if target.value == "bloodline":
-        bloodline = dict(bundle["bloodline"])
-        modifier = effective_attribute(c, mods, "will") + int(bloodline.get("purity", 0)) // 20 - int(bloodline.get("rejection", 0)) // 25 + int(c.get("realm_index", 0)) // 2
-        tn = 13
-        result = roll_2d10(modifier, tn)
-        if result.success:
-            _, definition = bloodline_definition(bloodline, WORLD.bloodlines)
-            bloodline.update(state="awakened", evolution_stage=1, progress=0, rejection=max(0, int(bloodline.get("rejection", 0)) - 10))
-            bloodline["unlocked_techniques"] = unlocked_ancestral_techniques(bloodline, definition)
-        else:
-            bloodline["rejection"] = min(100, int(bloodline.get("rejection", 0)) + 9 + max(0, -result.margin))
-            if bloodline["rejection"] >= 100:
-                bloodline["state"] = "rejected"
-            if result.margin <= -7:
-                bloodline["mutation"] = f"Divergent {bloodline.get('affinity','Ancestral')} Strain"
-        await DB.save_bloodline_profile(interaction.user.id, bloodline, event_type="bloodline_awakening")
-        state = bloodline["state"]
-    else:
-        physique = dict(bundle["physique"])
-        modifier = effective_attribute(c, mods, "body") + max(1, effective_attribute(c, mods, "will") // 2) + int(physique.get("stability", 0)) // 25 + int(c.get("body_realm_index", 0)) // 2
-        tn = 14
-        result = roll_2d10(modifier, tn)
-        if result.success:
-            physique.update(state="awakened", evolution_stage=1, progress=0, instability=max(0, int(physique.get("instability", 0)) - 10))
-        else:
-            physique["instability"] = min(100, int(physique.get("instability", 0)) + 9 + max(0, -result.margin))
-            physique["stability"] = max(0, int(physique.get("stability", 0)) - 5)
-        await DB.save_physique_profile(interaction.user.id, physique, event_type="physique_awakening")
-        state = physique["state"]
-    await DB.set_cooldown(interaction.user.id, f"aptitude_awaken:{target.value}", 6 * 3600)
+    result = dict(envelope.get("result") or {})
+    roll = SimpleNamespace(**dict(result.get("roll") or {}))
+    state = str(result.get("state") or "unknown")
     await interaction.response.send_message(
-        f"✨ **{target.name} Awakening**\n{roll_line(result)}\n"
-        + (f"The {target.name.lower()} awakens successfully. State: **{str(state).title()}**." if result.success else f"Awakening failed. The persistent backlash has been recorded; use **/cultivation → Aptitudes → harmonize** before rejection or instability becomes severe.")
+        f"✨ **{target.name} Awakening**\n{roll_line(roll)}\n"
+        + (
+            f"The {target.name.lower()} awakens successfully. State: **{state.title()}**."
+            if bool(getattr(roll, "success", False))
+            else "Awakening failed. The persistent backlash has been recorded; use **/cultivation → Aptitudes → harmonize** before rejection or instability becomes severe."
+        )
     )
-
 
 @registered_group_command(aptitude_group, name="evolve", description="Attempt the next grade or ancestral evolution")
 @app_commands.choices(target=APTITUDE_TARGET_CHOICES)
@@ -3968,74 +3893,36 @@ async def aptitude_evolve(interaction: discord.Interaction, target: app_commands
     c = await require_character(interaction)
     if not c:
         return
-    bundle = await DB.get_aptitudes(interaction.user.id)
-    problems = progression_requirements(
-        target.value, bundle, c,
-        root_system=WORLD.spiritual_root_system,
-        bloodline_definitions=WORLD.bloodlines,
-        physique_definitions=WORLD.physiques,
-        action="evolve",
-    )
-    if problems:
-        await interaction.response.send_message("❌ " + "\n❌ ".join(problems), ephemeral=False)
+    wt = await current_world_time()
+    try:
+        envelope = await ENGINE.authoritative_action(
+            "aptitude.evolve",
+            interaction.user.id,
+            {"target": target.value},
+            action_id=f"discord:{interaction.id}:aptitude.evolve:{target.value}",
+        )
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}", ephemeral=False)
         return
-    remaining = await DB.cooldown_remaining(interaction.user.id, f"aptitude_evolve:{target.value}")
-    if remaining:
-        await interaction.response.send_message(f"The evolutionary resonance cannot be attempted again for **{human_duration(remaining)}**.", ephemeral=False)
-        return
-    _, mods, _ = await current_effect_modifiers(interaction.user.id)
+    result = dict(envelope.get("result") or {})
+    roll = SimpleNamespace(**dict(result.get("roll") or {}))
+    outcome = dict(result.get("outcome") or {})
     if target.value == "root":
-        root = dict(bundle["root"])
-        grades = list(WORLD.spiritual_root_system.get("grades", []))
-        next_index = grade_index(WORLD.spiritual_root_system, str(root.get("grade", "Mortal"))) + 1
-        modifier = effective_attribute(c, mods, "insight") + max(1, effective_attribute(c, mods, "will") // 2) + int(root.get("stability", 0)) // 25
-        result = roll_2d10(modifier, 13 + next_index)
-        if result.success:
-            root.update(grade=str(grades[next_index]["name"]), purity=min(100, int(root.get("purity", 0)) + 3), refinement_progress=0, stability=min(100, int(root.get("stability", 0)) + 2))
-        else:
-            root["stability"] = max(0, int(root.get("stability", 0)) - 7 - max(0, -result.margin // 2))
-            if result.margin <= -7:
-                eligible = [key for key, definition in WORLD.spiritual_root_system.get("mutations", {}).items() if not definition.get("requires_any") or set(root.get("elements", [])).intersection(definition.get("requires_any", []))]
-                if eligible:
-                    root["mutation"] = eligible[secrets.randbelow(len(eligible))]
-        root["compatibility"] = root_compatibility(root.get("elements", []), str(c.get("path", "")), WORLD.spiritual_root_system, str(root.get("mutation", "")))
-        await DB.save_root_profile(interaction.user.id, root, event_type="root_evolution")
-        outcome = f"Root grade: **{root['grade']}** • Stability: **{root['stability']}%**"
+        outcome_text = f"Root grade: **{outcome.get('grade', 'Unknown')}** • Stability: **{int(outcome.get('stability', 0))}%**"
     elif target.value == "bloodline":
-        bloodline = dict(bundle["bloodline"])
-        _, definition = bloodline_definition(bloodline, WORLD.bloodlines)
-        stage = int(bloodline.get("evolution_stage", 1))
-        modifier = effective_attribute(c, mods, "will") + int(bloodline.get("purity", 0)) // 20 - int(bloodline.get("rejection", 0)) // 25 + int(c.get("realm_index", 0)) // 2
-        result = roll_2d10(modifier, 13 + stage * 2)
-        if result.success:
-            bloodline.update(state="evolved", evolution_stage=stage + 1, progress=0, purity=min(100, int(bloodline.get("purity", 0)) + 4), rejection=max(0, int(bloodline.get("rejection", 0)) - 5))
-            bloodline["unlocked_techniques"] = unlocked_ancestral_techniques(bloodline, definition)
-        else:
-            bloodline["purity"] = max(1, int(bloodline.get("purity", 0)) - 2)
-            bloodline["rejection"] = min(100, int(bloodline.get("rejection", 0)) + 10 + max(0, -result.margin))
-            if result.margin <= -7:
-                bloodline["state"] = "mutated"
-                bloodline["mutation"] = f"Divergent {bloodline.get('affinity','Ancestral')} Strain"
-        await DB.save_bloodline_profile(interaction.user.id, bloodline, event_type="bloodline_evolution")
-        outcome = f"Stage: **{bloodline['evolution_stage']}** • Purity: **{bloodline['purity']}%** • Rejection: **{bloodline['rejection']}%**"
+        outcome_text = (
+            f"Stage: **{int(outcome.get('stage', 0))}** • Purity: **{int(outcome.get('purity', 0))}%** • "
+            f"Rejection: **{int(outcome.get('rejection', 0))}%**"
+        )
     else:
-        physique = dict(bundle["physique"])
-        stage = int(physique.get("evolution_stage", 1))
-        modifier = effective_attribute(c, mods, "body") + max(1, effective_attribute(c, mods, "will") // 2) + int(physique.get("stability", 0)) // 25 - int(physique.get("instability", 0)) // 25
-        result = roll_2d10(modifier, 14 + stage * 2)
-        if result.success:
-            physique.update(state="evolved", evolution_stage=stage + 1, progress=0, stability=min(100, int(physique.get("stability", 0)) + 3), instability=max(0, int(physique.get("instability", 0)) - 5))
-        else:
-            physique["stability"] = max(0, int(physique.get("stability", 0)) - 8)
-            physique["instability"] = min(100, int(physique.get("instability", 0)) + 10 + max(0, -result.margin))
-        await DB.save_physique_profile(interaction.user.id, physique, event_type="physique_evolution")
-        outcome = f"Stage: **{physique['evolution_stage']}** • Stability: **{physique['stability']}%** • Instability: **{physique['instability']}%**"
-    await DB.set_cooldown(interaction.user.id, f"aptitude_evolve:{target.value}", 12 * 3600)
+        outcome_text = (
+            f"Stage: **{int(outcome.get('stage', 0))}** • Stability: **{int(outcome.get('stability', 0))}%** • "
+            f"Instability: **{int(outcome.get('instability', 0))}%**"
+        )
     await interaction.response.send_message(
-        f"🌌 **{target.name} Evolution**\n{roll_line(result)}\n{outcome}\n"
-        + ("The evolution succeeds." if result.success else "The failure caused a persistent setback that must be harmonized or overcome.")
+        f"🌌 **{target.name} Evolution**\n{roll_line(roll)}\n{outcome_text}\n"
+        + ("The evolution succeeds." if bool(getattr(roll, "success", False)) else "The failure caused a persistent setback that must be harmonized or overcome.")
     )
-
 
 @registered_group_command(aptitude_group, name="harmonize", description="Spend essence to reduce rejection or instability and restore stability")
 @app_commands.choices(target=APTITUDE_TARGET_CHOICES)
@@ -4044,33 +3931,37 @@ async def aptitude_harmonize(interaction: discord.Interaction, target: app_comma
     c = await require_character(interaction)
     if not c:
         return
-    bundle = await DB.get_aptitudes(interaction.user.id)
-    record = bundle.get(target.value)
-    if target.value == "bloodline" and not record:
-        await interaction.response.send_message("You do not carry a recognized bloodline.", ephemeral=False)
-        return
-    if target.value == "physique" and str((record or {}).get("physique_id", "ordinary_mortal_body")) == "ordinary_mortal_body":
-        await interaction.response.send_message("An ordinary body has no special-physique instability.", ephemeral=False)
-        return
-    remaining = await DB.cooldown_remaining(interaction.user.id, f"aptitude_harmonize:{target.value}")
-    if remaining:
-        await interaction.response.send_message(f"Harmonization can continue in **{human_duration(remaining)}**.", ephemeral=False)
-        return
-    if target.value == "physique":
-        stage_cost = WORLD.body_phase_cost(int(c.get("body_realm_index", 0)), int(c.get("body_phase", 1)))
-    else:
-        stage_cost = WORLD.phase_cost(int(c.get("realm_index", 0)), int(c.get("phase", 1)))
-    cost = max(2, stage_cost // 15)
-    amount = 8 + secrets.randbelow(8) + max(0, int(c["attributes"].get("will", 0)) // 2)
+    wt = await current_world_time()
     try:
-        updated = await DB.harmonize_aptitude(interaction.user.id, target=target.value, essence_cost=cost, amount=amount)
-    except ValueError as exc:
+        envelope = await ENGINE.authoritative_action(
+            "aptitude.harmonize",
+            interaction.user.id,
+            {
+                "target": target.value,
+                
+                "cooldown_seconds": max(300, SETTINGS.cultivate_cooldown_minutes * 60),
+            },
+            action_id=f"discord:{interaction.id}:aptitude.harmonize:{target.value}",
+        )
+    except GameEngineError as exc:
         await interaction.response.send_message(f"❌ {exc}", ephemeral=False)
         return
-    await DB.set_cooldown(interaction.user.id, f"aptitude_harmonize:{target.value}", max(300, SETTINGS.cultivate_cooldown_minutes * 60))
-    summary = _root_summary(updated["root"], c) if target.value == "root" else _bloodline_summary(updated["bloodline"]) if target.value == "bloodline" else _physique_summary(updated["physique"])
-    await reply_long(interaction, f"☯️ Harmonization spent **{cost}** essence and restored **{amount}** points.\n\n{summary}", ephemeral=False)
-
+    result = dict(envelope.get("result") or {})
+    bundle = dict(result.get("aptitudes") or {})
+    amount = int(result.get("amount", 0))
+    cost = int(result.get("cost", 0))
+    summary = (
+        _root_summary(dict(bundle.get("root") or {}), c)
+        if target.value == "root"
+        else _bloodline_summary(bundle.get("bloodline"))
+        if target.value == "bloodline"
+        else _physique_summary(dict(bundle.get("physique") or {}))
+    )
+    await reply_long(
+        interaction,
+        f"☯️ Harmonization spent **{cost}** essence and restored **{amount}** points.\n\n{summary}",
+        ephemeral=False,
+    )
 
 async def _player_dashboard_embed(user_id: int, *, guild_id: int | None, page: str = "overview") -> discord.Embed:
     c = await DB.get_character(int(user_id))
@@ -4167,7 +4058,7 @@ class PlayerDashboardView(discord.ui.View):
         await self._show(interaction, "quests")
 
 
-@registered_root_command(name="me", description="Open your v0.13 player dashboard", guild=GUILD)
+@registered_root_command(name="me", description="Open your v0.18 player dashboard", guild=GUILD)
 async def player_dashboard(interaction: discord.Interaction) -> None:
     c = await require_character(interaction, allow_deceased=True)
     if not c:
@@ -4254,84 +4145,43 @@ async def cultivate(interaction: discord.Interaction) -> None:
     c = await require_character(interaction)
     if not c:
         return
-    remaining = await DB.cooldown_remaining(interaction.user.id, "cultivate")
-    if remaining:
-        await interaction.response.send_message(
-            f"Your meridians need time to settle. Try again in **{human_duration(remaining)}**.",
-            ephemeral=False,
+    wt = await current_world_time()
+    try:
+        envelope = await ENGINE.authoritative_action(
+            "cultivation.train",
+            interaction.user.id,
+            {"cooldown_seconds": SETTINGS.cultivate_cooldown_minutes * 60},
+            action_id=f"discord:{interaction.id}:cultivation.train",
         )
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}", ephemeral=False)
         return
-
-    active_effects, effect_mods, wt = await current_effect_modifiers(interaction.user.id)
-    effective_will = effective_attribute(c, effect_mods, "will")
-    base_gain = 8 + secrets.randbelow(7) + effective_will
-    resonance_bonus = WORLD.dual_resonance_training_bonus(c, base_gain)
-    time_mods = cultivation_speed_modifiers(wt, c.get("spiritual_root"))
-    attempted_gain = base_gain + resonance_bonus
-    attempted_gain = int(round(attempted_gain * float(time_mods["qi_mult"])))
-    attempted_gain = int(round(attempted_gain * effect_mods.get("cultivation_gain_mult", 1.0)))
-    soul_legacy = await DB.get_soul_legacy(interaction.user.id)
-    soul_mods = soul_legacy_modifiers(soul_legacy)
-    attempted_gain = int(round(attempted_gain * float(soul_mods["cultivation_mult"])))
-    era = await DB.get_current_era()
-    era_cultivation_mult = max(0.25, float((era or {}).get("modifiers", {}).get("cultivation_gain", 1.0)))
-    attempted_gain = int(round(attempted_gain * era_cultivation_mult))
-    member_manor = await DB.get_member_sect_manor(interaction.user.id)
-    manor_qi_mult = 1.0
-    if member_manor and str(member_manor.get("base_location", "")) == str(c.get("location", "")):
-        manor_qi_mult = manor_qi_multiplier(member_manor)
-        attempted_gain = int(round(attempted_gain * manor_qi_mult))
-    # Shared qi-storm events make cultivation unusually rich while they last.
-    active_events = await DB.get_active_world_events(c["location"])
-    storm_bonus = 4 if any(e["payload"].get("definition_id") == "qi_storm" for e in active_events) else 0
-    attempted_gain += storm_bonus
-    cost = WORLD.phase_cost(c["realm_index"], c["phase"])
-    gain = await CULTIVATION.reward(
-        interaction.user.id,
-        cultivation=attempted_gain,
-        cultivation_cap=cost,
-        event_type="cultivate",
-    )
-
-    perfection_gain = 0
-    perfection = await DB.get_perfection(interaction.user.id, c["realm_index"])
-    if c["phase"] == 9 and perfection and perfection["active"]:
-        perfection_gain = await DB.add_perfection_training(
-            interaction.user.id, c["realm_index"], 1 + secrets.randbelow(3), WORLD.perfection_training_cap()
-        )
-
-    await DB.set_cooldown(interaction.user.id, "cultivate", SETTINGS.cultivate_cooldown_minutes * 60)
-    new_total = c["cultivation"] + gain
+    result = dict(envelope.get("result") or {})
+    gain, total, cost = int(result.get("gain", 0)), int(result.get("total", 0)), int(result.get("cost", 0))
     extra = ""
-    if resonance_bonus:
-        extra += f"\n☯ Dual Cultivation Resonance added **+{resonance_bonus}** to the attempted gain before the stage cap."
-    extra += f"\n🕰️ {wt.period} cultivation flow: **x{float(time_mods['qi_mult']):.2f}** Qi efficiency."
-    if time_mods.get("root_resonance"):
-        extra += f"\n🌿 **{c.get('spiritual_root')}** resonates with **{wt.season}**: +10% seasonal Qi efficiency."
-    if effect_mods.get("cultivation_gain_mult", 1.0) != 1.0:
-        extra += f"\n💊 Active effects modified cultivation efficiency to **x{effect_mods['cultivation_gain_mult']:.2f}**."
-    if float(soul_mods["cultivation_mult"]) > 1.0:
-        extra += f"\n☸️ Soul Legacy talent echo: **x{float(soul_mods['cultivation_mult']):.2f}** cultivation efficiency."
-    if era_cultivation_mult != 1.0:
-        extra += f"\n🌌 **{(era or {}).get('name','World Era')}** modifies cultivation to **x{era_cultivation_mult:.2f}**."
-    if manor_qi_mult != 1.0:
-        extra += f"\n🏯 **{member_manor.get('name','Sect Manor')}** Qi Gathering Array: **x{manor_qi_mult:.2f}** cultivation efficiency."
-    if storm_bonus:
-        extra += f"\n⚡ Active Qi Storm added **+{storm_bonus}** before the stage cap."
-    if perfection_gain:
-        extra += f"\n★ Realm refinement deepens by **+{perfection_gain}%**."
+    if int(result.get("resonance_bonus", 0)):
+        extra += f"\n☯ Dual Cultivation Resonance added **+{int(result['resonance_bonus'])}** to the attempted gain before the stage cap."
+    extra += f"\n🕰️ {result.get('period','World-time')} cultivation flow: **x{float(result.get('time_mult',1)):.2f}** Qi efficiency."
+    if result.get("root_resonance"):
+        extra += f"\n🌿 **{c.get('spiritual_root')}** resonates with **{result.get('season','the season')}**: +10% seasonal Qi efficiency."
+    if float(result.get("effect_mult", 1)) != 1.0:
+        extra += f"\n💊 Active effects modified cultivation efficiency to **x{float(result['effect_mult']):.2f}**."
+    if float(result.get("soul_mult", 1)) > 1.0:
+        extra += f"\n☸️ Soul Legacy talent echo: **x{float(result['soul_mult']):.2f}** cultivation efficiency."
+    if float(result.get("era_mult", 1)) != 1.0:
+        extra += f"\n🌌 **{result.get('era_name') or 'World Era'}** modifies cultivation to **x{float(result['era_mult']):.2f}**."
+    if float(result.get("manor_mult", 1)) != 1.0:
+        extra += f"\n🏯 **{result.get('manor_name') or 'Sect Manor'}** Qi Gathering Array: **x{float(result['manor_mult']):.2f}** cultivation efficiency."
+    if int(result.get("storm_bonus", 0)):
+        extra += f"\n⚡ Active Qi Storm added **+{int(result['storm_bonus'])}** before the stage cap."
+    if int(result.get("perfection_gain", 0)):
+        extra += f"\n★ Realm refinement deepens by **+{int(result['perfection_gain'])}%**."
     ready = ""
-    if new_total >= cost:
-        if c["phase"] == 9:
-            ready = "\n✨ Stage 9 is full. Choose **/quest → Realm Perfection → Start** or **/quest → Main Progression → Breakthrough**."
-        else:
-            ready = "\n✨ You are ready to attempt **/quest → Main Progression → Breakthrough**."
+    if result.get("ready"):
+        ready = "\n✨ Stage 9 is full. Choose **/quest → Realm Perfection → Start** or **/quest → Main Progression → Breakthrough**." if int(c.get("phase", 1)) == 9 else "\n✨ You are ready to attempt **/quest → Main Progression → Breakthrough**."
     await interaction.response.send_message(
-        f"🧘 **{c['name']} cultivates.**\n"
-        f"You circulate qi through your meridians and gain **+{gain} cultivation essence**.\n"
-        f"Progress: **{new_total}/{cost}**{extra}{ready}"
+        f"🧘 **{c['name']} cultivates.**\nYou circulate qi through your meridians and gain **+{gain} cultivation essence**.\nProgress: **{total}/{cost}**{extra}{ready}"
     )
-
 seclusion_group = app_commands.Group(
     name="seclusion",
     description="Closed-door background cultivation that progresses with world time",
@@ -4381,15 +4231,14 @@ async def seclusion_start(
         array_seclusion_mult = float(aggregate_modifiers([payload]).get("cultivation_gain_mult", 1.0))
         env_mult *= array_seclusion_mult
     try:
-        state = await DB.start_seclusion(
-            interaction.user.id,
-            mode=mode.value,
-            current_game_minute=wt.total_minutes,
-            duration_game_minutes=int(days) * MINUTES_PER_DAY,
-            location=str(c.get("location", "")),
-            environment_mult=env_mult,
+        envelope = await ENGINE.authoritative_action(
+            "seclusion.start", interaction.user.id,
+            {"mode": mode.value, "duration_game_minutes": int(days) * MINUTES_PER_DAY,
+             "location": str(c.get("location", "")), "environment_mult": env_mult},
+            action_id=f"discord:{interaction.id}:seclusion.start",
         )
-    except ValueError as exc:
+        state = dict(envelope.get("result") or {})
+    except GameEngineError as exc:
         await interaction.response.send_message(f"❌ {exc}", ephemeral=False)
         return
     soul = await DB.get_soul_legacy(interaction.user.id)
@@ -4450,11 +4299,19 @@ async def seclusion_end(interaction: discord.Interaction) -> None:
     if not c:
         return
     wt = await current_world_time()
-    state = await settle_seclusion_for_user(interaction.user.id, wt.total_minutes)
-    if not state or str(state.get("status")) != "active":
+    state = await DB.get_seclusion(interaction.user.id)
+    if not state:
         await interaction.response.send_message("You are not in active seclusion.", ephemeral=False)
         return
-    await DB.end_seclusion(interaction.user.id, current_game_minute=wt.total_minutes, reason="emerged early")
+    try:
+        await ENGINE.authoritative_action(
+            "seclusion.settle", interaction.user.id,
+            {"minutes_per_day": MINUTES_PER_DAY, "force_end": True, "end_reason": "emerged early"},
+            action_id=f"discord:{interaction.id}:seclusion.end",
+        )
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}", ephemeral=False)
+        return
     final = await DB.get_seclusion(interaction.user.id, active_only=False) or state
     await interaction.response.send_message(
         f"🚪 **You emerge from seclusion.**\n"
@@ -4469,133 +4326,58 @@ async def breakthrough(interaction: discord.Interaction, confirm: bool = False) 
     c = await require_character(interaction)
     if not c:
         return
-    cost = WORLD.phase_cost(c["realm_index"], c["phase"])
-    if c["cultivation"] < cost:
-        await interaction.response.send_message(
-            f"You need **{cost} cultivation essence**, but have **{c['cultivation']}**.", ephemeral=False
-        )
-        return
-
-    perfection = await DB.get_perfection(interaction.user.id, c["realm_index"])
-    if c["phase"] == 9:
-        if perfection and perfection["active"]:
-            await interaction.response.send_message(
-                "You are already walking the Perfect Path. Complete **/quest → Realm Perfection → Trial** or **/quest → Realm Perfection → Abandon** before leaving this realm.",
-                ephemeral=False,
-            )
-            return
-        if not (perfection and perfection["completed"]) and not confirm:
-            await interaction.response.send_message(
-                "⚠️ **Stage 9 choice**\nYou can pursue **/quest → Realm Perfection → Start** for a much stronger long-term foundation. "
-                "If you intentionally want to skip it, use **/quest → Main Progression → Breakthrough**.",
-                ephemeral=False,
-            )
-            return
-
-    next_stage = WORLD.next_stage(c["realm_index"], c["phase"])
-    if not next_stage:
-        await interaction.response.send_message("You have reached the current world's cultivation ceiling.", ephemeral=False)
-        return
-
-    next_realm_index, next_phase = next_stage
-    if WORLD.realm_world(next_realm_index) != WORLD.realm_world(c["realm_index"]):
-        gate = ascension_gate(int(c["realm_index"]))
-        state = await DB.get_tribulation_state(interaction.user.id, int(c["realm_index"]))
-        if gate and not (state and int(state.get("cleared", 0))):
-            await interaction.response.send_message(
-                f"⚡ **{gate['name']} required.** Your next breakthrough crosses from "
-                f"**{gate['from_world']}** into **{gate['to_world']}**. Prepare and clear it with "
-                "**/quest → Tribulation / Ascension → Prepare** and **/quest → Tribulation / Ascension → Attempt** first.",
-                ephemeral=False,
-            )
-            return
-    tn = WORLD.breakthrough_tn(c["realm_index"], c["phase"])
-    perfect_bonus = 2 if await DB.has_completed_perfection(interaction.user.id) else 0
-    resonance_bonus = WORLD.dual_resonance_check_bonus(c)
-    _, effect_mods, _ = await current_effect_modifiers(interaction.user.id)
-    innate_breakthrough_bonus = int(round(effect_mods.get("breakthrough_bonus", 0)))
-    modifier = effective_attribute(c, effect_mods, "will") + 2 + perfect_bonus + resonance_bonus + innate_breakthrough_bonus
-    result = roll_2d10(modifier, tn)
-    failure_loss = max(5, cost // 10)
-    payload = {
-        "dice": [result.die1, result.die2], "modifier": result.modifier, "total": result.total,
-        "tn": result.tn, "degree": result.degree, "success": result.success,
-        "from_realm": WORLD.realm_name(c["realm_index"], c.get("gender")), "from_stage": c["phase"],
-        "to_realm": WORLD.realm_name(next_realm_index, c.get("gender")), "to_stage": next_phase,
-        "perfect_bonus": perfect_bonus, "resonance_bonus": resonance_bonus,
-        "innate_breakthrough_bonus": innate_breakthrough_bonus,
-    }
-    await DB.apply_breakthrough(
-        interaction.user.id, new_realm_index=next_realm_index, new_phase=next_phase,
-        cultivation_cost=cost, success=result.success, failure_loss=failure_loss, roll_payload=payload
-    )
-    await interaction.response.defer()
-    breakthrough_context = await NARRATOR_CONTEXT.build(
-        c, scene_type="cultivation breakthrough", query_text=f"breakthrough {WORLD.realm_name(next_realm_index, c.get('gender'))} stage {next_phase}"
-    )
+    wt = await current_world_time()
     try:
-        narration = await NARRATOR.narrate_breakthrough(
-            c, WORLD.realm_name(next_realm_index, c.get("gender")), next_phase, roll_line(result), result.success,
-            scene_context=breakthrough_context.text,
+        envelope = await ENGINE.authoritative_action(
+            "cultivation.breakthrough",
+            interaction.user.id,
+            {"confirm": bool(confirm)},
+            action_id=f"discord:{interaction.id}:cultivation.breakthrough",
         )
+    except GameEngineError as exc:
+        message = str(exc)
+        if "perfection choice requires explicit confirmation" in message:
+            message = "⚠️ **Stage 9 choice**\nYou can pursue **/quest → Realm Perfection → Start** for a stronger long-term foundation, or explicitly confirm this breakthrough to skip it."
+        await interaction.response.send_message(f"❌ {message}" if not message.startswith("⚠️") else message, ephemeral=False)
+        return
+    result = dict(envelope.get("result") or {})
+    roll = SimpleNamespace(**dict(result.get("roll") or {}))
+    next_realm = str(result.get("to_realm") or "Unknown Realm")
+    next_phase = int(result.get("to_stage", 1))
+    success = bool(result.get("success"))
+    await interaction.response.defer()
+    breakthrough_context = await NARRATOR_CONTEXT.build(c, scene_type="cultivation breakthrough", query_text=f"breakthrough {next_realm} stage {next_phase}")
+    try:
+        narration = await NARRATOR.narrate_breakthrough(c, next_realm, next_phase, roll_line(roll), success, scene_context=breakthrough_context.text)
     except Exception:
         log.exception("Breakthrough narration failed")
         narration = "Qi surges through your meridians as the breakthrough reaches its fixed mechanical result."
     try:
         await DB.add_rag_memory(
-            interaction.user.id, memory_kind="breakthrough",
-            salience=88 if result.success else 66, location=str(c.get("location") or ""),
-            source="breakthrough", game_minute=breakthrough_context.game_minute,
-            summary=(
-                f"{c.get('name','The cultivator')} attempted a breakthrough from "
-                f"{WORLD.realm_name(c['realm_index'], c.get('gender'))} Stage {c['phase']} to "
-                f"{WORLD.realm_name(next_realm_index, c.get('gender'))} Stage {next_phase}. "
-                f"Outcome: {'success' if result.success else 'failure'}. Observed: {narration[:540]}"
-            ),
+            interaction.user.id, memory_kind="breakthrough", salience=88 if success else 66,
+            location=str(c.get("location") or ""), source="breakthrough", game_minute=breakthrough_context.game_minute,
+            summary=(f"{c.get('name','The cultivator')} attempted a breakthrough from {result.get('from_realm','Unknown')} Stage {result.get('from_stage',1)} to {next_realm} Stage {next_phase}. Outcome: {'success' if success else 'failure'}. Observed: {narration[:540]}"),
         )
     except Exception:
         log.exception("Could not persist breakthrough RAG memory")
-    mechanical = roll_line(result)
-    if perfect_bonus:
+    mechanical = roll_line(roll)
+    if int(result.get("perfect_bonus", 0)):
         mechanical += "\n★ Perfect-foundation legacy bonus: **+2** to this breakthrough."
-    if resonance_bonus:
+    if int(result.get("resonance_bonus", 0)):
         mechanical += "\n☯ Dual Cultivation Resonance: **+1** to this breakthrough."
-    if innate_breakthrough_bonus:
-        mechanical += f"\n🌿 Innate aptitude modifier: **{innate_breakthrough_bonus:+d}** to this breakthrough."
-    if result.success:
-        legacy=await DB.awaken_soul_memory(interaction.user.id, 5)
-        mechanical += f"\n✨ Advanced to **{WORLD.realm_name(next_realm_index, c.get("gender"))}, Stage {next_phase}**."
-        master_reward = await DB.reward_master_for_disciple_breakthrough(
-            interaction.user.id, realm_changed=(int(next_realm_index) != int(c["realm_index"]))
-        )
-        if master_reward:
-            mechanical += (
-                f"\n🎓 Your breakthrough feeds the master-disciple bond: **{master_reward['master_name']}** "
-                f"receives **+{master_reward['insight_xp']} Insight XP** and the lineage gains "
-                f"**+{master_reward['attention']} Master Attention**."
-            )
-        if int(legacy.get("awakened_memory",0)):
+    if int(result.get("innate_breakthrough_bonus", 0)):
+        mechanical += f"\n🌿 Innate aptitude modifier: **{int(result['innate_breakthrough_bonus']):+d}** to this breakthrough."
+    if success:
+        mechanical += f"\n✨ Advanced to **{next_realm}, Stage {next_phase}**."
+        master = dict(result.get("master_reward") or {})
+        if master:
+            mechanical += f"\n🎓 Your breakthrough feeds the master-disciple bond: **{master.get('master_name','Your master')}** receives **+{int(master.get('insight_xp',0))} Insight XP** and the lineage gains **+{int(master.get('attention',0))} Master Attention**."
+        legacy = dict(result.get("soul_legacy") or {})
+        if int(legacy.get("awakened_memory", 0)):
             mechanical += f"\n🕯️ Past-life memory awakened: **{int(legacy.get('awakened_memory',0))}% / {int(legacy.get('memory_seed',0))}%**."
-        old_world = WORLD.realm_world(int(c["realm_index"]))
-        new_world = WORLD.realm_world(int(next_realm_index))
-        if old_world != new_world:
-            await DB.record_world_history_event(
-                event_type="ascension", title=f"{c.get('name','A cultivator')} ascended to {new_world}",
-                summary=(
-                    f"After clearing the world-crossing tribulation, {c.get('name','the cultivator')} broke through from "
-                    f"{old_world} into {new_world}, entering {WORLD.realm_name(next_realm_index, c.get('gender'))}."
-                ),
-                significance=98, visibility="public", location=str(c.get('location') or ''), world_name=str(new_world),
-                actor_type="player", actor_key=str(interaction.user.id), actor_name=str(c.get('name') or ''),
-                target_type="world", target_key=str(new_world), target_name=str(new_world), related_user_id=interaction.user.id,
-                tags=("ascension","breakthrough",str(old_world),str(new_world)), game_minute=breakthrough_context.game_minute,
-                metadata={"from_world": old_world, "to_world": new_world, "realm_index": int(next_realm_index)},
-                source_key=f"ascension:qi:{interaction.user.id}:{int(next_realm_index)}:{breakthrough_context.game_minute}",
-            )
     else:
-        mechanical += f"\n⚠️ Breakthrough failed; **{failure_loss} cultivation essence** was lost."
+        mechanical += f"\n⚠️ Breakthrough failed; **{int(result.get('failure_loss',0))} cultivation essence** was lost."
     await reply_long(interaction, f"{mechanical}\n\n{narration}")
-
 # ---------------- Body Cultivation commands ----------------
 body_group = app_commands.Group(name="body", description="Parallel body-cultivation progression")
 
@@ -4637,65 +4419,32 @@ async def body_cultivate(interaction: discord.Interaction) -> None:
     c = await require_character(interaction)
     if not c:
         return
-    remaining = await DB.cooldown_remaining(interaction.user.id, "body_cultivate")
-    if remaining:
-        await interaction.response.send_message(
-            f"Your flesh, bones, and meridians need time to recover. Continue in **{human_duration(remaining)}**.",
-            ephemeral=False,
+    wt = await current_world_time()
+    try:
+        envelope = await ENGINE.authoritative_action(
+            "cultivation.body_train",
+            interaction.user.id,
+            {"cooldown_seconds": SETTINGS.cultivate_cooldown_minutes * 60},
+            action_id=f"discord:{interaction.id}:cultivation.body_train",
         )
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}", ephemeral=False)
         return
-
-    _, effect_mods, wt = await current_effect_modifiers(interaction.user.id)
-    base_gain = 8 + secrets.randbelow(7) + effective_attribute(c, effect_mods, "body")
-    resonance_bonus = WORLD.dual_resonance_training_bonus(c, base_gain)
-    ri = int(c.get("body_realm_index", 0))
-    ph = int(c.get("body_phase", 1))
-    cost = WORLD.body_phase_cost(ri, ph)
-    time_mods = cultivation_speed_modifiers(wt, c.get("spiritual_root"))
-    attempted_gain = int(round((base_gain + resonance_bonus) * float(time_mods["body_mult"])))
-    attempted_gain = int(round(attempted_gain * effect_mods.get("body_cultivation_gain_mult", 1.0)))
-    soul_legacy = await DB.get_soul_legacy(interaction.user.id)
-    soul_mods = soul_legacy_modifiers(soul_legacy)
-    attempted_gain = int(round(attempted_gain * float(soul_mods["cultivation_mult"])))
-    era = await DB.get_current_era()
-    era_cultivation_mult = max(0.25, float((era or {}).get("modifiers", {}).get("cultivation_gain", 1.0)))
-    attempted_gain = int(round(attempted_gain * era_cultivation_mult))
-    gain = await DB.reward_body_cultivation(
-        interaction.user.id,
-        attempted_gain,
-        cultivation_cap=cost,
-    )
-    perfection_gain = 0
-    p = await DB.get_body_perfection(interaction.user.id, ri)
-    if ph == 9 and p and p["active"]:
-        perfection_gain = await DB.add_body_perfection_training(
-            interaction.user.id, ri, 1 + secrets.randbelow(3), WORLD.body_perfection_training_cap()
-        )
-
-    await DB.set_cooldown(interaction.user.id, "body_cultivate", SETTINGS.cultivate_cooldown_minutes * 60)
-    total = int(c.get("body_cultivation", 0)) + gain
-    extra = (
-        f"\n☯ Resonance added **+{resonance_bonus}** to the attempted body gain before the stage cap."
-        if resonance_bonus else ""
-    )
-    extra += f"\n🕰️ {wt.period} body-tempering flow: **x{float(time_mods['body_mult']):.2f}** efficiency."
-    if float(soul_mods["cultivation_mult"]) > 1.0:
-        extra += f"\n☸️ Soul Legacy talent echo: **x{float(soul_mods['cultivation_mult']):.2f}** body-cultivation efficiency."
-    if era_cultivation_mult != 1.0:
-        extra += f"\n🌌 **{(era or {}).get('name','World Era')}** modifies cultivation to **x{era_cultivation_mult:.2f}**."
-    if perfection_gain:
-        extra += f"\n★ Body refinement deepens by **+{perfection_gain}%**."
-    if total >= cost:
-        extra += (
-            "\n✨ Body Stage 9 is full. Choose **/quest → Body Perfection → Start** or **/cultivation → Body Cultivation → Breakthrough**."
-            if ph == 9 else "\n✨ Your body is ready for **/cultivation → Body Cultivation → Breakthrough**."
-        )
-    await interaction.response.send_message(
-        f"💪 **{c['name']} tempers the body.**\n"
-        f"You refine flesh, blood, bone, and meridians for **+{gain} body essence**.\n"
-        f"Progress: **{total}/{cost}**{extra}"
-    )
-
+    result = dict(envelope.get("result") or {})
+    gain, total, cost = int(result.get("gain", 0)), int(result.get("total", 0)), int(result.get("cost", 0))
+    extra = ""
+    if int(result.get("resonance_bonus", 0)):
+        extra += f"\n☯ Resonance added **+{int(result['resonance_bonus'])}** to the attempted body gain before the stage cap."
+    extra += f"\n🕰️ {result.get('period','World-time')} body-tempering flow: **x{float(result.get('time_mult',1)):.2f}** efficiency."
+    if float(result.get("soul_mult", 1)) > 1.0:
+        extra += f"\n☸️ Soul Legacy talent echo: **x{float(result['soul_mult']):.2f}** body-cultivation efficiency."
+    if float(result.get("era_mult", 1)) != 1.0:
+        extra += f"\n🌌 **{result.get('era_name') or 'World Era'}** modifies cultivation to **x{float(result['era_mult']):.2f}**."
+    if int(result.get("perfection_gain", 0)):
+        extra += f"\n★ Body refinement deepens by **+{int(result['perfection_gain'])}%**."
+    if result.get("ready"):
+        extra += "\n✨ Body Stage 9 is full. Choose **/quest → Body Perfection → Start** or **/cultivation → Body Cultivation → Breakthrough**." if int(c.get("body_phase", 1)) == 9 else "\n✨ Your body is ready for **/cultivation → Body Cultivation → Breakthrough**."
+    await interaction.response.send_message(f"💪 **{c['name']} tempers the body.**\nYou refine flesh, blood, bone, and meridians for **+{gain} body essence**.\nProgress: **{total}/{cost}**{extra}")
 
 @registered_group_command(body_group, name="breakthrough", description="Attempt to advance your body-cultivation stage")
 @serialized_user_action
@@ -4703,119 +4452,43 @@ async def body_breakthrough(interaction: discord.Interaction, confirm: bool = Fa
     c = await require_character(interaction)
     if not c:
         return
-    ri = int(c.get("body_realm_index", 0))
-    ph = int(c.get("body_phase", 1))
-    essence = int(c.get("body_cultivation", 0))
-    cost = WORLD.body_phase_cost(ri, ph)
-    if essence < cost:
-        await interaction.response.send_message(
-            f"You need **{cost} body essence**, but have **{essence}**.", ephemeral=False
+    wt = await current_world_time()
+    try:
+        envelope = await ENGINE.authoritative_action(
+            "cultivation.body_breakthrough",
+            interaction.user.id,
+            {"confirm": bool(confirm)},
+            action_id=f"discord:{interaction.id}:cultivation.body_breakthrough",
         )
+    except GameEngineError as exc:
+        message = str(exc)
+        if "perfection choice requires explicit confirmation" in message:
+            message = "⚠️ **Body Stage 9 choice**\nPursue **/quest → Body Perfection → Start** for a stronger physical foundation, or explicitly confirm this breakthrough to skip it."
+        await interaction.response.send_message(f"❌ {message}" if not message.startswith("⚠️") else message, ephemeral=False)
         return
-
-    perfection = await DB.get_body_perfection(interaction.user.id, ri)
-    if ph == 9:
-        if perfection and perfection["active"]:
-            await interaction.response.send_message(
-                "You are already walking the Perfect Body Path. Complete **/quest → Body Perfection → Trial** or **/quest → Body Perfection → Abandon** first.",
-                ephemeral=False,
-            )
-            return
-        if not (perfection and perfection["completed"]) and not confirm:
-            await interaction.response.send_message(
-                "⚠️ **Body Stage 9 choice**\nPursue **/quest → Body Perfection → Start** for a stronger physical foundation, "
-                "or deliberately skip it with **/cultivation → Body Cultivation → Breakthrough**.",
-                ephemeral=False,
-            )
-            return
-
-    nxt = WORLD.body_next_stage(ri, ph)
-    if not nxt:
-        await interaction.response.send_message("You have reached the current body-cultivation ceiling.", ephemeral=False)
-        return
-    new_ri, new_ph = nxt
-    if WORLD.body_realm_world(new_ri) != WORLD.body_realm_world(ri):
-        gate = ascension_gate(ri)
-        state = await DB.get_tribulation_state(interaction.user.id, ri)
-        if gate and not (state and int(state.get("cleared",0))):
-            await interaction.response.send_message(
-                f"⚡ **{gate['name']} required.** Your body path is trying to cross from **{gate['from_world']}** "
-                f"into **{gate['to_world']}**. Clear **/quest → Tribulation / Ascension → Attempt** first.", ephemeral=False
-            )
-            return
-    perfect_bonus = 2 if await DB.has_completed_body_perfection(interaction.user.id) else 0
-    resonance_bonus = WORLD.dual_resonance_check_bonus(c)
-    _, effect_mods, _ = await current_effect_modifiers(interaction.user.id)
-    eff_body = effective_attribute(c, effect_mods, "body")
-    eff_will = effective_attribute(c, effect_mods, "will")
-    innate_breakthrough_bonus = int(round(effect_mods.get("breakthrough_bonus", 0)))
-    modifier = eff_body + max(1, eff_will // 2) + 2 + perfect_bonus + resonance_bonus + innate_breakthrough_bonus
-    tn = WORLD.body_breakthrough_tn(ri, ph)
-    result = roll_2d10(modifier, tn)
-    failure_loss = max(5, cost // 10)
-    vitality_gain = 5 if new_ri != ri else 2
-    payload = {
-        "dice": [result.die1, result.die2], "modifier": result.modifier, "total": result.total,
-        "tn": result.tn, "degree": result.degree, "success": result.success,
-        "from_realm": WORLD.body_realm_name(ri, c.get("gender")), "from_stage": ph,
-        "to_realm": WORLD.body_realm_name(new_ri, c.get("gender")), "to_stage": new_ph,
-        "perfect_bonus": perfect_bonus, "resonance_bonus": resonance_bonus,
-        "innate_breakthrough_bonus": innate_breakthrough_bonus,
-    }
-    await DB.apply_body_breakthrough(
-        interaction.user.id,
-        new_realm_index=new_ri,
-        new_phase=new_ph,
-        cultivation_cost=cost,
-        success=result.success,
-        failure_loss=failure_loss,
-        vitality_gain=vitality_gain,
-        roll_payload=payload,
-    )
-    text = f"💥 **Body Breakthrough**\n{roll_line(result)}"
-    if perfect_bonus:
+    result = dict(envelope.get("result") or {})
+    roll = SimpleNamespace(**dict(result.get("roll") or {}))
+    success = bool(result.get("success"))
+    text = f"💥 **Body Breakthrough**\n{roll_line(roll)}"
+    if int(result.get("perfect_bonus", 0)):
         text += "\n★ Perfect-body legacy bonus: **+2**."
-    if resonance_bonus:
+    if int(result.get("resonance_bonus", 0)):
         text += "\n☯ Dual Cultivation Resonance: **+1**."
-    if innate_breakthrough_bonus:
-        text += f"\n🌿 Innate aptitude modifier: **{innate_breakthrough_bonus:+d}**."
-    if result.success:
-        legacy=await DB.awaken_soul_memory(interaction.user.id, 4)
-        text += (
-            f"\n✨ Advanced to **{WORLD.body_realm_name(new_ri, c.get('gender'))}, Stage {new_ph}**."
-            f"\n❤️ Physical advancement increases maximum Vitality by **+{vitality_gain}**."
-        )
-        master_reward = await DB.reward_master_for_disciple_breakthrough(
-            interaction.user.id, realm_changed=(int(new_ri) != int(ri))
-        )
-        if master_reward:
-            text += (
-                f"\n🎓 **{master_reward['master_name']}** receives **+{master_reward['insight_xp']} Insight XP** "
-                f"from your advancement; Master Attention rises by **+{master_reward['attention']}**."
-            )
-        if int(legacy.get("awakened_memory",0)):
+    if int(result.get("innate_breakthrough_bonus", 0)):
+        text += f"\n🌿 Innate aptitude modifier: **{int(result['innate_breakthrough_bonus']):+d}**."
+    if success:
+        text += f"\n✨ Advanced to **{result.get('to_realm','Unknown Realm')}, Stage {int(result.get('to_stage',1))}**."
+        if int(result.get("vitality_gain", 0)):
+            text += f"\n❤️ Physical advancement increases maximum Vitality by **+{int(result['vitality_gain'])}**."
+        master = dict(result.get("master_reward") or {})
+        if master:
+            text += f"\n🎓 **{master.get('master_name','Your master')}** receives **+{int(master.get('insight_xp',0))} Insight XP** from your advancement; Master Attention rises by **+{int(master.get('attention',0))}**."
+        legacy = dict(result.get("soul_legacy") or {})
+        if int(legacy.get("awakened_memory", 0)):
             text += f"\n🕯️ Past-life memory awakened: **{int(legacy.get('awakened_memory',0))}% / {int(legacy.get('memory_seed',0))}%**."
-        old_world = WORLD.body_realm_world(int(ri))
-        new_world = WORLD.body_realm_world(int(new_ri))
-        if old_world != new_world:
-            wt_asc = await current_world_time()
-            await DB.record_world_history_event(
-                event_type="ascension", title=f"{c.get('name','A cultivator')} ascended by the Body Path to {new_world}",
-                summary=(
-                    f"{c.get('name','The cultivator')} crossed the world boundary through body cultivation, "
-                    f"advancing from {old_world} into {new_world}."
-                ),
-                significance=98, visibility="public", location=str(c.get('location') or ''), world_name=str(new_world),
-                actor_type="player", actor_key=str(interaction.user.id), actor_name=str(c.get('name') or ''),
-                target_type="world", target_key=str(new_world), target_name=str(new_world), related_user_id=interaction.user.id,
-                tags=("ascension","body cultivation",str(old_world),str(new_world)), game_minute=wt_asc.total_minutes,
-                metadata={"from_world": old_world, "to_world": new_world, "body_realm_index": int(new_ri)},
-                source_key=f"ascension:body:{interaction.user.id}:{int(new_ri)}:{wt_asc.total_minutes}",
-            )
     else:
-        text += f"\n⚠️ The tempering fails; **{failure_loss} body essence** is lost, with no permanent mutilation."
+        text += f"\n⚠️ The tempering fails; **{int(result.get('failure_loss',0))} body essence** is lost, with no permanent mutilation."
     await interaction.response.send_message(text)
-
 
 bodyperfect_group = app_commands.Group(name="bodyperfect", description="Long-form Stage 9 Body Realm Perfection")
 
@@ -4826,25 +4499,17 @@ async def bodyperfect_start(interaction: discord.Interaction) -> None:
     c = await require_character(interaction)
     if not c:
         return
-    ri, ph = int(c.get("body_realm_index", 0)), int(c.get("body_phase", 1))
-    if ph != 9:
-        await interaction.response.send_message("Perfect Body cultivation unlocks at **Body Stage 9**.", ephemeral=False)
-        return
-    cost = WORLD.body_phase_cost(ri, ph)
-    if int(c.get("body_cultivation", 0)) < cost:
-        await interaction.response.send_message(f"Fill Body Stage 9 first: **{c.get('body_cultivation', 0)}/{cost}**.", ephemeral=False)
-        return
-    existing = await DB.get_body_perfection(interaction.user.id, ri)
-    if existing and existing["active"]:
-        await interaction.response.send_message(
-            "Your Perfect Body Path is already active. Use **/quest → Body Perfection → Info** to continue it.",
-            ephemeral=False,
+    wt = await current_world_time()
+    try:
+        await ENGINE.authoritative_action(
+            "perfection.body_start", interaction.user.id,
+            {},
+            action_id=f"discord:{interaction.id}:perfection.body_start",
         )
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"Perfect Body Path could not begin: {exc}", ephemeral=False)
         return
-    started = await DB.start_body_perfection(interaction.user.id, ri)
-    if not started:
-        await interaction.response.send_message("This Body Realm is already Perfect.", ephemeral=False)
-        return
+    ri = int(c.get("body_realm_index", 0))
     q = WORLD.body_perfection_quest(ri, 0, c)
     await interaction.response.send_message(
         f"★ **Perfect Body Path begun: {WORLD.body_realm_name(ri, c.get('gender'))}**\n"
@@ -4891,50 +4556,47 @@ async def bodyperfect_quest(interaction: discord.Interaction, action: app_comman
         return
     ri = int(c.get("body_realm_index", 0))
     p = await DB.get_body_perfection(interaction.user.id, ri)
-    if not p or not p["active"]:
-        await interaction.response.send_message("No active Perfect Body Path.", ephemeral=False)
-        return
-    if p["quest_index"] >= WORLD.body_perfection_quest_count():
-        await interaction.response.send_message("All Body Perfection quests are complete. Use **/quest → Body Perfection → Trial**.", ephemeral=False)
-        return
-    q = WORLD.body_perfection_quest(ri, p["quest_index"], c)
     if action.value == "info":
+        if not p or not p["active"]:
+            await interaction.response.send_message("No active Perfect Body Path.", ephemeral=False)
+            return
+        if p["quest_index"] >= WORLD.body_perfection_quest_count():
+            await interaction.response.send_message("All Body Perfection quests are complete. Use **/quest → Body Perfection → Trial**.", ephemeral=False)
+            return
+        q = WORLD.body_perfection_quest(ri, p["quest_index"], c)
         await interaction.response.send_message(
             f"📜 **Body Perfection Quest {p['quest_index']+1}/{WORLD.body_perfection_quest_count()} — {q['title']}**\n"
             f"{q['description']}\nPreparation: **{p['quest_preparation']}/{q['preparation_required']}**\n"
             f"Trial: **{q['attribute'].title()} — TN {q['tn']}**\nClue: *{q['clue']}*\n"
-            f"Reward: **+{q['progress_reward']}% Body Perfection**",
-            ephemeral=False,
+            f"Reward: **+{q['progress_reward']}% Body Perfection**", ephemeral=False,
         )
         return
-    remaining = await DB.cooldown_remaining(interaction.user.id, "body_perfect_quest")
-    if remaining:
-        await interaction.response.send_message(f"Your body needs recovery time. Continue in **{human_duration(remaining)}**.", ephemeral=False)
+    _, _, wt = await current_effect_modifiers(interaction.user.id)
+    try:
+        envelope = await ENGINE.authoritative_action(
+            "perfection.body_quest", interaction.user.id,
+            {"mode": action.value, 
+             "quest_cooldown_seconds": SETTINGS.perfect_quest_cooldown_minutes * 60},
+            action_id=f"discord:{interaction.id}:perfection.body_quest:{action.value}",
+        )
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"Body Perfection quest could not resolve: {exc}", ephemeral=False)
         return
+    result = dict(envelope.get("result") or {})
     if action.value == "prepare":
-        prep = await DB.add_body_perfection_preparation(interaction.user.id, ri, 1)
-        await DB.set_cooldown(interaction.user.id, "body_perfect_quest", SETTINGS.perfect_quest_cooldown_minutes * 60)
+        prep = int(result.get("preparation", 0)); required = int(result.get("preparation_required", 0))
         await interaction.response.send_message(
-            f"💪 **{q['title']} — Preparation**\nProgress: **{min(prep, q['preparation_required'])}/{q['preparation_required']}**\n{q['clue']}" +
-            ("\n✨ The trial is available with **/quest → Body Perfection → Quest → Attempt**." if prep >= q["preparation_required"] else ""),
+            f"💪 **{result.get('title','Body Perfection')} — Preparation**\nProgress: **{min(prep, required)}/{required}**\n{result.get('clue','')}" +
+            ("\n✨ The trial is available with **/quest → Body Perfection → Quest → Attempt**." if prep >= required else ""),
             ephemeral=False,
         )
         return
-    if p["quest_preparation"] < q["preparation_required"]:
-        await interaction.response.send_message(
-            f"You are not ready. Preparation: **{p['quest_preparation']}/{q['preparation_required']}**.", ephemeral=False
-        )
-        return
-    result = roll_2d10(c["attributes"].get(q["attribute"], 0) + 2 + WORLD.dual_resonance_check_bonus(c), int(q["tn"]))
-    await DB.set_cooldown(interaction.user.id, "body_perfect_quest", SETTINGS.perfect_quest_cooldown_minutes * 60)
-    if result.success:
-        await DB.complete_body_perfection_quest(
-            interaction.user.id, ri, progress_reward=q["progress_reward"], clue=q["clue"]
-        )
-        text = f"{roll_line(result)}\n✨ **{q['title']} completed.** +{q['progress_reward']}% Body Perfection."
+    roll = SimpleNamespace(**dict(result.get("roll") or {}))
+    if bool(result.get("success")):
+        text = f"{roll_line(roll)}\n✨ **{result.get('title','Body Perfection quest')} completed.** +{int(result.get('progress_reward',0))}% Body Perfection."
     else:
-        text = f"{roll_line(result)}\n⚠️ Your body cannot complete this tempering yet. Preparation is retained."
-    await interaction.response.send_message(text)
+        text = f"{roll_line(roll)}\n⚠️ Your body cannot complete this tempering yet. Preparation is retained."
+    await interaction.response.send_message(text, ephemeral=False)
 
 
 @registered_group_command(bodyperfect_group, name="clues", description="Review Body Perfection clues you have discovered")
@@ -4956,38 +4618,28 @@ async def bodyperfect_trial(interaction: discord.Interaction) -> None:
     c = await require_character(interaction)
     if not c:
         return
-    ri = int(c.get("body_realm_index", 0))
-    p = await DB.get_body_perfection(interaction.user.id, ri)
-    if not p or not p["active"]:
-        await interaction.response.send_message("No active Perfect Body Path.", ephemeral=False)
-        return
-    if p["completed_quests"] < WORLD.body_perfection_quest_count() or p["progress"] < 100:
-        await interaction.response.send_message(
-            f"Final body trial locked. Perfection **{p['progress']}%**, quests **{p['completed_quests']}/{WORLD.body_perfection_quest_count()}**.",
-            ephemeral=False,
+    _, _, wt = await current_effect_modifiers(interaction.user.id)
+    try:
+        envelope = await ENGINE.authoritative_action(
+            "perfection.body_trial", interaction.user.id,
+            {"trial_cooldown_seconds": SETTINGS.perfect_trial_cooldown_minutes * 60},
+            action_id=f"discord:{interaction.id}:perfection.body_trial",
         )
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"Final Body Perfection trial could not resolve: {exc}", ephemeral=False)
         return
-    remaining = await DB.cooldown_remaining(interaction.user.id, "body_perfect_trial")
-    if remaining:
-        await interaction.response.send_message(f"Your body is still recovering. Retry in **{human_duration(remaining)}**.", ephemeral=False)
-        return
-    results = []
-    resonance = WORLD.dual_resonance_check_bonus(c)
-    for trial in WORLD.body_perfection["final_trials"]:
-        r = roll_2d10(c["attributes"].get(trial["attribute"], 0) + 2 + resonance, int(trial["tn"]))
-        results.append((trial, r))
-    lines = ["💥 **FINAL BODY REALM PERFECTION TRIAL**"] + [f"{t['name']}: {roll_line(r)}" for t, r in results]
-    if all(r.success for _, r in results):
-        await DB.complete_body_perfection(interaction.user.id, ri)
+    result = dict(envelope.get("result") or {})
+    lines = ["💥 **FINAL BODY REALM PERFECTION TRIAL**"]
+    for row in result.get("rolls", []):
+        lines.append(f"{row.get('name','Trial')}: {roll_line(SimpleNamespace(**dict(row)))}")
+    if bool(result.get("success")):
         lines.append(
-            f"\n★ **PERFECT {WORLD.body_realm_name(ri, c.get('gender')).upper()} ACHIEVED**\n"
+            f"\n★ **PERFECT {WORLD.body_realm_name(int(c.get('body_realm_index',0)), c.get('gender')).upper()} ACHIEVED**\n"
             "Your physical foundation permanently improves: Max Vitality +10%, Max Qi +5%, and future body breakthroughs gain +2."
         )
     else:
-        await DB.reduce_body_perfection_progress(interaction.user.id, ri, 4)
-        await DB.set_cooldown(interaction.user.id, "body_perfect_trial", SETTINGS.perfect_trial_cooldown_minutes * 60)
         lines.append(
-            "\n⚠️ The final body tempering fails. **4% recoverable Body Perfection training** is lost; "
+            f"\n⚠️ The final body tempering fails. **{int(result.get('training_loss',0))}% recoverable Body Perfection training** is lost; "
             "your body realm remains stable. Restore it with **/cultivation → Body Cultivation → Cultivate** before trying again."
         )
     await reply_long(interaction, "\n".join(lines))
@@ -4999,57 +4651,168 @@ async def bodyperfect_abandon(interaction: discord.Interaction) -> None:
     c = await require_character(interaction)
     if not c:
         return
-    ri = int(c.get("body_realm_index", 0))
-    p = await DB.get_body_perfection(interaction.user.id, ri)
-    if not p or not p["active"]:
+    wt = await current_world_time()
+    try:
+        envelope = await ENGINE.authoritative_action(
+            "perfection.body_abandon", interaction.user.id, {},
+            action_id=f"discord:{interaction.id}:perfection.body_abandon",
+        )
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"Perfect Body Path could not be abandoned: {exc}", ephemeral=False)
+        return
+    if not bool(dict(envelope.get("result") or {}).get("abandoned")):
         await interaction.response.send_message("No active Perfect Body Path to abandon.", ephemeral=False)
         return
-    await DB.abandon_body_perfection(interaction.user.id, ri)
-    await interaction.response.send_message(
-        "The Perfect Body Path has been abandoned. You may now attempt a normal body breakthrough.", ephemeral=False
-    )
+    await interaction.response.send_message("The Perfect Body Path has been abandoned. You may now break through normally.", ephemeral=False)
 
 
-async def _apply_event_participation(
-    user_id:int, character:dict, event:dict, *, event_type:str,
-)->list[str]:
-    """Apply the once-per-participant reward/effect payload for an event."""
-    details:list[str]=[]; reward=dict(event.get("player_reward") or {})
-    if reward:
-        cultivation=await CULTIVATION.reward(
-            user_id,cultivation=int(reward.get("cultivation",0)),
-            cultivation_cap=WORLD.phase_cost(int(character["realm_index"]),int(character["phase"])),
-            spirit_stones=int(reward.get("spirit_stones",0)),insight_xp=int(reward.get("insight_xp",0)),
-            items=dict(reward.get("items") or {}),event_type=event_type,
+
+class ExplorationEventView(discord.ui.View):
+    """Personal exploration-event controls backed entirely by Go authority."""
+
+    def __init__(self, owner_user_id: int, event: dict[str, Any]) -> None:
+        self.owner_user_id = int(owner_user_id)
+        self.event = dict(event or {})
+        expires_at = float(self.event.get("expires_at") or time.time() + 7200)
+        super().__init__(timeout=max(300, min(21600, int(expires_at - time.time()))))
+        self._sync_buttons()
+
+    def _available_keys(self) -> set[str]:
+        return {
+            str(row.get("key") or "")
+            for row in list(self.event.get("available_actions") or [])
+            if isinstance(row, dict)
+        }
+
+    def _sync_buttons(self) -> None:
+        available = self._available_keys()
+        active = bool(self.event.get("active"))
+        for item in self.children:
+            if not isinstance(item, discord.ui.Button):
+                continue
+            custom_id = str(item.custom_id or "")
+            if custom_id == "exploration_event:refresh":
+                item.disabled = False
+                continue
+            key = custom_id.rsplit(":", 1)[-1]
+            item.disabled = (not active) or key not in available
+
+    def embed(self) -> discord.Embed:
+        active = bool(self.event.get("active"))
+        title = str(self.event.get("title") or "Unexpected Event")
+        description = str(self.event.get("description") or "Something unexpected interrupts your exploration.")
+        location = str(self.event.get("location") or "Unknown")
+        expires_at = int(float(self.event.get("expires_at") or time.time()))
+        embed = discord.Embed(
+            title=f"🌌 {title}",
+            description=(
+                f"**{self.event.get('category','Fate Encounter')}** • {'🟢 Active' if active else '⚫ Resolved'}\n"
+                f"📍 **{location}** • ⏳ <t:{expires_at}:R>\n\n{description}"
+            ),
+            color=0x9B59B6 if active else 0x5C6370,
         )
-        if cultivation: details.append(f"Cultivation +{cultivation}")
-        if int(reward.get("spirit_stones",0)): details.append(f"Spirit Stones +{int(reward['spirit_stones'])}")
-        if int(reward.get("insight_xp",0)): details.append(f"Insight +{int(reward['insight_xp'])}")
-        if reward.get("items"): details.append(WORLD.item_names(dict(reward["items"])))
-    player_effect=dict(event.get("player_effect") or {})
-    if player_effect:
-        effect_key=str(player_effect.get("effect_key") or f"event_{event.get('definition_id') or event.get('id','unknown')}")
-        effect=normalize_effect_payload({"effect_key":effect_key,"special":True,**player_effect})
-        wt=await current_world_time()
-        await DB.apply_effect(
-            user_id,effect_key=effect_key,name=str(player_effect.get("name") or effect_key.replace('_',' ').title()),
-            source_type="random_event",source_id=str(event.get("definition_id") or event.get("id","unknown")),
-            effect=effect,starts_game_minute=wt.total_minutes,
-            duration_game_minutes=max(1,int(player_effect.get("duration_game_minutes",120))),
-        )
-        details.append(f"Effect: {player_effect.get('name',effect_key.replace('_',' ').title())}")
-    karma_delta=int(event.get("karma_delta",0))
-    if karma_delta:
-        karma=await DB.adjust_karma(user_id,karma_delta,reason=f"random_event:{event.get('definition_id') or event.get('id','unknown')}")
-        details.append(f"Karma {karma_delta:+d} → {karma:+d}")
-    fate_delta=int(event.get("fate_delta",0))
-    if fate_delta:
-        wt=await current_world_time()
-        before=int((await DB.get_fate(user_id)).get("points",0))
-        fate=await DB.adjust_fate(user_id,fate_delta,reason=f"event:{event.get('definition_id') or event.get('id','unknown')}",game_minute=wt.total_minutes)
-        if fate != before:
-            details.append(f"Fate {fate-before:+d} → {fate}/9")
-    return details
+        labels = [
+            str(row.get("label") or row.get("key") or "Action")
+            for row in list(self.event.get("available_actions") or [])
+            if isinstance(row, dict)
+        ]
+        embed.add_field(name="Available actions", value=(" • ".join(labels) if labels else "This encounter has ended."), inline=False)
+        embed.set_footer(text="Exploration is paused until this event is resolved or left • Go owns rolls, rewards, and state")
+        return embed
+
+    async def _owned(self, interaction: discord.Interaction) -> bool:
+        if int(interaction.user.id) == self.owner_user_id:
+            return True
+        await interaction.response.send_message("This is another cultivator's personal exploration event.", ephemeral=False)
+        return False
+
+    @staticmethod
+    def _outcome_lines(outcome: dict[str, Any]) -> list[str]:
+        lines: list[str] = []
+        if int(outcome.get("cultivation_awarded", 0)):
+            lines.append(f"Cultivation +{int(outcome['cultivation_awarded'])}")
+        if int(outcome.get("spirit_stones", 0)):
+            lines.append(f"Spirit Stones +{int(outcome['spirit_stones'])}")
+        if int(outcome.get("insight_xp", 0)):
+            lines.append(f"Insight +{int(outcome['insight_xp'])}")
+        if outcome.get("items"):
+            lines.append(WORLD.item_names({str(k): int(v) for k, v in dict(outcome["items"]).items()}))
+        if outcome.get("effect"):
+            lines.append(f"Effect: {dict(outcome['effect']).get('name','Special effect')}")
+        if outcome.get("karma_delta"):
+            lines.append(f"Karma {int(outcome['karma_delta']):+d} → {int(outcome.get('karma_score',0)):+d}")
+        if outcome.get("fate_delta"):
+            lines.append(f"Fate {int(outcome['fate_delta']):+d} → {int(outcome.get('fate',0))}/9")
+        return lines
+
+    async def run_action(self, interaction: discord.Interaction, action: str) -> None:
+        if not await self._owned(interaction):
+            return
+        await interaction.response.defer(ephemeral=False)
+        wt = await current_world_time()
+        operation = "exploration.event.leave" if action == "leave" else "exploration.event.act"
+        try:
+            envelope = await ENGINE.authoritative_action(
+                operation, interaction.user.id,
+                {"event_id": str(self.event.get("event_id") or ""), "action": action},
+                action_id=f"discord:{interaction.id}:{operation}:{action}",
+            )
+        except GameEngineError as exc:
+            await interaction.followup.send(f"That event action could not proceed: {exc}", ephemeral=False)
+            return
+        result = dict(envelope.get("result") or {})
+        self.event = dict(result.get("event") or self.event)
+        self._sync_buttons()
+        try:
+            await interaction.edit_original_response(embed=self.embed(), view=self)
+        except discord.HTTPException:
+            pass
+        lines = [f"**{str(result.get('label') or action.replace('_',' ').title())} — {'SUCCESS' if result.get('success') else 'FAILURE'}**"]
+        roll = dict(result.get("roll") or {})
+        if roll:
+            lines.append(roll_line(SimpleNamespace(**roll)))
+        outcome_lines = self._outcome_lines(dict(result.get("outcome") or {}))
+        if outcome_lines:
+            lines.append("**Outcome:** " + " • ".join(outcome_lines))
+        if result.get("resolved"):
+            lines.append("The encounter is resolved. Normal exploration is available again.")
+        await interaction.followup.send("\n".join(lines), ephemeral=False)
+
+    @discord.ui.button(label="Observe", emoji="👁️", style=discord.ButtonStyle.secondary, custom_id="exploration_event:observe", row=0)
+    async def observe(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        await self.run_action(interaction, "observe")
+
+    @discord.ui.button(label="Approach", emoji="🚶", style=discord.ButtonStyle.primary, custom_id="exploration_event:approach", row=0)
+    async def approach(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        await self.run_action(interaction, "approach")
+
+    @discord.ui.button(label="Help", emoji="🤲", style=discord.ButtonStyle.success, custom_id="exploration_event:help", row=0)
+    async def help(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        await self.run_action(interaction, "help")
+
+    @discord.ui.button(label="Rob Them", emoji="🗡️", style=discord.ButtonStyle.danger, custom_id="exploration_event:rob", row=0)
+    async def rob(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        await self.run_action(interaction, "rob")
+
+    @discord.ui.button(label="Leave", emoji="↩️", style=discord.ButtonStyle.secondary, custom_id="exploration_event:leave", row=1)
+    async def leave(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        await self.run_action(interaction, "leave")
+
+    @discord.ui.button(label="Refresh", emoji="🔄", style=discord.ButtonStyle.secondary, custom_id="exploration_event:refresh", row=1)
+    async def refresh(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        if not await self._owned(interaction):
+            return
+        try:
+            status = await ENGINE.action(
+                "exploration.event.status", interaction.user.id,
+                {"event_id": str(self.event.get("event_id") or "")},
+            )
+        except GameEngineError as exc:
+            await interaction.response.send_message(f"Could not refresh the event: {exc}", ephemeral=False)
+            return
+        self.event = dict(status or self.event)
+        self._sync_buttons()
+        await interaction.response.edit_message(embed=self.embed(), view=self)
 
 
 @registered_root_command(name="explore", description="Explore your current location for events and discoveries", guild=GUILD)
@@ -5058,24 +4821,54 @@ async def explore(interaction: discord.Interaction) -> None:
     c = await require_character(interaction)
     if not c:
         return
-    location_key = str(c.get("location") or "")
-    if location_key.startswith(("abode:", "sect_abode:", "personal_world:")):
-        private_thread = await active_private_location_thread(interaction, c)
-        note = f" Continue the scene in {private_thread.mention} with **/action**." if private_thread else " Use **/action** for this private location."
-        await interaction.response.send_message(
-            "🧭 World exploration is available at normal map locations, not while inside a private residence or personal world." + note,
-            ephemeral=False,
-        )
-        return
-    remaining = await DB.cooldown_remaining(interaction.user.id, "explore")
-    if remaining:
-        await interaction.response.send_message(
-            f"You should study what you already found. Explore again in **{human_duration(remaining)}**.", ephemeral=False
-        )
-        return
-
-    # Defer before narration + private-thread creation so the slash command never times out.
     await interaction.response.defer(ephemeral=False)
+    wt_discovery = await current_world_time()
+    try:
+        envelope = await ENGINE.authoritative_action(
+            "exploration.explore", interaction.user.id,
+            {
+                
+                "cooldown_seconds": SETTINGS.explore_cooldown_minutes * 60,
+                "unexpected_event_chance_percent": SETTINGS.unexpected_event_chance_percent,
+                "event_key": f"discord:{interaction.id}:exploration:event",
+            },
+            action_id=f"discord:{interaction.id}:exploration.explore",
+        )
+    except GameEngineError as exc:
+        await interaction.followup.send(f"Exploration could not proceed: {exc}", ephemeral=False)
+        return
+    outcome = dict(envelope.get("result") or {})
+    if str(outcome.get("kind") or "") == "event_active":
+        event = dict(outcome.get("event") or {})
+        expedition_thread = await ensure_expedition_thread(interaction, c)
+        view = ExplorationEventView(interaction.user.id, event)
+        if expedition_thread is not None:
+            await EXPLORATION.enter_expedition(
+                interaction.user.id,
+                physical_location=str(c.get("location") or "Unknown"),
+                channel_id=expedition_thread.id,
+                guild_id=interaction.guild_id,
+            )
+            try:
+                await expedition_thread.send(
+                    content=f"{interaction.user.mention}, your previous exploration is still interrupted by this encounter.",
+                    embed=view.embed(),
+                    view=view,
+                )
+                await interaction.followup.send(
+                    f"🌌 You are still dealing with **{event.get('title','an unexpected event')}**. Controls reopened in {expedition_thread.mention}.",
+                    ephemeral=False,
+                )
+            except discord.HTTPException:
+                await interaction.followup.send(embed=view.embed(), view=view, ephemeral=False)
+        else:
+            await interaction.followup.send(embed=view.embed(), view=view, ephemeral=False)
+        return
+    encounter = str(outcome.get("encounter") or "The region is strangely quiet.")
+    cultivation = int(outcome.get("cultivation_awarded", 0))
+    stones = int(outcome.get("spirit_stones", 0))
+    items = {str(k): int(v) for k, v in dict(outcome.get("items") or {}).items()}
+
     expedition_thread = await ensure_expedition_thread(interaction, c)
     if expedition_thread is not None:
         await EXPLORATION.enter_expedition(
@@ -5093,157 +4886,79 @@ async def explore(interaction: discord.Interaction) -> None:
         except discord.HTTPException:
             pass
 
-    encounter = WORLD.random_encounter(c["location"])
-    cultivation, stones, items = WORLD.random_explore_rewards()
-    cultivation = await CULTIVATION.reward(
-        interaction.user.id,
-        cultivation=cultivation,
-        cultivation_cap=WORLD.phase_cost(c["realm_index"], c["phase"]),
-        spirit_stones=stones,
-        items=items,
-        event_type="explore_discovery",
-    )
-
-    shared_claims: list[str] = []
-    for active in await DB.get_active_world_events(c["location"]):
-        payload=dict(active["payload"])
-        if (payload.get("player_reward") or payload.get("player_effect") or payload.get("karma_delta") or payload.get("fate_delta")) and await DB.claim_world_event(interaction.user.id, active["event_key"]):
-            await _apply_event_participation(
-                interaction.user.id,c,payload,event_type=f"world_event_{payload.get('definition_id','participation')}",
-            )
-            shared_claims.append(active["title"])
-
-    automation = await DB.get_automation_settings()
-    surprise = (
-        WORLD.roll_unexpected_event(
-            location=c["location"], character=c, chance_percent=SETTINGS.unexpected_event_chance_percent
-        )
-        if automation.get("unexpected_events", True)
-        else None
-    )
+    shared_claims = [str(row.get("title") or "world event") for row in list(outcome.get("shared_claims") or [])]
+    surprise = dict(outcome.get("surprise") or {})
     surprise_text = ""
     event_thread: discord.Thread | None = None
+    personal_event_view: ExplorationEventView | None = None
     if surprise:
-        kind = surprise.get("kind")
-        surprise_text = f"\n\n🌌 **UNEXPECTED EVENT — {surprise['title']}**\n{surprise['description']}"
-
+        kind = str(surprise.get("kind") or "")
+        surprise_text = f"\n\n🌌 **UNEXPECTED EVENT — {surprise.get('title','Unknown Event')}**\n{surprise.get('description','')}"
         if kind == "personal":
-            details=await _apply_event_participation(
-                interaction.user.id,c,surprise,event_type=f"unexpected_{surprise['id']}",
-            )
-            if details: surprise_text += "\n**Outcome:** " + " • ".join(details)
-            expires_at = time.time() + int(surprise.get("duration_hours", 2)) * 3600
-            personal_key = f"personal:{surprise['id']}:{interaction.user.id}:{time.time_ns()}"
-            event_thread = await spawn_event_thread(
-                interaction,
-                title=surprise["title"],
-                event_type="personal",
-                event_key=personal_key,
-                expires_at=expires_at,
-                announcement=(
-                    f"🌌 **UNEXPECTED EVENT — {surprise['title']}**\n"
-                    f"📍 **{c['location']}**\n{surprise['description']}\n\n"
-                    f"Discovered by {interaction.user.mention}. A live event thread has opened below."
-                ),
-            )
-
+            personal_event_view = ExplorationEventView(interaction.user.id, surprise)
+            surprise_text += "\n**Your exploration is paused here.** Resolve the encounter or choose **Leave** before exploring, hunting, or travelling again."
         elif kind == "world_event":
-            event_key = f"{surprise['id']}:{time.time_ns()}"
-            ends_at = time.time() + int(surprise.get("duration_hours", 2)) * 3600
-            payload = {
-                "definition_id":surprise["id"],"category":surprise.get("category","Phenomenon"),
-                "severity":int(surprise.get("severity",1)),"consequence_text":surprise.get("consequence_text",""),
-                "player_reward":surprise.get("player_reward",{}),"player_effect":surprise.get("player_effect",{}),
-                "karma_delta":int(surprise.get("karma_delta",0)),"fate_delta":int(surprise.get("fate_delta",0)),"world_effect":surprise.get("world_effect",{}),
-            }
-            activated=await DB.activate_world_event(
-                event_key=event_key,event_type="random_event",title=surprise["title"],
-                location=c["location"],payload=payload,ends_at=ends_at,
-                dedupe_key=f"random:{surprise.get('dedupe_group') or surprise['id']}",
-            )
-            if not activated:
-                surprise_text=f"\n\n🌌 **EVENT ECHO — {surprise['title']}**\nThis event is already active at **{c['location']}**; its consequences do not stack."
+            if not bool(surprise.get("activated")):
+                surprise_text = (
+                    f"\n\n🌌 **EVENT ECHO — {surprise.get('title','World Event')}**\n"
+                    f"This event is already active at **{c['location']}**; its consequences do not stack."
+                )
             else:
-                wt=await current_world_time()
-                impacts=await SIM.apply_random_event(
-                    event_id=surprise["id"],title=surprise["title"],location=c["location"],
-                    game_minute=wt.total_minutes,severity=int(surprise.get("severity",1)),
-                    effect=dict(surprise.get("world_effect") or {}),
-                )
-                await DB.record_world_history_event(
-                    event_type="world_event", title=str(surprise["title"]),
-                    summary=(
-                        f"A server-wide {surprise.get('category','phenomenon')} manifested at {c['location']}. "
-                        f"{surprise.get('description','')}" + (f" Persistent effects: {'; '.join(impacts)}." if impacts else "")
-                    ),
-                    significance=min(95, 50 + int(surprise.get("severity",1))*5), visibility="public",
-                    location=str(c["location"]), actor_type="world", actor_key=str(surprise["id"]), actor_name="World phenomenon",
-                    target_type="location", target_key=str(c["location"]), target_name=str(c["location"]),
-                    tags=("world event",str(surprise.get('category','phenomenon')),str(surprise['id'])),
-                    game_minute=wt.total_minutes, metadata={"impacts": impacts, "severity": int(surprise.get("severity",1))},
-                    source_key=f"world_event:{event_key}:history",
-                )
+                impacts=[str(x) for x in list(surprise.get("impacts") or [])]
                 consequence=str(surprise.get("consequence_text") or "").strip()
-                if consequence: surprise_text += f"\n**Persistent consequence:** {consequence}"
-                if impacts: surprise_text += f"\n**Systems changed:** {'; '.join(impacts)}."
-                surprise_text += f"\nThis is now a **server-wide event** for about {int(surprise.get('duration_hours', 2))}h. Use **/world → Events**."
+                if consequence:
+                    surprise_text += f"\n**Persistent consequence:** {consequence}"
+                if impacts:
+                    surprise_text += f"\n**Systems changed:** {'; '.join(impacts)}."
+                surprise_text += f"\nThis is now a **server-wide event** for about {int(surprise.get('duration_hours') or 2)}h. Use **/world → Events**."
                 event_thread = await spawn_event_thread(
-                    interaction,title=surprise["title"],event_type="random_event",event_key=event_key,expires_at=ends_at,
+                    interaction,title=str(surprise.get("title") or "World Event"),event_type="random_event",
+                    event_key=str(surprise.get("event_key") or ""),expires_at=float(surprise.get("expires_at") or time.time()+7200),
                     announcement=(
-                        f"⚡ **SERVER-WIDE EVENT — {surprise['title']}**\n"
+                        f"⚡ **SERVER-WIDE EVENT — {surprise.get('title','World Event')}**\n"
                         f"Category: **{surprise.get('category','Phenomenon')}** • Severity **{int(surprise.get('severity',1))}/10**\n"
-                        f"📍 **{c['location']}**\n{surprise['description']}"
+                        f"📍 **{c['location']}**\n{surprise.get('description','')}"
                         + (f"\n\n**Persistent consequence:** {consequence}" if consequence else "")
-                        + f"\n\nActive for about **{int(surprise.get('duration_hours', 2))}h**. Use the thread below for the live scene."
+                        + f"\n\nActive for about **{int(surprise.get('duration_hours') or 2)}h**. Use the thread below for the live scene."
                     ),
                 )
-
         elif kind == "secret_realm":
-            realm_id = surprise["secret_realm_id"]
-            realm = WORLD.secret_realms[realm_id]
-            event_key = f"secret:{realm_id}:{time.time_ns()}"
-            ends_at = time.time() + int(realm.get("open_hours", 8)) * 3600
-            activated=await DB.activate_world_event(
-                event_key=event_key, event_type="secret_realm", title=realm["name"],
-                location=realm["location"],payload={"definition_id":surprise["id"],"category":surprise.get("category","Ancient Ruin"),"realm_id":realm_id},
-                ends_at=ends_at,dedupe_key=f"secret_realm:{realm_id}",
-            )
-            if not activated:
-                surprise_text=f"\n\n🌀 **SPATIAL ECHO — {realm['name']}**\nThat entrance is already open at **{realm['location']}**. Use **/world → Events**."
+            if not bool(surprise.get("activated")):
+                surprise_text = (
+                    f"\n\n🌀 **SPATIAL ECHO — {surprise.get('realm_name') or surprise.get('title','Secret Realm')}**\n"
+                    f"That entrance is already open at **{surprise.get('location') or c['location']}**. Use **/world → Events**."
+                )
             else:
-                wt_secret = await current_world_time()
                 await DB.record_world_history_event(
-                    event_type="discovery", title=f"Secret realm opened: {realm['name']}",
-                    summary=f"The entrance to {realm['name']} opened at {realm['location']}. {realm['description']}",
-                    significance=76, visibility="public", location=str(realm['location']),
-                    actor_type="world", actor_key=str(realm_id), actor_name=str(realm['name']),
-                    target_type="secret_realm", target_key=str(realm_id), target_name=str(realm['name']),
-                    tags=("discovery","secret realm","opening"), game_minute=wt_secret.total_minutes,
-                    metadata={"event_key": event_key, "open_hours": int(realm.get('open_hours',8))},
-                    source_key=f"secret_realm_open:{event_key}",
+                    event_type="discovery", title=f"Secret realm opened: {surprise.get('realm_name') or surprise.get('title','Secret Realm')}",
+                    summary=f"The entrance to {surprise.get('realm_name') or surprise.get('title','Secret Realm')} opened at {surprise.get('location')}. {surprise.get('realm_description','')}",
+                    significance=76, visibility="public", location=str(surprise.get("location") or c["location"]),
+                    actor_type="world", actor_key=str(surprise.get("secret_realm_id") or ""), actor_name=str(surprise.get("realm_name") or "Secret Realm"),
+                    target_type="secret_realm", target_key=str(surprise.get("secret_realm_id") or ""), target_name=str(surprise.get("realm_name") or "Secret Realm"),
+                    tags=("discovery","secret realm","opening"), game_minute=wt_discovery.total_minutes,
+                    metadata={"event_key": surprise.get("event_key"), "open_hours": int(surprise.get("open_hours") or 8)},
+                    source_key=f"secret_realm_open:{surprise.get('event_key')}",
                 )
                 surprise_text += (
-                    f"\n🌀 **Secret Realm Opened: {realm['name']}**\n{realm['description']}\n"
-                    f"The entrance remains unstable for about **{realm['open_hours']}h**. Use **/realm → Secret Realms → Enter**."
+                    f"\n🌀 **Secret Realm Opened: {surprise.get('realm_name') or surprise.get('title','Secret Realm')}**\n"
+                    f"{surprise.get('realm_description','')}\nThe entrance remains unstable for about **{int(surprise.get('open_hours') or 8)}h**. "
+                    "Use **/realm → Secret Realms → Enter**."
                 )
                 event_thread = await spawn_event_thread(
-                    interaction,title=realm["name"],event_type="secret_realm",event_key=event_key,expires_at=ends_at,
+                    interaction,title=str(surprise.get("realm_name") or surprise.get("title") or "Secret Realm"),event_type="secret_realm",
+                    event_key=str(surprise.get("event_key") or ""),expires_at=float(surprise.get("expires_at") or time.time()+28800),
                     announcement=(
-                        f"🌀 **{surprise.get('category','SECRET REALM').upper()} — {realm['name']}**\n"
-                        f"📍 Entrance: **{realm['location']}**\n{surprise['description']}\n{realm['description']}\n\n"
-                        f"The entrance remains open for about **{realm['open_hours']}h**. "
+                        f"🌀 **{str(surprise.get('category') or 'SECRET REALM').upper()} — {surprise.get('realm_name') or surprise.get('title','Secret Realm')}**\n"
+                        f"📍 Entrance: **{surprise.get('location') or c['location']}**\n{surprise.get('description','')}\n{surprise.get('realm_description','')}\n\n"
+                        f"The entrance remains open for about **{int(surprise.get('open_hours') or 8)}h**. "
                         "Travel there, then use **/realm → Secret Realms → Enter**. The thread below is the shared expedition scene."
                     ),
                 )
-
         if event_thread is not None:
             surprise_text += f"\n💬 **Live event thread:** {event_thread.mention}"
 
     discovery_text = ""
-    wt_discovery = await current_world_time()
-    discovered_location = await _discover_next_location(
-        interaction.user.id, c, game_minute=wt_discovery.total_minutes
-    )
+    discovered_location = str(outcome.get("discovered_location") or "")
     if discovered_location:
         discovery_text = (
             f"\n\n🧭 **New route discovered — {discovered_location}**\n"
@@ -5268,10 +4983,9 @@ async def explore(interaction: discord.Interaction) -> None:
                     f"While exploring from {c.get('location','Unknown')}, {c.get('name','the cultivator')} charted a route to "
                     f"{discovered_location}." + (f" Sect access revealed: {', '.join(discovered_sects)}." if discovered_sects else "")
                 ),
-                significance=58 if discovered_sects else 48, visibility="participant",
-                location=str(discovered_location), actor_type="player", actor_key=str(interaction.user.id),
-                actor_name=str(c.get('name') or ''), target_type="location", target_key=str(discovered_location),
-                target_name=str(discovered_location), related_user_id=interaction.user.id,
+                significance=58 if discovered_sects else 48, visibility="participant", location=str(discovered_location),
+                actor_type="player", actor_key=str(interaction.user.id), actor_name=str(c.get('name') or ''),
+                target_type="location", target_key=str(discovered_location), target_name=str(discovered_location), related_user_id=interaction.user.id,
                 tags=("discovery","route",*tuple(discovered_sects or [])), game_minute=wt_discovery.total_minutes,
                 metadata={"origin": str(c.get('location') or ''), "sects": list(discovered_sects or [])},
                 source_key=f"location_discovery:{interaction.user.id}:{discovered_location}",
@@ -5283,28 +4997,23 @@ async def explore(interaction: discord.Interaction) -> None:
         await QUESTS.progress(interaction.user.id, "explore", amount=1, target=str(c.get("location") or ""), game_minute=wt_discovery.total_minutes)
     except Exception:
         log.exception("Quest progress update failed after exploration")
-    await DB.set_cooldown(interaction.user.id, "explore", SETTINGS.explore_cooldown_minutes * 60)
     await DB.add_history(history_channel_id, user_id=interaction.user.id, speaker=c["name"], content=f"Explores {c['location']}")
     history = await DB.get_history(history_channel_id, 20)
-    exploration_context = await NARRATOR_CONTEXT.build(
-        c, scene_type="exploration", query_text=str(encounter)
-    )
+    exploration_context = await NARRATOR_CONTEXT.build(c, scene_type="exploration", query_text=encounter)
     try:
         narration = await NARRATOR_QUEUE.run(
-            "exploration",
-            NARRATOR.narrate_exploration(c, encounter, history, scene_context=exploration_context.text),
+            "exploration", NARRATOR.narrate_exploration(c, encounter, history, scene_context=exploration_context.text),
         )
     except Exception:
         log.exception("Exploration narration failed")
         narration = encounter
     try:
         await DB.add_rag_memory(
-            interaction.user.id, memory_kind="exploration", salience=38,
-            location=str(c.get("location") or ""), source="exploration",
-            game_minute=exploration_context.game_minute,
+            interaction.user.id, memory_kind="exploration", salience=38, location=str(c.get("location") or ""),
+            source="exploration", game_minute=exploration_context.game_minute,
             summary=(
                 f"While exploring {c.get('location','Unknown')}, {c.get('name','the player')} encountered: "
-                f"{str(encounter)[:360]} | Observed scene: {narration[:500]}"
+                f"{encounter[:360]} | Observed scene: {narration[:500]}"
             ),
         )
     except Exception:
@@ -5317,19 +5026,21 @@ async def explore(interaction: discord.Interaction) -> None:
     if expedition_thread is not None:
         try:
             await send_long_to_thread(expedition_thread, full_exploration)
-            await interaction.followup.send(
-                f"🧭 Exploration recorded in your private expedition journal: {expedition_thread.mention}",
-                ephemeral=False,
-            )
+            if personal_event_view is not None:
+                await expedition_thread.send(embed=personal_event_view.embed(), view=personal_event_view)
+            await interaction.followup.send(f"🧭 Exploration recorded in your private expedition journal: {expedition_thread.mention}", ephemeral=False)
         except discord.HTTPException:
             log.exception("Could not write exploration result to private expedition thread")
             await reply_long(interaction, full_exploration, ephemeral=False)
+            if personal_event_view is not None:
+                await interaction.followup.send(embed=personal_event_view.embed(), view=personal_event_view, ephemeral=False)
     else:
         await reply_long(
-            interaction,
-            full_exploration + "\n\n⚠️ No private expedition thread is configured. Ask an admin to run **/admin → Server → Base Channels → Create / repair**.",
+            interaction, full_exploration + "\n\n⚠️ No private expedition thread is configured. Ask an admin to bind the existing channel in the admin dashboard, then run **/admin → Server → Base Channels → Validate / bind**.",
             ephemeral=False,
         )
+        if personal_event_view is not None:
+            await interaction.followup.send(embed=personal_event_view.embed(), view=personal_event_view, ephemeral=False)
 
 
 @registered_root_command(name="hunt", description="Hunt a spirit beast for materials", guild=GUILD)
@@ -5338,92 +5049,62 @@ async def hunt(interaction: discord.Interaction) -> None:
     c = await require_character(interaction)
     if not c:
         return
-    remaining = await DB.cooldown_remaining(interaction.user.id, "hunt")
-    if remaining:
-        await interaction.response.send_message(
-            f"The nearby beasts are alert to your presence. Hunt again in **{human_duration(remaining)}**.",
-            ephemeral=False,
+    await interaction.response.defer(ephemeral=False)
+    wt = await current_world_time()
+    try:
+        envelope = await ENGINE.authoritative_action(
+            "exploration.hunt", interaction.user.id,
+            {"cooldown_seconds": SETTINGS.hunt_cooldown_minutes * 60},
+            action_id=f"discord:{interaction.id}:exploration.hunt",
         )
+    except GameEngineError as exc:
+        await interaction.followup.send(f"The hunt could not proceed: {exc}", ephemeral=False)
         return
+    outcome = dict(envelope.get("result") or {})
+    beast = dict(outcome.get("beast") or {})
+    roll = SimpleNamespace(**dict(outcome.get("roll") or {}))
+    success = bool(outcome.get("success"))
+    cultivation_awarded = int(outcome.get("cultivation_awarded", 0))
 
-    beast = WORLD.random_hunt(c["realm_index"])
-    modifier = c["attributes"]["agility"] + c["attributes"]["body"] + 1 + WORLD.dual_resonance_check_bonus(c)
-    result = roll_2d10(modifier, beast["tn"])
-    await DB.set_cooldown(
-        interaction.user.id,
-        "hunt",
-        SETTINGS.hunt_cooldown_minutes * 60,
-    )
-    if result.success:
-        cultivation_awarded = await CULTIVATION.reward(
-            interaction.user.id,
-            cultivation=beast["cultivation"],
-            cultivation_cap=WORLD.phase_cost(c["realm_index"], c["phase"]),
-            spirit_stones=beast["stones"],
-            items=beast["loot"],
-            event_type="hunt_success",
-        )
-    else:
-        cultivation_awarded = 0
-
-    await interaction.response.defer()
     hunt_context = await NARRATOR_CONTEXT.build(
         c, scene_type="spirit beast hunt", query_text=f"hunt {beast.get('name','spirit beast')} {beast.get('element','')}"
     )
     try:
-        narration = await NARRATOR.narrate_hunt_result(
-            c, beast, roll_line(result), result.success, scene_context=hunt_context.text
-        )
+        narration = await NARRATOR.narrate_hunt_result(c, beast, roll_line(roll), success, scene_context=hunt_context.text)
     except Exception:
         log.exception("Hunt narration failed")
-        narration = f"You encounter a {beast['name']}."
+        narration = f"You encounter a {beast.get('name','spirit beast')}."
     try:
         await DB.add_rag_memory(
-            interaction.user.id, memory_kind="hunt", salience=48 if result.success else 32,
+            interaction.user.id, memory_kind="hunt", salience=48 if success else 32,
             location=str(c.get("location") or ""), source="hunt", game_minute=hunt_context.game_minute,
             summary=(
                 f"{c.get('name','The player')} hunted {beast.get('name','a spirit beast')} at {c.get('location','Unknown')}. "
-                f"Outcome: {'success' if result.success else 'the beast escaped'}. Observed: {narration[:520]}"
+                f"Outcome: {'success' if success else 'the beast escaped'}. Observed: {narration[:520]}"
             ),
         )
     except Exception:
         log.exception("Could not persist hunt RAG memory")
 
-    text = f"**Hunt: {beast['name']}**\n{roll_line(result)}\n\n{narration}"
-    if result.success:
+    text = f"**Hunt: {beast.get('name','Spirit Beast')}**\n{roll_line(roll)}\n\n{narration}"
+    if success:
+        loot = {str(k): int(v) for k, v in dict(beast.get("loot") or {}).items()}
         text += (
-            f"\n\n**Loot:** +{cultivation_awarded} cultivation, +{beast['stones']} spirit stones, "
-            f"{WORLD.item_names(beast['loot'])}"
+            f"\n\n**Loot:** +{cultivation_awarded} cultivation, +{int(beast.get('stones',0))} spirit stones, "
+            f"{WORLD.item_names(loot)}"
         )
-        existing = await DB.get_spirit_beasts(interaction.user.id)
-        can_bond_species = len(existing) < 5 and not any(str(x.get("species")) == str(beast["name"]) for x in existing)
-        if can_bond_species and str(c.get("path")) == "Beast Binder" and int(result.margin) >= 8:
-            bonded = await DB.add_spirit_beast(
-                interaction.user.id, name=str(beast["name"]), species=str(beast["name"]),
-                rank=int(beast.get("rank", max(0,int(c.get("realm_index",0))//4))),
-                element=str(beast.get("element", "Wild")),
-                intelligence=int(beast.get("intelligence", 15+max(0,int(result.margin)))), temperament="respectful",
-                bloodline=str(beast.get("bloodline", "Wild Spirit")), contract_type="equality", active=not bool(existing),
-            )
+        bonded = dict(outcome.get("bonded_beast") or {})
+        wild = dict(outcome.get("wild_encounter") or {})
+        if bonded:
             text += (
-                f"\n\n🐉 **Beast bond:** your overwhelming Beast-Binder success earns the respect of **{bonded['name']}**. "
-                f"An **equality contract** is formed at loyalty **{bonded['loyalty']}**"
+                f"\n\n🐉 **Beast bond:** your overwhelming Beast-Binder success earns the respect of **{bonded.get('name', beast.get('name','the beast'))}**. "
+                f"An **equality contract** is formed at loyalty **{int(bonded.get('loyalty',25))}**"
                 + (" and it becomes your active companion." if bonded.get("active") else ".")
             )
-        elif can_bond_species and int(result.margin) >= (2 if str(c.get("path")) == "Beast Binder" else 4):
-            wt = await current_world_time()
-            taming_tn = int(beast.get("taming_tn", int(beast["tn"]) + 2))
-            if str(c.get("path")) == "Beast Binder":
-                taming_tn = max(7, taming_tn - 2)
-            encounter = await DB.create_wild_beast_encounter(
-                interaction.user.id, species=str(beast["name"]), rank=int(beast.get("rank", 0)),
-                element=str(beast.get("element", "Wild")), intelligence=int(beast.get("intelligence", 12)),
-                temperament=str(beast.get("temperament", "wary")), bloodline=str(beast.get("bloodline", "Wild Spirit")),
-                taming_tn=taming_tn, location=str(c.get("location", "")), created_game_minute=wt.total_minutes,
-            )
+        elif wild:
             text += (
-                f"\n\n🪢 **Subdued beast opportunity:** **{beast['name']}** survives the clash and watches you warily. "
-                f"Encounter `#{encounter['encounter_id']}` can be approached through **/beast → Tame** before it leaves."
+                f"\n\n🪢 **Subdued beast opportunity:** **{beast.get('name','The beast')}** survives the clash and watches you warily. "
+                f"Encounter `#{int(wild.get('encounter_id',0))}` can be approached through **/beast → Tame** before it leaves."
             )
     else:
         text += "\n\nThe beast escapes. No permanent injury or item loss is applied."
@@ -5469,84 +5150,43 @@ async def _run_crafting(
         )
         return
 
-    abode_here = await DB.get_abode_by_location(c.get("location", ""))
-    _, craft_mods, wt = await current_effect_modifiers(interaction.user.id)
-    profession_state = await DB.get_profession_progress(interaction.user.id, profession) or {}
-    profession_bonus = int(profession_state.get("level", 0))
-    birth_family = await DB.get_birth_family(interaction.user.id) if profession == "Alchemy" else None
-    inherited_family_bonus = family_profession_bonus(birth_family, profession)
-    member_manor = await DB.get_member_sect_manor(interaction.user.id)
-    manor_facility_bonus = 0
-    if member_manor and str(member_manor.get("base_location", "")) == str(c.get("location", "")):
-        manor_facility_bonus = manor_craft_bonus(member_manor, profession)
-
-    facility_bonus = 0
-    if profession == "Alchemy":
-        modifier = c["attributes"]["insight"] + c["attributes"]["spirit"] + int(craft_mods.get("alchemy_bonus", 0))
-        if abode_here and await DB.can_access_abode(int(abode_here['user_id']), interaction.user.id):
-            facility_bonus = int(abode_here.get('alchemy_level', 0)) * 2
-    elif profession == "Forging":
-        modifier = c["attributes"]["insight"] + c["attributes"]["body"] + int(craft_mods.get("forging_bonus", 0))
-        if abode_here and await DB.can_access_abode(int(abode_here['user_id']), interaction.user.id):
-            facility_bonus = int(abode_here.get('forge_level', 0)) * 2
-    elif profession == "Formation":
-        modifier = c["attributes"]["insight"] + c["attributes"]["spirit"] + int(craft_mods.get("formation_bonus", 0))
-        if abode_here and await DB.can_access_abode(int(abode_here['user_id']), interaction.user.id):
-            facility_bonus = int(abode_here.get('formation_level', 0)) * 2
-    else:
-        modifier = c["attributes"]["insight"] + c["attributes"]["will"]
-
-    modifier += facility_bonus + profession_bonus + manor_facility_bonus + inherited_family_bonus
-    result = roll_2d10(modifier, int(r["tn"]))
-    output = {str(k): int(v) for k, v in dict(r["output"]).items()}
-    quality = None
-    if profession == "Alchemy":
-        quality = alchemy_quality(int(result.margin), success=bool(result.success))
-        if result.success:
-            output = alchemy_output(output, quality)
-
-    had_materials, missing = await DB.consume_and_create(
-        interaction.user.id,
-        costs=r["cost"],
-        outputs=output,
-        event_type=f"craft_{profession.lower()}",
-        success=result.success,
-    )
-    if not had_materials:
-        await interaction.response.send_message(
-            "Missing materials: " + WORLD.item_names(missing), ephemeral=False
+    try:
+        envelope = await ENGINE.authoritative_action(
+            "craft.resolve",
+            interaction.user.id,
+            {"recipe": recipe},
+            action_id=f"discord:{interaction.id}:craft.resolve",
         )
+    except GameEngineError as exc:
+        message = str(exc)
+        if "missing materials" in message.casefold():
+            message = "Missing materials for that recipe."
+        await interaction.response.send_message(message, ephemeral=False)
         return
 
-    if result.success:
-        outcome = f"Created **{WORLD.item_names(output)}**."
-    else:
-        outcome = "The refinement fails and the ingredients are consumed."
-
-    xp_gain = 12 if result.success else 5
-    if quality is not None and result.success:
-        xp_gain += int(quality.xp_bonus)
-    profession_row = await DB.record_profession_practice(
-        interaction.user.id, profession, success=result.success,
-        xp_gain=xp_gain, quality_points=max(0, int(result.margin)),
-    )
+    resolved = dict(envelope.get("result") or {})
+    result = SimpleNamespace(**resolved)
+    facility_bonus = int(resolved.get("facility_bonus", 0))
+    manor_facility_bonus = int(resolved.get("manor_facility_bonus", 0))
+    inherited_family_bonus = int(resolved.get("family_bonus", 0))
+    profession_bonus = int(resolved.get("profession_bonus", 0))
+    output = {str(k): int(v) for k, v in dict(resolved.get("output") or {}).items()}
+    success = bool(resolved.get("success"))
+    outcome = f"Created **{WORLD.item_names(output)}**." if success else "The refinement fails and the ingredients are consumed."
+    profession_row = dict(resolved.get("profession_progress") or {})
     level = int(profession_row.get("level", 0))
     mastery_line = (
         f"\n🛠️ Profession: **{profession_rank(level)}** (Level {level}) • "
         f"XP {profession_row.get('xp',0)}/{profession_xp_needed(level)}"
     )
-
+    quality_label = str(resolved.get("quality_label") or "")
     quality_line = ""
-    if quality is not None:
-        await DB.record_alchemy_batch(
-            interaction.user.id, recipe_name=recipe, quality=quality.key,
-            margin=int(result.margin), success=bool(result.success), output=output if result.success else {},
-            location=str(c.get("location", "")), game_minute=int(wt.total_minutes),
-        )
-        quality_line = (
-            f"\n⚗️ Batch quality: **{quality.label}**"
-            + (f" • output ×{quality.output_multiplier}" if result.success and quality.output_multiplier > 1 else "")
-        )
+    if quality_label:
+        prefix = "⚗️ Batch quality" if profession == "Alchemy" else "✨ Craft quality"
+        quality_line = f"\n{prefix}: **{quality_label}**"
+        mult = int(resolved.get("output_multiplier", 1))
+        if profession == "Alchemy" and success and mult > 1:
+            quality_line += f" • output ×{mult}"
 
     await interaction.response.send_message(
         f"**{profession}: {recipe}**\n{roll_line(result)}\n"
@@ -5625,41 +5265,46 @@ async def alchemy_forage(interaction: discord.Interaction) -> None:
             f"The nearby herb beds need time to recover. Forage again in **{human_duration(remaining)}**.", ephemeral=False,
         )
         return
-    abode_here = await DB.get_abode_by_location(str(c.get("location", "")))
-    can_use_property = bool(abode_here and await DB.can_access_abode(int(abode_here['user_id']), interaction.user.id))
-    forage_location = str(abode_here.get('base_location')) if can_use_property else str(c.get("location", ""))
-    garden_level = int(abode_here.get('herb_garden_level', 0)) if can_use_property else 0
-    garden_bonus = garden_level * 2
-    profile = await SIM.alchemy_forage_profile(forage_location, int(c.get("realm_index", 0)))
-    _, modifiers, _ = await current_effect_modifiers(interaction.user.id)
-    profession = await DB.get_profession_progress(interaction.user.id, "Alchemy") or {}
-    birth_family = await DB.get_birth_family(interaction.user.id)
-    inherited_forage_bonus = family_forage_bonus(birth_family)
-    mod = int(c["attributes"].get("insight", 0)) + int(c["attributes"].get("spirit", 0))
-    mod += int(profession.get("level", 0)) + int(profile.get("resource_bonus", 0)) + int(modifiers.get("alchemy_bonus", 0)) + inherited_forage_bonus + garden_bonus
-    result = roll_2d10(mod, int(profile["tn"]))
-    await DB.set_cooldown(interaction.user.id, "alchemy_forage", 20 * 60)
-    if not result.success:
+    try:
+        envelope = await ENGINE.authoritative_action(
+            "forage.resolve",
+            interaction.user.id,
+            {},
+            action_id=f"discord:{interaction.id}:forage.resolve",
+        )
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"Foraging could not resolve: {exc}", ephemeral=False)
+        return
+    resolved = dict(envelope.get("result") or {})
+    result = SimpleNamespace(**resolved)
+    success = bool(resolved.get("success"))
+    forage_progress = dict(resolved.get("profession_progress") or {})
+    level = int(forage_progress.get("level", 0))
+    forage_location = str(resolved.get("location") or c.get("location", ""))
+    inherited_forage_bonus = int(resolved.get("family_bonus", 0))
+    garden_bonus = int(resolved.get("garden_bonus", 0))
+    bonus_bits = (
+        f"{(' • Alchemy-family herb lore **+'+str(inherited_forage_bonus)+'**') if inherited_forage_bonus else ''}"
+        f"{(' • Property herb garden **+'+str(garden_bonus)+'**') if garden_bonus else ''}"
+    )
+    if not success:
         await interaction.response.send_message(
             f"🌿 **Medicinal Forage — {forage_location}**\n{roll_line(result)}\n"
-            f"Regional spirit resources: **{profile['spirit_resources']}/100**."
-            f"{(' • Alchemy-family herb lore **+'+str(inherited_forage_bonus)+'**') if inherited_forage_bonus else ''}"
-            f"{(' • Property herb garden **+'+str(garden_bonus)+'**') if garden_bonus else ''} "
+            f"Regional spirit resources: **{int(resolved.get('spirit_resources',0))}/100**.{bonus_bits} "
             "You find no usable harvest this time."
+            f"\n🧺 Foraging: **{profession_rank(level)}** Lv.{level} "
+            f"• XP {int(forage_progress.get('xp',0))}/{profession_xp_needed(level)}"
         )
         return
-    loot = dict(profile["loot"])
-    if garden_level > 0:
-        loot["spirit_herb"] = int(loot.get("spirit_herb", 0)) + max(1, garden_level // 2)
-    await DB.add_items(interaction.user.id, loot)
-    rare = str(profile.get("rare_found") or "")
+    awarded = {str(k): int(v) for k, v in dict(resolved.get("loot") or {}).items()}
+    rare = str(resolved.get("rare_found") or "")
     rare_line = f"\n✨ Rare find: **{WORLD.item_name(rare)}**." if rare else ""
     await interaction.response.send_message(
         f"🌿 **Medicinal Forage — {forage_location}**\n{roll_line(result)}\n"
-        f"Regional spirit resources: **{profile['spirit_resources']}/100**."
-        f"{(' • Alchemy-family herb lore **+'+str(inherited_forage_bonus)+'**') if inherited_forage_bonus else ''}"
-        f"{(' • Property herb garden **+'+str(garden_bonus)+'**') if garden_bonus else ''}\n"
-        f"Harvested: **{WORLD.item_names(loot)}**.{rare_line}"
+        f"Regional spirit resources: **{int(resolved.get('spirit_resources',0))}/100**.{bonus_bits}\n"
+        f"Harvested: **{WORLD.item_names(awarded)}**.{rare_line}\n"
+        f"🧺 Foraging: **{profession_rank(level)}** Lv.{level} "
+        f"• XP {int(forage_progress.get('xp',0))}/{profession_xp_needed(level)}"
     )
 
 
@@ -5731,21 +5376,23 @@ async def realmhub_status(interaction: discord.Interaction) -> None:
 async def realmhub_go(interaction:discord.Interaction,world:str)->None:
     c=await require_character(interaction)
     if not c:return
-    if str(c.get('location','')).startswith('abode:'):
-        await interaction.response.send_message("Leave your player-owned property before realm-capital travel.",ephemeral=False);return
-    if str(c.get('location','')).startswith('personal_world:'):
-        await interaction.response.send_message("Leave your personal world before realm-capital travel.",ephemeral=False);return
     hub=realm_hub(world)
     if not hub:
         await interaction.response.send_message("Unknown realm capital.",ephemeral=False);return
-    if int(c.get('realm_index',0))<int(hub['min_realm_index']):
-        await interaction.response.send_message(f"🔒 Your cultivation cannot safely reach **{hub['display_name']}** yet.",ephemeral=False);return
-    await DB.set_location(interaction.user.id,str(hub['location']))
+    try:
+        envelope=await ENGINE.authoritative_action(
+            "exploration.travel",interaction.user.id,
+            {"destination":str(hub["location"]),"mode":"hub"},
+            action_id=f"discord:{interaction.id}:exploration.travel.hub",
+        )
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"Realm-capital travel failed: {exc}",ephemeral=False);return
+    result=dict(envelope.get("result") or {})
     channel_line=""
     if interaction.guild:
         rows=await DB.get_realm_hub_channels(interaction.guild.id); row=next((r for r in rows if str(r['world_name'])==world),None)
         if row: channel_line=f"\n💬 Meet other cultivators in <#{int(row['channel_id'])}>."
-    await interaction.response.send_message(f"🏙️ **{c['name']} arrives at {hub['display_name']} — {world}.**{channel_line}")
+    await interaction.response.send_message(f"🏙️ **{c['name']} arrives at {hub['display_name']} — {result.get('world') or world}.**{channel_line}")
 
 
 def _world_min_realm_index(world_name: str) -> int:
@@ -5770,6 +5417,17 @@ async def _known_locations(user_id: int, character: dict[str, Any]) -> set[str]:
     current = str(character.get("location") or "")
     if current and not current.startswith(("abode:", "personal_world:")):
         known.add(current)
+        current_data = WORLD.locations.get(current) or {}
+        for neighbor in current_data.get("roads", []):
+            neighbor_name = str(neighbor)
+            neighbor_data = WORLD.locations.get(neighbor_name) or {}
+            if not neighbor_data or bool(neighbor_data.get("private", False)):
+                continue
+            if int(character.get("realm_index", 0)) < int(neighbor_data.get("min_realm_index", 0)):
+                continue
+            if str(neighbor_data.get("world") or "") != str(current_data.get("world") or ""):
+                continue
+            known.add(neighbor_name)
     # Realm capitals become public knowledge only when the character can actually
     # survive in that world. Future worlds remain completely hidden.
     for world_name, hub in REALM_HUBS.items():
@@ -5785,32 +5443,6 @@ async def _location_is_visible(user_id: int, character: dict[str, Any], location
     if not _world_is_unlocked(character, str(data.get("world") or WORLD.realm_world(int(character.get("realm_index", 0))))):
         return False
     return str(location) in await _known_locations(user_id, character)
-
-
-async def _discover_next_location(user_id: int, character: dict[str, Any], *, game_minute: int) -> str | None:
-    known = await _known_locations(user_id, character)
-    current = str(character.get("location") or "")
-    current_def = WORLD.locations.get(current, {})
-    current_world = str(current_def.get("world") or WORLD.realm_world(int(character.get("realm_index", 0))))
-    candidates = [
-        name for name, data in WORLD.locations.items()
-        if name not in known
-        and str(data.get("world")) == current_world
-        and int(data.get("min_realm_index", 0)) <= int(character.get("realm_index", 0))
-        and not bool(data.get("private", False))
-        and not str(name).startswith(("abode:", "personal_world:"))
-    ]
-    if not candidates:
-        return None
-    # Exploration is the discovery mechanism. A failed discovery roll does not
-    # block normal exploration rewards, but repeated exploration will eventually
-    # reveal routes within the current world.
-    if secrets.randbelow(100) >= 45:
-        return None
-    location = secrets.choice(sorted(candidates))
-    if await DB.discover_location(user_id, location, game_minute=game_minute, discovery_kind="exploration"):
-        return location
-    return None
 
 
 async def location_autocomplete(
@@ -5837,64 +5469,45 @@ async def travel(interaction: discord.Interaction, destination: str) -> None:
     c = await require_character(interaction)
     if not c:
         return
-    if str(c.get("location", "")).startswith("abode:"):
-        await interaction.response.send_message("Leave the player-owned property with **/abode → Leave** before normal travel.", ephemeral=False)
-        return
-    if str(c.get("location", "")).startswith("personal_world:"):
-        await interaction.response.send_message("Leave the personal world with **/innerworld → Leave** before normal travel.", ephemeral=False)
-        return
-    location_def = await DB.get_location_definition(destination)
-    if not location_def:
-        await interaction.response.send_message("Unknown destination.", ephemeral=False)
-        return
-    if c["location"] == destination:
-        await interaction.response.send_message("You are already there.", ephemeral=False)
-        return
-    destination_house = WORLD.auction_house_at(destination)
-    if destination_house:
-        _, house = destination_house
-        await interaction.response.send_message(
-            f"Enter **{house['name']}** from **{house.get('entrance_location', 'its entrance')}** using **/economy → Auction House → Enter**. "
-            "Direct travel cannot bypass its warded doors.",
-            ephemeral=False,
+    try:
+        envelope=await ENGINE.authoritative_action(
+            "exploration.travel",interaction.user.id,
+            {"destination":destination,"mode":"known"},
+            action_id=f"discord:{interaction.id}:exploration.travel",
         )
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"Travel failed: {exc}",ephemeral=False)
         return
-    current_house = WORLD.auction_house_at(c["location"])
-    if current_house:
-        _, house = current_house
-        outside = str(house.get("entrance_location", location_def.get("outside_location", "Greenriver Town")))
-        if destination != outside:
-            await interaction.response.send_message(
-                f"The Golden Pavilion's warded exit leads first to **{outside}**. Use **/economy → Auction House → Leave** before traveling elsewhere.",
-                ephemeral=False,
-            )
-            return
-    min_realm = int(location_def.get("min_realm_index", 0))
-    if int(c["realm_index"]) < min_realm:
-        await interaction.response.send_message(
-            "That route lies beyond the world your cultivation can currently perceive.",
-            ephemeral=False,
+    result=dict(envelope.get("result") or {})
+    desc=str(result.get("description") or "")
+    safe="\n🛡️ This location is protected by laws or formations." if bool(result.get("safe_zone")) else ""
+    road=""
+    if bool(result.get("road_connection")):
+        minutes=int(result.get("travel_minutes") or 0)
+        danger=int(result.get("road_danger") or 0)
+        chance=int(result.get("road_encounter_chance_percent") or 0)
+        arrival=int(result.get("arrival_game_minute") or 0)
+        road=(
+            f"\n⏱️ Road time **{minutes} game-minutes** • Danger **{danger}/45** • "
+            f"Encounter risk **{chance}%** • Arrival **game minute {arrival}**."
+            "\n🚶 You remain in transit and cannot take authoritative actions until arrival."
         )
-        return
-    if not await _location_is_visible(interaction.user.id, c, destination):
-        await interaction.response.send_message(
-            "🧭 You have not discovered a reliable route to that location yet. Explore your known regions to uncover new paths.",
-            ephemeral=False,
-        )
-        return
-    await DB.set_location(interaction.user.id, destination)
-    desc = str(location_def.get("description", ""))
-    safe = "\n🛡️ This location is protected by laws or formations." if location_def.get("safe_zone") else ""
-    meeting = ""
-    hub_match = realm_hub_by_location(destination)
+        encounter=result.get("road_encounter")
+        if isinstance(encounter,dict):
+            road+=f"\n⚠️ {str(encounter.get('detail') or 'A road encounter delays the journey')}"
+            delay=int(encounter.get("delay_minutes") or 0)
+            damage=int(encounter.get("vitality_damage") or 0)
+            if delay or damage:
+                road+=f" (**+{delay} min**, **-{damage} Vitality**)"
+    meeting=""
+    hub_match=realm_hub_by_location(str(result.get("destination") or destination))
     if hub_match and interaction.guild:
-        world_name, _hub = hub_match
-        rows = await DB.get_realm_hub_channels(interaction.guild.id)
-        row = next((r for r in rows if str(r.get("world_name")) == world_name), None)
-        if row:
-            meeting = f"\n💬 Public meeting channel: <#{int(row['channel_id'])}>."
+        world_name,_hub=hub_match
+        rows=await DB.get_realm_hub_channels(interaction.guild.id)
+        row=next((r for r in rows if str(r.get("world_name"))==world_name),None)
+        if row: meeting=f"\n💬 Public meeting channel: <#{int(row['channel_id'])}>."
     await interaction.response.send_message(
-        f"🗺️ **{c['name']} travels to {destination}.**\n{desc}{safe}{meeting}"
+        f"🗺️ **{c['name']} travels to {result.get('destination') or destination}.**\n{desc}{road}{safe}{meeting}"
     )
 
 
@@ -6045,12 +5658,30 @@ SCENE_ACTION_TYPES: dict[str, dict[str, Any]] = {
 }
 
 
+def _scene_player_target_id(target: str) -> int | None:
+    text = str(target or "")
+    if not text.startswith("Player ") or ":" not in text:
+        return None
+    raw = text[7:].split(":", 1)[0].strip()
+    try:
+        value = int(raw)
+    except ValueError:
+        return None
+    return value if value > 0 else None
+
+
 async def _scene_action_targets(character: dict[str, Any]) -> list[str]:
     wt = await current_world_time()
     targets: list[str] = []
+    location = str(character.get("location") or "")
     for npc_name in WORLD.npcs:
-        if await current_npc_location(npc_name, wt.period) == character.get("location"):
+        if await current_npc_location(npc_name, wt.period) == location:
             targets.append(npc_name)
+    player_rows = await DB.get_characters_at_location(
+        location, exclude_user_id=int(character.get("user_id") or 0) or None
+    )
+    for row in player_rows:
+        targets.append(f"Player {int(row['user_id'])}: {str(row.get('name') or 'Cultivator')}"[:100])
     return targets[:20]
 
 
@@ -6066,11 +5697,20 @@ async def _resolve_scene_action(
         await reply_long(interaction, "That scene action is no longer available.", ephemeral=False)
         return
     target = str(target or "Environment")
+    player_target_id = _scene_player_target_id(target)
     if target not in {"Environment", "Self"}:
-        wt = await current_world_time()
-        if await current_npc_location(target, wt.period) != c.get("location"):
-            await reply_long(interaction, "That NPC is not present in your current scene.", ephemeral=False)
-            return
+        if player_target_id is not None:
+            rows = await DB.get_characters_at_location(
+                str(c.get("location") or ""), exclude_user_id=interaction.user.id
+            )
+            if not any(int(row.get("user_id") or 0) == player_target_id for row in rows):
+                await reply_long(interaction, "That cultivator is not present in your current scene.", ephemeral=False)
+                return
+        else:
+            wt = await current_world_time()
+            if await current_npc_location(target, wt.period) != c.get("location"):
+                await reply_long(interaction, "That NPC is not present in your current scene.", ephemeral=False)
+                return
     detail = str(detail).strip()
     if not detail:
         await reply_long(interaction, "Describe how your character attempts the action.", ephemeral=False)
@@ -6080,10 +5720,30 @@ async def _resolve_scene_action(
     # acting on their own known state. This is not an information-discovery
     # bypass: hidden canonical facts remain outside the narrator context.
     # Every external/scene target still uses a transparent canonical roll.
-    attribute = str(profile["attribute"])
-    tn = int(profile["tn"])
-    self_action = target == "Self"
-    result = None
+    # Settle time-based effects, then let Go derive the canonical attribute,
+    # target number, RNG, and degree. Discord only validates presentation/world
+    # presence and narrates the committed fixed result.
+    _, _, wt = await current_effect_modifiers(interaction.user.id)
+    try:
+        envelope = await ENGINE.authoritative_action(
+            "scene.action",
+            interaction.user.id,
+            {
+                "action_key": action_key,
+                "target": target,
+                "detail": detail,
+                
+            },
+            action_id=f"discord:{interaction.id}:scene.action:{action_key}",
+        )
+    except GameEngineError as exc:
+        await reply_long(interaction, f"Scene action could not be resolved: {exc}", ephemeral=False)
+        return
+    mechanics = dict(envelope.get("result") or {})
+    attribute = str(mechanics.get("attribute") or profile["attribute"])
+    tn = int(mechanics.get("tn", profile["tn"]))
+    self_action = bool(mechanics.get("automatic", False))
+    result = None if self_action else SimpleNamespace(**mechanics)
     if self_action:
         fixed = (
             f"Scene action: {profile['label']}\nTarget: Self\n"
@@ -6093,9 +5753,6 @@ async def _resolve_scene_action(
             "Hidden canonical information remains concealed."
         )
     else:
-        _, effect_mods, _ = await current_effect_modifiers(interaction.user.id)
-        modifier = effective_attribute(c, effect_mods, attribute) + 2
-        result = roll_2d10(modifier, tn)
         fixed = (
             f"Scene action: {profile['label']}\nTarget: {target}\n"
             f"Attribute: {attribute.title()}\n{roll_line(result)}"
@@ -6106,7 +5763,7 @@ async def _resolve_scene_action(
     history = await DB.get_history(channel_id, 20)
     context = await NARRATOR_CONTEXT.build(
         c, scene_type=f"structured_scene_action:{action_key}", query_text=action_text,
-        focus_npc=(target if target not in {"Environment", "Self"} else ""),
+        focus_npc=(target if target not in {"Environment", "Self"} and player_target_id is None else ""),
     )
     private_scene = None
     if interaction.guild is not None and isinstance(interaction.channel, discord.Thread):
@@ -6139,7 +5796,7 @@ async def _resolve_scene_action(
             interaction.user.id, memory_kind="scene_action",
             salience=42 if (self_action or (result and result.success)) else 34,
             location=str(c.get("location") or ""),
-            npc_name=(target if target not in {"Environment", "Self"} else ""),
+            npc_name=(target if target not in {"Environment", "Self"} and player_target_id is None else ""),
             source="scene_action", game_minute=context.game_minute,
             summary=(
                 f"{c.get('name','The player')} attempted {profile['label']} at {c.get('location','Unknown')} "
@@ -6371,22 +6028,25 @@ async def sense_command(
         )
         return
 
-    stats = spiritual_sense_stats(c)
-    _, sense_effect_mods, _ = await current_effect_modifiers(interaction.user.id)
-    stats["power"] += int(round(sense_effect_mods.get("sense_power", 0)))
-    stats["precision"] += int(round(sense_effect_mods.get("sense_precision", 0)))
-    stats["range_m"] += int(round(sense_effect_mods.get("sense_range", 0)))
+    wt = await current_world_time()
 
-    # No target = personal Spiritual Sense status.
+    # No target = personal Spiritual Sense status. Derived sense/concealment
+    # values are calculated by Go from canonical state.
     if selected == 0 or (target is not None and target.id == interaction.user.id):
-        conceal = concealment_power(c)
+        try:
+            status = dict(await ENGINE.action(
+                "sense.status", interaction.user.id, {},
+            ) or {})
+        except GameEngineError as exc:
+            await interaction.response.send_message(f"Spiritual Sense status could not resolve: {exc}", ephemeral=False)
+            return
         await interaction.response.send_message(
             "🔍 **Spiritual Sense**\n"
-            f"Power: **{stats['power']}**\n"
-            f"Precision: **{stats['precision']}**\n"
-            f"Range: **{stats['range_m']:,} m**\n"
-            f"Aura concealment: **{'Active' if c.get('concealment_active') else 'Off'}**\n"
-            f"Current concealment strength: **{conceal}**\n\n"
+            f"Power: **{int(status.get('power', 0))}**\n"
+            f"Precision: **{int(status.get('precision', 0))}**\n"
+            f"Range: **{int(status.get('range_m', 0)):,} m**\n"
+            f"Aura concealment: **{'Active' if status.get('concealment_active') else 'Off'}**\n"
+            f"Current concealment strength: **{int(status.get('concealment_strength', 0))}**\n\n"
             "Power penetrates concealment, Precision controls how much detail you can identify, and Range controls area scans.",
             ephemeral=False,
         )
@@ -6399,44 +6059,49 @@ async def sense_command(
                 f"{target.mention} does not have a cultivation character yet.", ephemeral=False
             )
             return
-        target_conceal = concealment_power(tc)
-        tn = 10 + target_conceal
-        result = roll_2d10(stats["power"], tn)
-        detection_tier = sense_result_tier(result.margin)
-        precision = sense_precision_check(
-            c,
-            die1=result.die1,
-            die2=result.die2,
-            target_realm_index=int(tc["realm_index"]),
-        )
-        precision_tier = str(precision["tier"])
-        if detection_tier in {"critical_failure", "failure"}:
+        try:
+            envelope = await ENGINE.authoritative_action(
+                "sense.inspect", interaction.user.id,
+                {"mode": "player", "target_user_id": target.id},
+                action_id=f"discord:{interaction.id}:sense.inspect:player:{target.id}",
+            )
+        except GameEngineError as exc:
+            await interaction.response.send_message(f"Spiritual Sense could not resolve: {exc}", ephemeral=False)
+            return
+        sensed = dict(envelope.get("result") or {})
+        roll = SimpleNamespace(**dict(sensed.get("roll") or {}))
+        precision = dict(sensed.get("precision") or {})
+        precision_tier = str(precision.get("tier", "failure"))
+        detection_tier = str(sensed.get("detection_tier", "failure"))
+        reveal = str(sensed.get("reveal", "none"))
+        if reveal == "none":
             reading = (
                 "Their aura slips away from your probing sense; you cannot obtain a reliable cultivation reading."
-                if tc.get("concealment_active")
+                if sensed.get("target_concealed")
                 else "You detect spiritual activity, but its depth remains unclear."
             )
-        elif detection_tier == "partial" or precision_tier in {"critical_failure", "failure"}:
-            reading = f"You estimate that this cultivator belongs to **{WORLD.realm_world(int(tc['realm_index']))}** power." 
-        elif precision_tier == "partial":
-            reading = f"Main cultivation appears to be **{WORLD.realm_name(int(tc['realm_index']), tc.get('gender'))}**."
-        elif precision_tier in {"success", "strong"}:
+        elif reveal == "world":
+            reading = f"You estimate that this cultivator belongs to **{WORLD.realm_world(int(sensed.get('target_realm_index', 0)))}** power."
+        elif reveal == "realm":
+            reading = f"Main cultivation appears to be **{WORLD.realm_name(int(sensed.get('target_realm_index', 0)), tc.get('gender'))}**."
+        elif reveal == "approx":
             reading = (
                 "Main cultivation: **"
                 + WORLD.approximate_realm(
-                    int(tc["realm_index"]), int(tc["phase"]), precision_tier=precision_tier, gender=tc.get("gender")
+                    int(sensed.get("target_realm_index", 0)), int(sensed.get("target_phase", 1)),
+                    precision_tier=precision_tier, gender=tc.get("gender"),
                 )
                 + "**."
             )
         else:
             body_name = WORLD.body_realm_name(int(tc.get("body_realm_index", 0)), tc.get("gender"))
             reading = (
-                f"Main cultivation: **{WORLD.realm_name(int(tc['realm_index']), tc.get('gender'))} — Stage {tc['phase']}**.\n"
+                f"Main cultivation: **{WORLD.realm_name(int(sensed.get('target_realm_index', 0)), tc.get('gender'))} — Stage {int(sensed.get('target_phase', 1))}**.\n"
                 f"Body cultivation: **{body_name} — Stage {tc.get('body_phase', 1)}**."
             )
         await interaction.response.send_message(
-            f"🔍 **Spiritual Sense — {tc['name']}**\n{roll_line(result)}\n"
-            f"Precision: **{precision['total']}** vs detail TN **{precision['tn']}** — **{str(precision_tier).replace('_', ' ').title()}**\n\n"
+            f"🔍 **Spiritual Sense — {tc['name']}**\n{roll_line(roll)}\n"
+            f"Precision: **{int(precision.get('total', 0))}** vs detail TN **{int(precision.get('tn', 0))}** — **{precision_tier.replace('_', ' ').title()}**\n\n"
             f"{reading}",
             ephemeral=False,
         )
@@ -6446,103 +6111,85 @@ async def sense_command(
         if npc not in WORLD.npcs:
             await interaction.response.send_message("Unknown NPC.", ephemeral=False)
             return
-        npc_data = WORLD.npcs[npc]
-        wt = await current_world_time()
         npc_location = await current_npc_location(npc, wt.period)
         if npc_location and npc_location != c.get("location"):
             await interaction.response.send_message(
                 f"**{npc}** is not currently present at **{c['location']}**.", ephemeral=False
             )
             return
-        if npc in WORLD.hidden_masters:
-            # Hidden/fake masters use an opposed threshold that can be far beyond the sensing cultivator.
-            provisional = roll_2d10(stats["power"], 10)
-            sensed = sense_hidden_npc(
-                c, npc, provisional.total, hidden_masters=WORLD.hidden_masters,
-                realm_name=WORLD.realm_name, realm_world=WORLD.realm_world,
+        try:
+            envelope = await ENGINE.authoritative_action(
+                "sense.inspect", interaction.user.id,
+                {"mode": "npc", "npc_name": npc},
+                action_id=f"discord:{interaction.id}:sense.inspect:npc:{npc}",
             )
-            # Re-render the fixed line using the real hidden threshold without rerolling.
-            from .game import RollResult
-            fixed = RollResult(
-                provisional.die1,
-                provisional.die2,
-                provisional.modifier,
-                provisional.total,
-                int(sensed["target"]),
-            )
-            await interaction.response.send_message(
-                f"🔍 **Spiritual Sense — {npc}**\n{roll_line(fixed)}\n"
-                f"Precision: **{sensed['precision_total']}** vs detail TN **{sensed['precision_tn']}** — "
-                f"**{str(sensed['precision_tier']).replace('_', ' ').title()}**\n\n{sensed['reading']}",
-                ephemeral=False,
-            )
+        except GameEngineError as exc:
+            await interaction.response.send_message(f"Spiritual Sense could not resolve: {exc}", ephemeral=False)
             return
-
-        # Ordinary NPCs do not need a secret resolver.
-        tn = 12
-        result = roll_2d10(stats["power"], tn)
-        if result.success:
-            reading = f"Detected cultivation: **{npc_data.get('realm', 'Unknown')}**."
-        else:
-            reading = "You cannot obtain a stable reading from their aura."
-        await interaction.response.send_message(
-            f"🔍 **Spiritual Sense — {npc}**\n{roll_line(result)}\n\n{reading}",
-            ephemeral=False,
-        )
+        sensed = dict(envelope.get("result") or {})
+        roll = SimpleNamespace(**dict(sensed.get("roll") or {}))
+        precision = dict(sensed.get("precision") or {})
+        lines = [f"🔍 **Spiritual Sense — {npc}**", roll_line(roll)]
+        if precision:
+            precision_tier = str(precision.get("tier", "failure"))
+            lines.append(
+                f"Precision: **{int(precision.get('total', 0))}** vs detail TN **{int(precision.get('tn', 0))}** — "
+                f"**{precision_tier.replace('_', ' ').title()}**"
+            )
+        lines.append("")
+        lines.append(str(sensed.get("reading") or "You cannot obtain a stable reading from their aura."))
+        await interaction.response.send_message("\n".join(lines), ephemeral=False)
         return
 
-    # Area sweep.
-    location = WORLD.locations[c["location"]]
-    env_tn = 14 + (3 if c["location"] == "Moonfen Marsh" else 0)
-    result = roll_2d10(stats["power"], env_tn)
-    area_precision = sense_precision_check(
-        c,
-        die1=result.die1,
-        die2=result.die2,
-        target_realm_index=int(c["realm_index"]),
-        extra_tn=2,
-    )
+    # Area sweep. Python supplies only which hidden NPCs are physically present;
+    # the still-unmigrated autonomous world simulation owns that movement. Go
+    # owns perception RNG, thresholds, detail, hints, and secret-safe signals.
+    present_hidden: list[str] = []
+    for hidden_name in hidden_npc_names(WORLD.hidden_masters):
+        if await current_npc_location(hidden_name, wt.period) == c["location"]:
+            present_hidden.append(hidden_name)
+    try:
+        envelope = await ENGINE.authoritative_action(
+            "sense.inspect", interaction.user.id,
+            {
+                "mode": "area",
+                "present_hidden_npcs": present_hidden,
+                
+            },
+            action_id=f"discord:{interaction.id}:sense.inspect:area",
+        )
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"Spiritual Sense sweep could not resolve: {exc}", ephemeral=False)
+        return
+    sensed = dict(envelope.get("result") or {})
+    roll = SimpleNamespace(**dict(sensed.get("roll") or {}))
+    area_precision = dict(sensed.get("precision") or {})
+    precision_tier = str(area_precision.get("tier", "failure"))
     lines = [
-        f"🌌 **Spiritual Sense Sweep — {c['location']}**",
-        roll_line(result),
-        f"Precision: **{area_precision['total']}** vs detail TN **{area_precision['tn']}** — "
-        f"**{str(area_precision['tier']).replace('_', ' ').title()}**",
-        f"Effective range: **{stats['range_m']:,} m**",
+        f"🌌 **Spiritual Sense Sweep — {sensed.get('location', c['location'])}**",
+        roll_line(roll),
+        f"Precision: **{int(area_precision.get('total', 0))}** vs detail TN **{int(area_precision.get('tn', 0))}** — "
+        f"**{precision_tier.replace('_', ' ').title()}**",
+        f"Effective range: **{int(sensed.get('range_m', 0)):,} m**",
     ]
-    hints = list(location.get("sense_hints", []))
-    if result.success and hints:
-        precision_tier = str(area_precision["tier"])
-        reveal_count = 1
-        if precision_tier in {"success", "strong"}:
-            reveal_count = min(2, len(hints))
-        elif precision_tier == "overwhelming":
-            reveal_count = min(3, len(hints))
-        lines.extend(f"• {hint}" for hint in hints[:reveal_count])
-    elif not result.success:
+    hints = list(sensed.get("hints") or [])
+    if hints:
+        lines.extend(f"• {hint}" for hint in hints)
+    elif not bool(getattr(roll, "success", False)):
         lines.append("• Environmental interference prevents a clean sweep.")
 
-    active_events = await DB.get_active_world_events(c["location"])
-    if result.margin >= 0 and active_events:
+    if bool(sensed.get("event_visibility")):
+        active_events = await DB.get_active_world_events(c["location"])
         for event in active_events[:3]:
             if event["event_type"] == "secret_realm":
                 lines.append(f"• A strong **spatial distortion** is present: {event['title']}.")
             else:
                 lines.append(f"• Abnormal spiritual currents match the active phenomenon **{event['title']}**.")
 
-    # Hidden and fake masters can generate vague signals; area scans never reveal true identities directly.
-    wt = await current_world_time()
-    for hidden_name in hidden_npc_names(WORLD.hidden_masters):
-        if await current_npc_location(hidden_name, wt.period) != c["location"]:
-            continue
-        sensed = sense_hidden_npc(
-            c, hidden_name, result.total, hidden_masters=WORLD.hidden_masters,
-            realm_name=WORLD.realm_name, realm_world=WORLD.realm_world,
-        )
-        if sensed["reveal"] == "none":
-            continue
-        if sensed["kind"] == "fake" and sensed["reveal"] in {"projection", "fake"}:
+    for signal in sensed.get("hidden_signals", []):
+        if signal == "artificial":
             lines.append("• One nearby aura feels **artificially projected or inconsistent**.")
-        else:
+        elif signal == "concealed":
             lines.append("• One nearby presence is **far too perfectly concealed to feel ordinary**.")
 
     await interaction.response.send_message("\n".join(lines), ephemeral=False)
@@ -6554,10 +6201,18 @@ async def conceal_command(interaction: discord.Interaction, active: bool) -> Non
     c = await require_character(interaction)
     if not c:
         return
-    await DB.set_concealment(interaction.user.id, active)
-    updated = dict(c)
-    updated["concealment_active"] = 1 if active else 0
-    strength = concealment_power(updated)
+    wt = await current_world_time()
+    try:
+        envelope = await ENGINE.authoritative_action(
+            "sense.conceal", interaction.user.id,
+            {"active": active},
+            action_id=f"discord:{interaction.id}:sense.conceal",
+        )
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"Aura concealment could not change: {exc}", ephemeral=False)
+        return
+    result = dict(envelope.get("result") or {})
+    strength = int(result.get("concealment_strength", 0))
     await interaction.response.send_message(
         f"{'🌑' if active else '✨'} Aura concealment **{'enabled' if active else 'disabled'}**.\n"
         f"Current concealment strength: **{strength}**.\n"
@@ -6577,9 +6232,25 @@ async def check(
     c = await require_character(interaction)
     if not c:
         return
-    _, effect_mods, _ = await current_effect_modifiers(interaction.user.id)
-    modifier = effective_attribute(c, effect_mods, attribute.value) + 2
-    result = roll_2d10(modifier, difficulty.value)
+    # Effect settlement remains adapter orchestration for now; Go owns the
+    # effective attribute calculation, d10 rolls, target comparison, and result.
+    _, _, wt = await current_effect_modifiers(interaction.user.id)
+    try:
+        envelope = await ENGINE.authoritative_action(
+            "check.resolve",
+            interaction.user.id,
+            {
+                "attribute": attribute.value,
+                "tn": difficulty.value,
+                "label": action,
+                
+            },
+            action_id=f"discord:{interaction.id}:check.resolve",
+        )
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"Check could not be resolved: {exc}", ephemeral=False)
+        return
+    result = SimpleNamespace(**dict(envelope.get("result") or {}))
     fixed = f"Action: {action}\n{roll_line(result)}"
     channel_id = interaction.channel_id or 0
     await DB.add_history(
@@ -6744,28 +6415,18 @@ async def perfect_start(interaction: discord.Interaction) -> None:
     c = await require_character(interaction)
     if not c:
         return
-    if c["phase"] != 9:
-        await interaction.response.send_message("Realm Perfection becomes available at **Stage 9**.", ephemeral=False)
-        return
-    cost = WORLD.phase_cost(c["realm_index"], c["phase"])
-    if int(c.get("cultivation", 0)) < cost:
-        await interaction.response.send_message(
-            f"Fill Stage 9 first: **{c.get('cultivation', 0)}/{cost}** cultivation essence.",
-            ephemeral=False,
+    wt = await current_world_time()
+    try:
+        await ENGINE.authoritative_action(
+            "perfection.start", interaction.user.id, {},
+            action_id=f"discord:{interaction.id}:perfection.start",
         )
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"Perfect Path could not begin: {exc}", ephemeral=False)
         return
-    existing = await DB.get_perfection(interaction.user.id, c["realm_index"])
-    if existing and existing["completed"]:
-        await interaction.response.send_message("You already perfected this realm.", ephemeral=False); return
-    if existing and existing["active"]:
-        await interaction.response.send_message(
-            "Your Perfect Path is already active. Use **/quest → Realm Perfection → Info** to continue it.",
-            ephemeral=False,
-        ); return
-    await DB.start_perfection(interaction.user.id, c["realm_index"])
-    quest = WORLD.perfection_quest(c["realm_index"], 0, c)
+    quest = WORLD.perfection_quest(int(c["realm_index"]), 0, c)
     await interaction.response.send_message(
-        f"★ **Perfect Path begun: {WORLD.realm_name(c['realm_index'], c.get("gender"))}**\n"
+        f"★ **Perfect Path begun: {WORLD.realm_name(c['realm_index'], c.get('gender'))}**\n"
         f"Perfection starts at **0%**. Training contributes at most **{WORLD.perfection_training_cap()}%**; the rest comes from seven long quests.\n\n"
         f"**First Quest — {quest['title']}**\n{quest['description']}\nPreparation: 0/{quest['preparation_required']}\nUse **/quest → Realm Perfection → Quest**.",
         ephemeral=False,
@@ -6793,41 +6454,47 @@ PERFECT_ACTIONS=[app_commands.Choice(name="Info",value="info"),app_commands.Choi
 @serialized_user_action
 async def perfect_quest(interaction: discord.Interaction, action: app_commands.Choice[str]) -> None:
     c = await require_character(interaction)
-    if not c: return
+    if not c:
+        return
     p = await DB.get_perfection(interaction.user.id, c["realm_index"])
-    if not p or not p["active"]:
-        await interaction.response.send_message("Start the Perfect Path first with **/quest → Realm Perfection → Start**.", ephemeral=False); return
-    if p["quest_index"] >= WORLD.perfection_quest_count():
-        await interaction.response.send_message("All seven quests are complete. Reach 100% and use **/quest → Realm Perfection → Trial**.", ephemeral=False); return
-    q = WORLD.perfection_quest(c["realm_index"], p["quest_index"], c)
     if action.value == "info":
+        if not p or not p["active"]:
+            await interaction.response.send_message("Start the Perfect Path first with **/quest → Realm Perfection → Start**.", ephemeral=False)
+            return
+        if p["quest_index"] >= WORLD.perfection_quest_count():
+            await interaction.response.send_message("All seven quests are complete. Reach 100% and use **/quest → Realm Perfection → Trial**.", ephemeral=False)
+            return
+        q = WORLD.perfection_quest(c["realm_index"], p["quest_index"], c)
         await interaction.response.send_message(
             f"📜 **Perfection Quest {p['quest_index']+1}/{WORLD.perfection_quest_count()} — {q['title']}**\n{q['description']}\n"
-            f"Preparation: **{p['quest_preparation']}/{q['preparation_required']}**\nTrial: **{q['attribute'].title()} — TN {q['tn']}**\nClue: *{q['clue']}*\nReward: **+{q['progress_reward']}% Perfection**", ephemeral=False
-        ); return
-    remaining = await DB.cooldown_remaining(interaction.user.id, "perfect_quest")
-    if remaining:
-        await interaction.response.send_message(f"Your realm refinement needs time. Continue in **{human_duration(remaining)}**.", ephemeral=False); return
+            f"Preparation: **{p['quest_preparation']}/{q['preparation_required']}**\nTrial: **{q['attribute'].title()} — TN {q['tn']}**\nClue: *{q['clue']}*\nReward: **+{q['progress_reward']}% Perfection**", ephemeral=False,
+        )
+        return
+    _, _, wt = await current_effect_modifiers(interaction.user.id)
+    try:
+        envelope = await ENGINE.authoritative_action(
+            "perfection.quest", interaction.user.id,
+            {"mode": action.value, 
+             "quest_cooldown_seconds": SETTINGS.perfect_quest_cooldown_minutes * 60},
+            action_id=f"discord:{interaction.id}:perfection.quest:{action.value}",
+        )
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"Perfection quest could not resolve: {exc}", ephemeral=False)
+        return
+    result = dict(envelope.get("result") or {})
     if action.value == "prepare":
-        prep = await DB.add_perfection_preparation(interaction.user.id, c["realm_index"], 1)
-        await DB.set_cooldown(interaction.user.id, "perfect_quest", SETTINGS.perfect_quest_cooldown_minutes*60)
+        prep = int(result.get("preparation", 0)); required = int(result.get("preparation_required", 0))
         await interaction.response.send_message(
-            f"🧭 **{q['title']} — Preparation**\nProgress: **{min(prep,q['preparation_required'])}/{q['preparation_required']}**\n{q['clue']}" +
-            ("\n✨ The trial is now available with **/quest → Realm Perfection → Quest → Attempt**." if prep >= q['preparation_required'] else ""), ephemeral=False
-        ); return
-    if p["quest_preparation"] < q["preparation_required"]:
-        await interaction.response.send_message(f"You are not ready. Preparation is **{p['quest_preparation']}/{q['preparation_required']}**.", ephemeral=False); return
-    result = roll_2d10(
-        c["attributes"].get(q["attribute"], 0) + 2 + WORLD.dual_resonance_check_bonus(c),
-        int(q["tn"]),
-    )
-    await DB.set_cooldown(interaction.user.id, "perfect_quest", SETTINGS.perfect_quest_cooldown_minutes*60)
-    if result.success:
-        await DB.complete_perfection_quest(interaction.user.id,c["realm_index"],progress_reward=q["progress_reward"],clue=q["clue"])
-        text=f"{roll_line(result)}\n✨ **{q['title']} completed.** +{q['progress_reward']}% Perfection."
+            f"🧭 **{result.get('title','Perfection')} — Preparation**\nProgress: **{min(prep, required)}/{required}**\n{result.get('clue','')}" +
+            ("\n✨ The trial is now available with **/quest → Realm Perfection → Quest → Attempt**." if prep >= required else ""), ephemeral=False,
+        )
+        return
+    roll = SimpleNamespace(**dict(result.get("roll") or {}))
+    if bool(result.get("success")):
+        text = f"{roll_line(roll)}\n✨ **{result.get('title','Perfection quest')} completed.** +{int(result.get('progress_reward',0))}% Perfection."
     else:
-        text=f"{roll_line(result)}\n⚠️ The trial rejects your current understanding. Your preparation remains; try again later."
-    await interaction.response.send_message(text)
+        text = f"{roll_line(roll)}\n⚠️ The trial rejects your current understanding. Your preparation remains; try again later."
+    await interaction.response.send_message(text, ephemeral=False)
 
 @registered_group_command(perfect_group, name="clues", description="Review Perfection clues you have discovered")
 async def perfect_clues(interaction: discord.Interaction) -> None:
@@ -6840,43 +6507,51 @@ async def perfect_clues(interaction: discord.Interaction) -> None:
 @registered_group_command(perfect_group, name="trial", description="Attempt the final Realm Perfection trial")
 @serialized_user_action
 async def perfect_trial(interaction: discord.Interaction) -> None:
-    c=await require_character(interaction)
-    if not c:return
-    p=await DB.get_perfection(interaction.user.id,c["realm_index"])
-    if not p or not p["active"]:
-        await interaction.response.send_message("No active Perfect Path.",ephemeral=False);return
-    if p["completed_quests"] < WORLD.perfection_quest_count() or p["progress"] < 100:
-        await interaction.response.send_message(f"Final trial locked. Perfection **{p['progress']}%**, quests **{p['completed_quests']}/{WORLD.perfection_quest_count()}**.",ephemeral=False);return
-    remaining=await DB.cooldown_remaining(interaction.user.id,"perfect_trial")
-    if remaining:
-        await interaction.response.send_message(f"Your foundation is still settling. Retry in **{human_duration(remaining)}**.",ephemeral=False);return
-    results=[]
-    resonance = WORLD.dual_resonance_check_bonus(c)
-    for trial in WORLD.perfection["final_trials"]:
-        r=roll_2d10(c["attributes"].get(trial["attribute"],0)+2+resonance,int(trial["tn"]));results.append((trial,r))
-    lines=["🌌 **FINAL REALM PERFECTION TRIAL**"]+[f"{t['name']}: {roll_line(r)}" for t,r in results]
-    if all(r.success for _,r in results):
-        await DB.complete_perfection(interaction.user.id,c["realm_index"])
-        lines.append(f"\n★ **PERFECT {WORLD.realm_name(c['realm_index'], c.get("gender")).upper()} ACHIEVED**\nYour Max Qi and Vitality permanently increase, and future major breakthroughs gain a bonus.")
+    c = await require_character(interaction)
+    if not c:
+        return
+    _, _, wt = await current_effect_modifiers(interaction.user.id)
+    try:
+        envelope = await ENGINE.authoritative_action(
+            "perfection.trial", interaction.user.id,
+            {"trial_cooldown_seconds": SETTINGS.perfect_trial_cooldown_minutes * 60},
+            action_id=f"discord:{interaction.id}:perfection.trial",
+        )
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"Final Perfection trial could not resolve: {exc}", ephemeral=False)
+        return
+    result = dict(envelope.get("result") or {})
+    lines = ["🌌 **FINAL REALM PERFECTION TRIAL**"]
+    for row in result.get("rolls", []):
+        lines.append(f"{row.get('name','Trial')}: {roll_line(SimpleNamespace(**dict(row)))}")
+    if bool(result.get("success")):
+        lines.append(f"\n★ **PERFECT {WORLD.realm_name(c['realm_index'], c.get('gender')).upper()} ACHIEVED**\nYour Max Qi and Vitality permanently increase, and future major breakthroughs gain a bonus.")
     else:
-        await DB.reduce_perfection_progress(interaction.user.id,c["realm_index"],4)
-        await DB.set_cooldown(interaction.user.id,"perfect_trial",SETTINGS.perfect_trial_cooldown_minutes*60)
         lines.append(
-            "\n⚠️ The final compression fails. **4% recoverable Perfection training** is lost, but your realm remains stable. "
+            f"\n⚠️ The final compression fails. **{int(result.get('training_loss',0))}% recoverable Perfection training** is lost, but your realm remains stable. "
             "Restore it with **/cultivation → Meditation** before trying again."
         )
-    await reply_long(interaction,"\n".join(lines))
+    await reply_long(interaction, "\n".join(lines))
 
 @registered_group_command(perfect_group, name="abandon", description="Abandon the active Perfect Path and lose its progress")
 @serialized_user_action
 async def perfect_abandon(interaction: discord.Interaction) -> None:
-    c=await require_character(interaction)
-    if not c:return
-    p=await DB.get_perfection(interaction.user.id,c["realm_index"])
-    if not p or not p["active"]:
-        await interaction.response.send_message("No active Perfect Path to abandon.",ephemeral=False);return
-    await DB.abandon_perfection(interaction.user.id,c["realm_index"])
-    await interaction.response.send_message("The Perfect Path has been abandoned. You may now break through normally.",ephemeral=False)
+    c = await require_character(interaction)
+    if not c:
+        return
+    wt = await current_world_time()
+    try:
+        envelope = await ENGINE.authoritative_action(
+            "perfection.abandon", interaction.user.id, {},
+            action_id=f"discord:{interaction.id}:perfection.abandon",
+        )
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"Perfect Path could not be abandoned: {exc}", ephemeral=False)
+        return
+    if not bool(dict(envelope.get("result") or {}).get("abandoned")):
+        await interaction.response.send_message("No active Perfect Path to abandon.", ephemeral=False)
+        return
+    await interaction.response.send_message("The Perfect Path has been abandoned. You may now break through normally.", ephemeral=False)
 
 
 # ---------------- Secret Realm commands ----------------
@@ -6884,118 +6559,152 @@ secret_group = app_commands.Group(name="secretrealm", description="Enter and exp
 
 @registered_group_command(secret_group, name="status", description="Show secret realms available at your location or your active run")
 async def secret_status(interaction: discord.Interaction) -> None:
-    c=await require_character(interaction)
-    if not c:return
-    run=await DB.get_secret_realm_run(interaction.user.id)
-    if run and run["active"]:
-        realm=WORLD.secret_realms[run["realm_id"]]
-        room=WORLD.secret_room(run["realm_id"],run["room_index"])
-        text=f"🌀 **Inside {realm['name']}**\nRoom: **{room['name'] if room else 'Inheritance Chamber Complete'}**\nDanger: **{run['danger']}/3**\nCloses in: **{human_duration(int(run['expires_at']-time.time()))}**"
-        await interaction.response.send_message(text,ephemeral=False);return
-    events=[e for e in await DB.get_active_world_events(c["location"]) if e["event_type"]=="secret_realm"]
-    if not events:
-        await interaction.response.send_message("No secret-realm entrance is currently open at your location.",ephemeral=False);return
-    lines=["🌀 **Open Secret Realms Here**"]
-    for e in events:
-        r=WORLD.secret_realms[e["payload"]["realm_id"]]
-        thread_ref=f" — scene <#{e['thread_id']}>" if e.get("thread_id") else ""
-        lines.append(f"\n**{r['name']}** — minimum realm: {WORLD.realm_name(r['min_realm_index'])} — closes in {human_duration(int(e['ends_at']-time.time()))}{thread_ref}")
-    await interaction.response.send_message("".join(lines),ephemeral=False)
+    c = await require_character(interaction)
+    if not c:
+        return
+    try:
+        envelope = await ENGINE.action("secret_realm.status", interaction.user.id, {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"Secret-realm status could not be read: {exc}", ephemeral=False)
+        return
+    result = dict(envelope.get("result") or {})
+    if bool(result.get("active")):
+        run = dict(result.get("run") or {})
+        realm = dict(run.get("realm") or {})
+        room = run.get("room")
+        room_name = dict(room or {}).get("name") if room else "Inheritance Chamber Complete"
+        remaining = max(0, int(float(run.get("expires_at") or 0) - time.time()))
+        text = (
+            f"🌀 **Inside {realm.get('name', run.get('realm_id', 'Secret Realm'))}**\n"
+            f"Room: **{room_name}**\nDanger: **{int(run.get('danger') or 0)}/3**\n"
+            f"Closes in: **{human_duration(remaining)}**"
+        )
+        await interaction.response.send_message(text, ephemeral=False)
+        return
+    available = list(result.get("available") or [])
+    if not available:
+        await interaction.response.send_message("No secret-realm entrance is currently open at your location.", ephemeral=False)
+        return
+    lines = ["🌀 **Open Secret Realms Here**"]
+    for entry in available:
+        entry = dict(entry or {})
+        realm = dict(entry.get("realm") or {})
+        thread_ref = f" — scene <#{entry['thread_id']}>" if entry.get("thread_id") else ""
+        remaining = max(0, int(float(entry.get("ends_at") or 0) - time.time()))
+        lines.append(
+            f"\n**{realm.get('name', entry.get('realm_id', 'Secret Realm'))}** — minimum realm: "
+            f"{WORLD.realm_name(int(realm.get('min_realm_index') or 0))} — closes in {human_duration(remaining)}{thread_ref}"
+        )
+    await interaction.response.send_message("".join(lines), ephemeral=False)
 
 @registered_group_command(secret_group, name="enter", description="Enter an open secret realm by name")
 @serialized_user_action
 async def secret_enter(interaction: discord.Interaction, realm: str) -> None:
-    c=await require_character(interaction)
-    if not c:return
-    realm_id=WORLD.normalize_secret_realm(realm)
-    if not realm_id:
-        await interaction.response.send_message("Unknown secret realm. Use **/realm → Secret Realms → Status** to see open entrances.",ephemeral=False);return
-    info=WORLD.secret_realms[realm_id]
-    if c["location"] != info["location"]:
-        await interaction.response.send_message(f"Its entrance is in **{info['location']}**, not {c['location']}.",ephemeral=False);return
-    if c["realm_index"] < int(info["min_realm_index"]):
-        await interaction.response.send_message(f"The realm pressure rejects you. Minimum: **{WORLD.realm_name(info['min_realm_index'])}**.",ephemeral=False);return
-    events=[e for e in await DB.get_active_world_events(c["location"]) if e["event_type"]=="secret_realm" and e["payload"].get("realm_id")==realm_id]
-    if not events:
-        await interaction.response.send_message("That secret realm is not currently open.",ephemeral=False);return
-    event=events[0]
-    started=await DB.start_secret_realm_run(interaction.user.id,realm_id=realm_id,event_key=event["event_key"],expires_at=float(event["ends_at"]))
-    if not started:
-        await interaction.response.send_message("You are already inside an active secret realm.",ephemeral=False);return
-    first=WORLD.secret_room(realm_id,0)
-    thread_ref=f"\n\n💬 Shared expedition thread: <#{event['thread_id']}>" if event.get("thread_id") else ""
-    await interaction.response.send_message(f"🌀 **{c['name']} enters {info['name']}.**\n{info['description']}\n\nFirst area: **{first['name']}**\n{first['description']}\nUse **/realm → Secret Realms → Explore**.{thread_ref}")
+    c = await require_character(interaction)
+    if not c:
+        return
+    await interaction.response.defer(ephemeral=False)
+    wt = await current_world_time()
+    try:
+        envelope = await ENGINE.authoritative_action(
+            "secret_realm.enter", interaction.user.id,
+            {"realm_id": realm},
+            action_id=f"discord:{interaction.id}:secret_realm.enter",
+        )
+    except GameEngineError as exc:
+        await interaction.followup.send(f"You cannot enter that secret realm: {exc}", ephemeral=False)
+        return
+    result = dict(envelope.get("result") or {})
+    info = dict(result.get("realm") or {})
+    first = dict(result.get("first_room") or {})
+    thread_ref = f"\n\n💬 Shared expedition thread: <#{result['thread_id']}>" if result.get("thread_id") else ""
+    await interaction.followup.send(
+        f"🌀 **{c['name']} enters {info.get('name', result.get('realm_id', 'the secret realm'))}.**\n"
+        f"{info.get('description', '')}\n\nFirst area: **{first.get('name', 'Unknown Chamber')}**\n"
+        f"{first.get('description', '')}\nUse **/realm → Secret Realms → Explore**.{thread_ref}",
+        ephemeral=False,
+    )
 
 @registered_group_command(secret_group, name="explore", description="Attempt the next area of your active secret realm")
 @serialized_user_action
 async def secret_explore(interaction: discord.Interaction) -> None:
-    c=await require_character(interaction)
-    if not c:return
-    run=await DB.get_secret_realm_run(interaction.user.id)
-    if not run or not run["active"]:
-        await interaction.response.send_message("You are not inside an active secret realm.",ephemeral=False);return
-    remaining=await DB.cooldown_remaining(interaction.user.id,"secret_realm")
-    if remaining:
-        await interaction.response.send_message(f"The realm's spatial pressure has not settled. Continue in **{human_duration(remaining)}**.",ephemeral=False);return
-    realm=WORLD.secret_realms[run["realm_id"]]
-    room=WORLD.secret_room(run["realm_id"],run["room_index"])
-    if not room:
-        await interaction.response.send_message("This run has already reached its end.",ephemeral=False);return
-    modifier=WORLD.secret_realm_modifier(c,room)
-    result=roll_2d10(modifier,int(room["tn"]))
-    await DB.set_cooldown(interaction.user.id,"secret_realm",SETTINGS.secret_realm_cooldown_minutes*60)
-    text=f"🌀 **{realm['name']} — {room['name']}**\n{room['description']}\n\n{roll_line(result)}"
-    if result.success:
-        cultivation,stones,items,insight=WORLD.secret_realm_reward(room)
-        cultivation=await CULTIVATION.reward(
-            interaction.user.id,
-            cultivation=cultivation,
-            cultivation_cap=WORLD.phase_cost(c["realm_index"], c["phase"]),
-            spirit_stones=stones,
-            insight_xp=insight,
-            items=items,
-            event_type="secret_realm_room",
+    c = await require_character(interaction)
+    if not c:
+        return
+    await interaction.response.defer(ephemeral=False)
+    wt = await current_world_time()
+    try:
+        envelope = await ENGINE.authoritative_action(
+            "secret_realm.explore", interaction.user.id,
+            {
+                
+                "cooldown_seconds": SETTINGS.secret_realm_cooldown_minutes * 60,
+            },
+            action_id=f"discord:{interaction.id}:secret_realm.explore",
         )
-        await DB.advance_secret_realm_run(interaction.user.id,danger_delta=-1)
+    except GameEngineError as exc:
+        await interaction.followup.send(f"The secret realm resists your attempt: {exc}", ephemeral=False)
+        return
+    result = dict(envelope.get("result") or {})
+    room = dict(result.get("room") or {})
+    roll = SimpleNamespace(**dict(result.get("roll") or {}))
+    text = (
+        f"🌀 **{result.get('realm_name', 'Secret Realm')} — {room.get('name', 'Unknown Area')}**\n"
+        f"{room.get('description', '')}\n\n{roll_line(roll)}"
+    )
+    if bool(result.get("success")):
+        cultivation = int(result.get("cultivation_awarded") or 0)
+        stones = int(result.get("spirit_stones") or 0)
+        insight = int(result.get("insight_xp") or 0)
+        items = dict(result.get("items") or {})
         text += f"\n✨ Area cleared. **+{cultivation} cultivation, +{stones} spirit stones, +{insight} insight**"
-        if items: text += f", {WORLD.item_names(items)}"
-        final_room = run["room_index"] == len(realm["rooms"]) - 1
-        if final_room:
-            inheritance_id=realm["inheritance_id"]; inheritance=WORLD.inheritances[inheritance_id]
-            gained=await DB.grant_inheritance(
-                interaction.user.id,inheritance_id=inheritance_id,source_realm_id=run["realm_id"],
-                bonuses=inheritance["bonuses"],item_id=inheritance["item"]
-            )
-            if gained:
-                text += (f"\n\n📜 **INHERITANCE OBTAINED — {inheritance['name']}**\n{inheritance['description']}\n"
-                         f"Permanent gains: +{inheritance['bonuses'].get('qi_max',0)} Max Qi, +{inheritance['bonuses'].get('vitality_max',0)} Max Vitality, +{inheritance['bonuses'].get('insight_xp',0)} Insight XP.")
+        if items:
+            text += f", {WORLD.item_names(items)}"
+        if bool(result.get("final_room")):
+            inheritance = dict(result.get("inheritance") or {})
+            if bool(inheritance.get("gained")):
+                bonuses = dict(inheritance.get("bonuses") or {})
+                text += (
+                    f"\n\n📜 **INHERITANCE OBTAINED — {inheritance.get('name', 'Ancient Legacy')}**\n"
+                    f"{inheritance.get('description', '')}\nPermanent gains: "
+                    f"+{int(bonuses.get('qi_max') or 0)} Max Qi, "
+                    f"+{int(bonuses.get('vitality_max') or 0)} Max Vitality, "
+                    f"+{int(bonuses.get('insight_xp') or 0)} Insight XP."
+                )
             else:
-                # A completed final chamber still ends the expedition even when
-                # the one-time inheritance was already claimed on an earlier run.
-                await DB.leave_secret_realm(interaction.user.id)
                 text += "\n\nThe inheritance recognizes that you already carry this legacy and grants no duplicate permanent bonus."
         else:
-            next_room=WORLD.secret_room(run["realm_id"],run["room_index"]+1)
-            text += f"\n\nNext: **{next_room['name']}**"
+            next_room = dict(result.get("next_room") or {})
+            if next_room:
+                text += f"\n\nNext: **{next_room.get('name', 'Unknown Area')}**"
     else:
-        new_danger=run["danger"]+1
-        text += f"\n⚠️ The realm rejects your attempt. Danger rises to **{new_danger}/3**."
-        if new_danger >= 3:
-            await DB.leave_secret_realm(interaction.user.id)
+        danger = int(result.get("danger") or 0)
+        text += f"\n⚠️ The realm rejects your attempt. Danger rises to **{danger}/3**."
+        if bool(result.get("ejected")):
             text += "\n💥 Space collapses around you and forcibly ejects you from the secret realm. You keep rewards already earned."
-        else:
-            # Failure does not advance the room. Store only the increased danger.
-            await DB.set_secret_realm_danger(interaction.user.id, new_danger)
-    await reply_long(interaction,text)
+    await interaction.followup.send(text, ephemeral=False)
 
 @registered_group_command(secret_group, name="leave", description="Leave your active secret realm voluntarily")
 @serialized_user_action
 async def secret_leave(interaction: discord.Interaction) -> None:
-    c=await require_character(interaction)
-    if not c:return
-    await DB.leave_secret_realm(interaction.user.id)
-    await interaction.response.send_message("You withdraw before the secret realm seals. Rewards already obtained are kept.",ephemeral=False)
-
+    c = await require_character(interaction)
+    if not c:
+        return
+    wt = await current_world_time()
+    try:
+        envelope = await ENGINE.authoritative_action(
+            "secret_realm.leave", interaction.user.id, {},
+            action_id=f"discord:{interaction.id}:secret_realm.leave",
+        )
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"You cannot leave the secret realm cleanly: {exc}", ephemeral=False)
+        return
+    left = bool(dict(envelope.get("result") or {}).get("left"))
+    message = (
+        "You withdraw before the secret realm seals. Rewards already obtained are kept."
+        if left else "You are not currently inside an active secret realm."
+    )
+    await interaction.response.send_message(message, ephemeral=False)
 
 
 
@@ -7015,7 +6724,7 @@ async def world_time_command(interaction: discord.Interaction) -> None:
     cycle = cultivation_cycle_summary(wt, c.get("spiritual_root") if c else None)
     age_line=""
     if c:
-        life=lifespan_status(c,wt.total_minutes)
+        life=await authoritative_lifespan(interaction.user.id)
         age_line = (f"\nYour age: **{life.age_years:.1f} years** • lifespan: **Ageless**" if life.ageless else f"\nYour age: **{life.age_years:.1f} years** • lifespan ceiling: **{life.total_years} years**")
     await interaction.response.send_message(
         f"🕰️ **World Time**\n{wt.display}\n"
@@ -7123,29 +6832,23 @@ async def use_item_command(interaction: discord.Interaction, item: str) -> None:
         return
 
     if array_key:
-        definition = array_definition(array_key)
-        if not definition:
-            await interaction.response.send_message("That formation disk has no valid deployment definition.", ephemeral=False)
-            return
-        wt = await current_world_time()
+        wt=await current_world_time()
         try:
-            deployed = await DB.deploy_location_array(
-                interaction.user.id,
-                location=str(c.get("location", "")),
-                item_id=item,
-                name=str(definition["name"]),
-                effect=dict(definition["effect"]),
-                starts_game_minute=wt.total_minutes,
-                duration_game_minutes=int(definition["duration_game_minutes"]),
-            )
-        except ValueError as exc:
-            await interaction.response.send_message(f"❌ {exc}", ephemeral=False)
-            return
-        await interaction.response.send_message(
-            f"🧿 **{deployed['name']} deployed at {deployed['location']}.**\n"
-            f"It affects every cultivator mechanically present at this location for **{int(definition['duration_game_minutes'])} game minutes**.\n"
-            "Only one deployable location array can occupy the same location at a time."
-        )
+            e=await ENGINE.authoritative_action("array.deploy",interaction.user.id,{"item_id":item},action_id=f"discord:{interaction.id}:array.deploy")
+            deployed=dict(e.get("result") or {})
+        except GameEngineError as exc:
+            await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
+        await interaction.response.send_message(f"🧿 **{deployed.get('name',item_def.get('name',item))} deployed at {deployed.get('location',c.get('location'))}.**",ephemeral=False)
+        return
+
+    if storage_upgrade:
+        wt=await current_world_time()
+        try:
+            e=await ENGINE.authoritative_action("storage.upgrade",interaction.user.id,{"item_id":item},action_id=f"discord:{interaction.id}:storage.upgrade")
+            upgraded=dict(e.get("result") or {})
+        except GameEngineError as exc:
+            await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
+        await interaction.response.send_message(f"✨ Spatial storage upgraded to **{item_def.get('name',item)}** — **{upgraded.get('slot_capacity',storage_upgrade.get('slot_capacity',24))} item stacks**.",ephemeral=False)
         return
 
     if not await DB.consume_item(interaction.user.id, item, 1):
@@ -7153,21 +6856,6 @@ async def use_item_command(interaction: discord.Interaction, item: str) -> None:
         return
 
     lines=[f"✨ **Used {item_def.get('name', item)}**"]
-    if storage_upgrade:
-        await DB.set_storage_container(
-            interaction.user.id,
-            container_id=str(storage_upgrade.get("container_id", item)),
-            name=str(item_def.get("name", item)),
-            grade=str(storage_upgrade.get("grade", "Mortal")),
-            slot_capacity=int(storage_upgrade.get("slot_capacity", 24)),
-            living_space=bool(storage_upgrade.get("living_space", False)),
-        )
-        lines.append(
-            f"Spatial storage upgraded to **{item_def.get('name', item)}** — "
-            f"**{storage_upgrade.get('slot_capacity', 24)} item stacks**."
-        )
-        if storage_upgrade.get("living_space"):
-            lines.append("🌿 Its inner space is stable enough to sustain living beings temporarily.")
 
     instant=use.get("instant", {})
     if instant:
@@ -7278,21 +6966,27 @@ async def storage_status(interaction:discord.Interaction)->None:
 @app_commands.autocomplete(item=carried_item_autocomplete)
 @serialized_user_action
 async def storage_deposit(interaction:discord.Interaction,item:str,quantity:app_commands.Range[int,1,999999]=1)->None:
-    if not await require_character(interaction):return
-    try: await DB.storage_deposit(interaction.user.id,item,int(quantity))
-    except ValueError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
-    await interaction.response.send_message(f"💍 Stored **{WORLD.item_name(item)} x{quantity}**.",ephemeral=False)
+    if not await require_character(interaction): return
+    wt=await current_world_time()
+    try:
+        envelope=await ENGINE.authoritative_action("storage.deposit",interaction.user.id,{"item_id":item,"quantity":int(quantity)},action_id=f"discord:{interaction.id}:storage.deposit")
+        result=dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
+    await interaction.response.send_message(f"📦 Stored **{WORLD.item_name(item)} x{quantity}**.",ephemeral=False)
 
 
 @registered_group_command(storage_group, name="withdraw",description="Take items out of spatial storage")
 @app_commands.autocomplete(item=stored_item_autocomplete)
 @serialized_user_action
 async def storage_withdraw(interaction:discord.Interaction,item:str,quantity:app_commands.Range[int,1,999999]=1)->None:
-    if not await require_character(interaction):return
-    try: await DB.storage_withdraw(interaction.user.id,item,int(quantity))
-    except ValueError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
+    if not await require_character(interaction): return
+    wt=await current_world_time()
+    try:
+        envelope=await ENGINE.authoritative_action("storage.withdraw",interaction.user.id,{"item_id":item,"quantity":int(quantity)},action_id=f"discord:{interaction.id}:storage.withdraw")
+        result=dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
     await interaction.response.send_message(f"🎒 Withdrew **{WORLD.item_name(item)} x{quantity}**.",ephemeral=False)
 
 
@@ -7303,60 +6997,17 @@ def _house_for_character(c:dict):
     return WORLD.auction_house_at(c.get("location",""))
 
 
-_AUCTION_PURSUER_NAMES=["Black Veil Enforcer","Silent Fang Cultivator","Rival Young Master's Guard","Shadow Market Hunter","Masked Treasure Seeker"]
-
-def _auction_pursuer(character:dict,item_id:str)->dict[str,int|str]:
-    profile=WORLD.auction_door_profile(item_id) or {"level":"special","hunter_realm_bonus":0}; base=int(character.get("realm_index",0)); stage0=int(character.get("phase",1))
-    drift=secrets.choice((0,1,1,2)) if profile["level"]=="legendary" else secrets.choice((-1,0,0,1))
-    realm=max(0,min(len(WORLD.realms)-1,base+int(profile.get("hunter_realm_bonus",0))+drift)); stage=max(1,min(9,stage0+secrets.choice((-2,-1,1,2,3)))) if realm==base else secrets.randbelow(9)+1
-    return {"name":secrets.choice(_AUCTION_PURSUER_NAMES),"realm_index":realm,"stage":stage}
-
-async def _maybe_trigger_auction_door_event(interaction:discord.Interaction,character:dict,outside:str)->tuple[str|None,discord.Thread|None]:
-    risks=await DB.get_pending_auction_door_risks(interaction.user.id)
-    if not risks: return None,None
-    risk=risks[0]; await DB.consume_auction_door_risk(int(risk["risk_id"])); chance=max(0,min(100,int(risk.get("chance_percent",0))))
-    if secrets.randbelow(100)>=chance: return None,None
-    item_id=str(risk["item_id"]); item_name=WORLD.item_name(item_id); pursuer=_auction_pursuer(character,item_id); npc_name=str(pursuer["name"]); ri=int(pursuer["realm_index"]); st=int(pursuer["stage"]); realm_name=WORLD.realm_name(ri); expires=time.time()+3600
-    if WORLD.is_higher_power(ri,st,character):
-        source=f"auction:{risk['auction_id']}:{item_id}"
-        try:
-            bid=await DB.create_battle(
-                user_id=interaction.user.id,npc_name=npc_name,npc_realm_index=ri,npc_stage=st,
-                player_hp=max(1,int(character.get("vitality",1))),
-                player_hp_max=max(1,int(character.get("vitality_max",character.get("vitality",1)))),
-                npc_hp=max(10,12+ri*3+st),location=outside,source=source,target_key=source,
-            )
-        except ValueError:
-            return f"⚔️ The pursuer is already engaged in another unresolved confrontation over **{item_name}**.",None
-        announcement=f"⚔️ **AUCTION DOOR AMBUSH**\nThe moment {interaction.user.mention} leaves the Pavilion carrying **{item_name}**, **{npc_name}** blocks the road. Their aura is **{realm_name} — Stage {st}**, stronger than the target. The confrontation becomes a battle."
-        thread=await spawn_event_thread(interaction,title=f"Auction Ambush — {item_name}",announcement=announcement,event_type="auction_ambush",expires_at=expires,event_key=f"auction_ambush:{bid}")
-        if thread:
-            await DB.update_battle(bid,thread_id=thread.id)
-            battle=await DB.get_active_battle(interaction.user.id)
-            if battle:
-                try:
-                    embed,view=await _battle_panel(interaction.user.id,character,battle)
-                    await thread.send(embed=embed,view=view)
-                except (discord.Forbidden,discord.HTTPException): pass
-        return f"⚔️ A stronger pursuer ambushed you over **{item_name}**. Battle **#{bid}** has begun. Your battle options are shown in the event thread and with **/combat → Active Battle → Status**.",thread
-    announcement=f"🌑 **AUCTION DOOR INCIDENT**\nA suspicious **{npc_name}** follows {interaction.user.mention} after the purchase of **{item_name}**. Their visible cultivation is **{realm_name} — Stage {st}**. This begins as a confrontation, not a forced battle."
-    thread=await spawn_event_thread(interaction,title=f"Auction Door — {item_name}",announcement=announcement,event_type="auction_door",expires_at=expires,event_key=f"auction_door:{risk['risk_id']}")
-    return f"🌑 Someone took an interest in **{item_name}** after you left the Pavilion.",thread
-
-
 @registered_group_command(auction_group, name="enter",description="Enter the local protected auction hall")
 @serialized_user_action
 async def auction_enter(interaction:discord.Interaction)->None:
-    c=await require_character(interaction)
-    if not c:return
-    for house_id,house in WORLD.auction_houses.items():
-        if c["location"]==house.get("entrance_location"):
-            await DB.set_location(interaction.user.id,str(house["location"]))
-            await interaction.response.send_message(
-                f"🏮 You enter **{house['name']}**. Hidden experts and formations suppress violence inside.\n"
-                "🛡️ **Protection applies only inside the hall. The moment you leave through the doors, it ends.**"
-            );return
-    await interaction.response.send_message("There is no recognized auction-house entrance at your current location.",ephemeral=False)
+    if not await require_character(interaction): return
+    wt=await current_world_time()
+    try:
+        envelope=await ENGINE.authoritative_action("auction.enter",interaction.user.id,{},action_id=f"discord:{interaction.id}:auction.enter")
+        result=dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
+    await interaction.response.send_message(f"🏮 You enter **{result.get('name','the auction hall')}**. Hidden experts and formations suppress violence inside.\n🛡️ **Protection applies only inside the hall. The moment you leave through the doors, it ends.**",ephemeral=False)
 
 
 @registered_group_command(auction_group, name="leave",description="Leave the auction hall; its protection ends at the door")
@@ -7364,17 +7015,18 @@ async def auction_enter(interaction:discord.Interaction)->None:
 async def auction_leave(interaction:discord.Interaction)->None:
     c=await require_character(interaction)
     if not c:return
-    found=_house_for_character(c)
-    if not found:
-        await interaction.response.send_message("You are not inside a registered auction house.",ephemeral=False);return
-    _,house=found; outside=str(house.get("entrance_location","Greenriver Town"))
-    await DB.set_location(interaction.user.id,outside); updated=dict(c); updated["location"]=outside
-    event_text, thread = await _maybe_trigger_auction_door_event(interaction,updated,outside)
-    lines=[f"🚪 You step out of **{house['name']}** into **{outside}**.","The Pavilion's protection ends at the door."]
-    if event_text:
-        lines.append(event_text)
-        if thread: lines.append(f"💬 Event scene: {thread.mention}")
-    await interaction.response.send_message("\n".join(lines))
+    wt=await current_world_time()
+    try:
+        envelope=await ENGINE.authoritative_action("auction.leave",interaction.user.id,{},action_id=f"discord:{interaction.id}:auction.leave")
+        result=dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
+    lines=[f"🚪 You step out of **{result.get('name','the auction hall')}** into **{result.get('outside','outside')}**.","The Pavilion's protection ends at the door."]
+    incident=dict(result.get('incident') or {})
+    if incident.get('triggered'):
+        if incident.get('battle_id'): lines.append(f"⚔️ A stronger pursuer ambushed you. Battle **#{incident['battle_id']}** has begun.")
+        else: lines.append("🌑 Someone took an interest in your auction purchase after you left the Pavilion.")
+    await interaction.response.send_message("\n".join(lines),ephemeral=False)
 
 
 @registered_group_command(auction_group, name="browse",description="Browse active lots in the current auction house")
@@ -7422,33 +7074,27 @@ async def auction_sell(
     found=_house_for_character(c)
     if not found:
         await interaction.response.send_message("You must be inside an auction house to list a lot.",ephemeral=False);return
-    if currency not in WORLD.currencies:
-        await interaction.response.send_message("Unknown currency.",ephemeral=False);return
     house_id,_=found
+    wt=await current_world_time()
     try:
-        auction_id=await DB.create_auction(house_id=house_id,seller_user_id=interaction.user.id,item_id=item,quantity=int(quantity),currency_id=currency,starting_bid=int(starting_bid),anonymous=anonymous,ends_at=time.time()+int(duration_minutes)*60)
-    except ValueError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
-    await interaction.response.send_message(
-        f"🏮 Lot `#{auction_id}` listed: **{WORLD.item_name(item)} x{quantity}** starting at **{starting_bid} {WORLD.currency_name(currency)}**.\n"
-        f"Bidding is **{'anonymous' if anonymous else 'open'}**."
-    )
+        envelope=await ENGINE.authoritative_action("auction.sell",interaction.user.id,{"house_id":house_id,"item_id":item,"quantity":int(quantity),"currency_id":currency,"starting_bid":int(starting_bid),"anonymous":anonymous,"ends_at":time.time()+int(duration_minutes)*60},action_id=f"discord:{interaction.id}:auction.sell")
+        result=dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
+    await interaction.response.send_message(f"🏮 Lot `#{result.get('auction_id')}` listed: **{WORLD.item_name(item)} x{quantity}** starting at **{starting_bid} {WORLD.currency_name(currency)}**.",ephemeral=False)
 
 
 @registered_group_command(auction_group, name="bid",description="Place an escrowed bid on an active auction lot")
 @serialized_user_action
 async def auction_bid(interaction:discord.Interaction,auction_id:int,amount:app_commands.Range[int,1,2000000000])->None:
-    c=await require_character(interaction)
-    if not c:return
-    if not _house_for_character(c):
-        await interaction.response.send_message("You must be inside the auction hall to bid.",ephemeral=False);return
-    try: lot=await DB.place_bid(int(auction_id),interaction.user.id,int(amount))
-    except ValueError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
-    await interaction.response.send_message(
-        f"🔨 Bid accepted on lot `#{auction_id}`: **{amount} {WORLD.currency_name(str(lot['currency_id']))}**.\n"
-        "The funds are held in escrow until the lot closes; an outbid cultivator is refunded automatically."
-    )
+    if not await require_character(interaction): return
+    wt=await current_world_time()
+    try:
+        envelope=await ENGINE.authoritative_action("auction.bid",interaction.user.id,{"auction_id":int(auction_id),"amount":int(amount)},action_id=f"discord:{interaction.id}:auction.bid")
+        result=dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
+    await interaction.response.send_message(f"🔨 Bid accepted on lot `#{auction_id}`: **{amount} {WORLD.currency_name(str(result.get('currency_id','low_spirit_stone')))}**.",ephemeral=False)
 
 
 battle_group = app_commands.Group(name="battle",description="Resolve active danger scenes such as auction-door ambushes")
@@ -7565,8 +7211,8 @@ class BattleView(discord.ui.View):
             c=await DB.get_character(self.user_id)
             if not c:
                 await _battle_reply(interaction,content="This incarnation no longer exists.",view=None,edit_panel=True);return
-            if kind=="technique": result=await _execute_battle_law_technique(self.user_id,c,battle,value)
-            elif kind=="item": result=await _use_battle_recovery_item(self.user_id,value)
+            if kind=="technique": result=await _execute_battle_law_technique(interaction,battle,value)
+            elif kind=="item": result=await _use_battle_recovery_item(interaction,self.battle_id,value)
             else: result="🔄 Battle panel refreshed."
             updated=await DB.get_battle(self.battle_id,user_id=self.user_id,active_only=True)
             if not updated:
@@ -7630,44 +7276,53 @@ async def _battle_panel(user_id:int,c:dict,b:dict,*,result_text:str|None=None)->
     return embed,BattleView(user_id,int(b['battle_id']),techniques,items)
 
 
-async def _use_battle_recovery_item(user_id:int,item_id:str)->str:
-    item=WORLD.items.get(item_id,{})
-    instant=item.get('use',{}).get('instant',{})
-    if not instant: return "❌ That item has no instant battle recovery effect."
-    inv=await DB.get_inventory(user_id)
-    if int(inv.get(item_id,0))<=0: return "❌ That recovery item is no longer in your inventory."
-    if not await DB.consume_item(user_id,item_id,1): return "❌ That recovery item was already consumed."
-    state=await DB.restore_resources(user_id,qi=int(instant.get('qi_restore',0)),vitality=int(instant.get('vitality_restore',0)))
-    lines=[f"🧪 **Used {item.get('name',item_id)}**"]
-    if int(instant.get('vitality_restore',0)): lines.append(f"Vitality: **{state.get('vitality',0)}/{state.get('vitality_max',0)}**")
-    if int(instant.get('qi_restore',0)): lines.append(f"Qi: **{state.get('qi',0)}/{state.get('qi_max',0)}**")
+async def _use_battle_recovery_item(interaction: discord.Interaction, battle_id: int, item_id: str) -> str:
+    wt = await current_world_time()
+    try:
+        envelope = await COMBAT.recovery_item(
+            interaction.user.id,
+            battle_id=int(battle_id),
+            item_id=item_id,
+            game_minute=wt.total_minutes,
+            action_id=f"discord:{interaction.id}:combat.recovery_item:{int(battle_id)}:{item_id}",
+        )
+    except GameEngineError as exc:
+        return f"❌ {exc}"
+    state = dict(envelope.get("result") or {})
+    lines = [f"🧪 **Used {state.get('item_name', item_id)}**"]
+    if int(state.get("vitality_restore", 0)):
+        lines.append(f"Vitality: **{int(state.get('vitality', 0))}/{int(state.get('vitality_max', 0))}**")
+    if int(state.get("qi_restore", 0)):
+        lines.append(f"Qi: **{int(state.get('qi', 0))}/{int(state.get('qi_max', 0))}**")
     return "\n".join(lines)
 
-
-async def _execute_battle_law_technique(user_id:int,c:dict,battle:dict,technique:str)->str:
-    t=WORLD.law_technique(technique)
-    if not t: return "❌ Unknown Law technique."
-    rows=await DB.get_law_progress(user_id,str(t['law'])); comp=int(rows[0]['comprehension']) if rows else 0; stage=WORLD.law_stage(comp)
-    if int(stage['index'])<int(t.get('requires_stage',1)) or int(c['realm_index'])<int(t.get('min_realm_index',0)):
-        return f"❌ You no longer meet the requirements for **{t['name']}**."
-    if technique=='world_collapse' and not await DB.get_personal_world(user_id): return "❌ World Collapse requires a stabilized personal world."
-    if int(battle.get('npc_hp',0))<=0: return "🏆 The opponent is already defeated. Choose **Spare** or **Kill**."
-    law_power=comp//10+int(c['realm_index'])*2+int(c['phase'])//3+c['attributes']['insight']
-    target_power=int(battle['npc_realm_index'])*2+int(battle['npc_stage'])//3+8; r=roll_2d10(law_power,target_power)
-    lines=[f"🌌 **{t['name']}**",roll_line(r)]
-    if r.success:
-        turns=1+(1 if r.margin>=5 else 0)
-        if technique=='spatial_lockdown':
-            await DB.update_battle(int(battle['battle_id']),npc_suppressed_turns=max(int(battle.get('npc_suppressed_turns',0)),turns));lines.append(f"Space freezes around **{battle['npc_name']}**. Their counteractions are suppressed for **{turns} turn(s)**.")
-        elif technique=='spatial_strangulation':
-            dmg=max(2,3+comp//25+max(0,r.margin)//3); nhp=max(0,int(battle['npc_hp'])-dmg)
-            await DB.update_battle(int(battle['battle_id']),npc_hp=nhp,npc_suppressed_turns=max(int(battle.get('npc_suppressed_turns',0)),1))
-            lines.append(f"Space compresses inward for **{dmg} conceptual damage**. Opponent Vitality: **{nhp}**.")
-            if nhp<=0: lines.append("🏆 **Opponent defeated.** The battle remains open for your explicit **Spare** or **Kill** decision.")
-        else: lines.append("Your Law dominates the local rules of the exchange.")
-    else: lines.append("The opponent resists or tears free of your spatial authority.")
+async def _execute_battle_law_technique(interaction: discord.Interaction, battle: dict, technique: str) -> str:
+    wt = await current_world_time()
+    try:
+        envelope = await COMBAT.technique(
+            interaction.user.id,
+            battle_id=int(battle["battle_id"]),
+            technique=technique,
+            game_minute=wt.total_minutes,
+            action_id=f"discord:{interaction.id}:combat.technique:{int(battle['battle_id'])}:{technique}",
+        )
+    except GameEngineError as exc:
+        return f"❌ {exc}"
+    result = dict(envelope.get("result") or {})
+    roll = SimpleNamespace(**dict(result.get("roll") or {}))
+    lines = [f"🌌 **{result.get('technique_name', technique)}**", roll_line(roll)]
+    if bool(getattr(roll, "success", False)):
+        if technique == "spatial_lockdown":
+            lines.append(f"Space freezes around **{battle['npc_name']}**. Their counteractions are suppressed for **{int(result.get('suppressed_turns', 1))} turn(s)**.")
+        elif technique == "spatial_strangulation":
+            lines.append(f"Space compresses inward for **{int(result.get('damage_dealt', 0))} conceptual damage**. Opponent Vitality: **{int(result.get('npc_hp', 0))}**.")
+            if result.get("opponent_defeated"):
+                lines.append("🏆 **Opponent defeated.** The battle remains open for your explicit **Spare** or **Kill** decision.")
+        else:
+            lines.append("Your Law dominates the local rules of the exchange.")
+    else:
+        lines.append("The opponent resists or tears free of your spatial authority.")
     return "\n".join(lines)
-
 
 async def _finish_battle(interaction:discord.Interaction,outcome:str,*,expected_battle_id:int|None=None,edit_panel:bool=False)->None:
     c=await DB.get_character(interaction.user.id)
@@ -7681,21 +7336,17 @@ async def _finish_battle(interaction:discord.Interaction,outcome:str,*,expected_
     outcome=str(outcome).lower()
     if outcome not in {"spare","kill"}:
         await _battle_reply(interaction,content="Choose **Spare** or **Kill**.",ephemeral=False,edit_panel=edit_panel);return
-    claimed=await DB.claim_battle_finalization(interaction.user.id,int(b['battle_id']),outcome)
-    if not claimed:
-        await _battle_reply(interaction,content="⌛ This battle was already finalized. No duplicate reward or consequence was applied.",view=None,ephemeral=False,edit_panel=edit_panel);return
-    b=claimed
-    await CULTIVATION.reward(interaction.user.id,insight_xp=5+int(b["npc_realm_index"]),event_type="battle_victory")
     wt=await current_world_time()
-    source=str(b.get("source") or "")
-    if source.startswith("event:"):
-        event_key=source[len("event:"):]
-        await DB.record_world_event_action(
-            event_key=event_key,user_id=interaction.user.id,action_key="battle_victory",stance="defend",
-            target=str(b.get("npc_name") or "event threat"),attribute="combat",total=0,tn=0,success=True,
-            contribution_delta=4,support_delta=2,combat_victory=True,
-            detail=f"Defeated an event-specific hostile manifestation during {event_key}.",game_minute=wt.total_minutes,
+    try:
+        envelope=await COMBAT.finalize(
+            interaction.user.id,battle_id=int(b["battle_id"]),outcome=outcome,game_minute=wt.total_minutes,
+            action_id=f"discord:{interaction.id}:combat.finalize:{int(b['battle_id'])}:{outcome}",
         )
+    except GameEngineError as exc:
+        await _battle_reply(interaction,content=f"❌ {exc}",view=None,ephemeral=False,edit_panel=edit_panel);return
+    result=dict(envelope.get("result") or {})
+    replayed=bool(envelope.get("replayed"))
+    if result.get("event_manifestation"):
         verb="disperse" if outcome=="kill" else "drive off"
         await _battle_reply(
             interaction,
@@ -7704,45 +7355,30 @@ async def _finish_battle(interaction:discord.Interaction,outcome:str,*,expected_
             view=None,ephemeral=False,edit_panel=edit_panel,
         )
         return
-    severity=max(1,min(10,1+int(b["npc_realm_index"])//4+int(b["npc_stage"])//3))
-    action_type="npc_killed" if outcome=="kill" else "npc_spared"
-    impact=await SIM.apply_player_action(
-        user_id=interaction.user.id,action_type=action_type,target_name=str(b["npc_name"]),
-        location=str(b["location"]),game_minute=wt.total_minutes,severity=severity,
-        payload={"battle_id":int(b["battle_id"]),"source":str(b.get("source") or "battle")},
-    )
+    impact={"impacts":[str(x) for x in list(result.get("impacts") or [])]}
     lines=[]
+    npc_name=str(result.get("npc_name") or b.get("npc_name") or "your opponent")
     if outcome=="kill":
-        lines.append(f"☠️ **You kill {b['npc_name']}.** This is a canonical NPC death.")
-        if not str(b.get("source") or "").startswith("auction:"):
-            new_karma=await DB.adjust_karma(interaction.user.id,-max(1,severity),reason=f"killed:{b['npc_name']}")
-            lines.append(f"☯️ Karma shifts to **{new_karma:+d}**.")
-        grudge=await DB.add_grudge(
-            interaction.user.id,holder_type="victim_lineage",holder_key=str(b["npc_name"]),
-            intensity=max(1,severity),reason=f"Blood debt created by the death of {b['npc_name']}",game_minute=wt.total_minutes,
-        )
-        await DB.adjust_reputation(interaction.user.id,"Merciful Reputation",-max(1,severity),reason=f"killed {b['npc_name']}")
-        lines.append(f"🗡️ A lineage grudge is now tracked at intensity **{grudge.get('intensity',severity)}/10**.")
+        lines.append(f"☠️ **You kill {npc_name}.** This is a canonical NPC death.")
+        if "karma_score" in result:
+            lines.append(f"☯️ Karma shifts to **{int(result['karma_score']):+d}**.")
+        if int(result.get("grudge_intensity_delta",0)):
+            lines.append(f"🗡️ A lineage grudge is now tracked with **+{int(result['grudge_intensity_delta'])}** intensity from this death.")
     else:
-        lines.append(f"🤝 **You spare {b['npc_name']}.** The battle ends without a death.")
-        new_karma=await DB.adjust_karma(interaction.user.id,2,reason=f"spared:{b['npc_name']}")
-        await DB.adjust_reputation(interaction.user.id,"Merciful Reputation",2,reason=f"spared {b['npc_name']}")
-        lines.append(f"☯️ Karma shifts to **{new_karma:+d}**.")
-        if severity >= 3:
-            before_fate = int((await DB.get_fate(interaction.user.id)).get("points", 0))
-            after_fate = await DB.adjust_fate(
-                interaction.user.id, 1, reason=f"meaningful_mercy:{b['npc_name']}", game_minute=wt.total_minutes
-            )
-            if after_fate > before_fate:
-                lines.append(f"🌠 Meaningful mercy draws providence: **Fate {after_fate}/9**.")
+        lines.append(f"🤝 **You spare {npc_name}.** The battle ends without a death.")
+        if "karma_score" in result:
+            lines.append(f"☯️ Karma shifts to **{int(result['karma_score']):+d}**.")
+        if "fate_after" in result:
+            lines.append(f"🌠 Meaningful mercy draws providence: **Fate {int(result['fate_after'])}/9**.")
     impacts=list(impact.get("impacts") or [])
     if impacts:
         lines.append("🌍 **World consequences:**")
         lines.extend(f"• {x}" for x in impacts[:8])
+    elif replayed:
+        lines.append("🌍 This final decision was replayed idempotently; its world consequence was not applied twice.")
     else:
         lines.append("🌍 No major faction or family consequence was attached to this opponent, but the action was recorded in world history.")
     await _battle_reply(interaction,content="\n".join(lines),view=None,edit_panel=edit_panel)
-
 
 async def _resolve_battle_turn(interaction:discord.Interaction,style:str,action:str="",*,expected_battle_id:int|None=None,edit_panel:bool=False)->None:
     c=await DB.get_character(interaction.user.id)
@@ -7751,100 +7387,69 @@ async def _resolve_battle_turn(interaction:discord.Interaction,style:str,action:
     b=(await DB.get_battle(expected_battle_id,user_id=interaction.user.id,active_only=True)) if expected_battle_id is not None else await DB.get_active_battle(interaction.user.id)
     if not b:
         await _battle_reply(interaction,content="You are not in an active battle.",ephemeral=False,edit_panel=edit_panel); return
-    _,mods,_=await current_effect_modifiers(interaction.user.id); realm=int(c.get("realm_index",0)); stage=int(c.get("phase",1)); nri=int(b["npc_realm_index"]); nst=int(b["npc_stage"]); resonance=WORLD.dual_resonance_check_bonus(c); law_bonus=int(mods.get('combat_bonus',0)); php=int(b["player_hp"]); nhp=int(b["npc_hp"]); lines=[]
-    beasts=await DB.get_spirit_beasts(interaction.user.id); active_beast=next((x for x in beasts if int(x.get('active',0))==1),None)
-    beast_bonus=(int(active_beast.get('rank',0))//2 + int(active_beast.get('evolution_stage',0)) + int(active_beast.get('loyalty',0))//40) if active_beast else 0
-    bonds=await DB.get_artifact_bonds(interaction.user.id); artifact_bonus=min(4,sum(1 + int(x.get('bond_level',0))//4 for x in bonds if int(x.get('awakened',0))==1))
-    companion_bonus=beast_bonus+artifact_bonus
-    equipment=await DB.equipment_bonus(interaction.user.id)
-    equipment_attack=int(equipment.get('attack',0))+int(equipment.get('spirit',0))//2
-    equipment_defense=int(equipment.get('defense',0))+int(equipment.get('agility',0))//2
-    if nhp<=0:
+    if int(b.get("npc_hp",0))<=0:
         embed,view=await _battle_panel(interaction.user.id,c,b)
         await _battle_reply(interaction,embed=embed,view=view,ephemeral=False,edit_panel=edit_panel);return
-    if action.strip(): lines.append(f"Action: *{action.strip()[:300]}*")
-    if companion_bonus: lines.append(f"🐉 Artifact/companion support grants **+{companion_bonus}** to this exchange.")
-    if equipment_attack or equipment_defense: lines.append(f"🛡️ Equipment contributes **+{equipment_attack} offense / +{equipment_defense} defense**. Durability is consumed by combat exchanges.")
-    if style=="flee":
-        r=roll_2d10(effective_attribute(c,mods,"agility")+realm*2+stage//3+resonance+law_bonus+companion_bonus+int(equipment.get('agility',0)),11+nri*2+nst//3); lines.append(roll_line(r))
-        if r.success:
-            await DB.damage_equipment(interaction.user.id,1)
-            await DB.update_battle(int(b["battle_id"]),status="escaped"); lines.append("🏃 **Escape successful.**")
-            await _battle_reply(interaction,content="\n".join(lines),view=None,edit_panel=edit_panel); return
-        defense_bonus=equipment_defense
-    elif style=="defend": defense_bonus=4+max(effective_attribute(c,mods,"will"),effective_attribute(c,mods,"body"))//3+equipment_defense; lines.append("🛡️ You brace and reinforce your defenses.")
-    else:
-        r=roll_2d10(max(effective_attribute(c,mods,"body"),effective_attribute(c,mods,"spirit"))+realm*2+stage//3+resonance+law_bonus+companion_bonus+equipment_attack,10+nri*2+nst//3); lines.append(roll_line(r)); defense_bonus=equipment_defense
-        if r.success: dmg=max(1,2+max(0,r.margin)//3+realm//4+max(0,equipment_attack)//3); nhp=max(0,nhp-dmg); lines.append(f"💥 You deal **{dmg}** damage.")
-        if nhp<=0:
-            await DB.damage_equipment(interaction.user.id,1)
-            await DB.update_battle(int(b["battle_id"]),npc_hp=0)
-            updated=await DB.get_battle(int(b['battle_id']),user_id=interaction.user.id,active_only=True) or {**b,"npc_hp":0,"player_hp":php}
-            lines.append("🏆 **Opponent defeated.** Decide whether to **Spare** or **Kill** them. Killing named NPCs can permanently change families, sects, regions, alliances and the economy.")
-            embed,view=await _battle_panel(interaction.user.id,c,updated,result_text="\n".join(lines))
-            await _battle_reply(interaction,embed=embed,view=view,edit_panel=edit_panel); return
-    await DB.damage_equipment(interaction.user.id,1)
-    suppressed=max(0,int(b.get("npc_suppressed_turns",0)))
-    if suppressed>0:
-        await DB.update_battle(int(b["battle_id"]),npc_suppressed_turns=suppressed-1); lines.append("🌌 Opponent counter suppressed by spatial control.")
-    else:
-        counter=roll_2d10(4+nri*2+nst//3,10+realm*2+stage//3+defense_bonus+law_bonus+companion_bonus); lines.append(f"**Opponent counter:** {roll_line(counter)}")
-        if counter.success:
-            dmg=max(1,2+max(0,counter.margin)//4+max(0,nri-realm)); state=await COMBAT.apply_damage(int(b['battle_id']),interaction.user.id,dmg); php=int(state.get('vitality',max(0,php-dmg))); lines.append(f"🩸 You take **{dmg}** damage.")
-    if php<=0:
-        await DB.update_battle(int(b["battle_id"]),player_hp=0,npc_hp=nhp,status="lost")
-        realm_gap=max(0,(nri-realm)*9+(nst-stage))
-        fatal_chance=min(75,8+realm_gap*3)
-        if secrets.randbelow(100)<fatal_chance:
-            wt=await current_world_time()
-            fate_state = await DB.get_fate(interaction.user.id)
-            if int(fate_state.get("points", 0)) > 0:
-                remaining_fate = await DB.spend_fate(
-                    interaction.user.id, 1, reason=f"averted_true_death:{b['npc_name']}", game_minute=wt.total_minutes
-                )
-                await DB.restore_resources(interaction.user.id, vitality=1)
-                injury_key="soul_wound" if realm_gap>=18 else "bone_fracture"
-                injury_severity=3 if realm_gap>=18 else 2
-                definition=condition_definition(injury_key); effect=condition_effect(injury_key,injury_severity)
-                injury=await DB.apply_condition(
-                    interaction.user.id,condition_key=injury_key,category=str(definition.get("category","Injury")),
-                    name=str(definition.get("name",injury_key)),severity=injury_severity,source_type="fate_rescue",
-                    source_id=str(b["battle_id"]),effect=effect,game_minute=wt.total_minutes,
-                )
-                lines.append(
-                    f"🌠 **FATE DEFIES DEATH.** A thread of providence snaps instead of your soul. "
-                    f"You survive at **1 Vitality** with **{injury.get('name',definition.get('name'))}** "
-                    f"(severity **{injury.get('severity',injury_severity)}/5**). Fate remaining: **{remaining_fate}/9**."
-                )
-            else:
-                death_state=await DB.record_true_death(
-                    interaction.user.id,current_game_minute=wt.total_minutes,reason=f"battle:{b['npc_name']}",
-                    minutes_per_year=MINUTES_PER_YEAR,
-                    base_samsara_years=SETTINGS.reincarnation_base_samsara_years,
-                    max_wait_seconds=SETTINGS.reincarnation_max_wait_seconds,
-                )
-                years=(int((death_state or {}).get('family_target_minutes',0))//MINUTES_PER_YEAR) if death_state else SETTINGS.reincarnation_base_samsara_years
-                wait=max(0,int(float((death_state or {}).get('reincarnation_ready_at',time.time()))-time.time())) if death_state else SETTINGS.reincarnation_max_wait_seconds
-                lines.append(
-                    f"☠️ **TRUE DEATH.** Your body and current incarnation are lost. Your soul enters **Samsara** for roughly **{years:,} private years**, compressed into at most **{human_duration(max(1,wait))}** of real time. The wheel selected **{str((death_state or {}).get('target_world') or 'Mortal World')}** as your possible rebirth world. The shared world and your old family are not fast-forwarded."
-                )
-        else:
-            wt=await current_world_time()
-            injury_key="bone_fracture" if realm_gap>=9 else "flesh_wound"
-            injury_severity=2 if realm_gap>=9 else 1
-            definition=condition_definition(injury_key); effect=condition_effect(injury_key,injury_severity)
-            injury=await DB.apply_condition(
-                interaction.user.id,condition_key=injury_key,category=str(definition.get("category","Injury")),
-                name=str(definition.get("name",injury_key)),severity=injury_severity,source_type="battle",
-                source_id=str(b["battle_id"]),effect=effect,game_minute=wt.total_minutes,
-            )
+    wt=await current_world_time()
+    try:
+        envelope=await COMBAT.turn(
+            interaction.user.id,battle_id=int(b["battle_id"]),style=style,action=action,
+            game_minute=wt.total_minutes,minutes_per_year=MINUTES_PER_YEAR,
+            base_samsara_years=SETTINGS.reincarnation_base_samsara_years,
+            max_wait_seconds=SETTINGS.reincarnation_max_wait_seconds,
+            action_id=f"discord:{interaction.id}:combat.turn:{int(b['battle_id'])}:{style}",
+        )
+    except GameEngineError as exc:
+        await _battle_reply(interaction,content=f"❌ {exc}",view=None,ephemeral=False,edit_panel=edit_panel);return
+    result=dict(envelope.get("result") or {})
+    lines=[]
+    if str(result.get("action") or "").strip(): lines.append(f"Action: *{str(result['action'])[:300]}*")
+    if int(result.get("companion_bonus",0)): lines.append(f"🐉 Artifact/companion support grants **+{int(result['companion_bonus'])}** to this exchange.")
+    if int(result.get("equipment_attack",0)) or int(result.get("equipment_defense",0)):
+        lines.append(f"🛡️ Equipment contributes **+{int(result.get('equipment_attack',0))} offense / +{int(result.get('equipment_defense',0))} defense**. Durability is consumed by combat exchanges.")
+    if result.get("player_roll"):
+        lines.append(roll_line(SimpleNamespace(**dict(result["player_roll"]))))
+    if result.get("defending"): lines.append("🛡️ You brace and reinforce your defenses.")
+    if int(result.get("damage_dealt",0)): lines.append(f"💥 You deal **{int(result['damage_dealt'])}** damage.")
+    if result.get("escaped"):
+        lines.append("🏃 **Escape successful.**")
+        await _battle_reply(interaction,content="\n".join(lines),view=None,edit_panel=edit_panel);return
+    if result.get("counter_suppressed"):
+        lines.append("🌌 Opponent counter suppressed by spatial control.")
+    elif result.get("counter_roll"):
+        lines.append(f"**Opponent counter:** {roll_line(SimpleNamespace(**dict(result['counter_roll'])))}")
+    if int(result.get("damage_taken",0)): lines.append(f"🩸 You take **{int(result['damage_taken'])}** damage.")
+    if result.get("opponent_defeated"):
+        updated=await DB.get_battle(int(b["battle_id"]),user_id=interaction.user.id,active_only=True) or {**b,"npc_hp":0,"player_hp":int(result.get("player_hp",b.get("player_hp",1)))}
+        c=await DB.get_character(interaction.user.id) or c
+        lines.append("🏆 **Opponent defeated.** Decide whether to **Spare** or **Kill** them. Killing named NPCs can permanently change families, sects, regions, alliances and the economy.")
+        embed,view=await _battle_panel(interaction.user.id,c,updated,result_text="\n".join(lines))
+        await _battle_reply(interaction,embed=embed,view=view,edit_panel=edit_panel);return
+    if str(result.get("status"))=="lost":
+        injury=dict(result.get("injury") or {})
+        if result.get("fate_rescue"):
             lines.append(
-                f"💀 **Defeated.** You survive but are incapacitated and suffer **{injury.get('name',definition.get('name'))}** "
-                f"(severity **{injury.get('severity',injury_severity)}/5**). True death was possible in this battle."
+                f"🌠 **FATE DEFIES DEATH.** A thread of providence snaps instead of your soul. You survive at **1 Vitality** with "
+                f"**{injury.get('name','a grave injury')}** (severity **{int(injury.get('severity',1))}/5**). Fate remaining: **{int(result.get('fate_remaining',0))}/9**."
             )
-        await _battle_reply(interaction,content="\n".join(lines),view=None,edit_panel=edit_panel); return
-    await DB.update_battle(int(b["battle_id"]),player_hp=php,npc_hp=nhp)
-    updated=await DB.get_active_battle(interaction.user.id) or {**b,'player_hp':php,'npc_hp':nhp}
+        elif result.get("true_death"):
+            death=dict(result.get("true_death") or {})
+            await _record_true_death_history(interaction.user.id,death,wt.total_minutes)
+            years=int(death.get("private_years",SETTINGS.reincarnation_base_samsara_years))
+            wait=max(1,int(death.get("real_wait_seconds",SETTINGS.reincarnation_max_wait_seconds)))
+            lines.append(
+                f"☠️ **TRUE DEATH.** Your body and current incarnation are lost. Your soul enters **Samsara** for roughly **{years:,} private years**, "
+                f"compressed into at most **{human_duration(wait)}** of real time. The wheel selected **{str(death.get('target_world') or 'Mortal World')}** as your possible rebirth world. "
+                "The shared world and your old family are not fast-forwarded."
+            )
+        else:
+            lines.append(
+                f"💀 **Defeated.** You survive but are incapacitated and suffer **{injury.get('name','an injury')}** "
+                f"(severity **{int(injury.get('severity',1))}/5**). True death was possible in this battle."
+            )
+        await _battle_reply(interaction,content="\n".join(lines),view=None,edit_panel=edit_panel);return
+    updated=await DB.get_active_battle(interaction.user.id) or {**b,'player_hp':int(result.get('player_hp',b.get('player_hp',1))),'npc_hp':int(result.get('npc_hp',b.get('npc_hp',1)))}
+    c=await DB.get_character(interaction.user.id) or c
     embed,view=await _battle_panel(interaction.user.id,c,updated,result_text="\n".join(lines))
     await _battle_reply(interaction,embed=embed,view=view,edit_panel=edit_panel)
 
@@ -7946,26 +7551,27 @@ async def law_comprehend(interaction:discord.Interaction,law:str)->None:
     c=await require_character(interaction)
     if not c:return
     definition=WORLD.law_definition(law)
-    if not definition: await interaction.response.send_message("Unknown Law.",ephemeral=False);return
-    minimum=int(WORLD.law_system.get('supreme_min_realm_index',11) if definition.get('supreme') else WORLD.law_system.get('normal_min_realm_index',6))
-    if int(c['realm_index'])<minimum:
-        await interaction.response.send_message(f"Your cultivation is not yet stable enough to comprehend **{definition['name']}**. Required realm: **{WORLD.realm_name(minimum)}** or higher.",ephemeral=False);return
-    remaining=await DB.cooldown_remaining(interaction.user.id,f"law:{law}")
-    if remaining: await interaction.response.send_message(f"Your mind needs time to digest that insight. Try again in **{human_duration(remaining)}**.",ephemeral=False);return
-    _,mods,_=await current_effect_modifiers(interaction.user.id)
-    soul_legacy=await DB.get_soul_legacy(interaction.user.id)
-    soul_mods=soul_legacy_modifiers(soul_legacy)
-    mod=c['attributes']['insight']+c['attributes']['spirit']+WORLD.law_affinity_bonus(c,law)+int(mods.get('law_comprehension_bonus',0))+int(soul_mods['law_bonus'])
-    tn=17+(5 if definition.get('supreme') else 0)
-    result=roll_2d10(mod,tn); gain=max(1,2+(max(0,result.margin)//3 if result.success else 0)+(WORLD.law_affinity_bonus(c,law)//2))
-    if not result.success: gain=1
-    state=await DB.add_law_comprehension(interaction.user.id,law,gain,str(definition.get('dao',definition['name'])))
-    if result.success and int(soul_legacy.get('memory_seed',0))>int(soul_legacy.get('awakened_memory',0)):
-        await DB.awaken_soul_memory(interaction.user.id, 2)
-    await DB.set_cooldown(interaction.user.id,f"law:{law}",int(WORLD.law_system.get('comprehend_cooldown_minutes',120))*60)
-    stage=WORLD.law_stage(state['comprehension'])
-    legacy_note=f"\n☸️ Soul Legacy Law Echo: **+{int(soul_mods['law_bonus'])}** to the comprehension check." if int(soul_mods['law_bonus']) else ""
-    await interaction.response.send_message(f"⚖️ **{definition['name']}**\n{roll_line(result)}{legacy_note}\nComprehension **+{gain}%** → **{state['comprehension']}%**\nStage: **{stage['name']}**\nDao reconstruction +{state['dao_gain']}%.")
+    if not definition:
+        await interaction.response.send_message("Unknown Law.",ephemeral=False);return
+    # Settle time-based effects; Go owns eligibility, affinity, legacy bonus,
+    # cooldown, RNG, comprehension/Dao gains, and memory awakening.
+    _,_,wt=await current_effect_modifiers(interaction.user.id)
+    try:
+        envelope=await ENGINE.authoritative_action(
+            "law.comprehend",interaction.user.id,
+            {"law":law},
+            action_id=f"discord:{interaction.id}:law.comprehend:{law}",
+        )
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"Law comprehension could not resolve: {exc}",ephemeral=False);return
+    result=dict(envelope.get("result") or {})
+    roll=SimpleNamespace(**dict(result.get("roll") or {}))
+    legacy_note=f"\n☸️ Soul Legacy Law Echo: **+{int(result.get('legacy_bonus',0))}** to the comprehension check." if int(result.get('legacy_bonus',0)) else ""
+    await interaction.response.send_message(
+        f"⚖️ **{result.get('name',definition['name'])}**\n{roll_line(roll)}{legacy_note}\n"
+        f"Comprehension **+{int(result.get('gain',0))}%** → **{int(result.get('comprehension',0))}%**\n"
+        f"Stage: **{result.get('stage_name','Unawakened')}**\nDao reconstruction +{int(result.get('dao_gain',0))}%."
+    )
 
 async def law_technique_autocomplete(interaction:discord.Interaction,current:str)->list[app_commands.Choice[str]]:
     needle=current.casefold().strip();out=[]
@@ -8067,26 +7673,19 @@ async def manual_study(interaction:discord.Interaction,manual:str)->None:
     learned={str(r['manual_id']):r for r in await DB.get_manuals(interaction.user.id)}
     if manual not in learned and int(inv.get(iid,0))<=0:
         await interaction.response.send_message(f"You do not possess **{WORLD.item_name(iid)}**.",ephemeral=False);return
-    remaining=await DB.cooldown_remaining(interaction.user.id,f"manual:{manual}")
-    if remaining:
-        await interaction.response.send_message(f"Your meridians and mind are still digesting that manual. Try again in **{human_duration(remaining)}**.",ephemeral=False);return
-    first=manual not in learned
-    if first: state=await DB.learn_manual(interaction.user.id,manual)
-    else:
-        gain=max(1,1+int(c['attributes'].get('insight',0))//5)
-        state=await DB.practice_manual(interaction.user.id,manual,gain) or learned[manual]
-    await DB.set_cooldown(interaction.user.id,f"manual:{manual}",45*60)
-    forbidden=manual_is_forbidden(m)
-    karma_note=""
-    if first and forbidden:
-        newkarma=await FORBIDDEN_ARTS.record_manual_study(
-            user_id=interaction.user.id,
-            manual_id=manual,
-            manual=m,
-            first_study=True,
-            current_karma=int(c.get('karma_score',0)),
+    wt=await current_world_time()
+    try:
+        envelope=await ENGINE.authoritative_action(
+            "manual.study",interaction.user.id,
+            {"manual_id":manual,"cooldown_seconds":45*60},
+            action_id=f"discord:{interaction.id}:manual.study",
         )
-        karma_note=f"\n☯️ Merely accepting the inheritance leaves a faint karmic stain: **{newkarma:+d}**."
+    except GameEngineError as exc:
+        await interaction.response.send_message(str(exc),ephemeral=False);return
+    resolved=dict(envelope.get("result") or {});state=dict(resolved.get("state") or {})
+    first=bool(resolved.get("first_study"));forbidden=bool(resolved.get("forbidden"));karma_note=""
+    if first and forbidden:
+        karma_note=f"\n☯️ Merely accepting the inheritance leaves a faint karmic stain: **{int(resolved.get('karma_score',0)):+d}**."
     unlocked=[]
     for tid in m.get('techniques',[]):
         t=WORLD.technique_definition(str(tid)) or {}
@@ -8111,48 +7710,31 @@ async def manual_technique(interaction:discord.Interaction,technique:str)->None:
         await interaction.response.send_message("That technique currently requires an active battle target.",ephemeral=False);return
     if int(battle.get('npc_hp',0))<=0:
         await interaction.response.send_message("The opponent is already defeated. Choose **Spare** or **Kill**.",ephemeral=False);return
-    qi_cost=int(t.get('qi_cost',0)); vit_cost=int(t.get('vitality_cost',0))
-    paid=await DB.spend_resources(interaction.user.id,qi=qi_cost,vitality=vit_cost)
-    if not paid:
-        await interaction.response.send_message(f"You lack the resources to use **{t['name']}**. Cost: **{qi_cost} Qi** and **{vit_cost} Vitality** (you cannot sacrifice your final point of Vitality).",ephemeral=False);return
-    mastery=int(row.get('mastery',0)); damage=max(0,int(t.get('damage',0))+mastery)
-    heal=max(0,int(t.get('heal',0))+mastery)
-    suppress=max(0,int(t.get('suppress_turns',0)))
-    nhp=max(0,int(battle.get('npc_hp',0))-damage)
-    fields={'npc_hp':nhp}
-    if suppress: fields['npc_suppressed_turns']=max(int(battle.get('npc_suppressed_turns',0)),suppress)
-    await DB.update_battle(int(battle['battle_id']),**fields)
-    if heal: paid=await DB.restore_resources(interaction.user.id,vitality=heal)
     wt=await current_world_time()
-    location=str(battle.get('location') or c.get('location') or 'Unknown')
-    manual_def=WORLD.manual_definition(str(t.get('manual'))) or {}
-    forbidden_result=await FORBIDDEN_ARTS.resolve_technique_use(
-        user_id=interaction.user.id,
-        technique_id=technique,
-        technique=t,
-        manual=manual_def,
-        location=location,
-        game_minute=wt.total_minutes,
-        concealment_active=bool(c.get('concealment_active',0)),
-        current_karma=int(c.get('karma_score',0)),
-    )
-    social_note=""
-    if forbidden_result.crime:
-        crime=forbidden_result.crime
-        social_note=f"⚖️ Crime record **#{crime['crime_id']}** opened with **{crime['evidence']}% evidence**."
-        if crime.get('bounty_id'):
-            social_note += " A bounty was issued."
-    await DB.practice_manual(interaction.user.id,str(t.get('manual')),1)
+    try:
+        envelope=await ENGINE.authoritative_action(
+            "manual.technique",interaction.user.id,
+            {"technique_id":technique},
+            action_id=f"discord:{interaction.id}:manual.technique",
+        )
+    except GameEngineError as exc:
+        await interaction.response.send_message(str(exc),ephemeral=False);return
+    resolved=dict(envelope.get("result") or {})
+    qi_cost=int(resolved.get('qi_cost',0));vit_cost=int(resolved.get('vitality_cost',0));damage=int(resolved.get('damage',0));heal=int(resolved.get('heal',0));suppress=int(resolved.get('suppress_turns',0));nhp=int(resolved.get('npc_hp',0))
+    crime=dict(resolved.get('crime') or {});social_note=""
+    if crime:
+        social_note=f"⚖️ Crime record **#{crime.get('crime_id')}** opened with **{crime.get('evidence',0)}% evidence**."
+        if crime.get('bounty_id') is not None: social_note += " A bounty was issued."
     updated=await DB.get_battle(int(battle['battle_id']),user_id=interaction.user.id,active_only=True) or {**battle,'npc_hp':nhp}
     c=await DB.get_character(interaction.user.id) or c
-    impacts=forbidden_result.impacts
+    impacts=list(resolved.get('impacts') or [])
     result=[f"🌑 **{t['name']}** — {t.get('description','')}",f"Cost: **{qi_cost} Qi**"+(f" + **{vit_cost} Vitality**" if vit_cost else "")]
     if damage: result.append(f"💥 Damage: **{damage}** • Opponent Vitality: **{nhp}**")
     if heal: result.append(f"🩸 Forced recovery: **+{heal} Vitality**")
     if suppress: result.append(f"⛓️ Suppression: **{suppress} turn(s)**")
-    if forbidden_result.forbidden:
-        result.append(f"☯️ Karma: **{forbidden_result.karma_score:+d}**")
-        result.append("👁️ The forbidden art was **witnessed**." if forbidden_result.witnessed else "🌫️ The forbidden art was mostly **concealed**.")
+    if bool(resolved.get('forbidden')):
+        result.append(f"☯️ Karma: **{int(resolved.get('karma_score',0)):+d}**")
+        result.append("👁️ The forbidden art was **witnessed**." if bool(resolved.get('witnessed')) else "🌫️ The forbidden art was mostly **concealed**.")
     if impacts: result.extend(["🌍 **World reaction:**",*[f"• {x}" for x in impacts[:6]]])
     if social_note: result.append(social_note)
     if nhp<=0: result.append("🏆 **Opponent defeated.** You must still choose **Spare** or **Kill**.")
@@ -8213,36 +7795,25 @@ async def condition_treat(interaction: discord.Interaction, condition: str) -> N
     c = await require_character(interaction)
     if not c:
         return
-    row = await DB.get_condition(interaction.user.id, condition)
-    if not row:
-        await interaction.response.send_message("That active condition was not found.", ephemeral=False)
-        return
-    definition = condition_definition(condition)
-    treatment_item = str(definition.get("treatment_item", "recovery_pill"))
-    if not await DB.consume_item(interaction.user.id, treatment_item, 1):
-        await interaction.response.send_message(
-            f"Treatment for **{row['name']}** requires **1× {WORLD.item_name(treatment_item)}**.", ephemeral=False
+    _, _, wt = await current_effect_modifiers(interaction.user.id)
+    try:
+        envelope = await ENGINE.authoritative_action(
+            "condition.treat", interaction.user.id,
+            {"condition": condition},
+            action_id=f"discord:{interaction.id}:condition.treat:{condition}",
         )
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"Condition treatment could not resolve: {exc}", ephemeral=False)
         return
-    _, mods, wt = await current_effect_modifiers(interaction.user.id)
-    severity = max(1, int(row.get("severity", 1)))
-    modifier = effective_attribute(c, mods, "insight") + effective_attribute(c, mods, "spirit")
-    result = roll_2d10(modifier, 10 + severity * 2)
-    if result.success:
-        reduction = 2 if result.margin >= 5 else 1
-        new_severity = max(0, severity - reduction)
-        effect = condition_effect(condition, max(1, new_severity)) if new_severity else None
-        remaining = await DB.set_condition_severity(
-            interaction.user.id, condition, severity=new_severity, effect=effect, game_minute=wt.total_minutes
-        )
-        if remaining:
-            outcome = f"Severity falls to **{remaining['severity']}/5**."
-        else:
-            outcome = "The condition is **resolved** and its mechanical penalties are removed."
+    result = dict(envelope.get("result") or {})
+    roll = SimpleNamespace(**dict(result.get("roll") or {}))
+    if bool(result.get("success")):
+        outcome = ("The condition is **resolved** and its mechanical penalties are removed."
+                   if bool(result.get("resolved")) else f"Severity falls to **{int(result.get('severity_after',0))}/5**.")
     else:
         outcome = "The treatment fails. The medicine is consumed, but the condition does not worsen."
     await interaction.response.send_message(
-        f"🩺 **Treat {row['name']}**\n{roll_line(result)}\n{outcome}", ephemeral=False
+        f"🩺 **Treat {result.get('name', condition)}**\n{roll_line(roll)}\n{outcome}", ephemeral=False,
     )
 
 
@@ -8297,32 +7868,19 @@ async def tribulation_prepare(interaction: discord.Interaction) -> None:
     c = await require_character(interaction)
     if not c:
         return
-    gate = _eligible_ascension_gate(c)
-    if not gate:
-        await interaction.response.send_message("You are not currently standing at a world-crossing ascension gate.", ephemeral=False)
-        return
-    state = await DB.get_tribulation_state(interaction.user.id, int(gate["gate_realm_index"])) or {}
-    if int(state.get("cleared", 0)):
-        await interaction.response.send_message("This incarnation has already cleared the current tribulation gate.", ephemeral=False)
-        return
-    if int(state.get("preparation", 0)) >= 5:
-        await interaction.response.send_message("Your tribulation preparation is already at the **5/5** cap.", ephemeral=False)
-        return
-    currency = _tribulation_currency(str(gate["from_world"]))
-    try:
-        balance = await DB.spend_currency(interaction.user.id, currency, 5)
-    except ValueError:
-        await interaction.response.send_message(
-            f"Preparing the defensive arrays, medicine and grounding treasures costs **5 {WORLD.currency_name(currency)}**.",
-            ephemeral=False,
-        )
-        return
     wt = await current_world_time()
-    state = await DB.add_tribulation_preparation(
-        interaction.user.id, int(gate["gate_realm_index"]), amount=1, game_minute=wt.total_minutes
-    )
+    try:
+        envelope = await ENGINE.authoritative_action(
+            "tribulation.prepare", interaction.user.id, {},
+            action_id=f"discord:{interaction.id}:tribulation.prepare",
+        )
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"Tribulation preparation could not resolve: {exc}", ephemeral=False)
+        return
+    result = dict(envelope.get("result") or {})
+    currency = str(result.get("currency", "low_spirit_stone"))
     await interaction.response.send_message(
-        f"⚡ Tribulation preparation rises to **{state.get('preparation',0)}/5**. Remaining {WORLD.currency_name(currency)}: **{balance}**.",
+        f"⚡ Tribulation preparation rises to **{int(result.get('preparation',0))}/5**. Remaining {WORLD.currency_name(currency)}: **{int(result.get('balance',0))}**.",
         ephemeral=False,
     )
 
@@ -8333,68 +7891,30 @@ async def tribulation_attempt(interaction: discord.Interaction) -> None:
     c = await require_character(interaction)
     if not c:
         return
-    gate = _eligible_ascension_gate(c)
-    if not gate:
-        await interaction.response.send_message("You are not at a world-crossing tribulation gate.", ephemeral=False)
-        return
-    phase_cost = (WORLD.phase_cost(int(gate["gate_realm_index"]), int(c["phase"])) if gate["path"]=="Qi" else WORLD.body_phase_cost(int(gate["gate_realm_index"]), int(c["body_phase"])))
-    current_essence = int(c.get("cultivation",0)) if gate["path"]=="Qi" else int(c.get("body_cultivation",0))
-    if current_essence < phase_cost:
-        await interaction.response.send_message(
-            f"You must first fill the current {gate['path'].lower()} cultivation stage: **{current_essence}/{phase_cost}** essence.", ephemeral=False
+    _, _, wt = await current_effect_modifiers(interaction.user.id)
+    try:
+        envelope = await ENGINE.authoritative_action(
+            "tribulation.attempt", interaction.user.id, {},
+            action_id=f"discord:{interaction.id}:tribulation.attempt",
         )
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"Tribulation attempt could not resolve: {exc}", ephemeral=False)
         return
-    state = await DB.get_tribulation_state(interaction.user.id, int(gate["gate_realm_index"])) or {}
-    if int(state.get("cleared", 0)):
-        await interaction.response.send_message("⚡ This tribulation is already cleared. Use **/quest → Main Progression → Breakthrough** or **/cultivation → Body Cultivation → Breakthrough** for the path at this gate.", ephemeral=False)
-        return
-    prep = max(0, min(5, int(state.get("preparation", 0))))
-    _, mods, wt = await current_effect_modifiers(interaction.user.id)
-    tns = tribulation_tns(int(gate["gate_realm_index"]))
-    karma_mod = max(-4, min(4, int(c.get("karma_score", 0)) // 25))
-    wave_defs = [
-        ("Heavenly Lightning", max(effective_attribute(c, mods, "body"), effective_attribute(c, mods, "will")) + prep, tns[0], "meridian_damage"),
-        ("Heart Tribulation", effective_attribute(c, mods, "will") + effective_attribute(c, mods, "insight") // 2 + prep, tns[1], "heart_demon"),
-        ("Void & Karma Rejection", effective_attribute(c, mods, "spirit") + effective_attribute(c, mods, "will") // 2 + prep + karma_mod, tns[2], "soul_wound"),
-    ]
-    waves: list[dict] = []
-    lines = [f"⚡ **{gate['name']}** • Preparation **{prep}/5**"]
-    successes = 0
-    for name, modifier, tn, condition_key in wave_defs:
-        result = roll_2d10(modifier, tn)
-        waves.append({
-            "name": name, "dice": [result.die1, result.die2], "modifier": result.modifier,
-            "total": result.total, "tn": result.tn, "degree": result.degree, "success": result.success,
-        })
-        lines.append(f"\n**{name}:** {roll_line(result)}")
-        if result.success:
-            successes += 1
-        else:
-            severity = 2 if result.margin <= -4 else 1
-            effect = condition_effect(condition_key, severity)
-            definition = condition_definition(condition_key)
-            applied = await DB.apply_condition(
-                interaction.user.id, condition_key=condition_key,
-                category=str(definition.get("category", "Tribulation Injury")),
-                name=str(definition.get("name", condition_key)), severity=severity,
-                source_type="tribulation", source_id=str(gate["gate_realm_index"]), effect=effect,
-                game_minute=wt.total_minutes,
-            )
-            lines.append(f"↳ Persistent consequence: **{applied.get('name', definition.get('name'))}**, severity **{applied.get('severity',severity)}/5**.")
-    success = successes >= 2
-    state = await DB.record_tribulation_attempt(
-        interaction.user.id, int(gate["gate_realm_index"]), preparation_used=prep, waves=waves,
-        success=success, game_minute=wt.total_minutes,
-    )
-    if success:
-        lines.append(f"\n🌌 **Tribulation cleared.** Heaven accepts your claim to enter **{gate['to_world']}**. Your next world-crossing **{'/breakthrough' if gate['path']=='Qi' else '/body breakthrough'}** may proceed.")
-        await DB.adjust_reputation(interaction.user.id, "Heavenly Recognition", 8, reason=f"cleared:{gate['name']}")
-        before_fate = int((await DB.get_fate(interaction.user.id)).get("points", 0))
-        after_fate = await DB.adjust_fate(
-            interaction.user.id, 2, reason=f"tribulation_cleared:{gate['name']}", game_minute=wt.total_minutes
+    result = dict(envelope.get("result") or {})
+    lines = [f"⚡ **{result.get('gate_name','Heavenly Tribulation')}** • Preparation **{int(result.get('preparation_used',0))}/5**"]
+    for wave in result.get("waves", []):
+        roll = SimpleNamespace(**dict(wave))
+        lines.append(f"\n**{wave.get('name','Tribulation Wave')}:** {roll_line(roll)}")
+        condition = wave.get("condition") or {}
+        if condition:
+            lines.append(f"↳ Persistent consequence: **{condition.get('name', condition.get('condition_key','Condition'))}**, severity **{int(condition.get('severity',1))}/5**.")
+    if bool(result.get("success")):
+        lines.append(
+            f"\n🌌 **Tribulation cleared.** Heaven accepts your claim to enter **{result.get('to_world','the higher world')}**. "
+            f"Your next world-crossing **{'/breakthrough' if result.get('path')=='Qi' else '/body breakthrough'}** may proceed."
         )
-        if after_fate > before_fate:
-            lines.append(f"🌠 Heaven leaves providence in your wake: **Fate {after_fate}/9**.")
+        if int(result.get("fate_after", -1)) >= 0:
+            lines.append(f"🌠 Heaven leaves providence in your wake: **Fate {int(result.get('fate_after',0))}/9**.")
     else:
         lines.append("\n💥 **Tribulation failed.** Preparation is consumed. Heal persistent injuries and prepare before trying again.")
     await reply_long(interaction, "\n".join(lines), ephemeral=False)
@@ -8478,19 +7998,17 @@ async def crime_atone(interaction: discord.Interaction, crime_id: int) -> None:
         await interaction.response.send_message(
             f"You must return to **{row.get('jurisdiction')}** to negotiate restitution for this jurisdictional record.",ephemeral=False
         );return
-    fine=max(10,int(row.get("severity",1))*25+int(row.get("evidence",0))//10*5)
-    currency=_tribulation_currency(WORLD.realm_world(int(c.get("realm_index",0))))
+    wt=await current_world_time()
     try:
-        balance=await DB.spend_currency(interaction.user.id,currency,fine)
-    except ValueError:
-        await interaction.response.send_message(
-            f"Restitution requires **{fine} {WORLD.currency_name(currency)}**.",ephemeral=False
-        );return
-    resolved=await DB.resolve_crime(interaction.user.id,int(crime_id),status="atoned")
-    if not resolved:
-        await DB.add_currency(interaction.user.id,currency,fine)
-        await interaction.response.send_message("The record changed before settlement; your payment was returned.",ephemeral=False);return
-    await DB.adjust_reputation(interaction.user.id,"Orthodox Society",max(1,int(row.get("severity",1))),reason=f"atoned crime #{crime_id}")
+        envelope=await ENGINE.authoritative_action(
+            "crime.atone",interaction.user.id,
+            {"crime_id":int(crime_id)},
+            action_id=f"discord:{interaction.id}:crime.atone",
+        )
+    except GameEngineError as exc:
+        await interaction.response.send_message(str(exc),ephemeral=False);return
+    resolved=dict(envelope.get("result") or {})
+    fine=int(resolved.get("fine",0));currency=str(resolved.get("currency",''));balance=int(resolved.get("balance",0))
     await interaction.response.send_message(
         f"⚖️ Crime **#{crime_id}** is marked **atoned** and any bounty sourced only from it is resolved. "
         f"Paid **{fine} {WORLD.currency_name(currency)}** • remaining balance **{balance}**.",ephemeral=False
@@ -8561,102 +8079,108 @@ async def equipment_status(interaction: discord.Interaction) -> None:
 @registered_group_command(equipment_group, name="bind", description="Convert one carried equipment item into a persistent durable instance")
 @serialized_user_action
 async def equipment_bind(interaction: discord.Interaction, item: str) -> None:
-    c=await require_character(interaction)
-    if not c:return
-    if item not in EQUIPMENT_DEFINITIONS:
-        await interaction.response.send_message("Supported equipment: "+", ".join(f"`{k}`" for k in EQUIPMENT_DEFINITIONS),ephemeral=False);return
-    try: row=await DB.bind_equipment(interaction.user.id,item)
-    except ValueError as exc:
-        await interaction.response.send_message(str(exc),ephemeral=False);return
-    await interaction.response.send_message(f"🛡️ Bound **{EQUIPMENT_DEFINITIONS[item]['name']}** as equipment `#{row['equipment_id']}` with **{row['durability']}** durability. Use **/items → Equipment → Equip**.",ephemeral=False)
+    if not await require_character(interaction): return
+    wt=await current_world_time()
+    try:
+        envelope=await ENGINE.authoritative_action("equipment.bind",interaction.user.id,{"item_id":item},action_id=f"discord:{interaction.id}:equipment.bind")
+        result=dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
+    await interaction.response.send_message(f"🧷 Bound **{WORLD.item_name(item)}** as equipment `#{result.get('equipment_id')}`.",ephemeral=False)
 
 
 @registered_group_command(equipment_group, name="equip", description="Equip a bound item; another item in the same slot is automatically unequipped")
 @serialized_user_action
 async def equipment_equip(interaction: discord.Interaction, equipment_id: int) -> None:
-    c=await require_character(interaction)
-    if not c:return
-    row=await DB.equip_item(interaction.user.id,equipment_id)
-    if not row:
-        await interaction.response.send_message("That equipment is missing or broken and must be repaired first.",ephemeral=False);return
-    await interaction.response.send_message(f"✅ Equipped `#{row['equipment_id']}` **{WORLD.item_name(row['item_id'])}** in the **{row['slot']}** slot.",ephemeral=False)
+    if not await require_character(interaction): return
+    wt=await current_world_time()
+    try:
+        envelope=await ENGINE.authoritative_action("equipment.equip",interaction.user.id,{"id":int(equipment_id)},action_id=f"discord:{interaction.id}:equipment.equip")
+        result=dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
+    await interaction.response.send_message(f"⚔️ Equipped item `#{equipment_id}`.",ephemeral=False)
 
 
 @registered_group_command(equipment_group, name="unequip", description="Remove a bound item from your active combat loadout")
 @serialized_user_action
 async def equipment_unequip(interaction: discord.Interaction, equipment_id: int) -> None:
-    c=await require_character(interaction)
-    if not c:return
-    ok=await DB.unequip_item(interaction.user.id,equipment_id)
-    await interaction.response.send_message("Equipment removed from the active loadout." if ok else "Unknown equipment instance.",ephemeral=False)
+    if not await require_character(interaction): return
+    wt=await current_world_time()
+    try:
+        envelope=await ENGINE.authoritative_action("equipment.unequip",interaction.user.id,{"id":int(equipment_id)},action_id=f"discord:{interaction.id}:equipment.unequip")
+        result=dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
+    await interaction.response.send_message(f"🎒 Unequipped item `#{equipment_id}`.",ephemeral=False)
 
 
 @registered_group_command(equipment_group, name="repair", description="Restore equipment durability using Spirit Iron")
 @serialized_user_action
 async def equipment_repair(interaction: discord.Interaction, equipment_id: int) -> None:
-    c=await require_character(interaction)
-    if not c:return
-    try: row=await DB.repair_equipment(interaction.user.id,equipment_id)
-    except ValueError as exc:
-        await interaction.response.send_message(str(exc),ephemeral=False);return
-    if not row:
-        await interaction.response.send_message("Unknown equipment instance.",ephemeral=False);return
-    await interaction.response.send_message(f"🔨 Equipment `#{equipment_id}` restored to **{row['durability']}/{row['max_durability']}** durability for **{row.get('repair_cost',0)} Spirit Iron**.",ephemeral=False)
+    if not await require_character(interaction): return
+    wt=await current_world_time()
+    try:
+        envelope=await ENGINE.authoritative_action("equipment.repair",interaction.user.id,{"id":int(equipment_id)},action_id=f"discord:{interaction.id}:equipment.repair")
+        result=dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
+    await interaction.response.send_message(f"🔧 Repaired item `#{equipment_id}` for **{int(result.get('repair_cost',0))} Spirit Iron**.",ephemeral=False)
 
 
 @registered_group_command(formation_group, name="create", description="Create a named combat formation for your active party")
 @serialized_user_action
 async def formation_create(interaction: discord.Interaction, name: str) -> None:
-    c=await require_character(interaction)
-    if not c:return
-    party=await DB.get_party(interaction.user.id)
-    if not party or int(party['leader_user_id'])!=interaction.user.id:
-        await interaction.response.send_message("Only the active party leader can create a formation.",ephemeral=False);return
-    fid=await DB.create_formation(int(party['party_id']),name)
-    await interaction.response.send_message(f"☯️ Formation **{name[:80]}** created as `#{fid}`. Assign at least two members before activation.",ephemeral=False)
+    if not await require_character(interaction): return
+    wt=await current_world_time()
+    try:
+        envelope=await ENGINE.authoritative_action("formation.create",interaction.user.id,{"name":name},action_id=f"discord:{interaction.id}:formation.create")
+        result=dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
+    await interaction.response.send_message(f"🧿 Formation `#{result.get('formation_id')}` created.",ephemeral=False)
 
 
 @registered_group_command(formation_group, name="assign", description="Assign one party member to Vanguard, Core, Flank or Support")
 @app_commands.choices(position=[app_commands.Choice(name=x.title(),value=x) for x in FORMATION_POSITIONS])
 @serialized_user_action
 async def formation_assign(interaction: discord.Interaction, formation_id: int, member: discord.Member, position: app_commands.Choice[str]) -> None:
-    c=await require_character(interaction)
-    if not c:return
-    party=await DB.get_party(interaction.user.id)
-    if not party or int(party['leader_user_id'])!=interaction.user.id:
-        await interaction.response.send_message("Only the party leader assigns formation positions.",ephemeral=False);return
-    ok=await DB.assign_formation_position(int(party['party_id']),formation_id,member.id,position.value)
-    if not ok:
-        await interaction.response.send_message("Formation or party member not found.",ephemeral=False);return
-    await interaction.response.send_message(f"☯️ <@{member.id}> takes the **{position.name}** position in formation `#{formation_id}`.")
+    if not await require_character(interaction): return
+    wt=await current_world_time()
+    try:
+        envelope=await ENGINE.authoritative_action("formation.assign",interaction.user.id,{"formation_id":int(formation_id),"target_user_id":member.id,"position":position.value},action_id=f"discord:{interaction.id}:formation.assign")
+        result=dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
+    await interaction.response.send_message(f"🧿 Assigned {member.mention} to **{position.value}**.",ephemeral=False)
 
 
 @registered_group_command(formation_group, name="activate", description="Activate a formation and choose its combat stance")
 @app_commands.choices(stance=[app_commands.Choice(name=x.title(),value=x) for x in FORMATION_STANCES])
 @serialized_user_action
 async def formation_activate(interaction: discord.Interaction, formation_id: int, stance: app_commands.Choice[str]) -> None:
-    c=await require_character(interaction)
-    if not c:return
-    party=await DB.get_party(interaction.user.id)
-    if not party or int(party['leader_user_id'])!=interaction.user.id:
-        await interaction.response.send_message("Only the party leader can activate a formation.",ephemeral=False);return
-    row=await DB.activate_formation(int(party['party_id']),formation_id,stance=stance.value)
-    if not row:
-        await interaction.response.send_message("Activation requires a valid formation with at least two assigned party members.",ephemeral=False);return
-    await interaction.response.send_message(f"☯️ **{row['name']}** activates in **{row['stance']}** stance with **{row['cohesion']}% cohesion**.")
+    if not await require_character(interaction): return
+    wt=await current_world_time()
+    try:
+        envelope=await ENGINE.authoritative_action("formation.activate",interaction.user.id,{"formation_id":int(formation_id),"stance":stance.value},action_id=f"discord:{interaction.id}:formation.activate")
+        result=dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
+    await interaction.response.send_message(f"🧿 Formation `#{formation_id}` activated in **{stance.value}** stance.",ephemeral=False)
 
 
 @registered_group_command(formation_group, name="stance", description="Change the active formation stance between combat rounds")
 @app_commands.choices(stance=[app_commands.Choice(name=x.title(),value=x) for x in FORMATION_STANCES])
 @serialized_user_action
 async def formation_stance(interaction: discord.Interaction, stance: app_commands.Choice[str]) -> None:
-    c=await require_character(interaction)
-    if not c:return
-    party=await DB.get_party(interaction.user.id)
-    if not party or int(party['leader_user_id'])!=interaction.user.id:
-        await interaction.response.send_message("Only the party leader can change formation stance.",ephemeral=False);return
-    row=await DB.set_formation_stance(int(party['party_id']),stance.value)
-    await interaction.response.send_message(f"Formation stance changed to **{stance.name}**." if row else "No active formation exists.",ephemeral=False)
+    if not await require_character(interaction): return
+    wt=await current_world_time()
+    try:
+        envelope=await ENGINE.authoritative_action("formation.stance",interaction.user.id,{"stance":stance.value},action_id=f"discord:{interaction.id}:formation.stance")
+        result=dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
+    await interaction.response.send_message(f"🧿 Active formation stance changed to **{stance.value}**.",ephemeral=False)
 
 
 @registered_group_command(formation_group, name="status", description="Inspect your party formation, positions and remaining cohesion")
@@ -8689,16 +8213,13 @@ async def boss_list(interaction: discord.Interaction) -> None:
 @registered_group_command(boss_group, name="start", description="Party leader starts a persistent multi-phase boss encounter")
 @serialized_user_action
 async def boss_start(interaction: discord.Interaction, boss: str) -> None:
-    c=await require_character(interaction)
-    if not c:return
-    party=await DB.get_party(interaction.user.id)
-    if not party or int(party['leader_user_id'])!=interaction.user.id:
-        await interaction.response.send_message("Only the active party leader can start a boss encounter.",ephemeral=False);return
+    if not await require_character(interaction):return
     wt=await current_world_time()
-    try: enc=await DB.start_boss_encounter(int(party['party_id']),boss,game_minute=wt.total_minutes)
-    except ValueError as exc:
-        await interaction.response.send_message(str(exc),ephemeral=False);return
-    await interaction.response.send_message(f"👹 **Boss Encounter #{enc['encounter_id']} — {enc['boss_name']}** begins with **{enc['boss_hp']}/{enc['boss_hp_max']} HP**. Phase: **{enc['phase'].get('name','Unknown')}**. Every active party member acts once per round with **/combat → Boss Raids → Act**.")
+    try:
+        e=await ENGINE.authoritative_action("boss.start",interaction.user.id,{"template_key":boss},action_id=f"discord:{interaction.id}:boss.start"); r=dict(e.get('result') or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
+    await interaction.response.send_message(f"👹 **Boss Encounter #{r.get('encounter_id')} — {r.get('boss_name','Boss')}** begins with **{r.get('boss_hp',0)}/{r.get('boss_hp_max',0)} HP**.",ephemeral=False)
 
 
 @registered_group_command(boss_group, name="status", description="View the active party boss phase, HP, raid vitality and round")
@@ -8718,35 +8239,33 @@ async def boss_status(interaction: discord.Interaction) -> None:
 @app_commands.choices(style=[app_commands.Choice(name="Attack",value="attack"),app_commands.Choice(name="Technique",value="technique"),app_commands.Choice(name="Defend",value="defend"),app_commands.Choice(name="Support",value="support")])
 @serialized_user_action
 async def boss_act(interaction: discord.Interaction, style: app_commands.Choice[str]) -> None:
-    c=await require_character(interaction)
-    if not c:return
+    if not await require_character(interaction):return
     enc=await DB.get_boss_encounter(user_id=interaction.user.id)
     if not enc:
         await interaction.response.send_message("Your party has no active boss encounter.",ephemeral=False);return
-    wt = await current_world_time()
-    updated=await DB.boss_action(int(enc['encounter_id']),interaction.user.id,style=style.value,expected_version=int(enc['version']),game_minute=wt.total_minutes)
-    if not updated:
-        await interaction.response.send_message("You already acted this round or the encounter state changed; check **/combat → Boss Raids → Status**.",ephemeral=False);return
-    events="\n".join(f"• {x}" for x in updated.get('events',[])[:12])
-    await interaction.response.send_message(f"👹 **Boss #{updated['encounter_id']}** • {updated['status']} • Round {updated['round_index']} • HP **{updated['boss_hp']}/{updated['boss_hp_max']}**\n{events}")
+    wt=await current_world_time()
+    try:
+        e=await ENGINE.authoritative_action("boss.act",interaction.user.id,{"encounter_id":int(enc['encounter_id']),"style":style.value,"version":int(enc['version'])},action_id=f"discord:{interaction.id}:boss.act"); r=dict(e.get('result') or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
+    events="\n".join(f"• {x}" for x in list(r.get('events') or [])[:12])
+    await interaction.response.send_message(f"👹 **Boss #{r.get('encounter_id',enc['encounter_id'])}** • {r.get('status','active')} • Round {r.get('round_index','?')} • HP **{r.get('boss_hp','?')}/{r.get('boss_hp_max','?')}**\n{events}",ephemeral=False)
 
 
 @registered_group_command(boss_group, name="claim", description="Claim your reward from a completed boss encounter")
 @serialized_user_action
 async def boss_claim(interaction: discord.Interaction, encounter_id: int) -> None:
-    c=await require_character(interaction)
-    if not c:return
-    reward=await DB.claim_boss_reward(encounter_id,interaction.user.id)
-    if not reward:
-        await interaction.response.send_message("No unclaimed reward exists for you on that encounter.",ephemeral=False);return
-    await interaction.response.send_message(f"🏆 Claimed **{reward['currency_amount']} Low Spirit Stones** and **{WORLD.item_name(reward['item_id'])} x{reward['item_quantity']}**.",ephemeral=False)
+    if not await require_character(interaction):return
+    try:
+        e=await ENGINE.authoritative_action("boss.claim",interaction.user.id,{"id":int(encounter_id)},action_id=f"discord:{interaction.id}:boss.claim"); r=dict(e.get('result') or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
+    await interaction.response.send_message(f"🏆 Claimed **{r.get('currency_amount',0)} Low Spirit Stones** and **{WORLD.item_name(str(r.get('item_id','')))} x{r.get('item_quantity',0)}**.",ephemeral=False)
 
 
 @registered_group_command(hunter_group, name="status", description="View the autonomous bounty hunter currently tracking this incarnation")
 async def hunter_status(interaction: discord.Interaction) -> None:
-    c=await require_character(interaction)
-    if not c:return
-    wt=await current_world_time(); await DB.spawn_bounty_hunter_pursuits(wt.total_minutes); await DB.advance_bounty_hunters(wt.total_minutes)
+    if not await require_character(interaction):return
     p=await DB.get_bounty_hunter_pursuit(user_id=interaction.user.id)
     if not p:
         await interaction.response.send_message("🎯 No autonomous bounty hunter is actively pursuing you.",ephemeral=False);return
@@ -8757,12 +8276,13 @@ async def hunter_status(interaction: discord.Interaction) -> None:
 @app_commands.choices(action=[app_commands.Choice(name="Evade",value="evade"),app_commands.Choice(name="Fight",value="fight"),app_commands.Choice(name="Surrender",value="surrender")])
 @serialized_user_action
 async def hunter_act(interaction: discord.Interaction, pursuit_id: int, action: app_commands.Choice[str]) -> None:
-    c=await require_character(interaction)
-    if not c:return
-    wt=await current_world_time(); row=await DB.bounty_hunter_action(interaction.user.id,pursuit_id,action.value,game_minute=wt.total_minutes)
-    if not row:
-        await interaction.response.send_message("That active pursuit does not exist for you.",ephemeral=False);return
-    await interaction.response.send_message(f"🎯 **{row['hunter_name']}** • status **{row['status']}** • pressure {row['pressure']}% • escape {row['escape_progress']}% • capture {row['capture_progress']}%",ephemeral=False)
+    if not await require_character(interaction):return
+    wt=await current_world_time()
+    try:
+        e=await ENGINE.authoritative_action("bounty_hunter.act",interaction.user.id,{"pursuit_id":int(pursuit_id),"action":action.value},action_id=f"discord:{interaction.id}:bounty_hunter.act"); row=dict(e.get('result') or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
+    await interaction.response.send_message(f"🎯 **{row.get('hunter_name','Hunter')}** • status **{row.get('status','active')}** • pressure {row.get('pressure',0)}% • escape {row.get('escape_progress',0)}% • capture {row.get('capture_progress',0)}%",ephemeral=False)
 
 
 @registered_group_command(beast_group, name="status", description="View your contracted spirit beasts")
@@ -8806,56 +8326,37 @@ async def beast_encounters(interaction: discord.Interaction) -> None:
 @registered_group_command(beast_group, name="tame", description="Attempt a consensual spirit-beast bond with a subdued wild beast")
 @serialized_user_action
 async def beast_tame(interaction: discord.Interaction, encounter_id: int) -> None:
-    c = await require_character(interaction)
-    if not c:
+    if not await require_character(interaction):
         return
-    remaining = await DB.cooldown_remaining(interaction.user.id, "beast_tame")
-    if remaining:
-        await interaction.response.send_message(
-            f"Your spiritual presence is still unsettled. Attempt another bond in **{human_duration(remaining)}**.", ephemeral=False,
-        )
-        return
-    wt = await current_world_time()
-    rows = await DB.get_wild_beast_encounters(
-        interaction.user.id, game_minute=wt.total_minutes, location=str(c.get("location", "")),
-    )
-    encounter = next((r for r in rows if int(r["encounter_id"]) == int(encounter_id)), None)
-    if not encounter:
-        await interaction.response.send_message(
-            "That wild-beast opportunity is missing, expired, or no longer at your current location.", ephemeral=False,
-        )
-        return
-    path_bonus = 4 if str(c.get("path")) == "Beast Binder" else 0
-    existing = await DB.get_spirit_beasts(interaction.user.id)
-    bond_experience = min(4, len(existing))
-    modifier = int(c["attributes"].get("spirit", 0)) + int(c["attributes"].get("presence", 0))
-    modifier += int(c["attributes"].get("will", 0)) // 2 + path_bonus + bond_experience
-    result = roll_2d10(modifier, int(encounter["taming_tn"]))
-    await DB.set_cooldown(interaction.user.id, "beast_tame", 30 * 60)
     try:
-        resolved = await DB.resolve_wild_beast_taming(
-            interaction.user.id, int(encounter_id), success=bool(result.success), game_minute=wt.total_minutes,
-            contract_type="equality", active_if_first=True,
+        envelope = await ENGINE.authoritative_action(
+            "beast.tame",
+            interaction.user.id,
+            {"encounter_id": int(encounter_id)},
+            action_id=f"discord:{interaction.id}:beast.tame",
         )
-    except ValueError as exc:
+    except GameEngineError as exc:
         await interaction.response.send_message(str(exc), ephemeral=False)
         return
-    if not resolved:
-        await interaction.response.send_message("The taming opportunity has already passed.", ephemeral=False)
-        return
-    if result.success:
-        beast = resolved.get("beast") or {}
+
+    resolved = dict(envelope.get("result") or {})
+    encounter = dict(resolved.get("encounter") or {})
+    result = SimpleNamespace(**resolved)
+    species = str(encounter.get("species") or "spirit beast")
+    if bool(resolved.get("success")):
+        beast = dict(resolved.get("beast") or {})
+        beast_progress = dict(resolved.get("profession_progress") or {})
         active_line = " It becomes your active companion." if beast.get("active") else ""
         await interaction.response.send_message(
-            f"🐉 **Spirit-Beast Bond — {encounter['species']}**\n{roll_line(result)}\n"
-            f"The beast accepts an **equality contract** at loyalty **{beast.get('loyalty',30)}**.{active_line}"
+            f"🐉 **Spirit-Beast Bond — {species}**\n{roll_line(result)}\n"
+            f"The beast accepts an **equality contract** at loyalty **{beast.get('loyalty', 30)}**.{active_line}\n"
+            f"🪢 Beast Taming: **{profession_rank(int(beast_progress.get('level', 0)))}** Lv.{int(beast_progress.get('level', 0))}."
         )
     else:
         await interaction.response.send_message(
-            f"🐾 **Taming Failed — {encounter['species']}**\n{roll_line(result)}\n"
+            f"🐾 **Taming Failed — {species}**\n{roll_line(result)}\n"
             "The beast rejects the bond and escapes. No contract is forced."
         )
-
 
 @registered_group_command(beast_group, name="feed", description="Feed a contracted beast Spirit Herbs or Beast Cores to strengthen loyalty")
 @app_commands.choices(food=[
@@ -8864,62 +8365,68 @@ async def beast_tame(interaction: discord.Interaction, encounter_id: int) -> Non
 ])
 @serialized_user_action
 async def beast_feed(interaction: discord.Interaction, beast_id: int, food: app_commands.Choice[str]) -> None:
-    c = await require_character(interaction)
-    if not c:
+    if not await require_character(interaction):
         return
-    rows = await DB.get_spirit_beasts(interaction.user.id)
-    beast = next((r for r in rows if int(r["beast_id"]) == int(beast_id)), None)
-    if not beast:
-        await interaction.response.send_message("Unknown contracted beast.", ephemeral=False)
-        return
-    remaining = await DB.cooldown_remaining(interaction.user.id, f"beast_feed:{beast_id}")
-    if remaining:
-        await interaction.response.send_message(
-            f"That beast is still digesting its last feeding. Try again in **{human_duration(remaining)}**.", ephemeral=False,
+    try:
+        envelope = await ENGINE.authoritative_action(
+            "beast.feed",
+            interaction.user.id,
+            {"beast_id": int(beast_id), "food": food.value},
+            action_id=f"discord:{interaction.id}:beast.feed",
         )
+    except GameEngineError as exc:
+        await interaction.response.send_message(str(exc), ephemeral=False)
         return
-    if not await DB.consume_item(interaction.user.id, food.value, 1):
-        await interaction.response.send_message(f"You do not carry **{WORLD.item_name(food.value)}**.", ephemeral=False)
-        return
-    gain = 5 if food.value == "spirit_herb" else 10
-    updated = await DB.train_spirit_beast(interaction.user.id, beast_id, gain)
-    await DB.set_cooldown(interaction.user.id, f"beast_feed:{beast_id}", 20 * 60)
+
+    updated = dict(envelope.get("result") or {})
     await interaction.response.send_message(
         f"🐉 **{updated['name']}** accepts the **{WORLD.item_name(food.value)}**. "
-        f"Loyalty rises to **{updated['loyalty']}** and intelligence to **{updated['intelligence']}**.", ephemeral=False,
+        f"Loyalty rises to **{updated['loyalty']}** and intelligence to **{updated['intelligence']}**.",
+        ephemeral=False,
     )
-
 
 @registered_group_command(beast_group, name="train", description="Train a contracted beast to raise loyalty and intelligence")
 @serialized_user_action
 async def beast_train(interaction: discord.Interaction, beast_id: int) -> None:
-    c=await require_character(interaction)
-    if not c:return
-    rem=await DB.cooldown_remaining(interaction.user.id,f"beast_train:{beast_id}")
-    if rem:
-        await interaction.response.send_message(f"That beast needs time to digest the lesson. Try again in **{human_duration(rem)}**.",ephemeral=False);return
-    abode_here=await DB.get_abode_by_location(str(c.get('location') or ''))
-    pen_level=0
-    if abode_here and await DB.can_access_abode(int(abode_here['user_id']),interaction.user.id):
-        pen_level=int(abode_here.get('beast_pen_level',0))
-    gain=6+int(c['attributes'].get('spirit',0))//3+pen_level*2
-    row=await DB.train_spirit_beast(interaction.user.id,beast_id,gain)
-    if not row:
-        await interaction.response.send_message("Unknown contracted beast.",ephemeral=False);return
-    await DB.set_cooldown(interaction.user.id,f"beast_train:{beast_id}",45*60)
-    pen_note=f" • Spirit Beast Pen Lv.{pen_level} training bonus +{pen_level*2}" if pen_level else ""
-    await interaction.response.send_message(f"🐉 **{row['name']}** completes a training cycle. Loyalty **{row['loyalty']}**, intelligence **{row['intelligence']}**.{pen_note}",ephemeral=False)
+    if not await require_character(interaction):
+        return
+    try:
+        envelope = await ENGINE.authoritative_action(
+            "beast.train",
+            interaction.user.id,
+            {"beast_id": int(beast_id)},
+            action_id=f"discord:{interaction.id}:beast.train",
+        )
+    except GameEngineError as exc:
+        await interaction.response.send_message(str(exc), ephemeral=False)
+        return
 
+    resolved = dict(envelope.get("result") or {})
+    row = dict(resolved.get("beast") or {})
+    gain = int(resolved.get("gain", 0))
+    beast_progress = dict(resolved.get("profession_progress") or {})
+    pen_level = int(resolved.get("beast_pen_level", 0))
+    context_bonus = int(resolved.get("context_bonus", 0))
+    pen_note = f" • Spirit Beast Pen Lv.{pen_level} training bonus +{context_bonus}" if pen_level else ""
+    await interaction.response.send_message(
+        f"🐉 **{row['name']}** completes a training cycle. Loyalty **{row['loyalty']}**, "
+        f"intelligence **{row['intelligence']}**.{pen_note}\n"
+        f"🪢 Beast Taming: **{profession_rank(int(beast_progress.get('level', 0)))}** "
+        f"Lv.{int(beast_progress.get('level', 0))}.",
+        ephemeral=False,
+    )
 
 @registered_group_command(beast_group, name="evolve", description="Attempt a bloodline/evolution step once loyalty is sufficient")
 @serialized_user_action
 async def beast_evolve(interaction: discord.Interaction, beast_id: int) -> None:
     c=await require_character(interaction)
     if not c:return
-    row=await DB.evolve_spirit_beast(interaction.user.id,beast_id)
-    if not row:
-        await interaction.response.send_message("Evolution failed: the contract is absent or loyalty is below the required threshold (60 + 10 per prior evolution).",ephemeral=False);return
-    await interaction.response.send_message(f"🧬 **{row['name']} evolves.** Evolution Stage **{row['evolution_stage']}**, Rank **{row['rank']}**. The strain reduces loyalty to **{row['loyalty']}**.",ephemeral=False)
+    try:
+        envelope=await ENGINE.authoritative_action("beast.evolve",interaction.user.id,{"beast_id":int(beast_id)},action_id=f"discord:{interaction.id}:beast.evolve")
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"Evolution failed: {exc}",ephemeral=False);return
+    resolved=dict(envelope.get("result") or {});row=dict(resolved.get("beast") or {});beast_progress=dict(resolved.get("profession_progress") or {})
+    await interaction.response.send_message(f"🧬 **{row['name']} evolves.** Evolution Stage **{row['evolution_stage']}**, Rank **{row['rank']}**. The strain reduces loyalty to **{row['loyalty']}**.\n🪢 Beast Taming: **{profession_rank(int(beast_progress.get('level',0)))}** Lv.{int(beast_progress.get('level',0))}.",ephemeral=False)
 
 
 @registered_group_command(beast_group, name="active", description="Choose the spirit beast that supports you in battle")
@@ -8927,8 +8434,10 @@ async def beast_evolve(interaction: discord.Interaction, beast_id: int) -> None:
 async def beast_active(interaction: discord.Interaction, beast_id: int) -> None:
     c=await require_character(interaction)
     if not c:return
-    if not await DB.set_active_spirit_beast(interaction.user.id,beast_id):
-        await interaction.response.send_message("Unknown contracted beast.",ephemeral=False);return
+    try:
+        await ENGINE.authoritative_action("beast.active",interaction.user.id,{"beast_id":int(beast_id)},action_id=f"discord:{interaction.id}:beast.active")
+    except GameEngineError as exc:
+        await interaction.response.send_message(str(exc),ephemeral=False);return
     await interaction.response.send_message("🐉 Active companion changed. Its rank, evolution and loyalty now contribute to normal battle exchanges.",ephemeral=False)
 
 
@@ -8949,31 +8458,41 @@ async def artifact_status(interaction: discord.Interaction) -> None:
 @registered_group_command(artifact_group, name="bond", description="Deepen a bond with a carried item")
 @serialized_user_action
 async def artifact_bond(interaction: discord.Interaction, item: str) -> None:
-    c=await require_character(interaction)
-    if not c:return
-    inv=await DB.get_inventory(interaction.user.id)
-    if int(inv.get(item,0))<=0 or item not in WORLD.items:
-        await interaction.response.send_message("You must carry that canonical item to form a bond.",ephemeral=False);return
-    rem=await DB.cooldown_remaining(interaction.user.id,f"artifact_bond:{item}")
-    if rem:
-        await interaction.response.send_message(f"Artifact resonance is still settling. Try again in **{human_duration(rem)}**.",ephemeral=False);return
-    row=await DB.bond_artifact(interaction.user.id,item)
-    wt=await current_world_time()
-    if not await DB.get_item_provenance(interaction.user.id,item):
-        await DB.record_item_provenance(interaction.user.id,item,source_type="bonded_inventory",source_key=str(c.get('location','')),ownership_mark=c['name'],game_minute=wt.total_minutes)
-    await DB.set_cooldown(interaction.user.id,f"artifact_bond:{item}",30*60)
-    await interaction.response.send_message(f"🗡️ **{WORLD.item_name(item)}** answers your spiritual imprint. Bond **{row['bond_level']}/10**, resonance **{row['resonance']}%**.",ephemeral=False)
+    if not await require_character(interaction):
+        return
+    try:
+        envelope = await ENGINE.authoritative_action(
+            "artifact.bond",
+            interaction.user.id,
+            {"item_id": item},
+            action_id=f"discord:{interaction.id}:artifact.bond",
+        )
+    except GameEngineError as exc:
+        await interaction.response.send_message(str(exc), ephemeral=False)
+        return
 
+    resolved = dict(envelope.get("result") or {})
+    row = dict(resolved.get("artifact") or {})
+    art_progress = dict(resolved.get("profession_progress") or {})
+    await interaction.response.send_message(
+        f"🗡️ Bond with **{WORLD.item_name(item)}** deepens to **{row['bond_level']}**. "
+        f"Resonance **{row['resonance']}%**.\n"
+        f"🔨 Artifact Refining: **{profession_rank(int(art_progress.get('level', 0)))}** "
+        f"Lv.{int(art_progress.get('level', 0))}.",
+        ephemeral=False,
+    )
 
 @registered_group_command(artifact_group, name="awaken", description="Awaken a sufficiently bonded artifact spirit")
 @serialized_user_action
 async def artifact_awaken(interaction: discord.Interaction, item: str, spirit_name: str) -> None:
     c=await require_character(interaction)
     if not c:return
-    row=await DB.awaken_artifact(interaction.user.id,item,spirit_name)
-    if not row:
-        await interaction.response.send_message("The artifact is not ready. It needs at least **Bond 3** and **25% resonance**.",ephemeral=False);return
-    await interaction.response.send_message(f"✨ **{WORLD.item_name(item)} awakens.** Its spirit answers to **{row['spirit_name']}** at **{row['resonance']}% resonance**. Awakened artifacts contribute to battle checks.",ephemeral=False)
+    try:
+        envelope=await ENGINE.authoritative_action("artifact.awaken",interaction.user.id,{"item_id":item,"spirit_name":spirit_name},action_id=f"discord:{interaction.id}:artifact.awaken")
+    except GameEngineError as exc:
+        await interaction.response.send_message(str(exc),ephemeral=False);return
+    resolved=dict(envelope.get("result") or {});row=dict(resolved.get("artifact") or {});art_progress=dict(resolved.get("profession_progress") or {})
+    await interaction.response.send_message(f"✨ **{WORLD.item_name(item)} awakens.** Its spirit answers to **{row['spirit_name']}** at **{row['resonance']}% resonance**. Awakened artifacts contribute to battle checks.\n🔮 Artifact Refining: **{profession_rank(int(art_progress.get('level',0)))}** Lv.{int(art_progress.get('level',0))}.",ephemeral=False)
 
 
 @registered_group_command(territory_group, name="status", description="Inspect persistent control and resource state at your location")
@@ -8993,25 +8512,17 @@ async def territory_status(interaction: discord.Interaction) -> None:
 async def territory_claim(interaction: discord.Interaction) -> None:
     c=await require_character(interaction)
     if not c:return
-    membership=await DB.get_sect_membership(interaction.user.id)
-    if not membership:
-        await interaction.response.send_message("Only a cultivator with canonical sect membership can make a sect territory claim.",ephemeral=False);return
-    if int(c.get('realm_index',0)) < 2:
-        await interaction.response.send_message("Your cultivation is too low to make a claim that local powers recognize.",ephemeral=False);return
     rows=await DB.get_territories(str(c.get('location')))
     if not rows:
         await interaction.response.send_message("No claimable territory node exists here.",ephemeral=False);return
-    t=rows[0]; sect=str(membership['sect_name']); wt=await current_world_time()
-    if not t.get('controller_key'):
-        await DB.claim_territory(str(t['territory_key']),controller_type='sect',controller_key=sect,game_minute=wt.total_minutes)
-        await interaction.response.send_message(f"🏯 **{sect}** establishes a recognized claim over **{t['name']}**. The transfer raises local unrest.");return
-    if str(t.get('controller_key'))==sect:
-        await interaction.response.send_message("Your sect already controls this territory.",ephemeral=False);return
-    active=[w for w in await DB.get_territory_wars() if str(w.get('territory_key'))==str(t['territory_key'])]
-    if active:
-        await interaction.response.send_message(f"⚔️ A territorial war for **{t['name']}** is already active (`#{active[0]['war_id']}`).",ephemeral=False);return
-    wid=await DB.start_territory_war(attacker_key=sect,defender_key=str(t['controller_key']),territory_key=str(t['territory_key']),game_minute=wt.total_minutes)
-    await interaction.response.send_message(f"⚔️ **Territorial War #{wid}** begins: **{sect}** challenges **{t['controller_key']}** for **{t['name']}**. The conflict is persistent world state.")
+    t=rows[0]; wt=await current_world_time()
+    try:
+        e=await ENGINE.authoritative_action("territory.claim",interaction.user.id,{"territory_key":str(t['territory_key'])},action_id=f"discord:{interaction.id}:territory.claim"); r=dict(e.get('result') or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
+    if r.get('war_id'): text=f"⚔️ **Territorial War #{r['war_id']}** begins for **{t['name']}**."
+    else: text=f"🏯 **{r.get('sect_name','Your sect')}** establishes a recognized claim over **{t['name']}**."
+    await interaction.response.send_message(text,ephemeral=False)
 
 
 @registered_group_command(war_group, name="status", description="View siege, armies, morale and occupation state for territorial wars")
@@ -9033,41 +8544,16 @@ async def war_status(interaction: discord.Interaction) -> None:
 @app_commands.choices(tactic=[app_commands.Choice(name=x.title(),value=x) for x in ("assault","siege","sabotage","fortify","repel")])
 @serialized_user_action
 async def war_act(interaction: discord.Interaction, war_id: int, tactic: app_commands.Choice[str]) -> None:
-    c=await require_character(interaction)
-    if not c:return
-    membership=await DB.get_sect_membership(interaction.user.id)
-    if not membership:
-        await interaction.response.send_message("Only a member of one of the belligerent sects can contribute to a formal territorial war.",ephemeral=False);return
-    wars=await DB.get_territory_wars()
-    war=next((x for x in wars if int(x['war_id'])==int(war_id)),None)
-    if not war:
-        await interaction.response.send_message("That war is no longer active.",ephemeral=False);return
-    sect=str(membership['sect_name'])
-    side='attacker' if sect==str(war['attacker_key']) else ('defender' if sect==str(war['defender_key']) else '')
-    if not side:
-        await interaction.response.send_message("Your sect is not a belligerent in that war.",ephemeral=False);return
-    rem=await DB.cooldown_remaining(interaction.user.id,f"war_action:{war_id}")
-    if rem:
-        await interaction.response.send_message(f"Your war contribution is still being consolidated. Try again in **{human_duration(rem)}**.",ephemeral=False);return
-    equip=await DB.equipment_bonus(interaction.user.id)
-    attrs=c.get('attributes',{})
-    power=max(5,int(c.get('realm_index',0))*8+int(c.get('phase',1))+max(int(attrs.get('body',0)),int(attrs.get('spirit',0)))+int(equip.get('attack',0))+int(equip.get('defense',0)))
-    manor_defense_bonus = 0
-    if side == 'defender' and tactic.value in {'fortify','repel'}:
-        manor = await DB.get_sect_manor(sect)
-        if manor and str(manor.get('base_location','')) == str(war.get('territory_key','')):
-            manor_defense_bonus = manor_defense_power_bonus(manor)
-            power += manor_defense_bonus
-    wt=await current_world_time(); updated=await DB.territory_war_action(war_id,interaction.user.id,side=side,tactic=tactic.value,power=power,game_minute=wt.total_minutes)
-    await DB.set_cooldown(interaction.user.id,f"war_action:{war_id}",30*60)
-    if not updated:
-        await interaction.response.send_message("The war resolved before your contribution landed.",ephemeral=False);return
-    op=updated.get('operations') or {}
-    result=f"⚔️ **War #{war_id} — {tactic.name}**\nSiege **{op.get('siege_progress',0)}%** • morale A/D **{op.get('attacker_morale',100)}/{op.get('defender_morale',100)}** • forces A/D **{op.get('attacker_force',0)}/{op.get('defender_force',0)}**"
-    if manor_defense_bonus:
-        result += f"\n🏯 Sect-manor Defensive Grand Array added **+{manor_defense_bonus}** war power."
-    if updated.get('status')!='active': result+=f"\n🏯 War resolved: **{op.get('winner_key','unknown')}** • {op.get('resolution','resolved')}."
-    await interaction.response.send_message(result)
+    if not await require_character(interaction):return
+    wt=await current_world_time()
+    try:
+        e=await ENGINE.authoritative_action("war.act",interaction.user.id,{"war_id":int(war_id),"tactic":tactic.value},action_id=f"discord:{interaction.id}:war.act"); r=dict(e.get('result') or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
+    op=dict(r.get('operations') or r)
+    text=f"⚔️ **War #{war_id} — {tactic.name}**\nSiege **{op.get('siege_progress',0)}%** • morale A/D **{op.get('attacker_morale',100)}/{op.get('defender_morale',100)}** • forces A/D **{op.get('attacker_force',0)}/{op.get('defender_force',0)}**"
+    if r.get('status') and r.get('status')!='active': text+=f"\n🏯 War resolved: **{op.get('winner_key','unknown')}**."
+    await interaction.response.send_message(text,ephemeral=False)
 
 
 @registered_group_command(caravan_group, name="dispatch", description="Send goods with optional escorts, smuggling and destination tax exposure")
@@ -9076,39 +8562,27 @@ async def war_act(interaction: discord.Interaction, war_id: int, tactic: app_com
 async def caravan_dispatch(interaction: discord.Interaction, destination: str, item: str, quantity: app_commands.Range[int,1,50]=1, escort: app_commands.Range[int,0,20]=0, smuggle: bool=False) -> None:
     c=await require_character(interaction)
     if not c:return
-    if not await DB.get_location_definition(destination) or destination==str(c.get('location')):
-        await interaction.response.send_message("Choose a different canonical destination.",ephemeral=False);return
-    inv=await DB.get_inventory(interaction.user.id); qty=int(quantity)
-    if int(inv.get(item,0))<qty or item not in WORLD.items:
-        await interaction.response.send_message("You do not carry that quantity of the canonical item.",ephemeral=False);return
-    currency=_tribulation_currency(WORLD.realm_world(int(c.get('realm_index',0))))
-    escort_cost=int(escort)*3
-    if escort_cost:
-        try: await DB.spend_currency(interaction.user.id,currency,escort_cost)
-        except ValueError:
-            await interaction.response.send_message(f"Hiring escort strength {int(escort)} costs **{escort_cost} {WORLD.currency_name(currency)}**.",ephemeral=False);return
-    if not await DB.consume_item(interaction.user.id,item,qty):
-        if escort_cost: await DB.add_currency(interaction.user.id,currency,escort_cost)
-        await interaction.response.send_message("Those goods are no longer available; escort payment was returned.",ephemeral=False);return
-    wt=await current_world_time(); base=max(5,int(WORLD.items.get(item,{}).get('base_price',WORLD.items.get(item,{}).get('sect_value',10))))
-    risk=min(85,20+max(0,int(c.get('realm_index',0))))
-    payout=max(1,int(base*qty*(1.35 if smuggle else 1.15)))
-    concealment=max(0,int(c.get('attributes',{}).get('agility',0))//2 + int(c.get('concealment_bonus',0)))
+    wt=await current_world_time()
     try:
-        cid=await DB.create_caravan(owner_type='player',owner_key=str(interaction.user.id),origin=str(c.get('location')),destination=destination,cargo={item:qty,'_payout':payout,'_currency':currency},risk=risk,depart_game_minute=wt.total_minutes,arrive_game_minute=wt.total_minutes+MINUTES_PER_DAY,escort_strength=int(escort),concealment=concealment,smuggling=smuggle,tax_rate=8)
-    except Exception:
-        await DB.add_items(interaction.user.id,{item:qty})
-        if escort_cost: await DB.add_currency(interaction.user.id,currency,escort_cost)
-        raise
-    await DB.record_item_provenance(interaction.user.id,item,quantity=qty,source_type='caravan_dispatch',source_key=f"caravan:{cid}",legal_status='smuggled_in_transit' if smuggle else 'in_transit',tracking_strength=20 if smuggle else 5,game_minute=wt.total_minutes)
-    await interaction.response.send_message(f"🐫 **Caravan #{cid}** departs for **{destination}** with **{WORLD.item_name(item)} x{qty}**. Escort **{int(escort)}** • concealment **{concealment}** • {'smuggling/no declared tax' if smuggle else 'declared cargo/8% destination tax'} • base route risk **{risk}%** • expected gross **{payout} {WORLD.currency_name(currency)}**.")
+        e=await ENGINE.authoritative_action("caravan.dispatch",interaction.user.id,{"destination":destination,"item_id":item,"quantity":int(quantity),"escort":int(escort),"smuggle":bool(smuggle)},action_id=f"discord:{interaction.id}:caravan.dispatch"); r=dict(e.get('result') or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
+    await interaction.response.send_message(f"🐫 Caravan **#{r.get('caravan_id')}** dispatched to **{destination}** carrying **{WORLD.item_name(item)} x{quantity}**.",ephemeral=False)
 
 
 @registered_group_command(caravan_group, name="status", description="Settle due caravans and inspect escorts, interception, smuggling, tax and losses")
 async def caravan_status(interaction: discord.Interaction) -> None:
     c=await require_character(interaction)
     if not c:return
-    wt=await current_world_time(); arrived=await DB.settle_player_caravans(interaction.user.id,wt.total_minutes)
+    wt=await current_world_time()
+    try:
+        envelope=await ENGINE.authoritative_action(
+            "caravan.settle", interaction.user.id, {},
+            action_id=f"discord:{interaction.id}:caravan.settle",
+        )
+        arrived=list(dict(envelope.get("result") or {}).get("resolved") or [])
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
     rows=[x for x in await DB.get_caravans() if x.get('owner_type')=='player' and str(x.get('owner_key'))==str(interaction.user.id)]
     if not rows:
         await interaction.response.send_message("🐫 You have not dispatched a caravan.",ephemeral=False);return
@@ -9139,25 +8613,27 @@ async def caravan_events(interaction: discord.Interaction, caravan_id: int) -> N
 @registered_group_command(party_group, name="create", description="Create a voluntary cultivation party")
 @serialized_user_action
 async def party_create(interaction: discord.Interaction, name: str) -> None:
-    c=await require_character(interaction)
-    if not c:return
-    try: pid=await DB.create_party(interaction.user.id,name)
-    except ValueError as exc:
-        await interaction.response.send_message(str(exc),ephemeral=False);return
-    await interaction.response.send_message(f"👥 Party **{name[:80]}** created as `#{pid}`. Other players may join voluntarily with **/combat → Party → Join**.")
+    if not await require_character(interaction): return
+    wt=await current_world_time()
+    try:
+        envelope=await ENGINE.authoritative_action("party.create",interaction.user.id,{"name":name},action_id=f"discord:{interaction.id}:party.create")
+        result=dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
+    await interaction.response.send_message(f"👥 Party **{result.get('name',name)}** created.",ephemeral=False)
 
 
 @registered_group_command(party_group, name="join", description="Join another cultivator's active party voluntarily")
 @serialized_user_action
 async def party_join(interaction: discord.Interaction, leader: discord.Member) -> None:
-    c=await require_character(interaction)
-    if not c:return
-    party=await DB.get_party(leader.id)
-    if not party or int(party['leader_user_id'])!=leader.id:
-        await interaction.response.send_message("That cultivator is not leading an active party.",ephemeral=False);return
-    if not await DB.join_party(interaction.user.id,int(party['party_id'])):
-        await interaction.response.send_message("You are already in a party or that party closed.",ephemeral=False);return
-    await interaction.response.send_message(f"👥 You join **{party['name']}** (`#{party['party_id']}`).")
+    if not await require_character(interaction):return
+    target=await DB.get_party(leader.id)
+    if not target:
+        await interaction.response.send_message("That cultivator does not lead an active party.",ephemeral=False);return
+    try: await ENGINE.authoritative_action("party.join",interaction.user.id,{"party_id":int(target['party_id'])},action_id=f"discord:{interaction.id}:party.join")
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
+    await interaction.response.send_message(f"👥 You joined {leader.mention}'s party.",ephemeral=False)
 
 
 @registered_group_command(party_group, name="status", description="View your active cultivation party")
@@ -9174,13 +8650,14 @@ async def party_status(interaction: discord.Interaction) -> None:
 @registered_group_command(party_group, name="leave", description="Leave your current cultivation party")
 @serialized_user_action
 async def party_leave(interaction: discord.Interaction) -> None:
-    c=await require_character(interaction)
-    if not c:return
-    if await DB.get_boss_encounter(user_id=interaction.user.id):
-        await interaction.response.send_message("You cannot leave or restructure the party while a persistent boss encounter is active.",ephemeral=False);return
-    if not await DB.leave_party(interaction.user.id):
-        await interaction.response.send_message("You are not in an active party.",ephemeral=False);return
-    await interaction.response.send_message("👥 You leave the party. Leadership transfers automatically if needed.",ephemeral=False)
+    if not await require_character(interaction): return
+    wt=await current_world_time()
+    try:
+        envelope=await ENGINE.authoritative_action("party.leave",interaction.user.id,{},action_id=f"discord:{interaction.id}:party.leave")
+        result=dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
+    await interaction.response.send_message("👋 You left your active party.",ephemeral=False)
 
 
 @registered_group_command(duel_group, name="challenge", description="Offer a nonlethal PvP duel; combat cannot start without acceptance")
@@ -9195,9 +8672,11 @@ async def duel_challenge(interaction: discord.Interaction, member: discord.Membe
         await interaction.response.send_message("Consent PvP requires both cultivators to be mechanically present at the same location.",ephemeral=False);return
     if WORLD.location_safe_zone(str(c.get('location'))):
         await interaction.response.send_message("Local formations suppress PvP here.",ephemeral=False);return
-    try: cid=await DB.create_pvp_challenge(interaction.user.id,member.id,stakes=stakes)
-    except ValueError as exc:
+    try:
+        envelope=await ENGINE.authoritative_action("pvp.challenge",interaction.user.id,{"target_user_id":member.id,"stakes":stakes,"ttl_seconds":300},action_id=f"discord:{interaction.id}:pvp.challenge")
+    except GameEngineError as exc:
         await interaction.response.send_message(str(exc),ephemeral=False);return
+    result=dict(envelope.get("result") or {});cid=int(result.get("challenge_id",0))
     await interaction.response.send_message(f"⚔️ <@{member.id}> receives consent duel challenge `#{cid}` from <@{interaction.user.id}>. Stakes: **{stakes[:200]}**. It expires in **5 minutes**; use **/combat → Duels → Respond**.")
 
 
@@ -9207,9 +8686,11 @@ async def duel_challenge(interaction: discord.Interaction, member: discord.Membe
 async def duel_respond(interaction: discord.Interaction, challenge_id: int, decision: app_commands.Choice[str]) -> None:
     c=await require_character(interaction)
     if not c:return
-    result=await DB.respond_pvp_challenge(challenge_id,interaction.user.id,decision.value=='accept')
-    if not result:
-        await interaction.response.send_message("That pending challenge is missing, expired or not addressed to you.",ephemeral=False);return
+    try:
+        envelope=await ENGINE.authoritative_action("pvp.respond",interaction.user.id,{"challenge_id":int(challenge_id),"accept":decision.value=='accept'},action_id=f"discord:{interaction.id}:pvp.respond")
+    except GameEngineError as exc:
+        await interaction.response.send_message(str(exc),ephemeral=False);return
+    result=dict(envelope.get("result") or {})
     if decision.value=='accept':
         await interaction.response.send_message(f"⚔️ Duel accepted. Nonlethal PvP match **#{result['match_id']}** begins; challenger acts first. Use **/combat → Duels → Act**.")
     else:
@@ -9244,20 +8725,22 @@ async def duel_act(interaction: discord.Interaction, style: app_commands.Choice[
     opponent=await DB.get_character(opponent_id)
     if not opponent:
         await interaction.response.send_message("Opponent state is unavailable.",ephemeral=False);return
+    try:
+        envelope=await ENGINE.authoritative_action(
+            "pvp.act",interaction.user.id,
+            {"match_id":int(match['match_id']),"style":style.value,"match_version":int(match['version'])},
+            action_id=f"discord:{interaction.id}:pvp.act",
+        )
+    except GameEngineError as exc:
+        await interaction.response.send_message(str(exc),ephemeral=False);return
+    resolved=dict(envelope.get("result") or {});updated=dict(resolved.get("match") or {})
     if style.value=='surrender':
-        updated=await DB.apply_pvp_turn(int(match['match_id']),interaction.user.id,surrender=True,expected_version=int(match['version']))
-        await interaction.response.send_message(f"🏳️ You surrender duel **#{match['match_id']}**. <@{opponent_id}> wins; no true-death or injury roll occurs.");return
+        await interaction.response.send_message(f"🏳️ You surrender duel **#{match['match_id']}**. <@{opponent_id}> wins; no true-death or injury roll occurs. Martial Society reputation records the honorable result.");return
     if style.value=='defend':
-        updated=await DB.apply_pvp_turn(int(match['match_id']),interaction.user.id,guard=True,expected_version=int(match['version']))
         await interaction.response.send_message(f"🛡️ You take a guarded stance. Turn passes to <@{opponent_id}>.");return
-    attack_mod=max(int(c['attributes'].get('body',0)),int(c['attributes'].get('spirit',0)))+int(c.get('realm_index',0))*2+int(c.get('phase',1))//3
-    defense_tn=10+max(int(opponent['attributes'].get('agility',0)),int(opponent['attributes'].get('body',0)))+int(opponent.get('realm_index',0))*2+int(opponent.get('phase',1))//3
-    roll=roll_2d10(attack_mod,defense_tn); damage=max(0,2+max(0,roll.margin)//3+max(0,int(c.get('realm_index',0))-int(opponent.get('realm_index',0)))) if roll.success else 0
-    updated=await DB.apply_pvp_turn(int(match['match_id']),interaction.user.id,damage=damage,expected_version=int(match['version']))
-    if not updated:
-        await interaction.response.send_message("The duel ended before that action resolved.",ephemeral=False);return
-    finished=str(updated.get('status'))!='active'; result=f"\n💥 Damage **{damage}**." if damage else "\nThe attack fails to land cleanly."
-    if finished: result+=f"\n🏆 <@{updated['winner_user_id']}> wins the **nonlethal** duel."
+    roll=SimpleNamespace(**resolved);damage=int(resolved.get('damage',0));finished=bool(resolved.get('finished'));result=f"\n💥 Damage **{damage}**." if damage else "\nThe attack fails to land cleanly."
+    if finished:
+        winner_id=int(resolved.get('winner_user_id',0));result+=f"\n🏆 <@{winner_id}> wins the **nonlethal** duel. Martial Society reputation records the result."
     await interaction.response.send_message(f"⚔️ **Duel #{match['match_id']}**\n{roll_line(roll)}{result}")
 
 
@@ -9285,7 +8768,7 @@ async def provenance_command(interaction: discord.Interaction, item: str) -> Non
 async def era_command(interaction: discord.Interaction) -> None:
     c=await require_character(interaction)
     if not c:return
-    wt=await current_world_time(); era=await DB.advance_world_era(wt.total_minutes)
+    wt=await current_world_time(); era=await DB.get_current_era()
     if not era:
         await interaction.response.send_message("No active world era is recorded.",ephemeral=False);return
     mods=", ".join(f"{k}={v}" for k,v in (era.get('modifiers') or {}).items()) or "baseline laws"
@@ -9323,24 +8806,14 @@ ABODE_FACILITIES=[
 @app_commands.choices(property_type=PLAYER_PROPERTY_TYPE_CHOICES)
 @serialized_user_action
 async def abode_establish(interaction:discord.Interaction,name:str,property_type:app_commands.Choice[str])->None:
-    c=await require_character(interaction)
-    if not c:return
-    if str(c['location']).startswith(('abode:','sect_abode:','personal_world:')) or WORLD.auction_house_at(c['location']):
-        await interaction.response.send_message("Choose a normal outdoor/city location as the foundation of your property.",ephemeral=False);return
-    definition=player_property_definition(property_type.value)
-    defaults={str(k):int(v) for k,v in dict(definition.get('defaults') or {}).items() if str(k) in PLAYER_PROPERTY_FACILITY_KEYS}
+    if not await require_character(interaction): return
+    wt=await current_world_time()
     try:
-        a=await DB.establish_abode(
-            interaction.user.id,name,c['location'],property_type=property_type.value,facility_levels=defaults,
-        )
-    except ValueError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
-    thread=await ensure_abode_thread(interaction,a)
-    thread_text=f"\nPrivate location thread: {thread.mention}" if thread else "\n⚠️ No private property thread was created; run **/admin → Server → Setup Server** and grant Create Private Threads / Send in Threads."
-    await interaction.response.send_message(
-        f"{player_property_emoji(a)} **{a['name']}** established as a **{player_property_label(a)}** near **{a['base_location']}**. "
-        f"Use **/abode → Enter** to make it your active private scene.{thread_text}"
-    )
+        envelope=await ENGINE.authoritative_action("abode.establish",interaction.user.id,{"name":name,"property_type":property_type.value},action_id=f"discord:{interaction.id}:abode.establish")
+        result=dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
+    await interaction.response.send_message(f"🏡 **{result.get('name',name)}** established.",ephemeral=False)
 
 
 @registered_group_command(abode_group, name="status",description="Inspect your player-owned property, facilities and guest access")
@@ -9381,113 +8854,65 @@ async def abode_thread_command(interaction:discord.Interaction)->None:
 @registered_group_command(abode_group, name="enter",description="Enter your player-owned property from its physical entrance location")
 @serialized_user_action
 async def abode_enter(interaction:discord.Interaction)->None:
-    c=await require_character(interaction)
-    if not c:return
-    a=await DB.get_abode(interaction.user.id)
-    if not a:
-        await interaction.response.send_message("You do not own a player property.",ephemeral=False);return
-    if c['location']!=a['base_location']:
-        await interaction.response.send_message(f"Travel to **{a['base_location']}** first.",ephemeral=False);return
-    await DB.set_location(interaction.user.id,a['location_key'])
-    thread=await ensure_abode_thread(interaction,a)
-    if thread:
-        try: await thread.send(f"{player_property_emoji(a)} **{c['name']}** enters **{a['name']}**. This private thread is now the active location scene.")
-        except discord.HTTPException: pass
-    await interaction.response.send_message(
-        f"{player_property_emoji(a)} You enter **{a['name']}**. This **{player_property_label(a)}** is now your active scene."
-        + (f" Continue in {thread.mention}." if thread else ""),ephemeral=False,
-    )
+    if not await require_character(interaction): return
+    wt=await current_world_time()
+    try:
+        envelope=await ENGINE.authoritative_action("abode.enter",interaction.user.id,{},action_id=f"discord:{interaction.id}:abode.enter")
+        result=dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
+    await interaction.response.send_message(f"🏡 You enter **{result.get('name','your property')}**.",ephemeral=False)
 
 
 @registered_group_command(abode_group, name="visit",description="Enter another player's property if they invited you and you reached its entrance")
 @serialized_user_action
 async def abode_visit(interaction:discord.Interaction,owner:discord.Member)->None:
-    c=await require_character(interaction)
-    if not c:return
-    a=await DB.get_abode(owner.id)
-    if not a:
-        await interaction.response.send_message("That cultivator has no player-owned property.",ephemeral=False);return
-    if c['location']!=a['base_location']:
-        await interaction.response.send_message(f"Travel to **{a['base_location']}** first.",ephemeral=False);return
-    if not await DB.can_access_abode(owner.id,interaction.user.id):
-        await interaction.response.send_message("You have not been invited to that property.",ephemeral=False);return
-    thread=None
-    if a.get('thread_id') and interaction.guild:
-        thread=await _get_thread(interaction.guild,int(a['thread_id']))
-        if thread:
-            try: await thread.add_user(interaction.user)
-            except (discord.Forbidden,discord.HTTPException): pass
-    await DB.set_location(interaction.user.id,a['location_key'])
-    if thread:
-        try: await thread.send(f"🚪 **{c['name']}** arrives at **{a['name']}** as an invited guest.")
-        except discord.HTTPException: pass
-    await interaction.response.send_message(
-        f"{player_property_emoji(a)} You enter **{a['name']}**, with {owner.display_name}'s permission."
-        + (f" Continue in {thread.mention}." if thread else ""),ephemeral=False,
-    )
+    if not await require_character(interaction): return
+    wt=await current_world_time()
+    try:
+        envelope=await ENGINE.authoritative_action("abode.visit",interaction.user.id,{"owner_user_id":owner.id},action_id=f"discord:{interaction.id}:abode.visit")
+        result=dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
+    await interaction.response.send_message(f"🏡 You visit **{result.get('name','the property')}**.",ephemeral=False)
 
 
 @registered_group_command(abode_group, name="leave",description="Leave the current player-owned property and return to its entrance")
 @serialized_user_action
 async def abode_leave(interaction:discord.Interaction)->None:
-    c=await require_character(interaction)
-    if not c:return
-    a=await DB.get_abode_by_location(c['location'])
-    if not a:
-        await interaction.response.send_message("You are not inside a player-owned property.",ephemeral=False);return
-    thread=None
-    if a.get('thread_id') and interaction.guild:
-        thread=await _get_thread(interaction.guild,int(a['thread_id']))
-        if thread:
-            try: await thread.send(f"🚪 **{c['name']}** leaves **{a['name']}** and returns to **{a['base_location']}**.")
-            except discord.HTTPException: pass
-    await DB.set_location(interaction.user.id,a['base_location'])
-    if int(a['user_id'])!=interaction.user.id and thread:
-        try: await thread.remove_user(interaction.user)
-        except (discord.Forbidden,discord.HTTPException): pass
-    await interaction.response.send_message(f"You leave **{a['name']}** and return to **{a['base_location']}**.",ephemeral=False)
+    if not await require_character(interaction): return
+    wt=await current_world_time()
+    try:
+        envelope=await ENGINE.authoritative_action("abode.leave",interaction.user.id,{},action_id=f"discord:{interaction.id}:abode.leave")
+        result=dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
+    await interaction.response.send_message(f"🚪 You leave the property for **{result.get('outside','outside')}**.",ephemeral=False)
 
 
 @registered_group_command(abode_group, name="invite",description="Invite another cultivator to your player-owned property")
 async def abode_invite(interaction:discord.Interaction,member:discord.Member)->None:
-    c=await require_character(interaction)
-    if not c:return
-    a=await DB.get_abode(interaction.user.id)
-    if not a:
-        await interaction.response.send_message("You do not own a player property.",ephemeral=False);return
-    if member.id==interaction.user.id:
-        await interaction.response.send_message("You already own this property.",ephemeral=False);return
-    if not await DB.get_character(member.id):
-        await interaction.response.send_message("That member has no cultivation character.",ephemeral=False);return
-    await DB.grant_abode_access(interaction.user.id,member.id)
-    await interaction.response.send_message(
-        f"{player_property_emoji(a)} {member.mention} is invited to **{a['name']}**. "
-        f"They must physically travel to **{a['base_location']}** and use **/abode → Visit** before the private thread becomes visible to them."
-    )
+    if not await require_character(interaction): return
+    wt=await current_world_time()
+    try:
+        envelope=await ENGINE.authoritative_action("abode.invite",interaction.user.id,{"guest_user_id":member.id},action_id=f"discord:{interaction.id}:abode.invite")
+        result=dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
+    await interaction.response.send_message(f"🔑 {member.mention} may now enter your property.",ephemeral=False)
 
 
 @registered_group_command(abode_group, name="revoke",description="Revoke a guest's access to your player-owned property")
 @serialized_user_action
 async def abode_revoke(interaction:discord.Interaction,member:discord.Member)->None:
-    c=await require_character(interaction)
-    if not c:return
-    a=await DB.get_abode(interaction.user.id)
-    if not a:
-        await interaction.response.send_message("You do not own a player property.",ephemeral=False);return
-    await DB.revoke_abode_access(interaction.user.id,member.id)
-    guest=await DB.get_character(member.id)
-    evicted=False
-    if guest and str(guest.get('location') or '')==str(a['location_key']):
-        await DB.set_location(member.id,a['base_location']); evicted=True
-    if a.get('thread_id') and interaction.guild:
-        thread=await _get_thread(interaction.guild,int(a['thread_id']))
-        if thread:
-            try: await thread.remove_user(member)
-            except (discord.Forbidden,discord.HTTPException): pass
-    await interaction.response.send_message(
-        f"🔒 {member.mention}'s access to **{a['name']}** was revoked."
-        + (f" They were returned to **{a['base_location']}**." if evicted else ""),ephemeral=False,
-    )
+    if not await require_character(interaction): return
+    wt=await current_world_time()
+    try:
+        envelope=await ENGINE.authoritative_action("abode.revoke",interaction.user.id,{"guest_user_id":member.id},action_id=f"discord:{interaction.id}:abode.revoke")
+        result=dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
+    await interaction.response.send_message(f"🔒 Property access revoked for {member.mention}.",ephemeral=False)
 
 
 @registered_group_command(abode_group, name="guests",description="List cultivators currently invited to your player-owned property")
@@ -9510,45 +8935,28 @@ async def abode_guests(interaction:discord.Interaction)->None:
 @app_commands.choices(facility=ABODE_FACILITIES)
 @serialized_user_action
 async def abode_upgrade(interaction:discord.Interaction,facility:app_commands.Choice[str])->None:
-    c=await require_character(interaction)
-    if not c:return
-    a=await DB.get_abode(interaction.user.id)
-    if not a:
-        await interaction.response.send_message("You do not own a player property.",ephemeral=False);return
-    col=f"{facility.value}_level"; current=int(a.get(col,0)); maxlvl=int(WORLD.abode_system.get('max_level',9))
-    if current>=maxlvl:
-        await interaction.response.send_message("That facility is already at maximum level.",ephemeral=False);return
-    cost=int(WORLD.abode_system.get('upgrade_base_cost',100))*(current+1)*(current+1); currency=str(WORLD.abode_system.get('currency','low_spirit_stone'))
-    try: balance=await DB.spend_currency(interaction.user.id,currency,cost)
-    except ValueError:
-        await interaction.response.send_message(f"You need **{cost:,} {WORLD.currency_name(currency)}**.",ephemeral=False);return
-    a=await DB.upgrade_abode_facility(interaction.user.id,facility.value)
-    await interaction.response.send_message(
-        f"{player_property_emoji(a)} **{facility.name}** upgraded to level **{a[col]}**. "
-        f"Remaining: **{balance:,} {WORLD.currency_name(currency)}**."
-    )
+    if not await require_character(interaction): return
+    wt=await current_world_time()
+    try:
+        envelope=await ENGINE.authoritative_action("abode.upgrade",interaction.user.id,{"facility":facility.value},action_id=f"discord:{interaction.id}:abode.upgrade")
+        result=dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
+    await interaction.response.send_message(f"🏡 **{facility.value}** upgraded to level **{result.get('level','?')}**.",ephemeral=False)
 
 
 @registered_group_command(abode_group, name="focus",description="Use a developed property facility for a temporary specialization effect or scene benefit")
 @app_commands.choices(facility=ABODE_FACILITIES)
 @serialized_user_action
 async def abode_focus(interaction:discord.Interaction,facility:app_commands.Choice[str])->None:
-    c=await require_character(interaction)
-    if not c:return
-    a=await DB.get_abode_by_location(c['location'])
-    if not a or not await DB.can_access_abode(int(a['user_id']),interaction.user.id):
-        await interaction.response.send_message("You must be inside a player-owned property you are allowed to use.",ephemeral=False);return
-    lvl=int(a.get(f"{facility.value}_level",0))
-    if lvl<=0:
-        await interaction.response.send_message("That facility has not been built yet.",ephemeral=False);return
-    effect_id={'cultivation':'abode_cultivation_focus','alchemy':'alchemy_inspiration','forge':'forge_inspiration'}.get(facility.value)
-    if not effect_id:
-        await interaction.response.send_message(
-            f"You spend time using the **{facility.name}** at level **{lvl}**. "
-            "Its developed facilities are now part of the canonical private scene and can support relevant RP/actions."
-        );return
-    effect=WORLD.special_effect(effect_id) or {}; payload=normalize_effect_payload({'effect_key':effect_id,'special':True,**effect}); wt=await current_world_time(); await DB.apply_effect(interaction.user.id,effect_key=effect_id,name=str(effect.get('name',facility.name)),source_type='abode',source_id=str(a['user_id']),effect=payload,starts_game_minute=wt.total_minutes,duration_game_minutes=240)
-    await interaction.response.send_message(f"✨ **{effect.get('name',facility.name)}** applied for 240 game minutes.")
+    if not await require_character(interaction): return
+    wt=await current_world_time()
+    try:
+        envelope=await ENGINE.authoritative_action("abode.focus",interaction.user.id,{"facility":facility.value},action_id=f"discord:{interaction.id}:abode.focus")
+        result=dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
+    await interaction.response.send_message(f"🏡 You focus within the **{facility.value}** facility.",ephemeral=False)
 
 # ---------- Teleportation arrays / spatial keys ----------
 array_group=app_commands.Group(name="array",description="Use public teleportation formations")
@@ -9574,32 +8982,25 @@ async def array_destination_autocomplete(interaction:discord.Interaction,current
 @app_commands.autocomplete(array=array_destination_autocomplete)
 @serialized_user_action
 async def array_use(interaction:discord.Interaction,array:str)->None:
-    c=await require_character(interaction)
-    if not c:return
-    d=WORLD.teleport_arrays.get(array)
-    if not d or d.get('from')!=c['location']: await interaction.response.send_message("That array is not available here.",ephemeral=False);return
-    if int(c['realm_index'])<int(d.get('min_realm_index',0)): await interaction.response.send_message(f"Your realm cannot withstand this transit. Required: **{WORLD.realm_name(int(d.get('min_realm_index',0)))}**.",ephemeral=False);return
-    try: await DB.spend_currency(interaction.user.id,str(d['currency']),int(d['cost']))
-    except ValueError: await interaction.response.send_message("You cannot pay the array activation cost.",ephemeral=False);return
-    await DB.set_location(interaction.user.id,str(d['to']));await interaction.response.send_message(f"🌀 The formation ignites and folds the route beneath you. You arrive at **{d['to']}**.")
+    if not await require_character(interaction):return
+    wt=await current_world_time()
+    try:
+        e=await ENGINE.authoritative_action("array.use",interaction.user.id,{"array_id":array},action_id=f"discord:{interaction.id}:array.use"); r=dict(e.get('result') or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
+    await interaction.response.send_message(f"🌀 The formation ignites and folds the route beneath you. You arrive at **{r.get('location',r.get('destination','your destination'))}**.",ephemeral=False)
 
 @registered_root_command(name="spatialkey",description="Use a spatial key/token to open its linked secret dimension",guild=GUILD)
 @app_commands.autocomplete(item=usable_item_autocomplete)
 @serialized_user_action
 async def spatial_key_command(interaction:discord.Interaction,item:str)->None:
-    c=await require_character(interaction)
-    if not c:return
-    idef=WORLD.items.get(item,{}); key=idef.get('spatial_key')
-    if not key: await interaction.response.send_message("That item is not a spatial key/token.",ephemeral=False);return
-    inv=await DB.get_inventory(interaction.user.id)
-    if inv.get(item,0)<=0: await interaction.response.send_message("You do not carry that spatial key.",ephemeral=False);return
-    rid=str(key['secret_realm_id']); realm=WORLD.secret_realms.get(rid)
-    if not realm: await interaction.response.send_message("The token's coordinates no longer correspond to a known realm.",ephemeral=False);return
-    if key.get('consumed',True) and not await DB.consume_item(interaction.user.id,item,1): await interaction.response.send_message("The key is no longer available.",ephemeral=False);return
-    event_key=f"spatial_key:{rid}:{time.time_ns()}"; ends=time.time()+int(key.get('open_hours',2))*3600
-    await DB.activate_world_event(event_key=event_key,event_type='secret_realm',title=realm['name'],location=c['location'],payload={'definition_id':'spatial_key','realm_id':rid,'opened_by':interaction.user.id},ends_at=ends)
-    await interaction.response.defer(ephemeral=False); thread=await spawn_event_thread(interaction,title=realm['name'],event_type='secret_realm',event_key=event_key,expires_at=ends,announcement=f"🗝️ **SPATIAL KEY ACTIVATED — {realm['name']}**\n📍 Temporary entrance: **{c['location']}**\n{realm['description']}\n\nThe forced entrance closes <t:{int(ends)}:R>.")
-    await interaction.followup.send(f"🗝️ The key tears open a temporary entrance to **{realm['name']}**."+(f" Scene: {thread.mention}" if thread else ""),ephemeral=False)
+    if not await require_character(interaction):return
+    wt=await current_world_time()
+    try:
+        e=await ENGINE.authoritative_action("spatial_key.use",interaction.user.id,{"item_id":item},action_id=f"discord:{interaction.id}:spatial_key.use"); r=dict(e.get('result') or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
+    await interaction.response.send_message(f"🗝️ The key tears open a temporary entrance to **{r.get('realm_name',r.get('realm_id','a secret realm'))}**.",ephemeral=False)
 
 # ---------- Personal world creation ----------
 innerworld_group=app_commands.Group(name="innerworld",description="Create and define a stabilized personal world at the peak of Space Law")
@@ -9607,12 +9008,14 @@ innerworld_group=app_commands.Group(name="innerworld",description="Create and de
 @registered_group_command(innerworld_group, name="create",description="Stabilize your own personal world")
 @serialized_user_action
 async def innerworld_create(interaction:discord.Interaction,name:str)->None:
-    c=await require_character(interaction)
-    if not c:return
-    rows=await DB.get_law_progress(interaction.user.id,'space'); comp=int(rows[0]['comprehension']) if rows else 0
-    if comp<100 or int(c['realm_index'])<30: await interaction.response.send_message("World Creation requires **Space Law — Essence/Origin (100%)** and at least **Dao Saint** realm.",ephemeral=False);return
-    if await DB.get_personal_world(interaction.user.id): await interaction.response.send_message("You have already stabilized a personal world.",ephemeral=False);return
-    pw=await DB.create_personal_world(interaction.user.id,name);await interaction.response.send_message(f"🌌 **{pw['name']}** is born. Its laws are initially sparse and unstable. Use **/innerworld → Set Rule** to define local rules.")
+    if not await require_character(interaction): return
+    wt=await current_world_time()
+    try:
+        envelope=await ENGINE.authoritative_action("personal_world.create",interaction.user.id,{"name":name},action_id=f"discord:{interaction.id}:personal_world.create")
+        result=dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
+    await interaction.response.send_message(f"🌌 Personal world **{result.get('name',name)}** created.",ephemeral=False)
 
 @registered_group_command(innerworld_group, name="status",description="Inspect your stabilized personal world")
 async def innerworld_status(interaction:discord.Interaction)->None:
@@ -9626,29 +9029,38 @@ async def innerworld_status(interaction:discord.Interaction)->None:
 @registered_group_command(innerworld_group, name="setrule",description="Define or refine one physical/conceptual rule inside your personal world")
 @serialized_user_action
 async def innerworld_setrule(interaction:discord.Interaction,rule:str,definition:str)->None:
-    c=await require_character(interaction)
-    if not c:return
-    try: pw=await DB.set_personal_world_rule(interaction.user.id,rule,definition)
-    except ValueError as exc: await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
-    await interaction.response.send_message(f"🌌 Rule inscribed into **{pw['name']}**: **{rule[:40]}** — {definition[:300]}")
+    if not await require_character(interaction): return
+    wt=await current_world_time()
+    try:
+        envelope=await ENGINE.authoritative_action("personal_world.set_rule",interaction.user.id,{"rule":rule,"definition":definition},action_id=f"discord:{interaction.id}:personal_world.set_rule")
+        result=dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
+    await interaction.response.send_message(f"🌌 Inner-world rule **{rule}** updated.",ephemeral=False)
 
 @registered_group_command(innerworld_group, name="enter",description="Enter your personal world")
 @serialized_user_action
 async def innerworld_enter(interaction:discord.Interaction)->None:
-    c=await require_character(interaction)
-    if not c:return
-    pw=await DB.get_personal_world(interaction.user.id)
-    if not pw: await interaction.response.send_message("You have no personal world.",ephemeral=False);return
-    await DB.set_location(interaction.user.id,pw['location_key']);await interaction.response.send_message(f"🌌 You step beyond ordinary space and enter **{pw['name']}**.")
+    if not await require_character(interaction): return
+    wt=await current_world_time()
+    try:
+        envelope=await ENGINE.authoritative_action("personal_world.enter",interaction.user.id,{},action_id=f"discord:{interaction.id}:personal_world.enter")
+        result=dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
+    await interaction.response.send_message("🌌 You enter your personal world.",ephemeral=False)
 
 @registered_group_command(innerworld_group, name="leave",description="Leave your personal world and return to Greenriver Town")
 @serialized_user_action
 async def innerworld_leave(interaction:discord.Interaction)->None:
-    c=await require_character(interaction)
-    if not c:return
-    pw=await DB.get_personal_world_by_location(c['location'])
-    if not pw: await interaction.response.send_message("You are not inside a personal world.",ephemeral=False);return
-    await DB.set_location(interaction.user.id,'Greenriver Town');await interaction.response.send_message("You fold the world boundary aside and return to **Greenriver Town**.")
+    if not await require_character(interaction): return
+    wt=await current_world_time()
+    try:
+        envelope=await ENGINE.authoritative_action("personal_world.leave",interaction.user.id,{},action_id=f"discord:{interaction.id}:personal_world.leave")
+        result=dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
+    await interaction.response.send_message(f"🚪 You leave the personal world for **{result.get('outside','outside')}**.",ephemeral=False)
 
 
 sect_group = app_commands.Group(name="sect", description="Sect membership, lineage, resources, manor, and martial-family titles")
@@ -9892,98 +9304,30 @@ async def sect_recruitment_info(interaction: discord.Interaction, sect_name: str
 @app_commands.autocomplete(npc=sect_recommender_autocomplete)
 @serialized_user_action
 async def sect_recruitment_recommendation(interaction: discord.Interaction, npc: str) -> None:
-    c = await require_character(interaction)
-    if not c:
-        return
-    if await DB.get_sect_membership(interaction.user.id):
-        await interaction.response.send_message("You already belong to a public sect; leave or resolve that membership before seeking another sponsor.", ephemeral=False)
-        return
-    npc_data = await DB.get_npc_definition(npc)
-    if not npc_data or not bool(npc_data.get("can_recommend")) or not npc_data.get("sect_affiliation"):
-        await interaction.response.send_message("That NPC cannot issue a sect recommendation.", ephemeral=False)
-        return
-    sect_name = str(npc_data.get("sect_affiliation"))
-    rec = recruitment_definition(WORLD.sects, sect_name)
+    c=await require_character(interaction)
+    if not c:return
+    npc_data=await DB.get_npc_definition(npc)
+    if not npc_data or not bool(npc_data.get('can_recommend')) or not npc_data.get('sect_affiliation'):
+        await interaction.response.send_message("That NPC cannot issue a sect recommendation.",ephemeral=False);return
+    sect_name=str(npc_data.get('sect_affiliation')); rec=recruitment_definition(WORLD.sects,sect_name)
     if not rec:
-        await interaction.response.send_message("That NPC's sect has no public recruitment path configured.", ephemeral=False)
-        return
-    wt = await current_world_time()
-    npc_location = await current_npc_location(npc, wt.period)
-    if npc_location != str(c.get("location") or ""):
-        await interaction.response.send_message(
-            f"**{npc}** is currently at **{npc_location or 'an unknown location'}**, not **{c['location']}**.", ephemeral=False
-        )
-        return
-    memory = await DB.get_npc_memory(interaction.user.id, npc)
+        await interaction.response.send_message("That NPC's sect has no public recruitment path configured.",ephemeral=False);return
+    wt=await current_world_time(); npc_location=await current_npc_location(npc,wt.period)
+    if npc_location!=str(c.get('location') or ''):
+        await interaction.response.send_message(f"**{npc}** is currently at **{npc_location or 'an unknown location'}**, not **{c['location']}**.",ephemeral=False);return
+    memory=await DB.get_npc_memory(interaction.user.id,npc)
     if not memory.strip():
-        await interaction.response.send_message(
-            f"Speak with **{npc}** first. A recommendation requires at least some established personal history, not a cold menu request.", ephemeral=False
-        )
-        return
-    active = await DB.get_active_sect_recommendation(interaction.user.id, sect_name)
-    if active:
-        await interaction.response.send_message(
-            f"📜 **{npc}** or another sponsor has already issued an active recommendation for **{sect_name}**.", ephemeral=False
-        )
-        return
-    latest = await DB.get_latest_sect_recruitment_attempt(interaction.user.id, sect_name, "recommendation")
-    if latest and str(latest.get("result")) == "fail":
-        remain = RECOMMENDATION_RETRY_COOLDOWN_MINUTES - (wt.total_minutes - int(latest.get("game_minute", 0)))
-        if remain > 0:
-            await interaction.response.send_message(
-                f"**{npc}** is not ready to reconsider yet. Try again after about **{remain} in-world minutes**.", ephemeral=False
-            )
-            return
-    family = await DB.get_birth_family(interaction.user.id)
-    reputations = await DB.get_reputations(interaction.user.id)
-    rep = next((int(row.get("score", 0)) for row in reputations if str(row.get("faction_key")) == sect_name), 0)
-    modifier, notes = recommendation_modifier(
-        c, faction_reputation=rep, family=family, sect_alignment=str(WORLD.sects[sect_name].get("alignment", "Neutral"))
-    )
-    tn = max(8, int(npc_data.get("recommendation_tn", 14)))
-    result = roll_2d10(modifier, tn)
-    success = result.success
-    route_revealed = False
-    bonus = max(0, int(npc_data.get("recommendation_bonus", rec.get("recommendation_bonus", 2))))
-    if success:
-        await DB.issue_sect_recommendation(
-            interaction.user.id, npc_name=npc, sect_name=sect_name, bonus=bonus, game_minute=wt.total_minutes
-        )
-        await DB.discover_sect(
-            interaction.user.id, sect_name, game_minute=wt.total_minutes,
-            discovery_kind="npc_recommendation", source_key=npc,
-        )
-        location = str(rec.get("location") or "")
-        if location:
-            route_revealed = await DB.discover_location(
-                interaction.user.id, location, game_minute=wt.total_minutes, discovery_kind="npc_recommendation"
-            )
-        await DB.set_npc_memory(
-            interaction.user.id, npc,
-            (memory + f"\nIssued a formal recommendation to {sect_name} after judging the cultivator worthy of sponsorship.")[-1800:],
-        )
-    await DB.record_sect_recruitment_attempt(
-        interaction.user.id, sect_name=sect_name, attempt_type="recommendation", npc_name=npc,
-        location=str(c.get("location") or ""), result="pass" if success else "fail",
-        score=result.total, target=result.tn, recommendation_bonus=bonus if success else 0,
-        details={"roll": roll_line(result), "modifier_notes": notes, "route_revealed": route_revealed},
-        game_minute=wt.total_minutes,
-    )
-    await interaction.response.defer(ephemeral=False)
-    context = await NARRATOR_CONTEXT.build(
-        c, scene_type="sect recommendation", query_text=f"{npc} recommendation {sect_name}", focus_npc=npc
-    )
-    narration = await NARRATOR.narrate_sect_recommendation(
-        character=c, npc_name=npc, sect_name=sect_name, roll_text=roll_line(result), success=success,
-        recruitment_location=str(rec.get("location") or "Unknown"), route_revealed=route_revealed,
-        scene_context=context.text,
-    )
-    tail = (
-        f"\n\n📜 **Recommendation secured:** +{bonus} on the sect entrance checks."
-        + (f"\n🧭 **Route revealed:** {rec.get('location')}" if route_revealed else "")
-        if success else "\n\nThe NPC recommendation was not granted. No sect membership or route was created."
-    )
-    await reply_long(interaction, f"{narration}\n\n{roll_line(result)}\n*Factors: {'; '.join(notes)}*{tail}", ephemeral=False)
+        await interaction.response.send_message(f"Speak with **{npc}** first; a recommendation requires established personal history.",ephemeral=False);return
+    family=await DB.get_birth_family(interaction.user.id); reps=await DB.get_reputations(interaction.user.id); rep=next((int(x.get('score',0)) for x in reps if str(x.get('faction_key'))==sect_name),0)
+    modifier,notes=recommendation_modifier(c,faction_reputation=rep,family=family,sect_alignment=str(WORLD.sects[sect_name].get('alignment','Neutral')))
+    tn=max(8,int(npc_data.get('recommendation_tn',14))); bonus=max(0,int(npc_data.get('recommendation_bonus',rec.get('recommendation_bonus',2))))
+    try:
+        e=await ENGINE.authoritative_action("sect.recruitment.recommendation",interaction.user.id,{"npc_name":npc,"sect_name":sect_name,"modifier":modifier,"tn":tn,"bonus":bonus,"location":str(rec.get('location') or ''),"details":{"modifier_notes":notes}},action_id=f"discord:{interaction.id}:sect.recruitment.recommendation"); r=dict(e.get('result') or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
+    roll=dict(r.get('roll') or {}); roll_text=f"2d10 {int(roll.get('modifier',0)):+d} = **{int(roll.get('total',0))}** vs TN **{int(roll.get('tn',tn))}**"
+    tail=f"📜 Recommendation secured: +{bonus}." if r.get('success') else "The recommendation was not granted."
+    await interaction.response.send_message(f"{roll_text}\n{tail}",ephemeral=False)
 
 
 @registered_group_command(sect_recruitment_group, name="recommendations", description="List active NPC sect recommendations")
@@ -10005,106 +9349,24 @@ async def sect_recruitment_recommendations(interaction: discord.Interaction) -> 
 @app_commands.autocomplete(sect_name=sect_local_trial_autocomplete)
 @serialized_user_action
 async def sect_recruitment_trial(interaction: discord.Interaction, sect_name: str) -> None:
-    c = await require_character(interaction)
-    if not c:
-        return
-    if await DB.get_sect_membership(interaction.user.id):
-        await interaction.response.send_message("You already belong to a public sect.", ephemeral=False)
-        return
+    c=await require_character(interaction)
+    if not c:return
     if sect_name not in WORLD.sects:
-        await interaction.response.send_message("Unknown sect.", ephemeral=False)
-        return
-    wt = await current_world_time()
-    await _sync_sect_discoveries(interaction.user.id, c, game_minute=wt.total_minutes)
-    if not await DB.has_discovered_sect(interaction.user.id, sect_name):
-        await interaction.response.send_message("That sect has not been discovered by this character.", ephemeral=False)
-        return
-    rec = recruitment_definition(WORLD.sects, sect_name)
-    profile = trial_profile(WORLD.sects, sect_name)
+        await interaction.response.send_message("Unknown sect.",ephemeral=False);return
+    wt=await current_world_time(); rec=recruitment_definition(WORLD.sects,sect_name); profile=trial_profile(WORLD.sects,sect_name)
     if not rec or not profile:
-        await interaction.response.send_message("That sect has no configured entrance trial.", ephemeral=False)
-        return
-    if str(c.get("location") or "") != profile.location:
-        await interaction.response.send_message(
-            f"You must physically travel to **{profile.location}** to take **{profile.trial_name}**.", ephemeral=False
-        )
-        return
-    latest = await DB.get_latest_sect_recruitment_attempt(interaction.user.id, sect_name, "trial")
-    if latest and str(latest.get("result")) == "fail":
-        remain = RECRUITMENT_RETRY_COOLDOWN_MINUTES - (wt.total_minutes - int(latest.get("game_minute", 0)))
-        if remain > 0:
-            await interaction.response.send_message(
-                f"The sect has recorded your previous attempt. You may challenge the gate again after about **{remain} in-world minutes**.", ephemeral=False
-            )
-            return
-    recommendation = await DB.get_active_sect_recommendation(interaction.user.id, sect_name)
-    recommendation_bonus = int(recommendation.get("bonus", 0)) if recommendation else 0
-    family = await DB.get_birth_family(interaction.user.id)
-    primary_mod, primary_notes, rejection = trial_modifier(
-        c, rec, attribute=profile.primary_attribute, family=family, recommendation_bonus=recommendation_bonus
-    )
-    if rejection:
-        await interaction.response.send_message(f"🚫 **Entrance refused before examination.** {rejection}", ephemeral=False)
-        return
-    secondary_mod, secondary_notes, rejection2 = trial_modifier(
-        c, rec, attribute=profile.secondary_attribute, family=family, recommendation_bonus=recommendation_bonus
-    )
-    if rejection2:
-        await interaction.response.send_message(f"🚫 **Entrance refused before examination.** {rejection2}", ephemeral=False)
-        return
-    primary = roll_2d10(primary_mod, profile.base_tn)
-    secondary = roll_2d10(secondary_mod, max(8, profile.base_tn - 1))
-    outcome = trial_outcome(primary.margin, secondary.margin, has_recommendation=bool(recommendation))
-    if recommendation:
-        await DB.consume_sect_recommendation(int(recommendation["recommendation_id"]), game_minute=wt.total_minutes)
-    if outcome in {"pass", "conditional_pass"}:
-        await SECTS.admit_outer_disciple(interaction.user.id, sect_name)
-    await DB.record_sect_recruitment_attempt(
-        interaction.user.id, sect_name=sect_name, attempt_type="trial", npc_name=profile.examiner,
-        location=profile.location, result=outcome, score=primary.total + secondary.total,
-        target=primary.tn + secondary.tn, recommendation_bonus=recommendation_bonus,
-        details={
-            "trial_name": profile.trial_name, "primary_roll": roll_line(primary), "secondary_roll": roll_line(secondary),
-            "primary_factors": primary_notes, "secondary_factors": secondary_notes,
-            "recommendation_source": str(recommendation.get("npc_name")) if recommendation else "",
-        }, game_minute=wt.total_minutes,
-    )
+        await interaction.response.send_message("That sect has no configured entrance trial.",ephemeral=False);return
+    recommendation=await DB.get_active_sect_recommendation(interaction.user.id,sect_name); recommendation_bonus=int(recommendation.get('bonus',0)) if recommendation else 0; family=await DB.get_birth_family(interaction.user.id)
+    primary_mod,primary_notes,rejection=trial_modifier(c,rec,attribute=profile.primary_attribute,family=family,recommendation_bonus=recommendation_bonus)
+    secondary_mod,secondary_notes,rejection2=trial_modifier(c,rec,attribute=profile.secondary_attribute,family=family,recommendation_bonus=recommendation_bonus)
+    if rejection or rejection2:
+        await interaction.response.send_message(f"🚫 **Entrance refused before examination.** {rejection or rejection2}",ephemeral=False);return
     try:
-        await QUESTS.progress(interaction.user.id, "sect_trial", amount=1, target=sect_name, game_minute=wt.total_minutes)
-    except Exception:
-        log.exception("Quest progress update failed after sect trial")
-    await interaction.response.defer(ephemeral=False)
-    sect_abode_thread: discord.Thread | None = None
-    if outcome in {"pass", "conditional_pass"} and interaction.guild is not None:
-        membership = await DB.get_sect_membership(interaction.user.id)
-        if membership:
-            sect_abode = await ensure_sect_abode_record(interaction.user.id, c, membership)
-            sect_abode_thread = await ensure_sect_abode_thread_for(interaction.guild, interaction.user, sect_abode)
-    context = await NARRATOR_CONTEXT.build(
-        c, scene_type="major sect recruitment trial", query_text=f"{sect_name} recruitment trial {profile.trial_name}"
-    )
-    narration = await NARRATOR_QUEUE.run(
-        "sect_trial",
-        NARRATOR.narrate_sect_trial(
-            character=c, sect_name=sect_name, trial_name=profile.trial_name, examiner=profile.examiner,
-            trial_description=profile.description, primary_roll=roll_line(primary), secondary_roll=roll_line(secondary),
-            outcome=outcome, recommendation_source=str(recommendation.get("npc_name")) if recommendation else "",
-            scene_context=context.text,
-        ),
-    )
-    result_line = (
-        "✅ **Admitted as Outer Disciple.**" if outcome == "pass" else
-        "✅ **Conditionally admitted as Outer Disciple under your sponsor's name.**" if outcome == "conditional_pass" else
-        "❌ **Entrance trial failed.** No membership was created."
-    )
-    if sect_abode_thread is not None:
-        result_line += f"\n🏯 **Sect abode assigned:** {sect_abode_thread.mention}"
-    await reply_long(
-        interaction,
-        f"{narration}\n\n**Primary test:** {roll_line(primary)}\n*{' ; '.join(primary_notes)}*\n"
-        f"**Secondary test:** {roll_line(secondary)}\n*{' ; '.join(secondary_notes)}*\n\n{result_line}",
-        ephemeral=False,
-    )
+        e=await ENGINE.authoritative_action("sect.recruitment.trial",interaction.user.id,{"sect_name":sect_name,"examiner":profile.examiner,"location":profile.location,"trial_name":profile.trial_name,"primary_modifier":primary_mod,"secondary_modifier":secondary_mod,"base_tn":profile.base_tn,"primary_details":primary_notes,"secondary_details":secondary_notes},action_id=f"discord:{interaction.id}:sect.recruitment.trial"); r=dict(e.get('result') or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
+    outcome=str(r.get('outcome','fail')); p=dict(r.get('primary') or {}); q=dict(r.get('secondary') or {})
+    await interaction.response.send_message(f"**{profile.trial_name}** — {outcome.replace('_',' ').title()}\nPrimary: **{p.get('total','?')}** vs TN **{p.get('tn','?')}**\nSecondary: **{q.get('total','?')}** vs TN **{q.get('tn','?')}**",ephemeral=False)
 
 
 @registered_group_command(sect_recruitment_group, name="history", description="Review your recent sect recommendation and entrance-trial history")
@@ -10203,67 +9465,53 @@ async def sect_discipleship_status(interaction: discord.Interaction) -> None:
 @registered_group_command(sect_disciple_group, name="request", description="Ask a stronger cultivator to formally become your master")
 @serialized_user_action
 async def sect_discipleship_request(interaction: discord.Interaction, master: discord.Member) -> None:
-    if not await require_character(interaction):
-        return
+    if not await require_character(interaction): return
+    wt=await current_world_time()
     try:
-        request = await DB.create_disciple_request(interaction.user.id, master.id)
-    except ValueError as exc:
-        await interaction.response.send_message(f"❌ {exc}", ephemeral=False)
-        return
-    await interaction.response.send_message(
-        f"🎓 Master request **#{request['request_id']}** sent to {master.mention}. "
-        "They can answer it from **Sect → Discipleship → Accept/Reject**.",
-        ephemeral=False,
-    )
+        envelope=await ENGINE.authoritative_action("discipleship.request",interaction.user.id,{"master_user_id":master.id},action_id=f"discord:{interaction.id}:discipleship.request")
+        result=dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
+    await interaction.response.send_message(f"🙏 Discipleship request `#{result.get('request_id')}` sent to {master.mention}.",ephemeral=False)
 
 
 @registered_group_command(sect_disciple_group, name="accept", description="Accept a pending disciple request addressed to you")
 @serialized_user_action
 async def sect_discipleship_accept(interaction: discord.Interaction, request_id: int) -> None:
-    if not await require_character(interaction):
-        return
+    if not await require_character(interaction): return
+    wt=await current_world_time()
     try:
-        result = await DB.resolve_disciple_request(interaction.user.id, request_id, accept=True)
-    except ValueError as exc:
-        await interaction.response.send_message(f"❌ {exc}", ephemeral=False)
-        return
-    disciple = await DB.get_character(int(result['disciple_user_id']))
-    await interaction.response.send_message(
-        f"✅ **{(disciple or {}).get('name','The cultivator')}** is now your formal disciple. "
-        "Their future breakthroughs can strengthen your lineage, contribution and insight.", ephemeral=False
-    )
+        envelope=await ENGINE.authoritative_action("discipleship.resolve",interaction.user.id,{"request_id":int(request_id),"accept":True},action_id=f"discord:{interaction.id}:discipleship.resolve")
+        result=dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
+    await interaction.response.send_message("🙏 Discipleship request accepted.",ephemeral=False)
 
 
 @registered_group_command(sect_disciple_group, name="reject", description="Reject a pending disciple request addressed to you")
 @serialized_user_action
 async def sect_discipleship_reject(interaction: discord.Interaction, request_id: int) -> None:
-    if not await require_character(interaction):
-        return
+    if not await require_character(interaction): return
+    wt=await current_world_time()
     try:
-        result = await DB.resolve_disciple_request(interaction.user.id, request_id, accept=False)
-    except ValueError as exc:
-        await interaction.response.send_message(f"❌ {exc}", ephemeral=False)
-        return
-    disciple = await DB.get_character(int(result['disciple_user_id']))
-    await interaction.response.send_message(f"You reject **{(disciple or {}).get('name','that cultivator')}**'s request.", ephemeral=False)
+        envelope=await ENGINE.authoritative_action("discipleship.resolve",interaction.user.id,{"request_id":int(request_id),"accept":False},action_id=f"discord:{interaction.id}:discipleship.resolve")
+        result=dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
+    await interaction.response.send_message("Discipleship request rejected.",ephemeral=False)
 
 
 @registered_group_command(sect_disciple_group, name="leave", description="Sever your current master-disciple bond")
 @serialized_user_action
 async def sect_discipleship_leave(interaction: discord.Interaction, confirm: bool = False) -> None:
-    if not await require_character(interaction):
-        return
-    master = await DB.get_master(interaction.user.id)
-    if not master:
-        await interaction.response.send_message("You do not currently have a recorded master.", ephemeral=False)
-        return
-    if not confirm:
-        await interaction.response.send_message(
-            f"⚠️ Sever your formal bond with **{master['name']}**? Repeat with **confirm:true** to proceed.", ephemeral=False
-        )
-        return
-    await DB.clear_master(interaction.user.id)
-    await interaction.response.send_message(f"🧵 Your formal master-disciple bond with **{master['name']}** is severed.", ephemeral=False)
+    if not await require_character(interaction): return
+    wt=await current_world_time()
+    try:
+        envelope=await ENGINE.authoritative_action("discipleship.leave",interaction.user.id,{},action_id=f"discord:{interaction.id}:discipleship.leave")
+        result=dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
+    await interaction.response.send_message("🧵 Your discipleship bond has been ended.",ephemeral=False)
 
 
 SECT_ABODE_ACTIONS = [
@@ -10467,15 +9715,14 @@ async def sect_treasury(interaction:discord.Interaction)->None:
 @app_commands.autocomplete(item=carried_item_autocomplete)
 @serialized_user_action
 async def sect_contribute(interaction:discord.Interaction,item:str,quantity:app_commands.Range[int,1,999999]=1)->None:
-    if not await require_character(interaction):return
+    if not await require_character(interaction): return
+    wt=await current_world_time()
     try:
-        points=await DB.sect_contribute(interaction.user.id,item,int(quantity),WORLD.item_sect_value(item))
-    except ValueError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
-    await interaction.response.send_message(
-        f"🏯 Donated **{WORLD.item_name(item)} x{quantity}** to the sect treasury and earned **{points} contribution points**.",
-        ephemeral=False,
-    )
+        envelope=await ENGINE.authoritative_action("sect.contribute",interaction.user.id,{"item_id":item,"quantity":int(quantity)},action_id=f"discord:{interaction.id}:sect.contribute")
+        result=dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
+    await interaction.response.send_message(f"🏯 Contributed **{WORLD.item_name(item)} x{quantity}** to the sect treasury.",ephemeral=False)
 
 
 async def sect_treasury_item_autocomplete(interaction:discord.Interaction,current:str)->list[app_commands.Choice[str]]:
@@ -10492,21 +9739,14 @@ async def sect_treasury_item_autocomplete(interaction:discord.Interaction,curren
 @app_commands.autocomplete(item=sect_treasury_item_autocomplete)
 @serialized_user_action
 async def sect_redeem(interaction:discord.Interaction,item:str,quantity:app_commands.Range[int,1,999999]=1)->None:
-    if not await require_character(interaction):return
-    membership=await DB.get_sect_membership(interaction.user.id)
-    if not membership:
-        await interaction.response.send_message("You are not a sect member.",ephemeral=False);return
-    sim_state=await SIM.sect_status(str(membership['sect_name']))
-    resources=int((sim_state or {}).get('resources',50))
-    pressure_mult=1.60 if resources<25 else 1.35 if resources<50 else 1.20 if resources<80 else 1.00
-    unit=max(1,int(round(WORLD.item_sect_value(item)*pressure_mult)))
-    try:remaining=await DB.sect_redeem(interaction.user.id,item,int(quantity),unit)
-    except ValueError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
-    await interaction.response.send_message(
-        f"📜 Redeemed **{WORLD.item_name(item)} x{quantity}** for **{unit*int(quantity)} CP**. Remaining: **{remaining} CP**.",
-        ephemeral=False,
-    )
+    if not await require_character(interaction): return
+    wt=await current_world_time()
+    try:
+        envelope=await ENGINE.authoritative_action("sect.redeem",interaction.user.id,{"item_id":item,"quantity":int(quantity)},action_id=f"discord:{interaction.id}:sect.redeem")
+        result=dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
+    await interaction.response.send_message(f"🏯 Redeemed **{WORLD.item_name(item)} x{quantity}** from the sect treasury.",ephemeral=False)
 
 
 @registered_group_command(sect_manor_group, name="status", description="Inspect your sect's shared manor, facilities and recent construction")
@@ -10563,45 +9803,16 @@ async def sect_manor_status(interaction: discord.Interaction) -> None:
 @registered_group_command(sect_manor_group, name="establish", description="Spend shared treasury materials to establish the sect's one persistent manor")
 @serialized_user_action
 async def sect_manor_establish(interaction: discord.Interaction, name: str, confirm: bool = False) -> None:
-    c = await require_character(interaction)
-    if not c:
-        return
-    membership = await DB.get_sect_membership(interaction.user.id)
-    if not membership:
-        await interaction.response.send_message("Only a recorded sect member can establish a sect manor.", ephemeral=False)
-        return
-    if int(membership.get("rank_level", 0)) < 70:
-        await interaction.response.send_message("Only a **Sect Master or Ancestor** can establish the sect manor.", ephemeral=False)
-        return
-    location = str(c.get("location", ""))
-    if location.startswith(("abode:", "personal_world:")) or WORLD.auction_house_at(location):
-        await interaction.response.send_message("Choose a normal world location as the permanent seat of the sect manor.", ephemeral=False)
-        return
-    if await DB.get_sect_manor(str(membership["sect_name"])):
-        await interaction.response.send_message("Your sect already has a persistent manor.", ephemeral=False)
-        return
+    c=await require_character(interaction)
+    if not c:return
     if not confirm:
-        await interaction.response.send_message(
-            f"🏯 **Establish {name[:80]} at {location}?**\n"
-            f"This permanently spends from **{membership['sect_name']}**'s shared treasury:\n"
-            f"**{WORLD.item_names(SECT_MANOR_ESTABLISHMENT_COST)}**\n\n"
-            "Run the action again with **confirm:true** to lay the foundation.",
-            ephemeral=False,
-        )
-        return
-    wt = await current_world_time()
+        await interaction.response.send_message(f"🏯 Establish **{name[:80]}** here? Repeat with **confirm:true** to lay the foundation.",ephemeral=False);return
+    wt=await current_world_time()
     try:
-        manor = await DB.establish_sect_manor(
-            interaction.user.id, name=name, base_location=location, game_minute=wt.total_minutes
-        )
-    except ValueError as exc:
-        await interaction.response.send_message(f"❌ {exc}", ephemeral=False)
-        return
-    await interaction.response.send_message(
-        f"🏯 **{manor['name']}** is established at **{manor['base_location']}** for **{manor['sect_name']}**.\n"
-        "Every sect member can contribute materials through **Sect → Contribute**; Elders and higher may direct facility upgrades through **Sect → Manor → Upgrade**.",
-        ephemeral=False,
-    )
+        e=await ENGINE.authoritative_action("sect.manor.establish",interaction.user.id,{"name":name},action_id=f"discord:{interaction.id}:sect.manor.establish"); r=dict(e.get('result') or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
+    await interaction.response.send_message(f"🏯 **{r.get('name',name)}** is established at **{r.get('base_location',c.get('location'))}**.",ephemeral=False)
 
 
 @registered_group_command(sect_manor_group, name="upgrade", description="Upgrade a shared manor facility using materials from the sect treasury")
@@ -10610,60 +9821,15 @@ async def sect_manor_establish(interaction: discord.Interaction, name: str, conf
 async def sect_manor_upgrade(
     interaction: discord.Interaction, facility: app_commands.Choice[str], confirm: bool = False
 ) -> None:
-    c = await require_character(interaction)
-    if not c:
-        return
-    membership = await DB.get_sect_membership(interaction.user.id)
-    if not membership:
-        await interaction.response.send_message("You are not a sect member.", ephemeral=False)
-        return
-    if int(membership.get("rank_level", 0)) < 50:
-        await interaction.response.send_message("Only an **Elder or higher** can direct sect-manor construction.", ephemeral=False)
-        return
-    manor = await DB.get_sect_manor(str(membership["sect_name"]))
-    if not manor:
-        await interaction.response.send_message("Your sect has not established a manor yet.", ephemeral=False)
-        return
-    if str(c.get("location", "")) != str(manor.get("base_location", "")):
-        await interaction.response.send_message(
-            f"Construction must be directed at **{manor['name']}** in **{manor['base_location']}**.", ephemeral=False
-        )
-        return
-    definition = SECT_MANOR_FACILITIES.get(facility.value)
-    if not definition:
-        await interaction.response.send_message("Unknown manor facility.", ephemeral=False)
-        return
-    current_level = int(manor.get(str(definition["column"]), 0))
-    if current_level >= MAX_MANOR_FACILITY_LEVEL:
-        await interaction.response.send_message(
-            f"**{definition['name']}** is already at the maximum level ({MAX_MANOR_FACILITY_LEVEL}).", ephemeral=False
-        )
-        return
-    cost = manor_upgrade_cost(facility.value, current_level)
+    if not await require_character(interaction):return
     if not confirm:
-        await interaction.response.send_message(
-            f"🏗️ **{definition['name']} Lv.{current_level} → Lv.{current_level+1}**\n"
-            f"Shared treasury cost: **{WORLD.item_names(cost)}**\n"
-            f"Effect: {definition['description']}\n\n"
-            "Run the action again with **confirm:true** to spend the materials.",
-            ephemeral=False,
-        )
-        return
-    wt = await current_world_time()
+        await interaction.response.send_message(f"🏗️ Upgrade **{facility.name}**? Repeat with **confirm:true** to spend shared treasury materials.",ephemeral=False);return
+    wt=await current_world_time()
     try:
-        updated = await DB.upgrade_sect_manor_facility(
-            interaction.user.id, facility.value, game_minute=wt.total_minutes
-        )
-    except ValueError as exc:
-        await interaction.response.send_message(f"❌ {exc}", ephemeral=False)
-        return
-    new_level = int(updated.get(str(definition["column"]), current_level + 1))
-    await interaction.response.send_message(
-        f"🏗️ **{definition['name']} upgraded to Lv.{new_level}.**\n"
-        f"Spent: **{WORLD.item_names(updated.get('last_upgrade_cost', cost))}**\n"
-        + manor_benefit_lines(updated)[list(SECT_MANOR_FACILITIES).index(facility.value)],
-        ephemeral=False,
-    )
+        e=await ENGINE.authoritative_action("sect.manor.upgrade",interaction.user.id,{"facility":facility.value},action_id=f"discord:{interaction.id}:sect.manor.upgrade"); r=dict(e.get('result') or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
+    await interaction.response.send_message(f"🏗️ **{facility.name} upgraded to Lv.{r.get('level','?')}**.",ephemeral=False)
 
 
 @registered_group_command(sect_group, name="address", description="Show the proper English martial-family title for another cultivator")
@@ -10708,12 +9874,12 @@ async def _current_birth_family(user_id:int, *, simulate:bool=True)->dict|None:
     c=await DB.get_character(user_id)
     wt=await current_world_time()
     if c and c.get("life_status")=="deceased":
-        # Death never fast-forwards the family. The old household remains on the
-        # shared world timeline exactly where it was when the character died.
         return fam
-    fam=await DB.simulate_birth_family(int(fam['family_id']),wt.total_minutes,MINUTES_PER_YEAR) or fam
-    refreshed=await DB.get_birth_family(user_id)
-    return refreshed or fam
+    try:
+        await ENGINE.authoritative_action("family.simulate",int(user_id),{"family_id":int(fam['family_id']),"minutes_per_year":MINUTES_PER_YEAR},action_id=f"family:auto:{int(user_id)}:{wt.total_minutes}")
+    except GameEngineError:
+        log.exception("Go family simulation failed")
+    return await DB.get_birth_family(user_id) or fam
 
 @registered_group_command(family_group, name="view",description="View the NPC family you were born into")
 async def birth_family_view(interaction:discord.Interaction)->None:
@@ -10746,7 +9912,89 @@ async def birth_family_view(interaction:discord.Interaction)->None:
         ])
         if state:
             lines.append("Your soul is currently in **Samsara**; use **/character → Samsara** for the reincarnation clock.")
+    household_key = f"birth_family:{int(fam.get('family_id') or 0)}"
+    if str(c.get("location") or "") == household_key:
+        lines.extend(["", "🏠 **You are currently inside this shared household.** Other player members who enter are present in the same family scene."])
+    else:
+        lines.extend(["", "🏠 Use **/family enter** to visit the shared household. Players born into this same starter family meet in the same scene."])
     await reply_long(interaction,"\n".join(lines),ephemeral=False)
+
+@registered_group_command(family_group, name="enter", description="Enter your shared birth-family household")
+@serialized_user_action
+async def birth_family_enter(interaction: discord.Interaction) -> None:
+    c = await require_character(interaction)
+    if not c:
+        return
+    fam = await DB.get_birth_family(interaction.user.id)
+    if not fam:
+        await interaction.response.send_message("No birth family is recorded.", ephemeral=False)
+        return
+    wt = await current_world_time()
+    await interaction.response.defer(ephemeral=False)
+    try:
+        envelope = await ENGINE.authoritative_action(
+            "family.household.enter",
+            interaction.user.id,
+            {},
+            action_id=f"discord:{interaction.id}:family.household.enter",
+        )
+    except GameEngineError as exc:
+        await interaction.followup.send(f"❌ Could not enter the household: {exc}", ephemeral=False)
+        return
+    result = dict(envelope.get("result") or {})
+    thread = await ensure_birth_family_household_thread(interaction, fam)
+    players = [str(row.get("name") or "Cultivator") for row in (result.get("players_present") or [])]
+    others = [name for name in players if name != str(c.get("name") or "")]
+    presence = f"\nPresent with you: **{', '.join(others)}**" if others else "\nYou are currently the only player member inside."
+    if thread is not None:
+        await interaction.followup.send(
+            f"🏠 Entered **{result.get('family_name') or fam.get('family_name')}**. Shared household scene: {thread.mention}{presence}",
+            ephemeral=False,
+        )
+    else:
+        await interaction.followup.send(
+            f"🏠 Entered **{result.get('family_name') or fam.get('family_name')}**.{presence}\n"
+            "The canonical shared location is active, but Discord could not create/recover its household thread.",
+            ephemeral=False,
+        )
+
+@registered_group_command(family_group, name="leave", description="Leave your shared birth-family household")
+@serialized_user_action
+async def birth_family_leave(interaction: discord.Interaction) -> None:
+    c = await require_character(interaction)
+    if not c:
+        return
+    fam = await DB.get_birth_family(interaction.user.id)
+    if not fam:
+        await interaction.response.send_message("No birth family is recorded.", ephemeral=False)
+        return
+    wt = await current_world_time()
+    household_row = None
+    if interaction.guild is not None:
+        household_row = await DB.get_birth_family_household_thread(interaction.guild.id, int(fam["family_id"]))
+    await interaction.response.defer(ephemeral=False)
+    try:
+        envelope = await ENGINE.authoritative_action(
+            "family.household.leave",
+            interaction.user.id,
+            {},
+            action_id=f"discord:{interaction.id}:family.household.leave",
+        )
+    except GameEngineError as exc:
+        await interaction.followup.send(f"❌ Could not leave the household: {exc}", ephemeral=False)
+        return
+    result = dict(envelope.get("result") or {})
+    if interaction.guild is not None and household_row:
+        thread = await _get_thread(interaction.guild, household_row.get("thread_id"))
+        if thread is not None:
+            try:
+                await thread.remove_user(interaction.user)
+            except (discord.Forbidden, discord.HTTPException):
+                pass
+    await interaction.followup.send(
+        f"🚪 Left **{result.get('family_name') or fam.get('family_name')}** and returned to **{result.get('location') or fam.get('location')}**.",
+        ephemeral=False,
+    )
 
 @registered_group_command(family_group, name="clan",description="View bloodline, branches, retainers and martial-clan alliance ties")
 async def birth_family_clan(interaction:discord.Interaction)->None:
@@ -10791,23 +10039,14 @@ async def birth_family_clan(interaction:discord.Interaction)->None:
 @registered_group_command(family_group, name="support",description="Ask your birth family for resources or emergency support")
 @serialized_user_action
 async def birth_family_support(interaction:discord.Interaction)->None:
-    if not await require_character(interaction):return
-    fam=await _current_birth_family(interaction.user.id)
-    if not fam:
-        await interaction.response.send_message("No birth family is recorded.",ephemeral=False);return
+    if not await require_character(interaction): return
     wt=await current_world_time()
     try:
-        reward=await DB.claim_birth_family_support(interaction.user.id,wt.total_minutes,3*MINUTES_PER_MONTH)
-    except ValueError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
-    bits=[]
-    if reward['stones']:bits.append(f"{reward['stones']} Low-Grade Spirit Stones")
-    for iid,qty in reward['items'].items():bits.append(f"{WORLD.item_name(iid)} x{qty}")
-    await interaction.response.send_message(
-        f"🏠 **{reward['family_name']} supports you.**\nReceived: **{', '.join(bits) if bits else 'advice and shelter'}**\n"
-        "Family support consumes real household resources, so stronger support is not available continuously.",
-        ephemeral=False,
-    )
+        envelope=await ENGINE.authoritative_action("family.support",interaction.user.id,{"cooldown_game_minutes":3*MINUTES_PER_MONTH},action_id=f"discord:{interaction.id}:family.support")
+        result=dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
+    await interaction.response.send_message(f"🏠 **{result.get('family_name','Your family')} supports you.**\nReceived: **{int(result.get('stones',0))} Low-Grade Spirit Stones**",ephemeral=False)
 
 @registered_group_command(family_group, name="history",description="View recent rises, setbacks and political changes in your family")
 async def birth_family_history(interaction:discord.Interaction)->None:
@@ -10825,18 +10064,17 @@ async def birth_family_history(interaction:discord.Interaction)->None:
 async def birth_family_child(interaction:discord.Interaction,name:str,gender:app_commands.Choice[str])->None:
     c=await require_character(interaction)
     if not c:return
-    wt=await current_world_time(); life=lifespan_status(c,wt.total_minutes)
+    wt=await current_world_time(); life=await authoritative_lifespan(interaction.user.id)
     if life.age_years<18:
         await interaction.response.send_message("Your character must be at least **18 years old** to have a recorded child.",ephemeral=False);return
     fam=await _current_birth_family(interaction.user.id)
     if not fam:
         await interaction.response.send_message("No birth family is recorded.",ephemeral=False);return
-    root=inherited_root(str(c.get('spiritual_root') or 'Mortal Root'),WORLD.roots,family_tier=int(fam.get('tier',1)),karma_score=int(c.get('karma_score',0)),bloodline_purity=int(fam.get('bloodline_purity',0)))
-    child_id=await DB.add_birth_family_child(user_id=interaction.user.id,name=name,gender=gender.value,current_game_minute=wt.total_minutes,spiritual_root=root)
-    await interaction.response.send_message(
-        f"👶 **{name.strip()}** is born into **{fam['family_name']}** as descendant `#{child_id}`.\n"
-        f"Their cultivation talent stays private until around age **{CHILD_CULTIVATION_AWAKENING_AGE}**."
-    )
+    try:
+        e=await ENGINE.authoritative_action("family.add_child",interaction.user.id,{"name":name,"gender":gender.value},action_id=f"discord:{interaction.id}:family.add_child"); result=dict(e.get('result') or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
+    await interaction.response.send_message(f"👶 **{name.strip()}** is born as descendant `#{result.get('child_id')}`.",ephemeral=False)
 
 @registered_group_command(family_group, name="descendants",description="View descendants in your family branch and whether they can cultivate")
 async def birth_family_descendants(interaction:discord.Interaction)->None:
@@ -11015,21 +10253,13 @@ async def _black_market_item_autocomplete(interaction:discord.Interaction,curren
 async def blackmarket_buy(interaction:discord.Interaction,item:str,quantity:app_commands.Range[int,1,20]=1)->None:
     c=await require_character(interaction)
     if not c:return
-    reason,_,_=await _black_market_access(interaction.user.id,c)
-    if not reason:
-        await interaction.response.send_message("🌑 The broker refuses to recognize you.",ephemeral=False);return
     wt=await current_world_time()
-    try: result=await DB.black_market_trade(user_id=interaction.user.id,location=str(c.get('location','')),item_id=item,quantity=int(quantity),buy=True,game_minute=wt.total_minutes)
-    except ValueError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
-    await DB.adjust_reputation(interaction.user.id,"Underworld Contacts",1,reason="black market trade")
-    detected=False
-    if int(result.get('heat',0))>=40 and secrets.randbelow(100)<min(45,max(5,int(result['heat'])//3)):
-        crime=await DB.record_crime(interaction.user.id,jurisdiction=str(c.get('location','')),crime_type="contraband_trade",severity=2,evidence=min(85,30+int(result['heat'])//2),description=f"Suspected purchase of {WORLD.item_name(item)} from an illicit broker",game_minute=wt.total_minutes,witness_type="local_watch",witness_key=str(c.get('location','')))
-        detected=True
-    text=f"🌑 Bought **{WORLD.item_name(item)} x{result['quantity']}** for **{result['total']:,} {WORLD.currency_name(result['currency_id'])}**. Provenance now records the underworld source."
-    if detected:text+="\n👁️ A local watcher noticed enough to open a **contraband-trade crime record**."
-    await interaction.response.send_message(text,ephemeral=False)
+    try:
+        envelope=await ENGINE.authoritative_action("black_market.trade",interaction.user.id,{"location":str(c.get('location','')),"item_id":item,"quantity":int(quantity),"buy":True},action_id=f"discord:{interaction.id}:black_market.trade")
+        result=dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
+    await interaction.response.send_message(f"🌑 Bought **{WORLD.item_name(item)} x{quantity}** for **{result.get('total_price',0)}** stones.",ephemeral=False)
 
 
 @blackmarket_buy.autocomplete("item")
@@ -11042,15 +10272,13 @@ async def blackmarket_buy_autocomplete(interaction:discord.Interaction,current:s
 async def blackmarket_sell(interaction:discord.Interaction,item:str,quantity:app_commands.Range[int,1,20]=1)->None:
     c=await require_character(interaction)
     if not c:return
-    reason,_,_=await _black_market_access(interaction.user.id,c)
-    if not reason:
-        await interaction.response.send_message("🌑 The broker refuses to recognize you.",ephemeral=False);return
     wt=await current_world_time()
-    try: result=await DB.black_market_trade(user_id=interaction.user.id,location=str(c.get('location','')),item_id=item,quantity=int(quantity),buy=False,game_minute=wt.total_minutes)
-    except ValueError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
-    await DB.adjust_reputation(interaction.user.id,"Underworld Contacts",1,reason="black market fencing")
-    await interaction.response.send_message(f"🌑 Fenced **{WORLD.item_name(item)} x{result['quantity']}** for **{result['total']:,} {WORLD.currency_name(result['currency_id'])}**.",ephemeral=False)
+    try:
+        envelope=await ENGINE.authoritative_action("black_market.trade",interaction.user.id,{"location":str(c.get('location','')),"item_id":item,"quantity":int(quantity),"buy":False},action_id=f"discord:{interaction.id}:black_market.trade")
+        result=dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
+    await interaction.response.send_message(f"🌑 Sold **{WORLD.item_name(item)} x{quantity}** for **{result.get('total_price',0)}** stones.",ephemeral=False)
 
 
 @blackmarket_sell.autocomplete("item")
@@ -11093,10 +10321,13 @@ async def market_prices_item_autocomplete(interaction:discord.Interaction,curren
 async def market_buy_command(interaction:discord.Interaction,item:str,quantity:app_commands.Range[int,1,100]=1)->None:
     c=await require_character(interaction)
     if not c:return
-    try: result=await SIM.market_trade(user_id=interaction.user.id,location=str(c.get('location') or ''),item_id=item,quantity=int(quantity),buy=True)
-    except ValueError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
-    await interaction.response.send_message(f"🛒 Bought **{WORLD.item_name(item)} x{result['quantity']}** for **{result['total']:,} {WORLD.currency_name(result['currency_id'])}**.\nYour purchase increased local demand and reduced supply.",ephemeral=False)
+    wt=await current_world_time()
+    try:
+        envelope=await ENGINE.authoritative_action("market.trade",interaction.user.id,{"location":str(c.get('location','')),"item_id":item,"quantity":int(quantity),"buy":True},action_id=f"discord:{interaction.id}:market.trade")
+        result=dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
+    await interaction.response.send_message(f"🪙 Bought **{WORLD.item_name(item)} x{quantity}** for **{result.get('total_price',0)}** stones.",ephemeral=False)
 
 
 @market_buy_command.autocomplete("item")
@@ -11109,10 +10340,13 @@ async def market_buy_item_autocomplete(interaction:discord.Interaction,current:s
 async def market_sell_command(interaction:discord.Interaction,item:str,quantity:app_commands.Range[int,1,100]=1)->None:
     c=await require_character(interaction)
     if not c:return
-    try: result=await SIM.market_trade(user_id=interaction.user.id,location=str(c.get('location') or ''),item_id=item,quantity=int(quantity),buy=False)
-    except ValueError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
-    await interaction.response.send_message(f"💰 Sold **{WORLD.item_name(item)} x{result['quantity']}** for **{result['total']:,} {WORLD.currency_name(result['currency_id'])}**.\nYour sale increased local supply and eased demand.",ephemeral=False)
+    wt=await current_world_time()
+    try:
+        envelope=await ENGINE.authoritative_action("market.trade",interaction.user.id,{"location":str(c.get('location','')),"item_id":item,"quantity":int(quantity),"buy":False},action_id=f"discord:{interaction.id}:market.trade")
+        result=dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
+    await interaction.response.send_message(f"🪙 Sold **{WORLD.item_name(item)} x{quantity}** for **{result.get('total_price',0)}** stones.",ephemeral=False)
 
 
 @market_sell_command.autocomplete("item")
@@ -11123,7 +10357,7 @@ async def market_sell_item_autocomplete(interaction:discord.Interaction,current:
 async def lifespan_command(interaction:discord.Interaction)->None:
     c=await require_character(interaction,allow_deceased=True)
     if not c:return
-    wt=await current_world_time(); life=lifespan_status(c,wt.total_minutes)
+    wt=await current_world_time(); life=await authoritative_lifespan(interaction.user.id)
     realm=WORLD.realm_name(int(c.get('realm_index',0))); phase=int(c.get('phase',1))
     if life.ageless:
         ceiling="**Ageless / no natural-aging death**"
@@ -11135,6 +10369,13 @@ async def lifespan_command(interaction:discord.Interaction)->None:
         else:
             range_line="Realm range: mortal baseline."
     remain=("∞" if life.remaining_years is None else f"{life.remaining_years:,.1f} years")
+    pause_line = ""
+    if getattr(life, "aging_paused", False):
+        paused_years = float(getattr(life, "paused_game_minutes", 0) or 0) / float(MINUTES_PER_YEAR)
+        pause_line = (
+            f"\n⏸️ Inactivity protection is active. **{paused_years:,.1f} game-years** "
+            "of biological aging are currently excluded."
+        )
     await interaction.response.send_message(
         f"🕯️ **Lifespan — {c['name']}**\n"
         f"Realm: **{realm}, Stage {phase}**\n"
@@ -11143,7 +10384,7 @@ async def lifespan_command(interaction:discord.Interaction)->None:
         f"Cultivation/body longevity contribution: **+{life.cultivation_bonus_years:,} years**\n"
         f"Life-extension medicines/herbs: **+{life.extension_years:,} years**\n"
         f"Current lifespan ceiling: {ceiling}\n"
-        f"Remaining: **{remain}**\n\n{range_line}\n\n"
+        f"Remaining: **{remain}**{pause_line}\n\n{range_line}\n\n"
         "Natural longevity does not protect against combat death, tribulations, curses, soul destruction, or explicit life-draining techniques.",
         ephemeral=False,
     )
@@ -11219,73 +10460,54 @@ async def bond_status(interaction:discord.Interaction)->None:
 @registered_group_command(bond_group, name="propose", description="Invite another cultivator into a consensual Dao partnership")
 @serialized_user_action
 async def bond_propose(interaction:discord.Interaction,partner:discord.Member)->None:
-    if not await require_character(interaction):return
-    try: row=await DB.create_dao_partnership_request(interaction.user.id,partner.id)
-    except ValueError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
-    await interaction.response.send_message(
-        f"💞 Dao-partnership proposal **#{row['partnership_id']}** sent to {partner.mention}. "
-        "Nothing becomes active until they explicitly accept through **Character → Dao Partnership → Respond**.",ephemeral=False
-    )
+    if not await require_character(interaction): return
+    wt=await current_world_time()
+    try:
+        envelope=await ENGINE.authoritative_action("dao.propose",interaction.user.id,{"partner_user_id":partner.id},action_id=f"discord:{interaction.id}:dao.propose")
+        result=dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
+    await interaction.response.send_message(f"💞 Dao-partnership proposal **#{result.get('partnership_id')}** sent to {partner.mention}.",ephemeral=False)
 
 
 @registered_group_command(bond_group, name="respond", description="Accept or reject a Dao-partnership proposal addressed to you")
 @app_commands.choices(decision=[app_commands.Choice(name="Accept",value="accept"),app_commands.Choice(name="Reject",value="reject")])
 @serialized_user_action
 async def bond_respond(interaction:discord.Interaction,partnership_id:int,decision:app_commands.Choice[str])->None:
-    if not await require_character(interaction):return
-    try: row=await DB.resolve_dao_partnership(interaction.user.id,partnership_id,accept=decision.value=='accept')
-    except ValueError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
-    other=int(row['user_b']) if int(row['user_a'])==interaction.user.id else int(row['user_a']); oc=await DB.get_character(other)
-    if decision.value=='accept':
-        await interaction.response.send_message(f"💞 You and **{(oc or {}).get('name','your partner')}** are now Dao partners. Dual cultivation still requires both living characters to be at the **same canonical location**.")
-    else:
-        await interaction.response.send_message("The Dao-partnership proposal is rejected.",ephemeral=False)
+    if not await require_character(interaction): return
+    wt=await current_world_time()
+    try:
+        envelope=await ENGINE.authoritative_action("dao.respond",interaction.user.id,{"partnership_id":int(partnership_id),"accept":decision.value=='accept'},action_id=f"discord:{interaction.id}:dao.respond")
+        result=dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
+    await interaction.response.send_message("💞 Dao partnership response recorded.",ephemeral=False)
 
 
 @registered_group_command(bond_group, name="dual_cultivate", description="Cultivate with your accepted Dao partner while both are at the same location")
 @serialized_user_action
 async def bond_dual_cultivate(interaction:discord.Interaction)->None:
-    c=await require_character(interaction)
-    if not c:return
-    bond=await DB.get_dao_partnership(interaction.user.id,active_only=True)
-    if not bond:
-        await interaction.response.send_message("You need an accepted Dao partnership first.",ephemeral=False);return
-    partner_id=int(bond['partner_user_id']); partner=await DB.get_character(partner_id)
-    if not partner:
-        await interaction.response.send_message("Your partner's current incarnation is unavailable.",ephemeral=False);return
-    caps={
-        interaction.user.id: WORLD.phase_cost(int(c['realm_index']),int(c['phase'])),
-        partner_id: WORLD.phase_cost(int(partner['realm_index']),int(partner['phase'])),
-    }
-    try: result=await DB.record_dual_cultivation(interaction.user.id,cultivation_caps=caps,cooldown_seconds=SETTINGS.cultivate_cooldown_minutes*60)
-    except ValueError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
-    if result.get('milestone'):
-        wt=await current_world_time()
-        await DB.adjust_fate(interaction.user.id,1,reason="dao_partner_resonance",game_minute=wt.total_minutes)
-        await DB.adjust_fate(partner_id,1,reason="dao_partner_resonance",game_minute=wt.total_minutes)
-    await interaction.response.send_message(
-        f"☯️ **Paired meridians resonate at {result['location']}.**\n"
-        f"{c['name']} gains **+{int(result['awarded'].get(interaction.user.id,0))} cultivation**; "
-        f"**{result['partner_name']}** gains **+{int(result['awarded'].get(partner_id,0))}**.\n"
-        f"Bond Resonance: **{int(result['resonance'])}/100**"
-        + ("\n🌠 Crossing a resonance threshold grants **+1 Fate to both partners**." if result.get('milestone') else "")
-    )
+    if not await require_character(interaction): return
+    wt=await current_world_time()
+    try:
+        envelope=await ENGINE.authoritative_action("dao.dual_cultivate",interaction.user.id,{"cooldown_seconds":SETTINGS.cultivate_cooldown_minutes*60},action_id=f"discord:{interaction.id}:dao.dual_cultivate")
+        result=dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
+    await interaction.response.send_message(f"☯️ Paired meridians resonate at **{result.get('location','your shared location')}**.\nBond Resonance: **{int(result.get('resonance',0))}/100**",ephemeral=False)
 
 
 @registered_group_command(bond_group, name="sever", description="End your active Dao partnership")
 @serialized_user_action
 async def bond_sever(interaction:discord.Interaction,confirm:bool=False)->None:
-    if not await require_character(interaction):return
-    bond=await DB.get_dao_partnership(interaction.user.id,active_only=True)
-    if not bond:
-        await interaction.response.send_message("You have no active Dao partnership.",ephemeral=False);return
-    if not confirm:
-        await interaction.response.send_message(f"⚠️ Sever your Dao partnership with **{bond['partner_name']}**? Repeat with **confirm:true**.",ephemeral=False);return
-    await DB.sever_dao_partnership(interaction.user.id)
-    await interaction.response.send_message(f"🧵 Your Dao partnership with **{bond['partner_name']}** is severed.",ephemeral=False)
+    if not await require_character(interaction): return
+    wt=await current_world_time()
+    try:
+        envelope=await ENGINE.authoritative_action("dao.sever",interaction.user.id,{},action_id=f"discord:{interaction.id}:dao.sever")
+        result=dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
+    await interaction.response.send_message("🧵 Your Dao partnership is severed.",ephemeral=False)
 
 
 @registered_root_command(name="soul",description="View your reincarnation history and persistent Soul Legacy",guild=GUILD)
@@ -11323,13 +10545,13 @@ async def afterlife_status(interaction:discord.Interaction)->None:
     if not c:return
     if c.get("life_status")!="deceased":
         await interaction.response.send_message("You are alive; no Samsara cycle is active.",ephemeral=False);return
-    state=await DB.advance_samsara_time(
-        interaction.user.id,minutes_per_year=MINUTES_PER_YEAR,
-        max_wait_seconds=SETTINGS.reincarnation_max_wait_seconds,
-    )
-    if not state:
-        await interaction.response.send_message("No reincarnation path is currently recorded for this soul.",ephemeral=False);return
-    old_family=state.get("family") or {}
+    try:
+        state=dict(await ENGINE.action(
+            "lifecycle.samsara_status",interaction.user.id,{"minutes_per_year":MINUTES_PER_YEAR},
+        ) or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"No reincarnation path is currently recorded for this soul. ({exc})",ephemeral=False);return
+    old_family=await DB.get_birth_family(interaction.user.id) or {}
     progress=min(1.0,float(state.get('samsara_years_elapsed',0))/max(1.0,float(state.get('samsara_years_target',1))))
     passed=int(int(state.get('samsara_lives_count',0))*progress)
     lines=[
@@ -11363,14 +10585,12 @@ async def reincarnate(interaction:discord.Interaction,name:str,path:str,gender:a
         await interaction.response.send_message("Create your first incarnation with **/begin**.",ephemeral=False);return
     if c.get('life_status')!='deceased':
         await interaction.response.send_message("Your current incarnation is still alive.",ephemeral=False);return
-    state=await DB.get_reincarnation_state(interaction.user.id)
-    if not state:
-        await interaction.response.send_message("No Samsara cycle is recorded for this soul.",ephemeral=False);return
-    wt=await current_world_time()
-    state=await DB.advance_samsara_time(
-        interaction.user.id,minutes_per_year=MINUTES_PER_YEAR,
-        max_wait_seconds=SETTINGS.reincarnation_max_wait_seconds,
-    ) or state
+    try:
+        state=dict(await ENGINE.action(
+            "lifecycle.samsara_status",interaction.user.id,{"minutes_per_year":MINUTES_PER_YEAR},
+        ) or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"No Samsara cycle is recorded for this soul. ({exc})",ephemeral=False);return
     if not state.get("ready"):
         await interaction.response.send_message(
             f"☸️ Your soul is still turning through Samsara.\n"
@@ -11380,56 +10600,42 @@ async def reincarnate(interaction:discord.Interaction,name:str,path:str,gender:a
     normalized_path=WORLD.normalize_path(path)
     if not normalized_path:
         await interaction.response.send_message("Unknown path. Choose: "+", ".join(WORLD.paths.keys()),ephemeral=False);return
-
-    target_world=str(state.get("target_world") or "Mortal World")
-    new_family_profile=generate_samsara_family(target_world, int(state.get("karma_at_death",0)))
-    soul_talent_echo=max(0,min(100,int(state.get("talent_retention",0))))
-    partner_echo=max(0,min(25,int(state.get("partner_echo",0))))
-    talent_echo=max(0,min(100,soul_talent_echo+partner_echo))
-    old_root=str(state.get("previous_spiritual_root") or c.get('spiritual_root') or 'Mortal Root')
-    # Talent Echo increases the chance that a compatible past-life root resurfaces,
-    # but a fresh Samsara birth can still produce a different root.
-    echo_chance=min(70, max(5, talent_echo * 2 // 3))
-    if secrets.randbelow(100)<echo_chance:
-        root=old_root
-    else:
-        root=inherited_root(old_root,WORLD.roots,family_tier=int(new_family_profile.get('tier',1)),karma_score=int(state.get('karma_at_death',0)))
-
-    attrs,qi_max,vitality_max=WORLD.starting_stats(normalized_path)
-    aptitude_profile=generate_aptitude_bundle(
-        base_root=root,path=normalized_path,family=new_family_profile,
-        root_system=WORLD.spiritual_root_system,bloodline_definitions=WORLD.bloodlines,
-        physique_definitions=WORLD.physiques,talent_echo=talent_echo,
-    )
+    wt=await current_world_time()
     try:
-        result=await DB.reincarnate_character(
-            user_id=interaction.user.id,name=name.strip(),gender=gender.value,path=normalized_path,spiritual_root=root,
-            attributes=attrs,qi_max=qi_max,vitality_max=vitality_max,current_game_minute=wt.total_minutes,
-            starting_age=12,natural_lifespan_years=70+secrets.randbelow(11),new_family_profile=new_family_profile,
-            aptitude_profile=aptitude_profile,
+        envelope=await ENGINE.authoritative_action(
+            "lifecycle.reincarnate",interaction.user.id,
+            {"name":name.strip(),"path":normalized_path,"gender":gender.value},
+            action_id=f"discord:{interaction.id}:lifecycle.reincarnate",
         )
-    except ValueError as exc:
+    except GameEngineError as exc:
         await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
-
+    result=dict(envelope.get("result") or {})
+    partner_echo=max(0,min(25,int(result.get("partner_echo",0))))
+    partner_name=str(result.get("partner_name") or "")
     lines=[
         "☸️ **Samsara turns. A new life begins.**",
         f"You awaken as **{name.strip()}**, generation **1** of **{result['family_name']}**.",
-        f"World: **{result.get('target_world', target_world)}**",
+        f"World: **{result.get('target_world', state.get('target_world','Mortal World'))}**",
+        f"Home: **{result.get('physical_location','Unknown')}** • Opening scene: **family household**",
         f"Age: **12** • Spiritual Root: **{result['spiritual_root']}** • Path: **{normalized_path}**",
         f"Incarnation: **{int(result.get('incarnation_count',2))}**",
         f"Soul Legacy Points: **{int(result.get('legacy_points',0))}**",
         f"Memory Seed: **{int(result.get('memory_retention',0))}%**",
-        f"Talent Echo: **{int(result.get('talent_retention',0))}%**" + (f" + **{partner_echo}% Partner Echo** from {state.get('partner_name')}" if partner_echo else ""),
+        f"Talent Echo: **{int(result.get('talent_retention',0))}%**" + (f" + **{partner_echo}% Partner Echo** from {partner_name}" if partner_echo and partner_name else ""),
         f"Law Echo: **{int(result.get('comprehension_retention',0))}%**",
         "Your previous realm, Qi/Body cultivation, inventory, money, and direct Law progress are gone.",
         "Past-life memories are sealed and can awaken gradually through breakthroughs and deep comprehension.",
     ]
+    if result.get("lineage_status"):
+        lines.append(f"Lineage outcome: **{str(result['lineage_status']).replace('_',' ').title()}**")
+    if result.get("lineage_summary"):
+        lines.append(str(result["lineage_summary"]))
     if result.get("special_trait"):
         lines.append(f"🌌 Samsara Trait: **{result['special_trait']}**")
     try:
-        await SIM.ensure_all_clans(wt.total_minutes)
+        await ENGINE.bootstrap_simulation(wt.total_minutes)
     except Exception:
-        log.exception("Could not initialize martial-clan records after reincarnation")
+        log.exception("Could not initialize Go-owned simulation bootstrap after reincarnation")
     await interaction.response.send_message("\n".join(lines))
 
 @registered_group_command(admin_player_group, name="karma",description="Adjust a cultivator's canonical Good/Evil karma score")
@@ -11438,8 +10644,24 @@ async def admin_karma(interaction:discord.Interaction,member:discord.Member,amou
     if not await DB.get_character(member.id):
         await interaction.response.send_message("That member has no cultivation character.",ephemeral=False);return
     before_c = await DB.get_character(member.id)
-    score=await DB.adjust_karma(member.id,int(amount),reason=reason[:200])
-    await audit_admin(interaction, "player.karma", target=f"user:{member.id}", before={"karma": int((before_c or {}).get("karma_score",0))}, after={"karma": score}, reason=reason)
+    karma_result = dict(
+        await ENGINE.action(
+            "admin.player.karma",
+            interaction.user.id,
+            {"user_id": member.id, "delta": int(amount), "reason": reason[:200]},
+        )
+        or {}
+    )
+    score = int(karma_result.get("karma_score", 0))
+    await audit_admin(
+        interaction,
+        "player.karma",
+        target=f"user:{member.id}",
+        before={"karma": int((before_c or {}).get("karma_score", 0))},
+        after={"karma": score},
+        reason=reason,
+        database_log=False,
+    )
     await interaction.response.send_message(f"☯️ {member.mention}: karma changed by **{int(amount):+d}** → **{score:+d} ({karma_label(score)})**.",ephemeral=False)
 
 @registered_group_command(admin_sect_group, name="setsect", description="Assign a cultivator to a sect using the canonical hierarchy")
@@ -11605,16 +10827,53 @@ async def admin_grant_currency(interaction:discord.Interaction,member:discord.Me
     if not await require_admin(interaction):return
     if currency not in WORLD.currencies:
         await interaction.response.send_message("Unknown currency.",ephemeral=False);return
-    balance=await DB.add_currency(member.id,currency,int(amount))
-    await audit_admin(interaction, "player.grantcurrency", target=f"user:{member.id}", after={"currency": currency, "amount": int(amount), "balance": balance})
+    currency_result = dict(
+        await ENGINE.action(
+            "admin.player.grant_currency",
+            interaction.user.id,
+            {
+                "user_id": member.id,
+                "currency_id": currency,
+                "amount": int(amount),
+                "reason": "discord admin",
+            },
+        )
+        or {}
+    )
+    balance = int(currency_result.get("balance", 0))
+    await audit_admin(
+        interaction,
+        "player.grantcurrency",
+        target=f"user:{member.id}",
+        after={"currency": currency, "amount": int(amount), "balance": balance},
+        database_log=False,
+    )
     await interaction.response.send_message(f"✅ Granted **{amount:,} {WORLD.currency_name(currency)}**. New balance: **{balance:,}**.",ephemeral=False)
 
 
 @registered_group_command(admin_world_group, name="advancetime",description="Advance the canonical in-world clock")
 async def admin_advance_time(interaction:discord.Interaction,minutes:app_commands.Range[int,1,525600])->None:
     if not await require_admin(interaction):return
-    new_minute=await DB.advance_world_clock(int(minutes),scale=SETTINGS.world_time_scale)
-    await audit_admin(interaction, "world.advancetime", target="world_clock", after={"minutes": int(minutes), "new_game_minute": new_minute})
+    time_result = dict(
+        await ENGINE.action(
+            "admin.world.advance_time",
+            interaction.user.id,
+            {
+                "minutes": int(minutes),
+                "scale": SETTINGS.world_time_scale,
+                "reason": "discord admin",
+            },
+        )
+        or {}
+    )
+    new_minute = int(time_result.get("game_minute", 0))
+    await audit_admin(
+        interaction,
+        "world.advancetime",
+        target="world_clock",
+        after={"minutes": int(minutes), "new_game_minute": new_minute},
+        database_log=False,
+    )
     wt=from_game_minutes(new_minute)
     await interaction.response.send_message(f"🕰️ Advanced world time by **{minutes:,} minutes**.\nNow: **{wt.display}**",ephemeral=False)
 
@@ -11722,8 +10981,20 @@ async def admin_teleport(interaction: discord.Interaction, member: discord.Membe
     if not loc:
         await interaction.response.send_message("Unknown canonical location.", ephemeral=False); return
     before = {"location": c.get("location")}
-    await DB.admin_teleport_character(member.id, location)
-    await audit_admin(interaction, "player.teleport", target=f"user:{member.id}", before=before, after={"location": location}, reason=reason)
+    await ENGINE.action(
+        "admin.player.teleport",
+        interaction.user.id,
+        {"user_id": member.id, "location": location, "reason": reason},
+    )
+    await audit_admin(
+        interaction,
+        "player.teleport",
+        target=f"user:{member.id}",
+        before=before,
+        after={"location": location},
+        reason=reason,
+        database_log=False,
+    )
     await interaction.response.send_message(f"✅ Teleported {member.mention} to **{location}**.", ephemeral=False)
 
 
@@ -11740,18 +11011,49 @@ async def admin_revive(interaction: discord.Interaction, member: discord.Member,
     if not c:
         await interaction.response.send_message("That member has no cultivation character.", ephemeral=False); return
     before = {"life_status": c.get("life_status"), "vitality": c.get("vitality")}
-    ok = await DB.admin_revive_character(member.id)
+    revive_result = dict(
+        await ENGINE.action(
+            "admin.player.revive",
+            interaction.user.id,
+            {"user_id": member.id, "reason": reason},
+        )
+        or {}
+    )
+    ok = bool(revive_result)
     if not ok:
         await interaction.response.send_message("Could not revive that character.", ephemeral=False); return
-    await audit_admin(interaction, "player.revive", target=f"user:{member.id}", before=before, after={"life_status":"alive","vitality":"full"}, reason=reason)
+    await audit_admin(
+        interaction,
+        "player.revive",
+        target=f"user:{member.id}",
+        before=before,
+        after={"life_status": "alive", "vitality": "full"},
+        reason=reason,
+        database_log=False,
+    )
     await interaction.response.send_message(f"✨ Revived {member.mention}. Pending Samsara was cancelled.", ephemeral=False)
 
 
 @registered_group_command(admin_player_group, name="clearbattle", description="Force-clear a player's active battle state")
 async def admin_clearbattle(interaction: discord.Interaction, member: discord.Member, reason: str = "GM recovery") -> None:
     if not await require_admin(interaction): return
-    count = await DB.admin_clear_battle(member.id)
-    await audit_admin(interaction, "player.clearbattle", target=f"user:{member.id}", after={"cleared": count}, reason=reason)
+    clear_result = dict(
+        await ENGINE.action(
+            "admin.player.clear_battle",
+            interaction.user.id,
+            {"user_id": member.id, "reason": reason},
+        )
+        or {}
+    )
+    count = int(clear_result.get("cleared", 0))
+    await audit_admin(
+        interaction,
+        "player.clearbattle",
+        target=f"user:{member.id}",
+        after={"cleared": count},
+        reason=reason,
+        database_log=False,
+    )
     await interaction.response.send_message(f"✅ Cleared **{count}** active battle state(s) for {member.mention}.", ephemeral=False)
 
 
@@ -11813,8 +11115,23 @@ async def admin_npcinspect_autocomplete(interaction: discord.Interaction, curren
 async def admin_automation(interaction: discord.Interaction, system: app_commands.Choice[str], enabled: bool) -> None:
     if not await require_admin(interaction): return
     before = await DB.get_automation_settings()
-    after = await DB.set_automation_setting(system.value, enabled)
-    await audit_admin(interaction, "automation.set", target=system.value, before={system.value: before.get(system.value)}, after={system.value: after.get(system.value)})
+    automation_result = dict(
+        await ENGINE.action(
+            "admin.automation.set",
+            interaction.user.id,
+            {"system": system.value, "enabled": enabled, "reason": "discord admin"},
+        )
+        or {}
+    )
+    after = dict(automation_result.get("settings") or {})
+    await audit_admin(
+        interaction,
+        "automation.set",
+        target=system.value,
+        before={system.value: before.get(system.value)},
+        after={system.value: after.get(system.value)},
+        database_log=False,
+    )
     await interaction.response.send_message(f"⚙️ **{system.name}** is now **{'ON' if enabled else 'OFF'}**.", ephemeral=False)
 
 

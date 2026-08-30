@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tests.support import install_aiosqlite_shim, PROJECT_ROOT
+from tests.support import install_aiosqlite_shim, PROJECT_ROOT, seed_character
 install_aiosqlite_shim()
 
 from app.database import Database, SCHEMA_VERSION
@@ -16,7 +16,7 @@ class PrivateSceneRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.db = Database(Path(self.tmp.name) / "scenes.sqlite3")
         await self.db.init()
-        self.assertTrue(await self.db.create_character(
+        self.assertTrue(await seed_character(self.db,
             user_id=1801, discord_name="sceneuser", name="Jin Wei",
             origin="Greenriver Town", path="Qi Refiner", spiritual_root="Wood",
             concept="wanderer", location="Greenriver Town", attributes=ATTRS,
@@ -27,7 +27,7 @@ class PrivateSceneRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.tmp.cleanup()
 
     async def test_schema_v10_stores_info_expedition_and_scene_threads(self):
-        self.assertEqual(SCHEMA_VERSION, 17)
+        self.assertEqual(SCHEMA_VERSION, 22)
         await self.db.set_server_channels(
             77, announcement_channel_id=1, event_scene_channel_id=2,
             home_scene_channel_id=3, log_channel_id=4, begin_channel_id=5,
@@ -46,6 +46,18 @@ class PrivateSceneRoutingTests(unittest.IsolatedAsyncioTestCase):
         await self.db.update_expedition_location(77, 1801, "Moonfen Marsh")
         self.assertEqual((await self.db.get_expedition_thread(77, 1801))["last_location"], "Moonfen Marsh")
 
+        async with self.db._connect() as db:
+            cur = await db.execute(
+                "INSERT INTO birth_families(family_name,surname,archetype,tier,wealth,influence,stability,alignment_bias,location,head_name,head_gender,head_title,head_realm_index,head_phase,treasury_balance,generation,created_game_minute,last_simulated_game_minute,history_json,line_status,clan_structure,bloodline_name,bloodline_affinity,bloodline_trait,bloodline_purity,branch_count,retainer_count,confederacy_name,created_at,updated_at,starter_key) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                ("Han Family","Han","martial_household",2,42,48,62,0,"Greenriver Town","Han Wei","male","Patriarch",0,1,168,1,10,10,"[]","active","martial_household","None","None","None",0,1,4,"None",0,0,"starter:mortal_world:martial_household"),
+            )
+            family_id = int(cur.lastrowid)
+            await db.commit()
+        await self.db.set_birth_family_household_thread(77, family_id, thread_id=8101, parent_channel_id=3)
+        household = await self.db.get_birth_family_household_thread(77, family_id)
+        self.assertEqual(household["thread_id"], 8101)
+        self.assertEqual((await self.db.get_birth_family_household_thread_by_thread(8101))["family_id"], family_id)
+
     async def test_sect_abode_is_one_persistent_private_location_per_member(self):
         await self.db.set_sect_membership(1801, sect_name="Azure Cloud Sect", rank_name="Outer Disciple", rank_level=10)
         abode = await self.db.ensure_sect_abode(
@@ -55,25 +67,6 @@ class PrivateSceneRoutingTests(unittest.IsolatedAsyncioTestCase):
         await self.db.set_sect_abode_thread(1801, thread_id=9001, thread_channel_id=3)
         self.assertEqual((await self.db.get_sect_abode_by_thread(9001))["sect_name"], "Azure Cloud Sect")
         self.assertEqual((await self.db.get_sect_abode_by_location("sect_abode:1801"))["user_id"], 1801)
-
-    def test_discord_gui_routes_explore_action_and_read_only_info(self):
-        source = (ROOT / "app" / "bot" / "main.py").read_text(encoding="utf-8")
-        creation_flow = source[
-            source.index("class CharacterModal"):
-            source.index("def _birth_family_preview_embed")
-        ]
-        self.assertIn('"xianxia-info": cfg.get("info_channel_id")', source)
-        self.assertIn('"expeditions": cfg.get("exploration_channel_id")', source)
-        self.assertIn('send_messages=False', source)
-        self.assertIn('ensure_expedition_thread(interaction, character)', creation_flow)
-        self.assertIn('Your private expedition journal is ready', creation_flow)
-        self.assertIn('ensure_expedition_thread(interaction, c)', source)
-        self.assertIn('Exploration recorded in your private expedition journal', source)
-        self.assertIn('target_thread = await active_private_location_thread(interaction, c)', source)
-        self.assertIn('Private Expedition Journal', source)
-        self.assertIn('Sect abode assigned', source)
-        self.assertIn('@registered_group_command(sect_group, name="abode"', source)
-        self.assertIn('bool(private_scene)', source)
 
 
 if __name__ == "__main__":

@@ -118,8 +118,31 @@ def condition_effect(key: str, severity: int) -> dict[str, Any]:
     }
 
 
-PROFESSIONS = ("Alchemy", "Forging", "Formation", "Inscription", "Beast Taming", "Appraisal")
+PROFESSIONS = (
+    "Alchemy", "Forging", "Formation", "Inscription", "Foraging",
+    "Beast Taming", "Artifact Refining", "Appraisal",
+)
 
+
+
+
+def craft_quality(margin: int, *, success: bool) -> dict[str, Any]:
+    """Shared craftsmanship quality for non-alchemy professions.
+
+    Alchemy keeps its specialized pill-quality/output rules. Forging, formation
+    crafting and inscription still gain a visible quality grade and profession
+    XP without duplicating finished equipment simply because a roll was high.
+    """
+    if not success:
+        return {"key": "failed", "label": "Failed", "xp_bonus": 0, "quality_points": 0}
+    margin = int(margin)
+    if margin >= 9:
+        return {"key": "masterwork", "label": "Masterwork", "xp_bonus": 8, "quality_points": 9}
+    if margin >= 6:
+        return {"key": "superior", "label": "Superior", "xp_bonus": 5, "quality_points": 6}
+    if margin >= 3:
+        return {"key": "fine", "label": "Fine", "xp_bonus": 3, "quality_points": 3}
+    return {"key": "ordinary", "label": "Ordinary", "xp_bonus": 0, "quality_points": max(0, margin)}
 
 def profession_xp_needed(level: int) -> int:
     level = max(0, int(level))

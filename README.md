@@ -1,8 +1,15 @@
-# Xianxia RP Discord Bot v0.13
+# Xianxia RP Discord Bot v0.18
 
-A persistent Xianxia role-playing Discord bot designed for a CPU-only QNAP/NAS deployment: Python owns Discord/RAG/presentation, Go owns canonical game rules and SQLite WAL, and OpenRouter provides read-only cloud narration with a fully free fallback chain.
+A persistent Xianxia role-playing Discord bot designed for CPU-only QNAP/NAS deployment. Python owns
+Discord, RAG, dashboard, and presentation orchestration; Go owns canonical gameplay rules, current
+game time, simulation mutations, and SQLite WAL state.
 
-Version **0.13** removes the local Ollama/Qwen stack and restores the guided **`/action`-only** interaction design. Routine narration uses Gemma 4 31B Free, epic narration uses Nemotron 3 Super Free, known free cloud fallbacks are tried next, and `openrouter/free` is the final cloud fallback before deterministic procedural narration.
+Version **0.18** completes the staged authority cleanup: forage/crafting/companions, canonical time,
+unified lifespan, multi-hop road travel, caravan mechanics, dashboard-owned Discord setup, and removal
+of obsolete Python mechanical authority paths. The release uses schema **22**.
+
+See `V018_RELEASE_NOTES.md`, `V018_RELEASE_VALIDATION.md`, and
+`V018_RELEASE_SECURITY_LOAD_AUDIT.md`.
 
 ## Release architecture
 
@@ -101,7 +108,7 @@ cache_size=-32768
 wal_autocheckpoint=1000
 ```
 
-The current schema is **17**. Historical migrations remain in the repository and upgrades run in place.
+The current schema is **21**. Historical migrations remain in the repository and upgrades run in place.
 
 ## Requirements
 
@@ -190,7 +197,7 @@ Optional authenticated GM control plane. `startup.sh` starts it when:
 DASHBOARD_ENABLED=true
 ```
 
-No Ollama/local-LLM service exists in v0.13.
+No Ollama/local-LLM service exists in v0.18.
 
 ## Player interface and Discord GUI
 
@@ -570,8 +577,35 @@ The Python service exposes its configured health/metrics behavior and records st
 
 - `GET /livez` is unauthenticated for container health checks.
 - UI/API routes require Basic authentication.
+- The **Discord Setup** page talks only to the private Python-bot control endpoint inside the Docker network. It never sends Discord mutations through Go.
+- The bot control endpoint requires `BOT_CONTROL_TOKEN`; when that value is blank both bot and dashboard reuse `DASHBOARD_TOKEN`.
 
 If the dashboard rejects startup, verify `DASHBOARD_TOKEN` is at least 20 characters and not a placeholder. If Admin Console controls are disabled, verify `DASHBOARD_ADMIN_WRITES=true` and `GAME_ENGINE_URL` is reachable.
+
+### Discord Server Setup from the GM Dashboard
+
+Open **Discord Setup** in the GM dashboard after the bot has joined the configured `GUILD_ID`. The page can:
+
+- inspect the connected Xianxia RP guild and bot identity
+- diagnose required Discord permissions and realm-role hierarchy problems
+- run an idempotent **Full Setup** that creates/reuses/repairs the canonical Xianxia RP base channels and realm-capital channels
+- run **Repair Server** without deleting unrelated Discord channels or resetting game/world data
+- synchronize guild slash commands
+- synchronize existing cultivators' generated realm-access roles
+- rebuild the persistent `#xianxia-info` guide
+- send a test message to the configured world-events channel
+- bind existing text channels manually for world events, event scenes, player homes, logs, onboarding, info and expeditions
+
+Discord provisioning is intentionally owned by the Python `discord.py` process. The dashboard calls a private authenticated bot-control endpoint, and every state-changing dashboard Discord operation writes an `admin_audit_log` entry through the normal Go-owned database boundary.
+
+Recommended first install:
+
+1. Create or choose the Discord server.
+2. Invite the Xianxia RP bot with the required permissions.
+3. Set `GUILD_ID` and start the stack.
+4. Open **GM Dashboard -> Discord Setup**.
+5. Run **Full Setup**.
+6. Resolve any permission warnings shown by the dashboard, then run **Repair Server** if needed.
 
 If SQLite reports contention, verify only the Go service is opening the production database and inspect `journal_mode`, `busy_timeout` and current engine sessions rather than adding direct Python SQLite writers.
 
@@ -656,6 +690,18 @@ tests/python/           Python-owned unit/integration/contract suite
 tests/support.py         shared dependency shims and test path helpers
 ```
 
+## Release status — v0.18
+
+- Recommended final release after Stages 1–8 authority migration and adversarial hardening.
+- Go owns canonical gameplay time, migrated gameplay mechanics, lifespan/death authority, road travel,
+  caravan settlement, simulation mutation, and SQLite WAL.
+- Python owns Discord/RAG/dashboard/presentation orchestration and does not duplicate the removed
+  lifespan/mechanical authority paths.
+- Discord channel/category provisioning is admin-dashboard-owned; the bot validates configured channels.
+- Database schema is **22**.
+- The final release gate adds loopback-by-default standalone engine binding plus strict bounded JSON
+  request handling.
+
 ## Design rules for future work
 
 1. **Do not reintroduce a Go shadow mode.** New migrated mechanics should execute once in Go.
@@ -666,44 +712,7 @@ tests/support.py         shared dependency shims and test path helpers
 6. **Audit GM mutations.** New Admin Console actions should write `admin_audit_log`.
 7. **Prefer native Go tests for Go-owned rules.** Pytest should test Python-owned behavior and integration boundaries rather than duplicate engine formulas.
 
-## Release notes — v0.13
+## Release notes — v0.18
 
-- removed Ollama, Qwen model downloads and the `local-llm` Docker profile for CPU-only NAS deployment
-- restored `/action` as the only freeform scene-action entry point; removed the AI-classified root `/act` shortcut
-- changed AI to two narration tiers only: routine and epic
-- routine chain: Gemma 4 31B Free -> Gemma 4 26B A4B Free -> `openrouter/free` -> procedural
-- epic chain: Nemotron 3 Super Free -> Gemma 4 31B Free -> `openrouter/free` -> procedural
-- added fail-fast OpenRouter request-rate limiting and per-route cooldowns
-- added separate routine/epic OpenRouter timeouts
-- added QNAP-focused `startup.sh` and `stop.sh` scripts
-- added a ready-to-fill `.env` for QNAP deployment
-- removed `START_FULL_DOCKER.sh`, `STOP_FULL_DOCKER.sh` and `QNAP_QWEN_SETUP.sh`
-
-## Release notes — v0.12
-
-- introduced the OpenRouter routing layer and free-only model enforcement
-- this release is superseded by v0.13 for the CPU-only NAS architecture
-
-## Release notes — v0.11
-
-- reorganized pytest into `tests/python/unit`, `tests/python/integration` and `tests/python/contracts`
-- added pytest ownership markers for targeted `unit`, `integration` and `contract` runs
-- centralized shared artifact-only dependency shims in `tests/support.py`
-- removed Python tests for Go-owned SQLite concurrency/WAL internals and replaced them with native Go storage tests
-- moved simulation backlog/batch assertions and authoritative relationship/scene/quest/combat/cultivation action coverage into native Go tests
-- removed the unused shadow-era Python core write ledger helper while preserving its historical migration tables
-- removed in-process Python replicas of Go relationship and quest rules from the service tests
-- fixed authoritative Go scene transitions so nullable `channel_id` values bind correctly to SQLite
-
-## Release notes — v0.10
-
-- upgraded the local GM dashboard from read-only observability to an authenticated Admin Console
-- added authoritative Go admin actions for time, player teleport/revive/battle recovery, currency, karma, automation and simulation intervals
-- exposed native Go forced-simulation controls through the dashboard
-- exposed Go-owned backups, optimize and VACUUM through the dashboard
-- added dashboard admin audit visibility
-- kept read-only mode available with `DASHBOARD_ADMIN_WRITES=false`
-- fixed dashboard startup so production query-only Go sessions do not require a local SQLite mount
-- added native Go tests for admin-state mutations and auditing
-- consolidated the former GUI, event GUI, local dashboard, NPC autonomous life, NPC memory, RAG performance, RAG v1 and world-history markdown notes into this README
-
+See `V018_RELEASE_NOTES.md` for the complete staged-authority, road/caravan, setup, cleanup, migration,
+security, and upgrade summary.

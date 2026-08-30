@@ -23,6 +23,9 @@ class ContainerBootstrapTests(unittest.TestCase):
     def test_qnap_scripts_manage_engine_bot_and_optional_dashboard(self):
         self.assertIn("docker compose --profile dashboard up", self.startup)
         self.assertIn("OPENROUTER_API_KEY", self.startup)
+        self.assertIn("DASHBOARD_TOKEN", self.startup)
+        self.assertIn('BOT_CONTROL_URL: "http://xianxia-bot:8080"', self.compose)
+        self.assertIn('test: ["CMD", "python", "-m", "app.healthcheck"]', self.compose)
         self.assertNotIn("ollama", self.startup.casefold())
         self.assertIn("docker compose --profile dashboard down", self.stop)
         self.assertNotIn("ollama", self.stop.casefold())

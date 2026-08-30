@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tests.support import install_aiosqlite_shim, PROJECT_ROOT
+from tests.support import install_aiosqlite_shim, PROJECT_ROOT, seed_character
 install_aiosqlite_shim()
 
 from app.database import Database, SCHEMA_VERSION
@@ -20,7 +20,7 @@ class RagV1Tests(unittest.IsolatedAsyncioTestCase):
         self.path = Path(self.tmp.name) / "rag.sqlite3"
         self.db = Database(self.path)
         await self.db.init()
-        ok = await self.db.create_character(
+        ok = await seed_character(self.db,
             user_id=8101, discord_name="rag", name="Zi Dian",
             origin="Greenriver Town", path="Qi Refiner", spiritual_root="Lightning",
             concept="remember what the world teaches", location="Greenriver Town",
@@ -35,7 +35,7 @@ class RagV1Tests(unittest.IsolatedAsyncioTestCase):
         self.tmp.cleanup()
 
     def test_schema_is_v16(self):
-        self.assertEqual(SCHEMA_VERSION, 17)
+        self.assertEqual(SCHEMA_VERSION, 22)
 
 
     def test_scene_profiles_tighten_routine_context_by_scene_type(self):
@@ -114,7 +114,12 @@ class RagV1Tests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("Cloudspine Foothills", ctx.text)
         self.assertNotIn("Blood Sea Scripture", ctx.text)
 
-        await self.db.learn_manual(8101, "blood_sea_scripture")
+        async with self.db._connect() as db:
+            await db.execute(
+                "INSERT INTO character_manuals(user_id,manual_id,mastery,practice,learned_at,updated_at) VALUES(?,?,?,?,?,?)",
+                (8101, "blood_sea_scripture", 0, 0, 1.0, 1.0),
+            )
+            await db.commit()
         known = await self.db.get_manuals(8101)
         ctx2 = await retriever.retrieve(
             character, query_text="Blood Sea Scripture blood qi",

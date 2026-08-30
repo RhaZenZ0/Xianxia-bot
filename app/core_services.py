@@ -234,7 +234,6 @@ class QuestService:
                     "objective_type": str(objective_type),
                     "amount": int(amount),
                     "target": target,
-                    "game_minute": int(game_minute),
                 },
             ))
             if transition.get("touched"):
@@ -294,34 +293,58 @@ class CombatService:
         self.engine = engine
 
     async def apply_damage(self, battle_id: int, user_id: int, damage: int) -> dict[str, int]:
+        # Legacy compatibility path. New battle exchanges use turn(), which owns the
+        # counter-roll and damage mutation atomically in Go.
         return dict(await self.engine.action(
             "combat.apply_damage", int(user_id),
             {"battle_id": int(battle_id), "damage": max(0, int(damage))},
         ))
 
-
-class CultivationService:
-    """Cultivation/reward mutations owned by the authoritative Go engine."""
-
-    def __init__(self, db: Any, *, engine: Any):
-        self.db = db
-        self.engine = engine
-
-    async def reward(self, user_id: int, **changes: Any) -> int:
-        result = dict(await self.engine.action("cultivation.reward", int(user_id), changes))
-        return int(result.get("cultivation_awarded", 0))
-
-
-class SectService:
-    """Sect membership orchestration without Discord-specific objects."""
-
-    def __init__(self, db: Any):
-        self.db = db
-
-    async def admit_outer_disciple(self, user_id: int, sect_name: str) -> None:
-        await self.db.set_sect_membership(
-            int(user_id), sect_name=str(sect_name), rank_name="Outer Disciple", rank_level=10,
+    async def turn(
+        self, user_id: int, *, battle_id: int, style: str, game_minute: int,
+        minutes_per_year: int, base_samsara_years: int, max_wait_seconds: int,
+        action_id: str, action: str = "",
+    ) -> dict[str, Any]:
+        return await self.engine.authoritative_action(
+            "combat.turn", int(user_id),
+            {
+                "battle_id": int(battle_id),
+                "style": str(style),
+                "action": str(action),
+                
+                "minutes_per_year": int(minutes_per_year),
+                "base_samsara_years": int(base_samsara_years),
+                "max_wait_seconds": int(max_wait_seconds),
+            },
+            action_id=str(action_id),
         )
-        await self.db.adjust_reputation(
-            int(user_id), str(sect_name), 5, reason="Passed sect entrance trial",
+
+    async def technique(
+        self, user_id: int, *, battle_id: int, technique: str, game_minute: int, action_id: str,
+    ) -> dict[str, Any]:
+        return await self.engine.authoritative_action(
+            "combat.technique", int(user_id),
+            {"battle_id": int(battle_id), "technique": str(technique)},
+            action_id=str(action_id),
         )
+
+    async def recovery_item(
+        self, user_id: int, *, battle_id: int, item_id: str, game_minute: int, action_id: str,
+    ) -> dict[str, Any]:
+        return await self.engine.authoritative_action(
+            "combat.recovery_item", int(user_id),
+            {"battle_id": int(battle_id), "item_id": str(item_id)},
+            action_id=str(action_id),
+        )
+
+    async def finalize(
+        self, user_id: int, *, battle_id: int, outcome: str, game_minute: int, action_id: str,
+    ) -> dict[str, Any]:
+        return await self.engine.authoritative_action(
+            "combat.finalize", int(user_id),
+            {"battle_id": int(battle_id), "outcome": str(outcome)},
+            action_id=str(action_id),
+        )
+
+
+

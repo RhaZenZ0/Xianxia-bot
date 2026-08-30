@@ -25,6 +25,7 @@ CREATE TABLE battles(battle_id INTEGER PRIMARY KEY,user_id INTEGER,player_hp INT
 CREATE TABLE currency_wallets(user_id INTEGER,currency_id TEXT,balance INTEGER,PRIMARY KEY(user_id,currency_id));
 CREATE TABLE inventory(user_id INTEGER,item_id TEXT,quantity INTEGER,PRIMARY KEY(user_id,item_id));
 CREATE TABLE event_log(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER,event_type TEXT,payload_json TEXT,created_at REAL);
+CREATE TABLE world_state(key TEXT PRIMARY KEY,value_json TEXT NOT NULL,updated_at REAL NOT NULL DEFAULT 0);
 INSERT INTO characters VALUES(42,20,20,5,0,0,0);
 INSERT INTO battles VALUES(7,42,20,20,'active',0,0);
 INSERT INTO character_quests VALUES(42,'first_steps','active','{"talk":0}',NULL,0);
@@ -90,7 +91,8 @@ func TestSceneTransitionPersistsPhysicalAndActiveScene(t *testing.T) {
 
 func TestQuestProgressUpdatesPersistentQuestState(t *testing.T) {
 	path := setupActionDB(t)
-	result := applyAction(t, path, "quest.progress", 42, map[string]any{"quest_key": "first_steps", "objectives": []map[string]any{{"id": "talk", "type": "talk", "target": "Elder Pine", "count": 1}}, "objective_type": "talk", "target": "elder pine", "amount": 1, "game_minute": 130})
+	batch4SetCanonicalGameMinute(t, path, 130)
+	result := applyAction(t, path, "quest.progress", 42, map[string]any{"quest_key": "first_steps", "objectives": []map[string]any{{"id": "talk", "type": "talk", "target": "Elder Pine", "count": 1}}, "objective_type": "talk", "target": "elder pine", "amount": 1})
 	if complete, _ := result["complete"].(bool); !complete {
 		t.Fatalf("result=%v", result)
 	}

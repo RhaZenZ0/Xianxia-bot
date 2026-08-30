@@ -43,7 +43,26 @@ class SchemaMigrationTests(unittest.IsolatedAsyncioTestCase):
                 "SELECT name FROM schema_migrations WHERE version=?", (SCHEMA_VERSION,)
             ).fetchone()[0]
         self.assertEqual(version, SCHEMA_VERSION)
-        self.assertEqual(migration, "event_specific_discord_gui_v1")
+        self.assertEqual(migration, "canonical_family_homeland_cities")
+        with closing(sqlite3.connect(self.path)) as conn:
+            objects = {row[0]: row[1] for row in conn.execute(
+                "SELECT name,type FROM sqlite_master WHERE name IN (?,?,?,?,?,?,?,?,?,?)",
+                ("authoritative_actor_versions", "authoritative_action_receipts",
+                 "authoritative_entity_versions", "domain_events",
+                 "character_events", "npc_events", "sect_events",
+                 "character_creation_family_options", "birth_family_household_threads",
+                 "idx_birth_families_starter_key"),
+            ).fetchall()}
+        self.assertEqual(objects.get("authoritative_actor_versions"), "table")
+        self.assertEqual(objects.get("authoritative_action_receipts"), "table")
+        self.assertEqual(objects.get("authoritative_entity_versions"), "table")
+        self.assertEqual(objects.get("domain_events"), "table")
+        self.assertEqual(objects.get("character_events"), "view")
+        self.assertEqual(objects.get("npc_events"), "view")
+        self.assertEqual(objects.get("sect_events"), "view")
+        self.assertEqual(objects.get("character_creation_family_options"), "table")
+        self.assertEqual(objects.get("birth_family_household_threads"), "table")
+        self.assertEqual(objects.get("idx_birth_families_starter_key"), "index")
 
         await db.record_startup_event("boot-test", "DATABASE_READY", detail={"schema_version": SCHEMA_VERSION})
         with closing(sqlite3.connect(self.path)) as conn:
@@ -198,6 +217,46 @@ class HealthServerTests(unittest.IsolatedAsyncioTestCase):
         with patch.dict(os.environ, env, clear=False):
             code = await asyncio.to_thread(healthcheck.main)
         self.assertEqual(code, 0)
+
+
+    async def test_private_discord_control_requires_token_and_dispatches(self):
+        calls = []
+
+        async def handler(action, payload):
+            calls.append((action, payload))
+            return {"ok": True, "action": action, "result": payload}
+
+        server = HealthServer(
+            self.state, host="127.0.0.1", port=0,
+            control_handler=handler, control_token="private-dashboard-control-token",
+        )
+        await server.start()
+        try:
+            async def post(token: str):
+                reader, writer = await asyncio.open_connection("127.0.0.1", server.bound_port)
+                body = json.dumps({"action": "sync_commands", "payload": {"reason": "test"}}).encode()
+                request = (
+                    "POST /control/discord HTTP/1.1\r\n"
+                    "Host: localhost\r\n"
+                    f"X-Xianxia-Control: {token}\r\n"
+                    "Content-Type: application/json\r\n"
+                    f"Content-Length: {len(body)}\r\n"
+                    "Connection: close\r\n\r\n"
+                ).encode() + body
+                writer.write(request); await writer.drain()
+                data = await reader.read(); writer.close(); await writer.wait_closed()
+                header, response_body = data.split(b"\r\n\r\n", 1)
+                return int(header.split(b" ", 2)[1]), json.loads(response_body)
+
+            status, payload = await post("wrong-token")
+            self.assertEqual(status, 403)
+            self.assertEqual(calls, [])
+            status, payload = await post("private-dashboard-control-token")
+            self.assertEqual(status, 200)
+            self.assertEqual(payload["action"], "sync_commands")
+            self.assertEqual(calls, [("sync_commands", {"reason": "test"})])
+        finally:
+            await server.stop()
 
     async def test_metrics_expose_phase_and_schema_gauges(self):
         self.state.set_schema_version(SCHEMA_VERSION)

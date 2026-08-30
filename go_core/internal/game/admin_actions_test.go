@@ -2,8 +2,11 @@ package game
 
 import (
 	"encoding/json"
+	"fmt"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
 	"xianxia/core/internal/storage"
 )
@@ -39,14 +42,19 @@ INSERT INTO world_simulation_state VALUES('npc_life',0,10080,0,0);
 	return path
 }
 
-func applyAdmin(t *testing.T, path, op string, payload map[string]any) any {
+func applyAdminAs(t *testing.T, path, op string, actorID int64, payload map[string]any) any {
 	t.Helper()
 	raw, _ := json.Marshal(payload)
-	out, err := Apply(path, ActionRequest{Operation: op, ActorID: 0, Payload: raw})
+	out, err := Apply(path, ActionRequest{Operation: op, ActorID: actorID, Payload: raw})
 	if err != nil {
 		t.Fatalf("%s: %v", op, err)
 	}
 	return out.Result
+}
+
+func applyAdmin(t *testing.T, path, op string, payload map[string]any) any {
+	t.Helper()
+	return applyAdminAs(t, path, op, 0, payload)
 }
 
 func scalar(t *testing.T, path, sql string, params ...any) any {
@@ -105,5 +113,114 @@ func TestAdminActionsMutateAndAudit(t *testing.T) {
 	applyAdmin(t, path, "admin.world.advance_time", map[string]any{"minutes": 1440, "reason": "test"})
 	if got := storage.ParseInt(scalar(t, path, "SELECT COUNT(*) FROM admin_audit_log")); got < 8 {
 		t.Fatalf("audit count=%d", got)
+	}
+}
+
+func TestAdminGrantCurrencyPreservesDiscordRangeAndLegacyMirrorSemantics(t *testing.T) {
+	path := setupAdminDB(t)
+
+	applyAdmin(t, path, "admin.player.grant_currency", map[string]any{
+		"user_id": 42, "currency_id": "low_spirit_stone", "amount": 90, "reason": "range test",
+	})
+	if got := storage.ParseInt(scalar(t, path, "SELECT spirit_stones FROM characters WHERE user_id=42")); got != 100 {
+		t.Fatalf("spirit_stones=%d, want 100", got)
+	}
+
+	applyAdmin(t, path, "admin.player.grant_currency", map[string]any{
+		"user_id": 42, "currency_id": "low_immortal_stone", "amount": int64(2000000000), "reason": "upper bound",
+	})
+	if got := storage.ParseInt(scalar(t, path, "SELECT balance FROM currency_wallets WHERE user_id=42 AND currency_id='low_immortal_stone'")); got != 2000000000 {
+		t.Fatalf("balance=%d, want 2000000000", got)
+	}
+}
+
+func TestAdminKarmaAllowsZeroAndPreservesReason(t *testing.T) {
+	path := setupAdminDB(t)
+
+	applyAdmin(t, path, "admin.player.karma", map[string]any{
+		"user_id": 42, "delta": 0, "reason": "audit reason",
+	})
+	if got := storage.ParseInt(scalar(t, path, "SELECT karma_score FROM characters WHERE user_id=42")); got != 5 {
+		t.Fatalf("karma=%d, want 5", got)
+	}
+	payload := fmt.Sprint(scalar(t, path, "SELECT payload_json FROM event_log WHERE event_type='karma_change' ORDER BY id DESC LIMIT 1"))
+	if !strings.Contains(payload, `"reason":"audit reason"`) {
+		t.Fatalf("event payload did not preserve reason: %s", payload)
+	}
+}
+
+func TestAdminAutomationSupportsAllDiscordChoices(t *testing.T) {
+	path := setupAdminDB(t)
+	for _, system := range []string{
+		"event_expiry",
+		"auction_settlement",
+		"unexpected_events",
+		"maintenance_cleanup",
+		"npc_civilization",
+		"npc_life",
+		"sect_politics",
+		"dynamic_economy",
+		"clan_dynamics",
+		"background_seclusion",
+		"black_markets",
+		"autonomous_world_events",
+	} {
+		applyAdmin(t, path, "admin.automation.set", map[string]any{
+			"system": system, "enabled": false, "reason": "choice coverage",
+		})
+	}
+}
+
+func TestAdminAdvanceTimeAppliesRequestedScaleAndClampsFutureAnchor(t *testing.T) {
+	path := setupAdminDB(t)
+	future := float64(time.Now().Add(time.Hour).UnixNano()) / 1e9
+	state, _ := json.Marshal(map[string]any{
+		"anchor_game_minute": int64(1000),
+		"anchor_real_ts":     future,
+		"scale":              int64(9),
+	})
+	conn, err := storage.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = conn.Execute(
+		`INSERT INTO world_state(key,value_json,updated_at) VALUES('world_clock',?,0)`,
+		[]any{string(state)},
+	); err != nil {
+		conn.Close()
+		t.Fatal(err)
+	}
+	if err = conn.Commit(); err != nil {
+		conn.Close()
+		t.Fatal(err)
+	}
+	conn.Close()
+
+	result := applyAdmin(t, path, "admin.world.advance_time", map[string]any{
+		"minutes": 60, "scale": 2, "reason": "clock test",
+	})
+	data, ok := result.(map[string]any)
+	if !ok {
+		t.Fatalf("unexpected result type %T", result)
+	}
+	if got := storage.ParseInt(data["game_minute"]); got != 1060 {
+		t.Fatalf("game_minute=%d, want 1060", got)
+	}
+	raw := fmt.Sprint(scalar(t, path, "SELECT value_json FROM world_state WHERE key='world_clock'"))
+	if !strings.Contains(raw, `"scale":2`) {
+		t.Fatalf("world clock did not apply requested scale: %s", raw)
+	}
+}
+
+func TestAdminAuditUsesActionActorID(t *testing.T) {
+	path := setupAdminDB(t)
+	applyAdminAs(t, path, "admin.player.teleport", 777, map[string]any{
+		"user_id": 42, "location": "Greenriver Town", "reason": "operator identity",
+	})
+	if got := storage.ParseInt(scalar(t, path, "SELECT admin_user_id FROM admin_audit_log ORDER BY audit_id DESC LIMIT 1")); got != 777 {
+		t.Fatalf("admin_user_id=%d, want 777", got)
+	}
+	if got := fmt.Sprint(scalar(t, path, "SELECT action FROM admin_audit_log ORDER BY audit_id DESC LIMIT 1")); got != "admin.player.teleport" {
+		t.Fatalf("action=%q, want admin.player.teleport", got)
 	}
 }

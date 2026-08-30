@@ -12,6 +12,8 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, unquote, urlsplit
+from urllib.request import Request, urlopen
+from urllib.error import HTTPError, URLError
 
 import aiosqlite
 
@@ -34,6 +36,8 @@ class DashboardSettings:
     token: str
     admin_writes: bool = False
     engine_url: str = ""
+    bot_control_url: str = ""
+    bot_control_token: str = ""
 
     @classmethod
     def from_env(cls) -> "DashboardSettings":
@@ -55,7 +59,13 @@ class DashboardSettings:
         engine_url = os.getenv("GAME_ENGINE_URL", "").strip().rstrip("/")
         if admin_writes and not engine_url:
             raise RuntimeError("GAME_ENGINE_URL is required when DASHBOARD_ADMIN_WRITES is enabled")
-        return cls(database_path=database_path, host=host, port=port, username=username, token=token, admin_writes=admin_writes, engine_url=engine_url)
+        bot_control_url = os.getenv("BOT_CONTROL_URL", "http://127.0.0.1:8080").strip().rstrip("/")
+        bot_control_token = os.getenv("BOT_CONTROL_TOKEN", "").strip() or token
+        return cls(
+            database_path=database_path, host=host, port=port, username=username, token=token,
+            admin_writes=admin_writes, engine_url=engine_url, bot_control_url=bot_control_url,
+            bot_control_token=bot_control_token,
+        )
 
 
 class ReadOnlyDashboardStore:
@@ -566,11 +576,75 @@ class AdminDashboardController:
         raise ValueError(f"Unsupported dashboard admin action: {action}")
 
 
+class DiscordDashboardController:
+    """Proxy Discord provisioning requests to the connected Python bot process."""
+
+    def __init__(self, base_url: str, token: str, enabled: bool) -> None:
+        self.base_url = str(base_url or "").rstrip("/")
+        self.token = str(token or "")
+        self.enabled = bool(enabled)
+
+    async def _request(self, action: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        if not self.base_url:
+            raise RuntimeError("BOT_CONTROL_URL is not configured")
+        if not self.token:
+            raise RuntimeError("BOT_CONTROL_TOKEN/DASHBOARD_TOKEN is not configured")
+        body = json.dumps({"action": action, "payload": payload or {}}, separators=(",", ":")).encode("utf-8")
+        req = Request(
+            self.base_url + "/control/discord",
+            data=body,
+            method="POST",
+            headers={
+                "Content-Type": "application/json",
+                "X-Xianxia-Control": self.token,
+            },
+        )
+
+        def do_request() -> dict[str, Any]:
+            try:
+                with urlopen(req, timeout=15) as response:
+                    raw = response.read()
+            except HTTPError as exc:
+                raw = exc.read()
+                try:
+                    detail = json.loads(raw.decode("utf-8"))
+                    message = detail.get("message") or detail.get("error") or str(exc)
+                except Exception:
+                    message = raw.decode("utf-8", "replace")[:300] or str(exc)
+                raise RuntimeError(f"Discord bot control rejected request: {message}") from exc
+            except URLError as exc:
+                raise RuntimeError(f"Discord bot control is unavailable: {exc.reason}") from exc
+            return dict(json.loads(raw.decode("utf-8")))
+
+        return await asyncio.to_thread(do_request)
+
+    async def snapshot(self) -> dict[str, Any]:
+        try:
+            response = await self._request("status")
+            result = dict(response.get("result") or {})
+            result["control_available"] = True
+            result["admin_writes"] = self.enabled
+            return result
+        except Exception as exc:
+            return {
+                "connected": False,
+                "control_available": False,
+                "admin_writes": self.enabled,
+                "message": str(exc),
+            }
+
+    async def run(self, action: str, payload: dict[str, Any]) -> dict[str, Any]:
+        if not self.enabled:
+            raise PermissionError("Dashboard admin writes are disabled")
+        return await self._request(action, payload)
+
+
 class DashboardServer:
     def __init__(self, settings: DashboardSettings):
         self.settings = settings
         self.store = ReadOnlyDashboardStore(settings.database_path)
         self.admin = AdminDashboardController(self.store, settings.engine_url or os.getenv("GAME_ENGINE_URL", ""), settings.admin_writes)
+        self.discord = DiscordDashboardController(settings.bot_control_url, settings.bot_control_token, settings.admin_writes)
         self._server: asyncio.AbstractServer | None = None
 
     def _authorized(self, headers: dict[str, str]) -> bool:
@@ -636,7 +710,7 @@ class DashboardServer:
                 return
 
             if method == "POST":
-                if path != "/api/admin/action":
+                if path not in {"/api/admin/action", "/api/discord/action"}:
                     await self._send_json(writer, 404, {"error": "not_found"}); return
                 if not self.settings.admin_writes:
                     await self._send_json(writer, 403, {"error": "admin_writes_disabled"}); return
@@ -653,10 +727,10 @@ class DashboardServer:
                     body = json.loads(raw.decode("utf-8"))
                     action = str(body.get("action") or "")
                     payload = dict(body.get("payload") or {})
-                    result = await self.admin.run(action, payload)
+                    result = await (self.discord.run(action, payload) if path == "/api/discord/action" else self.admin.run(action, payload))
                 except PermissionError as exc:
                     await self._send_json(writer, 403, {"error": "forbidden", "message": str(exc)}); return
-                except (ValueError, TypeError, GameEngineError, RemoteDatabaseError) as exc:
+                except (ValueError, TypeError, RuntimeError, GameEngineError, RemoteDatabaseError) as exc:
                     await self._send_json(writer, 400, {"error": "admin_action_failed", "message": str(exc)}); return
                 await self._send_json(writer, 200, result); return
 
@@ -700,6 +774,8 @@ class DashboardServer:
                 await self._send_json(writer, 200, await self.store.decisions(limit=_qint(query, "limit", 150))); return
             if path == "/api/admin":
                 await self._send_json(writer, 200, await self.admin.snapshot()); return
+            if path == "/api/discord":
+                await self._send_json(writer, 200, await self.discord.snapshot()); return
             if path == "/api/health":
                 await self._send_json(writer, 200, {"ok": True, "schema_version": await self.store.schema_version(), "database": str(self.settings.database_path), "admin_writes": self.settings.admin_writes}); return
             await self._send_json(writer, 404, {"error": "not_found"})

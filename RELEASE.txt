@@ -1,0 +1,18 @@
+Xianxia RP v0.18 RECOMMENDED RELEASE
+
+Release date: 2026-08-30
+Schema: 22
+Migration: automatic schema 21 -> 22 family-homeland canonicalization; existing player locations are not teleported
+
+v0.18 completes the staged gameplay-authority cleanup:
+- canonical Go-owned game-time authority across authoritative gameplay operations;
+- Go-owned forage, craft, companion/artifact, lifespan, road, travel, and caravan mechanics;
+- unified player/NPC lifespan, bootstrap-age, and natural-death authority;
+- multi-hop road routing with canonical duration, cost, danger, encounters, discovery, and transit locks;
+- canonical caravan routing, ETA, operating cost, dispatch bounds, and living-actor checks;
+- dashboard-owned Discord channel/category setup with bot auto-provisioning removed;
+- obsolete Python lifespan/mechanical authority paths removed after migration;
+- release hardening for the Go HTTP boundary: loopback default bind, strict single-JSON decoding,
+  and bounded JSON request bodies on internal mutation/data endpoints.
+
+See V018_RELEASE_NOTES.md, V018_RELEASE_VALIDATION.md, and V018_RELEASE_SECURITY_LOAD_AUDIT.md.

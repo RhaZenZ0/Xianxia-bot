@@ -5,7 +5,6 @@ from dataclasses import dataclass
 from typing import Any, Iterable
 
 from .birthfamily import family_tier_name, karma_label
-from .lifespan import status as lifespan_status
 from .realm_hubs import realm_hub_by_location
 from .worldtime import from_game_minutes
 from .npc_memory import format_memories, public_mood_hint
@@ -568,8 +567,15 @@ class NarratorContextBuilder:
             lines.append(f"Declared personal Dao / goal: {_clip(character.get('concept'), 360)}")
 
         try:
-            life = lifespan_status(character, game_minute)
-            life_text = f"{life.age_years:.1f} years old; " + ("ageless by current cultivation" if life.ageless else f"lifespan ceiling {life.total_years} years")
+            life = await self.simulator.engine.action("character.lifespan", user_id, {})
+            age_years = float(life.get("age_years", 0.0))
+            ageless = bool(life.get("ageless", False))
+            total_years = int(life.get("total_years", 0))
+            life_text = (
+                f"{age_years:.1f} years old; ageless by current cultivation"
+                if ageless
+                else f"{age_years:.1f} years old; lifespan ceiling {total_years} years"
+            )
             lines.append(f"Life state: {life_text}")
         except Exception:
             pass

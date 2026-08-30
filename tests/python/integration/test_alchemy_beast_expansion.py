@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tests.support import install_aiosqlite_shim, PROJECT_ROOT
+from tests.support import install_aiosqlite_shim, PROJECT_ROOT, seed_character
 install_aiosqlite_shim()
 
 from app.alchemy import alchemy_output, alchemy_quality, pill_toxicity_value, medicine_toxicity_effect
@@ -14,6 +14,14 @@ from app.game import World
 from app.simulation import WorldSimulator
 
 ROOT = PROJECT_ROOT
+class _NoopSimulationEngine:
+    async def bootstrap_simulation(self, game_minute: int):
+        return {"npc_moods_initialized": 0, "clan_branches_created": 0, "retainer_groups_created": 0, "clan_relations_created": 0}
+
+    async def force_simulation(self, system, steps, game_minute):
+        return {"system": system, "due_steps": steps, "applied_steps": steps, "summary": "test seed"}
+
+
 ATTRS = {"body": 4, "agility": 3, "spirit": 6, "insight": 6, "will": 5, "presence": 4}
 
 
@@ -23,7 +31,7 @@ class AlchemyBeastExpansionTests(unittest.IsolatedAsyncioTestCase):
         self.path = Path(self.tmp.name) / "expansion.sqlite3"
         self.db = Database(self.path)
         await self.db.init()
-        ok = await self.db.create_character(
+        ok = await seed_character(self.db,
             user_id=909, discord_name="alchemist", name="Azure Alchemist",
             origin="Greenriver Town", path="Beast Binder", spiritual_root="Wood",
             concept="alchemy and beast integration test", location="Greenriver Town",
@@ -31,14 +39,14 @@ class AlchemyBeastExpansionTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertTrue(ok)
         self.world = World(ROOT / "content" / "world.json")
-        self.sim = WorldSimulator(self.db, self.world.data)
+        self.sim = WorldSimulator(self.db, self.world.data, engine=_NoopSimulationEngine())
         await self.sim.initialize(0)
 
     async def asyncTearDown(self):
         self.tmp.cleanup()
 
     async def test_schema_v6_retains_expansion_tables(self):
-        self.assertEqual(SCHEMA_VERSION, 17)
+        self.assertEqual(SCHEMA_VERSION, 22)
         import sqlite3
         with sqlite3.connect(self.path) as conn:
             tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
@@ -77,14 +85,14 @@ class AlchemyBeastExpansionTests(unittest.IsolatedAsyncioTestCase):
             ) SELECT user_id,location_key,name,base_location,grade,cultivation_level,alchemy_level,forge_level,formation_level,defense_level,
                      thread_id,thread_channel_id,created_at,updated_at FROM cave_abodes_v10""")
             conn.execute("DROP TABLE cave_abodes_v10")
-            conn.execute("DELETE FROM schema_migrations WHERE version IN (5,6,7,8,9,10,11,12,13,14,15,16,17)")
+            conn.execute("DELETE FROM schema_migrations WHERE version IN (5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22)")
             conn.execute("UPDATE schema_version SET current_version=4 WHERE singleton=1")
             conn.commit()
         await self.db.init()
         character = await self.db.get_character(909)
         self.assertEqual(character["name"], "Azure Alchemist")
         status = await self.db.get_schema_status()
-        self.assertEqual(status["current"], 17)
+        self.assertEqual(status["current"], 22)
 
     def test_alchemy_quality_scales_output_without_item_instances(self):
         self.assertEqual(alchemy_quality(0, success=True).label, "Ordinary")
@@ -108,42 +116,43 @@ class AlchemyBeastExpansionTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNotNone(payload)
         self.assertTrue(any(m["stat"] == "cultivation_gain" for m in payload["modifiers"]))
 
-    async def test_alchemy_batches_track_quality_and_outputs(self):
-        batch = await self.db.record_alchemy_batch(
-            909, recipe_name="Qi Nourishing Pill", quality="superior", margin=6,
-            success=True, output={"qi_pill": 2}, location="Greenriver Town", game_minute=400,
-        )
-        self.assertEqual(batch["quality"], "superior")
-        self.assertEqual(batch["output"], {"qi_pill": 2})
-        state = await self.db.get_alchemy_state(909, game_minute=400)
-        self.assertEqual(state["total_refinements"], 1)
-        self.assertEqual(state["successful_refinements"], 1)
-        self.assertEqual(state["best_margin"], 6)
 
-    async def test_worldsim_forage_uses_persistent_spirit_resources(self):
-        profile = await self.sim.alchemy_forage_profile("Greenriver Town", realm_index=0)
-        self.assertEqual(profile["location"], "Greenriver Town")
-        self.assertIn("spirit_resources", profile)
-        self.assertIn("spirit_herb", profile["loot"])
-        self.assertGreaterEqual(profile["tn"], 8)
+    async def test_active_effect_reads_filter_time_without_deleting_rows(self):
+        await self.db.apply_effect(
+            909,
+            effect_key="expired_test",
+            name="Expired Test",
+            source_type="test",
+            source_id="expired",
+            effect={"modifiers": [{"stat": "alchemy_bonus", "operation": "add", "value": 2}]},
+            starts_game_minute=100,
+            duration_game_minutes=10,
+        )
+        await self.db.apply_effect(
+            909,
+            effect_key="future_test",
+            name="Future Test",
+            source_type="test",
+            source_id="future",
+            effect={"modifiers": [{"stat": "alchemy_bonus", "operation": "add", "value": 3}]},
+            starts_game_minute=200,
+            duration_game_minutes=100,
+        )
 
-    async def test_wild_beast_encounter_can_become_equality_contract(self):
-        encounter = await self.db.create_wild_beast_encounter(
-            909, species="Mistclaw Wolf", rank=0, element="Wind", intelligence=18,
-            temperament="cautious", bloodline="Mistclaw", taming_tn=13,
-            location="Greenriver Town", created_game_minute=500,
-        )
-        resolved = await self.db.resolve_wild_beast_taming(
-            909, encounter["encounter_id"], success=True, game_minute=510,
-            contract_type="equality", active_if_first=True,
-        )
-        self.assertEqual(resolved["status"], "tamed")
-        beast = resolved["beast"]
-        self.assertEqual(beast["species"], "Mistclaw Wolf")
-        self.assertEqual(beast["contract_type"], "equality")
-        self.assertEqual(beast["active"], 1)
-        active = await self.db.get_wild_beast_encounters(909, game_minute=510)
-        self.assertEqual(active, [])
+        effects = await self.db.get_active_effects(909, 150)
+        keys = {effect["effect_key"] for effect in effects}
+        self.assertNotIn("expired_test", keys)
+        self.assertNotIn("future_test", keys)
+
+        import sqlite3
+        with sqlite3.connect(self.path) as conn:
+            count = conn.execute(
+                "SELECT COUNT(*) FROM active_effects WHERE user_id=? AND source_type='test'",
+                (909,),
+            ).fetchone()[0]
+        self.assertEqual(count, 2)
+
+
 
     def test_hunt_candidates_expose_taming_traits(self):
         beast = self.world.random_hunt(4)

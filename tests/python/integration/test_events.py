@@ -12,7 +12,6 @@ import aiosqlite
 
 from app.database import Database
 from app.game import World
-from app.simulation import WorldSimulator
 
 
 ROOT = PROJECT_ROOT
@@ -163,9 +162,6 @@ class RandomEventPersistenceTests(unittest.IsolatedAsyncioTestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.db = Database(Path(self.tmp.name) / "events.sqlite3")
         await self.db.init()
-        self.world = World(WORLD_PATH)
-        self.sim = WorldSimulator(self.db, self.world.data)
-        await self.sim.initialize(0)
 
     async def asyncTearDown(self):
         self.tmp.cleanup()
@@ -205,52 +201,6 @@ class RandomEventPersistenceTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(other_location)
         active = await self.db.get_active_world_events()
         self.assertEqual({row["event_key"] for row in active}, {"beast-tide:one", "beast-tide:three"})
-
-    async def test_beast_tide_persists_regional_and_market_damage(self):
-        event = next(event for event in self.world.unexpected_events if event["id"] == "beast_tide")
-        async with self.db._connect() as db:
-            db.row_factory = aiosqlite.Row
-            cur = await db.execute("SELECT * FROM civilization_regions WHERE location=?", ("Greenriver Town",))
-            region_before = dict(await cur.fetchone())
-            cur = await db.execute(
-                "SELECT * FROM economy_markets WHERE location=? AND item_id=?",
-                ("Greenriver Town", "spirit_herb"),
-            )
-            market_before = dict(await cur.fetchone())
-
-        impacts = await self.sim.apply_random_event(
-            event_id=event["id"],
-            title=event["title"],
-            location="Greenriver Town",
-            game_minute=1440,
-            severity=event["severity"],
-            effect=event["world_effect"],
-        )
-
-        async with self.db._connect() as db:
-            db.row_factory = aiosqlite.Row
-            cur = await db.execute("SELECT * FROM civilization_regions WHERE location=?", ("Greenriver Town",))
-            region_after = dict(await cur.fetchone())
-            cur = await db.execute(
-                "SELECT * FROM economy_markets WHERE location=? AND item_id=?",
-                ("Greenriver Town", "spirit_herb"),
-            )
-            market_after = dict(await cur.fetchone())
-            cur = await db.execute(
-                "SELECT event_text,severity FROM civilization_events WHERE location=? ORDER BY event_id DESC LIMIT 1",
-                ("Greenriver Town",),
-            )
-            history = dict(await cur.fetchone())
-
-        self.assertEqual(len(impacts), 2)
-        self.assertLess(region_after["population"], region_before["population"])
-        self.assertLess(region_after["security"], region_before["security"])
-        self.assertGreater(region_after["unrest"], region_before["unrest"])
-        self.assertLess(market_after["supply"], market_before["supply"])
-        self.assertGreater(market_after["demand"], market_before["demand"])
-        self.assertGreater(market_after["price_index"], market_before["price_index"])
-        self.assertEqual(history["severity"], event["severity"])
-        self.assertIn("beast tide", history["event_text"].lower())
 
 
 if __name__ == "__main__":

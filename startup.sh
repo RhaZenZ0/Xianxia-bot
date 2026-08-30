@@ -29,6 +29,7 @@ GUILD_ID_VALUE="$(env_value GUILD_ID)"
 NARRATOR_PROVIDER_VALUE="$(env_value NARRATOR_PROVIDER)"
 OPENROUTER_KEY_VALUE="$(env_value OPENROUTER_API_KEY)"
 DASHBOARD_ENABLED_VALUE="$(env_value DASHBOARD_ENABLED)"
+DASHBOARD_TOKEN_VALUE="$(env_value DASHBOARD_TOKEN)"
 
 [ -n "$DISCORD_TOKEN_VALUE" ] || fail "DISCORD_TOKEN is empty in .env"
 [ -n "$GUILD_ID_VALUE" ] || fail "GUILD_ID is empty in .env"
@@ -53,7 +54,8 @@ echo "  Narration:  OpenRouter free cloud fallback chain"
 
 case "$(printf '%s' "$DASHBOARD_ENABLED_VALUE" | tr '[:upper:]' '[:lower:]')" in
   1|true|yes|on)
-    echo "  Dashboard:  enabled"
+    [ ${#DASHBOARD_TOKEN_VALUE} -ge 20 ] || fail "DASHBOARD_TOKEN must be at least 20 characters when DASHBOARD_ENABLED=true"
+    echo "  Dashboard:  enabled (GM Admin + Discord Server Setup)"
     docker compose --profile dashboard up -d --build --remove-orphans "$@"
     ;;
   *)

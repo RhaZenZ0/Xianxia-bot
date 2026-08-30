@@ -39,6 +39,21 @@ class GameEngineClientTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result, {"operation": "combat.damage", "actor_id": 42})
         self.assertEqual(self.requests[-1].url.path, "/v1/game/action")
 
+    async def test_authoritative_action_rejects_client_game_minute(self):
+        with self.assertRaisesRegex(ValueError, "Go owns current world time"):
+            await self.client.authoritative_action(
+                "exploration.travel",
+                42,
+                {"destination": "Riverguard City", "game_minute": 999999},
+                action_id="forged-time",
+            )
+        self.assertFalse(self.requests)
+
+    async def test_simulation_endpoints_keep_explicit_scheduler_time(self):
+        await self.client.run_due_simulation(12345, {"npc_life": True})
+        payload = __import__("json").loads(self.requests[-1].content)
+        self.assertEqual(payload["game_minute"], 12345)
+
     async def test_run_due_simulation_is_one_coarse_grained_call(self):
         result = await self.client.run_due_simulation(12345, {"npc_life": True, "economy": True})
         self.assertEqual(result, [{"system": "npc_life", "updated": 12}])

@@ -3,6 +3,7 @@ package core
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"strings"
 )
 
@@ -75,6 +76,9 @@ func Validate(req Request) *ContractError {
 	if req.ExpectedVersion < 0 {
 		return invalid("invalid_expected_version", "Expected version cannot be negative.")
 	}
+	if req.ExpectedVersion == math.MaxInt64 {
+		return invalid("invalid_expected_version", "Expected version is too large to advance.")
+	}
 	if len(req.Payload) == 0 || string(req.Payload) == "null" {
 		return invalid("invalid_payload", "Payload must be an object.")
 	}
@@ -142,8 +146,8 @@ func resolveCheck(raw json.RawMessage) (any, *ContractError) {
 	if payload.Dice[0] < 1 || payload.Dice[0] > 10 || payload.Dice[1] < 1 || payload.Dice[1] > 10 {
 		return nil, invalid("invalid_dice", "Injected d10 values must be within 1..10.")
 	}
-	total := payload.Dice[0] + payload.Dice[1] + payload.Modifier
-	margin := total - payload.TN
+	total := saturatingAdd(saturatingAdd(payload.Dice[0], payload.Dice[1]), payload.Modifier)
+	margin := saturatingSub(total, payload.TN)
 	return map[string]any{
 		"die1": payload.Dice[0], "die2": payload.Dice[1], "modifier": payload.Modifier,
 		"tn": payload.TN, "total": total, "margin": margin,
@@ -169,6 +173,30 @@ func clamp(value, low, high int64) int64 {
 	return value
 }
 
+func saturatingAdd(value, delta int64) int64 {
+	if delta > 0 && value > math.MaxInt64-delta {
+		return math.MaxInt64
+	}
+	if delta < 0 && value < math.MinInt64-delta {
+		return math.MinInt64
+	}
+	return value + delta
+}
+
+func saturatingSub(value, delta int64) int64 {
+	if delta > 0 && value < math.MinInt64+delta {
+		return math.MinInt64
+	}
+	if delta < 0 && value > math.MaxInt64+delta {
+		return math.MaxInt64
+	}
+	return value - delta
+}
+
+func clampAdd(value, delta, low, high int64) int64 {
+	return clamp(saturatingAdd(value, delta), low, high)
+}
+
 func updateRelationship(raw json.RawMessage) (any, *ContractError) {
 	var payload relationshipPayload
 	if err := json.Unmarshal(raw, &payload); err != nil {
@@ -182,7 +210,7 @@ func updateRelationship(raw json.RawMessage) (any, *ContractError) {
 	}
 	result := map[string]any{}
 	for _, key := range relationshipDimensions {
-		result[key] = clamp(payload.Current[key]+payload.Deltas[key], -100, 100)
+		result[key] = clampAdd(payload.Current[key], payload.Deltas[key], -100, 100)
 	}
 	result["encounter_count"] = clamp(payload.Current["encounter_count"], 0, 1<<62) + 1
 	runes := []rune(payload.Summary)
@@ -241,7 +269,7 @@ func progressQuest(raw json.RawMessage) (any, *ContractError) {
 				if amount < 0 {
 					amount = 0
 				}
-				current = clamp(current+amount, 0, required)
+				current = clampAdd(current, amount, 0, required)
 				updated[objective.ID] = current
 				touched = true
 			}

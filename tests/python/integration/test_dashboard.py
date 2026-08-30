@@ -5,15 +5,24 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tests.support import install_aiosqlite_shim, PROJECT_ROOT
+from tests.support import install_aiosqlite_shim, PROJECT_ROOT, seed_simulation_fixture
 install_aiosqlite_shim()
 
-from app.dashboard import AdminDashboardController, DashboardServer, DashboardSettings, ReadOnlyDashboardStore
-from app.database import Database
+from app.dashboard import AdminDashboardController, DashboardServer, DashboardSettings, DiscordDashboardController, ReadOnlyDashboardStore
+from app.database import Database, SCHEMA_VERSION
+from app.health import HealthServer, HealthState
 from app.game import World
 from app.simulation import WorldSimulator
 
 ROOT = PROJECT_ROOT
+
+
+class _NoopSimulationEngine:
+    async def bootstrap_simulation(self, game_minute):
+        return {"npc_moods_initialized": 0, "clan_branches_created": 0, "retainer_groups_created": 0, "clan_relations_created": 0}
+
+    async def force_simulation(self, system, steps, game_minute):
+        return {"system": system, "due_steps": steps, "applied_steps": steps, "summary": "test seed"}
 
 
 class DashboardTests(unittest.IsolatedAsyncioTestCase):
@@ -23,8 +32,7 @@ class DashboardTests(unittest.IsolatedAsyncioTestCase):
         self.db = Database(self.path)
         await self.db.init()
         self.world = World(ROOT / "content" / "world.json")
-        self.sim = WorldSimulator(self.db, self.world.data)
-        await self.sim.initialize(0)
+        await seed_simulation_fixture(self.db, self.world.data, 0)
         self.store = ReadOnlyDashboardStore(self.path)
 
     async def asyncTearDown(self):
@@ -32,7 +40,7 @@ class DashboardTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_overview_reads_schema_and_simulation(self):
         data = await self.store.overview()
-        self.assertEqual(data["schema_version"], 17)
+        self.assertEqual(data["schema_version"], 22)
         self.assertIn("clock", data)
         self.assertGreater(data["counts"]["npcs_alive"], 0)
         self.assertTrue(data["simulations"])
@@ -68,11 +76,42 @@ class DashboardTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(PermissionError):
             await admin.run("world.advance_time", {"minutes": 60})
 
+    async def test_discord_dashboard_proxy_uses_private_bot_control_endpoint(self):
+        state = HealthState(supported_schema_version=SCHEMA_VERSION)
+        calls = []
+
+        async def handler(action, payload):
+            calls.append((action, payload))
+            return {"ok": True, "action": action, "result": {"connected": True, "guild": {"name": "Xianxia RP"}}}
+
+        server = HealthServer(
+            state, host="127.0.0.1", port=0, control_handler=handler,
+            control_token="dashboard-discord-control-token",
+        )
+        await server.start()
+        try:
+            control = DiscordDashboardController(
+                f"http://127.0.0.1:{server.bound_port}", "dashboard-discord-control-token", True
+            )
+            snapshot = await control.snapshot()
+            self.assertTrue(snapshot["connected"])
+            self.assertTrue(snapshot["control_available"])
+            result = await control.run("sync_commands", {"reason": "dashboard test"})
+            self.assertTrue(result["ok"])
+            self.assertEqual(calls, [("status", {}), ("sync_commands", {"reason": "dashboard test"})])
+        finally:
+            await server.stop()
+
     def test_static_dashboard_contains_real_admin_console(self):
         html = (ROOT / "dashboard" / "index.html").read_text(encoding="utf-8")
         js = (ROOT / "dashboard" / "app.js").read_text(encoding="utf-8")
         self.assertIn("Admin Console", html)
+        self.assertIn("Discord Setup", html)
         self.assertIn("/api/admin/action", js)
+        self.assertIn("/api/discord/action", js)
+        self.assertIn("Full Setup", js)
+        self.assertIn("sync_commands", js)
+        self.assertIn("bind_channels", js)
         self.assertIn("player.grant_currency", js)
         self.assertIn("database.vacuum", js)
 

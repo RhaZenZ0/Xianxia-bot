@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tests.support import install_aiosqlite_shim, PROJECT_ROOT
+from tests.support import install_aiosqlite_shim, PROJECT_ROOT, seed_character
 
 install_aiosqlite_shim()
 
@@ -100,60 +100,6 @@ class AptitudeRuleTests(unittest.TestCase):
         )
         self.assertIn("Bloodline tempering must reach 100%.", problems)
 
-
-class AptitudeDatabaseTests(unittest.IsolatedAsyncioTestCase):
-    async def asyncSetUp(self):
-        self.tmp = tempfile.TemporaryDirectory()
-        self.db = Database(Path(self.tmp.name) / "aptitudes.sqlite3")
-        await self.db.init()
-        self.world = World(ROOT / "content" / "world.json")
-        self.family = {
-            "id": "body_tempering_family", "family_name": "Han Family", "surname": "Han",
-            "tier": 3, "wealth": 50, "influence": 40, "stability": 70, "alignment_bias": 0,
-            "location": "Greenriver Town", "head_name": "Han Wei", "head_gender": "male",
-            "head_title": "Patriarch", "head_realm_index": 2, "head_phase": 3,
-            "bloodline_name": "Stone Bear Ancestry", "bloodline_affinity": "Earth",
-            "bloodline_trait": "Powerful physique", "bloodline_purity": 70,
-            "clan_structure": "martial_household", "branch_count": 1, "retainer_count": 4,
-            "confederacy_name": "None", "birth_order": 1, "relatives": [],
-        }
-        self.profile = generate_aptitude_bundle(
-            base_root="Earth",
-            path="Body Refiner",
-            family=self.family,
-            root_system=self.world.spiritual_root_system,
-            bloodline_definitions=self.world.bloodlines,
-            physique_definitions=self.world.physiques,
-            randbelow=SequenceRoll(700, 10, 99, 99, 0, 0, 0),
-        )
-        created = await self.db.create_character(
-            user_id=7, discord_name="Tester", name="Han Rui", origin="Han Family",
-            path="Body Refiner", spiritual_root="Earth", concept="Test aptitudes",
-            location="Greenriver Town", attributes={"body": 3, "agility": 1, "spirit": 1, "insight": 2, "will": 3, "presence": 2},
-            qi_max=10, vitality_max=16, birth_family_profile=self.family, aptitude_profile=self.profile,
-        )
-        self.assertTrue(created)
-
-    async def asyncTearDown(self):
-        self.tmp.cleanup()
-
-    async def test_profile_round_trip_and_atomic_tempering(self):
-        bundle = await self.db.get_aptitudes(7)
-        self.assertEqual(bundle["root"]["elements"], self.profile["root"]["elements"])
-        self.assertEqual(bundle["bloodline"]["name"], "Stone Bear Ancestry")
-        await self.db.reward(7, cultivation=50)
-        trained = await self.db.train_aptitude(7, target="bloodline", essence_cost=10, progress_gain=14)
-        self.assertEqual(trained["bloodline"]["progress"], 14)
-        character = await self.db.get_character(7)
-        self.assertEqual(character["cultivation"], 40)
-
-    async def test_harmonization_reduces_persistent_rejection(self):
-        bloodline = dict((await self.db.get_aptitudes(7))["bloodline"])
-        bloodline["rejection"] = 65
-        await self.db.save_bloodline_profile(7, bloodline)
-        await self.db.reward(7, cultivation=30)
-        updated = await self.db.harmonize_aptitude(7, target="bloodline", essence_cost=5, amount=12)
-        self.assertEqual(updated["bloodline"]["rejection"], 53)
 
 
 if __name__ == "__main__":

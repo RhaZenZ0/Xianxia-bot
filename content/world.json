@@ -2283,22 +2283,31 @@
       "outside_location": "Greenriver Town"
     },
     "Azure Crown Imperial City": {
-      "description": "The capital of the dominant mortal dynasty, filled with noble clans, ministries, sect envoys and imperial guards.",
+      "description": "The capital of the dominant mortal dynasty, filled with noble clans, ministries, sect envoys and imperial guards. The city functions as a complete family starting region with local trade, cultivation resources, household politics, work, and recurring problems.",
       "world": "Mortal World",
       "min_realm_index": 0,
       "safe_zone": true,
       "realm_hub": true,
       "meeting_channel_slug": "mortal-world-capital",
       "encounters": [
-        "Sect envoys argue beneath a bronze ranking stele while wandering cultivators trade rumors nearby.",
-        "A public challenge ring draws a crowd, but imperial law keeps killing intent suppressed.",
-        "A merchant consortium opens a temporary stall of formation paper, spirit ink and travel supplies.",
-        "Young masters from rival clans compare auction rumors outside a crowded teahouse.",
-        "An imperial notice board announces sect missions, caravan routes and wanted cultivators."
+        "A steward from a local cultivation family asks for help with a succession dispute spilling into the streets.",
+        "The inner-city market is trading tribute goods, but a sudden shortage has pushed smaller shops into a bidding dispute.",
+        "A resource seeker claims a fresh cache of tribute goods has appeared beyond the safest streets and wants a partner.",
+        "Two junior cultivators from rival local households turn a routine disagreement in Azure Crown Imperial City into a public challenge.",
+        "A traveling artisan posts court commissions on the city notice board, offering payment, reputation, or family favor."
       ],
       "sense_hints": [
         "Thousands of mortal and cultivator auras overlap behind the capital formations.",
         "Several guarded spiritual signatures move between the palace, clan districts and sect embassies."
+      ],
+      "private": false,
+      "climate": "temperate",
+      "terrain": "imperial heartland",
+      "settlement_type": "city",
+      "roads": [
+        "Ashenwall City",
+        "Jadewood Medicine City",
+        "Riverguard City"
       ]
     },
     "Spirit Jade Capital": {
@@ -2318,6 +2327,10 @@
       "sense_hints": [
         "A jade ley-line nexus makes spiritual sense unusually vivid but crowded.",
         "High-level auras are common enough here that individual experts are difficult to isolate."
+      ],
+      "roads": [
+        "Jade Crown Spirit City",
+        "Jadeflow Spirit City"
       ]
     },
     "Nine-Heavens Immortal Court": {
@@ -2337,6 +2350,10 @@
       "sense_hints": [
         "Immortal law formations layer space so densely that distant courtyards feel only a step apart.",
         "The strongest auras are deliberately veiled by court etiquette and defensive arrays."
+      ],
+      "roads": [
+        "Immortal River City",
+        "Ninefold Noble Immortal City"
       ]
     },
     "Celestial Mandate Palace": {
@@ -2356,6 +2373,10 @@
       "sense_hints": [
         "Sovereign law formations suppress hostile intent without dulling spiritual perception.",
         "Countless celestial signatures overlap with traces of fate, law and ancient bloodlines."
+      ],
+      "roads": [
+        "Celestial River City",
+        "Mandate Crown Celestial City"
       ]
     },
     "Spirit Jade Rebirth Enclave": {
@@ -2422,6 +2443,1088 @@
       "min_realm_index": 0,
       "safe_zone": false,
       "private": true
+    },
+    "Riverguard City": {
+      "description": "A public temperate cultivation city shaped by temperate river martial district. Its family districts are part of the normal world: travelers can discover, visit, trade, and interact here. The city functions as a complete family starting region with local trade, cultivation resources, household politics, work, and recurring problems.",
+      "world": "Mortal World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "private": false,
+      "climate": "temperate",
+      "terrain": "river plains",
+      "settlement_type": "city",
+      "encounters": [
+        "A steward from a local cultivation family asks for help with a patrol line under pressure.",
+        "The garrison market is trading weapon timber, but a sudden shortage has pushed smaller shops into a bidding dispute.",
+        "A resource seeker claims a fresh cache of weapon timber has appeared beyond the safest streets and wants a partner.",
+        "Two junior cultivators from rival local households turn a routine disagreement in Riverguard City into a public challenge.",
+        "A traveling artisan posts escort contracts on the city notice board, offering payment, reputation, or family favor."
+      ],
+      "sense_hints": [
+        "Roads, caravans, and cultivator rumors point toward Riverguard City.",
+        "The city's temperate river martial district leave a recognizable spiritual signature."
+      ],
+      "roads": [
+        "Azure Crown Imperial City",
+        "Four-Roads Caravan City",
+        "Jadewood Medicine City"
+      ]
+    },
+    "Jadeflow Spirit City": {
+      "description": "A public temperate cultivation city shaped by temperate river martial district. Its family districts are part of the normal world: travelers can discover, visit, trade, and interact here. The city functions as a complete family starting region with local trade, cultivation resources, household politics, work, and recurring problems.",
+      "world": "Spiritual World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "private": false,
+      "climate": "temperate",
+      "terrain": "river plains",
+      "settlement_type": "city",
+      "encounters": [
+        "A steward from a local cultivation family asks for help with a damaged river ward.",
+        "The river market is trading water-aspect herbs, but a sudden shortage has pushed smaller shops into a bidding dispute.",
+        "A resource seeker claims a fresh cache of water-aspect herbs has appeared beyond the safest streets and wants a partner.",
+        "Two junior cultivators from rival local households turn a routine disagreement in Jadeflow Spirit City into a public challenge.",
+        "A traveling artisan posts ferry and ward contracts on the city notice board, offering payment, reputation, or family favor."
+      ],
+      "sense_hints": [
+        "Roads, caravans, and cultivator rumors point toward Jadeflow Spirit City.",
+        "The city's temperate river martial district leave a recognizable spiritual signature."
+      ],
+      "roads": [
+        "Galevein Spirit City",
+        "Hundred Herb Spirit City",
+        "Spirit Jade Capital"
+      ]
+    },
+    "Immortal River City": {
+      "description": "A public temperate cultivation city shaped by temperate river martial district. Its family districts are part of the normal world: travelers can discover, visit, trade, and interact here. The city functions as a complete family starting region with local trade, cultivation resources, household politics, work, and recurring problems.",
+      "world": "Immortal World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "private": false,
+      "climate": "temperate",
+      "terrain": "river plains",
+      "settlement_type": "city",
+      "encounters": [
+        "A steward from a local cultivation family asks for help with a damaged river ward.",
+        "The river market is trading water-aspect herbs, but a sudden shortage has pushed smaller shops into a bidding dispute.",
+        "A resource seeker claims a fresh cache of water-aspect herbs has appeared beyond the safest streets and wants a partner.",
+        "Two junior cultivators from rival local households turn a routine disagreement in Immortal River City into a public challenge.",
+        "A traveling artisan posts ferry and ward contracts on the city notice board, offering payment, reputation, or family favor."
+      ],
+      "sense_hints": [
+        "Roads, caravans, and cultivator rumors point toward Immortal River City.",
+        "The city's temperate river martial district leave a recognizable spiritual signature."
+      ],
+      "roads": [
+        "Jade Cauldron Immortal City",
+        "Nine-Heavens Immortal Court",
+        "Skyroad Immortal City"
+      ]
+    },
+    "Celestial River City": {
+      "description": "A public temperate cultivation city shaped by temperate river martial district. Its family districts are part of the normal world: travelers can discover, visit, trade, and interact here. The city functions as a complete family starting region with local trade, cultivation resources, household politics, work, and recurring problems.",
+      "world": "Celestial World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "private": false,
+      "climate": "temperate",
+      "terrain": "river plains",
+      "settlement_type": "city",
+      "encounters": [
+        "A steward from a local cultivation family asks for help with a damaged river ward.",
+        "The river market is trading water-aspect herbs, but a sudden shortage has pushed smaller shops into a bidding dispute.",
+        "A resource seeker claims a fresh cache of water-aspect herbs has appeared beyond the safest streets and wants a partner.",
+        "Two junior cultivators from rival local households turn a routine disagreement in Celestial River City into a public challenge.",
+        "A traveling artisan posts ferry and ward contracts on the city notice board, offering payment, reputation, or family favor."
+      ],
+      "sense_hints": [
+        "Roads, caravans, and cultivator rumors point toward Celestial River City.",
+        "The city's temperate river martial district leave a recognizable spiritual signature."
+      ],
+      "roads": [
+        "Celestial Mandate Palace",
+        "Divine Herb Celestial City",
+        "Starroad Celestial City"
+      ]
+    },
+    "Four-Roads Caravan City": {
+      "description": "A public warm-breezy cultivation city shaped by open-road trade crossroads. Its family districts are part of the normal world: travelers can discover, visit, trade, and interact here. The city functions as a complete family starting region with local trade, cultivation resources, household politics, work, and recurring problems.",
+      "world": "Mortal World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "private": false,
+      "climate": "warm-breezy",
+      "terrain": "open trade roads",
+      "settlement_type": "city",
+      "encounters": [
+        "A steward from a local cultivation family asks for help with a caravan overdue on the outer road.",
+        "The caravan exchange is trading route maps and beast feed, but a sudden shortage has pushed smaller shops into a bidding dispute.",
+        "A resource seeker claims a fresh cache of route maps and beast feed has appeared beyond the safest streets and wants a partner.",
+        "Two junior cultivators from rival local households turn a routine disagreement in Four-Roads Caravan City into a public challenge.",
+        "A traveling artisan posts escort work on the city notice board, offering payment, reputation, or family favor."
+      ],
+      "sense_hints": [
+        "Roads, caravans, and cultivator rumors point toward Four-Roads Caravan City.",
+        "The city's open-road trade crossroads leave a recognizable spiritual signature."
+      ],
+      "roads": [
+        "Emberforge City",
+        "Riverguard City"
+      ]
+    },
+    "Galevein Spirit City": {
+      "description": "A public warm-breezy cultivation city shaped by open-road trade crossroads. Its family districts are part of the normal world: travelers can discover, visit, trade, and interact here. The city functions as a complete family starting region with local trade, cultivation resources, household politics, work, and recurring problems.",
+      "world": "Spiritual World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "private": false,
+      "climate": "warm-breezy",
+      "terrain": "open trade roads",
+      "settlement_type": "city",
+      "encounters": [
+        "A steward from a local cultivation family asks for help with a caravan overdue on the outer road.",
+        "The caravan exchange is trading route maps and beast feed, but a sudden shortage has pushed smaller shops into a bidding dispute.",
+        "A resource seeker claims a fresh cache of route maps and beast feed has appeared beyond the safest streets and wants a partner.",
+        "Two junior cultivators from rival local households turn a routine disagreement in Galevein Spirit City into a public challenge.",
+        "A traveling artisan posts escort work on the city notice board, offering payment, reputation, or family favor."
+      ],
+      "sense_hints": [
+        "Roads, caravans, and cultivator rumors point toward Galevein Spirit City.",
+        "The city's open-road trade crossroads leave a recognizable spiritual signature."
+      ],
+      "roads": [
+        "Jadeflow Spirit City",
+        "Vermilion Furnace City"
+      ]
+    },
+    "Skyroad Immortal City": {
+      "description": "A public warm-breezy cultivation city shaped by open-road trade crossroads. Its family districts are part of the normal world: travelers can discover, visit, trade, and interact here. The city functions as a complete family starting region with local trade, cultivation resources, household politics, work, and recurring problems.",
+      "world": "Immortal World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "private": false,
+      "climate": "warm-breezy",
+      "terrain": "open trade roads",
+      "settlement_type": "city",
+      "encounters": [
+        "A steward from a local cultivation family asks for help with a caravan overdue on the outer road.",
+        "The caravan exchange is trading route maps and beast feed, but a sudden shortage has pushed smaller shops into a bidding dispute.",
+        "A resource seeker claims a fresh cache of route maps and beast feed has appeared beyond the safest streets and wants a partner.",
+        "Two junior cultivators from rival local households turn a routine disagreement in Skyroad Immortal City into a public challenge.",
+        "A traveling artisan posts escort work on the city notice board, offering payment, reputation, or family favor."
+      ],
+      "sense_hints": [
+        "Roads, caravans, and cultivator rumors point toward Skyroad Immortal City.",
+        "The city's open-road trade crossroads leave a recognizable spiritual signature."
+      ],
+      "roads": [
+        "Immortal River City",
+        "Solar Furnace Immortal City"
+      ]
+    },
+    "Starroad Celestial City": {
+      "description": "A public warm-breezy cultivation city shaped by open-road trade crossroads. Its family districts are part of the normal world: travelers can discover, visit, trade, and interact here. The city functions as a complete family starting region with local trade, cultivation resources, household politics, work, and recurring problems.",
+      "world": "Celestial World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "private": false,
+      "climate": "warm-breezy",
+      "terrain": "open trade roads",
+      "settlement_type": "city",
+      "encounters": [
+        "A steward from a local cultivation family asks for help with a caravan overdue on the outer road.",
+        "The caravan exchange is trading route maps and beast feed, but a sudden shortage has pushed smaller shops into a bidding dispute.",
+        "A resource seeker claims a fresh cache of route maps and beast feed has appeared beyond the safest streets and wants a partner.",
+        "Two junior cultivators from rival local households turn a routine disagreement in Starroad Celestial City into a public challenge.",
+        "A traveling artisan posts escort work on the city notice board, offering payment, reputation, or family favor."
+      ],
+      "sense_hints": [
+        "Roads, caravans, and cultivator rumors point toward Starroad Celestial City.",
+        "The city's open-road trade crossroads leave a recognizable spiritual signature."
+      ],
+      "roads": [
+        "Celestial River City",
+        "Solar Crucible Celestial City"
+      ]
+    },
+    "Emberforge City": {
+      "description": "A public hot cultivation city shaped by forge and volcanic firelands. Its family districts are part of the normal world: travelers can discover, visit, trade, and interact here. The city functions as a complete family starting region with local trade, cultivation resources, household politics, work, and recurring problems.",
+      "world": "Mortal World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "private": false,
+      "climate": "hot",
+      "terrain": "volcanic forge basin",
+      "settlement_type": "city",
+      "encounters": [
+        "A steward from a local cultivation family asks for help with a cracked furnace array.",
+        "The forge quarter is trading spirit iron, but a sudden shortage has pushed smaller shops into a bidding dispute.",
+        "A resource seeker claims a fresh cache of spirit iron has appeared beyond the safest streets and wants a partner.",
+        "Two junior cultivators from rival local households turn a routine disagreement in Emberforge City into a public challenge.",
+        "A traveling artisan posts smithing contracts on the city notice board, offering payment, reputation, or family favor."
+      ],
+      "sense_hints": [
+        "Roads, caravans, and cultivator rumors point toward Emberforge City.",
+        "The city's forge and volcanic firelands leave a recognizable spiritual signature."
+      ],
+      "roads": [
+        "Four-Roads Caravan City",
+        "Stoneback Mountain City"
+      ]
+    },
+    "Vermilion Furnace City": {
+      "description": "A public hot cultivation city shaped by forge and volcanic firelands. Its family districts are part of the normal world: travelers can discover, visit, trade, and interact here. The city functions as a complete family starting region with local trade, cultivation resources, household politics, work, and recurring problems.",
+      "world": "Spiritual World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "private": false,
+      "climate": "hot",
+      "terrain": "volcanic forge basin",
+      "settlement_type": "city",
+      "encounters": [
+        "A steward from a local cultivation family asks for help with a cracked furnace array.",
+        "The forge quarter is trading spirit iron, but a sudden shortage has pushed smaller shops into a bidding dispute.",
+        "A resource seeker claims a fresh cache of spirit iron has appeared beyond the safest streets and wants a partner.",
+        "Two junior cultivators from rival local households turn a routine disagreement in Vermilion Furnace City into a public challenge.",
+        "A traveling artisan posts smithing contracts on the city notice board, offering payment, reputation, or family favor."
+      ],
+      "sense_hints": [
+        "Roads, caravans, and cultivator rumors point toward Vermilion Furnace City.",
+        "The city's forge and volcanic firelands leave a recognizable spiritual signature."
+      ],
+      "roads": [
+        "Galevein Spirit City",
+        "Stoneheart Spirit City"
+      ]
+    },
+    "Solar Furnace Immortal City": {
+      "description": "A public hot cultivation city shaped by forge and volcanic firelands. Its family districts are part of the normal world: travelers can discover, visit, trade, and interact here. The city functions as a complete family starting region with local trade, cultivation resources, household politics, work, and recurring problems.",
+      "world": "Immortal World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "private": false,
+      "climate": "hot",
+      "terrain": "volcanic forge basin",
+      "settlement_type": "city",
+      "encounters": [
+        "A steward from a local cultivation family asks for help with a cracked furnace array.",
+        "The forge quarter is trading spirit iron, but a sudden shortage has pushed smaller shops into a bidding dispute.",
+        "A resource seeker claims a fresh cache of spirit iron has appeared beyond the safest streets and wants a partner.",
+        "Two junior cultivators from rival local households turn a routine disagreement in Solar Furnace Immortal City into a public challenge.",
+        "A traveling artisan posts smithing contracts on the city notice board, offering payment, reputation, or family favor."
+      ],
+      "sense_hints": [
+        "Roads, caravans, and cultivator rumors point toward Solar Furnace Immortal City.",
+        "The city's forge and volcanic firelands leave a recognizable spiritual signature."
+      ],
+      "roads": [
+        "Adamant Body Immortal City",
+        "Skyroad Immortal City"
+      ]
+    },
+    "Solar Crucible Celestial City": {
+      "description": "A public hot cultivation city shaped by forge and volcanic firelands. Its family districts are part of the normal world: travelers can discover, visit, trade, and interact here. The city functions as a complete family starting region with local trade, cultivation resources, household politics, work, and recurring problems.",
+      "world": "Celestial World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "private": false,
+      "climate": "hot",
+      "terrain": "volcanic forge basin",
+      "settlement_type": "city",
+      "encounters": [
+        "A steward from a local cultivation family asks for help with a cracked furnace array.",
+        "The forge quarter is trading spirit iron, but a sudden shortage has pushed smaller shops into a bidding dispute.",
+        "A resource seeker claims a fresh cache of spirit iron has appeared beyond the safest streets and wants a partner.",
+        "Two junior cultivators from rival local households turn a routine disagreement in Solar Crucible Celestial City into a public challenge.",
+        "A traveling artisan posts smithing contracts on the city notice board, offering payment, reputation, or family favor."
+      ],
+      "sense_hints": [
+        "Roads, caravans, and cultivator rumors point toward Solar Crucible Celestial City.",
+        "The city's forge and volcanic firelands leave a recognizable spiritual signature."
+      ],
+      "roads": [
+        "Starroad Celestial City",
+        "Worldstone Celestial City"
+      ]
+    },
+    "Stoneback Mountain City": {
+      "description": "A public cool-highland cultivation city shaped by rugged mountain highlands. Its family districts are part of the normal world: travelers can discover, visit, trade, and interact here. The city functions as a complete family starting region with local trade, cultivation resources, household politics, work, and recurring problems.",
+      "world": "Mortal World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "private": false,
+      "climate": "cool-highland",
+      "terrain": "rugged mountain highlands",
+      "settlement_type": "city",
+      "encounters": [
+        "A steward from a local cultivation family asks for help with a collapsed cultivation quarry.",
+        "The body-tempering district is trading marrow stone, but a sudden shortage has pushed smaller shops into a bidding dispute.",
+        "A resource seeker claims a fresh cache of marrow stone has appeared beyond the safest streets and wants a partner.",
+        "Two junior cultivators from rival local households turn a routine disagreement in Stoneback Mountain City into a public challenge.",
+        "A traveling artisan posts training hall commissions on the city notice board, offering payment, reputation, or family favor."
+      ],
+      "sense_hints": [
+        "Roads, caravans, and cultivator rumors point toward Stoneback Mountain City.",
+        "The city's rugged mountain highlands leave a recognizable spiritual signature."
+      ],
+      "roads": [
+        "Cloudblade City",
+        "Emberforge City"
+      ]
+    },
+    "Stoneheart Spirit City": {
+      "description": "A public cool-highland cultivation city shaped by rugged mountain highlands. Its family districts are part of the normal world: travelers can discover, visit, trade, and interact here. The city functions as a complete family starting region with local trade, cultivation resources, household politics, work, and recurring problems.",
+      "world": "Spiritual World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "private": false,
+      "climate": "cool-highland",
+      "terrain": "rugged mountain highlands",
+      "settlement_type": "city",
+      "encounters": [
+        "A steward from a local cultivation family asks for help with a collapsed cultivation quarry.",
+        "The body-tempering district is trading marrow stone, but a sudden shortage has pushed smaller shops into a bidding dispute.",
+        "A resource seeker claims a fresh cache of marrow stone has appeared beyond the safest streets and wants a partner.",
+        "Two junior cultivators from rival local households turn a routine disagreement in Stoneheart Spirit City into a public challenge.",
+        "A traveling artisan posts training hall commissions on the city notice board, offering payment, reputation, or family favor."
+      ],
+      "sense_hints": [
+        "Roads, caravans, and cultivator rumors point toward Stoneheart Spirit City.",
+        "The city's rugged mountain highlands leave a recognizable spiritual signature."
+      ],
+      "roads": [
+        "Cloudedge Spirit City",
+        "Vermilion Furnace City"
+      ]
+    },
+    "Adamant Body Immortal City": {
+      "description": "A public cool-highland cultivation city shaped by rugged mountain highlands. Its family districts are part of the normal world: travelers can discover, visit, trade, and interact here. The city functions as a complete family starting region with local trade, cultivation resources, household politics, work, and recurring problems.",
+      "world": "Immortal World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "private": false,
+      "climate": "cool-highland",
+      "terrain": "rugged mountain highlands",
+      "settlement_type": "city",
+      "encounters": [
+        "A steward from a local cultivation family asks for help with a collapsed cultivation quarry.",
+        "The body-tempering district is trading marrow stone, but a sudden shortage has pushed smaller shops into a bidding dispute.",
+        "A resource seeker claims a fresh cache of marrow stone has appeared beyond the safest streets and wants a partner.",
+        "Two junior cultivators from rival local households turn a routine disagreement in Adamant Body Immortal City into a public challenge.",
+        "A traveling artisan posts training hall commissions on the city notice board, offering payment, reputation, or family favor."
+      ],
+      "sense_hints": [
+        "Roads, caravans, and cultivator rumors point toward Adamant Body Immortal City.",
+        "The city's rugged mountain highlands leave a recognizable spiritual signature."
+      ],
+      "roads": [
+        "Heavenblade Immortal City",
+        "Solar Furnace Immortal City"
+      ]
+    },
+    "Worldstone Celestial City": {
+      "description": "A public cool-highland cultivation city shaped by rugged mountain highlands. Its family districts are part of the normal world: travelers can discover, visit, trade, and interact here. The city functions as a complete family starting region with local trade, cultivation resources, household politics, work, and recurring problems.",
+      "world": "Celestial World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "private": false,
+      "climate": "cool-highland",
+      "terrain": "rugged mountain highlands",
+      "settlement_type": "city",
+      "encounters": [
+        "A steward from a local cultivation family asks for help with a collapsed cultivation quarry.",
+        "The body-tempering district is trading marrow stone, but a sudden shortage has pushed smaller shops into a bidding dispute.",
+        "A resource seeker claims a fresh cache of marrow stone has appeared beyond the safest streets and wants a partner.",
+        "Two junior cultivators from rival local households turn a routine disagreement in Worldstone Celestial City into a public challenge.",
+        "A traveling artisan posts training hall commissions on the city notice board, offering payment, reputation, or family favor."
+      ],
+      "sense_hints": [
+        "Roads, caravans, and cultivator rumors point toward Worldstone Celestial City.",
+        "The city's rugged mountain highlands leave a recognizable spiritual signature."
+      ],
+      "roads": [
+        "Firmament Blade City",
+        "Solar Crucible Celestial City"
+      ]
+    },
+    "Cloudblade City": {
+      "description": "A public cool-windy cultivation city shaped by high windy sword peaks. Its family districts are part of the normal world: travelers can discover, visit, trade, and interact here. The city functions as a complete family starting region with local trade, cultivation resources, household politics, work, and recurring problems.",
+      "world": "Mortal World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "private": false,
+      "climate": "cool-windy",
+      "terrain": "windy high peaks",
+      "settlement_type": "city",
+      "encounters": [
+        "A steward from a local cultivation family asks for help with a disputed sword manual.",
+        "The training courts is trading sword ore, but a sudden shortage has pushed smaller shops into a bidding dispute.",
+        "A resource seeker claims a fresh cache of sword ore has appeared beyond the safest streets and wants a partner.",
+        "Two junior cultivators from rival local households turn a routine disagreement in Cloudblade City into a public challenge.",
+        "A traveling artisan posts dueling commissions on the city notice board, offering payment, reputation, or family favor."
+      ],
+      "sense_hints": [
+        "Roads, caravans, and cultivator rumors point toward Cloudblade City.",
+        "The city's high windy sword peaks leave a recognizable spiritual signature."
+      ],
+      "roads": [
+        "Ironbanner City",
+        "Stoneback Mountain City"
+      ]
+    },
+    "Cloudedge Spirit City": {
+      "description": "A public cool-windy cultivation city shaped by high windy sword peaks. Its family districts are part of the normal world: travelers can discover, visit, trade, and interact here. The city functions as a complete family starting region with local trade, cultivation resources, household politics, work, and recurring problems.",
+      "world": "Spiritual World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "private": false,
+      "climate": "cool-windy",
+      "terrain": "windy high peaks",
+      "settlement_type": "city",
+      "encounters": [
+        "A steward from a local cultivation family asks for help with a disputed sword manual.",
+        "The training courts is trading sword ore, but a sudden shortage has pushed smaller shops into a bidding dispute.",
+        "A resource seeker claims a fresh cache of sword ore has appeared beyond the safest streets and wants a partner.",
+        "Two junior cultivators from rival local households turn a routine disagreement in Cloudedge Spirit City into a public challenge.",
+        "A traveling artisan posts dueling commissions on the city notice board, offering payment, reputation, or family favor."
+      ],
+      "sense_hints": [
+        "Roads, caravans, and cultivator rumors point toward Cloudedge Spirit City.",
+        "The city's high windy sword peaks leave a recognizable spiritual signature."
+      ],
+      "roads": [
+        "Spearwall Spirit City",
+        "Stoneheart Spirit City"
+      ]
+    },
+    "Heavenblade Immortal City": {
+      "description": "A public cool-windy cultivation city shaped by high windy sword peaks. Its family districts are part of the normal world: travelers can discover, visit, trade, and interact here. The city functions as a complete family starting region with local trade, cultivation resources, household politics, work, and recurring problems.",
+      "world": "Immortal World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "private": false,
+      "climate": "cool-windy",
+      "terrain": "windy high peaks",
+      "settlement_type": "city",
+      "encounters": [
+        "A steward from a local cultivation family asks for help with a disputed sword manual.",
+        "The training courts is trading sword ore, but a sudden shortage has pushed smaller shops into a bidding dispute.",
+        "A resource seeker claims a fresh cache of sword ore has appeared beyond the safest streets and wants a partner.",
+        "Two junior cultivators from rival local households turn a routine disagreement in Heavenblade Immortal City into a public challenge.",
+        "A traveling artisan posts dueling commissions on the city notice board, offering payment, reputation, or family favor."
+      ],
+      "sense_hints": [
+        "Roads, caravans, and cultivator rumors point toward Heavenblade Immortal City.",
+        "The city's high windy sword peaks leave a recognizable spiritual signature."
+      ],
+      "roads": [
+        "Adamant Body Immortal City",
+        "Golden Spear Immortal City"
+      ]
+    },
+    "Firmament Blade City": {
+      "description": "A public cool-windy cultivation city shaped by high windy sword peaks. Its family districts are part of the normal world: travelers can discover, visit, trade, and interact here. The city functions as a complete family starting region with local trade, cultivation resources, household politics, work, and recurring problems.",
+      "world": "Celestial World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "private": false,
+      "climate": "cool-windy",
+      "terrain": "windy high peaks",
+      "settlement_type": "city",
+      "encounters": [
+        "A steward from a local cultivation family asks for help with a disputed sword manual.",
+        "The training courts is trading sword ore, but a sudden shortage has pushed smaller shops into a bidding dispute.",
+        "A resource seeker claims a fresh cache of sword ore has appeared beyond the safest streets and wants a partner.",
+        "Two junior cultivators from rival local households turn a routine disagreement in Firmament Blade City into a public challenge.",
+        "A traveling artisan posts dueling commissions on the city notice board, offering payment, reputation, or family favor."
+      ],
+      "sense_hints": [
+        "Roads, caravans, and cultivator rumors point toward Firmament Blade City.",
+        "The city's high windy sword peaks leave a recognizable spiritual signature."
+      ],
+      "roads": [
+        "Mandate Spear City",
+        "Worldstone Celestial City"
+      ]
+    },
+    "Ironbanner City": {
+      "description": "A public dry-temperate cultivation city shaped by fortified dry plains. Its family districts are part of the normal world: travelers can discover, visit, trade, and interact here. The city functions as a complete family starting region with local trade, cultivation resources, household politics, work, and recurring problems.",
+      "world": "Mortal World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "private": false,
+      "climate": "dry-temperate",
+      "terrain": "fortified dry plains",
+      "settlement_type": "city",
+      "encounters": [
+        "A steward from a local cultivation family asks for help with a patrol line under pressure.",
+        "The garrison market is trading weapon timber, but a sudden shortage has pushed smaller shops into a bidding dispute.",
+        "A resource seeker claims a fresh cache of weapon timber has appeared beyond the safest streets and wants a partner.",
+        "Two junior cultivators from rival local households turn a routine disagreement in Ironbanner City into a public challenge.",
+        "A traveling artisan posts escort contracts on the city notice board, offering payment, reputation, or family favor."
+      ],
+      "sense_hints": [
+        "Roads, caravans, and cultivator rumors point toward Ironbanner City.",
+        "The city's fortified dry plains leave a recognizable spiritual signature."
+      ],
+      "roads": [
+        "Cloudblade City",
+        "Moonfen City"
+      ]
+    },
+    "Spearwall Spirit City": {
+      "description": "A public dry-temperate cultivation city shaped by fortified dry plains. Its family districts are part of the normal world: travelers can discover, visit, trade, and interact here. The city functions as a complete family starting region with local trade, cultivation resources, household politics, work, and recurring problems.",
+      "world": "Spiritual World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "private": false,
+      "climate": "dry-temperate",
+      "terrain": "fortified dry plains",
+      "settlement_type": "city",
+      "encounters": [
+        "A steward from a local cultivation family asks for help with a patrol line under pressure.",
+        "The garrison market is trading weapon timber, but a sudden shortage has pushed smaller shops into a bidding dispute.",
+        "A resource seeker claims a fresh cache of weapon timber has appeared beyond the safest streets and wants a partner.",
+        "Two junior cultivators from rival local households turn a routine disagreement in Spearwall Spirit City into a public challenge.",
+        "A traveling artisan posts escort contracts on the city notice board, offering payment, reputation, or family favor."
+      ],
+      "sense_hints": [
+        "Roads, caravans, and cultivator rumors point toward Spearwall Spirit City.",
+        "The city's fortified dry plains leave a recognizable spiritual signature."
+      ],
+      "roads": [
+        "Cloudedge Spirit City",
+        "Moonfrost Spirit City"
+      ]
+    },
+    "Golden Spear Immortal City": {
+      "description": "A public dry-temperate cultivation city shaped by fortified dry plains. Its family districts are part of the normal world: travelers can discover, visit, trade, and interact here. The city functions as a complete family starting region with local trade, cultivation resources, household politics, work, and recurring problems.",
+      "world": "Immortal World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "private": false,
+      "climate": "dry-temperate",
+      "terrain": "fortified dry plains",
+      "settlement_type": "city",
+      "encounters": [
+        "A steward from a local cultivation family asks for help with a patrol line under pressure.",
+        "The garrison market is trading weapon timber, but a sudden shortage has pushed smaller shops into a bidding dispute.",
+        "A resource seeker claims a fresh cache of weapon timber has appeared beyond the safest streets and wants a partner.",
+        "Two junior cultivators from rival local households turn a routine disagreement in Golden Spear Immortal City into a public challenge.",
+        "A traveling artisan posts escort contracts on the city notice board, offering payment, reputation, or family favor."
+      ],
+      "sense_hints": [
+        "Roads, caravans, and cultivator rumors point toward Golden Spear Immortal City.",
+        "The city's fortified dry plains leave a recognizable spiritual signature."
+      ],
+      "roads": [
+        "Heavenblade Immortal City",
+        "Lunar Veil Immortal City"
+      ]
+    },
+    "Mandate Spear City": {
+      "description": "A public dry-temperate cultivation city shaped by fortified dry plains. Its family districts are part of the normal world: travelers can discover, visit, trade, and interact here. The city functions as a complete family starting region with local trade, cultivation resources, household politics, work, and recurring problems.",
+      "world": "Celestial World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "private": false,
+      "climate": "dry-temperate",
+      "terrain": "fortified dry plains",
+      "settlement_type": "city",
+      "encounters": [
+        "A steward from a local cultivation family asks for help with a patrol line under pressure.",
+        "The garrison market is trading weapon timber, but a sudden shortage has pushed smaller shops into a bidding dispute.",
+        "A resource seeker claims a fresh cache of weapon timber has appeared beyond the safest streets and wants a partner.",
+        "Two junior cultivators from rival local households turn a routine disagreement in Mandate Spear City into a public challenge.",
+        "A traveling artisan posts escort contracts on the city notice board, offering payment, reputation, or family favor."
+      ],
+      "sense_hints": [
+        "Roads, caravans, and cultivator rumors point toward Mandate Spear City.",
+        "The city's fortified dry plains leave a recognizable spiritual signature."
+      ],
+      "roads": [
+        "Firmament Blade City",
+        "Lunar Shadow Celestial City"
+      ]
+    },
+    "Moonfen City": {
+      "description": "A public cold-damp cultivation city shaped by misty yin wetlands. Its family districts are part of the normal world: travelers can discover, visit, trade, and interact here. The city functions as a complete family starting region with local trade, cultivation resources, household politics, work, and recurring problems.",
+      "world": "Mortal World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "private": false,
+      "climate": "cold-damp",
+      "terrain": "mist wetlands",
+      "settlement_type": "city",
+      "encounters": [
+        "A steward from a local cultivation family asks for help with a string of vanished informants.",
+        "The night market is trading yin herbs, but a sudden shortage has pushed smaller shops into a bidding dispute.",
+        "A resource seeker claims a fresh cache of yin herbs has appeared beyond the safest streets and wants a partner.",
+        "Two junior cultivators from rival local households turn a routine disagreement in Moonfen City into a public challenge.",
+        "A traveling artisan posts discreet courier work on the city notice board, offering payment, reputation, or family favor."
+      ],
+      "sense_hints": [
+        "Roads, caravans, and cultivator rumors point toward Moonfen City.",
+        "The city's misty yin wetlands leave a recognizable spiritual signature."
+      ],
+      "roads": [
+        "Frostwatch City",
+        "Ironbanner City"
+      ]
+    },
+    "Moonfrost Spirit City": {
+      "description": "A public cold-damp cultivation city shaped by misty yin wetlands. Its family districts are part of the normal world: travelers can discover, visit, trade, and interact here. The city functions as a complete family starting region with local trade, cultivation resources, household politics, work, and recurring problems.",
+      "world": "Spiritual World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "private": false,
+      "climate": "cold-damp",
+      "terrain": "mist wetlands",
+      "settlement_type": "city",
+      "encounters": [
+        "A steward from a local cultivation family asks for help with a string of vanished informants.",
+        "The night market is trading yin herbs, but a sudden shortage has pushed smaller shops into a bidding dispute.",
+        "A resource seeker claims a fresh cache of yin herbs has appeared beyond the safest streets and wants a partner.",
+        "Two junior cultivators from rival local households turn a routine disagreement in Moonfrost Spirit City into a public challenge.",
+        "A traveling artisan posts discreet courier work on the city notice board, offering payment, reputation, or family favor."
+      ],
+      "sense_hints": [
+        "Roads, caravans, and cultivator rumors point toward Moonfrost Spirit City.",
+        "The city's misty yin wetlands leave a recognizable spiritual signature."
+      ],
+      "roads": [
+        "Northwind Spirit City",
+        "Spearwall Spirit City"
+      ]
+    },
+    "Lunar Veil Immortal City": {
+      "description": "A public cold-damp cultivation city shaped by misty yin wetlands. Its family districts are part of the normal world: travelers can discover, visit, trade, and interact here. The city functions as a complete family starting region with local trade, cultivation resources, household politics, work, and recurring problems.",
+      "world": "Immortal World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "private": false,
+      "climate": "cold-damp",
+      "terrain": "mist wetlands",
+      "settlement_type": "city",
+      "encounters": [
+        "A steward from a local cultivation family asks for help with a string of vanished informants.",
+        "The night market is trading yin herbs, but a sudden shortage has pushed smaller shops into a bidding dispute.",
+        "A resource seeker claims a fresh cache of yin herbs has appeared beyond the safest streets and wants a partner.",
+        "Two junior cultivators from rival local households turn a routine disagreement in Lunar Veil Immortal City into a public challenge.",
+        "A traveling artisan posts discreet courier work on the city notice board, offering payment, reputation, or family favor."
+      ],
+      "sense_hints": [
+        "Roads, caravans, and cultivator rumors point toward Lunar Veil Immortal City.",
+        "The city's misty yin wetlands leave a recognizable spiritual signature."
+      ],
+      "roads": [
+        "Golden Spear Immortal City",
+        "Polar Gate Immortal City"
+      ]
+    },
+    "Lunar Shadow Celestial City": {
+      "description": "A public cold-damp cultivation city shaped by misty yin wetlands. Its family districts are part of the normal world: travelers can discover, visit, trade, and interact here. The city functions as a complete family starting region with local trade, cultivation resources, household politics, work, and recurring problems.",
+      "world": "Celestial World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "private": false,
+      "climate": "cold-damp",
+      "terrain": "mist wetlands",
+      "settlement_type": "city",
+      "encounters": [
+        "A steward from a local cultivation family asks for help with a string of vanished informants.",
+        "The night market is trading yin herbs, but a sudden shortage has pushed smaller shops into a bidding dispute.",
+        "A resource seeker claims a fresh cache of yin herbs has appeared beyond the safest streets and wants a partner.",
+        "Two junior cultivators from rival local households turn a routine disagreement in Lunar Shadow Celestial City into a public challenge.",
+        "A traveling artisan posts discreet courier work on the city notice board, offering payment, reputation, or family favor."
+      ],
+      "sense_hints": [
+        "Roads, caravans, and cultivator rumors point toward Lunar Shadow Celestial City.",
+        "The city's misty yin wetlands leave a recognizable spiritual signature."
+      ],
+      "roads": [
+        "Froststar Border City",
+        "Mandate Spear City"
+      ]
+    },
+    "Frostwatch City": {
+      "description": "A public cold cultivation city shaped by northern frozen frontier. Its family districts are part of the normal world: travelers can discover, visit, trade, and interact here. The city functions as a complete family starting region with local trade, cultivation resources, household politics, work, and recurring problems.",
+      "world": "Mortal World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "private": false,
+      "climate": "cold",
+      "terrain": "frozen frontier",
+      "settlement_type": "city",
+      "encounters": [
+        "A steward from a local cultivation family asks for help with a beast migration near the walls.",
+        "The frontier bazaar is trading cold-aspect crystals, but a sudden shortage has pushed smaller shops into a bidding dispute.",
+        "A resource seeker claims a fresh cache of cold-aspect crystals has appeared beyond the safest streets and wants a partner.",
+        "Two junior cultivators from rival local households turn a routine disagreement in Frostwatch City into a public challenge.",
+        "A traveling artisan posts border patrol work on the city notice board, offering payment, reputation, or family favor."
+      ],
+      "sense_hints": [
+        "Roads, caravans, and cultivator rumors point toward Frostwatch City.",
+        "The city's northern frozen frontier leave a recognizable spiritual signature."
+      ],
+      "roads": [
+        "Ashenwall City",
+        "Moonfen City"
+      ]
+    },
+    "Northwind Spirit City": {
+      "description": "A public cold cultivation city shaped by northern frozen frontier. Its family districts are part of the normal world: travelers can discover, visit, trade, and interact here. The city functions as a complete family starting region with local trade, cultivation resources, household politics, work, and recurring problems.",
+      "world": "Spiritual World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "private": false,
+      "climate": "cold",
+      "terrain": "frozen frontier",
+      "settlement_type": "city",
+      "encounters": [
+        "A steward from a local cultivation family asks for help with a beast migration near the walls.",
+        "The frontier bazaar is trading cold-aspect crystals, but a sudden shortage has pushed smaller shops into a bidding dispute.",
+        "A resource seeker claims a fresh cache of cold-aspect crystals has appeared beyond the safest streets and wants a partner.",
+        "Two junior cultivators from rival local households turn a routine disagreement in Northwind Spirit City into a public challenge.",
+        "A traveling artisan posts border patrol work on the city notice board, offering payment, reputation, or family favor."
+      ],
+      "sense_hints": [
+        "Roads, caravans, and cultivator rumors point toward Northwind Spirit City.",
+        "The city's northern frozen frontier leave a recognizable spiritual signature."
+      ],
+      "roads": [
+        "Broken Halo Spirit City",
+        "Moonfrost Spirit City"
+      ]
+    },
+    "Polar Gate Immortal City": {
+      "description": "A public cold cultivation city shaped by northern frozen frontier. Its family districts are part of the normal world: travelers can discover, visit, trade, and interact here. The city functions as a complete family starting region with local trade, cultivation resources, household politics, work, and recurring problems.",
+      "world": "Immortal World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "private": false,
+      "climate": "cold",
+      "terrain": "frozen frontier",
+      "settlement_type": "city",
+      "encounters": [
+        "A steward from a local cultivation family asks for help with a beast migration near the walls.",
+        "The frontier bazaar is trading cold-aspect crystals, but a sudden shortage has pushed smaller shops into a bidding dispute.",
+        "A resource seeker claims a fresh cache of cold-aspect crystals has appeared beyond the safest streets and wants a partner.",
+        "Two junior cultivators from rival local households turn a routine disagreement in Polar Gate Immortal City into a public challenge.",
+        "A traveling artisan posts border patrol work on the city notice board, offering payment, reputation, or family favor."
+      ],
+      "sense_hints": [
+        "Roads, caravans, and cultivator rumors point toward Polar Gate Immortal City.",
+        "The city's northern frozen frontier leave a recognizable spiritual signature."
+      ],
+      "roads": [
+        "Fallen Star Immortal City",
+        "Lunar Veil Immortal City"
+      ]
+    },
+    "Froststar Border City": {
+      "description": "A public cold cultivation city shaped by northern frozen frontier. Its family districts are part of the normal world: travelers can discover, visit, trade, and interact here. The city functions as a complete family starting region with local trade, cultivation resources, household politics, work, and recurring problems.",
+      "world": "Celestial World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "private": false,
+      "climate": "cold",
+      "terrain": "frozen frontier",
+      "settlement_type": "city",
+      "encounters": [
+        "A steward from a local cultivation family asks for help with a beast migration near the walls.",
+        "The frontier bazaar is trading cold-aspect crystals, but a sudden shortage has pushed smaller shops into a bidding dispute.",
+        "A resource seeker claims a fresh cache of cold-aspect crystals has appeared beyond the safest streets and wants a partner.",
+        "Two junior cultivators from rival local households turn a routine disagreement in Froststar Border City into a public challenge.",
+        "A traveling artisan posts border patrol work on the city notice board, offering payment, reputation, or family favor."
+      ],
+      "sense_hints": [
+        "Roads, caravans, and cultivator rumors point toward Froststar Border City.",
+        "The city's northern frozen frontier leave a recognizable spiritual signature."
+      ],
+      "roads": [
+        "Lunar Shadow Celestial City",
+        "Ruined Constellation City"
+      ]
+    },
+    "Ashenwall City": {
+      "description": "A public cool-dry cultivation city shaped by weathered ruins and old battlefields. Its family districts are part of the normal world: travelers can discover, visit, trade, and interact here. The city functions as a complete family starting region with local trade, cultivation resources, household politics, work, and recurring problems.",
+      "world": "Mortal World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "private": false,
+      "climate": "cool-dry",
+      "terrain": "weathered ruins",
+      "settlement_type": "city",
+      "encounters": [
+        "A steward from a local cultivation family asks for help with an old estate claimed by two rival houses.",
+        "The reclamation market is trading salvaged relics, but a sudden shortage has pushed smaller shops into a bidding dispute.",
+        "A resource seeker claims a fresh cache of salvaged relics has appeared beyond the safest streets and wants a partner.",
+        "Two junior cultivators from rival local households turn a routine disagreement in Ashenwall City into a public challenge.",
+        "A traveling artisan posts ruin-clearing contracts on the city notice board, offering payment, reputation, or family favor."
+      ],
+      "sense_hints": [
+        "Roads, caravans, and cultivator rumors point toward Ashenwall City.",
+        "The city's weathered ruins and old battlefields leave a recognizable spiritual signature."
+      ],
+      "roads": [
+        "Azure Crown Imperial City",
+        "Frostwatch City"
+      ]
+    },
+    "Broken Halo Spirit City": {
+      "description": "A public cool-dry cultivation city shaped by weathered ruins and old battlefields. Its family districts are part of the normal world: travelers can discover, visit, trade, and interact here. The city functions as a complete family starting region with local trade, cultivation resources, household politics, work, and recurring problems.",
+      "world": "Spiritual World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "private": false,
+      "climate": "cool-dry",
+      "terrain": "weathered ruins",
+      "settlement_type": "city",
+      "encounters": [
+        "A steward from a local cultivation family asks for help with an old estate claimed by two rival houses.",
+        "The reclamation market is trading salvaged relics, but a sudden shortage has pushed smaller shops into a bidding dispute.",
+        "A resource seeker claims a fresh cache of salvaged relics has appeared beyond the safest streets and wants a partner.",
+        "Two junior cultivators from rival local households turn a routine disagreement in Broken Halo Spirit City into a public challenge.",
+        "A traveling artisan posts ruin-clearing contracts on the city notice board, offering payment, reputation, or family favor."
+      ],
+      "sense_hints": [
+        "Roads, caravans, and cultivator rumors point toward Broken Halo Spirit City.",
+        "The city's weathered ruins and old battlefields leave a recognizable spiritual signature."
+      ],
+      "roads": [
+        "Jade Crown Spirit City",
+        "Northwind Spirit City"
+      ]
+    },
+    "Fallen Star Immortal City": {
+      "description": "A public cool-dry cultivation city shaped by weathered ruins and old battlefields. Its family districts are part of the normal world: travelers can discover, visit, trade, and interact here. The city functions as a complete family starting region with local trade, cultivation resources, household politics, work, and recurring problems.",
+      "world": "Immortal World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "private": false,
+      "climate": "cool-dry",
+      "terrain": "weathered ruins",
+      "settlement_type": "city",
+      "encounters": [
+        "A steward from a local cultivation family asks for help with an old estate claimed by two rival houses.",
+        "The reclamation market is trading salvaged relics, but a sudden shortage has pushed smaller shops into a bidding dispute.",
+        "A resource seeker claims a fresh cache of salvaged relics has appeared beyond the safest streets and wants a partner.",
+        "Two junior cultivators from rival local households turn a routine disagreement in Fallen Star Immortal City into a public challenge.",
+        "A traveling artisan posts ruin-clearing contracts on the city notice board, offering payment, reputation, or family favor."
+      ],
+      "sense_hints": [
+        "Roads, caravans, and cultivator rumors point toward Fallen Star Immortal City.",
+        "The city's weathered ruins and old battlefields leave a recognizable spiritual signature."
+      ],
+      "roads": [
+        "Ninefold Noble Immortal City",
+        "Polar Gate Immortal City"
+      ]
+    },
+    "Ruined Constellation City": {
+      "description": "A public cool-dry cultivation city shaped by weathered ruins and old battlefields. Its family districts are part of the normal world: travelers can discover, visit, trade, and interact here. The city functions as a complete family starting region with local trade, cultivation resources, household politics, work, and recurring problems.",
+      "world": "Celestial World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "private": false,
+      "climate": "cool-dry",
+      "terrain": "weathered ruins",
+      "settlement_type": "city",
+      "encounters": [
+        "A steward from a local cultivation family asks for help with an old estate claimed by two rival houses.",
+        "The reclamation market is trading salvaged relics, but a sudden shortage has pushed smaller shops into a bidding dispute.",
+        "A resource seeker claims a fresh cache of salvaged relics has appeared beyond the safest streets and wants a partner.",
+        "Two junior cultivators from rival local households turn a routine disagreement in Ruined Constellation City into a public challenge.",
+        "A traveling artisan posts ruin-clearing contracts on the city notice board, offering payment, reputation, or family favor."
+      ],
+      "sense_hints": [
+        "Roads, caravans, and cultivator rumors point toward Ruined Constellation City.",
+        "The city's weathered ruins and old battlefields leave a recognizable spiritual signature."
+      ],
+      "roads": [
+        "Froststar Border City",
+        "Mandate Crown Celestial City"
+      ]
+    },
+    "Jadewood Medicine City": {
+      "description": "A public warm-humid cultivation city shaped by warm herb forests and medicine gardens. Its family districts are part of the normal world: travelers can discover, visit, trade, and interact here. The city functions as a complete family starting region with local trade, cultivation resources, household politics, work, and recurring problems.",
+      "world": "Mortal World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "private": false,
+      "climate": "warm-humid",
+      "terrain": "herb forest valleys",
+      "settlement_type": "city",
+      "encounters": [
+        "A steward from a local cultivation family asks for help with a tainted herb shipment.",
+        "The medicine market is trading rare herbs, but a sudden shortage has pushed smaller shops into a bidding dispute.",
+        "A resource seeker claims a fresh cache of rare herbs has appeared beyond the safest streets and wants a partner.",
+        "Two junior cultivators from rival local households turn a routine disagreement in Jadewood Medicine City into a public challenge.",
+        "A traveling artisan posts apothecary commissions on the city notice board, offering payment, reputation, or family favor."
+      ],
+      "sense_hints": [
+        "Roads, caravans, and cultivator rumors point toward Jadewood Medicine City.",
+        "The city's warm herb forests and medicine gardens leave a recognizable spiritual signature."
+      ],
+      "roads": [
+        "Azure Crown Imperial City",
+        "Riverguard City"
+      ]
+    },
+    "Hundred Herb Spirit City": {
+      "description": "A public warm-humid cultivation city shaped by warm herb forests and medicine gardens. Its family districts are part of the normal world: travelers can discover, visit, trade, and interact here. The city functions as a complete family starting region with local trade, cultivation resources, household politics, work, and recurring problems.",
+      "world": "Spiritual World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "private": false,
+      "climate": "warm-humid",
+      "terrain": "herb forest valleys",
+      "settlement_type": "city",
+      "encounters": [
+        "A steward from a local cultivation family asks for help with a tainted herb shipment.",
+        "The medicine market is trading rare herbs, but a sudden shortage has pushed smaller shops into a bidding dispute.",
+        "A resource seeker claims a fresh cache of rare herbs has appeared beyond the safest streets and wants a partner.",
+        "Two junior cultivators from rival local households turn a routine disagreement in Hundred Herb Spirit City into a public challenge.",
+        "A traveling artisan posts apothecary commissions on the city notice board, offering payment, reputation, or family favor."
+      ],
+      "sense_hints": [
+        "Roads, caravans, and cultivator rumors point toward Hundred Herb Spirit City.",
+        "The city's warm herb forests and medicine gardens leave a recognizable spiritual signature."
+      ],
+      "roads": [
+        "Jade Crown Spirit City",
+        "Jadeflow Spirit City"
+      ]
+    },
+    "Jade Cauldron Immortal City": {
+      "description": "A public warm-humid cultivation city shaped by warm herb forests and medicine gardens. Its family districts are part of the normal world: travelers can discover, visit, trade, and interact here. The city functions as a complete family starting region with local trade, cultivation resources, household politics, work, and recurring problems.",
+      "world": "Immortal World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "private": false,
+      "climate": "warm-humid",
+      "terrain": "herb forest valleys",
+      "settlement_type": "city",
+      "encounters": [
+        "A steward from a local cultivation family asks for help with a tainted herb shipment.",
+        "The medicine market is trading rare herbs, but a sudden shortage has pushed smaller shops into a bidding dispute.",
+        "A resource seeker claims a fresh cache of rare herbs has appeared beyond the safest streets and wants a partner.",
+        "Two junior cultivators from rival local households turn a routine disagreement in Jade Cauldron Immortal City into a public challenge.",
+        "A traveling artisan posts apothecary commissions on the city notice board, offering payment, reputation, or family favor."
+      ],
+      "sense_hints": [
+        "Roads, caravans, and cultivator rumors point toward Jade Cauldron Immortal City.",
+        "The city's warm herb forests and medicine gardens leave a recognizable spiritual signature."
+      ],
+      "roads": [
+        "Immortal River City",
+        "Ninefold Noble Immortal City"
+      ]
+    },
+    "Divine Herb Celestial City": {
+      "description": "A public warm-humid cultivation city shaped by warm herb forests and medicine gardens. Its family districts are part of the normal world: travelers can discover, visit, trade, and interact here. The city functions as a complete family starting region with local trade, cultivation resources, household politics, work, and recurring problems.",
+      "world": "Celestial World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "private": false,
+      "climate": "warm-humid",
+      "terrain": "herb forest valleys",
+      "settlement_type": "city",
+      "encounters": [
+        "A steward from a local cultivation family asks for help with a tainted herb shipment.",
+        "The medicine market is trading rare herbs, but a sudden shortage has pushed smaller shops into a bidding dispute.",
+        "A resource seeker claims a fresh cache of rare herbs has appeared beyond the safest streets and wants a partner.",
+        "Two junior cultivators from rival local households turn a routine disagreement in Divine Herb Celestial City into a public challenge.",
+        "A traveling artisan posts apothecary commissions on the city notice board, offering payment, reputation, or family favor."
+      ],
+      "sense_hints": [
+        "Roads, caravans, and cultivator rumors point toward Divine Herb Celestial City.",
+        "The city's warm herb forests and medicine gardens leave a recognizable spiritual signature."
+      ],
+      "roads": [
+        "Celestial River City",
+        "Mandate Crown Celestial City"
+      ]
+    },
+    "Jade Crown Spirit City": {
+      "description": "A public temperate noble cultivation city in the prosperous imperial heartland, protected for local households while remaining open to normal discovery, travel, trade, and visitors. The city functions as a complete family starting region with local trade, cultivation resources, household politics, work, and recurring problems.",
+      "world": "Spiritual World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "private": false,
+      "climate": "temperate",
+      "terrain": "imperial heartland",
+      "settlement_type": "city",
+      "encounters": [
+        "A steward from a local cultivation family asks for help with a succession dispute spilling into the streets.",
+        "The inner-city market is trading tribute goods, but a sudden shortage has pushed smaller shops into a bidding dispute.",
+        "A resource seeker claims a fresh cache of tribute goods has appeared beyond the safest streets and wants a partner.",
+        "Two junior cultivators from rival local households turn a routine disagreement in Jade Crown Spirit City into a public challenge.",
+        "A traveling artisan posts court commissions on the city notice board, offering payment, reputation, or family favor."
+      ],
+      "sense_hints": [
+        "Clan banners and public roads lead toward Jade Crown Spirit City.",
+        "Dense but orderly household auras mark the city's noble districts."
+      ],
+      "roads": [
+        "Broken Halo Spirit City",
+        "Hundred Herb Spirit City",
+        "Spirit Jade Capital"
+      ]
+    },
+    "Ninefold Noble Immortal City": {
+      "description": "A public temperate noble cultivation city in the prosperous imperial heartland, protected for local households while remaining open to normal discovery, travel, trade, and visitors. The city functions as a complete family starting region with local trade, cultivation resources, household politics, work, and recurring problems.",
+      "world": "Immortal World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "private": false,
+      "climate": "temperate",
+      "terrain": "imperial heartland",
+      "settlement_type": "city",
+      "encounters": [
+        "A steward from a local cultivation family asks for help with a succession dispute spilling into the streets.",
+        "The inner-city market is trading tribute goods, but a sudden shortage has pushed smaller shops into a bidding dispute.",
+        "A resource seeker claims a fresh cache of tribute goods has appeared beyond the safest streets and wants a partner.",
+        "Two junior cultivators from rival local households turn a routine disagreement in Ninefold Noble Immortal City into a public challenge.",
+        "A traveling artisan posts court commissions on the city notice board, offering payment, reputation, or family favor."
+      ],
+      "sense_hints": [
+        "Clan banners and public roads lead toward Ninefold Noble Immortal City.",
+        "Dense but orderly household auras mark the city's noble districts."
+      ],
+      "roads": [
+        "Fallen Star Immortal City",
+        "Jade Cauldron Immortal City",
+        "Nine-Heavens Immortal Court"
+      ]
+    },
+    "Mandate Crown Celestial City": {
+      "description": "A public temperate noble cultivation city in the prosperous imperial heartland, protected for local households while remaining open to normal discovery, travel, trade, and visitors. The city functions as a complete family starting region with local trade, cultivation resources, household politics, work, and recurring problems.",
+      "world": "Celestial World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "private": false,
+      "climate": "temperate",
+      "terrain": "imperial heartland",
+      "settlement_type": "city",
+      "encounters": [
+        "A steward from a local cultivation family asks for help with a succession dispute spilling into the streets.",
+        "The inner-city market is trading tribute goods, but a sudden shortage has pushed smaller shops into a bidding dispute.",
+        "A resource seeker claims a fresh cache of tribute goods has appeared beyond the safest streets and wants a partner.",
+        "Two junior cultivators from rival local households turn a routine disagreement in Mandate Crown Celestial City into a public challenge.",
+        "A traveling artisan posts court commissions on the city notice board, offering payment, reputation, or family favor."
+      ],
+      "sense_hints": [
+        "Clan banners and public roads lead toward Mandate Crown Celestial City.",
+        "Dense but orderly household auras mark the city's noble districts."
+      ],
+      "roads": [
+        "Celestial Mandate Palace",
+        "Divine Herb Celestial City",
+        "Ruined Constellation City"
+      ]
     }
   },
   "npcs": {
@@ -2984,6 +4087,754 @@
         "Afternoon": "Corpse Lantern Necropolis",
         "Evening": "Corpse Lantern Necropolis",
         "Night": "Corpse Lantern Necropolis"
+      }
+    },
+    "Adamant Body Immortal City Family Steward": {
+      "role": "Local family liaison, shop broker and problem-board steward",
+      "realm": "Local Cultivator",
+      "personality": "Practical, observant and familiar with the rivalries between the city's households.",
+      "speech": "Direct and commercially minded.",
+      "want": "Keep family business, local shops and resource routes functioning.",
+      "fear": "A local dispute will grow into a feud that damages the city.",
+      "secret": "Keeps private notes on which households are rising, falling, extinct or newly replaced.",
+      "location": "Adamant Body Immortal City",
+      "schedule": {
+        "Dawn": "Adamant Body Immortal City",
+        "Morning": "Adamant Body Immortal City",
+        "Afternoon": "Adamant Body Immortal City",
+        "Evening": "Adamant Body Immortal City",
+        "Night": "Adamant Body Immortal City"
+      }
+    },
+    "Ashenwall City Family Steward": {
+      "role": "Local family liaison, shop broker and problem-board steward",
+      "realm": "Local Cultivator",
+      "personality": "Practical, observant and familiar with the rivalries between the city's households.",
+      "speech": "Direct and commercially minded.",
+      "want": "Keep family business, local shops and resource routes functioning.",
+      "fear": "A local dispute will grow into a feud that damages the city.",
+      "secret": "Keeps private notes on which households are rising, falling, extinct or newly replaced.",
+      "location": "Ashenwall City",
+      "schedule": {
+        "Dawn": "Ashenwall City",
+        "Morning": "Ashenwall City",
+        "Afternoon": "Ashenwall City",
+        "Evening": "Ashenwall City",
+        "Night": "Ashenwall City"
+      }
+    },
+    "Azure Crown Imperial City Family Steward": {
+      "role": "Local family liaison, shop broker and problem-board steward",
+      "realm": "Local Cultivator",
+      "personality": "Practical, observant and familiar with the rivalries between the city's households.",
+      "speech": "Direct and commercially minded.",
+      "want": "Keep family business, local shops and resource routes functioning.",
+      "fear": "A local dispute will grow into a feud that damages the city.",
+      "secret": "Keeps private notes on which households are rising, falling, extinct or newly replaced.",
+      "location": "Azure Crown Imperial City",
+      "schedule": {
+        "Dawn": "Azure Crown Imperial City",
+        "Morning": "Azure Crown Imperial City",
+        "Afternoon": "Azure Crown Imperial City",
+        "Evening": "Azure Crown Imperial City",
+        "Night": "Azure Crown Imperial City"
+      }
+    },
+    "Broken Halo Spirit City Family Steward": {
+      "role": "Local family liaison, shop broker and problem-board steward",
+      "realm": "Local Cultivator",
+      "personality": "Practical, observant and familiar with the rivalries between the city's households.",
+      "speech": "Direct and commercially minded.",
+      "want": "Keep family business, local shops and resource routes functioning.",
+      "fear": "A local dispute will grow into a feud that damages the city.",
+      "secret": "Keeps private notes on which households are rising, falling, extinct or newly replaced.",
+      "location": "Broken Halo Spirit City",
+      "schedule": {
+        "Dawn": "Broken Halo Spirit City",
+        "Morning": "Broken Halo Spirit City",
+        "Afternoon": "Broken Halo Spirit City",
+        "Evening": "Broken Halo Spirit City",
+        "Night": "Broken Halo Spirit City"
+      }
+    },
+    "Celestial River City Family Steward": {
+      "role": "Local family liaison, shop broker and problem-board steward",
+      "realm": "Local Cultivator",
+      "personality": "Practical, observant and familiar with the rivalries between the city's households.",
+      "speech": "Direct and commercially minded.",
+      "want": "Keep family business, local shops and resource routes functioning.",
+      "fear": "A local dispute will grow into a feud that damages the city.",
+      "secret": "Keeps private notes on which households are rising, falling, extinct or newly replaced.",
+      "location": "Celestial River City",
+      "schedule": {
+        "Dawn": "Celestial River City",
+        "Morning": "Celestial River City",
+        "Afternoon": "Celestial River City",
+        "Evening": "Celestial River City",
+        "Night": "Celestial River City"
+      }
+    },
+    "Cloudblade City Family Steward": {
+      "role": "Local family liaison, shop broker and problem-board steward",
+      "realm": "Local Cultivator",
+      "personality": "Practical, observant and familiar with the rivalries between the city's households.",
+      "speech": "Direct and commercially minded.",
+      "want": "Keep family business, local shops and resource routes functioning.",
+      "fear": "A local dispute will grow into a feud that damages the city.",
+      "secret": "Keeps private notes on which households are rising, falling, extinct or newly replaced.",
+      "location": "Cloudblade City",
+      "schedule": {
+        "Dawn": "Cloudblade City",
+        "Morning": "Cloudblade City",
+        "Afternoon": "Cloudblade City",
+        "Evening": "Cloudblade City",
+        "Night": "Cloudblade City"
+      }
+    },
+    "Cloudedge Spirit City Family Steward": {
+      "role": "Local family liaison, shop broker and problem-board steward",
+      "realm": "Local Cultivator",
+      "personality": "Practical, observant and familiar with the rivalries between the city's households.",
+      "speech": "Direct and commercially minded.",
+      "want": "Keep family business, local shops and resource routes functioning.",
+      "fear": "A local dispute will grow into a feud that damages the city.",
+      "secret": "Keeps private notes on which households are rising, falling, extinct or newly replaced.",
+      "location": "Cloudedge Spirit City",
+      "schedule": {
+        "Dawn": "Cloudedge Spirit City",
+        "Morning": "Cloudedge Spirit City",
+        "Afternoon": "Cloudedge Spirit City",
+        "Evening": "Cloudedge Spirit City",
+        "Night": "Cloudedge Spirit City"
+      }
+    },
+    "Divine Herb Celestial City Family Steward": {
+      "role": "Local family liaison, shop broker and problem-board steward",
+      "realm": "Local Cultivator",
+      "personality": "Practical, observant and familiar with the rivalries between the city's households.",
+      "speech": "Direct and commercially minded.",
+      "want": "Keep family business, local shops and resource routes functioning.",
+      "fear": "A local dispute will grow into a feud that damages the city.",
+      "secret": "Keeps private notes on which households are rising, falling, extinct or newly replaced.",
+      "location": "Divine Herb Celestial City",
+      "schedule": {
+        "Dawn": "Divine Herb Celestial City",
+        "Morning": "Divine Herb Celestial City",
+        "Afternoon": "Divine Herb Celestial City",
+        "Evening": "Divine Herb Celestial City",
+        "Night": "Divine Herb Celestial City"
+      }
+    },
+    "Emberforge City Family Steward": {
+      "role": "Local family liaison, shop broker and problem-board steward",
+      "realm": "Local Cultivator",
+      "personality": "Practical, observant and familiar with the rivalries between the city's households.",
+      "speech": "Direct and commercially minded.",
+      "want": "Keep family business, local shops and resource routes functioning.",
+      "fear": "A local dispute will grow into a feud that damages the city.",
+      "secret": "Keeps private notes on which households are rising, falling, extinct or newly replaced.",
+      "location": "Emberforge City",
+      "schedule": {
+        "Dawn": "Emberforge City",
+        "Morning": "Emberforge City",
+        "Afternoon": "Emberforge City",
+        "Evening": "Emberforge City",
+        "Night": "Emberforge City"
+      }
+    },
+    "Fallen Star Immortal City Family Steward": {
+      "role": "Local family liaison, shop broker and problem-board steward",
+      "realm": "Local Cultivator",
+      "personality": "Practical, observant and familiar with the rivalries between the city's households.",
+      "speech": "Direct and commercially minded.",
+      "want": "Keep family business, local shops and resource routes functioning.",
+      "fear": "A local dispute will grow into a feud that damages the city.",
+      "secret": "Keeps private notes on which households are rising, falling, extinct or newly replaced.",
+      "location": "Fallen Star Immortal City",
+      "schedule": {
+        "Dawn": "Fallen Star Immortal City",
+        "Morning": "Fallen Star Immortal City",
+        "Afternoon": "Fallen Star Immortal City",
+        "Evening": "Fallen Star Immortal City",
+        "Night": "Fallen Star Immortal City"
+      }
+    },
+    "Firmament Blade City Family Steward": {
+      "role": "Local family liaison, shop broker and problem-board steward",
+      "realm": "Local Cultivator",
+      "personality": "Practical, observant and familiar with the rivalries between the city's households.",
+      "speech": "Direct and commercially minded.",
+      "want": "Keep family business, local shops and resource routes functioning.",
+      "fear": "A local dispute will grow into a feud that damages the city.",
+      "secret": "Keeps private notes on which households are rising, falling, extinct or newly replaced.",
+      "location": "Firmament Blade City",
+      "schedule": {
+        "Dawn": "Firmament Blade City",
+        "Morning": "Firmament Blade City",
+        "Afternoon": "Firmament Blade City",
+        "Evening": "Firmament Blade City",
+        "Night": "Firmament Blade City"
+      }
+    },
+    "Four-Roads Caravan City Family Steward": {
+      "role": "Local family liaison, shop broker and problem-board steward",
+      "realm": "Local Cultivator",
+      "personality": "Practical, observant and familiar with the rivalries between the city's households.",
+      "speech": "Direct and commercially minded.",
+      "want": "Keep family business, local shops and resource routes functioning.",
+      "fear": "A local dispute will grow into a feud that damages the city.",
+      "secret": "Keeps private notes on which households are rising, falling, extinct or newly replaced.",
+      "location": "Four-Roads Caravan City",
+      "schedule": {
+        "Dawn": "Four-Roads Caravan City",
+        "Morning": "Four-Roads Caravan City",
+        "Afternoon": "Four-Roads Caravan City",
+        "Evening": "Four-Roads Caravan City",
+        "Night": "Four-Roads Caravan City"
+      }
+    },
+    "Froststar Border City Family Steward": {
+      "role": "Local family liaison, shop broker and problem-board steward",
+      "realm": "Local Cultivator",
+      "personality": "Practical, observant and familiar with the rivalries between the city's households.",
+      "speech": "Direct and commercially minded.",
+      "want": "Keep family business, local shops and resource routes functioning.",
+      "fear": "A local dispute will grow into a feud that damages the city.",
+      "secret": "Keeps private notes on which households are rising, falling, extinct or newly replaced.",
+      "location": "Froststar Border City",
+      "schedule": {
+        "Dawn": "Froststar Border City",
+        "Morning": "Froststar Border City",
+        "Afternoon": "Froststar Border City",
+        "Evening": "Froststar Border City",
+        "Night": "Froststar Border City"
+      }
+    },
+    "Frostwatch City Family Steward": {
+      "role": "Local family liaison, shop broker and problem-board steward",
+      "realm": "Local Cultivator",
+      "personality": "Practical, observant and familiar with the rivalries between the city's households.",
+      "speech": "Direct and commercially minded.",
+      "want": "Keep family business, local shops and resource routes functioning.",
+      "fear": "A local dispute will grow into a feud that damages the city.",
+      "secret": "Keeps private notes on which households are rising, falling, extinct or newly replaced.",
+      "location": "Frostwatch City",
+      "schedule": {
+        "Dawn": "Frostwatch City",
+        "Morning": "Frostwatch City",
+        "Afternoon": "Frostwatch City",
+        "Evening": "Frostwatch City",
+        "Night": "Frostwatch City"
+      }
+    },
+    "Galevein Spirit City Family Steward": {
+      "role": "Local family liaison, shop broker and problem-board steward",
+      "realm": "Local Cultivator",
+      "personality": "Practical, observant and familiar with the rivalries between the city's households.",
+      "speech": "Direct and commercially minded.",
+      "want": "Keep family business, local shops and resource routes functioning.",
+      "fear": "A local dispute will grow into a feud that damages the city.",
+      "secret": "Keeps private notes on which households are rising, falling, extinct or newly replaced.",
+      "location": "Galevein Spirit City",
+      "schedule": {
+        "Dawn": "Galevein Spirit City",
+        "Morning": "Galevein Spirit City",
+        "Afternoon": "Galevein Spirit City",
+        "Evening": "Galevein Spirit City",
+        "Night": "Galevein Spirit City"
+      }
+    },
+    "Golden Spear Immortal City Family Steward": {
+      "role": "Local family liaison, shop broker and problem-board steward",
+      "realm": "Local Cultivator",
+      "personality": "Practical, observant and familiar with the rivalries between the city's households.",
+      "speech": "Direct and commercially minded.",
+      "want": "Keep family business, local shops and resource routes functioning.",
+      "fear": "A local dispute will grow into a feud that damages the city.",
+      "secret": "Keeps private notes on which households are rising, falling, extinct or newly replaced.",
+      "location": "Golden Spear Immortal City",
+      "schedule": {
+        "Dawn": "Golden Spear Immortal City",
+        "Morning": "Golden Spear Immortal City",
+        "Afternoon": "Golden Spear Immortal City",
+        "Evening": "Golden Spear Immortal City",
+        "Night": "Golden Spear Immortal City"
+      }
+    },
+    "Heavenblade Immortal City Family Steward": {
+      "role": "Local family liaison, shop broker and problem-board steward",
+      "realm": "Local Cultivator",
+      "personality": "Practical, observant and familiar with the rivalries between the city's households.",
+      "speech": "Direct and commercially minded.",
+      "want": "Keep family business, local shops and resource routes functioning.",
+      "fear": "A local dispute will grow into a feud that damages the city.",
+      "secret": "Keeps private notes on which households are rising, falling, extinct or newly replaced.",
+      "location": "Heavenblade Immortal City",
+      "schedule": {
+        "Dawn": "Heavenblade Immortal City",
+        "Morning": "Heavenblade Immortal City",
+        "Afternoon": "Heavenblade Immortal City",
+        "Evening": "Heavenblade Immortal City",
+        "Night": "Heavenblade Immortal City"
+      }
+    },
+    "Hundred Herb Spirit City Family Steward": {
+      "role": "Local family liaison, shop broker and problem-board steward",
+      "realm": "Local Cultivator",
+      "personality": "Practical, observant and familiar with the rivalries between the city's households.",
+      "speech": "Direct and commercially minded.",
+      "want": "Keep family business, local shops and resource routes functioning.",
+      "fear": "A local dispute will grow into a feud that damages the city.",
+      "secret": "Keeps private notes on which households are rising, falling, extinct or newly replaced.",
+      "location": "Hundred Herb Spirit City",
+      "schedule": {
+        "Dawn": "Hundred Herb Spirit City",
+        "Morning": "Hundred Herb Spirit City",
+        "Afternoon": "Hundred Herb Spirit City",
+        "Evening": "Hundred Herb Spirit City",
+        "Night": "Hundred Herb Spirit City"
+      }
+    },
+    "Immortal River City Family Steward": {
+      "role": "Local family liaison, shop broker and problem-board steward",
+      "realm": "Local Cultivator",
+      "personality": "Practical, observant and familiar with the rivalries between the city's households.",
+      "speech": "Direct and commercially minded.",
+      "want": "Keep family business, local shops and resource routes functioning.",
+      "fear": "A local dispute will grow into a feud that damages the city.",
+      "secret": "Keeps private notes on which households are rising, falling, extinct or newly replaced.",
+      "location": "Immortal River City",
+      "schedule": {
+        "Dawn": "Immortal River City",
+        "Morning": "Immortal River City",
+        "Afternoon": "Immortal River City",
+        "Evening": "Immortal River City",
+        "Night": "Immortal River City"
+      }
+    },
+    "Ironbanner City Family Steward": {
+      "role": "Local family liaison, shop broker and problem-board steward",
+      "realm": "Local Cultivator",
+      "personality": "Practical, observant and familiar with the rivalries between the city's households.",
+      "speech": "Direct and commercially minded.",
+      "want": "Keep family business, local shops and resource routes functioning.",
+      "fear": "A local dispute will grow into a feud that damages the city.",
+      "secret": "Keeps private notes on which households are rising, falling, extinct or newly replaced.",
+      "location": "Ironbanner City",
+      "schedule": {
+        "Dawn": "Ironbanner City",
+        "Morning": "Ironbanner City",
+        "Afternoon": "Ironbanner City",
+        "Evening": "Ironbanner City",
+        "Night": "Ironbanner City"
+      }
+    },
+    "Jade Cauldron Immortal City Family Steward": {
+      "role": "Local family liaison, shop broker and problem-board steward",
+      "realm": "Local Cultivator",
+      "personality": "Practical, observant and familiar with the rivalries between the city's households.",
+      "speech": "Direct and commercially minded.",
+      "want": "Keep family business, local shops and resource routes functioning.",
+      "fear": "A local dispute will grow into a feud that damages the city.",
+      "secret": "Keeps private notes on which households are rising, falling, extinct or newly replaced.",
+      "location": "Jade Cauldron Immortal City",
+      "schedule": {
+        "Dawn": "Jade Cauldron Immortal City",
+        "Morning": "Jade Cauldron Immortal City",
+        "Afternoon": "Jade Cauldron Immortal City",
+        "Evening": "Jade Cauldron Immortal City",
+        "Night": "Jade Cauldron Immortal City"
+      }
+    },
+    "Jade Crown Spirit City Family Steward": {
+      "role": "Local family liaison, shop broker and problem-board steward",
+      "realm": "Local Cultivator",
+      "personality": "Practical, observant and familiar with the rivalries between the city's households.",
+      "speech": "Direct and commercially minded.",
+      "want": "Keep family business, local shops and resource routes functioning.",
+      "fear": "A local dispute will grow into a feud that damages the city.",
+      "secret": "Keeps private notes on which households are rising, falling, extinct or newly replaced.",
+      "location": "Jade Crown Spirit City",
+      "schedule": {
+        "Dawn": "Jade Crown Spirit City",
+        "Morning": "Jade Crown Spirit City",
+        "Afternoon": "Jade Crown Spirit City",
+        "Evening": "Jade Crown Spirit City",
+        "Night": "Jade Crown Spirit City"
+      }
+    },
+    "Jadeflow Spirit City Family Steward": {
+      "role": "Local family liaison, shop broker and problem-board steward",
+      "realm": "Local Cultivator",
+      "personality": "Practical, observant and familiar with the rivalries between the city's households.",
+      "speech": "Direct and commercially minded.",
+      "want": "Keep family business, local shops and resource routes functioning.",
+      "fear": "A local dispute will grow into a feud that damages the city.",
+      "secret": "Keeps private notes on which households are rising, falling, extinct or newly replaced.",
+      "location": "Jadeflow Spirit City",
+      "schedule": {
+        "Dawn": "Jadeflow Spirit City",
+        "Morning": "Jadeflow Spirit City",
+        "Afternoon": "Jadeflow Spirit City",
+        "Evening": "Jadeflow Spirit City",
+        "Night": "Jadeflow Spirit City"
+      }
+    },
+    "Jadewood Medicine City Family Steward": {
+      "role": "Local family liaison, shop broker and problem-board steward",
+      "realm": "Local Cultivator",
+      "personality": "Practical, observant and familiar with the rivalries between the city's households.",
+      "speech": "Direct and commercially minded.",
+      "want": "Keep family business, local shops and resource routes functioning.",
+      "fear": "A local dispute will grow into a feud that damages the city.",
+      "secret": "Keeps private notes on which households are rising, falling, extinct or newly replaced.",
+      "location": "Jadewood Medicine City",
+      "schedule": {
+        "Dawn": "Jadewood Medicine City",
+        "Morning": "Jadewood Medicine City",
+        "Afternoon": "Jadewood Medicine City",
+        "Evening": "Jadewood Medicine City",
+        "Night": "Jadewood Medicine City"
+      }
+    },
+    "Lunar Shadow Celestial City Family Steward": {
+      "role": "Local family liaison, shop broker and problem-board steward",
+      "realm": "Local Cultivator",
+      "personality": "Practical, observant and familiar with the rivalries between the city's households.",
+      "speech": "Direct and commercially minded.",
+      "want": "Keep family business, local shops and resource routes functioning.",
+      "fear": "A local dispute will grow into a feud that damages the city.",
+      "secret": "Keeps private notes on which households are rising, falling, extinct or newly replaced.",
+      "location": "Lunar Shadow Celestial City",
+      "schedule": {
+        "Dawn": "Lunar Shadow Celestial City",
+        "Morning": "Lunar Shadow Celestial City",
+        "Afternoon": "Lunar Shadow Celestial City",
+        "Evening": "Lunar Shadow Celestial City",
+        "Night": "Lunar Shadow Celestial City"
+      }
+    },
+    "Lunar Veil Immortal City Family Steward": {
+      "role": "Local family liaison, shop broker and problem-board steward",
+      "realm": "Local Cultivator",
+      "personality": "Practical, observant and familiar with the rivalries between the city's households.",
+      "speech": "Direct and commercially minded.",
+      "want": "Keep family business, local shops and resource routes functioning.",
+      "fear": "A local dispute will grow into a feud that damages the city.",
+      "secret": "Keeps private notes on which households are rising, falling, extinct or newly replaced.",
+      "location": "Lunar Veil Immortal City",
+      "schedule": {
+        "Dawn": "Lunar Veil Immortal City",
+        "Morning": "Lunar Veil Immortal City",
+        "Afternoon": "Lunar Veil Immortal City",
+        "Evening": "Lunar Veil Immortal City",
+        "Night": "Lunar Veil Immortal City"
+      }
+    },
+    "Mandate Crown Celestial City Family Steward": {
+      "role": "Local family liaison, shop broker and problem-board steward",
+      "realm": "Local Cultivator",
+      "personality": "Practical, observant and familiar with the rivalries between the city's households.",
+      "speech": "Direct and commercially minded.",
+      "want": "Keep family business, local shops and resource routes functioning.",
+      "fear": "A local dispute will grow into a feud that damages the city.",
+      "secret": "Keeps private notes on which households are rising, falling, extinct or newly replaced.",
+      "location": "Mandate Crown Celestial City",
+      "schedule": {
+        "Dawn": "Mandate Crown Celestial City",
+        "Morning": "Mandate Crown Celestial City",
+        "Afternoon": "Mandate Crown Celestial City",
+        "Evening": "Mandate Crown Celestial City",
+        "Night": "Mandate Crown Celestial City"
+      }
+    },
+    "Mandate Spear City Family Steward": {
+      "role": "Local family liaison, shop broker and problem-board steward",
+      "realm": "Local Cultivator",
+      "personality": "Practical, observant and familiar with the rivalries between the city's households.",
+      "speech": "Direct and commercially minded.",
+      "want": "Keep family business, local shops and resource routes functioning.",
+      "fear": "A local dispute will grow into a feud that damages the city.",
+      "secret": "Keeps private notes on which households are rising, falling, extinct or newly replaced.",
+      "location": "Mandate Spear City",
+      "schedule": {
+        "Dawn": "Mandate Spear City",
+        "Morning": "Mandate Spear City",
+        "Afternoon": "Mandate Spear City",
+        "Evening": "Mandate Spear City",
+        "Night": "Mandate Spear City"
+      }
+    },
+    "Moonfen City Family Steward": {
+      "role": "Local family liaison, shop broker and problem-board steward",
+      "realm": "Local Cultivator",
+      "personality": "Practical, observant and familiar with the rivalries between the city's households.",
+      "speech": "Direct and commercially minded.",
+      "want": "Keep family business, local shops and resource routes functioning.",
+      "fear": "A local dispute will grow into a feud that damages the city.",
+      "secret": "Keeps private notes on which households are rising, falling, extinct or newly replaced.",
+      "location": "Moonfen City",
+      "schedule": {
+        "Dawn": "Moonfen City",
+        "Morning": "Moonfen City",
+        "Afternoon": "Moonfen City",
+        "Evening": "Moonfen City",
+        "Night": "Moonfen City"
+      }
+    },
+    "Moonfrost Spirit City Family Steward": {
+      "role": "Local family liaison, shop broker and problem-board steward",
+      "realm": "Local Cultivator",
+      "personality": "Practical, observant and familiar with the rivalries between the city's households.",
+      "speech": "Direct and commercially minded.",
+      "want": "Keep family business, local shops and resource routes functioning.",
+      "fear": "A local dispute will grow into a feud that damages the city.",
+      "secret": "Keeps private notes on which households are rising, falling, extinct or newly replaced.",
+      "location": "Moonfrost Spirit City",
+      "schedule": {
+        "Dawn": "Moonfrost Spirit City",
+        "Morning": "Moonfrost Spirit City",
+        "Afternoon": "Moonfrost Spirit City",
+        "Evening": "Moonfrost Spirit City",
+        "Night": "Moonfrost Spirit City"
+      }
+    },
+    "Ninefold Noble Immortal City Family Steward": {
+      "role": "Local family liaison, shop broker and problem-board steward",
+      "realm": "Local Cultivator",
+      "personality": "Practical, observant and familiar with the rivalries between the city's households.",
+      "speech": "Direct and commercially minded.",
+      "want": "Keep family business, local shops and resource routes functioning.",
+      "fear": "A local dispute will grow into a feud that damages the city.",
+      "secret": "Keeps private notes on which households are rising, falling, extinct or newly replaced.",
+      "location": "Ninefold Noble Immortal City",
+      "schedule": {
+        "Dawn": "Ninefold Noble Immortal City",
+        "Morning": "Ninefold Noble Immortal City",
+        "Afternoon": "Ninefold Noble Immortal City",
+        "Evening": "Ninefold Noble Immortal City",
+        "Night": "Ninefold Noble Immortal City"
+      }
+    },
+    "Northwind Spirit City Family Steward": {
+      "role": "Local family liaison, shop broker and problem-board steward",
+      "realm": "Local Cultivator",
+      "personality": "Practical, observant and familiar with the rivalries between the city's households.",
+      "speech": "Direct and commercially minded.",
+      "want": "Keep family business, local shops and resource routes functioning.",
+      "fear": "A local dispute will grow into a feud that damages the city.",
+      "secret": "Keeps private notes on which households are rising, falling, extinct or newly replaced.",
+      "location": "Northwind Spirit City",
+      "schedule": {
+        "Dawn": "Northwind Spirit City",
+        "Morning": "Northwind Spirit City",
+        "Afternoon": "Northwind Spirit City",
+        "Evening": "Northwind Spirit City",
+        "Night": "Northwind Spirit City"
+      }
+    },
+    "Polar Gate Immortal City Family Steward": {
+      "role": "Local family liaison, shop broker and problem-board steward",
+      "realm": "Local Cultivator",
+      "personality": "Practical, observant and familiar with the rivalries between the city's households.",
+      "speech": "Direct and commercially minded.",
+      "want": "Keep family business, local shops and resource routes functioning.",
+      "fear": "A local dispute will grow into a feud that damages the city.",
+      "secret": "Keeps private notes on which households are rising, falling, extinct or newly replaced.",
+      "location": "Polar Gate Immortal City",
+      "schedule": {
+        "Dawn": "Polar Gate Immortal City",
+        "Morning": "Polar Gate Immortal City",
+        "Afternoon": "Polar Gate Immortal City",
+        "Evening": "Polar Gate Immortal City",
+        "Night": "Polar Gate Immortal City"
+      }
+    },
+    "Riverguard City Family Steward": {
+      "role": "Local family liaison, shop broker and problem-board steward",
+      "realm": "Local Cultivator",
+      "personality": "Practical, observant and familiar with the rivalries between the city's households.",
+      "speech": "Direct and commercially minded.",
+      "want": "Keep family business, local shops and resource routes functioning.",
+      "fear": "A local dispute will grow into a feud that damages the city.",
+      "secret": "Keeps private notes on which households are rising, falling, extinct or newly replaced.",
+      "location": "Riverguard City",
+      "schedule": {
+        "Dawn": "Riverguard City",
+        "Morning": "Riverguard City",
+        "Afternoon": "Riverguard City",
+        "Evening": "Riverguard City",
+        "Night": "Riverguard City"
+      }
+    },
+    "Ruined Constellation City Family Steward": {
+      "role": "Local family liaison, shop broker and problem-board steward",
+      "realm": "Local Cultivator",
+      "personality": "Practical, observant and familiar with the rivalries between the city's households.",
+      "speech": "Direct and commercially minded.",
+      "want": "Keep family business, local shops and resource routes functioning.",
+      "fear": "A local dispute will grow into a feud that damages the city.",
+      "secret": "Keeps private notes on which households are rising, falling, extinct or newly replaced.",
+      "location": "Ruined Constellation City",
+      "schedule": {
+        "Dawn": "Ruined Constellation City",
+        "Morning": "Ruined Constellation City",
+        "Afternoon": "Ruined Constellation City",
+        "Evening": "Ruined Constellation City",
+        "Night": "Ruined Constellation City"
+      }
+    },
+    "Skyroad Immortal City Family Steward": {
+      "role": "Local family liaison, shop broker and problem-board steward",
+      "realm": "Local Cultivator",
+      "personality": "Practical, observant and familiar with the rivalries between the city's households.",
+      "speech": "Direct and commercially minded.",
+      "want": "Keep family business, local shops and resource routes functioning.",
+      "fear": "A local dispute will grow into a feud that damages the city.",
+      "secret": "Keeps private notes on which households are rising, falling, extinct or newly replaced.",
+      "location": "Skyroad Immortal City",
+      "schedule": {
+        "Dawn": "Skyroad Immortal City",
+        "Morning": "Skyroad Immortal City",
+        "Afternoon": "Skyroad Immortal City",
+        "Evening": "Skyroad Immortal City",
+        "Night": "Skyroad Immortal City"
+      }
+    },
+    "Solar Crucible Celestial City Family Steward": {
+      "role": "Local family liaison, shop broker and problem-board steward",
+      "realm": "Local Cultivator",
+      "personality": "Practical, observant and familiar with the rivalries between the city's households.",
+      "speech": "Direct and commercially minded.",
+      "want": "Keep family business, local shops and resource routes functioning.",
+      "fear": "A local dispute will grow into a feud that damages the city.",
+      "secret": "Keeps private notes on which households are rising, falling, extinct or newly replaced.",
+      "location": "Solar Crucible Celestial City",
+      "schedule": {
+        "Dawn": "Solar Crucible Celestial City",
+        "Morning": "Solar Crucible Celestial City",
+        "Afternoon": "Solar Crucible Celestial City",
+        "Evening": "Solar Crucible Celestial City",
+        "Night": "Solar Crucible Celestial City"
+      }
+    },
+    "Solar Furnace Immortal City Family Steward": {
+      "role": "Local family liaison, shop broker and problem-board steward",
+      "realm": "Local Cultivator",
+      "personality": "Practical, observant and familiar with the rivalries between the city's households.",
+      "speech": "Direct and commercially minded.",
+      "want": "Keep family business, local shops and resource routes functioning.",
+      "fear": "A local dispute will grow into a feud that damages the city.",
+      "secret": "Keeps private notes on which households are rising, falling, extinct or newly replaced.",
+      "location": "Solar Furnace Immortal City",
+      "schedule": {
+        "Dawn": "Solar Furnace Immortal City",
+        "Morning": "Solar Furnace Immortal City",
+        "Afternoon": "Solar Furnace Immortal City",
+        "Evening": "Solar Furnace Immortal City",
+        "Night": "Solar Furnace Immortal City"
+      }
+    },
+    "Spearwall Spirit City Family Steward": {
+      "role": "Local family liaison, shop broker and problem-board steward",
+      "realm": "Local Cultivator",
+      "personality": "Practical, observant and familiar with the rivalries between the city's households.",
+      "speech": "Direct and commercially minded.",
+      "want": "Keep family business, local shops and resource routes functioning.",
+      "fear": "A local dispute will grow into a feud that damages the city.",
+      "secret": "Keeps private notes on which households are rising, falling, extinct or newly replaced.",
+      "location": "Spearwall Spirit City",
+      "schedule": {
+        "Dawn": "Spearwall Spirit City",
+        "Morning": "Spearwall Spirit City",
+        "Afternoon": "Spearwall Spirit City",
+        "Evening": "Spearwall Spirit City",
+        "Night": "Spearwall Spirit City"
+      }
+    },
+    "Starroad Celestial City Family Steward": {
+      "role": "Local family liaison, shop broker and problem-board steward",
+      "realm": "Local Cultivator",
+      "personality": "Practical, observant and familiar with the rivalries between the city's households.",
+      "speech": "Direct and commercially minded.",
+      "want": "Keep family business, local shops and resource routes functioning.",
+      "fear": "A local dispute will grow into a feud that damages the city.",
+      "secret": "Keeps private notes on which households are rising, falling, extinct or newly replaced.",
+      "location": "Starroad Celestial City",
+      "schedule": {
+        "Dawn": "Starroad Celestial City",
+        "Morning": "Starroad Celestial City",
+        "Afternoon": "Starroad Celestial City",
+        "Evening": "Starroad Celestial City",
+        "Night": "Starroad Celestial City"
+      }
+    },
+    "Stoneback Mountain City Family Steward": {
+      "role": "Local family liaison, shop broker and problem-board steward",
+      "realm": "Local Cultivator",
+      "personality": "Practical, observant and familiar with the rivalries between the city's households.",
+      "speech": "Direct and commercially minded.",
+      "want": "Keep family business, local shops and resource routes functioning.",
+      "fear": "A local dispute will grow into a feud that damages the city.",
+      "secret": "Keeps private notes on which households are rising, falling, extinct or newly replaced.",
+      "location": "Stoneback Mountain City",
+      "schedule": {
+        "Dawn": "Stoneback Mountain City",
+        "Morning": "Stoneback Mountain City",
+        "Afternoon": "Stoneback Mountain City",
+        "Evening": "Stoneback Mountain City",
+        "Night": "Stoneback Mountain City"
+      }
+    },
+    "Stoneheart Spirit City Family Steward": {
+      "role": "Local family liaison, shop broker and problem-board steward",
+      "realm": "Local Cultivator",
+      "personality": "Practical, observant and familiar with the rivalries between the city's households.",
+      "speech": "Direct and commercially minded.",
+      "want": "Keep family business, local shops and resource routes functioning.",
+      "fear": "A local dispute will grow into a feud that damages the city.",
+      "secret": "Keeps private notes on which households are rising, falling, extinct or newly replaced.",
+      "location": "Stoneheart Spirit City",
+      "schedule": {
+        "Dawn": "Stoneheart Spirit City",
+        "Morning": "Stoneheart Spirit City",
+        "Afternoon": "Stoneheart Spirit City",
+        "Evening": "Stoneheart Spirit City",
+        "Night": "Stoneheart Spirit City"
+      }
+    },
+    "Vermilion Furnace City Family Steward": {
+      "role": "Local family liaison, shop broker and problem-board steward",
+      "realm": "Local Cultivator",
+      "personality": "Practical, observant and familiar with the rivalries between the city's households.",
+      "speech": "Direct and commercially minded.",
+      "want": "Keep family business, local shops and resource routes functioning.",
+      "fear": "A local dispute will grow into a feud that damages the city.",
+      "secret": "Keeps private notes on which households are rising, falling, extinct or newly replaced.",
+      "location": "Vermilion Furnace City",
+      "schedule": {
+        "Dawn": "Vermilion Furnace City",
+        "Morning": "Vermilion Furnace City",
+        "Afternoon": "Vermilion Furnace City",
+        "Evening": "Vermilion Furnace City",
+        "Night": "Vermilion Furnace City"
+      }
+    },
+    "Worldstone Celestial City Family Steward": {
+      "role": "Local family liaison, shop broker and problem-board steward",
+      "realm": "Local Cultivator",
+      "personality": "Practical, observant and familiar with the rivalries between the city's households.",
+      "speech": "Direct and commercially minded.",
+      "want": "Keep family business, local shops and resource routes functioning.",
+      "fear": "A local dispute will grow into a feud that damages the city.",
+      "secret": "Keeps private notes on which households are rising, falling, extinct or newly replaced.",
+      "location": "Worldstone Celestial City",
+      "schedule": {
+        "Dawn": "Worldstone Celestial City",
+        "Morning": "Worldstone Celestial City",
+        "Afternoon": "Worldstone Celestial City",
+        "Evening": "Worldstone Celestial City",
+        "Night": "Worldstone Celestial City"
       }
     }
   },

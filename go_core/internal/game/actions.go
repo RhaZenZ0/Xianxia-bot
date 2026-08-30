@@ -12,17 +12,31 @@ import (
 )
 
 type ActionRequest struct {
-	Operation string          `json:"operation"`
-	ActorID   int64           `json:"actor_id"`
-	Payload   json.RawMessage `json:"payload"`
+	APIVersion      string          `json:"api_version,omitempty"`
+	ActionID        string          `json:"action_id,omitempty"`
+	Operation       string          `json:"operation"`
+	ActorID         int64           `json:"actor_id"`
+	ExpectedVersion *int64          `json:"expected_version,omitempty"`
+	Payload         json.RawMessage `json:"payload"`
 }
 
 type ActionResponse struct {
-	Operation string `json:"operation"`
-	Result    any    `json:"result"`
+	APIVersion   string `json:"api_version,omitempty"`
+	ActionID     string `json:"action_id,omitempty"`
+	Operation    string `json:"operation"`
+	StateVersion int64  `json:"state_version,omitempty"`
+	Replayed     bool   `json:"replayed,omitempty"`
+	Result       any    `json:"result"`
 }
 
 func Apply(databasePath string, req ActionRequest) (ActionResponse, error) {
+	return ApplyWithWorld(databasePath, "", req)
+}
+
+func ApplyWithWorld(databasePath, worldPath string, req ActionRequest) (ActionResponse, error) {
+	if isAuthoritativeOperation(req.Operation) {
+		return applyAuthoritative(databasePath, worldPath, req)
+	}
 	if req.ActorID < 0 {
 		return ActionResponse{}, errors.New("actor_id cannot be negative")
 	}
@@ -44,23 +58,23 @@ func Apply(databasePath string, req ActionRequest) (ActionResponse, error) {
 	case "cultivation.reward":
 		result, err = cultivationReward(conn, req.ActorID, req.Payload)
 	case "admin.world.advance_time":
-		result, err = adminAdvanceTime(conn, req.Payload)
+		result, err = adminAdvanceTime(conn, req.ActorID, req.Payload)
 	case "admin.player.grant_currency":
-		result, err = adminGrantCurrency(conn, req.Payload)
+		result, err = adminGrantCurrency(conn, req.ActorID, req.Payload)
 	case "admin.player.karma":
-		result, err = adminKarma(conn, req.Payload)
+		result, err = adminKarma(conn, req.ActorID, req.Payload)
 	case "admin.player.teleport":
-		result, err = adminTeleport(conn, req.Payload)
+		result, err = adminTeleport(conn, req.ActorID, req.Payload)
 	case "admin.player.revive":
-		result, err = adminRevive(conn, req.Payload)
+		result, err = adminRevive(conn, req.ActorID, req.Payload)
 	case "admin.player.clear_battle":
-		result, err = adminClearBattle(conn, req.Payload)
+		result, err = adminClearBattle(conn, req.ActorID, req.Payload)
 	case "admin.automation.set":
-		result, err = adminAutomationSet(conn, req.Payload)
+		result, err = adminAutomationSet(conn, req.ActorID, req.Payload)
 	case "admin.simulation.interval":
-		result, err = adminSimulationInterval(conn, req.Payload)
+		result, err = adminSimulationInterval(conn, req.ActorID, req.Payload)
 	case "admin.audit":
-		result, err = adminAuditOnly(conn, req.Payload)
+		result, err = adminAuditOnly(conn, req.ActorID, req.Payload)
 	default:
 		err = fmt.Errorf("unsupported authoritative operation: %s", req.Operation)
 	}
@@ -205,7 +219,6 @@ type questPayload struct {
 	ObjectiveType string           `json:"objective_type"`
 	Amount        *int64           `json:"amount"`
 	Target        *string          `json:"target"`
-	GameMinute    int64            `json:"game_minute"`
 }
 
 func questProgress(conn *storage.Conn, userID int64, raw json.RawMessage) (any, error) {
@@ -213,10 +226,17 @@ func questProgress(conn *storage.Conn, userID int64, raw json.RawMessage) (any, 
 	if err := json.Unmarshal(raw, &p); err != nil {
 		return nil, err
 	}
+	if err := rejectCallerGameMinute(raw); err != nil {
+		return nil, err
+	}
 	if p.QuestKey == "" {
 		return nil, errors.New("quest_key is required")
 	}
 	if err := begin(conn); err != nil {
+		return nil, err
+	}
+	gameMinute, err := canonicalWorldGameMinute(conn)
+	if err != nil {
 		return nil, err
 	}
 	defer func() {
@@ -262,7 +282,7 @@ func questProgress(conn *storage.Conn, userID int64, raw json.RawMessage) (any, 
 	var completed any = nil
 	if complete {
 		status = "completed"
-		completed = p.GameMinute
+		completed = gameMinute
 	}
 	now := float64(time.Now().UnixNano()) / 1e9
 	_, err = conn.Execute(`UPDATE character_quests SET progress_json=?,status=?,completed_game_minute=?,updated_at=? WHERE user_id=? AND quest_key=?`, []any{string(nextJSON), status, completed, now, userID, p.QuestKey})
@@ -402,11 +422,11 @@ func cultivationReward(conn *storage.Conn, userID int64, raw json.RawMessage) (a
 	return map[string]any{"cultivation_awarded": awarded}, nil
 }
 
-func auditAdmin(conn *storage.Conn, action, target string, before, after any, reason string) error {
+func auditAdmin(conn *storage.Conn, adminUserID int64, action, target string, before, after any, reason string) error {
 	beforeJSON, _ := json.Marshal(before)
 	afterJSON, _ := json.Marshal(after)
-	_, err := conn.Execute(`INSERT INTO admin_audit_log(admin_user_id,action,target,before_json,after_json,reason,created_at) VALUES(0,?,?,?,?,?,?)`, []any{
-		action, target, string(beforeJSON), string(afterJSON), strings.TrimSpace(reason), float64(time.Now().UnixNano()) / 1e9,
+	_, err := conn.Execute(`INSERT INTO admin_audit_log(admin_user_id,action,target,before_json,after_json,reason,created_at) VALUES(?,?,?,?,?,?,?)`, []any{
+		adminUserID, action, target, string(beforeJSON), string(afterJSON), strings.TrimSpace(reason), float64(time.Now().UnixNano()) / 1e9,
 	})
 	return err
 }
@@ -427,7 +447,7 @@ func requiredInt(p map[string]any, key string) (int64, error) {
 	return storage.ParseInt(v), nil
 }
 
-func adminAdvanceTime(conn *storage.Conn, raw json.RawMessage) (any, error) {
+func adminAdvanceTime(conn *storage.Conn, adminUserID int64, raw json.RawMessage) (any, error) {
 	p, err := decodeMap(raw)
 	if err != nil {
 		return nil, err
@@ -438,6 +458,13 @@ func adminAdvanceTime(conn *storage.Conn, raw json.RawMessage) (any, error) {
 	}
 	if minutes == 0 || minutes < -5256000 || minutes > 5256000 {
 		return nil, errors.New("minutes must be between -5256000 and 5256000 and non-zero")
+	}
+	requestedScale := int64(-1)
+	if rawScale, ok := p["scale"]; ok {
+		requestedScale = storage.ParseInt(rawScale)
+		if requestedScale < 0 {
+			return nil, errors.New("scale cannot be negative")
+		}
 	}
 	if err := begin(conn); err != nil {
 		return nil, err
@@ -452,22 +479,34 @@ func adminAdvanceTime(conn *storage.Conn, raw json.RawMessage) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	state := map[string]any{"anchor_game_minute": int64(480), "anchor_real_ts": now, "scale": int64(4)}
+	defaultScale := int64(4)
+	if requestedScale >= 0 {
+		defaultScale = requestedScale
+	}
+	state := map[string]any{"anchor_game_minute": int64(480), "anchor_real_ts": now, "scale": defaultScale}
 	if row := firstRowMap(res); row != nil {
 		if text, ok := row["value_json"].(string); ok {
 			_ = json.Unmarshal([]byte(text), &state)
 		}
 	}
 	anchor := storage.ParseInt(state["anchor_game_minute"])
-	scale := storage.ParseInt(state["scale"])
-	if scale < 0 {
-		scale = 0
+	storedScale := storage.ParseInt(state["scale"])
+	if storedScale < 0 {
+		storedScale = 0
+	}
+	nextScale := storedScale
+	if requestedScale >= 0 {
+		nextScale = requestedScale
 	}
 	anchorReal, _ := state["anchor_real_ts"].(float64)
 	if anchorReal <= 0 {
 		anchorReal = now
 	}
-	current := anchor + int64(((now-anchorReal)/60.0)*float64(scale))
+	elapsedRealMinutes := (now - anchorReal) / 60.0
+	if elapsedRealMinutes < 0 {
+		elapsedRealMinutes = 0
+	}
+	current := anchor + int64(elapsedRealMinutes*float64(storedScale))
 	if current < 0 {
 		current = 0
 	}
@@ -475,13 +514,13 @@ func adminAdvanceTime(conn *storage.Conn, raw json.RawMessage) (any, error) {
 	if updated < 0 {
 		updated = 0
 	}
-	next := map[string]any{"anchor_game_minute": updated, "anchor_real_ts": now, "scale": scale}
+	next := map[string]any{"anchor_game_minute": updated, "anchor_real_ts": now, "scale": nextScale}
 	encoded, _ := json.Marshal(next)
 	_, err = conn.Execute(`INSERT INTO world_state(key,value_json,updated_at) VALUES('world_clock',?,?) ON CONFLICT(key) DO UPDATE SET value_json=excluded.value_json,updated_at=excluded.updated_at`, []any{string(encoded), now})
 	if err != nil {
 		return nil, err
 	}
-	if err := auditAdmin(conn, "dashboard.world.advance_time", "world_clock", map[string]any{"game_minute": current}, map[string]any{"game_minute": updated, "delta": minutes}, fmt.Sprint(p["reason"])); err != nil {
+	if err := auditAdmin(conn, adminUserID, "admin.world.advance_time", "world_clock", map[string]any{"game_minute": current}, map[string]any{"game_minute": updated, "delta": minutes}, fmt.Sprint(p["reason"])); err != nil {
 		return nil, err
 	}
 	if err := conn.Commit(); err != nil {
@@ -490,7 +529,7 @@ func adminAdvanceTime(conn *storage.Conn, raw json.RawMessage) (any, error) {
 	return map[string]any{"game_minute": updated, "delta": minutes}, nil
 }
 
-func adminGrantCurrency(conn *storage.Conn, raw json.RawMessage) (any, error) {
+func adminGrantCurrency(conn *storage.Conn, adminUserID int64, raw json.RawMessage) (any, error) {
 	p, err := decodeMap(raw)
 	if err != nil {
 		return nil, err
@@ -504,7 +543,7 @@ func adminGrantCurrency(conn *storage.Conn, raw json.RawMessage) (any, error) {
 		return nil, err
 	}
 	currency := strings.TrimSpace(fmt.Sprint(p["currency_id"]))
-	if uid <= 0 || amount <= 0 || amount > 1000000000 || currency == "" || len(currency) > 80 {
+	if uid <= 0 || amount <= 0 || amount > 2000000000 || currency == "" || len(currency) > 80 {
 		return nil, errors.New("invalid user_id, amount, or currency_id")
 	}
 	if err := begin(conn); err != nil {
@@ -534,12 +573,12 @@ func adminGrantCurrency(conn *storage.Conn, raw json.RawMessage) (any, error) {
 	}
 	after := before + amount
 	if currency == "low_spirit_stone" {
-		_, err = conn.Execute(`UPDATE characters SET spirit_stones=?,updated_at=? WHERE user_id=?`, []any{after, float64(time.Now().UnixNano()) / 1e9, uid})
+		_, err = conn.Execute(`UPDATE characters SET spirit_stones=MAX(0,spirit_stones+?),updated_at=? WHERE user_id=?`, []any{amount, float64(time.Now().UnixNano()) / 1e9, uid})
 		if err != nil {
 			return nil, err
 		}
 	}
-	if err := auditAdmin(conn, "dashboard.player.grant_currency", fmt.Sprintf("user:%d", uid), map[string]any{"currency": currency, "balance": before}, map[string]any{"currency": currency, "amount": amount, "balance": after}, fmt.Sprint(p["reason"])); err != nil {
+	if err := auditAdmin(conn, adminUserID, "admin.player.grant_currency", fmt.Sprintf("user:%d", uid), map[string]any{"currency": currency, "balance": before}, map[string]any{"currency": currency, "amount": amount, "balance": after}, fmt.Sprint(p["reason"])); err != nil {
 		return nil, err
 	}
 	if err := conn.Commit(); err != nil {
@@ -548,7 +587,7 @@ func adminGrantCurrency(conn *storage.Conn, raw json.RawMessage) (any, error) {
 	return map[string]any{"user_id": uid, "name": row["name"], "currency_id": currency, "amount": amount, "balance": after}, nil
 }
 
-func adminKarma(conn *storage.Conn, raw json.RawMessage) (any, error) {
+func adminKarma(conn *storage.Conn, adminUserID int64, raw json.RawMessage) (any, error) {
 	p, err := decodeMap(raw)
 	if err != nil {
 		return nil, err
@@ -561,7 +600,7 @@ func adminKarma(conn *storage.Conn, raw json.RawMessage) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	if uid <= 0 || delta == 0 || delta < -2000 || delta > 2000 {
+	if uid <= 0 || delta < -2000 || delta > 2000 {
 		return nil, errors.New("invalid user_id or karma delta")
 	}
 	if err := begin(conn); err != nil {
@@ -586,11 +625,11 @@ func adminKarma(conn *storage.Conn, raw json.RawMessage) (any, error) {
 	if _, err = conn.Execute(`UPDATE characters SET karma_score=?,updated_at=? WHERE user_id=?`, []any{after, now, uid}); err != nil {
 		return nil, err
 	}
-	payload, _ := json.Marshal(map[string]any{"delta": delta, "reason": "dashboard", "score": after})
+	payload, _ := json.Marshal(map[string]any{"delta": delta, "reason": strings.TrimSpace(fmt.Sprint(p["reason"])), "score": after})
 	if _, err = conn.Execute(`INSERT INTO event_log(user_id,event_type,payload_json,created_at) VALUES(?,?,?,?)`, []any{uid, "karma_change", string(payload), now}); err != nil {
 		return nil, err
 	}
-	if err := auditAdmin(conn, "dashboard.player.karma", fmt.Sprintf("user:%d", uid), map[string]any{"karma": before}, map[string]any{"karma": after, "delta": delta}, fmt.Sprint(p["reason"])); err != nil {
+	if err := auditAdmin(conn, adminUserID, "admin.player.karma", fmt.Sprintf("user:%d", uid), map[string]any{"karma": before}, map[string]any{"karma": after, "delta": delta}, fmt.Sprint(p["reason"])); err != nil {
 		return nil, err
 	}
 	if err := conn.Commit(); err != nil {
@@ -599,7 +638,7 @@ func adminKarma(conn *storage.Conn, raw json.RawMessage) (any, error) {
 	return map[string]any{"user_id": uid, "name": row["name"], "karma_score": after, "delta": delta}, nil
 }
 
-func adminTeleport(conn *storage.Conn, raw json.RawMessage) (any, error) {
+func adminTeleport(conn *storage.Conn, adminUserID int64, raw json.RawMessage) (any, error) {
 	p, err := decodeMap(raw)
 	if err != nil {
 		return nil, err
@@ -651,7 +690,7 @@ func adminTeleport(conn *storage.Conn, raw json.RawMessage) (any, error) {
 		return nil, err
 	}
 	_, _ = conn.Execute(`UPDATE player_scene_state SET physical_location=?,scene_type='world',scene_key='',scene_label=?,channel_id=NULL,metadata_json='{}',updated_at=? WHERE user_id=?`, []any{loc, loc, now, uid})
-	if err := auditAdmin(conn, "dashboard.player.teleport", fmt.Sprintf("user:%d", uid), map[string]any{"location": before}, map[string]any{"location": loc}, fmt.Sprint(p["reason"])); err != nil {
+	if err := auditAdmin(conn, adminUserID, "admin.player.teleport", fmt.Sprintf("user:%d", uid), map[string]any{"location": before}, map[string]any{"location": loc}, fmt.Sprint(p["reason"])); err != nil {
 		return nil, err
 	}
 	if err := conn.Commit(); err != nil {
@@ -660,7 +699,7 @@ func adminTeleport(conn *storage.Conn, raw json.RawMessage) (any, error) {
 	return map[string]any{"user_id": uid, "name": row["name"], "location": loc}, nil
 }
 
-func adminRevive(conn *storage.Conn, raw json.RawMessage) (any, error) {
+func adminRevive(conn *storage.Conn, adminUserID int64, raw json.RawMessage) (any, error) {
 	p, err := decodeMap(raw)
 	if err != nil {
 		return nil, err
@@ -694,7 +733,7 @@ func adminRevive(conn *storage.Conn, raw json.RawMessage) (any, error) {
 	}
 	_, _ = conn.Execute(`UPDATE reincarnation_state SET active=0 WHERE user_id=?`, []any{uid})
 	_, _ = conn.Execute(`UPDATE battles SET status='abandoned',updated_at=? WHERE user_id=? AND status='active'`, []any{now, uid})
-	if err := auditAdmin(conn, "dashboard.player.revive", fmt.Sprintf("user:%d", uid), row, map[string]any{"life_status": "alive", "vitality": "full", "qi": "full"}, fmt.Sprint(p["reason"])); err != nil {
+	if err := auditAdmin(conn, adminUserID, "admin.player.revive", fmt.Sprintf("user:%d", uid), row, map[string]any{"life_status": "alive", "vitality": "full", "qi": "full"}, fmt.Sprint(p["reason"])); err != nil {
 		return nil, err
 	}
 	if err := conn.Commit(); err != nil {
@@ -703,7 +742,7 @@ func adminRevive(conn *storage.Conn, raw json.RawMessage) (any, error) {
 	return map[string]any{"user_id": uid, "name": row["name"], "life_status": "alive"}, nil
 }
 
-func adminClearBattle(conn *storage.Conn, raw json.RawMessage) (any, error) {
+func adminClearBattle(conn *storage.Conn, adminUserID int64, raw json.RawMessage) (any, error) {
 	p, err := decodeMap(raw)
 	if err != nil {
 		return nil, err
@@ -728,7 +767,7 @@ func adminClearBattle(conn *storage.Conn, raw json.RawMessage) (any, error) {
 		return nil, err
 	}
 	count := res.RowsAffected
-	if err := auditAdmin(conn, "dashboard.player.clear_battle", fmt.Sprintf("user:%d", uid), map[string]any{}, map[string]any{"cleared": count}, fmt.Sprint(p["reason"])); err != nil {
+	if err := auditAdmin(conn, adminUserID, "admin.player.clear_battle", fmt.Sprintf("user:%d", uid), map[string]any{}, map[string]any{"cleared": count}, fmt.Sprint(p["reason"])); err != nil {
 		return nil, err
 	}
 	if err := conn.Commit(); err != nil {
@@ -737,7 +776,7 @@ func adminClearBattle(conn *storage.Conn, raw json.RawMessage) (any, error) {
 	return map[string]any{"user_id": uid, "cleared": count}, nil
 }
 
-func adminAutomationSet(conn *storage.Conn, raw json.RawMessage) (any, error) {
+func adminAutomationSet(conn *storage.Conn, adminUserID int64, raw json.RawMessage) (any, error) {
 	p, err := decodeMap(raw)
 	if err != nil {
 		return nil, err
@@ -747,7 +786,20 @@ func adminAutomationSet(conn *storage.Conn, raw json.RawMessage) (any, error) {
 	if !ok {
 		return nil, errors.New("enabled must be boolean")
 	}
-	defaults := map[string]bool{"npc_civilization": true, "npc_life": true, "sect_politics": true, "dynamic_economy": true, "clan_dynamics": true, "background_seclusion": true, "black_markets": true, "autonomous_world_events": true}
+	defaults := map[string]bool{
+		"event_expiry":            true,
+		"auction_settlement":      true,
+		"unexpected_events":       true,
+		"maintenance_cleanup":     true,
+		"npc_civilization":        true,
+		"npc_life":                true,
+		"sect_politics":           true,
+		"dynamic_economy":         true,
+		"clan_dynamics":           true,
+		"background_seclusion":    true,
+		"black_markets":           true,
+		"autonomous_world_events": true,
+	}
 	if _, ok := defaults[name]; !ok {
 		return nil, errors.New("unknown automation system")
 	}
@@ -776,7 +828,7 @@ func adminAutomationSet(conn *storage.Conn, raw json.RawMessage) (any, error) {
 	if _, err = conn.Execute(`INSERT INTO world_state(key,value_json,updated_at) VALUES('automation_settings',?,?) ON CONFLICT(key) DO UPDATE SET value_json=excluded.value_json,updated_at=excluded.updated_at`, []any{string(encoded), now}); err != nil {
 		return nil, err
 	}
-	if err := auditAdmin(conn, "dashboard.automation.set", name, map[string]any{"enabled": before}, map[string]any{"enabled": enabled}, fmt.Sprint(p["reason"])); err != nil {
+	if err := auditAdmin(conn, adminUserID, "admin.automation.set", name, map[string]any{"enabled": before}, map[string]any{"enabled": enabled}, fmt.Sprint(p["reason"])); err != nil {
 		return nil, err
 	}
 	if err := conn.Commit(); err != nil {
@@ -785,7 +837,7 @@ func adminAutomationSet(conn *storage.Conn, raw json.RawMessage) (any, error) {
 	return map[string]any{"system": name, "enabled": enabled, "settings": settings}, nil
 }
 
-func adminSimulationInterval(conn *storage.Conn, raw json.RawMessage) (any, error) {
+func adminSimulationInterval(conn *storage.Conn, adminUserID int64, raw json.RawMessage) (any, error) {
 	p, err := decodeMap(raw)
 	if err != nil {
 		return nil, err
@@ -819,7 +871,7 @@ func adminSimulationInterval(conn *storage.Conn, raw json.RawMessage) (any, erro
 	if _, err = conn.Execute(`UPDATE world_simulation_state SET interval_game_minutes=? WHERE system=?`, []any{after, name}); err != nil {
 		return nil, err
 	}
-	if err := auditAdmin(conn, "dashboard.simulation.interval", name, map[string]any{"interval_game_minutes": before}, map[string]any{"interval_game_minutes": after, "days": days}, fmt.Sprint(p["reason"])); err != nil {
+	if err := auditAdmin(conn, adminUserID, "admin.simulation.interval", name, map[string]any{"interval_game_minutes": before}, map[string]any{"interval_game_minutes": after, "days": days}, fmt.Sprint(p["reason"])); err != nil {
 		return nil, err
 	}
 	if err := conn.Commit(); err != nil {
@@ -828,7 +880,7 @@ func adminSimulationInterval(conn *storage.Conn, raw json.RawMessage) (any, erro
 	return map[string]any{"system": name, "days": days, "interval_game_minutes": after}, nil
 }
 
-func adminAuditOnly(conn *storage.Conn, raw json.RawMessage) (any, error) {
+func adminAuditOnly(conn *storage.Conn, adminUserID int64, raw json.RawMessage) (any, error) {
 	p, err := decodeMap(raw)
 	if err != nil {
 		return nil, err
@@ -854,7 +906,7 @@ func adminAuditOnly(conn *storage.Conn, raw json.RawMessage) (any, error) {
 	if after == nil {
 		after = map[string]any{}
 	}
-	if err := auditAdmin(conn, action, target, before, after, fmt.Sprint(p["reason"])); err != nil {
+	if err := auditAdmin(conn, adminUserID, action, target, before, after, fmt.Sprint(p["reason"])); err != nil {
 		return nil, err
 	}
 	if err := conn.Commit(); err != nil {

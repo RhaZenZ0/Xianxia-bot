@@ -64,9 +64,11 @@ func Open(path string) (*Conn, error) {
 
 func (c *Conn) configure() error {
 	// WAL is persistent at database level. The remaining pragmas are connection-local.
-	script := `PRAGMA journal_mode=WAL;
+	// Apply busy_timeout before touching journal mode so concurrent connection
+	// startup waits instead of producing transient lock failures.
+	script := `PRAGMA busy_timeout=10000;
+PRAGMA journal_mode=WAL;
 PRAGMA foreign_keys=ON;
-PRAGMA busy_timeout=10000;
 PRAGMA synchronous=NORMAL;
 PRAGMA cache_size=-32768;
 PRAGMA wal_autocheckpoint=1000;`

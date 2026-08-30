@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import asyncio
 import json
+import hmac
 import logging
 import time
 import uuid
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Awaitable, Callable
 
 from .version import RELEASE_VERSION
 
@@ -162,10 +163,20 @@ class HealthState:
 
 
 class HealthServer:
-    def __init__(self, state: HealthState, *, host: str = "0.0.0.0", port: int = 8080) -> None:
+    def __init__(
+        self,
+        state: HealthState,
+        *,
+        host: str = "0.0.0.0",
+        port: int = 8080,
+        control_handler: Callable[[str, dict[str, Any]], Awaitable[dict[str, Any]]] | None = None,
+        control_token: str = "",
+    ) -> None:
         self.state = state
         self.host = str(host)
         self.port = int(port)
+        self.control_handler = control_handler
+        self.control_token = str(control_token or "")
         self._server: asyncio.AbstractServer | None = None
 
     @property
@@ -192,12 +203,17 @@ class HealthServer:
         try:
             raw = await asyncio.wait_for(reader.readline(), timeout=2.0)
             request = raw.decode("ascii", errors="replace").strip().split()
+            method = request[0].upper() if request else "GET"
             path = request[1].split("?", 1)[0] if len(request) >= 2 else "/"
-            # Consume request headers so clients can cleanly reuse/close sockets.
+            headers: dict[str, str] = {}
             while True:
                 line = await asyncio.wait_for(reader.readline(), timeout=2.0)
                 if line in {b"\r\n", b"\n", b""}:
                     break
+                text = line.decode("latin-1", errors="replace").strip()
+                if ":" in text:
+                    key, value = text.split(":", 1)
+                    headers[key.strip().lower()] = value.strip()
 
             if path == "/livez":
                 await self._respond(writer, 200, {"status": "alive", "boot_id": self.state.boot_id})
@@ -206,6 +222,36 @@ class HealthServer:
                 await self._respond(writer, 200 if self.state.ready else 503, snapshot)
             elif path == "/metrics":
                 await self._respond_text(writer, 200, self.state.prometheus_metrics(), "text/plain; version=0.0.4")
+            elif path == "/control/discord":
+                if method != "POST":
+                    await self._respond(writer, 405, {"error": "method_not_allowed"})
+                elif self.control_handler is None or not self.control_token:
+                    await self._respond(writer, 404, {"error": "not_found"})
+                elif not hmac.compare_digest(headers.get("x-xianxia-control", ""), self.control_token):
+                    await self._respond(writer, 403, {"error": "forbidden"})
+                else:
+                    try:
+                        length = int(headers.get("content-length", "0") or 0)
+                    except ValueError:
+                        length = -1
+                    if length < 2 or length > 65536:
+                        await self._respond(writer, 400, {"error": "invalid_body_size"})
+                    else:
+                        body = await asyncio.wait_for(reader.readexactly(length), timeout=3.0)
+                        try:
+                            payload = json.loads(body.decode("utf-8"))
+                            action = str(payload.get("action") or "status")
+                            args = dict(payload.get("payload") or {})
+                            result = await self.control_handler(action, args)
+                        except (ValueError, TypeError, json.JSONDecodeError) as exc:
+                            await self._respond(writer, 400, {"error": "bad_request", "message": str(exc)[:300]})
+                        except PermissionError as exc:
+                            await self._respond(writer, 403, {"error": "forbidden", "message": str(exc)[:300]})
+                        except Exception as exc:
+                            log.exception("Discord control request failed")
+                            await self._respond(writer, 500, {"error": "control_failed", "message": str(exc)[:300]})
+                        else:
+                            await self._respond(writer, 200, result)
             else:
                 await self._respond(writer, 404, {"error": "not_found"})
         except (asyncio.TimeoutError, ConnectionError):
@@ -225,7 +271,7 @@ class HealthServer:
 
     @staticmethod
     async def _respond_text(writer: asyncio.StreamWriter, status: int, body: str, content_type: str) -> None:
-        reason = {200: "OK", 404: "Not Found", 503: "Service Unavailable"}.get(status, "OK")
+        reason = {200: "OK", 400: "Bad Request", 403: "Forbidden", 404: "Not Found", 405: "Method Not Allowed", 500: "Internal Server Error", 503: "Service Unavailable"}.get(status, "OK")
         encoded = body.encode("utf-8")
         headers = (
             f"HTTP/1.1 {status} {reason}\r\n"

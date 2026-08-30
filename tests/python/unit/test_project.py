@@ -167,22 +167,26 @@ class ProjectDataTests(unittest.TestCase):
         self.assertIn("interaction.edit_original_response", source)
         self.assertIn("interaction.response.edit_message", source)
         self.assertIn("expected_battle_id=self.battle_id", source)
-        self.assertIn("claim_battle_finalization", source)
+        self.assertIn("COMBAT.finalize(", source)
+        self.assertIn("COMBAT.turn(", source)
         self.assertNotIn("status='won' if nhp<=0", source)
         self.assertIn('@registered_group_command(battle_group, name="challenge"', source)
         self.assertIn('@registered_group_command(battle_group, name="finish"', source)
-        self.assertIn('SIM.apply_player_action(', source)
+        self.assertNotIn('SIM.apply_player_action(', source)
+        self.assertIn('result.get("impacts")', source)
 
     def test_random_event_pipeline_has_persistent_consequences_and_deduplication(self):
         bot_source = (ROOT / "app" / "bot" / "main.py").read_text(encoding="utf-8")
         database_source = (ROOT / "app" / "database" / "core.py").read_text(encoding="utf-8")
         worldsim_source = (ROOT / "app" / "simulation" / "world.py").read_text(encoding="utf-8")
-        self.assertIn("_apply_event_participation", bot_source)
-        self.assertIn("SIM.apply_random_event(", bot_source)
-        self.assertIn('dedupe_key=f"random:', bot_source)
+        self.assertIn('"world_event.act"', bot_source)
+        self.assertNotIn("SIM.apply_random_event(", bot_source)
+        self.assertIn("for event in sim_run.events", bot_source)
         self.assertIn("idx_world_events_active_dedupe", database_source)
-        self.assertIn("async def apply_random_event", worldsim_source)
-        self.assertIn("INSERT INTO civilization_events", worldsim_source)
+        self.assertIn('"autonomous_world_events"', worldsim_source)
+        go_sim_source = (ROOT / "go_core" / "internal" / "simulation" / "world.go").read_text(encoding="utf-8")
+        self.assertIn('"autonomous_world_events"', go_sim_source)
+        self.assertIn("applyAutonomousWorldEffect", go_sim_source)
 
 
 if __name__ == "__main__":

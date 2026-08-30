@@ -3,6 +3,7 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&
 const n=v=>Number(v??0).toLocaleString();
 const pill=(v,cls='')=>`<span class="pill ${cls}">${esc(v??'—')}</span>`;
 async function api(path){const r=await fetch(path,{cache:'no-store'}); if(!r.ok) throw new Error(`${r.status} ${await r.text()}`); return r.json()}
+async function discordPost(action,payload={}){const r=await fetch('/api/discord/action',{method:'POST',cache:'no-store',headers:{'Content-Type':'application/json','X-Xianxia-Admin':'1'},body:JSON.stringify({action,payload})});let d={};try{d=await r.json()}catch{}if(!r.ok)throw new Error(d.message||d.error||`Discord setup action failed (${r.status})`);return d}
 async function adminPost(action,payload={}){const r=await fetch('/api/admin/action',{method:'POST',cache:'no-store',headers:{'Content-Type':'application/json','X-Xianxia-Admin':'1'},body:JSON.stringify({action,payload})});let d={};try{d=await r.json()}catch{}if(!r.ok)throw new Error(d.message||d.error||`Admin action failed (${r.status})`);return d}
 function resultBox(v,ok=true){return `<div class="result ${ok?'goodbox':'badbox'}"><b>${ok?'Success':'Failed'}</b><pre>${esc(typeof v==='string'?v:JSON.stringify(v,null,2))}</pre></div>`}
 function optionRows(rows,value='user_id',label=r=>`${r.name} · ${r.discord_name}`){return rows.map(r=>`<option value="${esc(r[value])}">${esc(label(r))}</option>`).join('')}
@@ -24,6 +25,43 @@ async function loadPlayers(){const d=await api('/api/players');app.innerHTML=`<h
 async function loadRag(){const d=await api('/api/rag?limit=200');app.innerHTML=`<h2>RAG Memory Inspector</h2><div class="cards"><div class="card"><small>Player memories</small><div class="metric">${n(d.memories.length)}</div></div><div class="card"><small>Safe canon documents</small><div class="metric">${n(d.canon_count)}</div></div><div class="card"><small>World-history events</small><div class="metric">${n(d.history_count)}</div></div></div>${filters(`<input id="q" placeholder="Search memory"><select id="uid"><option value="">All players</option>${d.players.map(x=>`<option value="${x.user_id}">${esc(x.name)}</option>`).join('')}</select><input id="npc" placeholder="NPC exact name">`)}<div id="ragRows">${ragTable(d.memories)}</div>`;document.getElementById('applyFilters').onclick=async()=>{const p=new URLSearchParams({limit:'250',q:q.value,user_id:uid.value,npc:npc.value});const x=await api('/api/rag?'+p);document.getElementById('ragRows').innerHTML=ragTable(x.memories)}}
 function ragTable(rows){return table([['Player','player_name'],['Kind','memory_kind'],['Summary','summary'],['Salience','salience'],['Location','location'],['NPC','npc_name'],['Source','source'],['Time',r=>fmtGM(r.game_minute)],['Recalls','recalled_count']],rows)}
 async function loadDecisions(){const d=await api('/api/decisions?limit=250');app.innerHTML=`<h2>Autonomous NPC Decisions</h2>${table([['NPC','npc_name'],['Status','status'],['Location','current_location'],['Faction','faction'],['Rank','sect_rank'],['Activity','activity'],['Mood','mood'],['Goal','current_goal'],['Progress',r=>`${r.goal_progress}%`],['Recent autonomous development','recent_event']],d.minds)}<h2>Autonomous Outcomes Written to History</h2>${timeline(d.history)}<h2>Simulation Clocks</h2>${table([['System','system'],['Last minute','last_game_minute'],['Interval','interval_game_minutes'],['Runs','runs']],d.simulation)}`}
+
+async function loadDiscordSetup(){
+ const d=await api('/api/discord');
+ if(!d.control_available){app.innerHTML=`<h2>Discord Server Setup</h2><div class="card badbox"><b>Discord bot control is unavailable.</b><div class="muted">${esc(d.message||'The dashboard cannot reach the Python Discord bot.')}</div></div>`;return}
+ const guild=d.guild||{}, bot=d.bot||{}, perms=d.permissions||[], base=d.base_channels||[], realms=d.realm_hubs||[], channels=d.text_channels||[];
+ const pgood=perms.filter(x=>x.ok).length;
+ const channelOptions=current=>channels.map(c=>`<option value="${c.id}" ${Number(current)===Number(c.id)?'selected':''}>#${esc(c.name)} · ${esc(c.category)}</option>`).join('');
+ const byKey=Object.fromEntries(base.map(x=>[x.key,x]));
+ const bind=(id,label,key)=>`<label>${label}<select id="${id}"><option value="">Keep current</option>${channelOptions(byKey[key]?.channel_id||byKey[key]?.configured_id)}</select></label>`;
+ app.innerHTML=`<div class="admin-hero"><div><div class="eyebrow">DISCORD SERVER CONTROL</div><h2>Xianxia RP Discord Setup</h2><p>The dashboard talks to the connected Python bot. Discord.py creates/repairs channels and roles; Go remains responsible only for canonical game state.</p></div><div class="tagline">${pill(guild.name||'Guild','good')}${pill(`${pgood}/${perms.length} permissions`,pgood===perms.length?'good':'warn')}${pill(`${d.registered_commands||0} commands`,'blue')}</div></div>
+ <div id="discordResult"></div>
+ <div class="cards">
+  <div class="card"><small>Connected Guild</small><div class="metric">${esc(guild.name||'—')}</div><div class="muted">${esc(guild.id||'')}</div></div>
+  <div class="card"><small>Base Channels</small><div class="metric">${n(d.base_ready)}/${n(d.base_total)}</div></div>
+  <div class="card"><small>Realm Hubs</small><div class="metric">${n(d.realm_ready)}/${n(d.realm_total)}</div></div>
+  <div class="card"><small>Setup State</small><div class="metric ${d.setup_ready?'good':'warn'}">${d.setup_ready?'READY':'ATTENTION'}</div></div>
+ </div>
+ <div class="admin-grid">
+  <section class="card control"><h3>🛠️ Automatic Setup</h3><p>Safe and idempotent. Existing configured/name-matching channels are reused and repaired.</p><div class="buttonrow"><button class="btn primary" id="fullSetup">Full Setup</button><button class="btn" id="repairSetup">Repair Server</button><button class="btn" id="refreshDiscord">Refresh Status</button></div><div class="buttonrow"><button class="btn" id="syncCommands">Sync Slash Commands</button><button class="btn" id="syncRealmRoles">Sync Realm Roles</button><button class="btn" id="rebuildInfo">Rebuild Info Guide</button><button class="btn" id="testAnnouncement">Test Announcement</button></div></section>
+  <section class="card control"><h3>🔐 Permission Diagnostics</h3>${perms.map(x=>`<div class="row"><span>${esc(x.label)}</span><b class="${x.ok?'good':'bad'}">${x.ok?'READY':'MISSING'}</b></div><div class="muted">${esc(x.purpose)}</div>`).join('')}${(d.permission_warnings||[]).length?`<div class="result badbox"><b>Attention</b><div>${(d.permission_warnings||[]).map(x=>`• ${esc(x)}`).join('<br>')}</div></div>`:''}</section>
+ </div>
+ <div class="grid2">
+  <section><h2>Base Xianxia RP Channels</h2>${table([['Channel','key'],['State',r=>pill(r.status,r.status==='ready'?'good':r.status==='stale'?'bad':'warn')],['Discord Channel',r=>r.name?`#${esc(r.name)} · ${r.channel_id}`:'—']],base)}</section>
+  <section><h2>Realm Capitals</h2>${table([['World','world'],['State',r=>pill(r.ready?'ready':'missing',r.ready?'good':'warn')],['Channel',r=>r.channel_name?`#${esc(r.channel_name)}`:'—'],['Role',r=>esc(r.role_name||'—')]],realms)}</section>
+ </div>
+ <h2>Use Existing Channels</h2><section class="card control"><p>Choose existing text channels instead of the recommended generated layout. Blank selections preserve the current binding.</p><div class="grid2">${bind('bindAnnouncements','World events / announcements','world-events')}${bind('bindScenes','Event scenes','event-scenes')}${bind('bindHomes','Player homes','player-homes')}${bind('bindLogs','Bot logs','bot-logs')}${bind('bindBegin','Begin here','begin-here')}${bind('bindInfo','Xianxia info','xianxia-info')}${bind('bindExploration','Expeditions','expeditions')}</div><label>Audit reason<input id="discordReason" value="GM dashboard Discord setup"></label><button class="btn primary" id="saveBindings">Save Channel Bindings</button></section>`;
+ const out=document.getElementById('discordResult');
+ const run=async(action,payload={},confirmText='')=>{if(confirmText&&!confirm(confirmText))return;out.innerHTML='<div class="loading">Applying Discord setup action…</div>';try{const r=await discordPost(action,{...payload,reason:discordReason?.value||'GM dashboard Discord setup'});out.innerHTML=resultBox(r.result??r);setTimeout(()=>loadDiscordSetup().catch(()=>{}),900)}catch(e){out.innerHTML=resultBox(e.message,false)}};
+ fullSetup.onclick=()=>run('setup',{},'Install/repair the recommended Xianxia RP Discord layout and sync slash commands?');
+ repairSetup.onclick=()=>run('repair',{},'Repair Xianxia RP channels, permissions, realm roles and slash commands?');
+ refreshDiscord.onclick=()=>loadDiscordSetup();
+ syncCommands.onclick=()=>run('sync_commands');
+ syncRealmRoles.onclick=()=>run('sync_roles');
+ rebuildInfo.onclick=()=>run('rebuild_info');
+ testAnnouncement.onclick=()=>run('test_announcement',{},'Send a visible Xianxia RP dashboard test message to the configured world-events channel?');
+ saveBindings.onclick=()=>run('bind_channels',{announcements:bindAnnouncements.value,scenes:bindScenes.value,homes:bindHomes.value,logs:bindLogs.value,begin:bindBegin.value,info:bindInfo.value,exploration:bindExploration.value},'Save these Discord channel bindings?');
+}
 
 async function loadAdmin(){
  const d=await api('/api/admin');
@@ -60,6 +98,6 @@ async function loadAdmin(){
  document.querySelectorAll('[data-auto]').forEach(el=>el.onchange=()=>run('automation.set',{system:el.dataset.auto,enabled:el.checked,reason:'GM dashboard automation toggle'}));
 }
 
-const loaders={overview:loadOverview,timeline:loadTimeline,npcs:loadNPCs,families:loadFamilies,sects:loadSects,conflicts:loadConflicts,events:loadEvents,players:loadPlayers,rag:loadRag,decisions:loadDecisions,admin:loadAdmin};
+const loaders={overview:loadOverview,timeline:loadTimeline,npcs:loadNPCs,families:loadFamilies,sects:loadSects,conflicts:loadConflicts,events:loadEvents,players:loadPlayers,rag:loadRag,decisions:loadDecisions,discord:loadDiscordSetup,admin:loadAdmin};
 async function switchView(v){document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('active',b.dataset.view===v));app.innerHTML='<div class="loading">Loading…</div>';try{await loaders[v]()}catch(e){app.innerHTML=`<div class="card"><h3>Dashboard error</h3><div class="bad">${esc(e.message)}</div></div>`}}
 document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>switchView(b.dataset.view));document.getElementById('closeDrawer').onclick=()=>drawer.classList.add('hidden');drawer.onclick=e=>{if(e.target===drawer)drawer.classList.add('hidden')};switchView('overview');setInterval(()=>{if(document.querySelector('#nav button.active')?.dataset.view==='overview')loadOverview().catch(()=>{})},15000);

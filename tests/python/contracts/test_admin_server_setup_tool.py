@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tests.support import install_aiosqlite_shim, PROJECT_ROOT
+from tests.support import install_aiosqlite_shim, PROJECT_ROOT, seed_character
 install_aiosqlite_shim()
 
 from app.database import Database, SCHEMA_VERSION
@@ -37,7 +37,7 @@ class AdminServerSetupSourceTests(unittest.TestCase):
         self.assertIn("Create Private Threads", source)
         self.assertIn("Send Messages in Threads", source)
         self.assertIn("Manage Roles", source)
-        self.assertIn("Realm-role syncing and automatic private/read-only permission repair will not work.", source)
+        self.assertIn("Realm-role creation and synchronization will not work.", source)
         self.assertIn("Realm Role Hierarchy", source)
         self.assertIn("Move the bot's highest role above", source)
 
@@ -51,27 +51,33 @@ class AdminServerSetupSourceTests(unittest.TestCase):
         self.assertIn("ensure_xianxia_info_guide", source)
         self.assertIn("No database/world reset was performed", source)
 
-    def test_realm_permissions_cannot_lock_the_bot_out(self):
+    def test_dashboard_can_reuse_the_same_discord_setup_implementation(self):
         source = BOT.read_text(encoding="utf-8")
-        self.assertIn("def _realm_channel_overwrites", source)
-        self.assertIn("async def _apply_realm_channel_permissions", source)
-        self.assertIn('create_kwargs["overwrites"] = _realm_channel_overwrites', source)
-        start = source.index("async def _apply_realm_channel_permissions")
-        end = source.index("async def ensure_realm_hub_channels", start)
-        block = source[start:end]
-        self.assertLess(block.index("guild.me,"), block.index("access_role,"))
-        self.assertLess(block.index("access_role,"), block.index("guild.default_role,"))
-        self.assertIn("Deny @everyone only after both positive overwrites", block)
+        self.assertIn("async def dashboard_discord_control", source)
+        self.assertIn("await _run_complete_server_setup(guild)", source)
+        self.assertIn('action == "sync_commands"', source)
+        self.assertIn('action == "bind_channels"', source)
+        self.assertIn('action == "test_announcement"', source)
+        self.assertIn("dashboard.discord.", source)
+
+    def test_dashboard_owned_setup_does_not_provision_discord_channels(self):
+        source = BOT.read_text(encoding="utf-8")
+        self.assertNotIn("guild.create_text_channel", source)
+        self.assertNotIn("guild.create_category", source)
+        self.assertNotIn("set_permissions(", source)
+        self.assertNotIn("auto-provision", source)
+        self.assertIn("Discord channel creation is dashboard-owned", source)
+        self.assertIn("the bot will not provision channels", source)
 
 
 class AdminServerSetupDatabaseTests(unittest.IsolatedAsyncioTestCase):
     async def test_bulk_role_reconciliation_can_list_character_owners(self):
-        self.assertEqual(SCHEMA_VERSION, 17)
+        self.assertEqual(SCHEMA_VERSION, 22)
         with tempfile.TemporaryDirectory() as tmp:
             db = Database(Path(tmp) / "server-setup.sqlite3")
             await db.init()
             for uid in (9303, 9301, 9302):
-                created = await db.create_character(
+                created = await seed_character(db,
                     user_id=uid,
                     discord_name=f"u{uid}",
                     name=f"Cultivator {uid}",
