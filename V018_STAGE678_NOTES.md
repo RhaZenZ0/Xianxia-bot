@@ -23,4 +23,4 @@
 - Removed stale test-support dependency on the deleted Python lifespan model.
 - Kept Python orchestration/read surfaces where they do not duplicate Go mechanical authority.
 
-See `V018_STAGE678_VALIDATION.md` and `V018_STAGE678_ADVERSARIAL_AUDIT.md`.
+See `V018_BUILD_HISTORY.md` (consolidated Stage 6-8 validation/audit record).

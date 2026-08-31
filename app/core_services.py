@@ -320,11 +320,19 @@ class CombatService:
         )
 
     async def technique(
-        self, user_id: int, *, battle_id: int, technique: str, game_minute: int, action_id: str,
+        self, user_id: int, *, battle_id: int, technique: str, game_minute: int,
+        minutes_per_year: int, base_samsara_years: int, max_wait_seconds: int,
+        action_id: str,
     ) -> dict[str, Any]:
         return await self.engine.authoritative_action(
             "combat.technique", int(user_id),
-            {"battle_id": int(battle_id), "technique": str(technique)},
+            {
+                "battle_id": int(battle_id),
+                "technique": str(technique),
+                "minutes_per_year": int(minutes_per_year),
+                "base_samsara_years": int(base_samsara_years),
+                "max_wait_seconds": int(max_wait_seconds),
+            },
             action_id=str(action_id),
         )
 

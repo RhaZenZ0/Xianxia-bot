@@ -21,6 +21,15 @@ from .worldtime import from_game_minutes
 from .database.remote import GoDatabaseTransport, RemoteDatabaseError
 from .game_engine import GameEngineClient, GameEngineError
 
+# Release-blocking browser/API/schema contract shared with the standard checker.
+from .dashboard_contract import (
+    DASHBOARD_API_VERSION,
+    DASHBOARD_GET_API_PATHS,
+    DASHBOARD_REVIEWED_SCHEMA_VERSION,
+    DASHBOARD_SYSTEM_TABLES,
+    DASHBOARD_VIEW_ENDPOINTS,
+)
+
 log = logging.getLogger("xianxia.dashboard")
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -129,6 +138,12 @@ class ReadOnlyDashboardStore:
     async def _table_exists(db: Any, name: str) -> bool:
         cur = await db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (name,))
         return bool(await cur.fetchone())
+
+    @classmethod
+    async def _fetchall_if_table(cls, db: Any, table: str, sql: str, params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
+        if not await cls._table_exists(db, table):
+            return []
+        return await cls._fetchall(db, sql, params)
 
     async def schema_version(self) -> int:
         async with self._connect() as db:
@@ -321,6 +336,19 @@ class ReadOnlyDashboardStore:
             custom_children = await self._fetchall(db, "SELECT * FROM family_children ORDER BY family_id,birth_game_minute")
             npc_desc = await self._fetchall(db, "SELECT * FROM npc_descendants ORDER BY birth_game_minute DESC LIMIT 500")
             npc_marriages = await self._fetchall(db, "SELECT npc_name,spouse_name,children_count,sect_rank FROM npc_life_state WHERE relationship_status='married' ORDER BY npc_name")
+            household_threads = (
+                await self._fetchall(
+                    db,
+                    "SELECT guild_id,family_id,thread_id,parent_channel_id,created_at,updated_at FROM birth_family_household_threads ORDER BY family_id,guild_id",
+                )
+                if await self._table_exists(db, "birth_family_household_threads")
+                else []
+            )
+            current_occupants = await self._fetchall(
+                db,
+                """SELECT CAST(SUBSTR(c.location,14) AS INTEGER) AS family_id,c.user_id,c.name,c.discord_name,c.life_status
+                   FROM characters c WHERE c.location LIKE 'birth_family:%' ORDER BY family_id,c.name""",
+            )
             return {
                 "clock": clock,
                 "birth_families": birth,
@@ -333,7 +361,73 @@ class ReadOnlyDashboardStore:
                 "player_family_children": custom_children,
                 "npc_descendants": npc_desc,
                 "npc_marriages": npc_marriages,
+                "household_threads": household_threads,
+                "current_occupants": current_occupants,
             }
+
+    async def party(self) -> dict[str, Any]:
+        async with self._connect() as db:
+            parties = await self._fetchall_if_table(
+                db, "parties",
+                """SELECT p.*,l.name AS leader_name FROM parties p
+                   JOIN characters l ON l.user_id=p.leader_user_id
+                   ORDER BY p.status DESC,p.updated_at DESC""",
+            )
+            members = await self._fetchall_if_table(
+                db, "party_members",
+                """SELECT pm.*,c.name,c.discord_name,c.life_status,c.realm_index,c.phase
+                   FROM party_members pm JOIN characters c ON c.user_id=pm.user_id
+                   ORDER BY pm.party_id,pm.role DESC""",
+            )
+            formations = await self._fetchall_if_table(
+                db, "party_formations",
+                "SELECT * FROM party_formations ORDER BY party_id,active DESC,formation_id",
+            )
+            positions = await self._fetchall_if_table(
+                db, "formation_positions",
+                """SELECT fp.*,c.name FROM formation_positions fp
+                   JOIN characters c ON c.user_id=fp.user_id
+                   ORDER BY fp.formation_id,fp.position""",
+            )
+            return {
+                "parties": parties,
+                "party_members": members,
+                "party_formations": formations,
+                "formation_positions": positions,
+            }
+
+    async def pvp(self) -> dict[str, Any]:
+        async with self._connect() as db:
+            challenges = await self._fetchall_if_table(
+                db, "pvp_challenges",
+                """SELECT pc.*,a.name AS challenger_name,b.name AS target_name
+                   FROM pvp_challenges pc
+                   JOIN characters a ON a.user_id=pc.challenger_user_id
+                   JOIN characters b ON b.user_id=pc.target_user_id
+                   ORDER BY pc.status DESC,pc.created_at DESC LIMIT 200""",
+            )
+            matches = await self._fetchall_if_table(
+                db, "pvp_matches",
+                """SELECT m.*,a.name AS player1_name,b.name AS player2_name,w.name AS winner_name
+                   FROM pvp_matches m
+                   JOIN characters a ON a.user_id=m.player1_user_id
+                   JOIN characters b ON b.user_id=m.player2_user_id
+                   LEFT JOIN characters w ON w.user_id=m.winner_user_id
+                   ORDER BY m.status DESC,m.updated_at DESC LIMIT 200""",
+            )
+            return {"pvp_challenges": challenges, "pvp_matches": matches}
+
+    async def conditions(self) -> dict[str, Any]:
+        async with self._connect() as db:
+            rows = await self._fetchall_if_table(
+                db, "character_conditions",
+                """SELECT cc.*,c.name AS player_name,c.discord_name,c.life_status
+                   FROM character_conditions cc
+                   JOIN characters c ON c.user_id=cc.user_id
+                   WHERE cc.state='active'
+                   ORDER BY cc.severity DESC,cc.updated_game_minute DESC LIMIT 300""",
+            )
+            return {"character_conditions": rows}
 
     async def sects(self) -> dict[str, Any]:
         async with self._connect() as db:
@@ -420,6 +514,346 @@ class ReadOnlyDashboardStore:
             )
             return {"players": rows, "recent_actions": actions, "scene_activity": scenes}
 
+    async def capabilities(self) -> dict[str, Any]:
+        """Describe the dashboard/API contract and whether newer-system tables are present."""
+        groups = DASHBOARD_SYSTEM_TABLES
+        async with self._connect() as db:
+            schema = 0
+            if await self._table_exists(db, "schema_version"):
+                schema = await self._scalar(db, "SELECT current_version FROM schema_version WHERE singleton=1")
+            systems: dict[str, Any] = {}
+            for name, tables in groups.items():
+                present = [table for table in tables if await self._table_exists(db, table)]
+                missing = [table for table in tables if table not in present]
+                systems[name] = {
+                    "available": not missing,
+                    "present_tables": present,
+                    "missing_tables": missing,
+                    "endpoint": DASHBOARD_VIEW_ENDPOINTS[name],
+                }
+        return {
+            "api_version": DASHBOARD_API_VERSION,
+            "schema_version": schema,
+            "implementation": {
+                "reviewed_schema_version": DASHBOARD_REVIEWED_SCHEMA_VERSION,
+                "schema_review_current": schema == DASHBOARD_REVIEWED_SCHEMA_VERSION,
+                "standard_check": "python scripts/check_dashboard_implementation.py",
+            },
+            "views": DASHBOARD_VIEW_ENDPOINTS,
+            "get_endpoints": sorted(DASHBOARD_GET_API_PATHS),
+            "systems": systems,
+        }
+
+    async def cultivation(self) -> dict[str, Any]:
+        async with self._connect() as db:
+            if await self._table_exists(db, "character_spiritual_roots"):
+                roots = await self._fetchall(
+                    db,
+                    """SELECT c.user_id,c.name,c.discord_name,c.path,c.life_status,c.realm_index,c.phase,
+                              c.body_realm_index,c.body_phase,c.location,c.spiritual_root AS legacy_root,
+                              r.grade AS root_grade,r.purity,r.elements_json,r.mutation,r.stability,
+                              r.refinement_progress,r.compatibility,r.updated_at
+                       FROM characters c LEFT JOIN character_spiritual_roots r ON r.user_id=c.user_id
+                       ORDER BY c.life_status DESC,c.realm_index DESC,c.phase DESC,c.name""",
+                )
+            else:
+                roots = await self._fetchall(
+                    db,
+                    """SELECT user_id,name,discord_name,path,life_status,realm_index,phase,body_realm_index,body_phase,
+                              location,spiritual_root AS legacy_root
+                       FROM characters ORDER BY life_status DESC,realm_index DESC,phase DESC,name""",
+                )
+            bloodlines = await self._fetchall_if_table(
+                db, "character_bloodlines",
+                """SELECT b.*,c.name AS player_name,c.discord_name FROM character_bloodlines b
+                   JOIN characters c ON c.user_id=b.user_id
+                   ORDER BY b.primary_lineage DESC,b.purity DESC,b.evolution_stage DESC,c.name""",
+            )
+            physiques = await self._fetchall_if_table(
+                db, "character_physiques",
+                """SELECT p.*,c.name AS player_name,c.discord_name FROM character_physiques p
+                   JOIN characters c ON c.user_id=p.user_id ORDER BY p.evolution_stage DESC,p.progress DESC,c.name""",
+            )
+            dao = await self._fetchall_if_table(
+                db, "dao_progress",
+                """SELECT d.*,c.name AS player_name FROM dao_progress d JOIN characters c ON c.user_id=d.user_id
+                   ORDER BY d.progress DESC,d.dao_id,c.name LIMIT 300""",
+            )
+            laws = await self._fetchall_if_table(
+                db, "law_progress",
+                """SELECT l.*,c.name AS player_name FROM law_progress l JOIN characters c ON c.user_id=l.user_id
+                   ORDER BY l.comprehension DESC,l.insights DESC,l.law_id,c.name LIMIT 300""",
+            )
+            tribulations = await self._fetchall_if_table(
+                db, "tribulation_state",
+                """SELECT t.*,c.name AS player_name,c.realm_index,c.phase FROM tribulation_state t
+                   JOIN characters c ON c.user_id=t.user_id
+                   ORDER BY t.cleared ASC,t.gate_realm_index DESC,t.updated_game_minute DESC LIMIT 250""",
+            )
+            attempts = await self._fetchall_if_table(
+                db, "tribulation_attempts",
+                """SELECT a.*,c.name AS player_name FROM tribulation_attempts a JOIN characters c ON c.user_id=a.user_id
+                   ORDER BY a.created_game_minute DESC,a.attempt_id DESC LIMIT 120""",
+            )
+            perfection = await self._fetchall_if_table(
+                db, "realm_perfection",
+                """SELECT p.*,c.name AS player_name FROM realm_perfection p JOIN characters c ON c.user_id=p.user_id
+                   WHERE p.active=1 OR p.completed=1 ORDER BY p.active DESC,p.realm_index DESC,p.progress DESC LIMIT 200""",
+            )
+            body_perfection = await self._fetchall_if_table(
+                db, "body_realm_perfection",
+                """SELECT p.*,c.name AS player_name FROM body_realm_perfection p JOIN characters c ON c.user_id=p.user_id
+                   WHERE p.active=1 OR p.completed=1 ORDER BY p.active DESC,p.realm_index DESC,p.progress DESC LIMIT 200""",
+            )
+            seclusion = await self._fetchall_if_table(
+                db, "seclusion_sessions",
+                """SELECT s.*,c.name AS player_name,c.location FROM seclusion_sessions s JOIN characters c ON c.user_id=s.user_id
+                   ORDER BY (s.status='active') DESC,s.updated_at DESC LIMIT 150""",
+            )
+            summary = {
+                "roots": len(roots),
+                "mutated_roots": sum(1 for r in roots if str(r.get("mutation") or "").strip()),
+                "active_seclusion": sum(1 for r in seclusion if str(r.get("status")) == "active"),
+                "uncleared_tribulations": sum(1 for r in tribulations if not int(r.get("cleared") or 0)),
+                "bloodlines": len(bloodlines),
+            }
+            return {
+                "summary": summary, "roots": roots, "bloodlines": bloodlines, "physiques": physiques,
+                "dao": dao, "laws": laws, "tribulations": tribulations, "tribulation_attempts": attempts,
+                "realm_perfection": perfection, "body_realm_perfection": body_perfection, "seclusion": seclusion,
+            }
+
+    async def crafting(self) -> dict[str, Any]:
+        async with self._connect() as db:
+            professions = await self._fetchall_if_table(
+                db, "profession_progress",
+                """SELECT p.*,c.name AS player_name,c.discord_name FROM profession_progress p
+                   JOIN characters c ON c.user_id=p.user_id
+                   ORDER BY p.level DESC,p.xp DESC,p.profession,c.name LIMIT 300""",
+            )
+            alchemy = await self._fetchall_if_table(
+                db, "alchemy_state",
+                """SELECT a.*,c.name AS player_name,c.discord_name FROM alchemy_state a
+                   JOIN characters c ON c.user_id=a.user_id
+                   ORDER BY a.pill_toxicity DESC,a.total_refinements DESC,c.name""",
+            )
+            batches = await self._fetchall_if_table(
+                db, "alchemy_batches",
+                """SELECT b.*,c.name AS player_name FROM alchemy_batches b JOIN characters c ON c.user_id=b.user_id
+                   ORDER BY b.game_minute DESC,b.batch_id DESC LIMIT 150""",
+            )
+            beasts = await self._fetchall_if_table(
+                db, "spirit_beasts",
+                """SELECT b.*,c.name AS player_name,c.location AS player_location FROM spirit_beasts b
+                   JOIN characters c ON c.user_id=b.user_id
+                   ORDER BY b.active DESC,b.evolution_stage DESC,b.loyalty DESC,b.rank DESC LIMIT 200""",
+            )
+            artifacts = await self._fetchall_if_table(
+                db, "artifact_bonds",
+                """SELECT a.*,c.name AS player_name FROM artifact_bonds a JOIN characters c ON c.user_id=a.user_id
+                   ORDER BY a.awakened DESC,a.bond_level DESC,a.resonance DESC,c.name LIMIT 200""",
+            )
+            abodes = await self._fetchall_if_table(
+                db, "cave_abodes",
+                """SELECT a.*,c.name AS owner_name FROM cave_abodes a JOIN characters c ON c.user_id=a.user_id
+                   ORDER BY a.grade DESC,a.cultivation_level DESC,a.updated_at DESC LIMIT 200""",
+            )
+            sect_abodes = await self._fetchall_if_table(
+                db, "sect_abodes",
+                """SELECT a.*,c.name AS owner_name FROM sect_abodes a JOIN characters c ON c.user_id=a.user_id
+                   ORDER BY a.sect_name,a.name LIMIT 200""",
+            )
+            personal_worlds = await self._fetchall_if_table(
+                db, "personal_worlds",
+                """SELECT w.*,c.name AS owner_name FROM personal_worlds w JOIN characters c ON c.user_id=w.user_id
+                   ORDER BY w.stability DESC,w.updated_at DESC LIMIT 200""",
+            )
+            arrays = await self._fetchall_if_table(
+                db, "deployed_location_arrays",
+                """SELECT a.*,c.name AS owner_name FROM deployed_location_arrays a
+                   LEFT JOIN characters c ON c.user_id=a.owner_user_id
+                   ORDER BY a.ends_game_minute DESC,a.location,a.name LIMIT 200""",
+            )
+            equipment = await self._fetchall_if_table(
+                db, "equipment_instances",
+                """SELECT e.*,c.name AS player_name FROM equipment_instances e JOIN characters c ON c.user_id=e.user_id
+                   ORDER BY e.equipped DESC,e.quality DESC,e.updated_at DESC LIMIT 250""",
+            )
+            return {
+                "summary": {
+                    "profession_tracks": len(professions), "alchemy_users": len(alchemy),
+                    "active_beasts": sum(1 for r in beasts if int(r.get("active") or 0)),
+                    "awakened_artifacts": sum(1 for r in artifacts if int(r.get("awakened") or 0)),
+                    "properties": len(abodes) + len(sect_abodes) + len(personal_worlds),
+                    "deployed_arrays": len(arrays),
+                },
+                "professions": professions, "alchemy": alchemy, "alchemy_batches": batches,
+                "spirit_beasts": beasts, "artifact_bonds": artifacts, "cave_abodes": abodes,
+                "sect_abodes": sect_abodes, "personal_worlds": personal_worlds,
+                "deployed_arrays": arrays, "equipment": equipment,
+            }
+
+    async def exploration(self) -> dict[str, Any]:
+        async with self._connect() as db:
+            events = await self._fetchall_if_table(
+                db, "exploration_events",
+                """SELECT e.*,
+                          (SELECT COUNT(*) FROM exploration_event_participants p WHERE p.event_id=e.event_id) AS participants
+                   FROM exploration_events e
+                   ORDER BY (e.state='active') DESC,e.created_game_minute DESC,e.updated_at DESC LIMIT 200""",
+            )
+            participants = await self._fetchall_if_table(
+                db, "exploration_event_participants",
+                """SELECT p.*,c.name AS player_name,e.title,e.location FROM exploration_event_participants p
+                   JOIN characters c ON c.user_id=p.user_id JOIN exploration_events e ON e.event_id=p.event_id
+                   ORDER BY p.joined_game_minute DESC LIMIT 250""",
+            )
+            secret_realms = await self._fetchall_if_table(
+                db, "secret_realm_runs",
+                """SELECT r.*,c.name AS player_name,c.location FROM secret_realm_runs r JOIN characters c ON c.user_id=r.user_id
+                   ORDER BY r.active DESC,r.expires_at DESC LIMIT 150""",
+            )
+            discoveries = await self._fetchall_if_table(
+                db, "character_location_discoveries",
+                """SELECT d.*,c.name AS player_name FROM character_location_discoveries d
+                   JOIN characters c ON c.user_id=d.user_id
+                   ORDER BY d.discovered_game_minute DESC,d.created_at DESC LIMIT 250""",
+            )
+            beast_encounters = await self._fetchall_if_table(
+                db, "wild_beast_encounters",
+                """SELECT w.*,c.name AS player_name FROM wild_beast_encounters w JOIN characters c ON c.user_id=w.user_id
+                   ORDER BY (w.status='active') DESC,w.created_game_minute DESC LIMIT 150""",
+            )
+            caravans = await self._fetchall_if_table(
+                db, "caravans",
+                """SELECT c.*,o.escort_strength,o.concealment,o.smuggling,o.tax_rate,o.toll_paid,o.intercepted,
+                          o.seized,o.payout_final,o.outcome,o.resolved_game_minute
+                   FROM caravans c LEFT JOIN caravan_operations o ON o.caravan_id=c.caravan_id
+                   ORDER BY (c.status='traveling') DESC,c.depart_game_minute DESC,c.caravan_id DESC LIMIT 180""",
+            )
+            expeditions = await self._fetchall_if_table(
+                db, "expedition_threads",
+                """SELECT e.*,c.name AS player_name FROM expedition_threads e JOIN characters c ON c.user_id=e.user_id
+                   ORDER BY e.updated_at DESC LIMIT 150""",
+            )
+            return {
+                "summary": {
+                    "active_events": sum(1 for r in events if str(r.get("state")) == "active"),
+                    "active_secret_realms": sum(1 for r in secret_realms if int(r.get("active") or 0)),
+                    "discoveries_shown": len(discoveries),
+                    "active_beast_encounters": sum(1 for r in beast_encounters if str(r.get("status")) == "active"),
+                    "traveling_caravans": sum(1 for r in caravans if str(r.get("status")) == "traveling"),
+                },
+                "events": events, "participants": participants, "secret_realms": secret_realms,
+                "discoveries": discoveries, "wild_beast_encounters": beast_encounters,
+                "caravans": caravans, "expedition_threads": expeditions,
+            }
+
+    async def economy(self) -> dict[str, Any]:
+        async with self._connect() as db:
+            markets = await self._fetchall_if_table(
+                db, "economy_markets",
+                """SELECT * FROM economy_markets
+                   ORDER BY ABS(price_index-1.0) DESC,demand DESC,supply ASC,location,item_id LIMIT 300""",
+            )
+            economy_events = await self._fetchall_if_table(
+                db, "economy_events",
+                "SELECT * FROM economy_events ORDER BY game_minute DESC,event_id DESC LIMIT 160",
+            )
+            auctions = await self._fetchall_if_table(
+                db, "auctions",
+                """SELECT a.*,seller.name AS seller_name,bidder.name AS bidder_name,
+                          (SELECT COUNT(*) FROM auction_bids b WHERE b.auction_id=a.auction_id) AS bid_count
+                   FROM auctions a JOIN characters seller ON seller.user_id=a.seller_user_id
+                   LEFT JOIN characters bidder ON bidder.user_id=a.current_bidder_user_id
+                   ORDER BY a.active DESC,a.ends_at DESC,a.auction_id DESC LIMIT 180""",
+            )
+            black_posts = await self._fetchall_if_table(
+                db, "black_market_posts",
+                "SELECT * FROM black_market_posts ORDER BY active DESC,heat DESC,world_name",
+            )
+            black_stock = await self._fetchall_if_table(
+                db, "black_market_stock",
+                "SELECT * FROM black_market_stock ORDER BY world_name,legal_status DESC,unit_price DESC LIMIT 250",
+            )
+            crimes = await self._fetchall_if_table(
+                db, "crime_records",
+                """SELECT cr.*,c.name AS player_name FROM crime_records cr JOIN characters c ON c.user_id=cr.user_id
+                   ORDER BY (cr.status='open') DESC,cr.severity DESC,cr.created_game_minute DESC LIMIT 180""",
+            )
+            return {
+                "summary": {
+                    "markets": len(markets),
+                    "active_auctions": sum(1 for r in auctions if int(r.get("active") or 0)),
+                    "active_black_markets": sum(1 for r in black_posts if int(r.get("active") or 0)),
+                    "open_crimes": sum(1 for r in crimes if str(r.get("status")) == "open"),
+                },
+                "markets": markets, "events": economy_events, "auctions": auctions,
+                "black_market_posts": black_posts, "black_market_stock": black_stock, "crimes": crimes,
+            }
+
+    async def dynasties(self) -> dict[str, Any]:
+        async with self._connect() as db:
+            reincarnation = await self._fetchall_if_table(
+                db, "reincarnation_state",
+                """SELECT r.*,c.name AS current_name,c.discord_name FROM reincarnation_state r
+                   LEFT JOIN characters c ON c.user_id=r.user_id
+                   ORDER BY r.active DESC,r.death_game_minute DESC LIMIT 150""",
+            )
+            soul_legacy = await self._fetchall_if_table(
+                db, "soul_legacy",
+                """SELECT s.*,c.name AS player_name FROM soul_legacy s JOIN characters c ON c.user_id=s.user_id
+                   ORDER BY s.incarnation_count DESC,s.legacy_points DESC,c.name LIMIT 150""",
+            )
+            history = await self._fetchall_if_table(
+                db, "samsara_dynasty_history",
+                """SELECT h.*,c.name AS player_name,c.discord_name FROM samsara_dynasty_history h
+                   LEFT JOIN characters c ON c.user_id=h.user_id
+                   ORDER BY h.created_game_minute DESC,h.history_id DESC LIMIT 250""",
+            )
+            leads = await self._fetchall_if_table(
+                db, "samsara_ancestral_leads",
+                """SELECT l.*,c.name AS player_name,h.source_family_name,h.destination_family_name
+                   FROM samsara_ancestral_leads l LEFT JOIN characters c ON c.user_id=l.user_id
+                   LEFT JOIN samsara_dynasty_history h ON h.history_id=l.history_id
+                   ORDER BY CASE l.status WHEN 'discovered' THEN 0 WHEN 'active' THEN 0 WHEN 'hidden' THEN 2 ELSE 1 END,
+                            l.danger DESC,l.created_game_minute DESC LIMIT 300""",
+            )
+            quests = await self._fetchall_if_table(
+                db, "samsara_investigation_quests",
+                """SELECT q.*,c.name AS player_name,l.name AS lead_name,l.location
+                   FROM samsara_investigation_quests q LEFT JOIN characters c ON c.user_id=q.user_id
+                   LEFT JOIN samsara_ancestral_leads l ON l.lead_id=q.lead_id
+                   ORDER BY CASE q.status WHEN 'active' THEN 0 WHEN 'available' THEN 1 WHEN 'locked' THEN 3 ELSE 2 END,
+                            q.created_game_minute DESC LIMIT 300""",
+            )
+            claims = await self._fetchall_if_table(
+                db, "samsara_dynasty_claims",
+                """SELECT cl.*,c.name AS player_name FROM samsara_dynasty_claims cl
+                   LEFT JOIN characters c ON c.user_id=cl.user_id
+                   ORDER BY CASE cl.status WHEN 'contested' THEN 0 WHEN 'pending' THEN 1 ELSE 2 END,
+                            cl.legitimacy DESC,cl.created_game_minute DESC LIMIT 220""",
+            )
+            conflicts = await self._fetchall_if_table(
+                db, "samsara_dynasty_conflicts",
+                """SELECT cf.*,c.name AS player_name,cl.dynasty_name,cl.claim_type
+                   FROM samsara_dynasty_conflicts cf LEFT JOIN characters c ON c.user_id=cf.user_id
+                   LEFT JOIN samsara_dynasty_claims cl ON cl.claim_id=cf.claim_id
+                   ORDER BY (cf.status='active') DESC,cf.created_game_minute DESC LIMIT 200""",
+            )
+            return {
+                "summary": {
+                    "active_reincarnations": sum(1 for r in reincarnation if int(r.get("active") or 0)),
+                    "dynasty_records": len(history),
+                    "open_leads": sum(1 for r in leads if str(r.get("status")) not in {"resolved", "closed"}),
+                    "active_quests": sum(1 for r in quests if str(r.get("status")) in {"active", "available"}),
+                    "contested_claims": sum(1 for r in claims if str(r.get("status")) == "contested"),
+                    "active_conflicts": sum(1 for r in conflicts if str(r.get("status")) == "active"),
+                },
+                "reincarnation": reincarnation, "soul_legacy": soul_legacy, "history": history,
+                "leads": leads, "quests": quests, "claims": claims, "conflicts": conflicts,
+            }
+
     async def rag(self, *, limit: int = 150, q: str = "", user_id: int | None = None, npc: str = "") -> dict[str, Any]:
         limit = max(1, min(400, int(limit)))
         clauses = ["1=1"]
@@ -476,6 +910,7 @@ class AdminDashboardController:
         "world.advance_time": "admin.world.advance_time",
         "player.grant_currency": "admin.player.grant_currency",
         "player.karma": "admin.player.karma",
+        "player.fate": "admin.player.fate",
         "player.teleport": "admin.player.teleport",
         "player.revive": "admin.player.revive",
         "player.clear_battle": "admin.player.clear_battle",
@@ -745,6 +1180,8 @@ class DashboardServer:
                 return
             if path == "/api/overview":
                 await self._send_json(writer, 200, await self.store.overview()); return
+            if path == "/api/capabilities":
+                await self._send_json(writer, 200, await self.store.capabilities()); return
             if path == "/api/timeline":
                 await self._send_json(writer, 200, await self.store.timeline(
                     limit=_qint(query, "limit", 100), q=_q(query, "q"), event_type=_q(query, "event_type"), visibility=_q(query, "visibility")
@@ -766,6 +1203,22 @@ class DashboardServer:
                 await self._send_json(writer, 200, await self.store.events()); return
             if path == "/api/players":
                 await self._send_json(writer, 200, await self.store.players(limit=_qint(query, "limit", 200))); return
+            if path == "/api/cultivation":
+                await self._send_json(writer, 200, await self.store.cultivation()); return
+            if path == "/api/crafting":
+                await self._send_json(writer, 200, await self.store.crafting()); return
+            if path == "/api/exploration":
+                await self._send_json(writer, 200, await self.store.exploration()); return
+            if path == "/api/economy":
+                await self._send_json(writer, 200, await self.store.economy()); return
+            if path == "/api/dynasties":
+                await self._send_json(writer, 200, await self.store.dynasties()); return
+            if path == "/api/party":
+                await self._send_json(writer, 200, await self.store.party()); return
+            if path == "/api/pvp":
+                await self._send_json(writer, 200, await self.store.pvp()); return
+            if path == "/api/conditions":
+                await self._send_json(writer, 200, await self.store.conditions()); return
             if path == "/api/rag":
                 uid_raw = _q(query, "user_id")
                 uid = int(uid_raw) if uid_raw.isdigit() else None

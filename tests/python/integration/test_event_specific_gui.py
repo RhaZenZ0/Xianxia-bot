@@ -33,7 +33,7 @@ class EventSpecificGuiPersistenceTests(unittest.IsolatedAsyncioTestCase):
         self.tmp.cleanup()
 
     def test_schema_is_v17(self):
-        self.assertEqual(SCHEMA_VERSION, 22)
+        self.assertEqual(SCHEMA_VERSION, 24)
 
 
 if __name__ == "__main__":

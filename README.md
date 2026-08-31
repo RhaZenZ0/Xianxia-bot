@@ -8,8 +8,8 @@ Version **0.18** completes the staged authority cleanup: forage/crafting/compani
 unified lifespan, multi-hop road travel, caravan mechanics, dashboard-owned Discord setup, and removal
 of obsolete Python mechanical authority paths. The release uses schema **22**.
 
-See `V018_RELEASE_NOTES.md`, `V018_RELEASE_VALIDATION.md`, and
-`V018_RELEASE_SECURITY_LOAD_AUDIT.md`.
+See `V018_RELEASE_NOTES.md` and `V018_BUILD_HISTORY.md`
+(consolidated validation/audit record).
 
 ## Release architecture
 
@@ -295,9 +295,16 @@ The dashboard contains:
 6. **Conflicts** — wars, battles, feuds, grudges, bounties/hunters and boss encounters.
 7. **World Events** — active phenomena, civilization regions/incidents and eras.
 8. **Player Activity** — player state, persistent world actions and scene activity.
-9. **RAG Memory** — memories, salience, recall counts and metadata.
-10. **Autonomous Decisions** — NPC goals/mood/activity plus simulation-generated historical outcomes.
-11. **Admin Console** — authoritative world/player/simulation/database controls.
+9. **Cultivation** — spiritual-root grade/purity/elements/refinement, bloodlines, physiques, Dao/law progress, tribulations, realm perfection and seclusion.
+10. **Crafting & Assets** — profession progress, alchemy/toxicity/batches, spirit beasts, artifact bonds, player/sect properties, personal worlds, formations and equipment.
+11. **Exploration** — exploration events/participants, secret-realm runs, location discoveries, wild-beast encounters, caravans and expedition threads.
+12. **Economy** — dynamic markets, economy events, auctions, black markets/stock and crime records.
+13. **Samsara Dynasties** — reincarnation state, soul legacy, dynasty history, ancestral leads, investigation quests, claims and persistent dynasty conflicts.
+14. **RAG Memory** — memories, salience, recall counts and metadata.
+15. **Autonomous Decisions** — NPC goals/mood/activity plus simulation-generated historical outcomes.
+16. **Admin Console** — authoritative world/player/simulation/database controls.
+
+`/api/capabilities` publishes the dashboard API/schema coverage contract. The regression suite compares browser API references, navigation loaders and the backend endpoint registry, and performs authenticated HTTP smoke tests for the newer-system endpoints so frontend/backend drift fails CI instead of appearing as a broken dashboard tab.
 
 ### Real admin actions
 
@@ -624,6 +631,14 @@ Run everything:
 ```bash
 pytest -q
 ```
+
+Dashboard implementation is part of the standard release gate. To run that contract directly:
+
+```bash
+python scripts/check_dashboard_implementation.py
+```
+
+This check fails on frontend/backend API drift, missing dashboard loaders/views/routes, or a schema version that has not been explicitly reviewed for dashboard coverage.
 
 Or target one ownership layer:
 

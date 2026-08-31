@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"xianxia/core/internal/eventledger"
@@ -109,18 +110,46 @@ func loadTribulationCharacter(conn *storage.Conn, userID int64) (tribulationChar
 	x := r.Rows[0]
 	return tribulationCharacter{storage.ParseInt(x[0]), storage.ParseInt(x[1]), storage.ParseInt(x[2]), storage.ParseInt(x[3]), storage.ParseInt(x[4]), storage.ParseInt(x[5]), storage.ParseInt(x[6])}, nil
 }
-func eligibleTribulation(c tribulationCharacter) (tribulationGate, string, bool) {
-	if c.Phase == 9 {
-		if g, ok := tribulationGates[c.Realm]; ok {
-			return g, "Qi", true
-		}
+func tribulationGateFor(phase, realm int64) (tribulationGate, bool) {
+	if phase != 9 {
+		return tribulationGate{}, false
 	}
-	if c.BodyPhase == 9 {
-		if g, ok := tribulationGates[c.BodyRealm]; ok {
-			return g, "Body", true
+	g, ok := tribulationGates[realm]
+	return g, ok
+}
+
+// eligibleTribulation resolves which gate/path a tribulation action should act
+// on. A dual cultivator can, in principle, be simultaneously bottlenecked on
+// both the qi and body paths at once (each at phase 9 of its own gate realm) -
+// those are tracked as independent tribulation_state rows keyed by realm, so
+// neither should be permanently inaccessible just because the other exists.
+// requestedPath ("qi" or "body", case-insensitive) lets the caller pick which
+// one to act on when both are eligible; an empty/unrecognized value keeps the
+// historical default of preferring qi, so existing callers that don't send a
+// path are unaffected.
+func eligibleTribulation(c tribulationCharacter, requestedPath string) (tribulationGate, string, bool) {
+	qiGate, qiOK := tribulationGateFor(c.Phase, c.Realm)
+	bodyGate, bodyOK := tribulationGateFor(c.BodyPhase, c.BodyRealm)
+	switch strings.ToLower(strings.TrimSpace(requestedPath)) {
+	case "body":
+		if bodyOK {
+			return bodyGate, "Body", true
 		}
+		return tribulationGate{}, "", false
+	case "qi":
+		if qiOK {
+			return qiGate, "Qi", true
+		}
+		return tribulationGate{}, "", false
+	default:
+		if qiOK {
+			return qiGate, "Qi", true
+		}
+		if bodyOK {
+			return bodyGate, "Body", true
+		}
+		return tribulationGate{}, "", false
 	}
-	return tribulationGate{}, "", false
 }
 func tribulationCurrency(world string) string {
 	switch world {
@@ -136,7 +165,8 @@ func tribulationCurrency(world string) string {
 }
 
 type tribulationPayload struct {
-	GameMinute int64 `json:"game_minute"`
+	GameMinute int64  `json:"game_minute"`
+	Path       string `json:"path"`
 }
 
 func tribulationState(conn *storage.Conn, userID, realm int64) (prep, attempts int64, cleared bool, err error) {
@@ -161,7 +191,7 @@ func tribulationPrepareAction(conn *storage.Conn, catalog worlddata.Catalog, use
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
-	gate, path, ok := eligibleTribulation(c)
+	gate, path, ok := eligibleTribulation(c, p.Path)
 	if !ok {
 		return authoritativeMutation{}, errors.New("not at a world-crossing ascension gate")
 	}
@@ -215,7 +245,7 @@ func tribulationAttemptAction(conn *storage.Conn, catalog worlddata.Catalog, use
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
-	gate, path, ok := eligibleTribulation(c)
+	gate, path, ok := eligibleTribulation(c, p.Path)
 	if !ok {
 		return authoritativeMutation{}, errors.New("not at a world-crossing tribulation gate")
 	}
@@ -315,10 +345,6 @@ func tribulationAttemptAction(conn *storage.Conn, catalog worlddata.Catalog, use
 	fate := int64(-1)
 	if success {
 		if err = adjustReputationGo(conn, userID, "Heavenly Recognition", 8, "cleared:"+gate.Name); err != nil {
-			return authoritativeMutation{}, err
-		}
-		fate, err = addFateGo(conn, userID, "tribulation_cleared:"+gate.Name, p.GameMinute)
-		if err != nil {
 			return authoritativeMutation{}, err
 		}
 		fate, err = addFateGo(conn, userID, "tribulation_cleared:"+gate.Name, p.GameMinute)

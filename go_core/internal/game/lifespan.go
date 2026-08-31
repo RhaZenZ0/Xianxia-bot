@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
+	"xianxia/core/internal/eventledger"
 	lifespanmodel "xianxia/core/internal/lifespan"
 	"xianxia/core/internal/storage"
 )
@@ -423,5 +425,83 @@ func playerLifespanStatus(
 		AgingPaused:                 clock.AgingPaused,
 		PausedGameMinutes:           clock.PausedGameMinutes,
 		InactivityPauseAfterSeconds: int64(playerLifespanInactivityPauseAfter / time.Second),
+	}, nil
+}
+
+// Defaults mirror REINCARNATION_BASE_SAMSARA_YEARS / REINCARNATION_MAX_WAIT_SECONDS
+// in app/config.py, since an automatic old-age death has no caller payload to
+// take these from.
+const oldAgeDeathBaseSamsaraYears int64 = 320
+const oldAgeDeathMaxWaitSeconds int64 = 300
+
+// checkPlayerOldAgeDeathTx evaluates whether a living player character has
+// exceeded their (activity-paused) natural lifespan and, if so, routes them
+// through the same true-death/samsara pipeline as a player-initiated death.
+// It uses the activity-paused effective game minute from playerLifespanClock:
+// world time that elapsed while the player was inactive for longer than
+// playerLifespanInactivityPauseAfter never counts toward this check, so a
+// long-absent character is paused, not silently aged to death while no one
+// was there to respond. Returns nil, nil when no death occurs (character
+// missing, already deceased, still within lifespan, or missing the
+// birth-family record the samsara pipeline requires - that last case is left
+// for a player-initiated lifecycle.true_death call to surface properly
+// instead of silently blocking whatever unrelated action triggered this
+// check).
+func checkPlayerOldAgeDeathTx(conn *storage.Conn, userID, currentGameMinute int64, now time.Time) (*authoritativeMutation, error) {
+	res, err := conn.Execute(
+		`SELECT life_status,realm_index,phase,body_realm_index,body_phase,natural_lifespan_years,
+		        life_extension_years,created_game_minute,age_at_creation_years
+		   FROM characters WHERE user_id=?`,
+		[]any{userID},
+	)
+	if err != nil {
+		return nil, err
+	}
+	row := firstRowMap(res)
+	if row == nil || fmt.Sprint(row["life_status"]) != "alive" {
+		return nil, nil
+	}
+	subject := lifespanmodel.Subject{
+		RealmIndex:         i64(row["realm_index"]),
+		Phase:              i64(row["phase"]),
+		BodyRealmIndex:     i64(row["body_realm_index"]),
+		BodyPhase:          i64(row["body_phase"]),
+		NaturalYears:       i64(row["natural_lifespan_years"]),
+		ExtensionYears:     i64(row["life_extension_years"]),
+		BirthGameMinute:    i64(row["created_game_minute"]),
+		AgeAtCreationYears: i64(row["age_at_creation_years"]),
+	}
+	clock, err := playerLifespanClock(conn, userID, currentGameMinute, now)
+	if err != nil {
+		return nil, err
+	}
+	if !lifespanmodel.OldAgeExpired(subject, clock.EffectiveGameMinute) {
+		return nil, nil
+	}
+	out, err := recordTrueDeathAuthoritative(conn, userID, trueDeathPayload{
+		GameMinute:       clock.EffectiveGameMinute,
+		Reason:           "old_age",
+		MinutesPerYear:   minutesPerYear,
+		BaseSamsaraYears: oldAgeDeathBaseSamsaraYears,
+		MaxWaitSeconds:   oldAgeDeathMaxWaitSeconds,
+	})
+	if err != nil {
+		if strings.Contains(err.Error(), "birth family") {
+			return nil, nil
+		}
+		return nil, err
+	}
+	actor := userID
+	return &authoritativeMutation{
+		Result: out,
+		Event: eventledger.Event{
+			Domain:     "lifecycle",
+			EventType:  "true_death",
+			EntityType: "character",
+			EntityID:   fmt.Sprint(userID),
+			ActorID:    &actor,
+			GameMinute: clock.EffectiveGameMinute,
+			Payload:    out,
+		},
 	}, nil
 }

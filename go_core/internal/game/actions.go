@@ -63,6 +63,8 @@ func ApplyWithWorld(databasePath, worldPath string, req ActionRequest) (ActionRe
 		result, err = adminGrantCurrency(conn, req.ActorID, req.Payload)
 	case "admin.player.karma":
 		result, err = adminKarma(conn, req.ActorID, req.Payload)
+	case "admin.player.fate":
+		result, err = adminFate(conn, req.ActorID, req.Payload)
 	case "admin.player.teleport":
 		result, err = adminTeleport(conn, req.ActorID, req.Payload)
 	case "admin.player.revive":
@@ -636,6 +638,72 @@ func adminKarma(conn *storage.Conn, adminUserID int64, raw json.RawMessage) (any
 		return nil, err
 	}
 	return map[string]any{"user_id": uid, "name": row["name"], "karma_score": after, "delta": delta}, nil
+}
+
+// adminFate lets a GM grant or deduct Fate outside the automatic canonical
+// triggers (spendFateGo on an averted true death, addFateGo on meaningful
+// mercy or clearing a tribulation). It reuses the same adjustFateGo
+// primitive those triggers use - clamped to 0-9, and recorded in
+// fate_ledger - so a manual grant shows up in the player's own /fate
+// history exactly like an automatic one, distinguishable only by its reason
+// text.
+func adminFate(conn *storage.Conn, adminUserID int64, raw json.RawMessage) (any, error) {
+	p, err := decodeMap(raw)
+	if err != nil {
+		return nil, err
+	}
+	uid, err := requiredInt(p, "user_id")
+	if err != nil {
+		return nil, err
+	}
+	delta, err := requiredInt(p, "delta")
+	if err != nil {
+		return nil, err
+	}
+	if uid <= 0 || delta < -9 || delta > 9 {
+		return nil, errors.New("invalid user_id or fate delta")
+	}
+	if err := begin(conn); err != nil {
+		return nil, err
+	}
+	defer func() {
+		if conn.InTransaction() {
+			rollback(conn)
+		}
+	}()
+	gameMinute, err := canonicalWorldGameMinute(conn)
+	if err != nil {
+		return nil, err
+	}
+	res, err := conn.Execute(`SELECT name FROM characters WHERE user_id=?`, []any{uid})
+	if err != nil {
+		return nil, err
+	}
+	row := firstRowMap(res)
+	if row == nil {
+		return nil, errors.New("character not found")
+	}
+	beforeRes, err := conn.Execute(`SELECT points FROM character_fate WHERE user_id=?`, []any{uid})
+	if err != nil {
+		return nil, err
+	}
+	before := int64(0)
+	if beforeRow := firstRowMap(beforeRes); beforeRow != nil {
+		before = i64(beforeRow["points"])
+	}
+	now := float64(time.Now().UnixNano()) / 1e9
+	reason := strings.TrimSpace(fmt.Sprint(p["reason"]))
+	after, err := adjustFateGo(conn, uid, delta, firstNonempty(reason, "GM dashboard fate adjustment"), gameMinute, now)
+	if err != nil {
+		return nil, err
+	}
+	if err := auditAdmin(conn, adminUserID, "admin.player.fate", fmt.Sprintf("user:%d", uid), map[string]any{"points": before}, map[string]any{"points": after, "delta": delta}, reason); err != nil {
+		return nil, err
+	}
+	if err := conn.Commit(); err != nil {
+		return nil, err
+	}
+	return map[string]any{"user_id": uid, "name": row["name"], "points": after, "delta": delta}, nil
 }
 
 func adminTeleport(conn *storage.Conn, adminUserID int64, raw json.RawMessage) (any, error) {

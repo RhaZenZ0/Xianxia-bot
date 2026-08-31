@@ -398,8 +398,8 @@ func checkAscensionGate(conn *storage.Conn, oldWorld, newWorld string, userID, r
 	}
 	return nil
 }
-func completedPerfection(conn *storage.Conn, table string, userID int64) (bool, error) {
-	return boolRow(conn, fmt.Sprintf(`SELECT 1 FROM %s WHERE user_id=? AND completed=1 LIMIT 1`, table), []any{userID})
+func completedPerfection(conn *storage.Conn, table string, userID, realm int64) (bool, error) {
+	return boolRow(conn, fmt.Sprintf(`SELECT 1 FROM %s WHERE user_id=? AND realm_index=? AND completed=1 LIMIT 1`, table), []any{userID, realm})
 }
 func awakenSoulMemoryGo(conn *storage.Conn, userID, amount int64, now float64) (map[string]any, error) {
 	res, err := conn.Execute(`SELECT memory_seed,awakened_memory FROM soul_legacy WHERE user_id=?`, []any{userID})
@@ -503,7 +503,7 @@ func cultivationBreakthrough(conn *storage.Conn, catalog worlddata.Catalog, user
 	if err = checkAscensionGate(conn, oldWorld, newWorld, userID, realm); err != nil {
 		return authoritativeMutation{}, err
 	}
-	perfect, err := completedPerfection(conn, perfectionTable, userID)
+	perfect, err := completedPerfection(conn, perfectionTable, userID, realm)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}

@@ -23,10 +23,24 @@ The final release gate additionally:
 
 ## Validation
 
-See:
-- `V018_RELEASE_VALIDATION.md`
-- `V018_RELEASE_SECURITY_LOAD_AUDIT.md`
-- `V018_RELEASE_NOTES.md`
+See `V019_RELEASE_NOTES.md` for the current release and `V018_BUILD_HISTORY.md`
+for the consolidated prior build/validation record.
 
-Release version: 0.18.
-Schema version: 22.
+Release version: 0.19.
+Schema version: 24 (unchanged from v0.18).
+
+## Samsara dynasty extension
+
+The v0.18 patch line now includes persistent cross-incarnation ancestry, ancestral investigation
+sites/quests, evidence-gated inheritance/restoration/revenge claims, and replacement-house legacy
+conflicts. Replacement families remain blood-unrelated when the historical branch is extinct.
+
+## v0.19 — Stage 18 consistency/coverage pass, folded into this release
+
+On top of the v0.18 release above, v0.19 (see `V019_RELEASE_NOTES.md`) adds: real old-age
+death enforcement (previously display-only), a fixed dynasty-quest RNG gap and a
+dynasty-conflict rounds-based balance fix, a GM fate-grant path (`admin.player.fate`), five
+closed dashboard coverage gaps (household threads/occupants, Party & Formations, PvP,
+Conditions), the `npc.lifespan` query wired into Discord's NPC inspect command, a
+package-wide RNG/IDOR/canonical-time audit, and a full cultivation-depth audit (realm
+breakthroughs, tribulations, aptitude, techniques) that found and fixed five further bugs.

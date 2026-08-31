@@ -105,6 +105,13 @@ SETTINGS = Settings.from_env()
 GUILD = discord.Object(id=SETTINGS.guild_id)
 ROOT = Path(__file__).resolve().parents[2]
 WORLD = World(ROOT / "content" / "world.json")
+
+# Optional landmark art shown exactly when a character first reaches/discovers
+# the associated location. Keep this mapping small and explicit so adding art
+# never changes canonical world/discovery mechanics.
+LOCATION_DISCOVERY_IMAGES: dict[str, Path] = {
+    "Azure Crown Imperial City": ROOT / "assets" / "locations" / "azure_crown_imperial_city.png",
+}
 ENGINE = GameEngineClient(
     SETTINGS.game_engine_url, timeout_seconds=SETTINGS.game_engine_timeout_seconds
 )
@@ -312,6 +319,76 @@ async def reply_long(interaction: discord.Interaction, text: str, *, ephemeral: 
         await interaction.followup.send(chunks[0], ephemeral=False)
     for chunk in chunks[1:]:
         await interaction.followup.send(chunk, ephemeral=False)
+
+
+def location_discovery_image_path(location: str) -> Path | None:
+    path = LOCATION_DISCOVERY_IMAGES.get(str(location))
+    return path if path is not None and path.is_file() else None
+
+
+def location_discovery_embed(location: str, *, filename: str) -> discord.Embed:
+    world_name = str((WORLD.locations.get(str(location)) or {}).get("world") or "Mortal World")
+    embed = discord.Embed(
+        title=f"🏙️ First Sight — {location}",
+        description=(
+            f"For the first time, **{location}** opens before you — the central city of the **{world_name}**."
+            if str(location) == "Azure Crown Imperial City"
+            else f"For the first time, **{location}** opens before you."
+        ),
+    )
+    embed.set_image(url=f"attachment://{filename}")
+    return embed
+
+
+async def send_location_discovery_image(
+    interaction: discord.Interaction,
+    location: str,
+    *,
+    thread: discord.Thread | None = None,
+) -> bool:
+    """Send configured landmark art without mutating discovery state.
+
+    The caller is responsible for proving this is the character's first
+    canonical discovery/arrival. That keeps image delivery separate from the
+    authoritative Go-owned mechanics.
+    """
+    path = location_discovery_image_path(location)
+    if path is None:
+        return False
+    filename = path.name
+    file = discord.File(path, filename=filename)
+    embed = location_discovery_embed(location, filename=filename)
+    try:
+        if thread is not None:
+            await thread.send(embed=embed, file=file)
+        elif interaction.response.is_done():
+            await interaction.followup.send(embed=embed, file=file, ephemeral=False)
+        else:
+            await interaction.response.send_message(embed=embed, file=file, ephemeral=False)
+        return True
+    except discord.HTTPException:
+        log.exception("Could not send discovery image for %s", location)
+        return False
+
+
+def travel_first_discovers_location(
+    result: dict[str, Any],
+    location: str,
+    *,
+    previously_discovered: bool,
+) -> bool:
+    """True when a successful authoritative travel first records location.
+
+    Road travel records every traversed node, while direct/hub travel records
+    its destination. The pre-action DB check prevents repeat image sends.
+    """
+    if previously_discovered:
+        return False
+    target = str(location)
+    route = [str(x) for x in list(result.get("road_route") or [])]
+    if target in route:
+        return True
+    return str(result.get("destination") or "") == target
 
 
 async def current_world_time():
@@ -1595,6 +1672,19 @@ class CharacterModal(discord.ui.Modal):
         )
         embed.set_footer(text="The authoritative game engine owns mechanics; AI only narrates validated canonical results.")
         await interaction.response.send_message(embed=embed, ephemeral=True)
+        # First-sight art applies to every character, regardless of birthplace.
+        # A character who starts in an illustrated location discovers it here;
+        # everyone else receives the same art only when canonical exploration or
+        # travel later records their first arrival/discovery of that location.
+        if location in LOCATION_DISCOVERY_IMAGES:
+            discovery_art = location_discovery_image_path(location)
+            if discovery_art is not None:
+                filename = discovery_art.name
+                await interaction.followup.send(
+                    embed=location_discovery_embed(location, filename=filename),
+                    file=discord.File(discovery_art, filename=filename),
+                    ephemeral=True,
+                )
 
         # Character creation is the natural point to establish the player's
         # persistent private scene. Previously this was delayed until the first
@@ -5026,6 +5116,10 @@ async def explore(interaction: discord.Interaction) -> None:
     if expedition_thread is not None:
         try:
             await send_long_to_thread(expedition_thread, full_exploration)
+            if discovered_location:
+                await send_location_discovery_image(
+                    interaction, discovered_location, thread=expedition_thread
+                )
             if personal_event_view is not None:
                 await expedition_thread.send(embed=personal_event_view.embed(), view=personal_event_view)
             await interaction.followup.send(f"🧭 Exploration recorded in your private expedition journal: {expedition_thread.mention}", ephemeral=False)
@@ -5039,6 +5133,8 @@ async def explore(interaction: discord.Interaction) -> None:
             interaction, full_exploration + "\n\n⚠️ No private expedition thread is configured. Ask an admin to bind the existing channel in the admin dashboard, then run **/admin → Server → Base Channels → Validate / bind**.",
             ephemeral=False,
         )
+        if discovered_location:
+            await send_location_discovery_image(interaction, discovered_location)
         if personal_event_view is not None:
             await interaction.followup.send(embed=personal_event_view.embed(), view=personal_event_view, ephemeral=False)
 
@@ -5379,6 +5475,8 @@ async def realmhub_go(interaction:discord.Interaction,world:str)->None:
     hub=realm_hub(world)
     if not hub:
         await interaction.response.send_message("Unknown realm capital.",ephemeral=False);return
+    discovery_location = str(hub["location"])
+    previously_discovered = await DB.has_discovered_location(interaction.user.id, discovery_location)
     try:
         envelope=await ENGINE.authoritative_action(
             "exploration.travel",interaction.user.id,
@@ -5393,6 +5491,10 @@ async def realmhub_go(interaction:discord.Interaction,world:str)->None:
         rows=await DB.get_realm_hub_channels(interaction.guild.id); row=next((r for r in rows if str(r['world_name'])==world),None)
         if row: channel_line=f"\n💬 Meet other cultivators in <#{int(row['channel_id'])}>."
     await interaction.response.send_message(f"🏙️ **{c['name']} arrives at {hub['display_name']} — {result.get('world') or world}.**{channel_line}")
+    if travel_first_discovers_location(
+        result, discovery_location, previously_discovered=previously_discovered
+    ):
+        await send_location_discovery_image(interaction, discovery_location)
 
 
 def _world_min_realm_index(world_name: str) -> int:
@@ -5469,6 +5571,11 @@ async def travel(interaction: discord.Interaction, destination: str) -> None:
     c = await require_character(interaction)
     if not c:
         return
+    undiscovered_image_locations = {
+        location
+        for location in LOCATION_DISCOVERY_IMAGES
+        if not await DB.has_discovered_location(interaction.user.id, location)
+    }
     try:
         envelope=await ENGINE.authoritative_action(
             "exploration.travel",interaction.user.id,
@@ -5509,6 +5616,11 @@ async def travel(interaction: discord.Interaction, destination: str) -> None:
     await interaction.response.send_message(
         f"🗺️ **{c['name']} travels to {result.get('destination') or destination}.**\n{desc}{road}{safe}{meeting}"
     )
+    for location in sorted(undiscovered_image_locations):
+        if travel_first_discovers_location(
+            result, location, previously_discovered=False
+        ):
+            await send_location_discovery_image(interaction, location)
 
 
 async def local_npc_autocomplete(
@@ -7304,6 +7416,9 @@ async def _execute_battle_law_technique(interaction: discord.Interaction, battle
             battle_id=int(battle["battle_id"]),
             technique=technique,
             game_minute=wt.total_minutes,
+            minutes_per_year=MINUTES_PER_YEAR,
+            base_samsara_years=SETTINGS.reincarnation_base_samsara_years,
+            max_wait_seconds=SETTINGS.reincarnation_max_wait_seconds,
             action_id=f"discord:{interaction.id}:combat.technique:{int(battle['battle_id'])}:{technique}",
         )
     except GameEngineError as exc:
@@ -7322,6 +7437,36 @@ async def _execute_battle_law_technique(interaction: discord.Interaction, battle
             lines.append("Your Law dominates the local rules of the exchange.")
     else:
         lines.append("The opponent resists or tears free of your spatial authority.")
+    if result.get("opponent_defeated"):
+        return "\n".join(lines)
+    if result.get("counter_suppressed"):
+        lines.append("🌌 Opponent counter suppressed by spatial control.")
+    elif result.get("counter_roll"):
+        lines.append(f"**Opponent counter:** {roll_line(SimpleNamespace(**dict(result['counter_roll'])))}")
+    if int(result.get("damage_taken", 0)):
+        lines.append(f"🩸 You take **{int(result['damage_taken'])}** damage.")
+    if str(result.get("status")) == "lost":
+        injury = dict(result.get("injury") or {})
+        if result.get("fate_rescue"):
+            lines.append(
+                f"🌠 **FATE DEFIES DEATH.** A thread of providence snaps instead of your soul. You survive at **1 Vitality** with "
+                f"**{injury.get('name','a grave injury')}** (severity **{int(injury.get('severity',1))}/5**). Fate remaining: **{int(result.get('fate_remaining',0))}/9**."
+            )
+        elif result.get("true_death"):
+            death = dict(result.get("true_death") or {})
+            await _record_true_death_history(interaction.user.id, death, wt.total_minutes)
+            years = int(death.get("private_years", SETTINGS.reincarnation_base_samsara_years))
+            wait = max(1, int(death.get("real_wait_seconds", SETTINGS.reincarnation_max_wait_seconds)))
+            lines.append(
+                f"☠️ **TRUE DEATH.** Your body and current incarnation are lost. Your soul enters **Samsara** for roughly **{years:,} private years**, "
+                f"compressed into at most **{human_duration(wait)}** of real time. The wheel selected **{str(death.get('target_world') or 'Mortal World')}** as your possible rebirth world. "
+                "The shared world and your old family are not fast-forwarded."
+            )
+        else:
+            lines.append(
+                f"💀 **Defeated.** You survive but are incapacitated and suffer **{injury.get('name','an injury')}** "
+                f"(severity **{int(injury.get('severity',1))}/5**). True death was possible in this battle."
+            )
     return "\n".join(lines)
 
 async def _finish_battle(interaction:discord.Interaction,outcome:str,*,expected_battle_id:int|None=None,edit_panel:bool=False)->None:
@@ -7598,7 +7743,7 @@ async def law_technique_command(interaction:discord.Interaction,technique:str)->
     if technique in {'spatial_lockdown','spatial_strangulation'} and not battle:
         await interaction.response.send_message("That control technique currently requires an active battle target.",ephemeral=False);return
     if battle:
-        result=await _execute_battle_law_technique(interaction.user.id,c,battle,technique)
+        result=await _execute_battle_law_technique(interaction,battle,technique)
         updated=await DB.get_battle(int(battle['battle_id']),user_id=interaction.user.id,active_only=True)
         if not updated:
             await interaction.response.send_message("⌛ This battle has already ended.",ephemeral=False);return
@@ -7862,16 +8007,23 @@ async def tribulation_status(interaction: discord.Interaction) -> None:
     )
 
 
+TRIBULATION_PATH_CHOICES = [
+    app_commands.Choice(name="Qi cultivation", value="qi"),
+    app_commands.Choice(name="Body cultivation", value="body"),
+]
+
+
 @registered_group_command(tribulation_group, name="prepare", description="Spend realm-appropriate currency to prepare a tribulation defense")
+@app_commands.choices(path=TRIBULATION_PATH_CHOICES)
 @serialized_user_action
-async def tribulation_prepare(interaction: discord.Interaction) -> None:
+async def tribulation_prepare(interaction: discord.Interaction, path: app_commands.Choice[str] | None = None) -> None:
     c = await require_character(interaction)
     if not c:
         return
     wt = await current_world_time()
     try:
         envelope = await ENGINE.authoritative_action(
-            "tribulation.prepare", interaction.user.id, {},
+            "tribulation.prepare", interaction.user.id, ({"path": path.value} if path else {}),
             action_id=f"discord:{interaction.id}:tribulation.prepare",
         )
     except GameEngineError as exc:
@@ -7886,15 +8038,16 @@ async def tribulation_prepare(interaction: discord.Interaction) -> None:
 
 
 @registered_group_command(tribulation_group, name="attempt", description="Face the three-wave heavenly tribulation at your current world gate")
+@app_commands.choices(path=TRIBULATION_PATH_CHOICES)
 @serialized_user_action
-async def tribulation_attempt(interaction: discord.Interaction) -> None:
+async def tribulation_attempt(interaction: discord.Interaction, path: app_commands.Choice[str] | None = None) -> None:
     c = await require_character(interaction)
     if not c:
         return
     _, _, wt = await current_effect_modifiers(interaction.user.id)
     try:
         envelope = await ENGINE.authoritative_action(
-            "tribulation.attempt", interaction.user.id, {},
+            "tribulation.attempt", interaction.user.id, ({"path": path.value} if path else {}),
             action_id=f"discord:{interaction.id}:tribulation.attempt",
         )
     except GameEngineError as exc:
@@ -10058,6 +10211,309 @@ async def birth_family_history(interaction:discord.Interaction)->None:
     text=f"📜 **{fam['family_name']} — Recent History**\n"+("\n".join(f"• {x}" for x in history) if history else "No major family events have been recorded yet.")
     await reply_long(interaction,text,ephemeral=False)
 
+@registered_group_command(family_group, name="ancestry", description="Trace persistent family history across your Samsara incarnations")
+async def birth_family_ancestry(
+    interaction: discord.Interaction,
+    limit: app_commands.Range[int, 1, 20] = 10,
+) -> None:
+    if not await require_character(interaction, allow_deceased=True):
+        return
+    rows = await DB.get_samsara_dynasty_history(interaction.user.id, limit=int(limit))
+    if not rows:
+        await interaction.response.send_message(
+            "☸️ No cross-incarnation dynasty transitions have been recorded yet. "
+            "Your first Samsara rebirth will create the first persistent ancestry record.",
+            ephemeral=False,
+        )
+        return
+
+    state_names = {
+        0: "Uninvestigated",
+        1: "Clue Found",
+        2: "Corroborated",
+        3: "Confirmed",
+    }
+    lines = ["🧬 **Persistent Samsara Dynasty History**"]
+    for row in reversed(rows):
+        level = max(0, min(3, int(row.get("investigation_level", 0))))
+        status = str(row.get("lineage_status") or "uncertain_lineage").replace("_", " ").title()
+        history_id = int(row.get("history_id", 0))
+        lines.extend([
+            "",
+            f"**Record #{history_id} — Incarnation {int(row.get('incarnation_number', 0))}**",
+            f"{row.get('source_family_name', 'Unknown')} ({row.get('source_world', 'Unknown')}) → "
+            f"{row.get('destination_family_name', 'Unknown')} ({row.get('destination_world', 'Unknown')})",
+            f"Outcome: **{status}** • Investigation: **{state_names[level]}**",
+            str(row.get("summary") or "No surviving summary."),
+        ])
+        if level >= 3:
+            continuity = "confirmed" if int(row.get("blood_continuity", 0)) else "none — replacement/unrelated line"
+            lines.append(f"Blood continuity: **{continuity}**")
+        evidence = list(row.get("evidence") or [])[:level]
+        if evidence:
+            lines.append("Evidence: " + " | ".join(str(item) for item in evidence))
+    lines.append("\nUse **/family investigate** with a record number to uncover and corroborate its surviving evidence.")
+    await reply_long(interaction, "\n".join(lines), ephemeral=False)
+
+
+@registered_group_command(family_group, name="investigate", description="Investigate an extinct, replaced or surviving Samsara family connection")
+@serialized_user_action
+async def birth_family_investigate(interaction: discord.Interaction, history_id: int = 0) -> None:
+    if not await require_character(interaction):
+        return
+    try:
+        envelope = await ENGINE.authoritative_action(
+            "family.lineage.investigate",
+            interaction.user.id,
+            {"history_id": max(0, int(history_id))},
+            action_id=f"discord:{interaction.id}:family.lineage.investigate",
+        )
+        result = dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}", ephemeral=False)
+        return
+
+    state = str(result.get("investigation_state") or "unknown").replace("_", " ").title()
+    lines = [
+        f"🔎 **Dynasty Investigation — Record #{int(result.get('history_id', 0))}**",
+        f"{result.get('source_family', 'Unknown')} ({result.get('source_world', 'Unknown')}) → "
+        f"{result.get('destination_family', 'Unknown')} ({result.get('destination_world', 'Unknown')})",
+        f"Outcome: **{str(result.get('lineage_status') or 'unknown').replace('_', ' ').title()}**",
+        f"Evidence state: **{state}**",
+    ]
+    evidence = list(result.get("evidence") or [])
+    if evidence:
+        lines.append("\n**Recovered evidence**")
+        lines.extend(f"• {item}" for item in evidence)
+    continuity = str(result.get("blood_continuity") or "not_yet_confirmed")
+    if continuity == "confirmed_ancestral_continuity":
+        lines.append("\n🩸 **Blood continuity confirmed.** The later house descends from the historical branch, but rank/resources remain independent.")
+    elif continuity == "confirmed_no_blood_continuity":
+        lines.append("\n✂️ **No blood continuity.** The later house is a replacement or unrelated family, not a descendant of the extinct line.")
+    else:
+        lines.append("\nBlood continuity remains **unconfirmed**; investigate this record again to strengthen the evidence.")
+
+    leads = list(result.get("ancestral_leads") or [])
+    if leads:
+        lines.append("\n**Ancestral leads**")
+        for lead in leads[:8]:
+            label = str(lead.get("lead_kind") or "lead").replace("_", " ").title()
+            lines.append(
+                f"• **{label}: {lead.get('name', 'Unknown')}** — {lead.get('location', 'Unknown')} "
+                f"({lead.get('world', 'Unknown')}) • danger {int(lead.get('danger', 0))}/100"
+            )
+            if lead.get("retainer_name"):
+                lines.append(f"  Retainer: **{lead.get('retainer_name')}** — {lead.get('retainer_relation', 'ancestral witness')}")
+    quests = [quest for quest in (result.get("investigation_quests") or []) if str(quest.get("status")) != "completed"]
+    if quests:
+        lines.append("\n**Available investigation quests**")
+        for quest in quests[:8]:
+            lines.append(
+                f"• `#{int(quest.get('quest_id', 0))}` **{quest.get('title', 'Investigation')}** — "
+                f"{int(quest.get('progress', 0))}/{int(quest.get('target', 1))}"
+            )
+        lines.append("Use **/family quest** to work an unlocked investigation quest.")
+    await reply_long(interaction, "\n".join(lines), ephemeral=False)
+
+
+@registered_group_command(family_group, name="legacy", description="View ancestral sites, investigation quests, claims and dynasty conflicts")
+async def birth_family_legacy(interaction: discord.Interaction, history_id: int = 0) -> None:
+    if not await require_character(interaction, allow_deceased=True):
+        return
+    state = await DB.get_samsara_legacy_state(interaction.user.id, history_id=max(0, int(history_id)))
+    leads = list(state.get("leads") or [])
+    quests = list(state.get("quests") or [])
+    claims = list(state.get("claims") or [])
+    conflicts = list(state.get("conflicts") or [])
+    if not any((leads, quests, claims, conflicts)):
+        await interaction.response.send_message(
+            "🏚️ No ancestral investigation content has been uncovered yet. Use **/family investigate** on a Samsara ancestry record first.",
+            ephemeral=False,
+        )
+        return
+    lines = ["🏛️ **Ancestral Legacy Ledger**"]
+    if leads:
+        lines.append("\n**Sites & surviving retainers**")
+        for lead in leads[:15]:
+            label = str(lead.get("lead_kind") or "lead").replace("_", " ").title()
+            lines.append(
+                f"• `#{int(lead.get('lead_id', 0))}` **{label}: {lead.get('name', 'Unknown')}** — "
+                f"{lead.get('location', 'Unknown')} • {str(lead.get('status', 'unknown')).replace('_', ' ').title()} "
+                f"• danger {int(lead.get('danger', 0))}/100"
+            )
+            if lead.get("retainer_name"):
+                lines.append(f"  **{lead.get('retainer_name')}** — {lead.get('retainer_relation', 'ancestral witness')}")
+    if quests:
+        lines.append("\n**Investigation quests**")
+        for quest in quests[:15]:
+            hostile = " • ⚔️ hostile cause established" if int(quest.get("hostile_cause", 0)) else ""
+            lines.append(
+                f"• `#{int(quest.get('quest_id', 0))}` **{quest.get('title', 'Investigation')}** — "
+                f"{quest.get('status', 'unknown')} {int(quest.get('progress', 0))}/{int(quest.get('target', 1))}{hostile}"
+            )
+    if claims:
+        lines.append("\n**Dynasty claims**")
+        for claim in claims[:12]:
+            lines.append(
+                f"• `#{int(claim.get('claim_id', 0))}` **{str(claim.get('claim_type', 'claim')).replace('_', ' ').title()}** "
+                f"for {claim.get('dynasty_name', 'Unknown')} — {str(claim.get('status', 'unknown')).replace('_', ' ').title()} "
+                f"• legitimacy {int(claim.get('legitimacy', 0))}/100"
+            )
+            if claim.get("resolution"):
+                lines.append(f"  Resolution: **{str(claim.get('resolution')).replace('_', ' ').title()}**")
+    if conflicts:
+        lines.append("\n**Active / historical conflicts**")
+        for conflict in conflicts[:12]:
+            lines.append(
+                f"• Claim `#{int(conflict.get('claim_id', 0))}` vs **{conflict.get('opponent_name', 'Unknown')}** — "
+                f"{str(conflict.get('status', 'unknown')).title()} • "
+                f"{int(conflict.get('player_progress', 0))} vs {int(conflict.get('opponent_progress', 0))}"
+            )
+            if conflict.get("outcome"):
+                lines.append(f"  {conflict.get('outcome')}")
+    await reply_long(interaction, "\n".join(lines), ephemeral=False)
+
+
+@registered_group_command(family_group, name="quest", description="Work an unlocked ancestral archive, ruin, tomb or retainer investigation")
+@serialized_user_action
+async def birth_family_quest(interaction: discord.Interaction, history_id: int, quest_id: int = 0) -> None:
+    if not await require_character(interaction):
+        return
+    try:
+        envelope = await ENGINE.authoritative_action(
+            "family.lineage.quest",
+            interaction.user.id,
+            {"history_id": max(0, int(history_id)), "quest_id": max(0, int(quest_id))},
+            action_id=f"discord:{interaction.id}:family.lineage.quest",
+        )
+        result = dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}", ephemeral=False)
+        return
+    lines = [
+        f"🧭 **{result.get('title', 'Ancestral Investigation')}**",
+        f"Progress: **{int(result.get('progress', 0))}/{int(result.get('target', 1))}**",
+        f"State: **{str(result.get('status', 'unknown')).replace('_', ' ').title()}**",
+    ]
+    roll = dict(result.get("roll") or {})
+    if roll:
+        attribute = str(result.get("attribute") or "will").replace("_", " ").title()
+        lines.append(
+            f"Check: **{attribute} {int(roll.get('total', 0))} vs TN {int(result.get('difficulty_tn', roll.get('tn', 0)))}** "
+            f"— {str(roll.get('degree') or 'Resolved')} • danger **{int(result.get('danger', 0))}/100**"
+        )
+    if not result.get("success", True):
+        lines.append("❌ The attempt failed to advance the investigation.")
+        if int(result.get("setback", 0)) > 0:
+            lines.append(f"Setback: **-{int(result.get('setback', 0))} progress** from the existing investigation.")
+        if int(result.get("vitality_loss", 0)) > 0:
+            lines.append(f"🩸 The danger was real: **-{int(result.get('vitality_loss', 0))} vitality**.")
+    if result.get("completed"):
+        lines.append(f"Recovered evidence weight: **{int(result.get('reward_evidence', 0))}**")
+        if result.get("hostile_cause"):
+            lines.append(f"⚔️ Corroborated hostile culprit: **{result.get('culprit_name', 'Unknown')}**. A revenge claim is now legally/historically supportable.")
+    await interaction.response.send_message("\n".join(lines), ephemeral=False)
+
+
+@registered_group_command(family_group, name="claim", description="Assert inheritance, restore a fallen dynasty, seek revenge, or challenge a replacement house")
+@app_commands.choices(
+    claim_type=[
+        app_commands.Choice(name="Inheritance", value="inheritance"),
+        app_commands.Choice(name="Dynasty Restoration", value="restoration"),
+        app_commands.Choice(name="Ancestral Revenge", value="revenge"),
+        app_commands.Choice(name="Challenge Replacement Family", value="replacement_challenge"),
+    ]
+)
+@serialized_user_action
+async def birth_family_claim(
+    interaction: discord.Interaction,
+    history_id: int,
+    claim_type: app_commands.Choice[str],
+) -> None:
+    if not await require_character(interaction):
+        return
+    try:
+        envelope = await ENGINE.authoritative_action(
+            "family.dynasty.claim",
+            interaction.user.id,
+            {"history_id": max(0, int(history_id)), "claim_type": claim_type.value},
+            action_id=f"discord:{interaction.id}:family.dynasty.claim",
+        )
+        result = dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}", ephemeral=False)
+        return
+    lines = [
+        f"⚖️ **{str(result.get('claim_type', 'claim')).replace('_', ' ').title()} — {result.get('dynasty_name', 'Unknown')}**",
+        f"Status: **{str(result.get('status', 'unknown')).replace('_', ' ').title()}**",
+        f"Legitimacy: **{int(result.get('legitimacy', 0))}/100** • Support: **{int(result.get('support', 0))}/100** • Opposition: **{int(result.get('opposition', 0))}/100**",
+        f"Blood-based claim: **{'yes' if result.get('blood_based') else 'no'}**",
+    ]
+    if int(result.get("conflict_id", 0)) > 0:
+        lines.append(f"Conflict opened. Use **/family conflict claim_id:{int(result.get('claim_id', 0))}** to contest it.")
+    elif result.get("resolution"):
+        lines.append(f"Resolution: **{str(result.get('resolution')).replace('_', ' ').title()}**")
+    await interaction.response.send_message("\n".join(lines), ephemeral=False)
+
+
+@registered_group_command(family_group, name="conflict", description="Advance an active inheritance, restoration, revenge or replacement-family conflict")
+@app_commands.choices(
+    tactic=[
+        app_commands.Choice(name="Negotiate", value="negotiate"),
+        app_commands.Choice(name="Expose Evidence", value="expose"),
+        app_commands.Choice(name="Rally Supporters", value="rally"),
+        app_commands.Choice(name="Investigate Weakness", value="investigate"),
+        app_commands.Choice(name="Formal Duel", value="duel"),
+    ]
+)
+@serialized_user_action
+async def birth_family_conflict(
+    interaction: discord.Interaction,
+    claim_id: int,
+    tactic: app_commands.Choice[str],
+) -> None:
+    if not await require_character(interaction):
+        return
+    try:
+        envelope = await ENGINE.authoritative_action(
+            "family.dynasty.conflict",
+            interaction.user.id,
+            {"claim_id": max(0, int(claim_id)), "tactic": tactic.value},
+            action_id=f"discord:{interaction.id}:family.dynasty.conflict",
+        )
+        result = dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}", ephemeral=False)
+        return
+    lines = [
+        f"⚔️ **Dynasty Conflict vs {result.get('opponent', 'Unknown')}**",
+        f"Tactic: **{str(result.get('tactic', '')).title()}**",
+    ]
+    player_roll = dict(result.get("player_roll") or {})
+    opponent_roll = dict(result.get("opponent_roll") or {})
+    if player_roll:
+        attribute = str(result.get("attribute") or "will").replace("_", " ").title()
+        lines.append(
+            f"Your check: **{attribute} {int(player_roll.get('total', 0))} vs TN {int(result.get('player_tn', player_roll.get('tn', 0)))}** "
+            f"— {str(player_roll.get('degree') or 'Resolved')}"
+        )
+    if opponent_roll:
+        lines.append(
+            f"Opposition check: **{int(opponent_roll.get('total', 0))} vs TN {int(result.get('opponent_tn', opponent_roll.get('tn', 0)))}** "
+            f"— {str(opponent_roll.get('degree') or 'Resolved')}"
+        )
+    lines.extend([
+        f"Round **{int(result.get('rounds', 0))}**: +{int(result.get('player_gain', 0))} claim pressure / +{int(result.get('opponent_gain', 0))} opposition",
+        f"Progress: **{int(result.get('player_progress', 0))}** vs **{int(result.get('opponent_progress', 0))}**",
+        f"State: **{str(result.get('status', 'active')).title()}**",
+    ])
+    if result.get("outcome"):
+        lines.append(f"\n{result.get('outcome')}")
+        if result.get("resolution"):
+            lines.append(f"Resolution: **{str(result.get('resolution')).replace('_', ' ').title()}**")
+    await interaction.response.send_message("\n".join(lines), ephemeral=False)
+
+
 @registered_group_command(family_group, name="child",description="Add a child to your family branch; descendants may awaken cultivation talent")
 @app_commands.choices(gender=GENDER_CHOICES)
 @serialized_user_action
@@ -11100,6 +11556,17 @@ async def admin_npcinspect(interaction: discord.Interaction, npc: str) -> None:
         lines.append(f"\n🎯 **Current goal:** {sim_state.get('current_goal') or 'No active goal recorded.'} ({sim_state.get('goal_progress',0)}%)")
         if sim_state.get('recent_event'):
             lines.append(f"\n🧠 **Recent autonomous development:** {sim_state.get('recent_event')}")
+    try:
+        lifespan = await ENGINE.action("npc.lifespan", 0, {"npc_name": npc})
+    except GameEngineError:
+        lifespan = None
+    if lifespan:
+        remaining = lifespan.get("remaining_years")
+        ageless = bool(lifespan.get("ageless"))
+        lines.append(
+            f"\n\n⌛ **Lifespan:** age {lifespan.get('age_years','?')} • "
+            f"{'ageless (realm transcends natural lifespan)' if ageless else f'~{remaining} years remaining' if remaining is not None else 'unknown'}"
+        )
     await audit_admin(interaction, "npc.inspect", target=f"npc:{npc}")
     await reply_long(interaction, "".join(lines), ephemeral=False)
 
