@@ -1262,10 +1262,17 @@ class EventSceneView(discord.ui.View):
         text=f"{self.category} {self.event_type}".casefold()
         if not any(x in text for x in ("beast","demon","invasion","tide","attack","war","calamity")):
             await interaction.response.send_message("No event-specific hostile manifestation is currently forcing a battle here. Use **Systems** to inspect other combat mechanics.",ephemeral=False);return
-        ri=max(0,int(c.get("realm_index",0))+max(0,self.severity-5)//3); stage=max(1,min(9,int(c.get("phase",1))+max(0,self.severity-4)//2))
-        hp=max(12,14+ri*5+stage*2+self.severity*2); source=f"event:{self.event_key or self.title}"
-        bid=await DB.create_battle(user_id=interaction.user.id,npc_name=f"{self.title} — hostile manifestation",npc_realm_index=ri,npc_stage=stage,player_hp=max(1,int(c.get("vitality",1))),player_hp_max=max(1,int(c.get("vitality_max",c.get("vitality",1)))),npc_hp=hp,location=str(c.get("location") or ""),source=source,target_key=f"{source}:{interaction.user.id}")
-        battle=await DB.get_active_battle(interaction.user.id); embed,view=await _battle_panel(interaction.user.id,c,battle or {"battle_id":bid,"npc_name":self.title,"npc_realm_index":ri,"npc_stage":stage,"player_hp":c.get("vitality",1),"player_hp_max":c.get("vitality_max",1),"npc_hp":hp,"npc_hp_max":hp,"location":c.get("location","")})
+        source=f"event:{self.event_key or self.title}"
+        try:
+            envelope=await COMBAT.start(
+                interaction.user.id,kind="event",npc_name=f"{self.title} — hostile manifestation",
+                severity=int(self.severity),source=source,target_key=f"{source}:{interaction.user.id}",
+                action_id=f"discord:{interaction.id}:combat.start:{source}",
+            )
+        except GameEngineError as exc:
+            await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
+        result=dict(envelope.get("result") or {}); bid=int(result.get("battle_id") or 0)
+        battle=await DB.get_active_battle(interaction.user.id); embed,view=await _battle_panel(interaction.user.id,c,battle or result)
         await interaction.response.send_message(content=f"⚔️ **Event confrontation #{bid} begins.** Defeating this manifestation contributes to the event; it is not a persistent NPC life.",embed=embed,view=view)
 
     @discord.ui.button(label="Scene Action",emoji="🎭",style=discord.ButtonStyle.success,row=2)
@@ -6963,23 +6970,44 @@ async def use_item_command(interaction: discord.Interaction, item: str) -> None:
         await interaction.response.send_message(f"✨ Spatial storage upgraded to **{item_def.get('name',item)}** — **{upgraded.get('slot_capacity',storage_upgrade.get('slot_capacity',24))} item stacks**.",ephemeral=False)
         return
 
-    if not await DB.consume_item(interaction.user.id, item, 1):
-        await interaction.response.send_message("The item is no longer in your carried inventory.", ephemeral=False)
-        return
-
-    lines=[f"✨ **Used {item_def.get('name', item)}**"]
-
     instant=use.get("instant", {})
-    if instant:
-        state=await DB.restore_resources(
-            interaction.user.id,
-            qi=int(instant.get("qi_restore",0)),
-            vitality=int(instant.get("vitality_restore",0)),
-        )
+    active_battle=await DB.get_active_battle(interaction.user.id) if instant else None
+    lines=[f"✨ **Used {item_def.get('name', item)}**"]
+    if instant and active_battle:
+        # Mid-battle instant restore must go through the authoritative combat
+        # engine, the same as the battle panel's own recovery-item option, so
+        # battles.player_hp stays in lockstep with characters.vitality under
+        # a version-checked mutation instead of Python patching both tables
+        # directly and unguarded. combat.recovery_item also consumes the
+        # item itself, so DB.consume_item must not run in this branch.
+        wt=await current_world_time()
+        try:
+            envelope=await COMBAT.recovery_item(
+                interaction.user.id,battle_id=int(active_battle["battle_id"]),item_id=item,
+                game_minute=wt.total_minutes,
+                action_id=f"discord:{interaction.id}:combat.recovery_item:{int(active_battle['battle_id'])}:{item}",
+            )
+        except GameEngineError as exc:
+            await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
+        state=dict(envelope.get("result") or {})
         if instant.get("qi_restore"):
-            lines.append(f"Qi restored to **{state.get('qi',0)}/{state.get('qi_max',0)}**.")
+            lines.append(f"Qi restored to **{int(state.get('qi',0))}/{int(state.get('qi_max',0))}**.")
         if instant.get("vitality_restore"):
-            lines.append(f"Vitality restored to **{state.get('vitality',0)}/{state.get('vitality_max',0)}**.")
+            lines.append(f"Vitality restored to **{int(state.get('vitality',0))}/{int(state.get('vitality_max',0))}**.")
+    else:
+        if not await DB.consume_item(interaction.user.id, item, 1):
+            await interaction.response.send_message("The item is no longer in your carried inventory.", ephemeral=False)
+            return
+        if instant:
+            state=await DB.restore_resources(
+                interaction.user.id,
+                qi=int(instant.get("qi_restore",0)),
+                vitality=int(instant.get("vitality_restore",0)),
+            )
+            if instant.get("qi_restore"):
+                lines.append(f"Qi restored to **{state.get('qi',0)}/{state.get('qi_max',0)}**.")
+            if instant.get("vitality_restore"):
+                lines.append(f"Vitality restored to **{state.get('vitality',0)}/{state.get('vitality_max',0)}**.")
 
     life_years = max(0, int(use.get("lifespan_years", 0)))
     if life_years:
@@ -7627,18 +7655,17 @@ async def battle_challenge(interaction:discord.Interaction,target:str)->None:
     if not info:
         await interaction.response.send_message("That living NPC/family head is not mechanically present here or cannot be openly challenged.",ephemeral=False);return
     ri=max(0,int(info.get("realm_index",0))); st=max(1,min(9,int(info.get("phase",1))))
-    hp=max(10,12+ri*4+st*2)
     source=f"challenge:{info.get('target_type','npc')}:{info.get('family_id') or info.get('name')}"
     try:
-        bid=await DB.create_battle(
-            user_id=interaction.user.id,npc_name=str(info["name"]),npc_realm_index=ri,npc_stage=st,
-            player_hp=max(1,int(c.get("vitality",1))),player_hp_max=max(1,int(c.get("vitality_max",c.get("vitality",1)))),
-            npc_hp=hp,location=str(c.get("location","")),source=source,target_key=source,
+        envelope=await COMBAT.start(
+            interaction.user.id,kind="challenge",npc_name=str(info["name"]),npc_realm_index=ri,npc_stage=st,
+            source=source,target_key=source,action_id=f"discord:{interaction.id}:combat.start:{source}",
         )
-    except ValueError as exc:
+    except GameEngineError as exc:
         await interaction.response.send_message(f"⚔️ {exc}. Wait for that confrontation to end.",ephemeral=False);return
+    result=dict(envelope.get("result") or {}); bid=int(result.get("battle_id") or 0)
     battle=await DB.get_active_battle(interaction.user.id)
-    embed,view=await _battle_panel(interaction.user.id,c,battle or {"battle_id":bid,"npc_name":info["name"],"npc_realm_index":ri,"npc_stage":st,"player_hp":c.get("vitality",1),"player_hp_max":c.get("vitality_max",1),"npc_hp":hp,"npc_hp_max":hp,"location":c.get("location","")})
+    embed,view=await _battle_panel(interaction.user.id,c,battle or result)
     await interaction.response.send_message(
         content=f"⚔️ **Challenge accepted.** Battle `#{bid}` begins. If you win, you will explicitly choose whether the defeated NPC lives or dies.",
         embed=embed,view=view,
@@ -8390,15 +8417,18 @@ async def boss_status(interaction: discord.Interaction) -> None:
 
 @registered_group_command(boss_group, name="act", description="Take your once-per-round raid action; boss retaliates after the full party acts")
 @app_commands.choices(style=[app_commands.Choice(name="Attack",value="attack"),app_commands.Choice(name="Technique",value="technique"),app_commands.Choice(name="Defend",value="defend"),app_commands.Choice(name="Support",value="support")])
+@app_commands.autocomplete(technique=law_technique_autocomplete)
 @serialized_user_action
-async def boss_act(interaction: discord.Interaction, style: app_commands.Choice[str]) -> None:
+async def boss_act(interaction: discord.Interaction, style: app_commands.Choice[str], technique: str = "") -> None:
     if not await require_character(interaction):return
     enc=await DB.get_boss_encounter(user_id=interaction.user.id)
     if not enc:
         await interaction.response.send_message("Your party has no active boss encounter.",ephemeral=False);return
+    if style.value=="technique" and not technique.strip():
+        await interaction.response.send_message("Choose which unlocked Law technique to use.",ephemeral=False);return
     wt=await current_world_time()
     try:
-        e=await ENGINE.authoritative_action("boss.act",interaction.user.id,{"encounter_id":int(enc['encounter_id']),"style":style.value,"version":int(enc['version'])},action_id=f"discord:{interaction.id}:boss.act"); r=dict(e.get('result') or {})
+        e=await ENGINE.authoritative_action("boss.act",interaction.user.id,{"encounter_id":int(enc['encounter_id']),"style":style.value,"technique":technique.strip(),"version":int(enc['version'])},action_id=f"discord:{interaction.id}:boss.act"); r=dict(e.get('result') or {})
     except GameEngineError as exc:
         await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
     events="\n".join(f"• {x}" for x in list(r.get('events') or [])[:12])

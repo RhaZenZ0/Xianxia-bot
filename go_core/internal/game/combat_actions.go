@@ -275,6 +275,118 @@ func addFateGo(conn *storage.Conn, userID int64, reason string, gameMinute int64
 	return points, e
 }
 
+type combatStartPayload struct {
+	Kind          string `json:"kind"`
+	NPCName       string `json:"npc_name"`
+	NPCRealmIndex int64  `json:"npc_realm_index"`
+	NPCStage      int64  `json:"npc_stage"`
+	Severity      int64  `json:"severity"`
+	Source        string `json:"source"`
+	TargetKey     string `json:"target_key"`
+	GameMinute    int64  `json:"game_minute"`
+}
+
+// combatStartAction is the authoritative counterpart to Python's former
+// Database.create_battle: it decides the opponent's starting stats and
+// creates the battle row server-side, instead of trusting a client-computed
+// npc_hp. Two encounter kinds are supported, matching the two call sites
+// that previously computed this in Python:
+//
+//   - "challenge": npc_realm_index/npc_stage identify a real, already
+//     server-resolved NPC/family-head opponent (resolution of *which* NPC
+//     is still a Python/simulation concern - out of scope here); Go owns
+//     the HP curve derived from that realm/stage.
+//   - "event": the opponent is an ad-hoc "hostile manifestation" scaled off
+//     the player's own realm/phase and an event severity - Go derives the
+//     opponent's realm/stage itself from the caller's own canonical
+//     character row rather than trusting client-supplied npc_realm_index/
+//     npc_stage for this kind.
+//
+// Player HP/HP-max are always read from the caller's own canonical
+// characters row, never from the payload, closing the trust gap the old
+// Python path left between "read character" and "insert battle".
+func combatStartAction(conn *storage.Conn, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
+	var p combatStartPayload
+	if e := json.Unmarshal(raw, &p); e != nil {
+		return authoritativeMutation{}, e
+	}
+	kind := strings.ToLower(strings.TrimSpace(p.Kind))
+	if kind != "challenge" && kind != "event" {
+		return authoritativeMutation{}, errors.New("kind must be challenge or event")
+	}
+	npcName := strings.TrimSpace(p.NPCName)
+	if npcName == "" {
+		return authoritativeMutation{}, errors.New("npc_name is required")
+	}
+	source := strings.TrimSpace(p.Source)
+	if source == "" {
+		return authoritativeMutation{}, errors.New("source is required")
+	}
+	targetKey := strings.TrimSpace(p.TargetKey)
+
+	c, e := loadMechanicsCharacter(conn, userID)
+	if e != nil {
+		return authoritativeMutation{}, e
+	}
+	if c.LifeStatus != "alive" {
+		return authoritativeMutation{}, errors.New("a deceased incarnation cannot enter battle")
+	}
+	r, e := conn.Execute(`SELECT vitality,vitality_max FROM characters WHERE user_id=?`, []any{userID})
+	if e != nil {
+		return authoritativeMutation{}, e
+	}
+	if len(r.Rows) == 0 {
+		return authoritativeMutation{}, errors.New("create a cultivation character first")
+	}
+	playerHP := maxI64(1, i64(r.Rows[0][0]))
+	playerMax := maxI64(playerHP, i64(r.Rows[0][1]))
+
+	var npcRealm, npcStage, npcHP int64
+	switch kind {
+	case "challenge":
+		// realm/stage identify a real NPC already resolved server-side by
+		// the caller; Go still owns and clamps the resulting HP curve.
+		npcRealm = maxI64(0, p.NPCRealmIndex)
+		npcStage = maxI64(1, minI64(9, p.NPCStage))
+		npcHP = maxI64(10, 12+npcRealm*4+npcStage*2)
+	case "event":
+		sev := maxI64(0, p.Severity)
+		npcRealm = maxI64(0, c.RealmIndex+maxI64(0, sev-5)/3)
+		npcStage = maxI64(1, minI64(9, c.Phase+maxI64(0, sev-4)/2))
+		npcHP = maxI64(12, 14+npcRealm*5+npcStage*2+sev*2)
+	}
+
+	if targetKey != "" {
+		rr, e := conn.Execute(`SELECT 1 FROM battles WHERE target_key=? AND status='active' AND user_id<>? LIMIT 1`, []any{targetKey, userID})
+		if e != nil {
+			return authoritativeMutation{}, e
+		}
+		if len(rr.Rows) > 0 {
+			return authoritativeMutation{}, errors.New("that opponent is already locked in an unresolved battle")
+		}
+	}
+
+	now := float64(time.Now().UnixNano()) / 1e9
+	if _, e = conn.Execute(`UPDATE battles SET status='abandoned',version=version+1,updated_at=? WHERE user_id=? AND status='active'`, []any{now, userID}); e != nil {
+		return authoritativeMutation{}, e
+	}
+	ins, e := conn.Execute(
+		`INSERT INTO battles(user_id,npc_name,npc_realm_index,npc_stage,player_hp,player_hp_max,npc_hp,npc_hp_max,status,location,source,target_key,created_at,updated_at)
+		 VALUES(?,?,?,?,?,?,?,?, 'active',?,?,?,?,?)`,
+		[]any{userID, npcName, npcRealm, npcStage, playerHP, playerMax, npcHP, npcHP, c.Location, source, targetKey, now, now},
+	)
+	if e != nil {
+		return authoritativeMutation{}, e
+	}
+	battleID := ins.LastInsertID
+	out := map[string]any{
+		"battle_id": battleID, "npc_name": npcName, "npc_realm_index": npcRealm, "npc_stage": npcStage,
+		"player_hp": playerHP, "player_hp_max": playerMax, "npc_hp": npcHP, "npc_hp_max": npcHP,
+		"location": c.Location, "source": source, "target_key": targetKey, "status": "active",
+	}
+	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "combat", EventType: "battle_started", EntityType: "battle", EntityID: fmt.Sprint(battleID), GameMinute: p.GameMinute, Payload: out}}, nil
+}
+
 func combatTurnAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	var p combatTurnPayload
 	if e := json.Unmarshal(raw, &p); e != nil {
@@ -556,6 +668,12 @@ func combatTechniqueAction(conn *storage.Conn, catalog worlddata.Catalog, userID
 			out["law_dominance"] = true
 		}
 	}
+	// Match combat.turn's equipment wear: every offensive action in this
+	// battle system costs durability, not just a plain attack, so a
+	// technique can't be spammed as a durability-free alternative.
+	if e = damageEquipmentGo(conn, userID, 1); e != nil {
+		return authoritativeMutation{}, e
+	}
 	now := float64(time.Now().UnixNano()) / 1e9
 	if b.NPCHP <= 0 {
 		_, e = conn.Execute(`UPDATE battles SET npc_hp=0,npc_suppressed_turns=?,version=version+1,updated_at=? WHERE battle_id=?`, []any{b.Suppressed, now, b.BattleID})
@@ -695,7 +813,8 @@ func combatRecoveryItemAction(conn *storage.Conn, catalog worlddata.Catalog, use
 	if e := json.Unmarshal(raw, &p); e != nil {
 		return authoritativeMutation{}, e
 	}
-	if _, e := loadBattle(conn, userID, p.BattleID); e != nil {
+	b, e := loadBattle(conn, userID, p.BattleID)
+	if e != nil {
 		return authoritativeMutation{}, e
 	}
 	item, ok := catalog.Items[p.ItemID]
@@ -728,7 +847,18 @@ func combatRecoveryItemAction(conn *storage.Conn, catalog worlddata.Catalog, use
 		return authoritativeMutation{}, e
 	}
 	x := st.Rows[0]
-	out := map[string]any{"battle_id": p.BattleID, "item_id": p.ItemID, "item_name": item.Name, "qi": i64(x[0]), "qi_max": i64(x[1]), "vitality": i64(x[2]), "vitality_max": i64(x[3]), "qi_restore": item.Use.Instant.QiRestore, "vitality_restore": item.Use.Instant.VitalityRestore}
+	newVitality, newVitalityMax := i64(x[2]), i64(x[3])
+	if item.Use.Instant.VitalityRestore > 0 {
+		// Keep battles.player_hp in lockstep with characters.vitality the same
+		// way every other combat mutation does (combat.turn/combat.technique
+		// decrement both together on damage) - a mid-battle heal that only
+		// touched characters.vitality left the battle panel's HP bar stale
+		// until the next turn recomputed it.
+		if _, e = conn.Execute(`UPDATE battles SET player_hp=?,player_hp_max=MAX(player_hp_max,?),version=version+1,updated_at=? WHERE battle_id=? AND status='active'`, []any{newVitality, newVitalityMax, now, b.BattleID}); e != nil {
+			return authoritativeMutation{}, e
+		}
+	}
+	out := map[string]any{"battle_id": p.BattleID, "item_id": p.ItemID, "item_name": item.Name, "qi": i64(x[0]), "qi_max": i64(x[1]), "vitality": newVitality, "vitality_max": newVitalityMax, "qi_restore": item.Use.Instant.QiRestore, "vitality_restore": item.Use.Instant.VitalityRestore}
 	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "combat", EventType: "recovery_item", EntityType: "battle", EntityID: fmt.Sprint(p.BattleID), GameMinute: p.GameMinute, Payload: out}}, nil
 }
 

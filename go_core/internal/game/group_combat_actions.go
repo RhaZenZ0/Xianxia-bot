@@ -91,6 +91,7 @@ type bossStartPayload struct {
 type bossActPayload struct {
 	EncounterID int64  `json:"encounter_id"`
 	Style       string `json:"style"`
+	Technique   string `json:"technique"`
 	GameMinute  int64  `json:"game_minute"`
 	Version     *int64 `json:"version,omitempty"`
 }
@@ -478,7 +479,7 @@ func bossStartActionGo(conn *storage.Conn, _ worlddata.Catalog, userID int64, ra
 	result := map[string]any{"encounter_id": c.LastInsertID, "party_id": pid, "boss_name": t.Name, "boss_hp": hp, "boss_hp_max": hp, "round_index": 1}
 	return authoritativeMutation{Result: result, Event: eventledger.Event{Domain: "boss", EventType: "boss.start", EntityType: "boss_encounter", EntityID: fmt.Sprint(c.LastInsertID), GameMinute: p.GameMinute, Payload: result}}, nil
 }
-func bossActActionGo(conn *storage.Conn, _ worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
+func bossActActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	var p bossActPayload
 	if e := json.Unmarshal(raw, &p); e != nil {
 		return authoritativeMutation{}, e
@@ -552,7 +553,28 @@ func bossActActionGo(conn *storage.Conn, _ worlddata.Catalog, userID int64, raw 
 	} else {
 		bonus := int64(1)
 		if p.Style == "technique" {
-			bonus = 5
+			// Bring this in line with the real combat.technique system:
+			// using a technique requires actually having unlocked it (Law
+			// stage + realm), and its bonus scales with how deeply that Law
+			// is comprehended - not a flat, unconditional upgrade over
+			// attack available to every raider regardless of investment.
+			p.Technique = strings.TrimSpace(p.Technique)
+			techDef, ok := catalog.LawSystem.Techniques[p.Technique]
+			if !ok {
+				return authoritativeMutation{}, errors.New("unknown Law technique")
+			}
+			lr, e := conn.Execute(`SELECT comprehension FROM law_progress WHERE user_id=? AND law_id=?`, []any{userID, techDef.Law})
+			if e != nil {
+				return authoritativeMutation{}, e
+			}
+			comp := int64(0)
+			if row := firstRowMap(lr); row != nil {
+				comp = i64(row["comprehension"])
+			}
+			if lawStageIndex(catalog, comp) < techDef.RequiresStage || i64(cr["realm_index"]) < int64(techDef.MinRealmIndex) {
+				return authoritativeMutation{}, errors.New("technique requirements are no longer met")
+			}
+			bonus = 2 + comp/20
 		}
 		roll := stablePercentGo(p.EncounterID, round, userID, p.Style, i64(enc["version"]))
 		accuracy := 65 + agi*2 + equip["agility"] - phase.Defense*2
