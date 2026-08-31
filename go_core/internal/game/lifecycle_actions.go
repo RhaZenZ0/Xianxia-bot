@@ -829,6 +829,13 @@ func inheritedSamsaraRoot(old string, roots []string, f BirthFamily, karma, tale
 	return "Mortal Root", nil
 }
 
+func samsaraFamilySourceWorld(catalog worlddata.Catalog, familyLocation string, realmIndex int64) string {
+	if location, ok := catalog.Locations[strings.TrimSpace(familyLocation)]; ok && strings.TrimSpace(location.World) != "" {
+		return location.World
+	}
+	return realmWorld(catalog.Realms, realmIndex)
+}
+
 func reincarnateAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	var p reincarnatePayload
 	if err := json.Unmarshal(raw, &p); err != nil {
@@ -861,13 +868,15 @@ func reincarnateAction(conn *storage.Conn, catalog worlddata.Catalog, userID int
 	world := fmt.Sprint(s[5])
 	oldFamName := "Unknown Family"
 	oldFamArchetype := ""
-	of, familyLookupErr := conn.Execute(`SELECT family_name,archetype FROM birth_families WHERE family_id=?`, []any{i64(s[0])})
+	oldFamLocation := ""
+	of, familyLookupErr := conn.Execute(`SELECT family_name,archetype,location FROM birth_families WHERE family_id=?`, []any{i64(s[0])})
 	if familyLookupErr != nil {
 		return authoritativeMutation{}, familyLookupErr
 	}
 	if len(of.Rows) > 0 {
 		oldFamName = fmt.Sprint(of.Rows[0][0])
 		oldFamArchetype = fmt.Sprint(of.Rows[0][1])
+		oldFamLocation = fmt.Sprint(of.Rows[0][2])
 	}
 	family, err := generateSamsaraFamilyWithLineage(world, karma, oldFamName, oldFamArchetype)
 	if err != nil {
@@ -932,6 +941,7 @@ func reincarnateAction(conn *storage.Conn, catalog worlddata.Catalog, userID int
 	if trait == "" {
 		trait = fmt.Sprint(oldLegacy["special_trait"])
 	}
+	dynastyHistoryID := int64(0)
 	if world != "Mortal World" {
 		history := []string{fmt.Sprintf("Samsara turned, and %s was born into %s in the %s.", p.Name, family.FamilyName, world)}
 		if strings.TrimSpace(family.LineageSummary) != "" {
@@ -955,6 +965,27 @@ func reincarnateAction(conn *storage.Conn, catalog worlddata.Catalog, userID int
 				return authoritativeMutation{}, err
 			}
 		}
+	}
+	sourceWorld := samsaraFamilySourceWorld(catalog, oldFamLocation, i64(s[13]))
+	dynastyHistoryID, err = recordSamsaraDynastyHistory(
+		conn,
+		userID,
+		incarnation,
+		i64(s[0]),
+		familyID,
+		p.GameMinute,
+		oldFamName,
+		oldFamArchetype,
+		sourceWorld,
+		family.FamilyName,
+		firstNonempty(family.Archetype, family.ID),
+		world,
+		family.LineageStatus,
+		family.LineageSummary,
+		now,
+	)
+	if err != nil {
+		return authoritativeMutation{}, err
 	}
 	// Clear incarnation-scoped state before installing the new body.
 	tables := []string{"inventory", "active_effects", "character_conditions", "tribulation_state", "tribulation_attempts", "profession_progress", "faction_reputation", "bounty_hunter_pursuits", "boss_reward_claims", "formation_positions", "equipment_instances", "bounties", "grudges", "crime_records", "character_manuals", "spirit_beasts", "artifact_bonds", "item_provenance", "character_social_state", "hidden_sect_membership", "character_bloodlines", "character_physiques", "character_spiritual_roots", "cooldowns", "realm_perfection", "body_realm_perfection", "law_progress", "dao_progress", "inheritances", "currency_wallets", "storage_inventory", "storage_containers", "sect_membership", "secret_realm_runs", "auction_door_risks", "personal_worlds"}
@@ -1040,7 +1071,7 @@ func reincarnateAction(conn *storage.Conn, catalog worlddata.Catalog, userID int
 		"family_name": family.FamilyName, "family_archetype": family.Archetype, "generation": 1,
 		"spiritual_root": root, "mode": "samsara", "target_world": world,
 		"location": householdLocation, "physical_location": family.Location,
-		"lineage_status": family.LineageStatus, "lineage_summary": family.LineageSummary, "previous_family": family.PreviousFamily,
+		"lineage_status": family.LineageStatus, "lineage_summary": family.LineageSummary, "previous_family": family.PreviousFamily, "dynasty_history_id": dynastyHistoryID,
 		"memory_retention": memory, "talent_retention": mergedTalent, "partner_echo": i64(s[19]), "partner_name": fmt.Sprint(s[20]),
 		"comprehension_retention": mergedLaw, "insight_retention": mergedInsight, "legacy_points": totalLegacy,
 		"special_trait": trait, "incarnation_count": incarnation, "natural_lifespan_years": natural, "aptitudes": apt,

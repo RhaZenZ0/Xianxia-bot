@@ -35,7 +35,7 @@ from ..sect_manor import (
 log = logging.getLogger("xianxia.database")
 
 
-SCHEMA_VERSION = 22
+SCHEMA_VERSION = 24
 # A readiness probe must validate more than the schema-version marker.  If the
 # SQLite file is removed or replaced while the bot is running, SQLite will
 # happily create a new empty file at the same path.  Checking these tables lets
@@ -1165,6 +1165,154 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
         ),
     ),
 
+    (
+        23,
+        "persistent_samsara_dynasty_history",
+        (
+            """CREATE TABLE IF NOT EXISTS samsara_dynasty_history (
+                history_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                incarnation_number INTEGER NOT NULL,
+                source_family_id INTEGER,
+                source_family_name TEXT NOT NULL,
+                source_family_archetype TEXT NOT NULL DEFAULT '',
+                source_world TEXT NOT NULL,
+                destination_family_id INTEGER,
+                destination_family_name TEXT NOT NULL,
+                destination_family_archetype TEXT NOT NULL DEFAULT '',
+                destination_world TEXT NOT NULL,
+                lineage_status TEXT NOT NULL,
+                blood_continuity INTEGER NOT NULL DEFAULT 0,
+                event_kind TEXT NOT NULL,
+                summary TEXT NOT NULL,
+                evidence_json TEXT NOT NULL DEFAULT '[]',
+                investigation_level INTEGER NOT NULL DEFAULT 0,
+                investigation_count INTEGER NOT NULL DEFAULT 0,
+                first_discovered_game_minute INTEGER,
+                last_investigated_game_minute INTEGER,
+                created_game_minute INTEGER NOT NULL DEFAULT 0,
+                created_at REAL NOT NULL,
+                updated_at REAL NOT NULL,
+                UNIQUE(user_id, incarnation_number),
+                FOREIGN KEY(user_id) REFERENCES characters(user_id) ON DELETE CASCADE,
+                FOREIGN KEY(source_family_id) REFERENCES birth_families(family_id) ON DELETE SET NULL,
+                FOREIGN KEY(destination_family_id) REFERENCES birth_families(family_id) ON DELETE SET NULL
+            )""",
+            """CREATE INDEX IF NOT EXISTS idx_samsara_dynasty_history_user
+               ON samsara_dynasty_history(user_id,incarnation_number DESC)""",
+            """CREATE INDEX IF NOT EXISTS idx_samsara_dynasty_history_families
+               ON samsara_dynasty_history(source_family_id,destination_family_id)""",
+        ),
+    ),
+
+
+    (
+        24,
+        "ancestral_sites_dynasty_claims_conflicts",
+        (
+            """CREATE TABLE IF NOT EXISTS samsara_ancestral_leads (
+                lead_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                history_id INTEGER NOT NULL,
+                lead_kind TEXT NOT NULL,
+                name TEXT NOT NULL,
+                location TEXT NOT NULL,
+                world_name TEXT NOT NULL,
+                description TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'hidden',
+                clue_required INTEGER NOT NULL DEFAULT 1,
+                danger INTEGER NOT NULL DEFAULT 0,
+                evidence_weight INTEGER NOT NULL DEFAULT 10,
+                retainer_name TEXT NOT NULL DEFAULT '',
+                retainer_relation TEXT NOT NULL DEFAULT '',
+                discovered_game_minute INTEGER,
+                resolved_game_minute INTEGER,
+                created_game_minute INTEGER NOT NULL DEFAULT 0,
+                created_at REAL NOT NULL,
+                updated_at REAL NOT NULL,
+                UNIQUE(history_id,lead_kind),
+                FOREIGN KEY(user_id) REFERENCES characters(user_id) ON DELETE CASCADE,
+                FOREIGN KEY(history_id) REFERENCES samsara_dynasty_history(history_id) ON DELETE CASCADE
+            )""",
+            """CREATE INDEX IF NOT EXISTS idx_samsara_ancestral_leads_user
+               ON samsara_ancestral_leads(user_id,status,history_id)""",
+            """CREATE TABLE IF NOT EXISTS samsara_investigation_quests (
+                quest_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                history_id INTEGER NOT NULL,
+                lead_id INTEGER NOT NULL,
+                quest_kind TEXT NOT NULL,
+                title TEXT NOT NULL,
+                description TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'locked',
+                progress INTEGER NOT NULL DEFAULT 0,
+                target INTEGER NOT NULL DEFAULT 1,
+                reward_evidence INTEGER NOT NULL DEFAULT 10,
+                hostile_cause INTEGER NOT NULL DEFAULT 0,
+                culprit_name TEXT NOT NULL DEFAULT '',
+                created_game_minute INTEGER NOT NULL DEFAULT 0,
+                completed_game_minute INTEGER,
+                created_at REAL NOT NULL,
+                updated_at REAL NOT NULL,
+                UNIQUE(history_id,quest_kind),
+                FOREIGN KEY(user_id) REFERENCES characters(user_id) ON DELETE CASCADE,
+                FOREIGN KEY(history_id) REFERENCES samsara_dynasty_history(history_id) ON DELETE CASCADE,
+                FOREIGN KEY(lead_id) REFERENCES samsara_ancestral_leads(lead_id) ON DELETE CASCADE
+            )""",
+            """CREATE INDEX IF NOT EXISTS idx_samsara_investigation_quests_user
+               ON samsara_investigation_quests(user_id,status,history_id)""",
+            """CREATE TABLE IF NOT EXISTS samsara_dynasty_claims (
+                claim_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                history_id INTEGER NOT NULL,
+                claim_type TEXT NOT NULL,
+                dynasty_name TEXT NOT NULL,
+                target_family_name TEXT NOT NULL DEFAULT '',
+                target_world TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending',
+                legitimacy INTEGER NOT NULL DEFAULT 0,
+                support INTEGER NOT NULL DEFAULT 0,
+                opposition INTEGER NOT NULL DEFAULT 0,
+                blood_based INTEGER NOT NULL DEFAULT 0,
+                resolution TEXT NOT NULL DEFAULT '',
+                created_game_minute INTEGER NOT NULL DEFAULT 0,
+                resolved_game_minute INTEGER,
+                created_at REAL NOT NULL,
+                updated_at REAL NOT NULL,
+                UNIQUE(user_id,history_id,claim_type),
+                FOREIGN KEY(user_id) REFERENCES characters(user_id) ON DELETE CASCADE,
+                FOREIGN KEY(history_id) REFERENCES samsara_dynasty_history(history_id) ON DELETE CASCADE
+            )""",
+            """CREATE INDEX IF NOT EXISTS idx_samsara_dynasty_claims_user
+               ON samsara_dynasty_claims(user_id,status,history_id)""",
+            """CREATE TABLE IF NOT EXISTS samsara_dynasty_conflicts (
+                conflict_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                claim_id INTEGER NOT NULL UNIQUE,
+                history_id INTEGER NOT NULL,
+                conflict_type TEXT NOT NULL,
+                opponent_name TEXT NOT NULL,
+                opponent_family_name TEXT NOT NULL DEFAULT '',
+                stakes TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'active',
+                player_progress INTEGER NOT NULL DEFAULT 0,
+                opponent_progress INTEGER NOT NULL DEFAULT 0,
+                rounds INTEGER NOT NULL DEFAULT 0,
+                last_tactic TEXT NOT NULL DEFAULT '',
+                outcome TEXT NOT NULL DEFAULT '',
+                created_game_minute INTEGER NOT NULL DEFAULT 0,
+                resolved_game_minute INTEGER,
+                created_at REAL NOT NULL,
+                updated_at REAL NOT NULL,
+                FOREIGN KEY(user_id) REFERENCES characters(user_id) ON DELETE CASCADE,
+                FOREIGN KEY(claim_id) REFERENCES samsara_dynasty_claims(claim_id) ON DELETE CASCADE,
+                FOREIGN KEY(history_id) REFERENCES samsara_dynasty_history(history_id) ON DELETE CASCADE
+            )""",
+            """CREATE INDEX IF NOT EXISTS idx_samsara_dynasty_conflicts_user
+               ON samsara_dynasty_conflicts(user_id,status,history_id)""",
+        ),
+    ),
+
 )
 
 
@@ -2081,6 +2229,145 @@ class Database:
                     past_lives_json TEXT NOT NULL DEFAULT '[]', updated_at REAL NOT NULL,
                     FOREIGN KEY(user_id) REFERENCES characters(user_id) ON DELETE CASCADE
                 );
+
+                CREATE TABLE IF NOT EXISTS samsara_dynasty_history (
+                    history_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    incarnation_number INTEGER NOT NULL,
+                    source_family_id INTEGER,
+                    source_family_name TEXT NOT NULL,
+                    source_family_archetype TEXT NOT NULL DEFAULT '',
+                    source_world TEXT NOT NULL,
+                    destination_family_id INTEGER,
+                    destination_family_name TEXT NOT NULL,
+                    destination_family_archetype TEXT NOT NULL DEFAULT '',
+                    destination_world TEXT NOT NULL,
+                    lineage_status TEXT NOT NULL,
+                    blood_continuity INTEGER NOT NULL DEFAULT 0,
+                    event_kind TEXT NOT NULL,
+                    summary TEXT NOT NULL,
+                    evidence_json TEXT NOT NULL DEFAULT '[]',
+                    investigation_level INTEGER NOT NULL DEFAULT 0,
+                    investigation_count INTEGER NOT NULL DEFAULT 0,
+                    first_discovered_game_minute INTEGER,
+                    last_investigated_game_minute INTEGER,
+                    created_game_minute INTEGER NOT NULL DEFAULT 0,
+                    created_at REAL NOT NULL,
+                    updated_at REAL NOT NULL,
+                    UNIQUE(user_id, incarnation_number),
+                    FOREIGN KEY(user_id) REFERENCES characters(user_id) ON DELETE CASCADE,
+                    FOREIGN KEY(source_family_id) REFERENCES birth_families(family_id) ON DELETE SET NULL,
+                    FOREIGN KEY(destination_family_id) REFERENCES birth_families(family_id) ON DELETE SET NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_samsara_dynasty_history_user
+                    ON samsara_dynasty_history(user_id, incarnation_number DESC);
+                CREATE INDEX IF NOT EXISTS idx_samsara_dynasty_history_families
+                    ON samsara_dynasty_history(source_family_id, destination_family_id);
+
+
+                CREATE TABLE IF NOT EXISTS samsara_ancestral_leads (
+                    lead_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    history_id INTEGER NOT NULL,
+                    lead_kind TEXT NOT NULL,
+                    name TEXT NOT NULL,
+                    location TEXT NOT NULL,
+                    world_name TEXT NOT NULL,
+                    description TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'hidden',
+                    clue_required INTEGER NOT NULL DEFAULT 1,
+                    danger INTEGER NOT NULL DEFAULT 0,
+                    evidence_weight INTEGER NOT NULL DEFAULT 10,
+                    retainer_name TEXT NOT NULL DEFAULT '',
+                    retainer_relation TEXT NOT NULL DEFAULT '',
+                    discovered_game_minute INTEGER,
+                    resolved_game_minute INTEGER,
+                    created_game_minute INTEGER NOT NULL DEFAULT 0,
+                    created_at REAL NOT NULL,
+                    updated_at REAL NOT NULL,
+                    UNIQUE(history_id,lead_kind),
+                    FOREIGN KEY(user_id) REFERENCES characters(user_id) ON DELETE CASCADE,
+                    FOREIGN KEY(history_id) REFERENCES samsara_dynasty_history(history_id) ON DELETE CASCADE
+                );
+                CREATE INDEX IF NOT EXISTS idx_samsara_ancestral_leads_user
+                    ON samsara_ancestral_leads(user_id,status,history_id);
+
+                CREATE TABLE IF NOT EXISTS samsara_investigation_quests (
+                    quest_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    history_id INTEGER NOT NULL,
+                    lead_id INTEGER NOT NULL,
+                    quest_kind TEXT NOT NULL,
+                    title TEXT NOT NULL,
+                    description TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'locked',
+                    progress INTEGER NOT NULL DEFAULT 0,
+                    target INTEGER NOT NULL DEFAULT 1,
+                    reward_evidence INTEGER NOT NULL DEFAULT 10,
+                    hostile_cause INTEGER NOT NULL DEFAULT 0,
+                    culprit_name TEXT NOT NULL DEFAULT '',
+                    created_game_minute INTEGER NOT NULL DEFAULT 0,
+                    completed_game_minute INTEGER,
+                    created_at REAL NOT NULL,
+                    updated_at REAL NOT NULL,
+                    UNIQUE(history_id,quest_kind),
+                    FOREIGN KEY(user_id) REFERENCES characters(user_id) ON DELETE CASCADE,
+                    FOREIGN KEY(history_id) REFERENCES samsara_dynasty_history(history_id) ON DELETE CASCADE,
+                    FOREIGN KEY(lead_id) REFERENCES samsara_ancestral_leads(lead_id) ON DELETE CASCADE
+                );
+                CREATE INDEX IF NOT EXISTS idx_samsara_investigation_quests_user
+                    ON samsara_investigation_quests(user_id,status,history_id);
+
+                CREATE TABLE IF NOT EXISTS samsara_dynasty_claims (
+                    claim_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    history_id INTEGER NOT NULL,
+                    claim_type TEXT NOT NULL,
+                    dynasty_name TEXT NOT NULL,
+                    target_family_name TEXT NOT NULL DEFAULT '',
+                    target_world TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'pending',
+                    legitimacy INTEGER NOT NULL DEFAULT 0,
+                    support INTEGER NOT NULL DEFAULT 0,
+                    opposition INTEGER NOT NULL DEFAULT 0,
+                    blood_based INTEGER NOT NULL DEFAULT 0,
+                    resolution TEXT NOT NULL DEFAULT '',
+                    created_game_minute INTEGER NOT NULL DEFAULT 0,
+                    resolved_game_minute INTEGER,
+                    created_at REAL NOT NULL,
+                    updated_at REAL NOT NULL,
+                    UNIQUE(user_id,history_id,claim_type),
+                    FOREIGN KEY(user_id) REFERENCES characters(user_id) ON DELETE CASCADE,
+                    FOREIGN KEY(history_id) REFERENCES samsara_dynasty_history(history_id) ON DELETE CASCADE
+                );
+                CREATE INDEX IF NOT EXISTS idx_samsara_dynasty_claims_user
+                    ON samsara_dynasty_claims(user_id,status,history_id);
+
+                CREATE TABLE IF NOT EXISTS samsara_dynasty_conflicts (
+                    conflict_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    claim_id INTEGER NOT NULL UNIQUE,
+                    history_id INTEGER NOT NULL,
+                    conflict_type TEXT NOT NULL,
+                    opponent_name TEXT NOT NULL,
+                    opponent_family_name TEXT NOT NULL DEFAULT '',
+                    stakes TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'active',
+                    player_progress INTEGER NOT NULL DEFAULT 0,
+                    opponent_progress INTEGER NOT NULL DEFAULT 0,
+                    rounds INTEGER NOT NULL DEFAULT 0,
+                    last_tactic TEXT NOT NULL DEFAULT '',
+                    outcome TEXT NOT NULL DEFAULT '',
+                    created_game_minute INTEGER NOT NULL DEFAULT 0,
+                    resolved_game_minute INTEGER,
+                    created_at REAL NOT NULL,
+                    updated_at REAL NOT NULL,
+                    FOREIGN KEY(user_id) REFERENCES characters(user_id) ON DELETE CASCADE,
+                    FOREIGN KEY(claim_id) REFERENCES samsara_dynasty_claims(claim_id) ON DELETE CASCADE,
+                    FOREIGN KEY(history_id) REFERENCES samsara_dynasty_history(history_id) ON DELETE CASCADE
+                );
+                CREATE INDEX IF NOT EXISTS idx_samsara_dynasty_conflicts_user
+                    ON samsara_dynasty_conflicts(user_id,status,history_id);
 
                 CREATE TABLE IF NOT EXISTS admin_audit_log (
                     audit_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -5016,6 +5303,76 @@ class Database:
         except Exception:
             out["past_lives"] = []
         return out
+
+    async def get_samsara_dynasty_history(self, user_id: int, *, limit: int = 20) -> list[dict[str, Any]]:
+        """Return persistent cross-incarnation family-history records for one soul."""
+        safe_limit = max(1, min(100, int(limit)))
+        async with self._connect() as db:
+            db.row_factory = aiosqlite.Row
+            cur = await db.execute(
+                """SELECT *
+                   FROM samsara_dynasty_history
+                   WHERE user_id=?
+                   ORDER BY incarnation_number DESC,history_id DESC
+                   LIMIT ?""",
+                (int(user_id), safe_limit),
+            )
+            rows = await cur.fetchall()
+        history: list[dict[str, Any]] = []
+        for row in rows:
+            item = dict(row)
+            try:
+                item["evidence"] = json.loads(item.get("evidence_json") or "[]")
+            except Exception:
+                item["evidence"] = []
+            history.append(item)
+        return history
+
+    async def get_samsara_legacy_state(self, user_id: int, *, history_id: int = 0) -> dict[str, list[dict[str, Any]]]:
+        """Return persistent ancestral leads, quests, claims and conflicts for one soul."""
+        uid = int(user_id)
+        hid = max(0, int(history_id))
+        where = "user_id=?"
+        params: tuple[Any, ...] = (uid,)
+        if hid:
+            where += " AND history_id=?"
+            params = (uid, hid)
+        async with self._connect() as db:
+            db.row_factory = aiosqlite.Row
+            lead_cur = await db.execute(
+                f"""SELECT * FROM samsara_ancestral_leads
+                    WHERE {where} AND status!='hidden'
+                    ORDER BY history_id DESC,clue_required,lead_id""",
+                params,
+            )
+            quest_cur = await db.execute(
+                f"""SELECT * FROM samsara_investigation_quests
+                    WHERE {where} AND status!='locked'
+                    ORDER BY history_id DESC,quest_id""",
+                params,
+            )
+            claim_cur = await db.execute(
+                f"""SELECT * FROM samsara_dynasty_claims
+                    WHERE {where}
+                    ORDER BY history_id DESC,claim_id""",
+                params,
+            )
+            conflict_cur = await db.execute(
+                f"""SELECT * FROM samsara_dynasty_conflicts
+                    WHERE {where}
+                    ORDER BY history_id DESC,conflict_id""",
+                params,
+            )
+            leads = [dict(row) for row in await lead_cur.fetchall()]
+            quests = [dict(row) for row in await quest_cur.fetchall()]
+            claims = [dict(row) for row in await claim_cur.fetchall()]
+            conflicts = [dict(row) for row in await conflict_cur.fetchall()]
+        return {
+            "leads": leads,
+            "quests": quests,
+            "claims": claims,
+            "conflicts": conflicts,
+        }
 
 
     # ------------------------------------------------------------------

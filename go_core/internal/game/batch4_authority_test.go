@@ -86,6 +86,10 @@ CREATE TABLE characters(
     body_realm_index INTEGER NOT NULL DEFAULT 0,
     body_phase INTEGER NOT NULL DEFAULT 1,
     body_cultivation INTEGER NOT NULL DEFAULT 0,
+    age_at_creation_years INTEGER NOT NULL DEFAULT 18,
+    created_game_minute INTEGER NOT NULL DEFAULT 0,
+    natural_lifespan_years INTEGER NOT NULL DEFAULT 75,
+    life_extension_years INTEGER NOT NULL DEFAULT 0,
     life_status TEXT NOT NULL DEFAULT 'alive',
     karma_score INTEGER NOT NULL DEFAULT 0,
     sense_power_bonus INTEGER NOT NULL DEFAULT 0,
@@ -405,7 +409,7 @@ func TestBatch4TribulationPrepareAndAttemptPersistCanonicalOutcome(t *testing.T)
 	if got := storage.ParseInt(actionScalar(t, path, "SELECT score FROM faction_reputation WHERE user_id=42 AND faction_key='Heavenly Recognition'")); got != 8 {
 		t.Fatalf("reputation=%d", got)
 	}
-	if got := storage.ParseInt(actionScalar(t, path, "SELECT points FROM character_fate WHERE user_id=42")); got != 3 {
+	if got := storage.ParseInt(actionScalar(t, path, "SELECT points FROM character_fate WHERE user_id=42")); got != 2 {
 		t.Fatalf("fate=%d", got)
 	}
 }

@@ -1,4 +1,4 @@
 from __future__ import annotations
 
-RELEASE_VERSION = "0.18"
+RELEASE_VERSION = "0.19"
 __version__ = RELEASE_VERSION

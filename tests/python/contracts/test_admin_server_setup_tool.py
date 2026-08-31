@@ -72,7 +72,7 @@ class AdminServerSetupSourceTests(unittest.TestCase):
 
 class AdminServerSetupDatabaseTests(unittest.IsolatedAsyncioTestCase):
     async def test_bulk_role_reconciliation_can_list_character_owners(self):
-        self.assertEqual(SCHEMA_VERSION, 22)
+        self.assertEqual(SCHEMA_VERSION, 24)
         with tempfile.TemporaryDirectory() as tmp:
             db = Database(Path(tmp) / "server-setup.sqlite3")
             await db.init()

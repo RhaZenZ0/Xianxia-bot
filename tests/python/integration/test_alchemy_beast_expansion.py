@@ -46,7 +46,7 @@ class AlchemyBeastExpansionTests(unittest.IsolatedAsyncioTestCase):
         self.tmp.cleanup()
 
     async def test_schema_v6_retains_expansion_tables(self):
-        self.assertEqual(SCHEMA_VERSION, 22)
+        self.assertEqual(SCHEMA_VERSION, 24)
         import sqlite3
         with sqlite3.connect(self.path) as conn:
             tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
@@ -85,14 +85,14 @@ class AlchemyBeastExpansionTests(unittest.IsolatedAsyncioTestCase):
             ) SELECT user_id,location_key,name,base_location,grade,cultivation_level,alchemy_level,forge_level,formation_level,defense_level,
                      thread_id,thread_channel_id,created_at,updated_at FROM cave_abodes_v10""")
             conn.execute("DROP TABLE cave_abodes_v10")
-            conn.execute("DELETE FROM schema_migrations WHERE version IN (5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22)")
+            conn.execute("DELETE FROM schema_migrations WHERE version IN (5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24)")
             conn.execute("UPDATE schema_version SET current_version=4 WHERE singleton=1")
             conn.commit()
         await self.db.init()
         character = await self.db.get_character(909)
         self.assertEqual(character["name"], "Azure Alchemist")
         status = await self.db.get_schema_status()
-        self.assertEqual(status["current"], 22)
+        self.assertEqual(status["current"], 24)
 
     def test_alchemy_quality_scales_output_without_item_instances(self):
         self.assertEqual(alchemy_quality(0, success=True).label, "Ordinary")

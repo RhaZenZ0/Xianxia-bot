@@ -1,7 +1,7 @@
 # Xianxia RP v0.18 Release Notes
 
 Release date: 2026-08-30  
-Schema: 22
+Schema: 24
 
 ## Authority completion
 
@@ -44,10 +44,39 @@ v0.18 completes the staged migration of gameplay authority into Go.
 - Existing dashboard/control tokens remain constant-time compared and dashboard publishing remains
   loopback-only by default.
 
+## Samsara dynasty investigation and claims patch
+
+Schema 23 persists cross-incarnation dynasty history. Schema 24 makes that history playable:
+
+- archive, ancestral-ruin, last-heir-tomb, and surviving-retainer leads are generated per investigated transition;
+- persistent investigation quests corroborate documentary, physical, tomb, and witness evidence;
+- confirmed surviving bloodlines can assert inheritance without copying old rank or resources into the new realm;
+- fallen or extinct historical houses can pursue dynasty restoration;
+- revenge is evidence-gated and requires a corroborated hostile culprit;
+- extinct replacement houses can be challenged over legacy, archives, property, or recognition without becoming blood descendants;
+- contested restoration, revenge, and replacement claims use persistent multi-round conflict state.
+
+
+## GM dashboard system coverage
+
+The GM dashboard now exposes the newer v0.18 systems instead of limiting observability to the older NPC/sect/event views. Dedicated read-only endpoints and tabs cover cultivation aptitudes, crafting/assets, exploration/travel, dynamic economy, and Samsara dynasty investigation/claims.
+
+`/api/capabilities` publishes the backend view/API contract and table-coverage state. Regression tests cross-check browser API references against the backend registry, verify every navigation item has a loader, and perform authenticated HTTP smoke requests against every dashboard view endpoint. This turns frontend/backend drift into a test failure rather than a broken production tab.
+
 ## Upgrade
 
-The application migrates schema 21 to schema 22 automatically. The schema-22 migration canonicalizes
-starter family homelands without teleporting existing characters.
+The application migrates supported older schemas through schema 24 automatically. Schema 22 canonicalizes
+starter-family homelands, schema 23 adds persistent Samsara dynasty history, and schema 24 adds ancestral
+investigation sites/quests plus dynasty claims and conflicts. Existing player locations are not teleported.
 
 Back up the database before upgrading. The bundled local updater performs a live authoritative backup
 before replacing code and rolls back code/database on failed installation.
+
+## Dynasty risk-resolution follow-up (2026-08-31)
+
+The ancestral dynasty system now uses authoritative server-side 2d10 resolution for investigation
+quests and conflict rounds. Lead danger is a real difficulty input rather than display-only flavor;
+physical high-danger failures can cause investigation setbacks and non-lethal vitality loss.
+Contested dynasty rounds now resolve player and opposition checks before awarding pressure, and
+additional completed ancestral quests reduce the opposition baseline. No schema migration is
+required.

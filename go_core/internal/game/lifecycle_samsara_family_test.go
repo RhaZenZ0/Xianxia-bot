@@ -3,6 +3,8 @@ package game
 import (
 	"strings"
 	"testing"
+
+	"xianxia/core/internal/worlddata"
 )
 
 func TestMortalSamsaraUsesCanonicalStartingFamilies(t *testing.T) {
@@ -120,5 +122,20 @@ func TestSamsaraLineageSupportsSurvivalFallExtinctionReplacementAndNoConnection(
 	}
 	if !strings.Contains(summary, "no blood continuity") {
 		t.Fatalf("replacement does not clearly sever lineage: %q", summary)
+	}
+}
+
+func TestSamsaraDynastySourceWorldUsesFamilyHomelandBeforeCultivationRealm(t *testing.T) {
+	catalog := worlddata.Catalog{
+		Realms: []worlddata.Realm{{World: "Mortal World"}},
+		Locations: map[string]worlddata.LocationDefinition{
+			"Immortal River City": {World: "Immortal World"},
+		},
+	}
+	if got := samsaraFamilySourceWorld(catalog, "Immortal River City", 0); got != "Immortal World" {
+		t.Fatalf("family homeland world=%q want=%q", got, "Immortal World")
+	}
+	if got := samsaraFamilySourceWorld(catalog, "Unknown Homestead", 0); got != "Mortal World" {
+		t.Fatalf("fallback realm world=%q want=%q", got, "Mortal World")
 	}
 }

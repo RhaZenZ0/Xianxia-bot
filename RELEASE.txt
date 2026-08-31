@@ -1,8 +1,32 @@
+Xianxia RP v0.19 RECOMMENDED RELEASE
+
+Release date: 2026-08-31
+Schema: 24 (unchanged from v0.18)
+Migration: none required from v0.18 — every v0.19 change is logic-only.
+
+v0.19 is a cultivation-depth audit and consistency pass on top of v0.18:
+- player old-age death is now actually enforced (was display-only in v0.18's patch line),
+  routed through the existing samsara/true-death pipeline;
+- fixed a rounds-based balance bias in Ancestral Dynasty conflicts that structurally
+  favored the opposition side the longer a conflict ran;
+- added a GM fate-grant path (fate.adjust had zero callers anywhere);
+- closed five dashboard coverage gaps (household threads/occupants, Party & Formations,
+  PvP, Conditions) and wired the orphaned npc.lifespan query into Discord;
+- fixed five real bugs found during a full realm-progression/tribulation/aptitude/
+  technique audit: an unscoped breakthrough-perfection bonus, a duplicate tribulation
+  fate grant, dual-cultivators unable to reach their body-path tribulation, risk-free
+  combat techniques, and a crashing /law technique command;
+- consolidated 19 redundant per-stage audit/validation docs into one build history file.
+
+See V019_RELEASE_NOTES.md for full detail.
+
+---
+
 Xianxia RP v0.18 RECOMMENDED RELEASE
 
 Release date: 2026-08-30
-Schema: 22
-Migration: automatic schema 21 -> 22 family-homeland canonicalization; existing player locations are not teleported
+Schema: 24
+Migration: automatic supported-schema upgrade through v24; v23 adds persistent Samsara dynasty history and v24 adds ancestral investigation, dynasty claims, and conflicts
 
 v0.18 completes the staged gameplay-authority cleanup:
 - canonical Go-owned game-time authority across authoritative gameplay operations;
@@ -15,4 +39,29 @@ v0.18 completes the staged gameplay-authority cleanup:
 - release hardening for the Go HTTP boundary: loopback default bind, strict single-JSON decoding,
   and bounded JSON request bodies on internal mutation/data endpoints.
 
-See V018_RELEASE_NOTES.md, V018_RELEASE_VALIDATION.md, and V018_RELEASE_SECURITY_LOAD_AUDIT.md.
+See V018_RELEASE_NOTES.md and V018_BUILD_HISTORY.md (consolidated validation/audit record).
+
+Ancestral dynasty patch:
+- ancestral archives, ruins, tombs, and surviving-retainer leads persist per Samsara transition;
+- investigation quests provide the evidence used by inheritance, restoration, revenge, and replacement-house claims;
+- extinct replacement houses never gain blood continuity from a successful legacy dispute;
+- revenge requires corroborated hostile-cause evidence rather than assuming a replacement house caused the extinction.
+
+Mortal capital discovery image patch:
+- packages Azure Crown Imperial City landmark art under assets/locations;
+- applies to every character regardless of birthplace: capital-born characters see it at creation because that is their first sight, while all other characters see it the first time exploration or authoritative travel reaches/passes through the capital;
+- uses existing canonical location-discovery state to avoid repeat image sends and does not change Go-owned world/discovery mechanics.
+Dashboard systems-coverage patch:
+- adds authenticated read-only API endpoints for cultivation, crafting/assets, exploration/travel, economy, and Samsara dynasty systems;
+- surfaces spiritual-root grade/purity/elements/refinement, bloodlines/physiques, Dao/law progress, tribulations, seclusion, alchemy, professions, beasts, artifacts, properties, formations, secret realms, caravans, auctions, black markets, crimes, reincarnation, ancestral investigations, claims, and dynasty conflicts in dedicated GM views;
+- adds /api/capabilities so the dashboard can report schema/API coverage for the newer system groups;
+- adds frontend/backend contract regression coverage so a dashboard fetch with no backend route, a backend view with no frontend consumer, or a nav entry with no loader fails tests;
+- adds authenticated HTTP smoke coverage for every dashboard view endpoint.
+
+
+Dynasty risk-resolution patch:
+- ancestral investigation quests now resolve with authoritative server-side 2d10 checks instead of guaranteed progress;
+- lead danger now controls the actual quest TN, and hard failures on physical ruin/tomb leads can cause setbacks and non-lethal vitality loss;
+- dynasty conflicts now use random player/opposition checks each round, with tactic-specific modifiers and roll-derived progress;
+- completing more ancestral investigation quests reduces claim opposition (55 at two quests, 50 at three, 45 at four);
+- Discord quest/conflict output now shows the authoritative rolls, TNs, outcomes, danger and consequences.

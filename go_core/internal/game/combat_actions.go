@@ -24,9 +24,12 @@ type combatTurnPayload struct {
 	Action           string `json:"action"`
 }
 type combatTechniquePayload struct {
-	BattleID   int64  `json:"battle_id"`
-	Technique  string `json:"technique"`
-	GameMinute int64  `json:"game_minute"`
+	BattleID         int64  `json:"battle_id"`
+	Technique        string `json:"technique"`
+	GameMinute       int64  `json:"game_minute"`
+	MinutesPerYear   int64  `json:"minutes_per_year"`
+	BaseSamsaraYears int64  `json:"base_samsara_years"`
+	MaxWaitSeconds   int64  `json:"max_wait_seconds"`
 }
 type combatItemPayload struct {
 	BattleID   int64  `json:"battle_id"`
@@ -554,10 +557,136 @@ func combatTechniqueAction(conn *storage.Conn, catalog worlddata.Catalog, userID
 		}
 	}
 	now := float64(time.Now().UnixNano()) / 1e9
-	_, e = conn.Execute(`UPDATE battles SET npc_hp=?,npc_suppressed_turns=?,version=version+1,updated_at=? WHERE battle_id=?`, []any{b.NPCHP, b.Suppressed, now, b.BattleID})
+	if b.NPCHP <= 0 {
+		_, e = conn.Execute(`UPDATE battles SET npc_hp=0,npc_suppressed_turns=?,version=version+1,updated_at=? WHERE battle_id=?`, []any{b.Suppressed, now, b.BattleID})
+		if e != nil {
+			return authoritativeMutation{}, e
+		}
+		out["npc_hp"] = int64(0)
+		out["opponent_defeated"] = true
+		out["status"] = "active"
+		return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "combat", EventType: "opponent_defeated", EntityType: "battle", EntityID: fmt.Sprint(b.BattleID), GameMinute: p.GameMinute, Payload: out}}, nil
+	}
+
+	// A Law technique is still an offensive action taken mid-battle - like a
+	// normal combat.turn attack, it exposes the caster to the opponent's
+	// counter-attack (respecting suppression) instead of being a free,
+	// risk-free way to bypass the risk/injury/fatality economy that every
+	// other offensive action in this battle system enforces.
+	bundle, e := loadAptitudes(conn, userID)
 	if e != nil {
 		return authoritativeMutation{}, e
 	}
+	mods, e := loadEffectModifiers(conn, userID, p.GameMinute, bundle, c, catalog)
+	if e != nil {
+		return authoritativeMutation{}, e
+	}
+	resonance := dualCheckBonus(c)
+	lawBonus := int64(math.Round(mods.Add["combat_bonus"]))
+	compBonus, e := combatCompanionBonus(conn, userID)
+	if e != nil {
+		return authoritativeMutation{}, e
+	}
+	_, def, _, _, e := combatEquipment(conn, userID)
+	if e != nil {
+		return authoritativeMutation{}, e
+	}
+	realm, stage := c.RealmIndex, c.Phase
+	php := b.PlayerHP
+	if b.Suppressed > 0 {
+		b.Suppressed--
+		out["counter_suppressed"] = true
+	} else {
+		counter, e := roll2d10(4+b.NPCRealm*2+b.NPCStage/3, 10+realm*2+stage/3+def+lawBonus+compBonus+resonance)
+		if e != nil {
+			return authoritativeMutation{}, e
+		}
+		out["counter_roll"] = counter
+		if bval(counter, "success") {
+			margin := i64(counter["margin"])
+			dmg := maxI64(1, 2+maxI64(0, margin)/4+maxI64(0, b.NPCRealm-realm))
+			php = maxI64(0, php-dmg)
+			out["damage_taken"] = dmg
+			if _, e = conn.Execute(`UPDATE characters SET vitality=MAX(0,vitality-?),updated_at=? WHERE user_id=?`, []any{dmg, now, userID}); e != nil {
+				return authoritativeMutation{}, e
+			}
+		}
+	}
+	out["npc_hp"] = b.NPCHP
+	out["player_hp"] = php
+	if php <= 0 {
+		gap := maxI64(0, (b.NPCRealm-realm)*9+(b.NPCStage-stage))
+		fatalChance := minI64(75, 8+gap*3)
+		rr, e := gamerng.Intn(100)
+		if e != nil {
+			return authoritativeMutation{}, e
+		}
+		fatal := int64(rr) < fatalChance
+		out["fatality_roll"] = rr
+		out["fatality_chance"] = fatalChance
+		_, e = conn.Execute(`UPDATE battles SET player_hp=0,npc_hp=?,status='lost',npc_suppressed_turns=?,version=version+1,updated_at=? WHERE battle_id=?`, []any{b.NPCHP, b.Suppressed, now, b.BattleID})
+		if e != nil {
+			return authoritativeMutation{}, e
+		}
+		out["status"] = "lost"
+		if fatal {
+			fr, e := conn.Execute(`SELECT points FROM character_fate WHERE user_id=?`, []any{userID})
+			if e != nil {
+				return authoritativeMutation{}, e
+			}
+			fate := int64(0)
+			if len(fr.Rows) > 0 {
+				fate = i64(fr.Rows[0][0])
+			}
+			if fate > 0 {
+				remaining, e := spendFateGo(conn, userID, "averted_true_death:"+b.NPCName, p.GameMinute)
+				if e != nil {
+					return authoritativeMutation{}, e
+				}
+				if _, e = conn.Execute(`UPDATE characters SET vitality=1,updated_at=? WHERE user_id=?`, []any{now, userID}); e != nil {
+					return authoritativeMutation{}, e
+				}
+				key := "bone_fracture"
+				sev := int64(2)
+				if gap >= 18 {
+					key = "soul_wound"
+					sev = 3
+				}
+				inj, e := applyCombatCondition(conn, userID, key, sev, "fate_rescue", fmt.Sprint(b.BattleID), p.GameMinute)
+				if e != nil {
+					return authoritativeMutation{}, e
+				}
+				out["fate_rescue"] = true
+				out["fate_remaining"] = remaining
+				out["injury"] = inj
+				out["player_hp"] = int64(1)
+			} else {
+				death, e := recordTrueDeathAuthoritative(conn, userID, trueDeathPayload{GameMinute: p.GameMinute, Reason: "battle:" + b.NPCName, MinutesPerYear: p.MinutesPerYear, BaseSamsaraYears: p.BaseSamsaraYears, MaxWaitSeconds: p.MaxWaitSeconds})
+				if e != nil {
+					return authoritativeMutation{}, e
+				}
+				out["true_death"] = death
+			}
+		} else {
+			key := "flesh_wound"
+			sev := int64(1)
+			if gap >= 9 {
+				key = "bone_fracture"
+				sev = 2
+			}
+			inj, e := applyCombatCondition(conn, userID, key, sev, "battle", fmt.Sprint(b.BattleID), p.GameMinute)
+			if e != nil {
+				return authoritativeMutation{}, e
+			}
+			out["injury"] = inj
+		}
+		return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "combat", EventType: "battle_lost", EntityType: "battle", EntityID: fmt.Sprint(b.BattleID), GameMinute: p.GameMinute, Payload: out}}, nil
+	}
+	_, e = conn.Execute(`UPDATE battles SET player_hp=?,npc_hp=?,npc_suppressed_turns=?,version=version+1,updated_at=? WHERE battle_id=?`, []any{php, b.NPCHP, b.Suppressed, now, b.BattleID})
+	if e != nil {
+		return authoritativeMutation{}, e
+	}
+	out["status"] = "active"
 	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "combat", EventType: "law_technique", EntityType: "battle", EntityID: fmt.Sprint(b.BattleID), GameMinute: p.GameMinute, Payload: out}}, nil
 }
 

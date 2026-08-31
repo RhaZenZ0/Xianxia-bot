@@ -36,6 +36,10 @@ var authoritativeMutations = map[string]bool{
 	"character.create":                true,
 	"family.household.enter":          true,
 	"family.household.leave":          true,
+	"family.lineage.investigate":      true,
+	"family.lineage.quest":            true,
+	"family.dynasty.claim":            true,
+	"family.dynasty.conflict":         true,
 	"aptitude.temper":                 true,
 	"aptitude.awaken":                 true,
 	"aptitude.evolve":                 true,
@@ -271,165 +275,181 @@ func applyAuthoritative(databasePath, worldPath string, req ActionRequest) (Acti
 	if err := ensureRoadTransitReadyTx(conn, req.ActorID, actionGameMinute); err != nil {
 		return ActionResponse{}, err
 	}
+	oldAgeDeath, err := checkPlayerOldAgeDeathTx(conn, req.ActorID, actionGameMinute, time.Now())
+	if err != nil {
+		return ActionResponse{}, err
+	}
 	var mutation authoritativeMutation
-	switch req.Operation {
-	case "check.resolve", "scene.action":
-		if strings.TrimSpace(worldPath) == "" {
-			return ActionResponse{}, errors.New("world catalog path is required")
-		}
-		catalog, loadErr := worlddata.Load(worldPath)
-		if loadErr != nil {
-			return ActionResponse{}, loadErr
-		}
-		if req.Operation == "check.resolve" {
-			mutation, err = resolveCanonicalCheckV2(conn, catalog, req.ActorID, req.Payload)
-		} else {
-			mutation, err = resolveSceneAction(conn, catalog, req.ActorID, req.Payload)
-		}
-	case "lifecycle.true_death":
-		mutation, err = trueDeathAction(conn, req.ActorID, req.Payload)
-	case "combat.finalize":
-		mutation, err = combatFinalizeAction(conn, req.ActorID, req.Payload)
-	case "character.family_options":
-		mutation, err = birthFamilyOptionsAction(conn, req.ActorID, req.Payload)
-	case "character.create":
-		mutation, err = createCharacterAuthoritative(conn, worldPath, req.ActorID, req.Payload)
-	case "family.household.enter":
-		mutation, err = familyHouseholdEnterAction(conn, req.ActorID, req.Payload)
-	case "family.household.leave":
-		mutation, err = familyHouseholdLeaveAction(conn, req.ActorID, req.Payload)
-	case "auction.enter", "auction.leave", "auction.sell", "auction.bid", "black_market.trade", "market.trade", "bounty_hunter.act", "equipment.bind", "equipment.equip", "equipment.unequip", "equipment.repair", "party.create", "party.join", "party.leave", "formation.create", "formation.assign", "formation.activate", "formation.stance", "boss.start", "boss.act", "boss.claim", "territory.claim", "war.act", "caravan.dispatch", "caravan.settle", "sect.recruitment.recommendation", "sect.recruitment.trial", "sect.contribute", "sect.redeem", "discipleship.request", "discipleship.resolve", "discipleship.leave", "sect.manor.establish", "sect.manor.upgrade", "family.simulate", "family.support", "family.add_child", "seclusion.start", "seclusion.settle", "fate.adjust", "dao.propose", "dao.respond", "dao.sever", "dao.dual_cultivate", "storage.deposit", "storage.withdraw", "storage.upgrade", "abode.establish", "abode.enter", "abode.visit", "abode.leave", "abode.invite", "abode.revoke", "abode.upgrade", "abode.focus", "array.use", "array.deploy", "spatial_key.use", "personal_world.create", "personal_world.set_rule", "personal_world.enter", "personal_world.leave":
-		if strings.TrimSpace(worldPath) == "" {
-			return ActionResponse{}, errors.New("world catalog path is required")
-		}
-		catalog, loadErr := worlddata.Load(worldPath)
-		if loadErr != nil {
-			return ActionResponse{}, loadErr
-		}
-		mutation, err = applyLateMigrationAction(conn, catalog, req.ActorID, req.Operation, req.Payload)
-	case "aptitude.temper", "aptitude.awaken", "aptitude.evolve", "aptitude.harmonize",
-		"cultivation.train", "cultivation.body_train", "cultivation.breakthrough", "cultivation.body_breakthrough",
-		"lifecycle.reincarnate", "combat.turn", "combat.technique", "combat.recovery_item",
-		"perfection.start", "perfection.quest", "perfection.trial", "perfection.abandon",
-		"perfection.body_start", "perfection.body_quest", "perfection.body_trial", "perfection.body_abandon", "law.comprehend",
-		"condition.treat", "sense.inspect", "sense.conceal", "tribulation.prepare", "tribulation.attempt",
-		"exploration.explore", "exploration.event.act", "exploration.event.leave", "exploration.travel", "exploration.hunt",
-		"secret_realm.enter", "secret_realm.explore", "secret_realm.leave", "craft.resolve", "forage.resolve",
-		"beast.tame", "beast.feed", "beast.train", "beast.evolve", "beast.active", "artifact.bond", "artifact.awaken",
-		"pvp.challenge", "pvp.respond", "pvp.act", "manual.study", "manual.technique", "crime.atone", "world_event.act":
-		if strings.TrimSpace(worldPath) == "" {
-			return ActionResponse{}, errors.New("world catalog path is required")
-		}
-		catalog, loadErr := worlddata.Load(worldPath)
-		if loadErr != nil {
-			return ActionResponse{}, loadErr
-		}
+	if oldAgeDeath != nil {
+		mutation = *oldAgeDeath
+	} else {
 		switch req.Operation {
-		case "aptitude.temper":
-			mutation, err = aptitudeTemper(conn, catalog, req.ActorID, req.Payload)
-		case "aptitude.awaken":
-			mutation, err = aptitudeAwaken(conn, catalog, req.ActorID, req.Payload)
-		case "aptitude.evolve":
-			mutation, err = aptitudeEvolve(conn, catalog, req.ActorID, req.Payload)
-		case "aptitude.harmonize":
-			mutation, err = aptitudeHarmonize(conn, catalog, req.ActorID, req.Payload)
-		case "cultivation.train":
-			mutation, err = cultivationTrain(conn, catalog, req.ActorID, req.Payload, false)
-		case "cultivation.body_train":
-			mutation, err = cultivationTrain(conn, catalog, req.ActorID, req.Payload, true)
-		case "cultivation.breakthrough":
-			mutation, err = cultivationBreakthrough(conn, catalog, req.ActorID, req.Payload, false)
-		case "cultivation.body_breakthrough":
-			mutation, err = cultivationBreakthrough(conn, catalog, req.ActorID, req.Payload, true)
-		case "lifecycle.reincarnate":
-			mutation, err = reincarnateAction(conn, catalog, req.ActorID, req.Payload)
-		case "combat.turn":
-			mutation, err = combatTurnAction(conn, catalog, req.ActorID, req.Payload)
-		case "combat.technique":
-			mutation, err = combatTechniqueAction(conn, catalog, req.ActorID, req.Payload)
-		case "combat.recovery_item":
-			mutation, err = combatRecoveryItemAction(conn, catalog, req.ActorID, req.Payload)
-		case "perfection.start":
-			mutation, err = perfectionStartAction(conn, catalog, req.ActorID, req.Payload, false)
-		case "perfection.quest":
-			mutation, err = perfectionQuestAction(conn, catalog, req.ActorID, req.Payload, false)
-		case "perfection.trial":
-			mutation, err = perfectionTrialAction(conn, catalog, req.ActorID, req.Payload, false)
-		case "perfection.abandon":
-			mutation, err = perfectionAbandonAction(conn, catalog, req.ActorID, req.Payload, false)
-		case "perfection.body_start":
-			mutation, err = perfectionStartAction(conn, catalog, req.ActorID, req.Payload, true)
-		case "perfection.body_quest":
-			mutation, err = perfectionQuestAction(conn, catalog, req.ActorID, req.Payload, true)
-		case "perfection.body_trial":
-			mutation, err = perfectionTrialAction(conn, catalog, req.ActorID, req.Payload, true)
-		case "perfection.body_abandon":
-			mutation, err = perfectionAbandonAction(conn, catalog, req.ActorID, req.Payload, true)
-		case "law.comprehend":
-			mutation, err = lawComprehendAction(conn, catalog, req.ActorID, req.Payload)
-		case "condition.treat":
-			mutation, err = conditionTreatAction(conn, catalog, req.ActorID, req.Payload)
-		case "sense.inspect":
-			mutation, err = senseInspectAction(conn, catalog, req.ActorID, req.Payload)
-		case "sense.conceal":
-			mutation, err = senseConcealAction(conn, catalog, req.ActorID, req.Payload)
-		case "tribulation.prepare":
-			mutation, err = tribulationPrepareAction(conn, catalog, req.ActorID, req.Payload)
-		case "tribulation.attempt":
-			mutation, err = tribulationAttemptAction(conn, catalog, req.ActorID, req.Payload)
-		case "exploration.explore":
-			mutation, err = explorationExploreAction(conn, catalog, req.ActorID, req.Payload)
-		case "exploration.event.act":
-			mutation, err = explorationEventActAction(conn, catalog, req.ActorID, req.Payload, false)
-		case "exploration.event.leave":
-			mutation, err = explorationEventActAction(conn, catalog, req.ActorID, req.Payload, true)
-		case "exploration.travel":
-			mutation, err = explorationTravelAction(conn, catalog, req.ActorID, req.Payload)
-		case "exploration.hunt":
-			mutation, err = explorationHuntAction(conn, catalog, req.ActorID, req.Payload)
-		case "secret_realm.enter":
-			mutation, err = secretRealmEnterAction(conn, catalog, req.ActorID, req.Payload)
-		case "secret_realm.explore":
-			mutation, err = secretRealmExploreAction(conn, catalog, req.ActorID, req.Payload)
-		case "secret_realm.leave":
-			mutation, err = secretRealmLeaveAction(conn, req.ActorID, req.Payload)
-		case "craft.resolve":
-			mutation, err = craftResolveAction(conn, catalog, req.ActorID, req.Payload)
-		case "forage.resolve":
-			mutation, err = forageResolveAction(conn, catalog, req.ActorID, req.Payload)
-		case "beast.tame":
-			mutation, err = beastTameAction(conn, catalog, req.ActorID, req.Payload)
-		case "beast.feed":
-			mutation, err = beastFeedAction(conn, catalog, req.ActorID, req.Payload)
-		case "beast.train":
-			mutation, err = beastTrainAction(conn, catalog, req.ActorID, req.Payload)
-		case "beast.evolve":
-			mutation, err = beastEvolveAction(conn, catalog, req.ActorID, req.Payload)
-		case "beast.active":
-			mutation, err = beastActiveAction(conn, catalog, req.ActorID, req.Payload)
-		case "artifact.bond":
-			mutation, err = artifactBondAction(conn, catalog, req.ActorID, req.Payload)
-		case "artifact.awaken":
-			mutation, err = artifactAwakenAction(conn, catalog, req.ActorID, req.Payload)
-		case "pvp.challenge":
-			mutation, err = pvpChallengeAction(conn, catalog, req.ActorID, req.Payload)
-		case "pvp.respond":
-			mutation, err = pvpRespondAction(conn, catalog, req.ActorID, req.Payload)
-		case "pvp.act":
-			mutation, err = pvpActAction(conn, catalog, req.ActorID, req.Payload)
-		case "manual.study":
-			mutation, err = manualStudyAction(conn, catalog, req.ActorID, req.Payload)
-		case "manual.technique":
-			mutation, err = manualTechniqueAction(conn, catalog, req.ActorID, req.Payload)
-		case "crime.atone":
-			mutation, err = crimeAtoneAction(conn, catalog, req.ActorID, req.Payload)
-		case "world_event.act":
-			mutation, err = worldEventActAction(conn, catalog, req.ActorID, req.Payload)
+		case "check.resolve", "scene.action":
+			if strings.TrimSpace(worldPath) == "" {
+				return ActionResponse{}, errors.New("world catalog path is required")
+			}
+			catalog, loadErr := worlddata.Load(worldPath)
+			if loadErr != nil {
+				return ActionResponse{}, loadErr
+			}
+			if req.Operation == "check.resolve" {
+				mutation, err = resolveCanonicalCheckV2(conn, catalog, req.ActorID, req.Payload)
+			} else {
+				mutation, err = resolveSceneAction(conn, catalog, req.ActorID, req.Payload)
+			}
+		case "lifecycle.true_death":
+			mutation, err = trueDeathAction(conn, req.ActorID, req.Payload)
+		case "combat.finalize":
+			mutation, err = combatFinalizeAction(conn, req.ActorID, req.Payload)
+		case "character.family_options":
+			mutation, err = birthFamilyOptionsAction(conn, req.ActorID, req.Payload)
+		case "character.create":
+			mutation, err = createCharacterAuthoritative(conn, worldPath, req.ActorID, req.Payload)
+		case "family.household.enter":
+			mutation, err = familyHouseholdEnterAction(conn, req.ActorID, req.Payload)
+		case "family.household.leave":
+			mutation, err = familyHouseholdLeaveAction(conn, req.ActorID, req.Payload)
+		case "family.lineage.investigate":
+			mutation, err = lineageInvestigateAction(conn, req.ActorID, req.Payload)
+		case "family.lineage.quest":
+			mutation, err = dynastyQuestAction(conn, req.ActorID, req.Payload)
+		case "family.dynasty.claim":
+			mutation, err = dynastyClaimAction(conn, req.ActorID, req.Payload)
+		case "family.dynasty.conflict":
+			mutation, err = dynastyConflictAction(conn, req.ActorID, req.Payload)
+		case "auction.enter", "auction.leave", "auction.sell", "auction.bid", "black_market.trade", "market.trade", "bounty_hunter.act", "equipment.bind", "equipment.equip", "equipment.unequip", "equipment.repair", "party.create", "party.join", "party.leave", "formation.create", "formation.assign", "formation.activate", "formation.stance", "boss.start", "boss.act", "boss.claim", "territory.claim", "war.act", "caravan.dispatch", "caravan.settle", "sect.recruitment.recommendation", "sect.recruitment.trial", "sect.contribute", "sect.redeem", "discipleship.request", "discipleship.resolve", "discipleship.leave", "sect.manor.establish", "sect.manor.upgrade", "family.simulate", "family.support", "family.add_child", "seclusion.start", "seclusion.settle", "fate.adjust", "dao.propose", "dao.respond", "dao.sever", "dao.dual_cultivate", "storage.deposit", "storage.withdraw", "storage.upgrade", "abode.establish", "abode.enter", "abode.visit", "abode.leave", "abode.invite", "abode.revoke", "abode.upgrade", "abode.focus", "array.use", "array.deploy", "spatial_key.use", "personal_world.create", "personal_world.set_rule", "personal_world.enter", "personal_world.leave":
+			if strings.TrimSpace(worldPath) == "" {
+				return ActionResponse{}, errors.New("world catalog path is required")
+			}
+			catalog, loadErr := worlddata.Load(worldPath)
+			if loadErr != nil {
+				return ActionResponse{}, loadErr
+			}
+			mutation, err = applyLateMigrationAction(conn, catalog, req.ActorID, req.Operation, req.Payload)
+		case "aptitude.temper", "aptitude.awaken", "aptitude.evolve", "aptitude.harmonize",
+			"cultivation.train", "cultivation.body_train", "cultivation.breakthrough", "cultivation.body_breakthrough",
+			"lifecycle.reincarnate", "combat.turn", "combat.technique", "combat.recovery_item",
+			"perfection.start", "perfection.quest", "perfection.trial", "perfection.abandon",
+			"perfection.body_start", "perfection.body_quest", "perfection.body_trial", "perfection.body_abandon", "law.comprehend",
+			"condition.treat", "sense.inspect", "sense.conceal", "tribulation.prepare", "tribulation.attempt",
+			"exploration.explore", "exploration.event.act", "exploration.event.leave", "exploration.travel", "exploration.hunt",
+			"secret_realm.enter", "secret_realm.explore", "secret_realm.leave", "craft.resolve", "forage.resolve",
+			"beast.tame", "beast.feed", "beast.train", "beast.evolve", "beast.active", "artifact.bond", "artifact.awaken",
+			"pvp.challenge", "pvp.respond", "pvp.act", "manual.study", "manual.technique", "crime.atone", "world_event.act":
+			if strings.TrimSpace(worldPath) == "" {
+				return ActionResponse{}, errors.New("world catalog path is required")
+			}
+			catalog, loadErr := worlddata.Load(worldPath)
+			if loadErr != nil {
+				return ActionResponse{}, loadErr
+			}
+			switch req.Operation {
+			case "aptitude.temper":
+				mutation, err = aptitudeTemper(conn, catalog, req.ActorID, req.Payload)
+			case "aptitude.awaken":
+				mutation, err = aptitudeAwaken(conn, catalog, req.ActorID, req.Payload)
+			case "aptitude.evolve":
+				mutation, err = aptitudeEvolve(conn, catalog, req.ActorID, req.Payload)
+			case "aptitude.harmonize":
+				mutation, err = aptitudeHarmonize(conn, catalog, req.ActorID, req.Payload)
+			case "cultivation.train":
+				mutation, err = cultivationTrain(conn, catalog, req.ActorID, req.Payload, false)
+			case "cultivation.body_train":
+				mutation, err = cultivationTrain(conn, catalog, req.ActorID, req.Payload, true)
+			case "cultivation.breakthrough":
+				mutation, err = cultivationBreakthrough(conn, catalog, req.ActorID, req.Payload, false)
+			case "cultivation.body_breakthrough":
+				mutation, err = cultivationBreakthrough(conn, catalog, req.ActorID, req.Payload, true)
+			case "lifecycle.reincarnate":
+				mutation, err = reincarnateAction(conn, catalog, req.ActorID, req.Payload)
+			case "combat.turn":
+				mutation, err = combatTurnAction(conn, catalog, req.ActorID, req.Payload)
+			case "combat.technique":
+				mutation, err = combatTechniqueAction(conn, catalog, req.ActorID, req.Payload)
+			case "combat.recovery_item":
+				mutation, err = combatRecoveryItemAction(conn, catalog, req.ActorID, req.Payload)
+			case "perfection.start":
+				mutation, err = perfectionStartAction(conn, catalog, req.ActorID, req.Payload, false)
+			case "perfection.quest":
+				mutation, err = perfectionQuestAction(conn, catalog, req.ActorID, req.Payload, false)
+			case "perfection.trial":
+				mutation, err = perfectionTrialAction(conn, catalog, req.ActorID, req.Payload, false)
+			case "perfection.abandon":
+				mutation, err = perfectionAbandonAction(conn, catalog, req.ActorID, req.Payload, false)
+			case "perfection.body_start":
+				mutation, err = perfectionStartAction(conn, catalog, req.ActorID, req.Payload, true)
+			case "perfection.body_quest":
+				mutation, err = perfectionQuestAction(conn, catalog, req.ActorID, req.Payload, true)
+			case "perfection.body_trial":
+				mutation, err = perfectionTrialAction(conn, catalog, req.ActorID, req.Payload, true)
+			case "perfection.body_abandon":
+				mutation, err = perfectionAbandonAction(conn, catalog, req.ActorID, req.Payload, true)
+			case "law.comprehend":
+				mutation, err = lawComprehendAction(conn, catalog, req.ActorID, req.Payload)
+			case "condition.treat":
+				mutation, err = conditionTreatAction(conn, catalog, req.ActorID, req.Payload)
+			case "sense.inspect":
+				mutation, err = senseInspectAction(conn, catalog, req.ActorID, req.Payload)
+			case "sense.conceal":
+				mutation, err = senseConcealAction(conn, catalog, req.ActorID, req.Payload)
+			case "tribulation.prepare":
+				mutation, err = tribulationPrepareAction(conn, catalog, req.ActorID, req.Payload)
+			case "tribulation.attempt":
+				mutation, err = tribulationAttemptAction(conn, catalog, req.ActorID, req.Payload)
+			case "exploration.explore":
+				mutation, err = explorationExploreAction(conn, catalog, req.ActorID, req.Payload)
+			case "exploration.event.act":
+				mutation, err = explorationEventActAction(conn, catalog, req.ActorID, req.Payload, false)
+			case "exploration.event.leave":
+				mutation, err = explorationEventActAction(conn, catalog, req.ActorID, req.Payload, true)
+			case "exploration.travel":
+				mutation, err = explorationTravelAction(conn, catalog, req.ActorID, req.Payload)
+			case "exploration.hunt":
+				mutation, err = explorationHuntAction(conn, catalog, req.ActorID, req.Payload)
+			case "secret_realm.enter":
+				mutation, err = secretRealmEnterAction(conn, catalog, req.ActorID, req.Payload)
+			case "secret_realm.explore":
+				mutation, err = secretRealmExploreAction(conn, catalog, req.ActorID, req.Payload)
+			case "secret_realm.leave":
+				mutation, err = secretRealmLeaveAction(conn, req.ActorID, req.Payload)
+			case "craft.resolve":
+				mutation, err = craftResolveAction(conn, catalog, req.ActorID, req.Payload)
+			case "forage.resolve":
+				mutation, err = forageResolveAction(conn, catalog, req.ActorID, req.Payload)
+			case "beast.tame":
+				mutation, err = beastTameAction(conn, catalog, req.ActorID, req.Payload)
+			case "beast.feed":
+				mutation, err = beastFeedAction(conn, catalog, req.ActorID, req.Payload)
+			case "beast.train":
+				mutation, err = beastTrainAction(conn, catalog, req.ActorID, req.Payload)
+			case "beast.evolve":
+				mutation, err = beastEvolveAction(conn, catalog, req.ActorID, req.Payload)
+			case "beast.active":
+				mutation, err = beastActiveAction(conn, catalog, req.ActorID, req.Payload)
+			case "artifact.bond":
+				mutation, err = artifactBondAction(conn, catalog, req.ActorID, req.Payload)
+			case "artifact.awaken":
+				mutation, err = artifactAwakenAction(conn, catalog, req.ActorID, req.Payload)
+			case "pvp.challenge":
+				mutation, err = pvpChallengeAction(conn, catalog, req.ActorID, req.Payload)
+			case "pvp.respond":
+				mutation, err = pvpRespondAction(conn, catalog, req.ActorID, req.Payload)
+			case "pvp.act":
+				mutation, err = pvpActAction(conn, catalog, req.ActorID, req.Payload)
+			case "manual.study":
+				mutation, err = manualStudyAction(conn, catalog, req.ActorID, req.Payload)
+			case "manual.technique":
+				mutation, err = manualTechniqueAction(conn, catalog, req.ActorID, req.Payload)
+			case "crime.atone":
+				mutation, err = crimeAtoneAction(conn, catalog, req.ActorID, req.Payload)
+			case "world_event.act":
+				mutation, err = worldEventActAction(conn, catalog, req.ActorID, req.Payload)
+			default:
+				err = fmt.Errorf("unsupported authoritative operation: %s", req.Operation)
+			}
 		default:
 			err = fmt.Errorf("unsupported authoritative operation: %s", req.Operation)
 		}
-	default:
-		err = fmt.Errorf("unsupported authoritative operation: %s", req.Operation)
 	}
 	if err != nil {
 		return ActionResponse{}, err
