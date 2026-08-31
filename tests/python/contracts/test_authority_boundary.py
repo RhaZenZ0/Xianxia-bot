@@ -465,3 +465,40 @@ def test_wild_beast_encounter_reader_is_read_only_and_filters_expiry():
     assert "UPDATE wild_beast_encounters" not in method_source
     assert ".commit(" not in method_source
     assert "expires_game_minute>?" in method_source
+
+
+def _authoritative_action_payload_keys(name: str) -> set[str]:
+    # Only the dict literal actually passed as the payload argument to
+    # ENGINE.authoritative_action - not every string constant in the
+    # function, which would also catch legitimate dict-key reads of Go's
+    # *returned* roll data (e.g. roll.get('modifier'), roll.get('tn')) for
+    # display and false-flag on those.
+    keys: set[str] = set()
+    for node in ast.walk(FUNCTIONS[name]):
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "authoritative_action"
+        ):
+            for arg in node.args:
+                if isinstance(arg, ast.Dict):
+                    keys.update(
+                        k.value for k in arg.keys if isinstance(k, ast.Constant)
+                    )
+    return keys
+
+
+def test_sect_recruitment_does_not_send_caller_computed_rolls():
+    # sect.recruitment.recommendation and sect.recruitment.trial used to accept
+    # a client-supplied modifier/tn/bonus (recommendation) and
+    # primary_modifier/secondary_modifier/base_tn (trial), letting a forged
+    # authoritative_action call guarantee passing any sect trial. Go now
+    # derives all of these from canonical character/reputation state; the
+    # caller sends only identifiers and flavor-text details.
+    forbidden = {
+        "modifier", "tn", "bonus",
+        "primary_modifier", "secondary_modifier", "base_tn",
+    }
+    for fn in ("sect_recruitment_recommendation", "sect_recruitment_trial"):
+        hit = forbidden & _authoritative_action_payload_keys(fn)
+        assert not hit, f"{fn} still sends a forged-roll payload field: {hit}"

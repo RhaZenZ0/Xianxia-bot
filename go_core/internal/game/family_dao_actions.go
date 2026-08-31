@@ -83,6 +83,20 @@ func simulateBirthFamilyGo(conn *storage.Conn, userID int64, raw json.RawMessage
 			return authoritativeMutation{}, errors.New("no birth family is recorded")
 		}
 		familyID = i64(f["family_id"])
+	} else {
+		// family_id is a shared-household key - multiple players can belong
+		// to the same birth family - but that's not license for any caller
+		// to target an arbitrary family_id. Without this check a client
+		// could advance (and read the full wealth/influence/stability/
+		// bloodline/history of) any family in the game, including ones they
+		// have no connection to at all, just by guessing an ID.
+		linked, e := conn.Execute(`SELECT 1 FROM character_birth_family WHERE user_id=? AND family_id=?`, []any{userID, familyID})
+		if e != nil {
+			return authoritativeMutation{}, e
+		}
+		if len(linked.Rows) == 0 {
+			return authoritativeMutation{}, errors.New("you are not a member of that birth family")
+		}
 	}
 	r, e := conn.Execute(`SELECT * FROM birth_families WHERE family_id=?`, []any{familyID})
 	if e != nil {

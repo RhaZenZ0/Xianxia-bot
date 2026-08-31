@@ -16,24 +16,18 @@ import (
 type sectRecommendationPayload struct {
 	NPCName    string         `json:"npc_name"`
 	SectName   string         `json:"sect_name"`
-	Modifier   int64          `json:"modifier"`
-	TN         int64          `json:"tn"`
-	Bonus      int64          `json:"bonus"`
 	GameMinute int64          `json:"game_minute"`
 	Location   string         `json:"location"`
 	Details    map[string]any `json:"details"`
 }
 type sectTrialPayload struct {
-	SectName          string `json:"sect_name"`
-	Examiner          string `json:"examiner"`
-	Location          string `json:"location"`
-	TrialName         string `json:"trial_name"`
-	PrimaryModifier   int64  `json:"primary_modifier"`
-	SecondaryModifier int64  `json:"secondary_modifier"`
-	BaseTN            int64  `json:"base_tn"`
-	GameMinute        int64  `json:"game_minute"`
-	PrimaryDetails    any    `json:"primary_details"`
-	SecondaryDetails  any    `json:"secondary_details"`
+	SectName         string `json:"sect_name"`
+	Examiner         string `json:"examiner"`
+	Location         string `json:"location"`
+	TrialName        string `json:"trial_name"`
+	GameMinute       int64  `json:"game_minute"`
+	PrimaryDetails   any    `json:"primary_details"`
+	SecondaryDetails any    `json:"secondary_details"`
 }
 type sectItemPayload struct {
 	ItemID   string `json:"item_id"`
@@ -77,6 +71,17 @@ func recordSectAttemptGo(conn *storage.Conn, userID int64, sect, kind, npc, loc,
 	_, e := conn.Execute(`INSERT INTO sect_recruitment_attempts(user_id,sect_name,attempt_type,npc_name,location,result,score,target,recommendation_bonus,details_json,game_minute,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`, []any{userID, sect, kind, npc, loc, result, score, target, bonus, string(b), gm, now})
 	return e
 }
+func sectReputationScore(conn *storage.Conn, userID int64, sect string) (int64, error) {
+	r, e := conn.Execute(`SELECT score FROM faction_reputation WHERE user_id=? AND faction_key=?`, []any{userID, sect})
+	if e != nil {
+		return 0, e
+	}
+	row := firstRowMap(r)
+	if row == nil {
+		return 0, nil
+	}
+	return i64(row["score"]), nil
+}
 func sectRecommendationActionGo(conn *storage.Conn, _ worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	var p sectRecommendationPayload
 	if e := json.Unmarshal(raw, &p); e != nil {
@@ -86,6 +91,13 @@ func sectRecommendationActionGo(conn *storage.Conn, _ worlddata.Catalog, userID 
 	p.SectName = strings.TrimSpace(p.SectName)
 	if p.NPCName == "" || p.SectName == "" {
 		return authoritativeMutation{}, errors.New("npc_name and sect_name are required")
+	}
+	c, e := loadMechanicsCharacter(conn, userID)
+	if e != nil {
+		return authoritativeMutation{}, e
+	}
+	if c.LifeStatus != "alive" {
+		return authoritativeMutation{}, errors.New("a deceased incarnation cannot seek a sect recommendation")
 	}
 	if m, _ := sectMembershipRow(conn, userID); m != nil {
 		return authoritativeMutation{}, errors.New("already belongs to a public sect")
@@ -104,43 +116,61 @@ func sectRecommendationActionGo(conn *storage.Conn, _ worlddata.Catalog, userID 
 	if x := firstRowMap(r); x != nil && fmt.Sprint(x["result"]) == "fail" && p.GameMinute-i64(x["game_minute"]) < 1440 {
 		return authoritativeMutation{}, errors.New("recommendation retry cooldown is still active")
 	}
-	if p.TN < 8 {
-		p.TN = 8
-	}
-	roll, e := roll2d10Go(p.Modifier, p.TN)
+	repScore, e := sectReputationScore(conn, userID, p.SectName)
 	if e != nil {
 		return authoritativeMutation{}, e
+	}
+	// Canonical, not caller-supplied: how favorably an NPC is inclined to
+	// vouch for this character derives from the character's own presence,
+	// cultivation depth, and standing already earned with this sect - never
+	// from a client-chosen modifier/TN/bonus.
+	modifier := c.Attributes["presence"] + c.RealmIndex*2 + repScore/20
+	tn := int64(14)
+	roll, e := roll2d10Go(modifier, tn)
+	if e != nil {
+		return authoritativeMutation{}, e
+	}
+	bonus := int64(0)
+	if roll.Success {
+		bonus = clampI64(2+roll.Margin/3, 1, 6)
 	}
 	now := nowSeconds()
 	route := false
 	recID := int64(0)
 	if roll.Success {
 		_, _ = conn.Execute(`UPDATE sect_recommendations SET status='superseded',updated_at=? WHERE user_id=? AND sect_name=? AND status='active'`, []any{now, userID, p.SectName})
-		c, e := conn.Execute(`INSERT INTO sect_recommendations(user_id,npc_name,sect_name,bonus,status,issued_game_minute,created_at,updated_at) VALUES(?,?,?,?,'active',?,?,?)`, []any{userID, p.NPCName, p.SectName, max64(0, p.Bonus), p.GameMinute, now, now})
+		ins, e := conn.Execute(`INSERT INTO sect_recommendations(user_id,npc_name,sect_name,bonus,status,issued_game_minute,created_at,updated_at) VALUES(?,?,?,?,'active',?,?,?)`, []any{userID, p.NPCName, p.SectName, bonus, p.GameMinute, now, now})
 		if e != nil {
 			return authoritativeMutation{}, e
 		}
-		recID = c.LastInsertID
+		recID = ins.LastInsertID
 		_, _ = conn.Execute(`INSERT OR IGNORE INTO character_sect_discoveries(user_id,sect_name,discovery_kind,source_key,discovered_game_minute,created_at) VALUES(?,?, 'npc_recommendation', ?, ?, ?)`, []any{userID, p.SectName, p.NPCName, p.GameMinute, now})
 		if p.Location != "" {
-			c, _ := conn.Execute(`INSERT OR IGNORE INTO character_location_discoveries(user_id,location,discovery_kind,discovered_game_minute,created_at) VALUES(?,?,'npc_recommendation',?,?)`, []any{userID, p.Location, p.GameMinute, now})
-			route = c.RowsAffected > 0
+			ins, _ := conn.Execute(`INSERT OR IGNORE INTO character_location_discoveries(user_id,location,discovery_kind,discovered_game_minute,created_at) VALUES(?,?,'npc_recommendation',?,?)`, []any{userID, p.Location, p.GameMinute, now})
+			route = ins.RowsAffected > 0
 		}
 	}
 	details := map[string]any{"roll": rollMapGo(roll), "route_revealed": route}
 	for k, v := range p.Details {
 		details[k] = v
 	}
-	if e = recordSectAttemptGo(conn, userID, p.SectName, "recommendation", p.NPCName, p.Location, map[bool]string{true: "pass", false: "fail"}[roll.Success], roll.Total, roll.TN, map[bool]int64{true: p.Bonus, false: 0}[roll.Success], p.GameMinute, details, now); e != nil {
+	if e = recordSectAttemptGo(conn, userID, p.SectName, "recommendation", p.NPCName, p.Location, map[bool]string{true: "pass", false: "fail"}[roll.Success], roll.Total, roll.TN, bonus, p.GameMinute, details, now); e != nil {
 		return authoritativeMutation{}, e
 	}
-	out := map[string]any{"success": roll.Success, "roll": rollMapGo(roll), "recommendation_id": recID, "recommendation_bonus": map[bool]int64{true: p.Bonus, false: 0}[roll.Success], "route_revealed": route, "sect_name": p.SectName, "npc_name": p.NPCName}
+	out := map[string]any{"success": roll.Success, "roll": rollMapGo(roll), "recommendation_id": recID, "recommendation_bonus": bonus, "route_revealed": route, "sect_name": p.SectName, "npc_name": p.NPCName}
 	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "sect", EventType: "sect.recruitment.recommendation", EntityType: "character", EntityID: fmt.Sprint(userID), GameMinute: p.GameMinute, Payload: out}}, nil
 }
 func sectTrialActionGo(conn *storage.Conn, _ worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	var p sectTrialPayload
 	if e := json.Unmarshal(raw, &p); e != nil {
 		return authoritativeMutation{}, e
+	}
+	c, e := loadMechanicsCharacter(conn, userID)
+	if e != nil {
+		return authoritativeMutation{}, e
+	}
+	if c.LifeStatus != "alive" {
+		return authoritativeMutation{}, errors.New("a deceased incarnation cannot sit a sect entrance trial")
 	}
 	if m, _ := sectMembershipRow(conn, userID); m != nil {
 		return authoritativeMutation{}, errors.New("already belongs to a public sect")
@@ -152,12 +182,7 @@ func sectTrialActionGo(conn *storage.Conn, _ worlddata.Catalog, userID int64, ra
 	if firstRowMap(r) == nil {
 		return authoritativeMutation{}, errors.New("sect has not been discovered")
 	}
-	r, e = conn.Execute(`SELECT location FROM characters WHERE user_id=?`, []any{userID})
-	if e != nil {
-		return authoritativeMutation{}, e
-	}
-	c := firstRowMap(r)
-	if c == nil || fmt.Sprint(c["location"]) != p.Location {
+	if c.Location != p.Location {
 		return authoritativeMutation{}, errors.New("character is not at the sect trial location")
 	}
 	r, _ = conn.Execute(`SELECT result,game_minute FROM sect_recruitment_attempts WHERE user_id=? AND sect_name=? AND attempt_type='trial' ORDER BY attempt_id DESC LIMIT 1`, []any{userID, p.SectName})
@@ -173,14 +198,24 @@ func sectTrialActionGo(conn *storage.Conn, _ worlddata.Catalog, userID int64, ra
 	if rec != nil {
 		recBonus = i64(rec["bonus"])
 	}
-	if p.BaseTN < 8 {
-		p.BaseTN = 8
-	}
-	primary, e := roll2d10Go(p.PrimaryModifier, p.BaseTN)
+	repScore, e := sectReputationScore(conn, userID, p.SectName)
 	if e != nil {
 		return authoritativeMutation{}, e
 	}
-	secondary, e := roll2d10Go(p.SecondaryModifier, max64(8, p.BaseTN-1))
+	// Canonical, not caller-supplied: the primary (martial) and secondary
+	// (spiritual) trial components derive from the character's own
+	// attributes and cultivation depth, with existing sect standing making
+	// the baseline slightly easier. A recommendation grants leeway on the
+	// outcome threshold below, not a further modifier bump, so it isn't
+	// double-counted.
+	primaryMod := c.Attributes["body"] + c.RealmIndex*2 + c.Phase/3
+	secondaryMod := c.Attributes["insight"] + c.Attributes["spirit"]/2 + c.RealmIndex
+	baseTN := maxI64(10, 15-repScore/25)
+	primary, e := roll2d10Go(primaryMod, baseTN)
+	if e != nil {
+		return authoritativeMutation{}, e
+	}
+	secondary, e := roll2d10Go(secondaryMod, max64(8, baseTN-1))
 	if e != nil {
 		return authoritativeMutation{}, e
 	}
