@@ -9472,14 +9472,13 @@ async def sect_recruitment_recommendation(interaction: discord.Interaction, npc:
     if not memory.strip():
         await interaction.response.send_message(f"Speak with **{npc}** first; a recommendation requires established personal history.",ephemeral=False);return
     family=await DB.get_birth_family(interaction.user.id); reps=await DB.get_reputations(interaction.user.id); rep=next((int(x.get('score',0)) for x in reps if str(x.get('faction_key'))==sect_name),0)
-    modifier,notes=recommendation_modifier(c,faction_reputation=rep,family=family,sect_alignment=str(WORLD.sects[sect_name].get('alignment','Neutral')))
-    tn=max(8,int(npc_data.get('recommendation_tn',14))); bonus=max(0,int(npc_data.get('recommendation_bonus',rec.get('recommendation_bonus',2))))
+    _,notes=recommendation_modifier(c,faction_reputation=rep,family=family,sect_alignment=str(WORLD.sects[sect_name].get('alignment','Neutral')))
     try:
-        e=await ENGINE.authoritative_action("sect.recruitment.recommendation",interaction.user.id,{"npc_name":npc,"sect_name":sect_name,"modifier":modifier,"tn":tn,"bonus":bonus,"location":str(rec.get('location') or ''),"details":{"modifier_notes":notes}},action_id=f"discord:{interaction.id}:sect.recruitment.recommendation"); r=dict(e.get('result') or {})
+        e=await ENGINE.authoritative_action("sect.recruitment.recommendation",interaction.user.id,{"npc_name":npc,"sect_name":sect_name,"location":str(rec.get('location') or ''),"details":{"modifier_notes":notes}},action_id=f"discord:{interaction.id}:sect.recruitment.recommendation"); r=dict(e.get('result') or {})
     except GameEngineError as exc:
         await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
-    roll=dict(r.get('roll') or {}); roll_text=f"2d10 {int(roll.get('modifier',0)):+d} = **{int(roll.get('total',0))}** vs TN **{int(roll.get('tn',tn))}**"
-    tail=f"📜 Recommendation secured: +{bonus}." if r.get('success') else "The recommendation was not granted."
+    roll=dict(r.get('roll') or {}); roll_text=f"2d10 {int(roll.get('modifier',0)):+d} = **{int(roll.get('total',0))}** vs TN **{int(roll.get('tn',0))}**"
+    tail=f"📜 Recommendation secured: +{int(r.get('recommendation_bonus',0))}." if r.get('success') else "The recommendation was not granted."
     await interaction.response.send_message(f"{roll_text}\n{tail}",ephemeral=False)
 
 
@@ -9510,12 +9509,12 @@ async def sect_recruitment_trial(interaction: discord.Interaction, sect_name: st
     if not rec or not profile:
         await interaction.response.send_message("That sect has no configured entrance trial.",ephemeral=False);return
     recommendation=await DB.get_active_sect_recommendation(interaction.user.id,sect_name); recommendation_bonus=int(recommendation.get('bonus',0)) if recommendation else 0; family=await DB.get_birth_family(interaction.user.id)
-    primary_mod,primary_notes,rejection=trial_modifier(c,rec,attribute=profile.primary_attribute,family=family,recommendation_bonus=recommendation_bonus)
-    secondary_mod,secondary_notes,rejection2=trial_modifier(c,rec,attribute=profile.secondary_attribute,family=family,recommendation_bonus=recommendation_bonus)
+    _,primary_notes,rejection=trial_modifier(c,rec,attribute=profile.primary_attribute,family=family,recommendation_bonus=recommendation_bonus)
+    _,secondary_notes,rejection2=trial_modifier(c,rec,attribute=profile.secondary_attribute,family=family,recommendation_bonus=recommendation_bonus)
     if rejection or rejection2:
         await interaction.response.send_message(f"🚫 **Entrance refused before examination.** {rejection or rejection2}",ephemeral=False);return
     try:
-        e=await ENGINE.authoritative_action("sect.recruitment.trial",interaction.user.id,{"sect_name":sect_name,"examiner":profile.examiner,"location":profile.location,"trial_name":profile.trial_name,"primary_modifier":primary_mod,"secondary_modifier":secondary_mod,"base_tn":profile.base_tn,"primary_details":primary_notes,"secondary_details":secondary_notes},action_id=f"discord:{interaction.id}:sect.recruitment.trial"); r=dict(e.get('result') or {})
+        e=await ENGINE.authoritative_action("sect.recruitment.trial",interaction.user.id,{"sect_name":sect_name,"examiner":profile.examiner,"location":profile.location,"trial_name":profile.trial_name,"primary_details":primary_notes,"secondary_details":secondary_notes},action_id=f"discord:{interaction.id}:sect.recruitment.trial"); r=dict(e.get('result') or {})
     except GameEngineError as exc:
         await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
     outcome=str(r.get('outcome','fail')); p=dict(r.get('primary') or {}); q=dict(r.get('secondary') or {})
