@@ -193,22 +193,31 @@ func pvpActAction(conn *storage.Conn, _ worlddata.Catalog, userID int64, raw jso
 	now := float64(time.Now().UnixNano()) / 1e9
 	result := map[string]any{"match_id": p.MatchID, "style": p.Style, "opponent_user_id": opponentID}
 	if p.Style == "surrender" {
+		// Reputation is meant to reward an honorable yield mid-fight, not a
+		// free grant for both sides via an immediate challenge->accept->
+		// surrender cycle with zero real risk taken. version only advances
+		// on an actual attack/defend exchange, so version==0 means nothing
+		// has happened in this match yet.
+		fought := i64(m["version"]) > 0
 		_, e = conn.Execute(`UPDATE pvp_matches SET status='finished',winner_user_id=?,version=version+1,updated_at=? WHERE match_id=?`, []any{opponentID, now, p.MatchID})
 		if e != nil {
 			return authoritativeMutation{}, e
 		}
-		_, e = adjustReputationTx(conn, opponentID, "Martial Society", 2, fmt.Sprintf("won consensual duel #%d", p.MatchID), now)
-		if e != nil {
-			return authoritativeMutation{}, e
-		}
-		_, e = adjustReputationTx(conn, userID, "Martial Society", 1, fmt.Sprintf("honorably completed consensual duel #%d", p.MatchID), now)
-		if e != nil {
-			return authoritativeMutation{}, e
+		if fought {
+			_, e = adjustReputationTx(conn, opponentID, "Martial Society", 2, fmt.Sprintf("won consensual duel #%d", p.MatchID), now)
+			if e != nil {
+				return authoritativeMutation{}, e
+			}
+			_, e = adjustReputationTx(conn, userID, "Martial Society", 1, fmt.Sprintf("honorably completed consensual duel #%d", p.MatchID), now)
+			if e != nil {
+				return authoritativeMutation{}, e
+			}
 		}
 		updated, _ := pvpMatchRow(conn, p.MatchID)
 		result["match"] = updated
 		result["finished"] = true
 		result["winner_user_id"] = opponentID
+		result["reputation_awarded"] = fought
 		return authoritativeMutation{Result: result, Event: eventledger.Event{Domain: "pvp", EventType: "pvp.surrender", EntityType: "pvp_match", EntityID: fmt.Sprint(p.MatchID), Payload: result}}, nil
 	}
 	actorGuard := "player2_guard"

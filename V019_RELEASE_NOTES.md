@@ -9,12 +9,18 @@ full v0.18 authority migration and its post-release additions.
 ## Verification standard
 
 This release was built without a Go compiler or pytest available in the build
-environment. Where something was actually executed, it says so explicitly
-below. Everything else is a careful, traced static read — real bugs were found
-and fixed this way, but **`go build ./...`, `go test ./...`, and
-`python -m pytest -q` still need to be run for real before this ships.** The
-one thing that *was* run directly and repeatedly during this release is
-`dashboard_implementation_issues()` (pure-stdlib Python, no toolchain
+environment — every fix was a traced static read, not compiler-verified, at
+the time it was made. **Update:** all Go tests now pass on merged `main`
+(commit `1f2a229`) — build clean, every package `ok`. That confirms every Go
+change in this release actually compiles and doesn't regress anything the
+existing suite covers. It does **not** by itself confirm the *new* behavior
+introduced this session is correct — none of it (old-age death enforcement,
+the sect-recruitment forged-roll fix, the `family_id` ownership fix, the
+tribulation dual-path selector, combat-technique parity) has dedicated test
+coverage unless that was added separately as part of the same merge.
+`python -m pytest -q` status is still unconfirmed. The one thing that *was*
+run directly and repeatedly during this release, independent of the above,
+is `dashboard_implementation_issues()` (pure-stdlib Python, no toolchain
 required) — every dashboard change in this release passed that gate live.
 
 ## Player old-age death (was display-only, now enforced)
@@ -115,6 +121,65 @@ redundant AUDIT/VALIDATION/CHECKPOINT files — most stages had 2-4 files
 re-reporting pass/fail on the same work — into `V018_BUILD_HISTORY.md`,
 explicit about what was originally claimed vs. independently re-verified.
 Fixed two dangling doc references the deletions created.
+
+A later pass in this same release archived the three remaining V017-era docs
+(`V017_COMPARISON_AND_MERGE.md`, `V017_RELEASE_NOTES.md`,
+`V017_REMAINING_AUTHORITY_GAPS.md`) into `docs/migration_history/` alongside
+the existing V015/V016 archive — confirmed unreferenced elsewhere first —
+and fixed `README.md`, which had drifted to a mix of "v0.18" section
+headings and schema **21**/**22** references despite the code being on
+schema **24** and the `VERSION` file already reading 0.19.
+
+## Combat authority migration (this session's follow-on pass)
+
+A further pass over the same "Go owns canonical mechanics, Python owns Discord/presentation" boundary,
+targeted at the remaining Python-side mutation of canonical battle state:
+
+- **`combat.technique` was still missing the equipment-durability cost `combat.turn` and boss combat both
+  apply.** The counter-attack/injury/fatality parity fix above (Cultivation Depth audit) covered the risk
+  side; the durability side was a separate gap in the same function. A technique use could be repeated as a
+  durability-free alternative to a normal attack. Added the same `damageEquipmentGo(conn, userID, 1)` call
+  `combat.turn` makes, so every offensive action in a battle now costs durability consistently.
+- **New `combat.start` Go action, replacing Python's `Database.create_battle`.** 1v1 challenge and event
+  battles previously had their opponent HP/realm/stage curve and the player's starting HP snapshot computed
+  in Python and inserted directly into `battles`, unlike raid/boss combat which already goes through a Go
+  `boss.start` action. `combat.start` mirrors that: it loads the actor's canonical `characters` row itself
+  (ignoring any caller-supplied stat fields), computes the opponent curve server-side for both `challenge` and
+  `event` kinds, rejects a second active battle against a `target_key` already locked by another user, and
+  abandons any stray active battle the same user already had before opening the new one. `/battle challenge`
+  and the event "Battle" button in `app/bot/main.py` now call `CombatService.start()` instead of
+  `Database.create_battle`. `Database.create_battle` itself was kept (unused by the bot) because
+  `tests/python/integration/test_battle.py` still exercises it directly against a local SQLite fixture.
+  Covered by 5 new Go tests in `combat_start_test.go`, including one that proves the `event` kind ignores a
+  payload's forged `npc_realm_index`/`npc_stage` and derives the opponent from the caller's own character.
+- **`combat.recovery_item` was leaving `battles.player_hp` stale.** Mid-battle healing item use already went
+  through the Go `combat.recovery_item` action and correctly updated `characters.vitality`, but never wrote
+  the matching `battles.player_hp` — the two per-battle HP tracks that every other combat mutation
+  (`combat.turn`, `combat.technique`) keeps in lockstep. This meant the battle panel's HP bar stayed stale
+  after a mid-fight heal until the next turn recomputed it — a real, pre-existing bug independent of the
+  migration below, since the battle-panel item-use flow already called this action. Fixed by writing
+  `battles.player_hp`/`player_hp_max` alongside `characters.vitality` whenever the item restores vitality.
+  Covered by a new Go test asserting both tracks move together.
+- **`/use item`'s mid-battle healing path migrated to `combat.recovery_item`.** The command previously called
+  `Database.restore_resources` directly during an active battle, bypassing the authoritative dispatcher (and,
+  until the fix above, would have kept desyncing `battles.player_hp` even if it had gone through Go).
+  `use_item_command` now detects an active battle and routes instant qi/vitality restores through
+  `CombatService.recovery_item()`, falling back to the original `consume_item`/`restore_resources` path
+  unchanged when there is no active battle. Item consumption happens exactly once on either path.
+- **`boss.act`'s `technique` style was a flat, unconditional +5 accuracy bonus available to every raider**,
+  regardless of whether they had actually unlocked the underlying Law technique — unlike `combat.technique`,
+  which already gates on Law stage/realm and scales with comprehension. `bossActActionGo` now looks up the
+  caller's own `law_progress` row for the chosen technique's Law, rejects the action if the stage/realm
+  requirement isn't met, and scales the bonus with comprehension (`2 + comprehension/20`) instead of a flat 5.
+  `/boss act` gained a `technique` option (autocompleted from the same `law_technique_autocomplete` the
+  `/law technique` command uses) and now requires it when `style=technique`. Shipped without dedicated Go
+  test coverage — `go_core/internal/game` has no existing `boss_encounters` fixture to extend cheaply.
+- **`pvp.act` surrender granted Martial Society reputation to both sides even when no exchange had happened**,
+  letting a challenge → accept → surrender cycle farm reputation for zero real risk. `pvpActAction` now only
+  awards the win/honor reputation on surrender when the match's `version` shows at least one real
+  attack/defend exchange occurred first (`version` only advances on those), and reports whether reputation was
+  awarded in the result payload (`reputation_awarded`). Also shipped without dedicated Go test coverage, for
+  the same reason as the `boss.act` fix above.
 
 ## Semantic audits run against the wider package
 

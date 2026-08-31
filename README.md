@@ -1,15 +1,17 @@
-# Xianxia RP Discord Bot v0.18
+# Xianxia RP Discord Bot v0.19
 
 A persistent Xianxia role-playing Discord bot designed for CPU-only QNAP/NAS deployment. Python owns
 Discord, RAG, dashboard, and presentation orchestration; Go owns canonical gameplay rules, current
 game time, simulation mutations, and SQLite WAL state.
 
-Version **0.18** completes the staged authority cleanup: forage/crafting/companions, canonical time,
+Version **0.18** completed the staged authority cleanup: forage/crafting/companions, canonical time,
 unified lifespan, multi-hop road travel, caravan mechanics, dashboard-owned Discord setup, and removal
-of obsolete Python mechanical authority paths. The release uses schema **22**.
+of obsolete Python mechanical authority paths. **0.19** is a cultivation-depth consistency/coverage pass
+on top of that release, plus a further authority-migration pass for 1v1 battle start and mid-battle item
+recovery. The release uses schema **24**.
 
-See `V018_RELEASE_NOTES.md` and `V018_BUILD_HISTORY.md`
-(consolidated validation/audit record).
+See `V019_RELEASE_NOTES.md` for the current release, `V018_RELEASE_NOTES.md` and `V018_BUILD_HISTORY.md`
+(consolidated validation/audit record) for the prior staged-authority migration.
 
 ## Release architecture
 
@@ -108,7 +110,7 @@ cache_size=-32768
 wal_autocheckpoint=1000
 ```
 
-The current schema is **21**. Historical migrations remain in the repository and upgrades run in place.
+The current schema is **24**. Historical migrations remain in the repository and upgrades run in place.
 
 ## Requirements
 
@@ -197,7 +199,7 @@ Optional authenticated GM control plane. `startup.sh` starts it when:
 DASHBOARD_ENABLED=true
 ```
 
-No Ollama/local-LLM service exists in v0.18.
+No Ollama/local-LLM service exists.
 
 ## Player interface and Discord GUI
 
@@ -422,6 +424,10 @@ live structured SQL
 - **Schema 15** added structured permanent world history and `world_history_fts`.
 - **Schema 16** added persistent NPC life/social/descendant systems.
 - **Schema 17** adds the current event participation/GUI persistence layer and associated current schema updates.
+- **Schemas 18-24** carried the v0.18 staged-authority migration (forage/crafting/companions, canonical time,
+  unified lifespan, multi-hop road travel, caravan mechanics, dashboard-owned Discord setup) through to its
+  final state; no v0.19 change added new tables or columns. See `V018_RELEASE_NOTES.md` and
+  `V019_RELEASE_NOTES.md` for the per-release detail.
 
 ### Safe canon indexing
 
@@ -705,17 +711,18 @@ tests/python/           Python-owned unit/integration/contract suite
 tests/support.py         shared dependency shims and test path helpers
 ```
 
-## Release status — v0.18
+## Release status — v0.19
 
-- Recommended final release after Stages 1–8 authority migration and adversarial hardening.
+- Current release: a cultivation-depth consistency/coverage pass plus a further authority-migration pass for
+  1v1 battle start and mid-battle item recovery, built on top of the v0.18 staged-authority migration.
 - Go owns canonical gameplay time, migrated gameplay mechanics, lifespan/death authority, road travel,
   caravan settlement, simulation mutation, and SQLite WAL.
 - Python owns Discord/RAG/dashboard/presentation orchestration and does not duplicate the removed
   lifespan/mechanical authority paths.
 - Discord channel/category provisioning is admin-dashboard-owned; the bot validates configured channels.
-- Database schema is **22**.
-- The final release gate adds loopback-by-default standalone engine binding plus strict bounded JSON
-  request handling.
+- Database schema is **24**.
+- The v0.18 release gate added loopback-by-default standalone engine binding plus strict bounded JSON
+  request handling; v0.19 made no schema or binding changes, only mechanics/logic and documentation fixes.
 
 ## Design rules for future work
 
@@ -727,7 +734,8 @@ tests/support.py         shared dependency shims and test path helpers
 6. **Audit GM mutations.** New Admin Console actions should write `admin_audit_log`.
 7. **Prefer native Go tests for Go-owned rules.** Pytest should test Python-owned behavior and integration boundaries rather than duplicate engine formulas.
 
-## Release notes — v0.18
+## Release notes — v0.19
 
-See `V018_RELEASE_NOTES.md` for the complete staged-authority, road/caravan, setup, cleanup, migration,
-security, and upgrade summary.
+See `V019_RELEASE_NOTES.md` for the current release's cultivation-depth audit, dashboard coverage gaps, and
+combat authority-migration fixes. See `V018_RELEASE_NOTES.md` for the complete staged-authority, road/caravan,
+setup, cleanup, migration, security, and upgrade summary that v0.19 builds on.
