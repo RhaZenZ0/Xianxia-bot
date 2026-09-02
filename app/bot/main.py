@@ -7,7 +7,7 @@ import time
 from functools import wraps
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, Mapping
 
 import discord
 from discord import app_commands
@@ -217,6 +217,86 @@ def player_property_facility_lines(abode: dict[str, Any]) -> list[str]:
         if value > 0 or key in {"cultivation", "storage"}:
             lines.append(f"{PLAYER_PROPERTY_FACILITY_LABELS.get(key, key.replace('_', ' ').title())} **Lv.{value}**")
     return lines
+
+
+async def character_location_display(character: dict[str, Any]) -> str:
+    """Resolve a character's raw `location` column into a player-facing label.
+
+    `location` holds either a real world-catalog location name (already
+    display-ready) or one of four internal sentinel prefixes for a private
+    scene - `abode:`, `sect_abode:`, `personal_world:`, `birth_family:` -
+    which need a DB lookup to turn into a readable place name. Falls back to
+    the raw value unchanged if none of the lookups resolve (e.g. a plain
+    world-catalog location, or a stale/orphaned private-location key).
+    """
+    location = str(character.get("location") or "Unknown")
+    abode_location = await DB.get_abode_by_location(location)
+    if abode_location:
+        return f"{abode_location['name']} ({player_property_label(abode_location)})"
+    personal_location = await DB.get_personal_world_by_location(location)
+    if personal_location:
+        return f"{personal_location['name']} (Personal World)"
+    sect_abode_location = await DB.get_sect_abode_by_location(location)
+    if sect_abode_location:
+        return f"{sect_abode_location['name']} (Sect Abode)"
+    if location.startswith("birth_family:"):
+        family = await DB.get_birth_family(int(character.get("user_id") or 0))
+        if family and location == f"birth_family:{int(family.get('family_id') or 0)}":
+            return f"{family.get('family_name') or 'Birth Family'} Household"
+    return location
+
+
+PRIVATE_LOCATION_EXITS: tuple[tuple[str, str, str], ...] = (
+    ("birth_family:", "**/family → Leave**", "your birth household"),
+    ("sect_abode:", "**/abode → Leave**", "your sect residence"),
+    ("abode:", "**/abode → Leave**", "your own property"),
+    ("personal_world:", "**/innerworld → Leave**", "your personal world"),
+)
+
+
+def private_location_exit(location: object) -> tuple[str, str] | None:
+    """The command that steps a character back out into the shared world.
+
+    Exploring and hunting are blocked inside every private location (the prefix
+    guards in the Go engine's exploration_actions.go). A player who does not know
+    which command gets them out is simply stuck, so wherever we can tell which
+    private location they are in, we name the exact way out rather than listing
+    all of them. Returns (command, human description), or None out in the world.
+
+    Note the ordering: "sect_abode:" is checked before "abode:" because the
+    latter is a prefix of the former and would otherwise swallow it.
+    """
+    text = str(location or "")
+    for prefix, command, description in PRIVATE_LOCATION_EXITS:
+        if text.startswith(prefix):
+            return command, description
+    return None
+
+
+def _explain_engine_error(exc: Exception) -> str:
+    """Append an actionable hint to specific known engine errors that otherwise
+    leave the player stuck with no indication of what to do next - most notably
+    the "world exploration/hunting is unavailable inside a private residence or
+    personal world" error every freshly-created character used to hit immediately
+    (they start inside their birth household - see character.create in the Go
+    engine - with no way back out surfaced anywhere in the UI). Falls through to
+    the raw engine message unchanged for everything else.
+    """
+    text = str(exc)
+    if "private residence or personal world" in text:
+        # Spell these the way a player can actually reach them. The individual
+        # gameplay commands are not registered with Discord - only the 16 hub
+        # commands are (see register_command_surface) - so "/family leave" is a
+        # dead end: it does not exist to type. The route is the hub, then the
+        # action inside it.
+        text += (
+            "\n\nYou're **indoors** — exploring and hunting only work out in the shared world. "
+            "Step outside first, then try again:\n"
+            "**/family → Leave** (birth household) · "
+            "**/abode → Leave** (your property or sect residence) · "
+            "**/innerworld → Leave** (personal world)"
+        )
+    return text
 
 
 async def settle_seclusion_for_user(user_id: int, current_game_minute: int | None = None) -> dict | None:
@@ -604,10 +684,24 @@ async def _sync_realm_access_roles(
         log.exception("Could not synchronize realm access roles for user %s", member.id)
 
 
-async def ensure_realm_hub_channels(guild: discord.Guild, *, category_name: str = "🌌 Realm Capitals") -> list[dict[str, Any]]:
-    """Bind existing realm-capital channels; Discord layout is admin-dashboard owned."""
+async def ensure_realm_hub_channels(
+    guild: discord.Guild, *, category_name: str = "🌌 Realm Capitals", create_missing: bool = False,
+) -> list[dict[str, Any]]:
+    """Bind existing realm-capital channels and, when create_missing, create any
+    that are missing. Discord layout is admin-dashboard owned - the /admin slash
+    command leaves create_missing at its default False; only the web dashboard's
+    Full Setup/Repair actions opt in.
+    """
     existing = {str(row["world_name"]): row for row in await DB.get_realm_hub_channels(guild.id)}
     category = next((item for item in guild.categories if item.name == category_name), None)
+    me = guild.me
+    can_create = create_missing and bool(me) and me.guild_permissions.manage_channels
+    if can_create and category is None:
+        try:
+            category = await guild.create_category(category_name, reason="Xianxia RP realm-capital setup")
+        except discord.HTTPException:
+            log.exception("Could not create realm-capital category %s", category_name)
+
     for world, hub in REALM_HUBS.items():
         row = existing.get(world)
         channel = guild.get_channel(int(row["channel_id"])) if row else None
@@ -616,6 +710,14 @@ async def ensure_realm_hub_channels(guild: discord.Guild, *, category_name: str 
                 (item for item in guild.text_channels if item.name == str(hub["channel_name"])),
                 None,
             )
+        if channel is None and can_create:
+            try:
+                channel = await guild.create_text_channel(
+                    str(hub["channel_name"]), category=category, topic=str(hub.get("topic") or "")[:1024],
+                    reason="Xianxia RP realm-capital setup",
+                )
+            except discord.HTTPException:
+                log.exception("Could not create realm-capital channel #%s", hub["channel_name"])
         if channel is None:
             continue
         await DB.set_realm_hub_channel(
@@ -691,6 +793,40 @@ async def _get_thread(guild: discord.Guild, thread_id: int | None) -> discord.Th
     return fetched
 
 
+def _expedition_thread_intro(*, name: str, location_display: str, location: object) -> str:
+    """Opening message for a player's private expedition journal.
+
+    The closing line is location-aware on purpose. A character standing inside a
+    private location cannot explore or hunt, so telling them to "use Explore" is
+    an instruction that is guaranteed to fail - the same trap that made every new
+    cultivator think the game was broken. When they are indoors, name the way out
+    instead, and name the specific one for where they actually are.
+    """
+    lines = [
+        f"🧭 **{name} — Private Expedition Journal**",
+        f"Current location: **{location_display}**",
+        "",
+        "This scene is yours: only you, invited administrators and the bot. Exploration results "
+        "and guided Scene Actions are written here, so the thread builds into a continuing "
+        "record of where you went and what it cost you.",
+        "",
+    ]
+    exit_route = private_location_exit(location)
+    if exit_route is not None:
+        command, description = exit_route
+        lines.append(
+            f"Right now you're inside {description}, where exploring and hunting are unavailable. "
+            f"Step out with {command} first — then **/world → Explore** to search wherever you land, "
+            "or **/action** for a guided in-scene action."
+        )
+    else:
+        lines.append(
+            f"Start with **/world → Explore** to search **{location_display}**, "
+            "or **/action** for a guided in-scene action."
+        )
+    return "\n".join(lines)
+
+
 async def ensure_expedition_thread(interaction: discord.Interaction, character: dict[str, Any]) -> discord.Thread | None:
     """Create/recover one private expedition journal per player and guild."""
     guild = interaction.guild
@@ -722,11 +858,11 @@ async def ensure_expedition_thread(interaction: discord.Interaction, character: 
             parent_channel_id=parent.id, last_location=str(character.get("location") or "Unknown"),
         )
         await thread.send(
-            f"🧭 **{character.get('name', interaction.user.display_name)} — Private Expedition Journal**\n"
-            f"Current location: **{character.get('location','Unknown')}**\n"
-            "Only you, invited administrators, and the bot can use this private scene. "
-            "Exploration results and guided Scene Actions are written here so your choices remain visible as a continuing adventure log.\n\n"
-            "Use **/world → Explore** to search the current location or **/action** for a guided in-scene action."
+            _expedition_thread_intro(
+                name=str(character.get("name", interaction.user.display_name)),
+                location_display=await character_location_display(character),
+                location=character.get("location"),
+            )
         )
         return thread
     except (discord.Forbidden, discord.HTTPException):
@@ -773,9 +909,12 @@ async def ensure_birth_family_household_thread(
         await thread.send(
             f"🏠 **{family_name} — Shared Household**\n"
             f"Home region: **{base_location}**\n\n"
-            "Every player born into this same canonical household uses this scene. "
-            "When multiple household members are inside at the same time, they can talk, roleplay, and target one another with guided Scene Actions here. "
-            "Use **/family leave** to return to the household's home region."
+            "**You are inside the house.** Exploring, hunting and travel need the open world, "
+            f"so they will refuse until you step out — **/family → Leave** puts you in **{base_location}**, "
+            "and **/family → Enter** brings you back whenever you like.\n\n"
+            "This scene is shared by every player born into this household. While more than one of you "
+            "is inside, you can talk, roleplay and target each other with guided Scene Actions (**/action**). "
+            "Nothing here is lost when you leave."
         )
         return thread
     except (discord.Forbidden, discord.HTTPException):
@@ -1124,7 +1263,7 @@ class EventSceneView(discord.ui.View):
         if self.expires_at<=time.time():
             await interaction.response.send_message("This event scene has already closed.",ephemeral=False); return None
         if self.location and str(character.get("location") or "")!=self.location:
-            await interaction.response.send_message(f"You are at **{character.get('location','Unknown')}**. Travel to **{self.location}** before acting in this event.",ephemeral=False); return None
+            await interaction.response.send_message(f"You are at **{await character_location_display(character)}**. Travel to **{self.location}** before acting in this event.",ephemeral=False); return None
         return character
 
     async def _event_record(self) -> dict[str, Any]:
@@ -1174,7 +1313,7 @@ class EventSceneView(discord.ui.View):
     async def _open_scene_actions(self, interaction: discord.Interaction, *, default_action: str) -> None:
         character=await self._character_here(interaction)
         if character is None:return
-        npcs=await _scene_action_targets(character); view=SceneActionView(interaction.user.id,character,npcs)
+        npcs=await _scene_action_targets(character); view=SceneActionView(interaction.user.id,character,npcs,await character_location_display(character))
         if default_action in SCENE_ACTION_TYPES:
             view.action_key = default_action
             view.target = "Environment"
@@ -1672,7 +1811,10 @@ class CharacterModal(discord.ui.Modal):
         embed.add_field(
             name="Next steps",
             value=(
-                "**/character → Overview** • **/family → View** • **/cultivation → Meditation**\n"
+                "You begin **inside your birth household**. Look around first:\n"
+                "**/character → Overview** • **/family → View** • **/cultivation → Meditation**\n\n"
+                "Exploring and hunting need the open world, so they stay closed until you step outside "
+                "with **/family → Leave**. After that:\n"
                 "**/world → Explore** • **/npc → Talk** • **/action**"
             ),
             inline=False,
@@ -1696,22 +1838,48 @@ class CharacterModal(discord.ui.Modal):
         # Character creation is the natural point to establish the player's
         # persistent private scene. Previously this was delayed until the first
         # exploration or /action, which made a successful /begin look incomplete.
-        expedition_thread: discord.Thread | None = None
+        #
+        # New characters always start *inside* their birth-family household (see
+        # character.create in the Go engine) - a private residence where world
+        # exploration is blocked. Pointing them at an "expedition journal" thread
+        # with "use /world -> Explore" as the very first instruction sent every
+        # new player straight into a dead-end error with no indication of how to
+        # get out. The private scene created here now matches where the
+        # character actually is: the shared household thread, not the
+        # expedition journal, with guidance that leads them out of it first.
+        private_thread: discord.Thread | None = None
+        thread_is_household = False
         try:
             character = await DB.get_character(interaction.user.id)
             if character is not None:
-                expedition_thread = await ensure_expedition_thread(interaction, character)
+                start_location = str(character.get("location") or "")
+                if start_location.startswith("birth_family:"):
+                    family = await DB.get_birth_family(interaction.user.id)
+                    if family:
+                        private_thread = await ensure_birth_family_household_thread(interaction, family)
+                        thread_is_household = private_thread is not None
+                if private_thread is None:
+                    private_thread = await ensure_expedition_thread(interaction, character)
         except Exception:
-            log.exception("Could not provision private expedition thread after character creation")
-        if expedition_thread is not None:
+            log.exception("Could not provision private starting thread after character creation")
+        if private_thread is not None and thread_is_household:
             await interaction.followup.send(
-                f"🧭 Your private expedition journal is ready: {expedition_thread.mention}\n"
-                "Continue there with **/world → Explore** or **/action**.",
+                f"🏠 Your household scene is ready: {private_thread.mention}\n"
+                "Every cultivator begins at home, indoors with their family — so exploring and hunting "
+                "won't work yet, and that's not a bug. Meet them with **/family → View**, then "
+                "**/family → Leave** when you want to step outside. The world opens up from there: "
+                "**/world → Explore**, **/npc → Talk**, or **/action**.",
+                ephemeral=True,
+            )
+        elif private_thread is not None:
+            await interaction.followup.send(
+                f"🧭 Your private expedition journal is ready: {private_thread.mention}\n"
+                "Everything you explore is written there. Continue with **/world → Explore** or **/action**.",
                 ephemeral=True,
             )
         else:
             await interaction.followup.send(
-                "⚠️ Your cultivator was created, but Discord did not create the private expedition thread. "
+                "⚠️ Your cultivator was created, but Discord did not create the private starting thread. "
                 "Ask an administrator to run **/admin → Server → Setup Server** and confirm the bot has "
                 "**Create Private Threads**, **Send Messages in Threads**, and **Manage Threads**.",
                 ephemeral=True,
@@ -2339,7 +2507,7 @@ class XianxiaBot(commands.Bot):
         if hub_record and str(character.get("location", "")) != str(hub_record.get("location", "")):
             await message.reply(
                 f"🏙️ This channel represents **{hub_record['location']}** in **{hub_record['world_name']}**. "
-                f"Your cultivator is currently at **{character.get('location','Unknown')}**. "
+                f"Your cultivator is currently at **{await character_location_display(character)}**. "
                 "Use **/travel → Realm Capitals → Go** before roleplaying here."
             )
             return
@@ -2398,12 +2566,16 @@ class XianxiaBot(commands.Bot):
         )
         try:
             memory_kind, memory_salience = classify_memory(content, narration)
+            # `location=` below stays the raw DB key (memory lookups elsewhere filter by
+            # exact match against character.location); only the human-readable summary
+            # text - which can feed straight into future narration - gets translated.
+            location_label = await character_location_display(character)
             await DB.add_rag_memory(
                 message.author.id, memory_kind=memory_kind, salience=memory_salience,
                 location=str(character.get("location") or ""), source="freeform",
                 game_minute=scene_context.game_minute,
                 summary=(
-                    f"At {character.get('location','Unknown')}, {character.get('name','the player')} acted/said: "
+                    f"At {location_label}, {character.get('name','the player')} acted/said: "
                     f"{content[:320]} | Observed response: {narration[:560]}"
                 ),
             )
@@ -2725,7 +2897,7 @@ def _xianxia_info_guide_text() -> str:
 XIANXIA_INFO_PAGES: dict[str, tuple[str, str]] = {
     "getting_started": ("🌱 Getting Started", "Use `/begin` in `#begin-here`, then `/me` to see your current state. Exploration happens in your private expedition thread; main realm-capital channels remain shared social spaces."),
     "character": ("🧬 Character & Cultivation", "Your family, spiritual root, cultivation path, realms, resources, Karma, Fate, Dao Heart and effects remain canonical game state. The AI router narrates results but cannot change mechanics."),
-    "exploration": ("🧭 Exploration & Scenes", "The v0.18 scene engine separates **physical location** from **active scene**. Wilderness uses your expedition journal. Player properties and sect abodes use persistent private threads. Main cities remain shared channels."),
+    "exploration": ("🧭 Exploration & Scenes", "The scene engine separates **physical location** from **active scene**. Wilderness uses your expedition journal. Player properties and sect abodes use persistent private threads. Main cities remain shared channels."),
     "sects": ("🏯 Sects", "Discover a sect route, speak with affiliated NPCs, earn recommendations, take a sect-specific trial, and join only after a canonical success. Membership can grant a private sect residence."),
     "properties": ("🏡 Player-Owned Locations", "Properties are real database-backed locations with private threads, facilities and guest permissions. Guests must be invited and physically reach the entrance before gaining access."),
     "relationships": ("🤝 NPC Relationships", "Persistent NPC state tracks trust, respect, fear, affection, debt, grudge and encounter history. Narration may describe those relationships but never owns the underlying numbers."),
@@ -2753,6 +2925,213 @@ class XianxiaInfoView(discord.ui.View):
         self.add_item(XianxiaInfoSelect())
 
 
+CHANNEL_MESSAGE_KEYS: tuple[str, ...] = (
+    "world-events", "event-scenes", "player-homes", "bot-logs", "begin-here", "expeditions",
+    "realm:Mortal World", "realm:Spiritual World", "realm:Immortal World", "realm:Celestial World",
+)
+
+CHANNEL_MESSAGE_LABELS: dict[str, str] = {
+    "world-events": "#world-events",
+    "event-scenes": "#event-scenes",
+    "player-homes": "#player-homes",
+    "bot-logs": "#bot-logs",
+    "begin-here": "#begin-here",
+    "expeditions": "#expeditions",
+    "realm:Mortal World": "Azure Crown Imperial City (Mortal World)",
+    "realm:Spiritual World": "Spirit Jade Capital (Spiritual World)",
+    "realm:Immortal World": "Nine-Heavens Immortal Court (Immortal World)",
+    "realm:Celestial World": "Celestial Mandate Palace (Celestial World)",
+}
+
+# GM-authored default text for every channel-message slot. These ship as sensible
+# defaults so the feature is useful the moment it's enabled; GMs can rewrite any of
+# them from the dashboard's Discord Setup tab and the bot will edit the same
+# message in place rather than posting a duplicate (mirrors ensure_xianxia_info_guide).
+DEFAULT_CHANNEL_MESSAGES: dict[str, str] = {
+    "world-events": (
+        "🌍 **World Events**\n"
+        "Great happenings ripple out from here — dynastic wars, sect conflicts, tribulations that "
+        "split the sky, and the rise and fall of powers across every realm. The Xianxia bot posts "
+        "world-shaking news in this channel automatically; feel free to react and discuss what you "
+        "read, but roleplay itself belongs in your own scenes and threads, not here."
+    ),
+    "event-scenes": (
+        "🎭 **Event Scenes**\n"
+        "When the world calls for a shared, public scene — a market day, a tournament, a sect "
+        "gathering, a battle at the gates — the Xianxia bot opens a thread for it right here. Jump "
+        "into any open thread to roleplay the event live alongside other cultivators. Threads "
+        "archive automatically once their scene concludes."
+    ),
+    "player-homes": (
+        "🏡 **Player Homes**\n"
+        "This channel is a **read-only anchor** for every player-owned and sect-owned location in "
+        "the world — cave abodes, manors, sect grounds and more. It doesn't carry roleplay itself; "
+        "instead, each property gets its own private thread the moment it's built, visible only to "
+        "its owner and invited guests. Look for your thread once you've claimed or built a home."
+    ),
+    "bot-logs": (
+        "🛠️ **Bot Logs**\n"
+        "This is the Xianxia bot's private operations channel — administrator actions, errors, and "
+        "behind-the-scenes diagnostics land here. It's for staff only and has no bearing on the "
+        "story; check it if something in the game seems to be misbehaving."
+    ),
+    "begin-here": (
+        "🌱 **Begin Here**\n"
+        "Every journey starts with a single step onto the cultivation path. Run `/begin` right in "
+        "this channel to create your character — choose your background, awaken your spiritual "
+        "root, and step into the world for the first time. Once you're in, check `#xianxia-info` "
+        "for a full guide, or dive straight into your starting scene."
+    ),
+    "expeditions": (
+        "🧭 **Expeditions**\n"
+        "This channel is a **read-only anchor** for private expedition journals. Wilderness "
+        "exploration, foraging, secret realms and wandering encounters all happen inside your own "
+        "personal expedition thread, not in this channel directly — the bot creates one for you "
+        "automatically the first time you venture out. Look for your thread here once you've set off."
+    ),
+    "realm:Mortal World": (
+        "🏯 **Azure Crown Imperial City**\n"
+        "The great meeting city of the Mortal World — where markets bustle, sect envoys trade "
+        "favors, clans posture for standing, and duels of reputation are settled in public view. "
+        "This channel is shared, open roleplay: any cultivator who has reached the Mortal World may "
+        "walk these streets and speak freely. Come here to trade, scheme, forge alliances, or "
+        "simply be seen."
+    ),
+    "realm:Spiritual World": (
+        "💎 **Spirit Jade Capital**\n"
+        "The ascended meeting city of the Spiritual World — home to storied sects, ancient "
+        "bloodline families, and markets where spirit stones change hands by the sackful. This "
+        "channel is shared, open roleplay for any cultivator who has broken through into the "
+        "Spiritual World. Trade rare materials, court political favor, or cross paths with rivals "
+        "from every corner of the realm."
+    ),
+    "realm:Immortal World": (
+        "⛩️ **Nine-Heavens Immortal Court**\n"
+        "The immortal meeting court of the Immortal World — where law-bound clans debate the "
+        "boundaries of formation and edict, and politics carries the weight of centuries. This "
+        "channel is shared, open roleplay for cultivators who have ascended into the Immortal "
+        "World. Petition the court, trade in immortal-grade resources, or navigate the currents of "
+        "power that shape the higher realms."
+    ),
+    "realm:Celestial World": (
+        "👑 **Celestial Mandate Palace**\n"
+        "The sovereign palace of the Celestial World — where heavenly factions hold court, mandates "
+        "are issued and contested, and only the mightiest cultivators in existence are received. "
+        "This channel is shared, open roleplay for those who have reached the Celestial World. Here, "
+        "every word and every alliance can shift the balance of the world itself."
+    ),
+}
+
+
+CHANNEL_MESSAGE_DEFAULT = "default"
+CHANNEL_MESSAGE_CUSTOM = "custom"
+CHANNEL_MESSAGE_DISABLED = "disabled"
+
+
+def channel_message_state(stored: Mapping[str, Any], channel_key: str) -> str:
+    """Classify a channel-message slot into its three genuinely distinct states.
+
+    There are three, not two, and conflating the first and third is a real bug:
+
+      no stored row       -> "default"  : nothing configured, post the built-in text
+      stored row, text    -> "custom"   : the GM wrote their own message
+      stored row, ""      -> "disabled" : the GM cleared it on purpose, post nothing
+
+    The obvious `row.get("content") or DEFAULT_CHANNEL_MESSAGES[key]` collapses
+    "disabled" into "default", because an intentionally empty string is falsy.
+    That made clearing a message look like it worked - the Discord message was
+    deleted and "" was stored - and then silently undid itself: the dashboard
+    redisplayed the default, and the next Full Setup/Repair reposted it.
+    """
+    row = stored.get(channel_key)
+    if not isinstance(row, Mapping) or "content" not in row or row.get("content") is None:
+        return CHANNEL_MESSAGE_DEFAULT
+    return CHANNEL_MESSAGE_CUSTOM if str(row["content"]).strip() else CHANNEL_MESSAGE_DISABLED
+
+
+def resolve_channel_message_content(stored: Mapping[str, Any], channel_key: str) -> str:
+    """Effective text for a slot: the default, the GM's text, or "" when disabled."""
+    state = channel_message_state(stored, channel_key)
+    if state == CHANNEL_MESSAGE_DEFAULT:
+        return DEFAULT_CHANNEL_MESSAGES.get(channel_key, "")
+    if state == CHANNEL_MESSAGE_DISABLED:
+        return ""
+    return str((stored.get(channel_key) or {}).get("content") or "")
+
+
+async def _resolve_channel_message_target(guild: discord.Guild, channel_key: str) -> discord.TextChannel | None:
+    if channel_key.startswith("realm:"):
+        world = channel_key.split(":", 1)[1]
+        rows = {str(row["world_name"]): row for row in await DB.get_realm_hub_channels(guild.id)}
+        row = rows.get(world)
+        if not row:
+            return None
+        return await _resolve_text_channel(guild, row.get("channel_id"))
+    cfg = await DB.get_server_config(guild.id)
+    return await _resolve_text_channel(guild, _base_channel_bindings(cfg).get(channel_key))
+
+
+async def ensure_channel_message(guild: discord.Guild, channel_key: str, content: str) -> discord.Message | None:
+    """Keep one bot-managed GM-authored message per channel slot, edited in place
+    instead of duplicated on every save (same pattern as ensure_xianxia_info_guide).
+    An empty/whitespace-only content deletes any existing message for that slot.
+    """
+    text = content.strip()
+    stored = await DB.get_channel_messages(guild.id)
+    message_id = (stored.get(channel_key) or {}).get("message_id")
+    channel = await _resolve_channel_message_target(guild, channel_key)
+    if channel is None:
+        # Persist the GM's edit even with nothing to post it to. Returning early
+        # here used to throw the save away, so clearing a message while its
+        # channel was unbound left the old custom text stored and the message
+        # came back on the next Full Setup/Repair. The caller still sees None and
+        # reports the slot as not-yet-posted; ensure_all_channel_messages applies
+        # it once the channel exists.
+        await DB.set_channel_message(guild.id, channel_key, content=text, message_id=message_id)
+        return None
+    message: discord.Message | None = None
+    if message_id:
+        try:
+            message = await channel.fetch_message(int(message_id))
+        except (discord.Forbidden, discord.NotFound, discord.HTTPException):
+            message = None
+    try:
+        if not text:
+            if message is not None:
+                try:
+                    await message.delete()
+                except (discord.Forbidden, discord.NotFound, discord.HTTPException):
+                    pass
+            await DB.set_channel_message(guild.id, channel_key, content="", message_id=None)
+            return None
+        if message is None:
+            message = await channel.send(text)
+        elif message.content != text:
+            await message.edit(content=text)
+        await DB.set_channel_message(guild.id, channel_key, content=text, message_id=message.id)
+        return message
+    except (discord.Forbidden, discord.HTTPException):
+        log.exception("Could not create/update channel message for %s", channel_key)
+        return None
+
+
+async def ensure_all_channel_messages(guild: discord.Guild) -> dict[str, int | None]:
+    """Apply every channel-message slot's current (custom, default or disabled) content.
+    Called from Full Setup/Repair so newly-bound channels immediately get their
+    GM-authored message without a separate dashboard click. A slot the GM cleared
+    stays cleared: Repair must not resurrect a message that was deliberately removed.
+    """
+    stored = await DB.get_channel_messages(guild.id)
+    results: dict[str, int | None] = {}
+    for key in CHANNEL_MESSAGE_KEYS:
+        # Deliberately three-state: a slot the GM cleared resolves to "" and is
+        # left alone here instead of being repopulated with the default.
+        content = resolve_channel_message_content(stored, key)
+        message = await ensure_channel_message(guild, key, content)
+        results[key] = message.id if message else None
+    return results
+
+
 async def ensure_xianxia_info_guide(guild: discord.Guild, channel: discord.TextChannel) -> discord.Message | None:
     """Keep one bot-managed read-only guide message instead of duplicating it on every repair."""
     cfg = await DB.get_server_config(guild.id)
@@ -2776,24 +3155,79 @@ async def ensure_xianxia_info_guide(guild: discord.Guild, channel: discord.TextC
 
 
 async def ensure_base_xianxia_channels(
-    guild: discord.Guild, *, category_name: str = "📜 Xianxia RP"
+    guild: discord.Guild, *, category_name: str = "📜 Xianxia RP", create_missing: bool = False,
 ) -> dict[str, Any]:
-    """Validate and bind existing base channels without creating Discord channels."""
+    """Validate, bind and (when create_missing) create the base Xianxia channels.
+
+    create_missing defaults to False so the /admin Discord slash-command path stays
+    validate-only - "Discord channel/category provisioning is admin-dashboard owned"
+    means only the web GM dashboard's Full Setup/Repair actions pass True here.
+    Whatever this resolves for a channel - pre-existing, name-matched, or freshly
+    created - has its binding persisted immediately (mirroring
+    ensure_realm_hub_channels), so the dashboard's own status readout reflects it
+    without a separate manual "Save Channel Bindings" click.
+    """
     cfg = await DB.get_server_config(guild.id)
     bindings = _base_channel_bindings(cfg)
     category = next((item for item in guild.categories if item.name == category_name), None)
     channels: dict[str, discord.TextChannel] = {}
+    created: list[str] = []
     warnings: list[str] = []
+    me = guild.me
+    can_create = create_missing and bool(me) and me.guild_permissions.manage_channels
+
+    if can_create and category is None:
+        try:
+            category = await guild.create_category(category_name, reason="Xianxia RP base channel setup")
+        except discord.HTTPException:
+            log.exception("Could not create base category %s", category_name)
 
     for name in BASE_CHANNEL_SPECS:
         configured = await _resolve_text_channel(guild, bindings.get(name))
         channel = configured or next((item for item in guild.text_channels if item.name == name), None)
+        if channel is None and can_create:
+            try:
+                overwrites = (
+                    {guild.default_role: discord.PermissionOverwrite(send_messages=False)}
+                    if name in READ_ONLY_BASE_CHANNELS else {}
+                )
+                channel = await guild.create_text_channel(
+                    name, category=category, topic=BASE_CHANNEL_SPECS[name][:1024],
+                    overwrites=overwrites, reason="Xianxia RP base channel setup",
+                )
+                created.append(name)
+            except discord.HTTPException:
+                log.exception("Could not create base channel #%s", name)
+                warnings.append(
+                    f"Could not create **#{name}** — check the bot's Manage Channels permission and any Discord channel limits."
+                )
+                continue
         if channel is None:
             warnings.append(
                 f"Missing **#{name}**. Create/bind it from the admin dashboard; the bot will not provision channels."
             )
             continue
         channels[name] = channel
+
+    if channels.get("world-events") and channels.get("event-scenes"):
+        def _bound_id(key: str) -> int | None:
+            resolved = channels.get(key)
+            return resolved.id if resolved is not None else bindings.get(key)
+
+        await DB.set_server_channels(
+            guild.id,
+            announcement_channel_id=channels["world-events"].id,
+            event_scene_channel_id=channels["event-scenes"].id,
+            home_scene_channel_id=_bound_id("player-homes"),
+            log_channel_id=_bound_id("bot-logs"),
+            begin_channel_id=_bound_id("begin-here"),
+            info_channel_id=_bound_id("xianxia-info"),
+            exploration_channel_id=_bound_id("expeditions"),
+        )
+    elif channels or bindings.get("world-events") or bindings.get("event-scenes"):
+        warnings.append(
+            "Could not save channel bindings: both **#world-events** and **#event-scenes** must exist first."
+        )
 
     info_channel = channels.get("xianxia-info")
     if info_channel is not None:
@@ -2802,11 +3236,245 @@ async def ensure_base_xianxia_channels(
     return {
         "category": category,
         "channels": channels,
-        "created": [],
+        "created": created,
         "repaired": [],
         "warnings": warnings,
         "dashboard_owned": True,
     }
+
+
+BUGS_CHANNEL_NAME = "bugs"
+BUGS_GUIDELINES_KEY = "bugs-guidelines"
+# Forum-post guidelines shown to anyone starting a new #bugs post. Stored as the forum
+# channel's own topic (Discord shows a channel's topic as its "post guidelines" for
+# forum channels) - GM-customizable the same way as the channel_messages feature, just
+# applied by editing the channel's topic instead of sending/editing a message, since
+# ForumChannel has no send() of its own.
+DEFAULT_BUGS_GUIDELINES = (
+    "🐛 Create a new post here for anything that looks broken — a command erroring, "
+    "wrong numbers, a stuck scene, or a message that doesn't match what happened.\n\n"
+    "Please include: what you did (the exact command/action), what you expected, what "
+    "actually happened, and your character name. A screenshot helps but isn't required.\n\n"
+    "One bug per post, please — it's much easier to track and fix that way. The GM team "
+    "reads every post here and tags it as it's triaged."
+)
+BUGS_FORUM_TAGS: tuple[tuple[str, str], ...] = (
+    ("Open", "🔴"),
+    ("Investigating", "🔎"),
+    ("Fixed", "✅"),
+    ("Can't Reproduce", "❔"),
+    ("Duplicate", "♻️"),
+)
+
+
+def missing_bugs_forum_tags(channel: discord.ForumChannel) -> list[str]:
+    """Names from BUGS_FORUM_TAGS that this forum does not actually offer.
+
+    Only newly created forums got the tag set; an existing #bugs channel adopted
+    by setup kept whatever tags it already had (usually none) while the dashboard
+    still advertised the full list, so GMs were told they could file a report
+    under "Investigating" when Discord offered no such tag.
+    """
+    present = {str(tag.name).casefold() for tag in (getattr(channel, "available_tags", None) or ())}
+    return [name for name, _emoji in BUGS_FORUM_TAGS if name.casefold() not in present]
+
+
+async def sync_bugs_forum_tags(channel: discord.ForumChannel) -> list[str]:
+    """Add any missing required tag to an existing forum, keeping the GM's own tags.
+
+    Discord caps a forum at 20 tags, so this stops rather than clobbering custom
+    tags if there is no room. Returns the tag names actually added.
+    """
+    missing = missing_bugs_forum_tags(channel)
+    if not missing:
+        return []
+    existing = list(getattr(channel, "available_tags", None) or ())
+    room = max(0, 20 - len(existing))
+    if room <= 0:
+        log.warning("#%s already has 20 forum tags; not adding %s", BUGS_CHANNEL_NAME, ", ".join(missing))
+        return []
+    wanted = dict(BUGS_FORUM_TAGS)
+    added = missing[:room]
+    try:
+        await channel.edit(
+            available_tags=existing + [discord.ForumTag(name=name, emoji=wanted.get(name)) for name in added],
+            reason="Xianxia RP bug-report forum tag sync",
+        )
+    except (discord.Forbidden, discord.HTTPException):
+        log.exception("Could not sync #%s forum tags", BUGS_CHANNEL_NAME)
+        return []
+    return added
+
+
+async def ensure_bugs_forum_channel(
+    guild: discord.Guild, *, category_name: str = "📜 Xianxia RP", create_missing: bool = False,
+) -> tuple[discord.ForumChannel | None, str | None]:
+    """Validate/bind (and, when create_missing, create) the #bugs forum channel where
+    players report issues as individual forum posts. Mirrors ensure_base_xianxia_channels's
+    resolve-by-id -> resolve-by-name -> create fallback, but for a discord.ForumChannel
+    instead of a TextChannel (a forum channel has no send() of its own - posting means
+    creating a thread), and keeps the forum's guidelines/topic in sync with whatever the
+    GM has saved (defaulting to DEFAULT_BUGS_GUIDELINES the first time). Returns
+    (channel_or_None, warning_or_None) so callers can surface a create failure without
+    raising - matches every other base-channel/realm-hub helper's error handling.
+    """
+    cfg = await DB.get_server_config(guild.id)
+    channel_id = cfg.get("bugs_channel_id")
+    channel: discord.ForumChannel | None = None
+    if channel_id:
+        resolved = guild.get_channel(int(channel_id))
+        if resolved is None:
+            try:
+                resolved = await guild.fetch_channel(int(channel_id))
+            except discord.NotFound:
+                resolved = None
+            except (discord.Forbidden, discord.HTTPException):
+                log.exception("Could not resolve configured bugs channel %s", channel_id)
+                resolved = None
+        if isinstance(resolved, discord.ForumChannel):
+            channel = resolved
+    if channel is None:
+        existing = discord.utils.get(guild.channels, name=BUGS_CHANNEL_NAME)
+        if isinstance(existing, discord.ForumChannel):
+            channel = existing
+
+    warning: str | None = None
+    me = guild.me
+    can_create = create_missing and bool(me) and me.guild_permissions.manage_channels
+    if channel is None and can_create:
+        category = next((item for item in guild.categories if item.name == category_name), None)
+        try:
+            channel = await guild.create_forum(
+                BUGS_CHANNEL_NAME, category=category, topic=DEFAULT_BUGS_GUIDELINES[:1024],
+                available_tags=[discord.ForumTag(name=name, emoji=emoji) for name, emoji in BUGS_FORUM_TAGS],
+                reason="Xianxia RP bug-report forum setup",
+            )
+        except discord.HTTPException:
+            log.exception("Could not create #%s forum channel", BUGS_CHANNEL_NAME)
+            warning = (
+                f"Could not create **#{BUGS_CHANNEL_NAME}** — check the bot's Manage Channels "
+                "permission (forum channels also need Discord's Community feature enabled on some servers)."
+            )
+    elif channel is None:
+        warning = f"Missing **#{BUGS_CHANNEL_NAME}**. Create it as a forum channel from the admin dashboard; the bot will not provision channels."
+
+    if channel is not None:
+        await DB.set_bugs_channel_id(guild.id, channel.id)
+        await sync_bugs_forum_tags(channel)
+        stored = await DB.get_channel_messages(guild.id)
+        guidelines = (stored.get(BUGS_GUIDELINES_KEY) or {}).get("content") or DEFAULT_BUGS_GUIDELINES
+        text = guidelines.strip()[:1024]
+        if channel.topic != text:
+            try:
+                await channel.edit(topic=text, reason="Xianxia RP bug-report forum guidelines sync")
+            except discord.HTTPException:
+                log.exception("Could not update #%s forum guidelines", BUGS_CHANNEL_NAME)
+        if not (stored.get(BUGS_GUIDELINES_KEY) or {}).get("content"):
+            await DB.set_channel_message(guild.id, BUGS_GUIDELINES_KEY, content=DEFAULT_BUGS_GUIDELINES, message_id=None)
+    return channel, warning
+
+
+async def bugs_forum_reports(guild: discord.Guild, channel: discord.ForumChannel, *, limit: int = 20) -> list[dict[str, Any]]:
+    """Live-read recent #bugs forum posts straight from Discord (bug reports are
+    player-created threads, not bot-tracked rows, so there's nothing to store in SQLite -
+    this is how the dashboard 'gets info from it')."""
+    combined: dict[int, discord.Thread] = {thread.id: thread for thread in channel.threads}
+    try:
+        async for thread in channel.archived_threads(limit=limit):
+            combined.setdefault(thread.id, thread)
+    except (discord.Forbidden, discord.HTTPException):
+        log.exception("Could not read archived threads for #%s", BUGS_CHANNEL_NAME)
+    ordered = sorted(combined.values(), key=lambda t: t.id, reverse=True)[:limit]
+    reports: list[dict[str, Any]] = []
+    for thread in ordered:
+        owner = guild.get_member(thread.owner_id) if thread.owner_id else None
+        reports.append({
+            "id": thread.id,
+            "title": thread.name,
+            "author_id": thread.owner_id,
+            "author_name": str(owner) if owner else (str(thread.owner_id) if thread.owner_id else "Unknown"),
+            "created_at": thread.created_at.timestamp() if thread.created_at else None,
+            "message_count": thread.message_count,
+            "archived": thread.archived,
+            "locked": thread.locked,
+            "tags": [tag.name for tag in getattr(thread, "applied_tags", [])],
+            "url": f"https://discord.com/channels/{guild.id}/{thread.id}",
+        })
+    return reports
+
+
+# Channels safe to fully wipe (delete + recreate empty) for a "fresh look". Deliberately
+# excludes "player-homes", "expeditions" and "event-scenes": those three anchor players'
+# LIVE private/property/event threads (cave abodes, sect abodes, expedition journals,
+# world-event scenes - see Database.all_managed_thread_ids), and deleting the anchor
+# channel deletes every thread under it too, orphaning the database rows that still point
+# at those thread ids. A cosmetic message wipe is not worth destroying that game state, so
+# those three are left untouched here even though they're base Xianxia channels.
+CHANNEL_WIPE_KEYS: tuple[str, ...] = ("world-events", "bot-logs", "begin-here", "xianxia-info")
+
+
+async def clear_managed_channel_messages(guild: discord.Guild) -> dict[str, Any]:
+    """'Fresh look': delete and recreate every Xianxia-managed channel that's safe to
+    fully wipe (CHANNEL_WIPE_KEYS, every realm-capital hub, and the #bugs forum), then
+    reprovision and repost everything the same way Full Setup/Repair does. Deleting and
+    recreating clears all message history instantly and completely, regardless of
+    message age - Discord's bulk-delete API only works on messages under 14 days old,
+    so purging message-by-message would be slow, heavily rate-limited, and incomplete
+    for anything older. The tradeoff: any *custom* permission overwrites a GM added by
+    hand to these channels are lost (the bot only reapplies its own baseline
+    overwrites), and channels reappear at the bottom of their category rather than
+    their old position.
+    """
+    cfg = await DB.get_server_config(guild.id)
+    bindings = _base_channel_bindings(cfg)
+    cleared: list[str] = []
+    skipped: list[str] = []
+
+    for key in CHANNEL_WIPE_KEYS:
+        channel = await _resolve_text_channel(guild, bindings.get(key))
+        if channel is None:
+            continue
+        try:
+            await channel.delete(reason="Xianxia RP fresh-start channel wipe")
+            cleared.append(key)
+        except (discord.Forbidden, discord.HTTPException):
+            log.exception("Could not delete #%s for fresh-start wipe", key)
+            skipped.append(key)
+
+    realm_channel_rows = {str(row["world_name"]): row for row in await DB.get_realm_hub_channels(guild.id)}
+    for world, row in realm_channel_rows.items():
+        channel = guild.get_channel(int(row["channel_id"]))
+        if not isinstance(channel, discord.TextChannel):
+            continue
+        try:
+            await channel.delete(reason="Xianxia RP fresh-start channel wipe")
+            cleared.append(f"realm:{world}")
+        except (discord.Forbidden, discord.HTTPException):
+            log.exception("Could not delete realm hub #%s for fresh-start wipe", channel.name)
+            skipped.append(f"realm:{world}")
+
+    bugs_channel_id = cfg.get("bugs_channel_id")
+    bugs_channel = guild.get_channel(int(bugs_channel_id)) if bugs_channel_id else None
+    if isinstance(bugs_channel, discord.ForumChannel):
+        try:
+            await bugs_channel.delete(reason="Xianxia RP fresh-start channel wipe")
+            cleared.append("bugs")
+        except (discord.Forbidden, discord.HTTPException):
+            log.exception("Could not delete #%s for fresh-start wipe", BUGS_CHANNEL_NAME)
+            skipped.append("bugs")
+
+    # Recreate everything just deleted (plus anything else still missing) from scratch,
+    # exactly like Full Setup/Repair - name-based rebinding means the stale channel ids
+    # left behind by the deletes above self-heal here without any extra bookkeeping.
+    base_result, _realm_rows, bugs_warning = await _run_complete_server_setup(guild, create_missing=True)
+    info_channel = base_result["channels"].get("xianxia-info")
+    if info_channel is not None:
+        await ensure_xianxia_info_guide(guild, info_channel)
+    await ensure_all_channel_messages(guild)
+    if bugs_warning:
+        skipped.append(f"bugs recreation: {bugs_warning}")
+
+    return {"cleared": cleared, "skipped": skipped, "protected": ["player-homes", "expeditions", "event-scenes"]}
 
 
 @registered_group_command(admin_server_group, name="basechannels", description="Inspect dashboard-managed base Xianxia Discord channels")
@@ -2947,6 +3615,11 @@ async def _server_configuration_report(guild: discord.Guild) -> str:
         role_text = role.mention if role is not None else "not configured"
         lines.append(f"• **{world}** — channel: {channel_text} • role: {role_text}")
 
+    bugs_channel_id = cfg.get("bugs_channel_id")
+    bugs_channel = guild.get_channel(int(bugs_channel_id)) if bugs_channel_id else None
+    bugs_text = f"#{bugs_channel.name}" if isinstance(bugs_channel, discord.ForumChannel) else ("stale/missing" if bugs_channel_id else "not configured")
+    lines.append(f"\nBug-report forum: {bugs_text}")
+
     info_id = cfg.get("info_message_id")
     lines.append(f"\nInfo guide message ID: `{info_id}`" if info_id else "\nInfo guide message ID: *not recorded*")
     updated_at = cfg.get("updated_at")
@@ -2995,10 +3668,13 @@ async def _sync_all_realm_access_roles(guild: discord.Guild) -> dict[str, int]:
     return counts
 
 
-async def _run_complete_server_setup(guild: discord.Guild) -> tuple[dict[str, Any], list[dict[str, Any]]]:
-    base_result = await ensure_base_xianxia_channels(guild, category_name=SERVER_BASE_CATEGORY)
-    realm_rows = await ensure_realm_hub_channels(guild, category_name=SERVER_REALM_CATEGORY)
-    return base_result, realm_rows
+async def _run_complete_server_setup(
+    guild: discord.Guild, *, create_missing: bool = False,
+) -> tuple[dict[str, Any], list[dict[str, Any]], str | None]:
+    base_result = await ensure_base_xianxia_channels(guild, category_name=SERVER_BASE_CATEGORY, create_missing=create_missing)
+    realm_rows = await ensure_realm_hub_channels(guild, category_name=SERVER_REALM_CATEGORY, create_missing=create_missing)
+    _bugs_channel, bugs_warning = await ensure_bugs_forum_channel(guild, category_name=SERVER_BASE_CATEGORY, create_missing=create_missing)
+    return base_result, realm_rows, bugs_warning
 
 
 async def _dashboard_discord_snapshot(client: XianxiaBot, guild: discord.Guild) -> dict[str, Any]:
@@ -3032,9 +3708,58 @@ async def _dashboard_discord_snapshot(client: XianxiaBot, guild: discord.Guild) 
             "ready": isinstance(channel, discord.TextChannel) and role is not None,
         })
 
+    stored_messages = await DB.get_channel_messages(guild.id)
+    channel_messages: list[dict[str, Any]] = []
+    for key in CHANNEL_MESSAGE_KEYS:
+        target = await _resolve_channel_message_target(guild, key)
+        row = stored_messages.get(key) or {}
+        state = channel_message_state(stored_messages, key)
+        channel_messages.append({
+            "key": key,
+            "label": CHANNEL_MESSAGE_LABELS.get(key, key),
+            # The effective text, which is "" for a slot the GM cleared. The
+            # dashboard textarea shows exactly this, so a cleared slot must come
+            # back empty rather than redisplaying the default it no longer uses.
+            "content": resolve_channel_message_content(stored_messages, key),
+            "state": state,
+            "is_default": state == CHANNEL_MESSAGE_DEFAULT,
+            "is_disabled": state == CHANNEL_MESSAGE_DISABLED,
+            # What Save would restore if this slot were reset, so the dashboard
+            # can offer the built-in text without pretending it is in use.
+            "default_content": DEFAULT_CHANNEL_MESSAGES.get(key, ""),
+            "message_id": row.get("message_id"),
+            "channel_id": target.id if target else None,
+            "channel_ready": target is not None,
+        })
+
+    bugs_channel_id = cfg.get("bugs_channel_id")
+    bugs_channel = guild.get_channel(int(bugs_channel_id)) if bugs_channel_id else None
+    if not isinstance(bugs_channel, discord.ForumChannel):
+        bugs_channel = None
+    bugs_guidelines_row = stored_messages.get(BUGS_GUIDELINES_KEY) or {}
+    bugs_reports = await bugs_forum_reports(guild, bugs_channel) if bugs_channel is not None else []
+    bugs = {
+        "channel_id": bugs_channel.id if bugs_channel else None,
+        "channel_name": bugs_channel.name if bugs_channel else None,
+        "ready": bugs_channel is not None,
+        "guidelines": bugs_guidelines_row.get("content") or DEFAULT_BUGS_GUIDELINES,
+        "is_default_guidelines": not bugs_guidelines_row.get("content"),
+        # Report what Discord actually offers, not what we would like it to
+        # offer. This used to echo BUGS_FORUM_TAGS unconditionally, so a forum
+        # adopted from an existing #bugs channel (which never had the tags
+        # applied) still told the GM all five were available.
+        "available_tags": [
+            str(tag.name) for tag in (getattr(bugs_channel, "available_tags", None) or ())
+        ] if bugs_channel is not None else [],
+        "required_tags": [name for name, _emoji in BUGS_FORUM_TAGS],
+        "missing_tags": missing_bugs_forum_tags(bugs_channel) if bugs_channel is not None else [],
+        "open_reports": sum(1 for r in bugs_reports if not r["archived"]),
+        "reports": bugs_reports,
+    }
+
     me = guild.me
     permission_specs = (
-        ("manage_channels", "Manage Channels", "Optional; channel creation and layout are admin-dashboard owned.", False),
+        ("manage_channels", "Manage Channels", "Lets the dashboard's Full Setup/Repair create missing channels and categories automatically; without it, create them manually in Discord and Full Setup/Repair will still bind them by name.", False),
         ("manage_threads", "Manage Threads", "Recover/archive private expedition and property threads.", True),
         ("create_private_threads", "Create Private Threads", "Create private expedition and player-location threads.", True),
         ("send_messages_in_threads", "Send Messages in Threads", "Narrate and update private scenes.", True),
@@ -3089,6 +3814,8 @@ async def _dashboard_discord_snapshot(client: XianxiaBot, guild: discord.Guild) 
         "realm_total": len(realm_hubs),
         "text_channels": all_channels,
         "info_message_id": cfg.get("info_message_id"),
+        "channel_messages": channel_messages,
+        "bugs": bugs,
         "registered_commands": len(client.tree.get_commands(guild=GUILD)),
         "setup_ready": ready_base == len(base_channels) and ready_realms == len(realm_hubs) and not warnings,
     }
@@ -3121,20 +3848,28 @@ async def dashboard_discord_control(client: XianxiaBot, action: str, payload: di
         return {"ok": True, "action": action, "result": await _dashboard_discord_snapshot(client, guild)}
 
     if action in {"setup", "repair"}:
-        base_result, realm_rows = await _run_complete_server_setup(guild)
+        # This is the one caller that actually creates missing channels/categories -
+        # everything else (including the /admin slash command's own "setup"/"repair"
+        # choices) stays validate-and-bind-only, keeping Discord layout dashboard-owned.
+        base_result, realm_rows, bugs_warning = await _run_complete_server_setup(guild, create_missing=True)
         info_channel = base_result["channels"].get("xianxia-info")
         info_message = await ensure_xianxia_info_guide(guild, info_channel) if info_channel else None
+        channel_messages = await ensure_all_channel_messages(guild)
         role_sync: dict[str, int] | None = None
         if guild.me.guild_permissions.manage_roles:
             role_sync = await _sync_all_realm_access_roles(guild)
         synced = await client.tree.sync(guild=GUILD)
+        warnings = list(base_result["warnings"])
+        if bugs_warning:
+            warnings.append(bugs_warning)
         result = {
             "mode": action,
             "created": list(base_result["created"]),
             "repaired": list(base_result["repaired"]),
-            "warnings": list(base_result["warnings"]),
+            "warnings": warnings,
             "realm_hubs": len(realm_rows),
             "info_message_id": info_message.id if info_message else None,
+            "channel_messages_posted": sum(1 for v in channel_messages.values() if v),
             "realm_role_sync": role_sync,
             "synced_commands": len(synced),
         }
@@ -3156,6 +3891,41 @@ async def dashboard_discord_control(client: XianxiaBot, action: str, payload: di
         result = {"channel_id": channel.id, "message_id": message.id}
         await _audit_dashboard_discord(action, guild, after=result, reason=reason)
         return {"ok": True, "action": action, "result": result}
+
+    if action == "set_channel_messages":
+        raw = payload.get("messages")
+        if not isinstance(raw, dict) or not raw:
+            raise ValueError('payload "messages" must be a non-empty object of {channel_key: content}')
+        unknown = sorted(set(raw) - set(CHANNEL_MESSAGE_KEYS))
+        if unknown:
+            raise ValueError(f"Unknown channel message key(s): {', '.join(unknown)}")
+        applied: dict[str, int | None] = {}
+        skipped: list[str] = []
+        for key, content in raw.items():
+            message = await ensure_channel_message(guild, key, str(content or ""))
+            if message is not None or not str(content or "").strip():
+                applied[key] = message.id if message else None
+            else:
+                skipped.append(key)
+        result = {"applied": applied, "skipped": skipped}
+        await _audit_dashboard_discord(action, guild, after={"keys": sorted(applied)}, reason=reason)
+        return {"ok": True, "action": action, "result": result, "status": await _dashboard_discord_snapshot(client, guild)}
+
+    if action == "set_bugs_guidelines":
+        text = str(payload.get("guidelines") or "").strip() or DEFAULT_BUGS_GUIDELINES
+        await DB.set_channel_message(guild.id, BUGS_GUIDELINES_KEY, content=text, message_id=None)
+        channel, warning = await ensure_bugs_forum_channel(guild, category_name=SERVER_BASE_CATEGORY, create_missing=False)
+        result = {"channel_id": channel.id if channel else None, "warning": warning}
+        await _audit_dashboard_discord(action, guild, after={"channel_id": result["channel_id"]}, reason=reason)
+        return {"ok": True, "action": action, "result": result, "status": await _dashboard_discord_snapshot(client, guild)}
+
+    if action == "bugs_reports":
+        bugs_channel_id = (await DB.get_server_config(guild.id)).get("bugs_channel_id")
+        channel = guild.get_channel(int(bugs_channel_id)) if bugs_channel_id else None
+        if not isinstance(channel, discord.ForumChannel):
+            raise ValueError("#bugs is not configured as a forum channel yet. Run Full Setup or Repair first.")
+        reports = await bugs_forum_reports(guild, channel, limit=int(payload.get("limit") or 20))
+        return {"ok": True, "action": action, "result": {"channel_id": channel.id, "reports": reports}}
 
     if action == "sync_commands":
         synced = await client.tree.sync(guild=GUILD)
@@ -3201,6 +3971,84 @@ async def dashboard_discord_control(client: XianxiaBot, action: str, payload: di
             raise ValueError("No announcement channel is configured")
         message = await channel.send("🧪 **Xianxia RP GM Dashboard test** — Discord server integration is working.")
         result = {"channel_id": channel.id, "message_id": message.id}
+        await _audit_dashboard_discord(action, guild, after=result, reason=reason)
+        return {"ok": True, "action": action, "result": result}
+
+    if action == "fresh_start":
+        # Cosmetic message wipe, NOT a world/database reset: deletes and recreates
+        # every Xianxia-managed channel safe to fully clear (CHANNEL_WIPE_KEYS, the
+        # realm-capital hubs, #bugs), leaving player-homes/expeditions/event-scenes
+        # untouched so live private/property/event threads survive. See
+        # clear_managed_channel_messages for why deletion (not purge) is used and
+        # exactly what is and isn't cleared.
+        if str(payload.get("confirm") or "").strip().upper() != "CLEAR":
+            raise ValueError('confirmation required: payload "confirm" must be exactly "CLEAR"')
+        result = await clear_managed_channel_messages(guild)
+        await _audit_dashboard_discord(action, guild, after=result, reason=reason)
+        return {"ok": True, "action": action, "result": result, "status": await _dashboard_discord_snapshot(client, guild)}
+
+    if action == "reset_world":
+        # Discord-side half of a world reset: delete every thread the bot still
+        # has a database row for (they're about to become orphaned pointers to
+        # characters/events that no longer exist) and announce the reset. This
+        # never touches the SQLite file itself - that part is reset_database.sh's
+        # job, since only it can safely stop/restart the whole stack. Called by
+        # both reset_database.sh (before it wipes the database) and the
+        # dashboard's "Reset World" button.
+        if str(payload.get("confirm") or "").strip().upper() != "RESET":
+            raise ValueError('confirmation required: payload "confirm" must be exactly "RESET"')
+        records = await DB.all_managed_thread_ids()
+        deleted = 0
+        already_gone = 0
+        failed = 0
+        by_kind: dict[str, int] = {}
+        for record in records:
+            thread_id = int(record["thread_id"])
+            thread: discord.Thread | None = guild.get_thread(thread_id)
+            if thread is None:
+                try:
+                    fetched = await guild.fetch_channel(thread_id)
+                    thread = fetched if isinstance(fetched, discord.Thread) else None
+                except discord.NotFound:
+                    already_gone += 1
+                    continue
+                except (discord.Forbidden, discord.HTTPException):
+                    failed += 1
+                    continue
+            if thread is None:
+                already_gone += 1
+                continue
+            try:
+                await thread.delete()
+            except discord.NotFound:
+                already_gone += 1
+                continue
+            except (discord.Forbidden, discord.HTTPException):
+                failed += 1
+                continue
+            deleted += 1
+            by_kind[record["kind"]] = by_kind.get(record["kind"], 0) + 1
+
+        cfg = await DB.get_server_config(guild.id)
+        channel = await _resolve_text_channel(guild, cfg.get("announcement_channel_id"))
+        message_text = str(payload.get("message") or "").strip() or (
+            "🌌 **The world has ended and a new age begins.** Every cultivator, sect, "
+            "family and chapter of history has returned to dust — the slate is wiped "
+            "clean. Use `/begin` to forge a new legend."
+        )
+        announcement: dict[str, Any] | None = None
+        if channel is not None:
+            message = await channel.send(message_text)
+            announcement = {"channel_id": channel.id, "message_id": message.id}
+
+        result = {
+            "threads_found": len(records),
+            "threads_deleted": deleted,
+            "threads_already_gone": already_gone,
+            "threads_failed": failed,
+            "threads_deleted_by_kind": by_kind,
+            "announcement": announcement,
+        }
         await _audit_dashboard_discord(action, guild, after=result, reason=reason)
         return {"ok": True, "action": action, "result": result}
 
@@ -3290,7 +4138,7 @@ async def admin_setup_server(
     # and refreshes game-side metadata for channels that already exist.
     await interaction.response.defer(ephemeral=False)
     try:
-        base_result, realm_rows = await _run_complete_server_setup(guild)
+        base_result, realm_rows, bugs_warning = await _run_complete_server_setup(guild)
     except (discord.Forbidden, discord.HTTPException, PermissionError) as exc:
         await interaction.followup.send(
             f"❌ **Server {'setup' if action.value == 'setup' else 'repair'} stopped.** Discord rejected a required operation: {exc}\n"
@@ -3306,6 +4154,8 @@ async def admin_setup_server(
     info_message = await ensure_xianxia_info_guide(guild, info_channel) if info_channel else None
     _, permission_warnings = _server_permission_report(guild)
     warnings = list(base_result["warnings"]) + permission_warnings
+    if bugs_warning:
+        warnings.append(bugs_warning)
     role_sync_counts: dict[str, int] | None = None
     if guild.me and guild.me.guild_permissions.manage_roles:
         try:
@@ -3651,11 +4501,7 @@ async def sheet(interaction: discord.Interaction) -> None:
         root_text += f"\nMutation: **{mutation_name}**"
     embed.add_field(name="Spiritual Root", value=root_text, inline=True)
     embed.add_field(name="Path", value=c["path"], inline=True)
-    location_display=c["location"]
-    abode_location=await DB.get_abode_by_location(c["location"])
-    personal_location=await DB.get_personal_world_by_location(c["location"])
-    if abode_location: location_display=f"{abode_location['name']} ({player_property_label(abode_location)})"
-    elif personal_location: location_display=f"{personal_location['name']} (Personal World)"
+    location_display=await character_location_display(c)
     embed.add_field(name="Location", value=location_display, inline=True)
     wallet_lines=[f"{WORLD.currency_name(cid)}: **{int(balance):,}**" for cid,balance in wallet.items() if int(balance)>0]
     embed.add_field(name="Wallet", value="\n".join(wallet_lines[:6]) if wallet_lines else "Empty", inline=True)
@@ -4155,7 +5001,7 @@ class PlayerDashboardView(discord.ui.View):
         await self._show(interaction, "quests")
 
 
-@registered_root_command(name="me", description="Open your v0.18 player dashboard", guild=GUILD)
+@registered_root_command(name="me", description="Open your player dashboard", guild=GUILD)
 async def player_dashboard(interaction: discord.Interaction) -> None:
     c = await require_character(interaction, allow_deceased=True)
     if not c:
@@ -4353,7 +5199,7 @@ async def seclusion_start(
         f"🔒 **Closed-Door Seclusion Begun**\n"
         f"Path: **{'Qi' if mode.value == 'qi' else 'Body'} Cultivation**\n"
         f"Duration: **{int(days)} world-days**\n"
-        f"Location: **{c.get('location')}** ({env_label})\n"
+        f"Location: **{await character_location_display(c)}** ({env_label})\n"
         f"Environment efficiency: **x{env_mult:.2f}**\n"
         f"Projected background gain: about **{daily} essence per completed world-day**.\n\n"
         "Progress is settled automatically while the bot is online and catches up after restarts. "
@@ -4375,11 +5221,14 @@ async def seclusion_status(interaction: discord.Interaction) -> None:
         return
     remaining = max(0, int(state["ends_game_minute"]) - wt.total_minutes) if str(state.get("status")) == "active" else 0
     elapsed = max(0, min(wt.total_minutes, int(state["ends_game_minute"])) - int(state["started_game_minute"]))
+    start_location_display = await character_location_display(
+        {"location": state.get("start_location"), "user_id": c.get("user_id")}
+    )
     await interaction.response.send_message(
         f"🔒 **Seclusion Status**\n"
         f"State: **{str(state.get('status','unknown')).title()}**\n"
         f"Mode: **{str(state.get('mode','qi')).upper()}**\n"
-        f"Location: **{state.get('start_location')}**\n"
+        f"Location: **{start_location_display}**\n"
         f"Elapsed: **{elapsed / MINUTES_PER_DAY:.1f} world-days**\n"
         f"Remaining: **{remaining / MINUTES_PER_DAY:.1f} world-days**\n"
         f"Cultivation awarded: **{int(state.get('accumulated_gain',0))}**\n"
@@ -4932,7 +5781,7 @@ async def explore(interaction: discord.Interaction) -> None:
             action_id=f"discord:{interaction.id}:exploration.explore",
         )
     except GameEngineError as exc:
-        await interaction.followup.send(f"Exploration could not proceed: {exc}", ephemeral=False)
+        await interaction.followup.send(f"Exploration could not proceed: {_explain_engine_error(exc)}", ephemeral=False)
         return
     outcome = dict(envelope.get("result") or {})
     if str(outcome.get("kind") or "") == "event_active":
@@ -5161,7 +6010,7 @@ async def hunt(interaction: discord.Interaction) -> None:
             action_id=f"discord:{interaction.id}:exploration.hunt",
         )
     except GameEngineError as exc:
-        await interaction.followup.send(f"The hunt could not proceed: {exc}", ephemeral=False)
+        await interaction.followup.send(f"The hunt could not proceed: {_explain_engine_error(exc)}", ephemeral=False)
         return
     outcome = dict(envelope.get("result") or {})
     beast = dict(outcome.get("beast") or {})
@@ -5182,7 +6031,7 @@ async def hunt(interaction: discord.Interaction) -> None:
             interaction.user.id, memory_kind="hunt", salience=48 if success else 32,
             location=str(c.get("location") or ""), source="hunt", game_minute=hunt_context.game_minute,
             summary=(
-                f"{c.get('name','The player')} hunted {beast.get('name','a spirit beast')} at {c.get('location','Unknown')}. "
+                f"{c.get('name','The player')} hunted {beast.get('name','a spirit beast')} at {await character_location_display(c)}. "
                 f"Outcome: {'success' if success else 'the beast escaped'}. Observed: {narration[:520]}"
             ),
         )
@@ -5666,7 +6515,7 @@ async def talk(
     npc_location = await current_npc_location(npc, wt.period)
     if npc_location and npc_location != c.get("location"):
         await interaction.response.send_message(
-            f"**{npc}** is currently at **{npc_location}** during the **{wt.period}**, not **{c['location']}**.",
+            f"**{npc}** is currently at **{npc_location}** during the **{wt.period}**, not **{await character_location_display(c)}**.",
             ephemeral=False,
         )
         return
@@ -5918,7 +6767,7 @@ async def _resolve_scene_action(
             npc_name=(target if target not in {"Environment", "Self"} and player_target_id is None else ""),
             source="scene_action", game_minute=context.game_minute,
             summary=(
-                f"{c.get('name','The player')} attempted {profile['label']} at {c.get('location','Unknown')} "
+                f"{c.get('name','The player')} attempted {profile['label']} at {await character_location_display(c)} "
                 f"targeting {target}: {detail[:300]} | Outcome: {outcome_memory}. "
                 f"Observed response: {narration[:520]}"
             ),
@@ -6025,13 +6874,18 @@ class SceneActionTargetSelect(discord.ui.Select):
 
 
 class SceneActionView(discord.ui.View):
-    def __init__(self, owner_id: int, character: dict[str, Any], npcs: list[str]):
+    def __init__(self, owner_id: int, character: dict[str, Any], npcs: list[str], location_display: str | None = None):
         super().__init__(timeout=300)
         self.owner_id = int(owner_id)
         self.character = dict(character)
         self.npcs = list(npcs)
         self.action_key = "observe"
         self.target = "Environment"
+        # embed() is synchronous and can't itself resolve abode:/sect_abode:/
+        # personal_world:/birth_family: location keys into a place name (that needs a
+        # DB lookup) - callers precompute it with character_location_display() and pass
+        # it in. Falls back to the raw value if a caller doesn't (defensive only).
+        self.location_display = location_display if location_display is not None else str(character.get("location") or "Unknown")
         self.refresh_components()
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
@@ -6070,7 +6924,7 @@ class SceneActionView(discord.ui.View):
             else f"**{str(profile['attribute']).title()}** vs **TN {profile['tn']}**"
         )
         embed.add_field(name="Check", value=check_text, inline=True)
-        embed.set_footer(text=f"Current location: {self.character.get('location','Unknown')} • no reward/state change is invented by narration")
+        embed.set_footer(text=f"Current location: {self.location_display} • no reward/state change is invented by narration")
         return embed
 
 
@@ -6080,7 +6934,7 @@ async def scene_action_command(interaction: discord.Interaction) -> None:
     if not c:
         return
     npcs = await _scene_action_targets(c)
-    view = SceneActionView(interaction.user.id, c, npcs)
+    view = SceneActionView(interaction.user.id, c, npcs, await character_location_display(c))
 
     target_thread: discord.Thread | None = None
     if interaction.guild is not None and isinstance(interaction.channel, discord.Thread):
@@ -6089,7 +6943,16 @@ async def scene_action_command(interaction: discord.Interaction) -> None:
             target_thread = interaction.channel
     if target_thread is None:
         target_thread = await active_private_location_thread(interaction, c)
-    if target_thread is None and not str(c.get("location") or "").startswith("personal_world:"):
+    if target_thread is None and not str(c.get("location") or "").startswith(
+        ("personal_world:", "birth_family:", "sect_abode:", "abode:")
+    ):
+        # If active_private_location_thread() above couldn't resolve/create the
+        # right private thread for one of these prefixes (a missing DB row, a
+        # deleted Discord thread, a lost permission), the correct fallback is
+        # the public panel below - never the expedition journal. A character
+        # standing in a private residence isn't "exploring the world", and
+        # routing them there anyway just reproduces the world-catalog lookup
+        # failure a moment later when they try to actually use it.
         target_thread = await ensure_expedition_thread(interaction, c)
 
     if target_thread is not None:
@@ -6233,7 +7096,7 @@ async def sense_command(
         npc_location = await current_npc_location(npc, wt.period)
         if npc_location and npc_location != c.get("location"):
             await interaction.response.send_message(
-                f"**{npc}** is not currently present at **{c['location']}**.", ephemeral=False
+                f"**{npc}** is not currently present at **{await character_location_display(c)}**.", ephemeral=False
             )
             return
         try:
@@ -6285,7 +7148,7 @@ async def sense_command(
     area_precision = dict(sensed.get("precision") or {})
     precision_tier = str(area_precision.get("tier", "failure"))
     lines = [
-        f"🌌 **Spiritual Sense Sweep — {sensed.get('location', c['location'])}**",
+        f"🌌 **Spiritual Sense Sweep — {sensed.get('location') or await character_location_display(c)}**",
         roll_line(roll),
         f"Precision: **{int(area_precision.get('total', 0))}** vs detail TN **{int(area_precision.get('tn', 0))}** — "
         f"**{precision_tier.replace('_', ' ').title()}**",
@@ -6449,7 +7312,7 @@ async def world(interaction: discord.Interaction) -> None:
         return
     known = await _known_locations(interaction.user.id, c)
     current_world = WORLD.realm_world(int(c.get("realm_index", 0)))
-    lines = [f"🌍 **Known World — {current_world}**", f"Current location: **{c.get('location','Unknown')}**"]
+    lines = [f"🌍 **Known World — {current_world}**", f"Current location: **{await character_location_display(c)}**"]
     visible = []
     for name in sorted(known):
         data = WORLD.locations.get(name)
@@ -6957,7 +7820,8 @@ async def use_item_command(interaction: discord.Interaction, item: str) -> None:
             deployed=dict(e.get("result") or {})
         except GameEngineError as exc:
             await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
-        await interaction.response.send_message(f"🧿 **{deployed.get('name',item_def.get('name',item))} deployed at {deployed.get('location',c.get('location'))}.**",ephemeral=False)
+        deployed_location = deployed.get('location') or await character_location_display(c)
+        await interaction.response.send_message(f"🧿 **{deployed.get('name',item_def.get('name',item))} deployed at {deployed_location}.**",ephemeral=False)
         return
 
     if storage_upgrade:
@@ -7060,7 +7924,7 @@ async def scene_status(interaction: discord.Interaction) -> None:
         if await current_npc_location(name,wt.period)==c["location"]:
             local.append(name)
     lines=[
-        f"🎭 **Scene — {c['location']}**",
+        f"🎭 **Scene — {await character_location_display(c)}**",
         f"Time: **{wt.display}**",
         f"World: **{loc.get('world','Mortal World')}**",
         f"Protection: **{'Protected / no violence' if loc.get('safe_zone') else 'No absolute protection'}**",
@@ -8496,7 +9360,7 @@ async def beast_encounters(interaction: discord.Interaction) -> None:
             ephemeral=False,
         )
         return
-    lines = [f"🪢 **Taming Opportunities — {c['location']}**"]
+    lines = [f"🪢 **Taming Opportunities — {await character_location_display(c)}**"]
     for row in rows:
         remaining = max(0, int(row["expires_game_minute"]) - wt.total_minutes)
         lines.append(
@@ -9497,7 +10361,7 @@ async def sect_recruitment_recommendation(interaction: discord.Interaction, npc:
         await interaction.response.send_message("That NPC's sect has no public recruitment path configured.",ephemeral=False);return
     wt=await current_world_time(); npc_location=await current_npc_location(npc,wt.period)
     if npc_location!=str(c.get('location') or ''):
-        await interaction.response.send_message(f"**{npc}** is currently at **{npc_location or 'an unknown location'}**, not **{c['location']}**.",ephemeral=False);return
+        await interaction.response.send_message(f"**{npc}** is currently at **{npc_location or 'an unknown location'}**, not **{await character_location_display(c)}**.",ephemeral=False);return
     memory=await DB.get_npc_memory(interaction.user.id,npc)
     if not memory.strip():
         await interaction.response.send_message(f"Speak with **{npc}** first; a recommendation requires established personal history.",ephemeral=False);return
@@ -9719,7 +10583,7 @@ async def sect_abode(interaction: discord.Interaction, action: app_commands.Choi
     if action.value == "status":
         await interaction.response.send_message(
             f"🏯 **{abode['name']}**\nSect: **{abode['sect_name']}**\nSect gate: **{abode['base_location']}**\n"
-            f"Current location: **{c.get('location','Unknown')}**\n"
+            f"Current location: **{await character_location_display(c)}**\n"
             + (f"Private scene: {thread.mention}" if thread else "⚠️ Private scene thread is unavailable; repair the base channels."),
             ephemeral=False,
         )
@@ -9994,7 +10858,8 @@ async def sect_manor_establish(interaction: discord.Interaction, name: str, conf
         e=await ENGINE.authoritative_action("sect.manor.establish",interaction.user.id,{"name":name},action_id=f"discord:{interaction.id}:sect.manor.establish"); r=dict(e.get('result') or {})
     except GameEngineError as exc:
         await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
-    await interaction.response.send_message(f"🏯 **{r.get('name',name)}** is established at **{r.get('base_location',c.get('location'))}**.",ephemeral=False)
+    established_location = r.get('base_location') or await character_location_display(c)
+    await interaction.response.send_message(f"🏯 **{r.get('name',name)}** is established at **{established_location}**.",ephemeral=False)
 
 
 @registered_group_command(sect_manor_group, name="upgrade", description="Upgrade a shared manor facility using materials from the sect treasury")
@@ -10096,9 +10961,19 @@ async def birth_family_view(interaction:discord.Interaction)->None:
             lines.append("Your soul is currently in **Samsara**; use **/character → Samsara** for the reincarnation clock.")
     household_key = f"birth_family:{int(fam.get('family_id') or 0)}"
     if str(c.get("location") or "") == household_key:
-        lines.extend(["", "🏠 **You are currently inside this shared household.** Other player members who enter are present in the same family scene."])
+        lines.extend([
+            "",
+            "🏠 **You are inside this shared household right now.** Other player members who enter "
+            "share the same scene, so you can roleplay together here.",
+            "Exploring, hunting and travel need the open world — step outside with **/family → Leave** "
+            f"to stand in **{fam.get('location') or 'your home region'}**.",
+        ])
     else:
-        lines.extend(["", "🏠 Use **/family enter** to visit the shared household. Players born into this same starter family meet in the same scene."])
+        lines.extend([
+            "",
+            "🏠 Use **/family → Enter** to visit the shared household. Players born into this same "
+            "starter family meet in the same scene.",
+        ])
     await reply_long(interaction,"\n".join(lines),ephemeral=False)
 
 @registered_group_command(family_group, name="enter", description="Enter your shared birth-family household")
@@ -10281,7 +11156,7 @@ async def birth_family_ancestry(
         evidence = list(row.get("evidence") or [])[:level]
         if evidence:
             lines.append("Evidence: " + " | ".join(str(item) for item in evidence))
-    lines.append("\nUse **/family investigate** with a record number to uncover and corroborate its surviving evidence.")
+    lines.append("\nUse **/family → Investigate** with a record number to uncover and corroborate its surviving evidence.")
     await reply_long(interaction, "\n".join(lines), ephemeral=False)
 
 
@@ -10341,7 +11216,7 @@ async def birth_family_investigate(interaction: discord.Interaction, history_id:
                 f"• `#{int(quest.get('quest_id', 0))}` **{quest.get('title', 'Investigation')}** — "
                 f"{int(quest.get('progress', 0))}/{int(quest.get('target', 1))}"
             )
-        lines.append("Use **/family quest** to work an unlocked investigation quest.")
+        lines.append("Use **/family → Quest** to work an unlocked investigation quest.")
     await reply_long(interaction, "\n".join(lines), ephemeral=False)
 
 
@@ -10356,7 +11231,7 @@ async def birth_family_legacy(interaction: discord.Interaction, history_id: int 
     conflicts = list(state.get("conflicts") or [])
     if not any((leads, quests, claims, conflicts)):
         await interaction.response.send_message(
-            "🏚️ No ancestral investigation content has been uncovered yet. Use **/family investigate** on a Samsara ancestry record first.",
+            "🏚️ No ancestral investigation content has been uncovered yet. Use **/family → Investigate** on a Samsara ancestry record first.",
             ephemeral=False,
         )
         return
@@ -10479,7 +11354,7 @@ async def birth_family_claim(
         f"Blood-based claim: **{'yes' if result.get('blood_based') else 'no'}**",
     ]
     if int(result.get("conflict_id", 0)) > 0:
-        lines.append(f"Conflict opened. Use **/family conflict claim_id:{int(result.get('claim_id', 0))}** to contest it.")
+        lines.append(f"Conflict opened. Use **/family → Conflict** with claim id **{int(result.get('claim_id', 0))}** to contest it.")
     elif result.get("resolution"):
         lines.append(f"Resolution: **{str(result.get('resolution')).replace('_', ' ').title()}**")
     await interaction.response.send_message("\n".join(lines), ephemeral=False)
@@ -12167,7 +13042,7 @@ async def _player_hub_status(interaction: discord.Interaction) -> list[HubStatus
         ),
         HubStatusField(
             "📍 Location",
-            f"**{str(character.get('location') or 'Unknown')[:180]}**",
+            f"**{(await character_location_display(character))[:180]}**",
             inline=False,
         ),
     ]
@@ -12256,7 +13131,12 @@ async def on_app_command_error(
 
 def register_command_surface(client: XianxiaBot) -> None:
     """Register only public Discord commands; gameplay actions stay internal."""
-    for name in ("begin", "me", "quests", "action", "act", "check", "admin"):
+    # "act" is deliberately absent here: it's only ever a subcommand name under
+    # several groups (/battle act, /boss act, /hunter act, /war act, /duel act
+    # - see registered_group_command call sites above), never its own root
+    # command, so it was never registered into ACTIONS._roots and
+    # ACTIONS.root("act") raised KeyError on every bot startup.
+    for name in ("begin", "me", "quests", "action", "check", "admin"):
         client.tree.add_command(ACTIONS.root(name), guild=GUILD)
     for command in _HUB_COMMANDS:
         client.tree.add_command(command, guild=GUILD)

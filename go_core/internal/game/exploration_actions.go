@@ -1023,7 +1023,7 @@ func explorationExploreAction(conn *storage.Conn, catalog worlddata.Catalog, use
 		result := map[string]any{"kind": "event_active", "event": eventOut, "surprise": eventOut}
 		return authoritativeMutation{Result: result, Event: eventledger.Event{Domain: "exploration", EventType: "exploration_event_reopened", EntityType: "exploration_event", EntityID: activeEvent.EventID, SubjectType: "character", SubjectID: fmt.Sprint(userID), GameMinute: p.GameMinute, Payload: result}}, nil
 	}
-	if strings.HasPrefix(c.Location, "abode:") || strings.HasPrefix(c.Location, "sect_abode:") || strings.HasPrefix(c.Location, "personal_world:") {
+	if strings.HasPrefix(c.Location, "abode:") || strings.HasPrefix(c.Location, "sect_abode:") || strings.HasPrefix(c.Location, "personal_world:") || strings.HasPrefix(c.Location, "birth_family:") {
 		return authoritativeMutation{}, errors.New("world exploration is unavailable inside a private residence or personal world")
 	}
 	loc, ok := catalog.Locations[c.Location]
@@ -1115,6 +1115,12 @@ func explorationTravelAction(conn *storage.Conn, catalog worlddata.Catalog, user
 	}
 	if strings.HasPrefix(c.Location, "personal_world:") {
 		return authoritativeMutation{}, errors.New("leave the personal world before normal travel")
+	}
+	if strings.HasPrefix(c.Location, "sect_abode:") {
+		return authoritativeMutation{}, errors.New("leave the sect abode before normal travel")
+	}
+	if strings.HasPrefix(c.Location, "birth_family:") {
+		return authoritativeMutation{}, errors.New("leave the birth family household before normal travel")
 	}
 	dest, ok := catalog.Locations[p.Destination]
 	if !ok {
@@ -1348,6 +1354,9 @@ func explorationHuntAction(conn *storage.Conn, catalog worlddata.Catalog, userID
 	}
 	if c.LifeStatus != "alive" {
 		return authoritativeMutation{}, errors.New("only a living incarnation can hunt")
+	}
+	if strings.HasPrefix(c.Location, "abode:") || strings.HasPrefix(c.Location, "sect_abode:") || strings.HasPrefix(c.Location, "personal_world:") || strings.HasPrefix(c.Location, "birth_family:") {
+		return authoritativeMutation{}, errors.New("hunting is unavailable inside a private residence or personal world")
 	}
 	now := float64(time.Now().UnixNano()) / 1e9
 	if active, err := activeExplorationEventForUserTx(conn, userID, now); err != nil {

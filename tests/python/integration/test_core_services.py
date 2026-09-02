@@ -67,7 +67,7 @@ class CoreServiceTests(unittest.IsolatedAsyncioTestCase):
         self.tmp.cleanup()
 
     async def test_current_schema_has_core_npc_and_rag_tables(self):
-        self.assertEqual(SCHEMA_VERSION, 24)
+        self.assertEqual(SCHEMA_VERSION, 26)
         with sqlite3.connect(self.path) as conn:
             tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         self.assertTrue({

@@ -35,7 +35,7 @@ class RagV1Tests(unittest.IsolatedAsyncioTestCase):
         self.tmp.cleanup()
 
     def test_schema_is_v16(self):
-        self.assertEqual(SCHEMA_VERSION, 24)
+        self.assertEqual(SCHEMA_VERSION, 26)
 
 
     def test_scene_profiles_tighten_routine_context_by_scene_type(self):

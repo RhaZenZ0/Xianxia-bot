@@ -47,7 +47,7 @@ class DashboardTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_overview_reads_schema_and_simulation(self):
         data = await self.store.overview()
-        self.assertEqual(data["schema_version"], 24)
+        self.assertEqual(data["schema_version"], 26)
         self.assertIn("clock", data)
         self.assertGreater(data["counts"]["npcs_alive"], 0)
         self.assertTrue(data["simulations"])
