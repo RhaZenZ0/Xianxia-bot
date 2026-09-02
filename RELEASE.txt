@@ -1,8 +1,115 @@
-Xianxia RP v0.19 RECOMMENDED RELEASE
+Xianxia RP v0.19.9 RECOMMENDED RELEASE
 
-Release date: 2026-08-31
-Schema: 24 (unchanged from v0.18)
-Migration: none required from v0.18 — every v0.19 change is logic-only.
+Release date: 2026-09-01
+Schema: 26 (unchanged from v0.19)
+
+v0.19.9 fixes the release integrity check, which refused good packages on QNAP hardware.
+--quiet and --strict are GNU coreutils flags; BusyBox rejects them, so the check exited
+non-zero without ever verifying anything and reported "the package does not match its own
+manifest". Only -c is portable and that is all it uses now.
+
+IMPORTANT - this one is self-blocking. The updater that runs is the INSTALLED one, so a
+fixed update.sh inside this archive cannot fix the installation attempting to use it. If
+you are on v0.19.6, v0.19.7 or v0.19.8, patch your installed updater once, first:
+
+    cd /path/to/bot
+    sed -i 's/ -c --quiet --strict / -c /; s/ -c --quiet / -c /' update.sh
+    sh -n update.sh && ./update.sh --install
+
+After v0.19.9 is installed the corrected updater is in place and no further patching is
+needed.
+
+v0.19.8 fixes onboarding copy that pointed at commands players cannot type. Only the 21
+registered slash commands exist to type - the 16 hubs plus /begin, /me, /quests, /action,
+/check and /admin - so "/family leave" was a dead end, and it had shipped in both places a
+stuck player looks: the birth-household thread opener and the blocked-exploration hint. All
+six occurrences now read "/family -> Leave", the household and expedition openers lead with
+how to get out instead of burying it, the expedition journal is location-aware (it names the
+exit for where you actually are rather than telling you to explore, which would fail), and a
+new test gates the whole shape so it cannot ship a third time - it found four further
+instances nobody had noticed.
+
+v0.19.7 corrects the Components V2 hub layout against how it actually renders in Discord,
+now that v0.19.6 put it on screen. No structural change - same layout, same fallbacks:
+- action rows no longer show a generic glyph; every row on a page was rendering the same
+  fallback emoji because leaf command names are not in the hub-root emoji table;
+- the status header puts each resource on its own line instead of one run-on sentence, and
+  its bars are halved to five segments (ten read as a solid rule at 100%);
+- danger-styled buttons carry their own verb ("Sever") instead of a red button reading
+  "Open"; every other row keeps the single consistent label;
+- the system dropdown is removed - it duplicated Prev/Next and spent a row naming the
+  system already in the heading above it. The arrows wrap, so the far end of an 18-system
+  hub is one Prev away. The freed row raised the visible-action limit from 7 to 8.
+
+v0.19.6 is a correctness release answering an external audit of the v0.19 archive.
+Every finding below was reproduced against the source before being changed, and each
+carries a regression test that fails without the fix:
+
+- DATA LOSS (Go): POST /v1/db/batch with transaction:false - which is also what a client
+  gets by omitting the field, since Go's zero value for a bool is false - returned HTTP 200
+  and then discarded every write. storage.Conn opens an implicit BEGIN before any
+  INSERT/UPDATE/DELETE/REPLACE and Conn.Close rolls back whatever is still open, and the
+  handler only committed when transaction:true. dbBatch now commits unconditionally, and
+  commits already-completed statements before reporting a mid-batch failure. Six new tests
+  in go_core/internal/server/server_batch_test.go; three of them fail on the old code with
+  "reported success but persisted 0 of 2 rows". The only in-repo caller passes
+  transaction=True, so shipped code was not losing data - but the endpoint contract was.
+- HIGH (dashboard): Discord snowflakes were serialized as JSON numbers. Every id is 17-19
+  digits, past Number.MAX_SAFE_INTEGER, so JSON.parse rounded them before any dashboard
+  JavaScript ran: 847706123456789012 arrived as 847706123456789000, went into
+  <option value="...">, and came back on the next admin action as a user who does not
+  exist - every teleport, currency grant, karma and fate change against that player failed
+  with "character not found". app/dashboard.py now emits out-of-range integers as decimal
+  strings at the single _send_json chokepoint, and app.js compares/prints ids as strings.
+- MEDIUM (Discord): clearing a channel message did not stay cleared. The cleared state was
+  stored as "", which is falsy, so `row.get("content") or DEFAULT` read it back as "not
+  configured" - the dashboard redisplayed the default and the next Full Setup/Repair
+  reposted the message. There are three states now (no row = default, text = custom,
+  "" = explicitly disabled) and Repair leaves a disabled slot alone. Clearing a message
+  whose channel is currently unbound also persists instead of being silently dropped.
+- MEDIUM (release integrity): RELEASE_MANIFEST.sha256 had drifted to 42 wrong hashes, 14
+  entries pointing at docs that had moved, and 22 packaged files listed nowhere - and
+  update.sh never checked it. It is generated by scripts/release_manifest.py now, verified
+  by update.sh before the running install is touched, and gated by a test.
+- MEDIUM (Go): backups were named to the second, so two taken in the same second - a
+  double-click, or an automated backup landing with a manual one - silently overwrote each
+  other. Names now carry milliseconds and are reserved with O_EXCL.
+- LOW (Discord): an existing #bugs forum adopted by setup never received the required tags,
+  while the dashboard advertised all five as available. Setup/Repair now adds missing tags
+  (keeping any the GM added), and the dashboard reports the forum's real tags plus anything
+  still missing.
+
+Also: the release stamp is now self-consistent and enforced. VERSION, app/version.py, the
+Dockerfile label, both docker-compose labels and .env.example all read 0.19.9, and the
+contract test derives the expected value from app/version.py rather than repeating a
+literal - the drift that let VERSION say 0.19 while everything else said 0.18 now fails
+against one source of truth.
+
+Schema: 26 (unchanged from v0.19)
+Migration: automatic supported-schema upgrade through v26; v25 adds the channel_messages table for
+GM-authored per-channel welcome messages (base channels + realm hubs), edited in place like the
+#xianxia-info guide; v26 adds a bugs_channel_id column for the new #bugs forum channel where players
+report issues as forum posts. No v0.19.x point release adds a migration: upgrading from v0.19 is
+a container replace with no database change.
+
+v0.19.5 is a GUI release on top of v0.19:
+- the interactive hub panel gains a Components V2 "action list" layout, where every action on a
+  system is a visible row with its own button rather than an entry hidden inside a dropdown;
+- running an action no longer overwrites the panel it was launched from - results post beneath the
+  card and the card stays live and reusable;
+- the layout is piloted on /character only; the other 15 player hubs and /admin are untouched and
+  still render the classic embed panel. LAYOUT_HUB_NAMES in app/bot/hubs.py is the whole rollout
+  switch, and the layout is feature-detected and falls back to the classic panel on any error;
+- the release stamp is corrected and made self-consistent: VERSION said 0.19 while app/version.py,
+  the Dockerfile and docker-compose.yml still said 0.18. All four are stamped from one source now
+  (0.19.9 as of this build), and the release contract test reads the expected value from
+  app/version.py instead of repeating a literal, so the same drift cannot recur silently;
+- two stale in-product version references removed: /me described itself as the "v0.18 player
+  dashboard" and the in-game realm guide referred to "the v0.18 scene engine".
+
+DEPLOY: replace the container/image and restart. No database migration and no config change. Verify
+with /character (the new panel is the visible change). Running Full Setup/Repair once is optional but
+recommended on this build: it is what adds the missing tags to an existing #bugs forum.
 
 v0.19 is a cultivation-depth audit and consistency pass on top of v0.18:
 - player old-age death is now actually enforced (was display-only in v0.18's patch line),

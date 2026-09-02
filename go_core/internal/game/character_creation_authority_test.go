@@ -24,8 +24,12 @@ CREATE TABLE characters(
     path TEXT NOT NULL, spiritual_root TEXT NOT NULL, concept TEXT NOT NULL DEFAULT '', gender TEXT NOT NULL DEFAULT 'neutral',
     age_at_creation_years INTEGER NOT NULL DEFAULT 18, created_game_minute INTEGER NOT NULL DEFAULT 0,
     natural_lifespan_years INTEGER NOT NULL DEFAULT 75, life_extension_years INTEGER NOT NULL DEFAULT 0, life_status TEXT NOT NULL DEFAULT 'alive',
-    realm_index INTEGER NOT NULL DEFAULT 0, phase INTEGER NOT NULL DEFAULT 1, cultivation INTEGER NOT NULL DEFAULT 0, karma_score INTEGER NOT NULL DEFAULT 0,
-    body_realm_index INTEGER NOT NULL DEFAULT 0, body_phase INTEGER NOT NULL DEFAULT 1,
+    realm_index INTEGER NOT NULL DEFAULT 0, phase INTEGER NOT NULL DEFAULT 1, cultivation INTEGER NOT NULL DEFAULT 0,
+    -- checkPlayerOldAgeDeathTx (lifespan.go) reads body_realm_index/body_phase
+    -- off characters ahead of every authoritative mutation, including
+    -- character.family_options; this schema predates that dual-cultivation
+    -- read and never carried the columns.
+    body_realm_index INTEGER NOT NULL DEFAULT 0, body_phase INTEGER NOT NULL DEFAULT 1, karma_score INTEGER NOT NULL DEFAULT 0,
     qi INTEGER NOT NULL DEFAULT 0, qi_max INTEGER NOT NULL DEFAULT 0, vitality INTEGER NOT NULL DEFAULT 0, vitality_max INTEGER NOT NULL DEFAULT 0,
     spirit_stones INTEGER NOT NULL DEFAULT 0, insight_xp INTEGER NOT NULL DEFAULT 0, location TEXT NOT NULL DEFAULT '',
     attributes_json TEXT NOT NULL DEFAULT '{}', created_at REAL NOT NULL DEFAULT 0, updated_at REAL NOT NULL DEFAULT 0

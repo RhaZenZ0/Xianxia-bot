@@ -1,4 +1,4 @@
-# Xianxia RP Discord Bot v0.19
+# Xianxia RP Discord Bot v0.19.9
 
 A persistent Xianxia role-playing Discord bot designed for CPU-only QNAP/NAS deployment. Python owns
 Discord, RAG, dashboard, and presentation orchestration; Go owns canonical gameplay rules, current
@@ -8,10 +8,41 @@ Version **0.18** completed the staged authority cleanup: forage/crafting/compani
 unified lifespan, multi-hop road travel, caravan mechanics, dashboard-owned Discord setup, and removal
 of obsolete Python mechanical authority paths. **0.19** is a cultivation-depth consistency/coverage pass
 on top of that release, plus a further authority-migration pass for 1v1 battle start and mid-battle item
-recovery. The release uses schema **24**.
+recovery, plus GM-authored per-channel welcome messages and a #bugs forum channel for
+player bug reports. The release uses schema **26**.
 
-See `V019_RELEASE_NOTES.md` for the current release, `V018_RELEASE_NOTES.md` and `V018_BUILD_HISTORY.md`
-(consolidated validation/audit record) for the prior staged-authority migration.
+**0.19.5** is a GUI release on top of that. The interactive hub panel gains a Components V2
+"action list" layout: every action on a system is visible as its own row with its own button,
+instead of being hidden behind an action dropdown, and running an action no longer overwrites
+the panel it was launched from. It is piloted on `/character`; the other 15 player hubs and the
+admin panel keep the classic embed panel, and `LAYOUT_HUB_NAMES` in `app/bot/hubs.py` is the
+whole rollout switch. 0.19.5 changes no schema and no game rules. It also corrects the release
+stamp itself, which had drifted: `VERSION` said 0.19 while `app/version.py`, the `Dockerfile`
+and `docker-compose.yml` all still said 0.18.
+
+**0.19.6** is a correctness release answering an external audit. It fixes a silent data-loss
+path in the Go engine (`/v1/db/batch` with `transaction:false` returned HTTP 200 and then rolled
+the writes back), Discord snowflake ids being rounded to nothing by `JSON.parse` on the way to
+the dashboard, a cleared channel message coming back on the next Repair, backups taken in the
+same second overwriting each other, `#bugs` forum tags never being applied to an adopted
+channel, and a `RELEASE_MANIFEST.sha256` that had drifted out of date and was never verified by
+`update.sh`. Every fix carries a regression test that fails without it. No schema change.
+
+**0.19.7** corrects the hub layout against how it actually renders in Discord: no generic
+glyph on action rows, one status per line with shorter bars, danger buttons that name
+their own verb, and the system dropdown removed as a duplicate of Prev/Next.
+
+**0.19.8** fixes onboarding copy that told players to type commands that do not exist
+(`/family leave` is not registered — only the hub `/family` is), rewrites the household and
+expedition thread openers to lead with how to step outside, and adds a test that gates the
+whole shape.
+
+**0.19.9** fixes the release integrity check, which used GNU-only `sha256sum` flags and so
+refused every package on BusyBox-based NAS hardware. See RELEASE.txt — upgrading from
+0.19.6–0.19.8 needs a one-line patch to the *installed* `update.sh` first.
+
+See `docs/V019_RELEASE_NOTES.md` for the current release, `docs/V018_RELEASE_NOTES.md` and
+`docs/V018_BUILD_HISTORY.md` (consolidated validation/audit record) for the prior staged-authority migration.
 
 ## Release architecture
 
@@ -110,7 +141,7 @@ cache_size=-32768
 wal_autocheckpoint=1000
 ```
 
-The current schema is **24**. Historical migrations remain in the repository and upgrades run in place.
+The current schema is **26**. Historical migrations remain in the repository and upgrades run in place.
 
 ## Requirements
 
@@ -180,6 +211,20 @@ sudo ./stop.sh
 ```
 
 The stop script removes running containers/networks but preserves `.env` and `./data`.
+
+### Reset the database
+
+```bash
+chmod +x reset_database.sh
+./reset_database.sh
+```
+
+Wipes every character, NPC, family, sect, war, event and world-history entry and starts a
+brand-new game. Discord channels/threads are left alone - run **Server Setup → Repair**
+afterward if you want the bot to reconcile stale bindings. It always takes a safety backup
+first (through the same engine backup API described below when the stack is running, or a
+plain file copy when it is already stopped) and requires typing `RESET` to confirm unless
+you pass `--yes`. See `./reset_database.sh --help` for `--no-backup` and `--no-restart`.
 
 ## Services
 
@@ -426,8 +471,8 @@ live structured SQL
 - **Schema 17** adds the current event participation/GUI persistence layer and associated current schema updates.
 - **Schemas 18-24** carried the v0.18 staged-authority migration (forage/crafting/companions, canonical time,
   unified lifespan, multi-hop road travel, caravan mechanics, dashboard-owned Discord setup) through to its
-  final state; no v0.19 change added new tables or columns. See `V018_RELEASE_NOTES.md` and
-  `V019_RELEASE_NOTES.md` for the per-release detail.
+  final state; no v0.19 change added new tables or columns. See `docs/V018_RELEASE_NOTES.md` and
+  `docs/V019_RELEASE_NOTES.md` for the per-release detail.
 
 ### Safe canon indexing
 
@@ -523,6 +568,10 @@ From Discord or the Admin Console you can:
 - VACUUM SQLite when appropriate
 
 Do not copy a live WAL database file by hand as your primary backup strategy.
+
+To wipe the world and start over, use `./reset_database.sh` (see above) rather than
+deleting `data/xianxia.sqlite3` by hand - it takes a safety backup first and restarts
+the stack so a fresh schema is created automatically.
 
 ## Data ownership and migrations
 
@@ -711,18 +760,29 @@ tests/python/           Python-owned unit/integration/contract suite
 tests/support.py         shared dependency shims and test path helpers
 ```
 
-## Release status — v0.19
+## Release status — v0.19.9
 
-- Current release: a cultivation-depth consistency/coverage pass plus a further authority-migration pass for
+- Current release: v0.19.9, portable release-integrity check (BusyBox-safe).
+- v0.19.8: onboarding copy pointing at reachable commands, gated by a test.
+- v0.19.7: hub-layout corrections made after seeing the panel render live.
+- v0.19.6: a correctness release fixing the findings of an external audit
+  (engine batch durability, dashboard snowflake precision, cleared-message persistence, backup
+  naming, `#bugs` tag sync, release-manifest integrity). No schema change; schema stays at 26.
+- v0.19.5: a GUI release adding the Components V2 hub layout, piloted on `/character`.
+- v0.19: a cultivation-depth consistency/coverage pass plus a further authority-migration pass for
   1v1 battle start and mid-battle item recovery, built on top of the v0.18 staged-authority migration.
 - Go owns canonical gameplay time, migrated gameplay mechanics, lifespan/death authority, road travel,
   caravan settlement, simulation mutation, and SQLite WAL.
 - Python owns Discord/RAG/dashboard/presentation orchestration and does not duplicate the removed
   lifespan/mechanical authority paths.
-- Discord channel/category provisioning is admin-dashboard-owned; the bot validates configured channels.
-- Database schema is **24**.
+- Discord channel/category provisioning is admin-dashboard-owned: the web GM dashboard's Full Setup/Repair
+  action can create the missing base and realm-hub channels/categories itself (when the bot has Manage
+  Channels); the `/admin` Discord slash command's own setup action reuses the same helper but stays
+  validate-and-bind-only, so channel layout still can't drift out from under the dashboard via Discord itself.
+- Database schema is **26**.
 - The v0.18 release gate added loopback-by-default standalone engine binding plus strict bounded JSON
-  request handling; v0.19 made no schema or binding changes, only mechanics/logic and documentation fixes.
+  request handling; v0.19 added two schema migrations (schema 25 for GM-authored per-channel messages,
+  schema 26 for the #bugs forum channel), otherwise only mechanics/logic and documentation fixes.
 
 ## Design rules for future work
 
@@ -736,6 +796,6 @@ tests/support.py         shared dependency shims and test path helpers
 
 ## Release notes — v0.19
 
-See `V019_RELEASE_NOTES.md` for the current release's cultivation-depth audit, dashboard coverage gaps, and
-combat authority-migration fixes. See `V018_RELEASE_NOTES.md` for the complete staged-authority, road/caravan,
+See `docs/V019_RELEASE_NOTES.md` for the current release's cultivation-depth audit, dashboard coverage gaps, and
+combat authority-migration fixes. See `docs/V018_RELEASE_NOTES.md` for the complete staged-authority, road/caravan,
 setup, cleanup, migration, security, and upgrade summary that v0.19 builds on.

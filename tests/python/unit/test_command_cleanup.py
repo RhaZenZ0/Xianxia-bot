@@ -80,10 +80,22 @@ class CommandCleanupTests(unittest.TestCase):
         self.assertIn("@app_commands.default_permissions(administrator=True)", source)
         self.assertNotIn("bot.tree.add_command(admin_group, guild=GUILD)", source)
 
-    def test_stage7_bot_never_provisions_server_channels(self):
+    def test_stage7_channel_provisioning_is_gated_behind_dashboard_create_missing(self):
+        """Stage 7 moved channel/category setup to the admin dashboard. The bot can
+        now create the base and realm-hub channels/categories, but only when the
+        caller explicitly opts in with create_missing=True (default False) *and*
+        the bot actually holds Manage Channels — and only the web GM dashboard's
+        Full Setup/Repair action passes that True. The /admin Discord slash command
+        keeps the old validate-and-bind-only behavior.
+        """
         source = BOT.read_text(encoding="utf-8")
-        self.assertNotIn("guild.create_text_channel", source)
-        self.assertNotIn("guild.create_category", source)
+        self.assertIn("guild.create_text_channel", source)
+        self.assertIn("guild.create_category", source)
+        self.assertIn("create_missing: bool = False", source)
+        self.assertIn(
+            "can_create = create_missing and bool(me) and me.guild_permissions.manage_channels",
+            source,
+        )
         self.assertIn("Discord channel creation is dashboard-owned", source)
         self.assertIn("the bot will not provision channels", source)
 
@@ -161,13 +173,21 @@ class CommandCleanupTests(unittest.TestCase):
         begin_end = source.index("GENDER_CHOICES", begin_start)
         self.assertIn("ephemeral=True", source[begin_start:begin_end])
 
-    def test_stage7_dashboard_owned_channels_do_not_apply_setup_overwrites(self):
+    def test_stage7_dashboard_owned_channels_do_not_rewrite_existing_permissions(self):
+        """Setup/repair never touches permissions on a channel that already exists -
+        set_permissions() is never called at all. The one PermissionOverwrite use is
+        the read-only overwrite applied at creation time for READ_ONLY_BASE_CHANNELS
+        (world-events, bot-logs, xianxia-info), and only fires for a channel the bot
+        is itself creating (create_missing + Manage Channels), never for one that was
+        merely bound to an existing channel.
+        """
         source = BOT.read_text(encoding="utf-8")
         setup_start = source.index("async def ensure_base_xianxia_channels")
         setup_end = source.index("@registered_group_command(admin_server_group, name=\"basechannels\"", setup_start)
         setup_block = source[setup_start:setup_end]
         self.assertNotIn("set_permissions(", setup_block)
-        self.assertNotIn("PermissionOverwrite(", setup_block)
+        self.assertEqual(setup_block.count("PermissionOverwrite("), 1)
+        self.assertIn("if name in READ_ONLY_BASE_CHANNELS else {}", setup_block)
         self.assertIn("Discord channel creation is dashboard-owned", source)
         self.assertIn("the bot will not provision channels", source)
 

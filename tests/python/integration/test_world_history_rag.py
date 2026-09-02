@@ -36,7 +36,7 @@ class WorldHistoryRagTests(unittest.IsolatedAsyncioTestCase):
         self.tmp.cleanup()
 
     def test_schema_is_v16(self):
-        self.assertEqual(SCHEMA_VERSION, 24)
+        self.assertEqual(SCHEMA_VERSION, 26)
 
     async def test_public_history_is_fts_searchable(self):
         await self.db.record_world_history_event(

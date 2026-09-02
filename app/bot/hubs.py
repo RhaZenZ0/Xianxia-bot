@@ -35,6 +35,32 @@ _HUB_ICONS = {
 }
 
 _QUICK_ACTION_LIMIT = 3
+
+# --- Components V2 "action list" hub layout ---------------------------------
+# discord.py 2.6+ exposes LayoutView/Container/Section, which allow one visible,
+# individually tappable row per action instead of hiding every action behind a
+# dropdown.  requirements.txt pins 2.7.1, but the layout is feature-detected
+# rather than assumed: on an older discord.py these names are simply missing and
+# every hub keeps the classic embed panel instead of raising at import time.
+_LAYOUT_COMPONENT_NAMES = (
+    "LayoutView", "Container", "Section", "TextDisplay", "Separator", "ActionRow",
+)
+LAYOUT_COMPONENTS_AVAILABLE = all(
+    hasattr(discord.ui, name) for name in _LAYOUT_COMPONENT_NAMES
+)
+# Hubs rendered with the new layout.  Add a hub name here to migrate it; any hub
+# not listed keeps the classic embed + two-dropdown panel, so this set is the
+# whole rollout switch.
+LAYOUT_HUB_NAMES: set[str] = {"character"}
+# Discord counts every component in a message, nested ones included, against a
+# limit of 40.  With no system select row the chrome costs 12 at worst
+# (container, header, three separators, page text, and a five-button control
+# row) and each action row costs 3 (Section + TextDisplay + accessory Button).
+# 9 would technically fit at 39/40; 8 lands the busiest page in the game
+# (/sect: 25 actions across three subgroups) at 36 and keeps headroom in case
+# Discord ever counts a nested component differently.  Longer pages chunk.
+_LAYOUT_ACTION_LIMIT = 8
+
 _DANGER_ACTION_WORDS = frozenset({
     "abandon", "clear", "close", "delete", "destroy", "disband", "kill",
     "leave", "purge", "reject", "remove", "reset", "sever", "withdraw",
@@ -74,6 +100,42 @@ def _hub_icon(name: str) -> str:
 
 def _action_emoji(action: "HubAction") -> str:
     return _page_emoji(str(getattr(action.command, "name", "")))
+
+
+_STATUS_BAR = re.compile(r"[▰▱]{2,}")
+_LAYOUT_BAR_SEGMENTS = 5
+
+
+def _compact_status_value(value: object) -> str:
+    """Flatten a status value onto one line and shorten any progress bar.
+
+    Status values are built for embed fields, where a 10-segment bar sits alone
+    in its own box. Inside the layout's header it shares a line with its label
+    and numbers, and at that width ten segments render as one solid rule rather
+    than a meter - especially at 100%, where every cell is filled. Halving it
+    keeps the shape readable without changing what it means.
+    """
+    text = " ".join(str(value).split())
+
+    def shrink(match: re.Match[str]) -> str:
+        bar = match.group(0)
+        filled = round(bar.count("▰") / len(bar) * _LAYOUT_BAR_SEGMENTS)
+        return "▰" * filled + "▱" * (_LAYOUT_BAR_SEGMENTS - filled)
+
+    return _STATUS_BAR.sub(shrink, text)
+
+
+def _mapped_action_emoji(action: "HubAction") -> str | None:
+    """The action's own emoji, or None when nothing specific is mapped.
+
+    `_action_emoji` falls back to a generic glyph, which is right for a dense
+    text listing but wrong for the layout's action rows: leaf command names
+    (`propose`, `sever`, `status`) are almost never in `_PAGE_EMOJIS`, so every
+    row on a page ended up with the same diamond - five identical glyphs that
+    carried no information and competed with the labels. Returning None lets the
+    caller simply omit it.
+    """
+    return _PAGE_EMOJIS.get(str(getattr(action.command, "name", "")))
 
 
 def _action_button_style(action: "HubAction", index: int) -> discord.ButtonStyle:
@@ -443,6 +505,45 @@ async def _fallback_followup(source: discord.Interaction, content: Any, kwargs: 
     return await source.followup.send(content, ephemeral=False, **followup_kwargs)
 
 
+def _layout_targets_panel(source: discord.Interaction, hub_view: Any) -> bool:
+    """True when this interaction's original response *is* a Components V2 panel.
+
+    A Components V2 message may never carry ``content`` or ``embeds``, and the
+    flag cannot be removed by editing, so the classic behaviour - write the
+    action's output over the hub card - is impossible there.  When this returns
+    True the output is sent as a followup instead, which also leaves the panel
+    intact rather than replacing it with result text.
+
+    Component interactions raised by an *input step* message (a choice or member
+    picker the hub opened) are not the panel, so those keep editing themselves
+    in place exactly as before.  Modal submits have no source message at all and
+    resolve against their own deferred "thinking" response.
+    """
+    if not getattr(hub_view, "is_layout_hub", False):
+        return False
+    message = getattr(source, "message", None)
+    if message is None:
+        return False
+    panel = getattr(hub_view, "message", None)
+    if panel is None:
+        return True
+    return int(getattr(message, "id", 0)) == int(getattr(panel, "id", -1))
+
+
+async def _layout_result_send(
+    source: discord.Interaction, content: Any, kwargs: Mapping[str, Any]
+) -> Any:
+    """Deliver hub action output beside a Components V2 panel instead of over it."""
+    if not source.response.is_done():
+        await source.response.defer()
+    followup_kwargs = dict(kwargs)
+    for key in ("ephemeral", "silent", "view", "content"):
+        followup_kwargs.pop(key, None)
+    if content is None and not any(key in followup_kwargs for key in ("embed", "embeds")):
+        content = "✅ Done."
+    return await source.followup.send(content, ephemeral=False, **followup_kwargs)
+
+
 class _HubFollowupProxy:
     def __init__(self, owner: "HubInteractionProxy") -> None:
         self.owner = owner
@@ -451,7 +552,10 @@ class _HubFollowupProxy:
         chunks = _hub_content_chunks(content)
         first = chunks[0]
         result: Any = None
-        if not self.owner.output_written:
+        if _layout_targets_panel(self.owner.source, self.owner.hub_view):
+            self.owner.output_written = True
+            result = await _layout_result_send(self.owner.source, first, kwargs)
+        elif not self.owner.output_written:
             self.owner.output_written = True
             edit_kwargs = dict(kwargs)
             if first is not None:
@@ -481,6 +585,11 @@ class _HubResponseProxy:
         self.owner.output_written = True
         chunks = _hub_content_chunks(content)
         first = chunks[0]
+        if _layout_targets_panel(self.owner.source, self.owner.hub_view):
+            result = await _layout_result_send(self.owner.source, first, kwargs)
+            for chunk in chunks[1:]:
+                await self.owner.source.followup.send(chunk, ephemeral=False)
+            return result
         edit_kwargs = dict(kwargs)
         if first is not None:
             edit_kwargs["content"] = first
@@ -510,6 +619,10 @@ class _HubResponseProxy:
 
     async def edit_message(self, **kwargs: Any) -> Any:
         self.owner.output_written = True
+        if _layout_targets_panel(self.owner.source, self.owner.hub_view):
+            return await _layout_result_send(
+                self.owner.source, kwargs.get("content"), kwargs
+            )
         edit_kwargs = _safe_edit_kwargs(kwargs, fallback_view=self.owner.hub_view)
         source_message = getattr(self.owner.source, "message", None)
         hub_message = self.owner.hub_view.message
@@ -609,7 +722,9 @@ async def _invoke_action(
                 log.exception("Could not mirror hub failure to the configured Discord log channel")
         text = "❌ That action could not be completed. The game state was rechecked and no additional hub-side rule was applied."
         try:
-            if not interaction.response.is_done():
+            if _layout_targets_panel(interaction, hub_view):
+                await _layout_result_send(interaction, text, {})
+            elif not interaction.response.is_done():
                 await interaction.response.edit_message(content=text, embed=None, view=hub_view)
             else:
                 await interaction.edit_original_response(content=text, embed=None, view=hub_view)
@@ -1240,6 +1355,290 @@ class HubRefreshButton(discord.ui.Button):
         await interaction.response.edit_message(content=None, embed=self.hub_view.build_embed(), view=self.hub_view)
 
 
+# ---------------------------------------------------------------------------
+# Components V2 hub layout
+# ---------------------------------------------------------------------------
+# Subclassing LayoutView only when discord.py actually provides it keeps this
+# module importable on older versions; the class is then simply never selected.
+_LayoutHubBase = discord.ui.LayoutView if LAYOUT_COMPONENTS_AVAILABLE else discord.ui.View
+
+
+# The layout deliberately has NO system dropdown. It carried one at first, but
+# with Prev/Next present the two did the same job, and the select cost a full row
+# to display only the system already named in the page heading above it. Stepping
+# is the only navigation now; the arrows wrap, so the far end of a long hub is one
+# Prev away rather than seventeen Nexts.
+
+
+class HubLayoutActionButton(discord.ui.Button):
+    """Accessory button that runs the action shown on its own row."""
+
+    def __init__(self, hub_view: "LayoutHubView", action: HubAction, *, index: int) -> None:
+        self.hub_view = hub_view
+        self.action = action
+        style = _action_button_style(action, index)
+        # Destructive actions name themselves. A red button reading "Open" says
+        # nothing at the moment it matters most - the colour warns, the label
+        # should say what it is about to do ("Sever", "Disband", "Abandon").
+        # Everything else keeps one consistent label so the column stays calm.
+        label = action.label[:20] if style is discord.ButtonStyle.danger else "Open"
+        super().__init__(label=label, style=style)
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        await _start_hub_action(interaction, self.hub_view, self.action)
+
+
+class HubLayoutSystemStepButton(discord.ui.Button):
+    def __init__(self, hub_view: "LayoutHubView", *, direction: int) -> None:
+        self.hub_view = hub_view
+        self.direction = -1 if direction < 0 else 1
+        super().__init__(
+            label="Prev system" if self.direction < 0 else "Next system",
+            style=discord.ButtonStyle.secondary,
+            emoji="◀️" if self.direction < 0 else "▶️",
+        )
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        pages = list(self.hub_view.definition.pages)
+        if not pages:
+            await interaction.response.defer()
+            return
+        current = next(
+            (index for index, page in enumerate(pages) if page.key == self.hub_view.page_key),
+            0,
+        )
+        self.hub_view.page_key = pages[(current + self.direction) % len(pages)].key
+        self.hub_view.action_offset = 0
+        self.hub_view.rebuild()
+        await interaction.response.edit_message(view=self.hub_view)
+
+
+class HubLayoutActionPageButton(discord.ui.Button):
+    """Step through action chunks on systems with more actions than fit at once."""
+
+    def __init__(self, hub_view: "LayoutHubView", *, direction: int) -> None:
+        self.hub_view = hub_view
+        self.direction = -1 if direction < 0 else 1
+        super().__init__(
+            label="Fewer" if self.direction < 0 else "More actions",
+            style=discord.ButtonStyle.secondary,
+            emoji="🔼" if self.direction < 0 else "🔽",
+        )
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        page = self.hub_view.page
+        total = len(_leaf_actions(page)) if page is not None else 0
+        if total <= _LAYOUT_ACTION_LIMIT:
+            await interaction.response.defer()
+            return
+        step = _LAYOUT_ACTION_LIMIT * self.direction
+        offset = self.hub_view.action_offset + step
+        if offset >= total:
+            offset = 0
+        elif offset < 0:
+            offset = ((total - 1) // _LAYOUT_ACTION_LIMIT) * _LAYOUT_ACTION_LIMIT
+        self.hub_view.action_offset = offset
+        self.hub_view.rebuild()
+        await interaction.response.edit_message(view=self.hub_view)
+
+
+class HubLayoutRefreshButton(discord.ui.Button):
+    def __init__(self, hub_view: "LayoutHubView") -> None:
+        self.hub_view = hub_view
+        super().__init__(label="Refresh", style=discord.ButtonStyle.secondary, emoji="🔄")
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        await self.hub_view.refresh_status(interaction)
+        self.hub_view.rebuild()
+        await interaction.response.edit_message(view=self.hub_view)
+
+
+class LayoutHubView(_LayoutHubBase):
+    """Components V2 hub panel: one visible, tappable row per action.
+
+    The classic panel hides every action behind a page dropdown and an action
+    dropdown, so a player cannot see what a system offers without opening a menu
+    and cannot reach anything in fewer than two interactions.  Here each action
+    renders as its own Section - emoji, label, description and its own button -
+    and the only surviving dropdown jumps between systems.
+
+    A Components V2 message cannot carry ``content`` or ``embeds``, so unlike the
+    classic panel this one is never overwritten with action output; results are
+    routed to followup messages by ``_layout_targets_panel`` and the card stays
+    on screen, live and reusable, underneath them.
+    """
+
+    is_layout_hub = True
+
+    def __init__(
+        self,
+        owner_id: int,
+        definition: HubDefinition,
+        *,
+        owner_name: str = "Cultivator",
+        status_provider: Any | None = None,
+    ) -> None:
+        super().__init__(timeout=900)
+        self.owner_id = int(owner_id)
+        self.owner_name = str(owner_name)[:80]
+        self.definition = definition
+        self.status_provider = status_provider
+        self.status_fields: list[HubStatusField] = []
+        self.page_key = definition.pages[0].key if definition.pages else "empty"
+        self.action_offset = 0
+        self.expired = False
+        self.message: discord.Message | None = None
+        self.rebuild()
+
+    @property
+    def page(self) -> HubPage | None:
+        for page in self.definition.pages:
+            if page.key == self.page_key:
+                return page
+        return self.definition.pages[0] if self.definition.pages else None
+
+    async def refresh_status(self, interaction: discord.Interaction) -> None:
+        if not callable(self.status_provider):
+            return
+        try:
+            result = self.status_provider(interaction)
+            if inspect.isawaitable(result):
+                result = await result
+            self.status_fields = [
+                item for item in list(result or [])[:6] if isinstance(item, HubStatusField)
+            ]
+        except Exception:
+            log.exception("Could not refresh live hub status for %s", self.definition.name)
+
+    def _header_text(self) -> str:
+        icon = _hub_icon(self.definition.name)
+        title = (
+            self.definition.title
+            if self.definition.title.startswith(icon)
+            else f"{icon} {self.definition.title}"
+        )
+        lines = [f"## {title}", f"-# Xianxia RP  ·  {self.owner_name}"]
+        # One status per line. These values were written for embed fields, where
+        # each sits in its own labelled box; joining them into a single run-on
+        # sentence made the card unreadable - a resource's label ended one line
+        # while its bar started the next, and the whole block read as a wall.
+        for status in self.status_fields:
+            value = _compact_status_value(status.value)
+            lines.append(f"{status.name} {value}".strip()[:200])
+        return "\n".join(lines)[:900]
+
+    def _page_text(self, page: HubPage, total: int, shown: int) -> str:
+        page_index = next(
+            (index for index, item in enumerate(self.definition.pages, 1) if item.key == page.key),
+            1,
+        )
+        total_pages = max(1, len(self.definition.pages))
+        if total > shown:
+            first = self.action_offset + 1
+            meta = (
+                f"-# System {page_index}/{total_pages}  ·  "
+                f"actions {first}-{self.action_offset + shown} of {total}"
+            )
+        else:
+            meta = (
+                f"-# System {page_index}/{total_pages}  ·  "
+                f"{total} action{'s' if total != 1 else ''}"
+            )
+        body = page.description or "System actions"
+        return f"### {_page_emoji(page.key)} {page.label}\n{body}\n{meta}"[:600]
+
+    def _action_text(self, action: HubAction) -> str:
+        description = " ".join(str(action.description).split())[:150] or "Run this action."
+        emoji = _mapped_action_emoji(action)
+        prefix = f"{emoji} " if emoji else ""
+        return f"{prefix}**{action.label}**\n-# {description}"[:180]
+
+    def rebuild(self) -> None:
+        self.clear_items()
+        container = discord.ui.Container(
+            accent_colour=_HUB_COLOURS.get(self.definition.name, 0x5865F2)
+        )
+        container.add_item(discord.ui.TextDisplay(self._header_text()))
+
+        page = self.page
+        if self.expired:
+            container.add_item(discord.ui.Separator())
+            container.add_item(
+                discord.ui.TextDisplay(
+                    "-# This panel expired. Run the command again for a live one."
+                )
+            )
+            self.add_item(container)
+            return
+        if page is None:
+            container.add_item(discord.ui.Separator())
+            container.add_item(
+                discord.ui.TextDisplay("No migrated actions are configured for this hub.")
+            )
+            self.add_item(container)
+            return
+
+        actions = _leaf_actions(page)
+        total = len(actions)
+        if self.action_offset >= total:
+            self.action_offset = 0
+        visible = actions[self.action_offset : self.action_offset + _LAYOUT_ACTION_LIMIT]
+
+        container.add_item(discord.ui.Separator())
+        container.add_item(discord.ui.TextDisplay(self._page_text(page, total, len(visible))))
+        if visible:
+            container.add_item(discord.ui.Separator())
+        for offset, action in enumerate(visible):
+            container.add_item(
+                discord.ui.Section(
+                    discord.ui.TextDisplay(self._action_text(action)),
+                    accessory=HubLayoutActionButton(
+                        self, action, index=self.action_offset + offset
+                    ),
+                )
+            )
+        container.add_item(discord.ui.Separator())
+
+        multi_page = len(self.definition.pages) > 1
+        controls = discord.ui.ActionRow()
+        if multi_page:
+            controls.add_item(HubLayoutSystemStepButton(self, direction=-1))
+        controls.add_item(HubLayoutRefreshButton(self))
+        if multi_page:
+            controls.add_item(HubLayoutSystemStepButton(self, direction=1))
+        if total > _LAYOUT_ACTION_LIMIT:
+            controls.add_item(HubLayoutActionPageButton(self, direction=-1))
+            controls.add_item(HubLayoutActionPageButton(self, direction=1))
+        container.add_item(controls)
+
+        self.add_item(container)
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.owner_id:
+            if not interaction.response.is_done():
+                await interaction.response.send_message(
+                    "This system panel belongs to another player.", ephemeral=False
+                )
+            return False
+        return True
+
+    async def on_error(
+        self, interaction: discord.Interaction, error: Exception, item: discord.ui.Item[Any]
+    ) -> None:
+        await _report_hub_ui_error(
+            interaction, error, where=f"hub:{self.definition.name}:{type(item).__name__}"
+        )
+
+    async def on_timeout(self) -> None:
+        self.expired = True
+        self.rebuild()
+        if self.message is not None:
+            try:
+                await self.message.edit(view=self)
+            except discord.HTTPException:
+                pass
+
+
 class CommandHubView(discord.ui.View):
     def __init__(
         self,
@@ -1386,12 +1785,15 @@ class CommandHubView(discord.ui.View):
                 pass
 
 
-async def send_hub(
+def _use_layout_hub(definition: HubDefinition) -> bool:
+    return LAYOUT_COMPONENTS_AVAILABLE and definition.name in LAYOUT_HUB_NAMES
+
+
+async def _send_classic_hub(
     interaction: discord.Interaction,
     definition: HubDefinition,
-    *,
-    status_provider: Any | None = None,
-) -> None:
+    status_provider: Any | None,
+) -> "CommandHubView":
     view = CommandHubView(
         interaction.user.id,
         definition,
@@ -1399,7 +1801,45 @@ async def send_hub(
         status_provider=status_provider,
     )
     await view.refresh_status(interaction)
-    await interaction.response.send_message(embed=view.build_embed(), view=view, ephemeral=False)
+    if interaction.response.is_done():
+        await interaction.followup.send(embed=view.build_embed(), view=view, ephemeral=False)
+    else:
+        await interaction.response.send_message(
+            embed=view.build_embed(), view=view, ephemeral=False
+        )
+    return view
+
+
+async def send_hub(
+    interaction: discord.Interaction,
+    definition: HubDefinition,
+    *,
+    status_provider: Any | None = None,
+) -> None:
+    view: Any = None
+    if _use_layout_hub(definition):
+        try:
+            view = LayoutHubView(
+                interaction.user.id,
+                definition,
+                owner_name=getattr(interaction.user, "display_name", str(interaction.user)),
+                status_provider=status_provider,
+            )
+            await view.refresh_status(interaction)
+            # Layout components are built in rebuild(), so live status has to be
+            # folded in before sending rather than at render time like the embed.
+            view.rebuild()
+            await interaction.response.send_message(view=view, ephemeral=False)
+        except Exception:
+            # Any discord.py/API disagreement about Components V2 degrades to the
+            # classic panel rather than failing the player's command outright.
+            log.exception(
+                "Components V2 hub panel unavailable for %s; using the classic panel",
+                definition.name,
+            )
+            view = None
+    if view is None:
+        view = await _send_classic_hub(interaction, definition, status_provider)
     try:
         view.message = await interaction.original_response()
     except discord.HTTPException:

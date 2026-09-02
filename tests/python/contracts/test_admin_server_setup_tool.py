@@ -54,25 +54,40 @@ class AdminServerSetupSourceTests(unittest.TestCase):
     def test_dashboard_can_reuse_the_same_discord_setup_implementation(self):
         source = BOT.read_text(encoding="utf-8")
         self.assertIn("async def dashboard_discord_control", source)
-        self.assertIn("await _run_complete_server_setup(guild)", source)
+        self.assertIn("await _run_complete_server_setup(guild, create_missing=True)", source)
         self.assertIn('action == "sync_commands"', source)
         self.assertIn('action == "bind_channels"', source)
         self.assertIn('action == "test_announcement"', source)
         self.assertIn("dashboard.discord.", source)
 
-    def test_dashboard_owned_setup_does_not_provision_discord_channels(self):
+    def test_only_the_dashboard_path_can_provision_missing_discord_channels(self):
+        """Channel/category creation is dashboard-owned: only the web GM dashboard's
+        Full Setup/Repair action (dashboard_discord_control's "setup"/"repair" branch)
+        opts into create_missing=True. The /admin Discord slash command's own setup
+        action reuses the same helper but stays validate-and-bind-only, matching
+        "Discord channel creation is dashboard-owned" - it must never pass
+        create_missing=True itself.
+        """
         source = BOT.read_text(encoding="utf-8")
-        self.assertNotIn("guild.create_text_channel", source)
-        self.assertNotIn("guild.create_category", source)
-        self.assertNotIn("set_permissions(", source)
-        self.assertNotIn("auto-provision", source)
+        self.assertIn("guild.create_text_channel", source)
+        self.assertIn("guild.create_category", source)
+        self.assertIn("create_missing: bool = False", source)
         self.assertIn("Discord channel creation is dashboard-owned", source)
         self.assertIn("the bot will not provision channels", source)
+        # The /admin slash command's call site must stay on the create_missing=False
+        # default - i.e. call the helper with no create_missing kwarg at all.
+        slash_command_marker = "Discord channel creation is dashboard-owned"
+        slash_command_call = source.index(
+            "await _run_complete_server_setup(guild)", source.index(slash_command_marker)
+        )
+        self.assertNotIn(
+            "create_missing", source[slash_command_call:slash_command_call + len("await _run_complete_server_setup(guild)")]
+        )
 
 
 class AdminServerSetupDatabaseTests(unittest.IsolatedAsyncioTestCase):
     async def test_bulk_role_reconciliation_can_list_character_owners(self):
-        self.assertEqual(SCHEMA_VERSION, 24)
+        self.assertEqual(SCHEMA_VERSION, 26)
         with tempfile.TemporaryDirectory() as tmp:
             db = Database(Path(tmp) / "server-setup.sqlite3")
             await db.init()

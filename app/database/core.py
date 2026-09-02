@@ -35,7 +35,7 @@ from ..sect_manor import (
 log = logging.getLogger("xianxia.database")
 
 
-SCHEMA_VERSION = 24
+SCHEMA_VERSION = 26
 # A readiness probe must validate more than the schema-version marker.  If the
 # SQLite file is removed or replaced while the bot is running, SQLite will
 # happily create a new empty file at the same path.  Checking these tables lets
@@ -1310,6 +1310,27 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
             )""",
             """CREATE INDEX IF NOT EXISTS idx_samsara_dynasty_conflicts_user
                ON samsara_dynasty_conflicts(user_id,status,history_id)""",
+        ),
+    ),
+    (
+        25,
+        "gm_authored_channel_messages",
+        (
+            """CREATE TABLE IF NOT EXISTS channel_messages (
+                guild_id INTEGER NOT NULL,
+                channel_key TEXT NOT NULL,
+                content TEXT NOT NULL DEFAULT '',
+                message_id INTEGER,
+                updated_at REAL NOT NULL,
+                PRIMARY KEY(guild_id,channel_key)
+            )""",
+        ),
+    ),
+    (
+        26,
+        "bugs_forum_channel",
+        (
+            "ALTER TABLE server_config ADD COLUMN bugs_channel_id INTEGER",
         ),
     ),
 
@@ -3558,6 +3579,17 @@ class Database:
             )
             await db.commit()
 
+    async def set_bugs_channel_id(self, guild_id: int, channel_id: int | None) -> None:
+        now = time.time()
+        async with self._connect() as db:
+            await db.execute(
+                """INSERT INTO server_config(guild_id,bugs_channel_id,updated_at) VALUES(?,?,?)
+                   ON CONFLICT(guild_id) DO UPDATE SET
+                   bugs_channel_id=excluded.bugs_channel_id,updated_at=excluded.updated_at""",
+                (int(guild_id), int(channel_id) if channel_id else None, now),
+            )
+            await db.commit()
+
     async def get_expedition_thread(self, guild_id: int, user_id: int) -> dict[str, Any] | None:
         async with self._connect() as db:
             db.row_factory = aiosqlite.Row
@@ -3632,6 +3664,30 @@ class Database:
                 (int(guild_id), int(family_id), int(thread_id), int(parent_channel_id), now, now),
             )
             await db.commit()
+
+    async def all_managed_thread_ids(self) -> list[dict[str, Any]]:
+        """Every Discord thread ID this bot tracks, across every system that owns one.
+
+        Used by the GM dashboard/`reset_database.sh` world reset to clean up every
+        thread the bot created before the rows that reference them are wiped, since
+        once the database is gone there is no other way to find them again.
+        """
+        async with self._connect() as db:
+            db.row_factory = aiosqlite.Row
+            out: list[dict[str, Any]] = []
+            for kind, sql in (
+                ("expedition_journal", "SELECT thread_id FROM expedition_threads"),
+                ("birth_family_household", "SELECT thread_id FROM birth_family_household_threads"),
+                ("sect_abode", "SELECT thread_id FROM sect_abodes WHERE thread_id IS NOT NULL"),
+                ("cave_abode", "SELECT thread_id FROM cave_abodes WHERE thread_id IS NOT NULL"),
+                ("world_event_scene", "SELECT thread_id FROM event_threads"),
+                ("battle", "SELECT thread_id FROM battles WHERE thread_id IS NOT NULL"),
+            ):
+                cur = await db.execute(sql)
+                for row in await cur.fetchall():
+                    if row["thread_id"] is not None:
+                        out.append({"kind": kind, "thread_id": int(row["thread_id"])})
+            return out
 
     async def get_characters_at_location(self, location: str, *, exclude_user_id: int | None = None) -> list[dict[str, Any]]:
         async with self._connect() as db:
@@ -5009,6 +5065,39 @@ class Database:
             row = await cur.fetchone()
             return dict(row) if row else None
 
+    # ------------------------------------------------------------------
+    # GM-authored per-channel messages (schema 25) - one persistent, editable
+    # welcome/orientation message per base channel or realm-hub, edited in
+    # place the same way the #xianxia-info guide is (see ensure_channel_message
+    # in app/bot/main.py).
+    # ------------------------------------------------------------------
+
+    async def get_channel_messages(self, guild_id: int) -> dict[str, dict[str, Any]]:
+        async with self._connect() as db:
+            db.row_factory = aiosqlite.Row
+            cur = await db.execute(
+                "SELECT channel_key,content,message_id,updated_at FROM channel_messages WHERE guild_id=?",
+                (int(guild_id),),
+            )
+            return {
+                str(row["channel_key"]): {
+                    "content": str(row["content"] or ""),
+                    "message_id": row["message_id"],
+                    "updated_at": row["updated_at"],
+                }
+                for row in await cur.fetchall()
+            }
+
+    async def set_channel_message(self, guild_id: int, channel_key: str, *, content: str, message_id: int | None) -> None:
+        now = time.time()
+        async with self._connect() as db:
+            await db.execute(
+                """INSERT INTO channel_messages(guild_id,channel_key,content,message_id,updated_at)
+                   VALUES(?,?,?,?,?) ON CONFLICT(guild_id,channel_key) DO UPDATE SET
+                   content=excluded.content,message_id=excluded.message_id,updated_at=excluded.updated_at""",
+                (int(guild_id), str(channel_key), str(content), int(message_id) if message_id else None, now),
+            )
+            await db.commit()
 
     # ------------------------------------------------------------------
     # Auction house with escrow bidding

@@ -355,18 +355,31 @@ func (s *Server) dbBatch(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			if input.Transaction {
 				_ = conn.Rollback()
+			} else if commitErr := conn.Commit(); commitErr != nil {
+				// transaction:false means every statement stands on its own, so
+				// the ones that already succeeded have to survive a later one
+				// failing.  Without this commit the deferred Close below rolls
+				// them back and "completed": N is a lie.
+				_ = conn.Rollback()
+				writeJSON(w, http.StatusConflict, map[string]any{"error": "commit_failed", "message": commitErr.Error(), "completed": len(results)})
+				return
 			}
 			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "batch_execute_failed", "message": err.Error(), "completed": len(results)})
 			return
 		}
 		results = append(results, result)
 	}
-	if input.Transaction {
-		if err := conn.Commit(); err != nil {
-			_ = conn.Rollback()
-			writeJSON(w, http.StatusConflict, map[string]any{"error": "commit_failed", "message": err.Error()})
-			return
-		}
+	// Commit unconditionally, not only when the caller asked for a transaction.
+	// storage.Conn opens an implicit BEGIN ahead of every INSERT/UPDATE/DELETE/
+	// REPLACE (maybeBeginImplicitLocked) and Conn.Close rolls back whatever is
+	// still open, so returning 200 here without committing used to report
+	// success and then discard every write as soon as the deferred Close ran.
+	// Commit() is a no-op while the connection is in autocommit, so a read-only
+	// batch is unaffected.
+	if err := conn.Commit(); err != nil {
+		_ = conn.Rollback()
+		writeJSON(w, http.StatusConflict, map[string]any{"error": "commit_failed", "message": err.Error()})
+		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"results": results, "count": len(results)})
 }
@@ -439,6 +452,43 @@ type backupInfo struct {
 
 func (s *Server) backupDir() string { return filepath.Join(filepath.Dir(s.databasePath), "backups") }
 
+// reserveBackupPath returns a backup path that does not already exist.
+//
+// The name used to carry second resolution only, so two backups taken inside the
+// same second - trivially reachable by double-clicking the dashboard button, and
+// guaranteed whenever an automated backup coincides with a manual one - resolved
+// to the same filename and the second silently overwrote the first, leaving the
+// operator with one file where the UI claimed two. Milliseconds make that
+// practically impossible and the numbered suffix makes it actually impossible,
+// while keeping filenames lexicographically sortable by age.
+//
+// The file is created here (O_EXCL) rather than merely probed, so two concurrent
+// backup requests cannot both settle on the same free name.
+func reserveBackupPath(backupDir string, now time.Time) (string, error) {
+	stamp := now.Format("20060102-150405.000")
+	for attempt := 0; attempt < 1000; attempt++ {
+		name := "xianxia-" + stamp + ".sqlite3"
+		if attempt > 0 {
+			name = fmt.Sprintf("xianxia-%s-%d.sqlite3", stamp, attempt+1)
+		}
+		destination := filepath.Join(backupDir, name)
+		handle, err := os.OpenFile(destination, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0o644)
+		if err == nil {
+			// Leave the zero-byte placeholder in place rather than removing it:
+			// a zero-length file is a valid empty SQLite database, so BackupTo's
+			// sqlite3_open_v2(..., CREATE) is happy to write into it, and
+			// keeping it means a concurrent request can never claim this name in
+			// the window between reserving and writing.
+			_ = handle.Close()
+			return destination, nil
+		}
+		if !os.IsExist(err) {
+			return "", err
+		}
+	}
+	return "", errors.New("could not find an unused backup filename")
+}
+
 func (s *Server) dbBackups(w http.ResponseWriter, r *http.Request) {
 	backupDir := s.backupDir()
 	switch r.Method {
@@ -447,8 +497,11 @@ func (s *Server) dbBackups(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "backup_dir_failed", "message": err.Error()})
 			return
 		}
-		name := "xianxia-" + time.Now().UTC().Format("20060102-150405") + ".sqlite3"
-		destination := filepath.Join(backupDir, name)
+		destination, err := reserveBackupPath(backupDir, time.Now().UTC())
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "backup_name_failed", "message": err.Error()})
+			return
+		}
 		source, err := storage.Open(s.databasePath)
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "db_open_failed", "message": err.Error()})

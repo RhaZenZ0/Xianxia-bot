@@ -35,6 +35,43 @@ log = logging.getLogger("xianxia.dashboard")
 ROOT = Path(__file__).resolve().parents[1]
 STATIC_DIR = ROOT / "dashboard"
 
+# JavaScript numbers are IEEE-754 doubles, so integers above this lose precision.
+JS_MAX_SAFE_INTEGER = 2**53 - 1
+
+
+def json_safe_numbers(value: Any) -> Any:
+    """Emit integers JavaScript cannot represent exactly as decimal strings.
+
+    Every Discord ID - user_id, guild_id, channel_id, thread_id, message_id,
+    role_id - is a snowflake: a 17-19 digit integer, far past
+    Number.MAX_SAFE_INTEGER (2**53-1 = 9007199254740991). JSON has no integer
+    type of its own, so a bare 847706123456789012 in the response body is parsed
+    by JSON.parse into the nearest double and silently becomes
+    847706123456789000. The dashboard then writes that rounded value into
+    <option value="...">, posts it back on the next admin action, and the lookup
+    targets a user id that does not exist - so every teleport, currency grant,
+    karma and fate adjustment against that player fails with "character not
+    found", with nothing in the logs pointing at rounding.
+
+    This happens before any dashboard JavaScript runs, which is why the fix has
+    to live here rather than in app.js: by the time the browser can inspect the
+    value, the low digits are already gone.
+
+    Serialising them as strings is what Discord's own API does, for this exact
+    reason, and costs the front end nothing - these values are only compared,
+    displayed and echoed back, never used in arithmetic.
+    """
+    if isinstance(value, bool):
+        # bool subclasses int; keep true/false as JSON booleans.
+        return value
+    if isinstance(value, int):
+        return str(value) if abs(value) > JS_MAX_SAFE_INTEGER else value
+    if isinstance(value, dict):
+        return {key: json_safe_numbers(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [json_safe_numbers(item) for item in value]
+    return value
+
 
 @dataclass(frozen=True)
 class DashboardSettings:
@@ -749,6 +786,84 @@ class ReadOnlyDashboardStore:
                 "caravans": caravans, "expedition_threads": expeditions,
             }
 
+    async def threads(self) -> dict[str, Any]:
+        """Unified view of every Discord thread the bot tracks across all systems.
+
+        Each source table only ever knows about its own thread column, so a GM
+        previously had to hunt across the Families/Exploration pages (and had no
+        visibility at all into battle or abode threads) to find a stuck or
+        abandoned thread. This aggregates all of them into one sortable list with
+        a direct Discord jump link, using the single configured guild's ID as a
+        fallback for tables that don't store guild_id themselves (this bot only
+        ever binds to one guild).
+        """
+        async with self._connect() as db:
+            guild_row = await self._fetchone(db, "SELECT guild_id FROM server_config LIMIT 1")
+            fallback_guild_id = int(guild_row["guild_id"]) if guild_row and guild_row.get("guild_id") else 0
+
+            expeditions = await self._fetchall_if_table(
+                db, "expedition_threads",
+                """SELECT 'Expedition Journal' AS kind, e.guild_id AS guild_id, e.thread_id AS thread_id,
+                          e.parent_channel_id AS parent_channel_id, c.name AS owner_name,
+                          e.last_location AS detail, NULL AS status, e.updated_at AS updated_at
+                   FROM expedition_threads e JOIN characters c ON c.user_id=e.user_id""",
+            )
+            households = await self._fetchall_if_table(
+                db, "birth_family_household_threads",
+                """SELECT 'Birth Family Household' AS kind, h.guild_id AS guild_id, h.thread_id AS thread_id,
+                          h.parent_channel_id AS parent_channel_id, f.family_name AS owner_name,
+                          NULL AS detail, NULL AS status, h.updated_at AS updated_at
+                   FROM birth_family_household_threads h
+                   LEFT JOIN birth_families f ON f.family_id=h.family_id""",
+            )
+            sect_abodes = await self._fetchall_if_table(
+                db, "sect_abodes",
+                """SELECT 'Sect Abode' AS kind, NULL AS guild_id, a.thread_id AS thread_id,
+                          a.thread_channel_id AS parent_channel_id, c.name AS owner_name,
+                          a.name AS detail, NULL AS status, a.updated_at AS updated_at
+                   FROM sect_abodes a JOIN characters c ON c.user_id=a.user_id
+                   WHERE a.thread_id IS NOT NULL""",
+            )
+            cave_abodes = await self._fetchall_if_table(
+                db, "cave_abodes",
+                """SELECT 'Cave Abode' AS kind, NULL AS guild_id, ca.thread_id AS thread_id,
+                          ca.thread_channel_id AS parent_channel_id, c.name AS owner_name,
+                          ca.name AS detail, NULL AS status, ca.updated_at AS updated_at
+                   FROM cave_abodes ca JOIN characters c ON c.user_id=ca.user_id
+                   WHERE ca.thread_id IS NOT NULL""",
+            )
+            events = await self._fetchall_if_table(
+                db, "event_threads",
+                """SELECT 'World Event Scene' AS kind, NULL AS guild_id, thread_id AS thread_id,
+                          channel_id AS parent_channel_id, event_type AS owner_name,
+                          title AS detail, (CASE WHEN active=1 THEN 'active' ELSE 'closed' END) AS status,
+                          expires_at AS updated_at
+                   FROM event_threads""",
+            )
+            battles = await self._fetchall_if_table(
+                db, "battles",
+                """SELECT 'Battle' AS kind, NULL AS guild_id, b.thread_id AS thread_id,
+                          NULL AS parent_channel_id, c.name AS owner_name,
+                          b.npc_name AS detail, b.status AS status, b.updated_at AS updated_at
+                   FROM battles b JOIN characters c ON c.user_id=b.user_id
+                   WHERE b.thread_id IS NOT NULL""",
+            )
+            rows = [*expeditions, *households, *sect_abodes, *cave_abodes, *events, *battles]
+            for row in rows:
+                guild_id = int(row["guild_id"]) if row.get("guild_id") else fallback_guild_id
+                row["guild_id"] = guild_id or None
+                row["jump_url"] = (
+                    f"https://discord.com/channels/{guild_id}/{int(row['thread_id'])}" if guild_id else None
+                )
+            rows.sort(key=lambda r: float(r.get("updated_at") or 0), reverse=True)
+            counts: dict[str, int] = {}
+            for row in rows:
+                counts[row["kind"]] = counts.get(row["kind"], 0) + 1
+            return {
+                "summary": {"total_threads": len(rows), "by_kind": counts},
+                "threads": rows,
+            }
+
     async def economy(self) -> dict[str, Any]:
         async with self._connect() as db:
             markets = await self._fetchall_if_table(
@@ -1209,6 +1324,8 @@ class DashboardServer:
                 await self._send_json(writer, 200, await self.store.crafting()); return
             if path == "/api/exploration":
                 await self._send_json(writer, 200, await self.store.exploration()); return
+            if path == "/api/threads":
+                await self._send_json(writer, 200, await self.store.threads()); return
             if path == "/api/economy":
                 await self._send_json(writer, 200, await self.store.economy()); return
             if path == "/api/dynasties":
@@ -1254,7 +1371,9 @@ class DashboardServer:
         await self._send_bytes(writer, 200, body, content_type)
 
     async def _send_json(self, writer: asyncio.StreamWriter, status: int, payload: Any, *, extra_headers: dict[str, str] | None = None) -> None:
-        body = (json.dumps(payload, ensure_ascii=False, separators=(",", ":"), default=str) + "\n").encode("utf-8")
+        # Every dashboard JSON response funnels through here, so this is the one
+        # place snowflake precision has to be protected (see json_safe_numbers).
+        body = (json.dumps(json_safe_numbers(payload), ensure_ascii=False, separators=(",", ":"), default=str) + "\n").encode("utf-8")
         await self._send_bytes(writer, status, body, "application/json; charset=utf-8", extra_headers=extra_headers)
 
     async def _send_text(self, writer: asyncio.StreamWriter, status: int, text: str, content_type: str, *, extra_headers: dict[str, str] | None = None) -> None:
