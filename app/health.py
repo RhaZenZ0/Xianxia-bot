@@ -9,6 +9,14 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable
 
+from .http_limits import (
+    STREAM_LIMIT,
+    ConnectionLimiter,
+    EmptyRequest,
+    HeaderLimits,
+    RequestHeadRejected,
+    read_request_head,
+)
 from .version import RELEASE_VERSION
 
 log = logging.getLogger("xianxia.health")
@@ -171,12 +179,21 @@ class HealthServer:
         port: int = 8080,
         control_handler: Callable[[str, dict[str, Any]], Awaitable[dict[str, Any]]] | None = None,
         control_token: str = "",
+        header_limits: HeaderLimits | None = None,
+        max_connections: int = 64,
     ) -> None:
         self.state = state
         self.host = str(host)
         self.port = int(port)
         self.control_handler = control_handler
         self.control_token = str(control_token or "")
+        # The header loop below runs before any authentication, so its bounds are
+        # the only thing standing between an unauthenticated peer and this
+        # process's memory and connection table. A 2s per-line timeout that reset
+        # on every line was not one.
+        self.header_limits = (header_limits or HeaderLimits()).validated()
+        self.connections = ConnectionLimiter(max_connections)
+        self.rejected_heads = 0
         self._server: asyncio.AbstractServer | None = None
 
     @property
@@ -188,7 +205,9 @@ class HealthServer:
     async def start(self) -> None:
         if self._server is not None:
             return
-        self._server = await asyncio.start_server(self._handle_client, self.host, self.port)
+        self._server = await asyncio.start_server(
+            self._handle_client, self.host, self.port, limit=STREAM_LIMIT
+        )
         log.info("HEALTH_SERVER_READY host=%s port=%s boot_id=%s", self.host, self.bound_port, self.state.boot_id)
 
     async def stop(self) -> None:
@@ -200,20 +219,37 @@ class HealthServer:
         await server.wait_closed()
 
     async def _handle_client(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+        if not self.connections.try_acquire():
+            # Refuse loudly and immediately rather than queueing: a queued slow
+            # connection still costs a task and a buffer.
+            try:
+                await self._respond(writer, 503, {"error": "too_many_connections"})
+            except Exception:
+                pass
+            try:
+                writer.close()
+            except Exception:
+                pass
+            return
         try:
-            raw = await asyncio.wait_for(reader.readline(), timeout=2.0)
-            request = raw.decode("ascii", errors="replace").strip().split()
+            try:
+                head = await read_request_head(reader, limits=self.header_limits)
+            except EmptyRequest:
+                return
+            except RequestHeadRejected as rejected:
+                self.rejected_heads += 1
+                self.state.set_metric("health_head_rejected", self.rejected_heads)
+                self.state.set_metric("health_connections_refused", self.connections.refused)
+                log.warning(
+                    "HEALTH_HEAD_REJECTED status=%s error=%s detail=%s",
+                    rejected.status, rejected.error, rejected.detail,
+                )
+                await self._respond(writer, rejected.status, {"error": rejected.error})
+                return
+            request = head.request_line.split()
+            headers = head.headers
             method = request[0].upper() if request else "GET"
             path = request[1].split("?", 1)[0] if len(request) >= 2 else "/"
-            headers: dict[str, str] = {}
-            while True:
-                line = await asyncio.wait_for(reader.readline(), timeout=2.0)
-                if line in {b"\r\n", b"\n", b""}:
-                    break
-                text = line.decode("latin-1", errors="replace").strip()
-                if ":" in text:
-                    key, value = text.split(":", 1)
-                    headers[key.strip().lower()] = value.strip()
 
             if path == "/livez":
                 await self._respond(writer, 200, {"status": "alive", "boot_id": self.state.boot_id})
@@ -259,6 +295,7 @@ class HealthServer:
         except Exception:
             log.exception("Health HTTP request failed")
         finally:
+            self.connections.release()
             writer.close()
             try:
                 await writer.wait_closed()
@@ -271,7 +308,9 @@ class HealthServer:
 
     @staticmethod
     async def _respond_text(writer: asyncio.StreamWriter, status: int, body: str, content_type: str) -> None:
-        reason = {200: "OK", 400: "Bad Request", 403: "Forbidden", 404: "Not Found", 405: "Method Not Allowed", 500: "Internal Server Error", 503: "Service Unavailable"}.get(status, "OK")
+        # 408/414/431 are answered by the request-head limiter; without them a
+        # rejected slow-header request went out as "HTTP/1.1 408 OK".
+        reason = {200: "OK", 400: "Bad Request", 403: "Forbidden", 404: "Not Found", 405: "Method Not Allowed", 408: "Request Timeout", 414: "URI Too Long", 431: "Request Header Fields Too Large", 500: "Internal Server Error", 503: "Service Unavailable"}.get(status, "OK")
         encoded = body.encode("utf-8")
         headers = (
             f"HTTP/1.1 {status} {reason}\r\n"

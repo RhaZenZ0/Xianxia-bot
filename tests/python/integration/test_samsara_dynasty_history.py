@@ -40,7 +40,7 @@ class SamsaraDynastyHistoryTests(unittest.IsolatedAsyncioTestCase):
         self.tmp.cleanup()
 
     async def test_schema_24_contains_dynasty_investigation_and_conflict_tables(self) -> None:
-        self.assertEqual(SCHEMA_VERSION, 26)
+        self.assertEqual(SCHEMA_VERSION, 27)
         with sqlite3.connect(self.path) as conn:
             tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
             self.assertIn("samsara_dynasty_history", tables)

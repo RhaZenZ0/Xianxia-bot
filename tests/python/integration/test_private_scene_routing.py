@@ -27,7 +27,7 @@ class PrivateSceneRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.tmp.cleanup()
 
     async def test_schema_v10_stores_info_expedition_and_scene_threads(self):
-        self.assertEqual(SCHEMA_VERSION, 26)
+        self.assertEqual(SCHEMA_VERSION, 27)
         await self.db.set_server_channels(
             77, announcement_channel_id=1, event_scene_channel_id=2,
             home_scene_channel_id=3, log_channel_id=4, begin_channel_id=5,

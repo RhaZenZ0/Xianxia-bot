@@ -427,6 +427,62 @@ func roadTransitStateKey(userID int64) string {
 	return fmt.Sprintf("road_transit:%d", userID)
 }
 
+// travelStatusQuery reports whether the character is currently mid-transit on
+// a road journey, and if so, where to and when they arrive - both as an
+// absolute game-clock minute and, when the world clock is actually advancing
+// (scale > 0), as a real Unix timestamp the caller can hand straight to a
+// Discord <t:...> timestamp for a live, auto-updating countdown. This never
+// mutates anything (it is registered as a read-only authoritativeQuery, not a
+// mutation) beyond opportunistically clearing an already-arrived transit
+// record, exactly like ensureRoadTransitReadyTx does inline for every other
+// action - so a stale "still traveling" status is never reported once the
+// arrival minute has passed.
+func travelStatusQuery(conn *storage.Conn, userID int64) (map[string]any, error) {
+	gameMinute, err := readCanonicalWorldGameMinute(conn)
+	if err != nil {
+		return nil, err
+	}
+	res, err := conn.Execute(`SELECT value_json FROM world_state WHERE key=?`, []any{roadTransitStateKey(userID)})
+	if err != nil {
+		return nil, err
+	}
+	if len(res.Rows) == 0 || len(res.Rows[0]) == 0 {
+		return map[string]any{"traveling": false}, nil
+	}
+	var state roadTransitState
+	if err := json.Unmarshal([]byte(fmt.Sprint(res.Rows[0][0])), &state); err != nil {
+		return nil, fmt.Errorf("invalid road transit state: %w", err)
+	}
+	if gameMinute >= state.ArrivalGameMinute {
+		if _, err := conn.Execute(`DELETE FROM world_state WHERE key=?`, []any{roadTransitStateKey(userID)}); err != nil {
+			return nil, err
+		}
+		return map[string]any{"traveling": false}, nil
+	}
+	clock, err := readCanonicalWorldClock(conn)
+	if err != nil {
+		return nil, err
+	}
+	result := map[string]any{
+		"traveling":                 true,
+		"origin":                    state.Origin,
+		"destination":               state.Destination,
+		"route":                     state.Route,
+		"travel_cost_spirit_stones": state.TravelCost,
+		"departure_game_minute":     state.DepartureGameMinute,
+		"arrival_game_minute":       state.ArrivalGameMinute,
+		"current_game_minute":       gameMinute,
+		"remaining_game_minutes":    state.ArrivalGameMinute - gameMinute,
+	}
+	if arrivalTS, ok := realTimestampForGameMinute(clock, state.ArrivalGameMinute); ok {
+		result["arrival_unix_ts"] = arrivalTS
+	}
+	if departureTS, ok := realTimestampForGameMinute(clock, state.DepartureGameMinute); ok {
+		result["departure_unix_ts"] = departureTS
+	}
+	return result, nil
+}
+
 func ensureRoadTransitReadyTx(conn *storage.Conn, userID, gameMinute int64) error {
 	res, err := conn.Execute(`SELECT value_json FROM world_state WHERE key=?`, []any{roadTransitStateKey(userID)})
 	if err != nil {
@@ -614,15 +670,43 @@ func knownLocationsTx(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 var locationDiscoveryIntn = gamerng.Intn
 var unexpectedEventIntn = gamerng.Intn
 
+// roadFrontierTx returns every location one road-hop away from anything the
+// character already knows (their current spot, prior discoveries, and any
+// realm hub they qualify for) - the "edge of the charted map". A location's
+// own road neighbors are already auto-known the moment the character stands
+// there (see knownLocationsTx), so this frontier is naturally never the
+// city's own immediate neighbors while occupying it; it is exactly the
+// next ring out, reachable but not yet visited.
+func roadFrontierTx(catalog worlddata.Catalog, known map[string]bool, realmIndex int64) map[string]bool {
+	frontier := map[string]bool{}
+	for name := range known {
+		for _, neighbor := range canonicalRoadNeighbors(catalog, name, realmIndex) {
+			frontier[neighbor] = true
+		}
+	}
+	return frontier
+}
+
 func discoverNextLocationTx(conn *storage.Conn, catalog worlddata.Catalog, userID int64, c mechanicsCharacter, gameMinute int64, now float64) (string, error) {
 	known, err := knownLocationsTx(conn, catalog, userID, c)
 	if err != nil {
 		return "", err
 	}
 	world := currentWorld(c, catalog)
+	// Candidates are restricted to the road frontier of what the character
+	// already knows, not "any unknown location anywhere in the world" - a
+	// mortal-realm character exploring around their home village should turn
+	// up a road to a neighboring city, not a random capital on the far side
+	// of the map. Every world's road graph is fully connected from that
+	// world's realm-hub city (which every qualifying character always knows,
+	// per knownLocationsTx), so this never stalls exploration - it just
+	// makes discovery follow the road network outward ring by ring instead
+	// of jumping anywhere at once.
+	frontier := roadFrontierTx(catalog, known, c.RealmIndex)
 	candidates := []string{}
-	for name, loc := range catalog.Locations {
-		if known[name] || loc.World != world || loc.MinRealmIndex > c.RealmIndex || loc.Private || strings.HasPrefix(name, "abode:") || strings.HasPrefix(name, "personal_world:") {
+	for name := range frontier {
+		loc, ok := catalog.Locations[name]
+		if !ok || known[name] || loc.World != world || loc.MinRealmIndex > c.RealmIndex || loc.Private || strings.HasPrefix(name, "abode:") || strings.HasPrefix(name, "personal_world:") {
 			continue
 		}
 		candidates = append(candidates, name)
@@ -1273,6 +1357,19 @@ func explorationTravelAction(conn *storage.Conn, catalog worlddata.Catalog, user
 		"road_encounter_chance_percent": encounterChance,
 		"road_encounter":                roadEncounterOut,
 		"road_encounters":               roadEncounters,
+		"traveling":                     roadConnection && travelMinutes > 0,
+	}
+	// Best-effort: hand back real Unix timestamps for departure/arrival too,
+	// so the reply can show a live Discord countdown instead of a bare
+	// game-minute figure. Not fatal if the world clock can't be read - the
+	// game-minute fields above are always present regardless.
+	if clock, clockErr := readCanonicalWorldClock(conn); clockErr == nil {
+		if ts, ok := realTimestampForGameMinute(clock, p.GameMinute); ok {
+			result["departure_unix_ts"] = ts
+		}
+		if ts, ok := realTimestampForGameMinute(clock, arrivalGameMinute); ok {
+			result["arrival_unix_ts"] = ts
+		}
 	}
 	return authoritativeMutation{
 		Result: result,

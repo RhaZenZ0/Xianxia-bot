@@ -369,3 +369,153 @@ async def seed_character(
         return True
     except sqlite3.IntegrityError:
         return False
+
+
+def install_discord_ui_shim() -> None:
+    """Provide the Components V2 surface app/bot/scene_layout.py builds against.
+
+    No-ops when real discord.py is installed, so the same tests exercise the real
+    library on a machine that has it and the shim everywhere else. The ActionRow
+    assertion below mirrors Discord's own five-per-row rule, which is the limit a
+    layout is most likely to trip.
+    """
+    if "discord" in sys.modules:
+        return
+    if importlib.util.find_spec("discord") is not None:
+        return
+
+    import enum
+
+    discord = types.ModuleType("discord")
+    discord.__spec__ = importlib.machinery.ModuleSpec("discord", loader=None)
+
+    class ButtonStyle(enum.Enum):
+        primary = 1
+        secondary = 2
+        success = 3
+        danger = 4
+
+    class Interaction:
+        def __init__(self, user_id: int = 0):
+            self.user = types.SimpleNamespace(id=user_id)
+            self.edited_with = None
+            self.sent = []
+            self.response = self
+
+        def is_done(self) -> bool:
+            return False
+
+        async def edit_message(self, **kwargs):
+            self.edited_with = kwargs
+
+        async def send_message(self, *args, **kwargs):
+            self.sent.append((args, kwargs))
+
+        async def send_modal(self, modal):
+            self.sent.append(("modal", modal))
+
+    class _Item:
+        def __init__(self, *args, **kwargs):
+            self.children: list[Any] = []
+
+    class Button(_Item):
+        def __init__(self, *, label="", emoji=None, style=None, **kwargs):
+            super().__init__()
+            self.label = label
+            self.emoji = emoji
+            self.style = style
+            assert len(str(label)) <= 80, "button label over 80 characters"
+
+    class Select(_Item):
+        pass
+
+    class TextInput(_Item):
+        def __init__(self, **kwargs):
+            super().__init__()
+
+    class TextDisplay(_Item):
+        def __init__(self, content="", **kwargs):
+            super().__init__()
+            self.content = content
+            assert len(str(content)) <= 4000, "text display over 4000 characters"
+
+    class Separator(_Item):
+        pass
+
+    class _Holder(_Item):
+        def __init__(self, *children, **kwargs):
+            super().__init__()
+            self.children = list(children)
+
+        def add_item(self, item):
+            self.children.append(item)
+            return self
+
+    class ActionRow(_Holder):
+        def add_item(self, item):
+            assert len(self.children) < 5, "more than five components in one action row"
+            return super().add_item(item)
+
+    class Section(_Holder):
+        def __init__(self, *children, accessory=None, **kwargs):
+            super().__init__(*children)
+            self.accessory = accessory
+
+    class Container(_Holder):
+        def __init__(self, *children, accent_colour=None, **kwargs):
+            super().__init__(*children)
+            self.accent_colour = accent_colour
+
+    class View:
+        def __init__(self, *, timeout=180):
+            self.timeout = timeout
+            self._items: list[Any] = []
+
+        def add_item(self, item):
+            self._items.append(item)
+
+        def clear_items(self):
+            self._items = []
+
+        @property
+        def children(self):
+            return list(self._items)
+
+    class LayoutView(View):
+        pass
+
+    class Modal:
+        def __init__(self, *, title=None, timeout=None):
+            self.title = title
+
+        def add_item(self, item):
+            return None
+
+    ui = types.ModuleType("discord.ui")
+    for name, obj in (
+        ("Item", _Item), ("Button", Button), ("Select", Select), ("TextInput", TextInput),
+        ("TextDisplay", TextDisplay), ("Separator", Separator), ("ActionRow", ActionRow),
+        ("Section", Section), ("Container", Container), ("View", View),
+        ("LayoutView", LayoutView), ("Modal", Modal),
+    ):
+        setattr(ui, name, obj)
+
+    discord.ui = ui
+    discord.ButtonStyle = ButtonStyle
+    discord.Interaction = Interaction
+    sys.modules["discord"] = discord
+    sys.modules["discord.ui"] = ui
+
+
+def load_module_by_path(name: str, relative_path: str):
+    """Import one project module without importing its package __init__.
+
+    app/bot/__init__.py imports main.py, which needs the whole runtime. Loading
+    a single file directly is what lets a leaf module be unit tested on its own.
+    """
+    path = PROJECT_ROOT / relative_path
+    spec = importlib.util.spec_from_file_location(name, path)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module

@@ -73,7 +73,9 @@ class GUIIntegrityTests(unittest.TestCase):
             len(re.findall(rf"@registered_group_command\({re.escape(group)},\s*name=\"([^\"]+)\"", source))
             for group in expected_groups
         ]
-        self.assertEqual(sum(counts), 40)
+        # See test_command_cleanup for why this count is spelled out: 40 through
+        # v0.19.14, +2 in v0.19.15 for the administrator chat monitor.
+        self.assertEqual(sum(counts), 42)
         self.assertLessEqual(max(counts), 25)
 
     def test_hub_router_reapplies_range_constraints(self):
@@ -163,7 +165,10 @@ class GUIIntegrityTests(unittest.TestCase):
         for label in ("Investigate", "Scene Action", "Battle", "Refresh"):
             self.assertIn(f'label="{label}"', source)
         self.assertIn("await _scene_action_targets(character)", source)
-        self.assertIn("view.action_key = default_action", source)
+        # v0.19.18 moved Scene Action behind scene_action_panel(); the default
+        # action is now passed into the factory instead of assigned after
+        # construction. Same intent: the event button pre-selects its action.
+        self.assertIn("action_key=default_action", source)
         self.assertIn("Travel to **{self.location}** before acting in this event", source)
         self.assertIn("embed=event_view.embed()", source)
         self.assertIn("view=event_view", source)

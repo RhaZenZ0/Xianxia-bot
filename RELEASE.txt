@@ -1,7 +1,779 @@
-Xianxia RP v0.19.9 RECOMMENDED RELEASE
+Xianxia RP v0.19.24 RECOMMENDED RELEASE
 
-Release date: 2026-09-01
+Release date: 2026-09-03
 Schema: 26 (unchanged from v0.19)
+
+v0.19.24 gives every route its own rate window. The single account-wide ceiling could
+not express what the providers actually enforce.
+
+THE MISMATCH
+  Provider caps are PER MODEL. Google allows Gemma 4 roughly 15 requests/minute and
+  1500/day PER MODEL. This build had one global ceiling of 20/min, which is at once
+
+    TOO HIGH for a single route   (20 > 15 -> we call out and get refused)
+    TOO LOW  for the fleet        (two Gemma routes are entitled to 30)
+
+  Production showed exactly that: both Gemma routes cooling down independently while
+  the account limiter reported "granted 15, refused 0" - it had never fired once.
+  The thing throttling narration was invisible to the thing meant to prevent it.
+
+  And v0.19.20's daily budget default of 50 was correct for OpenRouter's shared free
+  pool but 30x too low for a provider key: with a Google key each Gemma route is
+  entitled to 1500/day, and our own counter would have cut narration off at 50 - the
+  feature added to save requests becoming the only thing refusing them.
+
+WHAT CHANGED
+  New RouteLimiter: one RPM + RPD window PER MODEL, alongside the account-wide pair.
+  Both are real and both are kept, because the topology genuinely has two layers:
+
+    account-wide   20/min, 50/day   OpenRouter's own free-tier limits
+    per route      15/min, 1500/day what the provider enforces per model
+
+  A route at ITS OWN ceiling is now SKIPPED, not called. Previously the only way to
+  discover a cap was to spend an upstream attempt and be refused - which also spent a
+  daily slot and started a 60-second cooldown. Skipping costs nothing and moves
+  straight to the next model, which has a separate quota.
+
+  A skipped route is NOT recorded as a failure: it has not failed, it is simply not
+  this route's turn. It keeps its never-succeeded status honest.
+
+  ai_status now prints each route's own ceiling, which of the two is closest, the
+  headroom left, and how many calls were held back before dialling out.
+
+DEFAULTS THAT ARE RIGHT IN BOTH REGIMES
+  15/min and 1500/day - the documented Gemma free-tier figures. On OpenRouter's shared
+  pool the account daily cap of 50 binds first and these never fire. With your own
+  provider key they ARE the ceiling. One set of numbers, correct either way, because
+  the account layer handles the first case and the route layer the second.
+
+  New: OPENROUTER_ROUTE_REQUESTS_PER_MINUTE=15, OPENROUTER_ROUTE_REQUESTS_PER_DAY=1500.
+
+STILL THE OPERATOR'S CALL
+  None of this raises a provider cap. A key at openrouter.ai/settings/integrations
+  moves these models off OpenRouter's shared pool and onto your own Google quota,
+  which is what the 429s were asking for. If you add one, raise
+  OPENROUTER_MAX_REQUESTS_PER_DAY too - at 1500 per route the account default of 50
+  becomes the binding constraint.
+
+Tests: 9 new. Seven mutations proved them load-bearing: the route check removed, one
+shared window instead of per-route, a capped route counted as a failure, each ceiling
+ignored in turn, drifted defaults, and a mis-reported binding ceiling.
+
+Suite baseline-diffed against v0.19.14: 527 tests vs 289, zero new failures, one fewer
+pre-existing error.
+
+NOTE: contains v0.19.15 through v0.19.23.
+
+
+v0.19.23 is SPLIT STAGE 2: /family moves out of main.py into
+app/bot/commands/family.py. Behaviour is unchanged - this is a move.
+
+  main.py     12786 lines (was 13177 before stage 1)
+  runtime.py    340
+  family.py     600   14 leaf commands, the group, and one helper
+
+STAGE 1 COST TWO FAILED DEPLOYS. BOTH SHAPED THIS ONE.
+  v0.19.12: a module-level name used above its assignment (DB built from ROOT
+  before ROOT existed). Everything moved here is a function or a literal, kept in
+  its original order, and DefinitionOrderTests covers the new module.
+
+  v0.19.13: NameError: name 'app_commands' is not defined. functools.wraps cannot
+  copy __globals__, so a callback wrapped by a decorator from another module
+  carries THAT module's namespace - and discord.py evaluates annotation STRINGS
+  against it. That is live here: EIGHT of the 14 family handlers are wrapped by
+  serialized_user_action, and the import check confirms their callbacks carry
+  app.bot.runtime's globals, not family.py's:
+
+    birth_family_child        callback globals = app.bot.runtime
+    birth_family_leave        callback globals = app.bot.runtime
+    ... 6 more ...
+    birth_family_view         callback globals = app.bot.commands.family
+
+  Every annotation they use - discord.Interaction, app_commands.Choice[str],
+  app_commands.Range[int, 1, 20], int, str - resolves in runtime.py. Checked
+  explicitly, not assumed.
+
+THE DEPENDENCY FOOTPRINT WAS MEASURED, NOT GUESSED
+  23 free names in the block: 8 already in runtime.py, 7 ordinary package
+  imports, 8 defined in main.py. The last group is the only interesting one:
+
+    family_group                        -> moves to family.py; main imports it
+    _current_birth_family               -> used ONLY by /family; moves with it
+    CHILD_CULTIVATION_AWAKENING_AGE     -> used ONLY by /family; moves with it
+    GENDER_CHOICES                      -> also used by /begin and the admin
+                                           override, so it moves to runtime.py
+                                           rather than being duplicated
+    SIM (31 other uses in main)         -> stays; imported inside the one
+    _get_thread (5)                        function that needs each
+    ensure_birth_family_household_thread (3)
+    open_expedition_thread_after_exit (3)
+
+  Those last four are imported INSIDE the function bodies on purpose. A
+  module-level "from ..main import" would be a genuine cycle; a call-time import
+  runs long after main.py has finished importing. There are exactly four, one use
+  each, and a test asserts both the list and that they are not at module level.
+
+  Proof that the distinction is real, not stylistic: promoting one of them to a
+  module-level import reproduces
+
+    ImportError: cannot import name 'SIM' from partially initialized module
+    'app.bot.main' (most likely due to a circular import)
+
+  in the stub-import harness. Two independent guards - the harness and the test.
+
+A TEST CAUGHT THE MOVE, FOR THE WRONG REASON
+  test_private_location_exits went red: it scanned main.py only, so when
+  birth_family_leave moved it concluded /family had stopped opening the expedition
+  journal. The code was fine; the test's scope was stale.
+
+  That is the exact mistake documented at the top of
+  test_player_facing_command_hints.py ("a check anchored to one file would quietly
+  stop covering them the moment they move") - which I wrote, and then repeated two
+  releases later. Both that test and the engine-result-key boundary scan now read
+  the whole app/bot package, so the next stage cannot silently drop coverage.
+
+Tests: 9 new. Five mutations proved them load-bearing: a module-level main import,
+a promoted deferred import, a duplicated GENDER_CHOICES, a stale group left in
+main, and a handler left behind.
+
+Suite baseline-diffed against v0.19.14: 518 tests vs 289, zero new failures, one
+fewer pre-existing error.
+
+NOTE: contains v0.19.15 through v0.19.22.
+
+
+v0.19.22 makes the expedition journal appear when you step back out into the world,
+instead of whenever you next happen to run /explore.
+
+THE REPORT
+  Arceus, before the GUI work: leave the birth household, and there is no personal
+  thread. It only appeared later, after exploring. The exit worked and the location was
+  right - the room a player's own scenes get written into simply did not exist yet.
+
+  This was queued and then genuinely forgotten while other reports came in. It was not a
+  regression; it had never worked.
+
+IT WAS THREE HANDLERS, NOT ONE
+  PRIVATE_LOCATION_EXITS lists four private locations and the command that steps out of
+  each: birth household, sect residence, own property, personal world. All of them land
+  the player back in the shared world, so all of them need the journal. Only the family
+  one was reported. NONE of the three handlers had it:
+
+    /family -> Leave       birth_family_leave    (11126)
+    /abode  -> Leave       abode_leave           (10035)  - covers abode: and sect_abode:
+    /innerworld -> Leave   innerworld_leave      (10208)
+
+  One shared helper now runs at the end of each.
+
+THREE DELIBERATE CHOICES IN THAT HELPER
+  1. THE CHARACTER IS RE-READ. Every caller fetched its copy BEFORE the engine moved
+     them, so reusing it would stamp the journal with the household they just walked out
+     of - the exact stale-snapshot bug fixed in the Scene Action panel in v0.19.18.
+  2. IF THEY ARE STILL IN A PRIVATE LOCATION, nothing opens. That exit stepped into
+     another private place and the world journal is not the right room yet.
+  3. IT RUNS AFTER THE CONFIRMATION AND NEVER RAISES. The exit is already committed
+     canonically at that point; a thread that cannot be created is worth a quiet log,
+     not a failed action or a stalled interaction. The test enforces the ordering.
+
+TEST DERIVES ITS OWN SCOPE
+  The new contract test reads PRIVATE_LOCATION_EXITS and checks the leave handler behind
+  each entry, rather than naming the three by hand. A fifth private location added
+  without wiring its exit fails here instead of in a player's face.
+
+  One test bug found and fixed while writing it: the ordering check first measured the
+  FIRST reply in each handler, which is always the GameEngineError branch - so it passed
+  no matter where the helper sat. It now measures the LAST reply, and a mutation moving
+  the helper before the confirmation is correctly caught.
+
+Tests: 8 new. Seven mutations proved each part is load-bearing: each of the three
+handlers dropping the call, the stale-character reuse, the private-location guard, the
+never-raises guard, and the ordering.
+
+Suite baseline-diffed against v0.19.14: 509 tests vs 289, zero new failures, one fewer
+pre-existing error.
+
+NOTE: contains v0.19.15 through v0.19.21.
+
+
+v0.19.21 fixes the equipment dead end a player hit while holding the sword he had just
+bought, and the wrong command path a new test then found sitting in shipped copy.
+
+THE DEAD END
+  Arceus: carried Spirit-Iron Sword x1. Clicked Equip. Got:
+
+    "Equip has no available equipment id options right now."
+
+  That message was TRUE and USELESS. Equip operates on BOUND equipment; the sword was
+  still a carried item. The real answer was "run Bind first" - which the panel had no way
+  to say.
+
+  Worse, Bind could not be run either. v0.19.17 gave Equip, Unequip and Repair live
+  option pickers, but BIND - the first rung of the ladder, the one that creates bound
+  equipment in the first place - still had no option provider at all, so it opened a text
+  box asking the player to type an internal item id like "spirit_iron_sword". The whole
+  chain was unreachable through the GUI:
+
+    Bind asks for a typed id -> nothing gets bound -> Equip is permanently empty ->
+    the empty message does not mention Bind.
+
+  Bind now lists the carried items that are ACTUALLY equipment (present in
+  EQUIPMENT_DEFINITIONS - a Spirit Herb is not offered), with quantity, slot, stat
+  bonuses and durability.
+
+EVERY EMPTY PICKER NOW NAMES THE PREREQUISITE
+  New register_hub_option_hint() in hubs.py, so an empty live picker can explain itself
+  instead of stating a fact the player cannot act on. All four equipment actions use it:
+  Bind points at Market/Craft, Equip points at Bind, Unequip says nothing is equipped,
+  Repair points at Bind.
+
+A NEW TEST IMMEDIATELY FOUND SHIPPED COPY POINTING AT A COMMAND THAT DOES NOT EXIST
+  Writing those hints, I got a page label wrong myself - "/economy -> Market -> Buy" when
+  the page is called "Local Market". The existing hint test only catches the arrow-LESS
+  form ("/family leave"); a wrong label after an arrow looks correct to a reviewer and is
+  a dead end to a player.
+
+  So the test now validates every "/hub -> Page -> ..." reference against the real hub
+  definitions. It caught my mistake, and one that had already shipped:
+
+    "You may use **/sect -> Shadow / Special -> Accept Initiation**"
+
+  /sect has three pages - Sect, Territory, War - and no action called Accept Initiation.
+  The real path is /sect -> Sect -> Shadow, then choose "Accept initiation". That text
+  sits at the hidden-sect initiation gate: exactly where a player who has finally met a
+  karma requirement goes looking. Fixed.
+
+ONE PRE-EXISTING TEST ERROR REMOVED
+  Both hint tests parse every bot module with ast. main.py uses a PEP 701 f-string that
+  Python 3.11 cannot parse, so the older test ERRORED on 3.11 (it is in the 14 baseline
+  errors). Both now skip what the running interpreter cannot parse, assert that something
+  WAS parsed so the scan can never go silently empty, and still re-raise on 3.12 - the
+  interpreter the bot actually ships on, per the Dockerfile. Baseline errors on 3.11:
+  14 -> 13.
+
+Tests: 5 new plus the arrow-path validator. Six mutations proved each fix is
+load-bearing: the bind provider, bind offering non-equipment, each empty hint, and a
+wrong page label in a hint.
+
+Suite baseline-diffed against v0.19.14: 501 tests vs 289, zero new failures, and one
+FEWER pre-existing error.
+
+NOTE: contains v0.19.15 through v0.19.20.
+
+
+v0.19.20 acts on what the new ai_status panel found in production: a 90.9% procedural
+fallback rate, and TWO different failures that had been wearing the same label.
+
+WHAT THE PANEL SHOWED
+  11 narration requests, 1 served by AI, 10 procedural fallbacks.
+  Local limiter: granted 15, refused 0 - so OUR ceiling never fired once. Every 429 came
+  from OpenRouter's shared free pool.
+
+  1. Both Gemma routes: 429 "temporarily rate-limited upstream", 4 failures each, and
+     "skipped while cooling 6" each - our blanket 60s cooldown turning a transient
+     provider blip into a minute of procedural prose.
+  2. openrouter/free: 6 attempts, ZERO successes, and its error was not a 429 at all -
+     "ValueError: AI provider returned an empty response". A last-resort route that had
+     never once worked.
+
+THE ARITHMETIC NOBODY WAS TRACKING
+  OpenRouter's free tier is 20 requests/MINUTE and 50 requests/DAY under $10 of lifetime
+  credits (1000/day at $10 or more). Only the per-minute half was ever tracked.
+
+  11 narrations cost 15 upstream attempts, because every failed route walks to the next
+  one and each walk spends a daily slot. That is 30% of a 50/day allowance for eleven
+  narrations, nine of which produced nothing.
+
+WHY openrouter/free RETURNS NOTHING
+  It is a RANDOM ROUTER over the free model pool, and that pool is now largely reasoning
+  models. Routine narration asks for 165-190 max_tokens. A reasoning model given 180
+  tokens spends all of them on reasoning and returns EMPTY content, with the text - if
+  any - in a separate reasoning field this code never read.
+
+  Two fixes, in that order of importance:
+    - The dynamic route now gets at least 700 output tokens, so content can exist.
+    - If content is STILL empty, prose is salvaged from the reasoning field.
+
+  Salvage is guarded. Raw chain-of-thought starting "Okay, the user wants a marsh
+  description. Let me set the scene." is WORSE than the deterministic procedural
+  fallback, so reasoning text that reads as scratchpad is discarded and the chain moves
+  on. This is judgement, not a rule Discord enforces, and it is tested both ways.
+
+RETRY-AFTER INSTEAD OF A GUESS
+  OpenRouter sends a Retry-After header when a provider offers a retry hint. The router
+  now uses it (clamped to 300s) and falls back to the old multiplier only when no hint is
+  given. A 3-second hint no longer parks a route for 60.
+
+DAILY BUDGET: TRACK AND STOP
+  New OPENROUTER_MAX_REQUESTS_PER_DAY, default 50 - the real free-tier floor. Once spent,
+  the router refuses locally with a named error instead of walking three routes to
+  discover the same thing three times. ai_status shows a usage bar and, when spent, says
+  exactly what to do.
+
+  This counter is a COST SAVER, NOT AN AUTHORITY: it lives in memory and resets on
+  restart, while the real limit does not. Upstream stays the source of truth.
+
+ai_status NOW DISTINGUISHES
+  - daily budget used/remaining, with a bar and an 80% warning
+  - "NEVER SUCCEEDED" on any route with attempts but no successes
+  - empty replies counted separately from failures, and how many were recovered
+
+TWO THINGS ONLY THE OPERATOR CAN DO - both bigger than anything above
+  1. Put $10 of credits on the OpenRouter account: 50/day -> 1000/day. Then set
+     OPENROUTER_MAX_REQUESTS_PER_DAY=1000.
+  2. Add a provider key at https://openrouter.ai/settings/integrations - the 429 message
+     says so itself. A Google AI Studio key routes the Gemma models through your own
+     Google quota instead of OpenRouter's shared pool, and Google AI Studio has its own
+     free tier.
+
+NOTHING WAS EVER BROKEN. Canonical mechanics resolved, players got deterministic prose,
+no error reached anyone. This is a quality degradation - exactly the failure ai_status
+exists to make visible, and it was invisible until v0.19.15 shipped.
+
+Tests: 23 new. Eight mutations proved each fix is load-bearing: the daily cap, the
+Retry-After read, its clamp, reading the reasoning field, the scratchpad guard, the token
+bump, empty-response counting, and the never-succeeded flag.
+
+Suite baseline-diffed against v0.19.14: 496 tests vs 289, zero new failures.
+
+NOTE: contains v0.19.15 through v0.19.19, including the v0.19.19 security fix.
+
+
+v0.19.19 closes an unauthenticated denial-of-service in both hand-rolled HTTP listeners.
+SECURITY FIX - deploy this one.
+
+THE REPORT WAS CORRECT, AND THE HOLE WAS WIDER THAN FOUR MISSING LIMITS
+  app/health.py and app/dashboard.py both parse HTTP with a loop of
+  "await asyncio.wait_for(reader.readline(), timeout=N)". There was a timeout per line
+  and nothing else. Missing: max request-line bytes, max header count, max cumulative
+  header bytes, absolute header deadline. All four confirmed.
+
+  Two things make it worse than the list suggests:
+
+  1. EVERY BYTE OF THIS RUNS BEFORE AUTHENTICATION. On the dashboard the header loop
+     completes before _authorized() is ever called, so no credential is needed.
+
+  2. IT IS TWO ATTACKS, NOT ONE.
+       - Slow: the per-line timeout RESETS on every line. One header just under the
+         limit (1.9s on health, 4.9s on the dashboard) holds a connection open forever.
+       - Fast: headers[key] = value grows a dict with no cap. Distinct short header
+         names are a memory-exhaustion vector that has nothing to do with holding
+         connections. Only bounded by asyncio's DEFAULT 64 KiB stream limit per line -
+         an accident of the library, not a decision.
+
+  A fifth gap sat underneath both: neither server capped concurrent connections, so
+  everything above multiplied by however many sockets were opened. And an oversized line
+  raised ValueError out of readline() into "except Exception: log.exception(...)",
+  writing a stack trace per line - the same attack amplified into log flooding.
+
+DEMONSTRATED, NOT ASSUMED
+  The pre-fix v0.19.18 health server was run on a real socket and fed one header every
+  1.5 seconds:
+
+    VULNERABLE: held open 15.0s, 10 header lines sent, no response, connection still live
+
+  The same script against this build:
+
+    server answered after 10.0s: HTTP/1.1 408 Request Timeout {"error":"header_timeout"}
+
+WHAT CHANGED
+  New app/http_limits.py, shared by both servers:
+    - max_request_line_bytes  (8192)   -> 414 URI Too Long
+    - max_header_lines        (100)    -> 431 Request Header Fields Too Large
+    - max_header_bytes        (16384)  -> 431
+    - header_deadline_seconds (10)     -> 408 Request Timeout  <- kills the slow attack
+    - line_timeout_seconds    (5)      -> 408
+    - max_connections         (64)     -> 503 too_many_connections
+  Each read gets whichever is smaller, the per-line timeout or the time left on the whole
+  head. That is the part a resetting timeout could never do.
+
+  Also: asyncio's stream limit is now STATED (131072) rather than inherited. It is
+  deliberately ABOVE the 65536 request-body cap - lowering it to bound header lines
+  directly would deadlock readexactly() for bodies, because _maybe_resume_transport
+  refuses to resume while the buffer exceeds the limit. Cumulative bytes are therefore
+  checked AFTER each line, so one line can overshoot by at most the stream limit. That
+  is bounded, and it is the cheaper correct answer.
+
+  Rejections now answer a real status line. Before, a rejected request went out as
+  "HTTP/1.1 408 OK" because the reason map had no entry for it and defaulted to OK.
+
+  Six new env knobs, same names on both servers: HTTP_MAX_REQUEST_LINE_BYTES,
+  HTTP_MAX_HEADER_LINES, HTTP_MAX_HEADER_BYTES, HTTP_HEADER_DEADLINE_SECONDS,
+  HTTP_HEADER_LINE_TIMEOUT_SECONDS, HTTP_MAX_CONNECTIONS. Defaults are generous for a
+  browser (Chrome sends ~15 headers, 1-2 KiB) and mean for an attacker.
+
+EXPOSURE, FOR SIZING THE URGENCY
+  The dashboard publishes to ${DASHBOARD_BIND_ADDRESS:-127.0.0.1}:8090, so by default it
+  is loopback-only on the NAS. If you have set DASHBOARD_BIND_ADDRESS=0.0.0.0 to reach it
+  from a laptop, this was reachable unauthenticated from your whole LAN. The health
+  listener binds 0.0.0.0 inside the container and is not published, so it was reachable
+  from other containers on the compose network.
+
+Tests: 48 new (24 unit, 5 socket-level integration, 19 contract incl. existing).
+The integration tests start the REAL HealthServer on a real port and dribble headers at
+it. Eight mutations proved every limit is load-bearing: the absolute deadline, the header
+count cap, the cumulative byte cap, the request-line cap, the ValueError mapping, the
+connection cap, releasing the slot in finally, and the explicit stream limit.
+
+Suite baseline-diffed against v0.19.14: 473 tests vs 289, zero new failures, identical
+pre-existing sandbox errors.
+
+NOTE: contains v0.19.15 through v0.19.18.
+
+
+v0.19.18 rebuilds the Scene Action panel: no dropdowns, and it follows the player when
+they travel.
+
+"SCENE ACTION STILL HAVE A DROP-DOWN MENU"
+  Correct, and it was a rollout gap rather than a decision. The 17 command hubs moved to
+  the Components V2 action-list layout in v0.19.5-v0.19.7. The Scene Action panel is not
+  a hub, so nothing carried it along and it kept both dropdowns - "Choose what you are
+  trying to do" and "Choose a target" - the exact shape that redesign existed to remove.
+
+  Both are now buttons. Eight action buttons across two rows with the selected one
+  highlighted, then target buttons (Environment, Self, and everyone present), then
+  Describe & Resolve and Refresh. Target lists longer than ten page with a More targets
+  button.
+
+  NO SELECT MENUS ANYWHERE IN IT, deliberately: a Select nested inside a V2 Container has
+  no precedent in this codebase - HubLayoutSystemSelect was deleted rather than kept - and
+  cannot be exercised in the build sandbox. Everything here uses only patterns the 17 hubs
+  already prove in production.
+
+"SCENE ACTION NEED TO TRAVEL WITH THE PLAYER"
+  The old panel snapshotted character, location and the NPC/player target list at
+  construction and never looked again. _resolve_scene_action DOES re-read the character
+  and rejects a target who is no longer present - so a player who travelled could still
+  pick a stale NPC off the panel and only find out AFTER writing their attempt into the
+  modal, with the panel still showing the location they had left.
+
+  Every interaction now re-reads the scene first. Travel updates the location line and
+  says so. A target who is no longer present is reset to Environment with a note, rather
+  than being left selected to fail later. Describe & Resolve re-checks before opening the
+  modal, so nobody types a paragraph about a scene they are not in. Panel lifetime went
+  from 5 to 15 minutes, which is only reasonable now that it stays current.
+
+THE PANEL MOVED TO ITS OWN MODULE
+  app/bot/scene_layout.py imports discord and NOTHING else from the project - everything
+  game-specific is injected from main.py. That is what lets the whole component tree be
+  built and counted in a sandbox with no discord.py installed. Discord's 40-component
+  limit counts nested components, so a panel that looks fine in source is rejected at
+  send time; measured worst case here is 33/40 with 30 people in the scene. Before this,
+  that limit could only have been discovered by a player hitting it.
+
+  tests/support.py gained install_discord_ui_shim(), which NO-OPS when real discord.py is
+  present - so the same tests exercise the real library on a machine that has it.
+
+Tests: 41 new (27 unit, 14 contract). Seven mutations proved they fail without their
+fixes: a stale target left selected after travel, reload dropped from refresh, resolve
+skipping the reload check, the travel notice suppressed, a row overflowing five buttons,
+a player id shown instead of a name, and a Select creeping back into the panel.
+
+One pre-existing assertion in test_gui_integrity was updated: it checked that the event
+thread's Scene Action button pre-selects its action by looking for
+"view.action_key = default_action". That is now passed into the factory as
+action_key=default_action - same intent, new shape.
+
+Suite baseline-diffed against v0.19.14: 436 tests vs 289, zero new failures, identical
+pre-existing sandbox errors.
+
+NOTE: v0.19.18 contains everything from v0.19.15 (chat monitor), v0.19.16 (openai 3.7.0)
+and v0.19.17 (the trade and equipment fixes).
+
+
+v0.19.17 fixes the two bugs Arceus found on the test server, and the four that were
+sitting next to them.
+
+BUG 1 - "Bought Spirit-Iron Sword x1 for 0 stones" while the wallet WAS debited.
+  Not a wallet bug. The Go engine returns the charge under the key "total". Every
+  Python trade handler read result.get("total_price", 0) - a key the engine has never
+  returned - and the DEFAULT turned a missing key into a specific, confident, wrong
+  number about someone's money.
+
+  It was in all FOUR trade handlers, not one: market buy, market sell, black market buy,
+  black market sell. Only buy was ever reported, because "you paid 0" reads as free money
+  while "you were paid 0" reads as a balance bug and gets shrugged off.
+
+  Receipts now go through app/trade_receipt.py, whose rule is: A PRICE THAT IS NOT
+  PRESENT IS REPORTED AS MISSING, NEVER AS ZERO. A real zero still prints as zero - a
+  free trade is a fact. A missing total prints a warning telling the player to check
+  their balance and report it. Receipts also now name the actual currency (the engine
+  returns currency_id; the message said "stones" regardless), show the balance after the
+  trade, show unit price on multi-buys, and say so when a black-market trade was
+  DETECTED - which the engine has always returned and the player was never told.
+
+  THE WHOLE BOUNDARY WAS THEN AUDITED. A new contract test parses the Go dispatch
+  switches, maps each action to its handler, transitively collects every string that
+  handler and its helpers can use as a result key, and compares that to every
+  result.get("...") in the matching Python handler. Across ~180 actions the ONLY
+  mismatch was total_price, in those four handlers. That test now runs in the suite, so
+  the next mismatch fails a build instead of lying to a player.
+
+BUG 2 - Equip opened a form asking for an "Equipment Id" that was never shown.
+  That is what the hub does when a parameter has no option provider: it falls back to a
+  text modal and asks the player to type the value. equipment_id is a plain int with no
+  autocomplete, so Equip, Unequip AND Repair were all asking players to type a database
+  row id.
+
+  All three now offer live dropdowns of the player's own equipment, showing name, slot,
+  durability and quality. Equip lists only unequipped items; Unequip only equipped ones;
+  Repair lists everything, most damaged first. Confirmations name the item instead of
+  saying "Equipped item #7".
+
+  These are registered through the hub's own provider registry rather than discord.py
+  autocomplete, deliberately: /equipment is not typable - it is reachable only through
+  the /items hub - so the hub is the only consumer, and this keeps the change entirely
+  inside code the build sandbox can exercise.
+
+Tests: 33 new (22 unit for the receipt, 11 contract for the boundary and the hub wiring).
+Six mutations proved they fail without their fixes - including RESTORING THE ORIGINAL
+BUG VERBATIM, which fails three of the new tests. Suite baseline-diffed against v0.19.14:
+395 tests vs 289, zero new failures, identical pre-existing sandbox errors.
+
+NOTE: v0.19.17 includes the v0.19.16 openai 3.7.0 bump. If you have not deployed 0.19.16
+yet and want the pin change isolated, deploy 0.19.16 first. Rollback for the dependency
+bump is still v0.19.15.
+
+
+v0.19.16 is a DEPENDENCY BUMP AND NOTHING ELSE: openai 2.52.1 -> 3.7.0. It is shipped on
+its own precisely so that if the container fails to start, the cause is unambiguous.
+Rollback is v0.19.15, which pins openai==2.52.1 and is otherwise identical.
+
+WHAT 3.x CHANGES
+  openai 3.0.0 replaced httpx with HTTPX2 as its HTTP client. Per the project's own
+  httpx2.md: "If you construct an OpenAI or AsyncOpenAI client without providing
+  http_client, your existing API calls, parsed response models, streaming APIs,
+  authentication, retries, and numeric timeouts continue to work."
+
+  This build never passes http_client. The entire openai surface in this codebase is five
+  lines: AsyncOpenAI(...) in ai_router.py and narrator.py, chat.completions.create,
+  responses.create, and output_text. A contract test now asserts http_client appears in
+  neither module, because that condition is the whole basis for calling the bump safe.
+
+  httpx: openai 3.x installs httpx2 and NO LONGER INSTALLS httpx. app/database/remote.py
+  and app/game_engine.py import httpx directly for the Go engine transport - the path
+  every piece of game state travels. That survives only because requirements.txt pins
+  httpx>=0.28,<1 itself rather than relying on openai's transitive install. httpx2 is a
+  separate package name, not httpx 2.x, so the two coexist with no version conflict. A
+  contract test now pins that invariant down.
+
+THE REAL RISK, AND WHAT WAS DONE ABOUT IT
+  HTTPX2 verifies certificates against the OPERATING SYSTEM trust store instead of the
+  certifi bundle httpx 0.x used. On python:3.12-slim that store is whatever
+  ca-certificates provides.
+
+  If it were missing, every OpenRouter call would fail with a TLS error - and NOTHING
+  WOULD RAISE. Narration is descriptive only; canonical mechanics resolve before it runs,
+  so a total failure just returns procedural prose. Players notice the writing going flat.
+  No log says why. That is the worst shape a failure can have.
+
+  Two defences:
+    1. The Dockerfile now installs ca-certificates, runs update-ca-certificates, asserts
+       the bundle is non-empty with `test -s`, and sets SSL_CERT_FILE to it - all BEFORE
+       pip install. A missing bundle is now a loud build failure, not a silent runtime
+       one. go_core/Dockerfile already did this; the Python image did not.
+    2. The router now classifies TLS/certificate failures by walking the exception cause
+       chain (the openai client wraps transport errors, so an SSLError is never the
+       outermost exception). It counts them, flags the offending route, logs once at
+       ERROR level with the remediation, and /admin -> Server -> ai_status prints a
+       loud banner. The failure is now named rather than invisible.
+
+HONEST LIMITS OF THIS VERIFICATION
+  The build sandbox has no PyPI access, so openai 3.7.0 could not be installed, imported,
+  or called even once here. The stub-import harness STUBS the openai module, so it would
+  pass green regardless and proves nothing about this change. Everything above is a traced
+  read of the published migration note against this codebase's five call sites, plus
+  defences for the one runtime failure mode that reading identified.
+
+  Also: 3.7.0 is the version supplied by the operator. PyPI's JSON API, the GitHub tags
+  page and the releases Atom feed are all robots-blocked to this build environment, and
+  the releases page returned inconsistent partial views across fetches, so the release
+  date and the existence of 3.7.0 specifically could not be independently confirmed.
+  v3.0.0 WAS confirmed to exist. If 3.7.0 does not exist, pip fails during docker build
+  and update.sh rolls back before anything is deployed - a safe failure mode.
+
+WATCH AFTER DEPLOY
+  Run /admin -> Server -> ai_status. If it shows a TLS banner or a non-zero procedural
+  fallback rate that was not there on 0.19.15, roll back to 0.19.15.
+
+Tests: 16 new (8 unit TLS-detection, 5 contract for the bump, plus 3 supporting). Eight
+mutations proved they fail without their fixes: the cause-chain walk, the TLS counter, the
+loud log, the per-model TLS flag, the Dockerfile CA assertion, the openai 3.x pin, the
+explicit httpx pin, and CA-install ordering before pip. Suite baseline-diffed against
+v0.19.15: zero new failures.
+
+
+v0.19.15 adds the administrator AI monitor: narrator/route health counters, and a chat
+digest that reads a channel's real Discord history and reports what players are doing.
+
+WHY THE BOT COULD NOT ALREADY DO THIS
+  scene_history is not a chat log. Database.add_history hard-deletes everything past the
+  newest 60 rows PER CHANNEL on every insert - its job is to feed the narrator a rolling
+  context window, not to archive play. "Analyse everything in the channel" therefore has
+  to read Discord's own message history, which nothing in the codebase did: there was no
+  channel.history() call anywhere in app/.
+
+  It also could not READ that history. MESSAGE_CONTENT_INTENT was false, so Discord
+  returns empty content for every message the bot was not mentioned in. This release
+  ships .env / .env.example with MESSAGE_CONTENT_INTENT=true, but that alone is not
+  enough: Message Content Intent must ALSO be enabled in the Discord Developer Portal
+  under Bot -> Privileged Gateway Intents. Under 100 servers this needs no verification,
+  just the toggle. If it is off, the digest says so explicitly instead of quietly
+  reporting an empty channel.
+
+  Turning the intent on also wakes the existing on_message path: the bot begins writing
+  RP messages into scene_history, and replies "Create your cultivator first with /begin"
+  to anyone who @-mentions it without a character. AUTO_NARRATE and
+  AUTO_NARRATE_EVENT_THREADS remain false, so it does not start narrating on its own.
+
+NEW ADMIN ACTIONS (both under /admin -> Server; neither is a typable command)
+  ai_status     Narrator health: how many narrations were served by AI vs silently
+                fell back to procedural prose, the per-route attempt/success/failure
+                counts, which routes are cooling down and why, and how often the local
+                20/min ceiling refused a request. A silent procedural fallback is the
+                failure players notice ("the narration went flat") and operators do not,
+                because nothing errors - this makes it visible.
+  chat_digest   Reads a channel (optionally its threads) over a configurable window and
+                reports what players did, where they got stuck, possible bugs, mood, and
+                what deserves attention. Options: channel, hours, include_threads.
+
+COST: ZERO. Fusion (OpenRouter's openrouter:fusion server tool) was evaluated and
+deliberately NOT used. Fusion fans a prompt out to a panel of 1-8 models and bills for
+every one of them; this build keeps OPENROUTER_REQUIRE_FREE=true and routes the monitor
+through the SAME AITaskRouter free chain as narration, so the monitor cannot start
+spending money. A contract test asserts chat_monitor.py contains no client, no base URL,
+no model string and no "openrouter:fusion" anywhere in the tree. The cost of that choice
+is a small context window, which is why the transcript is chunked and analysed
+map-reduce style rather than in one shot.
+
+TWO SAFETY PROPERTIES WORTH KNOWING
+  1. The transcript is untrusted input. It is player-authored text going into a model
+     prompt, so it is fenced, the system prompt states that fenced content is data and
+     never instructions, and a player who types the closing fence themselves has it
+     neutralised - otherwise the rest of their message escapes the fence and is read as
+     prompt text.
+  2. The player-facing prompt-leak guard is now opt-out, and only the monitor opts out.
+     That guard rejects model output containing "game engine", "system prompt" and
+     similar, so players are never shown implementation detail. A bug digest has to be
+     able to say "the game engine returned an error", and is only ever shown to someone
+     who already holds administrator on the guild. generate() defaults to leak_guard=True
+     and narrator.py never passes the flag at all; a contract test asserts chat_monitor.py
+     is the only file in app/ that sets leak_guard=False.
+
+EVERY AI FAILURE DEGRADES, NEVER RAISES. If a chunk fails, the rest still report. If the
+synthesis fails, the part notes are shown. If every route fails, or the router is not
+configured, the deterministic counts (messages, humans vs bots, per-author, per-channel,
+time span) are still returned - that half of the report never needs a model.
+
+New settings, all bounded in config.py: MONITOR_MAX_MESSAGES (400), MONITOR_LOOKBACK_HOURS
+(24), MONITOR_CHUNK_CHARS (6000), MONITOR_MAX_CHUNKS (6). The ceilings exist because the
+monitor shares the narrator's 20 req/min limiter - an unbounded transcript would starve
+narration for a whole minute.
+
+Tests: 59 new (47 unit, 12 contract). Eight independent mutations were applied to prove
+the new tests fail without their fixes: the leak-guard split, limiter counters, route
+attempt counters, the cooling-skip counter, fence neutralisation, newest-chunks-kept,
+degrade-not-raise, and the monitor's own leak_guard=False. The full suite was baseline-
+diffed against a pristine v0.19.14 extract: same 27 pre-existing sandbox loader errors on
+both, zero new failures. The v0.19.14 stub-import harness was re-run and the whole package,
+including both new command callbacks and their annotations, imports clean.
+
+
+v0.19.14 fixes the SECOND split-stage-1 failure. v0.19.13 fixed the ordering bug and still
+did not start:
+
+  NameError: name 'app_commands' is not defined
+
+main.py imports app_commands on line 13, but that is not the namespace being searched.
+serialized_user_action moved to runtime.py in v0.19.12 and wraps 119 command callbacks;
+functools.wraps cannot copy __globals__, so discord.py receives callbacks carrying
+runtime.py's globals. main.py uses `from __future__ import annotations`, so
+`target: app_commands.Choice[str]` arrives as a STRING that discord.py evals against those
+globals. The import had been there - a static "unused imports" cleanup removed it, because
+nothing in runtime.py's own code uses it.
+
+RULE: a module defining a wrapping decorator must import every name used in the ANNOTATIONS
+of the functions it decorates, not just the names its own code runs. runtime.py imports
+app_commands again, under a comment saying so, and a new test enforces it across the package.
+
+Verification is now much stronger: a stub discord module lets the whole package be IMPORTED
+in the build sandbox, and the stub reproduces discord.py's annotation resolution. Importing
+the v0.19.13 tree under it reproduces the production NameError exactly; this tree imports
+clean.
+
+v0.19.13 fixes the split-stage-1 bug that stopped v0.19.12 starting.
+
+runtime.py built DB with `Database(ROOT / ...)` ABOVE the line that assigns ROOT, so the bot
+raised NameError at import and never came up. The updater rolled back on its own and restored
+the database - it behaved correctly, it just should not have had to.
+
+Cause: the extraction ran in three passes and the follow-up passes inserted definitions at a
+marker instead of restoring their original position. Module-level code runs top-down, so
+position is semantics. runtime.py is now regenerated from the pre-split main.py in original
+line order, so ordering is correct by construction.
+
+The static check that passed anyway proved every name resolves SOMEWHERE in the module; it
+never asked whether the name is assigned YET at the point of use. A new DefinitionOrderTests
+walks module-level statements in order and fails on use-before-assignment; reinstating the
+bad ordering makes it name both offending lines.
+
+Not the cause: v0.19.11's non-root container drop landed in the same jump (0.19.6 -> 0.19.12)
+but is not implicated - the failure was a Python NameError, and xianxia-db-init, same image
+and same user, exited cleanly first.
+
+v0.19.12 begins the main.py decomposition documented since v0.15. Stage 1 of several, each
+shipped separately so a failure is attributable.
+
+- NEW app/bot/runtime.py (323 lines): the shared singletons (SETTINGS, DB, ENGINE, WORLD,
+  ROOT, log) and the session helpers every command needs (require_character, reply_long,
+  serialized_user_action, current_world_time, character_location_display, the per-user
+  action lock, the private-location exit table). main.py goes 13,177 -> 12,923 lines.
+- No behaviour change. Nothing was rewritten, only relocated. No command moved yet.
+- runtime.py imports nothing from main.py - that is what makes the later stages possible,
+  and a test asserts it.
+- Verification uses symtable scope analysis to prove every module resolves every name it
+  reads, because this sandbox cannot import main.py (no discord.py). It caught three names
+  left behind on the first cut (ROOT, _player_property_types, WORLD), each of which would
+  have been a NameError at import and a dead bot on deploy.
+
+WATCH ON FIRST START: this is a code-movement release validated statically, not by running
+the bot. If it fails to start, docker compose logs xianxia-bot will show a NameError or
+ImportError naming the symbol, and that is the whole diagnosis.
+
+v0.19.11 orders hub actions by relevance instead of alphabetically, and answers an external
+review of v0.19.7.
+
+- Actions sort into bands - orienting (status/view/history), primary (enter/leave/join/
+  create), everything else alphabetical, irreversible last (sever/disband/reset). /family's
+  "Leave" was tenth of fourteen and sat on the second chunk while the onboarding copy told
+  new players to use it; it is now fifth and visible. This is a different axis from button
+  colour: "Leave" stays red but sorts high, "Sever" is red AND rare so it sorts last.
+- REJECTED from the review: the claim that Components V2 allows only 30 components and the
+  action limit must drop to 8 -> 6. The limit is 40, confirmed against Discord's Component
+  Reference, discord.py's own view.py, and the discord.js guide. v0.19.10 stands as shipped.
+- FIXED: first-run setup told you to fill in three secrets, then failed on a fourth
+  (DASHBOARD_TOKEN) that .env.example requires by default. The message now names it and
+  gives the command to generate one.
+- FIXED: DASHBOARD_ENABLED=yes started the dashboard but suppressed its log-command hint,
+  because acceptance and reporting used different comparisons.
+- FIXED: the Python containers (bot, db-init, dashboard) ran as root while the Go engine
+  dropped to uid 10001. They now run as 10001 too. Watch the first start after upgrading:
+  this is the one change here that a container can fail on, though the data directory the
+  code unconditionally creates is pre-made and chowned in the image for exactly that reason.
+
+v0.19.10 rolls the Components V2 layout out to EVERY hub - all 16 player hubs and /admin -
+in four staged groups (simple multi-page, then single-page, then chunking, then admin last).
+Staging paid for itself: /admin needed a code change first. The classic panel re-checks the
+administrator permission on every interaction, not just at invoke, and the layout view only
+checked ownership - so an admin whose role was removed while their panel was open would have
+kept a working GM console for 15 minutes. That guard is ported and both views now deny
+identically. Every hub, page and action chunk was rendered through the real view code:
+worst case 36/40 components (/admin and /sect). Rollback is one line - remove a hub name
+from LAYOUT_HUB_NAMES and it returns to the classic panel.
+
+Known, not fixed: /family sorts actions alphabetically, so "Leave" is 10th of 14 and sits on
+the second chunk - a new player following the onboarding copy must press "More actions" to
+find it. Ordering actions by relevance affects every hub and both panels, so it is left as a
+deliberate decision rather than slipped into this release.
 
 v0.19.9 fixes the release integrity check, which refused good packages on QNAP hardware.
 --quiet and --strict are GNU coreutils flags; BusyBox rejects them, so the check exited
@@ -80,7 +852,7 @@ carries a regression test that fails without the fix:
   still missing.
 
 Also: the release stamp is now self-consistent and enforced. VERSION, app/version.py, the
-Dockerfile label, both docker-compose labels and .env.example all read 0.19.9, and the
+Dockerfile label, both docker-compose labels and .env.example all read 0.19.14, and the
 contract test derives the expected value from app/version.py rather than repeating a
 literal - the drift that let VERSION say 0.19 while everything else said 0.18 now fails
 against one source of truth.
@@ -102,7 +874,7 @@ v0.19.5 is a GUI release on top of v0.19:
   switch, and the layout is feature-detected and falls back to the classic panel on any error;
 - the release stamp is corrected and made self-consistent: VERSION said 0.19 while app/version.py,
   the Dockerfile and docker-compose.yml still said 0.18. All four are stamped from one source now
-  (0.19.9 as of this build), and the release contract test reads the expected value from
+  (0.19.14 as of this build), and the release contract test reads the expected value from
   app/version.py instead of repeating a literal, so the same drift cannot recur silently;
 - two stale in-product version references removed: /me described itself as the "v0.18 player
   dashboard" and the in-game realm guide referred to "the v0.18 scene engine".

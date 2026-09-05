@@ -194,3 +194,9 @@ class GoDatabaseTransport:
         if response.status_code >= 400:
             raise RemoteDatabaseError(f"Go SQLite backup listing failed ({response.status_code}): {response.text}")
         return [dict(row) for row in response.json().get("backups", [])]
+
+    async def restore_backup(self, name: str) -> dict[str, Any]:
+        response = await self._client.post(f"{self.engine_url}/v1/db/restore", json={"name": str(name)})
+        if response.status_code >= 400:
+            raise RemoteDatabaseError(f"Go SQLite restore failed ({response.status_code}): {response.text}")
+        return dict(response.json())

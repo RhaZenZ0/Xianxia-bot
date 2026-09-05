@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -125,6 +126,62 @@ func (c *Conn) BackupTo(path string) error {
 	}
 	if finishRC != C.SQLITE_OK {
 		return fmt.Errorf("sqlite backup finish failed: %d", int(finishRC))
+	}
+	return nil
+}
+
+// RestoreFrom overwrites this connection's "main" database with the contents
+// of the SQLite file at path, using the same online backup API as BackupTo
+// but with source/destination reversed. The source file is opened read-only
+// so a restore can never itself mutate the backup archive's actual page
+// content. Like BackupTo, this runs under SQLite's own locking - a
+// concurrent reader on this connection's database sees either the
+// pre-restore or post-restore state, never a torn mix, and
+// sqlite3_backup_step honours this connection's busy_timeout if the
+// destination is momentarily locked by another writer.
+func (c *Conn) RestoreFrom(path string) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.closed || c.handle == nil {
+		return errors.New("sqlite connection closed")
+	}
+	cpath := C.CString(path)
+	defer C.free(unsafe.Pointer(cpath))
+	var source *C.sqlite3
+	flags := C.int(C.SQLITE_OPEN_READONLY)
+	if rc := C.sqlite3_open_v2(cpath, &source, flags, nil); rc != C.SQLITE_OK {
+		msg := "sqlite restore source open failed"
+		if source != nil {
+			msg = C.GoString(C.sqlite3_errmsg(source))
+			C.sqlite3_close_v2(source)
+		}
+		return errors.New(msg)
+	}
+	main := C.CString("main")
+	defer C.free(unsafe.Pointer(main))
+	backup := C.sqlite3_backup_init(c.handle, main, source, main)
+	if backup == nil {
+		err := fmt.Errorf("sqlite restore init failed: %s", C.GoString(C.sqlite3_errmsg(c.handle)))
+		C.sqlite3_close_v2(source)
+		return err
+	}
+	rc := C.sqlite3_backup_step(backup, -1)
+	finishRC := C.sqlite3_backup_finish(backup)
+	C.sqlite3_close_v2(source)
+	// BackupTo copies the source's page 1 header verbatim, which records
+	// that the live (WAL-mode) database requests WAL journaling - so every
+	// backup archive carries that flag too, even though nothing ever writes
+	// to it. Opening it here, even read-only, makes SQLite provision the WAL
+	// index it needs to read consistently, leaving -wal/-shm sidecar files
+	// next to the archive. Clean those up so a backup stays the single
+	// self-contained file a GM expects to find in the backups list.
+	_ = os.Remove(path + "-wal")
+	_ = os.Remove(path + "-shm")
+	if rc != C.SQLITE_DONE {
+		return fmt.Errorf("sqlite restore step failed: %d", int(rc))
+	}
+	if finishRC != C.SQLITE_OK {
+		return fmt.Errorf("sqlite restore finish failed: %d", int(finishRC))
 	}
 	return nil
 }

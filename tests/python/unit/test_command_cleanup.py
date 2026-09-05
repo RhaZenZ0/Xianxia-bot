@@ -72,7 +72,10 @@ class CommandCleanupTests(unittest.TestCase):
             commands = re.findall(rf"@registered_group_command\({group},\s*name=\"([^\"]+)\"", source)
             self.assertLessEqual(len(commands), 25, group)
             total += len(commands)
-        self.assertEqual(total, 40)
+        # 40 through v0.19.14; +2 in v0.19.15 for the administrator chat monitor
+        # (server ai_status, server chat_digest).  This literal is deliberate:
+        # it is what catches an admin action being added or lost by accident.
+        self.assertEqual(total, 42)
         self.assertIn("_ADMIN_HUB_DEFINITION = HubDefinition(", source)
         self.assertIn('title="🛡️ Xianxia — Administrator Control Panel"', source)
         self.assertIn("command=admin_server_group", source)
@@ -131,6 +134,50 @@ class CommandCleanupTests(unittest.TestCase):
             "BirthFamilyBackButton",
             "BirthFamilyConfirmButton",
             "BirthFamilyView",
+            # v0.19.29: #xianxia-info is one persistent, shared message with a
+            # single timeout=None View - every player who opens its guide
+            # dropdown sees the identical option list, so the "Server
+            # Administration" topic can't be hidden from the menu itself.
+            # Instead every reply from this dropdown (not just the admin one)
+            # is sent privately to whoever clicked, both to stop the guide
+            # from spamming the channel on every click and so a non-admin who
+            # clicks the admin topic sees only a private "not for you" notice.
+            "XianxiaInfoSelect",
+            # v0.19.31: hub action feedback that is inherently single-user gets
+            # routed ephemeral instead of overwriting/spamming the shared hub
+            # card - none of this is "game output", it is UI plumbing around a
+            # panel only one player is interacting with at that moment.
+            # _fallback_followup forwards the *caller's own* ephemeral choice
+            # (it does not force True; it is flagged only because that choice
+            # is a variable, not a literal, so the static check cannot see
+            # through it) when the primary edit/response failed and a fresh
+            # message has to be sent instead.
+            "_fallback_followup",
+            # _HubFollowupProxy.send / _HubResponseProxy.send_message only take
+            # the ephemeral branch when the registered command handler (or a
+            # prior deferral) explicitly asked for a private reply - e.g. an
+            # error only the acting player needs to see - never as a default.
+            "_HubFollowupProxy",
+            "_HubResponseProxy",
+            # HubActionModal.on_submit reports bad modal input (and "continue
+            # to finish the action" prompts) back to the one player who is
+            # filling out that modal - nobody else can see the modal to begin
+            # with, so a public reply would leak nothing useful and would just
+            # spam the channel. Same shape as CharacterModal above.
+            "HubActionModal",
+            # _present_input_step shows the next choice/bool/member/channel
+            # picker for a guided multi-step hub action - directed at the one
+            # player continuing their own in-progress action, the same as the
+            # BirthFamily* picker chain above.
+            "_present_input_step",
+            # LayoutHubView/CommandHubView.interaction_check reject a click
+            # from someone who does not own the panel, or who lost the
+            # Administrator permission a panel was opened with. These used to
+            # reply ephemeral=False, which broadcast "this panel belongs to
+            # another player" / "requires Administrator" to the whole channel
+            # on every mis-click - a real privacy leak this release fixes.
+            "LayoutHubView",
+            "CommandHubView",
         }
         violations = []
 

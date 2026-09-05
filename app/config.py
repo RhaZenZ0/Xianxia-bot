@@ -61,6 +61,9 @@ class Settings:
     openrouter_dynamic_free_model: str
     openrouter_require_free: bool
     openrouter_max_requests_per_minute: int
+    openrouter_max_requests_per_day: int
+    openrouter_route_requests_per_minute: int
+    openrouter_route_requests_per_day: int
     openrouter_timeout_seconds: float
     openrouter_epic_timeout_seconds: float
     openrouter_failure_cooldown_seconds: float
@@ -68,6 +71,10 @@ class Settings:
     openrouter_app_name: str
     rp_channel_ids: set[int]
     message_content_intent: bool
+    monitor_max_messages: int
+    monitor_lookback_hours: int
+    monitor_chunk_chars: int
+    monitor_max_chunks: int
     auto_narrate: bool
     auto_narrate_event_threads: bool
     event_thread_auto_archive_minutes: int
@@ -83,6 +90,12 @@ class Settings:
     reincarnation_max_wait_seconds: int
     database_path: Path
     health_host: str
+    http_max_request_line_bytes: int
+    http_max_header_lines: int
+    http_max_header_bytes: int
+    http_header_deadline_seconds: float
+    http_header_line_timeout_seconds: float
+    http_max_connections: int
     health_port: int
     slow_query_ms: float
     alert_webhook_url: str | None
@@ -156,11 +169,60 @@ class Settings:
                     raise RuntimeError(
                         f"{env_name} must use a :free endpoint or openrouter/free while OPENROUTER_REQUIRE_FREE=true"
                     )
+        # Chat monitor budgets.  The ceilings exist because the monitor runs on the
+        # same free OpenRouter chain as narration and shares its 20 req/min limiter:
+        # an unbounded transcript would starve the narrator for a whole minute.
+        monitor_max_messages = _as_int(
+            os.getenv("MONITOR_MAX_MESSAGES"), 400, name="MONITOR_MAX_MESSAGES"
+        )
+        if not 20 <= monitor_max_messages <= 5000:
+            raise RuntimeError("MONITOR_MAX_MESSAGES must be between 20 and 5000")
+        monitor_lookback_hours = _as_int(
+            os.getenv("MONITOR_LOOKBACK_HOURS"), 24, name="MONITOR_LOOKBACK_HOURS"
+        )
+        if not 1 <= monitor_lookback_hours <= 720:
+            raise RuntimeError("MONITOR_LOOKBACK_HOURS must be between 1 and 720")
+        monitor_chunk_chars = _as_int(
+            os.getenv("MONITOR_CHUNK_CHARS"), 6000, name="MONITOR_CHUNK_CHARS"
+        )
+        if not 1000 <= monitor_chunk_chars <= 20000:
+            raise RuntimeError("MONITOR_CHUNK_CHARS must be between 1000 and 20000")
+        monitor_max_chunks = _as_int(
+            os.getenv("MONITOR_MAX_CHUNKS"), 6, name="MONITOR_MAX_CHUNKS"
+        )
+        if not 1 <= monitor_max_chunks <= 20:
+            raise RuntimeError("MONITOR_MAX_CHUNKS must be between 1 and 20")
         openrouter_max_requests_per_minute = _as_int(
             os.getenv("OPENROUTER_MAX_REQUESTS_PER_MINUTE"), 20, name="OPENROUTER_MAX_REQUESTS_PER_MINUTE"
         )
         if not 1 <= openrouter_max_requests_per_minute <= 120:
             raise RuntimeError("OPENROUTER_MAX_REQUESTS_PER_MINUTE must be between 1 and 120")
+        # OpenRouter's free tier is 20 req/min AND 50 req/day under $10 of lifetime
+        # credits - 1000/day at $10 or more. The default here is the smaller,
+        # honest number; raise it to 1000 once credits are on the account.
+        openrouter_max_requests_per_day = _as_int(
+            os.getenv("OPENROUTER_MAX_REQUESTS_PER_DAY"), 50, name="OPENROUTER_MAX_REQUESTS_PER_DAY"
+        )
+        if not 10 <= openrouter_max_requests_per_day <= 200000:
+            raise RuntimeError("OPENROUTER_MAX_REQUESTS_PER_DAY must be between 10 and 200000")
+        # PER-ROUTE ceilings. The two above are account-wide (OpenRouter's own);
+        # these are what a PROVIDER enforces per model - Google allows Gemma 4
+        # about 15 requests/minute and 1500/day per model. Defaults are those
+        # figures, which are right in both regimes: on the shared free pool the
+        # account-wide daily cap binds first and these never fire; on a BYOK
+        # provider key these are the real ceiling.
+        openrouter_route_requests_per_minute = _as_int(
+            os.getenv("OPENROUTER_ROUTE_REQUESTS_PER_MINUTE"), 15,
+            name="OPENROUTER_ROUTE_REQUESTS_PER_MINUTE",
+        )
+        if not 1 <= openrouter_route_requests_per_minute <= 600:
+            raise RuntimeError("OPENROUTER_ROUTE_REQUESTS_PER_MINUTE must be between 1 and 600")
+        openrouter_route_requests_per_day = _as_int(
+            os.getenv("OPENROUTER_ROUTE_REQUESTS_PER_DAY"), 1500,
+            name="OPENROUTER_ROUTE_REQUESTS_PER_DAY",
+        )
+        if not 10 <= openrouter_route_requests_per_day <= 1000000:
+            raise RuntimeError("OPENROUTER_ROUTE_REQUESTS_PER_DAY must be between 10 and 1000000")
         openrouter_timeout_seconds = _as_float(
             os.getenv("OPENROUTER_TIMEOUT_SECONDS"), 30.0, name="OPENROUTER_TIMEOUT_SECONDS"
         )
@@ -220,6 +282,38 @@ class Settings:
         if not 30 <= reincarnation_max_wait_seconds <= 3600:
             raise RuntimeError("REINCARNATION_MAX_WAIT_SECONDS must be between 30 and 3600")
 
+        # Bounds for the pre-auth HTTP request head on the health listener.
+        # Shared names with the dashboard: one knob per limit, both servers.
+        http_max_request_line_bytes = _as_int(
+            os.getenv("HTTP_MAX_REQUEST_LINE_BYTES"), 8192, name="HTTP_MAX_REQUEST_LINE_BYTES"
+        )
+        if not 256 <= http_max_request_line_bytes <= 65536:
+            raise RuntimeError("HTTP_MAX_REQUEST_LINE_BYTES must be between 256 and 65536")
+        http_max_header_lines = _as_int(
+            os.getenv("HTTP_MAX_HEADER_LINES"), 100, name="HTTP_MAX_HEADER_LINES"
+        )
+        if not 8 <= http_max_header_lines <= 1000:
+            raise RuntimeError("HTTP_MAX_HEADER_LINES must be between 8 and 1000")
+        http_max_header_bytes = _as_int(
+            os.getenv("HTTP_MAX_HEADER_BYTES"), 16384, name="HTTP_MAX_HEADER_BYTES"
+        )
+        if not 1024 <= http_max_header_bytes <= 262144:
+            raise RuntimeError("HTTP_MAX_HEADER_BYTES must be between 1024 and 262144")
+        http_header_deadline_seconds = _as_float(
+            os.getenv("HTTP_HEADER_DEADLINE_SECONDS"), 10.0, name="HTTP_HEADER_DEADLINE_SECONDS"
+        )
+        if not 1.0 <= http_header_deadline_seconds <= 120.0:
+            raise RuntimeError("HTTP_HEADER_DEADLINE_SECONDS must be between 1 and 120")
+        http_header_line_timeout_seconds = _as_float(
+            os.getenv("HTTP_HEADER_LINE_TIMEOUT_SECONDS"), 5.0, name="HTTP_HEADER_LINE_TIMEOUT_SECONDS"
+        )
+        if not 0.5 <= http_header_line_timeout_seconds <= 60.0:
+            raise RuntimeError("HTTP_HEADER_LINE_TIMEOUT_SECONDS must be between 0.5 and 60")
+        http_max_connections = _as_int(
+            os.getenv("HTTP_MAX_CONNECTIONS"), 64, name="HTTP_MAX_CONNECTIONS"
+        )
+        if not 4 <= http_max_connections <= 4096:
+            raise RuntimeError("HTTP_MAX_CONNECTIONS must be between 4 and 4096")
         health_host = os.getenv("HEALTH_HOST", "0.0.0.0").strip() or "0.0.0.0"
         health_port = _as_int(os.getenv("HEALTH_PORT"), 8080, name="HEALTH_PORT")
         if not 1 <= health_port <= 65535:
@@ -270,6 +364,9 @@ class Settings:
             openrouter_dynamic_free_model=openrouter_dynamic_free_model,
             openrouter_require_free=openrouter_require_free,
             openrouter_max_requests_per_minute=openrouter_max_requests_per_minute,
+            openrouter_max_requests_per_day=openrouter_max_requests_per_day,
+            openrouter_route_requests_per_minute=openrouter_route_requests_per_minute,
+            openrouter_route_requests_per_day=openrouter_route_requests_per_day,
             openrouter_timeout_seconds=openrouter_timeout_seconds,
             openrouter_epic_timeout_seconds=openrouter_epic_timeout_seconds,
             openrouter_failure_cooldown_seconds=openrouter_failure_cooldown_seconds,
@@ -277,6 +374,10 @@ class Settings:
             openrouter_app_name=openrouter_app_name,
             rp_channel_ids=_as_int_set(os.getenv("RP_CHANNEL_IDS"), name="RP_CHANNEL_IDS"),
             message_content_intent=_as_bool(os.getenv("MESSAGE_CONTENT_INTENT"), False),
+            monitor_max_messages=monitor_max_messages,
+            monitor_lookback_hours=monitor_lookback_hours,
+            monitor_chunk_chars=monitor_chunk_chars,
+            monitor_max_chunks=monitor_max_chunks,
             auto_narrate=_as_bool(os.getenv("AUTO_NARRATE"), False),
             auto_narrate_event_threads=_as_bool(os.getenv("AUTO_NARRATE_EVENT_THREADS"), False),
             event_thread_auto_archive_minutes=archive_minutes,
@@ -286,6 +387,12 @@ class Settings:
             reincarnation_max_wait_seconds=reincarnation_max_wait_seconds,
             database_path=Path(os.getenv("DATABASE_PATH", "data/xianxia.sqlite3")),
             health_host=health_host,
+            http_max_request_line_bytes=http_max_request_line_bytes,
+            http_max_header_lines=http_max_header_lines,
+            http_max_header_bytes=http_max_header_bytes,
+            http_header_deadline_seconds=http_header_deadline_seconds,
+            http_header_line_timeout_seconds=http_header_line_timeout_seconds,
+            http_max_connections=http_max_connections,
             health_port=health_port,
             slow_query_ms=slow_query_ms,
             alert_webhook_url=alert_webhook_url,

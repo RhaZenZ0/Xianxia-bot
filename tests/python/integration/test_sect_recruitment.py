@@ -72,7 +72,14 @@ class SectRecruitmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(trial_outcome(2, 1, has_recommendation=False), "pass")
 
     def test_source_contains_story_and_npc_recommendation_gui_paths(self):
-        source = (ROOT / "app" / "bot" / "main.py").read_text(encoding="utf-8")
+        # /sect -> Recruitment moved to app/bot/commands/sect.py in split stage 3
+        # (v0.19.30). A check anchored to one file would quietly stop covering
+        # some of these the moment the code moved - the exact mistake stage 2's
+        # notes warn about - so this checks the whole app/bot package rather
+        # than guessing which file each string still lives in.
+        source = "".join(
+            path.read_text(encoding="utf-8") for path in (ROOT / "app" / "bot").rglob("*.py")
+        )
         self.assertIn('name="recruitment"', source)
         self.assertIn('name="recommendation"', source)
         self.assertIn('name="trial"', source)

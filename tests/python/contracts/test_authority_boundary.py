@@ -4,18 +4,24 @@ import ast
 from tests.support import PROJECT_ROOT
 
 
-SOURCE = (PROJECT_ROOT / "app" / "bot" / "main.py").read_text(encoding="utf-8")
-TREE = ast.parse(SOURCE)
-FUNCTIONS = {
-    node.name: node
-    for node in ast.walk(TREE)
-    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
-}
+BOT_DIR = PROJECT_ROOT / "app" / "bot"
+MAIN = BOT_DIR / "main.py"
+SOURCE = MAIN.read_text(encoding="utf-8")
+
+FUNCTIONS: dict[str, ast.FunctionDef | ast.AsyncFunctionDef] = {}
+FUNCTION_SOURCES: dict[str, str] = {}
+for path in sorted(BOT_DIR.rglob("*.py")):
+    source = path.read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            FUNCTIONS[node.name] = node
+            FUNCTION_SOURCES[node.name] = source
 
 
 def _source(name: str) -> str:
     node = FUNCTIONS[name]
-    return ast.get_source_segment(SOURCE, node) or ""
+    return ast.get_source_segment(FUNCTION_SOURCES[name], node) or ""
 
 
 def _calls(name: str, call_name: str) -> bool:

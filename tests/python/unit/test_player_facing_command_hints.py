@@ -14,9 +14,33 @@ The correct form names the hub and the action inside it: "/family -> Leave".
 from tests.support import PROJECT_ROOT
 import ast
 import re
+import sys
 import unittest
 
-MAIN = PROJECT_ROOT / "app" / "bot" / "main.py"
+
+def _parse(module):
+    """Parse a bot module, or return None when this interpreter cannot.
+
+    main.py uses a PEP 701 f-string that Python 3.11 cannot parse. The bot ships
+    on 3.12 (see the Dockerfile), so on 3.11 these checks cover what they can
+    rather than erroring out - but every caller asserts something was actually
+    parsed, so a silently empty scan is still a failure. On 3.12 a syntax error
+    in main.py fails loudly, which is the case that matters.
+    """
+    try:
+        return ast.parse(module.read_text(encoding="utf-8"))
+    except SyntaxError:
+        if sys.version_info >= (3, 12):
+            raise
+        return None
+
+# Scan the whole bot package, not just main.py: the decomposition moved some
+# player-facing strings into runtime.py and later stages will move more into
+# app/bot/commands/. A check anchored to one file would quietly stop covering
+# them the moment they move.
+BOT = PROJECT_ROOT / "app" / "bot"
+BOT_MODULES = sorted(BOT.rglob("*.py"))
+MAIN = BOT / "main.py"
 
 # The hubs a player can actually type, from _HUB_DEFINITIONS plus the standalone roots.
 HUB_COMMANDS = {
@@ -62,11 +86,18 @@ def _string_constants(tree: ast.AST) -> list[tuple[int, str]]:
 class PlayerFacingCommandHintTests(unittest.TestCase):
     def test_no_player_facing_text_names_an_untypable_subcommand(self):
         offenders = []
-        for lineno, text in _string_constants(ast.parse(MAIN.read_text(encoding="utf-8"))):
-            for match in BAD_HINT.finditer(text):
-                if match.group(2) in PROSE_FOLLOWERS:
-                    continue
-                offenders.append(f"  main.py:{lineno}  {match.group(0)!r}")
+        parsed = 0
+        for module in BOT_MODULES:
+            tree = _parse(module)
+            if tree is None:
+                continue
+            parsed += 1
+            for lineno, text in _string_constants(tree):
+                for match in BAD_HINT.finditer(text):
+                    if match.group(2) in PROSE_FOLLOWERS:
+                        continue
+                    offenders.append(f"  {module.name}:{lineno}  {match.group(0)!r}")
+        self.assertGreater(parsed, 0, "no bot module could be parsed at all")
         self.assertEqual(
             offenders,
             [],
@@ -85,8 +116,12 @@ class PlayerFacingCommandHintTests(unittest.TestCase):
         self.assertFalse(BAD_HINT.search("**/world → Explore**"))
 
     def test_the_three_private_location_exits_are_all_reachable_forms(self):
-        source = MAIN.read_text(encoding="utf-8")
-        start = source.index("PRIVATE_LOCATION_EXITS")
+        """Find the module that DEFINES the table, wherever the split has put it."""
+        defining = [m for m in BOT_MODULES
+                    if re.search(r"^PRIVATE_LOCATION_EXITS", m.read_text(encoding="utf-8"), re.M)]
+        self.assertEqual(len(defining), 1, f"expected exactly one definition, found {defining}")
+        source = defining[0].read_text(encoding="utf-8")
+        start = re.search(r"^PRIVATE_LOCATION_EXITS", source, re.M).start()
         block = source[start : start + 500]
         for command in ("/family → Leave", "/abode → Leave", "/innerworld → Leave"):
             self.assertIn(command, block, f"{command} missing from the exit table")
@@ -94,3 +129,62 @@ class PlayerFacingCommandHintTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# --- arrow-form paths -------------------------------------------------------
+# The check above catches "/family leave". It does NOT catch "/economy -> Market
+# -> Buy", which is the right SHAPE with a wrong LABEL: the page is called "Local
+# Market". That reads as correct to a reviewer and is a dead end to a player, and
+# it shipped in the equipment hints before this test existed.
+# Only the FIRST segment after the hub is a page; deeper segments are subgroups
+# and leaf actions ("/quest -> Body Perfection -> Quest -> Attempt" is valid).
+ARROW_HINT = re.compile(r"/([a-z]+)\s*(?:->|→)\s*([^→>*\n]+?)\s*(?:->|→)")
+
+
+def _hub_pages() -> dict[str, set[str]]:
+    """{hub name: {page label}} straight out of _HUB_DEFINITIONS in the source."""
+    source = MAIN.read_text(encoding="utf-8")
+    pages: dict[str, set[str]] = {}
+    for block in re.finditer(
+        r'HubDefinition\(\s*name="([a-z]+)"(.*?)\n    \),', source, re.S
+    ):
+        hub = block.group(1)
+        labels = set(re.findall(r'_hub_page\(\s*"[a-z_]+",\s*"([^"]+)"', block.group(2)))
+        labels |= set(re.findall(r'HubPage\(key="[a-z_]+", label="([^"]+)"', block.group(2)))
+        if labels:
+            pages[hub] = labels
+    # /admin is a 17th hub, defined separately because it is GM-gated.
+    admin = re.search(r"_ADMIN_HUB_DEFINITION = HubDefinition\((.*?)\n\)", source, re.S)
+    if admin:
+        pages["admin"] = set(re.findall(r'HubPage\(key="[a-z_]+", label="([^"]+)"', admin.group(1)))
+    return pages
+
+
+class ArrowPathTests(unittest.TestCase):
+    def setUp(self):
+        self.pages = _hub_pages()
+
+    def test_the_hub_page_table_was_actually_parsed(self):
+        # A parser that matched nothing would make the test below vacuous.
+        self.assertGreaterEqual(len(self.pages), 10)
+        self.assertIn("Local Market", self.pages.get("economy", set()))
+
+    def test_every_arrow_path_names_a_real_hub_and_page(self):
+        problems = []
+        parsed = 0
+        for path in sorted(BOT_MODULES):
+            tree = _parse(path)
+            if tree is None:
+                continue
+            parsed += 1
+            for line, text in _string_constants(tree):
+                for hub, page in ARROW_HINT.findall(text):
+                    if hub not in self.pages:
+                        problems.append(f"{path.name}:{line} /{hub} is not a hub")
+                    elif page not in self.pages[hub]:
+                        problems.append(
+                            f"{path.name}:{line} /{hub} has no page {page!r} "
+                            f"(pages: {sorted(self.pages[hub])})"
+                        )
+        self.assertGreater(parsed, 0, "no bot module could be parsed at all")
+        self.assertEqual(problems, [], "\n" + "\n".join(problems))
