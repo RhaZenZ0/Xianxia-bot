@@ -519,3 +519,96 @@ def load_module_by_path(name: str, relative_path: str):
     sys.modules[name] = module
     spec.loader.exec_module(module)
     return module
+
+
+# ---------------------------------------------------------------------------
+# Source-scanning helpers for the app/bot package
+# ---------------------------------------------------------------------------
+# main.py is being decomposed one block at a time (see docs/MAIN_SPLIT_PLAN.md).
+# A test that reads app/bot/main.py by path and slices it does not fail when the
+# code it guards moves to another module - it silently stops guarding it, which
+# is what happened to test_engine_result_keys' EquipmentOptionTests in split
+# stage 4. Tests that need "the source of handler X" or "every bot source file"
+# go through these instead, so a later move needs no test edit at all.
+
+BOT_PACKAGE = PROJECT_ROOT / "app" / "bot"
+
+
+def bot_source_files() -> list[Path]:
+    """Every .py file under app/bot, in a stable order."""
+    return sorted(BOT_PACKAGE.rglob("*.py"))
+
+
+def bot_package_source() -> str:
+    """All of app/bot concatenated, for scans that assert an invariant holds
+    everywhere (or that a string appears nowhere)."""
+    return "\n".join(path.read_text(encoding="utf-8") for path in bot_source_files())
+
+
+def _bot_definition_source(name: str, kinds: tuple, what: str) -> str:
+    import ast
+
+    hits: list[tuple[Path, str]] = []
+    for path in bot_source_files():
+        source = path.read_text(encoding="utf-8")
+        lines = source.splitlines(keepends=True)
+        body = ast.parse(source).body
+        for index, node in enumerate(body):
+            if not (isinstance(node, kinds) and node.name == name):
+                continue
+            start = min([node.lineno] + [d.lineno for d in node.decorator_list]) - 1
+            if index + 1 < len(body):
+                nxt = body[index + 1]
+                decos = getattr(nxt, "decorator_list", [])
+                end = (min(d.lineno for d in decos) if decos else nxt.lineno) - 1
+            else:
+                end = len(lines)
+            hits.append((path, "".join(lines[start:end])))
+    if not hits:
+        raise AssertionError(f"no top-level {what} named {name!r} under app/bot")
+    if len(hits) > 1:
+        where = ", ".join(str(p.relative_to(PROJECT_ROOT)) for p, _ in hits)
+        raise AssertionError(f"{name!r} is defined in more than one bot module: {where}")
+    return hits[0][1]
+
+
+def bot_function_source(name: str) -> str:
+    """The source text of top-level function ``name``, wherever it lives under
+    app/bot: from its ``def``/``async def`` line (decorators included) up to the
+    next top-level definition. Raises if the name is defined in zero or more
+    than one module - both are bugs a split can introduce and both should fail
+    loudly rather than return the wrong text."""
+    import ast
+
+    return _bot_definition_source(name, (ast.FunctionDef, ast.AsyncFunctionDef), "function")
+
+
+def bot_class_source(name: str) -> str:
+    """bot_function_source for a top-level class."""
+    import ast
+
+    return _bot_definition_source(name, (ast.ClassDef,), "class")
+
+
+def bot_module_defining(name: str) -> Path:
+    """Path of the app/bot module that defines top-level ``name`` (function,
+    class or assignment). Same uniqueness rule as bot_function_source."""
+    import ast
+
+    hits: list[Path] = []
+    for path in bot_source_files():
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in tree.body:
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and node.name == name:
+                hits.append(path)
+            elif isinstance(node, ast.Assign) and any(
+                isinstance(t, ast.Name) and t.id == name for t in node.targets
+            ):
+                hits.append(path)
+            elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) and node.target.id == name:
+                hits.append(path)
+    if not hits:
+        raise AssertionError(f"nothing named {name!r} is defined at module level under app/bot")
+    if len(hits) > 1:
+        raise AssertionError(f"{name!r} is defined in more than one bot module: {hits}")
+    return hits[0]

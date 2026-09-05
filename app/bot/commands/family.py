@@ -23,6 +23,12 @@ than /family does - ``SIM`` (31 other uses), ``_get_thread`` (5),
 function that needs it. That is deliberate: a module-level ``from ..main import``
 would be a genuine import cycle, while a call-time import runs long after main.py
 has finished importing. There are exactly four, each used once.
+
+Update, split phases 2-4 (v0.19.34-v0.19.39): all four of those names now live
+below main.py (``SIM`` in services.py, ``_get_thread`` in channels.py, the two
+thread helpers in threads.py) and are ordinary module-level imports. This
+module no longer imports main.py at all; the paragraph above is kept as the
+record of why the split was ordered the way it was.
 """
 
 from __future__ import annotations
@@ -30,10 +36,13 @@ from __future__ import annotations
 import discord
 from discord import app_commands
 
-from ...game_engine import GameEngineError
-from ...worldtime import MINUTES_PER_MONTH, MINUTES_PER_YEAR
-from ...birthfamily import family_tier_name
+from ...ops.game_engine import GameEngineError
+from ...rules.worldtime import MINUTES_PER_MONTH, MINUTES_PER_YEAR
+from ...rules.birthfamily import family_tier_name
 from ..registry import registered_group_command
+from ..channels import _get_thread
+from ..services import SIM
+from ..threads import ensure_birth_family_household_thread, open_expedition_thread_after_exit
 from ..runtime import (
     DB,
     ENGINE,
@@ -138,7 +147,6 @@ async def birth_family_enter(interaction: discord.Interaction) -> None:
         await interaction.followup.send(f"❌ Could not enter the household: {exc}", ephemeral=False)
         return
     result = dict(envelope.get("result") or {})
-    from ..main import ensure_birth_family_household_thread
     thread = await ensure_birth_family_household_thread(interaction, fam)
     players = [str(row.get("name") or "Cultivator") for row in (result.get("players_present") or [])]
     others = [name for name in players if name != str(c.get("name") or "")]
@@ -182,7 +190,6 @@ async def birth_family_leave(interaction: discord.Interaction) -> None:
         return
     result = dict(envelope.get("result") or {})
     if interaction.guild is not None and household_row:
-        from ..main import _get_thread
         thread = await _get_thread(interaction.guild, household_row.get("thread_id"))
         if thread is not None:
             try:
@@ -193,7 +200,6 @@ async def birth_family_leave(interaction: discord.Interaction) -> None:
         f"🚪 Left **{result.get('family_name') or fam.get('family_name')}** and returned to **{result.get('location') or fam.get('location')}**.",
         ephemeral=False,
     )
-    from ..main import open_expedition_thread_after_exit
     await open_expedition_thread_after_exit(interaction)
 
 @registered_group_command(family_group, name="clan",description="View bloodline, branches, retainers and martial-clan alliance ties")
@@ -216,7 +222,6 @@ async def birth_family_clan(interaction:discord.Interaction)->None:
               f"Branches: **{fam.get('branch_count',1)}** • Retainers/adopted household members: **{fam.get('retainer_count',0)}**\n"
               f"Martial alliance: **{fam.get('confederacy_name','Independent')}**\n\n"
               "Bloodline purity improves the chance that descendants inherit family cultivation potential, but it never guarantees a Spiritual Root or successful breakthrough.")
-    from ..main import SIM
     clan = await SIM.clan_status(int(fam['family_id']))
     details=[]
     branches=list(clan.get('branches') or [])

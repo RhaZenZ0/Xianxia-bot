@@ -31,6 +31,11 @@ main.py imports this module at its own module level. ``_sect_recruitment_at_loca
 is the mirror image: it is DEFINED here but used once outside this module (in
 main.py's `/explore` road-discovery flow), so main.py imports it back, exactly
 as it already does for ``sect_group`` itself.
+
+Update, split phases 2-4 (v0.19.34-v0.19.39): all five of those names now live
+below main.py (``SIM`` in services.py, the two location helpers in
+locations.py, the two sect-abode helpers in threads.py) and are ordinary
+module-level imports. This module no longer imports main.py at all.
 """
 
 from __future__ import annotations
@@ -40,21 +45,24 @@ from typing import Any
 import discord
 from discord import app_commands
 
-from ...game_engine import GameEngineError
-from ...sect_manor import (
+from ...ops.game_engine import GameEngineError
+from ...rules.sect_manor import (
     MAX_MANOR_FACILITY_LEVEL,
     SECT_MANOR_ESTABLISHMENT_COST,
     SECT_MANOR_FACILITIES,
     manor_benefit_lines,
     manor_upgrade_cost,
 )
-from ...sect_recruitment import (
+from ...rules.sect_recruitment import (
     recommendation_modifier,
     recruitment_definition,
     trial_modifier,
     trial_profile,
 )
 from ..registry import registered_group_command
+from ..locations import _known_locations, current_npc_location
+from ..services import SIM
+from ..threads import ensure_sect_abode_record, ensure_sect_abode_thread_for
 from ..runtime import (
     DB,
     ENGINE,
@@ -158,7 +166,6 @@ async def _build_family_text(user_id: int, *, show_chinese: bool = False) -> str
 
 async def _sync_sect_discoveries(user_id: int, character: dict, *, game_minute: int | None = None) -> list[str]:
     """Promote already-discovered recruitment locations into public sect knowledge."""
-    from ..main import _known_locations
     if game_minute is None:
         game_minute = (await current_world_time()).total_minutes
     known_locations = await _known_locations(user_id, character)
@@ -221,7 +228,6 @@ async def sect_local_trial_autocomplete(interaction: discord.Interaction, curren
 
 
 async def sect_recommender_autocomplete(interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
-    from ..main import current_npc_location
     c = await DB.get_character(interaction.user.id)
     if not c:
         return []
@@ -320,7 +326,6 @@ async def sect_recruitment_info(interaction: discord.Interaction, sect_name: str
 @app_commands.autocomplete(npc=sect_recommender_autocomplete)
 @serialized_user_action
 async def sect_recruitment_recommendation(interaction: discord.Interaction, npc: str) -> None:
-    from ..main import current_npc_location
     c=await require_character(interaction)
     if not c:return
     npc_data=await DB.get_npc_definition(npc)
@@ -545,7 +550,6 @@ SECT_ABODE_ACTIONS = [
 @app_commands.choices(action=SECT_ABODE_ACTIONS)
 @serialized_user_action
 async def sect_abode(interaction: discord.Interaction, action: app_commands.Choice[str]) -> None:
-    from ..main import ensure_sect_abode_record, ensure_sect_abode_thread_for
     c = await require_character(interaction)
     if not c:
         return
@@ -662,7 +666,6 @@ async def sect_roster(interaction:discord.Interaction)->None:
 
 @registered_group_command(sect_group, name="politics", description="Show current sect influence, master attention and resource pressure")
 async def sect_politics(interaction: discord.Interaction) -> None:
-    from ..main import SIM
     if not await require_character(interaction):
         return
     membership = await DB.get_sect_membership(interaction.user.id)
@@ -715,7 +718,6 @@ async def sect_politics(interaction: discord.Interaction) -> None:
 
 @registered_group_command(sect_group, name="treasury", description="Inspect resources currently available to your sect")
 async def sect_treasury(interaction:discord.Interaction)->None:
-    from ..main import SIM
     if not await require_character(interaction):return
     membership=await DB.get_sect_membership(interaction.user.id)
     if not membership:

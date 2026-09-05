@@ -20,11 +20,26 @@ class NarrationTier(StrEnum):
     EPIC = "epic"
 
 
+# v0.19.38 defaults. Gemma 4 31B stays primary on both tiers: its :free route
+# is served by Google AI Studio alone, whose shared pool 429s per user, so it
+# is only a good primary when the operator has added their own AI Studio key
+# on OpenRouter's Integrations page (then it runs on the operator's own, far
+# larger, quota). The fallbacks are the best multi-provider / high-uptime
+# prose-capable models on the free catalogue (September 2026). Nemotron 3
+# Super is gone: it narrated its own instructions 3 of 3 times in production.
 DEFAULT_ROUTINE_MODEL = "google/gemma-4-31b-it:free"
-DEFAULT_ROUTINE_FALLBACK_MODEL = "google/gemma-4-26b-a4b-it:free"
-DEFAULT_EPIC_MODEL = "nvidia/nemotron-3-super-120b-a12b:free"
-DEFAULT_EPIC_FALLBACK_MODEL = DEFAULT_ROUTINE_MODEL
+DEFAULT_ROUTINE_FALLBACK_MODEL = "minimax/minimax-m3:free"
+DEFAULT_EPIC_MODEL = DEFAULT_ROUTINE_MODEL
+DEFAULT_EPIC_FALLBACK_MODEL = "z-ai/glm-5.2:free"
 DEFAULT_DYNAMIC_FREE_MODEL = "openrouter/free"
+
+# Reasoning is switched OFF on every narration request by default. Both
+# production failures of the free chain came from reasoning: models spending a
+# 180-token budget on thinking and returning empty content (v0.19.20), and a
+# model returning its thinking AS the content (v0.19.36). OpenRouter's unified
+# `reasoning` parameter turns it off on models that have it and is ignored by
+# models that do not, so this is safe to send to every route.
+REASONING_OFF: dict[str, Any] = {"reasoning": {"enabled": False, "exclude": True}}
 
 _PROMPT_LEAK_PATTERNS = (
     re.compile(r"\bsystem prompt\b", re.I),
@@ -236,6 +251,10 @@ def _extract_text(content: Any) -> str:
 # answer; reading the reasoning field is the salvage path, not the plan.
 DYNAMIC_FREE_MIN_OUTPUT_TOKENS = 700
 
+# Escalating cooldown for a route that keeps failing (see _mark_failure).
+MAX_BACKOFF_DOUBLINGS = 5            # 60s x 2^5 = 32 minutes at the fifth miss
+MAX_FAILURE_COOLDOWN_SECONDS = 1800.0
+
 _REASONING_FIELDS = ("reasoning", "reasoning_content")
 
 # Scratchpad tells on itself. Narration that starts "Okay, the user wants..." is
@@ -248,11 +267,57 @@ _SCRATCHPAD_PATTERNS = (
     re.compile(r"\blet(?:'s| us| me)\b", re.I),
     re.compile(r"\bas an ai\b", re.I),
     re.compile(r"\b(system|developer) (prompt|message)\b", re.I),
+    # v0.19.36: a model posted "Here's a thinking process: 1. Analyze User
+    # Input: Scene type: ... Player action: "Discover roads" (untrusted
+    # fictional action) ..." as the narration of a player's expedition. None
+    # of the patterns above matched it, and until that release this check was
+    # only run on the reasoning-salvage path, never on `content` itself.
+    re.compile(r"\b(thinking|thought|reasoning) process\b", re.I),
+    re.compile(r"\banaly[sz](e|ing) (the )?(user('s)? )?(input|request|prompt)\b", re.I),
+    re.compile(r"\bidentify (the )?key elements\b", re.I),
+    re.compile(r"\buntrusted fictional action\b", re.I),
+    re.compile(r"\b(scene type|fixed roll information|canonical context)\s*:", re.I),
+    re.compile(r"^\s*(here'?s|here is) (my|a|the) (thinking|reasoning|thought|plan|analysis)", re.I | re.M),
+    re.compile(r"^\s*\d+\.\s*\*\*[^*\n]{3,60}\*\*\s*:", re.M),  # "1. **Analyze User Input:**"
+)
+
+_THINKING_BLOCK_RE = re.compile(r"<\s*(think|thinking|reasoning|scratchpad)\s*>.*?<\s*/\s*\1\s*>", re.I | re.S)
+_UNCLOSED_THINKING_RE = re.compile(r"^\s*<\s*(think|thinking|reasoning|scratchpad)\s*>.*$", re.I | re.S)
+# A model that thinks out loud and then labels its answer. The LAST such label
+# wins; everything before it is discarded.
+_FINAL_SEGMENT_RE = re.compile(
+    r"(?im)^\s*(?:#{1,4}\s*|\*\*|__)?\s*(?:final (?:narration|answer|response|output|prose)|narration|response|output|answer)"
+    r"\s*(?:\*\*|__)?\s*:\s*(?:\*\*|__)?\s*"
 )
 
 
 def _looks_like_scratchpad(text: str) -> bool:
     return any(pattern.search(text) for pattern in _SCRATCHPAD_PATTERNS)
+
+
+def _strip_thinking_blocks(text: str) -> str:
+    """Drop <think>...</think>-style blocks; an unclosed one swallows the rest."""
+    value = _THINKING_BLOCK_RE.sub("", str(text or ""))
+    value = _UNCLOSED_THINKING_RE.sub("", value)
+    return value.strip()
+
+
+def _salvage_narration(text: str) -> str:
+    """Best effort at the prose inside a reply that reads as thinking-out-loud.
+
+    Returns "" when nothing survives - the caller then treats the reply as a
+    failed route (next model, then the procedural fallback), because a player
+    reading the model's analysis of their own action is worse than no prose.
+    """
+    value = _strip_thinking_blocks(text)
+    if value and not _looks_like_scratchpad(value):
+        return value
+    matches = list(_FINAL_SEGMENT_RE.finditer(value))
+    if matches:
+        tail = value[matches[-1].end():].strip()
+        if tail and not _looks_like_scratchpad(tail):
+            return tail
+    return ""
 
 
 def _extract_reasoning(message: Any) -> str:
@@ -277,6 +342,21 @@ def _extract_reasoning(message: Any) -> str:
         if text and not _looks_like_scratchpad(text):
             return text
     return ""
+
+
+def _response_provider(response: Any) -> str:
+    """OpenRouter puts the upstream that served the request in a top-level
+    `provider` field on the completion. The OpenAI SDK keeps unknown fields
+    as extras, so it is reachable by attribute or via model_extra."""
+    value = getattr(response, "provider", None)
+    if value is None:
+        extra = getattr(response, "model_extra", None)
+        if isinstance(extra, dict):
+            value = extra.get("provider")
+    return str(value or "").strip()
+
+
+BYOK_RECHECK_SECONDS = 3600.0
 
 
 def _retry_after_seconds(exc: Exception) -> float | None:
@@ -320,6 +400,10 @@ def _safe_free_model(model: str, *, require_free: bool) -> str:
     return chosen
 
 
+class ScratchpadResponse(ValueError):
+    """The model answered with its own reasoning instead of narration."""
+
+
 def _validate_generated_text(text: str, *, max_chars: int = 7000, leak_guard: bool = True) -> str:
     """Validate model output.
 
@@ -340,6 +424,21 @@ def _validate_generated_text(text: str, *, max_chars: int = 7000, leak_guard: bo
     if value.startswith("```") and value.endswith("```"):
         value = re.sub(r"^```(?:text|markdown|md)?\s*", "", value, flags=re.I)
         value = re.sub(r"\s*```$", "", value).strip()
+    if leak_guard:
+        # The scratchpad check used to run only when `content` was empty and
+        # the reasoning field was being salvaged. A reasoning model that puts
+        # its thinking IN the content field sailed straight through here and
+        # into a player's expedition thread (v0.19.36).
+        stripped = _strip_thinking_blocks(value)
+        if not stripped:
+            raise ValueError("AI response was a reasoning block with no narration")
+        if _looks_like_scratchpad(stripped):
+            salvaged = _salvage_narration(stripped)
+            if not salvaged:
+                raise ScratchpadResponse("AI response was reasoning scratchpad, not narration")
+            value = salvaged
+        else:
+            value = stripped
     if len(value) > max_chars:
         value = value[: max_chars - 1].rstrip() + "…"
     return value
@@ -388,6 +487,7 @@ class AITaskRouter:
         routine_timeout_seconds: float = 30.0,
         epic_timeout_seconds: float = 60.0,
         failure_cooldown_seconds: float = 20.0,
+        disable_reasoning: bool = True,
         app_url: str = "",
         app_name: str = "Xianxia RP",
     ) -> None:
@@ -397,6 +497,7 @@ class AITaskRouter:
         self.routine_timeout_seconds = max(5.0, float(routine_timeout_seconds))
         self.epic_timeout_seconds = max(5.0, float(epic_timeout_seconds))
         self.failure_cooldown_seconds = max(1.0, float(failure_cooldown_seconds))
+        self.disable_reasoning = bool(disable_reasoning)
         self.app_url = str(app_url or "").strip()
         self.app_name = str(app_name or "Xianxia RP").strip() or "Xianxia RP"
 
@@ -462,6 +563,44 @@ class AITaskRouter:
             headers["X-OpenRouter-Title"] = self.app_name
         return headers or None
 
+    async def _maybe_check_byok(self, model: str, response: Any) -> None:
+        """Ask OpenRouter whether the operator's own provider key served this.
+
+        GET /generation?id=... returns `is_byok` for a completed request. It is
+        one extra call per model per hour, only after a success, and any
+        failure is ignored - it is a diagnostic for /admin server ai_status,
+        never on the narration path. An operator who has added a Google AI
+        Studio key in OpenRouter's Integrations page can otherwise not tell
+        from the bot whether it is being used: OpenRouter tries the key first
+        and silently falls back to its shared pool on any error.
+        """
+        row = self._model_row(model)
+        now = time.time()
+        if row["byok_checked_at"] and now - row["byok_checked_at"] < BYOK_RECHECK_SECONDS:
+            return
+        generation_id = str(getattr(response, "id", "") or "").strip()
+        if not generation_id or not self.api_key:
+            return
+        row["byok_checked_at"] = now
+        try:
+            import httpx
+
+            async with httpx.AsyncClient(timeout=5.0) as http:
+                reply = await http.get(
+                    f"{self.base_url}/generation",
+                    params={"id": generation_id},
+                    headers={"Authorization": f"Bearer {self.api_key}"},
+                )
+            payload = reply.json() if reply.status_code == 200 else {}
+            data = payload.get("data") if isinstance(payload, dict) else None
+            if isinstance(data, dict) and "is_byok" in data:
+                row["byok"] = bool(data.get("is_byok"))
+                if data.get("provider_name") and not row["last_provider"]:
+                    row["last_provider"] = str(data["provider_name"])
+                log.info("AI_BYOK model=%s byok=%s provider=%s", model, row["byok"], row["last_provider"])
+        except Exception as exc:  # diagnostics never break narration
+            log.debug("BYOK lookup failed for %s: %s", model, exc)
+
     def _cooling_down(self, model: str) -> bool:
         return self._cooldown_until.get(model, 0.0) > time.monotonic()
 
@@ -490,7 +629,16 @@ class AITaskRouter:
                 "last_error_looks_like_tls": False,
                 "empty_responses": 0,
                 "reasoning_salvaged": 0,
+                "scratchpad_rejected": 0,
                 "skipped_route_limit": 0,
+                "consecutive_failures": 0,
+                "cooldown_seconds": 0.0,
+                # Which upstream actually served the last success, and whether
+                # OpenRouter used the operator's own provider key (BYOK) for
+                # it - the two facts a GM needs when a route "never responds".
+                "last_provider": "",
+                "byok": None,
+                "byok_checked_at": 0.0,
             }
             self._model_stats[model] = row
         return row
@@ -499,6 +647,9 @@ class AITaskRouter:
         status = getattr(exc, "status_code", None)
         if status is None:
             status = getattr(getattr(exc, "response", None), "status_code", None)
+        row = self._model_row(model)
+        row["failures"] += 1
+        row["consecutive_failures"] += 1
         # Prefer the provider's own hint over our guess. Falling back to the
         # blanket multiplier only when no hint is offered.
         hinted = _retry_after_seconds(exc)
@@ -507,9 +658,21 @@ class AITaskRouter:
         else:
             multiplier = 3.0 if status == 429 else 1.0
             cooldown = self.failure_cooldown_seconds * multiplier
+        # v0.19.37: a route that keeps failing backs off harder each time. Two
+        # Gemma free routes sat at 0-for-15 all day on a fixed 60s cooldown, so
+        # every narration re-tried both before reaching the route that worked -
+        # and each retry spent one of the 50 daily free-tier slots. 23
+        # narrations cost 50 slots. Doubling per consecutive failure, capped,
+        # means a dead route costs a handful of slots a day instead of most of
+        # them; the first success resets it.
+        streak = row["consecutive_failures"]
+        if streak > 1:
+            cooldown = min(
+                cooldown * (2 ** min(streak - 1, MAX_BACKOFF_DOUBLINGS)),
+                MAX_FAILURE_COOLDOWN_SECONDS,
+            )
         self._cooldown_until[model] = time.monotonic() + cooldown
-        row = self._model_row(model)
-        row["failures"] += 1
+        row["cooldown_seconds"] = float(cooldown)
         row["last_error"] = f"{type(exc).__name__}: {exc}"[:300]
         row["last_error_at"] = time.time()
         tls = _looks_like_tls_failure(exc)
@@ -558,6 +721,11 @@ class AITaskRouter:
                         else None
                     ),
                     "reasoning_salvaged": int(row["reasoning_salvaged"]),
+                    "scratchpad_rejected": int(row["scratchpad_rejected"]),
+                    "consecutive_failures": int(row["consecutive_failures"]),
+                    "cooldown_seconds": float(row["cooldown_seconds"]),
+                    "last_provider": str(row["last_provider"]),
+                    "byok": row["byok"],
                     "never_succeeded": int(row["attempts"]) > 0 and int(row["successes"]) == 0,
                     "last_error_at": float(row["last_error_at"]),
                     "last_success_at": float(row["last_success_at"]),
@@ -648,6 +816,7 @@ class AITaskRouter:
                     max_tokens=output_tokens,
                     temperature=temperature,
                     extra_headers=self._headers(),
+                    extra_body=dict(REASONING_OFF) if self.disable_reasoning else None,
                 )
                 response = await asyncio.wait_for(request, timeout=timeout_seconds)
                 if not response.choices:
@@ -662,10 +831,21 @@ class AITaskRouter:
                     if raw_text:
                         self._model_row(model)["reasoning_salvaged"] += 1
                         log.info("AI_REASONING_SALVAGED model=%s", model)
-                text = _validate_generated_text(raw_text, leak_guard=leak_guard)
+                try:
+                    text = _validate_generated_text(raw_text, leak_guard=leak_guard)
+                except ScratchpadResponse:
+                    self._model_row(model)["scratchpad_rejected"] += 1
+                    log.info("AI_SCRATCHPAD_REJECTED model=%s", model)
+                    raise
                 success_row = self._model_row(model)
                 success_row["successes"] += 1
                 success_row["last_success_at"] = time.time()
+                success_row["consecutive_failures"] = 0
+                success_row["cooldown_seconds"] = 0.0
+                provider_name = _response_provider(response)
+                if provider_name:
+                    success_row["last_provider"] = provider_name
+                await self._maybe_check_byok(model, response)
                 tier_counts["served"] += 1
                 return RoutedAIResult(
                     text=text,

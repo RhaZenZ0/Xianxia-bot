@@ -488,8 +488,23 @@ def render_health(snapshot: dict[str, Any]) -> str:
         if empty:
             salvaged = int(row.get("reasoning_salvaged", 0) or 0)
             detail += f" • empty replies **{empty}** (recovered from reasoning **{salvaged}**)"
+        scratchpad = int(row.get("scratchpad_rejected", 0) or 0)
+        if scratchpad:
+            detail += f" • answered with its own reasoning **{scratchpad}×** (rejected)"
+        streak = int(row.get("consecutive_failures", 0) or 0)
+        if streak > 1:
+            detail += f" • **{streak}** in a row, backing off {int(row.get('cooldown_seconds', 0) or 0)}s"
         if row.get("cooling_down"):
             detail += f" • {row.get('cooldown_remaining_seconds', 0)}s left"
+        provider_name = str(row.get("last_provider") or "").strip()
+        byok = row.get("byok")
+        if provider_name or byok is not None:
+            served = f"served by **{provider_name}**" if provider_name else "served"
+            if byok is True:
+                served += " via **your own provider key**"
+            elif byok is False:
+                served += " via OpenRouter's **shared pool** (your integration key was not used)"
+            detail += f" • {served}"
         lines.append(detail)
         if row.get("last_error"):
             flag = " 🚨 TLS/certificate" if row.get("last_error_looks_like_tls") else ""

@@ -7,8 +7,8 @@ from tests.support import install_aiosqlite_shim, PROJECT_ROOT, seed_character
 install_aiosqlite_shim()
 
 from app.database import Database, SCHEMA_VERSION
-from app.game import World
-from app.rag import MemoryRAGRetriever, build_fts_query, resolve_retrieval_profile
+from app.rules.game import World
+from app.ai.rag import MemoryRAGRetriever, build_fts_query, resolve_retrieval_profile
 
 ROOT = PROJECT_ROOT
 ATTRS = {"body": 4, "agility": 4, "spirit": 6, "insight": 6, "will": 5, "presence": 4}

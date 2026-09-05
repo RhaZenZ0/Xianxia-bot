@@ -17,7 +17,7 @@ from urllib.error import HTTPError, URLError
 
 import aiosqlite
 
-from .http_limits import (
+from ..ops.http_limits import (
     STREAM_LIMIT,
     ConnectionLimiter,
     EmptyRequest,
@@ -25,12 +25,12 @@ from .http_limits import (
     RequestHeadRejected,
     read_request_head,
 )
-from .worldtime import from_game_minutes
-from .database.remote import GoDatabaseTransport, RemoteDatabaseError
-from .game_engine import GameEngineClient, GameEngineError
+from ..rules.worldtime import from_game_minutes
+from ..database.remote import GoDatabaseTransport, RemoteDatabaseError
+from ..ops.game_engine import GameEngineClient, GameEngineError
 
 # Release-blocking browser/API/schema contract shared with the standard checker.
-from .dashboard_contract import (
+from .contract import (
     DASHBOARD_API_VERSION,
     DASHBOARD_GET_API_PATHS,
     DASHBOARD_REVIEWED_SCHEMA_VERSION,
@@ -40,7 +40,7 @@ from .dashboard_contract import (
 
 log = logging.getLogger("xianxia.dashboard")
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 STATIC_DIR = ROOT / "dashboard"
 
 # JavaScript numbers are IEEE-754 doubles, so integers above this lose precision.
@@ -1326,7 +1326,7 @@ class DashboardServer:
         self.store = ReadOnlyDashboardStore(settings.database_path)
         self.admin = AdminDashboardController(self.store, settings.engine_url or os.getenv("GAME_ENGINE_URL", ""), settings.admin_writes, settings.dashboard_actor_id)
         self.discord = DiscordDashboardController(settings.bot_control_url, settings.bot_control_token, settings.admin_writes)
-        # Bounds for the pre-auth request head. See app/http_limits.py: a per-line
+        # Bounds for the pre-auth request head. See app/ops/http_limits.py: a per-line
         # timeout that resets on every line is not a limit, it is an invitation.
         self.header_limits = HeaderLimits(
             max_request_line_bytes=settings.max_request_line_bytes,

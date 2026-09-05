@@ -6,7 +6,7 @@ from tests.support import install_aiosqlite_shim, seed_character
 install_aiosqlite_shim()
 
 from app.database import Database
-from app.progression_systems import condition_effect, condition_definition, ascension_gate, profession_rank
+from app.rules.progression_systems import condition_effect, condition_definition, ascension_gate, profession_rank
 
 
 class MissingSystemsDatabaseTests(unittest.IsolatedAsyncioTestCase):

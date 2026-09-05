@@ -3,15 +3,15 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tests.support import install_aiosqlite_shim, PROJECT_ROOT, seed_character
+from tests.support import install_aiosqlite_shim, PROJECT_ROOT, seed_character, bot_package_source
 install_aiosqlite_shim()
 
 from app.database import Database, SCHEMA_VERSION
-from app.core_services import (
+from app.ops.core_services import (
     CombatService, ExplorationService, LocationSceneService,
     NPCRelationshipService, QuestService,
 )
-from app.quests import QUEST_DEFINITIONS
+from app.rules.quests import QUEST_DEFINITIONS
 
 ATTRS = {"body": 4, "agility": 4, "spirit": 5, "insight": 5, "will": 4, "presence": 4}
 
@@ -124,7 +124,7 @@ class CoreServiceTests(unittest.IsolatedAsyncioTestCase):
 
     def test_player_and_info_interfaces_are_wired(self):
         root = PROJECT_ROOT
-        source = (root / "app" / "bot" / "main.py").read_text(encoding="utf-8")
+        source = bot_package_source()
         self.assertIn('@registered_root_command(name="me"', source)
         self.assertIn('@registered_root_command(name="quests"', source)
         self.assertIn('class XianxiaInfoView', source)

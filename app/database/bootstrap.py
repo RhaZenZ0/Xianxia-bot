@@ -5,10 +5,10 @@ import json
 import os
 from pathlib import Path
 
-from .database import Database
+from . import Database
 
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]
 
 
 def configured_database_path() -> Path:

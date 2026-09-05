@@ -1,4 +1,4 @@
-# Xianxia RP Discord Bot v0.19.31
+# Xianxia RP Discord Bot v0.20.2
 
 [![CI](https://github.com/RhaZenZ0/Xianxia-bot/actions/workflows/ci.yml/badge.svg)](https://github.com/RhaZenZ0/Xianxia-bot/actions/workflows/ci.yml)
 
@@ -7,8 +7,8 @@ Discord, RAG, dashboard, and presentation orchestration; Go owns canonical gamep
 game time, simulation mutations, and SQLite WAL state.
 
 
-See `VERSIONS.md` for the full release-by-release changelog (every v0.19.x release), and
-`docs/V019_RELEASE_NOTES.md`, `docs/V018_RELEASE_NOTES.md` and `docs/V018_BUILD_HISTORY.md`
+See `VERSIONS.md` for the full release-by-release changelog, and
+`docs/V020_RELEASE_NOTES.md`, `docs/V019_RELEASE_NOTES.md`, `docs/V018_RELEASE_NOTES.md` and `docs/V018_BUILD_HISTORY.md`
 (consolidated validation/audit record) for full per-release and staged-authority migration detail.
 
 ## Release architecture
@@ -62,10 +62,10 @@ Ownership rules:
 ### Routine
 
 ```text
-google/gemma-4-31b-it:free
+google/gemma-4-31b-it:free      (Google AI Studio only - add your own AI Studio key on OpenRouter)
         | fail / timeout / 429
         v
-google/gemma-4-26b-a4b-it:free
+minimax/minimax-m3:free
         | fail
         v
 openrouter/free
@@ -76,13 +76,21 @@ procedural narration
 
 Used for `/talk`, guided `/action` outcomes, exploration, hunts, ordinary events and normal NPC/sect scenes.
 
+Every narration request tells OpenRouter to switch model reasoning off
+(`OPENROUTER_DISABLE_REASONING=true`): the two production failures of the free
+chain were a model spending the whole budget thinking and returning nothing, and
+a model returning its thinking as the narration. `/admin server ai_status` shows,
+per route, which upstream served it, whether it went through your own provider
+key or OpenRouter's shared pool, and how long a repeatedly failing route is
+backing off.
+
 ### Epic
 
 ```text
-nvidia/nemotron-3-super-120b-a12b:free
+google/gemma-4-31b-it:free
         | fail / timeout / 429
         v
-google/gemma-4-31b-it:free
+z-ai/glm-5.2:free
         | fail
         v
 openrouter/free
@@ -103,7 +111,7 @@ own is not a limit: a client sending one header just under it holds the
 connection open indefinitely, and a client sending them quickly grows the header
 dictionary without bound.
 
-Every request head is therefore bounded (`app/http_limits.py`), on both servers,
+Every request head is therefore bounded (`app/ops/http_limits.py`), on both servers,
 with the same env knobs:
 
 | Setting | Default | Rejected with |
@@ -226,10 +234,11 @@ The default cloud-only narrator configuration is:
 ```env
 NARRATOR_PROVIDER=openrouter
 OPENROUTER_ROUTINE_MODEL=google/gemma-4-31b-it:free
-OPENROUTER_ROUTINE_FALLBACK_MODEL=google/gemma-4-26b-a4b-it:free
-OPENROUTER_EPIC_MODEL=nvidia/nemotron-3-super-120b-a12b:free
-OPENROUTER_EPIC_FALLBACK_MODEL=google/gemma-4-31b-it:free
+OPENROUTER_ROUTINE_FALLBACK_MODEL=minimax/minimax-m3:free
+OPENROUTER_EPIC_MODEL=google/gemma-4-31b-it:free
+OPENROUTER_EPIC_FALLBACK_MODEL=z-ai/glm-5.2:free
 OPENROUTER_DYNAMIC_FREE_FALLBACK=openrouter/free
+OPENROUTER_DISABLE_REASONING=true
 OPENROUTER_REQUIRE_FREE=true
 OPENROUTER_MAX_REQUESTS_PER_MINUTE=20
 OPENROUTER_TIMEOUT_SECONDS=30
@@ -676,7 +685,7 @@ Configure Python to point at it, then initialize and start the bot:
 
 ```bash
 export GAME_ENGINE_URL=http://127.0.0.1:8081
-python -m app.database_bootstrap
+python -m app.database.bootstrap
 python -m app.bot
 ```
 
@@ -802,14 +811,19 @@ python -m json.tool content/world.json >/dev/null
 
 ```text
 app/
-  bot/                 Discord frontend and hubs
-  database/            Python repository API + Go remote DB transport
+  bot/                 Discord frontend: runtime, services, commands/, admin/, ui/, surface wiring
+  rules/               gameplay rules and content helpers (pure: alchemy, aptitudes, birthfamily,
+                       samsara, sect*, worldtime, game/World ...) - imports nothing above it
+  ai/                  ai_router (OpenRouter routing), narrator + narrator_context, rag, chat_monitor
+  ops/                 config, health/http_limits, game_engine (Go client), core_services,
+                       the healthcheck entrypoint
+  dashboard/           authenticated GM web control plane (server.py) + front-end contract
+  database/            Python repository API, Go remote DB transport, bootstrap entrypoint
   simulation/          Python orchestration/compatibility during migration
-  dashboard.py         authenticated GM web control plane
-  game_engine.py       authoritative Go client
-  rag.py               deterministic memory/canon/history retrieval
-  ai_router.py         OpenRouter routine/epic free-fallback routing
-  narrator*.py         narration/context layer
+  version.py           the release stamp
+
+Layering (tests/python/unit/test_app_layout.py): {rules, ops} <- ai <- database <- simulation <- dashboard <- bot;
+rules and ops do not import each other.
 
 go_core/
   cmd/xianxia-core/    Go service entry point
@@ -827,7 +841,7 @@ tests/support.py         shared dependency shims and test path helpers
 
 ## Release status
 
-- Current release: v0.19.31. See `VERSIONS.md` for the full release-by-release history.
+- Current release: v0.20.2. See `VERSIONS.md` for the full release-by-release history.
 - Go owns canonical gameplay time, migrated gameplay mechanics, lifespan/death authority, road travel,
   caravan settlement, simulation mutation, and SQLite WAL.
 - Python owns Discord/RAG/dashboard/presentation orchestration and does not duplicate the removed

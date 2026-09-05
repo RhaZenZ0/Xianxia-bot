@@ -90,8 +90,8 @@ if __name__ == "__main__":
 
 
 REQUIREMENTS = (PROJECT_ROOT / "requirements.txt").read_text(encoding="utf-8")
-AI_ROUTER = (PROJECT_ROOT / "app" / "ai_router.py").read_text(encoding="utf-8")
-NARRATOR = (PROJECT_ROOT / "app" / "narrator.py").read_text(encoding="utf-8")
+AI_ROUTER = (PROJECT_ROOT / "app" / "ai" / "ai_router.py").read_text(encoding="utf-8")
+NARRATOR = (PROJECT_ROOT / "app" / "ai" / "narrator.py").read_text(encoding="utf-8")
 
 
 class OpenAISDKMajorBumpTests(unittest.TestCase):
@@ -110,10 +110,10 @@ class OpenAISDKMajorBumpTests(unittest.TestCase):
 
     def test_httpx_is_pinned_directly_and_not_relied_on_transitively(self):
         # openai 3.x installs httpx2 and no longer installs httpx at all, but
-        # app/database/remote.py and app/game_engine.py import httpx directly for
+        # app/database/remote.py and app/ops/game_engine.py import httpx directly for
         # the Go engine transport - the path every piece of game state uses.
         self.assertRegex(REQUIREMENTS, r"(?m)^httpx>=")
-        for module in ("app/database/remote.py", "app/game_engine.py"):
+        for module in ("app/database/remote.py", "app/ops/game_engine.py"):
             self.assertIn(
                 "import httpx",
                 (PROJECT_ROOT / module).read_text(encoding="utf-8"),
@@ -141,8 +141,8 @@ class OpenAISDKMajorBumpTests(unittest.TestCase):
         )
 
 
-HEALTH = (PROJECT_ROOT / "app" / "health.py").read_text(encoding="utf-8")
-DASHBOARD = (PROJECT_ROOT / "app" / "dashboard.py").read_text(encoding="utf-8")
+HEALTH = (PROJECT_ROOT / "app" / "ops" / "health.py").read_text(encoding="utf-8")
+DASHBOARD = (PROJECT_ROOT / "app" / "dashboard" / "server.py").read_text(encoding="utf-8")
 
 
 class RequestHeadLimitTests(unittest.TestCase):

@@ -1,8 +1,9 @@
 from pathlib import Path
 
+from tests.support import bot_package_source
+
 
 ROOT = Path(__file__).resolve().parents[3]
-BOT_MAIN = ROOT / "app" / "bot" / "main.py"
 CAPITAL_ART = ROOT / "assets" / "locations" / "azure_crown_imperial_city.png"
 
 
@@ -12,13 +13,13 @@ def test_mortal_capital_discovery_art_is_packaged() -> None:
 
 
 def test_mortal_capital_art_is_bound_to_azure_crown() -> None:
-    source = BOT_MAIN.read_text(encoding="utf-8")
+    source = bot_package_source()
     assert '"Azure Crown Imperial City": ROOT / "assets" / "locations" / "azure_crown_imperial_city.png"' in source
     assert 'title=f"🏙️ First Sight — {location}"' in source
 
 
 def test_first_discovery_delivery_covers_creation_exploration_and_travel() -> None:
-    source = BOT_MAIN.read_text(encoding="utf-8")
+    source = bot_package_source()
 
     # Birthplace does not gate the feature. Starting in any illustrated location
     # counts as that character's first discovery, while other birthplaces reach

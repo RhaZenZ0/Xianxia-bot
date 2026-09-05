@@ -5,8 +5,8 @@ from __future__ import annotations
 import discord
 from discord import app_commands
 
-from ...game_engine import GameEngineError
-from ...progression_systems import profession_rank
+from ...ops.game_engine import GameEngineError
+from ...rules.progression_systems import profession_rank
 from ..registry import registered_group_command
 from ..runtime import DB, ENGINE, WORLD, require_character, reply_long, serialized_user_action
 

@@ -6,8 +6,8 @@ from tests.support import install_openai_shim
 
 install_openai_shim()
 
-from app.ai_router import NarrationTier
-from app.narrator import Narrator
+from app.ai.ai_router import NarrationTier
+from app.ai.narrator import Narrator
 
 
 class NarratorProviderTests(unittest.TestCase):

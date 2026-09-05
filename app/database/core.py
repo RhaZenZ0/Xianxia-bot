@@ -22,12 +22,12 @@ except ModuleNotFoundError:  # Production remote-DB mode does not import a SQLit
     aiosqlite = _AioSQLiteRemoteOnly()  # type: ignore[assignment]
 
 from .remote import GoDatabaseTransport
-from ..advanced_runtime import (
+from ..rules.advanced_runtime import (
     BOSS_TEMPLATES, BOUNTY_HUNTER_TITLES, ERA_CYCLE,
     FORMATION_POSITIONS, FORMATION_STANCES, equipment_definition,
     equipment_power, era_index, formation_bonus, stable_percent,
 )
-from ..sect_manor import (
+from ..rules.sect_manor import (
     MAX_MANOR_FACILITY_LEVEL, SECT_MANOR_ESTABLISHMENT_COST, SECT_MANOR_ESTABLISH_RANK_LEVEL,
     SECT_MANOR_FACILITIES, SECT_MANOR_UPGRADE_RANK_LEVEL, manor_upgrade_cost,
 )
@@ -4161,7 +4161,7 @@ class Database:
             }
 
     async def get_address_context(self, observer_user_id: int, target_user_id: int) -> dict[str, Any] | None:
-        from ..sect import resolve_address
+        from ..rules.sect import resolve_address
 
         observer_snapshot = await self.get_lineage_snapshot(observer_user_id)
         target_snapshot = await self.get_lineage_snapshot(target_user_id)
@@ -5562,7 +5562,7 @@ class Database:
 
     async def get_alchemy_state(self, user_id: int, *, game_minute: int | None = None) -> dict[str, Any]:
         """Return persistent alchemy state, settling natural pill-toxicity decay."""
-        from ..alchemy import PILL_TOXICITY_DECAY_AMOUNT, PILL_TOXICITY_DECAY_MINUTES
+        from ..rules.alchemy import PILL_TOXICITY_DECAY_AMOUNT, PILL_TOXICITY_DECAY_MINUTES
 
         now = time.time()
         async with self._connect() as db:

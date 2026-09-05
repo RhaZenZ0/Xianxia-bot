@@ -2,8 +2,8 @@ from tests.support import PROJECT_ROOT
 import unittest
 from pathlib import Path
 
-from app.game import World
-from app.sense import (
+from app.rules.game import World
+from app.rules.sense import (
     concealment_power, hidden_npc_names, sense_hidden_npc, sense_precision_check, spiritual_sense_stats,
 )
 

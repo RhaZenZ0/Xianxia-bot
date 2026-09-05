@@ -1,6 +1,7 @@
 # Xianxia RP v0.19 — Cultivation Depth & Consistency Pass
 
-Shipping as **v0.19.31**. This file covers the whole v0.19 line: v0.19 itself, the v0.19.5
+The v0.19 line ends at **v0.19.48**; v0.20.0 (the `main.py` split completed) and later are in
+`docs/V020_RELEASE_NOTES.md`. This file covers the whole v0.19 line: v0.19 itself, the v0.19.5
 GUI release (the Components V2 hub layout), v0.19.6, which fixes the findings of an
 external audit, v0.19.25, a production-review pass covering the late-Discord-ack
 architecture, persistent event-scene timeouts, `/explore`'s road-discovery logic, and
@@ -17,17 +18,26 @@ world-time scale from the dashboard, adds a dynasty/samsara unstick control, fou
 crafting-adjacent admin controls, a mute/freeze moderation system (schema 27), and an
 "undo the most recent admin action" control, v0.19.30, split stage 3: `/sect` moves
 out of `main.py` into `app/bot/commands/sect.py`, the same way `/family` moved in stage 2
-(v0.19.23), and v0.19.31, a hub-UI ephemeral-visibility fix and privacy pass merged in
-(with two parts deliberately rejected) from a reviewed community patch — see "Components
+(v0.19.23), v0.19.31, a hub-UI ephemeral-visibility fix and privacy pass merged in
+(with two parts deliberately rejected) from a reviewed community patch, and v0.19.32,
+the Bugslayer Sword reward item, `/admin player grant` hardening and a startup fix, and
+v0.19.33, phase 1 of the `main.py` split (test scaffolding only), v0.19.34, phase 2
+(`services.py` and `formatting.py` leave `main.py`), v0.19.35, phase 3 (`locations.py`), v0.19.36, which stops a reasoning model's
+scratchpad being posted as narration, v0.19.37, escalating backoff for dead free routes
+and BYOK visibility in `ai_status`, v0.19.38, reasoning switched off on every narration
+request and new fallback chains, v0.19.39, phase 4 of the `main.py` split (the rest of the
+plumbing; last deferred hook gone), v0.19.40, phase 5 (`admin/core.py`), v0.19.41, phase 6 (the admin server layer), v0.19.42, phase 7 (the admin operations), v0.19.43, phase 8 (the shared UI and the bot
+class), v0.19.44, phase 9a (the first player-command domains), v0.19.45, phase 9b
+(character, economy and abode), v0.19.46, phase 9c (exploration, craft and alchemy), v0.19.47, phase 9d (battle and law), and v0.19.48, phase 9e (scene and sense; phase 9 complete) — see "Components
 V2 hub layout", "Release stamp corrected", "v0.19.6 — external audit findings, fixed",
 "v0.19.25", "v0.19.26", "v0.19.27", "v0.19.28", "v0.19.29", "v0.19.30 — split stage 3" and
-"v0.19.31 — ephemeral-visibility merge" near the end. The release is stamped 0.19.31 in
+"v0.19.31 — ephemeral-visibility merge", "v0.19.32", "v0.19.33", "v0.19.34", "v0.19.35", "v0.19.36", "v0.19.37", "v0.19.38", "v0.19.39", "v0.19.40", "v0.19.41", "v0.19.42", "v0.19.43", "v0.19.44", "v0.19.45", "v0.19.46", "v0.19.47" and "v0.19.48" near the end. The release is stamped 0.19.48 in
 `app/version.py`, `VERSION`, the `Dockerfile` and `docker-compose.yml`, and carries
-schema 27, unchanged from v0.19.29 (see "v0.19.29" for that migration; v0.19.30 and
-v0.19.31 are logic/documentation-only).
+schema 27, unchanged from v0.19.29 (see "v0.19.29" for that migration; v0.19.30,
+v0.19.31 through v0.19.48 are logic/content/test/documentation-only).
 
 Release date: 2026-08-31 (v0.19) / 2026-09-01 (v0.19.5, v0.19.6) / 2026-09-04 (v0.19.25,
-v0.19.26, v0.19.27, v0.19.28) / 2026-09-05 (v0.19.29, v0.19.30)
+v0.19.26, v0.19.27, v0.19.28) / 2026-09-05 (v0.19.29, v0.19.30, v0.19.31, v0.19.32, v0.19.33, v0.19.34, v0.19.35, v0.19.36, v0.19.37, v0.19.38, v0.19.39, v0.19.40, v0.19.41, v0.19.42, v0.19.43, v0.19.44, v0.19.45, v0.19.46, v0.19.47, v0.19.48)
 Schema: 27 (unchanged from v0.18 through most of this release — every fix was
 logic-only — until the "GM-authored per-channel messages" entry below added schema 25's
 `channel_messages` table, the "#bugs forum channel" entry further below added schema
@@ -3446,3 +3456,1094 @@ functions. The two new `HubFailurePublicSurfaceTests` and the six new
 allowlist entries were each mutation-tested (temporarily reintroducing the
 rejected patch behavior, or removing an allowlist entry, confirming the
 relevant test fails, then restoring and reconfirming green).
+
+## v0.19.32 — the Bugslayer Sword, `/admin player grant` hardening, and a startup fix
+
+### Where this release came from
+
+A community patch (`xianxia_grant_and_bugslayer_passive.patch`) arrived
+claiming to *extend* an existing "Bugslayer Sword" reward item, an existing
+`/admin player grantbugslayer` command, an existing
+`isIndestructibleEquipmentGo` engine function and an existing
+`bugslayer_reward_test.go`. None of those had ever existed in this codebase:
+`patch --dry-run` rejected six of its eight hunks outright, exhaustive
+searches of every Go, Python and content file found no trace of any of the
+names, and neither `VERSIONS.md` nor this file had ever mentioned them. The
+patch was written against a codebase that isn't this one, so it was not
+applied. The two ideas behind it were sound, though, and both were built
+here from scratch, against the code as it actually is — which turned up three
+things the patch could never have known about (below).
+
+Separately, the project tree this release is built on carries a batch of
+changes made outside the previous release: split stage 4 (`/equipment`,
+`/boss`, `/hunter`, `/duel`, `/beast`, `/artifact` and `/formation` leave
+`main.py` for `app/bot/commands/`), an `ENGINE_AUTH_TOKEN` shared secret on
+the Go engine's HTTP surface (`X-Xianxia-Engine-Token`, with `auth_test.go`),
+an explicit `httpx` pin in `requirements.txt`, and a `Makefile`,
+`pyproject.toml`, `requirements-dev.txt`, `docs/DEVELOPMENT.md` and a GitHub
+Actions workflow. Those are described here only as far as this release had
+to touch them.
+
+### The bot could not start (fixed)
+
+Split stage 4 moved `boss_status`, `hunter_status` and `formation_status`
+into `app/bot/commands/boss.py`/`formation.py` but did not import them back
+into `main.py` — and `register_event_handlers()` at the bottom of `main.py`
+reads all three **at import time**, so `from app.bot import main` raised
+`NameError: name 'boss_status' is not defined` before the bot ever connected.
+`tests/python/unit/test_bot_module_split.py` had been reporting exactly this
+(`main.py reads names it does not define or import: ['boss_status',
+'formation_status', 'hunter_status']`). Fixed by importing the three
+handlers; that test is green again.
+
+### Tests the command split broke (repaired, not deleted)
+
+- `EquipmentOptionTests` in `tests/python/contracts/test_engine_result_keys.py`
+  scanned `main.py` for the equipment option providers, hints and
+  confirmation messages. All of that moved intact to
+  `app/bot/commands/equipment.py`; the tests now read that file. One
+  assertion pinned the exact line-wrapping of `register_hub_option_hint(`
+  calls, which the split reflowed; it now matches on structure instead.
+- `test_no_python_handler_reads_a_key_the_engine_never_returns` flagged
+  `hunter_act` reading `hunter_name`/`pressure`/`escape_progress`/
+  `capture_progress`. False positive: `bountyHunterActionGo` returns
+  `firstRowMap()` of a `SELECT p.*, …` over `bounty_hunter_pursuits`, so
+  those are real columns passed through as a row — the scanner only sees Go
+  string literals. The split renamed the handler's local from `row` to
+  `result`, which is what first put it in front of the regex. Added the four
+  keys to `ALLOWED_MISSING` with that reason (the allowlist had been empty).
+
+### Bugslayer Sword — a one-of-a-kind, indestructible GM reward
+
+`bugslayer_sword` (weapon; +5 ATK, +1 DEF, +1 Spirit, +1 Agility; passive
+**Heavenly Flawfinder**). It exists only to be granted by the GM: it has no
+recipe, no market stock, no drop table, and `content/world.json` marks it
+`market_excluded` (a guard against the auction house, documentary only — see
+the honest note below). A test asserts nothing outside the item catalog
+mentions it.
+
+**Indestructible** was a new concept. Nothing in either language had any
+notion of equipment that doesn't wear, so it was built as a single boolean
+`Indestructible` on Go's `equipmentDefinitionGo`, read by a data-driven
+`indestructibleEquipmentIDsGo()` — no item-id string matching anywhere. All
+combat durability decay now goes through one choke point,
+`damageEquipmentGo` (`combat_actions.go`), which excludes those ids with a
+`NOT IN` clause. Before this release the boss-raid and bounty-hunter paths
+each carried their own copy of the two raw durability `UPDATE`s; they now
+call the shared function. Side effect worth naming: the bounty-hunter
+"fight" path's raw copy never auto-unequipped gear worn down to 0 durability
+(the 1v1 path did), so consolidating fixed that too.
+
+**Heavenly Flawfinder** fires on a strong normal attack in both combat
+systems and reuses mechanics that already existed rather than adding schema:
+
+- *1v1 (`combatTurnAction`)*: when the attack roll's margin is at least 5 —
+  `roll2d10`'s own "Strong Success" tier, not an invented threshold — it adds
+  +2 damage and sets `npc_suppressed_turns` via the same
+  `b.Suppressed = maxI64(b.Suppressed, 1)` idiom `spatial_strangulation`
+  uses, so the NPC's immediate counter is disrupted. The result carries
+  `bugslayer_passive`/`bugslayer_bonus_damage`, and the battle narration
+  reports it. The existing "counter suppressed by spatial control" line now
+  defers to the passive, since both suppress through the same field and it
+  would otherwise credit the wrong cause.
+- *Boss raids (`bossActActionGo`)*: on a normal `attack` (not `technique`)
+  that beats the accuracy roll by 20 or more, +2 damage and the
+  participant's existing `guard` flag is set (`guard=MAX(guard,?)`), which
+  halves the boss's next hit on them exactly as the Guard style does.
+
+**Three things the patch got wrong or never addressed**, found only by
+building against the real code:
+
+1. Equipment stats live in **three** places, not one: Python's
+   `EQUIPMENT_DEFINITIONS`, Go's `equipmentDefinitionsGo()` (boss/party
+   combat) and Go's separate `equipDefs` (1v1 combat only). An item added to
+   two of them silently contributes zero attack in whichever system was
+   missed while the bot still *displays* the bonus. The sword is in all
+   three, and a new cross-language contract test
+   (`tests/python/contracts/test_equipment_stat_parity.py`) parses both Go
+   maps out of the source and asserts every item's four stats, slot,
+   durability and indestructible flag agree with Python — for every item,
+   not just this one.
+2. `market_excluded` is not enforced anywhere in the codebase; it is a
+   documentation flag (the forbidden manuals already carry it). It is set on
+   the sword for consistency, but it is the `unique` grant guard and the
+   absence of any recipe/market entry that actually keep copies from
+   appearing, not this flag.
+3. There was no `indestructible` anything to extend, so the durability
+   exclusion had to be designed as a choke point rather than bolted onto one
+   call site — which is also what made the bounty-hunter auto-unequip gap
+   visible.
+
+`/equipment status` shows **indestructible** in place of a durability
+fraction for such gear and names the passive.
+
+### `/admin player grant` — one command for items and currency
+
+The project update already carried a `/admin player grant` (`kind`
+Item/Currency, `target`, `amount`, `reason`) beside the older
+`grantcurrency`; before it, the Go engine's `admin.player.adjust_item`
+action had no Discord caller at all, so a GM could hand out currency or a
+storage container but never an item. This release keeps that command's
+shape and adds what a one-of-a-kind reward needs:
+
+- **Unique guard.** Items flagged `unique` in `EQUIPMENT_DEFINITIONS` can be
+  granted one at a time only, and not to a character that already holds
+  one — checked against both the inventory *and* bound equipment, because
+  binding moves the item out of the inventory table and an inventory-only
+  check would have let a second sword through. The Go action is a plain
+  signed delta and knows nothing of uniqueness, so the guard lives at the
+  only grant entry point.
+- **Discord-side audit row** (`player.grant`, `database_log=False` since the
+  Go handler already writes `admin_audit_log`), matching
+  `grantcurrency`/`grantstorage`.
+- The confirmation names the passive when the item has one.
+
+`grantcurrency` is left in place; the update's author kept it and removing a
+command is a separate decision.
+
+### Verification
+
+Go: `go build ./...`, `go vet ./...`, `gofmt -l` clean, `go test ./...
+-count=1` all packages passing. Nine new tests in
+`go_core/internal/game/bugslayer_reward_test.go`: the two pure trigger
+functions at their exact boundaries, the indestructible lookups,
+`damageEquipmentGo` skipping the sword while wearing ordinary armour, two
+end-to-end `combatTurnAction` turns (with and without the sword; dice are
+`crypto/rand` with no seed hook, so the character is built with
+overwhelming attributes against a realm-0 dummy and the damage is pinned
+exactly from the reported margin), and two end-to-end `bossActActionGo`
+turns (boss rolls are a deterministic hash, so the test computes the same
+roll and picks participant ids that land in the hit window; a second
+participant keeps the boss from retaliating and consuming the guard flag in
+the same call). Eighteen mutants — flipped comparisons, dropped
+`equipped`/style checks, zeroed bonus, dropped suppression, wrong stat
+tuple, `Indestructible=false`, `NOT IN` clause removed, guard write
+neutralised — were each confirmed to fail the suite and restored.
+
+Python: full suite baseline-diffed against the untouched project update
+under python3.12 (with the pure-Python `httpx` stack made importable; the
+update's `remote.py` now imports it at module load): 571 tests versus 554,
+17 added (12 in `tests/python/unit/test_bugslayer_reward.py`, 5 in
+`test_equipment_stat_parity.py`), and the failure set shrank from 7
+failures/12 errors to 0 failures/9 errors — the remaining 9 are
+`test_game_engine`/`test_database_transport` needing `httpcore[asyncio]`,
+which is an environment gap here and not a code one (both modules, 12 tests,
+pass under this machine's python3.11, where `httpx` is properly installed). The
+Python tests were mutation-tested the same way (unique guard disabled two
+ways, equipment check dropped, audit action renamed, narration guard
+removed, indestructible display disabled, catalog flag flipped, item id
+renamed, each of the four parity dimensions perturbed in Go and Python) —
+one survivor found and fixed along the way, where a substring check could
+not see an `if False and …` prefix; that assertion is now anchored to the
+line.
+
+## v0.19.33 — main.py split, phase 1: the tests move first
+
+No code under `app/` changes in this release. It is the scaffolding phase of
+`docs/MAIN_SPLIT_PLAN.md` (shipped with this release): everything that has to be
+true of the test suite *before* any more code leaves `app/bot/main.py`, done as
+its own release so the later phases are pure cut-and-paste moves.
+
+### Why tests first
+
+Split stage 4 (the v0.19.32 tree) moved `/equipment` out of `main.py` and
+`EquipmentOptionTests` — which read `main.py` by path and searched it for the
+equipment option providers — did not fail. It just stopped guarding anything,
+because the code it was looking for was no longer in the file it was reading.
+Nineteen test files read `main.py` by path in the same way. Every later phase
+of the split would have silently defused a few more of them.
+
+### What changed
+
+**`tests/support.py`** gains four helpers that every bot-facing test now uses
+instead of a path: `bot_source_files()`, `bot_package_source()` (all of
+`app/bot` concatenated, for invariant scans), `bot_function_source(name)` /
+`bot_class_source(name)` (the source of one top-level definition wherever it
+lives, decorators included — raising if it is defined nowhere or in two
+places, both of which a split can cause), and `bot_module_defining(name)`.
+
+**Fifteen test files converted** from reading `app/bot/main.py` to the
+package: `test_project`, `test_gui_integrity`, `test_command_cleanup`,
+`test_character_creation_ui`, `test_channel_message_state`,
+`test_hub_layout_rollout`, `test_location_discovery_images`,
+`test_bugslayer_reward`, `test_world_access_scene_action`,
+`test_core_services`, `test_scene_action_surface`,
+`test_admin_server_setup_tool`, and the one remaining `main.py` read each in
+`test_engine_result_keys`, `test_chat_monitor_contract` and
+`test_authority_boundary` (which the plan had listed as already package-wide;
+they mostly were). Fixed-length slices such as `source[start : start + 1400]`
+after an `.index("def scene_action_panel(")` became `bot_function_source(...)`;
+AST walks that parsed `main.py` now walk every module (a concatenated package
+cannot be `ast.parse`d — each file has its own `from __future__` line).
+
+**Two things the wider scans found on their first run**, both on
+the "invariant that never fails, only stops checking" list:
+
+- The `ephemeral=True` allowlist (`test_only_begin_flow_can_send_ephemeral_responses`)
+  now covers every module. Its one new finding was `runtime.py`'s `reply_long`,
+  which is the v0.19.31 fix forwarding the caller's own `ephemeral` argument —
+  the same pass-through case as the already-allowlisted `_fallback_followup`.
+  Allowlisted with that reason. Confirmed the invariant now bites in
+  `commands/`: an `ephemeral=True` placed in `commands/equipment.py` fails the
+  test, which it could not have before this release.
+- `test_project`'s "every `DB.x` / `SIM.x` the bot references exists" checks
+  now walk the package. A misspelled `DB.` method in `commands/boss.py` fails
+  the test; before, only `main.py` was checked.
+
+**`MODULES` in `test_bot_module_split.py`** gains the six stage-4 modules
+(`artifact`, `beast`, `boss`, `duel`, `equipment`, `formation`). Between their
+creation and this release they had no definition-order, name-resolution or
+`serialized_user_action` annotation guard at all — the exact three failure
+modes that produced the v0.19.12/v0.19.13 deploys. All six pass; each guard
+was confirmed to fire on a stage-4 module by mutation (an undefined global, a
+name used before assignment, a `Mapping[...]` annotation `runtime.py` does not
+import, and a module-level `from ..main import`).
+
+**One new guard**: `ImportDirectionTests.test_no_module_below_main_imports_it_at_module_level`
+asserts, for every file under `app/bot` other than `main.py`, that `main` is
+never imported at module level — the package-wide form of the per-file checks
+in `FamilySplitTests`/`SectSplitTests`, so future modules are covered without a
+new class each.
+
+### What is left pinned to `main.py`, deliberately
+
+`test_bot_module_split.py` names `main.py` because it is *about* `main.py`.
+`test_command_cleanup.test_refactored_packages_have_no_legacy_module_shims`
+asserts the file exists. Everything else that reads bot source now reads the
+package or locates a definition by name.
+
+### Verification
+
+Go untouched (`go build ./...` confirmed). Python full suite under python3.12
+against v0.19.32: 572 tests versus 571 (+1, the new import-direction guard),
+identical failure set (the stale-manifest failure, regenerated on packaging,
+and the nine `httpcore[asyncio]` environment errors documented in v0.19.32).
+Every converted test was run against the unchanged `app/` tree and passes;
+the widened checks were mutation-tested as described above.
+
+## v0.19.34 — main.py split, phase 2: `services.py` and `formatting.py`
+
+The first phase of `docs/MAIN_SPLIT_PLAN.md` that moves code. Two new modules
+below `main.py`, 89 lines out of it, and the shape of every later phase
+established: measure the block's footprint, cut it verbatim in definition
+order, import the names back, add the module to `MODULES`, guard the move.
+
+### What moved
+
+**`app/bot/services.py`** — the twelve service singletons (`GUILD`, `SCENES`,
+`NPC_RELATIONSHIPS`, `QUESTS`, `EXPLORATION`, `COMBAT`, `NARRATOR_QUEUE`,
+`SIM`, `AI_ROUTER`, `NARRATOR`, `NARRATOR_CONTEXT`, `ALERTS`) and the three
+player-property constants, in the order they had in `main.py`. Footprint
+measured before the cut: they read `SETTINGS`/`DB`/`WORLD`/`ENGINE`/
+`PLAYER_PROPERTY_TYPES` from `runtime.py` and constructors from `app.*`, and
+nothing else in `main.py`. Kept separate from `runtime.py` deliberately —
+constructing `NARRATOR`/`AI_ROUTER`/`SIM` pulls in `app.narrator`,
+`app.ai_router` and `app.simulation`, and `runtime.py` staying light is what
+keeps the package cycle-free. `services` imports `runtime`; `runtime` never
+imports `services`.
+
+**`app/bot/formatting.py`** — `player_property_emoji`,
+`player_property_facility_lines`, `human_duration`, `roll_line`,
+`effective_attribute`. Reads `runtime` and the two property constants from
+`services`; nothing else. Layering is `runtime ← services ← formatting ← main`,
+asserted by `Phase2SplitTests.test_layering_runtime_services_formatting`.
+
+`main.py` imports all twenty names back by name (everything below still reads
+them as bare globals) and drops the seven `app.*` constructor imports this move
+orphaned — only those; three imports that were already unused before this
+release (`BOSS_TEMPLATES`, `GameEngineClient`, `array_definition`) are left
+alone, per the plan's "no reorganising while moving" rule.
+
+### Hooks and copies removed
+
+The plan's reason for moving infrastructure first was the call-time
+`from ..main import …` hooks in the modules already split out. Three of the
+ten are gone: `family.py`'s and `sect.py`'s two `SIM` hooks are now a
+module-level `from ..services import SIM`. Seven remain (`family.py` 3,
+`sect.py` 4), all thread/location helpers scheduled for phases 3–4.
+
+Split stage 4 had also handled `roll_line` the other way — by *copying* it
+into `commands/beast.py` and `commands/duel.py` rather than importing
+`main.py`. Both copies were byte-identical to the original and are replaced
+by `from ..formatting import roll_line`; `test_roll_line_is_no_longer_duplicated`
+asserts there is exactly one definition in the package.
+
+### Guards
+
+`services.py` and `formatting.py` are in `MODULES`, so the resolution,
+definition-order and annotation checks cover them. New `Phase2SplitTests`
+(7 tests): every moved name is defined in its new module and nowhere else;
+`main.py` imports all of them back; the layering above; no command module
+reaches into `main.py` for `SIM`; `roll_line` has one definition; `main.py`
+shrank. Six mutants, each confirmed to fail the suite: a moved name left out
+of `main.py`'s import-back; `WORLD` dropped from `services.py`'s runtime
+import (definition order); `human_duration` left behind in `main.py` (copy
+instead of move); `formatting.py` importing `main` (cycle); `sect.py` reverted
+to the deferred hook; `roll_line` re-duplicated in `duel.py`. The
+`FamilySplitTests`/`SectSplitTests` deferred-import lists were updated to the
+new counts, not loosened.
+
+### Verification
+
+Go untouched. Python full suite under python3.12 against v0.19.33: 579 tests
+versus 572 (+7, `Phase2SplitTests`), identical failure set (the nine
+`httpcore[asyncio]` environment errors; the manifest regenerated on packaging).
+`main.py`: 11,650 → 11,578 lines (net of the 27-line import-back block).
+
+## v0.19.35 — main.py split, phase 3: `locations.py`
+
+The plan's highest-leverage single move. The scope-accurate dependency scan
+behind `docs/MAIN_SPLIT_PLAN.md` found the 18 player-command sub-domains still
+in `main.py` have only 19 edges between them, and 15 of those point at the
+same six location helpers buried in the travel section. With those below
+`main.py`, the sub-domains can be cut out one at a time without cross-imports.
+
+### What moved
+
+**`app/bot/locations.py`** — `_world_min_realm_index`, `_world_is_unlocked`,
+`_known_locations`, `_location_is_visible`, `location_autocomplete`,
+`local_npc_autocomplete`, and `current_npc_location`. The last was scheduled
+for phase 4's `character_state.py`; it moved now because it is
+`local_npc_autocomplete`'s one dependency, its footprint is `SIM`/`WORLD`/
+`current_world_time` only, and "where is this NPC" is this file's question.
+The plan is updated accordingly. Footprint of the whole set, measured before
+the cut: `runtime` (`DB`, `WORLD`, `current_world_time`), `services` (`SIM`),
+`app.realm_hubs`, discord — nothing else in `main.py`. 91 lines out; `main.py`
+imports all seven back by name.
+
+Two of these are referenced as bare `@app_commands.autocomplete(...)`
+arguments, which evaluate when the decorated command's module is imported.
+That is exactly why they could never have been served by a deferred
+`from ..main import` from a command module, and why `sect.py` had to keep its
+`_known_locations` hook until now.
+
+### Hooks removed
+
+`sect.py`'s `_known_locations` hook and both `current_npc_location` hooks are
+now one module-level `from ..locations import`. Five of the original ten
+remain (`family.py` 3, `sect.py` 2), all thread helpers, all phase 4.
+
+### Guards
+
+`locations.py` is in `MODULES`. `Phase3SplitTests` (6 tests): each helper
+defined in `locations.py` and nowhere else; `main.py` imports all seven back;
+`locations` imports `runtime`/`services` and never `main`/`formatting`, and
+nothing below it imports it; any module that names one of the two
+autocompletes as a decorator argument imports it at module level; `sect.py`'s
+hooks are gone; `main.py` shrank. Five mutants, each confirmed to fail the
+suite: a name left out of the import-back; `locations` importing `main`;
+`current_world_time` dropped from its runtime import; `sect.py`'s import
+removed; `_world_is_unlocked` left behind in `main.py`.
+
+### Verification
+
+Go untouched. Python full suite under python3.12 against v0.19.34: 585 tests
+versus 579 (+6), identical failure set. `main.py`: 11,578 → 11,497 lines.
+
+## v0.19.36 — the narrator posted its own reasoning as the narration
+
+### What a player saw
+
+In a private expedition thread, after "Discover roads", the bot posted:
+
+> Here's a thinking process:
+> 1. **Analyze User Input:** Scene type: Private expedition / player action
+> resolution/continuation … Player action: "Discover roads" (untrusted
+> fictional action) … Constraints: Narrate only world/NPC response. Don't echo
+> fixed rolls, add mechanics … Keep it concise, Discord-friendly xianxia prose,
+> ~70-160 words …
+> 2. **Identify Key Elements from Context:** Character: Shen Zi, 18, sword
+> cultivator, wind spiritual root …
+
+That is a reasoning model's scratchpad — including a paraphrase of the system
+prompt's constraints — delivered as prose.
+
+### Why it got through
+
+`app/ai_router.py` already had a guard for exactly this: `_looks_like_scratchpad`,
+with the comment *"Narration that starts 'Okay, the user wants...' is worse than
+the deterministic procedural fallback."* Two gaps let this one past it:
+
+1. The guard ran **only on the reasoning-salvage path** — when `content` came
+   back empty and the router went digging in the `reasoning` field. A model
+   that puts its thinking *in* `content` never met it. `_validate_generated_text`
+   checked the prompt-leak patterns, none of which matched, and returned the
+   text.
+2. Even if it had run, it would not have fired: none of the six patterns
+   ("Okay,", "the user", "I should", "let me", "as an AI", "system prompt")
+   occur in this reply. Confirmed by running the leaked text against the
+   shipped v0.19.35 module — `_looks_like_scratchpad` returned `False` and the
+   validator passed it through.
+
+### The fix
+
+- `_validate_generated_text` now runs the scratchpad guard on `content` for
+  every player-facing route (`leak_guard=True`; the GM chat digest, which
+  legitimately says "analyze the user input", keeps opting out).
+- Seven patterns added for this shape of thinking-out-loud: "thinking/
+  reasoning process", "analyze the (user) input/request", "identify key
+  elements", "untrusted fictional action", "scene type:" / "fixed roll
+  information:" / "canonical context:", "Here's my/a reasoning…", and a
+  numbered bold heading (`1. **Analyze User Input:**`). Checked against all
+  1,028 prose strings in `content/world.json` and every string literal in
+  `app/narrator.py`: zero false positives.
+- Before rejecting, the router tries to **salvage**: `<think>…</think>`-style
+  blocks are stripped and the remainder used if it reads as prose; a reply
+  that thinks and then labels its answer ("**Final narration:** …",
+  "Narration:", "Response:") keeps only the part after the last label. An
+  unclosed `<think>` is all thinking and is rejected.
+- Rejection raises `ScratchpadResponse`, which the route loop treats like a
+  prompt leak: counted per model as `scratchpad_rejected` (visible in
+  `/admin server ai_status` as "answered with its own reasoning N× (rejected)"),
+  then the next free route, then the procedural fallback. A player never sees
+  scratchpad text; at worst they see the deterministic fallback line.
+
+### Tests
+
+`ScratchpadInContentTests` (10 tests) in `tests/python/unit/test_ai_router_health.py`,
+built around the verbatim leaked reply: recognised as scratchpad; rejected by
+the validator; the route falls through to the next model and the counter
+increments on the rejecting model only; every route scratchpadding raises
+(so the narrator's fallback fires); think-then-label salvage; `<think>` block
+stripping; unclosed tag rejection; ordinary narration untouched (including
+numbered prose and quoted dialogue); the GM report exempt; and one case per
+new pattern. Mutants confirmed to fail the suite: guard disabled, the
+"thinking process" pattern removed (isolated by its own case), the counter
+dropped, unclosed-tag stripping dropped.
+
+### Verification
+
+Go untouched. Python full suite under python3.12 against v0.19.35: 595 tests
+versus 585 (+10), identical failure set.
+
+## v0.19.37 — dead free routes were eating the daily budget; ai_status shows whose key served
+
+### What the GM saw
+
+`/admin server ai_status`: both Gemma free routes at **NEVER SUCCEEDED**,
+15 attempts, 15 failures each, every one a 429 reading *"google/gemma-4-…:free
+is temporarily rate-limited upstream. Please retry shortly, or add your own key
+to accumulate your rate limits"*; `openrouter/free` at 19 of 21. And the daily
+free-tier budget at **50/50** after only **23** narrations.
+
+The GM had added a Google key on OpenRouter's Integrations page and reasonably
+asked why Google "never responds".
+
+### Two separate things
+
+**1. The budget.** A 429 put a route on a fixed 60-second cooldown
+(`OPENROUTER_FAILURE_COOLDOWN_SECONDS` × 3). A route that is dead all day was
+therefore retried roughly once a minute, and the local daily limiter counts
+every upstream attempt — deliberately, since each is a request against the
+50/day allowance. Two dead routes ahead of the one that works meant about two
+of every three slots were spent learning what the last attempt already knew.
+Now `_mark_failure` doubles the cooldown per consecutive failure (60s, 120s,
+240s … capped at 30 minutes), a provider `Retry-After` hint is escalated the
+same way, and the first success resets the streak. A dead route now costs a
+handful of slots a day instead of most of them. `ai_status` shows the streak
+("**15** in a row, backing off 1800s").
+
+**2. The key.** The 429 text is OpenRouter's *shared-pool* message. OpenRouter's
+BYOK documentation: *"OpenRouter tries your key first, then falls back to
+OpenRouter endpoints on failures."* So if the GM's own key is failing — wrong
+integration (the Gemma `:free` variants are served by **Google AI Studio**, and
+a Vertex service-account key does nothing for them), a key restricted to
+another API, a project with the Gemini API not enabled — the request silently
+falls back to the shared pool, and the shared pool's rate limit is the only
+error anyone sees. The bot could not tell the two apart either.
+
+Now it can, after the fact: the completion's top-level `provider` field is
+recorded per route ("served by **Google AI Studio**"), and once an hour after
+a success the router asks `GET /generation?id=…` for `is_byok` and shows
+"via **your own provider key**" or "via OpenRouter's **shared pool** (your
+integration key was not used)". Both are diagnostics only: five-second
+timeout, any failure ignored, never on the narration path.
+
+What the bot cannot do is see *why* a BYOK attempt failed, because OpenRouter
+does not report it. The operator-side fix is documented in `.env.example`:
+on the integration key, set shared-capacity fallback to *never use shared
+capacity for models this key applies to*, so a failure of your key surfaces
+as Google's error in `last error` instead of the pool's 429. Or simply point
+`OPENROUTER_ROUTINE_MODEL` at the route that works.
+
+Also visible in the same screenshot: `nvidia/nemotron-3-super-120b-a12b:free`
+at 0 of 3, each rejected as "AI response exposed implementation or prompt
+details". That is the leak guard doing its job on a reasoning model that
+narrates its instructions; with v0.19.36 the scratchpad guard will usually
+catch the same replies first. Not changed here — it is the configured epic
+primary, and the fix is `OPENROUTER_EPIC_MODEL`, not code.
+
+### Tests
+
+`EscalatingBackoffTests` (4): doubling sequence 60/120/240/480 for 429s;
+the cap; a success resets streak and cooldown; a `Retry-After` hint is
+escalated on a streak. `ProviderAndByokTests` (4): `provider` read by
+attribute or `model_extra`; a success records it; the BYOK lookup is invoked
+with the generation id and its verdict lands in the snapshot; an unreachable
+lookup never breaks narration. Five mutants confirmed to fail the suite:
+escalation disabled, cap removed, streak not reset, provider not recorded,
+lookup not called.
+
+### Verification
+
+Go untouched. Python full suite under python3.12 against v0.19.36: 603 tests
+versus 595 (+8), identical failure set.
+
+## v0.19.38 — reasoning off on every narration request; new fallback chains
+
+### Reasoning off
+
+Both production failures of the free narration chain were reasoning: models
+spending a 180-token budget thinking and returning empty content (v0.19.20),
+and a model returning its thinking *as* the content (v0.19.36). OpenRouter's
+unified `reasoning` request parameter turns thinking off on models that have
+it and is ignored by models that do not, so every narration request now
+carries `{"reasoning": {"enabled": false, "exclude": true}}`.
+`OPENROUTER_DISABLE_REASONING=false` lets models think again. Verified by
+`ReasoningOffTests`: the body is sent by default, not sent when disabled,
+and — because the constructor default is `True` — a separate check that
+`services.py` actually passes the setting through (dropping the kwarg would
+have left the env var silently ignored; confirmed by mutation).
+
+### The chains
+
+The GM's Google routes had failed 30 of 30 times; the cause turned out to be
+that the Google AI Studio key had not been saved on OpenRouter's Integrations
+page. With it saved, Gemma runs on the operator's own AI Studio quota rather
+than OpenRouter's shared free pool (which is what returns the per-user 429s),
+so Gemma 4 31B stays primary on both tiers. What changed is everything behind
+it, chosen from the September 2026 free catalogue for multi-provider or
+high-uptime serving, latency under a few seconds, and prose ability:
+
+- Routine: `google/gemma-4-31b-it:free` → `minimax/minimax-m3:free` →
+  `openrouter/free`. MiniMax M3 (GMICloud, 99.9% uptime, 1.6s) replaces
+  `gemma-4-26b`, which is served by the same single Google pool as the
+  primary and so fails whenever the primary does.
+- Epic: `google/gemma-4-31b-it:free` → `z-ai/glm-5.2:free` →
+  `openrouter/free`. Nemotron 3 Super (0 of 3, every reply rejected by the
+  leak guard for narrating its own instructions) is dropped. GLM 5.2 is a
+  reasoning model served by 30+ providers at 99.3%; with reasoning off it is
+  a strong writer.
+- Considered and rejected: `nvidia/nemotron-3-ultra-550b-a55b:free` (10.8s
+  latency, 15 tok/s, 76.8% three-day availability — cannot finish an epic
+  narration inside the 60s timeout reliably); the code, finance, safety and
+  3B-class models on the list.
+
+A test asserts every chain keeps a non-Google route before `openrouter/free`,
+so a Google-side problem cannot take both tiers procedural. `.env.example`
+and the README explain when Gemma should *not* be primary (no AI Studio key
+saved → put MiniMax first) and how to make a failing key surface Google's
+own error instead of the pool's 429.
+
+### Verification
+
+Go untouched. Python full suite under python3.12 against v0.19.37: 607 tests
+versus 603 (+4), identical failure set.
+
+## v0.19.39 — main.py split, phase 4: the rest of the plumbing
+
+The last infrastructure phase of `docs/MAIN_SPLIT_PLAN.md`. 644 lines out of
+`main.py` into four modules, and the last call-time `from ..main import`
+anywhere in the package deleted. From here on, a command module that needs
+`main.py` is a bug, not a workaround — and a test says so.
+
+### What moved
+
+Footprint measured per function before the cut: none of the 33 definitions
+reads anything from the rest of `main.py`; the only intra-region edges are
+`threads` → `channels`.
+
+- **`app/bot/discovery.py`** (5) — `LOCATION_DISCOVERY_IMAGES`, the
+  discovery embed/image-path helpers, `send_location_discovery_image`,
+  `travel_first_discovers_location`. Reads `runtime` and discord only.
+- **`app/bot/character_state.py`** (5) — `current_effect_modifiers` (read by
+  eight command blocks), `sync_pill_toxicity_effect`,
+  `settle_all_seclusions`, `_npc_name_mentioned`,
+  `_remember_freeform_npc_scene`. Reads `runtime`, `services`, `app.*`.
+- **`app/bot/channels.py`** (13) — `_resolve_text_channel` (17 call sites),
+  the `configured_*_channel` accessors, `event_channels`/`home_scene_channel`/
+  `exploration_scene_channel`, realm-hub channels and access roles,
+  `_get_thread`, `send_long_to_thread`, `_event_archive_minutes`,
+  `post_server_log` (which the hubs report failures through:
+  `bot.hub_error_reporter = post_server_log` stays in `main.py` and is
+  guarded).
+- **`app/bot/threads.py`** (10) — expedition, birth-family household,
+  sect-abode and private-abode thread management,
+  `_private_scene_for_thread`, `active_private_location_thread`. Imports
+  `channels`, `formatting`, `runtime`.
+
+`main.py` imports all 33 names back and drops the five `app.*` imports the
+move orphaned (`medicine_toxicity_effect`, `aptitude_effects`,
+`scene_memory_summary`, `recruitment_definition`, `private_location_exit`).
+`trial_outcome` was already unused before this release and is left alone.
+
+### The hooks are gone
+
+`family.py`'s three (`_get_thread`, `ensure_birth_family_household_thread`,
+`open_expedition_thread_after_exit`) and `sect.py`'s two
+(`ensure_sect_abode_record`, `ensure_sect_abode_thread_for`) are ordinary
+module-level imports from `channels`/`threads`. Ten at the start of the
+split, zero now. Both modules' docstrings, which explained the hooks, carry
+a dated update rather than a rewrite — the reasoning they record is why the
+split was ordered as it was.
+
+### Guards
+
+All four modules are in `MODULES`. `Phase4SplitTests` (7): each name
+defined in its module and nowhere else; `main.py` imports every one back;
+layering (`threads` → `channels`, nothing lower imports anything higher,
+nothing imports `main`); **no call-time import of `main` anywhere under
+`app/bot`**; `family.py`/`sect.py` import the helpers normally; the hub
+error reporter still comes from `channels`; `main.py` shrank. The
+`FamilySplitTests`/`SectSplitTests` deferred-import lists are now empty
+lists, asserted as such. Seven mutants confirmed to fail the suite: a name
+dropped from the import-back; `threads` importing `main`; a `runtime` name
+dropped from `channels`' import; `family.py`'s and `sect.py`'s new imports
+removed; a hook reintroduced through a wrapper function; `post_server_log`
+left behind in `main.py`.
+
+### Verification
+
+Go untouched. Python full suite under python3.12 against v0.19.38: 614 tests
+versus 607 (+7), identical failure set. `main.py`: 11,497 → 10,894 lines.
+
+## v0.19.40 — main.py split, phase 5: `admin/core.py`
+
+Small and strictly bounded: the admin permission gate, the two audit trails
+and the eight `/admin` group objects (135 lines) move into a new
+`app/bot/admin/` package as `core.py`, so phases 6–7 can move the 43 `/admin`
+handlers in beside them. Footprint: discord, `DB`/`log` from `runtime`,
+`post_server_log` from `channels` — nothing from `main.py`. `require_admin`
+(44 call sites) and `audit_admin` (27) were 85 of the edges between the admin
+handlers and the rest of `main.py`.
+
+`Phase5SplitTests` (6): the package exists and owns the twelve names;
+nothing else defines them; `main.py` imports all back; the core imports
+only `channels`/`runtime`/discord; and — the one that matters for a GM
+surface — the `/admin` root keeps `guild_only=True` and
+`default_permissions=administrator`, and each of the seven sub-groups keeps
+`parent=admin_group`. Five mutants confirmed to fail: `guild_only` dropped,
+`default_permissions` dropped, the core importing `main`, a name left out of
+the import-back, `require_admin` left behind in `main.py`.
+
+Go untouched. Python full suite against v0.19.39: 620 tests versus 614
+(+6), identical failure set. `main.py`: 10,894 → 10,774 lines.
+
+## v0.19.41 — main.py split, phase 6: the admin server layer
+
+The largest single move of the split so far: 1,563 lines out of `main.py`
+into three modules in the `admin` package.
+
+- **`admin/channel_messages.py`** (453 lines) — base channel specs and
+  bindings, the `#xianxia-info` guide and its `XianxiaInfoView`, the
+  per-channel message state machine (default / custom / disabled) and
+  `ensure_base_xianxia_channels`. Leaf: reads `channels`, `runtime`,
+  `app.version`, discord.
+- **`admin/bugs_forum.py`** (180) — the `#bugs` forum: guidelines post, tag
+  sync, open reports. Leaf: reads `runtime`, discord.
+- **`admin/server_setup.py`** (1,143) — complete setup/repair, permission and
+  configuration reports, realm access roles, the dashboard's Discord bridge
+  (`_dashboard_discord_snapshot`, `dashboard_discord_control`), the chat
+  monitor, `clear_managed_channel_messages`, and eight of the eleven
+  `/admin server` commands (`bind_channels`, `status`, `basechannels`,
+  `setup`, `realmhubs`, `observability`, `ai_status`, `chat_digest`; the
+  other three sit with the admin operations further down and move in
+  phase 7). Imports the two leaves, `core`, `channels`, `services`,
+  `runtime`.
+
+Two decisions the footprint scan forced:
+
+1. The plan had `clear_managed_channel_messages` going to
+   `channel_messages`. It reads `_run_complete_server_setup`, which is
+   setup code, which imports `channel_messages` — a cycle. It went to
+   `server_setup` instead, next to its only caller. The plan is corrected.
+2. The two dashboard entry points were annotated `client: XianxiaBot`. The
+   class stays in `main.py` until phase 8, so the annotation becomes
+   `commands.Bot` (discord.ext) — the same object, its base class. A test
+   asserts the bot class name no longer appears in the module's code.
+
+Registration is a side effect: `server_setup` registers its eight commands
+into `admin_server_group` when imported, so `main.py` importing
+`dashboard_discord_control` from it is load-bearing, not just a name the bot
+class reads — dropping that line would make the eight commands vanish from
+`/admin` with no error anywhere. Guarded.
+
+`main.py` drops the ten imports this move orphaned (`timedelta`, `Mapping`,
+`chat_monitor`, `Settings`, `AI_ROUTER`, four channel helpers and two realm-
+role helpers); the phase-2 and phase-4 import-back guards are updated to say
+so rather than loosened.
+
+### Guards
+
+Three new `MODULES` entries. `Phase6SplitTests` (6): the layering (leaves
+import neither each other nor `server_setup`/`core`/`main`; `server_setup`
+imports both leaves and `core`); `clear_managed_channel_messages` lives with
+the setup it re-runs; the eight commands moved; `main.py` keeps the two
+load-bearing imports; the bridge no longer names the bot class; sizes. Five
+mutants confirmed to fail: the `server_setup` import dropped from `main.py`;
+a leaf importing `server_setup` (cycle); `server_setup` taking the core from
+`main`; `GUILD` dropped from its imports; `clear_managed_channel_messages`
+renamed.
+
+### Verification
+
+Go untouched. Python full suite against v0.19.40: 626 tests versus 620
+(+6), identical failure set. `main.py`: 10,774 → 9,208 lines.
+
+## v0.19.42 — main.py split, phase 7: the admin operations
+
+768 lines out of `main.py`: 32 `/admin` commands and their choice lists,
+autocompletes and hub option providers, into two modules in the `admin`
+package, plus a small new shared module.
+
+- **`admin/world_ops.py`** (397) — `/admin player` karma and the three
+  grants, all six `/admin sect` commands, `/admin world advancetime`,
+  `/admin server maintenance`.
+- **`admin/inspect_sim.py`** (519) — `/admin player` inspect, teleport,
+  revive, clearbattle; `/admin family`; `/admin npc`; all twelve `/admin
+  simulation` commands; `/admin server` backup and audit.
+- **`pickers.py`** (38) — `auction_currency_autocomplete` and
+  `_market_item_matches`. Both are named as decorator arguments in two
+  modules (the grant commands and the auction/market commands), so they must
+  be importable from below both. `carried_item_autocomplete` already lives in
+  `runtime.py` for the same reason, but these read `SIM`, and `runtime.py`
+  has to stay below `services.py`, so they get a module of their own that
+  later phases add to instead of duplicating a picker.
+
+Three `/admin world` commands stay in `main.py` for one more phase:
+`events`, `spawnrealm` and `closeevent` read `spawn_event_thread` (the
+event-scene UI, phase 8) and the `bot` instance (`bot.py`, phase 8). That
+makes it 40 of 43 admin commands out; the test that pins the count is
+already written for 43 and asserts each is registered exactly once across
+the package.
+
+`main.py` imports both modules purely for their registration side effect
+(`from .admin import world_ops as _admin_world_ops  # noqa`), guarded the
+same way as phase 6's `server_setup` import. Six imports orphaned by the
+move are dropped.
+
+### Guards
+
+Three new `MODULES` entries. `Phase7SplitTests` (6): each command where the
+plan says; all 43 admin commands registered exactly once across the
+package; `pickers` sits between `services` and the command modules and both
+consumers import it at module level; `main.py` keeps both side-effect
+imports; layering; sizes. Five mutants confirmed to fail: a side-effect
+import dropped from `main.py`; a command renamed on the move; `world_ops`
+taking a picker from `main`; `pickers` importing `main`; a thread helper
+dropped from `world_ops`' imports.
+
+### Verification
+
+Go untouched. Python full suite against v0.19.41: 632 tests versus 626
+(+6), identical failure set. `main.py`: 9,208 → 8,443 lines.
+
+## v0.19.43 — main.py split, phase 8: the shared UI and the bot class
+
+1,534 lines out of `main.py`. After this release `main.py` still holds the
+player-command blocks (phase 9) but no longer owns the bot class, the
+character-creation flow, the event-scene panel, or any `/admin` command.
+
+- **`ui/event_scene.py`** (518) — `EventSceneView` and its selects/modals,
+  `EVENT_ACTION_RULES`, `spawn_event_thread`, `spawn_system_event_thread`.
+- **`ui/creation.py`** (497) — `CharacterModal`, the `BirthFamily*`
+  buttons/selects/view, the birth-family preview embed. This is the one flow
+  the `ephemeral=True` allowlist admits, keyed by these class names, which
+  the move keeps.
+- **`bot.py`** (503) — `XianxiaBot` and the `bot` instance, with
+  `bot.hub_error_reporter = post_server_log` (guarded). `main.py` re-exports
+  both so `app/bot/__init__.py` and `python -m app.bot` are unchanged.
+- **`channels.py`** gains `_report_game_ui_error`: both UI modules and the
+  battle views use it, so it has to sit below all of them.
+- **`admin/world_ops.py`** gains the three `/admin world` commands that
+  waited for this phase (`events`, `spawnrealm`, `closeevent`): they read
+  `spawn_event_thread` and the `bot` instance, both importable from below
+  now. All 43 admin commands are out of `main.py`.
+
+### The five back-edges
+
+The plan's dependency graph found exactly five places in the file that
+referenced a later definition, all inside function bodies. Two were
+`XianxiaBot` reading `XianxiaInfoView` and `dashboard_discord_control` —
+resolved by phase 6, which moved both below it. The other three are
+`EventSceneView` calling `_scene_action_targets`, `scene_action_panel` and
+`_battle_panel`, which stay in `main.py` until their commands move in phase
+9. The view already reached every command it launches through the
+`EVENT_HANDLERS` registry (`EVENT_HANDLERS.invoke("battle", …)`), which
+`main.py` fills at import; the three helpers now go through the same
+registry, bound in `register_event_handlers()` beside the commands. No
+import edge, no deferred import — and a test asserts the view never calls
+any of the three directly and that `main.py` binds all three names. The
+bindings move with the helpers in phase 9.
+
+### Guards
+
+Three new `MODULES` entries (`ui/event_scene.py`, `ui/creation.py`,
+`bot.py`). `Phase8SplitTests` (6): `main.py` defines none of the moved
+classes; each name lives in its module; the registry routing above;
+layering (`bot` imports `ui.event_scene` and `admin.server_setup`, the UI
+modules import neither `bot` nor `main`, `world_ops` imports `bot` and
+`ui.event_scene`); `main.py` re-exports `XianxiaBot`/`bot`; sizes. The
+phase-4, -5 and -7 guards and `PublicSurfaceTests` are updated for what
+moved further (`_report_game_ui_error` to `channels`, the hub-error-reporter
+line to `bot.py`, the three world commands to `world_ops`, and re-exported
+names counting as exposed) — recorded, not loosened. Six mutants confirmed
+to fail: a registry binding dropped from `main.py`; the view calling
+`_battle_panel` directly via a deferred import; `bot.py` importing
+`spawn_system_event_thread` from `main`; `main.py`'s `bot` re-export
+dropped; the hub-error-reporter wiring removed; a world command renamed.
+`main.py` drops 19 imports the move orphaned; the two `server_setup` /
+`channel_messages` imports stay as the documented registration side effect.
+
+### Verification
+
+Go untouched. Python full suite against v0.19.42: 638 tests versus 632
+(+6), identical failure set. `main.py`: 8,443 → 6,910 lines.
+
+## v0.19.44 — main.py split, phase 9a: the first four player-command domains
+
+Phase 9 is the player commands — eighteen sub-domains, most of what is
+left in `main.py` — taken in several releases. This first one cuts the four
+domains the scope-accurate scan showed nothing else still in the file reads
+(only the hub wiring, which reads every group): 1,284 lines.
+
+- **`commands/aptitude.py`** (281) — `/aptitude`, all eight leaves and the
+  three summary helpers.
+- **`commands/territory.py`** (198) — `/territory`, `/war`, `/caravan`,
+  `/party`.
+- **`commands/secretrealm.py`** (176) — `/secretrealm`.
+- **`commands/cultivation.py`** (856) — `cultivate`, `breakthrough`,
+  `/seclusion`, `/body`, `/bodyperfect`, `/perfect`, `/tribulation`. This
+  block was scattered through `main.py` (seclusion near the top, perfect in
+  the middle, tribulation near the bottom); the cut takes the members in
+  their original relative order. `_tribulation_currency` travels with it: it
+  has had no caller for some releases, and the final sweep is where dead
+  code gets decided, not a move.
+
+`main.py` imports back the eleven groups and three `*_status` handlers its
+hub wiring and `register_event_handlers()` read, and drops nine `app.*`
+imports the move orphaned.
+
+### Guards
+
+Four new `MODULES` entries. `Phase9aSplitTests` (6): each domain owns its
+group and leaves and `main.py` no longer defines them; all eleven group
+objects gone from `main.py`; `main.py` imports every name the wiring reads;
+none of the new modules imports `main`; every command registration in the
+package is unique (a group- or root-command lost or duplicated in a move is
+silent until startup); sizes. Five mutants confirmed to fail: `secret_status`
+dropped from the import-back (`register_event_handlers` would `NameError`);
+`territory.py` taking `location_autocomplete` from `main`; a root command
+renamed; `roll_line` re-duplicated in `aptitude.py`; a group object left
+behind in `main.py`.
+
+### Verification
+
+Go untouched. Python full suite against v0.19.43: 644 tests versus 638
+(+6), identical failure set. `main.py`: 6,910 → 5,625 lines.
+
+## v0.19.45 — main.py split, phase 9b: character, economy, abode
+
+Second cut of the player commands: the three domains that share only the
+runtime/services layer with what remains, 1,553 lines.
+
+- **`commands/character.py`** (892) — `begin`, `set_gender`, `sheet`, the
+  player and quest dashboards (`PlayerDashboardView`, `QuestDashboardView`,
+  `QuestAcceptSelect`), `inventory`, `inheritances`, `effects`, `reputation`,
+  `grudges`, `daoheart`, `provenance`, `era`, `special_effects`, `lifespan`,
+  `karma`, `/fate`, `/bond`, `soul_status`, `afterlife_status`,
+  `reincarnate`. `BirthFamilyView` is reached through `ui/creation.py`, as
+  phase 8 arranged.
+- **`commands/economy.py`** (603) — `wallet`, `use`, `/storage`,
+  `/auction` + `auction_browse`, `/civilization` + `civilization_status`,
+  `/market`, `/blackmarket` + `blackmarket_status`, the two access helpers
+  and all nine market/black-market autocompletes. `carried_item_autocomplete`
+  (runtime) and `auction_currency_autocomplete` (pickers) are imported, not
+  copied.
+- **`commands/abode.py`** (318) — `/abode` and its eleven leaves, `/array`,
+  `spatial_key`, `/innerworld`.
+- **`pickers.py`** gains `usable_item_autocomplete`: `use` (economy) and
+  `/abode` (abode) both read it, so it goes to the shared picker module
+  rather than one domain importing from another.
+
+`main.py` imports back the twelve groups, `inventory`, `auction_browse`,
+`blackmarket_status` and `civilization_status_command` (hub wiring and
+`register_event_handlers()` read them), and drops the twenty-one imports the
+move orphaned — including the last `black_market.access_reason` alias and
+the last `Path` use.
+
+### Guards
+
+Three new `MODULES` entries. `Phase9bSplitTests` (5): each domain owns its
+groups and root commands and `main.py` no longer defines them; `main.py`
+imports every name the wiring reads; no new module imports `main`;
+`usable_item_autocomplete` lives in `pickers.py` only and both consumers take
+it from there; sizes. Older guards re-pointed rather than loosened:
+`SIM`-from-`services` is now an AST check on the names a command module
+imports; the phase-2 import-back guard now checks that everything `main.py`
+imports from `services`/`formatting` is defined there (it had accumulated
+one exception per phase). Five mutants confirmed to fail: `inventory`
+dropped from the import-back; `abode.py` taking the picker from
+`economy.py`; `economy.py` importing `sync_pill_toxicity_effect` from
+`main`; `reincarnate` renamed; `usable_item_autocomplete` left behind in
+`main.py`.
+
+### Verification
+
+Go untouched. Python full suite against v0.19.44: 649 tests versus 644
+(+5), identical failure set. `main.py`: 5,625 → 4,064 lines.
+
+## v0.19.46 — main.py split, phase 9c: exploration, craft and alchemy
+
+Third cut of the player commands. The §2 row "exploration + craft +
+alchemy" turned out to be one contiguous block of `main.py` (lines 575–1426)
+with nothing foreign inside it and no reads from anything else in the file,
+so it moves as one module: 852 lines.
+
+- **`commands/exploration.py`** (910 with its header) — `explore` and
+  `ExplorationEventView`, `hunt`, `craft`, `/alchemy` (status, refine,
+  forage, purge), `/realmhub` (status, go), `/travel` (travel, status),
+  the two recipe autocompletes, `realmhub_world_autocomplete`,
+  `_discord_arrival_display`. `_run_crafting` stays with them: `craft` and
+  `/alchemy refine` are its only callers. `_sect_recruitment_at_location`
+  (the road-discovery hint in `/explore`) is imported from
+  `commands/sect.py`, where it has lived since split stage 4.
+
+`main.py` imports back the three groups the hub wiring reads and drops the
+sixteen imports the move orphaned, among them the last uses of
+`location_autocomplete`, `spawn_event_thread`, the discovery-art helpers and
+`_sect_recruitment_at_location`.
+
+### A guard the split had been missing
+
+The first draft of the header wrote `from .runtime import DB` — one dot
+short, in a module one package deeper — and every existing guard passed:
+symtable proves a name is *bound*, not that the module binding it exists.
+Only a mutation run surfaced it. `ModuleResolutionTests` now has
+`test_every_relative_import_points_at_a_file_that_exists`: every relative
+import in every guarded module is resolved against the package on disk, and
+each imported name is checked against that file's top-level definitions.
+Five mutants confirmed to fail: the one-dot header; a two-dot `app.*`
+import; a misspelled name; `..main` in place of `..runtime`; a misspelled
+module.
+
+### Guards
+
+One new `MODULES` entry. `Phase9cSplitTests` (5): exploration owns the three
+groups and the three root commands and `main.py` no longer defines them;
+`_run_crafting` moved whole and has both callers; `main.py` imports the
+groups; the module reads only modules below `main.py` and takes the sect
+helper from `sect.py` rather than carrying a copy; sizes. Two stale pins
+re-pointed with dated comments: the stage-4 sect guard no longer expects
+`main.py` to import `_sect_recruitment_at_location`, and the phase-3 guard
+accepts that `location_autocomplete` has no reader left in `main.py`. Five
+phase mutants confirmed to fail: `travel_group` dropped from the
+import-back; the sect helper taken from `main`; `hunt` renamed; the module
+reading `..main` for the runtime; the picker alias trick.
+
+### Verification
+
+Go untouched. Python full suite against v0.19.45: 655 tests versus 649
+(+6), identical failure set. `main.py`: 4,064 → 3,199 lines.
+
+## v0.19.47 — main.py split, phase 9d: battle and law
+
+Fourth cut of the player commands, and the first with a real edge between
+the two domains: `/law technique` and `/manual technique` open the battle
+panel, and `BattleView` calls `_execute_battle_law_technique`. The plan
+listed law as "after battle" for that reason; the executor goes to
+`battle.py` so the edge runs one way (law → battle) and nothing reads back.
+850 lines moved.
+
+- **`commands/battle.py`** (521) — `/battle` (status, finish, challenge,
+  act), `BattleView`, `BattleFinishView`, the two selects, `_battle_panel`,
+  `_battle_embed`, `_resolve_battle_turn`, `_finish_battle`,
+  `_use_battle_recovery_item`, `_execute_battle_law_technique`,
+  `battle_challenge_autocomplete`, `bounty`.
+- **`commands/law.py`** (405) — `/law` (status, comprehend, technique),
+  `/manual` (list, study, technique), `/condition` (status, treat),
+  `/profession` (status), `/crime` (status, atone). `worldrules` sat between
+  the manual and condition blocks in `main.py`; it is the sense domain's and
+  stays for the next phase.
+
+The `EVENT_HANDLERS.register("battle_panel", _battle_panel)` binding that
+phase 8 put in `main.py`'s `register_event_handlers()` — so that
+`EventSceneView` could reach the panel without importing `main` — moved to
+the bottom of `battle.py`. It runs when the module is imported, which
+`main.py` does at startup, so the ambush flow finds the panel exactly as
+before. `main.py` imports back the six groups and `battle_status` and drops
+the fourteen imports the move orphaned, `asyncio` among them.
+
+### Guards
+
+Two new `MODULES` entries. `Phase9dSplitTests` (6): each domain owns its
+groups and roots and `worldrules` stayed behind; every leaf arrived under
+its own name (fifteen names pinned per group, counted from the v0.19.46
+file — a lost or renamed leaf is silent until a player looks for it);
+the edge runs law → battle only, and the executor is defined on the battle
+side; the `battle_panel` binding moved with the panel and `main.py` no
+longer mentions `_battle_panel`; `main.py` imports what the wiring reads,
+`battle_status` included; sizes. The phase-8 registry guard now finds each
+binding's owner across the package rather than expecting all three in
+`main.py`. Six mutants confirmed to fail: the binding commented out;
+`battle_status` dropped from the import-back; `law.py` taking the panel
+from `main`; `battle.py` importing `law`; `profession_group` dropped from
+the import-back; a leaf renamed (`atone` → `atone2`, which no guard in the
+package had caught before the leaf-name pin).
+
+### Verification
+
+Go untouched. Python full suite against v0.19.46: 661 tests versus 655
+(+6), identical failure set. `main.py`: 3,199 → 2,339 lines.
+
+## v0.19.48 — main.py split, phase 9e: scene and sense — phase 9 complete
+
+The last two player domains, 1,056 lines. With them, every player command
+has left `main.py`.
+
+- **`commands/scene.py`** (664) — `talk`, `action` with `SceneActionView`,
+  the type/target selects, `SceneActionDetailModal`, `_resolve_scene_action`,
+  `_scene_action_targets`, `scene_action_panel` and the reload/modal helpers;
+  `npcinfo`; `/scene status`. The two registry bindings phase 8 put in
+  `main.py` — `"scene_action_targets"` and `"scene_action_panel"` (the async
+  wrapper included) — moved to the bottom of this file, so `EventSceneView`
+  finds both exactly as before. `talk` and `scene_status` are imported back
+  because `register_event_handlers()` binds them by name.
+- **`commands/sense.py`** (459) — `sense`, `conceal`, `check`, `world`,
+  `worldevents`, `time`, `rulers`, `worldrules`, and the attribute/difficulty
+  choice lists `check` reads. Nothing in `main.py` reads any of it; the
+  module is imported for the registration that happens when it loads, the
+  same way `admin/world_ops.py` and `admin/inspect_sim.py` are.
+
+`main.py` drops thirty-five orphaned imports — `ENGINE`, `require_character`,
+`reply_long`, `serialized_user_action`, the narrator singletons, every
+location helper but the realm gate the hub wiring reads, `scene_layout`,
+`npc_memory`, `time`, `SimpleNamespace`, `registered_group_command` — and is
+left at 1,283 lines: the hub definitions, the `/admin` hub root,
+`register_command_surface()`, `register_event_handlers()` and `run()`. It
+defines no `app_commands.Group` and no group command. That is the state
+phase 10 (the final sweep) starts from.
+
+### Guards
+
+Two new `MODULES` entries. `Phase9eSplitTests` (5): each domain owns its
+roots (eleven names pinned) and `/scene status`; `main.py` defines no group,
+no group command and exactly one root (`admin`); the two scene bindings
+moved with the panel helpers and `main.py` no longer mentions them;
+`main.py` imports what the wiring reads and imports `sense` for its side
+effect; neither module imports `main` or the other; sizes. Three stale pins
+re-pointed: the phase-8 registry guard's owner table; the phase-3 guard,
+which now expects `main.py` to import only `_world_min_realm_index` from
+`locations`; and the import-direction guard, which now asserts that
+`ENGINE`/`require_character`/`reply_long` are *not* imported by `main.py`
+(an orphaned import is how the file used to hide a name nothing resolved).
+Seven mutants confirmed to fail: each scene binding commented out; `talk`
+dropped from the import-back; the `sense` side-effect import removed;
+`sense.py` taking the location helpers from `main`; `npcinfo` renamed;
+`sense.py` importing `scene`.
+
+### Verification
+
+Go untouched. Python full suite against v0.19.47: 666 tests versus 661
+(+5), identical failure set. `main.py`: 2,339 → 1,283 lines (11,650 at
+v0.19.32).

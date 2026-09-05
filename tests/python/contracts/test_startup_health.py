@@ -13,9 +13,9 @@ from tests.support import install_aiosqlite_shim
 install_aiosqlite_shim()
 
 from app.database import Database, SCHEMA_VERSION
-from app import database_bootstrap
-from app.health import HealthServer, HealthState, STARTUP_PHASES
-from app import healthcheck
+from app.database import bootstrap as database_bootstrap
+from app.ops.health import HealthServer, HealthState, STARTUP_PHASES
+from app.ops import healthcheck
 
 
 class SchemaMigrationTests(unittest.IsolatedAsyncioTestCase):

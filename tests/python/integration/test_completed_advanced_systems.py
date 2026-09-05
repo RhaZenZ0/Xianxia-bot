@@ -7,10 +7,10 @@ from pathlib import Path
 from tests.support import install_aiosqlite_shim, PROJECT_ROOT, seed_character
 install_aiosqlite_shim()
 
-from app.advanced_runtime import ERA_CYCLE
+from app.rules.advanced_runtime import ERA_CYCLE
 from app.database import Database, SCHEMA_VERSION
-from app.game import World
-from app.operations import AlertDispatcher
+from app.rules.game import World
+from app.ops.operations import AlertDispatcher
 
 
 class CompletedAdvancedSystemsTests(unittest.IsolatedAsyncioTestCase):

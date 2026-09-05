@@ -1,5 +1,5 @@
 import unittest
-from app.family import sibling_title,relative_sibling_title
+from app.rules.family import sibling_title,relative_sibling_title
 
 class PlayerFamilyTests(unittest.TestCase):
     def test_explicit_eldest_can_be_another_member(self):

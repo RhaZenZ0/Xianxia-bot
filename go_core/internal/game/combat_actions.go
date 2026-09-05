@@ -92,7 +92,12 @@ func combatCompanionBonus(conn *storage.Conn, userID int64) (int64, error) {
 	return bonus + ab, nil
 }
 
-var equipDefs = map[string][4]int64{"spirit_iron_sword": {4, 0, 1, 0}, "spirit_iron_armor": {0, 5, 1, -1}, "cloud_stepping_boots": {0, 1, 0, 4}, "lesser_stygian_seal": {1, 1, 4, 0}, "bone_comb": {0, 0, 5, 1}, "cracked_nether_mirror": {0, 2, 3, 0}}
+// equipDefs is a second copy of the same four combat stats as
+// equipmentDefinitionsGo (group_combat_actions.go), used only by 1v1 combat.
+// Keep bugslayer_sword's tuple here in sync with both that map and
+// app/advanced_runtime.py's EQUIPMENT_DEFINITIONS - see
+// tests/python/contracts/test_equipment_stat_parity.py.
+var equipDefs = map[string][4]int64{"spirit_iron_sword": {4, 0, 1, 0}, "spirit_iron_armor": {0, 5, 1, -1}, "cloud_stepping_boots": {0, 1, 0, 4}, "lesser_stygian_seal": {1, 1, 4, 0}, "bone_comb": {0, 0, 5, 1}, "cracked_nether_mirror": {0, 2, 3, 0}, bugslayerSwordItemID: {5, 1, 1, 1}}
 
 func combatEquipment(conn *storage.Conn, userID int64) (attack, defense, spirit, agility int64, err error) {
 	r, e := conn.Execute(`SELECT item_id,durability,max_durability,quality FROM equipment_instances WHERE user_id=? AND equipped=1 AND durability>0`, []any{userID})
@@ -123,12 +128,29 @@ func combatEquipment(conn *storage.Conn, userID int64) (attack, defense, spirit,
 	}
 	return
 }
+
+// damageEquipmentGo is the single shared choke point for combat durability
+// wear across every combat system (1v1, boss raids, bounty-hunter pursuits) -
+// see the callers in group_combat_actions.go and economy_actions.go. Routing
+// every durability decrement through here (rather than each caller running
+// its own copy of this UPDATE pair) is what lets indestructibleEquipmentIDsGo
+// protect the Bugslayer Sword everywhere at once.
 func damageEquipmentGo(conn *storage.Conn, userID, amount int64) error {
 	if amount <= 0 {
 		return nil
 	}
 	now := float64(time.Now().UnixNano()) / 1e9
-	if _, e := conn.Execute(`UPDATE equipment_instances SET durability=MAX(0,durability-?),updated_at=? WHERE user_id=? AND equipped=1`, []any{amount, now, userID}); e != nil {
+	query := `UPDATE equipment_instances SET durability=MAX(0,durability-?),updated_at=? WHERE user_id=? AND equipped=1`
+	args := []any{amount, now, userID}
+	if ids := indestructibleEquipmentIDsGo(); len(ids) > 0 {
+		placeholders := make([]string, len(ids))
+		for i, id := range ids {
+			placeholders[i] = "?"
+			args = append(args, id)
+		}
+		query += ` AND item_id NOT IN (` + strings.Join(placeholders, ",") + `)`
+	}
+	if _, e := conn.Execute(query, args); e != nil {
 		return e
 	}
 	_, e := conn.Execute(`UPDATE equipment_instances SET equipped=0,updated_at=? WHERE user_id=? AND durability<=0`, []any{now, userID})
@@ -470,6 +492,16 @@ func combatTurnAction(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 		if bval(r, "success") {
 			margin := i64(r["margin"])
 			dmg := maxI64(1, 2+maxI64(0, margin)/3+realm/4+maxI64(0, atk)/3)
+			hasBugslayer, bsErr := hasEquippedItemGo(conn, userID, bugslayerSwordItemID)
+			if bsErr != nil {
+				return authoritativeMutation{}, bsErr
+			}
+			if bugslayerCombatPassiveTriggers(hasBugslayer, margin) {
+				dmg += bugslayerPassiveBonusDamage
+				b.Suppressed = maxI64(b.Suppressed, 1)
+				out["bugslayer_passive"] = bugslayerPassiveName
+				out["bugslayer_bonus_damage"] = bugslayerPassiveBonusDamage
+			}
 			nhp = maxI64(0, nhp-dmg)
 			out["damage_dealt"] = dmg
 		}

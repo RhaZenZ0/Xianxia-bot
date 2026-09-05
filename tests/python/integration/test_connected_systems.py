@@ -7,9 +7,9 @@ from tests.support import install_aiosqlite_shim, PROJECT_ROOT, seed_character
 install_aiosqlite_shim()
 
 from app.database import Database, SCHEMA_VERSION
-from app.fate import fate_label
-from app.realm_hubs import REALM_HUBS, realm_hub_by_location
-from app.game import World
+from app.rules.fate import fate_label
+from app.rules.realm_hubs import REALM_HUBS, realm_hub_by_location
+from app.rules.game import World
 
 
 ATTRS = {"body": 4, "agility": 3, "spirit": 5, "insight": 4, "will": 5, "presence": 2}

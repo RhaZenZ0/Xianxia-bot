@@ -6,7 +6,7 @@ from tests.support import install_dotenv_shim
 
 install_dotenv_shim()
 
-from app.config import Settings
+from app.ops.config import Settings
 
 
 class ConfigTests(unittest.TestCase):
@@ -46,9 +46,10 @@ class ConfigTests(unittest.TestCase):
             settings = Settings.from_env()
         self.assertEqual(settings.narrator_provider, "openrouter")
         self.assertEqual(settings.openrouter_routine_model, "google/gemma-4-31b-it:free")
-        self.assertEqual(settings.openrouter_routine_fallback_model, "google/gemma-4-26b-a4b-it:free")
-        self.assertEqual(settings.openrouter_epic_model, "nvidia/nemotron-3-super-120b-a12b:free")
-        self.assertEqual(settings.openrouter_epic_fallback_model, "google/gemma-4-31b-it:free")
+        self.assertEqual(settings.openrouter_routine_fallback_model, "minimax/minimax-m3:free")
+        self.assertEqual(settings.openrouter_epic_model, "google/gemma-4-31b-it:free")
+        self.assertEqual(settings.openrouter_epic_fallback_model, "z-ai/glm-5.2:free")
+        self.assertTrue(settings.openrouter_disable_reasoning)
         self.assertEqual(settings.openrouter_dynamic_free_model, "openrouter/free")
         self.assertEqual(settings.openrouter_max_requests_per_minute, 20)
         self.assertEqual(settings.openrouter_timeout_seconds, 30.0)

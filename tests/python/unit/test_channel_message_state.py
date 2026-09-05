@@ -15,11 +15,14 @@ There are three states, and these tests pin all three:
 These tests deliberately exercise the resolver by source-loading it rather than
 importing app.bot.main, which needs discord.py at import time.
 """
-from tests.support import PROJECT_ROOT
+from tests.support import bot_function_source, bot_module_defining, bot_package_source, bot_source_files
 import ast
 import unittest
 
-MAIN = PROJECT_ROOT / "app" / "bot" / "main.py"
+# Phase 1 of the main.py split (v0.19.33): the helpers are lifted from whichever
+# bot module defines them (main.py today, admin/channel_messages.py after phase
+# 6 of the plan), and the source-level checks read the whole package.
+MAIN = bot_module_defining("channel_message_state")
 
 
 def _load_channel_message_helpers():
@@ -110,7 +113,7 @@ class ChannelMessagePersistenceTests(unittest.TestCase):
     """Source-level checks on the two call sites that used the falsy fallback."""
 
     def setUp(self):
-        self.source = MAIN.read_text(encoding="utf-8")
+        self.source = bot_package_source()
 
     def test_no_call_site_still_uses_the_falsy_default_fallback(self):
         """Look for the actual expression, not the text.
@@ -120,7 +123,8 @@ class ChannelMessagePersistenceTests(unittest.TestCase):
         DEFAULT_CHANNEL_MESSAGES[...]`/`.get(...)` expression instead.
         """
         offenders = []
-        for node in ast.walk(ast.parse(self.source)):
+        for path in bot_source_files():
+          for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
             if not isinstance(node, ast.BoolOp) or not isinstance(node.op, ast.Or):
                 continue
             for operand in node.values:
@@ -128,17 +132,16 @@ class ChannelMessagePersistenceTests(unittest.TestCase):
                 if isinstance(target, ast.Subscript):
                     target = target.value
                 if isinstance(target, ast.Name) and target.id == "DEFAULT_CHANNEL_MESSAGES":
-                    offenders.append(getattr(node, "lineno", "?"))
+                    offenders.append(f"{path.name}:{getattr(node, 'lineno', '?')}")
         self.assertEqual(
             offenders,
             [],
-            f"main.py line(s) {offenders} still collapse an explicitly cleared "
+            f"{offenders} still collapse an explicitly cleared "
             f'message into the default with `... or DEFAULT_CHANNEL_MESSAGES`',
         )
 
     def test_ensure_all_channel_messages_uses_the_resolver(self):
-        start = self.source.index("async def ensure_all_channel_messages")
-        body = self.source[start : start + 1200]
+        body = bot_function_source("ensure_all_channel_messages")
         self.assertIn("resolve_channel_message_content(stored, key)", body)
 
     def test_snapshot_reports_all_three_states(self):
@@ -148,8 +151,7 @@ class ChannelMessagePersistenceTests(unittest.TestCase):
 
     def test_clearing_persists_even_when_the_channel_is_unbound(self):
         """ensure_channel_message used to return before saving if the channel was gone."""
-        start = self.source.index("async def ensure_channel_message")
-        body = self.source[start : start + 2000]
+        body = bot_function_source("ensure_channel_message")
         early_return = body.index("if channel is None:")
         persisted = body.index("await DB.set_channel_message")
         self.assertLess(

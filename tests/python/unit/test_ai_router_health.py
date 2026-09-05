@@ -7,13 +7,17 @@ from tests.support import install_openai_shim
 
 install_openai_shim()
 
-from app.ai_router import (
+from app.ai.ai_router import (
     AITaskRouter,
     DYNAMIC_FREE_MIN_OUTPUT_TOKENS,
     RouteLimiter,
     NarrationTier,
     OpenRouterRequestLimiter,
     _looks_like_scratchpad,
+    _salvage_narration,
+    _response_provider,
+    DEFAULT_ROUTINE_MODEL,
+    MAX_FAILURE_COOLDOWN_SECONDS,
     _looks_like_tls_failure,
     _retry_after_seconds,
     _validate_generated_text,
@@ -508,3 +512,224 @@ class RouteLimitTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# The narration a player actually received in an expedition thread (v0.19.36).
+LEAKED_THINKING = """Here's a thinking process:
+
+1. **Analyze User Input:**
+    * **Scene type:** Private expedition / player action resolution/continuation
+    * **Canonical context provided:** Detailed world state, location, character stats, recent memories, NPC info, etc.
+    * **Player action:** "Discover roads" (untrusted fictional action)
+    * **Fixed roll information:** None. No mechanical roll to invent.
+    * **Constraints:** Narrate only world/NPC response. Don't echo fixed rolls, add mechanics, choose another action, or reveal hidden simulator facts. Stay in-world.
+
+2. **Identify Key Elements from Context:**
+    * Character: Shen Zi, 18, sword cultivator, wind spiritual root
+"""
+
+CLEAN_NARRATION = (
+    "Shen Zi follows the ridge until the trees thin. Below, a road: two ruts and a cairn, "
+    "half-swallowed by ferns, older than any map she has read."
+)
+
+
+class ScratchpadInContentTests(unittest.TestCase):
+    """A reasoning model put its thinking in `content`, not the reasoning field.
+
+    The scratchpad guard only ran on the reasoning-salvage path (empty content),
+    so this went straight through _validate_generated_text and into a player's
+    expedition thread as the narration of "Discover roads". Every check here
+    was red against v0.19.35.
+    """
+
+    def test_the_leaked_reply_is_recognised_as_scratchpad(self):
+        self.assertTrue(_looks_like_scratchpad(LEAKED_THINKING))
+
+    def test_the_leaked_reply_is_rejected_by_the_validator(self):
+        with self.assertRaises(ValueError):
+            _validate_generated_text(LEAKED_THINKING)
+
+    def test_the_route_falls_through_to_the_next_model_and_counts_it(self):
+        router = _router([LEAKED_THINKING, CLEAN_NARRATION])
+        result = _generate(router)
+        self.assertEqual(result.text, CLEAN_NARRATION)
+        rows = {r["model"]: r for r in router.health_snapshot()["models"]}
+        rejected = [r for r in rows.values() if r["scratchpad_rejected"]]
+        self.assertEqual(len(rejected), 1)
+        self.assertEqual(rejected[0]["scratchpad_rejected"], 1)
+        self.assertNotEqual(rejected[0]["model"], result.model)
+
+    def test_every_route_scratchpadding_ends_in_the_procedural_fallback(self):
+        # The narrator catches the exhausted-chain error and uses its fallback;
+        # what matters here is that no scratchpad text is ever returned.
+        router = _router([LEAKED_THINKING, LEAKED_THINKING, LEAKED_THINKING])
+        with self.assertRaises(RuntimeError):
+            _generate(router)
+
+    def test_a_reply_that_thinks_then_labels_its_narration_is_salvaged(self):
+        text = LEAKED_THINKING + "\n\n**Final narration:**\n" + CLEAN_NARRATION
+        self.assertEqual(_validate_generated_text(text), CLEAN_NARRATION)
+        self.assertEqual(_salvage_narration(text), CLEAN_NARRATION)
+
+    def test_think_tags_are_stripped_and_the_prose_kept(self):
+        text = "<think>\nthe user wants roads. I should keep it short.\n</think>\n" + CLEAN_NARRATION
+        self.assertEqual(_validate_generated_text(text), CLEAN_NARRATION)
+
+    def test_an_unclosed_think_tag_is_all_thinking(self):
+        # Neutral wording on purpose: nothing here trips the phrase patterns, so
+        # only the unclosed-tag rule can reject it.
+        with self.assertRaises(ValueError):
+            _validate_generated_text("<think>roads bend east through the reeds toward the pass")
+
+    def test_ordinary_narration_is_untouched(self):
+        for text in (
+            CLEAN_NARRATION,
+            "Mist coils over the black water and the reeds bend without wind.",
+            # Numbered prose and quoted dialogue must not trip the list-heading pattern.
+            "1. The first cairn. 2. The second, older. Neither marked on any map.",
+            '"You again," the ferryman says, and does not smile.',
+            "The road forks. Left, the reed beds; right, a climb toward the wind-scoured pass.",
+        ):
+            with self.subTest(text=text):
+                self.assertFalse(_looks_like_scratchpad(text))
+                self.assertEqual(_validate_generated_text(text), text)
+
+    def test_the_admin_monitor_report_is_not_subject_to_the_narration_guard(self):
+        # The GM chat digest legitimately says things like "analyze the user
+        # input"; it opts out of the player-facing guards with leak_guard=False.
+        text = "Summary: analyze the user input for bug reports. The thinking process was sound."
+        self.assertEqual(_validate_generated_text(text, leak_guard=False), text)
+
+    def test_more_shapes_of_thinking_out_loud(self):
+        for text in (
+            "Here is my reasoning: the scene is a marsh.",
+            "Analyzing the request: the player wants to discover roads.",
+            "Fixed roll information: none provided.",
+            "Scene type: private expedition.",
+            # Isolates the "thinking process" pattern - nothing else matches this.
+            "The thinking process was: describe the marsh at dusk.",
+        ):
+            with self.subTest(text=text):
+                self.assertTrue(_looks_like_scratchpad(text))
+
+
+class EscalatingBackoffTests(unittest.TestCase):
+    """Two Gemma free routes sat at 0-for-15 all day on a fixed 60s cooldown.
+
+    Every narration re-tried both before reaching the route that worked, and
+    each retry spent one of the 50 daily free-tier slots: 23 narrations cost
+    50 slots. A route that keeps failing now backs off harder each time.
+    """
+
+    def _row(self, router, model):
+        return next(r for r in router.health_snapshot()["models"] if r["model"] == model)
+
+    def test_consecutive_failures_double_the_cooldown(self):
+        router = _router([], failure_cooldown_seconds=20.0)
+        model = DEFAULT_ROUTINE_MODEL
+        seen = []
+        for _ in range(4):
+            router._cooldown_until.pop(model, None)
+            router._mark_failure(model, _RateLimit())
+            seen.append(self._row(router, model)["cooldown_seconds"])
+        # 20s x 3 for a 429 = 60s, then 120, 240, 480.
+        self.assertEqual(seen, [60.0, 120.0, 240.0, 480.0])
+        self.assertEqual(self._row(router, model)["consecutive_failures"], 4)
+
+    def test_the_backoff_is_capped(self):
+        router = _router([], failure_cooldown_seconds=20.0)
+        model = DEFAULT_ROUTINE_MODEL
+        for _ in range(12):
+            router._cooldown_until.pop(model, None)
+            router._mark_failure(model, _RateLimit())
+        self.assertEqual(self._row(router, model)["cooldown_seconds"], MAX_FAILURE_COOLDOWN_SECONDS)
+
+    def test_a_success_resets_the_streak(self):
+        router = _router([_RateLimit(), _RateLimit(), "narration"], failure_cooldown_seconds=1.0)
+        _generate(router)  # primary fails, fallback fails, openrouter/free serves
+        primary = self._row(router, DEFAULT_ROUTINE_MODEL)
+        self.assertEqual(primary["consecutive_failures"], 1)
+        # Now the primary recovers on the next call.
+        router._cooldown_until.clear()
+        router.client = _FakeClient(["narration again"])
+        _generate(router)
+        primary = self._row(router, DEFAULT_ROUTINE_MODEL)
+        self.assertEqual(primary["consecutive_failures"], 0)
+        self.assertEqual(primary["cooldown_seconds"], 0.0)
+
+    def test_a_provider_hint_is_still_escalated_on_a_streak(self):
+        router = _router([], failure_cooldown_seconds=20.0)
+        model = DEFAULT_ROUTINE_MODEL
+        router._mark_failure(model, _RateLimit(retry_after="3"))
+        self.assertEqual(self._row(router, model)["cooldown_seconds"], 3.0)
+        router._cooldown_until.pop(model, None)
+        router._mark_failure(model, _RateLimit(retry_after="3"))
+        self.assertEqual(self._row(router, model)["cooldown_seconds"], 6.0)
+
+
+class ProviderAndByokTests(unittest.TestCase):
+    """"Google AI never responds and I imported my key into OpenRouter."
+
+    OpenRouter tries an operator's own provider key first and silently falls
+    back to its shared pool on any error, so from the bot there was no way to
+    tell which one served a request. The completion carries a top-level
+    `provider`; GET /generation?id= carries `is_byok`.
+    """
+
+    def test_provider_is_read_from_the_completion(self):
+        self.assertEqual(_response_provider(SimpleNamespace(provider="Google AI Studio")), "Google AI Studio")
+        self.assertEqual(_response_provider(SimpleNamespace(model_extra={"provider": "Google"})), "Google")
+        self.assertEqual(_response_provider(SimpleNamespace()), "")
+
+    def test_a_success_records_the_provider(self):
+        completion = SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content="narration"))],
+            provider="Google AI Studio",
+            id="",
+        )
+        router = _router([])
+        router.client.completions.payloads = [completion]
+        router.client.completions.create = _return(completion)
+        result = _generate(router)
+        row = next(r for r in router.health_snapshot()["models"] if r["model"] == result.model)
+        self.assertEqual(row["last_provider"], "Google AI Studio")
+        self.assertIsNone(row["byok"])  # no generation id, so no lookup
+
+    def test_byok_lookup_records_whether_the_operators_key_was_used(self):
+        completion = SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content="narration"))],
+            provider="Google AI Studio",
+            id="gen-123",
+        )
+        router = _router([])
+        router.client.completions.create = _return(completion)
+        calls = []
+
+        async def fake_lookup(model, response):
+            calls.append((model, response.id))
+            router._model_row(model)["byok"] = False
+            router._model_row(model)["byok_checked_at"] = 1.0
+
+        router._maybe_check_byok = fake_lookup
+        result = _generate(router)
+        self.assertEqual(calls, [(result.model, "gen-123")])
+        row = next(r for r in router.health_snapshot()["models"] if r["model"] == result.model)
+        self.assertIs(row["byok"], False)
+
+    def test_byok_lookup_failure_never_breaks_narration(self):
+        completion = SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content="narration"))],
+            id="gen-999",
+        )
+        router = _router([])
+        router.client.completions.create = _return(completion)
+        # api_key set, base_url unreachable: the lookup raises inside and is swallowed.
+        router.base_url = "http://127.0.0.1:9"
+        self.assertEqual(_generate(router).text, "narration")
+
+
+def _return(value):
+    async def create(**kwargs):
+        return value
+    return create

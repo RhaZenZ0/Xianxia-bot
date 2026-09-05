@@ -15,17 +15,86 @@ import (
 type equipmentDefinitionGo struct {
 	Slot                                            string
 	MaxDurability, Attack, Defense, Spirit, Agility int64
+	Indestructible                                  bool
 }
 
 func equipmentDefinitionsGo() map[string]equipmentDefinitionGo {
 	return map[string]equipmentDefinitionGo{
-		"spirit_iron_sword":     {"weapon", 120, 4, 0, 1, 0},
-		"spirit_iron_armor":     {"armor", 160, 0, 5, 1, -1},
-		"cloud_stepping_boots":  {"boots", 100, 0, 1, 0, 4},
-		"lesser_stygian_seal":   {"accessory", 90, 1, 1, 4, 0},
-		"bone_comb":             {"accessory", 80, 0, 0, 5, 1},
-		"cracked_nether_mirror": {"accessory", 75, 0, 2, 3, 0},
+		"spirit_iron_sword":     {"weapon", 120, 4, 0, 1, 0, false},
+		"spirit_iron_armor":     {"armor", 160, 0, 5, 1, -1, false},
+		"cloud_stepping_boots":  {"boots", 100, 0, 1, 0, 4, false},
+		"lesser_stygian_seal":   {"accessory", 90, 1, 1, 4, 0, false},
+		"bone_comb":             {"accessory", 80, 0, 0, 5, 1, false},
+		"cracked_nether_mirror": {"accessory", 75, 0, 2, 3, 0, false},
+		// A one-of-a-kind GM reward (granted via /admin player grant, never
+		// crafted or bought) - Indestructible=true is what actually protects
+		// it from durability decay; see indestructibleEquipmentIDsGo below.
+		// Keep the four combat stats in sync with combat_actions.go's
+		// equipDefs and app/advanced_runtime.py's EQUIPMENT_DEFINITIONS (see
+		// tests/python/contracts/test_equipment_stat_parity.py).
+		bugslayerSwordItemID: {"weapon", 100, 5, 1, 1, 1, true},
 	}
+}
+
+const (
+	bugslayerSwordItemID = "bugslayer_sword"
+	bugslayerPassiveName = "Heavenly Flawfinder"
+	// bugslayerPassiveBonusDamage is added on top of normal damage when the
+	// passive triggers, in both the 1v1 and boss combat systems.
+	bugslayerPassiveBonusDamage = int64(2)
+	// bugslayerPassiveMargin matches roll2d10's own "Strong Success" tier
+	// (aptitude_actions.go) exactly - not an arbitrary number. The sword
+	// rewards a hit that was already convincing by this project's own
+	// definition of one.
+	bugslayerPassiveMargin = int64(5)
+	// bugslayerBossAccuracyMargin: bossActActionGo's roll is a 0-99
+	// percentile where lower is better, so requiring the roll to land at
+	// least this far under the accuracy threshold restricts the boss passive
+	// to a clean hit rather than a merely-connecting one.
+	bugslayerBossAccuracyMargin = int64(20)
+)
+
+// indestructibleEquipmentIDsGo lists item ids that never lose durability from
+// combat wear - hand-authored unique rewards where "cannot be worn down" is a
+// mechanical guarantee, not just flavor text. Data-driven off
+// equipmentDefinitionsGo so a future indestructible item needs no second
+// place to register it.
+func indestructibleEquipmentIDsGo() []string {
+	var ids []string
+	for id, d := range equipmentDefinitionsGo() {
+		if d.Indestructible {
+			ids = append(ids, id)
+		}
+	}
+	return ids
+}
+
+func isIndestructibleEquipmentGo(itemID string) bool {
+	d, ok := equipmentDefinitionsGo()[itemID]
+	return ok && d.Indestructible
+}
+
+func hasEquippedItemGo(conn *storage.Conn, userID int64, itemID string) (bool, error) {
+	r, err := conn.Execute(
+		`SELECT 1 FROM equipment_instances WHERE user_id=? AND item_id=? AND equipped=1 LIMIT 1`,
+		[]any{userID, itemID},
+	)
+	if err != nil {
+		return false, err
+	}
+	return len(r.Rows) > 0, nil
+}
+
+// bugslayerCombatPassiveTriggers gates the 1v1 "Heavenly Flawfinder" passive:
+// a Strong Success (or better) attack roll while the sword is equipped.
+func bugslayerCombatPassiveTriggers(equipped bool, margin int64) bool {
+	return equipped && margin >= bugslayerPassiveMargin
+}
+
+// bugslayerBossPassiveTriggers gates the raid version of the same passive:
+// only a plain attack (never a Law technique) that lands as a clean hit.
+func bugslayerBossPassiveTriggers(equipped bool, style string, accuracy, roll int64) bool {
+	return equipped && style == "attack" && accuracy-roll >= bugslayerBossAccuracyMargin
 }
 
 type formationPositionGo struct{ Attack, Defense, Support int64 }
@@ -578,15 +647,36 @@ func bossActActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64
 		}
 		roll := stablePercentGo(p.EncounterID, round, userID, p.Style, i64(enc["version"]))
 		accuracy := 65 + agi*2 + equip["agility"] - phase.Defense*2
+		bugslayerGuard := int64(0)
 		if roll < clamp(accuracy, 15, 95) {
 			damage = max64(1, base+bonus+(100-roll)/20-phase.Defense)
+			if p.Style == "attack" {
+				hasBugslayer, bsErr := hasEquippedItemGo(conn, userID, bugslayerSwordItemID)
+				if bsErr != nil {
+					return authoritativeMutation{}, bsErr
+				}
+				if bugslayerBossPassiveTriggers(hasBugslayer, p.Style, accuracy, roll) {
+					damage += bugslayerPassiveBonusDamage
+					bugslayerGuard = 1
+					events = append(
+						events,
+						fmt.Sprintf(
+							"%s exposes a flaw: +%d damage and the next boss hit against you is disrupted.",
+							bugslayerPassiveName,
+							bugslayerPassiveBonusDamage,
+						),
+					)
+				}
+			}
 		}
 		_, e = conn.Execute(`UPDATE boss_encounters SET boss_hp=MAX(0,boss_hp-?),updated_at=? WHERE encounter_id=?`, []any{damage, now, p.EncounterID})
 		if e == nil {
-			_, e = conn.Execute(`UPDATE boss_participants SET acted_round=?,total_damage=total_damage+?,updated_at=? WHERE encounter_id=? AND user_id=?`, []any{round, damage, now, p.EncounterID, userID})
+			_, e = conn.Execute(
+				`UPDATE boss_participants SET acted_round=?,total_damage=total_damage+?,guard=MAX(guard,?),updated_at=? WHERE encounter_id=? AND user_id=?`,
+				[]any{round, damage, bugslayerGuard, now, p.EncounterID, userID},
+			)
 		}
-		_, _ = conn.Execute(`UPDATE equipment_instances SET durability=MAX(0,durability-1),updated_at=? WHERE user_id=? AND equipped=1`, []any{now, userID})
-		_, _ = conn.Execute(`UPDATE equipment_instances SET equipped=0,updated_at=? WHERE user_id=? AND durability<=0`, []any{now, userID})
+		_ = damageEquipmentGo(conn, userID, 1)
 		events = append(events, fmt.Sprintf("%s deals %d damage.", strings.Title(p.Style), damage))
 	}
 	if e != nil {
@@ -651,8 +741,7 @@ func bossActActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64
 					st = "knocked_out"
 				}
 				_, _ = conn.Execute(`UPDATE boss_participants SET vitality=?,status=?,guard=0,updated_at=? WHERE encounter_id=? AND user_id=?`, []any{nv, st, now, p.EncounterID, tid})
-				_, _ = conn.Execute(`UPDATE equipment_instances SET durability=MAX(0,durability-1),updated_at=? WHERE user_id=? AND equipped=1`, []any{now, tid})
-				_, _ = conn.Execute(`UPDATE equipment_instances SET equipped=0,updated_at=? WHERE user_id=? AND durability<=0`, []any{now, tid})
+				_ = damageEquipmentGo(conn, tid, 1)
 				events = append(events, fmt.Sprintf("%s hits %d for %d raid vitality.", phase.Name, tid, incoming))
 			}
 			fr, _ := conn.Execute(`SELECT formation_id,stance FROM party_formations WHERE party_id=? AND active=1`, []any{i64(enc["party_id"])})

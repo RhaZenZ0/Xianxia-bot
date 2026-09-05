@@ -1,27 +1,38 @@
-from tests.support import PROJECT_ROOT
+from tests.support import (
+    PROJECT_ROOT,
+    bot_function_source,
+    bot_module_defining,
+    bot_package_source,
+    bot_source_files,
+)
 import ast
 import re
 import unittest
-from pathlib import Path
 
 
 ROOT = PROJECT_ROOT
-BOT = ROOT / "app" / "bot" / "main.py"
 HUBS = ROOT / "app" / "bot" / "hubs.py"
+# Phase 1 of the main.py split (v0.19.33): every check here used to read
+# app/bot/main.py by path. Those that assert an invariant now read the whole
+# package (bot_package_source / bot_source_files), and those that slice out one
+# function use bot_function_source, so a handler moving to another module can
+# neither break these tests nor slip out from under them.
 
 
 class CommandCleanupTests(unittest.TestCase):
     def test_player_surface_keeps_compact_roots_plus_admin(self):
-        tree = ast.parse(BOT.read_text(encoding="utf-8"))
         hub_names = []
-        for node in ast.walk(tree):
-            if not isinstance(node, ast.Call):
-                continue
-            if not isinstance(node.func, ast.Name) or node.func.id != "HubDefinition":
-                continue
-            for kw in node.keywords:
-                if kw.arg == "name" and isinstance(kw.value, ast.Constant):
-                    hub_names.append(str(kw.value.value))
+        for path in bot_source_files():
+            if path.name == "hubs.py":
+                continue  # defines HubDefinition; does not declare hubs
+            for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+                if not isinstance(node, ast.Call):
+                    continue
+                if not isinstance(node.func, ast.Name) or node.func.id != "HubDefinition":
+                    continue
+                for kw in node.keywords:
+                    if kw.arg == "name" and isinstance(kw.value, ast.Constant):
+                        hub_names.append(str(kw.value.value))
         self.assertEqual(
             set(hub_names),
             {
@@ -32,12 +43,12 @@ class CommandCleanupTests(unittest.TestCase):
         )
         self.assertEqual(len(hub_names), 17)
         # /begin, /action and /check remain direct convenience roots.
-        source = BOT.read_text(encoding="utf-8")
+        source = bot_package_source()
         for name in ("begin", "action", "check"):
             self.assertRegex(source, rf'@registered_root_command\([^\n]*name="{name}"|@registered_root_command\(name="{name}"')
 
     def test_internal_action_groups_are_not_registered_as_slash_roots(self):
-        source = BOT.read_text(encoding="utf-8")
+        source = bot_package_source()
         self.assertNotIn("tree.get_command(", source)
         self.assertNotIn("tree.remove_command(", source)
         self.assertIn("def register_command_surface", source)
@@ -46,15 +57,17 @@ class CommandCleanupTests(unittest.TestCase):
         self.assertIn('name="admin",', source)
         self.assertIn("async def admin_panel", source)
         self.assertIn("_MIGRATED_ROOTS", source)
-        migrated_node = next(node for node in ast.parse(source).body if isinstance(node, ast.Assign) and any(isinstance(target, ast.Name) and target.id == "_MIGRATED_ROOTS" for target in node.targets))
+        migrated_source = bot_module_defining("_MIGRATED_ROOTS").read_text(encoding="utf-8")
+        migrated_node = next(node for node in ast.parse(migrated_source).body if isinstance(node, ast.Assign) and any(isinstance(target, ast.Name) and target.id == "_MIGRATED_ROOTS" for target in node.targets))
         self.assertEqual(len(ast.literal_eval(migrated_node.value)), 74)
         self.assertNotIn("tree.remove_command", source)
         self.assertIn('"alchemy": alchemy_group', source)
         self.assertIn('_hub_page("alchemy", "Alchemy"', source)
 
     def test_private_expedition_copy_uses_registered_world_hub(self):
-        source = BOT.read_text(encoding="utf-8")
-        self.assertIn('"explore"', source[source.index("_MIGRATED_ROOTS"):source.index("_ROOT_ACTIONS")])
+        source = bot_package_source()
+        wiring = bot_module_defining("_MIGRATED_ROOTS").read_text(encoding="utf-8")
+        self.assertIn('"explore"', wiring[wiring.index("_MIGRATED_ROOTS"):wiring.index("_ROOT_ACTIONS")])
         self.assertIn('_hub_page("explore", "Explore"', source)
         self.assertIn("**/world → Explore**", source)
         self.assertIn("**/action**", source)
@@ -62,7 +75,7 @@ class CommandCleanupTests(unittest.TestCase):
         self.assertNotIn("**/act**", source)
 
     def test_admin_is_a_single_dropdown_panel_with_all_registered_actions(self):
-        source = BOT.read_text(encoding="utf-8")
+        source = bot_package_source()
         groups = [
             "admin_server_group", "admin_world_group", "admin_player_group",
             "admin_sect_group", "admin_family_group", "admin_npc_group", "admin_sim_group",
@@ -91,7 +104,7 @@ class CommandCleanupTests(unittest.TestCase):
         Full Setup/Repair action passes that True. The /admin Discord slash command
         keeps the old validate-and-bind-only behavior.
         """
-        source = BOT.read_text(encoding="utf-8")
+        source = bot_package_source()
         self.assertIn("guild.create_text_channel", source)
         self.assertIn("guild.create_category", source)
         self.assertIn("create_missing: bool = False", source)
@@ -103,7 +116,7 @@ class CommandCleanupTests(unittest.TestCase):
         self.assertIn("the bot will not provision channels", source)
 
     def test_deleted_configured_channels_are_treated_as_stale(self):
-        source = BOT.read_text(encoding="utf-8")
+        source = bot_package_source()
         self.assertIn('except discord.NotFound:', source)
         self.assertIn('treating binding as stale', source)
 
@@ -117,10 +130,7 @@ class CommandCleanupTests(unittest.TestCase):
         self.assertIn("await self.owner.source.followup.send(chunk, ephemeral=False)", source)
 
     def test_world_output_uses_shared_long_reply_helper(self):
-        source = BOT.read_text(encoding="utf-8")
-        start = source.index('@registered_root_command(name="world"')
-        end = source.index('@registered_root_command(name="worldevents"', start)
-        world_block = source[start:end]
+        world_block = bot_function_source("world")
         self.assertIn('await reply_long(interaction, "".join(lines), ephemeral=False)', world_block)
 
     def test_only_begin_flow_can_send_ephemeral_responses(self):
@@ -153,6 +163,11 @@ class CommandCleanupTests(unittest.TestCase):
             # through it) when the primary edit/response failed and a fresh
             # message has to be sent instead.
             "_fallback_followup",
+            # reply_long (runtime.py) is the same shape: v0.19.31 made it forward
+            # the caller's own `ephemeral` argument instead of hardcoding False.
+            # It never chooses privacy itself. Seen here only since phase 1 of
+            # the split widened this scan from main.py+hubs.py to the package.
+            "reply_long",
             # _HubFollowupProxy.send / _HubResponseProxy.send_message only take
             # the ephemeral branch when the registered command handler (or a
             # prior deferral) explicitly asked for a private reply - e.g. an
@@ -210,15 +225,17 @@ class CommandCleanupTests(unittest.TestCase):
                         violations.append((node.lineno, ast.unparse(keyword.value)))
                 self.generic_visit(node)
 
-        for path in (BOT, HUBS):
+        # Every bot module, not just main.py and hubs.py: a handler that moves
+        # out of main.py must stay under this invariant. Violations carry the
+        # file so a new one is easy to place.
+        for path in bot_source_files():
+            before = len(violations)
             VisibilityVisitor().visit(ast.parse(path.read_text(encoding="utf-8")))
+            violations[before:] = [(path.name, *v) for v in violations[before:]]
 
         self.assertEqual(violations, [])
 
-        source = BOT.read_text(encoding="utf-8")
-        begin_start = source.index('@registered_root_command(name="begin"')
-        begin_end = source.index("GENDER_CHOICES", begin_start)
-        self.assertIn("ephemeral=True", source[begin_start:begin_end])
+        self.assertIn("ephemeral=True", bot_function_source("begin"))
 
     def test_stage7_dashboard_owned_channels_do_not_rewrite_existing_permissions(self):
         """Setup/repair never touches permissions on a channel that already exists -
@@ -228,10 +245,8 @@ class CommandCleanupTests(unittest.TestCase):
         is itself creating (create_missing + Manage Channels), never for one that was
         merely bound to an existing channel.
         """
-        source = BOT.read_text(encoding="utf-8")
-        setup_start = source.index("async def ensure_base_xianxia_channels")
-        setup_end = source.index("@registered_group_command(admin_server_group, name=\"basechannels\"", setup_start)
-        setup_block = source[setup_start:setup_end]
+        source = bot_package_source()
+        setup_block = bot_function_source("ensure_base_xianxia_channels")
         self.assertNotIn("set_permissions(", setup_block)
         self.assertEqual(setup_block.count("PermissionOverwrite("), 1)
         self.assertIn("if name in READ_ONLY_BASE_CHANNELS else {}", setup_block)
@@ -275,7 +290,7 @@ if __name__ == "__main__":
 
 
 def test_admin_invocations_are_mirrored_to_private_discord_log():
-    source = Path("app/bot/main.py").read_text()
+    source = bot_package_source()
     assert "async def log_admin_command_invocation" in source
     assert 'post_server_log(interaction.guild, "Admin command", detail)' in source
     assert "await log_admin_command_invocation(interaction)" in source

@@ -11,7 +11,7 @@ install_aiosqlite_shim()
 import aiosqlite
 
 from app.database import Database
-from app.game import World
+from app.rules.game import World
 
 
 ROOT = PROJECT_ROOT

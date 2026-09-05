@@ -8,7 +8,7 @@ from typing import Any
 import aiosqlite
 
 from ..database import Database
-from ..black_market import BLACK_MARKET_ROTATION_MINUTES
+from ..rules.black_market import BLACK_MARKET_ROTATION_MINUTES
 
 MINUTES_PER_DAY = 24 * 60
 

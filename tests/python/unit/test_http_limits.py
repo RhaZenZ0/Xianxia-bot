@@ -1,7 +1,7 @@
 import asyncio
 import unittest
 
-from app.http_limits import (
+from app.ops.http_limits import (
     STREAM_LIMIT,
     ConnectionLimiter,
     EmptyRequest,

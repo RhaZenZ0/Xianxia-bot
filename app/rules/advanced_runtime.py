@@ -32,6 +32,23 @@ EQUIPMENT_DEFINITIONS: dict[str, dict[str, Any]] = {
         "name": "Cracked Nether Mirror", "slot": "accessory", "max_durability": 75,
         "attack": 0, "defense": 2, "spirit": 3, "agility": 0,
     },
+    # A one-of-a-kind GM reward granted via /admin player grant, never crafted
+    # or bought (content/world.json marks it market_excluded). "indestructible"
+    # and "unique" are read by app/bot/main.py's grant/equipment-status code;
+    # the Go engine enforces the durability side via its own Indestructible
+    # field on equipmentDefinitionsGo, which must stay in sync with the four
+    # combat stats below (also mirrored into combat_actions.go's equipDefs -
+    # see tests/python/contracts/test_equipment_stat_parity.py).
+    "bugslayer_sword": {
+        "name": "Bugslayer Sword", "slot": "weapon", "max_durability": 100,
+        "indestructible": True, "unique": True,
+        "attack": 5, "defense": 1, "spirit": 1, "agility": 1,
+        "passive_name": "Heavenly Flawfinder",
+        "passive_description": (
+            "A strong normal attack (Strong Success or better) exposes a flaw: "
+            "+2 bonus damage and the opponent's immediate counter/next hit is disrupted."
+        ),
+    },
 }
 
 FORMATION_POSITIONS: dict[str, dict[str, int]] = {

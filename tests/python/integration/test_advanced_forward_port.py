@@ -7,7 +7,7 @@ from tests.support import install_aiosqlite_shim, PROJECT_ROOT, seed_character
 install_aiosqlite_shim()
 
 from app.database import Database
-from app.game import World
+from app.rules.game import World
 
 
 class AdvancedForwardPortTests(unittest.IsolatedAsyncioTestCase):

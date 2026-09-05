@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from app.dashboard_contract import dashboard_implementation_issues
+from app.dashboard.contract import dashboard_implementation_issues
 
 
 def schema_version() -> int:

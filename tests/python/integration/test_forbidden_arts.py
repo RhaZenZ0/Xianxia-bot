@@ -1,7 +1,7 @@
 import unittest
 
 from tests.support import PROJECT_ROOT
-from app.game import World
+from app.rules.game import World
 
 
 class ForbiddenArtsContentTests(unittest.TestCase):

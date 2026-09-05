@@ -6,7 +6,7 @@ from tests.support import install_aiosqlite_shim, seed_character
 install_aiosqlite_shim()
 
 from app.database import Database, SCHEMA_VERSION
-from app.sect_manor import (
+from app.rules.sect_manor import (
     SECT_MANOR_ESTABLISHMENT_COST,
     manor_craft_bonus,
     manor_defense_power_bonus,

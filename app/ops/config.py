@@ -67,6 +67,7 @@ class Settings:
     openrouter_timeout_seconds: float
     openrouter_epic_timeout_seconds: float
     openrouter_failure_cooldown_seconds: float
+    openrouter_disable_reasoning: bool
     openrouter_app_url: str
     openrouter_app_name: str
     rp_channel_ids: set[int]
@@ -146,13 +147,13 @@ class Settings:
             "OPENROUTER_ROUTINE_MODEL", "google/gemma-4-31b-it:free"
         ).strip()
         openrouter_routine_fallback_model = os.getenv(
-            "OPENROUTER_ROUTINE_FALLBACK_MODEL", "google/gemma-4-26b-a4b-it:free"
+            "OPENROUTER_ROUTINE_FALLBACK_MODEL", "minimax/minimax-m3:free"
         ).strip()
         openrouter_epic_model = os.getenv(
-            "OPENROUTER_EPIC_MODEL", "nvidia/nemotron-3-super-120b-a12b:free"
+            "OPENROUTER_EPIC_MODEL", "google/gemma-4-31b-it:free"
         ).strip()
         openrouter_epic_fallback_model = os.getenv(
-            "OPENROUTER_EPIC_FALLBACK_MODEL", "google/gemma-4-31b-it:free"
+            "OPENROUTER_EPIC_FALLBACK_MODEL", "z-ai/glm-5.2:free"
         ).strip()
         openrouter_dynamic_free_model = os.getenv(
             "OPENROUTER_DYNAMIC_FREE_FALLBACK", "openrouter/free"
@@ -372,6 +373,7 @@ class Settings:
             openrouter_timeout_seconds=openrouter_timeout_seconds,
             openrouter_epic_timeout_seconds=openrouter_epic_timeout_seconds,
             openrouter_failure_cooldown_seconds=openrouter_failure_cooldown_seconds,
+            openrouter_disable_reasoning=_as_bool(os.getenv("OPENROUTER_DISABLE_REASONING"), True),
             openrouter_app_url=openrouter_app_url,
             openrouter_app_name=openrouter_app_name,
             rp_channel_ids=_as_int_set(os.getenv("RP_CHANNEL_IDS"), name="RP_CHANNEL_IDS"),

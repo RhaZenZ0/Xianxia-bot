@@ -2,19 +2,20 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tests.support import install_aiosqlite_shim, PROJECT_ROOT, seed_character
+from tests.support import install_aiosqlite_shim, PROJECT_ROOT, bot_function_source, bot_package_source, seed_character
 install_aiosqlite_shim()
 
 from app.database import Database, SCHEMA_VERSION
 
 ROOT = PROJECT_ROOT
-BOT = ROOT / "app" / "bot" / "main.py"
+# Phase 1 of the main.py split (v0.19.33): package-wide reads; the setup
+# code moves to admin/server_setup.py in phase 6 of the plan.
 ATTRS = {"body": 4, "agility": 4, "spirit": 5, "insight": 5, "will": 4, "presence": 4}
 
 
 class AdminServerSetupSourceTests(unittest.TestCase):
     def test_setup_action_has_six_installer_and_diagnostic_choices(self):
-        source = BOT.read_text(encoding="utf-8")
+        source = bot_package_source()
         expected = (
             ('name="Setup Server", value="setup"',),
             ('name="Repair Server", value="repair"',),
@@ -30,7 +31,7 @@ class AdminServerSetupSourceTests(unittest.TestCase):
         self.assertEqual(source[start:end].count("app_commands.Choice("), 6)
 
     def test_permission_diagnostics_are_actionable(self):
-        source = BOT.read_text(encoding="utf-8")
+        source = bot_package_source()
         self.assertIn("def _server_permission_report", source)
         self.assertIn("Manage Channels", source)
         self.assertIn("Manage Threads", source)
@@ -42,7 +43,7 @@ class AdminServerSetupSourceTests(unittest.TestCase):
         self.assertIn("Move the bot's highest role above", source)
 
     def test_setup_supports_config_role_sync_and_info_rebuild(self):
-        source = BOT.read_text(encoding="utf-8")
+        source = bot_package_source()
         self.assertIn("async def _server_configuration_report", source)
         self.assertIn("async def _sync_all_realm_access_roles", source)
         self.assertIn("await DB.list_character_user_ids()", source)
@@ -52,7 +53,7 @@ class AdminServerSetupSourceTests(unittest.TestCase):
         self.assertIn("No database/world reset was performed", source)
 
     def test_dashboard_can_reuse_the_same_discord_setup_implementation(self):
-        source = BOT.read_text(encoding="utf-8")
+        source = bot_package_source()
         self.assertIn("async def dashboard_discord_control", source)
         self.assertIn("await _run_complete_server_setup(guild, create_missing=True)", source)
         self.assertIn('action == "sync_commands"', source)
@@ -68,7 +69,7 @@ class AdminServerSetupSourceTests(unittest.TestCase):
         "Discord channel creation is dashboard-owned" - it must never pass
         create_missing=True itself.
         """
-        source = BOT.read_text(encoding="utf-8")
+        source = bot_package_source()
         self.assertIn("guild.create_text_channel", source)
         self.assertIn("guild.create_category", source)
         self.assertIn("create_missing: bool = False", source)
@@ -76,13 +77,10 @@ class AdminServerSetupSourceTests(unittest.TestCase):
         self.assertIn("the bot will not provision channels", source)
         # The /admin slash command's call site must stay on the create_missing=False
         # default - i.e. call the helper with no create_missing kwarg at all.
-        slash_command_marker = "Discord channel creation is dashboard-owned"
-        slash_command_call = source.index(
-            "await _run_complete_server_setup(guild)", source.index(slash_command_marker)
-        )
-        self.assertNotIn(
-            "create_missing", source[slash_command_call:slash_command_call + len("await _run_complete_server_setup(guild)")]
-        )
+        slash_command = bot_function_source("admin_setup_server")
+        self.assertIn("Discord channel creation is dashboard-owned", slash_command)
+        self.assertIn("await _run_complete_server_setup(guild)", slash_command)
+        self.assertNotIn("create_missing=True", slash_command)
 
 
 class AdminServerSetupDatabaseTests(unittest.IsolatedAsyncioTestCase):

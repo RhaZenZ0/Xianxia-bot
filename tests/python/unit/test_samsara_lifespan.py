@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch
 
-from app.samsara import choose_samsara_world, reincarnation_scale, soul_legacy_modifiers
+from app.rules.samsara import choose_samsara_world, reincarnation_scale, soul_legacy_modifiers
 
 
 class SamsaraAndLifespanTests(unittest.TestCase):
@@ -13,12 +13,12 @@ class SamsaraAndLifespanTests(unittest.TestCase):
         self.assertGreaterEqual(low["wait_seconds"], 45)
 
     def test_mortal_soul_can_roll_mortal_rebirth(self):
-        with patch("app.samsara.secrets.randbelow", return_value=0):
+        with patch("app.rules.samsara.secrets.randbelow", return_value=0):
             self.assertEqual(choose_samsara_world(0, 0), "Mortal World")
 
     def test_peak_celestial_soul_can_roll_celestial_rebirth(self):
         # Peak Celestial base weights sum to 100 and the final 85 points are Celestial.
-        with patch("app.samsara.secrets.randbelow", return_value=99):
+        with patch("app.rules.samsara.secrets.randbelow", return_value=99):
             self.assertEqual(choose_samsara_world(31, 0), "Celestial World")
 
     def test_soul_legacy_modifiers_remain_bounded(self):

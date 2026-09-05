@@ -29,7 +29,6 @@ import unittest
 from tests.support import PROJECT_ROOT
 
 GO_ROOT = PROJECT_ROOT / "go_core"
-BOT = PROJECT_ROOT / "app" / "bot" / "main.py"
 # Engine calls follow the handlers out of main.py as the decomposition proceeds
 # (/family moved to app/bot/commands/family.py in split stage 2), so the boundary
 # scan reads the whole package. Anchoring it to main.py would have quietly
@@ -43,7 +42,18 @@ def _bot_sources() -> str:
 # Keys read from a payload the engine passes through verbatim rather than
 # constructing, or read defensively where absence is a designed state. Add here
 # only with a reason; an empty allowlist is the goal.
-ALLOWED_MISSING: dict[tuple[str, str], str] = {}
+ALLOWED_MISSING: dict[tuple[str, str], str] = {
+    # bountyHunterActionGo returns firstRowMap() of
+    #   SELECT p.*,b.jurisdiction,b.amount,b.reason FROM bounty_hunter_pursuits p ...
+    # so these are real bounty_hunter_pursuits columns, passed through as a
+    # row rather than built from string literals this scanner can see. (The
+    # v0.19.32 command split renamed the handler's local from `row` to
+    # `result`, which is what first put it in front of this test.)
+    ("hunter_act", "hunter_name"): "bounty_hunter_pursuits.hunter_name column, row pass-through",
+    ("hunter_act", "pressure"): "bounty_hunter_pursuits.pressure column, row pass-through",
+    ("hunter_act", "escape_progress"): "bounty_hunter_pursuits.escape_progress column, row pass-through",
+    ("hunter_act", "capture_progress"): "bounty_hunter_pursuits.capture_progress column, row pass-through",
+}
 
 
 def _go_sources():
@@ -158,12 +168,12 @@ class EngineResultKeyTests(unittest.TestCase):
         self.assertEqual(problems, [], "\n" + "\n".join(problems))
 
     def test_total_price_is_gone_from_the_whole_bot_module(self):
-        self.assertNotIn("total_price", BOT.read_text(encoding="utf-8"))
+        self.assertNotIn("total_price", _bot_sources())
 
 
 class TradeReceiptWiringTests(unittest.TestCase):
     def setUp(self):
-        self.bot = BOT.read_text(encoding="utf-8")
+        self.bot = _bot_sources()
 
     def test_all_four_trade_handlers_use_the_shared_receipt(self):
         # market buy/sell and black market buy/sell. All four had the same bug;
@@ -180,7 +190,9 @@ class EquipmentOptionTests(unittest.TestCase):
     """Equip asked the player to type a database row id it never showed them."""
 
     def setUp(self):
-        self.bot = BOT.read_text(encoding="utf-8")
+        # The /equipment handlers moved out of main.py into their own module
+        # in the v0.19.32 command split; every guard below follows them.
+        self.bot = (BOT_DIR / "commands" / "equipment.py").read_text(encoding="utf-8")
 
     def test_every_equipment_id_action_has_a_live_option_provider(self):
         for action in ("equipment_equip", "equipment_unequip", "equipment_repair"):
@@ -211,9 +223,9 @@ class EquipmentOptionTests(unittest.TestCase):
             ("equipment_unequip", "equipment_id"),
             ("equipment_repair", "equipment_id"),
         ):
-            self.assertIn(
-                f'register_hub_option_hint(\n    {action}, "{parameter}",',
+            self.assertRegex(
                 self.bot,
+                rf'register_hub_option_hint\(\s*{action},\s*"{parameter}",',
                 f"{action}.{parameter}",
             )
 

@@ -7,7 +7,7 @@ from tests.support import install_aiosqlite_shim, PROJECT_ROOT, seed_character
 install_aiosqlite_shim()
 
 from app.database import Database, SCHEMA_VERSION
-from app.game import World
+from app.rules.game import World
 
 ROOT = PROJECT_ROOT
 ATTRS = {"body": 4, "agility": 4, "spirit": 5, "insight": 5, "will": 4, "presence": 4}

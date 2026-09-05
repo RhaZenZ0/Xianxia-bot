@@ -1,6 +1,6 @@
 import unittest
 
-from app.sect import resolve_address
+from app.rules.sect import resolve_address
 
 
 def person(uid, name, style="neutral", realm=0, phase=1, accepted=None):

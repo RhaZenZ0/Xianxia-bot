@@ -11,14 +11,14 @@ from pathlib import Path
 from tests.support import install_aiosqlite_shim, PROJECT_ROOT, seed_simulation_fixture
 install_aiosqlite_shim()
 
-from app.dashboard import (
+from app.dashboard.server import (
     AdminDashboardController, DASHBOARD_GET_API_PATHS, DASHBOARD_VIEW_ENDPOINTS, DashboardServer, DashboardSettings,
     DiscordDashboardController, ReadOnlyDashboardStore,
 )
-from app.dashboard_contract import DASHBOARD_API_VERSION, DASHBOARD_REVIEWED_SCHEMA_VERSION
+from app.dashboard.contract import DASHBOARD_API_VERSION, DASHBOARD_REVIEWED_SCHEMA_VERSION
 from app.database import Database, SCHEMA_VERSION
-from app.health import HealthServer, HealthState
-from app.game import World
+from app.ops.health import HealthServer, HealthState
+from app.rules.game import World
 from app.simulation import WorldSimulator
 
 ROOT = PROJECT_ROOT

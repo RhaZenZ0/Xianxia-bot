@@ -6,7 +6,7 @@ from tests.support import install_openai_shim
 
 install_openai_shim()
 
-from app.chat_monitor import (
+from app.ai.chat_monitor import (
     DEFAULT_CHUNK_CHARS,
     MonitorReport,
     TranscriptMessage,

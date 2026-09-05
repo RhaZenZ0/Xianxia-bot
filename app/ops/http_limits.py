@@ -2,7 +2,7 @@
 
 The hole this closes
 --------------------
-``app/health.py`` and ``app/dashboard.py`` both parse HTTP by hand with a loop of
+``app/ops/health.py`` and ``app/dashboard/server.py`` both parse HTTP by hand with a loop of
 ``await asyncio.wait_for(reader.readline(), timeout=N)``. There was a timeout per
 line and nothing else, which leaves four separate ways to hurt the process, all
 of them reachable **before any authentication runs**:

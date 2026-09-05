@@ -4,7 +4,7 @@ from tests.support import PROJECT_ROOT, install_aiosqlite_shim
 
 install_aiosqlite_shim()
 
-from app.dashboard_contract import (
+from app.dashboard.contract import (
     DASHBOARD_REVIEWED_SCHEMA_VERSION,
     DASHBOARD_SYSTEM_TABLES,
     dashboard_implementation_issues,
@@ -31,9 +31,10 @@ def test_dashboard_gate_detects_unreviewed_schema_bump():
 def test_dashboard_gate_detects_frontend_backend_drift(tmp_path):
     (tmp_path / "dashboard").mkdir()
     (tmp_path / "app").mkdir()
-    for rel in ("dashboard/index.html", "dashboard/app.js", "app/dashboard.py"):
+    for rel in ("dashboard/index.html", "dashboard/app.js", "app/dashboard/server.py"):
         src = PROJECT_ROOT / rel
         dst = tmp_path / rel
+        dst.parent.mkdir(parents=True, exist_ok=True)
         dst.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
     js_path = tmp_path / "dashboard" / "app.js"
     js_path.write_text(

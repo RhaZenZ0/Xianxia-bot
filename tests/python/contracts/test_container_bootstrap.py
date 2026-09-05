@@ -11,7 +11,7 @@ class ContainerBootstrapTests(unittest.TestCase):
 
     def test_database_bootstrap_is_a_required_one_shot_gate(self):
         self.assertIn("xianxia-db-init:", self.compose)
-        self.assertIn('command: ["python", "-m", "app.database_bootstrap"]', self.compose)
+        self.assertIn('command: ["python", "-m", "app.database.bootstrap"]', self.compose)
         self.assertIn("xianxia-db-init:\n        condition: service_completed_successfully", self.compose)
 
     def test_cpu_only_nas_stack_has_no_local_llm_service(self):
@@ -25,7 +25,7 @@ class ContainerBootstrapTests(unittest.TestCase):
         self.assertIn("OPENROUTER_API_KEY", self.startup)
         self.assertIn("DASHBOARD_TOKEN", self.startup)
         self.assertIn('BOT_CONTROL_URL: "http://xianxia-bot:8080"', self.compose)
-        self.assertIn('test: ["CMD", "python", "-m", "app.healthcheck"]', self.compose)
+        self.assertIn('test: ["CMD", "python", "-m", "app.ops.healthcheck"]', self.compose)
         self.assertNotIn("ollama", self.startup.casefold())
         self.assertIn("docker compose --profile dashboard down", self.stop)
         self.assertNotIn("ollama", self.stop.casefold())

@@ -7,6 +7,7 @@ from types import SimpleNamespace
 import discord
 from discord import app_commands
 
+from ..formatting import roll_line
 from ..registry import registered_group_command
 from ..runtime import (
     DB,
@@ -18,16 +19,9 @@ from ..runtime import (
     reply_long,
     serialized_user_action,
 )
-from ...game_engine import GameEngineError
-from ...progression_systems import profession_rank
+from ...ops.game_engine import GameEngineError
+from ...rules.progression_systems import profession_rank
 
-
-def roll_line(result) -> str:
-    sign = "+" if result.modifier >= 0 else ""
-    return (
-        f"2d10 ({result.die1}+{result.die2}) {sign}{result.modifier} = "
-        f"**{result.total}** vs TN **{result.tn}** — **{result.degree}**"
-    )
 
 beast_group = app_commands.Group(
     name="beast",

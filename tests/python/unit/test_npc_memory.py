@@ -1,6 +1,6 @@
 import unittest
 
-from app.npc_memory import classify_memory, exchange_memory_summary, format_memories, scene_memory_summary
+from app.rules.npc_memory import classify_memory, exchange_memory_summary, format_memories, scene_memory_summary
 
 
 class NPCMemoryTests(unittest.TestCase):

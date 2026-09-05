@@ -9,9 +9,9 @@ from typing import Any
 from openai import AsyncOpenAI
 
 from .ai_router import AITaskRouter, NarrationTier
-from .game import World
-from .sect import TERMINOLOGY_PROMPT
-from .npc_memory import format_memories
+from ..rules.game import World
+from ..rules.sect import TERMINOLOGY_PROMPT
+from ..rules.npc_memory import format_memories
 
 
 log = logging.getLogger("xianxia.narrator")

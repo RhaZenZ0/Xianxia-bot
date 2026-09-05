@@ -6,11 +6,11 @@ from pathlib import Path
 from tests.support import install_aiosqlite_shim, PROJECT_ROOT, seed_character
 install_aiosqlite_shim()
 
-from app.alchemy import alchemy_output, alchemy_quality, pill_toxicity_value, medicine_toxicity_effect
-from app.effects import medicine_toxicity_effect
-from app.birthfamily import family_forage_bonus, family_profession_bonus, generate_family_options
+from app.rules.alchemy import alchemy_output, alchemy_quality, pill_toxicity_value, medicine_toxicity_effect
+from app.rules.effects import medicine_toxicity_effect
+from app.rules.birthfamily import family_forage_bonus, family_profession_bonus, generate_family_options
 from app.database import Database, SCHEMA_VERSION
-from app.game import World
+from app.rules.game import World
 from app.simulation import WorldSimulator
 
 ROOT = PROJECT_ROOT

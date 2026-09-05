@@ -1,12 +1,14 @@
 from pathlib import Path
 import ast
 
-from tests.support import PROJECT_ROOT
+from tests.support import PROJECT_ROOT, bot_class_source, bot_package_source
 
 
 BOT_DIR = PROJECT_ROOT / "app" / "bot"
-MAIN = BOT_DIR / "main.py"
-SOURCE = MAIN.read_text(encoding="utf-8")
+# Phase 1 of the main.py split (v0.19.33): SOURCE is the whole package and the
+# class bodies below are located by name, so the creation/exploration UI
+# moving out of main.py (plan phases 8-9) cannot silently drop these checks.
+SOURCE = bot_package_source()
 
 FUNCTIONS: dict[str, ast.FunctionDef | ast.AsyncFunctionDef] = {}
 FUNCTION_SOURCES: dict[str, str] = {}
@@ -284,7 +286,7 @@ def test_python_go_authority_boundary_only_delegates_migrated_mechanics():
     assert "spiritual_sense_stats(c)" not in SOURCE
     # Character creation must consume an opaque Go-generated family offer.
     begin_body = _source("begin")
-    modal_body = SOURCE[SOURCE.index("class CharacterModal"):SOURCE.index("def _birth_family_preview_embed")]
+    modal_body = bot_class_source("CharacterModal")
     assert "generate_family_options" not in begin_body
     assert '"family_choice_id"' in modal_body
     assert '"family": family' not in modal_body
@@ -292,10 +294,7 @@ def test_python_go_authority_boundary_only_delegates_migrated_mechanics():
 
     # Personal exploration-event controls may present Go outcomes, but must not
     # reintroduce Python-side rolls, rewards, effects, Karma, or Fate authority.
-    event_view_body = SOURCE[
-        SOURCE.index("class ExplorationEventView"):
-        SOURCE.index('@registered_root_command(name="explore"')
-    ]
+    event_view_body = bot_class_source("ExplorationEventView")
     assert "exploration.event.act" in event_view_body
     assert "exploration.event.leave" in event_view_body
     assert "exploration.event.status" in event_view_body
@@ -373,7 +372,7 @@ def test_python_gameplay_purge_is_a_one_way_authority_boundary():
     assert "ensure_all_clans" not in world_methods
     assert "_npc_mood" not in simulation_source
     assert "secrets." not in simulation_source
-    birthfamily_source = (PROJECT_ROOT / "app" / "birthfamily.py").read_text(encoding="utf-8")
+    birthfamily_source = (PROJECT_ROOT / "app" / "rules" / "birthfamily.py").read_text(encoding="utf-8")
     assert "def inherited_root" not in birthfamily_source
     init_node = next(node for node in world_class.body if isinstance(node, ast.AsyncFunctionDef) and node.name == "initialize")
     init_source = ast.get_source_segment(simulation_source, init_node) or ""
@@ -394,7 +393,7 @@ def test_python_gameplay_purge_is_a_one_way_authority_boundary():
     engine_index = init_method.args.kwonlyargs.index(engine_arg)
     assert init_method.args.kw_defaults[engine_index] is None
 
-    engine_source = (PROJECT_ROOT / "app" / "game_engine.py").read_text(encoding="utf-8")
+    engine_source = (PROJECT_ROOT / "app" / "ops" / "game_engine.py").read_text(encoding="utf-8")
     engine_tree = ast.parse(engine_source)
     engine_class = next(node for node in engine_tree.body if isinstance(node, ast.ClassDef) and node.name == "GameEngineClient")
     bootstrap = next(node for node in engine_class.body if isinstance(node, ast.AsyncFunctionDef) and node.name == "bootstrap_simulation")
@@ -403,11 +402,11 @@ def test_python_gameplay_purge_is_a_one_way_authority_boundary():
     assert '"npcs"' not in bootstrap_source
     assert '"sects"' not in bootstrap_source
 
-    core_services_source = (PROJECT_ROOT / "app" / "core_services.py").read_text(encoding="utf-8")
+    core_services_source = (PROJECT_ROOT / "app" / "ops" / "core_services.py").read_text(encoding="utf-8")
     assert "class CultivationService" not in core_services_source
     assert "class SectService" not in core_services_source
 
-    bot_source = (PROJECT_ROOT / "app" / "bot" / "main.py").read_text(encoding="utf-8")
+    bot_source = SOURCE
     assert "_apply_event_participation" not in bot_source
     assert "CultivationService" not in bot_source
     assert "SectService" not in bot_source

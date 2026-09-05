@@ -1,4 +1,4 @@
-from tests.support import PROJECT_ROOT
+from tests.support import PROJECT_ROOT, bot_package_source, bot_source_files
 import json
 import ast
 import unittest
@@ -7,6 +7,17 @@ from pathlib import Path
 
 ROOT = PROJECT_ROOT
 WORLD_PATH = ROOT / "content" / "world.json"
+
+
+
+def _bot_ast_nodes():
+    """Every AST node in every app/bot module. Phase 1 of the main.py split
+    (v0.19.33): these reference checks used to parse main.py alone, so a bad
+    DB./SIM. reference in a commands/ module was never seen."""
+    import ast as _ast
+
+    for path in bot_source_files():
+        yield from _ast.walk(_ast.parse(path.read_text(encoding="utf-8")))
 
 
 class ProjectDataTests(unittest.TestCase):
@@ -93,7 +104,6 @@ class ProjectDataTests(unittest.TestCase):
                 self.assertTrue(0 <= projected <= max_index, name)
 
     def test_bot_database_method_references_exist(self):
-        bot_tree = ast.parse((ROOT / "app" / "bot" / "main.py").read_text(encoding="utf-8"))
         db_tree = ast.parse((ROOT / "app" / "database" / "core.py").read_text(encoding="utf-8"))
         methods = set()
         for node in db_tree.body:
@@ -105,7 +115,7 @@ class ProjectDataTests(unittest.TestCase):
                 )
         references = {
             node.attr
-            for node in ast.walk(bot_tree)
+            for node in _bot_ast_nodes()
             if isinstance(node, ast.Attribute)
             and isinstance(node.value, ast.Name)
             and node.value.id == "DB"
@@ -113,10 +123,9 @@ class ProjectDataTests(unittest.TestCase):
         self.assertEqual(references - methods, set())
 
     def test_no_duplicate_slash_command_names_within_same_group(self):
-        tree = ast.parse((ROOT / "app" / "bot" / "main.py").read_text(encoding="utf-8"))
         seen: set[tuple[str, str]] = set()
         duplicates: list[tuple[str, str]] = []
-        for node in ast.walk(tree):
+        for node in _bot_ast_nodes():
             if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 continue
             for decorator in node.decorator_list:
@@ -139,7 +148,6 @@ class ProjectDataTests(unittest.TestCase):
         self.assertEqual(duplicates, [])
 
     def test_bot_worldsim_method_references_exist(self):
-        bot_tree = ast.parse((ROOT / "app" / "bot" / "main.py").read_text(encoding="utf-8"))
         sim_tree = ast.parse((ROOT / "app" / "simulation" / "world.py").read_text(encoding="utf-8"))
         methods = set()
         for node in sim_tree.body:
@@ -151,7 +159,7 @@ class ProjectDataTests(unittest.TestCase):
                 )
         references = {
             node.attr
-            for node in ast.walk(bot_tree)
+            for node in _bot_ast_nodes()
             if isinstance(node, ast.Attribute)
             and isinstance(node.value, ast.Name)
             and node.value.id == "SIM"
@@ -159,7 +167,7 @@ class ProjectDataTests(unittest.TestCase):
         self.assertEqual(references - methods, set())
 
     def test_battle_ui_has_core_actions_and_explicit_spare_kill_finish(self):
-        source = (ROOT / "app" / "bot" / "main.py").read_text(encoding="utf-8")
+        source = bot_package_source()
         for label in ('label="Attack"', 'label="Defend"', 'label="Flee"', 'label="Refresh"', 'label="Spare"', 'label="Kill"'):
             self.assertIn(label, source)
         self.assertIn("class BattleTechniqueSelect", source)
@@ -176,7 +184,7 @@ class ProjectDataTests(unittest.TestCase):
         self.assertIn('result.get("impacts")', source)
 
     def test_random_event_pipeline_has_persistent_consequences_and_deduplication(self):
-        bot_source = (ROOT / "app" / "bot" / "main.py").read_text(encoding="utf-8")
+        bot_source = bot_package_source()
         database_source = (ROOT / "app" / "database" / "core.py").read_text(encoding="utf-8")
         worldsim_source = (ROOT / "app" / "simulation" / "world.py").read_text(encoding="utf-8")
         self.assertIn('"world_event.act"', bot_source)

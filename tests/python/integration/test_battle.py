@@ -6,7 +6,7 @@ from tests.support import install_aiosqlite_shim, seed_character
 
 install_aiosqlite_shim()
 
-from app.battle import matchup_label, suppression_label, vitality_band, vitality_bar, vitality_percentage
+from app.rules.battle import matchup_label, suppression_label, vitality_band, vitality_bar, vitality_percentage
 from app.database import Database
 
 

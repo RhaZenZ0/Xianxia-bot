@@ -13,17 +13,17 @@ visible from a unit test of the analysis logic itself:
 import re
 import unittest
 
-from tests.support import PROJECT_ROOT
+from tests.support import PROJECT_ROOT, bot_package_source, bot_source_files
 
-BOT = PROJECT_ROOT / "app" / "bot" / "main.py"
-MONITOR = PROJECT_ROOT / "app" / "chat_monitor.py"
-ROUTER = PROJECT_ROOT / "app" / "ai_router.py"
+BOT_DIR = PROJECT_ROOT / "app" / "bot"  # phase 1 of the main.py split: read the package
+MONITOR = PROJECT_ROOT / "app" / "ai" / "chat_monitor.py"
+ROUTER = PROJECT_ROOT / "app" / "ai" / "ai_router.py"
 ENV_EXAMPLE = PROJECT_ROOT / ".env.example"
 
 
 class MonitorSurfaceTests(unittest.TestCase):
     def setUp(self):
-        self.bot = BOT.read_text(encoding="utf-8")
+        self.bot = bot_package_source()
 
     def test_both_monitor_actions_are_registered_under_the_admin_server_group(self):
         for name in ("ai_status", "chat_digest"):
@@ -73,11 +73,11 @@ class MonitorCostTests(unittest.TestCase):
     def test_no_paid_server_tool_is_wired_in(self):
         # Fusion (openrouter:fusion) fans out to a panel of models and bills for all
         # of them. It is deliberately not used here.
-        for path in (MONITOR, ROUTER, BOT):
+        for path in (MONITOR, ROUTER, *bot_source_files()):
             self.assertNotIn("openrouter:fusion", path.read_text(encoding="utf-8"), str(path))
 
     def test_monitor_budgets_are_bounded_by_configuration(self):
-        bot = BOT.read_text(encoding="utf-8")
+        bot = bot_package_source()
         self.assertIn("SETTINGS.monitor_max_messages", bot)
         self.assertIn("SETTINGS.monitor_chunk_chars", bot)
         self.assertIn("SETTINGS.monitor_max_chunks", bot)
@@ -101,7 +101,7 @@ class LeakGuardContractTests(unittest.TestCase):
 
     def test_narrator_never_passes_leak_guard(self):
         # If narration ever opted out, players could be shown implementation detail.
-        narrator = (PROJECT_ROOT / "app" / "narrator.py").read_text(encoding="utf-8")
+        narrator = (PROJECT_ROOT / "app" / "ai" / "narrator.py").read_text(encoding="utf-8")
         self.assertNotIn("leak_guard", narrator)
 
     def test_only_the_monitor_opts_out(self):

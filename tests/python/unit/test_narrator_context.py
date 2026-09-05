@@ -4,8 +4,8 @@ from contextlib import asynccontextmanager
 from tests.support import install_openai_shim
 install_openai_shim()
 
-from app.narrator import Narrator, _style_memory, canonical_location_reply, is_current_location_question, roll_npc_memory
-from app.narrator_context import NarratorContextBuilder, _fit_context_to_budget
+from app.ai.narrator import Narrator, _style_memory, canonical_location_reply, is_current_location_question, roll_npc_memory
+from app.ai.narrator_context import NarratorContextBuilder, _fit_context_to_budget
 
 
 class FakeDB:

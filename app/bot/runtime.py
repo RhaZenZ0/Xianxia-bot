@@ -48,13 +48,13 @@ GENDER_CHOICES = [
     app_commands.Choice(name="Female", value="female"),
 ]
 
-from ..config import Settings
+from ..ops.config import Settings
 from ..database import Database
-from ..game import World
-from ..game_engine import GameEngineClient, GameEngineError
-from ..realm_hubs import REALM_HUBS
+from ..rules.game import World
+from ..ops.game_engine import GameEngineClient, GameEngineError
+from ..rules.realm_hubs import REALM_HUBS
 from ..simulation import MINUTES_PER_DAY
-from ..worldtime import from_game_minutes, MINUTES_PER_YEAR
+from ..rules.worldtime import from_game_minutes, MINUTES_PER_YEAR
 
 
 log = logging.getLogger("xianxia")

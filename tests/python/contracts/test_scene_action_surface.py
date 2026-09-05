@@ -12,9 +12,13 @@ kwargs, and no path that sends the dropdown panel while the layout is available.
 import re
 import unittest
 
-from tests.support import PROJECT_ROOT
+from tests.support import PROJECT_ROOT, bot_class_source, bot_function_source, bot_package_source
 
-BOT = (PROJECT_ROOT / "app" / "bot" / "main.py").read_text(encoding="utf-8")
+# Phase 1 of the main.py split (v0.19.33): BOT is the whole package, so the
+# "constructed exactly N times" counts keep holding after the scene-action
+# code moves to commands/scene.py; function bodies come from
+# bot_function_source instead of fixed-length slices.
+BOT = bot_package_source()
 LAYOUT = (PROJECT_ROOT / "app" / "bot" / "scene_layout.py").read_text(encoding="utf-8")
 
 
@@ -23,28 +27,24 @@ class PanelFactoryTests(unittest.TestCase):
         # Four call sites used to build it directly. Any new one that does is a
         # path that can still ship dropdowns.
         self.assertEqual(BOT.count("SceneActionView("), 2)  # the class def, and the fallback
-        start = BOT.index("def scene_action_panel(")
-        fallback = BOT[start : start + 1400]
-        self.assertIn("SceneActionView(", fallback)
+        self.assertIn("SceneActionView(", bot_function_source("scene_action_panel"))
 
     def test_no_scene_action_send_site_hand_builds_an_embed(self):
         # A Components V2 message cannot carry an embed; mixing the two paths by
         # hand is how one of them silently regresses. Scoped to the Scene Action
         # senders - ExplorationEventView is a different, still-classic panel.
-        for marker, span in (
-            ("async def _open_scene_actions(", 900),
-            ("async def scene_action_command(", 2200),
-        ):
-            body = BOT[BOT.index(marker) :][:span]
-            self.assertNotIn("embed=", body, marker)
+        event_view = bot_class_source("EventSceneView")
+        start = event_view.index("async def _open_scene_actions(")
+        end = event_view.find("\n    async def ", start + 1)
+        self.assertNotIn("embed=", event_view[start : end if end > 0 else None], "_open_scene_actions")
+        self.assertNotIn("embed=", bot_function_source("scene_action_command"), "scene_action_command")
 
     def test_every_scene_panel_send_uses_the_factory_kwargs(self):
         sends = [line for line in BOT.splitlines() if "panel_kwargs" in line or "**kwargs" in line]
         self.assertGreaterEqual(len(sends), 3)
 
     def test_the_factory_returns_a_view_and_its_send_kwargs(self):
-        start = BOT.index("def scene_action_panel(")
-        signature = BOT[start : start + 400]
+        signature = bot_function_source("scene_action_panel")[:400]
         self.assertIn("tuple[discord.ui.View, dict[str, Any]]", signature)
 
     def test_the_layout_is_feature_detected_not_assumed(self):
@@ -71,14 +71,13 @@ class NoDropdownTests(unittest.TestCase):
 
 class TravelTests(unittest.TestCase):
     def test_the_panel_is_given_a_way_to_re_read_the_players_scene(self):
-        self.assertIn("async def _scene_reload_state(", BOT)
-        body = BOT[BOT.index("async def _scene_reload_state(") :][:900]
+        body = bot_function_source("_scene_reload_state")
         self.assertIn("DB.get_character(", body)
         self.assertIn("_scene_action_targets(", body)
         self.assertIn("character_location_display(", body)
 
     def test_a_failed_reload_returns_none_rather_than_raising(self):
-        body = BOT[BOT.index("async def _scene_reload_state(") :][:900]
+        body = bot_function_source("_scene_reload_state")
         self.assertIn("except Exception:", body)
         self.assertIn("return None", body)
 

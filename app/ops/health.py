@@ -17,7 +17,7 @@ from .http_limits import (
     RequestHeadRejected,
     read_request_head,
 )
-from .version import RELEASE_VERSION
+from ..version import RELEASE_VERSION
 
 log = logging.getLogger("xianxia.health")
 

@@ -11,8 +11,8 @@ from collections.abc import Mapping
 import discord
 from discord import app_commands
 
-from ...advanced_runtime import EQUIPMENT_DEFINITIONS
-from ...game_engine import GameEngineError
+from ...rules.advanced_runtime import EQUIPMENT_DEFINITIONS
+from ...ops.game_engine import GameEngineError
 from ..hubs import HubDynamicOption, register_hub_option_hint, register_hub_option_provider
 from ..registry import registered_group_command
 from ..runtime import (
@@ -58,8 +58,17 @@ async def equipment_status(interaction: discord.Interaction) -> None:
             if value != 0:
                 stat_parts.append(f"{label} **{value:+d}**")
         stats_text = " • ".join(stat_parts) if stat_parts else "No stat modifiers"
+        # Indestructible reward gear never wears (the Go engine skips it in
+        # damageEquipmentGo), so a durability fraction would be misleading.
+        condition = (
+            "**indestructible**"
+            if definition.get("indestructible")
+            else f"durability **{row['durability']}/{row['max_durability']}**"
+        )
+        passive = str(definition.get("passive_name") or "").strip()
+        passive_suffix = f" • passive **{passive}**" if passive else ""
         lines.append(
-            f"\n{'✅' if row['equipped'] else '▫️'} `#{row['equipment_id']}` **{definition.get('name', WORLD.item_name(row['item_id']))}** • {row['slot']} • durability **{row['durability']}/{row['max_durability']}** • quality {row['quality']}% • stats {stats_text}"
+            f"\n{'✅' if row['equipped'] else '▫️'} `#{row['equipment_id']}` **{definition.get('name', WORLD.item_name(row['item_id']))}** • {row['slot']} • {condition} • quality {row['quality']}% • stats {stats_text}{passive_suffix}"
         )
     await reply_long(interaction, "\n".join(lines), ephemeral=False)
 

@@ -618,8 +618,10 @@ func bountyHunterActionGo(conn *storage.Conn, _ worlddata.Catalog, userID int64,
 			return authoritativeMutation{}, err
 		}
 		if p.Action == "fight" {
-			_, err = conn.Execute(`UPDATE equipment_instances SET durability=MAX(0,durability-1),updated_at=? WHERE user_id=? AND equipped=1`, []any{now, userID})
-			if err != nil {
+			// damageEquipmentGo also auto-unequips anything it wears down to
+			// 0 durability, which this raw UPDATE never did - a pre-existing
+			// gap this consolidation fixes as a side effect.
+			if err = damageEquipmentGo(conn, userID, 1); err != nil {
 				return authoritativeMutation{}, err
 			}
 		}

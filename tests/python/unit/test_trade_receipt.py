@@ -1,6 +1,6 @@
 import unittest
 
-from app.trade_receipt import (
+from app.rules.trade_receipt import (
     DEFAULT_CURRENCY_LABEL,
     ENGINE_TOTAL_KEY,
     format_trade_receipt,

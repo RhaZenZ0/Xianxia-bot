@@ -1,7 +1,9 @@
 import unittest
 from pathlib import Path
 
-from app.creation_ui import (
+from tests.support import bot_class_source, bot_package_source
+
+from app.rules.creation_ui import (
     CULTIVATION_STYLE_PROFILES,
     cultivation_style_profile,
     family_root_tendencies,
@@ -75,7 +77,9 @@ class CharacterCreationUITests(unittest.TestCase):
         self.assertEqual(cultivation_style_profile("Unknown")["emoji"], "☯️")
 
     def test_bot_uses_one_family_at_a_time_then_style_dropdown(self):
-        source = Path("app/bot/main.py").read_text(encoding="utf-8")
+        # Phase 1 of the main.py split: read the package, the creation UI
+        # classes move to ui/creation.py in phase 8 of the plan.
+        source = bot_package_source()
         self.assertIn("class BirthFamilyPreviousButton", source)
         self.assertIn("class BirthFamilyNextButton", source)
         self.assertIn('label="Choose Family"', source)
@@ -91,7 +95,7 @@ class CharacterCreationUITests(unittest.TestCase):
         self.assertIn('"character.create"', source)
         self.assertIn('"character.family_options"', source)
         self.assertIn('"family_choice_id"', source)
-        modal_source = source[source.index("class CharacterModal"):source.index("def _birth_family_preview_embed")]
+        modal_source = bot_class_source("CharacterModal")
         self.assertNotIn('"family": family', modal_source)
         self.assertIn("for field in (self.name_input, self.concept_input)", source)
         self.assertNotIn("self.style_input = discord.ui.TextInput", source)

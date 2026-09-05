@@ -5,7 +5,7 @@ services:
       dockerfile: go_core/Dockerfile
     container_name: xianxia-game-engine
     labels:
-      xianxia.release: "0.19.31"
+      xianxia.release: "0.20.2"
     restart: unless-stopped
     environment:
       ENGINE_ADDR: ":8081"
@@ -34,13 +34,13 @@ services:
         condition: service_healthy
     environment:
       GAME_ENGINE_URL: "http://xianxia-engine:8081"
-    command: ["python", "-m", "app.database_bootstrap"]
+    command: ["python", "-m", "app.database.bootstrap"]
 
   xianxia-bot:
     build: .
     container_name: xianxia-roleplay-bot
     labels:
-      xianxia.release: "0.19.31"
+      xianxia.release: "0.20.2"
     restart: unless-stopped
     env_file:
       - .env
@@ -54,7 +54,7 @@ services:
     expose:
       - "8080"
     healthcheck:
-      test: ["CMD", "python", "-m", "app.healthcheck"]
+      test: ["CMD", "python", "-m", "app.ops.healthcheck"]
       interval: 15s
       timeout: 5s
       retries: 8

@@ -3,9 +3,9 @@ import json
 import unittest
 from pathlib import Path
 
-from app.effects import aggregate_modifiers, normalize_effect_payload
-from app.game import World
-from app.worldtime import from_game_minutes
+from app.rules.effects import aggregate_modifiers, normalize_effect_payload
+from app.rules.game import World
+from app.rules.worldtime import from_game_minutes
 
 ROOT = PROJECT_ROOT
 

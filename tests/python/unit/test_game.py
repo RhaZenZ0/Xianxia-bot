@@ -2,7 +2,7 @@ from tests.support import PROJECT_ROOT
 import unittest
 from pathlib import Path
 
-from app.game import World, roll_2d10
+from app.rules.game import World, roll_2d10
 
 
 WORLD = World(PROJECT_ROOT / "content" / "world.json")

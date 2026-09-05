@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tests.support import install_aiosqlite_shim, PROJECT_ROOT, seed_character
+from tests.support import install_aiosqlite_shim, PROJECT_ROOT, seed_character, bot_package_source
 install_aiosqlite_shim()
 
 from app.database import Database, SCHEMA_VERSION
@@ -29,7 +29,7 @@ class WorldAccessAndSceneActionTests(unittest.IsolatedAsyncioTestCase):
 
 
     def test_scene_action_replaces_freeform_act(self):
-        source = (ROOT / "app" / "bot" / "main.py").read_text(encoding="utf-8")
+        source = bot_package_source()
         self.assertIn('@registered_root_command(name="action", description="Open the guided Scene Action panel"', source)
         self.assertNotIn('@registered_root_command(name="act"', source)
         for key in ("observe", "investigate", "influence", "stealth", "physical", "qi", "resolve", "aid"):
@@ -48,7 +48,7 @@ class WorldAccessAndSceneActionTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("This does not reveal hidden canonical information.", source)
 
     def test_visibility_guards_cover_world_npcs_and_realm_hubs(self):
-        source = (ROOT / "app" / "bot" / "main.py").read_text(encoding="utf-8")
+        source = bot_package_source()
         self.assertIn("_known_locations", source)
         self.assertIn("_location_is_visible", source)
         self.assertIn("_world_is_unlocked", source)

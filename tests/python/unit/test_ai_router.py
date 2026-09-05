@@ -6,7 +6,7 @@ from tests.support import install_openai_shim
 
 install_openai_shim()
 
-from app.ai_router import (
+from app.ai.ai_router import (
     AITaskRouter,
     DEFAULT_DYNAMIC_FREE_MODEL,
     DEFAULT_EPIC_FALLBACK_MODEL,
@@ -94,7 +94,7 @@ class AITaskRouterTests(unittest.TestCase):
         self.assertEqual(result.model, DEFAULT_DYNAMIC_FREE_MODEL)
         self.assertEqual(fake.completions.calls[-1]["model"], DEFAULT_DYNAMIC_FREE_MODEL)
 
-    def test_epic_chain_starts_with_nemotron_super(self):
+    def test_epic_chain_starts_with_the_default_epic_model(self):
         router = AITaskRouter(api_key=None)
         router.client = _FakeClient(["epic narration"])
         result = asyncio.run(
@@ -135,3 +135,44 @@ class AITaskRouterTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ReasoningOffTests(unittest.TestCase):
+    """v0.19.38: every narration request tells OpenRouter not to think.
+
+    Both production failures of the free chain were reasoning - empty content
+    after the budget went to thinking, and thinking returned as the content.
+    """
+
+    def test_reasoning_is_disabled_on_every_request_by_default(self):
+        router = AITaskRouter(api_key=None)
+        router.client = _FakeClient(["narration"])
+        asyncio.run(router.generate(tier=NarrationTier.ROUTINE, system_prompt="s", prompt="p", max_output_tokens=50))
+        call = router.client.completions.calls[0]
+        self.assertEqual(call["extra_body"], {"reasoning": {"enabled": False, "exclude": True}})
+
+    def test_the_operator_can_let_models_think(self):
+        router = AITaskRouter(api_key=None, disable_reasoning=False)
+        router.client = _FakeClient(["narration"])
+        asyncio.run(router.generate(tier=NarrationTier.EPIC, system_prompt="s", prompt="p", max_output_tokens=50))
+        self.assertIsNone(router.client.completions.calls[0]["extra_body"])
+
+    def test_the_bot_actually_passes_the_setting_through(self):
+        # The constructor default is True, so dropping the kwarg in services.py
+        # would leave OPENROUTER_DISABLE_REASONING silently ignored.
+        from tests.support import PROJECT_ROOT
+        services = (PROJECT_ROOT / "app" / "bot" / "services.py").read_text(encoding="utf-8")
+        self.assertIn("disable_reasoning=SETTINGS.openrouter_disable_reasoning", services)
+
+    def test_the_default_chains_drop_nemotron_super_and_keep_a_non_google_fallback(self):
+        # Nemotron 3 Super narrated its own instructions 3 of 3 times and is
+        # out. Gemma stays primary (it is only served by Google AI Studio, so
+        # it needs the operator's own key), and every chain keeps at least one
+        # non-Google route before openrouter/free so a Google-side problem
+        # cannot take both tiers procedural. See v0.19.38 release notes.
+        router = AITaskRouter(api_key=None)
+        for tier, chain in router.chains.items():
+            self.assertFalse(any("nemotron-3-super" in m for m in chain), tier)
+            self.assertTrue(any("google/" not in m and m != "openrouter/free" for m in chain), tier)
+        self.assertEqual(router.chains[NarrationTier.ROUTINE], ("google/gemma-4-31b-it:free", "minimax/minimax-m3:free", "openrouter/free"))
+        self.assertEqual(router.chains[NarrationTier.EPIC], ("google/gemma-4-31b-it:free", "z-ai/glm-5.2:free", "openrouter/free"))

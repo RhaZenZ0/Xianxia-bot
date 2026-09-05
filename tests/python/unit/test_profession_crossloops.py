@@ -6,7 +6,7 @@ from tests.support import install_aiosqlite_shim, seed_character
 install_aiosqlite_shim()
 
 from app.database import Database
-from app.progression_systems import PROFESSIONS, craft_quality, profession_rank
+from app.rules.progression_systems import PROFESSIONS, craft_quality, profession_rank
 
 ATTRS = {"body": 5, "agility": 4, "spirit": 6, "insight": 6, "will": 5, "presence": 5}
 

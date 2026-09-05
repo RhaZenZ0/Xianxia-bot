@@ -12,7 +12,7 @@ import unittest
 
 install_aiosqlite_shim()
 
-from app.dashboard import JS_MAX_SAFE_INTEGER, json_safe_numbers
+from app.dashboard.server import JS_MAX_SAFE_INTEGER, json_safe_numbers
 
 # A realistic Discord user snowflake: 18 digits, above 2**53-1.
 SNOWFLAKE = 847706123456789012
@@ -79,7 +79,7 @@ class SnowflakeSerializationTests(unittest.TestCase):
 
     def test_send_json_routes_through_the_sanitizer(self):
         """The fix is only real if every response body goes through it."""
-        source = (PROJECT_ROOT / "app" / "dashboard.py").read_text(encoding="utf-8")
+        source = (PROJECT_ROOT / "app" / "dashboard" / "server.py").read_text(encoding="utf-8")
         match = re.search(r"async def _send_json\(.*?\n(.*?)\n\n", source, re.S)
         self.assertIsNotNone(match, "could not locate _send_json")
         self.assertIn("json_safe_numbers(payload)", match.group(1))

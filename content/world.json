@@ -4895,6 +4895,12 @@
       "description": "A low-grade sword capable of carrying qi.",
       "sect_value": 8
     },
+    "bugslayer_sword": {
+      "name": "Bugslayer Sword",
+      "description": "A one-of-a-kind, indestructible reward blade granted for uncovering flaws hidden in the Heavenly Dao. Passive — Heavenly Flawfinder: a strong normal attack exposes a weakness, dealing bonus damage and disrupting the counter.",
+      "sect_value": 40,
+      "market_excluded": true
+    },
     "formation_flags": {
       "name": "Formation Flags",
       "description": "A reusable set of simple formation anchors.",

@@ -5,8 +5,8 @@ from __future__ import annotations
 import discord
 from discord import app_commands
 
-from ...advanced_runtime import FORMATION_POSITIONS, FORMATION_STANCES
-from ...game_engine import GameEngineError
+from ...rules.advanced_runtime import FORMATION_POSITIONS, FORMATION_STANCES
+from ...ops.game_engine import GameEngineError
 from ..registry import registered_group_command
 from ..runtime import (
     DB,

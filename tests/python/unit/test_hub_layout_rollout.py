@@ -6,17 +6,19 @@ things that would silently break the rollout: a hub quietly dropping back to the
 classic panel, the admin permission re-check going missing, and the component
 budget being exceeded by raising the per-page action limit.
 """
-from tests.support import PROJECT_ROOT
+from tests.support import PROJECT_ROOT, bot_package_source, bot_source_files
 import ast
 import textwrap
 import re
 import unittest
 
 HUBS = PROJECT_ROOT / "app" / "bot" / "hubs.py"
-MAIN = PROJECT_ROOT / "app" / "bot" / "main.py"
 
 HUBS_SOURCE = HUBS.read_text(encoding="utf-8")
-MAIN_SOURCE = MAIN.read_text(encoding="utf-8")
+# Phase 1 of the main.py split (v0.19.33): the hub declarations live in
+# main.py today and move to surface.py in the plan's final phase; read the
+# package so neither the move nor a hub declared elsewhere escapes this file.
+MAIN_SOURCE = bot_package_source()
 
 
 def _layout_hub_names() -> set[str]:
@@ -33,9 +35,12 @@ def _layout_hub_names() -> set[str]:
 
 
 def _declared_hub_names() -> set[str]:
-    """Every hub name in main.py: the 16 player hubs plus the admin panel."""
+    """Every hub name declared anywhere in app/bot: 16 player hubs plus /admin."""
     names = set()
-    for node in ast.walk(ast.parse(MAIN_SOURCE)):
+    for path in bot_source_files():
+      if path.name == "hubs.py":
+        continue  # defines HubDefinition itself
+      for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
         if (
             isinstance(node, ast.Call)
             and isinstance(node.func, ast.Name)

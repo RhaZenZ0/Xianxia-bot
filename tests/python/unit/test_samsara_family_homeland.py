@@ -1,4 +1,4 @@
-from app.birthfamily import generate_samsara_family
+from app.rules.birthfamily import generate_samsara_family
 
 
 EXPECTED_STARTERS = {
@@ -58,7 +58,7 @@ def test_upper_samsara_uses_realm_local_families_and_lineage() -> None:
 
 
 def test_upper_samsara_can_describe_extinction_and_replacement(monkeypatch) -> None:
-    import app.birthfamily as birthfamily
+    import app.rules.birthfamily as birthfamily
 
     rolls = iter((0, 50))
     monkeypatch.setattr(birthfamily.secrets, "randbelow", lambda limit: next(rolls) % limit)
@@ -83,7 +83,7 @@ def test_upper_samsara_can_describe_extinction_and_replacement(monkeypatch) -> N
 
 
 def test_lower_world_nobility_does_not_guarantee_upper_world_rank(monkeypatch) -> None:
-    import app.birthfamily as birthfamily
+    import app.rules.birthfamily as birthfamily
 
     monkeypatch.setattr(birthfamily.secrets, "randbelow", lambda limit: 0)
     status, summary = birthfamily._samsara_lineage(

@@ -11,7 +11,7 @@ This has shipped twice: once in the birth-household thread opener and once in th
 blocked-exploration hint, both in the exact place a stuck player looks for help.
 The correct form names the hub and the action inside it: "/family -> Leave".
 """
-from tests.support import PROJECT_ROOT
+from tests.support import PROJECT_ROOT, bot_module_defining
 import ast
 import re
 import sys
@@ -40,7 +40,9 @@ def _parse(module):
 # them the moment they move.
 BOT = PROJECT_ROOT / "app" / "bot"
 BOT_MODULES = sorted(BOT.rglob("*.py"))
-MAIN = BOT / "main.py"
+# The hub page tables moved from main.py to surface.py in split phase 10
+# (v0.20.0); bot_module_defining follows them wherever they go next.
+WIRING = bot_module_defining("_HUB_DEFINITIONS")
 
 # The hubs a player can actually type, from _HUB_DEFINITIONS plus the standalone roots.
 HUB_COMMANDS = {
@@ -143,7 +145,7 @@ ARROW_HINT = re.compile(r"/([a-z]+)\s*(?:->|→)\s*([^→>*\n]+?)\s*(?:->|→)")
 
 def _hub_pages() -> dict[str, set[str]]:
     """{hub name: {page label}} straight out of _HUB_DEFINITIONS in the source."""
-    source = MAIN.read_text(encoding="utf-8")
+    source = WIRING.read_text(encoding="utf-8")
     pages: dict[str, set[str]] = {}
     for block in re.finditer(
         r'HubDefinition\(\s*name="([a-z]+)"(.*?)\n    \),', source, re.S

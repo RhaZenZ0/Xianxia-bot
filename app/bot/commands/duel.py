@@ -7,7 +7,8 @@ from types import SimpleNamespace
 import discord
 from discord import app_commands
 
-from ...game_engine import GameEngineError
+from ...ops.game_engine import GameEngineError
+from ..formatting import roll_line
 from ..registry import registered_group_command
 from ..runtime import DB, ENGINE, WORLD, require_character, reply_long, serialized_user_action
 
@@ -17,13 +18,6 @@ duel_group = app_commands.Group(
     description="Consent-gated nonlethal player-versus-player duels",
 )
 
-
-def roll_line(result) -> str:
-    sign = "+" if result.modifier >= 0 else ""
-    return (
-        f"2d10 ({result.die1}+{result.die2}) {sign}{result.modifier} = "
-        f"**{result.total}** vs TN **{result.tn}** — **{result.degree}**"
-    )
 
 
 @registered_group_command(duel_group, name="challenge", description="Offer a nonlethal PvP duel; combat cannot start without acceptance")

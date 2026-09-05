@@ -6,7 +6,7 @@ from tests.support import install_aiosqlite_shim, PROJECT_ROOT, seed_character
 
 install_aiosqlite_shim()
 
-from app.aptitudes import (
+from app.rules.aptitudes import (
     aptitude_effects,
     generate_aptitude_bundle,
     generate_root_profile,
@@ -15,7 +15,7 @@ from app.aptitudes import (
     unlocked_ancestral_techniques,
 )
 from app.database import Database
-from app.game import World
+from app.rules.game import World
 
 
 ROOT = PROJECT_ROOT

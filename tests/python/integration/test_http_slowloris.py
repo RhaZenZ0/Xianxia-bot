@@ -14,8 +14,8 @@ import unittest
 
 from tests.support import PROJECT_ROOT  # noqa: F401  (ensures sys.path is set)
 
-from app.health import HealthServer, HealthState
-from app.http_limits import HeaderLimits
+from app.ops.health import HealthServer, HealthState
+from app.ops.http_limits import HeaderLimits
 
 
 async def _start(**kwargs) -> HealthServer:

@@ -2,7 +2,7 @@ import unittest
 
 import httpx
 
-from app.game_engine import GameEngineClient, GameEngineError
+from app.ops.game_engine import GameEngineClient, GameEngineError
 
 
 class GameEngineClientTests(unittest.IsolatedAsyncioTestCase):
