@@ -1,5 +1,7 @@
 # Xianxia RP Discord Bot v0.19.31
 
+[![CI](https://github.com/RhaZenZ0/Xianxia-bot/actions/workflows/ci.yml/badge.svg)](https://github.com/RhaZenZ0/Xianxia-bot/actions/workflows/ci.yml)
+
 A persistent Xianxia role-playing Discord bot designed for CPU-only QNAP/NAS deployment. Python owns
 Discord, RAG, dashboard, and presentation orchestration; Go owns canonical gameplay rules, current
 game time, simulation mutations, and SQLite WAL state.
