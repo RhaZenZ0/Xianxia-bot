@@ -4,6 +4,7 @@ import asyncio
 import logging
 import os
 import time
+from datetime import timedelta
 from functools import wraps
 from pathlib import Path
 from types import SimpleNamespace
@@ -14,8 +15,41 @@ from discord import app_commands
 from discord.ext import commands
 
 from .registry import ACTIONS, EVENT_HANDLERS, registered_group_command, registered_root_command
+from .commands.family import family_group
+from .commands.sect import sect_group, _sect_recruitment_at_location
+from .runtime import (
+    GENDER_CHOICES,
+    WORLD,
+    DB,
+    ROOT,
+    ENGINE,
+    PLAYER_PROPERTY_TYPES,
+    PRIVATE_LOCATION_EXITS,
+    SETTINGS,
+    _USER_ACTION_LOCKS,
+    _explain_engine_error,
+    _player_property_types,
+    _realm_access_role_name,
+    _record_true_death_history,
+    _sync_realm_access_roles,
+    authoritative_lifespan,
+    carried_item_autocomplete,
+    character_location_display,
+    chunk_text,
+    current_world_time,
+    log,
+    player_property_definition,
+    player_property_label,
+    private_location_exit,
+    reply_long,
+    require_character,
+    serialized_user_action,
+    settle_seclusion_for_user,
+)
 
+from .. import chat_monitor
 from ..config import Settings
+from ..trade_receipt import format_trade_receipt
 from ..version import RELEASE_VERSION
 from ..aptitudes import (
     aptitude_effects,
@@ -27,6 +61,7 @@ from ..aptitudes import (
 )
 from ..database import Database, SCHEMA_VERSION
 from ..health import HealthServer, HealthState
+from ..http_limits import HeaderLimits
 from ..operations import AlertDispatcher
 from ..core_services import (
     CombatService,
@@ -58,12 +93,13 @@ from ..narrator import Narrator, canonical_location_reply, is_current_location_q
 from ..narrator_context import NarratorContextBuilder
 from ..worldtime import cultivation_cycle_summary, cultivation_speed_modifiers, from_game_minutes, MINUTES_PER_YEAR, MINUTES_PER_MONTH
 from ..simulation import WorldSimulator, MINUTES_PER_DAY
-CHILD_CULTIVATION_AWAKENING_AGE = 12
+from . import scene_layout
 from .hubs import (
     HubDefinition,
     HubDynamicOption,
     HubPage,
     HubStatusField,
+    register_hub_option_hint,
     register_hub_option_provider,
     send_hub,
 )
@@ -82,12 +118,11 @@ from ..progression_systems import (
 )
 from ..sect_recruitment import (
     RECRUITMENT_RETRY_COOLDOWN_MINUTES, RECOMMENDATION_RETRY_COOLDOWN_MINUTES,
-    recruitment_definition, trial_profile, trial_modifier, recommendation_modifier, trial_outcome,
+    recruitment_definition, trial_outcome,
 )
 from ..sect_manor import (
-    MAX_MANOR_FACILITY_LEVEL, SECT_MANOR_ESTABLISHMENT_COST, SECT_MANOR_FACILITIES,
-    manor_benefit_lines, manor_craft_bonus, manor_defense_power_bonus, manor_qi_multiplier,
-    manor_seclusion_multiplier, manor_upgrade_cost,
+    manor_craft_bonus, manor_defense_power_bonus, manor_qi_multiplier,
+    manor_seclusion_multiplier,
 )
 from ..fate import fate_label
 from ..black_market import access_reason as black_market_access_reason
@@ -99,12 +134,8 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
 )
-log = logging.getLogger("xianxia")
 
-SETTINGS = Settings.from_env()
 GUILD = discord.Object(id=SETTINGS.guild_id)
-ROOT = Path(__file__).resolve().parents[2]
-WORLD = World(ROOT / "content" / "world.json")
 
 # Optional landmark art shown exactly when a character first reaches/discovers
 # the associated location. Keep this mapping small and explicit so adding art
@@ -112,14 +143,6 @@ WORLD = World(ROOT / "content" / "world.json")
 LOCATION_DISCOVERY_IMAGES: dict[str, Path] = {
     "Azure Crown Imperial City": ROOT / "assets" / "locations" / "azure_crown_imperial_city.png",
 }
-ENGINE = GameEngineClient(
-    SETTINGS.game_engine_url, timeout_seconds=SETTINGS.game_engine_timeout_seconds
-)
-DB = Database(
-    ROOT / SETTINGS.database_path,
-    slow_query_ms=SETTINGS.slow_query_ms,
-    engine_url=SETTINGS.game_engine_url,
-)
 SCENES = LocationSceneService(DB, engine=ENGINE)
 NPC_RELATIONSHIPS = NPCRelationshipService(DB, engine=ENGINE)
 QUESTS = QuestService(DB, QUEST_DEFINITIONS, engine=ENGINE)
@@ -137,6 +160,9 @@ AI_ROUTER = AITaskRouter(
     dynamic_free_model=SETTINGS.openrouter_dynamic_free_model,
     require_free=SETTINGS.openrouter_require_free,
     max_requests_per_minute=SETTINGS.openrouter_max_requests_per_minute,
+    max_requests_per_day=SETTINGS.openrouter_max_requests_per_day,
+    route_requests_per_minute=SETTINGS.openrouter_route_requests_per_minute,
+    route_requests_per_day=SETTINGS.openrouter_route_requests_per_day,
     routine_timeout_seconds=SETTINGS.openrouter_timeout_seconds,
     epic_timeout_seconds=SETTINGS.openrouter_epic_timeout_seconds,
     failure_cooldown_seconds=SETTINGS.openrouter_failure_cooldown_seconds,
@@ -162,19 +188,10 @@ NARRATOR_CONTEXT = NarratorContextBuilder(
 )
 ALERTS = AlertDispatcher(SETTINGS.alert_webhook_url, cooldown_seconds=SETTINGS.alert_cooldown_seconds)
 
-_USER_ACTION_LOCKS: dict[int, asyncio.Lock] = {}
 
 
-def _player_property_types() -> dict[str, dict[str, Any]]:
-    configured = WORLD.abode_system.get("property_types", {})
-    if isinstance(configured, dict) and configured:
-        return {str(key): dict(value) for key, value in configured.items() if isinstance(value, dict)}
-    return {
-        "cave_abode": {"name": "Cave Abode", "emoji": "🏡", "defaults": {"cultivation": 1, "storage": 1}},
-    }
 
 
-PLAYER_PROPERTY_TYPES = _player_property_types()
 PLAYER_PROPERTY_TYPE_CHOICES = [
     app_commands.Choice(name=str(defn.get("name", key.replace("_", " ").title()))[:100], value=key)
     for key, defn in PLAYER_PROPERTY_TYPES.items()
@@ -195,14 +212,8 @@ PLAYER_PROPERTY_FACILITY_LABELS = {
 }
 
 
-def player_property_definition(property_type: str | None) -> dict[str, Any]:
-    key = str(property_type or "cave_abode")
-    return PLAYER_PROPERTY_TYPES.get(key, PLAYER_PROPERTY_TYPES.get("cave_abode", {}))
 
 
-def player_property_label(abode: dict[str, Any]) -> str:
-    definition = player_property_definition(str(abode.get("property_type") or "cave_abode"))
-    return str(definition.get("name") or "Player Property")
 
 
 def player_property_emoji(abode: dict[str, Any]) -> str:
@@ -219,106 +230,14 @@ def player_property_facility_lines(abode: dict[str, Any]) -> list[str]:
     return lines
 
 
-async def character_location_display(character: dict[str, Any]) -> str:
-    """Resolve a character's raw `location` column into a player-facing label.
-
-    `location` holds either a real world-catalog location name (already
-    display-ready) or one of four internal sentinel prefixes for a private
-    scene - `abode:`, `sect_abode:`, `personal_world:`, `birth_family:` -
-    which need a DB lookup to turn into a readable place name. Falls back to
-    the raw value unchanged if none of the lookups resolve (e.g. a plain
-    world-catalog location, or a stale/orphaned private-location key).
-    """
-    location = str(character.get("location") or "Unknown")
-    abode_location = await DB.get_abode_by_location(location)
-    if abode_location:
-        return f"{abode_location['name']} ({player_property_label(abode_location)})"
-    personal_location = await DB.get_personal_world_by_location(location)
-    if personal_location:
-        return f"{personal_location['name']} (Personal World)"
-    sect_abode_location = await DB.get_sect_abode_by_location(location)
-    if sect_abode_location:
-        return f"{sect_abode_location['name']} (Sect Abode)"
-    if location.startswith("birth_family:"):
-        family = await DB.get_birth_family(int(character.get("user_id") or 0))
-        if family and location == f"birth_family:{int(family.get('family_id') or 0)}":
-            return f"{family.get('family_name') or 'Birth Family'} Household"
-    return location
 
 
-PRIVATE_LOCATION_EXITS: tuple[tuple[str, str, str], ...] = (
-    ("birth_family:", "**/family → Leave**", "your birth household"),
-    ("sect_abode:", "**/abode → Leave**", "your sect residence"),
-    ("abode:", "**/abode → Leave**", "your own property"),
-    ("personal_world:", "**/innerworld → Leave**", "your personal world"),
-)
 
 
-def private_location_exit(location: object) -> tuple[str, str] | None:
-    """The command that steps a character back out into the shared world.
-
-    Exploring and hunting are blocked inside every private location (the prefix
-    guards in the Go engine's exploration_actions.go). A player who does not know
-    which command gets them out is simply stuck, so wherever we can tell which
-    private location they are in, we name the exact way out rather than listing
-    all of them. Returns (command, human description), or None out in the world.
-
-    Note the ordering: "sect_abode:" is checked before "abode:" because the
-    latter is a prefix of the former and would otherwise swallow it.
-    """
-    text = str(location or "")
-    for prefix, command, description in PRIVATE_LOCATION_EXITS:
-        if text.startswith(prefix):
-            return command, description
-    return None
 
 
-def _explain_engine_error(exc: Exception) -> str:
-    """Append an actionable hint to specific known engine errors that otherwise
-    leave the player stuck with no indication of what to do next - most notably
-    the "world exploration/hunting is unavailable inside a private residence or
-    personal world" error every freshly-created character used to hit immediately
-    (they start inside their birth household - see character.create in the Go
-    engine - with no way back out surfaced anywhere in the UI). Falls through to
-    the raw engine message unchanged for everything else.
-    """
-    text = str(exc)
-    if "private residence or personal world" in text:
-        # Spell these the way a player can actually reach them. The individual
-        # gameplay commands are not registered with Discord - only the 16 hub
-        # commands are (see register_command_surface) - so "/family leave" is a
-        # dead end: it does not exist to type. The route is the hub, then the
-        # action inside it.
-        text += (
-            "\n\nYou're **indoors** — exploring and hunting only work out in the shared world. "
-            "Step outside first, then try again:\n"
-            "**/family → Leave** (birth household) · "
-            "**/abode → Leave** (your property or sect residence) · "
-            "**/innerworld → Leave** (personal world)"
-        )
-    return text
 
 
-async def settle_seclusion_for_user(user_id: int, current_game_minute: int | None = None) -> dict | None:
-    state = await DB.get_seclusion(int(user_id))
-    if not state:
-        return None
-    automation = await DB.get_automation_settings()
-    if not automation.get("background_seclusion", True):
-        return state
-    if current_game_minute is None:
-        current_game_minute = (await current_world_time()).total_minutes
-    try:
-        await ENGINE.authoritative_action(
-            "seclusion.settle",
-            int(user_id),
-            {"minutes_per_day": MINUTES_PER_DAY, "force_end": False, "end_reason": ""},
-            action_id=f"seclusion:auto:{int(user_id)}:{int(current_game_minute)}",
-        )
-    except GameEngineError as exc:
-        if "no active seclusion" not in str(exc).lower():
-            raise
-    return await DB.get_seclusion(int(user_id), active_only=False)
 
 
 async def settle_all_seclusions(current_game_minute: int) -> int:
@@ -327,31 +246,6 @@ async def settle_all_seclusions(current_game_minute: int) -> int:
     return len(await DB.list_active_seclusions())
 
 
-def serialized_user_action(func):
-    """Serialize state-changing commands per Discord user in this bot process.
-
-    Cooldown checks and game-state writes often span more than one SQLite call.
-    Without this guard, two near-simultaneous slash commands from the same user
-    could both pass a cooldown/read check before either write completed.
-    """
-    @wraps(func)
-    async def wrapper(interaction: discord.Interaction, *args, **kwargs):
-        lock = _USER_ACTION_LOCKS.setdefault(interaction.user.id, asyncio.Lock())
-        async with lock:
-            if not func.__name__.startswith("seclusion_"):
-                seclusion = await settle_seclusion_for_user(interaction.user.id)
-                if seclusion and str(seclusion.get("status")) == "active":
-                    remaining = max(0, int(seclusion["ends_game_minute"]) - (await current_world_time()).total_minutes)
-                    await interaction.response.send_message(
-                        f"🔒 You are in **closed-door seclusion** ({str(seclusion['mode']).upper()}). "
-                        f"About **{remaining / MINUTES_PER_DAY:.1f} world-days** remain. "
-                        "Use **/cultivation → Seclusion → End** to leave early before taking other actions.",
-                        ephemeral=False,
-                    )
-                    return None
-            return await func(interaction, *args, **kwargs)
-
-    return wrapper
 
 
 def human_duration(seconds: int) -> str:
@@ -372,33 +266,8 @@ def roll_line(result) -> str:
     )
 
 
-def chunk_text(text: str, limit: int = 1950) -> list[str]:
-    text = text.strip()
-    if len(text) <= limit:
-        return [text]
-    chunks: list[str] = []
-    while text:
-        if len(text) <= limit:
-            chunks.append(text)
-            break
-        split = text.rfind("\n", 0, limit)
-        if split < limit // 2:
-            split = text.rfind(" ", 0, limit)
-        if split <= 0:
-            split = limit
-        chunks.append(text[:split].strip())
-        text = text[split:].strip()
-    return chunks
 
 
-async def reply_long(interaction: discord.Interaction, text: str, *, ephemeral: bool = False) -> None:
-    chunks = chunk_text(text)
-    if not interaction.response.is_done():
-        await interaction.response.send_message(chunks[0], ephemeral=False)
-    else:
-        await interaction.followup.send(chunks[0], ephemeral=False)
-    for chunk in chunks[1:]:
-        await interaction.followup.send(chunk, ephemeral=False)
 
 
 def location_discovery_image_path(location: str) -> Path | None:
@@ -471,9 +340,6 @@ def travel_first_discovers_location(
     return str(result.get("destination") or "") == target
 
 
-async def current_world_time():
-    state = await DB.get_world_clock(scale=SETTINGS.world_time_scale)
-    return from_game_minutes(int(state["game_minute"]))
 
 
 async def current_npc_location(npc_name: str, period: str | None = None) -> str | None:
@@ -630,8 +496,6 @@ async def _resolve_text_channel(guild: discord.Guild, channel_id: int | None) ->
     return channel if isinstance(channel, discord.TextChannel) else None
 
 
-def _realm_access_role_name(world_name: str) -> str:
-    return f"Xianxia • {world_name}"[:100]
 
 
 async def _ensure_realm_access_roles(guild: discord.Guild) -> dict[str, discord.Role]:
@@ -654,34 +518,6 @@ async def _ensure_realm_access_roles(guild: discord.Guild) -> dict[str, discord.
     return roles
 
 
-async def _sync_realm_access_roles(
-    guild: discord.Guild | None, member: discord.Member | discord.User, character: dict[str, Any]
-) -> None:
-    if guild is None or not isinstance(member, discord.Member):
-        return
-    me = guild.me
-    if not me or not me.guild_permissions.manage_roles:
-        return
-    role_map = {world: discord.utils.get(guild.roles, name=_realm_access_role_name(world)) for world in REALM_HUBS}
-    available = {world: role for world, role in role_map.items() if role is not None}
-    if not available:
-        return
-    unlocked = {
-        world for world, hub in REALM_HUBS.items()
-        if int(character.get("realm_index", 0)) >= int(hub.get("min_realm_index", 0))
-    }
-    current_ids = {role.id for role in member.roles}
-    add_roles = [role for world, role in available.items() if world in unlocked and role.id not in current_ids]
-    remove_roles = [role for world, role in available.items() if world not in unlocked and role.id in current_ids]
-    try:
-        if add_roles:
-            await member.add_roles(*add_roles, reason="Xianxia cultivation unlocked realm-world access")
-        if remove_roles:
-            await member.remove_roles(*remove_roles, reason="Xianxia realm-world access resync")
-    except discord.Forbidden:
-        log.warning("Could not synchronize realm access roles for user %s; check bot role hierarchy", member.id)
-    except discord.HTTPException:
-        log.exception("Could not synchronize realm access roles for user %s", member.id)
 
 
 async def ensure_realm_hub_channels(
@@ -869,6 +705,50 @@ async def ensure_expedition_thread(interaction: discord.Interaction, character: 
         log.exception("Could not create private expedition thread for user %s", interaction.user.id)
         return None
 
+
+
+async def open_expedition_thread_after_exit(interaction: discord.Interaction) -> None:
+    """Open the personal expedition journal after stepping back into the world.
+
+    Reported by a player: after leaving the birth household there was no personal
+    thread until they happened to run /explore, so the room their own scenes get
+    written into simply did not exist yet. Every entry in PRIVATE_LOCATION_EXITS
+    has the same shape - household, sect residence, own property, personal world -
+    so all of them do this, rather than fixing the one that was reported.
+
+    Three deliberate choices:
+
+    * The character is RE-READ. Each caller fetched its copy before the engine
+      moved them, so using it would stamp the journal with the location they just
+      walked out of.
+    * If they are still inside a private location, this exit stepped into another
+      one and the world journal is not the right room yet.
+    * This runs AFTER the caller has already confirmed the move, and never
+      raises. The exit is committed canonically at that point; a thread that
+      cannot be created is worth a quiet log, not a failed action or a stalled
+      interaction.
+    """
+    if interaction.guild is None:
+        return
+    try:
+        character = await DB.get_character(interaction.user.id)
+        if not character:
+            return
+        if private_location_exit(character.get("location")) is not None:
+            return
+        thread = await ensure_expedition_thread(interaction, dict(character))
+        if thread is None:
+            return
+        await interaction.followup.send(
+            f"🧭 Your expedition journal is open in {thread.mention} — your private "
+            "scenes, exploration and Scene Actions are written there.",
+            ephemeral=False,
+        )
+    except Exception:
+        log.warning(
+            "Could not open the expedition journal after a private-location exit",
+            exc_info=True,
+        )
 
 
 async def ensure_birth_family_household_thread(
@@ -1231,7 +1111,12 @@ class EventSceneView(discord.ui.View):
         self, *, title: str, event_type: str, expires_at: float, location: str | None = None,
         event_key: str | None = None, category: str = "Event", severity: int = 1,
     ) -> None:
-        remaining=max(300,min(21600,int(expires_at-time.time())))
+        # The ceiling used to be 21600 (6h), which silently killed the controls
+        # of any longer-lived event scene at the halfway mark - content/world.json
+        # has secret realms open for up to 12h. 172800 (48h) comfortably covers
+        # today's longest realm with headroom for future content, while still
+        # bounding the timer instead of leaving it unbounded.
+        remaining=max(300,min(172800,int(expires_at-time.time())))
         super().__init__(timeout=remaining)
         self.title=str(title)[:160]; self.event_type=str(event_type or "event")[:80]
         self.expires_at=float(expires_at); self.location=str(location).strip()[:180] if location else None
@@ -1313,12 +1198,12 @@ class EventSceneView(discord.ui.View):
     async def _open_scene_actions(self, interaction: discord.Interaction, *, default_action: str) -> None:
         character=await self._character_here(interaction)
         if character is None:return
-        npcs=await _scene_action_targets(character); view=SceneActionView(interaction.user.id,character,npcs,await character_location_display(character))
-        if default_action in SCENE_ACTION_TYPES:
-            view.action_key = default_action
-            view.target = "Environment"
-            view.refresh_components()
-        await interaction.response.send_message(embed=view.embed(),view=view,ephemeral=False)
+        npcs=await _scene_action_targets(character)
+        _view, kwargs = scene_action_panel(
+            interaction.user.id, character, npcs,
+            await character_location_display(character), action_key=default_action,
+        )
+        await interaction.response.send_message(ephemeral=False, **kwargs)
 
     @discord.ui.button(label="Systems",emoji="🧭",style=discord.ButtonStyle.primary,row=1)
     async def systems(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
@@ -1510,7 +1395,37 @@ async def spawn_event_thread(
             expires_at=expires_at,
         )
     except Exception:
-        log.exception("Could not persist event thread metadata for %s", title)
+        log.exception("Could not persist event thread metadata for %s; retrying once", title)
+        try:
+            await DB.register_event_thread(
+                thread_id=thread.id,
+                event_key=event_key,
+                event_type=event_type,
+                title=title,
+                channel_id=scene_channel.id,
+                message_id=scene_message.id,
+                announcement_channel_id=announcement_channel.id if announcement_channel else None,
+                announcement_message_id=announcement_message.id if announcement_message else None,
+                triggered_by=interaction.user.id,
+                expires_at=expires_at,
+            )
+        except Exception:
+            # An unregistered thread is invisible to DB.get_expired_event_threads(),
+            # so the expiry worker could never discover or close it - a permanent
+            # orphan scene. Rather than hand the caller a Discord thread that no
+            # part of this bot can find again, archive/lock it (preserving it for
+            # manual recovery) and report the failure instead of the thread.
+            log.exception("Event thread metadata still not persisted for %s after retry; archiving orphan thread", title)
+            try:
+                await thread.send(
+                    "⚠️ This event scene could not be registered and will not be tracked "
+                    "or automatically closed. An administrator should investigate; the "
+                    "thread is being archived."
+                )
+                await thread.edit(archived=True, locked=True, reason="event registration failed - orphan prevention")
+            except (discord.Forbidden, discord.HTTPException):
+                log.exception("Could not archive orphaned event thread for %s", title)
+            return None
 
     try:
         event_location = await _event_scene_location(event_key, fallback_user_id=interaction.user.id)
@@ -1571,89 +1486,10 @@ async def spawn_system_event_thread(
     return thread
 
 
-async def authoritative_lifespan(user_id: int) -> SimpleNamespace:
-    result = await ENGINE.action("character.lifespan", int(user_id), {})
-    return SimpleNamespace(**dict(result or {}))
 
 
-async def _record_true_death_history(user_id: int, death: dict[str, Any], game_minute: int) -> None:
-    """Persist descriptive world history after Go commits the lifecycle transition."""
-    name = str(death.get("name") or "A cultivator")
-    location = str(death.get("location") or "")
-    reason = str(death.get("reason") or "unknown")
-    target_world = str(death.get("target_world") or "Mortal World")
-    try:
-        await DB.record_world_history_event(
-            event_type="death",
-            title=f"True death of {name}",
-            summary=f"{name} suffered true death at {location or 'an unknown place'}. Recorded cause: {reason}. The soul entered Samsara toward {target_world}.",
-            significance=92,
-            visibility="participant",
-            location=location,
-            actor_type="player",
-            actor_key=str(int(user_id)),
-            actor_name=name,
-            target_type="life",
-            target_key=str(int(user_id)),
-            target_name=name,
-            related_user_id=int(user_id),
-            tags=("death", "true death", "samsara", "reincarnation"),
-            game_minute=int(game_minute),
-            metadata={"reason": reason, "target_world": target_world, "previous_realm_index": int(death.get("previous_realm_index", 0))},
-            source_key=f"player_death:{int(user_id)}:{int(game_minute)}",
-        )
-    except Exception:
-        # History is descriptive; it must never roll back or counterfeit the already
-        # committed authoritative life-state transition.
-        log.exception("Could not mirror authoritative true death into world history")
 
 
-async def require_character(interaction: discord.Interaction, *, allow_deceased: bool = False) -> dict | None:
-    character = await DB.get_character(interaction.user.id)
-    if character is None:
-        await interaction.response.send_message(
-            "You do not have a cultivator yet. Use **/begin** first.",
-            ephemeral=False,
-        )
-        return None
-    wt = await current_world_time()
-    life = await authoritative_lifespan(interaction.user.id)
-    if not life.ageless and life.total_years is not None and life.age_years >= life.total_years:
-        if character.get("life_status") != "deceased":
-            try:
-                envelope = await ENGINE.authoritative_action(
-                    "lifecycle.true_death",
-                    interaction.user.id,
-                    {
-                        
-                        "reason": "old_age",
-                        "minutes_per_year": MINUTES_PER_YEAR,
-                        "base_samsara_years": SETTINGS.reincarnation_base_samsara_years,
-                        "max_wait_seconds": SETTINGS.reincarnation_max_wait_seconds,
-                    },
-                    action_id=f"lifecycle:old-age:{interaction.user.id}:{wt.total_minutes}",
-                )
-            except GameEngineError as exc:
-                await interaction.response.send_message(f"❌ Lifecycle authority rejected the old-age transition: {exc}", ephemeral=False)
-                return None
-            death = dict(envelope.get("result") or {})
-            # The descriptive history mirror is source-key idempotent, so replay it
-            # too: this repairs a prior best-effort history write without duplicating
-            # or changing the already-authoritative lifecycle transition.
-            await _record_true_death_history(interaction.user.id, death, wt.total_minutes)
-            character["life_status"] = "deceased"
-    if character.get("life_status") == "deceased" and not allow_deceased:
-        await interaction.response.send_message(
-            f"🕯️ **{character['name']}** is dead. Their old family remains in world history, but the soul has entered Samsara. "
-            "Use **/character → Samsara** to view the soul-cycle and **/character → Reincarnate** when rebirth opens.",
-            ephemeral=False,
-        )
-        return None
-    try:
-        await _sync_realm_access_roles(interaction.guild, interaction.user, character)
-    except Exception:
-        log.exception("Realm access role synchronization failed")
-    return character
 
 async def _report_game_ui_error(
     interaction: discord.Interaction,
@@ -2174,6 +2010,14 @@ class XianxiaBot(commands.Bot):
             port=SETTINGS.health_port,
             control_handler=self._dashboard_discord_control if control_token else None,
             control_token=control_token,
+            header_limits=HeaderLimits(
+                max_request_line_bytes=SETTINGS.http_max_request_line_bytes,
+                max_header_lines=SETTINGS.http_max_header_lines,
+                max_header_bytes=SETTINGS.http_max_header_bytes,
+                header_deadline_seconds=SETTINGS.http_header_deadline_seconds,
+                line_timeout_seconds=SETTINGS.http_header_line_timeout_seconds,
+            ),
+            max_connections=SETTINGS.http_max_connections,
         )
         self.operational_health_task: asyncio.Task | None = None
 
@@ -2271,60 +2115,71 @@ class XianxiaBot(commands.Bot):
             raise
 
     async def operational_health_worker(self) -> None:
+        # The exception boundary is per-iteration (like event_expiry_worker),
+        # not around the whole loop: a single transient failure from
+        # DB.operational_health()/flush_slow_query_log()/observability_snapshot()
+        # or alert persistence used to land in an outer `except Exception` that
+        # then let the coroutine return - silently disabling operational
+        # monitoring for the rest of the process's life. Catching per iteration
+        # means a transient SQLite/IO hiccup logs, alerts once, and the worker
+        # tries again on the next tick instead of dying for good.
         try:
             while not self.is_closed():
-                probe = await DB.operational_health()
-                self.health_state.set_check(
-                    "database", bool(probe.get("ok")),
-                    **{k: v for k, v in probe.items() if k != "ok"},
-                )
-                flushed = await DB.flush_slow_query_log()
-                obs = await DB.observability_snapshot()
-                for key in (
-                    "query_count", "slow_query_count", "recent_slow_queries_1h", "max_query_latency_ms",
-                    "connections_opened", "connections_reused", "writer_wait_count", "writer_wait_ms",
-                    "catalog_cache_entries", "catalog_cache_hits", "catalog_cache_misses",
-                ):
-                    self.health_state.set_metric(key, float(obs.get(key, 0)))
                 try:
-                    engine_status = await ENGINE.database_status()
-                    self.health_state.set_check("game_engine", True, **engine_status)
-                    self.health_state.set_metric("go_engine_requests", float(engine_status.get("requests", 0)))
+                    probe = await DB.operational_health()
+                    self.health_state.set_check(
+                        "database", bool(probe.get("ok")),
+                        **{k: v for k, v in probe.items() if k != "ok"},
+                    )
+                    flushed = await DB.flush_slow_query_log()
+                    obs = await DB.observability_snapshot()
+                    for key in (
+                        "query_count", "slow_query_count", "recent_slow_queries_1h", "max_query_latency_ms",
+                        "connections_opened", "connections_reused", "writer_wait_count", "writer_wait_ms",
+                        "catalog_cache_entries", "catalog_cache_hits", "catalog_cache_misses",
+                    ):
+                        self.health_state.set_metric(key, float(obs.get(key, 0)))
+                    try:
+                        engine_status = await ENGINE.database_status()
+                        self.health_state.set_check("game_engine", True, **engine_status)
+                        self.health_state.set_metric("go_engine_requests", float(engine_status.get("requests", 0)))
+                    except Exception as exc:
+                        self.health_state.set_check("game_engine", False, error=str(exc))
+                    if not probe.get("ok"):
+                        detail = {k: v for k, v in probe.items() if k != "ok"}
+                        delivered = await ALERTS.send("database_degraded", "SQLite operational health probe failed", severity="critical", details=detail)
+                        if probe.get("schema_intact") is False:
+                            # The most common cause is an operator removing the
+                            # SQLite file while this process is still alive.  Stop
+                            # cleanly so Docker's restart policy runs DB.init()
+                            # before Discord commands can touch the replacement.
+                            log.critical(
+                                "DATABASE_SCHEMA_LOST missing_tables=%s; closing for automatic recovery",
+                                ",".join(str(name) for name in probe.get("missing_tables", [])),
+                            )
+                            self.health_state.clear_phase(
+                                "DATABASE_READY", reason="required SQLite tables disappeared"
+                            )
+                            asyncio.create_task(self.close())
+                            return
+                        await DB.record_operational_alert("database_degraded", severity="critical", message="SQLite operational health probe failed", detail=detail, delivered=delivered)
+                    if int(obs.get("recent_slow_queries_1h", 0)) >= 5:
+                        detail = {"recent_slow_queries_1h": obs.get("recent_slow_queries_1h"), "max_query_latency_ms": obs.get("max_query_latency_ms"), "threshold_ms": obs.get("slow_query_threshold_ms"), "flushed": flushed}
+                        delivered = await ALERTS.send("slow_query_pressure", "Slow-query pressure exceeded the operational threshold", severity="warning", details=detail)
+                        await DB.record_operational_alert("slow_query_pressure", severity="warning", message="Slow-query pressure exceeded the operational threshold", detail=detail, delivered=delivered)
+                except asyncio.CancelledError:
+                    raise
                 except Exception as exc:
-                    self.health_state.set_check("game_engine", False, error=str(exc))
-                if not probe.get("ok"):
-                    detail = {k: v for k, v in probe.items() if k != "ok"}
-                    delivered = await ALERTS.send("database_degraded", "SQLite operational health probe failed", severity="critical", details=detail)
-                    if probe.get("schema_intact") is False:
-                        # The most common cause is an operator removing the
-                        # SQLite file while this process is still alive.  Stop
-                        # cleanly so Docker's restart policy runs DB.init()
-                        # before Discord commands can touch the replacement.
-                        log.critical(
-                            "DATABASE_SCHEMA_LOST missing_tables=%s; closing for automatic recovery",
-                            ",".join(str(name) for name in probe.get("missing_tables", [])),
-                        )
-                        self.health_state.clear_phase(
-                            "DATABASE_READY", reason="required SQLite tables disappeared"
-                        )
-                        asyncio.create_task(self.close())
-                        return
-                    await DB.record_operational_alert("database_degraded", severity="critical", message="SQLite operational health probe failed", detail=detail, delivered=delivered)
-                if int(obs.get("recent_slow_queries_1h", 0)) >= 5:
-                    detail = {"recent_slow_queries_1h": obs.get("recent_slow_queries_1h"), "max_query_latency_ms": obs.get("max_query_latency_ms"), "threshold_ms": obs.get("slow_query_threshold_ms"), "flushed": flushed}
-                    delivered = await ALERTS.send("slow_query_pressure", "Slow-query pressure exceeded the operational threshold", severity="warning", details=detail)
-                    await DB.record_operational_alert("slow_query_pressure", severity="warning", message="Slow-query pressure exceeded the operational threshold", detail=detail, delivered=delivered)
+                    log.exception("Operational health worker iteration failed")
+                    self.health_state.set_check("database", False, error="health worker failed")
+                    delivered = await ALERTS.send("health_worker_failed", str(exc), severity="critical")
+                    try:
+                        await DB.record_operational_alert("health_worker_failed", severity="critical", message=str(exc), delivered=delivered)
+                    except Exception:
+                        log.exception("Could not persist health-worker alert")
                 await asyncio.sleep(30)
         except asyncio.CancelledError:
             pass
-        except Exception as exc:
-            log.exception("Operational health worker failed")
-            self.health_state.set_check("database", False, error="health worker failed")
-            delivered = await ALERTS.send("health_worker_failed", str(exc), severity="critical")
-            try:
-                await DB.record_operational_alert("health_worker_failed", severity="critical", message=str(exc), delivered=delivered)
-            except Exception:
-                log.exception("Could not persist health-worker alert")
 
     async def close_event_scene(self, record: dict, *, manual: bool = False) -> None:
         guild = self.get_guild(SETTINGS.guild_id)
@@ -2915,8 +2770,26 @@ class XianxiaInfoSelect(discord.ui.Select):
         )
 
     async def callback(self, interaction: discord.Interaction) -> None:
-        title, body = XIANXIA_INFO_PAGES.get(self.values[0], ("📖 Xianxia Guide", "No guide page is available."))
-        await interaction.response.send_message(f"**{title}**\n{body}", ephemeral=False)
+        topic = self.values[0]
+        # #xianxia-info is one persistent, shared message with a single
+        # timeout=None View (custom_id-based) - every player who opens this
+        # dropdown sees the exact same option list, so a non-admin option
+        # cannot be hidden from the menu itself. The "admin" topic is gated
+        # here instead: anyone can see it listed, but only a real server
+        # administrator can actually open it.
+        if topic == "admin":
+            member = interaction.user
+            if not isinstance(member, discord.Member) or not member.guild_permissions.administrator:
+                await interaction.response.send_message(
+                    "🔒 This topic is for server administrators only.", ephemeral=True
+                )
+                return
+        title, body = XIANXIA_INFO_PAGES.get(topic, ("📖 Xianxia Guide", "No guide page is available."))
+        # Every guide reply is private to the person who opened the dropdown -
+        # this used to post publicly into the channel for every topic, which is
+        # both noisy and, for the admin topic, exposed GM instructions to the
+        # whole server.
+        await interaction.response.send_message(f"**{title}**\n{body}", ephemeral=True)
 
 
 class XianxiaInfoView(discord.ui.View):
@@ -4238,6 +4111,144 @@ async def admin_observability(interaction: discord.Interaction) -> None:
     await reply_long(interaction,"\n".join(lines),ephemeral=False)
 
 
+# ---------------------------------------------------------------------------
+# Chat monitor - administrator-only channel analysis
+# ---------------------------------------------------------------------------
+# scene_history cannot answer "what has been happening in this channel":
+# Database.add_history hard-deletes everything past the newest 60 rows per channel
+# on every insert, because its job is to feed the narrator a rolling context
+# window rather than to archive play.  These actions therefore read Discord's own
+# message history, and run the transcript through the same free OpenRouter chain
+# the narrator uses - never a paid route, so OPENROUTER_REQUIRE_FREE keeps holding.
+MONITOR_INTENT_HINT = (
+    "⚠️ **Message Content intent is off**, so Discord returns empty text for every "
+    "message the bot was not mentioned in. Set `MESSAGE_CONTENT_INTENT=true` in "
+    "`.env` **and** enable *Message Content Intent* under Bot → Privileged Gateway "
+    "Intents in the Discord Developer Portal, then restart the bot."
+)
+
+
+async def _monitor_collect(
+    channels: list[Any],
+    *,
+    limit: int,
+    after: Any,
+) -> tuple[list[chat_monitor.TranscriptMessage], list[str]]:
+    """Pull recent messages from each channel, newest first, degrading per channel.
+
+    One unreadable channel must not fail the whole report, so a permission error is
+    recorded and the sweep continues.
+    """
+    collected: list[chat_monitor.TranscriptMessage] = []
+    skipped: list[str] = []
+    per_channel = max(1, int(limit) // max(1, len(channels)))
+    for channel in channels:
+        name = getattr(channel, "name", str(getattr(channel, "id", "?")))
+        try:
+            async for message in channel.history(limit=per_channel, after=after, oldest_first=False):
+                author = message.author
+                collected.append(
+                    chat_monitor.TranscriptMessage(
+                        channel_id=int(channel.id),
+                        channel_name=str(name),
+                        author_id=int(author.id),
+                        author_name=str(getattr(author, "display_name", None) or author),
+                        is_bot=bool(getattr(author, "bot", False)),
+                        created_at=message.created_at.timestamp(),
+                        content=str(message.content or ""),
+                    )
+                )
+        except discord.Forbidden:
+            skipped.append(f"#{name} (missing Read Message History)")
+        except Exception as exc:
+            log.warning("Monitor could not read channel %s: %s", name, exc)
+            skipped.append(f"#{name} ({type(exc).__name__})")
+        if len(collected) >= int(limit):
+            break
+    return collected[: int(limit)], skipped
+
+
+@registered_group_command(admin_server_group, name="ai_status", description="Show narrator health and OpenRouter free-route counters")
+async def admin_ai_status(interaction: discord.Interaction) -> None:
+    if not await require_admin(interaction):
+        return
+    await reply_long(interaction, chat_monitor.render_health(NARRATOR.health_snapshot()), ephemeral=False)
+
+
+@registered_group_command(admin_server_group, name="chat_digest", description="Read a channel's recent history and report what players are doing")
+@app_commands.describe(
+    channel="Channel to analyse (defaults to the channel you run this in)",
+    hours="How far back to read, in hours",
+    include_threads="Also sweep the channel's threads",
+)
+async def admin_chat_digest(
+    interaction: discord.Interaction,
+    channel: discord.TextChannel | None = None,
+    hours: int | None = None,
+    include_threads: bool = False,
+) -> None:
+    if not await require_admin(interaction):
+        return
+    target = channel or interaction.channel
+    if not isinstance(target, (discord.TextChannel, discord.Thread)):
+        await interaction.response.send_message(
+            "Choose a text channel or thread to analyse.", ephemeral=False
+        )
+        return
+
+    window = SETTINGS.monitor_lookback_hours if hours is None else max(1, min(720, int(hours)))
+    after = discord.utils.utcnow() - timedelta(hours=window)
+
+    targets: list[Any] = [target]
+    if include_threads and isinstance(target, discord.TextChannel):
+        targets.extend(list(target.threads))
+        try:
+            async for archived in target.archived_threads(limit=20):
+                targets.append(archived)
+        except Exception:
+            log.warning("Monitor could not enumerate archived threads", exc_info=True)
+
+    await interaction.response.defer(ephemeral=False)
+    messages, skipped = await _monitor_collect(
+        targets, limit=SETTINGS.monitor_max_messages, after=after
+    )
+
+    scope = f"<#{target.id}>"
+    if len(targets) > 1:
+        scope += f" + {len(targets) - 1} thread(s)"
+    scope += f" • last {window}h"
+
+    suffix = ""
+    if skipped:
+        suffix += "\n⚠️ Skipped: " + ", ".join(skipped)
+    if not SETTINGS.message_content_intent:
+        suffix += "\n\n" + MONITOR_INTENT_HINT
+
+    if not messages:
+        await reply_long(
+            interaction,
+            f"🔎 **Channel Monitor**\nScope: {scope}\nNo messages found in that window." + suffix,
+            ephemeral=False,
+        )
+        return
+
+    report = await chat_monitor.analyse_transcript(
+        AI_ROUTER if NARRATOR.provider == "openrouter" else None,
+        messages,
+        chunk_chars=SETTINGS.monitor_chunk_chars,
+        max_chunks=SETTINGS.monitor_max_chunks,
+    )
+    await audit_admin(
+        interaction,
+        "server.chat_digest",
+        target=str(target.id),
+        after={"hours": window, "messages": len(messages), "channels": len(targets)},
+    )
+    await reply_long(
+        interaction, chat_monitor.render_report(report, scope=scope) + suffix, ephemeral=False
+    )
+
+
 @registered_group_command(admin_world_group, name="events", description="List categorized active world events with keys and locations")
 async def admin_events(interaction: discord.Interaction) -> None:
     if not await require_admin(interaction):
@@ -4432,10 +4443,6 @@ async def begin(interaction: discord.Interaction) -> None:
     )
 
 
-GENDER_CHOICES = [
-    app_commands.Choice(name="Male", value="male"),
-    app_commands.Choice(name="Female", value="female"),
-]
 
 
 @registered_root_command(name="gender", description="Set Male or Female for gendered realm titles and forms of address", guild=GUILD)
@@ -4768,6 +4775,7 @@ async def aptitude_physique(interaction: discord.Interaction) -> None:
 @app_commands.choices(target=APTITUDE_TARGET_CHOICES)
 @serialized_user_action
 async def aptitude_temper(interaction: discord.Interaction, target: app_commands.Choice[str]) -> None:
+    await interaction.response.defer(ephemeral=False)
     c = await require_character(interaction)
     if not c:
         return
@@ -4784,7 +4792,7 @@ async def aptitude_temper(interaction: discord.Interaction, target: app_commands
             action_id=f"discord:{interaction.id}:aptitude.temper:{target.value}",
         )
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}", ephemeral=False)
+        await interaction.followup.send(f"❌ {exc}", ephemeral=False)
         return
     result = dict(envelope.get("result") or {})
     bundle = dict(result.get("aptitudes") or {})
@@ -4793,7 +4801,7 @@ async def aptitude_temper(interaction: discord.Interaction, target: app_commands
     progress = int(record.get(progress_key, 0))
     awarded = int(result.get("awarded", 0))
     cost = int(result.get("cost", 0))
-    await interaction.response.send_message(
+    await interaction.followup.send(
         f"🔥 **{target.name} Tempering**\nSpent **{cost}** essence and gained **+{awarded}%** progress.\n"
         f"Progress: **{progress}% / 100%**"
         + ("\n✨ The aptitude is ready for its next awakening/evolution attempt." if progress >= 100 else "")
@@ -4803,6 +4811,7 @@ async def aptitude_temper(interaction: discord.Interaction, target: app_commands
 @app_commands.choices(target=AWAKEN_TARGET_CHOICES)
 @serialized_user_action
 async def aptitude_awaken(interaction: discord.Interaction, target: app_commands.Choice[str]) -> None:
+    await interaction.response.defer(ephemeral=False)
     c = await require_character(interaction)
     if not c:
         return
@@ -4815,12 +4824,12 @@ async def aptitude_awaken(interaction: discord.Interaction, target: app_commands
             action_id=f"discord:{interaction.id}:aptitude.awaken:{target.value}",
         )
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}", ephemeral=False)
+        await interaction.followup.send(f"❌ {exc}", ephemeral=False)
         return
     result = dict(envelope.get("result") or {})
     roll = SimpleNamespace(**dict(result.get("roll") or {}))
     state = str(result.get("state") or "unknown")
-    await interaction.response.send_message(
+    await interaction.followup.send(
         f"✨ **{target.name} Awakening**\n{roll_line(roll)}\n"
         + (
             f"The {target.name.lower()} awakens successfully. State: **{state.title()}**."
@@ -4833,6 +4842,7 @@ async def aptitude_awaken(interaction: discord.Interaction, target: app_commands
 @app_commands.choices(target=APTITUDE_TARGET_CHOICES)
 @serialized_user_action
 async def aptitude_evolve(interaction: discord.Interaction, target: app_commands.Choice[str]) -> None:
+    await interaction.response.defer(ephemeral=False)
     c = await require_character(interaction)
     if not c:
         return
@@ -4845,7 +4855,7 @@ async def aptitude_evolve(interaction: discord.Interaction, target: app_commands
             action_id=f"discord:{interaction.id}:aptitude.evolve:{target.value}",
         )
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}", ephemeral=False)
+        await interaction.followup.send(f"❌ {exc}", ephemeral=False)
         return
     result = dict(envelope.get("result") or {})
     roll = SimpleNamespace(**dict(result.get("roll") or {}))
@@ -4862,7 +4872,7 @@ async def aptitude_evolve(interaction: discord.Interaction, target: app_commands
             f"Stage: **{int(outcome.get('stage', 0))}** • Stability: **{int(outcome.get('stability', 0))}%** • "
             f"Instability: **{int(outcome.get('instability', 0))}%**"
         )
-    await interaction.response.send_message(
+    await interaction.followup.send(
         f"🌌 **{target.name} Evolution**\n{roll_line(roll)}\n{outcome_text}\n"
         + ("The evolution succeeds." if bool(getattr(roll, "success", False)) else "The failure caused a persistent setback that must be harmonized or overcome.")
     )
@@ -4871,6 +4881,7 @@ async def aptitude_evolve(interaction: discord.Interaction, target: app_commands
 @app_commands.choices(target=APTITUDE_TARGET_CHOICES)
 @serialized_user_action
 async def aptitude_harmonize(interaction: discord.Interaction, target: app_commands.Choice[str]) -> None:
+    await interaction.response.defer(ephemeral=False)
     c = await require_character(interaction)
     if not c:
         return
@@ -4887,7 +4898,7 @@ async def aptitude_harmonize(interaction: discord.Interaction, target: app_comma
             action_id=f"discord:{interaction.id}:aptitude.harmonize:{target.value}",
         )
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}", ephemeral=False)
+        await interaction.followup.send(f"❌ {exc}", ephemeral=False)
         return
     result = dict(envelope.get("result") or {})
     bundle = dict(result.get("aptitudes") or {})
@@ -5085,6 +5096,7 @@ async def inventory(interaction: discord.Interaction) -> None:
 @registered_root_command(name="cultivate", description="Meditate and gather cultivation essence", guild=GUILD)
 @serialized_user_action
 async def cultivate(interaction: discord.Interaction) -> None:
+    await interaction.response.defer(ephemeral=False)
     c = await require_character(interaction)
     if not c:
         return
@@ -5097,7 +5109,7 @@ async def cultivate(interaction: discord.Interaction) -> None:
             action_id=f"discord:{interaction.id}:cultivation.train",
         )
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}", ephemeral=False)
+        await interaction.followup.send(f"❌ {exc}", ephemeral=False)
         return
     result = dict(envelope.get("result") or {})
     gain, total, cost = int(result.get("gain", 0)), int(result.get("total", 0)), int(result.get("cost", 0))
@@ -5122,7 +5134,7 @@ async def cultivate(interaction: discord.Interaction) -> None:
     ready = ""
     if result.get("ready"):
         ready = "\n✨ Stage 9 is full. Choose **/quest → Realm Perfection → Start** or **/quest → Main Progression → Breakthrough**." if int(c.get("phase", 1)) == 9 else "\n✨ You are ready to attempt **/quest → Main Progression → Breakthrough**."
-    await interaction.response.send_message(
+    await interaction.followup.send(
         f"🧘 **{c['name']} cultivates.**\nYou circulate qi through your meridians and gain **+{gain} cultivation essence**.\nProgress: **{total}/{cost}**{extra}{ready}"
     )
 seclusion_group = app_commands.Group(
@@ -5269,6 +5281,7 @@ async def seclusion_end(interaction: discord.Interaction) -> None:
 @registered_root_command(name="breakthrough", description="Attempt to advance your cultivation stage", guild=GUILD)
 @serialized_user_action
 async def breakthrough(interaction: discord.Interaction, confirm: bool = False) -> None:
+    await interaction.response.defer(ephemeral=False)
     c = await require_character(interaction)
     if not c:
         return
@@ -5284,14 +5297,13 @@ async def breakthrough(interaction: discord.Interaction, confirm: bool = False) 
         message = str(exc)
         if "perfection choice requires explicit confirmation" in message:
             message = "⚠️ **Stage 9 choice**\nYou can pursue **/quest → Realm Perfection → Start** for a stronger long-term foundation, or explicitly confirm this breakthrough to skip it."
-        await interaction.response.send_message(f"❌ {message}" if not message.startswith("⚠️") else message, ephemeral=False)
+        await interaction.followup.send(f"❌ {message}" if not message.startswith("⚠️") else message, ephemeral=False)
         return
     result = dict(envelope.get("result") or {})
     roll = SimpleNamespace(**dict(result.get("roll") or {}))
     next_realm = str(result.get("to_realm") or "Unknown Realm")
     next_phase = int(result.get("to_stage", 1))
     success = bool(result.get("success"))
-    await interaction.response.defer()
     breakthrough_context = await NARRATOR_CONTEXT.build(c, scene_type="cultivation breakthrough", query_text=f"breakthrough {next_realm} stage {next_phase}")
     try:
         narration = await NARRATOR.narrate_breakthrough(c, next_realm, next_phase, roll_line(roll), success, scene_context=breakthrough_context.text)
@@ -5362,6 +5374,7 @@ async def body_sheet(interaction: discord.Interaction) -> None:
 @registered_group_command(body_group, name="cultivate", description="Temper your body and gather body-cultivation essence")
 @serialized_user_action
 async def body_cultivate(interaction: discord.Interaction) -> None:
+    await interaction.response.defer(ephemeral=False)
     c = await require_character(interaction)
     if not c:
         return
@@ -5374,7 +5387,7 @@ async def body_cultivate(interaction: discord.Interaction) -> None:
             action_id=f"discord:{interaction.id}:cultivation.body_train",
         )
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}", ephemeral=False)
+        await interaction.followup.send(f"❌ {exc}", ephemeral=False)
         return
     result = dict(envelope.get("result") or {})
     gain, total, cost = int(result.get("gain", 0)), int(result.get("total", 0)), int(result.get("cost", 0))
@@ -5390,11 +5403,12 @@ async def body_cultivate(interaction: discord.Interaction) -> None:
         extra += f"\n★ Body refinement deepens by **+{int(result['perfection_gain'])}%**."
     if result.get("ready"):
         extra += "\n✨ Body Stage 9 is full. Choose **/quest → Body Perfection → Start** or **/cultivation → Body Cultivation → Breakthrough**." if int(c.get("body_phase", 1)) == 9 else "\n✨ Your body is ready for **/cultivation → Body Cultivation → Breakthrough**."
-    await interaction.response.send_message(f"💪 **{c['name']} tempers the body.**\nYou refine flesh, blood, bone, and meridians for **+{gain} body essence**.\nProgress: **{total}/{cost}**{extra}")
+    await interaction.followup.send(f"💪 **{c['name']} tempers the body.**\nYou refine flesh, blood, bone, and meridians for **+{gain} body essence**.\nProgress: **{total}/{cost}**{extra}")
 
 @registered_group_command(body_group, name="breakthrough", description="Attempt to advance your body-cultivation stage")
 @serialized_user_action
 async def body_breakthrough(interaction: discord.Interaction, confirm: bool = False) -> None:
+    await interaction.response.defer(ephemeral=False)
     c = await require_character(interaction)
     if not c:
         return
@@ -5410,7 +5424,7 @@ async def body_breakthrough(interaction: discord.Interaction, confirm: bool = Fa
         message = str(exc)
         if "perfection choice requires explicit confirmation" in message:
             message = "⚠️ **Body Stage 9 choice**\nPursue **/quest → Body Perfection → Start** for a stronger physical foundation, or explicitly confirm this breakthrough to skip it."
-        await interaction.response.send_message(f"❌ {message}" if not message.startswith("⚠️") else message, ephemeral=False)
+        await interaction.followup.send(f"❌ {message}" if not message.startswith("⚠️") else message, ephemeral=False)
         return
     result = dict(envelope.get("result") or {})
     roll = SimpleNamespace(**dict(result.get("roll") or {}))
@@ -5434,7 +5448,7 @@ async def body_breakthrough(interaction: discord.Interaction, confirm: bool = Fa
             text += f"\n🕯️ Past-life memory awakened: **{int(legacy.get('awakened_memory',0))}% / {int(legacy.get('memory_seed',0))}%**."
     else:
         text += f"\n⚠️ The tempering fails; **{int(result.get('failure_loss',0))} body essence** is lost, with no permanent mutilation."
-    await interaction.response.send_message(text)
+    await interaction.followup.send(text)
 
 bodyperfect_group = app_commands.Group(name="bodyperfect", description="Long-form Stage 9 Body Realm Perfection")
 
@@ -5442,6 +5456,7 @@ bodyperfect_group = app_commands.Group(name="bodyperfect", description="Long-for
 @registered_group_command(bodyperfect_group, name="start", description="Begin the optional Perfect Body Path at Body Stage 9")
 @serialized_user_action
 async def bodyperfect_start(interaction: discord.Interaction) -> None:
+    await interaction.response.defer(ephemeral=False)
     c = await require_character(interaction)
     if not c:
         return
@@ -5453,11 +5468,11 @@ async def bodyperfect_start(interaction: discord.Interaction) -> None:
             action_id=f"discord:{interaction.id}:perfection.body_start",
         )
     except GameEngineError as exc:
-        await interaction.response.send_message(f"Perfect Body Path could not begin: {exc}", ephemeral=False)
+        await interaction.followup.send(f"Perfect Body Path could not begin: {exc}", ephemeral=False)
         return
     ri = int(c.get("body_realm_index", 0))
     q = WORLD.body_perfection_quest(ri, 0, c)
-    await interaction.response.send_message(
+    await interaction.followup.send(
         f"★ **Perfect Body Path begun: {WORLD.body_realm_name(ri, c.get('gender'))}**\n"
         f"Training can contribute **{WORLD.body_perfection_training_cap()}%**; the remaining progress comes from seven physical trials.\n\n"
         f"First quest: **{q['title']}**\n{q['description']}\nUse **/quest → Body Perfection → Quest**."
@@ -5561,6 +5576,7 @@ async def bodyperfect_clues(interaction: discord.Interaction) -> None:
 @registered_group_command(bodyperfect_group, name="trial", description="Attempt the final Perfect Body Realm trial")
 @serialized_user_action
 async def bodyperfect_trial(interaction: discord.Interaction) -> None:
+    await interaction.response.defer(ephemeral=False)
     c = await require_character(interaction)
     if not c:
         return
@@ -5572,7 +5588,7 @@ async def bodyperfect_trial(interaction: discord.Interaction) -> None:
             action_id=f"discord:{interaction.id}:perfection.body_trial",
         )
     except GameEngineError as exc:
-        await interaction.response.send_message(f"Final Body Perfection trial could not resolve: {exc}", ephemeral=False)
+        await interaction.followup.send(f"Final Body Perfection trial could not resolve: {exc}", ephemeral=False)
         return
     result = dict(envelope.get("result") or {})
     lines = ["💥 **FINAL BODY REALM PERFECTION TRIAL**"]
@@ -5594,6 +5610,7 @@ async def bodyperfect_trial(interaction: discord.Interaction) -> None:
 @registered_group_command(bodyperfect_group, name="abandon", description="Abandon the active Perfect Body Path")
 @serialized_user_action
 async def bodyperfect_abandon(interaction: discord.Interaction) -> None:
+    await interaction.response.defer(ephemeral=False)
     c = await require_character(interaction)
     if not c:
         return
@@ -5604,12 +5621,12 @@ async def bodyperfect_abandon(interaction: discord.Interaction) -> None:
             action_id=f"discord:{interaction.id}:perfection.body_abandon",
         )
     except GameEngineError as exc:
-        await interaction.response.send_message(f"Perfect Body Path could not be abandoned: {exc}", ephemeral=False)
+        await interaction.followup.send(f"Perfect Body Path could not be abandoned: {exc}", ephemeral=False)
         return
     if not bool(dict(envelope.get("result") or {}).get("abandoned")):
-        await interaction.response.send_message("No active Perfect Body Path to abandon.", ephemeral=False)
+        await interaction.followup.send("No active Perfect Body Path to abandon.", ephemeral=False)
         return
-    await interaction.response.send_message("The Perfect Body Path has been abandoned. You may now break through normally.", ephemeral=False)
+    await interaction.followup.send("The Perfect Body Path has been abandoned. You may now break through normally.", ephemeral=False)
 
 
 
@@ -6420,10 +6437,27 @@ async def location_autocomplete(
     return [app_commands.Choice(name=name[:100], value=name[:100]) for name in sorted(names)[:25]]
 
 
-@registered_root_command(name="travel", description="Travel to another known location", guild=GUILD)
+travel_group = app_commands.Group(name="travel", description="Travel to another known location")
+
+
+def _discord_arrival_display(result: dict) -> str:
+    """Render a road journey's arrival as a live, self-updating Discord
+    timestamp when the Go engine could resolve one, falling back to the raw
+    game-minute figure (e.g. when the world clock is frozen at scale=0, or
+    the world_state row can't be read) so the message never goes blank.
+    """
+    arrival_ts = result.get("arrival_unix_ts")
+    if isinstance(arrival_ts, (int, float)) and arrival_ts > 0:
+        ts = int(arrival_ts)
+        return f"<t:{ts}:R> (<t:{ts}:t>)"
+    return f"game minute {int(result.get('arrival_game_minute') or 0)}"
+
+
+@registered_group_command(travel_group, name="go", description="Travel to another known location")
 @app_commands.autocomplete(destination=location_autocomplete)
 @serialized_user_action
 async def travel(interaction: discord.Interaction, destination: str) -> None:
+    await interaction.response.defer(ephemeral=False)
     c = await require_character(interaction)
     if not c:
         return
@@ -6439,20 +6473,19 @@ async def travel(interaction: discord.Interaction, destination: str) -> None:
             action_id=f"discord:{interaction.id}:exploration.travel",
         )
     except GameEngineError as exc:
-        await interaction.response.send_message(f"Travel failed: {exc}",ephemeral=False)
+        await interaction.followup.send(f"Travel failed: {exc}",ephemeral=False)
         return
     result=dict(envelope.get("result") or {})
     desc=str(result.get("description") or "")
     safe="\n🛡️ This location is protected by laws or formations." if bool(result.get("safe_zone")) else ""
     road=""
     if bool(result.get("road_connection")):
-        minutes=int(result.get("travel_minutes") or 0)
         danger=int(result.get("road_danger") or 0)
         chance=int(result.get("road_encounter_chance_percent") or 0)
-        arrival=int(result.get("arrival_game_minute") or 0)
+        arrival_display=_discord_arrival_display(result)
         road=(
-            f"\n⏱️ Road time **{minutes} game-minutes** • Danger **{danger}/45** • "
-            f"Encounter risk **{chance}%** • Arrival **game minute {arrival}**."
+            f"\n⏱️ Arrival **{arrival_display}** • Danger **{danger}/45** • "
+            f"Encounter risk **{chance}%**."
             "\n🚶 You remain in transit and cannot take authoritative actions until arrival."
         )
         encounter=result.get("road_encounter")
@@ -6469,7 +6502,7 @@ async def travel(interaction: discord.Interaction, destination: str) -> None:
         rows=await DB.get_realm_hub_channels(interaction.guild.id)
         row=next((r for r in rows if str(r.get("world_name"))==world_name),None)
         if row: meeting=f"\n💬 Public meeting channel: <#{int(row['channel_id'])}>."
-    await interaction.response.send_message(
+    await interaction.followup.send(
         f"🗺️ **{c['name']} travels to {result.get('destination') or destination}.**\n{desc}{road}{safe}{meeting}"
     )
     for location in sorted(undiscovered_image_locations):
@@ -6477,6 +6510,35 @@ async def travel(interaction: discord.Interaction, destination: str) -> None:
             result, location, previously_discovered=False
         ):
             await send_location_discovery_image(interaction, location)
+
+
+@registered_group_command(travel_group, name="status", description="Show your destination and a live countdown while you are traveling")
+async def travel_status(interaction: discord.Interaction) -> None:
+    c = await require_character(interaction)
+    if not c:
+        return
+    try:
+        # ENGINE.action() already unwraps the HTTP envelope's "result" field
+        # (unlike the authoritative-mutation client method, which hands back
+        # the full envelope) - the query's own fields are the top level here.
+        result = dict(await ENGINE.action("exploration.travel_status", interaction.user.id, {}) or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"Travel status could not be read: {exc}", ephemeral=False)
+        return
+    if not bool(result.get("traveling")):
+        await interaction.response.send_message(
+            f"🗺️ **{c['name']}** is not currently traveling — at **{await character_location_display(c)}**.",
+            ephemeral=False,
+        )
+        return
+    arrival_display = _discord_arrival_display(result)
+    remaining = int(result.get("remaining_game_minutes") or 0)
+    text = (
+        f"🚶 **{c['name']}** is en route to **{result.get('destination', 'an unknown destination')}**.\n"
+        f"⏱️ Arrival **{arrival_display}** • {remaining} game-minutes remaining."
+        "\nYou cannot take authoritative actions until you arrive."
+    )
+    await interaction.response.send_message(text, ephemeral=False)
 
 
 async def local_npc_autocomplete(
@@ -6657,6 +6719,7 @@ async def _resolve_scene_action(
     interaction: discord.Interaction, *, action_key: str, target: str, detail: str,
     character: dict[str, Any] | None = None,
 ) -> None:
+    await interaction.response.defer(ephemeral=False)
     c = character or await require_character(interaction)
     if not c:
         return
@@ -6928,13 +6991,82 @@ class SceneActionView(discord.ui.View):
         return embed
 
 
+# ---------------------------------------------------------------------------
+# Scene Action panel wiring
+# ---------------------------------------------------------------------------
+# The panel itself lives in app/bot/scene_layout.py, which imports discord and
+# nothing else from the project: that is what lets the whole component tree be
+# built and counted in a build sandbox with no discord.py installed, so the
+# 40-component budget is checked here rather than by a player hitting it.
+# Everything game-specific is injected from this module.
+async def _scene_reload_state(owner_id: int) -> dict[str, Any] | None:
+    """Re-read one player's scene. Returning None leaves the panel as it was."""
+    try:
+        character = await DB.get_character(int(owner_id))
+        if not character:
+            return None
+        return {
+            "character": dict(character),
+            "npcs": await _scene_action_targets(character),
+            "location_display": await character_location_display(character),
+        }
+    except Exception:
+        log.warning("Scene Action panel could not reload state", exc_info=True)
+        return None
+
+
+async def _scene_open_detail_modal(
+    interaction: discord.Interaction, action_key: str, target: str
+) -> None:
+    await interaction.response.send_modal(
+        SceneActionDetailModal(action_key=action_key, target=target)
+    )
+
+
+def scene_action_panel(
+    owner_id: int,
+    character: dict[str, Any],
+    npcs: list[str],
+    location_display: str,
+    *,
+    action_key: str = "observe",
+) -> tuple[discord.ui.View, dict[str, Any]]:
+    """Return ``(view, send kwargs)``.
+
+    A Components V2 message cannot carry an embed and the classic fallback needs
+    one, so the kwargs travel with the view. Four call sites used to build the
+    send arguments themselves; returning both together is what stops the two
+    paths drifting apart.
+    """
+    if scene_layout.LAYOUT_COMPONENTS_AVAILABLE:
+        layout = scene_layout.SceneActionLayoutView(
+            owner_id=owner_id,
+            profiles=SCENE_ACTION_TYPES,
+            character=character,
+            npcs=npcs,
+            location_display=location_display,
+            reload_state=_scene_reload_state,
+            open_modal=_scene_open_detail_modal,
+            action_key=action_key,
+        )
+        return layout, {"view": layout}
+    classic = SceneActionView(owner_id, character, npcs, location_display)
+    if action_key in SCENE_ACTION_TYPES:
+        classic.action_key = action_key
+        classic.target = "Environment"
+        classic.refresh_components()
+    return classic, {"embed": classic.embed(), "view": classic}
+
+
 @registered_root_command(name="action", description="Open the guided Scene Action panel", guild=GUILD)
 async def scene_action_command(interaction: discord.Interaction) -> None:
     c = await require_character(interaction)
     if not c:
         return
     npcs = await _scene_action_targets(c)
-    view = SceneActionView(interaction.user.id, c, npcs, await character_location_display(c))
+    _view, panel_kwargs = scene_action_panel(
+        interaction.user.id, c, npcs, await character_location_display(c)
+    )
 
     target_thread: discord.Thread | None = None
     if interaction.guild is not None and isinstance(interaction.channel, discord.Thread):
@@ -6957,16 +7089,14 @@ async def scene_action_command(interaction: discord.Interaction) -> None:
 
     if target_thread is not None:
         try:
-            panel = await target_thread.send(embed=view.embed(), view=view)
+            panel = await target_thread.send(**panel_kwargs)
             await interaction.response.send_message(
                 f"🎭 Your Scene Action panel is open in {target_thread.mention}: {panel.jump_url}", ephemeral=False
             )
             return
         except discord.HTTPException:
             log.exception("Could not post Scene Action panel to private scene thread")
-    await interaction.response.send_message(
-        embed=view.embed(), view=view, ephemeral=False
-    )
+    await interaction.response.send_message(ephemeral=False, **panel_kwargs)
 
 
 ATTRIBUTE_CHOICES = [
@@ -7180,6 +7310,7 @@ async def sense_command(
 @registered_root_command(name="conceal", description="Turn your cultivation-aura concealment on or off", guild=GUILD)
 @serialized_user_action
 async def conceal_command(interaction: discord.Interaction, active: bool) -> None:
+    await interaction.response.defer(ephemeral=False)
     c = await require_character(interaction)
     if not c:
         return
@@ -7191,11 +7322,11 @@ async def conceal_command(interaction: discord.Interaction, active: bool) -> Non
             action_id=f"discord:{interaction.id}:sense.conceal",
         )
     except GameEngineError as exc:
-        await interaction.response.send_message(f"Aura concealment could not change: {exc}", ephemeral=False)
+        await interaction.followup.send(f"Aura concealment could not change: {exc}", ephemeral=False)
         return
     result = dict(envelope.get("result") or {})
     strength = int(result.get("concealment_strength", 0))
-    await interaction.response.send_message(
+    await interaction.followup.send(
         f"{'🌑' if active else '✨'} Aura concealment **{'enabled' if active else 'disabled'}**.\n"
         f"Current concealment strength: **{strength}**.\n"
         "Concealment suppresses your readable aura; it does not make you physically invisible.",
@@ -7211,6 +7342,7 @@ async def check(
     difficulty: app_commands.Choice[int],
     action: str,
 ) -> None:
+    await interaction.response.defer(ephemeral=False)
     c = await require_character(interaction)
     if not c:
         return
@@ -7230,7 +7362,7 @@ async def check(
             action_id=f"discord:{interaction.id}:check.resolve",
         )
     except GameEngineError as exc:
-        await interaction.response.send_message(f"Check could not be resolved: {exc}", ephemeral=False)
+        await interaction.followup.send(f"Check could not be resolved: {exc}", ephemeral=False)
         return
     result = SimpleNamespace(**dict(envelope.get("result") or {}))
     fixed = f"Action: {action}\n{roll_line(result)}"
@@ -7246,7 +7378,6 @@ async def check(
     social_context = (await NARRATOR_CONTEXT.build(
         c, scene_type="freeform roleplay", lineage_context=lineage_context,
     )).text
-    await interaction.response.defer()
     try:
         narration = await NARRATOR.narrate_action(
             character=c,
@@ -7394,6 +7525,7 @@ perfect_group = app_commands.Group(name="perfect", description="Long-form Stage 
 @registered_group_command(perfect_group, name="start", description="Begin the optional Perfect Path at Stage 9")
 @serialized_user_action
 async def perfect_start(interaction: discord.Interaction) -> None:
+    await interaction.response.defer(ephemeral=False)
     c = await require_character(interaction)
     if not c:
         return
@@ -7404,10 +7536,10 @@ async def perfect_start(interaction: discord.Interaction) -> None:
             action_id=f"discord:{interaction.id}:perfection.start",
         )
     except GameEngineError as exc:
-        await interaction.response.send_message(f"Perfect Path could not begin: {exc}", ephemeral=False)
+        await interaction.followup.send(f"Perfect Path could not begin: {exc}", ephemeral=False)
         return
     quest = WORLD.perfection_quest(int(c["realm_index"]), 0, c)
-    await interaction.response.send_message(
+    await interaction.followup.send(
         f"★ **Perfect Path begun: {WORLD.realm_name(c['realm_index'], c.get('gender'))}**\n"
         f"Perfection starts at **0%**. Training contributes at most **{WORLD.perfection_training_cap()}%**; the rest comes from seven long quests.\n\n"
         f"**First Quest — {quest['title']}**\n{quest['description']}\nPreparation: 0/{quest['preparation_required']}\nUse **/quest → Realm Perfection → Quest**.",
@@ -7489,6 +7621,7 @@ async def perfect_clues(interaction: discord.Interaction) -> None:
 @registered_group_command(perfect_group, name="trial", description="Attempt the final Realm Perfection trial")
 @serialized_user_action
 async def perfect_trial(interaction: discord.Interaction) -> None:
+    await interaction.response.defer(ephemeral=False)
     c = await require_character(interaction)
     if not c:
         return
@@ -7500,7 +7633,7 @@ async def perfect_trial(interaction: discord.Interaction) -> None:
             action_id=f"discord:{interaction.id}:perfection.trial",
         )
     except GameEngineError as exc:
-        await interaction.response.send_message(f"Final Perfection trial could not resolve: {exc}", ephemeral=False)
+        await interaction.followup.send(f"Final Perfection trial could not resolve: {exc}", ephemeral=False)
         return
     result = dict(envelope.get("result") or {})
     lines = ["🌌 **FINAL REALM PERFECTION TRIAL**"]
@@ -7518,6 +7651,7 @@ async def perfect_trial(interaction: discord.Interaction) -> None:
 @registered_group_command(perfect_group, name="abandon", description="Abandon the active Perfect Path and lose its progress")
 @serialized_user_action
 async def perfect_abandon(interaction: discord.Interaction) -> None:
+    await interaction.response.defer(ephemeral=False)
     c = await require_character(interaction)
     if not c:
         return
@@ -7528,12 +7662,12 @@ async def perfect_abandon(interaction: discord.Interaction) -> None:
             action_id=f"discord:{interaction.id}:perfection.abandon",
         )
     except GameEngineError as exc:
-        await interaction.response.send_message(f"Perfect Path could not be abandoned: {exc}", ephemeral=False)
+        await interaction.followup.send(f"Perfect Path could not be abandoned: {exc}", ephemeral=False)
         return
     if not bool(dict(envelope.get("result") or {}).get("abandoned")):
-        await interaction.response.send_message("No active Perfect Path to abandon.", ephemeral=False)
+        await interaction.followup.send("No active Perfect Path to abandon.", ephemeral=False)
         return
-    await interaction.response.send_message("The Perfect Path has been abandoned. You may now break through normally.", ephemeral=False)
+    await interaction.followup.send("The Perfect Path has been abandoned. You may now break through normally.", ephemeral=False)
 
 
 # ---------------- Secret Realm commands ----------------
@@ -7669,6 +7803,7 @@ async def secret_explore(interaction: discord.Interaction) -> None:
 @registered_group_command(secret_group, name="leave", description="Leave your active secret realm voluntarily")
 @serialized_user_action
 async def secret_leave(interaction: discord.Interaction) -> None:
+    await interaction.response.defer(ephemeral=False)
     c = await require_character(interaction)
     if not c:
         return
@@ -7679,23 +7814,14 @@ async def secret_leave(interaction: discord.Interaction) -> None:
             action_id=f"discord:{interaction.id}:secret_realm.leave",
         )
     except GameEngineError as exc:
-        await interaction.response.send_message(f"You cannot leave the secret realm cleanly: {exc}", ephemeral=False)
+        await interaction.followup.send(f"You cannot leave the secret realm cleanly: {exc}", ephemeral=False)
         return
     left = bool(dict(envelope.get("result") or {}).get("left"))
     message = (
         "You withdraw before the secret realm seals. Rewards already obtained are kept."
         if left else "You are not currently inside an active secret realm."
     )
-    await interaction.response.send_message(message, ephemeral=False)
-
-
-
-# ---------- Sect lineage / forms of address ----------
-ADDRESS_STYLE_CHOICES = [
-    app_commands.Choice(name="Masculine — Senior Brother / Junior Brother", value="masculine"),
-    app_commands.Choice(name="Feminine — Senior Sister / Junior Sister", value="feminine"),
-    app_commands.Choice(name="Neutral — Senior / Junior Martial Sibling", value="neutral"),
-]
+    await interaction.followup.send(message, ephemeral=False)
 
 
 
@@ -7936,15 +8062,6 @@ async def scene_status(interaction: discord.Interaction) -> None:
 storage_group = app_commands.Group(name="storage", description="Manage your spatial pouch, ring, or inner-space treasure")
 
 
-async def carried_item_autocomplete(interaction: discord.Interaction,current:str)->list[app_commands.Choice[str]]:
-    inv=await DB.get_inventory(interaction.user.id); needle=current.casefold().strip(); out=[]
-    for item_id,qty in inv.items():
-        name=WORLD.item_name(item_id)
-        if not needle or needle in name.casefold() or needle in item_id.casefold():
-            out.append(app_commands.Choice(name=f"{name} x{qty}"[:100],value=item_id[:100]))
-    return out[:25]
-
-
 async def stored_item_autocomplete(interaction: discord.Interaction,current:str)->list[app_commands.Choice[str]]:
     storage=await DB.get_storage(interaction.user.id) or {}; needle=current.casefold().strip(); out=[]
     for item_id,qty in storage.get("items",{}).items():
@@ -7970,28 +8087,30 @@ async def storage_status(interaction:discord.Interaction)->None:
 @app_commands.autocomplete(item=carried_item_autocomplete)
 @serialized_user_action
 async def storage_deposit(interaction:discord.Interaction,item:str,quantity:app_commands.Range[int,1,999999]=1)->None:
+    await interaction.response.defer(ephemeral=False)
     if not await require_character(interaction): return
     wt=await current_world_time()
     try:
         envelope=await ENGINE.authoritative_action("storage.deposit",interaction.user.id,{"item_id":item,"quantity":int(quantity)},action_id=f"discord:{interaction.id}:storage.deposit")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
-    await interaction.response.send_message(f"📦 Stored **{WORLD.item_name(item)} x{quantity}**.",ephemeral=False)
+        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+    await interaction.followup.send(f"📦 Stored **{WORLD.item_name(item)} x{quantity}**.",ephemeral=False)
 
 
 @registered_group_command(storage_group, name="withdraw",description="Take items out of spatial storage")
 @app_commands.autocomplete(item=stored_item_autocomplete)
 @serialized_user_action
 async def storage_withdraw(interaction:discord.Interaction,item:str,quantity:app_commands.Range[int,1,999999]=1)->None:
+    await interaction.response.defer(ephemeral=False)
     if not await require_character(interaction): return
     wt=await current_world_time()
     try:
         envelope=await ENGINE.authoritative_action("storage.withdraw",interaction.user.id,{"item_id":item,"quantity":int(quantity)},action_id=f"discord:{interaction.id}:storage.withdraw")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
-    await interaction.response.send_message(f"🎒 Withdrew **{WORLD.item_name(item)} x{quantity}**.",ephemeral=False)
+        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+    await interaction.followup.send(f"🎒 Withdrew **{WORLD.item_name(item)} x{quantity}**.",ephemeral=False)
 
 
 auction_group = app_commands.Group(name="auction", description="Use protected Xianxia auction houses and competitive bidding")
@@ -8004,19 +8123,21 @@ def _house_for_character(c:dict):
 @registered_group_command(auction_group, name="enter",description="Enter the local protected auction hall")
 @serialized_user_action
 async def auction_enter(interaction:discord.Interaction)->None:
+    await interaction.response.defer(ephemeral=False)
     if not await require_character(interaction): return
     wt=await current_world_time()
     try:
         envelope=await ENGINE.authoritative_action("auction.enter",interaction.user.id,{},action_id=f"discord:{interaction.id}:auction.enter")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
-    await interaction.response.send_message(f"🏮 You enter **{result.get('name','the auction hall')}**. Hidden experts and formations suppress violence inside.\n🛡️ **Protection applies only inside the hall. The moment you leave through the doors, it ends.**",ephemeral=False)
+        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+    await interaction.followup.send(f"🏮 You enter **{result.get('name','the auction hall')}**. Hidden experts and formations suppress violence inside.\n🛡️ **Protection applies only inside the hall. The moment you leave through the doors, it ends.**",ephemeral=False)
 
 
 @registered_group_command(auction_group, name="leave",description="Leave the auction hall; its protection ends at the door")
 @serialized_user_action
 async def auction_leave(interaction:discord.Interaction)->None:
+    await interaction.response.defer(ephemeral=False)
     c=await require_character(interaction)
     if not c:return
     wt=await current_world_time()
@@ -8024,13 +8145,13 @@ async def auction_leave(interaction:discord.Interaction)->None:
         envelope=await ENGINE.authoritative_action("auction.leave",interaction.user.id,{},action_id=f"discord:{interaction.id}:auction.leave")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
+        await interaction.followup.send(f"❌ {exc}",ephemeral=False);return
     lines=[f"🚪 You step out of **{result.get('name','the auction hall')}** into **{result.get('outside','outside')}**.","The Pavilion's protection ends at the door."]
     incident=dict(result.get('incident') or {})
     if incident.get('triggered'):
         if incident.get('battle_id'): lines.append(f"⚔️ A stronger pursuer ambushed you. Battle **#{incident['battle_id']}** has begun.")
         else: lines.append("🌑 Someone took an interest in your auction purchase after you left the Pavilion.")
-    await interaction.response.send_message("\n".join(lines),ephemeral=False)
+    await interaction.followup.send("\n".join(lines),ephemeral=False)
 
 
 @registered_group_command(auction_group, name="browse",description="Browse active lots in the current auction house")
@@ -8091,14 +8212,15 @@ async def auction_sell(
 @registered_group_command(auction_group, name="bid",description="Place an escrowed bid on an active auction lot")
 @serialized_user_action
 async def auction_bid(interaction:discord.Interaction,auction_id:int,amount:app_commands.Range[int,1,2000000000])->None:
+    await interaction.response.defer(ephemeral=False)
     if not await require_character(interaction): return
     wt=await current_world_time()
     try:
         envelope=await ENGINE.authoritative_action("auction.bid",interaction.user.id,{"auction_id":int(auction_id),"amount":int(amount)},action_id=f"discord:{interaction.id}:auction.bid")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
-    await interaction.response.send_message(f"🔨 Bid accepted on lot `#{auction_id}`: **{amount} {WORLD.currency_name(str(result.get('currency_id','low_spirit_stone')))}**.",ephemeral=False)
+        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+    await interaction.followup.send(f"🔨 Bid accepted on lot `#{auction_id}`: **{amount} {WORLD.currency_name(str(result.get('currency_id','low_spirit_stone')))}**.",ephemeral=False)
 
 
 battle_group = app_commands.Group(name="battle",description="Resolve active danger scenes such as auction-door ambushes")
@@ -8828,6 +8950,7 @@ async def condition_status(interaction: discord.Interaction) -> None:
 @app_commands.autocomplete(condition=condition_autocomplete)
 @serialized_user_action
 async def condition_treat(interaction: discord.Interaction, condition: str) -> None:
+    await interaction.response.defer(ephemeral=False)
     c = await require_character(interaction)
     if not c:
         return
@@ -8839,7 +8962,7 @@ async def condition_treat(interaction: discord.Interaction, condition: str) -> N
             action_id=f"discord:{interaction.id}:condition.treat:{condition}",
         )
     except GameEngineError as exc:
-        await interaction.response.send_message(f"Condition treatment could not resolve: {exc}", ephemeral=False)
+        await interaction.followup.send(f"Condition treatment could not resolve: {exc}", ephemeral=False)
         return
     result = dict(envelope.get("result") or {})
     roll = SimpleNamespace(**dict(result.get("roll") or {}))
@@ -8848,7 +8971,7 @@ async def condition_treat(interaction: discord.Interaction, condition: str) -> N
                    if bool(result.get("resolved")) else f"Severity falls to **{int(result.get('severity_after',0))}/5**.")
     else:
         outcome = "The treatment fails. The medicine is consumed, but the condition does not worsen."
-    await interaction.response.send_message(
+    await interaction.followup.send(
         f"🩺 **Treat {result.get('name', condition)}**\n{roll_line(roll)}\n{outcome}", ephemeral=False,
     )
 
@@ -8908,6 +9031,7 @@ TRIBULATION_PATH_CHOICES = [
 @app_commands.choices(path=TRIBULATION_PATH_CHOICES)
 @serialized_user_action
 async def tribulation_prepare(interaction: discord.Interaction, path: app_commands.Choice[str] | None = None) -> None:
+    await interaction.response.defer(ephemeral=False)
     c = await require_character(interaction)
     if not c:
         return
@@ -8918,11 +9042,11 @@ async def tribulation_prepare(interaction: discord.Interaction, path: app_comman
             action_id=f"discord:{interaction.id}:tribulation.prepare",
         )
     except GameEngineError as exc:
-        await interaction.response.send_message(f"Tribulation preparation could not resolve: {exc}", ephemeral=False)
+        await interaction.followup.send(f"Tribulation preparation could not resolve: {exc}", ephemeral=False)
         return
     result = dict(envelope.get("result") or {})
     currency = str(result.get("currency", "low_spirit_stone"))
-    await interaction.response.send_message(
+    await interaction.followup.send(
         f"⚡ Tribulation preparation rises to **{int(result.get('preparation',0))}/5**. Remaining {WORLD.currency_name(currency)}: **{int(result.get('balance',0))}**.",
         ephemeral=False,
     )
@@ -8932,6 +9056,7 @@ async def tribulation_prepare(interaction: discord.Interaction, path: app_comman
 @app_commands.choices(path=TRIBULATION_PATH_CHOICES)
 @serialized_user_action
 async def tribulation_attempt(interaction: discord.Interaction, path: app_commands.Choice[str] | None = None) -> None:
+    await interaction.response.defer(ephemeral=False)
     c = await require_character(interaction)
     if not c:
         return
@@ -8942,7 +9067,7 @@ async def tribulation_attempt(interaction: discord.Interaction, path: app_comman
             action_id=f"discord:{interaction.id}:tribulation.attempt",
         )
     except GameEngineError as exc:
-        await interaction.response.send_message(f"Tribulation attempt could not resolve: {exc}", ephemeral=False)
+        await interaction.followup.send(f"Tribulation attempt could not resolve: {exc}", ephemeral=False)
         return
     result = dict(envelope.get("result") or {})
     lines = [f"⚡ **{result.get('gate_name','Heavenly Tribulation')}** • Preparation **{int(result.get('preparation_used',0))}/5**"]
@@ -9123,108 +9248,258 @@ async def equipment_status(interaction: discord.Interaction) -> None:
 @registered_group_command(equipment_group, name="bind", description="Convert one carried equipment item into a persistent durable instance")
 @serialized_user_action
 async def equipment_bind(interaction: discord.Interaction, item: str) -> None:
+    await interaction.response.defer(ephemeral=False)
     if not await require_character(interaction): return
     wt=await current_world_time()
     try:
         envelope=await ENGINE.authoritative_action("equipment.bind",interaction.user.id,{"item_id":item},action_id=f"discord:{interaction.id}:equipment.bind")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
-    await interaction.response.send_message(f"🧷 Bound **{WORLD.item_name(item)}** as equipment `#{result.get('equipment_id')}`.",ephemeral=False)
+        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+    await interaction.followup.send(f"🧷 Bound **{WORLD.item_name(item)}** as equipment `#{result.get('equipment_id')}`.",ephemeral=False)
 
 
 @registered_group_command(equipment_group, name="equip", description="Equip a bound item; another item in the same slot is automatically unequipped")
 @serialized_user_action
 async def equipment_equip(interaction: discord.Interaction, equipment_id: int) -> None:
+    await interaction.response.defer(ephemeral=False)
     if not await require_character(interaction): return
     wt=await current_world_time()
     try:
         envelope=await ENGINE.authoritative_action("equipment.equip",interaction.user.id,{"id":int(equipment_id)},action_id=f"discord:{interaction.id}:equipment.equip")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
-    await interaction.response.send_message(f"⚔️ Equipped item `#{equipment_id}`.",ephemeral=False)
+        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+    await interaction.followup.send(f"⚔️ Equipped {await _equipment_label(interaction.user.id, int(equipment_id))}.",ephemeral=False)
 
 
 @registered_group_command(equipment_group, name="unequip", description="Remove a bound item from your active combat loadout")
 @serialized_user_action
 async def equipment_unequip(interaction: discord.Interaction, equipment_id: int) -> None:
+    await interaction.response.defer(ephemeral=False)
     if not await require_character(interaction): return
     wt=await current_world_time()
     try:
         envelope=await ENGINE.authoritative_action("equipment.unequip",interaction.user.id,{"id":int(equipment_id)},action_id=f"discord:{interaction.id}:equipment.unequip")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
-    await interaction.response.send_message(f"🎒 Unequipped item `#{equipment_id}`.",ephemeral=False)
+        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+    await interaction.followup.send(f"🎒 Unequipped {await _equipment_label(interaction.user.id, int(equipment_id))}.",ephemeral=False)
 
 
 @registered_group_command(equipment_group, name="repair", description="Restore equipment durability using Spirit Iron")
 @serialized_user_action
 async def equipment_repair(interaction: discord.Interaction, equipment_id: int) -> None:
+    await interaction.response.defer(ephemeral=False)
     if not await require_character(interaction): return
     wt=await current_world_time()
     try:
         envelope=await ENGINE.authoritative_action("equipment.repair",interaction.user.id,{"id":int(equipment_id)},action_id=f"discord:{interaction.id}:equipment.repair")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
-    await interaction.response.send_message(f"🔧 Repaired item `#{equipment_id}` for **{int(result.get('repair_cost',0))} Spirit Iron**.",ephemeral=False)
+        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+    await interaction.followup.send(f"🔧 Repaired {await _equipment_label(interaction.user.id, int(equipment_id))} for **{int(result.get('repair_cost',0))} Spirit Iron**.",ephemeral=False)
+
+# ---------------------------------------------------------------------------
+# Equipment live options
+# ---------------------------------------------------------------------------
+# A player reported that Equip opened a text box asking for an "Equipment Id"
+# with no id anywhere on screen. That is what the hub does when a parameter has
+# no option provider: it falls back to a modal and asks the player to type the
+# value. equipment_id is an int with no autocomplete, so Equip, Unequip and
+# Repair were all asking for a database row id.
+#
+# These are registered through the hub's own provider registry rather than
+# discord.py autocomplete on purpose. /equipment is not a typable command - it
+# is reachable only through the /items hub - so the hub is the only consumer,
+# and going through register_hub_option_provider keeps the change entirely
+# inside code this build can exercise.
+def _equipment_option(row: Mapping[str, Any]) -> HubDynamicOption:
+    definition = EQUIPMENT_DEFINITIONS.get(str(row["item_id"]), {})
+    name = str(definition.get("name") or WORLD.item_name(str(row["item_id"])))
+    durability = f"{int(row['durability'])}/{int(row['max_durability'])}"
+    worn = int(row["max_durability"]) - int(row["durability"])
+    return HubDynamicOption(
+        label=f"{name} • {row['slot']}"[:100],
+        value=int(row["equipment_id"]),
+        description=f"#{row['equipment_id']} • durability {durability} • quality {int(row['quality'])}%"[:100],
+        emoji="✅" if row["equipped"] else ("🔧" if worn else "▫️"),
+    )
+
+
+async def _equipment_options(
+    interaction: discord.Interaction, *, equipped: bool | None, damaged_first: bool = False
+) -> list[HubDynamicOption]:
+    try:
+        rows = list(await DB.get_equipment(interaction.user.id))
+    except Exception:
+        log.warning("Could not load equipment options", exc_info=True)
+        return []
+    if equipped is not None:
+        rows = [row for row in rows if bool(row["equipped"]) is equipped]
+    if damaged_first:
+        rows.sort(key=lambda row: int(row["durability"]) - int(row["max_durability"]))
+    return [_equipment_option(row) for row in rows[:25]]
+
+
+async def equipment_equip_hub_options(
+    interaction: discord.Interaction, current: str
+) -> list[HubDynamicOption]:
+    """Only unequipped items: equipping what is already equipped is a no-op."""
+    return await _equipment_options(interaction, equipped=False)
+
+
+async def equipment_unequip_hub_options(
+    interaction: discord.Interaction, current: str
+) -> list[HubDynamicOption]:
+    return await _equipment_options(interaction, equipped=True)
+
+
+async def equipment_repair_hub_options(
+    interaction: discord.Interaction, current: str
+) -> list[HubDynamicOption]:
+    """Everything, most damaged first - that is what a player is looking for."""
+    return await _equipment_options(interaction, equipped=None, damaged_first=True)
+
+
+# Bind is the FIRST rung of the equipment ladder and it had no option provider at
+# all, so it opened a text box asking the player to type an internal item id. A
+# player holding a Spirit-Iron Sword could not bind it, therefore could not equip
+# it, and Equip answered "no available equipment id options right now" - which
+# reads as a bug rather than as a missing prerequisite.
+async def equipment_bind_hub_options(
+    interaction: discord.Interaction, current: str
+) -> list[HubDynamicOption]:
+    """Carried items that are actually bindable equipment, with quantities."""
+    try:
+        inventory = await DB.get_inventory(interaction.user.id)
+    except Exception:
+        log.warning("Could not load inventory for bind options", exc_info=True)
+        return []
+    options: list[HubDynamicOption] = []
+    for item_id, quantity in sorted(dict(inventory or {}).items()):
+        if int(quantity or 0) <= 0:
+            continue
+        definition = EQUIPMENT_DEFINITIONS.get(str(item_id))
+        if not definition:
+            continue  # ordinary material, not equipment
+        bonuses = " ".join(
+            f"{label} +{int(definition.get(key, 0))}"
+            for label, key in (("ATK", "attack"), ("DEF", "defense"), ("SPI", "spirit"), ("AGI", "agility"))
+            if int(definition.get(key, 0)) > 0
+        )
+        options.append(
+            HubDynamicOption(
+                label=f"{definition.get('name', item_id)} x{int(quantity)}"[:100],
+                value=str(item_id),
+                description=f"{definition.get('slot', 'gear')} • {bonuses or 'no bonuses'} • durability {int(definition.get('max_durability', 0))}"[:100],
+                emoji="🧷",
+            )
+        )
+    return options[:25]
+
+
+register_hub_option_provider(equipment_bind, "item", equipment_bind_hub_options)
+register_hub_option_provider(equipment_equip, "equipment_id", equipment_equip_hub_options)
+register_hub_option_provider(equipment_unequip, "equipment_id", equipment_unequip_hub_options)
+register_hub_option_provider(equipment_repair, "equipment_id", equipment_repair_hub_options)
+
+# Every empty picker in this chain now names the prerequisite instead of stating
+# a fact the player cannot act on.
+register_hub_option_hint(
+    equipment_bind, "item",
+    "You are not carrying anything that can be bound as equipment. Weapons, armour, "
+    "boots and accessories can be bound — buy one with "
+    "**/economy → Local Market → Buy**, or forge one with "
+    "**/craft → General Crafting → Craft**.",
+)
+register_hub_option_hint(
+    equipment_equip, "equipment_id",
+    "Equip works on **bound** equipment, not on carried items. Run **Bind** on a carried "
+    "weapon or armour first — or everything you have bound is already equipped.",
+)
+register_hub_option_hint(
+    equipment_unequip, "equipment_id",
+    "Nothing is equipped right now, so there is nothing to remove.",
+)
+register_hub_option_hint(
+    equipment_repair, "equipment_id",
+    "You have no bound equipment to repair. Run **Bind** on a carried item first.",
+)
+
+
+async def _equipment_label(user_id: int, equipment_id: int) -> str:
+    """"Equipped item #7" tells a player nothing. Name it when we can."""
+    try:
+        for row in await DB.get_equipment(user_id):
+            if int(row["equipment_id"]) == int(equipment_id):
+                definition = EQUIPMENT_DEFINITIONS.get(str(row["item_id"]), {})
+                name = str(definition.get("name") or WORLD.item_name(str(row["item_id"])))
+                return f"**{name}** `#{equipment_id}`"
+    except Exception:
+        log.warning("Could not resolve equipment label", exc_info=True)
+    return f"item `#{equipment_id}`"
+
+
 
 
 @registered_group_command(formation_group, name="create", description="Create a named combat formation for your active party")
 @serialized_user_action
 async def formation_create(interaction: discord.Interaction, name: str) -> None:
+    await interaction.response.defer(ephemeral=False)
     if not await require_character(interaction): return
     wt=await current_world_time()
     try:
         envelope=await ENGINE.authoritative_action("formation.create",interaction.user.id,{"name":name},action_id=f"discord:{interaction.id}:formation.create")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
-    await interaction.response.send_message(f"🧿 Formation `#{result.get('formation_id')}` created.",ephemeral=False)
+        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+    await interaction.followup.send(f"🧿 Formation `#{result.get('formation_id')}` created.",ephemeral=False)
 
 
 @registered_group_command(formation_group, name="assign", description="Assign one party member to Vanguard, Core, Flank or Support")
 @app_commands.choices(position=[app_commands.Choice(name=x.title(),value=x) for x in FORMATION_POSITIONS])
 @serialized_user_action
 async def formation_assign(interaction: discord.Interaction, formation_id: int, member: discord.Member, position: app_commands.Choice[str]) -> None:
+    await interaction.response.defer(ephemeral=False)
     if not await require_character(interaction): return
     wt=await current_world_time()
     try:
         envelope=await ENGINE.authoritative_action("formation.assign",interaction.user.id,{"formation_id":int(formation_id),"target_user_id":member.id,"position":position.value},action_id=f"discord:{interaction.id}:formation.assign")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
-    await interaction.response.send_message(f"🧿 Assigned {member.mention} to **{position.value}**.",ephemeral=False)
+        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+    await interaction.followup.send(f"🧿 Assigned {member.mention} to **{position.value}**.",ephemeral=False)
 
 
 @registered_group_command(formation_group, name="activate", description="Activate a formation and choose its combat stance")
 @app_commands.choices(stance=[app_commands.Choice(name=x.title(),value=x) for x in FORMATION_STANCES])
 @serialized_user_action
 async def formation_activate(interaction: discord.Interaction, formation_id: int, stance: app_commands.Choice[str]) -> None:
+    await interaction.response.defer(ephemeral=False)
     if not await require_character(interaction): return
     wt=await current_world_time()
     try:
         envelope=await ENGINE.authoritative_action("formation.activate",interaction.user.id,{"formation_id":int(formation_id),"stance":stance.value},action_id=f"discord:{interaction.id}:formation.activate")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
-    await interaction.response.send_message(f"🧿 Formation `#{formation_id}` activated in **{stance.value}** stance.",ephemeral=False)
+        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+    await interaction.followup.send(f"🧿 Formation `#{formation_id}` activated in **{stance.value}** stance.",ephemeral=False)
 
 
 @registered_group_command(formation_group, name="stance", description="Change the active formation stance between combat rounds")
 @app_commands.choices(stance=[app_commands.Choice(name=x.title(),value=x) for x in FORMATION_STANCES])
 @serialized_user_action
 async def formation_stance(interaction: discord.Interaction, stance: app_commands.Choice[str]) -> None:
+    await interaction.response.defer(ephemeral=False)
     if not await require_character(interaction): return
     wt=await current_world_time()
     try:
         envelope=await ENGINE.authoritative_action("formation.stance",interaction.user.id,{"stance":stance.value},action_id=f"discord:{interaction.id}:formation.stance")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
-    await interaction.response.send_message(f"🧿 Active formation stance changed to **{stance.value}**.",ephemeral=False)
+        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+    await interaction.followup.send(f"🧿 Active formation stance changed to **{stance.value}**.",ephemeral=False)
 
 
 @registered_group_command(formation_group, name="status", description="Inspect your party formation, positions and remaining cohesion")
@@ -9257,13 +9532,14 @@ async def boss_list(interaction: discord.Interaction) -> None:
 @registered_group_command(boss_group, name="start", description="Party leader starts a persistent multi-phase boss encounter")
 @serialized_user_action
 async def boss_start(interaction: discord.Interaction, boss: str) -> None:
+    await interaction.response.defer(ephemeral=False)
     if not await require_character(interaction):return
     wt=await current_world_time()
     try:
         e=await ENGINE.authoritative_action("boss.start",interaction.user.id,{"template_key":boss},action_id=f"discord:{interaction.id}:boss.start"); r=dict(e.get('result') or {})
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
-    await interaction.response.send_message(f"👹 **Boss Encounter #{r.get('encounter_id')} — {r.get('boss_name','Boss')}** begins with **{r.get('boss_hp',0)}/{r.get('boss_hp_max',0)} HP**.",ephemeral=False)
+        await interaction.followup.send(f"❌ {exc}",ephemeral=False);return
+    await interaction.followup.send(f"👹 **Boss Encounter #{r.get('encounter_id')} — {r.get('boss_name','Boss')}** begins with **{r.get('boss_hp',0)}/{r.get('boss_hp_max',0)} HP**.",ephemeral=False)
 
 
 @registered_group_command(boss_group, name="status", description="View the active party boss phase, HP, raid vitality and round")
@@ -9302,12 +9578,13 @@ async def boss_act(interaction: discord.Interaction, style: app_commands.Choice[
 @registered_group_command(boss_group, name="claim", description="Claim your reward from a completed boss encounter")
 @serialized_user_action
 async def boss_claim(interaction: discord.Interaction, encounter_id: int) -> None:
+    await interaction.response.defer(ephemeral=False)
     if not await require_character(interaction):return
     try:
         e=await ENGINE.authoritative_action("boss.claim",interaction.user.id,{"id":int(encounter_id)},action_id=f"discord:{interaction.id}:boss.claim"); r=dict(e.get('result') or {})
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
-    await interaction.response.send_message(f"🏆 Claimed **{r.get('currency_amount',0)} Low Spirit Stones** and **{WORLD.item_name(str(r.get('item_id','')))} x{r.get('item_quantity',0)}**.",ephemeral=False)
+        await interaction.followup.send(f"❌ {exc}",ephemeral=False);return
+    await interaction.followup.send(f"🏆 Claimed **{r.get('currency_amount',0)} Low Spirit Stones** and **{WORLD.item_name(str(r.get('item_id','')))} x{r.get('item_quantity',0)}**.",ephemeral=False)
 
 
 @registered_group_command(hunter_group, name="status", description="View the autonomous bounty hunter currently tracking this incarnation")
@@ -9323,13 +9600,14 @@ async def hunter_status(interaction: discord.Interaction) -> None:
 @app_commands.choices(action=[app_commands.Choice(name="Evade",value="evade"),app_commands.Choice(name="Fight",value="fight"),app_commands.Choice(name="Surrender",value="surrender")])
 @serialized_user_action
 async def hunter_act(interaction: discord.Interaction, pursuit_id: int, action: app_commands.Choice[str]) -> None:
+    await interaction.response.defer(ephemeral=False)
     if not await require_character(interaction):return
     wt=await current_world_time()
     try:
         e=await ENGINE.authoritative_action("bounty_hunter.act",interaction.user.id,{"pursuit_id":int(pursuit_id),"action":action.value},action_id=f"discord:{interaction.id}:bounty_hunter.act"); row=dict(e.get('result') or {})
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
-    await interaction.response.send_message(f"🎯 **{row.get('hunter_name','Hunter')}** • status **{row.get('status','active')}** • pressure {row.get('pressure',0)}% • escape {row.get('escape_progress',0)}% • capture {row.get('capture_progress',0)}%",ephemeral=False)
+        await interaction.followup.send(f"❌ {exc}",ephemeral=False);return
+    await interaction.followup.send(f"🎯 **{row.get('hunter_name','Hunter')}** • status **{row.get('status','active')}** • pressure {row.get('pressure',0)}% • escape {row.get('escape_progress',0)}% • capture {row.get('capture_progress',0)}%",ephemeral=False)
 
 
 @registered_group_command(beast_group, name="status", description="View your contracted spirit beasts")
@@ -9373,6 +9651,7 @@ async def beast_encounters(interaction: discord.Interaction) -> None:
 @registered_group_command(beast_group, name="tame", description="Attempt a consensual spirit-beast bond with a subdued wild beast")
 @serialized_user_action
 async def beast_tame(interaction: discord.Interaction, encounter_id: int) -> None:
+    await interaction.response.defer(ephemeral=False)
     if not await require_character(interaction):
         return
     try:
@@ -9383,7 +9662,7 @@ async def beast_tame(interaction: discord.Interaction, encounter_id: int) -> Non
             action_id=f"discord:{interaction.id}:beast.tame",
         )
     except GameEngineError as exc:
-        await interaction.response.send_message(str(exc), ephemeral=False)
+        await interaction.followup.send(str(exc), ephemeral=False)
         return
 
     resolved = dict(envelope.get("result") or {})
@@ -9394,13 +9673,13 @@ async def beast_tame(interaction: discord.Interaction, encounter_id: int) -> Non
         beast = dict(resolved.get("beast") or {})
         beast_progress = dict(resolved.get("profession_progress") or {})
         active_line = " It becomes your active companion." if beast.get("active") else ""
-        await interaction.response.send_message(
+        await interaction.followup.send(
             f"🐉 **Spirit-Beast Bond — {species}**\n{roll_line(result)}\n"
             f"The beast accepts an **equality contract** at loyalty **{beast.get('loyalty', 30)}**.{active_line}\n"
             f"🪢 Beast Taming: **{profession_rank(int(beast_progress.get('level', 0)))}** Lv.{int(beast_progress.get('level', 0))}."
         )
     else:
-        await interaction.response.send_message(
+        await interaction.followup.send(
             f"🐾 **Taming Failed — {species}**\n{roll_line(result)}\n"
             "The beast rejects the bond and escapes. No contract is forced."
         )
@@ -9412,6 +9691,7 @@ async def beast_tame(interaction: discord.Interaction, encounter_id: int) -> Non
 ])
 @serialized_user_action
 async def beast_feed(interaction: discord.Interaction, beast_id: int, food: app_commands.Choice[str]) -> None:
+    await interaction.response.defer(ephemeral=False)
     if not await require_character(interaction):
         return
     try:
@@ -9422,11 +9702,11 @@ async def beast_feed(interaction: discord.Interaction, beast_id: int, food: app_
             action_id=f"discord:{interaction.id}:beast.feed",
         )
     except GameEngineError as exc:
-        await interaction.response.send_message(str(exc), ephemeral=False)
+        await interaction.followup.send(str(exc), ephemeral=False)
         return
 
     updated = dict(envelope.get("result") or {})
-    await interaction.response.send_message(
+    await interaction.followup.send(
         f"🐉 **{updated['name']}** accepts the **{WORLD.item_name(food.value)}**. "
         f"Loyalty rises to **{updated['loyalty']}** and intelligence to **{updated['intelligence']}**.",
         ephemeral=False,
@@ -9435,6 +9715,7 @@ async def beast_feed(interaction: discord.Interaction, beast_id: int, food: app_
 @registered_group_command(beast_group, name="train", description="Train a contracted beast to raise loyalty and intelligence")
 @serialized_user_action
 async def beast_train(interaction: discord.Interaction, beast_id: int) -> None:
+    await interaction.response.defer(ephemeral=False)
     if not await require_character(interaction):
         return
     try:
@@ -9445,7 +9726,7 @@ async def beast_train(interaction: discord.Interaction, beast_id: int) -> None:
             action_id=f"discord:{interaction.id}:beast.train",
         )
     except GameEngineError as exc:
-        await interaction.response.send_message(str(exc), ephemeral=False)
+        await interaction.followup.send(str(exc), ephemeral=False)
         return
 
     resolved = dict(envelope.get("result") or {})
@@ -9455,7 +9736,7 @@ async def beast_train(interaction: discord.Interaction, beast_id: int) -> None:
     pen_level = int(resolved.get("beast_pen_level", 0))
     context_bonus = int(resolved.get("context_bonus", 0))
     pen_note = f" • Spirit Beast Pen Lv.{pen_level} training bonus +{context_bonus}" if pen_level else ""
-    await interaction.response.send_message(
+    await interaction.followup.send(
         f"🐉 **{row['name']}** completes a training cycle. Loyalty **{row['loyalty']}**, "
         f"intelligence **{row['intelligence']}**.{pen_note}\n"
         f"🪢 Beast Taming: **{profession_rank(int(beast_progress.get('level', 0)))}** "
@@ -9466,26 +9747,28 @@ async def beast_train(interaction: discord.Interaction, beast_id: int) -> None:
 @registered_group_command(beast_group, name="evolve", description="Attempt a bloodline/evolution step once loyalty is sufficient")
 @serialized_user_action
 async def beast_evolve(interaction: discord.Interaction, beast_id: int) -> None:
+    await interaction.response.defer(ephemeral=False)
     c=await require_character(interaction)
     if not c:return
     try:
         envelope=await ENGINE.authoritative_action("beast.evolve",interaction.user.id,{"beast_id":int(beast_id)},action_id=f"discord:{interaction.id}:beast.evolve")
     except GameEngineError as exc:
-        await interaction.response.send_message(f"Evolution failed: {exc}",ephemeral=False);return
+        await interaction.followup.send(f"Evolution failed: {exc}",ephemeral=False);return
     resolved=dict(envelope.get("result") or {});row=dict(resolved.get("beast") or {});beast_progress=dict(resolved.get("profession_progress") or {})
-    await interaction.response.send_message(f"🧬 **{row['name']} evolves.** Evolution Stage **{row['evolution_stage']}**, Rank **{row['rank']}**. The strain reduces loyalty to **{row['loyalty']}**.\n🪢 Beast Taming: **{profession_rank(int(beast_progress.get('level',0)))}** Lv.{int(beast_progress.get('level',0))}.",ephemeral=False)
+    await interaction.followup.send(f"🧬 **{row['name']} evolves.** Evolution Stage **{row['evolution_stage']}**, Rank **{row['rank']}**. The strain reduces loyalty to **{row['loyalty']}**.\n🪢 Beast Taming: **{profession_rank(int(beast_progress.get('level',0)))}** Lv.{int(beast_progress.get('level',0))}.",ephemeral=False)
 
 
 @registered_group_command(beast_group, name="active", description="Choose the spirit beast that supports you in battle")
 @serialized_user_action
 async def beast_active(interaction: discord.Interaction, beast_id: int) -> None:
+    await interaction.response.defer(ephemeral=False)
     c=await require_character(interaction)
     if not c:return
     try:
         await ENGINE.authoritative_action("beast.active",interaction.user.id,{"beast_id":int(beast_id)},action_id=f"discord:{interaction.id}:beast.active")
     except GameEngineError as exc:
-        await interaction.response.send_message(str(exc),ephemeral=False);return
-    await interaction.response.send_message("🐉 Active companion changed. Its rank, evolution and loyalty now contribute to normal battle exchanges.",ephemeral=False)
+        await interaction.followup.send(str(exc),ephemeral=False);return
+    await interaction.followup.send("🐉 Active companion changed. Its rank, evolution and loyalty now contribute to normal battle exchanges.",ephemeral=False)
 
 
 @registered_group_command(artifact_group, name="status", description="View artifacts bonded to this incarnation")
@@ -9505,6 +9788,7 @@ async def artifact_status(interaction: discord.Interaction) -> None:
 @registered_group_command(artifact_group, name="bond", description="Deepen a bond with a carried item")
 @serialized_user_action
 async def artifact_bond(interaction: discord.Interaction, item: str) -> None:
+    await interaction.response.defer(ephemeral=False)
     if not await require_character(interaction):
         return
     try:
@@ -9515,13 +9799,13 @@ async def artifact_bond(interaction: discord.Interaction, item: str) -> None:
             action_id=f"discord:{interaction.id}:artifact.bond",
         )
     except GameEngineError as exc:
-        await interaction.response.send_message(str(exc), ephemeral=False)
+        await interaction.followup.send(str(exc), ephemeral=False)
         return
 
     resolved = dict(envelope.get("result") or {})
     row = dict(resolved.get("artifact") or {})
     art_progress = dict(resolved.get("profession_progress") or {})
-    await interaction.response.send_message(
+    await interaction.followup.send(
         f"🗡️ Bond with **{WORLD.item_name(item)}** deepens to **{row['bond_level']}**. "
         f"Resonance **{row['resonance']}%**.\n"
         f"🔨 Artifact Refining: **{profession_rank(int(art_progress.get('level', 0)))}** "
@@ -9532,14 +9816,15 @@ async def artifact_bond(interaction: discord.Interaction, item: str) -> None:
 @registered_group_command(artifact_group, name="awaken", description="Awaken a sufficiently bonded artifact spirit")
 @serialized_user_action
 async def artifact_awaken(interaction: discord.Interaction, item: str, spirit_name: str) -> None:
+    await interaction.response.defer(ephemeral=False)
     c=await require_character(interaction)
     if not c:return
     try:
         envelope=await ENGINE.authoritative_action("artifact.awaken",interaction.user.id,{"item_id":item,"spirit_name":spirit_name},action_id=f"discord:{interaction.id}:artifact.awaken")
     except GameEngineError as exc:
-        await interaction.response.send_message(str(exc),ephemeral=False);return
+        await interaction.followup.send(str(exc),ephemeral=False);return
     resolved=dict(envelope.get("result") or {});row=dict(resolved.get("artifact") or {});art_progress=dict(resolved.get("profession_progress") or {})
-    await interaction.response.send_message(f"✨ **{WORLD.item_name(item)} awakens.** Its spirit answers to **{row['spirit_name']}** at **{row['resonance']}% resonance**. Awakened artifacts contribute to battle checks.\n🔮 Artifact Refining: **{profession_rank(int(art_progress.get('level',0)))}** Lv.{int(art_progress.get('level',0))}.",ephemeral=False)
+    await interaction.followup.send(f"✨ **{WORLD.item_name(item)} awakens.** Its spirit answers to **{row['spirit_name']}** at **{row['resonance']}% resonance**. Awakened artifacts contribute to battle checks.\n🔮 Artifact Refining: **{profession_rank(int(art_progress.get('level',0)))}** Lv.{int(art_progress.get('level',0))}.",ephemeral=False)
 
 
 @registered_group_command(territory_group, name="status", description="Inspect persistent control and resource state at your location")
@@ -9591,34 +9876,37 @@ async def war_status(interaction: discord.Interaction) -> None:
 @app_commands.choices(tactic=[app_commands.Choice(name=x.title(),value=x) for x in ("assault","siege","sabotage","fortify","repel")])
 @serialized_user_action
 async def war_act(interaction: discord.Interaction, war_id: int, tactic: app_commands.Choice[str]) -> None:
+    await interaction.response.defer(ephemeral=False)
     if not await require_character(interaction):return
     wt=await current_world_time()
     try:
         e=await ENGINE.authoritative_action("war.act",interaction.user.id,{"war_id":int(war_id),"tactic":tactic.value},action_id=f"discord:{interaction.id}:war.act"); r=dict(e.get('result') or {})
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
+        await interaction.followup.send(f"❌ {exc}",ephemeral=False);return
     op=dict(r.get('operations') or r)
     text=f"⚔️ **War #{war_id} — {tactic.name}**\nSiege **{op.get('siege_progress',0)}%** • morale A/D **{op.get('attacker_morale',100)}/{op.get('defender_morale',100)}** • forces A/D **{op.get('attacker_force',0)}/{op.get('defender_force',0)}**"
     if r.get('status') and r.get('status')!='active': text+=f"\n🏯 War resolved: **{op.get('winner_key','unknown')}**."
-    await interaction.response.send_message(text,ephemeral=False)
+    await interaction.followup.send(text,ephemeral=False)
 
 
 @registered_group_command(caravan_group, name="dispatch", description="Send goods with optional escorts, smuggling and destination tax exposure")
 @app_commands.autocomplete(destination=location_autocomplete)
 @serialized_user_action
 async def caravan_dispatch(interaction: discord.Interaction, destination: str, item: str, quantity: app_commands.Range[int,1,50]=1, escort: app_commands.Range[int,0,20]=0, smuggle: bool=False) -> None:
+    await interaction.response.defer(ephemeral=False)
     c=await require_character(interaction)
     if not c:return
     wt=await current_world_time()
     try:
         e=await ENGINE.authoritative_action("caravan.dispatch",interaction.user.id,{"destination":destination,"item_id":item,"quantity":int(quantity),"escort":int(escort),"smuggle":bool(smuggle)},action_id=f"discord:{interaction.id}:caravan.dispatch"); r=dict(e.get('result') or {})
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
-    await interaction.response.send_message(f"🐫 Caravan **#{r.get('caravan_id')}** dispatched to **{destination}** carrying **{WORLD.item_name(item)} x{quantity}**.",ephemeral=False)
+        await interaction.followup.send(f"❌ {exc}",ephemeral=False);return
+    await interaction.followup.send(f"🐫 Caravan **#{r.get('caravan_id')}** dispatched to **{destination}** carrying **{WORLD.item_name(item)} x{quantity}**.",ephemeral=False)
 
 
 @registered_group_command(caravan_group, name="status", description="Settle due caravans and inspect escorts, interception, smuggling, tax and losses")
 async def caravan_status(interaction: discord.Interaction) -> None:
+    await interaction.response.defer(ephemeral=False)
     c=await require_character(interaction)
     if not c:return
     wt=await current_world_time()
@@ -9629,10 +9917,10 @@ async def caravan_status(interaction: discord.Interaction) -> None:
         )
         arrived=list(dict(envelope.get("result") or {}).get("resolved") or [])
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
+        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
     rows=[x for x in await DB.get_caravans() if x.get('owner_type')=='player' and str(x.get('owner_key'))==str(interaction.user.id)]
     if not rows:
-        await interaction.response.send_message("🐫 You have not dispatched a caravan.",ephemeral=False);return
+        await interaction.followup.send("🐫 You have not dispatched a caravan.",ephemeral=False);return
     lines=[f"🐫 **Caravans — {c['name']}**"]
     if arrived: lines.append(f"\n✅ **{len(arrived)} caravan(s) resolved on this check.**")
     for row in rows[:15]:
@@ -9660,14 +9948,15 @@ async def caravan_events(interaction: discord.Interaction, caravan_id: int) -> N
 @registered_group_command(party_group, name="create", description="Create a voluntary cultivation party")
 @serialized_user_action
 async def party_create(interaction: discord.Interaction, name: str) -> None:
+    await interaction.response.defer(ephemeral=False)
     if not await require_character(interaction): return
     wt=await current_world_time()
     try:
         envelope=await ENGINE.authoritative_action("party.create",interaction.user.id,{"name":name},action_id=f"discord:{interaction.id}:party.create")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
-    await interaction.response.send_message(f"👥 Party **{result.get('name',name)}** created.",ephemeral=False)
+        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+    await interaction.followup.send(f"👥 Party **{result.get('name',name)}** created.",ephemeral=False)
 
 
 @registered_group_command(party_group, name="join", description="Join another cultivator's active party voluntarily")
@@ -9697,14 +9986,15 @@ async def party_status(interaction: discord.Interaction) -> None:
 @registered_group_command(party_group, name="leave", description="Leave your current cultivation party")
 @serialized_user_action
 async def party_leave(interaction: discord.Interaction) -> None:
+    await interaction.response.defer(ephemeral=False)
     if not await require_character(interaction): return
     wt=await current_world_time()
     try:
         envelope=await ENGINE.authoritative_action("party.leave",interaction.user.id,{},action_id=f"discord:{interaction.id}:party.leave")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
-    await interaction.response.send_message("👋 You left your active party.",ephemeral=False)
+        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+    await interaction.followup.send("👋 You left your active party.",ephemeral=False)
 
 
 @registered_group_command(duel_group, name="challenge", description="Offer a nonlethal PvP duel; combat cannot start without acceptance")
@@ -9731,17 +10021,18 @@ async def duel_challenge(interaction: discord.Interaction, member: discord.Membe
 @app_commands.choices(decision=[app_commands.Choice(name="Accept",value="accept"),app_commands.Choice(name="Reject",value="reject")])
 @serialized_user_action
 async def duel_respond(interaction: discord.Interaction, challenge_id: int, decision: app_commands.Choice[str]) -> None:
+    await interaction.response.defer(ephemeral=False)
     c=await require_character(interaction)
     if not c:return
     try:
         envelope=await ENGINE.authoritative_action("pvp.respond",interaction.user.id,{"challenge_id":int(challenge_id),"accept":decision.value=='accept'},action_id=f"discord:{interaction.id}:pvp.respond")
     except GameEngineError as exc:
-        await interaction.response.send_message(str(exc),ephemeral=False);return
+        await interaction.followup.send(str(exc),ephemeral=False);return
     result=dict(envelope.get("result") or {})
     if decision.value=='accept':
-        await interaction.response.send_message(f"⚔️ Duel accepted. Nonlethal PvP match **#{result['match_id']}** begins; challenger acts first. Use **/combat → Duels → Act**.")
+        await interaction.followup.send(f"⚔️ Duel accepted. Nonlethal PvP match **#{result['match_id']}** begins; challenger acts first. Use **/combat → Duels → Act**.")
     else:
-        await interaction.response.send_message("🤝 Duel rejected. No combat state was created.")
+        await interaction.followup.send("🤝 Duel rejected. No combat state was created.")
 
 
 @registered_group_command(duel_group, name="status", description="View your active consent PvP match or pending challenges")
@@ -9853,14 +10144,15 @@ ABODE_FACILITIES=[
 @app_commands.choices(property_type=PLAYER_PROPERTY_TYPE_CHOICES)
 @serialized_user_action
 async def abode_establish(interaction:discord.Interaction,name:str,property_type:app_commands.Choice[str])->None:
+    await interaction.response.defer(ephemeral=False)
     if not await require_character(interaction): return
     wt=await current_world_time()
     try:
         envelope=await ENGINE.authoritative_action("abode.establish",interaction.user.id,{"name":name,"property_type":property_type.value},action_id=f"discord:{interaction.id}:abode.establish")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
-    await interaction.response.send_message(f"🏡 **{result.get('name',name)}** established.",ephemeral=False)
+        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+    await interaction.followup.send(f"🏡 **{result.get('name',name)}** established.",ephemeral=False)
 
 
 @registered_group_command(abode_group, name="status",description="Inspect your player-owned property, facilities and guest access")
@@ -9901,65 +10193,71 @@ async def abode_thread_command(interaction:discord.Interaction)->None:
 @registered_group_command(abode_group, name="enter",description="Enter your player-owned property from its physical entrance location")
 @serialized_user_action
 async def abode_enter(interaction:discord.Interaction)->None:
+    await interaction.response.defer(ephemeral=False)
     if not await require_character(interaction): return
     wt=await current_world_time()
     try:
         envelope=await ENGINE.authoritative_action("abode.enter",interaction.user.id,{},action_id=f"discord:{interaction.id}:abode.enter")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
-    await interaction.response.send_message(f"🏡 You enter **{result.get('name','your property')}**.",ephemeral=False)
+        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+    await interaction.followup.send(f"🏡 You enter **{result.get('name','your property')}**.",ephemeral=False)
 
 
 @registered_group_command(abode_group, name="visit",description="Enter another player's property if they invited you and you reached its entrance")
 @serialized_user_action
 async def abode_visit(interaction:discord.Interaction,owner:discord.Member)->None:
+    await interaction.response.defer(ephemeral=False)
     if not await require_character(interaction): return
     wt=await current_world_time()
     try:
         envelope=await ENGINE.authoritative_action("abode.visit",interaction.user.id,{"owner_user_id":owner.id},action_id=f"discord:{interaction.id}:abode.visit")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
-    await interaction.response.send_message(f"🏡 You visit **{result.get('name','the property')}**.",ephemeral=False)
+        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+    await interaction.followup.send(f"🏡 You visit **{result.get('name','the property')}**.",ephemeral=False)
 
 
 @registered_group_command(abode_group, name="leave",description="Leave the current player-owned property and return to its entrance")
 @serialized_user_action
 async def abode_leave(interaction:discord.Interaction)->None:
+    await interaction.response.defer(ephemeral=False)
     if not await require_character(interaction): return
     wt=await current_world_time()
     try:
         envelope=await ENGINE.authoritative_action("abode.leave",interaction.user.id,{},action_id=f"discord:{interaction.id}:abode.leave")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
-    await interaction.response.send_message(f"🚪 You leave the property for **{result.get('outside','outside')}**.",ephemeral=False)
+        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+    await interaction.followup.send(f"🚪 You leave the property for **{result.get('outside','outside')}**.",ephemeral=False)
+    await open_expedition_thread_after_exit(interaction)
 
 
 @registered_group_command(abode_group, name="invite",description="Invite another cultivator to your player-owned property")
 async def abode_invite(interaction:discord.Interaction,member:discord.Member)->None:
+    await interaction.response.defer(ephemeral=False)
     if not await require_character(interaction): return
     wt=await current_world_time()
     try:
         envelope=await ENGINE.authoritative_action("abode.invite",interaction.user.id,{"guest_user_id":member.id},action_id=f"discord:{interaction.id}:abode.invite")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
-    await interaction.response.send_message(f"🔑 {member.mention} may now enter your property.",ephemeral=False)
+        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+    await interaction.followup.send(f"🔑 {member.mention} may now enter your property.",ephemeral=False)
 
 
 @registered_group_command(abode_group, name="revoke",description="Revoke a guest's access to your player-owned property")
 @serialized_user_action
 async def abode_revoke(interaction:discord.Interaction,member:discord.Member)->None:
+    await interaction.response.defer(ephemeral=False)
     if not await require_character(interaction): return
     wt=await current_world_time()
     try:
         envelope=await ENGINE.authoritative_action("abode.revoke",interaction.user.id,{"guest_user_id":member.id},action_id=f"discord:{interaction.id}:abode.revoke")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
-    await interaction.response.send_message(f"🔒 Property access revoked for {member.mention}.",ephemeral=False)
+        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+    await interaction.followup.send(f"🔒 Property access revoked for {member.mention}.",ephemeral=False)
 
 
 @registered_group_command(abode_group, name="guests",description="List cultivators currently invited to your player-owned property")
@@ -9982,28 +10280,30 @@ async def abode_guests(interaction:discord.Interaction)->None:
 @app_commands.choices(facility=ABODE_FACILITIES)
 @serialized_user_action
 async def abode_upgrade(interaction:discord.Interaction,facility:app_commands.Choice[str])->None:
+    await interaction.response.defer(ephemeral=False)
     if not await require_character(interaction): return
     wt=await current_world_time()
     try:
         envelope=await ENGINE.authoritative_action("abode.upgrade",interaction.user.id,{"facility":facility.value},action_id=f"discord:{interaction.id}:abode.upgrade")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
-    await interaction.response.send_message(f"🏡 **{facility.value}** upgraded to level **{result.get('level','?')}**.",ephemeral=False)
+        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+    await interaction.followup.send(f"🏡 **{facility.value}** upgraded to level **{result.get('level','?')}**.",ephemeral=False)
 
 
 @registered_group_command(abode_group, name="focus",description="Use a developed property facility for a temporary specialization effect or scene benefit")
 @app_commands.choices(facility=ABODE_FACILITIES)
 @serialized_user_action
 async def abode_focus(interaction:discord.Interaction,facility:app_commands.Choice[str])->None:
+    await interaction.response.defer(ephemeral=False)
     if not await require_character(interaction): return
     wt=await current_world_time()
     try:
         envelope=await ENGINE.authoritative_action("abode.focus",interaction.user.id,{"facility":facility.value},action_id=f"discord:{interaction.id}:abode.focus")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
-    await interaction.response.send_message(f"🏡 You focus within the **{facility.value}** facility.",ephemeral=False)
+        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+    await interaction.followup.send(f"🏡 You focus within the **{facility.value}** facility.",ephemeral=False)
 
 # ---------- Teleportation arrays / spatial keys ----------
 array_group=app_commands.Group(name="array",description="Use public teleportation formations")
@@ -10029,25 +10329,27 @@ async def array_destination_autocomplete(interaction:discord.Interaction,current
 @app_commands.autocomplete(array=array_destination_autocomplete)
 @serialized_user_action
 async def array_use(interaction:discord.Interaction,array:str)->None:
+    await interaction.response.defer(ephemeral=False)
     if not await require_character(interaction):return
     wt=await current_world_time()
     try:
         e=await ENGINE.authoritative_action("array.use",interaction.user.id,{"array_id":array},action_id=f"discord:{interaction.id}:array.use"); r=dict(e.get('result') or {})
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
-    await interaction.response.send_message(f"🌀 The formation ignites and folds the route beneath you. You arrive at **{r.get('location',r.get('destination','your destination'))}**.",ephemeral=False)
+        await interaction.followup.send(f"❌ {exc}",ephemeral=False);return
+    await interaction.followup.send(f"🌀 The formation ignites and folds the route beneath you. You arrive at **{r.get('location',r.get('destination','your destination'))}**.",ephemeral=False)
 
 @registered_root_command(name="spatialkey",description="Use a spatial key/token to open its linked secret dimension",guild=GUILD)
 @app_commands.autocomplete(item=usable_item_autocomplete)
 @serialized_user_action
 async def spatial_key_command(interaction:discord.Interaction,item:str)->None:
+    await interaction.response.defer(ephemeral=False)
     if not await require_character(interaction):return
     wt=await current_world_time()
     try:
         e=await ENGINE.authoritative_action("spatial_key.use",interaction.user.id,{"item_id":item},action_id=f"discord:{interaction.id}:spatial_key.use"); r=dict(e.get('result') or {})
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
-    await interaction.response.send_message(f"🗝️ The key tears open a temporary entrance to **{r.get('realm_name',r.get('realm_id','a secret realm'))}**.",ephemeral=False)
+        await interaction.followup.send(f"❌ {exc}",ephemeral=False);return
+    await interaction.followup.send(f"🗝️ The key tears open a temporary entrance to **{r.get('realm_name',r.get('realm_id','a secret realm'))}**.",ephemeral=False)
 
 # ---------- Personal world creation ----------
 innerworld_group=app_commands.Group(name="innerworld",description="Create and define a stabilized personal world at the peak of Space Law")
@@ -10055,14 +10357,15 @@ innerworld_group=app_commands.Group(name="innerworld",description="Create and de
 @registered_group_command(innerworld_group, name="create",description="Stabilize your own personal world")
 @serialized_user_action
 async def innerworld_create(interaction:discord.Interaction,name:str)->None:
+    await interaction.response.defer(ephemeral=False)
     if not await require_character(interaction): return
     wt=await current_world_time()
     try:
         envelope=await ENGINE.authoritative_action("personal_world.create",interaction.user.id,{"name":name},action_id=f"discord:{interaction.id}:personal_world.create")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
-    await interaction.response.send_message(f"🌌 Personal world **{result.get('name',name)}** created.",ephemeral=False)
+        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+    await interaction.followup.send(f"🌌 Personal world **{result.get('name',name)}** created.",ephemeral=False)
 
 @registered_group_command(innerworld_group, name="status",description="Inspect your stabilized personal world")
 async def innerworld_status(interaction:discord.Interaction)->None:
@@ -10076,1385 +10379,42 @@ async def innerworld_status(interaction:discord.Interaction)->None:
 @registered_group_command(innerworld_group, name="setrule",description="Define or refine one physical/conceptual rule inside your personal world")
 @serialized_user_action
 async def innerworld_setrule(interaction:discord.Interaction,rule:str,definition:str)->None:
+    await interaction.response.defer(ephemeral=False)
     if not await require_character(interaction): return
     wt=await current_world_time()
     try:
         envelope=await ENGINE.authoritative_action("personal_world.set_rule",interaction.user.id,{"rule":rule,"definition":definition},action_id=f"discord:{interaction.id}:personal_world.set_rule")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
-    await interaction.response.send_message(f"🌌 Inner-world rule **{rule}** updated.",ephemeral=False)
+        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+    await interaction.followup.send(f"🌌 Inner-world rule **{rule}** updated.",ephemeral=False)
 
 @registered_group_command(innerworld_group, name="enter",description="Enter your personal world")
 @serialized_user_action
 async def innerworld_enter(interaction:discord.Interaction)->None:
+    await interaction.response.defer(ephemeral=False)
     if not await require_character(interaction): return
     wt=await current_world_time()
     try:
         envelope=await ENGINE.authoritative_action("personal_world.enter",interaction.user.id,{},action_id=f"discord:{interaction.id}:personal_world.enter")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
-    await interaction.response.send_message("🌌 You enter your personal world.",ephemeral=False)
+        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+    await interaction.followup.send("🌌 You enter your personal world.",ephemeral=False)
 
 @registered_group_command(innerworld_group, name="leave",description="Leave your personal world and return to Greenriver Town")
 @serialized_user_action
 async def innerworld_leave(interaction:discord.Interaction)->None:
+    await interaction.response.defer(ephemeral=False)
     if not await require_character(interaction): return
     wt=await current_world_time()
     try:
         envelope=await ENGINE.authoritative_action("personal_world.leave",interaction.user.id,{},action_id=f"discord:{interaction.id}:personal_world.leave")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
-    await interaction.response.send_message(f"🚪 You leave the personal world for **{result.get('outside','outside')}**.",ephemeral=False)
-
-
-sect_group = app_commands.Group(name="sect", description="Sect membership, lineage, resources, manor, and martial-family titles")
-sect_manor_group = app_commands.Group(
-    name="manor",
-    description="Build and upgrade your sect's shared cultivation manor",
-    parent=sect_group,
-)
-sect_disciple_group = app_commands.Group(
-    name="discipleship",
-    description="Request, accept and manage player master-disciple bonds",
-    parent=sect_group,
-)
-sect_recruitment_group = app_commands.Group(
-    name="recruitment",
-    description="Discover sects, earn NPC recommendations and take story-driven entrance trials",
-    parent=sect_group,
-)
-SECT_MANOR_FACILITY_CHOICES = [
-    app_commands.Choice(name=str(definition["name"]), value=key)
-    for key, definition in SECT_MANOR_FACILITIES.items()
-]
-
-
-def _relationship_label(rel: dict[str, Any] | None, *, show_chinese: bool) -> str:
-    if not rel:
-        return "Martial Sibling"
-    english = rel.get("translation") or "Martial Sibling"
-    if show_chinese and rel.get("pinyin") and rel.get("hanzi"):
-        return f"{english} ({rel['pinyin']} {rel['hanzi']})"
-    return english
-
-
-async def _build_family_text(user_id: int, *, show_chinese: bool = False) -> str | None:
-    c = await DB.get_character(user_id)
-    if not c:
-        return None
-    snap = await DB.get_lineage_snapshot(user_id)
-    if not snap:
-        return None
-
-    membership = snap.get("membership")
-    lines = [f"🌿 **Martial Family — {c['name']}**"]
-    if membership:
-        lines.append(f"🏯 **{membership['sect_name']}** — {membership['rank_name']}")
-
-    if snap.get("grandmaster"):
-        label = "Grandmaster"
-        if show_chinese:
-            label += " (Shigong/Shiye 师公/师爷)"
-        lines.append(f"**{label}:** {snap['grandmaster']['name']}")
-
-    if snap.get("master"):
-        label = "Master"
-        if show_chinese:
-            label += " (Shifu 师父)"
-        lines.append(f"**{label}:** {snap['master']['name']}")
-
-    if snap.get("master_siblings"):
-        lines.append("\n**Your master's martial siblings:**")
-        for row in snap["master_siblings"][:15]:
-            rel = await DB.get_address_context(user_id, int(row["user_id"]))
-            lines.append(f"• {_relationship_label(rel, show_chinese=show_chinese)}: {row['name']}")
-
-    if snap.get("siblings"):
-        lines.append("\n**Your martial siblings:**")
-        for row in snap["siblings"][:20]:
-            rel = await DB.get_address_context(user_id, int(row["user_id"]))
-            lines.append(f"• {_relationship_label(rel, show_chinese=show_chinese)}: {row['name']}")
-
-    if snap.get("disciples"):
-        lines.append("\n**Your direct disciples:**")
-        for row in snap["disciples"][:20]:
-            lines.append(f"• Disciple: {row['name']}")
-
-    if len(lines) <= 2 and not snap.get("master"):
-        lines.append("*No master/disciple lineage has been recorded yet.*")
-    return "\n".join(lines)
-
-
-
-async def _sync_sect_discoveries(user_id: int, character: dict, *, game_minute: int | None = None) -> list[str]:
-    """Promote already-discovered recruitment locations into public sect knowledge."""
-    if game_minute is None:
-        game_minute = (await current_world_time()).total_minutes
-    known_locations = await _known_locations(user_id, character)
-    newly_known: list[str] = []
-    for sect_name, sect_def in WORLD.sects.items():
-        rec = recruitment_definition(WORLD.sects, sect_name)
-        if not rec:
-            continue
-        location = str(rec.get("location") or "")
-        if location and location in known_locations:
-            if await DB.discover_sect(
-                user_id, sect_name, game_minute=int(game_minute),
-                discovery_kind="recruitment_route", source_key=location,
-            ):
-                newly_known.append(sect_name)
-    return newly_known
-
-
-async def _known_sect_names(user_id: int, character: dict) -> list[str]:
-    await _sync_sect_discoveries(user_id, character)
-    rows = await DB.get_discovered_sects(user_id)
-    names = [str(row.get("sect_name")) for row in rows if str(row.get("sect_name")) in WORLD.sects]
-    return sorted(dict.fromkeys(names))
-
-
-def _sect_recruitment_at_location(location: str) -> list[str]:
-    out: list[str] = []
-    for sect_name in WORLD.sects:
-        rec = recruitment_definition(WORLD.sects, sect_name)
-        if rec and str(rec.get("location") or "") == str(location):
-            out.append(sect_name)
-    return sorted(out)
-
-
-async def sect_known_autocomplete(interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
-    c = await DB.get_character(interaction.user.id)
-    if not c:
-        return []
-    needle = current.casefold().strip()
-    names = await _known_sect_names(interaction.user.id, c)
-    return [
-        app_commands.Choice(
-            name=f"{name} — {WORLD.sects[name].get('specialty','Sect')}"[:100], value=name[:100]
-        )
-        for name in names if not needle or needle in name.casefold()
-    ][:25]
-
-
-async def sect_local_trial_autocomplete(interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
-    c = await DB.get_character(interaction.user.id)
-    if not c:
-        return []
-    known = set(await _known_sect_names(interaction.user.id, c))
-    needle = current.casefold().strip()
-    names = [name for name in _sect_recruitment_at_location(str(c.get("location") or "")) if name in known]
-    return [
-        app_commands.Choice(name=f"{name} — Entrance Trial"[:100], value=name[:100])
-        for name in names if not needle or needle in name.casefold()
-    ][:25]
-
-
-async def sect_recommender_autocomplete(interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
-    c = await DB.get_character(interaction.user.id)
-    if not c:
-        return []
-    wt = await current_world_time()
-    needle = current.casefold().strip()
-    out: list[app_commands.Choice[str]] = []
-    for name, npc in WORLD.npcs.items():
-        if not bool(npc.get("can_recommend")) or not npc.get("sect_affiliation"):
-            continue
-        npc_location = await current_npc_location(name, wt.period)
-        if npc_location != str(c.get("location") or ""):
-            continue
-        if needle and needle not in name.casefold() and needle not in str(npc.get("sect_affiliation")).casefold():
-            continue
-        out.append(app_commands.Choice(
-            name=f"{name} — {npc.get('sect_affiliation')}"[:100], value=name[:100]
-        ))
-    return out[:25]
-
-
-@registered_group_command(sect_recruitment_group, name="status", description="Show sects, recruitment gates and recommendations your character actually knows")
-async def sect_recruitment_status(interaction: discord.Interaction) -> None:
-    c = await require_character(interaction)
-    if not c:
-        return
-    membership = await DB.get_sect_membership(interaction.user.id)
-    wt = await current_world_time()
-    newly = await _sync_sect_discoveries(interaction.user.id, c, game_minute=wt.total_minutes)
-    known = await _known_sect_names(interaction.user.id, c)
-    recommendations = await DB.get_active_sect_recommendations(interaction.user.id)
-    lines = ["🏯 **Sect Recruitment Journal**"]
-    if membership:
-        lines.append(f"Current public sect: **{membership['sect_name']} — {membership['rank_name']}**")
-    else:
-        lines.append("Current public sect: **Unaffiliated**")
-    if newly:
-        lines.append(f"🧭 Newly recognized from discovered routes: **{', '.join(newly)}**")
-    lines.append("\n**Known sects**")
-    if not known:
-        lines.append("• None yet. Explore the world, meet sect-affiliated NPCs, and listen for recruitment routes.")
-    for sect_name in known:
-        sect = WORLD.sects[sect_name]
-        rec = recruitment_definition(WORLD.sects, sect_name) or {}
-        at_gate = str(c.get("location") or "") == str(rec.get("location") or "")
-        lines.append(
-            f"• **{sect_name}** • {sect.get('alignment','Unknown')} • {sect.get('specialty','Unknown specialty')}\n"
-            f"  Gate: **{rec.get('location','Unknown')}**{' • **You are here**' if at_gate else ''}"
-        )
-    lines.append("\n**Active NPC recommendations**")
-    if recommendations:
-        for row in recommendations:
-            lines.append(
-                f"• **{row['sect_name']}** via **{row['npc_name']}** • entrance bonus **+{int(row.get('bonus',0))}**"
-            )
-    else:
-        lines.append("• None. Speak with a local sect-affiliated NPC before asking them to sponsor you.")
-    await reply_long(interaction, "\n".join(lines), ephemeral=False)
-
-
-@registered_group_command(sect_recruitment_group, name="info", description="Inspect the public recruitment story for a sect you have discovered")
-@app_commands.autocomplete(sect_name=sect_known_autocomplete)
-async def sect_recruitment_info(interaction: discord.Interaction, sect_name: str) -> None:
-    c = await require_character(interaction)
-    if not c:
-        return
-    known = set(await _known_sect_names(interaction.user.id, c))
-    if sect_name not in known or sect_name not in WORLD.sects:
-        await interaction.response.send_message("That sect has not been discovered by this character.", ephemeral=False)
-        return
-    sect = WORLD.sects[sect_name]
-    rec = recruitment_definition(WORLD.sects, sect_name) or {}
-    recommendation = await DB.get_active_sect_recommendation(interaction.user.id, sect_name)
-    lines = [
-        f"🏯 **{sect_name} — Recruitment**",
-        f"Alignment: **{sect.get('alignment','Unknown')}**",
-        f"Specialty: **{sect.get('specialty','Unknown')}**",
-        f"Recruitment gate: **{rec.get('location','Unknown')}**",
-        f"Entrance trial: **{rec.get('trial_name','Entrance Examination')}**",
-        str(rec.get("description") or "A formal sect entrance examination."),
-        f"Examiner: **{rec.get('examiner','Sect Examiner')}**",
-    ]
-    if recommendation:
-        lines.append(
-            f"\n📜 **Recommendation:** {recommendation['npc_name']} has sponsored your approach (**+{int(recommendation.get('bonus',0))}** to the trial checks)."
-        )
-    elif not bool(rec.get("public_route", True)):
-        lines.append("\n🌑 This is not a public recruitment route. An affiliated NPC recommendation is normally required to reveal the way.")
-    else:
-        lines.append("\nA recommendation is optional, but a trusted sponsor can improve the entrance examination.")
-    if str(c.get("location") or "") != str(rec.get("location") or ""):
-        lines.append("\n🗺️ You must physically travel to the recruitment gate before attempting the trial.")
-    await reply_long(interaction, "\n".join(lines), ephemeral=False)
-
-
-@registered_group_command(sect_recruitment_group, name="recommendation", description="Ask a local sect-affiliated NPC to sponsor your entrance attempt")
-@app_commands.autocomplete(npc=sect_recommender_autocomplete)
-@serialized_user_action
-async def sect_recruitment_recommendation(interaction: discord.Interaction, npc: str) -> None:
-    c=await require_character(interaction)
-    if not c:return
-    npc_data=await DB.get_npc_definition(npc)
-    if not npc_data or not bool(npc_data.get('can_recommend')) or not npc_data.get('sect_affiliation'):
-        await interaction.response.send_message("That NPC cannot issue a sect recommendation.",ephemeral=False);return
-    sect_name=str(npc_data.get('sect_affiliation')); rec=recruitment_definition(WORLD.sects,sect_name)
-    if not rec:
-        await interaction.response.send_message("That NPC's sect has no public recruitment path configured.",ephemeral=False);return
-    wt=await current_world_time(); npc_location=await current_npc_location(npc,wt.period)
-    if npc_location!=str(c.get('location') or ''):
-        await interaction.response.send_message(f"**{npc}** is currently at **{npc_location or 'an unknown location'}**, not **{await character_location_display(c)}**.",ephemeral=False);return
-    memory=await DB.get_npc_memory(interaction.user.id,npc)
-    if not memory.strip():
-        await interaction.response.send_message(f"Speak with **{npc}** first; a recommendation requires established personal history.",ephemeral=False);return
-    family=await DB.get_birth_family(interaction.user.id); reps=await DB.get_reputations(interaction.user.id); rep=next((int(x.get('score',0)) for x in reps if str(x.get('faction_key'))==sect_name),0)
-    _,notes=recommendation_modifier(c,faction_reputation=rep,family=family,sect_alignment=str(WORLD.sects[sect_name].get('alignment','Neutral')))
-    try:
-        e=await ENGINE.authoritative_action("sect.recruitment.recommendation",interaction.user.id,{"npc_name":npc,"sect_name":sect_name,"location":str(rec.get('location') or ''),"details":{"modifier_notes":notes}},action_id=f"discord:{interaction.id}:sect.recruitment.recommendation"); r=dict(e.get('result') or {})
-    except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
-    roll=dict(r.get('roll') or {}); roll_text=f"2d10 {int(roll.get('modifier',0)):+d} = **{int(roll.get('total',0))}** vs TN **{int(roll.get('tn',0))}**"
-    tail=f"📜 Recommendation secured: +{int(r.get('recommendation_bonus',0))}." if r.get('success') else "The recommendation was not granted."
-    await interaction.response.send_message(f"{roll_text}\n{tail}",ephemeral=False)
-
-
-@registered_group_command(sect_recruitment_group, name="recommendations", description="List active NPC sect recommendations")
-async def sect_recruitment_recommendations(interaction: discord.Interaction) -> None:
-    if not await require_character(interaction):
-        return
-    rows = await DB.get_active_sect_recommendations(interaction.user.id)
-    if not rows:
-        await interaction.response.send_message("You hold no active sect recommendations.", ephemeral=False)
-        return
-    lines = ["📜 **Active Sect Recommendations**"]
-    for row in rows:
-        lines.append(f"• **{row['sect_name']}** — sponsor **{row['npc_name']}** • trial bonus **+{int(row.get('bonus',0))}**")
-    lines.append("\nA recommendation is consumed when you take that sect's entrance trial. It does not guarantee admission.")
-    await interaction.response.send_message("\n".join(lines), ephemeral=False)
-
-
-@registered_group_command(sect_recruitment_group, name="trial", description="Take the story-driven entrance examination at your current sect gate")
-@app_commands.autocomplete(sect_name=sect_local_trial_autocomplete)
-@serialized_user_action
-async def sect_recruitment_trial(interaction: discord.Interaction, sect_name: str) -> None:
-    c=await require_character(interaction)
-    if not c:return
-    if sect_name not in WORLD.sects:
-        await interaction.response.send_message("Unknown sect.",ephemeral=False);return
-    wt=await current_world_time(); rec=recruitment_definition(WORLD.sects,sect_name); profile=trial_profile(WORLD.sects,sect_name)
-    if not rec or not profile:
-        await interaction.response.send_message("That sect has no configured entrance trial.",ephemeral=False);return
-    recommendation=await DB.get_active_sect_recommendation(interaction.user.id,sect_name); recommendation_bonus=int(recommendation.get('bonus',0)) if recommendation else 0; family=await DB.get_birth_family(interaction.user.id)
-    _,primary_notes,rejection=trial_modifier(c,rec,attribute=profile.primary_attribute,family=family,recommendation_bonus=recommendation_bonus)
-    _,secondary_notes,rejection2=trial_modifier(c,rec,attribute=profile.secondary_attribute,family=family,recommendation_bonus=recommendation_bonus)
-    if rejection or rejection2:
-        await interaction.response.send_message(f"🚫 **Entrance refused before examination.** {rejection or rejection2}",ephemeral=False);return
-    try:
-        e=await ENGINE.authoritative_action("sect.recruitment.trial",interaction.user.id,{"sect_name":sect_name,"examiner":profile.examiner,"location":profile.location,"trial_name":profile.trial_name,"primary_details":primary_notes,"secondary_details":secondary_notes},action_id=f"discord:{interaction.id}:sect.recruitment.trial"); r=dict(e.get('result') or {})
-    except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
-    outcome=str(r.get('outcome','fail')); p=dict(r.get('primary') or {}); q=dict(r.get('secondary') or {})
-    await interaction.response.send_message(f"**{profile.trial_name}** — {outcome.replace('_',' ').title()}\nPrimary: **{p.get('total','?')}** vs TN **{p.get('tn','?')}**\nSecondary: **{q.get('total','?')}** vs TN **{q.get('tn','?')}**",ephemeral=False)
-
-
-@registered_group_command(sect_recruitment_group, name="history", description="Review your recent sect recommendation and entrance-trial history")
-async def sect_recruitment_history(interaction: discord.Interaction) -> None:
-    if not await require_character(interaction):
-        return
-    rows = await DB.get_recent_sect_recruitment_attempts(interaction.user.id, limit=12)
-    if not rows:
-        await interaction.response.send_message("You have no sect recruitment history yet.", ephemeral=False)
-        return
-    lines = ["📚 **Sect Recruitment History**"]
-    for row in rows:
-        kind = "Recommendation" if str(row.get("attempt_type")) == "recommendation" else "Entrance Trial"
-        result = str(row.get("result", "unknown")).replace("_", " ").title()
-        actor = f" • {row.get('npc_name')}" if row.get("npc_name") else ""
-        lines.append(f"• **{row.get('sect_name')}** — {kind}: **{result}**{actor}")
-    await interaction.response.send_message("\n".join(lines), ephemeral=False)
-
-
-@registered_group_command(sect_group, name="form", description="Choose which English martial-sibling titles are used for your character")
-@app_commands.choices(style=ADDRESS_STYLE_CHOICES)
-async def sect_form(interaction: discord.Interaction, style: app_commands.Choice[str]) -> None:
-    c = await require_character(interaction)
-    if not c:
-        return
-    await DB.set_address_style(interaction.user.id, style.value)
-    examples = {
-        "masculine": "Senior Brother / Junior Brother",
-        "feminine": "Senior Sister / Junior Sister",
-        "neutral": "Senior / Junior Martial Sibling",
-    }
-    await interaction.response.send_message(
-        f"✅ Your normal English sect address is now **{examples[style.value]}**.",
-        ephemeral=False,
-    )
-
-
-@registered_group_command(sect_group, name="status", description="Show sect membership and direct lineage")
-async def sect_status(interaction: discord.Interaction, member: discord.Member | None = None) -> None:
-    target = member or interaction.user
-    c = await DB.get_character(target.id)
-    if not c:
-        await interaction.response.send_message("That member has no cultivation character.", ephemeral=False)
-        return
-    membership = await DB.get_sect_membership(target.id)
-    master = await DB.get_master(target.id)
-    lines = [f"🏯 **Sect Record — {c['name']}**"]
-    if membership:
-        lines += [
-            f"Sect: **{membership['sect_name']}**",
-            f"Rank: **{membership['rank_name']}** (level {membership['rank_level']})",
-            f"Contribution points: **{membership.get('contribution_points', 0)}**",
-            f"Influence: **{membership.get('influence', 0)}**",
-        ]
-        snap = await DB.get_lineage_snapshot(target.id)
-        if snap.get("person", {}).get("master_attention") is not None and master:
-            lines.append(f"Master attention: **{snap['person'].get('master_attention', 0)}**")
-    else:
-        lines.append("Sect: **Unaffiliated / not recorded**")
-    lines.append(f"Master: **{master['name']}**" if master else "Master: *none recorded*")
-    style_names = {
-        "masculine": "Senior Brother / Junior Brother",
-        "feminine": "Senior Sister / Junior Sister",
-        "neutral": "Senior / Junior Martial Sibling",
-    }
-    lines.append(f"Normal address form: **{style_names.get(c.get('address_style', 'neutral'), 'Senior / Junior Martial Sibling')}**")
-    await interaction.response.send_message("\n".join(lines), ephemeral=False)
-
-
-
-
-@registered_group_command(sect_disciple_group, name="status", description="View your master, disciples and pending player contracts")
-async def sect_discipleship_status(interaction: discord.Interaction) -> None:
-    c = await require_character(interaction)
-    if not c:
-        return
-    snap = await DB.get_lineage_snapshot(interaction.user.id)
-    incoming = await DB.get_disciple_requests(interaction.user.id, incoming=True)
-    outgoing = await DB.get_disciple_requests(interaction.user.id, incoming=False)
-    lines = [f"🎓 **Master-Disciple Record — {c['name']}**"]
-    master = snap.get("master")
-    lines.append(f"Master: **{master['name']}**" if master else "Master: *none*")
-    disciples = list(snap.get("disciples") or [])
-    lines.append("Direct disciples: " + (", ".join(f"**{x['name']}**" for x in disciples[:15]) if disciples else "*none*"))
-    if incoming:
-        lines.append("\n**Requests awaiting your answer**")
-        for row in incoming[:15]:
-            lines.append(f"• `#{row['request_id']}` — **{row['other_name']}**, realm {row['other_realm_index']} stage {row['other_phase']}")
-    if outgoing:
-        lines.append("\n**Requests you have sent**")
-        for row in outgoing[:15]:
-            lines.append(f"• `#{row['request_id']}` → **{row['other_name']}**")
-    await reply_long(interaction, "\n".join(lines), ephemeral=False)
-
-
-@registered_group_command(sect_disciple_group, name="request", description="Ask a stronger cultivator to formally become your master")
-@serialized_user_action
-async def sect_discipleship_request(interaction: discord.Interaction, master: discord.Member) -> None:
-    if not await require_character(interaction): return
-    wt=await current_world_time()
-    try:
-        envelope=await ENGINE.authoritative_action("discipleship.request",interaction.user.id,{"master_user_id":master.id},action_id=f"discord:{interaction.id}:discipleship.request")
-        result=dict(envelope.get("result") or {})
-    except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
-    await interaction.response.send_message(f"🙏 Discipleship request `#{result.get('request_id')}` sent to {master.mention}.",ephemeral=False)
-
-
-@registered_group_command(sect_disciple_group, name="accept", description="Accept a pending disciple request addressed to you")
-@serialized_user_action
-async def sect_discipleship_accept(interaction: discord.Interaction, request_id: int) -> None:
-    if not await require_character(interaction): return
-    wt=await current_world_time()
-    try:
-        envelope=await ENGINE.authoritative_action("discipleship.resolve",interaction.user.id,{"request_id":int(request_id),"accept":True},action_id=f"discord:{interaction.id}:discipleship.resolve")
-        result=dict(envelope.get("result") or {})
-    except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
-    await interaction.response.send_message("🙏 Discipleship request accepted.",ephemeral=False)
-
-
-@registered_group_command(sect_disciple_group, name="reject", description="Reject a pending disciple request addressed to you")
-@serialized_user_action
-async def sect_discipleship_reject(interaction: discord.Interaction, request_id: int) -> None:
-    if not await require_character(interaction): return
-    wt=await current_world_time()
-    try:
-        envelope=await ENGINE.authoritative_action("discipleship.resolve",interaction.user.id,{"request_id":int(request_id),"accept":False},action_id=f"discord:{interaction.id}:discipleship.resolve")
-        result=dict(envelope.get("result") or {})
-    except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
-    await interaction.response.send_message("Discipleship request rejected.",ephemeral=False)
-
-
-@registered_group_command(sect_disciple_group, name="leave", description="Sever your current master-disciple bond")
-@serialized_user_action
-async def sect_discipleship_leave(interaction: discord.Interaction, confirm: bool = False) -> None:
-    if not await require_character(interaction): return
-    wt=await current_world_time()
-    try:
-        envelope=await ENGINE.authoritative_action("discipleship.leave",interaction.user.id,{},action_id=f"discord:{interaction.id}:discipleship.leave")
-        result=dict(envelope.get("result") or {})
-    except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
-    await interaction.response.send_message("🧵 Your discipleship bond has been ended.",ephemeral=False)
-
-
-SECT_ABODE_ACTIONS = [
-    app_commands.Choice(name="Status / Open Thread", value="status"),
-    app_commands.Choice(name="Enter Sect Abode", value="enter"),
-    app_commands.Choice(name="Leave Sect Abode", value="leave"),
-]
-
-
-@registered_group_command(sect_group, name="abode", description="Open, enter or leave the private residence assigned by your public sect")
-@app_commands.choices(action=SECT_ABODE_ACTIONS)
-@serialized_user_action
-async def sect_abode(interaction: discord.Interaction, action: app_commands.Choice[str]) -> None:
-    c = await require_character(interaction)
-    if not c:
-        return
-    membership = await DB.get_sect_membership(interaction.user.id)
-    if not membership:
-        await interaction.response.send_message("You are not a public sect member, so no sect abode is assigned.", ephemeral=False)
-        return
-    abode = await ensure_sect_abode_record(interaction.user.id, c, membership)
-    thread = await ensure_sect_abode_thread_for(interaction.guild, interaction.user, abode) if interaction.guild else None
-    if action.value == "status":
-        await interaction.response.send_message(
-            f"🏯 **{abode['name']}**\nSect: **{abode['sect_name']}**\nSect gate: **{abode['base_location']}**\n"
-            f"Current location: **{await character_location_display(c)}**\n"
-            + (f"Private scene: {thread.mention}" if thread else "⚠️ Private scene thread is unavailable; repair the base channels."),
-            ephemeral=False,
-        )
-        return
-    if action.value == "leave":
-        if str(c.get("location") or "") != str(abode["location_key"]):
-            await interaction.response.send_message("You are not inside your sect abode.", ephemeral=False)
-            return
-        await DB.set_location(interaction.user.id, str(abode["base_location"]))
-        if thread:
-            try: await thread.send(f"🚪 **{c['name']}** leaves the sect abode and returns to **{abode['base_location']}**.")
-            except discord.HTTPException: pass
-        await interaction.response.send_message(f"You leave your sect abode and return to **{abode['base_location']}**.", ephemeral=False)
-        return
-    if str(c.get("location") or "") != str(abode["base_location"]):
-        await interaction.response.send_message(
-            f"Travel to the sect gate at **{abode['base_location']}** before entering your assigned residence.", ephemeral=False
-        )
-        return
-    await DB.set_location(interaction.user.id, str(abode["location_key"]))
-    if thread:
-        try: await thread.send(f"🏯 **{c['name']}** enters **{abode['name']}**. This private thread is now the active residence scene.")
-        except discord.HTTPException: pass
-    await interaction.response.send_message(
-        f"🏯 You enter **{abode['name']}**." + (f" Continue in {thread.mention}." if thread else ""), ephemeral=False
-    )
-
-
-@registered_group_command(sect_group, name="shadow", description="Investigate the hidden Heaven-Devouring Demon Sect and its karma gates")
-@app_commands.choices(action=[
-    app_commands.Choice(name="Investigate", value="investigate"),
-    app_commands.Choice(name="Status", value="status"),
-    app_commands.Choice(name="Accept initiation", value="initiate"),
-])
-@serialized_user_action
-async def sect_shadow(interaction: discord.Interaction, action: app_commands.Choice[str]) -> None:
-    c=await require_character(interaction)
-    if not c:return
-    sect_def=WORLD.sects.get("Heaven-Devouring Demon Sect",{})
-    karma=int(c.get('karma_score',0)); hidden=await DB.get_hidden_sect_membership(interaction.user.id)
-    world_name=WORLD.realm_world(int(c.get('realm_index',0)))
-    branch=str((sect_def.get('branches') or {}).get(world_name, 'Unknown Shadow Cell'))
-    righteous_enemy=int(sect_def.get('righteous_enemy',50)); observe=int(sect_def.get('karma_observation',-50)); initiate=int(sect_def.get('karma_initiation',-200))
-    if hidden and karma>=righteous_enemy and str(hidden.get('status'))!='enemy':
-        hidden=await DB.set_hidden_sect_status(interaction.user.id,'enemy',standing_delta=-100)
-    if action.value=='status':
-        if hidden:
-            await interaction.response.send_message(
-                f"🌑 **Heaven-Devouring Demon Sect**\nBranch: **{hidden['branch_name']}** • Rank **{hidden['rank_name']}** • Status **{hidden['status']}** • Standing **{hidden['standing']:+d}**\nKarma: **{karma:+d}**. Reaching righteous karma (**+{righteous_enemy}**) turns the hidden sect hostile.",ephemeral=False);return
-        if karma<=observe:
-            await interaction.response.send_message(f"🌫️ Your karma **{karma:+d}** has attracted unseen observation from **{branch}**, but you are not initiated.",ephemeral=False);return
-        await interaction.response.send_message("🌫️ You find rumors and contradictory signs, but no hidden-sect contact reveals itself to this incarnation.",ephemeral=False);return
-    if action.value=='investigate':
-        if karma>=righteous_enemy:
-            await interaction.response.send_message(f"☀️ Your righteous karma **{karma:+d}** marks you as a probable enemy. Shadow messengers avoid open contact; concealed hostility is more likely than recruitment.",ephemeral=False);return
-        if karma<=initiate:
-            await interaction.response.send_message(f"🌑 **{branch}** stops merely observing you. Your karma **{karma:+d}** satisfies the initiation gate. You may use **/sect → Shadow / Special → Accept Initiation**.",ephemeral=False);return
-        if karma<=observe:
-            await interaction.response.send_message(f"👁️ You detect a watcher from **{branch}**. Your karma **{karma:+d}** is dark enough for observation, but initiation requires **{initiate}** or lower.",ephemeral=False);return
-        await interaction.response.send_message(f"You uncover only dead drops and false trails. A karma stain of **{observe}** or lower is normally required before the sect takes interest.",ephemeral=False);return
-    if hidden and str(hidden.get('status'))=='active':
-        await interaction.response.send_message("You are already an active hidden-sect initiate.",ephemeral=False);return
-    if karma>initiate:
-        await interaction.response.send_message(f"The initiation seal remains cold. Required karma: **{initiate} or lower**; yours is **{karma:+d}**.",ephemeral=False);return
-    if karma>=righteous_enemy:
-        await interaction.response.send_message("The hidden sect recognizes you as a righteous enemy, not a recruit.",ephemeral=False);return
-    wt=await current_world_time(); hidden=await DB.initiate_hidden_sect(interaction.user.id,sect_name="Heaven-Devouring Demon Sect",branch_name=branch,game_minute=wt.total_minutes)
-    candidates=[]
-    for mid,m in WORLD.manuals.items():
-        if str(m.get('alignment','')).casefold()!='demonic': continue
-        if str(m.get('path',''))!=str(c.get('path','')): continue
-        if int(m.get('min_realm_index',0))<=int(c.get('realm_index',0)): candidates.append((int(m.get('min_realm_index',0)),mid,m))
-    granted=None
-    if candidates:
-        _,mid,m=max(candidates,key=lambda x:(x[0],x[1])); item_id=str(m.get('item_id',''))
-        if item_id:
-            await DB.add_items(interaction.user.id,{item_id:1}); granted=m
-            await DB.record_item_provenance(interaction.user.id,item_id,source_type='hidden_sect_initiation',source_key=branch,ownership_mark='Heaven-Devouring Seal',legal_status='forbidden',tracking_strength=70,game_minute=wt.total_minutes)
-    text=f"🌑 You accept the **Heaven-Devouring Demon Sect** initiation in **{branch}**. Hidden rank: **{hidden['rank_name']}**. This affiliation is stored separately from your public sect lineage."
-    if granted: text+=f"\n📕 Initiation inheritance: **{granted['name']}** was placed in your inventory; study it with **/cultivation → Manuals & Techniques → Study**."
-    await interaction.response.send_message(text,ephemeral=False)
-
-
-@registered_group_command(sect_group, name="roster", description="Show your sect hierarchy, ranks, contribution and influence")
-async def sect_roster(interaction:discord.Interaction)->None:
-    c=await require_character(interaction)
-    if not c:return
-    membership=await DB.get_sect_membership(interaction.user.id)
-    if not membership:
-        await interaction.response.send_message("You are not recorded as a sect member.",ephemeral=False);return
-    roster=await DB.get_sect_roster(str(membership['sect_name']))
-    lines=[f"🏯 **{membership['sect_name']} — Hierarchy**"]
-    for row in roster[:40]:
-        lines.append(
-            f"\n**{row['rank_name']}** — {row['name']} • "
-            f"{WORLD.realm_name(int(row['realm_index']))} Stage {row['phase']} • "
-            f"CP {row.get('contribution_points',0)} • Influence {row.get('influence',0)}"
-        )
-    await reply_long(interaction,"\n".join(lines),ephemeral=False)
-
-
-@registered_group_command(sect_group, name="politics", description="Show current sect influence, master attention and resource pressure")
-async def sect_politics(interaction: discord.Interaction) -> None:
-    if not await require_character(interaction):
-        return
-    membership = await DB.get_sect_membership(interaction.user.id)
-    if not membership:
-        await interaction.response.send_message("You are not a sect member.", ephemeral=False)
-        return
-    roster = await DB.get_sect_roster(str(membership["sect_name"]))
-    treasury = await DB.get_sect_treasury(str(membership["sect_name"]))
-    snap = await DB.get_lineage_snapshot(interaction.user.id)
-    attention = snap.get("person", {}).get("master_attention", 0)
-    sim_politics = await SIM.sect_status(str(membership["sect_name"]))
-    lines = [
-        f"🏯 **{membership['sect_name']} — Internal Politics**",
-        f"Your rank: **{membership['rank_name']}**",
-        f"Contribution points: **{membership.get('contribution_points', 0)}**",
-        f"Institutional influence: **{membership.get('influence', 0)}**",
-        f"Master attention: **{attention if snap.get('master') else 'No recorded master'}**",
-    ]
-    if sim_politics:
-        lines.extend([
-            f"Sect influence: **{sim_politics.get('influence',0)}** • Cohesion: **{sim_politics.get('cohesion',0)}/100** • Resources: **{sim_politics.get('resources',0)}**",
-            f"Recruitment pressure: **{sim_politics.get('recruitment_pressure',0)}/100** • Doctrine pressure: **{sim_politics.get('doctrine_pressure',0)}/100**",
-        ])
-        factions=list(sim_politics.get('factions') or [])[:3]
-        if factions:
-            lines.append("\n**Autonomous internal factions**")
-            for faction in factions:
-                lines.append(f"• **{faction['faction_name']}** — power {faction['power']}% • loyalty {faction['loyalty']}/100\n  {faction['agenda']}")
-        relations=list(sim_politics.get('relations') or [])[:4]
-        if relations:
-            lines.append("\n**External relations**")
-            for relation in relations:
-                lines.append(f"• **{relation['other']}** — {str(relation.get('relation_type','neutral')).title()} ({int(relation.get('relation_score',0)):+d}) • treaty {relation.get('treaty_status','none')}")
-        events=list(sim_politics.get('events') or [])[:3]
-        if events:
-            lines.append("\n**Recent political incidents**")
-            lines.extend(f"• {event['event_text']}" for event in events)
-    lines.append("\n**Most influential members**")
-    for row in sorted(roster, key=lambda r: (int(r.get('influence', 0)), int(r.get('rank_level', 0))), reverse=True)[:5]:
-        lines.append(f"• {row['name']} — {row['rank_name']} • Influence {row.get('influence', 0)}")
-    if treasury:
-        scarce = sorted(treasury.items(), key=lambda kv: kv[1])[:5]
-        lines.append("\n**Scarce stocked resources**")
-        for item_id, qty in scarce:
-            lines.append(f"• {WORLD.item_name(item_id)} x{qty}")
-    else:
-        lines.append("\n**Resource pressure:** the sect treasury is empty.")
-    await reply_long(interaction, "\n".join(lines), ephemeral=False)
-
-
-@registered_group_command(sect_group, name="treasury", description="Inspect resources currently available to your sect")
-async def sect_treasury(interaction:discord.Interaction)->None:
-    if not await require_character(interaction):return
-    membership=await DB.get_sect_membership(interaction.user.id)
-    if not membership:
-        await interaction.response.send_message("You are not a sect member.",ephemeral=False);return
-    treasury=await DB.get_sect_treasury(str(membership['sect_name']))
-    lines=[f"📦 **{membership['sect_name']} Treasury**",f"Your contribution points: **{membership.get('contribution_points',0)}**"]
-    if not treasury: lines.append("*No contributed materials are currently stocked.*")
-    else:
-        sim_state=await SIM.sect_status(str(membership['sect_name']))
-        resources=int((sim_state or {}).get('resources',50))
-        pressure_mult=1.60 if resources<25 else 1.35 if resources<50 else 1.20 if resources<80 else 1.00
-        lines.append(f"Autonomous resource pressure: **{resources}** • redemption multiplier **x{pressure_mult:.2f}**")
-        for item_id,qty in treasury.items():
-            cost=max(1,int(round(WORLD.item_sect_value(item_id)*pressure_mult)))
-            lines.append(f"• {WORLD.item_name(item_id)} x{qty} — **{cost} CP each**")
-    await reply_long(interaction,"\n".join(lines),ephemeral=False)
-
-
-@registered_group_command(sect_group, name="contribute", description="Donate materials to your sect for contribution points and influence")
-@app_commands.autocomplete(item=carried_item_autocomplete)
-@serialized_user_action
-async def sect_contribute(interaction:discord.Interaction,item:str,quantity:app_commands.Range[int,1,999999]=1)->None:
-    if not await require_character(interaction): return
-    wt=await current_world_time()
-    try:
-        envelope=await ENGINE.authoritative_action("sect.contribute",interaction.user.id,{"item_id":item,"quantity":int(quantity)},action_id=f"discord:{interaction.id}:sect.contribute")
-        result=dict(envelope.get("result") or {})
-    except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
-    await interaction.response.send_message(f"🏯 Contributed **{WORLD.item_name(item)} x{quantity}** to the sect treasury.",ephemeral=False)
-
-
-async def sect_treasury_item_autocomplete(interaction:discord.Interaction,current:str)->list[app_commands.Choice[str]]:
-    membership=await DB.get_sect_membership(interaction.user.id)
-    if not membership:return []
-    treasury=await DB.get_sect_treasury(str(membership['sect_name']));needle=current.casefold().strip();out=[]
-    for item_id,qty in treasury.items():
-        name=WORLD.item_name(item_id)
-        if not needle or needle in name.casefold() or needle in item_id.casefold():out.append(app_commands.Choice(name=f"{name} x{qty}"[:100],value=item_id[:100]))
-    return out[:25]
-
-
-@registered_group_command(sect_group, name="redeem", description="Exchange contribution points for stocked sect resources")
-@app_commands.autocomplete(item=sect_treasury_item_autocomplete)
-@serialized_user_action
-async def sect_redeem(interaction:discord.Interaction,item:str,quantity:app_commands.Range[int,1,999999]=1)->None:
-    if not await require_character(interaction): return
-    wt=await current_world_time()
-    try:
-        envelope=await ENGINE.authoritative_action("sect.redeem",interaction.user.id,{"item_id":item,"quantity":int(quantity)},action_id=f"discord:{interaction.id}:sect.redeem")
-        result=dict(envelope.get("result") or {})
-    except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
-    await interaction.response.send_message(f"🏯 Redeemed **{WORLD.item_name(item)} x{quantity}** from the sect treasury.",ephemeral=False)
-
-
-@registered_group_command(sect_manor_group, name="status", description="Inspect your sect's shared manor, facilities and recent construction")
-async def sect_manor_status(interaction: discord.Interaction) -> None:
-    c = await require_character(interaction)
-    if not c:
-        return
-    membership = await DB.get_sect_membership(interaction.user.id)
-    if not membership:
-        await interaction.response.send_message("You are not a sect member.", ephemeral=False)
-        return
-    sect_name = str(membership["sect_name"])
-    manor = await DB.get_sect_manor(sect_name)
-    treasury = await DB.get_sect_treasury(sect_name)
-    if not manor:
-        lines = [
-            f"🏯 **{sect_name} — No Sect Manor Yet**",
-            "A Sect Master or Ancestor can establish one at a normal world location once the shared treasury holds the foundation materials.",
-            f"Foundation cost: **{WORLD.item_names(SECT_MANOR_ESTABLISHMENT_COST)}**",
-            f"Current treasury toward foundation: **{WORLD.item_names({k: min(v, treasury.get(k,0)) for k,v in SECT_MANOR_ESTABLISHMENT_COST.items()})}**",
-        ]
-        await interaction.response.send_message("\n".join(lines), ephemeral=False)
-        return
-    lines = [
-        f"🏯 **{manor['name']} — {sect_name}**",
-        f"Seat: **{manor['base_location']}**",
-        f"Your rank: **{membership['rank_name']}** • Contribution Points: **{membership.get('contribution_points',0)}**",
-        "",
-        "**Facilities & active benefits**",
-    ]
-    lines.extend(f"• {line}" for line in manor_benefit_lines(manor))
-    lines.append("\n**Next upgrades**")
-    for key, definition in SECT_MANOR_FACILITIES.items():
-        level = int(manor.get(str(definition["column"]), 0))
-        if level >= MAX_MANOR_FACILITY_LEVEL:
-            lines.append(f"• **{definition['name']}** — MAX Lv.{MAX_MANOR_FACILITY_LEVEL}")
-        else:
-            lines.append(f"• **{definition['name']}** Lv.{level} → Lv.{level+1}: {WORLD.item_names(manor_upgrade_cost(key, level))}")
-    projects = await DB.get_sect_manor_projects(sect_name, limit=5)
-    if projects:
-        lines.append("\n**Recent construction**")
-        for project in projects:
-            if str(project.get("project_type")) == "establish":
-                lines.append(f"• Foundation established • {WORLD.item_names(project.get('cost',{}))}")
-            else:
-                facility = SECT_MANOR_FACILITIES.get(str(project.get("facility_key")), {})
-                lines.append(
-                    f"• {facility.get('name', project.get('facility_key','Facility'))} "
-                    f"Lv.{project.get('from_level',0)} → Lv.{project.get('to_level',0)} • {WORLD.item_names(project.get('cost',{}))}"
-                )
-    await reply_long(interaction, "\n".join(lines), ephemeral=False)
-
-
-@registered_group_command(sect_manor_group, name="establish", description="Spend shared treasury materials to establish the sect's one persistent manor")
-@serialized_user_action
-async def sect_manor_establish(interaction: discord.Interaction, name: str, confirm: bool = False) -> None:
-    c=await require_character(interaction)
-    if not c:return
-    if not confirm:
-        await interaction.response.send_message(f"🏯 Establish **{name[:80]}** here? Repeat with **confirm:true** to lay the foundation.",ephemeral=False);return
-    wt=await current_world_time()
-    try:
-        e=await ENGINE.authoritative_action("sect.manor.establish",interaction.user.id,{"name":name},action_id=f"discord:{interaction.id}:sect.manor.establish"); r=dict(e.get('result') or {})
-    except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
-    established_location = r.get('base_location') or await character_location_display(c)
-    await interaction.response.send_message(f"🏯 **{r.get('name',name)}** is established at **{established_location}**.",ephemeral=False)
-
-
-@registered_group_command(sect_manor_group, name="upgrade", description="Upgrade a shared manor facility using materials from the sect treasury")
-@app_commands.choices(facility=SECT_MANOR_FACILITY_CHOICES)
-@serialized_user_action
-async def sect_manor_upgrade(
-    interaction: discord.Interaction, facility: app_commands.Choice[str], confirm: bool = False
-) -> None:
-    if not await require_character(interaction):return
-    if not confirm:
-        await interaction.response.send_message(f"🏗️ Upgrade **{facility.name}**? Repeat with **confirm:true** to spend shared treasury materials.",ephemeral=False);return
-    wt=await current_world_time()
-    try:
-        e=await ENGINE.authoritative_action("sect.manor.upgrade",interaction.user.id,{"facility":facility.value},action_id=f"discord:{interaction.id}:sect.manor.upgrade"); r=dict(e.get('result') or {})
-    except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
-    await interaction.response.send_message(f"🏗️ **{facility.name} upgraded to Lv.{r.get('level','?')}**.",ephemeral=False)
-
-
-@registered_group_command(sect_group, name="address", description="Show the proper English martial-family title for another cultivator")
-async def sect_address(
-    interaction: discord.Interaction, member: discord.Member, show_chinese: bool = False
-) -> None:
-    observer = await require_character(interaction)
-    if not observer:
-        return
-    target = await DB.get_character(member.id)
-    if not target:
-        await interaction.response.send_message("That member has no cultivation character.", ephemeral=False)
-        return
-    result = await DB.get_address_context(interaction.user.id, member.id)
-    if not result:
-        await interaction.response.send_message("No relationship information could be resolved.", ephemeral=False)
-        return
-    display = result["display_chinese"] if show_chinese else result["display"]
-    await interaction.response.send_message(
-        f"🪷 **{observer['name']} → {target['name']}**\n{display}", ephemeral=False
-    )
-
-
-@registered_group_command(sect_group, name="family", description="Check your martial-family tree")
-async def sect_family(interaction: discord.Interaction, show_chinese: bool = False) -> None:
-    c = await require_character(interaction)
-    if not c:
-        return
-    text = await _build_family_text(interaction.user.id, show_chinese=show_chinese)
-    if not text:
-        await interaction.response.send_message("No sect lineage is recorded for your character.", ephemeral=False)
-        return
-    await reply_long(interaction, text, ephemeral=False)
-
-
-family_group=app_commands.Group(name="family",description="Your NPC birth family, relatives, descendants, support and family fortunes")
-
-async def _current_birth_family(user_id:int, *, simulate:bool=True)->dict|None:
-    fam=await DB.get_birth_family(user_id)
-    if not fam or not simulate:
-        return fam
-    c=await DB.get_character(user_id)
-    wt=await current_world_time()
-    if c and c.get("life_status")=="deceased":
-        return fam
-    try:
-        await ENGINE.authoritative_action("family.simulate",int(user_id),{"family_id":int(fam['family_id']),"minutes_per_year":MINUTES_PER_YEAR},action_id=f"family:auto:{int(user_id)}:{wt.total_minutes}")
-    except GameEngineError:
-        log.exception("Go family simulation failed")
-    return await DB.get_birth_family(user_id) or fam
-
-@registered_group_command(family_group, name="view",description="View the NPC family you were born into")
-async def birth_family_view(interaction:discord.Interaction)->None:
-    c=await require_character(interaction,allow_deceased=True)
-    if not c:return
-    fam=await _current_birth_family(interaction.user.id)
-    if not fam:
-        await interaction.response.send_message("No birth family is recorded for this character.",ephemeral=False);return
-    lines=[
-        f"🏠 **{fam['family_name']} — {family_tier_name(int(fam.get('tier',1)))}**",
-        f"Background: **{str(fam.get('archetype','family')).replace('_',' ').title()}**",
-        f"Home: **{fam.get('location','Unknown')}**",
-        f"Generation: **{fam.get('member_generation',1)}** • Your birth order: **#{fam.get('birth_order',1)}**",
-        f"Family head: **{fam.get('head_title','Family Head')} {fam.get('head_name','Unknown')}** — {WORLD.realm_name(int(fam.get('head_realm_index',0)))} Stage {fam.get('head_phase',1)}",
-        f"Wealth **{fam.get('wealth',0)}/100** • Influence **{fam.get('influence',0)}/100** • Stability **{fam.get('stability',0)}/100**",
-        f"Bloodline status: **{str(fam.get('line_status','active')).title()}**",
-        (f"Clan structure: **{str(fam.get('clan_structure','extended_household')).replace('_',' ').title()}**"),
-        (f"Ancestral bloodline: **{fam.get('bloodline_name','None')}** • Purity **{fam.get('bloodline_purity',0)}%**" if int(fam.get('bloodline_purity',0)) > 0 else "Ancestral bloodline: **None awakened**"),
-        "\n**Close relatives**",
-    ]
-    for npc in fam.get('npcs',[])[:12]:
-        status_note = " ☠️" if npc.get("status")=="deceased" else ""
-        lines.append(f"• **{npc['relation']}** — {npc['name']} • {WORLD.realm_name(int(npc.get('realm_index',0)))} Stage {npc.get('phase',1)}{status_note}")
-    if c.get("life_status")=="deceased":
-        state=await DB.get_reincarnation_state(interaction.user.id)
-        lines.extend([
-            "",
-            "🕯️ **Past-Life Family**",
-            "This household is **not** accelerated by your death. It continues only with normal shared world time.",
-        ])
-        if state:
-            lines.append("Your soul is currently in **Samsara**; use **/character → Samsara** for the reincarnation clock.")
-    household_key = f"birth_family:{int(fam.get('family_id') or 0)}"
-    if str(c.get("location") or "") == household_key:
-        lines.extend([
-            "",
-            "🏠 **You are inside this shared household right now.** Other player members who enter "
-            "share the same scene, so you can roleplay together here.",
-            "Exploring, hunting and travel need the open world — step outside with **/family → Leave** "
-            f"to stand in **{fam.get('location') or 'your home region'}**.",
-        ])
-    else:
-        lines.extend([
-            "",
-            "🏠 Use **/family → Enter** to visit the shared household. Players born into this same "
-            "starter family meet in the same scene.",
-        ])
-    await reply_long(interaction,"\n".join(lines),ephemeral=False)
-
-@registered_group_command(family_group, name="enter", description="Enter your shared birth-family household")
-@serialized_user_action
-async def birth_family_enter(interaction: discord.Interaction) -> None:
-    c = await require_character(interaction)
-    if not c:
-        return
-    fam = await DB.get_birth_family(interaction.user.id)
-    if not fam:
-        await interaction.response.send_message("No birth family is recorded.", ephemeral=False)
-        return
-    wt = await current_world_time()
-    await interaction.response.defer(ephemeral=False)
-    try:
-        envelope = await ENGINE.authoritative_action(
-            "family.household.enter",
-            interaction.user.id,
-            {},
-            action_id=f"discord:{interaction.id}:family.household.enter",
-        )
-    except GameEngineError as exc:
-        await interaction.followup.send(f"❌ Could not enter the household: {exc}", ephemeral=False)
-        return
-    result = dict(envelope.get("result") or {})
-    thread = await ensure_birth_family_household_thread(interaction, fam)
-    players = [str(row.get("name") or "Cultivator") for row in (result.get("players_present") or [])]
-    others = [name for name in players if name != str(c.get("name") or "")]
-    presence = f"\nPresent with you: **{', '.join(others)}**" if others else "\nYou are currently the only player member inside."
-    if thread is not None:
-        await interaction.followup.send(
-            f"🏠 Entered **{result.get('family_name') or fam.get('family_name')}**. Shared household scene: {thread.mention}{presence}",
-            ephemeral=False,
-        )
-    else:
-        await interaction.followup.send(
-            f"🏠 Entered **{result.get('family_name') or fam.get('family_name')}**.{presence}\n"
-            "The canonical shared location is active, but Discord could not create/recover its household thread.",
-            ephemeral=False,
-        )
-
-@registered_group_command(family_group, name="leave", description="Leave your shared birth-family household")
-@serialized_user_action
-async def birth_family_leave(interaction: discord.Interaction) -> None:
-    c = await require_character(interaction)
-    if not c:
-        return
-    fam = await DB.get_birth_family(interaction.user.id)
-    if not fam:
-        await interaction.response.send_message("No birth family is recorded.", ephemeral=False)
-        return
-    wt = await current_world_time()
-    household_row = None
-    if interaction.guild is not None:
-        household_row = await DB.get_birth_family_household_thread(interaction.guild.id, int(fam["family_id"]))
-    await interaction.response.defer(ephemeral=False)
-    try:
-        envelope = await ENGINE.authoritative_action(
-            "family.household.leave",
-            interaction.user.id,
-            {},
-            action_id=f"discord:{interaction.id}:family.household.leave",
-        )
-    except GameEngineError as exc:
-        await interaction.followup.send(f"❌ Could not leave the household: {exc}", ephemeral=False)
-        return
-    result = dict(envelope.get("result") or {})
-    if interaction.guild is not None and household_row:
-        thread = await _get_thread(interaction.guild, household_row.get("thread_id"))
-        if thread is not None:
-            try:
-                await thread.remove_user(interaction.user)
-            except (discord.Forbidden, discord.HTTPException):
-                pass
-    await interaction.followup.send(
-        f"🚪 Left **{result.get('family_name') or fam.get('family_name')}** and returned to **{result.get('location') or fam.get('location')}**.",
-        ephemeral=False,
-    )
-
-@registered_group_command(family_group, name="clan",description="View bloodline, branches, retainers and martial-clan alliance ties")
-async def birth_family_clan(interaction:discord.Interaction)->None:
-    if not await require_character(interaction,allow_deceased=True):return
-    fam=await _current_birth_family(interaction.user.id)
-    if not fam:
-        await interaction.response.send_message("No birth family is recorded.",ephemeral=False);return
-    purity=max(0,int(fam.get('bloodline_purity',0)))
-    if purity <= 0:
-        text=(f"🪶 **{fam['family_name']} — Extended Household**\n"
-              "No awakened ancestral bloodline is currently recorded. A household can still rise into clan status through wealth, cultivation, marriage, inheritance, or major world events.")
-    else:
-        text=(f"🩸 **{fam['family_name']} — Clan Record**\n"
-              f"Structure: **{str(fam.get('clan_structure','bloodline_clan')).replace('_',' ').title()}**\n"
-              f"Bloodline: **{fam.get('bloodline_name','Unknown')}**\n"
-              f"Affinity: **{fam.get('bloodline_affinity','Unknown')}**\n"
-              f"Purity: **{purity}%**\n"
-              f"Inherited tendency: {fam.get('bloodline_trait','Unknown')}\n\n"
-              f"Branches: **{fam.get('branch_count',1)}** • Retainers/adopted household members: **{fam.get('retainer_count',0)}**\n"
-              f"Martial alliance: **{fam.get('confederacy_name','Independent')}**\n\n"
-              "Bloodline purity improves the chance that descendants inherit family cultivation potential, but it never guarantees a Spiritual Root or successful breakthrough.")
-    clan = await SIM.clan_status(int(fam['family_id']))
-    details=[]
-    branches=list(clan.get('branches') or [])
-    retainers=list(clan.get('retainers') or [])
-    relations=list(clan.get('relations') or [])
-    if branches:
-        details.append("\n\n**Mechanical branches**")
-        for branch in branches[:8]:
-            details.append(f"• **{branch['branch_name']}** — {branch['status']} • strength {branch['martial_strength']} • loyalty {branch['loyalty']}/100 • ~{branch['members_estimate']} members")
-    if retainers:
-        details.append("\n**Retainer groups**")
-        for group in retainers[:8]:
-            details.append(f"• **{group['group_name']}** — {group['role']} • {group['members']} members • loyalty {group['loyalty']}/100 • {group['status']}")
-    if relations:
-        details.append("\n**Clan alliances / rivalries**")
-        for relation in relations[:8]:
-            details.append(f"• **{relation['partner_name']}** — {str(relation['relation_type']).replace('_',' ').title()} ({int(relation['relation_score']):+d})")
-    await reply_long(interaction,text+"\n".join(details),ephemeral=False)
-
-
-@registered_group_command(family_group, name="support",description="Ask your birth family for resources or emergency support")
-@serialized_user_action
-async def birth_family_support(interaction:discord.Interaction)->None:
-    if not await require_character(interaction): return
-    wt=await current_world_time()
-    try:
-        envelope=await ENGINE.authoritative_action("family.support",interaction.user.id,{"cooldown_game_minutes":3*MINUTES_PER_MONTH},action_id=f"discord:{interaction.id}:family.support")
-        result=dict(envelope.get("result") or {})
-    except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
-    await interaction.response.send_message(f"🏠 **{result.get('family_name','Your family')} supports you.**\nReceived: **{int(result.get('stones',0))} Low-Grade Spirit Stones**",ephemeral=False)
-
-@registered_group_command(family_group, name="history",description="View recent rises, setbacks and political changes in your family")
-async def birth_family_history(interaction:discord.Interaction)->None:
-    if not await require_character(interaction,allow_deceased=True):return
-    fam=await _current_birth_family(interaction.user.id)
-    if not fam:
-        await interaction.response.send_message("No birth family is recorded.",ephemeral=False);return
-    history=list(fam.get('history',[]))[-15:]
-    text=f"📜 **{fam['family_name']} — Recent History**\n"+("\n".join(f"• {x}" for x in history) if history else "No major family events have been recorded yet.")
-    await reply_long(interaction,text,ephemeral=False)
-
-@registered_group_command(family_group, name="ancestry", description="Trace persistent family history across your Samsara incarnations")
-async def birth_family_ancestry(
-    interaction: discord.Interaction,
-    limit: app_commands.Range[int, 1, 20] = 10,
-) -> None:
-    if not await require_character(interaction, allow_deceased=True):
-        return
-    rows = await DB.get_samsara_dynasty_history(interaction.user.id, limit=int(limit))
-    if not rows:
-        await interaction.response.send_message(
-            "☸️ No cross-incarnation dynasty transitions have been recorded yet. "
-            "Your first Samsara rebirth will create the first persistent ancestry record.",
-            ephemeral=False,
-        )
-        return
-
-    state_names = {
-        0: "Uninvestigated",
-        1: "Clue Found",
-        2: "Corroborated",
-        3: "Confirmed",
-    }
-    lines = ["🧬 **Persistent Samsara Dynasty History**"]
-    for row in reversed(rows):
-        level = max(0, min(3, int(row.get("investigation_level", 0))))
-        status = str(row.get("lineage_status") or "uncertain_lineage").replace("_", " ").title()
-        history_id = int(row.get("history_id", 0))
-        lines.extend([
-            "",
-            f"**Record #{history_id} — Incarnation {int(row.get('incarnation_number', 0))}**",
-            f"{row.get('source_family_name', 'Unknown')} ({row.get('source_world', 'Unknown')}) → "
-            f"{row.get('destination_family_name', 'Unknown')} ({row.get('destination_world', 'Unknown')})",
-            f"Outcome: **{status}** • Investigation: **{state_names[level]}**",
-            str(row.get("summary") or "No surviving summary."),
-        ])
-        if level >= 3:
-            continuity = "confirmed" if int(row.get("blood_continuity", 0)) else "none — replacement/unrelated line"
-            lines.append(f"Blood continuity: **{continuity}**")
-        evidence = list(row.get("evidence") or [])[:level]
-        if evidence:
-            lines.append("Evidence: " + " | ".join(str(item) for item in evidence))
-    lines.append("\nUse **/family → Investigate** with a record number to uncover and corroborate its surviving evidence.")
-    await reply_long(interaction, "\n".join(lines), ephemeral=False)
-
-
-@registered_group_command(family_group, name="investigate", description="Investigate an extinct, replaced or surviving Samsara family connection")
-@serialized_user_action
-async def birth_family_investigate(interaction: discord.Interaction, history_id: int = 0) -> None:
-    if not await require_character(interaction):
-        return
-    try:
-        envelope = await ENGINE.authoritative_action(
-            "family.lineage.investigate",
-            interaction.user.id,
-            {"history_id": max(0, int(history_id))},
-            action_id=f"discord:{interaction.id}:family.lineage.investigate",
-        )
-        result = dict(envelope.get("result") or {})
-    except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}", ephemeral=False)
-        return
-
-    state = str(result.get("investigation_state") or "unknown").replace("_", " ").title()
-    lines = [
-        f"🔎 **Dynasty Investigation — Record #{int(result.get('history_id', 0))}**",
-        f"{result.get('source_family', 'Unknown')} ({result.get('source_world', 'Unknown')}) → "
-        f"{result.get('destination_family', 'Unknown')} ({result.get('destination_world', 'Unknown')})",
-        f"Outcome: **{str(result.get('lineage_status') or 'unknown').replace('_', ' ').title()}**",
-        f"Evidence state: **{state}**",
-    ]
-    evidence = list(result.get("evidence") or [])
-    if evidence:
-        lines.append("\n**Recovered evidence**")
-        lines.extend(f"• {item}" for item in evidence)
-    continuity = str(result.get("blood_continuity") or "not_yet_confirmed")
-    if continuity == "confirmed_ancestral_continuity":
-        lines.append("\n🩸 **Blood continuity confirmed.** The later house descends from the historical branch, but rank/resources remain independent.")
-    elif continuity == "confirmed_no_blood_continuity":
-        lines.append("\n✂️ **No blood continuity.** The later house is a replacement or unrelated family, not a descendant of the extinct line.")
-    else:
-        lines.append("\nBlood continuity remains **unconfirmed**; investigate this record again to strengthen the evidence.")
-
-    leads = list(result.get("ancestral_leads") or [])
-    if leads:
-        lines.append("\n**Ancestral leads**")
-        for lead in leads[:8]:
-            label = str(lead.get("lead_kind") or "lead").replace("_", " ").title()
-            lines.append(
-                f"• **{label}: {lead.get('name', 'Unknown')}** — {lead.get('location', 'Unknown')} "
-                f"({lead.get('world', 'Unknown')}) • danger {int(lead.get('danger', 0))}/100"
-            )
-            if lead.get("retainer_name"):
-                lines.append(f"  Retainer: **{lead.get('retainer_name')}** — {lead.get('retainer_relation', 'ancestral witness')}")
-    quests = [quest for quest in (result.get("investigation_quests") or []) if str(quest.get("status")) != "completed"]
-    if quests:
-        lines.append("\n**Available investigation quests**")
-        for quest in quests[:8]:
-            lines.append(
-                f"• `#{int(quest.get('quest_id', 0))}` **{quest.get('title', 'Investigation')}** — "
-                f"{int(quest.get('progress', 0))}/{int(quest.get('target', 1))}"
-            )
-        lines.append("Use **/family → Quest** to work an unlocked investigation quest.")
-    await reply_long(interaction, "\n".join(lines), ephemeral=False)
-
-
-@registered_group_command(family_group, name="legacy", description="View ancestral sites, investigation quests, claims and dynasty conflicts")
-async def birth_family_legacy(interaction: discord.Interaction, history_id: int = 0) -> None:
-    if not await require_character(interaction, allow_deceased=True):
-        return
-    state = await DB.get_samsara_legacy_state(interaction.user.id, history_id=max(0, int(history_id)))
-    leads = list(state.get("leads") or [])
-    quests = list(state.get("quests") or [])
-    claims = list(state.get("claims") or [])
-    conflicts = list(state.get("conflicts") or [])
-    if not any((leads, quests, claims, conflicts)):
-        await interaction.response.send_message(
-            "🏚️ No ancestral investigation content has been uncovered yet. Use **/family → Investigate** on a Samsara ancestry record first.",
-            ephemeral=False,
-        )
-        return
-    lines = ["🏛️ **Ancestral Legacy Ledger**"]
-    if leads:
-        lines.append("\n**Sites & surviving retainers**")
-        for lead in leads[:15]:
-            label = str(lead.get("lead_kind") or "lead").replace("_", " ").title()
-            lines.append(
-                f"• `#{int(lead.get('lead_id', 0))}` **{label}: {lead.get('name', 'Unknown')}** — "
-                f"{lead.get('location', 'Unknown')} • {str(lead.get('status', 'unknown')).replace('_', ' ').title()} "
-                f"• danger {int(lead.get('danger', 0))}/100"
-            )
-            if lead.get("retainer_name"):
-                lines.append(f"  **{lead.get('retainer_name')}** — {lead.get('retainer_relation', 'ancestral witness')}")
-    if quests:
-        lines.append("\n**Investigation quests**")
-        for quest in quests[:15]:
-            hostile = " • ⚔️ hostile cause established" if int(quest.get("hostile_cause", 0)) else ""
-            lines.append(
-                f"• `#{int(quest.get('quest_id', 0))}` **{quest.get('title', 'Investigation')}** — "
-                f"{quest.get('status', 'unknown')} {int(quest.get('progress', 0))}/{int(quest.get('target', 1))}{hostile}"
-            )
-    if claims:
-        lines.append("\n**Dynasty claims**")
-        for claim in claims[:12]:
-            lines.append(
-                f"• `#{int(claim.get('claim_id', 0))}` **{str(claim.get('claim_type', 'claim')).replace('_', ' ').title()}** "
-                f"for {claim.get('dynasty_name', 'Unknown')} — {str(claim.get('status', 'unknown')).replace('_', ' ').title()} "
-                f"• legitimacy {int(claim.get('legitimacy', 0))}/100"
-            )
-            if claim.get("resolution"):
-                lines.append(f"  Resolution: **{str(claim.get('resolution')).replace('_', ' ').title()}**")
-    if conflicts:
-        lines.append("\n**Active / historical conflicts**")
-        for conflict in conflicts[:12]:
-            lines.append(
-                f"• Claim `#{int(conflict.get('claim_id', 0))}` vs **{conflict.get('opponent_name', 'Unknown')}** — "
-                f"{str(conflict.get('status', 'unknown')).title()} • "
-                f"{int(conflict.get('player_progress', 0))} vs {int(conflict.get('opponent_progress', 0))}"
-            )
-            if conflict.get("outcome"):
-                lines.append(f"  {conflict.get('outcome')}")
-    await reply_long(interaction, "\n".join(lines), ephemeral=False)
-
-
-@registered_group_command(family_group, name="quest", description="Work an unlocked ancestral archive, ruin, tomb or retainer investigation")
-@serialized_user_action
-async def birth_family_quest(interaction: discord.Interaction, history_id: int, quest_id: int = 0) -> None:
-    if not await require_character(interaction):
-        return
-    try:
-        envelope = await ENGINE.authoritative_action(
-            "family.lineage.quest",
-            interaction.user.id,
-            {"history_id": max(0, int(history_id)), "quest_id": max(0, int(quest_id))},
-            action_id=f"discord:{interaction.id}:family.lineage.quest",
-        )
-        result = dict(envelope.get("result") or {})
-    except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}", ephemeral=False)
-        return
-    lines = [
-        f"🧭 **{result.get('title', 'Ancestral Investigation')}**",
-        f"Progress: **{int(result.get('progress', 0))}/{int(result.get('target', 1))}**",
-        f"State: **{str(result.get('status', 'unknown')).replace('_', ' ').title()}**",
-    ]
-    roll = dict(result.get("roll") or {})
-    if roll:
-        attribute = str(result.get("attribute") or "will").replace("_", " ").title()
-        lines.append(
-            f"Check: **{attribute} {int(roll.get('total', 0))} vs TN {int(result.get('difficulty_tn', roll.get('tn', 0)))}** "
-            f"— {str(roll.get('degree') or 'Resolved')} • danger **{int(result.get('danger', 0))}/100**"
-        )
-    if not result.get("success", True):
-        lines.append("❌ The attempt failed to advance the investigation.")
-        if int(result.get("setback", 0)) > 0:
-            lines.append(f"Setback: **-{int(result.get('setback', 0))} progress** from the existing investigation.")
-        if int(result.get("vitality_loss", 0)) > 0:
-            lines.append(f"🩸 The danger was real: **-{int(result.get('vitality_loss', 0))} vitality**.")
-    if result.get("completed"):
-        lines.append(f"Recovered evidence weight: **{int(result.get('reward_evidence', 0))}**")
-        if result.get("hostile_cause"):
-            lines.append(f"⚔️ Corroborated hostile culprit: **{result.get('culprit_name', 'Unknown')}**. A revenge claim is now legally/historically supportable.")
-    await interaction.response.send_message("\n".join(lines), ephemeral=False)
-
-
-@registered_group_command(family_group, name="claim", description="Assert inheritance, restore a fallen dynasty, seek revenge, or challenge a replacement house")
-@app_commands.choices(
-    claim_type=[
-        app_commands.Choice(name="Inheritance", value="inheritance"),
-        app_commands.Choice(name="Dynasty Restoration", value="restoration"),
-        app_commands.Choice(name="Ancestral Revenge", value="revenge"),
-        app_commands.Choice(name="Challenge Replacement Family", value="replacement_challenge"),
-    ]
-)
-@serialized_user_action
-async def birth_family_claim(
-    interaction: discord.Interaction,
-    history_id: int,
-    claim_type: app_commands.Choice[str],
-) -> None:
-    if not await require_character(interaction):
-        return
-    try:
-        envelope = await ENGINE.authoritative_action(
-            "family.dynasty.claim",
-            interaction.user.id,
-            {"history_id": max(0, int(history_id)), "claim_type": claim_type.value},
-            action_id=f"discord:{interaction.id}:family.dynasty.claim",
-        )
-        result = dict(envelope.get("result") or {})
-    except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}", ephemeral=False)
-        return
-    lines = [
-        f"⚖️ **{str(result.get('claim_type', 'claim')).replace('_', ' ').title()} — {result.get('dynasty_name', 'Unknown')}**",
-        f"Status: **{str(result.get('status', 'unknown')).replace('_', ' ').title()}**",
-        f"Legitimacy: **{int(result.get('legitimacy', 0))}/100** • Support: **{int(result.get('support', 0))}/100** • Opposition: **{int(result.get('opposition', 0))}/100**",
-        f"Blood-based claim: **{'yes' if result.get('blood_based') else 'no'}**",
-    ]
-    if int(result.get("conflict_id", 0)) > 0:
-        lines.append(f"Conflict opened. Use **/family → Conflict** with claim id **{int(result.get('claim_id', 0))}** to contest it.")
-    elif result.get("resolution"):
-        lines.append(f"Resolution: **{str(result.get('resolution')).replace('_', ' ').title()}**")
-    await interaction.response.send_message("\n".join(lines), ephemeral=False)
-
-
-@registered_group_command(family_group, name="conflict", description="Advance an active inheritance, restoration, revenge or replacement-family conflict")
-@app_commands.choices(
-    tactic=[
-        app_commands.Choice(name="Negotiate", value="negotiate"),
-        app_commands.Choice(name="Expose Evidence", value="expose"),
-        app_commands.Choice(name="Rally Supporters", value="rally"),
-        app_commands.Choice(name="Investigate Weakness", value="investigate"),
-        app_commands.Choice(name="Formal Duel", value="duel"),
-    ]
-)
-@serialized_user_action
-async def birth_family_conflict(
-    interaction: discord.Interaction,
-    claim_id: int,
-    tactic: app_commands.Choice[str],
-) -> None:
-    if not await require_character(interaction):
-        return
-    try:
-        envelope = await ENGINE.authoritative_action(
-            "family.dynasty.conflict",
-            interaction.user.id,
-            {"claim_id": max(0, int(claim_id)), "tactic": tactic.value},
-            action_id=f"discord:{interaction.id}:family.dynasty.conflict",
-        )
-        result = dict(envelope.get("result") or {})
-    except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}", ephemeral=False)
-        return
-    lines = [
-        f"⚔️ **Dynasty Conflict vs {result.get('opponent', 'Unknown')}**",
-        f"Tactic: **{str(result.get('tactic', '')).title()}**",
-    ]
-    player_roll = dict(result.get("player_roll") or {})
-    opponent_roll = dict(result.get("opponent_roll") or {})
-    if player_roll:
-        attribute = str(result.get("attribute") or "will").replace("_", " ").title()
-        lines.append(
-            f"Your check: **{attribute} {int(player_roll.get('total', 0))} vs TN {int(result.get('player_tn', player_roll.get('tn', 0)))}** "
-            f"— {str(player_roll.get('degree') or 'Resolved')}"
-        )
-    if opponent_roll:
-        lines.append(
-            f"Opposition check: **{int(opponent_roll.get('total', 0))} vs TN {int(result.get('opponent_tn', opponent_roll.get('tn', 0)))}** "
-            f"— {str(opponent_roll.get('degree') or 'Resolved')}"
-        )
-    lines.extend([
-        f"Round **{int(result.get('rounds', 0))}**: +{int(result.get('player_gain', 0))} claim pressure / +{int(result.get('opponent_gain', 0))} opposition",
-        f"Progress: **{int(result.get('player_progress', 0))}** vs **{int(result.get('opponent_progress', 0))}**",
-        f"State: **{str(result.get('status', 'active')).title()}**",
-    ])
-    if result.get("outcome"):
-        lines.append(f"\n{result.get('outcome')}")
-        if result.get("resolution"):
-            lines.append(f"Resolution: **{str(result.get('resolution')).replace('_', ' ').title()}**")
-    await interaction.response.send_message("\n".join(lines), ephemeral=False)
-
-
-@registered_group_command(family_group, name="child",description="Add a child to your family branch; descendants may awaken cultivation talent")
-@app_commands.choices(gender=GENDER_CHOICES)
-@serialized_user_action
-async def birth_family_child(interaction:discord.Interaction,name:str,gender:app_commands.Choice[str])->None:
-    c=await require_character(interaction)
-    if not c:return
-    wt=await current_world_time(); life=await authoritative_lifespan(interaction.user.id)
-    if life.age_years<18:
-        await interaction.response.send_message("Your character must be at least **18 years old** to have a recorded child.",ephemeral=False);return
-    fam=await _current_birth_family(interaction.user.id)
-    if not fam:
-        await interaction.response.send_message("No birth family is recorded.",ephemeral=False);return
-    try:
-        e=await ENGINE.authoritative_action("family.add_child",interaction.user.id,{"name":name,"gender":gender.value},action_id=f"discord:{interaction.id}:family.add_child"); result=dict(e.get('result') or {})
-    except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
-    await interaction.response.send_message(f"👶 **{name.strip()}** is born as descendant `#{result.get('child_id')}`.",ephemeral=False)
-
-@registered_group_command(family_group, name="descendants",description="View descendants in your family branch and whether they can cultivate")
-async def birth_family_descendants(interaction:discord.Interaction)->None:
-    if not await require_character(interaction,allow_deceased=True):return
-    fam=await _current_birth_family(interaction.user.id)
-    if not fam:
-        await interaction.response.send_message("No birth family is recorded.",ephemeral=False);return
-    wt=await current_world_time(); rows=[n for n in fam.get('npcs',[]) if str(n.get('relation','')).startswith('Child of user')]
-    if not rows:
-        await interaction.response.send_message(f"🌿 **{fam['family_name']}** has no recorded descendants in your branch yet.",ephemeral=False);return
-    lines=[f"🌿 **{fam['family_name']} — Your Descendants**"]
-    for child in rows[:30]:
-        age=max(0,wt.total_minutes-int(child.get('birth_game_minute',wt.total_minutes)))/MINUTES_PER_YEAR
-        if age>=CHILD_CULTIVATION_AWAKENING_AGE:
-            talent=(f"Awakened **{child['spiritual_root']}**" if child.get('spiritual_root')!='Mortal Root' else "No usable spiritual root awakened; currently walking a mortal path")
-        else:
-            talent=f"Cultivation talent unawakened until around age {CHILD_CULTIVATION_AWAKENING_AGE}"
-        lines.append(f"• **{child['name']}** — age **{age:.1f}**\n  {talent}")
-    await reply_long(interaction,"\n".join(lines),ephemeral=False)
-
+        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+    await interaction.followup.send(f"🚪 You leave the personal world for **{result.get('outside','outside')}**.",ephemeral=False)
+    await open_expedition_thread_after_exit(interaction)
 
 
 civilization_group=app_commands.Group(name="civilization",description="Inspect the living population, security and activity of world regions")
@@ -11611,6 +10571,7 @@ async def _black_market_item_autocomplete(interaction:discord.Interaction,curren
 @registered_group_command(blackmarket_group, name="buy", description="Buy forbidden or scarce goods from the hidden post at your location")
 @serialized_user_action
 async def blackmarket_buy(interaction:discord.Interaction,item:str,quantity:app_commands.Range[int,1,20]=1)->None:
+    await interaction.response.defer(ephemeral=False)
     c=await require_character(interaction)
     if not c:return
     wt=await current_world_time()
@@ -11618,8 +10579,8 @@ async def blackmarket_buy(interaction:discord.Interaction,item:str,quantity:app_
         envelope=await ENGINE.authoritative_action("black_market.trade",interaction.user.id,{"location":str(c.get('location','')),"item_id":item,"quantity":int(quantity),"buy":True},action_id=f"discord:{interaction.id}:black_market.trade")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
-    await interaction.response.send_message(f"🌑 Bought **{WORLD.item_name(item)} x{quantity}** for **{result.get('total_price',0)}** stones.",ephemeral=False)
+        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+    await interaction.followup.send(format_trade_receipt(icon="🌑",verb="Bought",item_label=WORLD.item_name(item),quantity=int(quantity),result=result,currency_name=WORLD.currency_name),ephemeral=False)
 
 
 @blackmarket_buy.autocomplete("item")
@@ -11630,6 +10591,7 @@ async def blackmarket_buy_autocomplete(interaction:discord.Interaction,current:s
 @registered_group_command(blackmarket_group, name="sell", description="Fence a carried item through the hidden post at your location")
 @serialized_user_action
 async def blackmarket_sell(interaction:discord.Interaction,item:str,quantity:app_commands.Range[int,1,20]=1)->None:
+    await interaction.response.defer(ephemeral=False)
     c=await require_character(interaction)
     if not c:return
     wt=await current_world_time()
@@ -11637,8 +10599,8 @@ async def blackmarket_sell(interaction:discord.Interaction,item:str,quantity:app
         envelope=await ENGINE.authoritative_action("black_market.trade",interaction.user.id,{"location":str(c.get('location','')),"item_id":item,"quantity":int(quantity),"buy":False},action_id=f"discord:{interaction.id}:black_market.trade")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
-    await interaction.response.send_message(f"🌑 Sold **{WORLD.item_name(item)} x{quantity}** for **{result.get('total_price',0)}** stones.",ephemeral=False)
+        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+    await interaction.followup.send(format_trade_receipt(icon="🌑",verb="Sold",item_label=WORLD.item_name(item),quantity=int(quantity),result=result,currency_name=WORLD.currency_name),ephemeral=False)
 
 
 @blackmarket_sell.autocomplete("item")
@@ -11679,6 +10641,7 @@ async def market_prices_item_autocomplete(interaction:discord.Interaction,curren
 @registered_group_command(market_group, name="buy",description="Buy an item from the current dynamic market")
 @serialized_user_action
 async def market_buy_command(interaction:discord.Interaction,item:str,quantity:app_commands.Range[int,1,100]=1)->None:
+    await interaction.response.defer(ephemeral=False)
     c=await require_character(interaction)
     if not c:return
     wt=await current_world_time()
@@ -11686,8 +10649,8 @@ async def market_buy_command(interaction:discord.Interaction,item:str,quantity:a
         envelope=await ENGINE.authoritative_action("market.trade",interaction.user.id,{"location":str(c.get('location','')),"item_id":item,"quantity":int(quantity),"buy":True},action_id=f"discord:{interaction.id}:market.trade")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
-    await interaction.response.send_message(f"🪙 Bought **{WORLD.item_name(item)} x{quantity}** for **{result.get('total_price',0)}** stones.",ephemeral=False)
+        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+    await interaction.followup.send(format_trade_receipt(icon="🪙",verb="Bought",item_label=WORLD.item_name(item),quantity=int(quantity),result=result,currency_name=WORLD.currency_name),ephemeral=False)
 
 
 @market_buy_command.autocomplete("item")
@@ -11698,6 +10661,7 @@ async def market_buy_item_autocomplete(interaction:discord.Interaction,current:s
 @registered_group_command(market_group, name="sell",description="Sell carried items into the current dynamic market")
 @serialized_user_action
 async def market_sell_command(interaction:discord.Interaction,item:str,quantity:app_commands.Range[int,1,100]=1)->None:
+    await interaction.response.defer(ephemeral=False)
     c=await require_character(interaction)
     if not c:return
     wt=await current_world_time()
@@ -11705,8 +10669,8 @@ async def market_sell_command(interaction:discord.Interaction,item:str,quantity:
         envelope=await ENGINE.authoritative_action("market.trade",interaction.user.id,{"location":str(c.get('location','')),"item_id":item,"quantity":int(quantity),"buy":False},action_id=f"discord:{interaction.id}:market.trade")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
-    await interaction.response.send_message(f"🪙 Sold **{WORLD.item_name(item)} x{quantity}** for **{result.get('total_price',0)}** stones.",ephemeral=False)
+        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+    await interaction.followup.send(format_trade_receipt(icon="🪙",verb="Sold",item_label=WORLD.item_name(item),quantity=int(quantity),result=result,currency_name=WORLD.currency_name),ephemeral=False)
 
 
 @market_sell_command.autocomplete("item")
@@ -11820,54 +10784,58 @@ async def bond_status(interaction:discord.Interaction)->None:
 @registered_group_command(bond_group, name="propose", description="Invite another cultivator into a consensual Dao partnership")
 @serialized_user_action
 async def bond_propose(interaction:discord.Interaction,partner:discord.Member)->None:
+    await interaction.response.defer(ephemeral=False)
     if not await require_character(interaction): return
     wt=await current_world_time()
     try:
         envelope=await ENGINE.authoritative_action("dao.propose",interaction.user.id,{"partner_user_id":partner.id},action_id=f"discord:{interaction.id}:dao.propose")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
-    await interaction.response.send_message(f"💞 Dao-partnership proposal **#{result.get('partnership_id')}** sent to {partner.mention}.",ephemeral=False)
+        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+    await interaction.followup.send(f"💞 Dao-partnership proposal **#{result.get('partnership_id')}** sent to {partner.mention}.",ephemeral=False)
 
 
 @registered_group_command(bond_group, name="respond", description="Accept or reject a Dao-partnership proposal addressed to you")
 @app_commands.choices(decision=[app_commands.Choice(name="Accept",value="accept"),app_commands.Choice(name="Reject",value="reject")])
 @serialized_user_action
 async def bond_respond(interaction:discord.Interaction,partnership_id:int,decision:app_commands.Choice[str])->None:
+    await interaction.response.defer(ephemeral=False)
     if not await require_character(interaction): return
     wt=await current_world_time()
     try:
         envelope=await ENGINE.authoritative_action("dao.respond",interaction.user.id,{"partnership_id":int(partnership_id),"accept":decision.value=='accept'},action_id=f"discord:{interaction.id}:dao.respond")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
-    await interaction.response.send_message("💞 Dao partnership response recorded.",ephemeral=False)
+        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+    await interaction.followup.send("💞 Dao partnership response recorded.",ephemeral=False)
 
 
 @registered_group_command(bond_group, name="dual_cultivate", description="Cultivate with your accepted Dao partner while both are at the same location")
 @serialized_user_action
 async def bond_dual_cultivate(interaction:discord.Interaction)->None:
+    await interaction.response.defer(ephemeral=False)
     if not await require_character(interaction): return
     wt=await current_world_time()
     try:
         envelope=await ENGINE.authoritative_action("dao.dual_cultivate",interaction.user.id,{"cooldown_seconds":SETTINGS.cultivate_cooldown_minutes*60},action_id=f"discord:{interaction.id}:dao.dual_cultivate")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
-    await interaction.response.send_message(f"☯️ Paired meridians resonate at **{result.get('location','your shared location')}**.\nBond Resonance: **{int(result.get('resonance',0))}/100**",ephemeral=False)
+        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+    await interaction.followup.send(f"☯️ Paired meridians resonate at **{result.get('location','your shared location')}**.\nBond Resonance: **{int(result.get('resonance',0))}/100**",ephemeral=False)
 
 
 @registered_group_command(bond_group, name="sever", description="End your active Dao partnership")
 @serialized_user_action
 async def bond_sever(interaction:discord.Interaction,confirm:bool=False)->None:
+    await interaction.response.defer(ephemeral=False)
     if not await require_character(interaction): return
     wt=await current_world_time()
     try:
         envelope=await ENGINE.authoritative_action("dao.sever",interaction.user.id,{},action_id=f"discord:{interaction.id}:dao.sever")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
-    await interaction.response.send_message("🧵 Your Dao partnership is severed.",ephemeral=False)
+        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+    await interaction.followup.send("🧵 Your Dao partnership is severed.",ephemeral=False)
 
 
 @registered_root_command(name="soul",description="View your reincarnation history and persistent Soul Legacy",guild=GUILD)
@@ -12789,6 +11757,7 @@ _GROUP_ACTION_ROOTS = {
     "realmhub": realmhub_group,
     "fate": fate_group,
     "bond": bond_group,
+    "travel": travel_group,
 }
 
 _MIGRATED_ROOTS = {
@@ -12917,7 +11886,7 @@ _HUB_DEFINITIONS = (
         title="🗺 Travel Hub",
         description="Choose destinations, teleportation arrays and special movement options.",
         pages=(
-            _hub_page("travel", "Destinations", "Travel to another known normal destination."),
+            _hub_page("travel", "Destinations", "Travel to another known normal destination, or check your in-transit status."),
             _hub_page("realmhub", "Realm Capitals", "Travel to and inspect the public meeting city for every realm world."),
             _hub_page("array", "Teleportation Arrays", "List and use public teleportation formations."),
         ),
@@ -13084,7 +12053,7 @@ _ADMIN_HUB_DEFINITION = HubDefinition(
         "Choose a section, then choose an action. Actions use the explicitly registered canonical handlers and audit logging."
     ),
     pages=(
-        HubPage(key="server", label="Server", description="Channels, health, maintenance, backups and audit logs.", command=admin_server_group),
+        HubPage(key="server", label="Server", description="Channels, health, AI/narrator status, chat monitoring, maintenance, backups and audit logs.", command=admin_server_group),
         HubPage(key="world", label="World", description="Events, secret realms and canonical world time.", command=admin_world_group),
         HubPage(key="player", label="Players", description="Inspect, restore, reward or move cultivators.", command=admin_player_group),
         HubPage(key="sect", label="Sects", description="Membership, ranks and master/disciple administration.", command=admin_sect_group),
@@ -13122,7 +12091,13 @@ async def on_app_command_error(
         f"Channel: <#{interaction.channel_id}>\n"
         f"Error: `{type(original).__name__}: {str(original)[:900]}`",
     )
-    message = "Something went wrong, but no game-state change was intentionally applied. An administrator can check the configured bot log channel."
+    # This handler cannot know whether the failure happened before or after an
+    # authoritative Go mutation committed - many handlers do further work
+    # (narration, history, presentation) after a successful authoritative_action
+    # call, and an exception in that later work still reaches here with the
+    # mutation already applied. Claiming "no game-state change" would be a
+    # guess dressed up as a fact, so tell the player to check rather than assume.
+    message = "Something went wrong. Check your current state (e.g. inventory, sheet) before retrying — this error does not guarantee nothing changed. An administrator can check the configured bot log channel."
     if interaction.response.is_done():
         await interaction.followup.send(message, ephemeral=False)
     else:

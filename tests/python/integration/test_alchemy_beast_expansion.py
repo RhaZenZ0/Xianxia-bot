@@ -46,7 +46,7 @@ class AlchemyBeastExpansionTests(unittest.IsolatedAsyncioTestCase):
         self.tmp.cleanup()
 
     async def test_schema_v6_retains_expansion_tables(self):
-        self.assertEqual(SCHEMA_VERSION, 26)
+        self.assertEqual(SCHEMA_VERSION, 27)
         import sqlite3
         with sqlite3.connect(self.path) as conn:
             tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
@@ -96,7 +96,7 @@ class AlchemyBeastExpansionTests(unittest.IsolatedAsyncioTestCase):
         character = await self.db.get_character(909)
         self.assertEqual(character["name"], "Azure Alchemist")
         status = await self.db.get_schema_status()
-        self.assertEqual(status["current"], 26)
+        self.assertEqual(status["current"], 27)
 
     def test_alchemy_quality_scales_output_without_item_instances(self):
         self.assertEqual(alchemy_quality(0, success=True).label, "Ordinary")

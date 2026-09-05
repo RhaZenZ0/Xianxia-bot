@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
+import ssl
 import time
 from collections import deque
 from dataclasses import dataclass
@@ -36,12 +37,106 @@ _PROMPT_LEAK_PATTERNS = (
 )
 
 
+# openai 3.x replaced httpx with HTTPX2, which verifies TLS against the operating
+# system trust store rather than certifi.  If that store is thin or missing, every
+# route fails - and because narration is descriptive only, nothing raises: play
+# continues on procedural prose and the failure is invisible to an operator.  The
+# Dockerfile installs and asserts the CA bundle so this should never happen, but
+# "should never happen" is exactly the class of thing that deserves a named
+# counter rather than a shrug.
+_TLS_ERROR_PATTERN = re.compile(
+    r"\bssl\b|\btls\b|certificate|CERTIFICATE_VERIFY_FAILED|self[- ]signed"
+    r"|unable to get local issuer|CA bundle|trust store",
+    re.I,
+)
+
+
+def _looks_like_tls_failure(exc: BaseException | None) -> bool:
+    """Walk the exception chain looking for a certificate/TLS problem."""
+    seen: set[int] = set()
+    current: BaseException | None = exc
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        if isinstance(current, ssl.SSLError):
+            return True
+        if _TLS_ERROR_PATTERN.search(type(current).__name__):
+            return True
+        if _TLS_ERROR_PATTERN.search(str(current)):
+            return True
+        current = current.__cause__ or current.__context__
+    return False
+
+
 @dataclass(frozen=True)
 class RoutedAIResult:
     text: str
     tier: NarrationTier
     model: str
     attempted_models: tuple[str, ...]
+
+
+class RouteLimiter:
+    """Per-model rate window. The provider caps are per MODEL, not per account.
+
+    The account-wide limiter below counts every route together, which cannot
+    express what the providers actually enforce: Google allows Gemma 4 roughly
+    15 requests/minute and 1500/day PER MODEL. One global ceiling of 20/min is
+    therefore simultaneously too high for a single route (15) and too low for the
+    fleet (two Gemma routes = 30), and production showed exactly that - both
+    Gemma models cooling down independently while the account limiter had refused
+    nothing at all.
+
+    Defaults are the documented Gemma free-tier figures, which are correct in
+    both regimes: on OpenRouter's shared free pool the account-wide daily cap
+    binds first and these never fire, and on a BYOK provider key these are the
+    real ceiling.
+    """
+
+    def __init__(self, model: str, *, per_minute: int = 15, per_day: int = 1500) -> None:
+        self.model = str(model)
+        self.per_minute = max(1, int(per_minute))
+        self.per_day = max(1, int(per_day))
+        self._minute: deque[float] = deque()
+        self._day: deque[float] = deque()
+        self.refused_minute = 0
+        self.refused_day = 0
+
+    def _trim(self, now: float) -> None:
+        while self._minute and self._minute[0] <= now - 60.0:
+            self._minute.popleft()
+        while self._day and self._day[0] <= now - 86400.0:
+            self._day.popleft()
+
+    def try_acquire(self) -> bool:
+        now = time.monotonic()
+        self._trim(now)
+        if len(self._day) >= self.per_day:
+            self.refused_day += 1
+            return False
+        if len(self._minute) >= self.per_minute:
+            self.refused_minute += 1
+            return False
+        self._minute.append(now)
+        self._day.append(now)
+        return True
+
+    def snapshot(self) -> dict[str, Any]:
+        self._trim(time.monotonic())
+        used_minute, used_day = len(self._minute), len(self._day)
+        # Which ceiling this route is closest to, so the panel can say so rather
+        # than leaving an operator to work it out from two ratios.
+        minute_share = used_minute / self.per_minute
+        day_share = used_day / self.per_day
+        return {
+            "per_minute": self.per_minute,
+            "per_day": self.per_day,
+            "used_minute": used_minute,
+            "used_day": used_day,
+            "refused_minute": self.refused_minute,
+            "refused_day": self.refused_day,
+            "binding": "day" if day_share >= minute_share else "minute",
+            "headroom_percent": round(100.0 * (1.0 - max(minute_share, day_share)), 1),
+        }
 
 
 class OpenRouterRequestLimiter:
@@ -52,11 +147,32 @@ class OpenRouterRequestLimiter:
     narration falls through to the procedural safety net immediately.
     """
 
-    def __init__(self, max_requests_per_minute: int = 20) -> None:
+    def __init__(
+        self, max_requests_per_minute: int = 20, max_requests_per_day: int = 50
+    ) -> None:
         self.max_requests = max(1, int(max_requests_per_minute))
         self.window_seconds = 60.0
+        # OpenRouter's free tier is 20 requests/minute AND 50 requests/day under
+        # $10 of lifetime credits (1000/day at $10 or more). Only the per-minute
+        # half was ever tracked, so in production 11 narrations quietly cost 15
+        # upstream attempts against a 50/day allowance - every failed route walks
+        # to the next one, and each walk spends a slot.
+        #
+        # This counter is a COST SAVER, not an authority: it lives in memory and
+        # resets when the bot restarts, while the real limit does not. Upstream
+        # remains the source of truth; this just stops us paying for requests we
+        # already know will be refused.
+        self.max_requests_per_day = max(1, int(max_requests_per_day))
+        self.day_seconds = 86400.0
         self._timestamps: deque[float] = deque()
+        self._daily: deque[float] = deque()
         self._lock = asyncio.Lock()
+        # Monitoring counters.  These are the only honest signal that the free
+        # account ceiling - rather than a model failure - is what pushed players
+        # onto procedural prose, so /admin has to be able to read them.
+        self.granted = 0
+        self.rejected = 0
+        self.daily_rejected = 0
 
     async def try_acquire(self) -> bool:
         now = time.monotonic()
@@ -64,10 +180,33 @@ class OpenRouterRequestLimiter:
             cutoff = now - self.window_seconds
             while self._timestamps and self._timestamps[0] <= cutoff:
                 self._timestamps.popleft()
+            day_cutoff = now - self.day_seconds
+            while self._daily and self._daily[0] <= day_cutoff:
+                self._daily.popleft()
+            if len(self._daily) >= self.max_requests_per_day:
+                self.rejected += 1
+                self.daily_rejected += 1
+                return False
             if len(self._timestamps) >= self.max_requests:
+                self.rejected += 1
                 return False
             self._timestamps.append(now)
+            self._daily.append(now)
+            self.granted += 1
             return True
+
+    def snapshot(self) -> dict[str, Any]:
+        return {
+            "max_requests_per_minute": self.max_requests,
+            "in_window": len(self._timestamps),
+            "granted": self.granted,
+            "rejected": self.rejected,
+            "max_requests_per_day": self.max_requests_per_day,
+            "used_today": len(self._daily),
+            "remaining_today": max(0, self.max_requests_per_day - len(self._daily)),
+            "daily_rejected": self.daily_rejected,
+            "daily_exhausted": len(self._daily) >= self.max_requests_per_day,
+        }
 
 
 def _extract_text(content: Any) -> str:
@@ -90,6 +229,83 @@ def _extract_text(content: Any) -> str:
     return str(content or "").strip()
 
 
+# Free-model pools are increasingly reasoning models. Given a 180-token budget -
+# what routine narration asks for - such a model spends the whole allowance on
+# reasoning tokens and returns an EMPTY content field, which is exactly what
+# openrouter/free did 6 times out of 6 in production. The primary fix is room to
+# answer; reading the reasoning field is the salvage path, not the plan.
+DYNAMIC_FREE_MIN_OUTPUT_TOKENS = 700
+
+_REASONING_FIELDS = ("reasoning", "reasoning_content")
+
+# Scratchpad tells on itself. Narration that starts "Okay, the user wants..." is
+# worse than the deterministic procedural fallback, so text that reads as
+# thinking-out-loud is discarded rather than shown to a player.
+_SCRATCHPAD_PATTERNS = (
+    re.compile(r"^\s*(okay|ok|alright|so|hmm|right)\b[,.]", re.I),
+    re.compile(r"\bthe (user|player|prompt|request|instructions?)\b", re.I),
+    re.compile(r"\b(i|we) (should|need to|must|will|can) \b", re.I),
+    re.compile(r"\blet(?:'s| us| me)\b", re.I),
+    re.compile(r"\bas an ai\b", re.I),
+    re.compile(r"\b(system|developer) (prompt|message)\b", re.I),
+)
+
+
+def _looks_like_scratchpad(text: str) -> bool:
+    return any(pattern.search(text) for pattern in _SCRATCHPAD_PATTERNS)
+
+
+def _extract_reasoning(message: Any) -> str:
+    """Pull prose out of a reasoning field, or return "" if it reads as thinking."""
+    for field in _REASONING_FIELDS:
+        value = getattr(message, field, None)
+        if value is None and isinstance(message, dict):
+            value = message.get(field)
+        text = _extract_text(value)
+        if text and not _looks_like_scratchpad(text):
+            return text
+    details = getattr(message, "reasoning_details", None)
+    if details is None and isinstance(message, dict):
+        details = message.get("reasoning_details")
+    if isinstance(details, (list, tuple)):
+        chunks = []
+        for item in details:
+            piece = item.get("text") or item.get("summary") if isinstance(item, dict) else getattr(item, "text", None)
+            if piece:
+                chunks.append(str(piece))
+        text = "\n".join(chunks).strip()
+        if text and not _looks_like_scratchpad(text):
+            return text
+    return ""
+
+
+def _retry_after_seconds(exc: Exception) -> float | None:
+    """Read the Retry-After hint OpenRouter sends when a provider gives one.
+
+    A blanket cooldown is a guess. In production it parked both Gemma routes for
+    60 seconds each and produced "skipped while cooling 6" on both, turning a
+    transient provider blip into a minute of procedural prose.
+    """
+    response = getattr(exc, "response", None)
+    headers = getattr(response, "headers", None)
+    if headers is None:
+        return None
+    try:
+        raw = headers.get("retry-after") or headers.get("Retry-After")
+    except Exception:
+        return None
+    if raw is None:
+        return None
+    try:
+        seconds = float(str(raw).strip())
+    except (TypeError, ValueError):
+        # HTTP-date form. Not worth a date parser here; fall back to the default.
+        return None
+    if seconds <= 0:
+        return None
+    return min(300.0, seconds)
+
+
 def _is_free_route(model: str) -> bool:
     chosen = str(model or "").strip()
     return chosen.endswith(":free") or chosen == DEFAULT_DYNAMIC_FREE_MODEL
@@ -104,11 +320,22 @@ def _safe_free_model(model: str, *, require_free: bool) -> str:
     return chosen
 
 
-def _validate_generated_text(text: str, *, max_chars: int = 7000) -> str:
+def _validate_generated_text(text: str, *, max_chars: int = 7000, leak_guard: bool = True) -> str:
+    """Validate model output.
+
+    ``leak_guard`` exists because the prompt-leak patterns below are a
+    *player-facing* protection: narration must never mention the system prompt
+    or the Go/Python engines.  Administrator-facing analysis (the chat monitor)
+    is read only by someone who already has administrator on the guild, and it
+    routinely has to say things like "the game engine returned an error" when
+    summarising a bug report.  Running the player guard over that text made the
+    monitor fail on exactly the reports it exists to surface.  Narration keeps
+    the default; only the GM report opts out.
+    """
     value = str(text or "").strip()
     if not value:
         raise ValueError("AI provider returned an empty response")
-    if any(pattern.search(value) for pattern in _PROMPT_LEAK_PATTERNS):
+    if leak_guard and any(pattern.search(value) for pattern in _PROMPT_LEAK_PATTERNS):
         raise ValueError("AI response exposed implementation or prompt details")
     if value.startswith("```") and value.endswith("```"):
         value = re.sub(r"^```(?:text|markdown|md)?\s*", "", value, flags=re.I)
@@ -155,6 +382,9 @@ class AITaskRouter:
         dynamic_free_model: str = DEFAULT_DYNAMIC_FREE_MODEL,
         require_free: bool = True,
         max_requests_per_minute: int = 20,
+        max_requests_per_day: int = 50,
+        route_requests_per_minute: int = 15,
+        route_requests_per_day: int = 1500,
         routine_timeout_seconds: float = 30.0,
         epic_timeout_seconds: float = 60.0,
         failure_cooldown_seconds: float = 20.0,
@@ -175,13 +405,25 @@ class AITaskRouter:
         epic = _safe_free_model(epic_model, require_free=self.require_free)
         epic_fallback = _safe_free_model(epic_fallback_model, require_free=self.require_free)
         dynamic = _safe_free_model(dynamic_free_model, require_free=self.require_free)
+        self.dynamic_free_model = dynamic
 
         self.chains = {
             NarrationTier.ROUTINE: _dedupe_chain((routine, routine_fallback, dynamic)),
             NarrationTier.EPIC: _dedupe_chain((epic, epic_fallback, dynamic)),
         }
-        self.limiter = OpenRouterRequestLimiter(max_requests_per_minute)
+        self.limiter = OpenRouterRequestLimiter(max_requests_per_minute, max_requests_per_day)
         self._cooldown_until: dict[str, float] = {}
+        self._started_at = time.time()
+        self.route_requests_per_minute = max(1, int(route_requests_per_minute))
+        self.route_requests_per_day = max(1, int(route_requests_per_day))
+        self._route_limiters: dict[str, RouteLimiter] = {}
+        self._tls_failures = 0
+        self._tls_warned = False
+        self._model_stats: dict[str, dict[str, Any]] = {}
+        self._tier_stats: dict[str, dict[str, int]] = {
+            tier.value: {"requests": 0, "served": 0, "exhausted": 0, "rate_limited": 0}
+            for tier in NarrationTier
+        }
         self.client = (
             AsyncOpenAI(
                 api_key=self.api_key,
@@ -223,12 +465,116 @@ class AITaskRouter:
     def _cooling_down(self, model: str) -> bool:
         return self._cooldown_until.get(model, 0.0) > time.monotonic()
 
+    def _route_limiter(self, model: str) -> RouteLimiter:
+        limiter = self._route_limiters.get(model)
+        if limiter is None:
+            limiter = RouteLimiter(
+                model,
+                per_minute=self.route_requests_per_minute,
+                per_day=self.route_requests_per_day,
+            )
+            self._route_limiters[model] = limiter
+        return limiter
+
+    def _model_row(self, model: str) -> dict[str, Any]:
+        row = self._model_stats.get(model)
+        if row is None:
+            row = {
+                "attempts": 0,
+                "successes": 0,
+                "failures": 0,
+                "skipped_cooling": 0,
+                "last_error": "",
+                "last_error_at": 0.0,
+                "last_success_at": 0.0,
+                "last_error_looks_like_tls": False,
+                "empty_responses": 0,
+                "reasoning_salvaged": 0,
+                "skipped_route_limit": 0,
+            }
+            self._model_stats[model] = row
+        return row
+
     def _mark_failure(self, model: str, exc: Exception) -> None:
         status = getattr(exc, "status_code", None)
         if status is None:
             status = getattr(getattr(exc, "response", None), "status_code", None)
-        multiplier = 3.0 if status == 429 else 1.0
-        self._cooldown_until[model] = time.monotonic() + self.failure_cooldown_seconds * multiplier
+        # Prefer the provider's own hint over our guess. Falling back to the
+        # blanket multiplier only when no hint is offered.
+        hinted = _retry_after_seconds(exc)
+        if hinted is not None:
+            cooldown = hinted
+        else:
+            multiplier = 3.0 if status == 429 else 1.0
+            cooldown = self.failure_cooldown_seconds * multiplier
+        self._cooldown_until[model] = time.monotonic() + cooldown
+        row = self._model_row(model)
+        row["failures"] += 1
+        row["last_error"] = f"{type(exc).__name__}: {exc}"[:300]
+        row["last_error_at"] = time.time()
+        tls = _looks_like_tls_failure(exc)
+        row["last_error_looks_like_tls"] = tls
+        if tls:
+            self._tls_failures += 1
+            if not self._tls_warned:
+                self._tls_warned = True
+                # Loud, once, at error level: this is the failure that otherwise
+                # only shows up as narration quietly going flat.
+                log.error(
+                    "AI_TLS_FAILURE model=%s: %s -- narration is falling back to "
+                    "procedural prose. HTTPX2 (openai 3.x) verifies against the OS "
+                    "trust store, so check that ca-certificates is installed in the "
+                    "image and that SSL_CERT_FILE points at a real bundle.",
+                    model,
+                    exc,
+                )
+
+    def health_snapshot(self) -> dict[str, Any]:
+        """Administrator-readable view of how the free fallback chain is doing.
+
+        Deliberately contains no prompts, no player text and no API key - it is
+        counters only, so it is safe to render into a Discord panel.
+        """
+        now_monotonic = time.monotonic()
+        models: list[dict[str, Any]] = []
+        for model, row in sorted(self._model_stats.items()):
+            remaining = self._cooldown_until.get(model, 0.0) - now_monotonic
+            models.append(
+                {
+                    "model": model,
+                    "attempts": int(row["attempts"]),
+                    "successes": int(row["successes"]),
+                    "failures": int(row["failures"]),
+                    "skipped_cooling": int(row["skipped_cooling"]),
+                    "cooling_down": remaining > 0,
+                    "cooldown_remaining_seconds": round(max(0.0, remaining), 1),
+                    "last_error": str(row["last_error"]),
+                    "last_error_looks_like_tls": bool(row["last_error_looks_like_tls"]),
+                    "empty_responses": int(row["empty_responses"]),
+                    "skipped_route_limit": int(row["skipped_route_limit"]),
+                    "route_limits": (
+                        self._route_limiters[model].snapshot()
+                        if model in self._route_limiters
+                        else None
+                    ),
+                    "reasoning_salvaged": int(row["reasoning_salvaged"]),
+                    "never_succeeded": int(row["attempts"]) > 0 and int(row["successes"]) == 0,
+                    "last_error_at": float(row["last_error_at"]),
+                    "last_success_at": float(row["last_success_at"]),
+                }
+            )
+        return {
+            "enabled": self.enabled,
+            "require_free": self.require_free,
+            "uptime_seconds": round(max(0.0, time.time() - self._started_at), 1),
+            "tls_failures": int(self._tls_failures),
+            "route_requests_per_minute": self.route_requests_per_minute,
+            "route_requests_per_day": self.route_requests_per_day,
+            "chains": {tier.value: list(self.chains[tier]) for tier in NarrationTier},
+            "tiers": {name: dict(counts) for name, counts in self._tier_stats.items()},
+            "limiter": self.limiter.snapshot(),
+            "models": models,
+        }
 
     async def generate(
         self,
@@ -237,6 +583,8 @@ class AITaskRouter:
         system_prompt: str,
         prompt: str,
         max_output_tokens: int,
+        leak_guard: bool = True,
+        temperature: float | None = None,
     ) -> RoutedAIResult:
         if not self.client:
             raise RuntimeError("OPENROUTER_API_KEY is not configured")
@@ -248,31 +596,77 @@ class AITaskRouter:
         timeout_seconds = (
             self.epic_timeout_seconds if tier_name == NarrationTier.EPIC else self.routine_timeout_seconds
         )
-        temperature = 0.62 if tier_name == NarrationTier.EPIC else 0.78
+        if temperature is None:
+            temperature = 0.62 if tier_name == NarrationTier.EPIC else 0.78
+        temperature = min(2.0, max(0.0, float(temperature)))
         attempted: list[str] = []
         errors: list[str] = []
+        tier_counts = self._tier_stats.setdefault(
+            tier_name.value, {"requests": 0, "served": 0, "exhausted": 0, "rate_limited": 0}
+        )
+        tier_counts["requests"] += 1
 
         for model in self.chains[tier_name]:
             if self._cooling_down(model):
+                self._model_row(model)["skipped_cooling"] += 1
+                continue
+            if not self._route_limiter(model).try_acquire():
+                # A route at ITS OWN provider ceiling is skipped, not failed: the
+                # next model has a separate quota. Spending an upstream attempt to
+                # be told 429 is the waste this replaces.
+                self._model_row(model)["skipped_route_limit"] += 1
                 continue
             if not await self.limiter.try_acquire():
+                tier_counts["rate_limited"] += 1
+                snapshot = self.limiter.snapshot()
+                if snapshot["daily_exhausted"]:
+                    # Stopping here is the point: every request past the daily
+                    # allowance is refused upstream anyway, and walking the whole
+                    # chain to discover that costs three refusals instead of one.
+                    raise RuntimeError(
+                        "OpenRouter daily free-tier budget spent "
+                        f"({snapshot['used_today']}/{snapshot['max_requests_per_day']} in 24h); "
+                        "narration is procedural until it rolls over"
+                    )
                 raise RuntimeError("OpenRouter local request-rate ceiling reached")
             attempted.append(model)
+            self._model_row(model)["attempts"] += 1
             try:
+                # A reasoning model given 180 tokens spends them all on reasoning
+                # and returns empty content. The dynamic router picks at random
+                # from a free pool that is now mostly reasoning models, so it gets
+                # room to actually answer.
+                output_tokens = max(32, int(max_output_tokens))
+                if model == self.dynamic_free_model:
+                    output_tokens = max(output_tokens, DYNAMIC_FREE_MIN_OUTPUT_TOKENS)
                 request = self.client.chat.completions.create(
                     model=model,
                     messages=[
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": prompt},
                     ],
-                    max_tokens=max(32, int(max_output_tokens)),
+                    max_tokens=output_tokens,
                     temperature=temperature,
                     extra_headers=self._headers(),
                 )
                 response = await asyncio.wait_for(request, timeout=timeout_seconds)
                 if not response.choices:
                     raise RuntimeError("OpenRouter returned no choices")
-                text = _validate_generated_text(_extract_text(response.choices[0].message.content))
+                message = response.choices[0].message
+                raw_text = _extract_text(getattr(message, "content", None))
+                if not raw_text:
+                    # Empty content is a different failure from a 429 and is
+                    # tracked separately: it is a shape mismatch, not congestion.
+                    self._model_row(model)["empty_responses"] += 1
+                    raw_text = _extract_reasoning(message)
+                    if raw_text:
+                        self._model_row(model)["reasoning_salvaged"] += 1
+                        log.info("AI_REASONING_SALVAGED model=%s", model)
+                text = _validate_generated_text(raw_text, leak_guard=leak_guard)
+                success_row = self._model_row(model)
+                success_row["successes"] += 1
+                success_row["last_success_at"] = time.time()
+                tier_counts["served"] += 1
                 return RoutedAIResult(
                     text=text,
                     tier=tier_name,
@@ -289,5 +683,6 @@ class AITaskRouter:
                     exc,
                 )
 
+        tier_counts["exhausted"] += 1
         detail = " | ".join(errors[-3:]) if errors else "all configured routes are cooling down"
         raise RuntimeError(f"OpenRouter free fallback chain exhausted: {detail}")

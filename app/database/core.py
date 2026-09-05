@@ -35,7 +35,7 @@ from ..sect_manor import (
 log = logging.getLogger("xianxia.database")
 
 
-SCHEMA_VERSION = 26
+SCHEMA_VERSION = 27
 # A readiness probe must validate more than the schema-version marker.  If the
 # SQLite file is removed or replaced while the bot is running, SQLite will
 # happily create a new empty file at the same path.  Checking these tables lets
@@ -1331,6 +1331,15 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
         "bugs_forum_channel",
         (
             "ALTER TABLE server_config ADD COLUMN bugs_channel_id INTEGER",
+        ),
+    ),
+    (
+        27,
+        "player_moderation_flags",
+        (
+            "ALTER TABLE characters ADD COLUMN is_muted INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE characters ADD COLUMN is_frozen INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE characters ADD COLUMN moderation_reason TEXT NOT NULL DEFAULT ''",
         ),
     ),
 

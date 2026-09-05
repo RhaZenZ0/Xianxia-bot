@@ -48,10 +48,27 @@ _LAYOUT_COMPONENT_NAMES = (
 LAYOUT_COMPONENTS_AVAILABLE = all(
     hasattr(discord.ui, name) for name in _LAYOUT_COMPONENT_NAMES
 )
-# Hubs rendered with the new layout.  Add a hub name here to migrate it; any hub
-# not listed keeps the classic embed + two-dropdown panel, so this set is the
-# whole rollout switch.
-LAYOUT_HUB_NAMES: set[str] = {"character"}
+# Hubs rendered with the new layout.  Add or remove a name here to migrate a hub
+# or roll it back; any hub not listed keeps the classic embed + two-dropdown
+# panel, so this set is the whole rollout switch and the whole rollback switch.
+#
+# Rolled out in stages, easiest shape first, so a problem would surface on the
+# simplest hubs before reaching the ones that stress the component budget:
+#   1. multi-page, no page over 5 actions - nothing chunks
+#   2. single-page hubs - no Prev/Next at all; abode and family also chunk
+#   3. multi-page hubs that chunk, or sit right on the 8-action limit
+#   4. admin - last, because it is how the server is operated and because it
+#      needs the administrator re-check in interaction_check below
+LAYOUT_HUB_NAMES: set[str] = {
+    # stage 1
+    "character", "npc", "world", "travel", "craft", "realm", "items", "combat", "economy",
+    # stage 2
+    "innerworld", "beast", "abode", "family",
+    # stage 3
+    "quest", "cultivation", "sect",
+    # stage 4
+    "admin",
+}
 # Discord counts every component in a message, nested ones included, against a
 # limit of 40.  With no system select row the chrome costs 12 at worst
 # (container, header, three separators, page text, and a five-button control
@@ -234,6 +251,25 @@ class HubAction:
 
 _HUB_OPTION_PROVIDERS: dict[tuple[str, str], Any] = {}
 
+# What to say when a live provider returns nothing.
+#
+# "Equip has no available equipment id options right now." is true and useless: a
+# player holding a Spirit-Iron Sword reads it as a bug. The reason is that Equip
+# operates on BOUND equipment and the sword is still a carried item, so the real
+# answer is "use Bind first" - which the panel had no way to say.
+_HUB_OPTION_HINTS: dict[tuple[str, str], str] = {}
+
+
+def register_hub_option_hint(command: Any, parameter: str, hint: str) -> None:
+    """Explain an empty picker, and say what to do about it."""
+    qualified = str(getattr(command, "qualified_name", getattr(command, "name", "")))
+    _HUB_OPTION_HINTS[(qualified, str(parameter))] = str(hint)
+
+
+def _hub_option_hint(action: "HubAction", spec: "HubInput") -> str:
+    qualified = str(getattr(action.command, "qualified_name", getattr(action.command, "name", "")))
+    return _HUB_OPTION_HINTS.get((qualified, spec.name), "")
+
 
 def register_hub_option_provider(command: Any, parameter: str, provider: Any) -> None:
     """Register a live dropdown provider for a command parameter.
@@ -245,6 +281,54 @@ def register_hub_option_provider(command: Any, parameter: str, provider: Any) ->
 
     qualified = str(getattr(command, "qualified_name", getattr(command, "name", "")))
     _HUB_OPTION_PROVIDERS[(qualified, str(parameter))] = provider
+
+
+# --- Ordering actions within a page -----------------------------------------
+# Alphabetical is what a filesystem does, not what a player needs. It put
+# /family's "Leave" tenth of fourteen - onto the second chunk - while the
+# onboarding copy was telling new cultivators to use exactly that action to get
+# out of their birth household.
+#
+# This is a DIFFERENT axis from _DANGER_ACTION_WORDS, which decides button
+# colour, and the two must not be conflated. "Leave" is styled red because it
+# changes your state and is worth noticing, but it is ordinary movement and
+# belongs near the top. "Sever" is red as well, but it is irreversible and rare,
+# so it belongs at the bottom. Colour warns; order prioritises. Sorting by the
+# colour axis is exactly what would bury the action people need most.
+#
+# Only frequent, meaningful verbs are listed. There are 166 distinct leaf verbs
+# across the game and no per-hub tuning here - anything unlisted lands in the
+# middle band and stays alphabetical, which keeps this table small enough to
+# stay honest.
+_ORIENTING_ACTION_WORDS = frozenset({
+    "status", "view", "info", "sheet", "overview", "list", "show", "history",
+    "summary", "guide", "inspect", "check",
+})
+_PRIMARY_ACTION_WORDS = frozenset({
+    "accept", "act", "begin", "claim", "create", "cultivate", "enter", "establish",
+    "explore", "hunt", "join", "leave", "meditate", "open", "propose", "respond",
+    "start", "stop", "talk", "train", "travel", "use", "visit",
+})
+_IRREVERSIBLE_ACTION_WORDS = frozenset({
+    "abandon", "delete", "destroy", "disband", "dissolve", "purge", "reincarnate",
+    "reset", "revoke", "sever",
+})
+
+
+def _action_rank(name: str) -> int:
+    """Which band an action sorts into: 0 orienting, 1 primary, 2 rest, 3 rare.
+
+    Irreversible is tested first so a rare action is never promoted by also
+    matching a common word.
+    """
+    words = set(re.findall(r"[a-z]+", str(name).casefold()))
+    if words & _IRREVERSIBLE_ACTION_WORDS:
+        return 3
+    if words & _ORIENTING_ACTION_WORDS:
+        return 0
+    if words & _PRIMARY_ACTION_WORDS:
+        return 1
+    return 2
 
 
 def _leaf_actions(page: HubPage) -> list[HubAction]:
@@ -268,7 +352,17 @@ def _leaf_actions(page: HubPage) -> list[HubAction]:
                 description=str(getattr(item, "description", "Run this action"))[:100],
             )
         )
-    return sorted(actions, key=lambda action: action.path)
+    # (band, name, path): band puts the useful actions first, name keeps each
+    # band alphabetical, path is the tiebreaker so nested subgroups that share a
+    # leaf name (/sect has four distinct "status" commands) stay deterministic.
+    return sorted(
+        actions,
+        key=lambda action: (
+            _action_rank(getattr(action.command, "name", "")),
+            str(getattr(action.command, "name", "")).casefold(),
+            action.path,
+        ),
+    )
 
 
 def _command_parameter_metadata(command: Any) -> Mapping[str, Any]:
@@ -496,13 +590,35 @@ def _hub_content_chunks(content: Any, limit: int = 1950) -> list[Any]:
     return chunks or [""]
 
 
-async def _fallback_followup(source: discord.Interaction, content: Any, kwargs: Mapping[str, Any]) -> Any:
-    """Send a fresh public response when the original hub message is unavailable."""
+def _response_is_ephemeral(
+    kwargs: Mapping[str, Any], *, default: bool = False
+) -> bool:
+    """Return the handler's requested visibility without mutating its arguments."""
+    return bool(kwargs.get("ephemeral", default))
+
+
+async def _send_ephemeral_followup(
+    source: discord.Interaction,
+    content: Any,
+    kwargs: Mapping[str, Any],
+) -> Any:
+    """Send private hub feedback without replacing the shared hub surface."""
     followup_kwargs = dict(kwargs)
-    followup_kwargs.pop("ephemeral", None)
-    # A fallback response should not duplicate the command hub view.
-    followup_kwargs.pop("view", None)
-    return await source.followup.send(content, ephemeral=False, **followup_kwargs)
+    followup_kwargs.pop("content", None)
+    followup_kwargs["ephemeral"] = True
+    if not source.response.is_done():
+        return await source.response.send_message(content, **followup_kwargs)
+    return await source.followup.send(content, **followup_kwargs)
+
+
+async def _fallback_followup(source: discord.Interaction, content: Any, kwargs: Mapping[str, Any]) -> Any:
+    """Send a fresh response when the original hub message is unavailable."""
+    followup_kwargs = dict(kwargs)
+    ephemeral = bool(followup_kwargs.pop("ephemeral", False))
+    # A public fallback should not duplicate the command hub view.
+    if not ephemeral:
+        followup_kwargs.pop("view", None)
+    return await source.followup.send(content, ephemeral=ephemeral, **followup_kwargs)
 
 
 def _layout_targets_panel(source: discord.Interaction, hub_view: Any) -> bool:
@@ -534,6 +650,9 @@ async def _layout_result_send(
     source: discord.Interaction, content: Any, kwargs: Mapping[str, Any]
 ) -> Any:
     """Deliver hub action output beside a Components V2 panel instead of over it."""
+    if _response_is_ephemeral(kwargs):
+        return await _send_ephemeral_followup(source, content, kwargs)
+
     if not source.response.is_done():
         await source.response.defer()
     followup_kwargs = dict(kwargs)
@@ -551,6 +670,19 @@ class _HubFollowupProxy:
     async def send(self, content: Any = None, **kwargs: Any) -> Any:
         chunks = _hub_content_chunks(content)
         first = chunks[0]
+        requested_ephemeral = _response_is_ephemeral(
+            kwargs, default=self.owner.deferred_ephemeral
+        )
+        if requested_ephemeral:
+            private_kwargs = dict(kwargs)
+            private_kwargs["ephemeral"] = True
+            result = await _send_ephemeral_followup(
+                self.owner.source, first, private_kwargs
+            )
+            for chunk in chunks[1:]:
+                await self.owner.source.followup.send(chunk, ephemeral=True)
+            return result
+
         result: Any = None
         if _layout_targets_panel(self.owner.source, self.owner.hub_view):
             self.owner.output_written = True
@@ -560,13 +692,15 @@ class _HubFollowupProxy:
             edit_kwargs = dict(kwargs)
             if first is not None:
                 edit_kwargs["content"] = first
-            edit_kwargs = _safe_edit_kwargs(edit_kwargs, fallback_view=self.owner.hub_view)
+            edit_kwargs = _safe_edit_kwargs(
+                edit_kwargs, fallback_view=self.owner.hub_view
+            )
             try:
-                # edit_original_response uses the interaction webhook and remains
-                # valid when the original hub response has already been acknowledged.
                 result = await self.owner.source.edit_original_response(**edit_kwargs)
             except (discord.NotFound, discord.HTTPException):
-                result = await _fallback_followup(self.owner.source, first, kwargs)
+                result = await _fallback_followup(
+                    self.owner.source, first, kwargs
+                )
         else:
             result = await _fallback_followup(self.owner.source, first, kwargs)
         for chunk in chunks[1:]:
@@ -582,9 +716,21 @@ class _HubResponseProxy:
         return self.owner.source.response.is_done()
 
     async def send_message(self, content: Any = None, **kwargs: Any) -> Any:
-        self.owner.output_written = True
         chunks = _hub_content_chunks(content)
         first = chunks[0]
+        if _response_is_ephemeral(
+            kwargs, default=self.owner.deferred_ephemeral
+        ):
+            private_kwargs = dict(kwargs)
+            private_kwargs["ephemeral"] = True
+            result = await _send_ephemeral_followup(
+                self.owner.source, first, private_kwargs
+            )
+            for chunk in chunks[1:]:
+                await self.owner.source.followup.send(chunk, ephemeral=True)
+            return result
+
+        self.owner.output_written = True
         if _layout_targets_panel(self.owner.source, self.owner.hub_view):
             result = await _layout_result_send(self.owner.source, first, kwargs)
             for chunk in chunks[1:]:
@@ -593,29 +739,37 @@ class _HubResponseProxy:
         edit_kwargs = dict(kwargs)
         if first is not None:
             edit_kwargs["content"] = first
-        edit_kwargs = _safe_edit_kwargs(edit_kwargs, fallback_view=self.owner.hub_view)
+        edit_kwargs = _safe_edit_kwargs(
+            edit_kwargs, fallback_view=self.owner.hub_view
+        )
         source_message = getattr(self.owner.source, "message", None)
         hub_message = self.owner.hub_view.message
         result: Any = None
         try:
-            if not self.owner.source.response.is_done() and source_message is not None and source_message == hub_message:
+            if (
+                not self.owner.source.response.is_done()
+                and source_message is not None
+                and source_message == hub_message
+            ):
                 result = await self.owner.source.response.edit_message(**edit_kwargs)
             else:
                 if not self.owner.source.response.is_done():
                     await self.owner.source.response.defer()
                 result = await self.owner.source.edit_original_response(**edit_kwargs)
         except (discord.NotFound, discord.HTTPException):
-            result = await _fallback_followup(self.owner.source, first, kwargs)
+            result = await _fallback_followup(
+                self.owner.source, first, kwargs
+            )
         for chunk in chunks[1:]:
             await self.owner.source.followup.send(chunk, ephemeral=False)
         return result
 
     async def defer(self, **kwargs: Any) -> Any:
+        if "ephemeral" in kwargs:
+            self.owner.deferred_ephemeral = bool(kwargs["ephemeral"])
         if self.owner.source.response.is_done():
             return None
-        # Component/modal deferral acknowledges the interaction while allowing the
-        # registered handler to keep doing its normal asynchronous work.
-        return await self.owner.source.response.defer()
+        return await self.owner.source.response.defer(**kwargs)
 
     async def edit_message(self, **kwargs: Any) -> Any:
         self.owner.output_written = True
@@ -681,6 +835,7 @@ class HubInteractionProxy:
         self.command_override = command_override
         self.hub_supplied_options = dict(supplied_options or {})
         self.output_written = False
+        self.deferred_ephemeral = False
         self.response = _HubResponseProxy(self)
         self.followup = _HubFollowupProxy(self)
 
@@ -754,10 +909,9 @@ async def _report_hub_ui_error(
             log.exception("Could not mirror hub UI failure to the configured Discord log channel")
     text = "❌ This interface hit an unexpected error. No extra hub-side game rule was applied."
     try:
-        if interaction.response.is_done():
-            await interaction.followup.send(text, ephemeral=False)
-        else:
-            await interaction.response.send_message(text, ephemeral=False)
+        await _send_ephemeral_followup(
+            interaction, text, {"ephemeral": True}
+        )
     except discord.HTTPException:
         log.exception("Could not deliver hub UI failure response")
 
@@ -800,13 +954,13 @@ class HubActionModal(discord.ui.Modal):
             for spec in self.inputs:
                 values[spec.name] = await _resolve_input(interaction, spec, str(self.fields[spec.name].value))
         except (ValueError, TypeError) as exc:
-            await interaction.response.send_message(f"❌ {exc}", ephemeral=False)
+            await interaction.response.send_message(f"❌ {exc}", ephemeral=True)
             return
         if self.remaining:
             await interaction.response.send_message(
                 f"**{self.action.label}** has additional guided options. Continue to finish the action.",
                 view=HubContinueInputView(self.hub_view, self.action, self.remaining, values),
-                ephemeral=False,
+                ephemeral=True,
             )
             return
         await _invoke_action(interaction, self.hub_view, self.action, values)
@@ -1165,28 +1319,28 @@ async def _present_input_step(
         await interaction.response.send_message(
             f"**{action.label}** — select {spec.label.lower()}.",
             view=HubChoiceView(hub_view, action, spec, tail, values),
-            ephemeral=False,
+            ephemeral=True,
         )
         return
     if _is_bool_input(spec):
         await interaction.response.send_message(
             f"**{action.label}** — choose {spec.label.lower()}.",
             view=HubBoolView(hub_view, action, spec, tail, values),
-            ephemeral=False,
+            ephemeral=True,
         )
         return
     if _is_member_input(spec):
         await interaction.response.send_message(
             f"**{action.label}** — select {spec.label.lower()}.",
             view=HubMemberView(hub_view, action, spec, tail, values),
-            ephemeral=False,
+            ephemeral=True,
         )
         return
     if _is_channel_input(spec):
         await interaction.response.send_message(
             f"**{action.label}** — select {spec.label.lower()}.",
             view=HubChannelView(hub_view, action, spec, tail, values),
-            ephemeral=False,
+            ephemeral=True,
         )
         return
 
@@ -1197,13 +1351,14 @@ async def _present_input_step(
             await interaction.response.send_message(
                 f"**{action.label}** — choose {spec.label.lower()} from the current live options.",
                 view=HubDynamicView(hub_view, action, spec, options, tail, values),
-                ephemeral=False,
+                ephemeral=True,
             )
         else:
-            await interaction.response.send_message(
-                f"ℹ️ **{action.label}** has no available {spec.label.lower()} options right now.",
-                ephemeral=False,
-            )
+            hint = _hub_option_hint(action, spec)
+            message = f"ℹ️ **{action.label}** — nothing to choose from right now."
+            if hint:
+                message += f"\n{hint}"
+            await interaction.response.send_message(message, ephemeral=True)
         return
 
     # Collect a compact run of genuinely free-form values in one modal, stopping
@@ -1616,10 +1771,26 @@ class LayoutHubView(_LayoutHubBase):
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id != self.owner_id:
             if not interaction.response.is_done():
-                await interaction.response.send_message(
-                    "This system panel belongs to another player.", ephemeral=False
+                message = (
+                    "This admin panel belongs to another administrator."
+                    if self.definition.name == "admin"
+                    else "This system panel belongs to another player."
                 )
+                await interaction.response.send_message(message, ephemeral=True)
             return False
+        if self.definition.name == "admin":
+            # Re-check the permission on every interaction, exactly as the classic
+            # panel does. /admin is already gated at invoke time by
+            # default_permissions and require_admin, but a panel lives for 15
+            # minutes: without this, an administrator whose role is removed while
+            # their panel is open keeps a working GM console until it times out.
+            member = interaction.user
+            if not isinstance(member, discord.Member) or not member.guild_permissions.administrator:
+                if not interaction.response.is_done():
+                    await interaction.response.send_message(
+                        "This panel requires the **Administrator** permission.", ephemeral=True
+                    )
+                return False
         return True
 
     async def on_error(
@@ -1757,14 +1928,14 @@ class CommandHubView(discord.ui.View):
                     if self.definition.name == "admin"
                     else "This system panel belongs to another player."
                 )
-                await interaction.response.send_message(message, ephemeral=False)
+                await interaction.response.send_message(message, ephemeral=True)
             return False
         if self.definition.name == "admin":
             member = interaction.user
             if not isinstance(member, discord.Member) or not member.guild_permissions.administrator:
                 if not interaction.response.is_done():
                     await interaction.response.send_message(
-                        "This panel requires the **Administrator** permission.", ephemeral=False
+                        "This panel requires the **Administrator** permission.", ephemeral=True
                     )
                 return False
         return True

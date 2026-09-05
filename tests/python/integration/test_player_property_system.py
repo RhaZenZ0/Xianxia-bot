@@ -31,7 +31,7 @@ class PlayerPropertySystemTests(unittest.IsolatedAsyncioTestCase):
         self.tmp.cleanup()
 
     async def test_schema_v10_adds_general_property_columns_and_info_message(self):
-        self.assertEqual(SCHEMA_VERSION, 26)
+        self.assertEqual(SCHEMA_VERSION, 27)
         with sqlite3.connect(self.path) as conn:
             abode_cols = {row[1] for row in conn.execute("PRAGMA table_info(cave_abodes)")}
             server_cols = {row[1] for row in conn.execute("PRAGMA table_info(server_config)")}

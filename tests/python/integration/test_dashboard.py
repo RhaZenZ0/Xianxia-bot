@@ -47,7 +47,7 @@ class DashboardTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_overview_reads_schema_and_simulation(self):
         data = await self.store.overview()
-        self.assertEqual(data["schema_version"], 26)
+        self.assertEqual(data["schema_version"], 27)
         self.assertIn("clock", data)
         self.assertGreater(data["counts"]["npcs_alive"], 0)
         self.assertTrue(data["simulations"])
@@ -113,7 +113,7 @@ class DashboardTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(nav_views, loader_views)
 
     async def test_new_dashboard_api_routes_return_json(self):
-        settings = DashboardSettings(self.path, "127.0.0.1", 0, "gm", "a-very-long-private-dashboard-token", False)
+        settings = DashboardSettings(self.path, "127.0.0.1", 0, "gm", "a-very-long-private-dashboard-token", admin_writes=False)
         dashboard = DashboardServer(settings)
         server = await asyncio.start_server(dashboard._handle, "127.0.0.1", 0)
         port = server.sockets[0].getsockname()[1]
@@ -154,6 +154,33 @@ class DashboardTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(snapshot["enabled"])
         with self.assertRaises(PermissionError):
             await admin.run("world.advance_time", {"minutes": 60})
+
+    async def test_dashboard_admin_writes_attribute_to_configured_actor_id(self):
+        # Regression guard for the dashboard-attribution fix: every write used to
+        # be logged as ActorID 0 ("unattributed") no matter who ran it. Both the
+        # generic ACTION_MAP dispatch path and the manual branches that go
+        # through _audit() (e.g. backup.create) must now carry the configured
+        # dashboard_actor_id instead.
+        admin = AdminDashboardController(self.store, "http://fake-engine.invalid", True, 42)
+        calls: list[tuple[str, int]] = []
+
+        class _StubEngine:
+            async def action(self, operation, actor_id, payload, **kwargs):
+                calls.append((operation, actor_id))
+                return {"ok": True}
+
+        class _StubTransport:
+            async def create_backup(self):
+                return {"name": "test-backup"}
+
+        admin.engine = _StubEngine()
+        admin.transport = _StubTransport()
+
+        await admin.run("player.karma", {"user_id": 1, "delta": 5})
+        self.assertEqual(calls[-1], ("admin.player.karma", 42))
+
+        await admin.run("backup.create", {})
+        self.assertEqual(calls[-1], ("admin.audit", 42))
 
     async def test_discord_dashboard_proxy_uses_private_bot_control_endpoint(self):
         state = HealthState(supported_schema_version=SCHEMA_VERSION)
@@ -198,6 +225,41 @@ class DashboardTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Samsara Dynasties", html)
         self.assertIn("/api/cultivation", js)
         self.assertIn("/api/dynasties", js)
+        # Better admin dashboard: character-sheet editing, NPC/world-state editing,
+        # player moderation, and bulk/server-wide actions (all 9 new admin.* ops).
+        self.assertIn("player.set_realm", js)
+        self.assertIn("player.set_resource_caps", js)
+        self.assertIn("player.adjust_item", js)
+        self.assertIn("player.reset_cooldowns", js)
+        self.assertIn("player.force_end_scene", js)
+        self.assertIn("npc.relocate", js)
+        self.assertIn("world_event.end", js)
+        self.assertIn("bulk.grant_currency", js)
+        self.assertIn("bulk.reset_cooldowns", js)
+        self.assertIn("/api/player", js)
+        # Sect membership + progression-detail admin controls (6 new admin.* ops).
+        self.assertIn("player.set_sect", js)
+        self.assertIn("player.set_realm_perfection", js)
+        self.assertIn("player.set_spiritual_root", js)
+        self.assertIn("player.set_bloodline", js)
+        self.assertIn("player.set_physique", js)
+        self.assertIn("player.set_tribulation", js)
+        # Backup restore + debuff/condition clearing.
+        self.assertIn("backup.restore", js)
+        self.assertIn("player.clear_condition", js)
+        # v0.19.29: world-time scale wiring.
+        self.assertIn("timeScale", js)
+        # v0.19.29: dynasty/samsara admin write path.
+        self.assertIn("player.force_reincarnation_ready", js)
+        # v0.19.29: crafting-adjacent admin write path.
+        self.assertIn("player.set_pill_toxicity", js)
+        self.assertIn("player.set_beast_stats", js)
+        self.assertIn("player.remove_equipment", js)
+        self.assertIn("player.set_abode_access", js)
+        # v0.19.29: mute/freeze moderation.
+        self.assertIn("player.set_moderation", js)
+        # v0.19.29: undo the most recent admin action.
+        self.assertIn("audit.undo_last", js)
 
 
 if __name__ == "__main__":

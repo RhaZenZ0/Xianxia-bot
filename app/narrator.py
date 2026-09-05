@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
+import time
 from typing import Any
 
 from openai import AsyncOpenAI
@@ -298,6 +299,15 @@ class Narrator:
         self.model = model
         self.client = AsyncOpenAI(api_key=api_key) if api_key else None
         self.ai_router = ai_router
+        # Monitoring counters.  A silent procedural fallback is exactly the
+        # failure players notice ("the narration went flat") and operators do
+        # not, because nothing errors: play continues on deterministic prose.
+        # These make that visible in /admin without touching the fallback.
+        self.narration_requests = 0
+        self.narration_served = 0
+        self.procedural_fallbacks = 0
+        self.last_failure = ""
+        self.last_failure_at = 0.0
 
     @property
     def enabled(self) -> bool:
@@ -322,6 +332,7 @@ class Narrator:
         if self.provider in {"disabled", "procedural"}:
             return fallback
 
+        self.narration_requests += 1
         tier_name = NarrationTier.EPIC if str(tier).lower() == "epic" else NarrationTier.ROUTINE
         system_prompt = SYSTEM_PROMPT if tier_name == NarrationTier.EPIC else ROUTINE_SYSTEM_PROMPT
         try:
@@ -340,6 +351,7 @@ class Narrator:
                     result.model,
                     ",".join(result.attempted_models),
                 )
+                self.narration_served += 1
                 return result.text
             if self.provider == "openai":
                 if not self.client:
@@ -353,11 +365,15 @@ class Narrator:
                 text = response.output_text.strip()
                 if not text:
                     raise RuntimeError("OpenAI returned an empty narration")
+                self.narration_served += 1
                 return text
             raise RuntimeError(f"Unsupported narrator provider: {self.provider}")
         except Exception as exc:
             # Narration is descriptive only. Canonical mechanics have already been
             # resolved, so a cloud outage or free-tier exhaustion cannot fail play.
+            self.procedural_fallbacks += 1
+            self.last_failure = f"{type(exc).__name__}: {exc}"[:300]
+            self.last_failure_at = time.time()
             log.warning(
                 "Narrator provider %s tier=%s failed; using procedural fallback: %s",
                 self.provider_label,
@@ -365,6 +381,27 @@ class Narrator:
                 exc,
             )
             return fallback
+
+    def health_snapshot(self) -> dict[str, Any]:
+        """Counters only - safe to render into an administrator panel."""
+        requests = int(self.narration_requests)
+        served = int(self.narration_served)
+        fallbacks = int(self.procedural_fallbacks)
+        snapshot: dict[str, Any] = {
+            "provider": self.provider,
+            "provider_label": self.provider_label,
+            "enabled": self.enabled,
+            "narration_requests": requests,
+            "narration_served": served,
+            "procedural_fallbacks": fallbacks,
+            "fallback_rate": round(fallbacks / requests, 4) if requests else 0.0,
+            "last_failure": self.last_failure,
+            "last_failure_at": self.last_failure_at,
+            "router": None,
+        }
+        if self.ai_router is not None:
+            snapshot["router"] = self.ai_router.health_snapshot()
+        return snapshot
 
     def _character_summary(self, character: dict[str, Any], realm_name: str) -> str:
         attrs = character["attributes"]

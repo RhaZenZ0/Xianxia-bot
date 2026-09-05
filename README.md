@@ -1,4 +1,4 @@
-# Xianxia RP Discord Bot v0.19.9
+# Xianxia RP Discord Bot v0.19.31
 
 A persistent Xianxia role-playing Discord bot designed for CPU-only QNAP/NAS deployment. Python owns
 Discord, RAG, dashboard, and presentation orchestration; Go owns canonical gameplay rules, current
@@ -8,41 +8,13 @@ Version **0.18** completed the staged authority cleanup: forage/crafting/compani
 unified lifespan, multi-hop road travel, caravan mechanics, dashboard-owned Discord setup, and removal
 of obsolete Python mechanical authority paths. **0.19** is a cultivation-depth consistency/coverage pass
 on top of that release, plus a further authority-migration pass for 1v1 battle start and mid-battle item
-recovery, plus GM-authored per-channel welcome messages and a #bugs forum channel for
-player bug reports. The release uses schema **26**.
+recovery, GM-authored per-channel welcome messages, a #bugs forum channel for player bug reports, an
+administrator AI monitor, a mute/freeze moderation system, and an "undo the most recent admin action"
+control, among many smaller fixes and hardening passes along the way.
 
-**0.19.5** is a GUI release on top of that. The interactive hub panel gains a Components V2
-"action list" layout: every action on a system is visible as its own row with its own button,
-instead of being hidden behind an action dropdown, and running an action no longer overwrites
-the panel it was launched from. It is piloted on `/character`; the other 15 player hubs and the
-admin panel keep the classic embed panel, and `LAYOUT_HUB_NAMES` in `app/bot/hubs.py` is the
-whole rollout switch. 0.19.5 changes no schema and no game rules. It also corrects the release
-stamp itself, which had drifted: `VERSION` said 0.19 while `app/version.py`, the `Dockerfile`
-and `docker-compose.yml` all still said 0.18.
-
-**0.19.6** is a correctness release answering an external audit. It fixes a silent data-loss
-path in the Go engine (`/v1/db/batch` with `transaction:false` returned HTTP 200 and then rolled
-the writes back), Discord snowflake ids being rounded to nothing by `JSON.parse` on the way to
-the dashboard, a cleared channel message coming back on the next Repair, backups taken in the
-same second overwriting each other, `#bugs` forum tags never being applied to an adopted
-channel, and a `RELEASE_MANIFEST.sha256` that had drifted out of date and was never verified by
-`update.sh`. Every fix carries a regression test that fails without it. No schema change.
-
-**0.19.7** corrects the hub layout against how it actually renders in Discord: no generic
-glyph on action rows, one status per line with shorter bars, danger buttons that name
-their own verb, and the system dropdown removed as a duplicate of Prev/Next.
-
-**0.19.8** fixes onboarding copy that told players to type commands that do not exist
-(`/family leave` is not registered — only the hub `/family` is), rewrites the household and
-expedition thread openers to lead with how to step outside, and adds a test that gates the
-whole shape.
-
-**0.19.9** fixes the release integrity check, which used GNU-only `sha256sum` flags and so
-refused every package on BusyBox-based NAS hardware. See RELEASE.txt — upgrading from
-0.19.6–0.19.8 needs a one-line patch to the *installed* `update.sh` first.
-
-See `docs/V019_RELEASE_NOTES.md` for the current release, `docs/V018_RELEASE_NOTES.md` and
-`docs/V018_BUILD_HISTORY.md` (consolidated validation/audit record) for the prior staged-authority migration.
+See `VERSIONS.md` for the full release-by-release changelog (every v0.19.x release), and
+`docs/V019_RELEASE_NOTES.md`, `docs/V018_RELEASE_NOTES.md` and `docs/V018_BUILD_HISTORY.md`
+(consolidated validation/audit record) for full per-release and staged-authority migration detail.
 
 ## Release architecture
 
@@ -128,6 +100,88 @@ Used for major breakthroughs, sect trials, major event scenes and other explicit
 
 `OPENROUTER_REQUIRE_FREE=true` rejects paid model IDs. `openrouter/free` is explicitly allowed even though its ID does not end in `:free`. The local request limiter is fail-fast: it does not queue Discord users behind repeated retries.
 
+## HTTP request limits
+
+Both the health listener and the GM dashboard parse HTTP by hand, and both read
+the request head **before any authentication runs**. A per-line timeout on its
+own is not a limit: a client sending one header just under it holds the
+connection open indefinitely, and a client sending them quickly grows the header
+dictionary without bound.
+
+Every request head is therefore bounded (`app/http_limits.py`), on both servers,
+with the same env knobs:
+
+| Setting | Default | Rejected with |
+| --- | --- | --- |
+| `HTTP_MAX_REQUEST_LINE_BYTES` | 8192 | 414 URI Too Long |
+| `HTTP_MAX_HEADER_LINES` | 100 | 431 Request Header Fields Too Large |
+| `HTTP_MAX_HEADER_BYTES` | 16384 | 431 |
+| `HTTP_HEADER_DEADLINE_SECONDS` | 10 | 408 Request Timeout |
+| `HTTP_HEADER_LINE_TIMEOUT_SECONDS` | 5 | 408 |
+| `HTTP_MAX_CONNECTIONS` | 64 | 503 |
+
+The deadline is **absolute**: each read gets whichever is smaller, the per-line
+timeout or the time remaining for the whole head. Defaults are generous for a
+browser (Chrome sends roughly 15 headers, 1–2 KiB) and mean for an attacker.
+
+> The GM dashboard publishes to `${DASHBOARD_BIND_ADDRESS:-127.0.0.1}:8090` —
+> loopback-only by default. Setting `DASHBOARD_BIND_ADDRESS=0.0.0.0` exposes it
+> to your whole network; everything above then matters a great deal more.
+
+## Free-tier budget
+
+OpenRouter free models (`:free`) allow **20 requests per minute and 50 requests
+per day** while the account has under $10 of lifetime credits — **1000/day at $10
+or more**. Every failed route walks to the next one and each walk spends a daily
+slot, so the allowance drains faster than the narration count suggests.
+
+```env
+OPENROUTER_MAX_REQUESTS_PER_MINUTE=20
+OPENROUTER_MAX_REQUESTS_PER_DAY=50      # raise to 1000 once credits are added
+```
+
+Once the daily budget is spent the router stops locally rather than making
+requests it knows will be refused, and `/admin → Server → Ai Status` says so.
+The counter is in memory and resets on restart, so it is a cost saver rather
+than an authority — upstream remains the source of truth.
+
+If narration keeps falling back to procedural prose, the two highest-leverage
+actions are outside this codebase: add $10 of credits, or add your own provider
+key at [openrouter.ai/settings/integrations](https://openrouter.ai/settings/integrations)
+so the free models draw on your own provider quota instead of the shared pool.
+
+## Administrator AI monitor
+
+Two GM-only actions under `/admin → Server`. Neither is a typable slash command.
+
+| Action | What it does |
+| --- | --- |
+| `ai_status` | Narrator health from counters only: AI-served vs procedural fallbacks, per-route attempts/successes/failures, which routes are cooling down and why, and how often the local rate ceiling refused a request. No prompts, no player text, no API key. |
+| `chat_digest` | Reads a channel (optionally its threads) over a window and reports what players did, where they got stuck, possible bugs, mood, and what needs attention. Options: `channel`, `hours`, `include_threads`. |
+
+The digest runs on the **same free route chain as narration** — it never uses a
+paid model and never uses OpenRouter's paid `openrouter:fusion` server tool, so
+it cannot start spending money. The transcript is chunked and analysed
+map-reduce style to fit free-model context windows, and overflow keeps the
+newest parts. Every AI failure degrades rather than raises: if all routes fail
+you still get the deterministic counts.
+
+**`chat_digest` needs the Message Content intent.** Two steps, both required:
+
+1. `MESSAGE_CONTENT_INTENT=true` in `.env` (this is now the default).
+2. *Message Content Intent* enabled in the [Discord Developer Portal](https://discord.com/developers/applications) under **Bot → Privileged Gateway Intents**. Under 100 servers this needs no verification.
+
+Without step 2 Discord returns empty text for every message the bot was not
+mentioned in, and the digest tells you so rather than reporting an empty channel.
+Turning the intent on also activates the existing `on_message` path: RP messages
+start being written to `scene_history`, and the bot replies to @-mentions from
+users without a character. `AUTO_NARRATE` stays `false`, so it does not begin
+narrating on its own.
+
+> The bot's own `scene_history` table cannot answer this question — it keeps only
+> the newest 60 rows per channel as narrator context, and deletes the rest on
+> every insert. The digest reads Discord's message history instead.
+
 ## Current database configuration
 
 Every Go SQLite connection applies:
@@ -141,7 +195,7 @@ cache_size=-32768
 wal_autocheckpoint=1000
 ```
 
-The current schema is **26**. Historical migrations remain in the repository and upgrades run in place.
+The current schema is **27**. Historical migrations remain in the repository and upgrades run in place.
 
 ## Requirements
 
@@ -186,6 +240,28 @@ OPENROUTER_MAX_REQUESTS_PER_MINUTE=20
 OPENROUTER_TIMEOUT_SECONDS=30
 OPENROUTER_EPIC_TIMEOUT_SECONDS=60
 ```
+
+> **Dependency note (v0.19.16).** `openai` is pinned at `3.7.0`. openai 3.x uses
+> HTTPX2, which verifies TLS against the **operating system** trust store rather
+> than certifi — the Dockerfile installs `ca-certificates`, asserts the bundle is
+> present and sets `SSL_CERT_FILE`. `httpx` stays pinned in `requirements.txt` in
+> its own right because openai 3.x no longer installs it and the Go engine
+> transport imports it directly. If narration ever goes flat after an image
+> rebuild, check `/admin → Server → ai_status` for a TLS banner first.
+
+The administrator chat monitor is configured with:
+
+```env
+MESSAGE_CONTENT_INTENT=true
+MONITOR_MAX_MESSAGES=400
+MONITOR_LOOKBACK_HOURS=24
+MONITOR_CHUNK_CHARS=6000
+MONITOR_MAX_CHUNKS=6
+```
+
+The ceilings exist because the monitor shares the narrator's
+`OPENROUTER_MAX_REQUESTS_PER_MINUTE` limiter — an unbounded transcript would
+starve narration for a whole minute.
 
 ### 2. Start on QNAP
 
@@ -465,14 +541,8 @@ live structured SQL
 
 ### Schema history
 
-- **Schema 14** introduced player memory and narrator-safe canon FTS.
-- **Schema 15** added structured permanent world history and `world_history_fts`.
-- **Schema 16** added persistent NPC life/social/descendant systems.
-- **Schema 17** adds the current event participation/GUI persistence layer and associated current schema updates.
-- **Schemas 18-24** carried the v0.18 staged-authority migration (forage/crafting/companions, canonical time,
-  unified lifespan, multi-hop road travel, caravan mechanics, dashboard-owned Discord setup) through to its
-  final state; no v0.19 change added new tables or columns. See `docs/V018_RELEASE_NOTES.md` and
-  `docs/V019_RELEASE_NOTES.md` for the per-release detail.
+The RAG-relevant schema versions are 14-17 (see `VERSIONS.md` for the full schema history across
+every version, 14 through the current schema 27).
 
 ### Safe canon indexing
 
@@ -760,17 +830,9 @@ tests/python/           Python-owned unit/integration/contract suite
 tests/support.py         shared dependency shims and test path helpers
 ```
 
-## Release status — v0.19.9
+## Release status
 
-- Current release: v0.19.9, portable release-integrity check (BusyBox-safe).
-- v0.19.8: onboarding copy pointing at reachable commands, gated by a test.
-- v0.19.7: hub-layout corrections made after seeing the panel render live.
-- v0.19.6: a correctness release fixing the findings of an external audit
-  (engine batch durability, dashboard snowflake precision, cleared-message persistence, backup
-  naming, `#bugs` tag sync, release-manifest integrity). No schema change; schema stays at 26.
-- v0.19.5: a GUI release adding the Components V2 hub layout, piloted on `/character`.
-- v0.19: a cultivation-depth consistency/coverage pass plus a further authority-migration pass for
-  1v1 battle start and mid-battle item recovery, built on top of the v0.18 staged-authority migration.
+- Current release: v0.19.31. See `VERSIONS.md` for the full release-by-release history.
 - Go owns canonical gameplay time, migrated gameplay mechanics, lifespan/death authority, road travel,
   caravan settlement, simulation mutation, and SQLite WAL.
 - Python owns Discord/RAG/dashboard/presentation orchestration and does not duplicate the removed
@@ -779,10 +841,7 @@ tests/support.py         shared dependency shims and test path helpers
   action can create the missing base and realm-hub channels/categories itself (when the bot has Manage
   Channels); the `/admin` Discord slash command's own setup action reuses the same helper but stays
   validate-and-bind-only, so channel layout still can't drift out from under the dashboard via Discord itself.
-- Database schema is **26**.
-- The v0.18 release gate added loopback-by-default standalone engine binding plus strict bounded JSON
-  request handling; v0.19 added two schema migrations (schema 25 for GM-authored per-channel messages,
-  schema 26 for the #bugs forum channel), otherwise only mechanics/logic and documentation fixes.
+- Database schema is **27**.
 
 ## Design rules for future work
 
@@ -794,8 +853,7 @@ tests/support.py         shared dependency shims and test path helpers
 6. **Audit GM mutations.** New Admin Console actions should write `admin_audit_log`.
 7. **Prefer native Go tests for Go-owned rules.** Pytest should test Python-owned behavior and integration boundaries rather than duplicate engine formulas.
 
-## Release notes — v0.19
+## Version history
 
-See `docs/V019_RELEASE_NOTES.md` for the current release's cultivation-depth audit, dashboard coverage gaps, and
-combat authority-migration fixes. See `docs/V018_RELEASE_NOTES.md` for the complete staged-authority, road/caravan,
-setup, cleanup, migration, security, and upgrade summary that v0.19 builds on.
+See `VERSIONS.md` for the full v0.19.x (and v0.18) release-by-release changelog, schema history, and
+release-notes pointers.

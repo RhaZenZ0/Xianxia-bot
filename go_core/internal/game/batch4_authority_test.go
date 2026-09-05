@@ -107,6 +107,13 @@ CREATE TABLE characters(
     qi_max INTEGER NOT NULL DEFAULT 100,
     vitality INTEGER NOT NULL DEFAULT 100,
     vitality_max INTEGER NOT NULL DEFAULT 100,
+    -- checkPlayerModerationTx (moderation.go) runs ahead of every authoritative
+    -- mutation too, right after checkPlayerOldAgeDeathTx, and reads these
+    -- three columns directly off characters. Defaulted to "not moderated" so
+    -- existing fixture characters are unaffected unless a test opts in.
+    is_muted INTEGER NOT NULL DEFAULT 0,
+    is_frozen INTEGER NOT NULL DEFAULT 0,
+    moderation_reason TEXT NOT NULL DEFAULT '',
     updated_at REAL NOT NULL DEFAULT 0
 );
 CREATE TABLE cooldowns(user_id INTEGER NOT NULL,action TEXT NOT NULL,available_at REAL NOT NULL,PRIMARY KEY(user_id,action));

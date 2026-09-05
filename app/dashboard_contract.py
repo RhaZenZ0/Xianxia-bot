@@ -9,11 +9,11 @@ from typing import Iterable
 # run before the bot/dashboard dependencies are installed.  Keep the browser/API,
 # schema-review, and newer-system coverage contract in one place.
 DASHBOARD_API_VERSION = 2
-DASHBOARD_REVIEWED_SCHEMA_VERSION = 26
+DASHBOARD_REVIEWED_SCHEMA_VERSION = 27
 
 DASHBOARD_GET_API_PATHS = frozenset({
     "/api/overview", "/api/capabilities", "/api/timeline", "/api/npcs", "/api/npc",
-    "/api/families", "/api/sects", "/api/conflicts", "/api/events", "/api/players",
+    "/api/families", "/api/sects", "/api/conflicts", "/api/events", "/api/players", "/api/player",
     "/api/cultivation", "/api/crafting", "/api/exploration", "/api/economy", "/api/dynasties",
     "/api/party", "/api/pvp", "/api/conditions", "/api/threads",
     "/api/rag", "/api/decisions", "/api/admin", "/api/discord", "/api/health",

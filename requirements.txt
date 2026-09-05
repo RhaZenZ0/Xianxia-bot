@@ -1,5 +1,10 @@
 discord.py==2.7.1
-openai==2.52.1
+openai==3.7.0
 aiosqlite>=0.20,<1
 python-dotenv>=1.2.2,<2
+# Pinned explicitly, NOT relied on transitively. openai 3.x installs httpx2 and
+# no longer installs httpx at all, but app/database/remote.py and
+# app/game_engine.py import httpx directly for the Go engine transport - the
+# load-bearing path for every piece of game state. httpx2 is a separate package
+# name rather than httpx 2.x, so the two coexist without a version conflict.
 httpx>=0.28,<1

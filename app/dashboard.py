@@ -17,6 +17,14 @@ from urllib.error import HTTPError, URLError
 
 import aiosqlite
 
+from .http_limits import (
+    STREAM_LIMIT,
+    ConnectionLimiter,
+    EmptyRequest,
+    HeaderLimits,
+    RequestHeadRejected,
+    read_request_head,
+)
 from .worldtime import from_game_minutes
 from .database.remote import GoDatabaseTransport, RemoteDatabaseError
 from .game_engine import GameEngineClient, GameEngineError
@@ -80,10 +88,19 @@ class DashboardSettings:
     port: int
     username: str
     token: str
+    dashboard_actor_id: int = 1
     admin_writes: bool = False
     engine_url: str = ""
     bot_control_url: str = ""
     bot_control_token: str = ""
+    # Pre-auth request-head bounds. Defaults are generous for a browser (Chrome
+    # sends ~15 headers, 1-2 KiB) and mean for a slow-header attacker.
+    max_request_line_bytes: int = 8192
+    max_header_lines: int = 100
+    max_header_bytes: int = 16384
+    header_deadline_seconds: float = 10.0
+    header_line_timeout_seconds: float = 5.0
+    max_connections: int = 64
 
     @classmethod
     def from_env(cls) -> "DashboardSettings":
@@ -101,16 +118,57 @@ class DashboardSettings:
             raise RuntimeError(
                 "DASHBOARD_TOKEN must be set to a private random value of at least 20 characters before starting the dashboard"
             )
+        # Every dashboard-originated admin write is attributed to this actor id in
+        # admin_audit_log, instead of the hardcoded 0 ("unattributed") every write
+        # used before this setting existed. Small integers (this defaults to 1)
+        # can never collide with a real Discord snowflake (17-19 digits), which is
+        # what the bot's slash-command path already uses as ActorID - so 0 stays
+        # meaning "unattributed/legacy" and this is unambiguous going forward. Set
+        # it to your real Discord user id instead if you want dashboard-originated
+        # and bot-originated audit rows to attribute to the same identity.
+        try:
+            dashboard_actor_id = int(os.getenv("DASHBOARD_ACTOR_ID", "1"))
+        except ValueError as exc:
+            raise RuntimeError("DASHBOARD_ACTOR_ID must be an integer") from exc
+        if dashboard_actor_id < 0:
+            raise RuntimeError("DASHBOARD_ACTOR_ID must not be negative")
         admin_writes = os.getenv("DASHBOARD_ADMIN_WRITES", "true").strip().lower() in {"1", "true", "yes", "on"}
         engine_url = os.getenv("GAME_ENGINE_URL", "").strip().rstrip("/")
         if admin_writes and not engine_url:
             raise RuntimeError("GAME_ENGINE_URL is required when DASHBOARD_ADMIN_WRITES is enabled")
         bot_control_url = os.getenv("BOT_CONTROL_URL", "http://127.0.0.1:8080").strip().rstrip("/")
         bot_control_token = os.getenv("BOT_CONTROL_TOKEN", "").strip() or token
+
+
+        def _limit(name: str, default: int, low: int, high: int) -> int:
+            try:
+                value = int(os.getenv(name, str(default)) or default)
+            except ValueError as exc:
+                raise RuntimeError(f"{name} must be an integer") from exc
+            if not low <= value <= high:
+                raise RuntimeError(f"{name} must be between {low} and {high}")
+            return value
+
+        def _seconds(name: str, default: float, low: float, high: float) -> float:
+            try:
+                value = float(os.getenv(name, str(default)) or default)
+            except ValueError as exc:
+                raise RuntimeError(f"{name} must be a number") from exc
+            if not low <= value <= high:
+                raise RuntimeError(f"{name} must be between {low} and {high}")
+            return value
+
         return cls(
             database_path=database_path, host=host, port=port, username=username, token=token,
+            dashboard_actor_id=dashboard_actor_id,
             admin_writes=admin_writes, engine_url=engine_url, bot_control_url=bot_control_url,
             bot_control_token=bot_control_token,
+            max_request_line_bytes=_limit("HTTP_MAX_REQUEST_LINE_BYTES", 8192, 256, 65536),
+            max_header_lines=_limit("HTTP_MAX_HEADER_LINES", 100, 8, 1000),
+            max_header_bytes=_limit("HTTP_MAX_HEADER_BYTES", 16384, 1024, 262144),
+            header_deadline_seconds=_seconds("HTTP_HEADER_DEADLINE_SECONDS", 10.0, 1.0, 120.0),
+            header_line_timeout_seconds=_seconds("HTTP_HEADER_LINE_TIMEOUT_SECONDS", 5.0, 0.5, 60.0),
+            max_connections=_limit("HTTP_MAX_CONNECTIONS", 64, 4, 4096),
         )
 
 
@@ -550,6 +608,30 @@ class ReadOnlyDashboardStore:
                    GROUP BY s.user_id,c.name ORDER BY last_scene_at DESC LIMIT 100""",
             )
             return {"players": rows, "recent_actions": actions, "scene_activity": scenes}
+
+    async def player_detail(self, user_id: int) -> dict[str, Any]:
+        """Full character sheet + inventory for one player, mirroring npc_detail's
+        drawer pattern above. Needed so the Admin Console can show what a GM is
+        about to edit (realm/phase, resource caps, inventory) before editing it."""
+        async with self._connect() as db:
+            row = await self._fetchone(
+                db,
+                """SELECT c.*,sm.sect_name,sm.rank_name
+                   FROM characters c LEFT JOIN sect_membership sm ON sm.user_id=c.user_id
+                   WHERE c.user_id=?""",
+                (user_id,),
+            )
+            if not row:
+                return {}
+            inventory = await self._fetchall(db, "SELECT item_id,quantity FROM inventory WHERE user_id=? ORDER BY item_id", (user_id,))
+            cooldowns = await self._fetchall(db, "SELECT action,available_at FROM cooldowns WHERE user_id=? ORDER BY action", (user_id,))
+            scene = await self._fetchone(db, "SELECT * FROM player_scene_state WHERE user_id=?", (user_id,))
+            conditions = await self._fetchall(
+                db,
+                "SELECT condition_id,condition_key,category,name,severity FROM character_conditions WHERE user_id=? AND state='active' ORDER BY severity DESC",
+                (user_id,),
+            )
+            return {"player": row, "inventory": inventory, "cooldowns": cooldowns, "scene": scene or {}, "conditions": conditions}
 
     async def capabilities(self) -> dict[str, Any]:
         """Describe the dashboard/API contract and whether newer-system tables are present."""
@@ -1031,14 +1113,41 @@ class AdminDashboardController:
         "player.clear_battle": "admin.player.clear_battle",
         "automation.set": "admin.automation.set",
         "simulation.interval": "admin.simulation.interval",
+        "player.set_realm": "admin.player.set_realm",
+        "player.set_resource_caps": "admin.player.set_resource_caps",
+        "player.adjust_item": "admin.player.adjust_item",
+        "player.reset_cooldowns": "admin.player.reset_cooldowns",
+        "player.force_end_scene": "admin.player.force_end_scene",
+        "npc.relocate": "admin.npc.relocate",
+        "world_event.end": "admin.world_event.end",
+        "bulk.grant_currency": "admin.bulk.grant_currency",
+        "bulk.reset_cooldowns": "admin.bulk.reset_cooldowns",
+        "player.set_sect": "admin.player.set_sect",
+        "player.set_realm_perfection": "admin.player.set_realm_perfection",
+        "player.set_spiritual_root": "admin.player.set_spiritual_root",
+        "player.set_bloodline": "admin.player.set_bloodline",
+        "player.set_physique": "admin.player.set_physique",
+        "player.set_tribulation": "admin.player.set_tribulation",
+        "player.clear_condition": "admin.player.clear_condition",
+        "player.force_reincarnation_ready": "admin.player.force_reincarnation_ready",
+        "player.set_pill_toxicity": "admin.player.set_pill_toxicity",
+        "player.set_beast_stats": "admin.player.set_beast_stats",
+        "player.remove_equipment": "admin.player.remove_equipment",
+        "player.set_abode_access": "admin.player.set_abode_access",
+        "player.set_moderation": "admin.player.set_moderation",
+        "audit.undo_last": "admin.audit.undo_last",
     }
 
-    def __init__(self, store: ReadOnlyDashboardStore, engine_url: str, enabled: bool):
+    def __init__(self, store: ReadOnlyDashboardStore, engine_url: str, enabled: bool, actor_id: int = 1):
         self.store = store
         self.enabled = bool(enabled)
         self.engine_url = str(engine_url).strip().rstrip("/")
         self.engine = GameEngineClient(self.engine_url) if self.engine_url else None
         self.transport = GoDatabaseTransport(self.engine_url) if self.engine_url else None
+        # Real, distinguishable ActorID for every dashboard-originated write and
+        # audit entry - see DashboardSettings.dashboard_actor_id for why this
+        # replaced the hardcoded 0 every call in this class used before.
+        self.actor_id = int(actor_id)
 
     async def snapshot(self) -> dict[str, Any]:
         if not self.enabled or self.engine is None or self.transport is None:
@@ -1046,7 +1155,7 @@ class AdminDashboardController:
         async with self.store._connect() as db:
             players = await self.store._fetchall(
                 db,
-                "SELECT user_id,name,discord_name,life_status,location,realm_index,phase,karma_score,vitality,vitality_max,qi,qi_max FROM characters ORDER BY name",
+                "SELECT user_id,name,discord_name,life_status,location,realm_index,phase,karma_score,vitality,vitality_max,qi,qi_max,is_muted,is_frozen,moderation_reason FROM characters ORDER BY name",
             )
             locations = [str(r["name"]) for r in await self.store._fetchall(db, "SELECT name FROM catalog_locations ORDER BY name")]
             if not locations:
@@ -1076,6 +1185,18 @@ class AdminDashboardController:
                     pass
             clock = await self.store._world_clock(db)
             currencies = [str(r["currency_id"]) for r in await self.store._fetchall(db, "SELECT DISTINCT currency_id FROM currency_wallets ORDER BY currency_id")]
+            # NPC names + active world events, so the NPC/world-state admin controls
+            # below can offer real dropdowns instead of free-text fields the GM has
+            # to get exactly right.
+            npc_names = [str(r["npc_name"]) for r in await self.store._fetchall(db, "SELECT npc_name FROM npc_civilization_state WHERE status='alive' ORDER BY npc_name")]
+            active_events = await self.store._fetchall(db, "SELECT event_key,title FROM world_events WHERE active=1 ORDER BY title")
+            sects = [str(r["sect_name"]) for r in await self.store._fetchall(db, "SELECT sect_name FROM sect_politics_state ORDER BY sect_name")]
+            if not sects:
+                try:
+                    world = json.loads((ROOT / "content" / "world.json").read_text(encoding="utf-8"))
+                    sects = sorted(str(name) for name in (world.get("sects") or {}).keys())
+                except Exception:
+                    sects = []
         for currency in ("low_spirit_stone", "low_spirit_crystal", "low_immortal_stone", "low_celestial_crystal"):
             if currency not in currencies:
                 currencies.append(currency)
@@ -1088,6 +1209,9 @@ class AdminDashboardController:
             "automation": automation,
             "audit": audit,
             "clock": clock,
+            "npcs": npc_names,
+            "active_events": active_events,
+            "sects": sects,
             "backups": await self.transport.list_backups(),
             "database": await self.transport.status(),
         }
@@ -1095,7 +1219,7 @@ class AdminDashboardController:
     async def _audit(self, *, action: str, target: str = "", after: dict[str, Any] | None = None, reason: str = "") -> None:
         if self.engine is None:
             return
-        await self.engine.action("admin.audit", 0, {"action": action, "target": target, "after": after or {}, "reason": reason})
+        await self.engine.action("admin.audit", self.actor_id, {"action": action, "target": target, "after": after or {}, "reason": reason})
 
     async def run(self, action: str, payload: dict[str, Any]) -> dict[str, Any]:
         if not self.enabled or self.engine is None or self.transport is None:
@@ -1104,7 +1228,7 @@ class AdminDashboardController:
         payload = dict(payload or {})
         reason = str(payload.get("reason") or "GM dashboard")[:500]
         if action in self.ACTION_MAP:
-            result = await self.engine.action(self.ACTION_MAP[action], 0, payload)
+            result = await self.engine.action(self.ACTION_MAP[action], self.actor_id, payload)
             return {"ok": True, "action": action, "result": result}
         if action == "simulation.force":
             system = str(payload.get("system") or "").strip()
@@ -1117,6 +1241,13 @@ class AdminDashboardController:
         if action == "backup.create":
             result = await self.transport.create_backup()
             await self._audit(action="dashboard.backup.create", target=str(result.get("name") or "backup"), after=result, reason=reason)
+            return {"ok": True, "action": action, "result": result}
+        if action == "backup.restore":
+            name = str(payload.get("name") or "").strip()
+            if not name:
+                raise ValueError("backup.restore requires a name")
+            result = await self.transport.restore_backup(name)
+            await self._audit(action="dashboard.backup.restore", target=name, after=result, reason=reason)
             return {"ok": True, "action": action, "result": result}
         if action in {"database.optimize", "database.vacuum"}:
             maintenance = "optimize" if action.endswith("optimize") else "vacuum"
@@ -1193,8 +1324,19 @@ class DashboardServer:
     def __init__(self, settings: DashboardSettings):
         self.settings = settings
         self.store = ReadOnlyDashboardStore(settings.database_path)
-        self.admin = AdminDashboardController(self.store, settings.engine_url or os.getenv("GAME_ENGINE_URL", ""), settings.admin_writes)
+        self.admin = AdminDashboardController(self.store, settings.engine_url or os.getenv("GAME_ENGINE_URL", ""), settings.admin_writes, settings.dashboard_actor_id)
         self.discord = DiscordDashboardController(settings.bot_control_url, settings.bot_control_token, settings.admin_writes)
+        # Bounds for the pre-auth request head. See app/http_limits.py: a per-line
+        # timeout that resets on every line is not a limit, it is an invitation.
+        self.header_limits = HeaderLimits(
+            max_request_line_bytes=settings.max_request_line_bytes,
+            max_header_lines=settings.max_header_lines,
+            max_header_bytes=settings.max_header_bytes,
+            header_deadline_seconds=settings.header_deadline_seconds,
+            line_timeout_seconds=settings.header_line_timeout_seconds,
+        ).validated()
+        self.connections = ConnectionLimiter(settings.max_connections)
+        self.rejected_heads = 0
         self._server: asyncio.AbstractServer | None = None
 
     def _authorized(self, headers: dict[str, str]) -> bool:
@@ -1211,31 +1353,47 @@ class DashboardServer:
     async def serve(self) -> None:
         if self.store._go_transport is None and not self.settings.database_path.exists():
             raise RuntimeError(f"Dashboard database does not exist: {self.settings.database_path}")
-        self._server = await asyncio.start_server(self._handle, self.settings.host, self.settings.port)
+        self._server = await asyncio.start_server(
+            self._handle, self.settings.host, self.settings.port, limit=STREAM_LIMIT
+        )
         addrs = ", ".join(str(sock.getsockname()) for sock in (self._server.sockets or []))
         log.info("Xianxia RP GM dashboard listening on %s", addrs)
         async with self._server:
             await self._server.serve_forever()
 
     async def _handle(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
-        try:
-            request_line = await asyncio.wait_for(reader.readline(), timeout=5)
-            if not request_line:
-                return
+        # This is the only network-facing listener in the stack, and everything
+        # up to _authorized() below runs for an anonymous peer - so the request
+        # head has to be bounded before anything else happens.
+        if not self.connections.try_acquire():
             try:
-                method, target, _version = request_line.decode("ascii", "replace").strip().split(" ", 2)
+                await self._send_json(writer, 503, {"error": "too_many_connections"})
+            except Exception:
+                pass
+            try:
+                writer.close()
+            except Exception:
+                pass
+            return
+        try:
+            try:
+                head = await read_request_head(reader, limits=self.header_limits)
+            except EmptyRequest:
+                return
+            except RequestHeadRejected as rejected:
+                self.rejected_heads += 1
+                log.warning(
+                    "DASHBOARD_HEAD_REJECTED status=%s error=%s detail=%s",
+                    rejected.status, rejected.error, rejected.detail,
+                )
+                await self._send_json(writer, rejected.status, {"error": rejected.error})
+                return
+            headers = head.headers
+            try:
+                method, target, _version = head.request_line.split(" ", 2)
             except ValueError:
                 await self._send_json(writer, 400, {"error": "bad_request"})
                 return
-            headers: dict[str, str] = {}
-            while True:
-                line = await asyncio.wait_for(reader.readline(), timeout=5)
-                if line in {b"\r\n", b"\n", b""}:
-                    break
-                text = line.decode("latin-1", "replace").strip()
-                if ":" in text:
-                    key, value = text.split(":", 1)
-                    headers[key.strip().lower()] = value.strip()
 
             split = urlsplit(target)
             path = unquote(split.path)
@@ -1318,6 +1476,9 @@ class DashboardServer:
                 await self._send_json(writer, 200, await self.store.events()); return
             if path == "/api/players":
                 await self._send_json(writer, 200, await self.store.players(limit=_qint(query, "limit", 200))); return
+            if path == "/api/player":
+                user_id = _qint(query, "user_id", 0)
+                await self._send_json(writer, 200 if user_id else 400, await self.store.player_detail(user_id) if user_id else {"error": "user_id_required"}); return
             if path == "/api/cultivation":
                 await self._send_json(writer, 200, await self.store.cultivation()); return
             if path == "/api/crafting":
@@ -1358,6 +1519,7 @@ class DashboardServer:
             except Exception:
                 pass
         finally:
+            self.connections.release()
             writer.close()
             try:
                 await writer.wait_closed()
@@ -1381,7 +1543,9 @@ class DashboardServer:
 
     @staticmethod
     async def _send_bytes(writer: asyncio.StreamWriter, status: int, body: bytes, content_type: str, *, extra_headers: dict[str, str] | None = None) -> None:
-        reason = {200:"OK",400:"Bad Request",401:"Unauthorized",403:"Forbidden",404:"Not Found",405:"Method Not Allowed",500:"Internal Server Error"}.get(status,"OK")
+        # 408/414/431/503 come from the request-head limiter and the connection
+        # cap; without them a rejected request went out as "HTTP/1.1 431 OK".
+        reason = {200:"OK",400:"Bad Request",401:"Unauthorized",403:"Forbidden",404:"Not Found",405:"Method Not Allowed",408:"Request Timeout",414:"URI Too Long",431:"Request Header Fields Too Large",500:"Internal Server Error",503:"Service Unavailable"}.get(status,"OK")
         headers = {
             "Content-Type": content_type,
             "Content-Length": str(len(body)),

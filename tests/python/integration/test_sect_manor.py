@@ -54,10 +54,10 @@ class SectManorTests(unittest.IsolatedAsyncioTestCase):
         self.tmp.cleanup()
 
     async def test_schema_migration_includes_manor_tables(self):
-        self.assertEqual(SCHEMA_VERSION, 26)
+        self.assertEqual(SCHEMA_VERSION, 27)
         async with self.db._connect() as conn:
             cur = await conn.execute("SELECT current_version FROM schema_version WHERE singleton=1")
-            self.assertEqual(int((await cur.fetchone())[0]), 26)
+            self.assertEqual(int((await cur.fetchone())[0]), 27)
             cur = await conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='sect_manors'")
             self.assertIsNotNone(await cur.fetchone())
 

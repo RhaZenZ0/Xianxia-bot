@@ -98,6 +98,53 @@ func readCanonicalWorldGameMinute(conn *storage.Conn) (int64, error) {
 	return gameMinute, nil
 }
 
+// readCanonicalWorldClock is the read-only counterpart of canonicalWorldGameMinute:
+// it never inserts a default row (queries shouldn't need write access), and it
+// hands back the anchor/scale themselves, not just the derived current minute,
+// so a caller can convert *any* absolute game-minute (like a travel arrival) to
+// a real-world Unix timestamp with the same anchor - not just "now".
+func readCanonicalWorldClock(conn *storage.Conn) (canonicalWorldClock, error) {
+	now := float64(time.Now().UnixNano()) / 1e9
+	res, err := conn.Execute(`SELECT value_json FROM world_state WHERE key='world_clock'`, nil)
+	if err != nil {
+		return canonicalWorldClock{}, err
+	}
+	state := canonicalWorldClock{
+		AnchorGameMinute: 8 * 60,
+		AnchorRealTS:     now,
+		Scale:            4,
+	}
+	if row := firstRowMap(res); row != nil {
+		if err := json.Unmarshal([]byte(fmt.Sprint(row["value_json"])), &state); err != nil {
+			return canonicalWorldClock{}, fmt.Errorf("invalid canonical world clock: %w", err)
+		}
+	}
+	if state.Scale < 0 {
+		state.Scale = 0
+	}
+	if state.AnchorRealTS <= 0 {
+		state.AnchorRealTS = now
+	}
+	return state, nil
+}
+
+// realTimestampForGameMinute converts an absolute game-clock minute to a real
+// Unix timestamp (seconds) using the world clock's own anchor/scale, the
+// inverse of the anchor + elapsed*scale formula the clock itself advances by.
+// ok is false when the clock is frozen (scale 0) and the target lies in the
+// future relative to the anchor, since there is then no real time at which it
+// is ever reached.
+func realTimestampForGameMinute(clock canonicalWorldClock, targetGameMinute int64) (ts float64, ok bool) {
+	if clock.Scale <= 0 {
+		if targetGameMinute <= clock.AnchorGameMinute {
+			return clock.AnchorRealTS, true
+		}
+		return 0, false
+	}
+	gameMinutesFromAnchor := float64(targetGameMinute - clock.AnchorGameMinute)
+	return clock.AnchorRealTS + (gameMinutesFromAnchor/float64(clock.Scale))*60.0, true
+}
+
 func previewPillToxicity(conn *storage.Conn, userID, gameMinute int64) (int64, error) {
 	res, err := conn.Execute(
 		`SELECT pill_toxicity,last_toxicity_game_minute FROM alchemy_state WHERE user_id=?`,

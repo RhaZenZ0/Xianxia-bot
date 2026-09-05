@@ -32,7 +32,10 @@ CREATE TABLE characters(
     body_realm_index INTEGER NOT NULL DEFAULT 0, body_phase INTEGER NOT NULL DEFAULT 1, karma_score INTEGER NOT NULL DEFAULT 0,
     qi INTEGER NOT NULL DEFAULT 0, qi_max INTEGER NOT NULL DEFAULT 0, vitality INTEGER NOT NULL DEFAULT 0, vitality_max INTEGER NOT NULL DEFAULT 0,
     spirit_stones INTEGER NOT NULL DEFAULT 0, insight_xp INTEGER NOT NULL DEFAULT 0, location TEXT NOT NULL DEFAULT '',
-    attributes_json TEXT NOT NULL DEFAULT '{}', created_at REAL NOT NULL DEFAULT 0, updated_at REAL NOT NULL DEFAULT 0
+    attributes_json TEXT NOT NULL DEFAULT '{}', created_at REAL NOT NULL DEFAULT 0, updated_at REAL NOT NULL DEFAULT 0,
+    -- checkPlayerModerationTx (moderation.go) also runs ahead of every
+    -- authoritative mutation; see the same note in batch4_authority_test.go.
+    is_muted INTEGER NOT NULL DEFAULT 0, is_frozen INTEGER NOT NULL DEFAULT 0, moderation_reason TEXT NOT NULL DEFAULT ''
 );
 CREATE TABLE inventory(user_id INTEGER NOT NULL,item_id TEXT NOT NULL,quantity INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(user_id,item_id));
 CREATE TABLE currency_wallets(user_id INTEGER NOT NULL,currency_id TEXT NOT NULL,balance INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(user_id,currency_id));

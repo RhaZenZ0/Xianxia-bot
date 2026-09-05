@@ -133,6 +133,66 @@ func TestBackupProducesReadableConsistentDatabase(t *testing.T) {
 	}
 }
 
+// TestRestoreFromOverwritesLiveDatabaseWithBackupContent proves RestoreFrom is
+// a true reverse of BackupTo: take a backup, mutate the live database further,
+// then restore from the backup and confirm the live database reverts to
+// exactly the backup's content - the post-backup mutation is gone, and rows
+// present at backup time survive.
+func TestRestoreFromOverwritesLiveDatabaseWithBackupContent(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "live.sqlite3")
+	backup := filepath.Join(dir, "snapshot.sqlite3")
+	conn, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	if err := conn.ExecScript("CREATE TABLE state(k TEXT PRIMARY KEY,v TEXT);"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := conn.Execute("INSERT INTO state(k,v) VALUES(?,?)", []any{"keep", "jade"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := conn.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	if err := conn.BackupTo(backup); err != nil {
+		t.Fatal(err)
+	}
+	// Mutate the live database after the backup was taken - this change must
+	// not survive the restore below.
+	if _, err := conn.Execute("INSERT INTO state(k,v) VALUES(?,?)", []any{"post_backup", "should_vanish"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := conn.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	if got := scalar(t, conn, "SELECT COUNT(*) FROM state"); got != int64(2) {
+		t.Fatalf("pre-restore row count=%v, want 2", got)
+	}
+
+	if err := conn.RestoreFrom(backup); err != nil {
+		t.Fatalf("RestoreFrom failed: %v", err)
+	}
+	if got := scalar(t, conn, "SELECT v FROM state WHERE k='keep'"); got != "jade" {
+		t.Fatalf("post-restore value=%v, want jade", got)
+	}
+	if got := scalar(t, conn, "SELECT COUNT(*) FROM state"); got != int64(1) {
+		t.Fatalf("post-restore row count=%v, want 1 (the post-backup insert must be gone)", got)
+	}
+
+	// The restore source is opened read-only, so the backup archive itself
+	// must be untouched and still independently readable afterward.
+	archive, err := Open(backup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer archive.Close()
+	if got := scalar(t, archive, "SELECT COUNT(*) FROM state"); got != int64(1) {
+		t.Fatalf("backup archive row count=%v after restore, want unchanged 1", got)
+	}
+}
+
 func TestSessionManagerKeepsTransactionsConnectionScoped(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "sessions.sqlite3")
 	manager := NewSessionManager(path)

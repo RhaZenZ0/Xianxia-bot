@@ -104,6 +104,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/v1/db/status", s.dbStatus)
 	mux.HandleFunc("/v1/db/maintenance", s.dbMaintenance)
 	mux.HandleFunc("/v1/db/backups", s.dbBackups)
+	mux.HandleFunc("/v1/db/restore", s.dbRestore)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		s.requests.Add(1)
 		mux.ServeHTTP(w, r)
@@ -545,6 +546,91 @@ func (s *Server) dbBackups(w http.ResponseWriter, r *http.Request) {
 	default:
 		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"error": "method_not_allowed"})
 	}
+}
+
+type restoreRequest struct {
+	Name string `json:"name"`
+}
+
+// dbRestore replaces the live database with the contents of a previously
+// taken backup. This is the single most destructive operation this server
+// exposes, so it never touches the live file without first taking its own
+// "just in case" backup of the current state - a restore that turns out to
+// be a mistake is then itself just one more restore away from being undone.
+// It also closes every open db-session before restoring: a session holds its
+// own long-lived connection and can be sitting mid-transaction, and
+// RestoreFrom's backup step would otherwise have to fight that connection
+// for the write lock (or worse, complete the restore only for the session to
+// immediately overwrite it with stale in-flight data on its next write).
+func (s *Server) dbRestore(w http.ResponseWriter, r *http.Request) {
+	if !method(w, r, http.MethodPost) {
+		return
+	}
+	defer r.Body.Close()
+	limitJSONBody(w, r, 4<<10)
+	var input restoreRequest
+	if err := decodeJSON(r, &input); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid_json"})
+		return
+	}
+	// filepath.Base collapses any "../" traversal down to a bare filename, and
+	// the prefix/suffix check below matches exactly what dbBackups' own
+	// listing accepts - so a restore can only ever target a file that
+	// endpoint would itself have listed as a real backup.
+	name := filepath.Base(strings.TrimSpace(input.Name))
+	if name == "" || name == "." || name == string(filepath.Separator) || !strings.HasPrefix(name, "xianxia-") || !strings.HasSuffix(name, ".sqlite3") {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid_backup_name"})
+		return
+	}
+	backupDir := s.backupDir()
+	sourcePath := filepath.Join(backupDir, name)
+	if info, err := os.Stat(sourcePath); err != nil || info.IsDir() {
+		writeJSON(w, http.StatusNotFound, map[string]any{"error": "backup_not_found"})
+		return
+	}
+
+	if err := os.MkdirAll(backupDir, 0o755); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "backup_dir_failed", "message": err.Error()})
+		return
+	}
+	safetyPath, err := reserveBackupPath(backupDir, time.Now().UTC())
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "safety_backup_name_failed", "message": err.Error()})
+		return
+	}
+	safetySource, err := storage.Open(s.databasePath)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "db_open_failed", "message": err.Error()})
+		return
+	}
+	if err := safetySource.BackupTo(safetyPath); err != nil {
+		_ = safetySource.Close()
+		_ = os.Remove(safetyPath)
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "safety_backup_failed", "message": err.Error()})
+		return
+	}
+	_ = safetySource.Close()
+	safetyStat, err := os.Stat(safetyPath)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "safety_backup_stat_failed", "message": err.Error()})
+		return
+	}
+	safetyInfo := backupInfo{Name: safetyStat.Name(), Size: safetyStat.Size(), ModifiedAt: float64(safetyStat.ModTime().UnixNano()) / 1e9}
+
+	s.sessions.CloseAll()
+
+	dest, err := storage.Open(s.databasePath)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "db_open_failed", "message": err.Error(), "safety_backup": safetyInfo})
+		return
+	}
+	restoreErr := dest.RestoreFrom(sourcePath)
+	_ = dest.Close()
+	if restoreErr != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "restore_failed", "message": restoreErr.Error(), "safety_backup": safetyInfo})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "restored_from": name, "safety_backup": safetyInfo})
 }
 
 func (s *Server) StartReaper(stop <-chan struct{}) {
