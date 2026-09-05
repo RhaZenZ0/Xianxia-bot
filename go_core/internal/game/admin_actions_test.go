@@ -280,7 +280,7 @@ func TestAdminAdvanceTimeScaleZeroFreezesAndNegativeScaleRejected(t *testing.T) 
 
 func TestAdminForceReincarnationReadyClearsWallClockGateAndAudits(t *testing.T) {
 	path := setupAdminDB(t)
-	future := float64(time.Now().Add(48 * time.Hour).UnixNano()) / 1e9
+	future := float64(time.Now().Add(48*time.Hour).UnixNano()) / 1e9
 	conn, err := storage.Open(path)
 	if err != nil {
 		t.Fatal(err)

@@ -465,7 +465,7 @@ type senseConcealPayload struct {
 	GameMinute int64 `json:"game_minute"`
 }
 
-func senseConcealAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
+func senseConcealAction(conn *storage.Conn, _ worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	var p senseConcealPayload
 	if err := json.Unmarshal(raw, &p); err != nil {
 		return authoritativeMutation{}, err

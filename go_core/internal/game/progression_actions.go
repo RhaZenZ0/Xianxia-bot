@@ -182,7 +182,7 @@ func tribulationState(conn *storage.Conn, userID, realm int64) (prep, attempts i
 	}
 	return
 }
-func tribulationPrepareAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
+func tribulationPrepareAction(conn *storage.Conn, _ worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	var p tribulationPayload
 	if err := json.Unmarshal(raw, &p); err != nil {
 		return authoritativeMutation{}, err
