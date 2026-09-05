@@ -11207,6 +11207,77 @@ async def admin_grant_currency(interaction:discord.Interaction,member:discord.Me
     await interaction.response.send_message(f"✅ Granted **{amount:,} {WORLD.currency_name(currency)}**. New balance: **{balance:,}**.",ephemeral=False)
 
 
+ADMIN_GRANT_KIND_CHOICES = [
+    app_commands.Choice(name="Item", value="item"),
+    app_commands.Choice(name="Currency", value="currency"),
+]
+
+
+async def admin_grant_target_autocomplete(
+    interaction: discord.Interaction, current: str
+) -> list[app_commands.Choice[str]]:
+    kind = str(getattr(interaction.namespace, "kind", "item") or "item")
+    needle = current.casefold().strip()
+    if kind == "currency":
+        return await auction_currency_autocomplete(interaction, current)
+    options: list[app_commands.Choice[str]] = []
+    for item_id, item in WORLD.items.items():
+        name = str(item.get("name", item_id))
+        if needle and needle not in item_id.casefold() and needle not in name.casefold():
+            continue
+        options.append(app_commands.Choice(name=name[:100], value=str(item_id)[:100]))
+    return options[:25]
+
+
+@registered_group_command(
+    admin_player_group,
+    name="grant",
+    description="Grant an item or currency to a player's character",
+)
+@app_commands.choices(kind=ADMIN_GRANT_KIND_CHOICES)
+@app_commands.autocomplete(target=admin_grant_target_autocomplete)
+async def admin_grant(
+    interaction: discord.Interaction,
+    member: discord.Member,
+    kind: app_commands.Choice[str],
+    target: str,
+    amount: app_commands.Range[int, 1, 2000000000],
+    reason: str = "GM grant",
+) -> None:
+    if not await require_admin(interaction):
+        return
+    if not await DB.get_character(member.id):
+        await interaction.response.send_message("That member has no cultivation character.", ephemeral=False)
+        return
+    operation = "admin.player.grant_currency" if kind.value == "currency" else "admin.player.adjust_item"
+    payload: dict[str, Any] = {
+        "user_id": member.id,
+        "reason": reason[:200],
+    }
+    if kind.value == "currency":
+        if target not in WORLD.currencies:
+            await interaction.response.send_message("Unknown currency.", ephemeral=False)
+            return
+        payload.update({"currency_id": target, "amount": int(amount)})
+    else:
+        if target not in WORLD.items:
+            await interaction.response.send_message("Unknown item.", ephemeral=False)
+            return
+        payload.update({"item_id": target, "quantity": int(amount)})
+    try:
+        result = dict(await ENGINE.action(operation, interaction.user.id, payload) or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}", ephemeral=False)
+        return
+    label = WORLD.currency_name(target) if kind.value == "currency" else WORLD.item_name(target)
+    balance = result.get("balance") if kind.value == "currency" else result.get("quantity")
+    suffix = "balance" if kind.value == "currency" else "carried"
+    await interaction.response.send_message(
+        f"✅ Granted **{int(amount):,} {label}** to {member.mention}. New {suffix}: **{int(balance or 0):,}**.",
+        ephemeral=False,
+    )
+
+
 @registered_group_command(admin_world_group, name="advancetime",description="Advance the canonical in-world clock")
 async def admin_advance_time(interaction:discord.Interaction,minutes:app_commands.Range[int,1,525600])->None:
     if not await require_admin(interaction):return
@@ -12080,8 +12151,10 @@ async def _admin_hub_status(interaction: discord.Interaction) -> list[HubStatusF
 
 def _build_hub_command(definition: HubDefinition) -> app_commands.Command:
     async def hub_command(interaction: discord.Interaction) -> None:
-        status_provider = _economy_hub_status if definition.name == "economy" else _player_hub_status
-        await send_hub(interaction, definition, status_provider=status_provider)
+        if definition.name == "economy":
+            await send_hub(interaction, definition, status_provider=_economy_hub_status)
+            return
+        await send_hub(interaction, definition, status_provider=_player_hub_status)
 
     hub_command.__name__ = f"{definition.name}_hub_command"
     return app_commands.command(

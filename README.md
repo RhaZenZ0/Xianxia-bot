@@ -4,13 +4,6 @@ A persistent Xianxia role-playing Discord bot designed for CPU-only QNAP/NAS dep
 Discord, RAG, dashboard, and presentation orchestration; Go owns canonical gameplay rules, current
 game time, simulation mutations, and SQLite WAL state.
 
-Version **0.18** completed the staged authority cleanup: forage/crafting/companions, canonical time,
-unified lifespan, multi-hop road travel, caravan mechanics, dashboard-owned Discord setup, and removal
-of obsolete Python mechanical authority paths. **0.19** is a cultivation-depth consistency/coverage pass
-on top of that release, plus a further authority-migration pass for 1v1 battle start and mid-battle item
-recovery, GM-authored per-channel welcome messages, a #bugs forum channel for player bug reports, an
-administrator AI monitor, a mute/freeze moderation system, and an "undo the most recent admin action"
-control, among many smaller fixes and hardening passes along the way.
 
 See `VERSIONS.md` for the full release-by-release changelog (every v0.19.x release), and
 `docs/V019_RELEASE_NOTES.md`, `docs/V018_RELEASE_NOTES.md` and `docs/V018_BUILD_HISTORY.md`
