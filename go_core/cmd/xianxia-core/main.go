@@ -28,6 +28,9 @@ func main() {
 	if worldPath == "" {
 		worldPath = "/app/content/world.json"
 	}
+	if len(os.Getenv("ENGINE_AUTH_TOKEN")) < 20 {
+		log.Fatal("ENGINE_AUTH_TOKEN must be set to at least 20 characters")
+	}
 	engine, err := server.New(databasePath, worldPath)
 	if err != nil {
 		log.Fatalf("open authoritative sqlite: %v", err)

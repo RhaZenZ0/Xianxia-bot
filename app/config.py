@@ -102,6 +102,7 @@ class Settings:
     alert_cooldown_seconds: int
     game_engine_url: str
     game_engine_timeout_seconds: float
+    game_engine_auth_token: str
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -333,6 +334,7 @@ class Settings:
         )
         if not 1 <= game_engine_timeout_seconds <= 300:
             raise RuntimeError("GAME_ENGINE_TIMEOUT_SECONDS must be between 1 and 300")
+        game_engine_auth_token = os.getenv("ENGINE_AUTH_TOKEN", "").strip()
 
         cooldowns = {
             "cultivate_cooldown_minutes": _as_int(os.getenv("CULTIVATE_COOLDOWN_MINUTES"), 180, name="CULTIVATE_COOLDOWN_MINUTES"),
@@ -399,5 +401,6 @@ class Settings:
             alert_cooldown_seconds=alert_cooldown_seconds,
             game_engine_url=game_engine_url,
             game_engine_timeout_seconds=game_engine_timeout_seconds,
+            game_engine_auth_token=game_engine_auth_token,
             **cooldowns,
         )

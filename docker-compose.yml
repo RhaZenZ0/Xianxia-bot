@@ -11,6 +11,7 @@ services:
       ENGINE_ADDR: ":8081"
       DATABASE_PATH: "/data/xianxia.sqlite3"
       WORLD_DATA_PATH: "/app/content/world.json"
+      ENGINE_AUTH_TOKEN: "${ENGINE_AUTH_TOKEN:-}"
     volumes:
       - ./data:/data
     expose:

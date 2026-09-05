@@ -10509,6 +10509,34 @@ def _market_item_matches(current:str)->list[app_commands.Choice[str]]:
     return out
 
 
+async def _player_market_item_matches(
+    interaction: discord.Interaction,
+    current: str,
+    *,
+    selling: bool = False,
+) -> list[app_commands.Choice[str]]:
+    character = await DB.get_character(interaction.user.id)
+    if not character:
+        return []
+    location = str(character.get("location") or "")
+    rows = await SIM.market_rows(location, 100)
+    market_rows = {str(row.get("item_id")): row for row in rows}
+    inventory = await DB.get_inventory(interaction.user.id) if selling else {}
+    query = current.casefold().strip()
+    matches: list[app_commands.Choice[str]] = []
+    for item_id, row in market_rows.items():
+        if selling and int(inventory.get(item_id, 0) or 0) <= 0:
+            continue
+        if not selling and int(row.get("supply") or 0) <= 0:
+            continue
+        name = WORLD.item_name(item_id)
+        if query and query not in item_id.casefold() and query not in name.casefold():
+            continue
+        suffix = f" ({int(inventory[item_id])} carried)" if selling else f" ({int(row.get('supply') or 0)} in stock)"
+        matches.append(app_commands.Choice(name=f"{name}{suffix}"[:100], value=item_id[:100]))
+    return matches[:25]
+
+
 @registered_group_command(blackmarket_group, name="rumors", description="Use underworld contacts to locate the current hidden posts in each realm world")
 async def blackmarket_rumors(interaction: discord.Interaction) -> None:
     c = await require_character(interaction)
@@ -10635,7 +10663,7 @@ async def market_prices_command(interaction:discord.Interaction,item:str|None=No
 
 @market_prices_command.autocomplete("item")
 async def market_prices_item_autocomplete(interaction:discord.Interaction,current:str)->list[app_commands.Choice[str]]:
-    return _market_item_matches(current)
+    return await _player_market_item_matches(interaction, current)
 
 
 @registered_group_command(market_group, name="buy",description="Buy an item from the current dynamic market")
@@ -10655,7 +10683,7 @@ async def market_buy_command(interaction:discord.Interaction,item:str,quantity:a
 
 @market_buy_command.autocomplete("item")
 async def market_buy_item_autocomplete(interaction:discord.Interaction,current:str)->list[app_commands.Choice[str]]:
-    return _market_item_matches(current)
+    return await _player_market_item_matches(interaction, current)
 
 
 @registered_group_command(market_group, name="sell",description="Sell carried items into the current dynamic market")
@@ -10675,7 +10703,7 @@ async def market_sell_command(interaction:discord.Interaction,item:str,quantity:
 
 @market_sell_command.autocomplete("item")
 async def market_sell_item_autocomplete(interaction:discord.Interaction,current:str)->list[app_commands.Choice[str]]:
-    return _market_item_matches(current)
+    return await _player_market_item_matches(interaction, current, selling=True)
 
 @registered_root_command(name="lifespan",description="View your age, realm lifespan range and remaining longevity",guild=GUILD)
 async def lifespan_command(interaction:discord.Interaction)->None:
@@ -12017,6 +12045,29 @@ async def _player_hub_status(interaction: discord.Interaction) -> list[HubStatus
     ]
 
 
+async def _economy_hub_status(interaction: discord.Interaction) -> list[HubStatusField]:
+    character = await DB.get_character(interaction.user.id)
+    if character is None:
+        return [
+            HubStatusField("🌱 Character", "Not created — use **/begin**", inline=False),
+        ]
+    location = str(character.get("location") or "Unknown")
+    rows = await SIM.market_rows(location, 100)
+    stocked = [row for row in rows if int(row.get("supply") or 0) > 0]
+    average_index = (
+        sum(float(row.get("price_index") or 1.0) for row in stocked) / len(stocked)
+        if stocked else 1.0
+    )
+    market_signal = "No local market" if not rows else (
+        f"**{len(stocked):,}** stocked items • index **x{average_index:.2f}**"
+    )
+    return [
+        HubStatusField("🪙 Spirit Stones", f"**{int(character.get('spirit_stones', 0) or 0):,}**"),
+        HubStatusField("📍 Location", f"**{(await character_location_display(character))[:180]}**", inline=False),
+        HubStatusField("💹 Local Market", market_signal, inline=False),
+    ]
+
+
 async def _admin_hub_status(interaction: discord.Interaction) -> list[HubStatusField]:
     guild = interaction.guild
     return [
@@ -12029,7 +12080,8 @@ async def _admin_hub_status(interaction: discord.Interaction) -> list[HubStatusF
 
 def _build_hub_command(definition: HubDefinition) -> app_commands.Command:
     async def hub_command(interaction: discord.Interaction) -> None:
-        await send_hub(interaction, definition, status_provider=_player_hub_status)
+        status_provider = _economy_hub_status if definition.name == "economy" else _player_hub_status
+        await send_hub(interaction, definition, status_provider=status_provider)
 
     hub_command.__name__ = f"{definition.name}_hub_command"
     return app_commands.command(

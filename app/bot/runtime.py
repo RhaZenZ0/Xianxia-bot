@@ -62,7 +62,9 @@ SETTINGS = Settings.from_env()
 ROOT = Path(__file__).resolve().parents[2]
 WORLD = World(ROOT / "content" / "world.json")
 ENGINE = GameEngineClient(
-    SETTINGS.game_engine_url, timeout_seconds=SETTINGS.game_engine_timeout_seconds
+    SETTINGS.game_engine_url,
+    timeout_seconds=SETTINGS.game_engine_timeout_seconds,
+    auth_token=SETTINGS.game_engine_auth_token,
 )
 DB = Database(
     ROOT / SETTINGS.database_path,

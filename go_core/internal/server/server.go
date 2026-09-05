@@ -1,6 +1,7 @@
 package server
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -26,6 +27,7 @@ type Server struct {
 	sessions     *storage.SessionManager
 	simulation   *simulation.Runner
 	requests     atomic.Uint64
+	authToken    string
 }
 
 func New(databasePath string, worldPath string) (*Server, error) {
@@ -49,7 +51,7 @@ func New(databasePath string, worldPath string) (*Server, error) {
 	if err != nil {
 		return nil, fmt.Errorf("load world catalog: %w", err)
 	}
-	return &Server{databasePath: databasePath, worldPath: worldPath, sessions: storage.NewSessionManager(databasePath), simulation: runner}, nil
+	return &Server{databasePath: databasePath, worldPath: worldPath, sessions: storage.NewSessionManager(databasePath), simulation: runner, authToken: strings.TrimSpace(os.Getenv("ENGINE_AUTH_TOKEN"))}, nil
 }
 
 func (s *Server) Close() { s.sessions.CloseAll() }
@@ -107,8 +109,20 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/v1/db/restore", s.dbRestore)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		s.requests.Add(1)
+		if strings.HasPrefix(r.URL.Path, "/v1/") && !s.authorized(r) {
+			writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "engine_auth_required"})
+			return
+		}
 		mux.ServeHTTP(w, r)
 	})
+}
+
+func (s *Server) authorized(r *http.Request) bool {
+	if s.authToken == "" {
+		return true
+	}
+	provided := r.Header.Get("X-Xianxia-Engine-Token")
+	return len(provided) == len(s.authToken) && subtle.ConstantTimeCompare([]byte(provided), []byte(s.authToken)) == 1
 }
 
 func (s *Server) livez(w http.ResponseWriter, r *http.Request) {

@@ -33,6 +33,7 @@ fi
 
 DISCORD_TOKEN_VALUE="$(env_value DISCORD_TOKEN)"
 GUILD_ID_VALUE="$(env_value GUILD_ID)"
+ENGINE_AUTH_TOKEN_VALUE="$(env_value ENGINE_AUTH_TOKEN)"
 NARRATOR_PROVIDER_VALUE="$(env_value NARRATOR_PROVIDER)"
 OPENROUTER_KEY_VALUE="$(env_value OPENROUTER_API_KEY)"
 DASHBOARD_ENABLED_VALUE="$(env_value DASHBOARD_ENABLED)"
@@ -40,6 +41,7 @@ DASHBOARD_TOKEN_VALUE="$(env_value DASHBOARD_TOKEN)"
 
 [ -n "$DISCORD_TOKEN_VALUE" ] || fail "DISCORD_TOKEN is empty in .env"
 [ -n "$GUILD_ID_VALUE" ] || fail "GUILD_ID is empty in .env"
+[ ${#ENGINE_AUTH_TOKEN_VALUE} -ge 20 ] || fail "ENGINE_AUTH_TOKEN must be at least 20 characters. Generate one with: python3 -c \"import secrets; print(secrets.token_urlsafe(32))\""
 
 case "$NARRATOR_PROVIDER_VALUE" in
   ""|openrouter)

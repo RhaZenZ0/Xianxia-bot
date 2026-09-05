@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import os
 from dataclasses import dataclass
 from typing import Any
 
@@ -83,10 +84,11 @@ class RemoteCursor:
 class RemoteSQLiteConnection:
     """Transaction-capable SQLite session hosted by the authoritative Go engine."""
 
-    def __init__(self, client: httpx.AsyncClient, engine_url: str, session_id: str):
+    def __init__(self, client: httpx.AsyncClient, engine_url: str, session_id: str, auth_token: str):
         self._client = client
         self._engine_url = engine_url.rstrip("/")
         self._session_id = session_id
+        self._auth_token = auth_token
         self._row_factory: Any = None
         self._closed = False
 
@@ -99,9 +101,11 @@ class RemoteSQLiteConnection:
         self._row_factory = value
 
     async def _post(self, action: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        headers = {"X-Xianxia-Engine-Token": self._auth_token} if self._auth_token else None
         response = await self._client.post(
             f"{self._engine_url}/v1/db/session/{self._session_id}/{action}",
             json=payload or {},
+            headers=headers,
         )
         if response.status_code >= 400:
             try:
@@ -137,27 +141,30 @@ class RemoteSQLiteConnection:
         if self._closed:
             return
         self._closed = True
-        response = await self._client.delete(f"{self._engine_url}/v1/db/session/{self._session_id}")
+        headers = {"X-Xianxia-Engine-Token": self._auth_token} if self._auth_token else None
+        response = await self._client.delete(f"{self._engine_url}/v1/db/session/{self._session_id}", headers=headers)
         if response.status_code >= 400 and response.status_code != 404:
             raise RemoteDatabaseError(f"Go SQLite session close failed ({response.status_code}): {response.text}")
 
 
 class GoDatabaseTransport:
-    def __init__(self, engine_url: str, *, timeout_seconds: float = 30.0):
+    def __init__(self, engine_url: str, *, timeout_seconds: float = 30.0, auth_token: str | None = None):
         self.engine_url = str(engine_url).rstrip("/")
+        self._auth_token = str(auth_token if auth_token is not None else os.getenv("ENGINE_AUTH_TOKEN", "")).strip()
         self._client = httpx.AsyncClient(
             timeout=httpx.Timeout(timeout_seconds),
             limits=httpx.Limits(max_connections=40, max_keepalive_connections=20),
         )
 
     async def open(self) -> RemoteSQLiteConnection:
-        response = await self._client.post(f"{self.engine_url}/v1/db/session", json={})
+        headers = {"X-Xianxia-Engine-Token": self._auth_token} if self._auth_token else None
+        response = await self._client.post(f"{self.engine_url}/v1/db/session", json={}, headers=headers)
         if response.status_code >= 400:
             raise RemoteDatabaseError(f"Could not open Go SQLite session ({response.status_code}): {response.text}")
         session_id = str(response.json().get("session_id") or "")
         if not session_id:
             raise RemoteDatabaseError("Go engine returned an empty database session ID")
-        return RemoteSQLiteConnection(self._client, self.engine_url, session_id)
+        return RemoteSQLiteConnection(self._client, self.engine_url, session_id, self._auth_token)
 
     async def batch(self, statements: list[dict[str, Any]], *, transaction: bool = True) -> list[dict[str, Any]]:
         payload = {
@@ -167,36 +174,42 @@ class GoDatabaseTransport:
                 for item in statements
             ],
         }
-        response = await self._client.post(f"{self.engine_url}/v1/db/batch", json=payload)
+        headers = {"X-Xianxia-Engine-Token": self._auth_token} if self._auth_token else None
+        response = await self._client.post(f"{self.engine_url}/v1/db/batch", json=payload, headers=headers)
         if response.status_code >= 400:
             raise RemoteDatabaseError(f"Go SQLite batch failed ({response.status_code}): {response.text}")
         return list(response.json().get("results", []))
 
     async def status(self) -> dict[str, Any]:
-        response = await self._client.get(f"{self.engine_url}/v1/db/status")
+        headers = {"X-Xianxia-Engine-Token": self._auth_token} if self._auth_token else None
+        response = await self._client.get(f"{self.engine_url}/v1/db/status", headers=headers)
         response.raise_for_status()
         return dict(response.json())
 
     async def maintenance(self, action: str) -> dict[str, Any]:
-        response = await self._client.post(f"{self.engine_url}/v1/db/maintenance", json={"action": str(action)})
+        headers = {"X-Xianxia-Engine-Token": self._auth_token} if self._auth_token else None
+        response = await self._client.post(f"{self.engine_url}/v1/db/maintenance", json={"action": str(action)}, headers=headers)
         if response.status_code >= 400:
             raise RemoteDatabaseError(f"Go SQLite maintenance failed ({response.status_code}): {response.text}")
         return dict(response.json())
 
     async def create_backup(self) -> dict[str, Any]:
-        response = await self._client.post(f"{self.engine_url}/v1/db/backups", json={})
+        headers = {"X-Xianxia-Engine-Token": self._auth_token} if self._auth_token else None
+        response = await self._client.post(f"{self.engine_url}/v1/db/backups", json={}, headers=headers)
         if response.status_code >= 400:
             raise RemoteDatabaseError(f"Go SQLite backup failed ({response.status_code}): {response.text}")
         return dict(response.json())
 
     async def list_backups(self) -> list[dict[str, Any]]:
-        response = await self._client.get(f"{self.engine_url}/v1/db/backups")
+        headers = {"X-Xianxia-Engine-Token": self._auth_token} if self._auth_token else None
+        response = await self._client.get(f"{self.engine_url}/v1/db/backups", headers=headers)
         if response.status_code >= 400:
             raise RemoteDatabaseError(f"Go SQLite backup listing failed ({response.status_code}): {response.text}")
         return [dict(row) for row in response.json().get("backups", [])]
 
     async def restore_backup(self, name: str) -> dict[str, Any]:
-        response = await self._client.post(f"{self.engine_url}/v1/db/restore", json={"name": str(name)})
+        headers = {"X-Xianxia-Engine-Token": self._auth_token} if self._auth_token else None
+        response = await self._client.post(f"{self.engine_url}/v1/db/restore", json={"name": str(name)}, headers=headers)
         if response.status_code >= 400:
             raise RemoteDatabaseError(f"Go SQLite restore failed ({response.status_code}): {response.text}")
         return dict(response.json())

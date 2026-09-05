@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from typing import Any
 
 import httpx
@@ -17,7 +18,7 @@ class GameEngineClient:
     production owner of SQLite.
     """
 
-    def __init__(self, base_url: str, *, timeout_seconds: float = 30.0):
+    def __init__(self, base_url: str, *, timeout_seconds: float = 30.0, auth_token: str | None = None):
         self.base_url = str(base_url).strip().rstrip("/")
         if not self.base_url:
             raise ValueError("Game engine URL is required")
@@ -25,9 +26,13 @@ class GameEngineClient:
             timeout=httpx.Timeout(float(timeout_seconds)),
             limits=httpx.Limits(max_connections=40, max_keepalive_connections=20),
         )
+        self.auth_token = str(auth_token if auth_token is not None else os.getenv("ENGINE_AUTH_TOKEN", "")).strip()
+
+    def _headers(self) -> dict[str, str] | None:
+        return {"X-Xianxia-Engine-Token": self.auth_token} if self.auth_token else None
 
     async def _post(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
-        response = await self._client.post(f"{self.base_url}{path}", json=payload)
+        response = await self._client.post(f"{self.base_url}{path}", json=payload, headers=self._headers())
         if response.status_code >= 400:
             try:
                 detail = response.json()
@@ -99,6 +104,6 @@ class GameEngineClient:
         return dict(response.json())
 
     async def database_status(self) -> dict[str, Any]:
-        response = await self._client.get(f"{self.base_url}/v1/db/status")
+        response = await self._client.get(f"{self.base_url}/v1/db/status", headers=self._headers())
         response.raise_for_status()
         return dict(response.json())
