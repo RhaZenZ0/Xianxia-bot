@@ -322,12 +322,22 @@ one. No schema change.
 never saw each other: Quest Forge (schema 28) and the dashboard item-grant fix ship together, with no
 further code change. Either 0.20.6 zip is superseded by it.
 
+**0.20.8** fixes `update.sh` silently discarding a release's `.sha256` sidecar asset. `resolve_release()`
+isolated the current release object from the GitHub API listing by truncating at the next `{"url":...}`,
+but every entry in the release's own `assets` array also starts with its own `"url"` field; when the
+sidecar wasn't the first asset (as with v0.20.7), that truncation cut it out of the isolated object, so
+`fetch_release` refused a perfectly good, fully-published release as unverifiable. The truncation now
+anchors on `"assets_url"`, which is always the release object's second top-level key and never appears
+on an asset. No schema change, no gameplay change.
+
 See `docs/V020_RELEASE_NOTES.md` for v0.20.0, `docs/V019_RELEASE_NOTES.md` for the full detail on every v0.19.x release above, `docs/V018_RELEASE_NOTES.md` and
 `docs/V018_BUILD_HISTORY.md` (consolidated validation/audit record) for the prior staged-authority migration.
 
-## Release status — v0.20.7
+## Release status — v0.20.8
 
-- Current release: v0.20.7: the two v0.20.6 builds merged - Quest Forge (schema 28) and the
+- Current release: v0.20.8: fixes `update.sh` dropping the `.sha256` sidecar asset when it
+  wasn't the first asset on the release.
+- v0.20.7: the two v0.20.6 builds merged - Quest Forge (schema 28) and the
   dashboard item-grant fix.
 - v0.20.6: shipped twice from two sessions (build A: Quest Forge; build B: dashboard item grants).
 - v0.20.5: the updater preflights `.env` before stopping anything.
