@@ -74,6 +74,20 @@ func isIndestructibleEquipmentGo(itemID string) bool {
 	return ok && d.Indestructible
 }
 
+// uniqueEquipmentIDsGo mirrors the "unique" flag on EQUIPMENT_DEFINITIONS in
+// app/rules/advanced_runtime.py: one-of-a-kind rewards a character may hold
+// at most one of, carried or bound. The Discord /admin player grant path
+// checks this in Python; adminAdjustItem checks it here so the dashboard's
+// Adjust Inventory card (and any other caller of admin.player.adjust_item)
+// cannot hand out a second one.
+func uniqueEquipmentIDsGo() map[string]bool {
+	return map[string]bool{bugslayerSwordItemID: true}
+}
+
+func isUniqueEquipmentGo(itemID string) bool {
+	return uniqueEquipmentIDsGo()[itemID]
+}
+
 func hasEquippedItemGo(conn *storage.Conn, userID int64, itemID string) (bool, error) {
 	r, err := conn.Execute(
 		`SELECT 1 FROM equipment_instances WHERE user_id=? AND item_id=? AND equipped=1 LIMIT 1`,

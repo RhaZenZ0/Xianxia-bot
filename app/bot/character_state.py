@@ -13,7 +13,7 @@ from ..rules.aptitudes import aptitude_effects
 from ..rules.effects import aggregate_modifiers, medicine_toxicity_effect, normalize_effect_payload
 from ..rules.npc_memory import classify_memory, scene_memory_summary
 from ..rules.worldtime import from_game_minutes
-from .runtime import DB, ENGINE, WORLD
+from .runtime import DB, ENGINE, WORLD, log
 from .services import SIM
 
 async def settle_all_seclusions(current_game_minute: int) -> int:
@@ -126,3 +126,30 @@ async def _remember_freeform_npc_scene(
         )
 
 
+async def announce_quest_progress(interaction: Any, changed: list[dict[str, Any]]) -> None:
+    """Tell the player what QUESTS.progress() just did - a completed quest used
+    to flip to `completed` in silence (v0.20.6). Best effort: never raises."""
+    lines = []
+    for row in changed or ():
+        title = str(row.get("title") or row.get("quest_key"))
+        if row.get("just_completed"):
+            rewards = row.get("rewards_granted") or {}
+            parts = []
+            if rewards.get("insight_xp"):
+                parts.append(f"✨ {int(rewards['insight_xp'])} Insight XP")
+            if rewards.get("spirit_stones"):
+                parts.append(f"🪙 {int(rewards['spirit_stones'])} spirit stones")
+            for item_id, qty in dict(rewards.get("items") or {}).items():
+                parts.append(f"🎁 {item_id} ×{int(qty)}")
+            lines.append(f"📜 **Quest complete: {title}**" + (" — " + ", ".join(parts) if parts else ""))
+        else:
+            lines.append(f"📜 Quest progress: **{title}**")
+    if not lines:
+        return
+    try:
+        if interaction.response.is_done():
+            await interaction.followup.send("\n".join(lines), ephemeral=False)
+        else:
+            await interaction.response.send_message("\n".join(lines), ephemeral=False)
+    except Exception:
+        log.exception("Could not announce quest progress")

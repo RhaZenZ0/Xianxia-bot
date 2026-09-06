@@ -18,7 +18,7 @@ from ...ops.game_engine import GameEngineError
 from ...ai.narrator import roll_npc_memory
 from ...rules.npc_memory import classify_memory, exchange_memory_summary, public_mood_hint
 from .. import scene_layout
-from ..character_state import current_effect_modifiers
+from ..character_state import announce_quest_progress, current_effect_modifiers
 from ..formatting import roll_line
 from ..locations import _location_is_visible, current_npc_location, local_npc_autocomplete
 from ..registry import EVENT_HANDLERS, registered_group_command, registered_root_command
@@ -151,7 +151,7 @@ async def talk(
         deltas={"trust": 1},
     )
     try:
-        await QUESTS.progress(interaction.user.id, "talk", target=npc, game_minute=wt_now.total_minutes)
+        await announce_quest_progress(interaction, await QUESTS.progress(interaction.user.id, "talk", target=npc, game_minute=wt_now.total_minutes))
     except Exception:
         log.exception("Quest progress update failed after NPC talk")
     recommendation_hint = ""
@@ -323,7 +323,7 @@ async def _resolve_scene_action(
             ),
         )
         wt_now = await current_world_time()
-        await QUESTS.progress(interaction.user.id, "scene_action", amount=1, target=action_key, game_minute=wt_now.total_minutes)
+        await announce_quest_progress(interaction, await QUESTS.progress(interaction.user.id, "scene_action", amount=1, target=action_key, game_minute=wt_now.total_minutes))
     except Exception:
         log.exception("Quest progress update failed after Scene Action")
     if self_action:

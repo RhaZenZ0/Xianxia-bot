@@ -239,6 +239,15 @@ Release candidates go to the **beta channel** only.
 
 `v1.0.0` is the rc that survived, re-tagged.
 
+## Landed outside the milestones
+
+- **v0.20.6 — Quest Forge.** AI-drafted quests from a GM prompt or world
+  history, GM-approved, rewards granted through the engine's
+  `cultivation.reward` (in the spirit of Authority I: no Python-side
+  writes). It also closed two Gameplay dead ends found on the way: the
+  shipped sect quest could never complete (`sect_trial` was never reported)
+  and quest rewards were never granted.
+
 ## Order and dependencies
 
 ```

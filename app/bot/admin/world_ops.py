@@ -25,7 +25,9 @@ from ..hubs import HubDynamicOption, register_hub_option_provider
 from ..pickers import auction_currency_autocomplete
 from ..registry import registered_group_command
 from ..runtime import DB, ENGINE, SETTINGS, WORLD, current_world_time, log, reply_long
-from ..services import SIM
+from ..services import QUEST_FORGE, QUESTS, SIM
+from ...ai.quest_forge import store_draft
+from ...rules.quests import validate_quest_definition
 from ..threads import ensure_sect_abode_record, ensure_sect_abode_thread_for
 from ..bot import bot
 from ..ui.event_scene import spawn_event_thread
@@ -556,3 +558,123 @@ async def admin_closeevent_hub_options(
 register_hub_option_provider(admin_closeevent, "event_key", admin_closeevent_hub_options)
 
 
+# ---------------------------------------------------------------------------
+# Quest Forge (v0.20.6): draft a quest from a story, approve or discard it.
+# ---------------------------------------------------------------------------
+def _quest_draft_embed(row: dict[str, Any]) -> discord.Embed:
+    status = str(row.get("status", "draft"))
+    colour = {"draft": 0xC9A227, "approved": 0x2E8B57, "retired": 0x777777, "discarded": 0x8B2E2E}.get(status, 0x777777)
+    embed = discord.Embed(title=f"📜 {row['title']}", description=str(row.get("description", ""))[:1500], colour=colour)
+    objectives = "\n".join(
+        f"▫️ {obj.get('label', obj.get('id'))} ×{int(obj.get('count', 1))}"
+        + (f" — `{obj['target']}`" if obj.get("target") else "")
+        for obj in row.get("objectives") or []
+    ) or "—"
+    embed.add_field(name="Objectives", value=objectives[:1000], inline=False)
+    rewards = row.get("rewards") or {}
+    parts = []
+    if rewards.get("insight_xp"):
+        parts.append(f"✨ {rewards['insight_xp']} Insight XP")
+    if rewards.get("spirit_stones"):
+        parts.append(f"🪙 {rewards['spirit_stones']} spirit stones")
+    for item_id, qty in dict(rewards.get("items") or {}).items():
+        parts.append(f"🎁 {item_id} ×{qty}")
+    embed.add_field(name="Rewards", value=", ".join(parts) or "none", inline=False)
+    embed.set_footer(text=f"{row['quest_key']} • {status} • {row.get('origin', '')} • {row.get('model') or 'procedural'}")
+    return embed
+
+
+class QuestDraftReviewView(discord.ui.View):
+    """Approve / Discard for one draft; admin-gated like every /admin surface."""
+
+    def __init__(self, quest_key: str) -> None:
+        super().__init__(timeout=900)
+        self.quest_key = quest_key
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        return await require_admin(interaction)
+
+    async def _set(self, interaction: discord.Interaction, status: str, verb: str) -> None:
+        row = await DB.get_quest_definition(self.quest_key)
+        if row is None:
+            await interaction.response.send_message("That draft no longer exists.", ephemeral=False)
+            return
+        await DB.set_quest_definition_status(self.quest_key, status, reviewed_by=interaction.user.id)
+        await QUESTS.catalog(refresh=True)
+        await audit_admin(interaction, f"quest.{status}", target=self.quest_key, before={"status": row.get("status")}, after={"status": status})
+        for child in self.children:
+            child.disabled = True
+        await interaction.response.edit_message(content=f"{verb} **{row['title']}** (`{self.quest_key}`).", embed=_quest_draft_embed({**row, "status": status}), view=self)
+
+    @discord.ui.button(label="Approve — players can accept it", style=discord.ButtonStyle.success)
+    async def approve(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        await self._set(interaction, "approved", "✅ Approved")
+
+    @discord.ui.button(label="Discard", style=discord.ButtonStyle.danger)
+    async def discard(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        await self._set(interaction, "discarded", "🗑️ Discarded")
+
+
+@registered_group_command(admin_world_group, name="questforge", description="Draft a quest from a story; you approve it before players see it")
+@app_commands.describe(story="What happened, or what should happen - a few sentences. Locations and NPCs by name help.")
+async def admin_questforge(interaction: discord.Interaction, story: str) -> None:
+    if not await require_admin(interaction):
+        return
+    story = story.strip()
+    if len(story) < 12:
+        await interaction.response.send_message("Give the Forge a little more story to work with (a sentence or two).", ephemeral=False)
+        return
+    await interaction.response.defer(ephemeral=False)
+    result = await QUEST_FORGE.draft(story, source_key=f"gm:{interaction.user.id}")
+    if result.definition is None:
+        await interaction.followup.send("The Forge could not produce a valid quest:\n- " + "\n- ".join(result.errors[:8]), ephemeral=False)
+        return
+    row = await store_draft(DB, result, story=story, origin="gm_prompt", created_by=interaction.user.id)
+    await audit_admin(interaction, "quest.forge", target=row["quest_key"], after={"model": result.model, "procedural": result.procedural})
+    note = ""
+    if result.procedural:
+        note = "\n_(The model was unavailable or kept producing an invalid draft" + (f": {result.errors[0]}" if result.errors else "") + "; this is the procedural draft.)_"
+    await interaction.followup.send(
+        f"Draft ready. Approve to put it in every cultivator's **/quests**, or discard it.{note}",
+        embed=_quest_draft_embed(row), view=QuestDraftReviewView(row["quest_key"]), ephemeral=False,
+    )
+
+
+@registered_group_command(admin_world_group, name="quests", description="Review forged quest drafts; retire an approved one")
+@app_commands.describe(retire="Quest key of an approved forged quest to retire (optional)")
+async def admin_quests(interaction: discord.Interaction, retire: str = "") -> None:
+    if not await require_admin(interaction):
+        return
+    if retire.strip():
+        row = await DB.get_quest_definition(retire.strip())
+        if row is None or row.get("status") != "approved":
+            await interaction.response.send_message("No approved forged quest has that key.", ephemeral=False)
+            return
+        await DB.set_quest_definition_status(row["quest_key"], "retired", reviewed_by=interaction.user.id)
+        await QUESTS.catalog(refresh=True)
+        await audit_admin(interaction, "quest.retired", target=row["quest_key"], before={"status": "approved"}, after={"status": "retired"})
+        await interaction.response.send_message(f"📕 Retired **{row['title']}**; cultivators who already hold it keep it.", ephemeral=False)
+        return
+    drafts = await DB.list_quest_definitions("draft")
+    approved = await DB.list_quest_definitions("approved")
+    if not drafts and not approved:
+        await interaction.response.send_message("No forged quests yet. Draft one with **/admin world questforge**.", ephemeral=False)
+        return
+    lines = []
+    if approved:
+        lines.append("**Approved (live in /quests)**\n" + "\n".join(f"• `{r['quest_key']}` {r['title']}" for r in approved[:15]))
+    await interaction.response.send_message("\n".join(lines) or "No approved forged quests.", ephemeral=False)
+    for row in drafts[:5]:
+        await interaction.followup.send(embed=_quest_draft_embed(row), view=QuestDraftReviewView(row["quest_key"]), ephemeral=False)
+    if len(drafts) > 5:
+        await interaction.followup.send(f"…and {len(drafts) - 5} more drafts; review these first and run the command again.", ephemeral=False)
+
+
+@admin_quests.autocomplete("retire")
+async def admin_quests_retire_autocomplete(interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
+    needle = current.casefold().strip()
+    rows = await DB.list_quest_definitions("approved")
+    return [
+        app_commands.Choice(name=f"{r['title']} ({r['quest_key']})"[:100], value=str(r["quest_key"]))
+        for r in rows if not needle or needle in str(r["title"]).casefold() or needle in str(r["quest_key"])
+    ][:25]

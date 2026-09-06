@@ -74,9 +74,10 @@ class GUIIntegrityTests(unittest.TestCase):
             len(re.findall(rf"@registered_group_command\({re.escape(group)},\s*name=\"([^\"]+)\"", source))
             for group in expected_groups
         ]
-        # See test_command_cleanup for why this count is spelled out: 40 through
-        # v0.19.14, +2 in v0.19.15 for the administrator chat monitor.
-        self.assertEqual(sum(counts), 42)
+        # This literal is deliberate: it is what catches an admin action being
+        # added or lost by accident. 40 through v0.19.14, +2 in v0.19.15 (chat monitor).
+        # 42 through v0.20.5; +2 in v0.20.6 for the Quest Forge (world questforge, world quests).
+        self.assertEqual(sum(counts), 44)
         self.assertLessEqual(max(counts), 25)
         # (from test_command_cleanup's twin of this test, folded in v0.20.3)
         self.assertIn('title="🛡️ Xianxia — Administrator Control Panel"', panel)

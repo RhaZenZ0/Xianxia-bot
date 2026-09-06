@@ -108,6 +108,12 @@ class Settings:
     update_channel: str
     update_repository: str
     update_check_hours: int
+    quest_forge_auto: bool
+    quest_forge_min_significance: int
+    quest_forge_interval_hours: int
+    quest_reward_max_xp: int
+    quest_reward_max_stones: int
+    quest_reward_max_items: int
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -359,6 +365,17 @@ class Settings:
         update_check_hours = int(os.getenv("UPDATE_CHECK_HOURS", "24"))
         if update_check_hours < 1:
             raise ValueError("UPDATE_CHECK_HOURS must be at least 1")
+        quest_forge_min_significance = int(os.getenv("QUEST_FORGE_MIN_SIGNIFICANCE", "80"))
+        if not 0 <= quest_forge_min_significance <= 100:
+            raise ValueError("QUEST_FORGE_MIN_SIGNIFICANCE must be 0-100")
+        quest_forge_interval_hours = int(os.getenv("QUEST_FORGE_INTERVAL_HOURS", "6"))
+        if quest_forge_interval_hours < 1:
+            raise ValueError("QUEST_FORGE_INTERVAL_HOURS must be at least 1")
+        quest_budget = {}
+        for key, default in (("QUEST_REWARD_MAX_XP", 50), ("QUEST_REWARD_MAX_STONES", 200), ("QUEST_REWARD_MAX_ITEMS", 3)):
+            quest_budget[key] = int(os.getenv(key, str(default)))
+            if quest_budget[key] < 0:
+                raise ValueError(f"{key} cannot be negative")
         return cls(
             discord_token=discord_token,
             guild_id=guild_id,
@@ -418,5 +435,11 @@ class Settings:
             update_channel=update_channel,
             update_repository=(os.getenv("UPDATE_REPOSITORY") or "RhaZenZ0/Xianxia-bot").strip(),
             update_check_hours=update_check_hours,
+            quest_forge_auto=_as_bool(os.getenv("QUEST_FORGE_AUTO"), False),
+            quest_forge_min_significance=quest_forge_min_significance,
+            quest_forge_interval_hours=quest_forge_interval_hours,
+            quest_reward_max_xp=quest_budget["QUEST_REWARD_MAX_XP"],
+            quest_reward_max_stones=quest_budget["QUEST_REWARD_MAX_STONES"],
+            quest_reward_max_items=quest_budget["QUEST_REWARD_MAX_ITEMS"],
             **cooldowns,
         )
