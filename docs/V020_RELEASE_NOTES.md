@@ -1,12 +1,12 @@
 # Xianxia RP Discord Bot — v0.20 release notes
 
-Shipping as **v0.20.7**. The v0.19 line (v0.19 through v0.19.48) is in
+Shipping as **v0.20.8**. The v0.19 line (v0.19 through v0.19.48) is in
 `docs/V019_RELEASE_NOTES.md`; the staged-authority migration before it in
-`docs/V018_RELEASE_NOTES.md`. The release is stamped 0.20.7 in `app/version.py`,
+`docs/V018_RELEASE_NOTES.md`. The release is stamped 0.20.8 in `app/version.py`,
 `VERSION`, the `Dockerfile` and `docker-compose.yml`, and carries schema 28
 (v0.20.6: `quest_definitions`; 27 since v0.19.29 before that).
 
-Release date: 2026-09-05 (v0.20.0, v0.20.1, v0.20.2) / 2026-09-06 (v0.20.3, v0.20.4, v0.20.5, v0.20.6, v0.20.7).
+Release date: 2026-09-05 (v0.20.0, v0.20.1, v0.20.2) / 2026-09-06 (v0.20.3, v0.20.4, v0.20.5, v0.20.6, v0.20.7, v0.20.8).
 
 ## v0.20.0 — main.py split complete: phase 10, the final sweep
 
@@ -604,3 +604,22 @@ sections above, and either v0.20.6 zip is superseded by it.
 
 Schema 28 (from build A). Full suite and Go suite re-run on the merged
 tree; see the release status in `VERSIONS.md`.
+
+## v0.20.8 — update.sh stops dropping the .sha256 sidecar
+
+`resolve_release()` reads a release's assets out of a single-line GitHub API response by
+finding where the next top-level JSON object starts and cutting there. It matched on the
+bare pattern `{"url":...}` for that boundary, but every object in the release's own `assets`
+array also opens with its own `"url"` field. When the `.sha256` sidecar asset wasn't first
+in that array (true of v0.20.7's own GitHub Release, where the zip was listed before the
+sidecar), the truncation sliced the sidecar - and anything after it - out of the isolated
+release object before `RELEASE_SHA_URL` was ever extracted. `fetch_release` then refused the
+download: "Release vX has no .sha256 sidecar; refusing an unverifiable archive", even though
+the sidecar was attached and downloadable.
+
+`"assets_url"` is always the release object's second top-level key (right after `"url"`) and
+never appears on an asset object, so the truncation now anchors on the `"url":"...","assets_url"`
+pair instead - verified against the real `releases/latest` API response for this repository's
+v0.20.7 release (zip listed before the sidecar) and against a multi-release beta listing, both
+of which now resolve `RELEASE_TAG`, `RELEASE_ARCHIVE_URL` and `RELEASE_SHA_URL` correctly.
+Updater-only fix; no schema change, no gameplay change.
