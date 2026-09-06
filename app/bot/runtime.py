@@ -8,7 +8,7 @@ surface, so it lives here where a command module can import it without importing
 ``main`` and creating a cycle.
 
 Nothing in this module imports ``main``. That is the property that makes the rest
-of the split possible, and it is asserted by tests/python/unit/test_bot_module_split.py.
+of the split possible, and it is asserted by tests/python/unit/test_bot_package.py.
 """
 from __future__ import annotations
 
@@ -37,7 +37,7 @@ import discord
 #
 # The rule: this module must import every name that appears in the ANNOTATIONS
 # of any function it decorates, not merely the names its own code executes.
-# tests/python/unit/test_bot_module_split.py enforces that.
+# tests/python/unit/test_bot_package.py enforces that.
 from discord import app_commands
 
 # Shared by /begin, /family -> Child and the admin gender override. A literal

@@ -1,4 +1,5 @@
 from tests.support import (
+    declared_hub_names,
     PROJECT_ROOT,
     bot_function_source,
     bot_module_defining,
@@ -6,7 +7,6 @@ from tests.support import (
     bot_source_files,
 )
 import ast
-import re
 import unittest
 
 
@@ -21,18 +21,7 @@ HUBS = ROOT / "app" / "bot" / "hubs.py"
 
 class CommandCleanupTests(unittest.TestCase):
     def test_player_surface_keeps_compact_roots_plus_admin(self):
-        hub_names = []
-        for path in bot_source_files():
-            if path.name == "hubs.py":
-                continue  # defines HubDefinition; does not declare hubs
-            for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
-                if not isinstance(node, ast.Call):
-                    continue
-                if not isinstance(node.func, ast.Name) or node.func.id != "HubDefinition":
-                    continue
-                for kw in node.keywords:
-                    if kw.arg == "name" and isinstance(kw.value, ast.Constant):
-                        hub_names.append(str(kw.value.value))
+        hub_names = declared_hub_names()
         self.assertEqual(
             set(hub_names),
             {
@@ -73,47 +62,6 @@ class CommandCleanupTests(unittest.TestCase):
         self.assertIn("**/action**", source)
         self.assertNotIn("**/explore**", source)
         self.assertNotIn("**/act**", source)
-
-    def test_admin_is_a_single_dropdown_panel_with_all_registered_actions(self):
-        source = bot_package_source()
-        groups = [
-            "admin_server_group", "admin_world_group", "admin_player_group",
-            "admin_sect_group", "admin_family_group", "admin_npc_group", "admin_sim_group",
-        ]
-        total = 0
-        for group in groups:
-            commands = re.findall(rf"@registered_group_command\({group},\s*name=\"([^\"]+)\"", source)
-            self.assertLessEqual(len(commands), 25, group)
-            total += len(commands)
-        # 40 through v0.19.14; +2 in v0.19.15 for the administrator chat monitor
-        # (server ai_status, server chat_digest).  This literal is deliberate:
-        # it is what catches an admin action being added or lost by accident.
-        self.assertEqual(total, 42)
-        self.assertIn("_ADMIN_HUB_DEFINITION = HubDefinition(", source)
-        self.assertIn('title="🛡️ Xianxia — Administrator Control Panel"', source)
-        self.assertIn("command=admin_server_group", source)
-        self.assertIn("command=admin_sim_group", source)
-        self.assertIn("@app_commands.default_permissions(administrator=True)", source)
-        self.assertNotIn("bot.tree.add_command(admin_group, guild=GUILD)", source)
-
-    def test_stage7_channel_provisioning_is_gated_behind_dashboard_create_missing(self):
-        """Stage 7 moved channel/category setup to the admin dashboard. The bot can
-        now create the base and realm-hub channels/categories, but only when the
-        caller explicitly opts in with create_missing=True (default False) *and*
-        the bot actually holds Manage Channels — and only the web GM dashboard's
-        Full Setup/Repair action passes that True. The /admin Discord slash command
-        keeps the old validate-and-bind-only behavior.
-        """
-        source = bot_package_source()
-        self.assertIn("guild.create_text_channel", source)
-        self.assertIn("guild.create_category", source)
-        self.assertIn("create_missing: bool = False", source)
-        self.assertIn(
-            "can_create = create_missing and bool(me) and me.guild_permissions.manage_channels",
-            source,
-        )
-        self.assertIn("Discord channel creation is dashboard-owned", source)
-        self.assertIn("the bot will not provision channels", source)
 
     def test_deleted_configured_channels_are_treated_as_stale(self):
         source = bot_package_source()
@@ -245,13 +193,10 @@ class CommandCleanupTests(unittest.TestCase):
         is itself creating (create_missing + Manage Channels), never for one that was
         merely bound to an existing channel.
         """
-        source = bot_package_source()
         setup_block = bot_function_source("ensure_base_xianxia_channels")
         self.assertNotIn("set_permissions(", setup_block)
         self.assertEqual(setup_block.count("PermissionOverwrite("), 1)
         self.assertIn("if name in READ_ONLY_BASE_CHANNELS else {}", setup_block)
-        self.assertIn("Discord channel creation is dashboard-owned", source)
-        self.assertIn("the bot will not provision channels", source)
 
     def test_reusable_hub_framework_enforces_owner_and_uses_registered_handlers(self):
         source = HUBS.read_text(encoding="utf-8")
@@ -263,17 +208,8 @@ class CommandCleanupTests(unittest.TestCase):
             "response.edit_message", "message.edit",
         ):
             self.assertIn(required, source)
-        self.assertIn("interaction.user.id != self.owner_id", source)
         self.assertIn("command_override=action.command", source)
         self.assertIn("if self.definition.name == \"admin\"", source)
-
-    def test_refactored_packages_have_no_legacy_module_shims(self):
-        self.assertTrue((ROOT / "app" / "bot" / "main.py").is_file())
-        self.assertTrue((ROOT / "app" / "database" / "core.py").is_file())
-        self.assertTrue((ROOT / "app" / "simulation" / "world.py").is_file())
-        self.assertFalse((ROOT / "app" / "bot.py").exists())
-        self.assertFalse((ROOT / "app" / "database.py").exists())
-        self.assertFalse((ROOT / "app" / "worldsim.py").exists())
 
     def test_hubs_resolve_explicit_handlers_without_callback_introspection(self):
         hub_source = HUBS.read_text(encoding="utf-8")

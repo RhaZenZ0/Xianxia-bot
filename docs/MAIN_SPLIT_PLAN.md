@@ -15,7 +15,7 @@
 | 9 — command domains | 9a: v0.19.44, 9b: v0.19.45, 9c: v0.19.46, 9d: v0.19.47, 9e: v0.19.48 | done — 9a: aptitude, territory, secretrealm, cultivation (1,284 lines); 9b: character, economy, abode (1,553 lines; `usable_item_autocomplete` → `pickers.py`); 9c: exploration+craft+alchemy (852 lines, one module); 9d: battle + law (850 lines; `battle_panel` registry binding moved with the panel); 9e: scene + sense (1,056 lines; the two scene registry bindings moved with the panel helpers). No player command is defined in `main.py` any more; it is 1,283 lines of hub wiring, the `/admin` hub root, `register_event_handlers()` and the entrypoint |
 | 10 — final sweep | v0.20.0 | done — `surface.py` holds the wiring; `main.py` is a 35-line composition root; unread imports and `_tribulation_currency` dropped; reachability guard added. **Plan complete.** |
 
-Deferred `from ..main import` hooks remaining: **0** (down from 10). `Phase4SplitTests.test_no_call_time_import_of_main_remains_anywhere` keeps it there.
+Deferred `from ..main import` hooks remaining: **0** (down from 10). `ImportGraphTests.test_no_module_below_main_imports_it_anywhere` (test_bot_package.py) keeps it there.
 
 Measured against v0.19.32: `main.py` is 11,650 lines, 484 top-level definitions (545 nodes
 counting imports). The dependency graph below is scope-accurate (symtable). A grep- or
@@ -263,7 +263,7 @@ every phase; `test_release_manifest` fails otherwise.
 ## 7. Verification per phase
 
 `make check` (ruff E9 + pytest + Go). The guard that matters most is
-`tests/python/unit/test_bot_module_split.py`: the bot cannot be imported in the sandbox (no
+`tests/python/unit/test_bot_package.py` (named `test_bot_module_split.py` until v0.20.3): the bot cannot be imported in the sandbox (no
 discord.py), so its symtable-based checks are the only thing standing between a bad move and
 a `NameError` at startup — and they only cover modules in `MODULES`. Each phase also adds
 its own `<Stage>SplitTests` class in the style of `FamilySplitTests`/`SectSplitTests`

@@ -1,9 +1,9 @@
 from tests.support import (
+    declared_hub_definitions,
     PROJECT_ROOT,
     bot_function_source,
     bot_module_defining,
     bot_package_source,
-    bot_source_files,
 )
 import ast
 import re
@@ -38,13 +38,7 @@ class GUIIntegrityTests(unittest.TestCase):
 
     def test_hub_definitions_fit_page_and_action_select_limits(self):
         source = bot_package_source()
-        hub_nodes = [
-            node
-            for path in bot_source_files()
-            if path.name != "hubs.py"
-            for node in ast.walk(ast.parse(path.read_text(encoding="utf-8")))
-            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "HubDefinition"
-        ]
+        hub_nodes = declared_hub_definitions()
         self.assertTrue(hub_nodes)
         for hub in hub_nodes:
             name = "unknown"
@@ -84,6 +78,10 @@ class GUIIntegrityTests(unittest.TestCase):
         # v0.19.14, +2 in v0.19.15 for the administrator chat monitor.
         self.assertEqual(sum(counts), 42)
         self.assertLessEqual(max(counts), 25)
+        # (from test_command_cleanup's twin of this test, folded in v0.20.3)
+        self.assertIn('title="🛡️ Xianxia — Administrator Control Panel"', panel)
+        self.assertIn("@app_commands.default_permissions(administrator=True)", wiring)
+        self.assertNotIn("tree.add_command(admin_group", source)
 
     def test_hub_router_reapplies_range_constraints(self):
         source = HUBS.read_text(encoding="utf-8")

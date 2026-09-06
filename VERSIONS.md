@@ -289,12 +289,26 @@ tiers. Two container entrypoints change (`app.database.bootstrap`, `app.ops.heal
 the four deployment scripts at the root on purpose: the installed `update.sh` requires `startup.sh`/`stop.sh`
 there and replaces itself only there. No behaviour change, no schema change.
 
+**0.20.3** audits the Python test suite: 70 files become 59 (eight merges, three deletions, four moved from
+integration to unit), the eleven per-phase split-guard classes fold into one `test_bot_package.py` organised
+by invariant, and the stale `SCHEMA_VERSION == 27` copies leave seven files. The audit found one bug: the
+dashboard implementation gate had looked for `app/dashboard.py` since v0.20.1 (fixed, guarded). No schema
+change.
+
+**0.20.4** adds the release channel: releases are GitHub Releases built by CI from a tag (`v0.21.0` stable,
+`v0.21.0-beta.1` beta); the bot announces a newer release in the log channel; `update.sh --check/--fetch/--upgrade`
+download and SHA-256-verify an archive before the unchanged transactional install. `docs/ROADMAP_1_0.md` is
+the roadmap to v1.0.0. No behaviour or schema change.
+
 See `docs/V020_RELEASE_NOTES.md` for v0.20.0, `docs/V019_RELEASE_NOTES.md` for the full detail on every v0.19.x release above, `docs/V018_RELEASE_NOTES.md` and
 `docs/V018_BUILD_HISTORY.md` (consolidated validation/audit record) for the prior staged-authority migration.
 
-## Release status — v0.20.2
+## Release status — v0.20.4
 
-- Current release: v0.20.2: top-level tidy-up; `RELEASE.txt` archived, deployment
+- Current release: v0.20.4: release channel (GitHub Releases, bot announcement,
+  `update.sh --fetch/--upgrade`) and the roadmap to v1.0.0.
+- v0.20.3: test suite audited (70 → 59 files); dashboard gate path fixed.
+- v0.20.2: top-level tidy-up; `RELEASE.txt` archived, deployment
   scripts deliberately kept at the root.
 - v0.20.1: `app/` grouped into `rules/`, `ops/`, `ai/`, `dashboard/`
   packages with a layering guard.

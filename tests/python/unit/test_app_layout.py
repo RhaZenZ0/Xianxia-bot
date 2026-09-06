@@ -2,7 +2,7 @@
 
 Until v0.20.0 `app/` was 43 flat modules beside four packages. They are now
 grouped by role - rules, ai, ops, dashboard - and the grouping carries a
-layering rule. These checks pin both, the same way test_bot_module_split.py
+layering rule. These checks pin both, the same way test_bot_package.py
 pins the bot package: a module put in the wrong package, an import that
 runs the wrong way, or a flat module quietly re-appearing all fail here.
 """
@@ -25,7 +25,7 @@ PACKAGES = {
     "ai": {"ai_router", "chat_monitor", "narrator", "narrator_context", "rag"},
     "ops": {
         "config", "core_services", "game_engine", "health", "healthcheck", "http_limits", "operations",
-        "performance",
+        "performance", "release_channel",
     },
     "dashboard": {"server", "contract"},
 }
@@ -151,6 +151,12 @@ class AppLayoutTests(unittest.TestCase):
         old = {f"app.{m}" for mods in PACKAGES.values() for m in mods if m not in ("server", "contract")}
         old |= {"app.dashboard_contract", "app.database_bootstrap", "app.ops.database_bootstrap"}
         old_strings = re.compile(r"""["'](%s)(?:\.|["'])""" % "|".join(re.escape(o) for o in old))
+        # ... and the pathlib form: `root / "app" / "dashboard.py"` (v0.20.1
+        # shipped one of these in app/dashboard/contract.py; the dashboard
+        # implementation gate reported a missing file until v0.20.3).
+        old_joins = re.compile(r"""/\s*["']app["']\s*/\s*["'](%s)\.py["']""" % "|".join(
+            [re.escape(o.split(".", 1)[1]) for o in old if o.count(".") == 1] + ["dashboard"]
+        ))
         old_paths = {o.replace(".", "/") + ".py" for o in old}
         roots = [APP, PROJECT_ROOT / "tests", PROJECT_ROOT / "scripts"]
         files = [p for r in roots for p in r.rglob("*.py") if "__pycache__" not in p.parts]
@@ -172,6 +178,8 @@ class AppLayoutTests(unittest.TestCase):
                     problems.append(f"{path.relative_to(PROJECT_ROOT)} mentions {o}")
             for m in old_strings.finditer(text):
                 problems.append(f"{path.relative_to(PROJECT_ROOT)} mentions {m.group(1)} in a string")
+            for m in old_joins.finditer(text):
+                problems.append(f"{path.relative_to(PROJECT_ROOT)} joins the old path app/{m.group(1)}.py")
         self.assertEqual(problems, [], "\n" + "\n".join(problems))
 
 

@@ -95,10 +95,6 @@ class MonitorCostTests(unittest.TestCase):
 
 
 class LeakGuardContractTests(unittest.TestCase):
-    def test_the_guard_defaults_to_on(self):
-        source = ROUTER.read_text(encoding="utf-8")
-        self.assertIn("leak_guard: bool = True", source)
-
     def test_narrator_never_passes_leak_guard(self):
         # If narration ever opted out, players could be shown implementation detail.
         narrator = (PROJECT_ROOT / "app" / "ai" / "narrator.py").read_text(encoding="utf-8")

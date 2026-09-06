@@ -12,6 +12,7 @@ STARTUP = (PROJECT_ROOT / "startup.sh").read_text(encoding="utf-8")
 ENV_EXAMPLE = (PROJECT_ROOT / ".env.example").read_text(encoding="utf-8")
 DOCKERFILE = (PROJECT_ROOT / "Dockerfile").read_text(encoding="utf-8")
 COMPOSE = (PROJECT_ROOT / "docker-compose.yml").read_text(encoding="utf-8")
+STOP = (PROJECT_ROOT / "stop.sh").read_text(encoding="utf-8")
 
 
 class FirstRunSetupTests(unittest.TestCase):
@@ -83,10 +84,6 @@ class ContainerUserTests(unittest.TestCase):
         mounts = re.findall(r"^\s+-\s+\./data:/data\s*$", COMPOSE, re.M)
         self.assertEqual(len(mounts), 1,
                          "more than one service mounts ./data; the non-root drop assumes only the engine does")
-
-
-if __name__ == "__main__":
-    unittest.main()
 
 
 REQUIREMENTS = (PROJECT_ROOT / "requirements.txt").read_text(encoding="utf-8")
@@ -212,3 +209,25 @@ class RequestHeadLimitTests(unittest.TestCase):
             "HTTP_MAX_CONNECTIONS",
         ):
             self.assertIn(key, ENV_EXAMPLE, key)
+
+class ContainerBootstrapTests(unittest.TestCase):
+    """The compose stack's shape (merged from test_container_bootstrap.py in
+    v0.20.3; its "no Ollama service" check is the finished removal that
+    test_config already pins)."""
+
+    def test_database_bootstrap_is_a_required_one_shot_gate(self):
+        self.assertIn("xianxia-db-init:", COMPOSE)
+        self.assertIn('command: ["python", "-m", "app.database.bootstrap"]', COMPOSE)
+        self.assertIn("xianxia-db-init:\n        condition: service_completed_successfully", COMPOSE)
+
+    def test_qnap_scripts_manage_engine_bot_and_optional_dashboard(self):
+        self.assertIn("docker compose --profile dashboard up", STARTUP)
+        self.assertIn("OPENROUTER_API_KEY", STARTUP)
+        self.assertIn("DASHBOARD_TOKEN", STARTUP)
+        self.assertIn('BOT_CONTROL_URL: "http://xianxia-bot:8080"', COMPOSE)
+        self.assertIn('test: ["CMD", "python", "-m", "app.ops.healthcheck"]', COMPOSE)
+        self.assertIn("docker compose --profile dashboard down", STOP)
+
+
+if __name__ == "__main__":
+    unittest.main()

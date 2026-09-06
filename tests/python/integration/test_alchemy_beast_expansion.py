@@ -1,4 +1,3 @@
-import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -9,7 +8,7 @@ install_aiosqlite_shim()
 from app.rules.alchemy import alchemy_output, alchemy_quality, pill_toxicity_value, medicine_toxicity_effect
 from app.rules.effects import medicine_toxicity_effect
 from app.rules.birthfamily import family_forage_bonus, family_profession_bonus, generate_family_options
-from app.database import Database, SCHEMA_VERSION
+from app.database import Database
 from app.rules.game import World
 from app.simulation import WorldSimulator
 
@@ -45,8 +44,7 @@ class AlchemyBeastExpansionTests(unittest.IsolatedAsyncioTestCase):
     async def asyncTearDown(self):
         self.tmp.cleanup()
 
-    async def test_schema_v6_retains_expansion_tables(self):
-        self.assertEqual(SCHEMA_VERSION, 27)
+    async def test_the_expansion_tables_exist(self):
         import sqlite3
         with sqlite3.connect(self.path) as conn:
             tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}

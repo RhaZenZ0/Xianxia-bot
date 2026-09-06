@@ -16,6 +16,7 @@ from app.database import Database, SCHEMA_VERSION
 from app.database import bootstrap as database_bootstrap
 from app.ops.health import HealthServer, HealthState, STARTUP_PHASES
 from app.ops import healthcheck
+from app.ops.operations import AlertDispatcher
 
 
 class SchemaMigrationTests(unittest.IsolatedAsyncioTestCase):
@@ -266,6 +267,53 @@ class HealthServerTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("xianxia_schema_version", body)
         self.assertIn('phase="DATABASE_READY"', body)
         self.assertIn("xianxia_startup_ready", body)
+
+
+class ObservabilityTests(unittest.IsolatedAsyncioTestCase):
+    """Slow-query logging, the observability snapshot and the alert webhook
+    (merged from test_completed_advanced_systems.py in v0.20.3; that file's
+    three seeded characters were never read by its one surviving test)."""
+
+    async def asyncSetUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+
+    async def asyncTearDown(self):
+        self.tmp.cleanup()
+
+    async def test_slow_query_observability_persists_and_reaches_the_webhook(self):
+        obs_db = Database(Path(self.tmp.name) / "observed.sqlite3", slow_query_ms=0)
+        await obs_db.init()
+        await obs_db.operational_health()
+        flushed = await obs_db.flush_slow_query_log()
+        self.assertGreater(flushed, 0)
+        snapshot = await obs_db.observability_snapshot()
+        self.assertGreater(snapshot["recent_slow_queries_1h"], 0)
+        alert_id = await obs_db.record_operational_alert(
+            "test_alert", severity="warning", message="test", detail={"slow": True}, delivered=False,
+        )
+        self.assertGreater(alert_id, 0)
+
+        received = []
+        async def handler(reader, writer):
+            header = await reader.readuntil(b"\r\n\r\n")
+            length = 0
+            for line in header.decode("latin1").split("\r\n"):
+                if line.lower().startswith("content-length:"):
+                    length = int(line.split(":", 1)[1].strip())
+            body = await reader.readexactly(length) if length else b""
+            received.append(json.loads(body.decode("utf-8")))
+            writer.write(b"HTTP/1.1 204 No Content\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+            await writer.drain(); writer.close(); await writer.wait_closed()
+
+        server = await asyncio.start_server(handler, "127.0.0.1", 0)
+        port = server.sockets[0].getsockname()[1]
+        try:
+            dispatcher = AlertDispatcher(f"http://127.0.0.1:{port}/alert", cooldown_seconds=0)
+            self.assertTrue(await dispatcher.send("slow_query_pressure", "threshold exceeded", details={"count": 5}))
+            await asyncio.sleep(0.02)
+        finally:
+            server.close(); await server.wait_closed()
+        self.assertEqual(received[0]["key"], "slow_query_pressure")
 
 
 if __name__ == "__main__":

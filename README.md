@@ -1,4 +1,4 @@
-# Xianxia RP Discord Bot v0.20.2
+# Xianxia RP Discord Bot v0.20.4
 
 [![CI](https://github.com/RhaZenZ0/Xianxia-bot/actions/workflows/ci.yml/badge.svg)](https://github.com/RhaZenZ0/Xianxia-bot/actions/workflows/ci.yml)
 
@@ -647,6 +647,38 @@ To wipe the world and start over, use `./reset_database.sh` (see above) rather t
 deleting `data/xianxia.sqlite3` by hand - it takes a safety backup first and restarts
 the stack so a fresh schema is created automatically.
 
+## Updates and the release channel
+
+Releases are GitHub Releases on `RhaZenZ0/Xianxia-bot`, built by CI from a tag
+(`.github/workflows/release.yml`): `v0.21.0` is a **stable** release,
+`v0.21.0-beta.1` a **beta** (pre-release). Each carries
+`xianxia_rp_v<version>.zip` and its `.sha256`.
+
+Two things read that channel:
+
+- **The bot** checks it once after startup and then every `UPDATE_CHECK_HOURS`
+  (default 24) and posts "Update available" to the bot log channel once per
+  newer release. `UPDATE_CHANNEL=stable|beta` picks the channel;
+  `UPDATE_CHECK_ENABLED=false` turns the check off. The bot never downloads or
+  installs anything.
+- **`update.sh` on the NAS**, which stays offline unless you ask:
+
+```bash
+./update.sh                     # offline: look in ./updates for a ZIP you placed there
+./update.sh --check             # ask the channel whether something newer exists
+./update.sh --fetch             # download the newest ZIP into ./updates, verify its SHA-256
+./update.sh --upgrade           # fetch, then install (backup, stop, swap, start, rollback on failure)
+./update.sh --fetch --channel beta   # this run only; .env's UPDATE_CHANNEL otherwise
+```
+
+A download whose SHA-256 does not match the release's sidecar, or whose
+archive `VERSION` does not match the tag, is discarded. Installing a fetched
+ZIP is exactly the same transactional path as installing a hand-placed one,
+release manifest check included.
+
+The roadmap to v1.0.0 — what each milestone ships and the test that gates it —
+is `docs/ROADMAP_1_0.md`.
+
 ## Data ownership and migrations
 
 Canonical persistent data lives in:
@@ -841,7 +873,7 @@ tests/support.py         shared dependency shims and test path helpers
 
 ## Release status
 
-- Current release: v0.20.2. See `VERSIONS.md` for the full release-by-release history.
+- Current release: v0.20.4. See `VERSIONS.md` for the full release-by-release history.
 - Go owns canonical gameplay time, migrated gameplay mechanics, lifespan/death authority, road travel,
   caravan settlement, simulation mutation, and SQLite WAL.
 - Python owns Discord/RAG/dashboard/presentation orchestration and does not duplicate the removed

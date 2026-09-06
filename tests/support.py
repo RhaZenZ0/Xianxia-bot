@@ -539,6 +539,34 @@ def bot_source_files() -> list[Path]:
     return sorted(BOT_PACKAGE.rglob("*.py"))
 
 
+def declared_hub_definitions() -> list:
+    """Every `HubDefinition(...)` call node anywhere under app/bot (hubs.py
+    defines the class and declares none). Shared by the three surface scans
+    that used to each carry this walk (v0.20.3)."""
+    import ast
+
+    nodes = []
+    for path in bot_source_files():
+        if path.name == "hubs.py":
+            continue
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "HubDefinition":
+                nodes.append(node)
+    return nodes
+
+
+def declared_hub_names() -> list[str]:
+    """The `name=` of every declared hub, in source order (16 player hubs + admin)."""
+    import ast
+
+    names = []
+    for node in declared_hub_definitions():
+        for kw in node.keywords:
+            if kw.arg == "name" and isinstance(kw.value, ast.Constant):
+                names.append(str(kw.value.value))
+    return names
+
+
 def bot_package_source() -> str:
     """All of app/bot concatenated, for scans that assert an invariant holds
     everywhere (or that a string appears nowhere)."""

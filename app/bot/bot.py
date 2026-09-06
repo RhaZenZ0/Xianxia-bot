@@ -13,11 +13,13 @@ import time
 from typing import Any
 
 import discord
+import httpx
 from discord.ext import commands
 
 from ..database import SCHEMA_VERSION
 from ..ops.health import HealthServer, HealthState
 from ..ops.http_limits import HeaderLimits
+from ..ops.release_channel import announcement, api_url, newer_than_installed, newest_for_channel, parse_releases
 from ..ai.narrator import canonical_location_reply, is_current_location_question
 from ..rules.npc_memory import classify_memory, exchange_memory_summary, public_mood_hint
 from ..version import RELEASE_VERSION
@@ -66,6 +68,8 @@ class XianxiaBot(commands.Bot):
             max_connections=SETTINGS.http_max_connections,
         )
         self.operational_health_task: asyncio.Task | None = None
+        self.update_check_task: asyncio.Task | None = None
+        self.announced_release: str | None = None
 
     async def _dashboard_discord_control(self, action: str, payload: dict[str, Any]) -> dict[str, Any]:
         # The handler is intentionally hosted by the Discord process. The GM
@@ -132,6 +136,8 @@ class XianxiaBot(commands.Bot):
             log.info("COMMANDS_READY count=%s guild=%s", len(synced), SETTINGS.guild_id)
             self.event_expiry_task = asyncio.create_task(self.event_expiry_worker())
             self.operational_health_task = asyncio.create_task(self.operational_health_worker())
+            if SETTINGS.update_check_enabled:
+                self.update_check_task = asyncio.create_task(self.update_check_worker())
         except Exception as exc:
             self.health_state.fail(phase, exc)
             failure_detail = {
@@ -224,6 +230,55 @@ class XianxiaBot(commands.Bot):
                     except Exception:
                         log.exception("Could not persist health-worker alert")
                 await asyncio.sleep(30)
+        except asyncio.CancelledError:
+            pass
+
+    async def check_for_release(self) -> str | None:
+        """One release-channel check. Returns the announcement text when a
+        newer release exists on the configured channel (and posts it to the
+        log channel the first time per process), else None. Never raises:
+        the channel being unreachable is a health check, not a bot failure."""
+        channel = SETTINGS.update_channel
+        try:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(15.0), headers={
+                "Accept": "application/vnd.github+json",
+                "User-Agent": f"xianxia-rp-bot/{RELEASE_VERSION}",
+            }) as client:
+                response = await client.get(api_url(SETTINGS.update_repository))
+                response.raise_for_status()
+                releases = parse_releases(response.text)
+        except Exception as exc:
+            self.health_state.set_check("release_channel", False, channel=channel, error=f"{type(exc).__name__}: {exc}"[:200])
+            return None
+        newest = newest_for_channel(releases, channel)
+        available = newer_than_installed(newest, RELEASE_VERSION)
+        self.health_state.set_check(
+            "release_channel", True, channel=channel, installed=RELEASE_VERSION,
+            newest=newest.version_text if newest else None,
+            update_available=bool(available),
+        )
+        if available is None:
+            return None
+        text = announcement(available, RELEASE_VERSION, channel)
+        if self.announced_release != available.version_text:
+            self.announced_release = available.version_text
+            await post_server_log(self.get_guild(SETTINGS.guild_id), "Update available", text)
+        return text
+
+    async def update_check_worker(self) -> None:
+        # Same per-iteration exception boundary as operational_health_worker.
+        # First check a minute after the command sync, then every
+        # UPDATE_CHECK_HOURS; a newer release is announced once per process.
+        try:
+            await asyncio.sleep(60)
+            while not self.is_closed():
+                try:
+                    await self.check_for_release()
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
+                    log.exception("Update check iteration failed")
+                await asyncio.sleep(SETTINGS.update_check_hours * 3600)
         except asyncio.CancelledError:
             pass
 
@@ -324,7 +379,7 @@ class XianxiaBot(commands.Bot):
             pass
 
     async def close(self) -> None:
-        for task_name in ("event_expiry_task", "operational_health_task"):
+        for task_name in ("event_expiry_task", "operational_health_task", "update_check_task"):
             task = getattr(self, task_name, None)
             if task:
                 task.cancel()

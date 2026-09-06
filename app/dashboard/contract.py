@@ -145,17 +145,8 @@ def dashboard_implementation_issues(root: Path, *, schema_version: int) -> list[
     root = Path(root)
     html_path = root / "dashboard" / "index.html"
     js_path = root / "dashboard" / "app.js"
-    legacy_server_path = root / "app" / "dashboard.py"
-    package_server_path = root / "app" / "dashboard" / "server.py"
-    server_path = next(
-        (p for p in (legacy_server_path, package_server_path) if p.is_file()),
-        legacy_server_path,
-    )
-    missing_files = [
-        str(p.relative_to(root))
-        for p in (html_path, js_path, server_path)
-        if not p.is_file()
-    ]
+    server_path = root / "app" / "dashboard" / "server.py"
+    missing_files = [str(p.relative_to(root)) for p in (html_path, js_path, server_path) if not p.is_file()]
     if missing_files:
         return ["missing dashboard contract file: " + name for name in missing_files]
 

@@ -6,7 +6,7 @@ from pathlib import Path
 from tests.support import install_aiosqlite_shim, PROJECT_ROOT, seed_character
 install_aiosqlite_shim()
 
-from app.database import Database, SCHEMA_VERSION
+from app.database import Database
 from app.rules.game import World
 
 ROOT = PROJECT_ROOT
@@ -30,8 +30,7 @@ class PlayerPropertySystemTests(unittest.IsolatedAsyncioTestCase):
     async def asyncTearDown(self):
         self.tmp.cleanup()
 
-    async def test_schema_v10_adds_general_property_columns_and_info_message(self):
-        self.assertEqual(SCHEMA_VERSION, 27)
+    async def test_the_property_columns_and_info_message_exist(self):
         with sqlite3.connect(self.path) as conn:
             abode_cols = {row[1] for row in conn.execute("PRAGMA table_info(cave_abodes)")}
             server_cols = {row[1] for row in conn.execute("PRAGMA table_info(server_config)")}

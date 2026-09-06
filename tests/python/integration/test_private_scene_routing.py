@@ -5,7 +5,7 @@ from pathlib import Path
 from tests.support import install_aiosqlite_shim, PROJECT_ROOT, seed_character
 install_aiosqlite_shim()
 
-from app.database import Database, SCHEMA_VERSION
+from app.database import Database
 
 ROOT = PROJECT_ROOT
 ATTRS = {"body": 4, "agility": 4, "spirit": 4, "insight": 4, "will": 4, "presence": 4}
@@ -26,8 +26,7 @@ class PrivateSceneRoutingTests(unittest.IsolatedAsyncioTestCase):
     async def asyncTearDown(self):
         self.tmp.cleanup()
 
-    async def test_schema_v10_stores_info_expedition_and_scene_threads(self):
-        self.assertEqual(SCHEMA_VERSION, 27)
+    async def test_info_expedition_and_scene_threads_are_stored(self):
         await self.db.set_server_channels(
             77, announcement_channel_id=1, event_scene_channel_id=2,
             home_scene_channel_id=3, log_channel_id=4, begin_channel_id=5,

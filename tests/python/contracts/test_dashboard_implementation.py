@@ -30,11 +30,10 @@ def test_dashboard_gate_detects_unreviewed_schema_bump():
 
 def test_dashboard_gate_detects_frontend_backend_drift(tmp_path):
     (tmp_path / "dashboard").mkdir()
-    (tmp_path / "app").mkdir()
+    (tmp_path / "app" / "dashboard").mkdir(parents=True)
     for rel in ("dashboard/index.html", "dashboard/app.js", "app/dashboard/server.py"):
         src = PROJECT_ROOT / rel
         dst = tmp_path / rel
-        dst.parent.mkdir(parents=True, exist_ok=True)
         dst.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
     js_path = tmp_path / "dashboard" / "app.js"
     js_path.write_text(
