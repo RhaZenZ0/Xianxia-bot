@@ -117,10 +117,22 @@ type ItemInstantUse struct {
 }
 type ItemUse struct {
 	Instant ItemInstantUse `json:"instant"`
+	// v0.21.0 (item.use): the non-battle use fields Python used to read for
+	// itself. Effect is the raw effect definition (modifiers, tags, ...);
+	// EffectKey/Name label the active_effects row; DurationGameMinutes 0
+	// means the effect does not expire; LifespanYears is a permanent gain.
+	Effect              map[string]any `json:"effect"`
+	EffectKey           string         `json:"effect_key"`
+	Name                string         `json:"name"`
+	DurationGameMinutes int64          `json:"duration_game_minutes"`
+	LifespanYears       int64          `json:"lifespan_years"`
 }
 type Item struct {
 	Name             string         `json:"name"`
 	Use              ItemUse        `json:"use"`
+	// PillToxicity overrides the derived medicinal-residue value when the
+	// content sets it (nil = derive from tags/use, as app/rules/alchemy.py).
+	PillToxicity     *int64         `json:"pill_toxicity"`
 	SectValue        int64          `json:"sect_value"`
 	BasePrice        int64          `json:"base_price"`
 	LegalStatus      string         `json:"legal_status"`

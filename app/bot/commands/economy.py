@@ -11,18 +11,15 @@ from typing import Any
 import discord
 from discord import app_commands
 
-from ...rules.alchemy import is_pill, pill_toxicity_value, toxicity_band
 from ...rules.black_market import access_reason as black_market_access_reason
-from ...rules.effects import normalize_effect_payload
 from ...ops.game_engine import GameEngineError
-from ..character_state import sync_pill_toxicity_effect
 from ..locations import _known_locations, _location_is_visible, _world_is_unlocked, location_autocomplete
 from ...rules.trade_receipt import format_trade_receipt
 from ..formatting import human_duration
 from ..pickers import auction_currency_autocomplete, usable_item_autocomplete
 from ..registry import registered_group_command, registered_root_command
 from ..runtime import DB, ENGINE, WORLD, carried_item_autocomplete, character_location_display, current_world_time, log, reply_long, require_character, serialized_user_action
-from ..services import COMBAT, GUILD, SIM
+from ..services import GUILD, SIM
 
 @registered_root_command(name="wallet", description="View all cultivation currencies you currently hold", guild=GUILD)
 async def wallet_command(interaction: discord.Interaction) -> None:
@@ -89,78 +86,35 @@ async def use_item_command(interaction: discord.Interaction, item: str) -> None:
         await interaction.response.send_message(f"✨ Spatial storage upgraded to **{item_def.get('name',item)}** — **{upgraded.get('slot_capacity',storage_upgrade.get('slot_capacity',24))} item stacks**.",ephemeral=False)
         return
 
-    instant=use.get("instant", {})
-    active_battle=await DB.get_active_battle(interaction.user.id) if instant else None
-    lines=[f"✨ **Used {item_def.get('name', item)}**"]
-    if instant and active_battle:
-        # Mid-battle instant restore must go through the authoritative combat
-        # engine, the same as the battle panel's own recovery-item option, so
-        # battles.player_hp stays in lockstep with characters.vitality under
-        # a version-checked mutation instead of Python patching both tables
-        # directly and unguarded. combat.recovery_item also consumes the
-        # item itself, so DB.consume_item must not run in this branch.
-        wt=await current_world_time()
-        try:
-            envelope=await COMBAT.recovery_item(
-                interaction.user.id,battle_id=int(active_battle["battle_id"]),item_id=item,
-                game_minute=wt.total_minutes,
-                action_id=f"discord:{interaction.id}:combat.recovery_item:{int(active_battle['battle_id'])}:{item}",
-            )
-        except GameEngineError as exc:
-            await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
-        state=dict(envelope.get("result") or {})
-        if instant.get("qi_restore"):
-            lines.append(f"Qi restored to **{int(state.get('qi',0))}/{int(state.get('qi_max',0))}**.")
-        if instant.get("vitality_restore"):
-            lines.append(f"Vitality restored to **{int(state.get('vitality',0))}/{int(state.get('vitality_max',0))}**.")
-    else:
-        if not await DB.consume_item(interaction.user.id, item, 1):
-            await interaction.response.send_message("The item is no longer in your carried inventory.", ephemeral=False)
-            return
-        if instant:
-            state=await DB.restore_resources(
-                interaction.user.id,
-                qi=int(instant.get("qi_restore",0)),
-                vitality=int(instant.get("vitality_restore",0)),
-            )
-            if instant.get("qi_restore"):
-                lines.append(f"Qi restored to **{state.get('qi',0)}/{state.get('qi_max',0)}**.")
-            if instant.get("vitality_restore"):
-                lines.append(f"Vitality restored to **{state.get('vitality',0)}/{state.get('vitality_max',0)}**.")
-
-    life_years = max(0, int(use.get("lifespan_years", 0)))
-    if life_years:
-        total_extension = await DB.add_life_extension(interaction.user.id, life_years)
+    # v0.21.0 (roadmap "Authority I"): consume -> restore -> life extension ->
+    # effect -> toxicity is one engine transaction, `item.use`, in and out of
+    # battle (the restore keeps battles.player_hp in lockstep the same way
+    # combat.recovery_item does for the battle panel). Python formats.
+    try:
+        envelope = await ENGINE.authoritative_action(
+            "item.use", interaction.user.id, {"item_id": item}, action_id=f"discord:{interaction.id}:item.use:{item}",
+        )
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {exc}", ephemeral=False)
+        return
+    state = dict(envelope.get("result") or {})
+    lines = [f"✨ **Used {state.get('item_name', item_def.get('name', item))}**"]
+    if int(state.get("qi_restore", 0)):
+        lines.append(f"Qi restored to **{int(state.get('qi', 0))}/{int(state.get('qi_max', 0))}**.")
+    if int(state.get("vitality_restore", 0)):
+        lines.append(f"Vitality restored to **{int(state.get('vitality', 0))}/{int(state.get('vitality_max', 0))}**.")
+    if int(state.get("life_extension_years", 0)):
         lines.append(
-            f"🌿 Lifespan permanently extended by **{life_years} years** "
-            f"(medicine/herb extension total: **{total_extension} years**)."
+            f"🌿 Lifespan permanently extended by **{int(state['life_extension_years'])} years** "
+            f"(medicine/herb extension total: **{int(state.get('life_extension_total', 0))} years**)."
         )
-
-    if use.get("effect"):
-        wt=await current_world_time()
-        payload=normalize_effect_payload({"effect_key":use.get("effect_key",item),"name":use.get("name",item_def.get("name",item)),**use["effect"]})
-        await DB.apply_effect(
-            interaction.user.id,
-            effect_key=str(use.get("effect_key",item)),
-            name=str(use.get("name",item_def.get("name",item))),
-            source_type="item", source_id=item, effect=payload,
-            starts_game_minute=wt.total_minutes,
-            duration_game_minutes=int(use.get("duration_game_minutes",0)) or None,
+    if state.get("effect_name"):
+        lines.append(f"Effect applied: **{state['effect_name']}**.")
+    if int(state.get("toxicity_gain", 0)):
+        lines.append(
+            f"⚗️ Medicinal residue **+{int(state['toxicity_gain'])}** → pill toxicity "
+            f"**{int(state.get('pill_toxicity', 0))}/100 ({state.get('toxicity_band', '')})**."
         )
-        lines.append(f"Effect applied: **{use.get('name', item_def.get('name', item))}**.")
-
-    toxicity_gain = pill_toxicity_value(item, item_def) if is_pill(item, item_def) else 0
-    if toxicity_gain:
-        wt = await current_world_time()
-        alchemy_state = await DB.add_pill_toxicity(
-            interaction.user.id, toxicity_gain, game_minute=wt.total_minutes,
-        )
-        await sync_pill_toxicity_effect(
-            interaction.user.id, game_minute=wt.total_minutes, state=alchemy_state,
-        )
-        toxicity = int(alchemy_state.get("pill_toxicity", 0))
-        band, _ = toxicity_band(toxicity)
-        lines.append(f"⚗️ Medicinal residue **+{toxicity_gain}** → pill toxicity **{toxicity}/100 ({band})**.")
     await interaction.response.send_message("\n".join(lines))
 
 

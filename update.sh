@@ -447,9 +447,13 @@ done
 create_database_backup() {
     [ -f "$DB_PATH" ] || return 0
     echo "Creating transaction-safe SQLite backup through the Go engine..."
-    response=$(cd "$PROJECT_DIR" && docker compose exec -T xianxia-engine \
-        wget -q -O - --header='Content-Type: application/json' --post-data='{}' \
-        http://127.0.0.1:8081/v1/db/backups 2>/dev/null || true)
+    # The engine has required X-Xianxia-Engine-Token on every /v1/ call since
+    # 0.20.0; the container holds the token in its own environment, so the
+    # request is built inside it (v0.20.9 - before that this was an unauthenticated
+    # POST that a tokened engine answered 401, and every update from a 0.20
+    # engine stopped here with "Could not create a safe SQLite backup").
+    response=$(cd "$PROJECT_DIR" && docker compose exec -T xianxia-engine sh -c \
+        'wget -q -O - --header="Content-Type: application/json" --header="X-Xianxia-Engine-Token: $ENGINE_AUTH_TOKEN" --post-data="{}" http://127.0.0.1:8081/v1/db/backups' 2>/dev/null || true)
     name=$(printf '%s' "$response" | sed -n 's/.*"name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
     [ -n "$name" ] || {
         echo "ERROR: Could not create a safe SQLite backup. Start the current stack and retry." >&2
@@ -506,19 +510,33 @@ for old_item in "$PROJECT_DIR"/* "$PROJECT_DIR"/.[!.]* "$PROJECT_DIR"/..?*; do
     case "$name" in .env|data|updates|update_backups|update.sh) continue ;; esac
     case "$UPDATES_DIR/" in "$old_item"/*) continue ;; esac
     case "$BACKUP_DIR/" in "$old_item"/*) continue ;; esac
-    rm -rf "$old_item"
+    # A delete or copy that fails (a tree owned by another NAS account is the
+    # case seen) must abort into the rollback: before v0.20.9 the loop carried
+    # on and left the top-level files of the new release on the old code,
+    # with a VERSION that then told the updater there was nothing to install.
+    rm -rf "$old_item" || { echo "ERROR: Could not remove $old_item (permissions? the account running update.sh must own the project folder)." >&2; exit 1; }
+    [ ! -e "$old_item" ] || { echo "ERROR: $old_item is still present after removal (permissions? the account running update.sh must own the project folder)." >&2; exit 1; }
 done
 for item in "$INSTALL_TREE"/* "$INSTALL_TREE"/.[!.]* "$INSTALL_TREE"/..?*; do
     [ -e "$item" ] || continue
     name=$(basename "$item")
     case "$name" in .env|data|updates|update_backups|update.sh) continue ;; esac
-    cp -a "$item" "$PROJECT_DIR/"
+    cp -a "$item" "$PROJECT_DIR/" || { echo "ERROR: Could not copy $name into $PROJECT_DIR." >&2; exit 1; }
 done
 if [ -f "$INSTALL_TREE/update.sh" ]; then NEXT_UPDATER="$PROJECT_DIR/.update.sh.next"; cp -a "$INSTALL_TREE/update.sh" "$NEXT_UPDATER"; chmod +x "$NEXT_UPDATER"; fi
 chmod +x "$PROJECT_DIR/startup.sh" "$PROJECT_DIR/stop.sh" 2>/dev/null || true
 
 INSTALLED_VERSION=$(clean_version "$(cat "$PROJECT_DIR/VERSION")")
 [ "$INSTALLED_VERSION" = "$TARGET_VERSION" ] || { echo "ERROR: Post-install VERSION check failed." >&2; exit 1; }
+# ... and the whole tree, not just VERSION: every file the release manifest
+# names must be in place, byte for byte, before anything is started.
+if [ -f "$PROJECT_DIR/RELEASE_MANIFEST.sha256" ]; then
+    if command -v sha256sum >/dev/null 2>&1; then
+        (cd "$PROJECT_DIR" && sha256sum -c --quiet RELEASE_MANIFEST.sha256) || { echo "ERROR: Post-install tree does not match RELEASE_MANIFEST.sha256." >&2; exit 1; }
+    elif command -v shasum >/dev/null 2>&1; then
+        (cd "$PROJECT_DIR" && shasum -a 256 -c --quiet RELEASE_MANIFEST.sha256) || { echo "ERROR: Post-install tree does not match RELEASE_MANIFEST.sha256." >&2; exit 1; }
+    fi
+fi
 
 echo "Starting Xianxia RP $TARGET_VERSION..."
 "$PROJECT_DIR/startup.sh"

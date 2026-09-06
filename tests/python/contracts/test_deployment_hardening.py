@@ -284,6 +284,44 @@ class EnvPreflightTests(unittest.TestCase):
         self.assertIn('(cd "$NEW_ROOT" && sh ./startup.sh --check-env', update)
         self.assertIn("Nothing was stopped or changed.", update)
 
+    def test_update_sh_authenticates_its_backup_call_to_the_engine(self):
+        # Every /v1/ route has required X-Xianxia-Engine-Token since 0.20.0
+        # (go_core/internal/server/server.go, authorized()). The pre-update
+        # backup is a /v1/db/backups POST; without the header a tokened engine
+        # answers 401 and the updater stops at "Could not create a safe SQLite
+        # backup" - which is what every update *from* a 0.20 engine did until
+        # v0.20.9. The token lives in the engine container's environment, so
+        # the request must be assembled inside it, not on the host.
+        update = (PROJECT_ROOT / "update.sh").read_text(encoding="utf-8")
+        server = (PROJECT_ROOT / "go_core" / "internal" / "server" / "server.go").read_text(encoding="utf-8")
+        self.assertIn('r.Header.Get("X-Xianxia-Engine-Token")', server)
+        start = update.index("create_database_backup()")
+        body = update[start:update.index("DB_BACKUP_PATH=", start)]
+        self.assertIn("docker compose exec -T xianxia-engine sh -c", body)
+        self.assertIn('--header="X-Xianxia-Engine-Token: $ENGINE_AUTH_TOKEN"', body)
+        self.assertIn("/v1/db/backups", body)
+        # The whole request is one single-quoted string, so $ENGINE_AUTH_TOKEN
+        # expands in the container, not on the host where it may be unset.
+        request = body[body.index("sh -c"):body.index("2>/dev/null")]
+        self.assertRegex(request, r"sh -c \\\n\s*'wget [^']*\$ENGINE_AUTH_TOKEN[^']*/v1/db/backups'\s*$")
+
+    def test_update_sh_refuses_to_start_a_tree_that_does_not_match_the_manifest(self):
+        # A NAS install once ended with 0.20.8's VERSION, manifest and docs on
+        # pre-Quest-Forge code (app/ai/quest_forge.py absent), and the updater
+        # then reported "package 0.20.8 is not newer than installed 0.20.8".
+        # Deletes and copies now abort explicitly, and the installed tree is
+        # checked against the release manifest before startup.sh is called.
+        update = (PROJECT_ROOT / "update.sh").read_text(encoding="utf-8")
+        install = update.index('echo "Installing Xianxia RP $TARGET_VERSION..."')
+        start = update.index('echo "Starting Xianxia RP $TARGET_VERSION..."')
+        commit = update[install:start]
+        self.assertIn('rm -rf "$old_item" || {', commit)
+        self.assertIn('cp -a "$item" "$PROJECT_DIR/" || {', commit)
+        self.assertIn("sha256sum -c --quiet RELEASE_MANIFEST.sha256", commit)
+        self.assertIn("Post-install tree does not match RELEASE_MANIFEST.sha256", commit)
+        self.assertLess(commit.index("Post-install VERSION check failed"), commit.index("sha256sum -c --quiet"))
+        self.assertLess(update.index("ROLLBACK_ARMED=1"), install)
+
 
 if __name__ == "__main__":
     unittest.main()

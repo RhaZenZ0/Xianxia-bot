@@ -60,7 +60,7 @@ never got the same treatment.
 
 | Item | Where it is now | Engine action |
 |---|---|---|
-| `/item use` outside battle: consume → restore → life extension → effect → toxicity, five unguarded writes | `app/bot/commands/economy.py:116-163` | `item.use` |
+| ~~`/item use` outside battle: consume → restore → life extension → effect → toxicity, five unguarded writes~~ **done in v0.21.0** | `go_core/internal/game/item_use_actions.go` | `item.use` |
 | `/alchemy purge`: Qi cost, purge amount from `will`/`spirit`, cooldown | `app/bot/commands/exploration.py:721-734` | `alchemy.purge` |
 | `/sect shadow`: karma gates, initiation, hostility flip, demonic-manual pick | `app/bot/commands/sect.py:595-648` | `sect.shadow` |
 | `/law technique` self-applied effect with a hard-coded 120-minute duration | `app/bot/commands/law.py:114` | fold into the existing technique action |
@@ -70,7 +70,8 @@ never got the same treatment.
 
 **Gate:** `tests/python/contracts/test_authority_boundary.py` gains an
 allowlist of `DB.<mutator>(` call sites permitted from `app/bot/` and
-`app/ops/`; this milestone empties it for player commands. Go tests per new
+`app/ops/`; this milestone empties it for player commands. *(Landed in
+v0.21.0 as `PLAYER_MUTATIONS`: 27 rows at the start, 22 after `item.use`.)* Go tests per new
 action, mutation-tested as every admin op was.
 
 ### v0.22 — Authority II: derived inputs, pricing, the DB layer

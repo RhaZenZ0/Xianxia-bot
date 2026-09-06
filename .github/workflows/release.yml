@@ -64,7 +64,7 @@ jobs:
       - name: Build the archive
         run: |
           asset="${{ steps.version.outputs.asset }}"
-          zip -qr "/tmp/$asset" . -x '*/__pycache__/*' '*.pyc' '.env' 'data/*' '.git/*'
+          zip -qr "/tmp/$asset" . -x '*/__pycache__/*' '*.pyc' '.env' 'data/*' '.git/*' '.pytest_cache/*' '.ruff_cache/*'
           (cd /tmp && sha256sum "$asset" > "$asset.sha256")
           unzip -p "/tmp/$asset" VERSION
           cat "/tmp/$asset.sha256"
