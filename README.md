@@ -1,4 +1,4 @@
-# Xianxia RP Discord Bot v0.20.4
+# Xianxia RP Discord Bot v0.20.5
 
 [![CI](https://github.com/RhaZenZ0/Xianxia-bot/actions/workflows/ci.yml/badge.svg)](https://github.com/RhaZenZ0/Xianxia-bot/actions/workflows/ci.yml)
 
@@ -873,7 +873,7 @@ tests/support.py         shared dependency shims and test path helpers
 
 ## Release status
 
-- Current release: v0.20.4. See `VERSIONS.md` for the full release-by-release history.
+- Current release: v0.20.5. See `VERSIONS.md` for the full release-by-release history.
 - Go owns canonical gameplay time, migrated gameplay mechanics, lifespan/death authority, road travel,
   caravan settlement, simulation mutation, and SQLite WAL.
 - Python owns Discord/RAG/dashboard/presentation orchestration and does not duplicate the removed

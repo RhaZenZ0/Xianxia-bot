@@ -300,12 +300,17 @@ change.
 download and SHA-256-verify an archive before the unchanged transactional install. `docs/ROADMAP_1_0.md` is
 the roadmap to v1.0.0. No behaviour or schema change.
 
+**0.20.5** makes `update.sh` validate the installed `.env` against the new release's requirements
+(`startup.sh --check-env`) before it stops the stack: a missing key such as `ENGINE_AUTH_TOKEN` is now a
+message instead of a stop / fail / roll back / restart cycle. No schema change.
+
 See `docs/V020_RELEASE_NOTES.md` for v0.20.0, `docs/V019_RELEASE_NOTES.md` for the full detail on every v0.19.x release above, `docs/V018_RELEASE_NOTES.md` and
 `docs/V018_BUILD_HISTORY.md` (consolidated validation/audit record) for the prior staged-authority migration.
 
-## Release status — v0.20.4
+## Release status — v0.20.5
 
-- Current release: v0.20.4: release channel (GitHub Releases, bot announcement,
+- Current release: v0.20.5: the updater preflights `.env` before stopping anything.
+- v0.20.4: release channel (GitHub Releases, bot announcement,
   `update.sh --fetch/--upgrade`) and the roadmap to v1.0.0.
 - v0.20.3: test suite audited (70 → 59 files); dashboard gate path fixed.
 - v0.20.2: top-level tidy-up; `RELEASE.txt` archived, deployment

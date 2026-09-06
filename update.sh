@@ -387,6 +387,23 @@ verify_release_manifest() {
 }
 verify_release_manifest
 
+# Preflight the installed .env against the NEW release's requirements, using
+# the new release's own startup.sh in check-only mode, before anything is
+# stopped. v0.20.4 on a 0.19.20 install failed at `startup.sh` on a missing
+# ENGINE_AUTH_TOKEN and rolled back cleanly - correct, but a stop/rollback/
+# restart cycle for what is a one-line .env edit. An older release without
+# --check-env starts the stack instead, so only a release that knows the
+# flag is asked (v0.20.5).
+if grep -q -- '--check-env' "$NEW_ROOT/startup.sh" 2>/dev/null; then
+    echo "Checking .env against the requirements of $TARGET_VERSION..."
+    if ! (cd "$NEW_ROOT" && sh ./startup.sh --check-env "$PROJECT_DIR/.env"); then
+        echo "ERROR: The installed .env does not satisfy Xianxia RP $TARGET_VERSION (see above)." >&2
+        echo "       Edit $PROJECT_DIR/.env - compare it with the new .env.example in the package - and run the install again." >&2
+        echo "       Nothing was stopped or changed." >&2
+        exit 1
+    fi
+fi
+
 # Validate the complete staged release tree before touching the installed tree.
 INSTALL_TREE=$(mktemp -d "$PARENT_DIR/.xianxia-release-$TARGET_VERSION.XXXXXX")
 for item in "$NEW_ROOT"/* "$NEW_ROOT"/.[!.]* "$NEW_ROOT"/..?*; do
