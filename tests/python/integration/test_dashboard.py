@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tests.support import install_aiosqlite_shim, PROJECT_ROOT, seed_simulation_fixture
+from tests.support import install_aiosqlite_shim, PROJECT_ROOT, seed_character, seed_simulation_fixture
 install_aiosqlite_shim()
 
 from app.dashboard.server import (
@@ -45,7 +45,7 @@ class DashboardTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_overview_reads_schema_and_simulation(self):
         data = await self.store.overview()
-        self.assertEqual(data["schema_version"], 27)
+        self.assertEqual(data["schema_version"], SCHEMA_VERSION)
         self.assertIn("clock", data)
         self.assertGreater(data["counts"]["npcs_alive"], 0)
         self.assertTrue(data["simulations"])
@@ -165,6 +165,74 @@ class DashboardTests(unittest.IsolatedAsyncioTestCase):
 
         await admin.run("backup.create", {})
         self.assertEqual(calls[-1], ("admin.audit", 42))
+
+    async def test_dashboard_adjust_item_resolves_names_and_refuses_unknown_items(self):
+        # The Adjust Inventory card is a free-text field and the engine stores
+        # whatever it is handed: typing the display name "Bugslayer Sword" once
+        # produced an inventory row no catalog lookup could match, so the sword
+        # could never be bound. Names now resolve to ids; nonsense is refused
+        # before the engine is called.
+        admin = AdminDashboardController(self.store, "http://fake-engine.invalid", True, 42)
+        calls: list[dict] = []
+
+        class _StubEngine:
+            async def action(self, operation, actor_id, payload, **kwargs):
+                calls.append(dict(payload))
+                return {"ok": True}
+
+        admin.engine = _StubEngine()
+        admin.transport = object()
+
+        for typed in ("bugslayer_sword", "Bugslayer Sword", "  bugslayer sword ", "BUGSLAYER_SWORD"):
+            await admin.run("player.adjust_item", {"user_id": 1, "item_id": typed, "quantity": 1})
+            self.assertEqual(calls[-1]["item_id"], "bugslayer_sword", typed)
+        self.assertEqual(len(calls), 4)
+
+        with self.assertRaises(ValueError) as ctx:
+            await admin.run("player.adjust_item", {"user_id": 1, "item_id": "Bugslayer Blade", "quantity": 1})
+        self.assertIn("bugslayer_sword", str(ctx.exception))
+        with self.assertRaises(ValueError):
+            await admin.run("player.adjust_item", {"user_id": 1, "item_id": "", "quantity": 1})
+        self.assertEqual(len(calls), 4, "unknown items must never reach the engine")
+
+        # Other actions are untouched by the resolver.
+        await admin.run("player.karma", {"user_id": 1, "delta": 5})
+        self.assertEqual(len(calls), 5)
+
+    async def test_dashboard_adjust_item_removal_reaches_a_misspelt_row_as_typed(self):
+        # The repair for a phantom row is "-1 of the misspelt id" from the same
+        # card. With the resolver in front, "Bugslayer Sword" would now map to
+        # bugslayer_sword and the phantom row would be unreachable - so a
+        # removal targets a row that exists under the typed string as-is.
+        # Grants never get this bypass, and a removal of a string that matches
+        # no row still resolves like a grant.
+        self.assertTrue(await seed_character(
+            self.db, user_id=7, discord_name="tester-7", name="Tester Seven",
+            origin="Greenriver Town", path="Sword Cultivator", spiritual_root="Fire",
+            concept="dashboard test", location="Greenriver Town",
+            attributes={"body": 2, "agility": 2, "spirit": 2, "insight": 2, "will": 2, "presence": 2},
+            qi_max=10, vitality_max=20,
+        ))
+        await self.db.add_items(7, {"Bugslayer Sword": 1})
+        admin = AdminDashboardController(self.store, "http://fake-engine.invalid", True, 42)
+        calls: list[dict] = []
+
+        class _StubEngine:
+            async def action(self, operation, actor_id, payload, **kwargs):
+                calls.append(dict(payload))
+                return {"ok": True}
+
+        admin.engine = _StubEngine()
+        admin.transport = object()
+
+        await admin.run("player.adjust_item", {"user_id": 7, "item_id": "Bugslayer Sword", "quantity": -1})
+        self.assertEqual(calls[-1]["item_id"], "Bugslayer Sword")
+        await admin.run("player.adjust_item", {"user_id": 7, "item_id": "Bugslayer Sword", "quantity": 1})
+        self.assertEqual(calls[-1]["item_id"], "bugslayer_sword", "a grant must never store the raw string")
+        await admin.run("player.adjust_item", {"user_id": 8, "item_id": "Bugslayer Sword", "quantity": -1})
+        self.assertEqual(calls[-1]["item_id"], "bugslayer_sword", "no such row for user 8, so the resolver applies")
+        with self.assertRaises(ValueError):
+            await admin.run("player.adjust_item", {"user_id": 7, "item_id": "Nonsense Blade", "quantity": -1})
 
     async def test_discord_dashboard_proxy_uses_private_bot_control_endpoint(self):
         state = HealthState(supported_schema_version=SCHEMA_VERSION)

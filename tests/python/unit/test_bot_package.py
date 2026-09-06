@@ -656,7 +656,7 @@ class OwnershipTests(unittest.TestCase):
 # ---------------------------------------------------------------------------
 
 # Every group object, root command and group leaf, by the module that defines
-# it - 51 groups, 40 roots, 223 leaves as of v0.20.3. A leaf lost in a move is
+# it - 51 groups, 40 roots, 225 leaves as of v0.20.6 (Quest Forge added two). A leaf lost in a move is
 # silent until a player looks for it; so is a renamed one (phase 9d found no
 # guard caught `atone` -> `atone2`). The table is the pin; regenerate it
 # deliberately when a command is added, renamed or removed.
@@ -691,7 +691,7 @@ SURFACE = {
         "leaves": {
             "admin_player_group": ('karma', 'grantstorage', 'grantcurrency', 'grant'),
             "admin_sect_group": ('setsect', 'removesect', 'setmaster', 'clearmaster', 'sectrank', 'masterattention'),
-            "admin_world_group": ('advancetime', 'events', 'spawnrealm', 'closeevent'),
+            "admin_world_group": ('advancetime', 'events', 'spawnrealm', 'closeevent', 'questforge', 'quests'),
             "admin_server_group": ('maintenance',),
         },
     },

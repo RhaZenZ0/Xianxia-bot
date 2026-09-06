@@ -9,7 +9,7 @@ from typing import Iterable
 # run before the bot/dashboard dependencies are installed.  Keep the browser/API,
 # schema-review, and newer-system coverage contract in one place.
 DASHBOARD_API_VERSION = 2
-DASHBOARD_REVIEWED_SCHEMA_VERSION = 27
+DASHBOARD_REVIEWED_SCHEMA_VERSION = 28
 
 DASHBOARD_GET_API_PATHS = frozenset({
     "/api/overview", "/api/capabilities", "/api/timeline", "/api/npcs", "/api/npc",
@@ -67,7 +67,7 @@ DASHBOARD_SYSTEM_TABLES = {
     "exploration": (
         "exploration_events", "exploration_event_participants", "secret_realm_runs",
         "character_location_discoveries", "wild_beast_encounters", "caravans", "caravan_operations",
-        "expedition_threads",
+        "expedition_threads", "quest_definitions",
     ),
     "economy": (
         "economy_markets", "economy_events", "auctions", "auction_bids", "black_market_posts",

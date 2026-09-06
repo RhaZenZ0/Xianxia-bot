@@ -855,8 +855,16 @@ class ReadOnlyDashboardStore:
                 """SELECT e.*,c.name AS player_name FROM expedition_threads e JOIN characters c ON c.user_id=e.user_id
                    ORDER BY e.updated_at DESC LIMIT 150""",
             )
+            # Quest Forge (v0.20.6): drafted / approved / retired definitions.
+            forged_quests = await self._fetchall_if_table(
+                db, "quest_definitions",
+                """SELECT quest_key,title,description,status,origin,source_key,objectives_json,rewards_json,model,
+                          created_by,created_at,reviewed_by,reviewed_at
+                   FROM quest_definitions ORDER BY (status='draft') DESC,created_at DESC LIMIT 100""",
+            )
             return {
                 "summary": {
+                    "quest_drafts": sum(1 for r in forged_quests if str(r.get("status")) == "draft"),
                     "active_events": sum(1 for r in events if str(r.get("state")) == "active"),
                     "active_secret_realms": sum(1 for r in secret_realms if int(r.get("active") or 0)),
                     "discoveries_shown": len(discoveries),
@@ -865,7 +873,7 @@ class ReadOnlyDashboardStore:
                 },
                 "events": events, "participants": participants, "secret_realms": secret_realms,
                 "discoveries": discoveries, "wild_beast_encounters": beast_encounters,
-                "caravans": caravans, "expedition_threads": expeditions,
+                "caravans": caravans, "expedition_threads": expeditions, "forged_quests": forged_quests,
             }
 
     async def threads(self) -> dict[str, Any]:
@@ -1148,6 +1156,85 @@ class AdminDashboardController:
         # audit entry - see DashboardSettings.dashboard_actor_id for why this
         # replaced the hardcoded 0 every call in this class used before.
         self.actor_id = int(actor_id)
+        self._item_catalog: dict[str, str] | None = None
+
+    def item_catalog(self) -> dict[str, str]:
+        """item_id -> display name from content/world.json, loaded once.
+
+        The dashboard is a separate process from the bot and reads the content
+        pack straight from disk (as snapshot() does for locations) rather than
+        importing app.rules.game.World, which drags the whole rules tier into
+        the dashboard for one lookup table.
+        """
+        if self._item_catalog is None:
+            try:
+                world = json.loads((ROOT / "content" / "world.json").read_text(encoding="utf-8"))
+                items = dict(world.get("items") or {})
+            except Exception:
+                log.warning("Could not load content/world.json for the item catalog", exc_info=True)
+                items = {}
+            self._item_catalog = {
+                str(item_id): str((item or {}).get("name") or item_id) for item_id, item in items.items()
+            }
+        return self._item_catalog
+
+    def resolve_item_id(self, raw: Any) -> str:
+        """Turn whatever was typed into the Adjust Inventory card into a catalog item id.
+
+        The card is a free-text field and the Go engine's adjust_item is a plain
+        signed delta that stores whatever string it is handed, so before this
+        guard "Bugslayer Sword" (the display name) became an inventory row that
+        no catalog lookup - bind, the market, the inventory description - could
+        ever match. Accept the exact id, then the id or display name
+        case-insensitively; refuse anything else with the closest ids so the GM
+        can correct the field instead of the database.
+        """
+        typed = str(raw or "").strip()
+        if not typed:
+            raise ValueError("item_id is required")
+        catalog = self.item_catalog()
+        if typed in catalog:
+            return typed
+        needle = typed.casefold()
+        for item_id, name in catalog.items():
+            if needle in (item_id.casefold(), name.casefold()):
+                return item_id
+        tokens = [t for t in needle.replace("_", " ").split() if t]
+        suggestions = sorted(
+            item_id for item_id, name in catalog.items()
+            if any(t in item_id.casefold() or t in name.casefold() for t in tokens)
+        )[:5]
+        hint = f" Did you mean: {', '.join(suggestions)}?" if suggestions else ""
+        raise ValueError(f"Unknown item {typed!r}: not an item id or item name in content/world.json.{hint}")
+
+    async def _adjust_item_target(self, payload: dict[str, Any]) -> str:
+        """The item id an Adjust Inventory request should reach the engine with.
+
+        Grants must name a catalog item (resolve_item_id). Removals are how a
+        bad grant is undone, and the rows a GM most needs to remove are exactly
+        the ones the resolver would now redirect - `Bugslayer Sword` resolves
+        to `bugslayer_sword`, which is not the row that is wrong. So for a
+        negative delta, a row that exists under the typed string as-is wins;
+        otherwise the resolver applies as for a grant.
+        """
+        typed = str(payload.get("item_id") or "").strip()
+        try:
+            delta = int(payload.get("quantity") or 0)
+        except (TypeError, ValueError):
+            delta = 0
+        if delta < 0 and typed:
+            try:
+                user_id = int(payload.get("user_id") or 0)
+                async with self.store._connect() as db:
+                    row = await self.store._fetchone(
+                        db, "SELECT 1 AS present FROM inventory WHERE user_id=? AND item_id=?", (user_id, typed)
+                    )
+            except Exception:
+                log.warning("Could not check inventory for a raw item_id removal", exc_info=True)
+                row = None
+            if row:
+                return typed
+        return self.resolve_item_id(typed)
 
     async def snapshot(self) -> dict[str, Any]:
         if not self.enabled or self.engine is None or self.transport is None:
@@ -1227,6 +1314,8 @@ class AdminDashboardController:
         action = str(action).strip()
         payload = dict(payload or {})
         reason = str(payload.get("reason") or "GM dashboard")[:500]
+        if action == "player.adjust_item":
+            payload["item_id"] = await self._adjust_item_target(payload)
         if action in self.ACTION_MAP:
             result = await self.engine.action(self.ACTION_MAP[action], self.actor_id, payload)
             return {"ok": True, "action": action, "result": result}

@@ -8,7 +8,7 @@ install_aiosqlite_shim()
 from app.rules.alchemy import alchemy_output, alchemy_quality, pill_toxicity_value, medicine_toxicity_effect
 from app.rules.effects import medicine_toxicity_effect
 from app.rules.birthfamily import family_forage_bonus, family_profession_bonus, generate_family_options
-from app.database import Database
+from app.database import Database, SCHEMA_VERSION
 from app.rules.game import World
 from app.simulation import WorldSimulator
 
@@ -50,7 +50,7 @@ class AlchemyBeastExpansionTests(unittest.IsolatedAsyncioTestCase):
             tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         self.assertTrue({"alchemy_state", "alchemy_batches", "wild_beast_encounters"}.issubset(tables))
 
-    async def test_schema_v4_database_migrates_to_v16_without_losing_character(self):
+    async def test_a_schema_v4_database_migrates_to_current_without_losing_the_character(self):
         import sqlite3
         with sqlite3.connect(self.path) as conn:
             conn.execute("DROP TABLE alchemy_batches")
@@ -94,7 +94,7 @@ class AlchemyBeastExpansionTests(unittest.IsolatedAsyncioTestCase):
         character = await self.db.get_character(909)
         self.assertEqual(character["name"], "Azure Alchemist")
         status = await self.db.get_schema_status()
-        self.assertEqual(status["current"], 27)
+        self.assertEqual(status["current"], SCHEMA_VERSION)
 
     def test_alchemy_quality_scales_output_without_item_instances(self):
         self.assertEqual(alchemy_quality(0, success=True).label, "Ordinary")

@@ -28,7 +28,8 @@ from .admin.server_setup import dashboard_discord_control
 from .channels import post_server_log
 from .character_state import _remember_freeform_npc_scene
 from .runtime import DB, ENGINE, SETTINGS, WORLD, character_location_display, chunk_text, current_world_time, log
-from .services import ALERTS, GUILD, NARRATOR, NARRATOR_CONTEXT, SIM
+from ..ai.quest_forge import store_draft
+from .services import ALERTS, GUILD, NARRATOR, NARRATOR_CONTEXT, QUEST_FORGE, SIM
 from .threads import _private_scene_for_thread
 from .ui.event_scene import spawn_system_event_thread
 
@@ -69,6 +70,7 @@ class XianxiaBot(commands.Bot):
         )
         self.operational_health_task: asyncio.Task | None = None
         self.update_check_task: asyncio.Task | None = None
+        self.quest_forge_task: asyncio.Task | None = None
         self.announced_release: str | None = None
 
     async def _dashboard_discord_control(self, action: str, payload: dict[str, Any]) -> dict[str, Any]:
@@ -138,6 +140,8 @@ class XianxiaBot(commands.Bot):
             self.operational_health_task = asyncio.create_task(self.operational_health_worker())
             if SETTINGS.update_check_enabled:
                 self.update_check_task = asyncio.create_task(self.update_check_worker())
+            if SETTINGS.quest_forge_auto:
+                self.quest_forge_task = asyncio.create_task(self.quest_forge_worker())
         except Exception as exc:
             self.health_state.fail(phase, exc)
             failure_detail = {
@@ -265,6 +269,54 @@ class XianxiaBot(commands.Bot):
             await post_server_log(self.get_guild(SETTINGS.guild_id), "Update available", text)
         return text
 
+    async def forge_quests_from_history(self, *, limit: int = 3) -> list[dict[str, Any]]:
+        """Draft a quest for each notable world-history event that has none
+        yet. Idempotent: a drafted event is remembered by its source_key
+        (`history:<id>`), whatever became of the draft. Returns the new rows."""
+        threshold = int(SETTINGS.quest_forge_min_significance)
+        events = await DB.list_world_history(limit=60)
+        seen = {str(row.get("source_key")) for row in await DB.list_quest_definitions()}
+        created: list[dict[str, Any]] = []
+        for event in events:
+            if len(created) >= limit:
+                break
+            if str(event.get("visibility") or "public") != "public" or int(event.get("significance") or 0) < threshold:
+                continue
+            source_key = f"history:{event.get('history_id')}"
+            if source_key in seen:
+                continue
+            story = f"{event.get('title', '')}. {event.get('summary', '')} (at {event.get('location') or 'an unknown place'})"
+            result = await QUEST_FORGE.draft(story, source_key=source_key, fallback_event=event)
+            if result.definition is None:
+                log.warning("Quest Forge could not draft for history %s: %s", source_key, "; ".join(result.errors[:3]))
+                continue
+            row = await store_draft(DB, result, story=story, origin="world_history", created_by=0)
+            created.append(row)
+            seen.add(source_key)
+        if created:
+            titles = "\n".join(f"• {row['title']} (`{row['quest_key']}`)" for row in created)
+            await post_server_log(
+                self.get_guild(SETTINGS.guild_id), "Quest drafts ready",
+                f"The Forge drafted {len(created)} quest(s) from recent world history. Review with **/admin world quests**.\n{titles}",
+            )
+        return created
+
+    async def quest_forge_worker(self) -> None:
+        # Opt-in (QUEST_FORGE_AUTO). Same shape as the other workers: first
+        # pass a few minutes after startup, then every QUEST_FORGE_INTERVAL_HOURS.
+        try:
+            await asyncio.sleep(180)
+            while not self.is_closed():
+                try:
+                    await self.forge_quests_from_history()
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
+                    log.exception("Quest Forge iteration failed")
+                await asyncio.sleep(SETTINGS.quest_forge_interval_hours * 3600)
+        except asyncio.CancelledError:
+            pass
+
     async def update_check_worker(self) -> None:
         # Same per-iteration exception boundary as operational_health_worker.
         # First check a minute after the command sync, then every
@@ -379,7 +431,7 @@ class XianxiaBot(commands.Bot):
             pass
 
     async def close(self) -> None:
-        for task_name in ("event_expiry_task", "operational_health_task", "update_check_task"):
+        for task_name in ("event_expiry_task", "operational_health_task", "update_check_task", "quest_forge_task"):
             task = getattr(self, task_name, None)
             if task:
                 task.cancel()

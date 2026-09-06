@@ -304,12 +304,33 @@ the roadmap to v1.0.0. No behaviour or schema change.
 (`startup.sh --check-env`) before it stops the stack: a missing key such as `ENGINE_AUTH_TOKEN` is now a
 message instead of a stop / fail / roll back / restart cycle. No schema change.
 
+**0.20.6 (build A)** adds the Quest Forge: `/admin world questforge <story>` drafts a quest from a story through the
+narrator's free chain, validated against the world and a GM reward budget, held as a draft until approved
+(`/admin world quests`, or the dashboard); optionally one draft per notable world-history event. Rewards are
+granted by the engine on completion. Two dead ends fixed: `sect_trial` was never reported (the shipped sect
+quest could not complete) and quest rewards were never granted. Schema **28** (`quest_definitions`).
+
+**0.20.6 (build B)** fixes the dashboard's Adjust Inventory card storing whatever was typed as an inventory
+`item_id`: a display name such as `Bugslayer Sword` became a row no catalog lookup could match, so the
+sword showed with no description and could never be bound or equipped. The dashboard now resolves the
+id or the item name (case-insensitively) and refuses anything else with suggestions, and the Go engine's
+`admin.player.adjust_item` enforces the one-per-character rule for unique reward equipment, carried or
+bound. Existing bad rows are repaired through the same card: `-1` of the misspelt id, `+1` of the real
+one. No schema change.
+
+**0.20.7** is the merge of the two 0.20.6 builds above, which were produced in parallel from 0.20.5 and
+never saw each other: Quest Forge (schema 28) and the dashboard item-grant fix ship together, with no
+further code change. Either 0.20.6 zip is superseded by it.
+
 See `docs/V020_RELEASE_NOTES.md` for v0.20.0, `docs/V019_RELEASE_NOTES.md` for the full detail on every v0.19.x release above, `docs/V018_RELEASE_NOTES.md` and
 `docs/V018_BUILD_HISTORY.md` (consolidated validation/audit record) for the prior staged-authority migration.
 
-## Release status — v0.20.5
+## Release status — v0.20.7
 
-- Current release: v0.20.5: the updater preflights `.env` before stopping anything.
+- Current release: v0.20.7: the two v0.20.6 builds merged - Quest Forge (schema 28) and the
+  dashboard item-grant fix.
+- v0.20.6: shipped twice from two sessions (build A: Quest Forge; build B: dashboard item grants).
+- v0.20.5: the updater preflights `.env` before stopping anything.
 - v0.20.4: release channel (GitHub Releases, bot announcement,
   `update.sh --fetch/--upgrade`) and the roadmap to v1.0.0.
 - v0.20.3: test suite audited (70 → 59 files); dashboard gate path fixed.

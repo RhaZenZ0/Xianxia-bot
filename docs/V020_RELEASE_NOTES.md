@@ -1,12 +1,12 @@
 # Xianxia RP Discord Bot — v0.20 release notes
 
-Shipping as **v0.20.5**. The v0.19 line (v0.19 through v0.19.48) is in
+Shipping as **v0.20.7**. The v0.19 line (v0.19 through v0.19.48) is in
 `docs/V019_RELEASE_NOTES.md`; the staged-authority migration before it in
-`docs/V018_RELEASE_NOTES.md`. The release is stamped 0.20.5 in `app/version.py`,
-`VERSION`, the `Dockerfile` and `docker-compose.yml`, and carries schema 27,
-unchanged since v0.19.29.
+`docs/V018_RELEASE_NOTES.md`. The release is stamped 0.20.7 in `app/version.py`,
+`VERSION`, the `Dockerfile` and `docker-compose.yml`, and carries schema 28
+(v0.20.6: `quest_definitions`; 27 since v0.19.29 before that).
 
-Release date: 2026-09-05 (v0.20.0, v0.20.1, v0.20.2) / 2026-09-06 (v0.20.3, v0.20.4, v0.20.5).
+Release date: 2026-09-05 (v0.20.0, v0.20.1, v0.20.2) / 2026-09-06 (v0.20.3, v0.20.4, v0.20.5, v0.20.6, v0.20.7).
 
 ## v0.20.0 — main.py split complete: phase 10, the final sweep
 
@@ -414,3 +414,193 @@ the Docker checks run in check mode; a missing file is silently accepted.
 The first-run guard was re-pointed to the new `$ENV_FILE` condition.
 
 No schema change; full suite 610 tests, identical failure set.
+
+## v0.20.6 (build A) — Quest Forge: quests from a story
+
+"AI can make quest from story." It can now, with a GM between the model and
+the players, and the engine between the quest and the tables.
+
+### What a GM sees
+
+`/admin world questforge <story>` returns a draft quest as an embed with
+**Approve** and **Discard** buttons. Approved quests join every cultivator's
+`/quests`; discarded ones are kept for the audit trail and never served.
+`/admin world quests` lists the drafts (with the same buttons) and the
+approved set, and `retire:<key>` withdraws an approved quest from new takers
+without taking it from those who hold it. Every step audits (`quest.forge`,
+`quest.approved`, `quest.discarded`, `quest.retired`). The dashboard's
+Exploration view gains a "Forged Quests" table and a drafts count.
+
+With `QUEST_FORGE_AUTO=true` (default off - each draft is one routine-tier
+request against the free budget) the bot drafts a quest for each public
+world-history event at or above `QUEST_FORGE_MIN_SIGNIFICANCE` every
+`QUEST_FORGE_INTERVAL_HOURS`, at most three per pass, and posts "Quest
+drafts ready" to the log channel. Idempotent: an event is drafted once,
+whatever became of the draft.
+
+### How a draft is made and why it cannot be a dead end
+
+`app/ai/quest_forge.py` asks the narrator's routine chain for one JSON
+object in the catalog shape, with a system prompt that lists exactly what a
+quest may name: the objective vocabulary the engine already tracks
+(`explore`, `talk`, `scene_action`, `sect_discovery`, `sect_trial`, with
+what each target must be), the public locations, the non-hidden NPCs, the
+scene-action kinds, the rewardable items, and the reward caps. The GM's
+story is fenced and declared data. The reply is parsed strictly and handed
+to `validate_quest_definition()` in `app/rules/quests.py`, which turns it
+into the catalog shape or returns every reason it cannot: an unknown
+location, NPC, scene action or item, a target on a type that takes none, a
+reward over budget, a reward item that is market-excluded or unique (the
+Bugslayer Sword class), an unknown reward key. Nothing is silently dropped -
+a quest pointing at a place that does not exist is the one thing the Forge
+must never produce. An invalid draft is retried once with the errors quoted
+back; a second failure, or an unavailable model, falls back to
+`procedural_quest_from_event()`, a deterministic draft (explore the place,
+talk to whoever is there, resolve a fitting scene action) that the same
+validator proves valid. The player-facing leak guard stays on for the
+call - only the chat monitor may opt out, and the contract test for that
+held.
+
+### Storage, catalog, rewards
+
+Schema **28** adds `quest_definitions` (key, catalog fields, status
+`draft|approved|retired|discarded`, origin, story prompt, model, reviewer).
+`QuestService` now serves the static catalog plus approved forged
+definitions (a 15-second cache, refreshed on every approve/retire; a static
+quest always shadows a forged one with the same key). On completion the
+declared rewards are granted through the engine's existing
+`cultivation.reward` action with `event_type=quest_reward:<key>` - insight
+XP, low spirit stones and items - so a forged quest never writes a table
+from Python. The player is told what they earned. The dashboard review
+marker moved to 28 with the table registered under the Exploration view.
+
+### Two dead ends found on the way
+
+- The shipped quest "A Road Toward a Sect" could never complete: its
+  `sect_trial` objective was reported nowhere. `/sect recruitment trial`
+  reports it now.
+- Quest rewards were declared (`insight_xp`) and never granted, and a
+  completed quest flipped to `completed` in silence. Both fixed above;
+  `announce_quest_progress` in `app/bot/character_state.py` tells the
+  player at all four progress sites.
+
+### Settings
+
+`QUEST_FORGE_AUTO` (false), `QUEST_FORGE_MIN_SIGNIFICANCE` (80),
+`QUEST_FORGE_INTERVAL_HOURS` (6), `QUEST_REWARD_MAX_XP` (50),
+`QUEST_REWARD_MAX_STONES` (200), `QUEST_REWARD_MAX_ITEMS` (3), all
+documented in `.env.example`; none is required.
+
+### Guards
+
+`tests/python/unit/test_quest_forge.py` (27): the validator (normalisation,
+every error class, the budget, the item exclusions, hidden masters and
+private locations refused, the static catalog passing its own validator,
+the procedural draft always validating, key slugs); the forge against a fake
+router (JSON found fenced/bare/in prose, first-attempt success, retry with
+errors quoted, fallback after two failures, fallback on a dead chain,
+zero calls without a model, the fallback event shaping the draft); the
+service and the table (draft-then-approve gating, unique keys, retire
+semantics, rewards granted through `cultivation.reward` with the right
+payload, no reward call when nothing completes, static shadows forged); and
+the Discord surface in source (commands admin-gated and auditing, nothing
+on the Discord side writing a gameplay table, the worker opt-in and
+idempotent, `sect_trial` reported, completions announced). Seven mutants
+killed: market-excluded items allowed; the budget cap ×100; an unknown
+location passed through; the retry removed; completion ignored; forged
+shadowing static; the idempotency check removed. The command-surface pin
+gained the two admin leaves (225), the admin action count 44.
+
+### Verification
+
+Go untouched (the engine actions used - `quest.progress`,
+`cultivation.reward` - already existed). Python full suite against
+v0.20.5: 637 tests versus 610 (+27), identical failure set; pytest-style
+22/22. Migration replay from a schema-4 database to 28 passes.
+
+## v0.20.6 (build B) — the dashboard grant that could not be bound
+
+A player granted the Bugslayer Sword from the web dashboard could see it in
+`/inventory` — with no description, unlike every item beside it — but
+`/equipment → Bind` said there was nothing to bind, and `Equip` then said
+there was nothing bound. The inventory row was:
+
+```
+item_id = 'Bugslayer Sword'      -- every other row: spirit_herb, spirit_iron, ...
+```
+
+The dashboard's Adjust Inventory card is a free-text field, and the Go
+engine's `admin.player.adjust_item` is a plain signed delta that stores
+whatever string it is handed. The GM typed the display name; nothing between
+the text box and the `INSERT` knew the difference. The Discord path
+(`/admin player grant`) has always had the `target not in WORLD.items` guard
+and the one-per-character check for `unique` equipment — the dashboard had
+neither, so besides the phantom row it could also hand out a second Bugslayer
+Sword.
+
+### The fix, at both ends
+
+- **`app/dashboard/server.py`** — `AdminDashboardController.resolve_item_id()`
+  runs on every `player.adjust_item` before the engine is called: the exact
+  id passes; otherwise the id or the display name matches case-insensitively
+  (so `Bugslayer Sword`, `bugslayer sword` and `BUGSLAYER_SWORD` all resolve
+  to `bugslayer_sword`); anything else is a `ValueError` — a 400 with up to
+  five suggested ids — and never reaches the engine. The catalog is read from
+  `content/world.json` once, the way `snapshot()` already reads locations,
+  rather than importing the rules tier into the dashboard process.
+- **`go_core/internal/game/actions.go`** — `adminAdjustItem` refuses a
+  positive delta on a unique item (`uniqueEquipmentIDsGo`, mirroring the
+  Python `unique` flag; the Bugslayer Sword today) when the result would
+  exceed one carried copy *or* the character already has one bound in
+  `equipment_instances`. Removal is never blocked — that is how a mistaken
+  grant is undone. This is the authoritative side: the dashboard is one
+  caller of `adjust_item`, not necessarily the last one to get it wrong.
+- `dashboard/app.js`: the field's placeholder says the name works too.
+
+### Repairing an affected character
+
+Through the same Adjust Inventory card, so the change goes through the
+engine and is audited: item `Bugslayer Sword`, delta `-1` — the row is
+deleted at zero — then item `bugslayer_sword` (or the name; both resolve),
+delta `+1`. Then `/equipment → Bind`, and `Equip`.
+
+The first step works because of one rule in `_adjust_item_target()`: for a
+**negative** delta, a row that exists under the typed string exactly as
+typed is targeted as-is, before the resolver runs. Without it the resolver
+would have mapped `Bugslayer Sword` to `bugslayer_sword` and quietly removed
+nothing, leaving the phantom row unreachable from the card that made it.
+Grants never get that bypass, and a removal whose typed string matches no
+row still resolves like a grant.
+
+### Guards
+
+`admin_actions_test.go`: `TestAdminAdjustItemRefusesSecondCopyOfUniqueEquipment`
+(second carried copy refused, a delta of 2 refused, removal still works) and
+`TestAdminAdjustItemRefusesUniqueEquipmentAlreadyBound` (a bound copy blocks
+a carried one; another character is unaffected). Both fail with the guard
+removed. `test_dashboard.py::test_dashboard_adjust_item_resolves_names_and_refuses_unknown_items`
+(four spellings resolve; an unknown name is refused with `bugslayer_sword`
+suggested; an empty id is refused; nothing unknown reaches the engine; other
+actions untouched) and `test_dashboard_adjust_item_removal_reaches_a_misspelt_row_as_typed`
+(a `-1` of a misspelt id that exists as a row reaches the engine as typed; a
+`+1` of the same string resolves; a removal with no such row resolves; an
+unknown removal is refused).
+
+No schema change. Go suite green; Python full suite 596 tests versus 594,
+identical failure set.
+
+## v0.20.7 — the two v0.20.6 builds, merged
+
+Two sessions each shipped a "v0.20.6" from v0.20.5 without seeing the
+other: build A added the Quest Forge (schema 28), build B fixed the
+dashboard item grant and taught `admin.player.adjust_item` the
+one-per-character rule for unique reward equipment. Their file sets
+overlap only in `app/dashboard/server.py`, `dashboard/app.js`,
+`tests/python/integration/test_dashboard.py` and the docs; a three-way
+merge against v0.20.5 applied cleanly for the code and the two release
+documents were resolved by keeping both sections. v0.20.7 is that merge
+with the version stamps moved on - no new behaviour beyond the two
+sections above, and either v0.20.6 zip is superseded by it.
+
+Schema 28 (from build A). Full suite and Go suite re-run on the merged
+tree; see the release status in `VERSIONS.md`.

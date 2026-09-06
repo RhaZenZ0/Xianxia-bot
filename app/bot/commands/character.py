@@ -17,7 +17,6 @@ from ...rules.advanced_runtime import ERA_CYCLE
 from ...rules.birthfamily import family_tier_name, karma_description, karma_label
 from ...rules.fate import fate_label
 from ...ops.game_engine import GameEngineError
-from ...rules.quests import QUEST_DEFINITIONS
 from ...simulation import MINUTES_PER_DAY
 from ...rules.worldtime import MINUTES_PER_YEAR
 from ..channels import configured_begin_channel
@@ -340,9 +339,10 @@ async def _player_dashboard_embed(user_id: int, *, guild_id: int | None, page: s
 
     if page == "quests":
         available = await QUESTS.available(int(user_id))
+        catalog = await QUESTS.catalog()
         if active_quests:
             for row in active_quests[:8]:
-                definition = QUEST_DEFINITIONS.get(str(row["quest_key"]), {})
+                definition = catalog.get(str(row["quest_key"]), {})
                 progress = row.get("progress") or {}
                 parts = []
                 for obj in definition.get("objectives", []):
@@ -424,7 +424,7 @@ class QuestAcceptSelect(discord.ui.Select):
             await interaction.response.send_message("This quest panel belongs to another cultivator.", ephemeral=False); return
         wt = await current_world_time()
         row = await QUESTS.accept(self.user_id, self.values[0], game_minute=wt.total_minutes)
-        definition = QUEST_DEFINITIONS.get(str(row["quest_key"]), {})
+        definition = await QUESTS.definition(str(row["quest_key"])) or {}
         await interaction.response.send_message(f"📜 Quest accepted: **{definition.get('title', row['quest_key'])}**", ephemeral=False)
 
 
@@ -443,9 +443,10 @@ async def quests_command(interaction: discord.Interaction) -> None:
     active = await DB.list_character_quests(interaction.user.id, status="active")
     available = await QUESTS.available(interaction.user.id)
     lines = ["📜 **Quest Journal**"]
+    catalog = await QUESTS.catalog()
     if active:
         for row in active[:10]:
-            definition = QUEST_DEFINITIONS.get(str(row["quest_key"]), {})
+            definition = catalog.get(str(row["quest_key"]), {})
             progress = row.get("progress") or {}
             objectives = []
             for obj in definition.get("objectives", []):

@@ -21,7 +21,7 @@ from ...rules.progression_systems import profession_rank, profession_xp_needed
 from ...rules.realm_hubs import REALM_HUBS, realm_hub, realm_hub_by_location
 from ...rules.sect_manor import manor_craft_bonus
 from ..channels import send_long_to_thread
-from ..character_state import sync_pill_toxicity_effect
+from ..character_state import announce_quest_progress, sync_pill_toxicity_effect
 from ..discovery import (
     LOCATION_DISCOVERY_IMAGES,
     send_location_discovery_image,
@@ -362,7 +362,7 @@ async def explore(interaction: discord.Interaction) -> None:
                 )
             discovery_text += f"\n🏯 **Sect route discovered:** {', '.join(discovered_sects)}. Open **Sect → Recruitment** to learn about the gate."
             try:
-                await QUESTS.progress(interaction.user.id, "sect_discovery", amount=1, game_minute=wt_discovery.total_minutes)
+                await announce_quest_progress(interaction, await QUESTS.progress(interaction.user.id, "sect_discovery", amount=1, game_minute=wt_discovery.total_minutes))
             except Exception:
                 log.exception("Quest progress update failed after sect discovery")
         try:
@@ -383,7 +383,7 @@ async def explore(interaction: discord.Interaction) -> None:
             log.exception("Could not persist structured world-history discovery")
 
     try:
-        await QUESTS.progress(interaction.user.id, "explore", amount=1, target=str(c.get("location") or ""), game_minute=wt_discovery.total_minutes)
+        await announce_quest_progress(interaction, await QUESTS.progress(interaction.user.id, "explore", amount=1, target=str(c.get("location") or ""), game_minute=wt_discovery.total_minutes))
     except Exception:
         log.exception("Quest progress update failed after exploration")
     await DB.add_history(history_channel_id, user_id=interaction.user.id, speaker=c["name"], content=f"Explores {c['location']}")

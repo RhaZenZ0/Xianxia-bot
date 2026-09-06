@@ -32,6 +32,7 @@ from ..ai.narrator import Narrator
 from ..ai.narrator_context import NarratorContextBuilder
 from ..ops.operations import AlertDispatcher
 from ..ops.performance import AsyncWorkQueue
+from ..ai.quest_forge import QuestForge
 from ..rules.quests import QUEST_DEFINITIONS
 from ..simulation import WorldSimulator
 from .runtime import DB, ENGINE, PLAYER_PROPERTY_TYPES, SETTINGS, WORLD
@@ -73,6 +74,14 @@ AI_ROUTER = AITaskRouter(
     app_name=SETTINGS.openrouter_app_name,
 )
 
+# Quest Forge (v0.20.6): drafts quests from a GM prompt or a world-history
+# event through the same free chain the narrator uses; validated against WORLD
+# and the GM's reward budget before anything is stored.
+QUEST_FORGE = QuestForge(
+    AI_ROUTER, WORLD,
+    budget={"max_xp": SETTINGS.quest_reward_max_xp, "max_stones": SETTINGS.quest_reward_max_stones,
+            "max_items": SETTINGS.quest_reward_max_items},
+)
 NARRATOR = Narrator(
     world=WORLD,
     provider=SETTINGS.narrator_provider,

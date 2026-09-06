@@ -1243,6 +1243,22 @@ func adminAdjustItem(conn *storage.Conn, adminUserID int64, raw json.RawMessage)
 	if after < 0 {
 		after = 0
 	}
+	if delta > 0 && isUniqueEquipmentGo(item) {
+		// A unique reward is one per character, carried or bound - see
+		// uniqueEquipmentIDsGo. Bound copies live in equipment_instances, not
+		// inventory, so a quantity check alone would let a GM grant a second
+		// carried copy to someone already wielding one.
+		if after > 1 {
+			return nil, fmt.Errorf("%s is unique: a character can hold at most one", item)
+		}
+		boundRes, err := conn.Execute(`SELECT COUNT(*) AS n FROM equipment_instances WHERE user_id=? AND item_id=?`, []any{uid, item})
+		if err != nil {
+			return nil, err
+		}
+		if r := firstRowMap(boundRes); r != nil && storage.ParseInt(r["n"]) > 0 {
+			return nil, fmt.Errorf("%s is unique and this character already has it bound", item)
+		}
+	}
 	if after == 0 {
 		if _, err = conn.Execute(`DELETE FROM inventory WHERE user_id=? AND item_id=?`, []any{uid, item}); err != nil {
 			return nil, err

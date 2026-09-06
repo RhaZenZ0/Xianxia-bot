@@ -1,4 +1,4 @@
-# Xianxia RP Discord Bot v0.20.5
+# Xianxia RP Discord Bot v0.20.7
 
 [![CI](https://github.com/RhaZenZ0/Xianxia-bot/actions/workflows/ci.yml/badge.svg)](https://github.com/RhaZenZ0/Xianxia-bot/actions/workflows/ci.yml)
 
@@ -630,6 +630,25 @@ Discord Administrator commands remain available alongside the web dashboard. The
 
 The web Admin Console is an additional local control surface, not a replacement for Discord permissions.
 
+### Quest Forge
+
+`/admin world questforge <story>` turns a few sentences of story into a quest. The narrator's
+free model chain drafts it in the game's own quest shape - objectives from the small vocabulary
+the engine tracks (`explore <location>`, `talk <NPC>`, `scene_action <kind>`, `sect_discovery`,
+`sect_trial`) and rewards inside your budget - and every location, NPC, scene action and item it
+names is checked against `content/world.json` before you see it. You get the draft with
+**Approve** / **Discard** buttons; only an approved quest appears in players' `/quests`.
+If the model is down or keeps producing something invalid, a procedural draft built from the
+same story is offered instead, marked as such. `/admin world quests` lists drafts (with the
+same buttons) and approved quests, and retires an approved one by key; the dashboard's
+Exploration view shows them too.
+
+With `QUEST_FORGE_AUTO=true` the bot also drafts one quest per notable world-history event
+(`QUEST_FORGE_MIN_SIGNIFICANCE`, default 80) every `QUEST_FORGE_INTERVAL_HOURS` and posts
+"Quest drafts ready" to the log channel - drafts only, never auto-approved. Rewards are capped
+by `QUEST_REWARD_MAX_XP` / `_STONES` / `_ITEMS` and granted by the Go engine when the quest
+completes; the player is told what they earned.
+
 ## Backups and maintenance
 
 Backups are created by the Go engine using the SQLite backup API and stored under the data backup directory.
@@ -873,7 +892,7 @@ tests/support.py         shared dependency shims and test path helpers
 
 ## Release status
 
-- Current release: v0.20.5. See `VERSIONS.md` for the full release-by-release history.
+- Current release: v0.20.7. See `VERSIONS.md` for the full release-by-release history.
 - Go owns canonical gameplay time, migrated gameplay mechanics, lifespan/death authority, road travel,
   caravan settlement, simulation mutation, and SQLite WAL.
 - Python owns Discord/RAG/dashboard/presentation orchestration and does not duplicate the removed

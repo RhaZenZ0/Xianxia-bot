@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import time
+
 """Core service layer introduced for the 0.7 architecture.
 
 Discord callbacks should increasingly delegate state decisions to these services instead
@@ -199,15 +201,51 @@ class NPCRelationshipService:
 
 
 class QuestService:
-    """Generic quest/objective engine shared by sect, NPC, family and world content."""
+    """Generic quest/objective engine shared by sect, NPC, family and world content.
+
+    The catalog is the static definitions in app/rules/quests.py plus every
+    Quest Forge definition a GM has approved (quest_definitions table, v0.20.6).
+    Progress is the engine's (`quest.progress`); on completion the declared
+    rewards are granted through `cultivation.reward`, the same engine action
+    the cultivation loop uses, so a forged quest can never write a table.
+    """
+
+    CATALOG_TTL_SECONDS = 15.0
 
     def __init__(self, db: Any, definitions: dict[str, dict[str, Any]], *, engine: Any):
         self.db = db
         self.definitions = definitions
         self.engine = engine
+        self._forged: dict[str, dict[str, Any]] = {}
+        self._forged_loaded_at = 0.0
+
+    async def catalog(self, *, refresh: bool = False) -> dict[str, dict[str, Any]]:
+        """Static definitions plus approved forged ones, forged never shadowing static."""
+        now = time.time()
+        if refresh or now - self._forged_loaded_at > self.CATALOG_TTL_SECONDS:
+            forged: dict[str, dict[str, Any]] = {}
+            lister = getattr(self.db, "list_quest_definitions", None)
+            if lister is not None:
+                try:
+                    for row in await lister("approved"):
+                        forged[str(row["quest_key"])] = {
+                            "title": row["title"], "description": row.get("description", ""),
+                            "source_type": row.get("source_type", "forge"), "source_key": row.get("source_key", ""),
+                            "objectives": list(row.get("objectives") or []), "rewards": dict(row.get("rewards") or {}),
+                        }
+                except Exception:
+                    forged = self._forged  # keep the last good catalog rather than dropping quests mid-play
+            self._forged = forged
+            self._forged_loaded_at = now
+        merged = dict(self._forged)
+        merged.update(self.definitions)
+        return merged
+
+    async def definition(self, quest_key: str) -> dict[str, Any] | None:
+        return (await self.catalog()).get(str(quest_key))
 
     async def accept(self, user_id: int, quest_key: str, *, game_minute: int = 0) -> dict[str, Any]:
-        if quest_key not in self.definitions:
+        if await self.definition(quest_key) is None:
             raise ValueError("Unknown quest.")
         return await self.db.accept_quest(int(user_id), quest_key, game_minute=int(game_minute))
 
@@ -220,9 +258,12 @@ class QuestService:
         target: str | None = None,
         game_minute: int = 0,
     ) -> list[dict[str, Any]]:
+        """Report one objective event. Returns the quest rows it touched; a row
+        that just completed carries `just_completed=True` and `rewards_granted`."""
         changed: list[dict[str, Any]] = []
+        catalog = await self.catalog()
         for row in await self.db.list_character_quests(int(user_id), status="active"):
-            definition = self.definitions.get(str(row.get("quest_key")))
+            definition = catalog.get(str(row.get("quest_key")))
             if not definition:
                 continue
             transition = dict(await self.engine.action(
@@ -236,17 +277,38 @@ class QuestService:
                     "target": target,
                 },
             ))
-            if transition.get("touched"):
-                refreshed = await self.db.list_character_quests(int(user_id))
-                current = next((r for r in refreshed if str(r["quest_key"]) == str(row["quest_key"])), None)
-                if current is not None:
-                    changed.append(current)
+            if not transition.get("touched"):
+                continue
+            refreshed = await self.db.list_character_quests(int(user_id))
+            current = next((r for r in refreshed if str(r["quest_key"]) == str(row["quest_key"])), None)
+            if current is None:
+                continue
+            current = dict(current)
+            current["title"] = definition.get("title", current["quest_key"])
+            if transition.get("complete"):
+                current["just_completed"] = True
+                current["rewards_granted"] = await self._grant_rewards(int(user_id), str(row["quest_key"]), definition)
+            changed.append(current)
         return changed
+
+    async def _grant_rewards(self, user_id: int, quest_key: str, definition: dict[str, Any]) -> dict[str, Any]:
+        rewards = dict(definition.get("rewards") or {})
+        payload = {
+            "cultivation": 0,
+            "spirit_stones": int(rewards.get("spirit_stones", 0) or 0),
+            "insight_xp": int(rewards.get("insight_xp", 0) or 0),
+            "items": {str(k): int(v) for k, v in dict(rewards.get("items") or {}).items() if int(v) > 0},
+            "event_type": f"quest_reward:{quest_key}",
+        }
+        if not (payload["spirit_stones"] or payload["insight_xp"] or payload["items"]):
+            return {}
+        await self.engine.action("cultivation.reward", user_id, payload)
+        return {k: v for k, v in payload.items() if k in ("spirit_stones", "insight_xp", "items") and v}
 
     async def available(self, user_id: int) -> list[dict[str, Any]]:
         existing = {str(r["quest_key"]): r for r in await self.db.list_character_quests(int(user_id))}
         result = []
-        for key, definition in self.definitions.items():
+        for key, definition in (await self.catalog()).items():
             if key in existing:
                 continue
             result.append({"quest_key": key, **definition})

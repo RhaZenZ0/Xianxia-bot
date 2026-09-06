@@ -35,7 +35,7 @@ from ..rules.sect_manor import (
 log = logging.getLogger("xianxia.database")
 
 
-SCHEMA_VERSION = 27
+SCHEMA_VERSION = 28
 # A readiness probe must validate more than the schema-version marker.  If the
 # SQLite file is removed or replaced while the bot is running, SQLite will
 # happily create a new empty file at the same path.  Checking these tables lets
@@ -1340,6 +1340,35 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
             "ALTER TABLE characters ADD COLUMN is_muted INTEGER NOT NULL DEFAULT 0",
             "ALTER TABLE characters ADD COLUMN is_frozen INTEGER NOT NULL DEFAULT 0",
             "ALTER TABLE characters ADD COLUMN moderation_reason TEXT NOT NULL DEFAULT ''",
+        ),
+    ),
+    (
+        28,
+        "quest_forge_definitions",
+        (
+            # Quest Forge (v0.20.6): quests drafted by the narrator's model from
+            # a GM prompt or a world-history event, held as drafts until a GM
+            # approves them, then served beside the static catalog in
+            # app/rules/quests.py. Same objective/reward shape as the catalog.
+            """CREATE TABLE IF NOT EXISTS quest_definitions (
+                quest_key TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                description TEXT NOT NULL DEFAULT '',
+                source_type TEXT NOT NULL DEFAULT 'forge',
+                source_key TEXT NOT NULL DEFAULT '',
+                objectives_json TEXT NOT NULL DEFAULT '[]',
+                rewards_json TEXT NOT NULL DEFAULT '{}',
+                status TEXT NOT NULL DEFAULT 'draft',
+                origin TEXT NOT NULL DEFAULT 'gm_prompt',
+                story_prompt TEXT NOT NULL DEFAULT '',
+                model TEXT NOT NULL DEFAULT '',
+                created_by INTEGER NOT NULL DEFAULT 0,
+                created_at REAL NOT NULL,
+                reviewed_by INTEGER,
+                reviewed_at REAL,
+                updated_at REAL NOT NULL
+            )""",
+            "CREATE INDEX IF NOT EXISTS idx_quest_definitions_status ON quest_definitions(status, created_at)",
         ),
     ),
 
@@ -3304,6 +3333,73 @@ class Database:
             await db.commit()
         rows = await self.list_character_quests(int(user_id))
         return next(r for r in rows if str(r["quest_key"]) == str(quest_key))
+
+    # ---- Quest Forge definitions (v0.20.6) --------------------------------
+
+    @staticmethod
+    def _quest_definition_row(data: dict[str, Any]) -> dict[str, Any]:
+        row = dict(data)
+        for column, key, default in (("objectives_json", "objectives", []), ("rewards_json", "rewards", {})):
+            try:
+                row[key] = json.loads(str(row.pop(column, "") or "") or json.dumps(default))
+            except Exception:
+                row[key] = default
+        return row
+
+    async def list_quest_definitions(self, status: str | None = None, *, limit: int = 200) -> list[dict[str, Any]]:
+        async with self._connect() as db:
+            db.row_factory = aiosqlite.Row
+            if status is None:
+                cur = await db.execute("SELECT * FROM quest_definitions ORDER BY created_at DESC LIMIT ?", (int(limit),))
+            else:
+                cur = await db.execute(
+                    "SELECT * FROM quest_definitions WHERE status=? ORDER BY created_at DESC LIMIT ?", (str(status), int(limit)),
+                )
+            return [self._quest_definition_row(dict(r)) for r in await cur.fetchall()]
+
+    async def get_quest_definition(self, quest_key: str) -> dict[str, Any] | None:
+        async with self._connect() as db:
+            db.row_factory = aiosqlite.Row
+            cur = await db.execute("SELECT * FROM quest_definitions WHERE quest_key=?", (str(quest_key),))
+            row = await cur.fetchone()
+            return self._quest_definition_row(dict(row)) if row else None
+
+    async def save_quest_definition(self, definition: dict[str, Any], *, status: str = "draft", origin: str = "gm_prompt",
+                                    story_prompt: str = "", model: str = "", created_by: int = 0) -> dict[str, Any]:
+        """Insert or replace a forged definition. `definition` is the catalog
+        shape (title, description, source_type, source_key, objectives, rewards)
+        plus quest_key; validation is the caller's (app/rules/quests.py)."""
+        now = time.time()
+        async with self._connect() as db:
+            await db.execute(
+                """INSERT INTO quest_definitions(quest_key,title,description,source_type,source_key,objectives_json,rewards_json,
+                       status,origin,story_prompt,model,created_by,created_at,updated_at)
+                   VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                   ON CONFLICT(quest_key) DO UPDATE SET title=excluded.title,description=excluded.description,
+                       source_type=excluded.source_type,source_key=excluded.source_key,objectives_json=excluded.objectives_json,
+                       rewards_json=excluded.rewards_json,status=excluded.status,origin=excluded.origin,
+                       story_prompt=excluded.story_prompt,model=excluded.model,updated_at=excluded.updated_at""",
+                (
+                    str(definition["quest_key"]), str(definition["title"]), str(definition.get("description", "")),
+                    str(definition.get("source_type", "forge")), str(definition.get("source_key", "")),
+                    json.dumps(list(definition.get("objectives", []))), json.dumps(dict(definition.get("rewards", {}))),
+                    str(status), str(origin), str(story_prompt)[:2000], str(model)[:120], int(created_by), now, now,
+                ),
+            )
+            await db.commit()
+        return await self.get_quest_definition(str(definition["quest_key"]))
+
+    async def set_quest_definition_status(self, quest_key: str, status: str, *, reviewed_by: int = 0) -> bool:
+        if status not in ("draft", "approved", "retired", "discarded"):
+            raise ValueError("Unknown quest definition status.")
+        now = time.time()
+        async with self._connect() as db:
+            cur = await db.execute(
+                "UPDATE quest_definitions SET status=?,reviewed_by=?,reviewed_at=?,updated_at=? WHERE quest_key=?",
+                (str(status), int(reviewed_by), now, now, str(quest_key)),
+            )
+            await db.commit()
+            return bool(cur.rowcount)
 
     async def list_character_quests(self, user_id: int, status: str | None = None) -> list[dict[str, Any]]:
         async with self._connect() as db:

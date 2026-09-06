@@ -61,7 +61,8 @@ from ...rules.sect_recruitment import (
 )
 from ..registry import registered_group_command
 from ..locations import _known_locations, current_npc_location
-from ..services import SIM
+from ..character_state import announce_quest_progress
+from ..services import QUESTS, SIM
 from ..threads import ensure_sect_abode_record, ensure_sect_abode_thread_for
 from ..runtime import (
     DB,
@@ -70,6 +71,7 @@ from ..runtime import (
     carried_item_autocomplete,
     character_location_display,
     current_world_time,
+    log,
     reply_long,
     require_character,
     serialized_user_action,
@@ -388,6 +390,14 @@ async def sect_recruitment_trial(interaction: discord.Interaction, sect_name: st
         await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
     outcome=str(r.get('outcome','fail')); p=dict(r.get('primary') or {}); q=dict(r.get('secondary') or {})
     await interaction.response.send_message(f"**{profile.trial_name}** — {outcome.replace('_',' ').title()}\nPrimary: **{p.get('total','?')}** vs TN **{p.get('tn','?')}**\nSecondary: **{q.get('total','?')}** vs TN **{q.get('tn','?')}**",ephemeral=False)
+    # The "A Road Toward a Sect" quest's sect_trial objective was never
+    # reported anywhere, so the quest could not complete (found while building
+    # the Quest Forge, v0.20.6).
+    try:
+        wt_trial = await current_world_time()
+        await announce_quest_progress(interaction, await QUESTS.progress(interaction.user.id, "sect_trial", amount=1, game_minute=wt_trial.total_minutes))
+    except Exception:
+        log.exception("Quest progress update failed after sect trial")
 
 
 @registered_group_command(sect_recruitment_group, name="history", description="Review your recent sect recommendation and entrance-trial history")

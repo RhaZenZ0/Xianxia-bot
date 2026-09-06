@@ -22,7 +22,7 @@ PACKAGES = {
         "progression_systems", "quests", "realm_hubs", "samsara", "seclusion", "sect", "sect_manor",
         "sect_recruitment", "sense", "trade_receipt", "worldtime",
     },
-    "ai": {"ai_router", "chat_monitor", "narrator", "narrator_context", "rag"},
+    "ai": {"ai_router", "chat_monitor", "narrator", "narrator_context", "quest_forge", "rag"},
     "ops": {
         "config", "core_services", "game_engine", "health", "healthcheck", "http_limits", "operations",
         "performance", "release_channel",

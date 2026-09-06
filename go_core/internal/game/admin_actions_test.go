@@ -705,6 +705,67 @@ func TestAdminAdjustItemGrantsAndFloorsAtZeroOnRemoval(t *testing.T) {
 	}
 }
 
+func applyAdminErr(t *testing.T, path, op string, payload map[string]any) error {
+	t.Helper()
+	raw, _ := json.Marshal(payload)
+	_, err := Apply(path, ActionRequest{Operation: op, ActorID: 0, Payload: raw})
+	return err
+}
+
+func TestAdminAdjustItemRefusesSecondCopyOfUniqueEquipment(t *testing.T) {
+	// The dashboard's Adjust Inventory card reaches adjust_item with no Python
+	// guard in front of it, so uniqueness has to hold here. Ordinary items are
+	// untouched by the rule (the 5-then-more spirit_herb path above).
+	path := setupAdminDB(t)
+	applyAdmin(t, path, "admin.player.adjust_item", map[string]any{"user_id": 42, "item_id": bugslayerSwordItemID, "quantity": 1, "reason": "reward"})
+	if got := storage.ParseInt(scalar(t, path, "SELECT quantity FROM inventory WHERE user_id=42 AND item_id=?", bugslayerSwordItemID)); got != 1 {
+		t.Fatalf("quantity=%d, want 1", got)
+	}
+	if err := applyAdminErr(t, path, "admin.player.adjust_item", map[string]any{"user_id": 42, "item_id": bugslayerSwordItemID, "quantity": 1, "reason": "again"}); err == nil {
+		t.Fatal("expected a second carried copy of a unique item to be refused")
+	}
+	if got := storage.ParseInt(scalar(t, path, "SELECT quantity FROM inventory WHERE user_id=42 AND item_id=?", bugslayerSwordItemID)); got != 1 {
+		t.Fatalf("quantity=%d after refused grant, want still 1", got)
+	}
+	if err := applyAdminErr(t, path, "admin.player.adjust_item", map[string]any{"user_id": 42, "item_id": bugslayerSwordItemID, "quantity": 2, "reason": "two at once"}); err == nil {
+		t.Fatal("expected a delta that would exceed one copy to be refused")
+	}
+	// Removal is never blocked by uniqueness - that is how a mistaken grant is undone.
+	applyAdmin(t, path, "admin.player.adjust_item", map[string]any{"user_id": 42, "item_id": bugslayerSwordItemID, "quantity": -1, "reason": "take back"})
+	if got := scalar(t, path, "SELECT quantity FROM inventory WHERE user_id=42 AND item_id=?", bugslayerSwordItemID); got != nil {
+		t.Fatalf("expected the row deleted, got %v", got)
+	}
+}
+
+func TestAdminAdjustItemRefusesUniqueEquipmentAlreadyBound(t *testing.T) {
+	path := setupAdminDB(t)
+	conn, err := storage.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = conn.Execute(`INSERT INTO equipment_instances(equipment_id,user_id,item_id,slot,durability,max_durability,quality,equipped,bound_at,updated_at) VALUES(1,42,?,'weapon',100,100,100,1,0,0)`, []any{bugslayerSwordItemID}); err != nil {
+		conn.Close()
+		t.Fatal(err)
+	}
+	if _, err = conn.Execute(`INSERT INTO characters VALUES(43,'Second Test','alive','Old Place',0,10,10,10,10,0,0,1,NULL,NULL,0,0,0,'')`, nil); err != nil {
+		conn.Close()
+		t.Fatal(err)
+	}
+	if err = conn.Commit(); err != nil {
+		conn.Close()
+		t.Fatal(err)
+	}
+	conn.Close()
+	if err := applyAdminErr(t, path, "admin.player.adjust_item", map[string]any{"user_id": 42, "item_id": bugslayerSwordItemID, "quantity": 1, "reason": "duplicate"}); err == nil {
+		t.Fatal("expected a carried copy to be refused while one is bound")
+	}
+	if got := scalar(t, path, "SELECT quantity FROM inventory WHERE user_id=42 AND item_id=?", bugslayerSwordItemID); got != nil {
+		t.Fatalf("expected no inventory row, got %v", got)
+	}
+	// A different character is unaffected.
+	applyAdmin(t, path, "admin.player.adjust_item", map[string]any{"user_id": 43, "item_id": bugslayerSwordItemID, "quantity": 1, "reason": "other player"})
+}
+
 func TestAdminNpcRelocateUpdatesLocationAndAudits(t *testing.T) {
 	path := setupAdminDB(t)
 	conn, err := storage.Open(path)
