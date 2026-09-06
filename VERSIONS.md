@@ -2,7 +2,7 @@
 
 This is the release-by-release changelog for the Xianxia RP Discord Bot, split out of `README.md`
 so the README can stay focused on architecture, setup, and current operational documentation. See
-`README.md` for that; see `docs/V020_RELEASE_NOTES.md`, `docs/V019_RELEASE_NOTES.md`, `docs/V018_RELEASE_NOTES.md` and
+`README.md` for that; see `docs/V021_RELEASE_NOTES.md`, `docs/V020_RELEASE_NOTES.md`, `docs/V019_RELEASE_NOTES.md`, `docs/V018_RELEASE_NOTES.md` and
 `docs/V018_BUILD_HISTORY.md` for full per-release detail beyond the summaries below.
 
 ## Changelog
@@ -330,12 +330,25 @@ sidecar wasn't the first asset (as with v0.20.7), that truncation cut it out of 
 anchors on `"assets_url"`, which is always the release object's second top-level key and never appears
 on an asset. No schema change, no gameplay change.
 
-See `docs/V020_RELEASE_NOTES.md` for v0.20.0, `docs/V019_RELEASE_NOTES.md` for the full detail on every v0.19.x release above, `docs/V018_RELEASE_NOTES.md` and
+**0.20.9** makes `update.sh` send the engine token with its pre-update backup request (every update from a
+0.20 engine had failed there), abort into rollback when a delete or copy fails, and refuse to start a tree
+that does not match `RELEASE_MANIFEST.sha256`. No schema change.
+
+**0.21.0** opens the roadmap's Authority I milestone. The authority-boundary contract gains the v0.21 gate: an
+allowlist of every DB write reachable from `app/bot/` and `app/ops/` (27 gameplay rows at the start, plus the
+bookkeeping writes that stay in Python), which must be empty before v0.21 is tagged stable. The first row
+lands: the non-battle `/use` path is the engine action `item.use` (consume, restore, life extension,
+effect, toxicity in one transaction), and the handler only formats. 22 rows remain. No schema change.
+
+See `docs/V021_RELEASE_NOTES.md` for v0.21.0, `docs/V020_RELEASE_NOTES.md` for v0.20.0, `docs/V019_RELEASE_NOTES.md` for the full detail on every v0.19.x release above, `docs/V018_RELEASE_NOTES.md` and
 `docs/V018_BUILD_HISTORY.md` (consolidated validation/audit record) for the prior staged-authority migration.
 
-## Release status — v0.20.8
+## Release status — v0.21.0
 
-- Current release: v0.20.8: fixes `update.sh` dropping the `.sha256` sidecar asset when it
+- Current release: v0.21.0: Authority I begins - the v0.21 gate (DB-write allowlist) and `item.use`.
+- v0.20.9: the updater authenticates its backup call to the engine, aborts on a
+  failed copy, and verifies the installed tree against the manifest before starting.
+- v0.20.8: fixes `update.sh` dropping the `.sha256` sidecar asset when it
   wasn't the first asset on the release.
 - v0.20.7: the two v0.20.6 builds merged - Quest Forge (schema 28) and the
   dashboard item-grant fix.

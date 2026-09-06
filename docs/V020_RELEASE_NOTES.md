@@ -1,12 +1,12 @@
 # Xianxia RP Discord Bot — v0.20 release notes
 
-Shipping as **v0.20.8**. The v0.19 line (v0.19 through v0.19.48) is in
+The v0.20 line closed at **v0.20.9**; the current release is in `docs/V021_RELEASE_NOTES.md`. The v0.19 line (v0.19 through v0.19.48) is in
 `docs/V019_RELEASE_NOTES.md`; the staged-authority migration before it in
-`docs/V018_RELEASE_NOTES.md`. The release is stamped 0.20.8 in `app/version.py`,
+`docs/V018_RELEASE_NOTES.md`. v0.20.9 was stamped 0.20.9 in `app/version.py`,
 `VERSION`, the `Dockerfile` and `docker-compose.yml`, and carries schema 28
 (v0.20.6: `quest_definitions`; 27 since v0.19.29 before that).
 
-Release date: 2026-09-05 (v0.20.0, v0.20.1, v0.20.2) / 2026-09-06 (v0.20.3, v0.20.4, v0.20.5, v0.20.6, v0.20.7, v0.20.8).
+Release date: 2026-09-05 (v0.20.0, v0.20.1, v0.20.2) / 2026-09-06 (v0.20.3, v0.20.4, v0.20.5, v0.20.6, v0.20.7, v0.20.8, v0.20.9).
 
 ## v0.20.0 — main.py split complete: phase 10, the final sweep
 
@@ -623,3 +623,30 @@ pair instead - verified against the real `releases/latest` API response for this
 v0.20.7 release (zip listed before the sidecar) and against a multi-release beta listing, both
 of which now resolve `RELEASE_TAG`, `RELEASE_ARCHIVE_URL` and `RELEASE_SHA_URL` correctly.
 Updater-only fix; no schema change, no gameplay change.
+
+## v0.20.9 — the updater against a tokened engine, and a mixed tree
+
+The first update attempted *from* a 0.20 engine (0.20.8 over 0.20.8, on
+the NAS) stopped at "Could not create a safe SQLite backup. Start the
+current stack and retry." with the stack running. Since v0.20.0 the
+engine requires `X-Xianxia-Engine-Token` on every `/v1/` route, and the
+updater's pre-update backup was an unauthenticated POST to
+`/v1/db/backups`; the 401 read as "no backup". The 0.19.20 → 0.20.4
+update had worked only because the old engine carried no token. The
+request is now assembled inside the engine container (`docker compose
+exec … sh -c '…$ENGINE_AUTH_TOKEN…'`), where the token already lives, so
+nothing on the host needs to read `.env`.
+
+The same NAS had earlier ended up with 0.20.8's `VERSION`, manifest and
+docs on pre-Quest-Forge code — `app/ai/quest_forge.py` absent, the GM
+panel showing schema 27 — after an install run by an account that did
+not own the project folder; the updater then answered "package 0.20.8 is
+not newer than installed 0.20.8". The commit loop now aborts into the
+rollback on any delete or copy that fails (naming ownership as the
+likely cause), and after the copy the whole tree is checked against
+`RELEASE_MANIFEST.sha256` before `startup.sh` is called: a tree that is
+not byte-for-byte the release never starts.
+
+The workflow's zip excludes `.pytest_cache/` and `.ruff_cache/` (0.20.8's
+archive carried both). Two contract tests pin the updater changes; both
+kill their mutants. No schema change; no gameplay change.

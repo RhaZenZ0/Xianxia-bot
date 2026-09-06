@@ -82,6 +82,7 @@ def test_python_go_authority_boundary_only_delegates_migrated_mechanics():
         "artifact_bond": "artifact.bond",
         "artifact_awaken": "artifact.awaken",
         "birth_family_child": "family.add_child",
+        "use_item_command": "item.use",  # v0.21.0
     }
     for function_name, operation in expected_operations.items():
         assert function_name in FUNCTIONS, function_name
@@ -507,3 +508,135 @@ def test_sect_recruitment_does_not_send_caller_computed_rolls():
     for fn in ("sect_recruitment_recommendation", "sect_recruitment_trial"):
         hit = forbidden & _authoritative_action_payload_keys(fn)
         assert not hit, f"{fn} still sends a forged-roll payload field: {hit}"
+
+
+# ---------------------------------------------------------------------------
+# v0.21 gate (docs/ROADMAP_1_0.md, "Authority I"): every DB mutator call site
+# reachable from app/bot/ and app/ops/ is listed here. PLAYER_MUTATIONS is the
+# milestone's backlog - each entry names the engine action that replaces it,
+# and the milestone closes when the dict is empty. BOOKKEEPING_METHODS are the
+# writes that are not gameplay outcomes (narration history, RAG memory, thread
+# and channel ids, ops telemetry, the GM's quest-draft review) and stay in
+# Python. A mutator that is in neither set fails the gate: a new gameplay
+# write cannot be added from Python without appearing here, and a migrated one
+# cannot stay here once its row is deleted.
+# ---------------------------------------------------------------------------
+
+import re
+
+APP_DIR = PROJECT_ROOT / "app"
+WRITE_SQL = re.compile(r"^\s*(INSERT|UPDATE|DELETE|REPLACE)\b", re.I | re.M)
+
+PLAYER_MUTATIONS = {
+    # (file under app/, enclosing function, DB method): engine action that replaces it
+    # v0.21.0: the five use_item_command rows became `item.use`.
+    ("bot/commands/exploration.py", "alchemy_purge", "spend_resources"): "alchemy.purge",
+    ("bot/commands/exploration.py", "alchemy_purge", "set_cooldown"): "alchemy.purge",
+    ("bot/commands/sect.py", "sect_shadow", "set_hidden_sect_status"): "sect.shadow",
+    ("bot/commands/sect.py", "sect_shadow", "initiate_hidden_sect"): "sect.shadow",
+    ("bot/commands/sect.py", "sect_shadow", "add_items"): "sect.shadow",
+    ("bot/commands/sect.py", "sect_shadow", "record_item_provenance"): "sect.shadow",
+    ("bot/commands/law.py", "law_technique_command", "apply_effect"): "law.technique (existing)",
+    ("bot/character_state.py", "sync_pill_toxicity_effect", "remove_effect"): "engine-owned toxicity curve",
+    ("bot/character_state.py", "sync_pill_toxicity_effect", "apply_effect"): "engine-owned toxicity curve",
+    ("bot/admin/world_ops.py", "admin_setsect", "set_sect_membership"): "admin.player.set_sect",
+    ("bot/admin/world_ops.py", "admin_removesect", "clear_sect_membership"): "admin.player.set_sect",
+    ("bot/admin/world_ops.py", "admin_setmaster", "set_master"): "admin.player.set_master",
+    ("bot/admin/world_ops.py", "admin_clearmaster", "clear_master"): "admin.player.set_master",
+    ("bot/admin/world_ops.py", "admin_sect_rank", "set_sect_rank"): "admin.player.set_sect_rank",
+    ("bot/admin/world_ops.py", "admin_master_attention", "adjust_master_attention"): "admin.player.master_attention",
+    ("bot/admin/world_ops.py", "admin_grant_storage", "set_storage_container"): "admin.player.grant_storage",
+    ("bot/admin/world_ops.py", "admin_spawnrealm", "activate_world_event"): "admin.world.spawn_realm",
+    ("bot/commands/character.py", "set_gender", "set_gender"): "character.set_gender",
+    ("bot/commands/sect.py", "sect_abode", "set_location"): "abode.enter (adjacent)",
+    ("bot/commands/exploration.py", "explore", "discover_sect"): "sect.discover",
+    ("bot/commands/sect.py", "_sync_sect_discoveries", "discover_sect"): "sect.discover",
+    ("ops/core_services.py", "accept", "accept_quest"): "quest.accept",
+}
+
+BOOKKEEPING_METHODS = {
+    # narration and memory
+    "add_history", "add_rag_memory", "add_npc_player_memory", "set_npc_memory", "record_world_history_event",
+    # reads whose bodies also expire stale rows
+    "get_active_world_events", "get_alchemy_state", "get_secret_realm_run", "get_social_state", "get_world_clock",
+    "list_npc_player_memories",
+    # Discord ids: channels, messages, threads
+    "set_channel_message", "set_server_channels", "set_info_message_id", "set_bugs_channel_id", "set_realm_hub_channel",
+    "set_expedition_thread", "set_birth_family_household_thread", "set_sect_abode_thread", "set_abode_thread",
+    "register_event_thread", "close_event_thread", "ensure_sect_abode", "update_expedition_location",
+    # ops telemetry, startup, maintenance
+    "init", "sync_world_catalog", "sync_rag_canon", "record_startup_event", "record_operational_alert",
+    "flush_slow_query_log", "maintenance_cleanup", "log_admin_action",
+    # cosmetic / GM review of drafts (no gameplay table)
+    "set_address_style", "set_quest_definition_status",
+}
+
+
+def _database_mutators() -> set[str]:
+    names = set()
+    for path in sorted((APP_DIR / "database").glob("*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for cls in (n for n in ast.walk(tree) if isinstance(n, ast.ClassDef)):
+            for fn in cls.body:
+                if isinstance(fn, (ast.FunctionDef, ast.AsyncFunctionDef)) and any(
+                    isinstance(c, ast.Constant) and isinstance(c.value, str) and WRITE_SQL.search(c.value)
+                    for c in ast.walk(fn)
+                ):
+                    names.add(fn.name)
+    return names
+
+
+def _mutator_call_sites(mutators: set[str]) -> set[tuple[str, str, str]]:
+    sites = set()
+    for package in ("bot", "ops"):
+        for path in sorted((APP_DIR / package).rglob("*.py")):
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            for fn in ast.walk(tree):
+                if not isinstance(fn, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    continue
+                for node in ast.walk(fn):
+                    if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)):
+                        continue
+                    if node.func.attr not in mutators:
+                        continue
+                    base = node.func.value
+                    via_db = (isinstance(base, ast.Name) and base.id in ("DB", "db")) or (
+                        isinstance(base, ast.Attribute) and base.attr in ("db", "_db", "database")
+                    )
+                    if via_db:
+                        sites.add((str(path.relative_to(APP_DIR)).replace("\\", "/"), fn.name, node.func.attr))
+    return sites
+
+
+def test_the_mutator_scan_still_sees_the_database_layer():
+    mutators = _database_mutators()
+    assert len(mutators) >= 60, sorted(mutators)
+    for name in ("consume_item", "apply_effect", "accept_quest", "add_history"):
+        assert name in mutators
+
+
+def test_v0_21_gate_every_db_write_from_bot_and_ops_is_allowlisted():
+    sites = _mutator_call_sites(_database_mutators())
+    gameplay = {site for site in sites if site[2] not in BOOKKEEPING_METHODS}
+    unlisted = gameplay - set(PLAYER_MUTATIONS)
+    assert not unlisted, (
+        "DB writes from Python that are neither a listed v0.21 row nor bookkeeping "
+        "(gameplay outcomes belong in an engine action):\n" + "\n".join(f"  {s}" for s in sorted(unlisted))
+    )
+    gone = set(PLAYER_MUTATIONS) - gameplay
+    assert not gone, (
+        "v0.21 rows no longer present in the code - delete them from PLAYER_MUTATIONS "
+        "(and record the engine action that replaced them in the release notes):\n"
+        + "\n".join(f"  {s}" for s in sorted(gone))
+    )
+    stale = BOOKKEEPING_METHODS - {site[2] for site in sites}
+    assert not stale, f"bookkeeping methods no longer called from bot/ops: {sorted(stale)}"
+
+
+def test_the_v0_21_backlog_only_shrinks():
+    # The milestone is done when this is empty; until then every row names the
+    # action that will replace it. Reordering the roadmap changes the values,
+    # never adds keys.
+    assert len(PLAYER_MUTATIONS) <= 27, "v0.21 is about removing Python-side gameplay writes, not adding them"
+    for site, action in PLAYER_MUTATIONS.items():
+        assert action, site
