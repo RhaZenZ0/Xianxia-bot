@@ -202,8 +202,12 @@ resolve_release() {
     fi
     # Isolate the first release object (up to and including its assets).
     first=$(mktemp "${TMPDIR:-/tmp}/.xianxia-release.XXXXXX")
-    # (a sed that deletes from the second object onward - no newline tricks, so BusyBox sed is fine)
-    tr -d '\n' < "$listing" | sed 's/},[[:space:]]*{[[:space:]]*"url".*$//' > "$first"
+    # (a sed that deletes from the second release object onward - no newline tricks, so
+    # BusyBox sed is fine. Each asset in the release's "assets" array also starts with
+    # its own "url" field, so matching bare {"url" would truncate mid-array and drop
+    # later assets, incl. the .sha256 sidecar; "assets_url" is the release object's
+    # second key and never appears on an asset, so anchor on that pair instead.)
+    tr -d '\n' < "$listing" | sed 's/},[[:space:]]*{"url":"[^"]*","assets_url".*$//' > "$first"
     RELEASE_TAG=$(json_field "$first" tag_name)
     RELEASE_PAGE=$(json_field "$first" html_url)
     RELEASE_VERSION=$(printf '%s' "$RELEASE_TAG" | sed 's/^v//; s/-.*$//')
