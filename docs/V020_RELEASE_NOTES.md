@@ -1,12 +1,12 @@
 # Xianxia RP Discord Bot — v0.20 release notes
 
-Shipping as **v0.20.4**. The v0.19 line (v0.19 through v0.19.48) is in
+Shipping as **v0.20.5**. The v0.19 line (v0.19 through v0.19.48) is in
 `docs/V019_RELEASE_NOTES.md`; the staged-authority migration before it in
-`docs/V018_RELEASE_NOTES.md`. The release is stamped 0.20.4 in `app/version.py`,
+`docs/V018_RELEASE_NOTES.md`. The release is stamped 0.20.5 in `app/version.py`,
 `VERSION`, the `Dockerfile` and `docker-compose.yml`, and carries schema 27,
 unchanged since v0.19.29.
 
-Release date: 2026-09-05 (v0.20.0, v0.20.1, v0.20.2) / 2026-09-06 (v0.20.3, v0.20.4).
+Release date: 2026-09-05 (v0.20.0, v0.20.1, v0.20.2) / 2026-09-06 (v0.20.3, v0.20.4, v0.20.5).
 
 ## v0.20.0 — main.py split complete: phase 10, the final sweep
 
@@ -366,3 +366,51 @@ dropped; `>=` for "newer"; the stable filter removed; announce-every-time;
 
 Go untouched. Python full suite against v0.20.3: 606 tests versus 580
 (+26), identical failure set; pytest-style 22/22.
+
+## v0.20.5 — the updater checks .env before it stops anything
+
+The first install of v0.20.4 on a NAS that had been on 0.19.20 ended like
+this:
+
+```
+Starting Xianxia RP 0.20.4...
+ERROR: ENGINE_AUTH_TOKEN must be at least 20 characters. Generate one with: ...
+Update failed; rolling back Xianxia RP 0.20.4 -> 0.19.20.
+```
+
+Everything worked as designed - the rollback restored code and database
+and restarted 0.19.20 - but the whole stop / fail / restore / restart cycle
+was for a one-line `.env` edit that could have been asked for before a
+container was touched. The installed `.env` predated `ENGINE_AUTH_TOKEN`,
+and `startup.sh` is the first thing that checks it.
+
+- `startup.sh --check-env [FILE]` validates a `.env` (the installed one by
+  default) against the release's requirements - `DISCORD_TOKEN`, `GUILD_ID`,
+  `ENGINE_AUTH_TOKEN` length, the narrator provider and its key, and
+  `DASHBOARD_TOKEN` when the dashboard is on - and exits 0 or 1 without
+  touching Docker and without creating a `.env`. The dashboard-token check
+  was hoisted above the start so it runs in check mode too.
+- `update.sh` runs the **staged** release's `startup.sh --check-env` against
+  the installed `.env` right after the manifest check and before
+  `ROLLBACK_ARMED=1`, so a missing key is a message ("Nothing was stopped or
+  changed") and the running stack keeps running. It only asks a package
+  whose `startup.sh` knows the flag; an older package would start the stack.
+
+This protects the *next* update, not this one: the preflight lives in the
+updater that runs, and a 0.19.20 install still runs 0.19.20's. The
+recovery for the failed install is the `.env` edit itself - generate a
+token with `python3 -c "import secrets; print(secrets.token_urlsafe(32))"`,
+add `ENGINE_AUTH_TOKEN=<token>`, make sure `DASHBOARD_TOKEN` is set or
+`DASHBOARD_ENABLED=false`, then `./update.sh --install` again.
+
+### Guards
+
+`test_deployment_hardening.py::EnvPreflightTests` (4): a pre-0.19 `.env`
+is refused with the token hint and no `.env` is created; the dashboard
+token is checked in check mode; a complete `.env` passes with no Docker on
+`PATH`; `update.sh` preflights after the manifest check and before the
+rollback arm and `stop.sh`, using the staged copy. Two mutants killed:
+the Docker checks run in check mode; a missing file is silently accepted.
+The first-run guard was re-pointed to the new `$ENV_FILE` condition.
+
+No schema change; full suite 610 tests, identical failure set.

@@ -24,7 +24,7 @@ class FirstRunSetupTests(unittest.TestCase):
         all the way to the dashboard check and failed on a 20-character token it
         had never been told about.
         """
-        block = STARTUP[STARTUP.index("if [ ! -f .env ]"): STARTUP.index("DISCORD_TOKEN_VALUE=")]
+        block = STARTUP[STARTUP.index('if [ ! -f "$ENV_FILE" ]'): STARTUP.index("DISCORD_TOKEN_VALUE=")]
         dashboard_default_on = re.search(r"^DASHBOARD_ENABLED=(\w+)", ENV_EXAMPLE, re.M)
         self.assertIsNotNone(dashboard_default_on)
         if dashboard_default_on.group(1).lower() in {"1", "true", "yes", "on"}:
@@ -227,6 +227,62 @@ class ContainerBootstrapTests(unittest.TestCase):
         self.assertIn('BOT_CONTROL_URL: "http://xianxia-bot:8080"', COMPOSE)
         self.assertIn('test: ["CMD", "python", "-m", "app.ops.healthcheck"]', COMPOSE)
         self.assertIn("docker compose --profile dashboard down", STOP)
+
+
+class EnvPreflightTests(unittest.TestCase):
+    """v0.20.5: `startup.sh --check-env [FILE]` validates a .env against the
+    release's requirements without Docker and without starting anything, and
+    update.sh runs the STAGED release's copy against the installed .env
+    before it stops the stack. A 0.19.20 install updating to 0.20.4 failed at
+    startup on a missing ENGINE_AUTH_TOKEN and rolled back - correctly, but
+    a full stop/rollback/restart cycle for a one-line .env edit."""
+
+    def _check(self, env_text):
+        import subprocess
+        import tempfile
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for name in ("startup.sh", ".env.example", "VERSION"):
+                (root / name).write_text((PROJECT_ROOT / name).read_text(encoding="utf-8"), encoding="utf-8")
+            (root / "candidate.env").write_text(env_text, encoding="utf-8")
+            result = subprocess.run(
+                ["sh", "./startup.sh", "--check-env", "candidate.env"], cwd=root,
+                capture_output=True, text=True, env={"PATH": "/usr/bin:/bin"},
+            )
+            return result.returncode, result.stdout + result.stderr, (root / ".env").exists()
+
+    BASE = "DISCORD_TOKEN=x\nGUILD_ID=1\nOPENROUTER_API_KEY=k\n"
+
+    def test_a_pre_0_19_env_is_refused_with_the_token_hint_and_nothing_is_created(self):
+        rc, out, created = self._check(self.BASE + "DASHBOARD_ENABLED=false\n")
+        self.assertEqual(rc, 1)
+        self.assertIn("ENGINE_AUTH_TOKEN must be at least 20 characters", out)
+        self.assertFalse(created)
+
+    def test_the_dashboard_token_is_checked_in_check_mode_too(self):
+        rc, out, _ = self._check(self.BASE + "ENGINE_AUTH_TOKEN=abcdefghijklmnopqrstuvwxyz\nDASHBOARD_ENABLED=true\n")
+        self.assertEqual(rc, 1)
+        self.assertIn("DASHBOARD_TOKEN must be at least 20 characters", out)
+
+    def test_a_complete_env_passes_without_docker(self):
+        rc, out, _ = self._check(self.BASE + "ENGINE_AUTH_TOKEN=abcdefghijklmnopqrstuvwxyz\nDASHBOARD_ENABLED=false\n")
+        self.assertEqual(rc, 0, out)
+        self.assertIn("satisfies the requirements of Xianxia RP", out)
+        self.assertNotIn("Docker", out)
+
+    def test_update_sh_preflights_before_it_stops_anything(self):
+        update = (PROJECT_ROOT / "update.sh").read_text(encoding="utf-8")
+        preflight = update.index('sh ./startup.sh --check-env "$PROJECT_DIR/.env"')
+        self.assertLess(update.index("verify_release_manifest\n"), preflight)
+        self.assertLess(preflight, update.index("ROLLBACK_ARMED=1"))
+        self.assertLess(preflight, update.index('"$PROJECT_DIR/stop.sh"; else'))
+        # The new release's copy is what is asked - an older package without
+        # the flag would start the stack, so it is only run when it knows it.
+        self.assertIn("grep -q -- '--check-env' \"$NEW_ROOT/startup.sh\"", update)
+        self.assertIn('(cd "$NEW_ROOT" && sh ./startup.sh --check-env', update)
+        self.assertIn("Nothing was stopped or changed.", update)
 
 
 if __name__ == "__main__":
