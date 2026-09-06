@@ -1,4 +1,14 @@
-from app.rules.birthfamily import generate_samsara_family
+import json
+
+from tests.support import PROJECT_ROOT
+
+from app.rules.birthfamily import FAMILY_HOMELANDS, generate_samsara_family
+
+WORLDS = ("Mortal World", "Spiritual World", "Immortal World", "Celestial World")
+# Every city a birth family can call home, straight from the rules table
+# (11 archetypes x 4 worlds). test_family_homeland_playability.py used to
+# hand-copy the 44 names; merged here in v0.20.3.
+HOMELAND_CITIES = {profile[world] for profile in FAMILY_HOMELANDS.values() for world in WORLDS}
 
 
 EXPECTED_STARTERS = {
@@ -96,3 +106,27 @@ def test_lower_world_nobility_does_not_guarantee_upper_world_rank(monkeypatch) -
     assert status == "distant_surviving_branch"
     assert "never inherited its lower-world rank" in summary
     assert "not a royal continuation" in summary
+
+
+def test_the_homeland_table_is_eleven_archetypes_by_four_worlds() -> None:
+    assert len(FAMILY_HOMELANDS) == 11
+    for archetype, profile in FAMILY_HOMELANDS.items():
+        for world in WORLDS:
+            assert profile[world], f"{archetype} has no {world} city"
+    assert len(HOMELAND_CITIES) == 44, "two archetypes share a city"
+
+
+def test_every_family_homeland_is_explorable() -> None:
+    locations = json.loads((PROJECT_ROOT / "content" / "world.json").read_text(encoding="utf-8"))["locations"]
+    for city in sorted(HOMELAND_CITIES):
+        assert city in locations, city
+        assert locations[city]["encounters"], city
+        assert locations[city]["private"] is False, city
+
+
+def test_every_family_homeland_has_a_local_steward() -> None:
+    world = json.loads((PROJECT_ROOT / "content" / "world.json").read_text(encoding="utf-8"))
+    steward_locations = {
+        npc["location"] for name, npc in world["npcs"].items() if name.endswith(" Family Steward")
+    }
+    assert HOMELAND_CITIES <= steward_locations

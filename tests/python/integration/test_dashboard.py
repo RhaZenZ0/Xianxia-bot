@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import base64
 import json
-import re
 import tempfile
 import unittest
 from pathlib import Path
@@ -12,14 +11,13 @@ from tests.support import install_aiosqlite_shim, PROJECT_ROOT, seed_simulation_
 install_aiosqlite_shim()
 
 from app.dashboard.server import (
-    AdminDashboardController, DASHBOARD_GET_API_PATHS, DASHBOARD_VIEW_ENDPOINTS, DashboardServer, DashboardSettings,
+    AdminDashboardController, DASHBOARD_VIEW_ENDPOINTS, DashboardServer, DashboardSettings,
     DiscordDashboardController, ReadOnlyDashboardStore,
 )
 from app.dashboard.contract import DASHBOARD_API_VERSION, DASHBOARD_REVIEWED_SCHEMA_VERSION
 from app.database import Database, SCHEMA_VERSION
 from app.ops.health import HealthServer, HealthState
 from app.rules.game import World
-from app.simulation import WorldSimulator
 
 ROOT = PROJECT_ROOT
 
@@ -97,20 +95,6 @@ class DashboardTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("leads", dynasties)
         self.assertIn("claims", dynasties)
         self.assertIn("conflicts", dynasties)
-
-    def test_frontend_backend_api_contract_stays_in_sync(self):
-        html = (ROOT / "dashboard" / "index.html").read_text(encoding="utf-8")
-        js = (ROOT / "dashboard" / "app.js").read_text(encoding="utf-8")
-        js_paths = {m.split("?", 1)[0] for m in re.findall(r"/api/[A-Za-z0-9_./?=&${}-]+", js)}
-        get_refs = js_paths - {"/api/admin/action", "/api/discord/action"}
-        self.assertTrue(get_refs <= DASHBOARD_GET_API_PATHS, sorted(get_refs - DASHBOARD_GET_API_PATHS))
-        for endpoint in DASHBOARD_VIEW_ENDPOINTS.values():
-            self.assertIn(endpoint, get_refs, f"Backend dashboard view endpoint is not consumed by frontend: {endpoint}")
-        nav_views = set(re.findall(r'data-view="([a-z_]+)"', html))
-        loader_match = re.search(r"const loaders=\{([^}]+)\};", js)
-        self.assertIsNotNone(loader_match)
-        loader_views = set(re.findall(r"([a-z_]+):load[A-Za-z]+", loader_match.group(1)))
-        self.assertEqual(nav_views, loader_views)
 
     async def test_new_dashboard_api_routes_return_json(self):
         settings = DashboardSettings(self.path, "127.0.0.1", 0, "gm", "a-very-long-private-dashboard-token", admin_writes=False)

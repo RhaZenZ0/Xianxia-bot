@@ -12,7 +12,7 @@ runtime.py's value is that it is light and cycle-free; this module imports it
 and it never imports this one.
 
 Definition order below is exactly the order these had in main.py (the
-DefinitionOrderTests guard in tests/python/unit/test_bot_module_split.py
+DefinitionOrderTests guard in tests/python/unit/test_bot_package.py
 covers this file), and nothing here reads from any command module.
 """
 from __future__ import annotations

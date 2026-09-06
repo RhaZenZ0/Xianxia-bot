@@ -104,6 +104,10 @@ class Settings:
     game_engine_url: str
     game_engine_timeout_seconds: float
     game_engine_auth_token: str
+    update_check_enabled: bool
+    update_channel: str
+    update_repository: str
+    update_check_hours: int
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -349,6 +353,12 @@ class Settings:
             if value < 0:
                 raise RuntimeError(f"{field_name.upper()} cannot be negative")
 
+        update_channel = (os.getenv("UPDATE_CHANNEL") or "stable").strip().lower()
+        if update_channel not in ("stable", "beta"):
+            raise ValueError("UPDATE_CHANNEL must be 'stable' or 'beta'")
+        update_check_hours = int(os.getenv("UPDATE_CHECK_HOURS", "24"))
+        if update_check_hours < 1:
+            raise ValueError("UPDATE_CHECK_HOURS must be at least 1")
         return cls(
             discord_token=discord_token,
             guild_id=guild_id,
@@ -404,5 +414,9 @@ class Settings:
             game_engine_url=game_engine_url,
             game_engine_timeout_seconds=game_engine_timeout_seconds,
             game_engine_auth_token=game_engine_auth_token,
+            update_check_enabled=_as_bool(os.getenv("UPDATE_CHECK_ENABLED"), True),
+            update_channel=update_channel,
+            update_repository=(os.getenv("UPDATE_REPOSITORY") or "RhaZenZ0/Xianxia-bot").strip(),
+            update_check_hours=update_check_hours,
             **cooldowns,
         )

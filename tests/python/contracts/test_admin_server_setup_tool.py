@@ -5,7 +5,7 @@ from pathlib import Path
 from tests.support import install_aiosqlite_shim, PROJECT_ROOT, bot_function_source, bot_package_source, seed_character
 install_aiosqlite_shim()
 
-from app.database import Database, SCHEMA_VERSION
+from app.database import Database
 
 ROOT = PROJECT_ROOT
 # Phase 1 of the main.py split (v0.19.33): package-wide reads; the setup
@@ -73,6 +73,10 @@ class AdminServerSetupSourceTests(unittest.TestCase):
         self.assertIn("guild.create_text_channel", source)
         self.assertIn("guild.create_category", source)
         self.assertIn("create_missing: bool = False", source)
+        self.assertIn(
+            "can_create = create_missing and bool(me) and me.guild_permissions.manage_channels",
+            source,
+        )
         self.assertIn("Discord channel creation is dashboard-owned", source)
         self.assertIn("the bot will not provision channels", source)
         # The /admin slash command's call site must stay on the create_missing=False
@@ -85,7 +89,6 @@ class AdminServerSetupSourceTests(unittest.TestCase):
 
 class AdminServerSetupDatabaseTests(unittest.IsolatedAsyncioTestCase):
     async def test_bulk_role_reconciliation_can_list_character_owners(self):
-        self.assertEqual(SCHEMA_VERSION, 27)
         with tempfile.TemporaryDirectory() as tmp:
             db = Database(Path(tmp) / "server-setup.sqlite3")
             await db.init()

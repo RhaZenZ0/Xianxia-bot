@@ -4,14 +4,21 @@ set -eu
 # Xianxia RP transactional local updater (v0.17+).
 #
 # Usage:
-#   ./update.sh                 # check ./updates for a newer local ZIP
+#   ./update.sh                 # look in ./updates for a newer local ZIP (offline)
 #   ./update.sh --install       # install newest local ZIP from ./updates
 #   ./update.sh --install PATH  # install a specific local ZIP
 #   ./update.sh --force PATH    # intentional reinstall/downgrade
+#   ./update.sh --check         # ask the release channel (GitHub Releases) - network
+#   ./update.sh --fetch         # download + verify the newest release ZIP into ./updates
+#   ./update.sh --upgrade       # --fetch, then --install
+#   ... --channel stable|beta   # override UPDATE_CHANNEL from .env for this run
 #
-# No network access is used. .env, data/, updates/ and update_backups/ are
-# persistent. A live SQLite backup is created through the authoritative Go
-# engine before services are stopped. Failed installs restore code + database.
+# Without --check/--fetch/--upgrade no network access is used. .env, data/,
+# updates/ and update_backups/ are persistent. A live SQLite backup is created
+# through the authoritative Go engine before services are stopped. Failed
+# installs restore code + database. The release channel (v0.20.4) is
+# UPDATE_REPOSITORY / UPDATE_CHANNEL in .env; a fetched ZIP is verified
+# against the release's .sha256 sidecar before it is accepted into ./updates.
 
 # Run from a detached copy so a release can safely replace update.sh itself.
 if [ "${XIANXIA_UPDATER_REEXEC:-0}" != "1" ]; then
@@ -33,9 +40,10 @@ DB_PATH=${XIANXIA_DB_PATH:-$PROJECT_DIR/data/xianxia.sqlite3}
 VERSION_FILE="$PROJECT_DIR/VERSION"
 RUNNING_COPY=${XIANXIA_UPDATER_RUNNING_COPY:-}
 
-MODE=check
+MODE=local
 REQUESTED_ARCHIVE=""
 FORCE=0
+CHANNEL_OVERRIDE=""
 ROLLBACK_ARMED=0
 ROLLBACK_RUNNING=0
 STAGING_DIR=""
@@ -45,8 +53,20 @@ DB_BACKUP_PATH=""
 LOCK_DIR=""
 NEXT_UPDATER=""
 
+# `--channel X` may follow any of the network modes.
+take_channel() {
+    if [ "${1:-}" = "--channel" ]; then
+        CHANNEL_OVERRIDE=${2:-}
+        case "$CHANNEL_OVERRIDE" in stable|beta) ;; *) echo "ERROR: --channel must be stable or beta." >&2; exit 2 ;; esac
+        return 2
+    fi
+    [ $# -eq 0 ] || { echo "ERROR: Unexpected argument: $1" >&2; exit 2; }
+    return 0
+}
+
 case "${1:-}" in
-    ""|--check) MODE=check ;;
+    "") MODE=local ;;
+    --local) MODE=local ;;
     --install)
         MODE=install
         REQUESTED_ARCHIVE=${2:-}
@@ -57,8 +77,11 @@ case "${1:-}" in
         [ -n "$REQUESTED_ARCHIVE" ] || { echo "ERROR: --force requires a local ZIP path." >&2; exit 2; }
         [ $# -le 2 ] || { echo "ERROR: Too many arguments for --force." >&2; exit 2; }
         ;;
+    --check) MODE=remote_check; shift; take_channel "$@" || true ;;
+    --fetch) MODE=fetch; shift; take_channel "$@" || true ;;
+    --upgrade) MODE=upgrade; shift; take_channel "$@" || true ;;
     -h|--help)
-        sed -n '3,13p' "$0"
+        sed -n '3,20p' "$0"
         exit 0
         ;;
     *) echo "ERROR: Unknown option: $1" >&2; exit 2 ;;
@@ -124,7 +147,136 @@ find_latest_update() {
     rm -f "$candidates"
 }
 
-if [ "$MODE" = check ]; then
+# ---------------------------------------------------------------------------
+# Release channel (network only in --check / --fetch / --upgrade)
+# ---------------------------------------------------------------------------
+# Mirrors app/ops/release_channel.py: stable = GitHub's "latest" (full releases
+# only); beta = the newest release in the listing, pre-releases included. The
+# archive is xianxia_rp_v<version>.zip with a .sha256 sidecar; both are
+# release assets attached by .github/workflows/release.yml.
+env_value() {
+    # $1 = key; from $PROJECT_DIR/.env, ignoring comments, quotes stripped.
+    [ -f "$PROJECT_DIR/.env" ] || return 0
+    sed -n "s/^[[:space:]]*$1=//p" "$PROJECT_DIR/.env" | tail -n 1 | tr -d '"'"'" | tr -d '[:space:]'
+}
+UPDATE_REPOSITORY=${XIANXIA_UPDATE_REPOSITORY:-$(env_value UPDATE_REPOSITORY)}
+[ -n "$UPDATE_REPOSITORY" ] || UPDATE_REPOSITORY="RhaZenZ0/Xianxia-bot"
+UPDATE_CHANNEL=${CHANNEL_OVERRIDE:-${XIANXIA_UPDATE_CHANNEL:-$(env_value UPDATE_CHANNEL)}}
+[ -n "$UPDATE_CHANNEL" ] || UPDATE_CHANNEL=stable
+case "$UPDATE_CHANNEL" in stable|beta) ;; *) echo "ERROR: UPDATE_CHANNEL must be stable or beta (got: $UPDATE_CHANNEL)." >&2; exit 2 ;; esac
+API_BASE=${XIANXIA_UPDATE_API_BASE:-https://api.github.com}
+
+http_get() {
+    # $1 = url, $2 = output file. wget is what the NAS has; curl if present.
+    if command -v curl >/dev/null 2>&1; then
+        curl -fsSL --max-time 60 -H 'Accept: application/vnd.github+json' -H "User-Agent: xianxia-rp-updater/$CURRENT_VERSION" -o "$2" "$1"
+    elif command -v wget >/dev/null 2>&1; then
+        wget -q --timeout=60 --header='Accept: application/vnd.github+json' --header="User-Agent: xianxia-rp-updater/$CURRENT_VERSION" -O "$2" "$1"
+    else
+        echo "ERROR: Neither curl nor wget is available; cannot reach the release channel." >&2
+        return 1
+    fi
+}
+sha256_of() {
+    if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1" | awk '{print $1}'
+    elif command -v shasum >/dev/null 2>&1; then shasum -a 256 "$1" | awk '{print $1}'
+    elif command -v openssl >/dev/null 2>&1; then openssl dgst -sha256 "$1" | awk '{print $NF}'
+    else echo "ERROR: No sha256 tool (sha256sum/shasum/openssl) is available." >&2; return 1; fi
+}
+json_field() {
+    # $1 = file, $2 = key: the FIRST string value for "key" in the document.
+    tr -d '\n' < "$1" | sed -n "s/.*\"$2\":[[:space:]]*\"\([^\"]*\)\".*/\1/p" | head -n 1
+}
+# The GitHub listing is newest-first; the first release object is the one we
+# want for beta. For stable we ask /releases/latest, which GitHub defines as the
+# newest non-draft, non-prerelease release - the same rule the bot applies.
+resolve_release() {
+    RELEASE_TAG=""; RELEASE_VERSION=""; RELEASE_ARCHIVE_URL=""; RELEASE_SHA_URL=""; RELEASE_PAGE=""
+    listing=$(mktemp "${TMPDIR:-/tmp}/.xianxia-release.XXXXXX")
+    if [ "$UPDATE_CHANNEL" = stable ]; then
+        http_get "$API_BASE/repos/$UPDATE_REPOSITORY/releases/latest" "$listing" || { rm -f "$listing"; return 1; }
+        # /releases/latest returns a single object; the two-step below turns it into a one-element listing.
+        one=$(mktemp "${TMPDIR:-/tmp}/.xianxia-release.XXXXXX"); { printf '['; cat "$listing"; printf ']'; } > "$one"; mv -f "$one" "$listing"
+    else
+        http_get "$API_BASE/repos/$UPDATE_REPOSITORY/releases?per_page=10" "$listing" || { rm -f "$listing"; return 1; }
+    fi
+    # Isolate the first release object (up to and including its assets).
+    first=$(mktemp "${TMPDIR:-/tmp}/.xianxia-release.XXXXXX")
+    # (a sed that deletes from the second object onward - no newline tricks, so BusyBox sed is fine)
+    tr -d '\n' < "$listing" | sed 's/},[[:space:]]*{[[:space:]]*"url".*$//' > "$first"
+    RELEASE_TAG=$(json_field "$first" tag_name)
+    RELEASE_PAGE=$(json_field "$first" html_url)
+    RELEASE_VERSION=$(printf '%s' "$RELEASE_TAG" | sed 's/^v//; s/-.*$//')
+    RELEASE_ARCHIVE_URL=$(tr -d '\n' < "$first" | grep -o '"browser_download_url":[[:space:]]*"[^"]*xianxia_rp_v[0-9.]*\.zip"' | head -n 1 | sed 's/.*"\(http[^"]*\)"/\1/')
+    RELEASE_SHA_URL=$(tr -d '\n' < "$first" | grep -o '"browser_download_url":[[:space:]]*"[^"]*xianxia_rp_v[0-9.]*\.zip\.sha256"' | head -n 1 | sed 's/.*"\(http[^"]*\)"/\1/')
+    rm -f "$listing" "$first"
+    [ -n "$RELEASE_TAG" ] || { echo "ERROR: The release channel returned no release (repository $UPDATE_REPOSITORY, channel $UPDATE_CHANNEL)." >&2; return 1; }
+    valid_version "$RELEASE_VERSION" || { echo "ERROR: Release tag '$RELEASE_TAG' is not a version." >&2; return 1; }
+    [ -n "$RELEASE_ARCHIVE_URL" ] || { echo "ERROR: Release $RELEASE_TAG has no xianxia_rp_v<version>.zip asset (still building, or hand-made)." >&2; return 1; }
+    return 0
+}
+fetch_release() {
+    resolve_release || return 1
+    if ! version_gt "$RELEASE_VERSION" "$CURRENT_VERSION"; then
+        echo "Installed $CURRENT_VERSION is already the newest on the $UPDATE_CHANNEL channel ($RELEASE_VERSION)."
+        return 3
+    fi
+    target="$UPDATES_DIR/xianxia_rp_v$RELEASE_VERSION.zip"
+    partial="$target.part"
+    echo "Downloading $RELEASE_TAG from $UPDATE_REPOSITORY ($UPDATE_CHANNEL) ..."
+    http_get "$RELEASE_ARCHIVE_URL" "$partial" || { rm -f "$partial"; echo "ERROR: Download failed." >&2; return 1; }
+    if [ -n "$RELEASE_SHA_URL" ]; then
+        sidecar="$target.sha256"
+        http_get "$RELEASE_SHA_URL" "$sidecar" || { rm -f "$partial" "$sidecar"; echo "ERROR: Could not download the .sha256 sidecar." >&2; return 1; }
+        expected=$(awk '{print $1}' "$sidecar" | head -n 1 | tr 'A-F' 'a-f')
+        actual=$(sha256_of "$partial" | tr 'A-F' 'a-f')
+        if [ -z "$expected" ] || [ "$expected" != "$actual" ]; then
+            rm -f "$partial" "$sidecar"
+            echo "ERROR: SHA-256 mismatch for $RELEASE_TAG - the download was discarded." >&2
+            echo "       expected $expected" >&2; echo "       actual   $actual" >&2
+            return 1
+        fi
+        echo "SHA-256 verified: $actual"
+    else
+        rm -f "$partial"
+        echo "ERROR: Release $RELEASE_TAG has no .sha256 sidecar; refusing an unverifiable archive." >&2
+        return 1
+    fi
+    inner=$(archive_version "$partial")
+    [ "$inner" = "$RELEASE_VERSION" ] || { rm -f "$partial"; echo "ERROR: Archive VERSION ($inner) does not match release tag ($RELEASE_TAG)." >&2; return 1; }
+    mv -f "$partial" "$target"
+    echo "Fetched: $target"
+    FETCHED_ARCHIVE=$target
+    return 0
+}
+
+if [ "$MODE" = remote_check ]; then
+    echo "Xianxia RP installed version: $CURRENT_VERSION"
+    echo "Release channel: $UPDATE_REPOSITORY ($UPDATE_CHANNEL)"
+    resolve_release || exit 1
+    if version_gt "$RELEASE_VERSION" "$CURRENT_VERSION"; then
+        echo "UPDATE AVAILABLE: $RELEASE_VERSION ($RELEASE_TAG)"
+        [ -n "$RELEASE_PAGE" ] && echo "Release page: $RELEASE_PAGE"
+        echo "Fetch with: ./update.sh --fetch    (then ./update.sh --install, or ./update.sh --upgrade in one go)"
+    else
+        echo "Installed $CURRENT_VERSION is the newest on the $UPDATE_CHANNEL channel ($RELEASE_VERSION)."
+    fi
+    exit 0
+fi
+
+if [ "$MODE" = fetch ] || [ "$MODE" = upgrade ]; then
+    FETCHED_ARCHIVE=""
+    fetch_release; rc=$?
+    [ "$rc" -eq 3 ] && exit 0
+    [ "$rc" -eq 0 ] || exit 1
+    if [ "$MODE" = fetch ]; then
+        echo "Install with: ./update.sh --install"
+        exit 0
+    fi
+    MODE=install; REQUESTED_ARCHIVE=$FETCHED_ARCHIVE
+fi
+
+if [ "$MODE" = local ]; then
     find_latest_update
     echo "Xianxia RP installed version: $CURRENT_VERSION"
     echo "Local update folder: $UPDATES_DIR"
@@ -134,7 +286,8 @@ if [ "$MODE" = check ]; then
         echo "Install with: ./update.sh --install"
     else
         echo "No newer local Xianxia RP update was found."
-        echo "Place a newer Xianxia RP .zip in ./updates/ and run this script again."
+        echo "Place a newer Xianxia RP .zip in ./updates/ and run this script again,"
+        echo "or ask the release channel: ./update.sh --check  /  ./update.sh --fetch"
     fi
     exit 0
 fi

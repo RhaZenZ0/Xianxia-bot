@@ -6,7 +6,7 @@ things that would silently break the rollout: a hub quietly dropping back to the
 classic panel, the admin permission re-check going missing, and the component
 budget being exceeded by raising the per-page action limit.
 """
-from tests.support import PROJECT_ROOT, bot_package_source, bot_source_files
+from tests.support import PROJECT_ROOT, bot_package_source, declared_hub_names
 import ast
 import textwrap
 import re
@@ -36,20 +36,7 @@ def _layout_hub_names() -> set[str]:
 
 def _declared_hub_names() -> set[str]:
     """Every hub name declared anywhere in app/bot: 16 player hubs plus /admin."""
-    names = set()
-    for path in bot_source_files():
-      if path.name == "hubs.py":
-        continue  # defines HubDefinition itself
-      for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
-        if (
-            isinstance(node, ast.Call)
-            and isinstance(node.func, ast.Name)
-            and node.func.id == "HubDefinition"
-        ):
-            for keyword in node.keywords:
-                if keyword.arg == "name" and isinstance(keyword.value, ast.Constant):
-                    names.add(keyword.value.value)
-    return names
+    return set(declared_hub_names())
 
 
 class HubLayoutRolloutTests(unittest.TestCase):

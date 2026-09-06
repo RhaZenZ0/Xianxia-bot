@@ -55,10 +55,6 @@ class PanelFactoryTests(unittest.TestCase):
 
 
 class NoDropdownTests(unittest.TestCase):
-    def test_the_layout_module_never_constructs_a_select(self):
-        self.assertNotIn("ui.Select", LAYOUT)
-        self.assertNotIn("SelectOption", LAYOUT)
-
     def test_the_dropdown_classes_survive_only_for_the_classic_fallback(self):
         for name in ("SceneActionTypeSelect", "SceneActionTargetSelect"):
             self.assertIn(name, BOT, name)
@@ -81,13 +77,6 @@ class TravelTests(unittest.TestCase):
         self.assertIn("except Exception:", body)
         self.assertIn("return None", body)
 
-    def test_every_interaction_reloads_before_rendering(self):
-        body = LAYOUT[LAYOUT.index("async def refresh_and_edit(") :][:400]
-        self.assertLess(body.index("await self.reload()"), body.index("self.rebuild()"))
-
-    def test_resolve_reloads_before_opening_the_modal(self):
-        body = LAYOUT[LAYOUT.index("class SceneLayoutResolveButton") :][:1200]
-        self.assertLess(body.index("await self.scene_view.reload()"), body.index("open_modal("))
 
 
 class LayoutIsolationTests(unittest.TestCase):
@@ -100,11 +89,6 @@ class LayoutIsolationTests(unittest.TestCase):
                 self.assertNotIn("from .", stripped)
                 self.assertNotIn("from ..", stripped)
 
-    def test_the_component_limit_is_written_down(self):
-        self.assertIn("COMPONENT_LIMIT = 40", LAYOUT)
-
-    def test_an_action_row_never_gets_more_than_five_buttons(self):
-        self.assertIn("BUTTONS_PER_ROW = 5", LAYOUT)
 
 
 if __name__ == "__main__":

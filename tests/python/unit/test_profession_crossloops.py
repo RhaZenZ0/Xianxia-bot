@@ -1,32 +1,9 @@
-import tempfile
 import unittest
-from pathlib import Path
 
-from tests.support import install_aiosqlite_shim, seed_character
-install_aiosqlite_shim()
-
-from app.database import Database
-from app.rules.progression_systems import PROFESSIONS, craft_quality, profession_rank
-
-ATTRS = {"body": 5, "agility": 4, "spirit": 6, "insight": 6, "will": 5, "presence": 5}
+from app.rules.progression_systems import PROFESSIONS, craft_quality
 
 
-class ProfessionCrossLoopTests(unittest.IsolatedAsyncioTestCase):
-    async def asyncSetUp(self):
-        self.tmp = tempfile.TemporaryDirectory()
-        self.db = Database(Path(self.tmp.name) / "crossloops.sqlite3")
-        await self.db.init()
-        for uid, name in ((7101, "Crafter"), (7102, "Rival")):
-            self.assertTrue(await seed_character(self.db,
-                user_id=uid, discord_name=name.lower(), name=name,
-                origin="Greenriver Town", path="Sword Cultivator", spiritual_root="Fire",
-                concept="cross-loop progression", location="Greenriver Town",
-                attributes=ATTRS, qi_max=40, vitality_max=40, created_game_minute=0,
-            ))
-
-    async def asyncTearDown(self):
-        self.tmp.cleanup()
-
+class ProfessionCrossLoopTests(unittest.TestCase):
     def test_profession_catalog_contains_cross_loop_tracks(self):
         self.assertIn("Foraging", PROFESSIONS)
         self.assertIn("Beast Taming", PROFESSIONS)

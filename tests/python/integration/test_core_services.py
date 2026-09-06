@@ -6,7 +6,7 @@ from pathlib import Path
 from tests.support import install_aiosqlite_shim, PROJECT_ROOT, seed_character, bot_package_source
 install_aiosqlite_shim()
 
-from app.database import Database, SCHEMA_VERSION
+from app.database import Database
 from app.ops.core_services import (
     CombatService, ExplorationService, LocationSceneService,
     NPCRelationshipService, QuestService,
@@ -67,7 +67,6 @@ class CoreServiceTests(unittest.IsolatedAsyncioTestCase):
         self.tmp.cleanup()
 
     async def test_current_schema_has_core_npc_and_rag_tables(self):
-        self.assertEqual(SCHEMA_VERSION, 27)
         with sqlite3.connect(self.path) as conn:
             tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         self.assertTrue({

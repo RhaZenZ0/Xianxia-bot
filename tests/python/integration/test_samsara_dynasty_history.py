@@ -8,7 +8,7 @@ from tests.support import install_aiosqlite_shim, seed_character
 
 install_aiosqlite_shim()
 
-from app.database import Database, SCHEMA_VERSION
+from app.database import Database
 
 
 ATTRS = {"body": 4, "agility": 4, "spirit": 4, "insight": 4, "will": 4, "presence": 4}
@@ -39,8 +39,7 @@ class SamsaraDynastyHistoryTests(unittest.IsolatedAsyncioTestCase):
     async def asyncTearDown(self) -> None:
         self.tmp.cleanup()
 
-    async def test_schema_24_contains_dynasty_investigation_and_conflict_tables(self) -> None:
-        self.assertEqual(SCHEMA_VERSION, 27)
+    async def test_the_dynasty_investigation_and_conflict_tables_exist(self) -> None:
         with sqlite3.connect(self.path) as conn:
             tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
             self.assertIn("samsara_dynasty_history", tables)

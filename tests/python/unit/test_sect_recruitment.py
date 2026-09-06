@@ -1,17 +1,11 @@
-import json
-import tempfile
 import unittest
-from pathlib import Path
 
-from tests.support import install_aiosqlite_shim, PROJECT_ROOT, seed_character
-install_aiosqlite_shim()
+from tests.support import PROJECT_ROOT
 
-from app.database import Database, SCHEMA_VERSION
 from app.rules.game import World
 from app.rules.sect_recruitment import (
     recruitment_definition,
     trial_modifier,
-    recommendation_modifier,
     trial_outcome,
 )
 
@@ -19,23 +13,14 @@ ROOT = PROJECT_ROOT
 ATTRS = {"body": 4, "agility": 4, "spirit": 5, "insight": 5, "will": 4, "presence": 5}
 
 
-class SectRecruitmentTests(unittest.IsolatedAsyncioTestCase):
-    async def asyncSetUp(self):
-        self.tmp = tempfile.TemporaryDirectory()
-        self.db = Database(Path(self.tmp.name) / "sect.sqlite3")
-        await self.db.init()
-        ok = await seed_character(self.db, 
-            user_id=1701, discord_name="candidate", name="Mei Lan",
-            origin="Greenriver Town", path="Qi Refiner", spiritual_root="Fire",
-            concept="become a great alchemist", location="Greenriver Town",
-            attributes=ATTRS, qi_max=20, vitality_max=20, created_game_minute=10,
-        )
-        self.assertTrue(ok)
-        self.world = World(ROOT / "content" / "world.json")
+class SectRecruitmentTests(unittest.TestCase):
+    """Recruitment content and the pure trial/recommendation modifiers.
+    (Moved from integration/ in v0.20.3: the seeded database no test read
+    is gone; ATTRS stays because the modifier test reads it.)"""
 
-    async def asyncTearDown(self):
-        self.tmp.cleanup()
-
+    @classmethod
+    def setUpClass(cls):
+        cls.world = World(ROOT / "content" / "world.json")
 
     def test_all_public_sects_have_story_recruitment_configuration(self):
         configured = {name: recruitment_definition(self.world.sects, name) for name in self.world.sects}

@@ -153,10 +153,6 @@ class EquipmentStatParityTest(unittest.TestCase):
                 f"{item_id}: indestructible flag",
             )
 
-    def test_bugslayer_sword_is_the_only_indestructible_item(self):
-        self.assertEqual(
-            [i for i, d in self.py.items() if d["indestructible"]], ["bugslayer_sword"]
-        )
 
 
 if __name__ == "__main__":

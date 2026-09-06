@@ -1,32 +1,11 @@
-import tempfile
 import unittest
-from pathlib import Path
 
-from tests.support import install_aiosqlite_shim, PROJECT_ROOT, seed_character, bot_package_source
-install_aiosqlite_shim()
-
-from app.database import Database, SCHEMA_VERSION
-
-ROOT = PROJECT_ROOT
-ATTRS = {"body": 4, "agility": 4, "spirit": 4, "insight": 4, "will": 4, "presence": 4}
+from tests.support import bot_package_source
 
 
-class WorldAccessAndSceneActionTests(unittest.IsolatedAsyncioTestCase):
-    async def asyncSetUp(self):
-        self.tmp = tempfile.TemporaryDirectory()
-        self.path = Path(self.tmp.name) / "access.sqlite3"
-        self.db = Database(self.path)
-        await self.db.init()
-        self.assertTrue(await seed_character(self.db,
-            user_id=1601, discord_name="wanderer", name="Lin Yue",
-            origin="Greenriver Town", path="Qi Refiner", spiritual_root="Wood",
-            concept="discover the world", location="Greenriver Town",
-            attributes=ATTRS, qi_max=20, vitality_max=20, created_game_minute=10,
-        ))
-
-    async def asyncTearDown(self):
-        self.tmp.cleanup()
-
+class WorldAccessAndSceneActionTests(unittest.TestCase):
+    """Source scans of the /action command and the visibility guards. (Moved
+    from integration/ in v0.20.3: the seeded database no test read is gone.)"""
 
     def test_scene_action_replaces_freeform_act(self):
         source = bot_package_source()
