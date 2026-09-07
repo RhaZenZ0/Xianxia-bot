@@ -29,7 +29,7 @@ class ReleaseVersionTests(unittest.TestCase):
         )
 
     def test_release_is_marked_v0_21_6(self):
-        self.assertEqual(__version__, "0.23.1")
+        self.assertEqual(__version__, "0.23.2")
 
     def test_health_metadata_exposes_release_version(self):
         state = HealthState(supported_schema_version=4)

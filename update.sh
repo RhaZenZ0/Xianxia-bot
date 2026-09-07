@@ -357,17 +357,27 @@ for required in VERSION startup.sh stop.sh docker-compose.yml go_core app conten
 # scripts/release_manifest.py now and checked here, which means a truncated
 # download or a partially repacked archive is refused while the running install
 # is still completely untouched.
-verify_release_manifest() {
-    manifest="$NEW_ROOT/RELEASE_MANIFEST.sha256"
-    if [ ! -f "$manifest" ]; then
-        echo "WARNING: Package has no RELEASE_MANIFEST.sha256; skipping integrity check." >&2
+# ONE implementation, used by both the pre-install and post-install checks.
+#
+# There used to be two, and the BusyBox fix below was applied to this one and
+# missed the other - so v0.23.0 verified the downloaded archive correctly and
+# then failed the identical check against the installed tree, after the files
+# were already in place. Two copies of a check is two places to fix a bug in,
+# and this one only got fixed in the place it was noticed.
+#
+# $1 = directory to verify, $2 = where to write the per-file log,
+# $3 = what to say if it fails.
+verify_manifest_tree() {
+    _dir=$1; _log=$2; _context=$3
+    if [ ! -f "$_dir/RELEASE_MANIFEST.sha256" ]; then
+        echo "WARNING: No RELEASE_MANIFEST.sha256 in $_dir; skipping integrity check." >&2
         return 0
     fi
     # Only "-c" is portable. --quiet and --strict are GNU coreutils extensions
     # and BusyBox (which is what a QNAP NAS actually provides) rejects them with
-    # "unrecognized option", exits non-zero, and made a perfectly good archive
-    # look like a failed integrity check. Per-file "OK" output goes to the log
-    # file instead of the terminal, which is all --quiet was buying.
+    # "unrecognized option", exits non-zero, and makes a perfectly good tree look
+    # like a failed integrity check. Per-file "OK" output goes to the log file
+    # instead of the terminal, which is all --quiet was buying.
     if command -v sha256sum >/dev/null 2>&1; then
         set -- sha256sum -c RELEASE_MANIFEST.sha256
     elif command -v shasum >/dev/null 2>&1; then
@@ -377,17 +387,22 @@ verify_release_manifest() {
         return 0
     fi
     # The manifest deliberately omits .env, data/, caches and itself, so a plain
-    # -c run from the extracted root is exactly the right check. Both streams are
+    # -c run from the tree root is exactly the right check. Both streams are
     # captured together because these tools print FAILED lines on stdout, not
-    # stderr - reporting only stderr would have hidden which files mismatched.
-    if ( cd "$NEW_ROOT" && "$@" ) >"$STAGING_DIR/manifest.log" 2>&1; then
-        echo "Release integrity verified against RELEASE_MANIFEST.sha256."
+    # stderr - reporting only stderr would hide which files mismatched.
+    if ( cd "$_dir" && "$@" ) >"$_log" 2>&1; then
         return 0
     fi
-    echo "ERROR: Release integrity check failed - the package does not match its own manifest." >&2
-    echo "       Nothing was installed; the running release is untouched." >&2
-    grep -v ': OK$' "$STAGING_DIR/manifest.log" 2>/dev/null | head -n 20 >&2 || true
+    echo "ERROR: $_context" >&2
+    grep -v ': OK$' "$_log" 2>/dev/null | head -n 20 >&2 || true
     return 1
+}
+
+verify_release_manifest() {
+    verify_manifest_tree "$NEW_ROOT" "$STAGING_DIR/manifest.log" \
+        "Release integrity check failed - the package does not match its own manifest.
+       Nothing was installed; the running release is untouched." || return 1
+    echo "Release integrity verified against RELEASE_MANIFEST.sha256."
 }
 verify_release_manifest
 
@@ -530,13 +545,8 @@ INSTALLED_VERSION=$(clean_version "$(cat "$PROJECT_DIR/VERSION")")
 [ "$INSTALLED_VERSION" = "$TARGET_VERSION" ] || { echo "ERROR: Post-install VERSION check failed." >&2; exit 1; }
 # ... and the whole tree, not just VERSION: every file the release manifest
 # names must be in place, byte for byte, before anything is started.
-if [ -f "$PROJECT_DIR/RELEASE_MANIFEST.sha256" ]; then
-    if command -v sha256sum >/dev/null 2>&1; then
-        (cd "$PROJECT_DIR" && sha256sum -c --quiet RELEASE_MANIFEST.sha256) || { echo "ERROR: Post-install tree does not match RELEASE_MANIFEST.sha256." >&2; exit 1; }
-    elif command -v shasum >/dev/null 2>&1; then
-        (cd "$PROJECT_DIR" && shasum -a 256 -c --quiet RELEASE_MANIFEST.sha256) || { echo "ERROR: Post-install tree does not match RELEASE_MANIFEST.sha256." >&2; exit 1; }
-    fi
-fi
+verify_manifest_tree "$PROJECT_DIR" "${STAGING_DIR:-$PARENT_DIR}/post-install-manifest.log" \
+    "Post-install tree does not match RELEASE_MANIFEST.sha256." || exit 1
 
 echo "Starting Xianxia RP $TARGET_VERSION..."
 "$PROJECT_DIR/startup.sh"

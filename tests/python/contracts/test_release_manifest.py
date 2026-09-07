@@ -64,9 +64,16 @@ class ReleaseManifestTests(unittest.TestCase):
         refused on the target hardware, in the one code path whose entire job is
         to distinguish a corrupt package from a sound one. Only -c is portable.
         """
+        # v0.23.2: scan the WHOLE script, not one function.
+        #
+        # This test used to slice `verify_release_manifest` and check only that,
+        # which is exactly how the bug it was written to prevent shipped anyway:
+        # there was a second, identical check against the installed tree, it
+        # still passed `--quiet`, and no test looked at it. v0.23.0 and v0.23.1
+        # could not be installed on a QNAP as a result. There is one helper now,
+        # and this reads every line of the file.
         source = (PROJECT_ROOT / "update.sh").read_text(encoding="utf-8")
-        start = source.index("verify_release_manifest()")
-        block = source[start : source.index("verify_release_manifest\n", start)]
+        block = source
         # Strip comments first: the comment above the check names the offending
         # flags to explain why they are banned, and would otherwise trip its own
         # rule - the same way a docstring quoting a bad pattern trips a grep.
@@ -86,8 +93,8 @@ class ReleaseManifestTests(unittest.TestCase):
     def test_manifest_failure_output_reads_the_stream_the_tools_actually_use(self):
         """sha256sum prints FAILED lines on stdout, so stderr alone shows nothing useful."""
         source = (PROJECT_ROOT / "update.sh").read_text(encoding="utf-8")
-        start = source.index("verify_release_manifest()")
-        block = source[start : source.index("verify_release_manifest\n", start)]
+        start = source.index("verify_manifest_tree() {")
+        block = source[start : source.index("\n}", start)]
         self.assertIn("2>&1", block, "the check must capture stdout and stderr together")
 
     def test_updater_verifies_the_manifest_before_installing(self):
