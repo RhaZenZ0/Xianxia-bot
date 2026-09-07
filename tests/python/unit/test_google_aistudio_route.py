@@ -66,10 +66,11 @@ class ChainPlacementTests(unittest.TestCase):
         router = AITaskRouter(api_key="sk-or-test", google_api_key="ai-studio-key")
         for tier, chain in router.chains.items():
             self.assertTrue(is_aistudio_route(chain[0]), f"{tier}: {chain}")
-            self.assertEqual(len(chain), 4, tier)
+            self.assertEqual(len(chain), 3, tier)
         # The OpenRouter chain is unchanged behind it - this adds a hop, it does
-        # not replace the fallbacks that already work.
-        self.assertEqual(router.chains[NarrationTier.ROUTINE][1:], ("google/gemma-4-31b-it:free", "z-ai/glm-5.2:free", "openrouter/free"))
+        # not replace the routes that already work. (The named second hop was
+        # dropped in v0.26.1 when its free slug left OpenRouter's catalogue.)
+        self.assertEqual(router.chains[NarrationTier.ROUTINE][1:], ("google/gemma-4-31b-it:free", "openrouter/free"))
 
     def test_the_free_route_guard_does_not_apply_to_it(self):
         # OPENROUTER_REQUIRE_FREE is about OpenRouter's catalogue. An aistudio/

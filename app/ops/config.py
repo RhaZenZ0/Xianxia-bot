@@ -180,14 +180,18 @@ class Settings:
         openrouter_routine_model = os.getenv(
             "OPENROUTER_ROUTINE_MODEL", "google/gemma-4-31b-it:free"
         ).strip()
+        # v0.26.1: no default second hop. OpenRouter withdrew z-ai/glm-5.2:free
+        # and 404s it, so the shipped default failed every narration; set this
+        # to a free slug yourself to put a named route back in front of
+        # OPENROUTER_DYNAMIC_FREE_FALLBACK.
         openrouter_routine_fallback_model = os.getenv(
-            "OPENROUTER_ROUTINE_FALLBACK_MODEL", "z-ai/glm-5.2:free"
+            "OPENROUTER_ROUTINE_FALLBACK_MODEL", ""
         ).strip()
         openrouter_epic_model = os.getenv(
             "OPENROUTER_EPIC_MODEL", "google/gemma-4-31b-it:free"
         ).strip()
         openrouter_epic_fallback_model = os.getenv(
-            "OPENROUTER_EPIC_FALLBACK_MODEL", "z-ai/glm-5.2:free"
+            "OPENROUTER_EPIC_FALLBACK_MODEL", ""
         ).strip()
         openrouter_dynamic_free_model = os.getenv(
             "OPENROUTER_DYNAMIC_FREE_FALLBACK", "openrouter/free"
@@ -218,6 +222,12 @@ class Settings:
                 ("OPENROUTER_EPIC_FALLBACK_MODEL", openrouter_epic_fallback_model),
                 ("OPENROUTER_DYNAMIC_FREE_FALLBACK", openrouter_dynamic_free_model),
             ):
+                # An empty fallback slot means "this tier has no named second
+                # hop"; there is no route for the free guard to have an opinion
+                # about. The primary and dynamic slots are never empty - config
+                # defaults them, and the router rejects an empty value there.
+                if not route_model:
+                    continue
                 if not (route_model.endswith(":free") or route_model == "openrouter/free"):
                     raise RuntimeError(
                         f"{env_name} must use a :free endpoint or openrouter/free while OPENROUTER_REQUIRE_FREE=true"

@@ -89,9 +89,6 @@ the chain, `/admin → Server → Ai Status` says why, and narration carries on.
 google/gemma-4-31b-it:free      (Google AI Studio only - add your own AI Studio key on OpenRouter)
         | fail / timeout / 429
         v
-z-ai/glm-5.2:free
-        | fail
-        v
 openrouter/free
         | fail / account quota exhausted
         v
@@ -116,9 +113,6 @@ backing off.
 ```text
 google/gemma-4-31b-it:free
         | fail / timeout / 429
-        v
-z-ai/glm-5.2:free
-        | fail
         v
 openrouter/free
         | fail / account quota exhausted
@@ -311,9 +305,9 @@ The default cloud-only narrator configuration is:
 ```env
 NARRATOR_PROVIDER=openrouter
 OPENROUTER_ROUTINE_MODEL=google/gemma-4-31b-it:free
-OPENROUTER_ROUTINE_FALLBACK_MODEL=z-ai/glm-5.2:free
+OPENROUTER_ROUTINE_FALLBACK_MODEL=
 OPENROUTER_EPIC_MODEL=google/gemma-4-31b-it:free
-OPENROUTER_EPIC_FALLBACK_MODEL=z-ai/glm-5.2:free
+OPENROUTER_EPIC_FALLBACK_MODEL=
 OPENROUTER_DYNAMIC_FREE_FALLBACK=openrouter/free
 OPENROUTER_DISABLE_REASONING=true
 OPENROUTER_REQUIRE_FREE=true
