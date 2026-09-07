@@ -535,6 +535,27 @@ Four of these had no Go tests at all before this release (`family.support`, `sto
 `seclusion.start`, `seclusion.settle`), and the quest suite tested a *wrong* target but never a
 missing one. Every fix ships with tests verified against the defect. No schema change.
 
+**0.23.2** fixes the updater, which could not install v0.23.0 or v0.23.1 on a QNAP.
+
+`update.sh` verifies the release manifest twice: once against the downloaded archive before anything
+is touched, and once against the installed tree before starting it. Those were two separate copies of
+the same check. The first was made BusyBox-safe some releases ago - `--quiet` and `--strict` are GNU
+coreutils extensions, and BusyBox answers "unrecognized option" and exits non-zero - and the second
+was not, because that is where the failure had been noticed and the other copy was never touched.
+
+So the update downloaded cleanly, verified cleanly, installed cleanly, and then failed a check on a
+byte-perfect tree and rolled itself back. The install was never damaged; it just never upgraded.
+
+There is now one `verify_manifest_tree` helper with two call sites, and a contract test that asserts
+there is only one - the duplication is the actual root cause, not the flag. A second test refuses
+any GNU-only checksum flag anywhere in the script.
+
+Worth recording: the suite already had a test for the post-install check, and it asserted the literal
+string `sha256sum -c --quiet RELEASE_MANIFEST.sha256`. It was holding the bug in place. It now asserts
+that the check happens and leaves the spelling to the helper.
+
+No application change; no schema change.
+
 See `docs/V021_RELEASE_NOTES.md` for v0.21.x, `docs/V020_RELEASE_NOTES.md` for v0.20.0, `docs/V019_RELEASE_NOTES.md` for the full detail on every v0.19.x release above, `docs/V018_RELEASE_NOTES.md` and
 `docs/V018_BUILD_HISTORY.md` (consolidated validation/audit record) for the prior staged-authority migration.
 

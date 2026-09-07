@@ -317,11 +317,66 @@ class EnvPreflightTests(unittest.TestCase):
         commit = update[install:start]
         self.assertIn('rm -rf "$old_item" || {', commit)
         self.assertIn('cp -a "$item" "$PROJECT_DIR/" || {', commit)
-        self.assertIn("sha256sum -c --quiet RELEASE_MANIFEST.sha256", commit)
+        # The check must happen; how it is spelled belongs to the shared helper.
+        # This used to assert the literal `sha256sum -c --quiet ...`, which is
+        # how the suite came to hold the BusyBox bug in place: the command was
+        # unrunnable on the target NAS and the test insisted on it verbatim.
+        self.assertIn('verify_manifest_tree "$PROJECT_DIR"', commit)
         self.assertIn("Post-install tree does not match RELEASE_MANIFEST.sha256", commit)
-        self.assertLess(commit.index("Post-install VERSION check failed"), commit.index("sha256sum -c --quiet"))
+        self.assertLess(commit.index("Post-install VERSION check failed"),
+                        commit.index('verify_manifest_tree "$PROJECT_DIR"'))
         self.assertLess(update.index("ROLLBACK_ARMED=1"), install)
 
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class UpdaterManifestPortabilityTests(unittest.TestCase):
+    """v0.23.2: the updater must run on BusyBox, which is what a QNAP provides.
+
+    v0.23.0 shipped an updater that verified the downloaded archive correctly
+    and then failed the *identical* check against the installed tree, because
+    the check was written twice and only one copy had been made portable. The
+    second still passed `--quiet`, a GNU coreutils extension; BusyBox answers
+    "unrecognized option", exits non-zero, and the updater rolls the install
+    back reporting a corrupt tree that is in fact byte-perfect.
+    """
+
+    UPDATE = (PROJECT_ROOT / "update.sh").read_text(encoding="utf-8")
+
+    def test_no_gnu_only_checksum_flags_are_passed(self):
+        for flag in ("--quiet", "--strict", "--warn", "--ignore-missing"):
+            for line in self.UPDATE.splitlines():
+                stripped = line.strip()
+                if stripped.startswith("#"):
+                    continue  # the comment explaining why is allowed to name them
+                if flag in stripped and ("sha256sum" in stripped or "shasum" in stripped):
+                    self.fail(f"update.sh passes {flag} to a checksum tool: {stripped}")
+
+    def test_there_is_exactly_one_manifest_verification(self):
+        """Two copies of a check is two places to fix a bug in.
+
+        This is the actual root cause: the BusyBox fix was applied where the
+        failure was noticed and the other copy was never touched. One helper,
+        two call sites.
+        """
+        self.assertEqual(
+            self.UPDATE.count("verify_manifest_tree() {"), 1,
+            "the manifest check should be defined once",
+        )
+        invocations = [
+            line for line in self.UPDATE.splitlines()
+            if "verify_manifest_tree " in line and not line.strip().startswith("#")
+        ]
+        self.assertGreaterEqual(len(invocations), 2,
+                                "both the pre-install and post-install checks should call the helper")
+        for tool in ("sha256sum -c", "shasum -a 256 -c"):
+            self.assertEqual(
+                self.UPDATE.count(tool), 1,
+                f"{tool} appears more than once; the check has been duplicated again",
+            )
+
+    def test_both_the_package_and_the_installed_tree_are_verified(self):
+        self.assertIn('verify_manifest_tree "$NEW_ROOT"', self.UPDATE)
+        self.assertIn('verify_manifest_tree "$PROJECT_DIR"', self.UPDATE)
