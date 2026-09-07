@@ -17,21 +17,49 @@ STOP = (PROJECT_ROOT / "stop.sh").read_text(encoding="utf-8")
 
 class FirstRunSetupTests(unittest.TestCase):
     def test_first_run_message_mentions_every_secret_the_run_will_demand(self):
-        """.env.example enables the dashboard, so DASHBOARD_TOKEN is required too.
+        """Whatever startup.sh hard-fails on must be named before the first run.
 
-        The message used to name only DISCORD_TOKEN, GUILD_ID and
-        OPENROUTER_API_KEY. A first run that filled in exactly those three got
-        all the way to the dashboard check and failed on a 20-character token it
-        had never been told about.
+        Naming a subset is how a first run gets all the way to a check it was
+        never told about. It happened twice: the message named only
+        DISCORD_TOKEN, GUILD_ID and OPENROUTER_API_KEY while the dashboard check
+        demanded a 20-character DASHBOARD_TOKEN, and then again with
+        ENGINE_AUTH_TOKEN, which is checked three lines after the message and
+        stops the stack dead. So this reads the failures out of the script
+        rather than listing names here, and a new required value fails this
+        test until it is announced.
         """
-        block = STARTUP[STARTUP.index('if [ ! -f "$ENV_FILE" ]'): STARTUP.index("DISCORD_TOKEN_VALUE=")]
+        section = STARTUP[STARTUP.index('if [ ! -f "$ENV_FILE" ]'): STARTUP.index("DISCORD_TOKEN_VALUE=")]
+        # Only what the operator is actually shown. A comment in the same block
+        # explaining why a name matters would otherwise satisfy this test while
+        # the name never reached the terminal.
+        block = "\n".join(line for line in section.splitlines() if line.strip().startswith("echo "))
+        demanded = set(re.findall(r'fail "([A-Z][A-Z0-9_]*) (?:is empty|must be)', STARTUP))
+        self.assertTrue(demanded, "no required-value checks found in startup.sh")
+        for name in sorted(demanded):
+            self.assertIn(name, block,
+                          f"startup.sh fails on {name} but the first-run message never mentions it")
+
         dashboard_default_on = re.search(r"^DASHBOARD_ENABLED=(\w+)", ENV_EXAMPLE, re.M)
         self.assertIsNotNone(dashboard_default_on)
         if dashboard_default_on.group(1).lower() in {"1", "true", "yes", "on"}:
-            self.assertIn("DASHBOARD_TOKEN", block,
-                          "dashboard is on by default but the first-run message omits its token")
             self.assertIn("DASHBOARD_ENABLED=false", block,
                           "offer the opt-out alongside the requirement")
+
+    def test_the_required_block_is_the_first_thing_in_the_env_example(self):
+        """A value you must supply should not be 200 lines below one you need not.
+
+        OPENROUTER_API_KEY used to sit in the AI section and DASHBOARD_TOKEN at
+        the very bottom, so filling in a fresh .env meant hunting for them.
+        """
+        head = ENV_EXAMPLE[:ENV_EXAMPLE.index("# Discord")]
+        for name in ("DISCORD_TOKEN=", "GUILD_ID=", "OPENROUTER_API_KEY=",
+                     "ENGINE_AUTH_TOKEN=", "DASHBOARD_TOKEN="):
+            self.assertIn(name, head, f"{name} is not in the required block at the top of .env.example")
+        # And exactly once each - a key set twice in a .env silently takes its
+        # last value, which is the worst way to learn it was duplicated.
+        for name in ("OPENROUTER_API_KEY", "DASHBOARD_TOKEN", "ENGINE_AUTH_TOKEN"):
+            assignments = re.findall(rf"^{name}=", ENV_EXAMPLE, re.M)
+            self.assertEqual(len(assignments), 1, f"{name} is assigned {len(assignments)} times")
 
     def test_the_token_failure_says_how_to_produce_one(self):
         self.assertIn("secrets.token_urlsafe", STARTUP)

@@ -175,10 +175,21 @@ class PrefixSettingTests(unittest.TestCase):
         self.config = load_module_by_path("config_under_test_typed_play", "app/ops/config.py")
 
     def test_default_and_common_choices(self):
-        self.assertEqual(self.config._typed_play_prefix(None), ">")
-        self.assertEqual(self.config._typed_play_prefix(""), ">")
+        # v0.25.1: the default is "$". It used to be ">", which Discord renders
+        # as a blockquote - the reason it was picked. A server that wants that
+        # back sets it explicitly.
+        self.assertEqual(self.config._typed_play_prefix(None), "$")
+        self.assertEqual(self.config._typed_play_prefix(""), "$")
+        self.assertEqual(self.config._typed_play_prefix(">"), ">")
         self.assertEqual(self.config._typed_play_prefix("!"), "!")
         self.assertEqual(self.config._typed_play_prefix("*"), "*")
+
+    def test_a_regex_metacharacter_prefix_matches_literally(self):
+        # The router uses str.startswith, not a pattern, so "$" - a regex
+        # end-anchor - is matched as the character it is.
+        router = (PROJECT_ROOT / "app" / "bot" / "typed_play_router.py").read_text(encoding="utf-8")
+        self.assertIn("raw.startswith(prefix)", router)
+        self.assertNotIn("re.compile(prefix", router)
 
     def test_rejects_letters_digits_space_and_strings(self):
         for bad in ("i", "I", "7", " ", ">>", "act"):

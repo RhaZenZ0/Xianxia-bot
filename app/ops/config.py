@@ -43,9 +43,9 @@ def _typed_play_prefix(value: str | None) -> str:
     else would swallow ordinary speech ("i explore" must never be an action
     because someone set the prefix to "i").
     """
-    prefix = (value if value is not None else ">").strip("\r\n")
+    prefix = (value if value is not None else "$").strip("\r\n")
     if prefix == "":
-        prefix = ">"
+        prefix = "$"
     if len(prefix) != 1 or prefix.isalnum() or prefix.isspace():
         raise ValueError("TYPED_PLAY_PREFIX must be exactly one non-alphanumeric, non-space character")
     return prefix

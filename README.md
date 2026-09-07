@@ -216,7 +216,7 @@ allowance for everyone. Speech is free. A refused line is answered with the wait
 not queued.
 
 ```env
-TYPED_PLAY_PREFIX=>        # exactly one character; not a letter, digit or space
+TYPED_PLAY_PREFIX=$        # exactly one character; not a letter, digit or space
 TYPED_PLAY_BURST=4
 TYPED_PLAY_PER_MINUTE=6
 TYPED_PLAY_HINT=true       # once a day, tell a player how when their speech looked like an action

@@ -37,14 +37,17 @@ if [ ! -f "$ENV_FILE" ]; then
   [ "$CHECK_ENV_ONLY" -eq 0 ] || fail "$ENV_FILE does not exist"
   cp .env.example .env
   echo "Created .env from .env.example." >&2
-  echo "Fill in DISCORD_TOKEN, GUILD_ID and OPENROUTER_API_KEY, then run startup.sh again." >&2
-  # DASHBOARD_TOKEN belongs in this list. .env.example ships DASHBOARD_ENABLED=true
-  # with DASHBOARD_TOKEN empty, so a first run that fills in exactly the three
-  # names above gets all the way to the dashboard check below and dies on a
-  # requirement it was never told about.
-  echo "The GM dashboard is on by default and also needs DASHBOARD_TOKEN (20+ characters):" >&2
+  # Every name this run will hard-fail on, in one message. Naming a subset is
+  # how a first run gets all the way to a check it was never told about: the
+  # message used to omit DASHBOARD_TOKEN, and then ENGINE_AUTH_TOKEN, both of
+  # which are checked below and both of which stop the stack dead.
+  echo "Fill in all five required values, then run startup.sh again:" >&2
+  echo "  DISCORD_TOKEN, GUILD_ID, OPENROUTER_API_KEY" >&2
+  echo "  ENGINE_AUTH_TOKEN  - 20+ characters, the same value for Python and the Go engine" >&2
+  echo "  DASHBOARD_TOKEN    - 20+ characters (or set DASHBOARD_ENABLED=false to run without the dashboard)" >&2
+  echo "Generate either token with:" >&2
   echo "  python3 -c \"import secrets; print(secrets.token_urlsafe(32))\"" >&2
-  echo "Or set DASHBOARD_ENABLED=false in .env to start without it." >&2
+  echo "They are the first block in .env, above every setting that has a default." >&2
   exit 2
 fi
 

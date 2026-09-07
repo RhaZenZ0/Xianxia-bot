@@ -298,7 +298,7 @@ feel like he remembers.
 
 *Shipped in v0.21.1 — gate: `tests/python/contracts/test_typed_play_surface.py`,
 `tests/python/unit/test_typed_play_router.py`, `tests/python/unit/test_user_budget.py`.
-The prefix is configurable (`TYPED_PLAY_PREFIX`, default `>`). Roots with
+The prefix is configurable (`TYPED_PLAY_PREFIX`, default `$` since v0.25.1). Roots with
 parameters and group commands are not in the verb table yet.*
 
 ### What happened before v0.21.1
