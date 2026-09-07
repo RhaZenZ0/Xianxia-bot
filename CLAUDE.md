@@ -6,8 +6,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A persistent Xianxia role-playing Discord bot. Python owns Discord, RAG, dashboard, and presentation
 orchestration; Go owns canonical gameplay rules, current game time, simulation mutations, and SQLite
-WAL state. Designed for CPU-only QNAP/NAS deployment — no local LLM, narration comes from OpenRouter
-free-tier models with a fallback chain ending in procedural (non-AI) narration.
+WAL state. Designed for CPU-only QNAP/NAS deployment — no local LLM, narration comes from cloud
+free-tier models (OpenRouter, plus an optional direct Google AI Studio route) with a fallback chain
+ending in procedural (non-AI) narration.
 
 ## Commands
 
@@ -157,13 +158,22 @@ etc.), separate from current structured state (what's true now — always wins o
 carry visibility levels `public` / `participant` / `faction` / `hidden`; hidden rows never reach
 narrator RAG, and a focused NPC does not inherit the player's participant-only knowledge.
 
-### OpenRouter narration routing
+### Narration routing
 
 Two chains, "routine" (ordinary scenes) and "epic" (breakthroughs, sect trials, major events), each
 walking primary model -> fallback model -> `openrouter/free` -> procedural narration on failure.
+
 Reasoning is disabled per-request (`OPENROUTER_DISABLE_REASONING=true`) and `OPENROUTER_REQUIRE_FREE`
 rejects paid model IDs. Rate limiting is fail-fast (no queuing) and shared with the admin
 `chat_digest` monitor, so an unbounded transcript can starve narration — see `MONITOR_*` env knobs.
+
+Optionally (v0.26.0) a direct Google AI Studio route (`aistudio/<model>`, `app/ai/google_route.py`)
+leads both chains when `GOOGLE_AI_STUDIO_API_KEY` is set. It is the one route that does not go
+through OpenRouter, so it deliberately does not spend `AITaskRouter.limiter` - OpenRouter's daily
+free budget - and `OPENROUTER_REQUIRE_FREE` does not apply to it. It is still narration-only and
+still passes through `_validate_generated_text`, so it is not trusted more than any other route.
+`google-genai` is an optional, lazily imported dependency: absent or incompatible, the route is left
+out of the chain and `ai_status` reports why.
 
 ### Dashboard (`app/dashboard`, `dashboard/`)
 

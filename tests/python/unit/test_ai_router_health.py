@@ -847,6 +847,63 @@ class ReasoningOffTests(unittest.TestCase):
         self.assertEqual(router.chains[NarrationTier.EPIC], (DEFAULT_EPIC_MODEL, DEFAULT_EPIC_FALLBACK_MODEL, DEFAULT_DYNAMIC_FREE_MODEL))
         self.assertEqual(DEFAULT_ROUTINE_MODEL, "google/gemma-4-31b-it:free")  # the one literal; test_config pins the rest
 
+    def test_no_default_route_is_a_model_dropped_for_scratchpadding(self):
+        # A reasoning-native route ignores `reasoning.enabled=false` and answers
+        # with its own analysis; _validate_generated_text then rejects the reply
+        # ("ScratchpadResponse: AI response was reasoning scratchpad, not
+        # narration"), so the hop is dead weight that still spends a daily
+        # free-tier slot on every narration. MiniMax M3 was the routine fallback
+        # until v0.25.3 and did this in production; Nemotron 3 Super went the
+        # same way in v0.19.38. Neither may come back into the defaults.
+        dropped = ("minimax-m3", "nemotron-3-super")
+        router = AITaskRouter(api_key=None)
+        for tier, chain in router.chains.items():
+            for model in chain:
+                for name in dropped:
+                    self.assertNotIn(name, model, f"{tier}: {model}")
+        for text in (DEFAULT_ROUTINE_MODEL, DEFAULT_ROUTINE_FALLBACK_MODEL,
+                     DEFAULT_EPIC_MODEL, DEFAULT_EPIC_FALLBACK_MODEL):
+            for name in dropped:
+                self.assertNotIn(name, text)
+
+    def test_the_documented_default_chain_matches_the_code(self):
+        # README and .env.example both spell the chain out. When only the code
+        # moved, an operator copying .env.example pinned the dead route back in
+        # by hand - so the docs are gated here rather than trusted.
+        from tests.support import PROJECT_ROOT
+        env_example = (PROJECT_ROOT / ".env.example").read_text(encoding="utf-8")
+        readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
+        for name, value in (
+            ("OPENROUTER_ROUTINE_MODEL", DEFAULT_ROUTINE_MODEL),
+            ("OPENROUTER_ROUTINE_FALLBACK_MODEL", DEFAULT_ROUTINE_FALLBACK_MODEL),
+            ("OPENROUTER_EPIC_MODEL", DEFAULT_EPIC_MODEL),
+            ("OPENROUTER_EPIC_FALLBACK_MODEL", DEFAULT_EPIC_FALLBACK_MODEL),
+            ("OPENROUTER_DYNAMIC_FREE_FALLBACK", DEFAULT_DYNAMIC_FREE_MODEL),
+        ):
+            self.assertIn(f"{name}={value}", env_example, name)
+            self.assertIn(f"{name}={value}", readme, name)
+        # The dropped route must not survive anywhere an operator could copy it.
+        self.assertNotIn("minimax/minimax-m3:free", env_example)
+        self.assertNotIn("minimax/minimax-m3:free", readme)
+        # v0.25.4: the `NAME=value` lines were corrected in v0.25.3 but the
+        # prose chain summary right above them still read "Gemma 4 31B Free ->
+        # MiniMax M3 Free -> ...", which is the line an operator actually reads.
+        # Every arrow summary is gated, not just the assignments.
+        for line in env_example.splitlines():
+            if line.startswith("#") and line.count("->") >= 2:
+                for dead in ("MiniMax", "Nemotron"):
+                    self.assertNotIn(dead, line, line)
+
+    def test_the_env_example_says_where_the_ai_studio_key_comes_from(self):
+        # The BYOK instructions said where to PASTE the key and never where to
+        # get it, which is the step an operator is actually missing.
+        from tests.support import PROJECT_ROOT
+        env_example = (PROJECT_ROOT / ".env.example").read_text(encoding="utf-8")
+        readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
+        for text in (env_example, readme):
+            self.assertIn("aistudio.google.com/api-keys", text)
+            self.assertIn("openrouter.ai/settings/integrations", text)
+
 
 def _return(value):
     async def create(**kwargs):

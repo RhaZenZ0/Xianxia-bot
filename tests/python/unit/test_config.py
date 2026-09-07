@@ -46,15 +46,63 @@ class ConfigTests(unittest.TestCase):
             settings = Settings.from_env()
         self.assertEqual(settings.narrator_provider, "openrouter")
         self.assertEqual(settings.openrouter_routine_model, "google/gemma-4-31b-it:free")
-        self.assertEqual(settings.openrouter_routine_fallback_model, "minimax/minimax-m3:free")
+        self.assertEqual(settings.openrouter_routine_fallback_model, "z-ai/glm-5.2:free")
         self.assertEqual(settings.openrouter_epic_model, "google/gemma-4-31b-it:free")
         self.assertEqual(settings.openrouter_epic_fallback_model, "z-ai/glm-5.2:free")
         self.assertTrue(settings.openrouter_disable_reasoning)
         self.assertEqual(settings.openrouter_dynamic_free_model, "openrouter/free")
+        # v0.26.0: the direct Google route is opt-in. No key means the router
+        # behaves exactly as it did before the feature existed.
+        self.assertIsNone(settings.google_ai_studio_api_key)
+        self.assertEqual(settings.google_ai_studio_model, "aistudio/gemini-3.8-flash")
         self.assertEqual(settings.openrouter_max_requests_per_minute, 20)
         self.assertEqual(settings.openrouter_timeout_seconds, 30.0)
         self.assertEqual(settings.openrouter_epic_timeout_seconds, 60.0)
         self.assertTrue(settings.openrouter_require_free)
+
+    def test_gemini_api_key_is_accepted_as_an_alias(self):
+        # Google's own quickstart says `export GEMINI_API_KEY`, so an operator
+        # who followed it must not have to find a second spelling.
+        env = self.base_env()
+        env.update({"OPENROUTER_API_KEY": "sk-or-test", "GEMINI_API_KEY": "ai-studio-key"})
+        with patch.dict(os.environ, env, clear=True):
+            settings = Settings.from_env()
+        self.assertEqual(settings.google_ai_studio_api_key, "ai-studio-key")
+
+    def test_the_explicit_name_wins_over_the_alias(self):
+        env = self.base_env()
+        env.update({
+            "OPENROUTER_API_KEY": "sk-or-test",
+            "GOOGLE_AI_STUDIO_API_KEY": "explicit",
+            "GEMINI_API_KEY": "alias",
+        })
+        with patch.dict(os.environ, env, clear=True):
+            settings = Settings.from_env()
+        self.assertEqual(settings.google_ai_studio_api_key, "explicit")
+
+    def test_a_google_model_without_the_prefix_is_refused(self):
+        env = self.base_env()
+        env.update({
+            "OPENROUTER_API_KEY": "sk-or-test",
+            "GOOGLE_AI_STUDIO_API_KEY": "k",
+            "GOOGLE_AI_STUDIO_MODEL": "gemini-3.8-flash",
+        })
+        with patch.dict(os.environ, env, clear=True):
+            with self.assertRaisesRegex(RuntimeError, "aistudio/"):
+                Settings.from_env()
+
+    def test_the_free_guard_does_not_reject_the_google_route(self):
+        # OPENROUTER_REQUIRE_FREE is about OpenRouter's catalogue; an aistudio/
+        # id has no ":free" suffix and must not be caught by it.
+        env = self.base_env()
+        env.update({
+            "OPENROUTER_API_KEY": "sk-or-test",
+            "OPENROUTER_REQUIRE_FREE": "true",
+            "GOOGLE_AI_STUDIO_API_KEY": "k",
+        })
+        with patch.dict(os.environ, env, clear=True):
+            settings = Settings.from_env()
+        self.assertEqual(settings.google_ai_studio_model, "aistudio/gemini-3.8-flash")
 
     def test_openrouter_free_guard_rejects_paid_route(self):
         env = self.base_env()

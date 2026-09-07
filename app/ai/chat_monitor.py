@@ -418,6 +418,23 @@ def render_health(snapshot: dict[str, Any]) -> str:
             "a real bundle."
         )
 
+    google = router.get("google_route") or {}
+    if google.get("configured"):
+        if google.get("available"):
+            lines.append(
+                f"Google AI Studio route **on** (`{google.get('model', '')}`) — "
+                "your own key, its own quota, outside the OpenRouter daily budget."
+            )
+        else:
+            # The silent-failure case: a key is set, the route is not in the
+            # chain, and nothing else on this panel would say why.
+            reason = str(google.get("last_error") or "the google-genai SDK could not be loaded")
+            lines.append(
+                f"⚠️ Google AI Studio key is set but the route is **off** — `{reason}`. "
+                "Narration is on the OpenRouter chain only. Install it with "
+                "`pip install -U google-genai`."
+            )
+
     limiter = router.get("limiter") or {}
     lines.append(
         f"Local rate ceiling **{limiter.get('max_requests_per_minute', 0)}/min** • "
