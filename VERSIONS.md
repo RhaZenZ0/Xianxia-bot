@@ -643,9 +643,23 @@ The palette, the serif headings, the drawer, the authority split and the coverag
 unchanged. See `docs/V025_RELEASE_NOTES.md`.
 
 
-## Release status — v0.25.0
+**0.25.1** changes the typed-play prefix default from `>` to `$`.
 
-- Current release: v0.25.0: the dashboard remade - 23 flat tabs become five grouped ones, and the
+`>` was chosen because Discord renders `> text` as a blockquote, which set an action line apart from
+speech in the channel. `$` gives that up; it is a house preference, and a server that wants the
+blockquote back sets `TYPED_PLAY_PREFIX=>` explicitly.
+
+Worth recording: the router matches the prefix with `str.startswith`, not a pattern, so `$` - an
+end-of-string anchor in a regular expression - is matched as the character it is. A prefix like `*`
+or `+` would have been just as safe, and there is now a test that says so, because the day someone
+"optimises" that into a compiled pattern the failure is silent: every action line stops being an
+action and becomes speech.
+
+
+## Release status — v0.25.1
+
+- Current release: v0.25.1: the typed-play prefix default is `$` rather than `>`.
+- v0.25.0: the dashboard remade - 23 flat tabs become five grouped ones, and the
   worst page goes from eleven stacked tables to eleven tabs. No schema change.
 - v0.24.0: the Quests workbench - one page for every definition a player can be
   given, an editor where there was none, and pinned terms so an edit cannot rewrite a deal a player

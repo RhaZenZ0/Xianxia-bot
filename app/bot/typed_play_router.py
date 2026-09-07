@@ -290,9 +290,11 @@ def addressed_npc(text: str, present: Iterable[str]) -> str | None:
 def parse_prefixed(content: str, prefix: str) -> str | None:
     """The action text of a prefixed line, or None if the line is not prefixed.
 
-    Discord renders ``> text`` as a quote, so ``>`` at the very start with or
-    without a space both count. A line that is only the prefix is not an
-    action.
+    The prefix counts at the very start of the line with or without a space
+    after it, and a line that is only the prefix is not an action. Matched with
+    ``startswith`` rather than a pattern, so a prefix that means something in a
+    regular expression - ``$``, the default since v0.25.1, or ``*`` or ``+`` -
+    needs no escaping and cannot silently match nothing.
     """
     raw = content.lstrip()
     if not raw.startswith(prefix):
