@@ -67,6 +67,13 @@ class _FakeClient:
 
 def _router(payloads, **kwargs):
     kwargs.setdefault("failure_cooldown_seconds", 1.0)
+    # A named second hop, so these fixtures exercise a three-deep chain
+    # (primary -> named fallback -> dynamic router) regardless of what the
+    # shipped default happens to be. Since v0.26.1 the default fallback slot is
+    # empty; the shape of the DEFAULT chain is gated by AITaskRouterTests rather
+    # than here, so pinning a slug in the fixture weakens nothing.
+    kwargs.setdefault("routine_fallback_model", "fixture-vendor/fixture-model:free")
+    kwargs.setdefault("epic_fallback_model", "fixture-vendor/fixture-model:free")
     router = AITaskRouter(api_key="test-key", **kwargs)
     router.client = _FakeClient(payloads)
     return router
@@ -230,6 +237,23 @@ class TLSDetectionTests(unittest.TestCase):
 
     def test_none_is_not_a_tls_failure(self):
         self.assertFalse(_looks_like_tls_failure(None))
+
+    def test_a_timeout_mid_handshake_is_a_timeout_not_a_certificate_problem(self):
+        # asyncio.wait_for cancels the in-flight request, and a request cancelled
+        # during the handshake leaves the half-finished SSL exception in the
+        # context chain. Reporting that as a trust-store failure sends the
+        # operator to check ca-certificates for an upstream they simply cannot
+        # reach in time.
+        try:
+            try:
+                try:
+                    raise ssl.SSLWantReadError("The operation did not complete (read)")
+                except ssl.SSLWantReadError:
+                    raise asyncio.CancelledError()
+            except asyncio.CancelledError:
+                raise TimeoutError()
+        except TimeoutError as exc:
+            self.assertFalse(_looks_like_tls_failure(exc))
 
     def test_a_cyclic_exception_chain_terminates(self):
         first = RuntimeError("a")
@@ -742,12 +766,16 @@ class AITaskRouterTests(unittest.TestCase):
         router = AITaskRouter(api_key=None)
         self.assertEqual(
             router.models_for(NarrationTier.ROUTINE),
-            (DEFAULT_ROUTINE_MODEL, DEFAULT_ROUTINE_FALLBACK_MODEL, DEFAULT_DYNAMIC_FREE_MODEL),
+            (DEFAULT_ROUTINE_MODEL, DEFAULT_DYNAMIC_FREE_MODEL),
         )
         self.assertEqual(
             router.models_for(NarrationTier.EPIC),
-            (DEFAULT_EPIC_MODEL, DEFAULT_EPIC_FALLBACK_MODEL, DEFAULT_DYNAMIC_FREE_MODEL),
+            (DEFAULT_EPIC_MODEL, DEFAULT_DYNAMIC_FREE_MODEL),
         )
+        # The fallback slots are empty by default (v0.26.1) and an empty slot is
+        # dropped from the chain rather than attempted as a model named "".
+        self.assertEqual(DEFAULT_ROUTINE_FALLBACK_MODEL, "")
+        self.assertEqual(DEFAULT_EPIC_FALLBACK_MODEL, "")
         self.assertFalse(router.enabled)
 
     def test_free_only_guard_rejects_paid_model(self):
@@ -770,11 +798,11 @@ class AITaskRouterTests(unittest.TestCase):
                 max_output_tokens=80,
             )
         )
-        self.assertEqual(result.model, DEFAULT_ROUTINE_FALLBACK_MODEL)
-        self.assertEqual(result.attempted_models, (DEFAULT_ROUTINE_MODEL, DEFAULT_ROUTINE_FALLBACK_MODEL))
+        self.assertEqual(result.model, DEFAULT_DYNAMIC_FREE_MODEL)
+        self.assertEqual(result.attempted_models, (DEFAULT_ROUTINE_MODEL, DEFAULT_DYNAMIC_FREE_MODEL))
 
     def test_dynamic_free_router_is_last_cloud_fallback(self):
-        router = AITaskRouter(api_key=None)
+        router = AITaskRouter(api_key=None, routine_fallback_model="fixture-vendor/fixture-model:free")
         fake = _FakeClient([
             RuntimeError("primary unavailable"),
             RuntimeError("known fallback unavailable"),
@@ -833,29 +861,55 @@ class ReasoningOffTests(unittest.TestCase):
         services = (PROJECT_ROOT / "app" / "bot" / "services.py").read_text(encoding="utf-8")
         self.assertIn("disable_reasoning=SETTINGS.openrouter_disable_reasoning", services)
 
-    def test_the_default_chains_drop_nemotron_super_and_keep_a_non_google_fallback(self):
-        # Nemotron 3 Super narrated its own instructions 3 of 3 times and is
-        # out. Gemma stays primary (it is only served by Google AI Studio, so
-        # it needs the operator's own key), and every chain keeps at least one
-        # non-Google route before openrouter/free so a Google-side problem
-        # cannot take both tiers procedural. See v0.19.38 release notes.
+    def test_the_default_chains_drop_nemotron_super_and_end_at_the_dynamic_router(self):
+        # Nemotron 3 Super narrated its own instructions 3 of 3 times and is out.
+        # Gemma stays primary (it is only served by Google AI Studio, so it needs
+        # the operator's own key).
+        #
+        # v0.19.38 also required a named non-Google route before openrouter/free,
+        # so a Google-side problem could not take both tiers procedural. That is
+        # no longer expressible: the two models that held the slot were dropped
+        # for scratchpadding (MiniMax M3, v0.25.3) and for leaving the free
+        # catalogue (GLM 5.2, v0.26.1), and a slug pinned here is only as good as
+        # OpenRouter's catalogue on the day it is written - a dead hop fails every
+        # narration AND spends a daily free-tier slot doing it, which is worse
+        # than no hop. The guarantee now rests on openrouter/free, which is itself
+        # a dynamic router across free models from many providers rather than a
+        # single upstream. What is still gated is that the chain ENDS there.
         router = AITaskRouter(api_key=None)
         for tier, chain in router.chains.items():
             self.assertFalse(any("nemotron-3-super" in m for m in chain), tier)
-            self.assertTrue(any("google/" not in m and m != "openrouter/free" for m in chain), tier)
-        self.assertEqual(router.chains[NarrationTier.ROUTINE], (DEFAULT_ROUTINE_MODEL, DEFAULT_ROUTINE_FALLBACK_MODEL, DEFAULT_DYNAMIC_FREE_MODEL))
-        self.assertEqual(router.chains[NarrationTier.EPIC], (DEFAULT_EPIC_MODEL, DEFAULT_EPIC_FALLBACK_MODEL, DEFAULT_DYNAMIC_FREE_MODEL))
+            self.assertEqual(chain[-1], DEFAULT_DYNAMIC_FREE_MODEL, tier)
+        self.assertEqual(router.chains[NarrationTier.ROUTINE], (DEFAULT_ROUTINE_MODEL, DEFAULT_DYNAMIC_FREE_MODEL))
+        self.assertEqual(router.chains[NarrationTier.EPIC], (DEFAULT_EPIC_MODEL, DEFAULT_DYNAMIC_FREE_MODEL))
         self.assertEqual(DEFAULT_ROUTINE_MODEL, "google/gemma-4-31b-it:free")  # the one literal; test_config pins the rest
 
-    def test_no_default_route_is_a_model_dropped_for_scratchpadding(self):
-        # A reasoning-native route ignores `reasoning.enabled=false` and answers
-        # with its own analysis; _validate_generated_text then rejects the reply
-        # ("ScratchpadResponse: AI response was reasoning scratchpad, not
-        # narration"), so the hop is dead weight that still spends a daily
-        # free-tier slot on every narration. MiniMax M3 was the routine fallback
-        # until v0.25.3 and did this in production; Nemotron 3 Super went the
-        # same way in v0.19.38. Neither may come back into the defaults.
-        dropped = ("minimax-m3", "nemotron-3-super")
+    def test_an_operator_can_still_name_a_second_hop(self):
+        # Dropping the default must not remove the capability: the slot is empty,
+        # not gone, so an operator who finds a free route that works can put it
+        # back without a code change.
+        router = AITaskRouter(
+            api_key=None,
+            routine_fallback_model="some-vendor/some-model:free",
+            epic_fallback_model="some-vendor/some-model:free",
+        )
+        for tier, chain in router.chains.items():
+            self.assertIn("some-vendor/some-model:free", chain, tier)
+            self.assertEqual(chain[-1], DEFAULT_DYNAMIC_FREE_MODEL, tier)
+
+    def test_no_default_route_is_a_model_already_dropped_in_production(self):
+        # Each of these was a shipped default that failed 100% of the time while
+        # still spending a daily free-tier slot on every attempt:
+        #   - Nemotron 3 Super (v0.19.38) and MiniMax M3 (v0.25.3) are
+        #     reasoning-native, ignore `reasoning.enabled=false` and answer with
+        #     their own analysis, which _validate_generated_text rejects
+        #     ("ScratchpadResponse: AI response was reasoning scratchpad, not
+        #     narration").
+        #   - GLM 5.2 (v0.26.1) left OpenRouter's free catalogue, which now 404s
+        #     the `:free` slug and points at the paid one that
+        #     OPENROUTER_REQUIRE_FREE rejects.
+        # None of them may come back into the defaults.
+        dropped = ("minimax-m3", "nemotron-3-super", "glm-5.2")
         router = AITaskRouter(api_key=None)
         for tier, chain in router.chains.items():
             for model in chain:

@@ -39,10 +39,21 @@ class NarrationTier(StrEnum):
 # often enough that the routine chain's second hop was effectively dead
 # ("ScratchpadResponse: AI response was reasoning scratchpad, not narration").
 # GLM 5.2 already served the epic tier's second hop, so both tiers now share it.
+# GLM 5.2 is gone too (v0.26.1), for a different reason: OpenRouter withdrew the
+# `:free` variant and now answers it with `404 - This model is unavailable for
+# free. The paid version is available now - use this slug instead: z-ai/glm-5.2`.
+# The paid slug cannot take its place because OPENROUTER_REQUIRE_FREE rejects it,
+# so the hop failed on every narration while still costing a daily free-tier
+# slot. There is deliberately no replacement literal: a named free slug is only
+# as good as OpenRouter's catalogue on the day it is written, and this is the
+# second one to die under a shipped default. The second hop is now empty by
+# default and `openrouter/free` - OpenRouter's own dynamic free-model router,
+# which resolves to whatever is actually free at call time - carries the tier.
+# An operator who wants a named second hop sets OPENROUTER_*_FALLBACK_MODEL.
 DEFAULT_ROUTINE_MODEL = "google/gemma-4-31b-it:free"
-DEFAULT_ROUTINE_FALLBACK_MODEL = "z-ai/glm-5.2:free"
+DEFAULT_ROUTINE_FALLBACK_MODEL = ""
 DEFAULT_EPIC_MODEL = DEFAULT_ROUTINE_MODEL
-DEFAULT_EPIC_FALLBACK_MODEL = "z-ai/glm-5.2:free"
+DEFAULT_EPIC_FALLBACK_MODEL = ""
 DEFAULT_DYNAMIC_FREE_MODEL = "openrouter/free"
 
 # Reasoning is switched OFF on every narration request by default. Both
@@ -79,7 +90,16 @@ _TLS_ERROR_PATTERN = re.compile(
 
 
 def _looks_like_tls_failure(exc: BaseException | None) -> bool:
-    """Walk the exception chain looking for a certificate/TLS problem."""
+    """Walk the exception chain looking for a certificate/TLS problem.
+
+    A timeout is never one. Cancelling a request that is mid-handshake leaves
+    the half-finished SSL exception in the chain as context, which otherwise
+    reads here as a broken trust store and sends the operator to check
+    `ca-certificates` for what is actually an unreachable or slow upstream. A
+    genuinely bad trust store raises the SSL error itself, not a timeout.
+    """
+    if isinstance(exc, (TimeoutError, asyncio.CancelledError)):
+        return False
     seen: set[int] = set()
     current: BaseException | None = exc
     while current is not None and id(current) not in seen:
@@ -403,9 +423,14 @@ def _is_free_route(model: str) -> bool:
     return chosen.endswith(":free") or chosen == DEFAULT_DYNAMIC_FREE_MODEL
 
 
-def _safe_free_model(model: str, *, require_free: bool) -> str:
+def _safe_free_model(model: str, *, require_free: bool, allow_empty: bool = False) -> str:
     chosen = str(model or "").strip()
     if not chosen:
+        # Empty is a real answer for a fallback slot - "this tier has no second
+        # hop, go straight to the dynamic free router" - but never for a primary
+        # or for the dynamic route itself, where it can only be a misconfiguration.
+        if allow_empty:
+            return ""
         raise ValueError("OpenRouter model cannot be empty")
     # OPENROUTER_REQUIRE_FREE is a statement about OpenRouter's catalogue: it
     # exists so a paid OpenRouter model cannot be configured by accident. A
@@ -539,9 +564,13 @@ class AITaskRouter:
         self.app_name = str(app_name or "Xianxia RP").strip() or "Xianxia RP"
 
         routine = _safe_free_model(routine_model, require_free=self.require_free)
-        routine_fallback = _safe_free_model(routine_fallback_model, require_free=self.require_free)
+        routine_fallback = _safe_free_model(
+            routine_fallback_model, require_free=self.require_free, allow_empty=True
+        )
         epic = _safe_free_model(epic_model, require_free=self.require_free)
-        epic_fallback = _safe_free_model(epic_fallback_model, require_free=self.require_free)
+        epic_fallback = _safe_free_model(
+            epic_fallback_model, require_free=self.require_free, allow_empty=True
+        )
         dynamic = _safe_free_model(dynamic_free_model, require_free=self.require_free)
         self.dynamic_free_model = dynamic
 

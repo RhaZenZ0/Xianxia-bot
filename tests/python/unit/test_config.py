@@ -46,9 +46,11 @@ class ConfigTests(unittest.TestCase):
             settings = Settings.from_env()
         self.assertEqual(settings.narrator_provider, "openrouter")
         self.assertEqual(settings.openrouter_routine_model, "google/gemma-4-31b-it:free")
-        self.assertEqual(settings.openrouter_routine_fallback_model, "z-ai/glm-5.2:free")
+        # v0.26.1: no default second hop - OpenRouter withdrew z-ai/glm-5.2:free
+        # and 404s it, so the shipped default failed every narration.
+        self.assertEqual(settings.openrouter_routine_fallback_model, "")
         self.assertEqual(settings.openrouter_epic_model, "google/gemma-4-31b-it:free")
-        self.assertEqual(settings.openrouter_epic_fallback_model, "z-ai/glm-5.2:free")
+        self.assertEqual(settings.openrouter_epic_fallback_model, "")
         self.assertTrue(settings.openrouter_disable_reasoning)
         self.assertEqual(settings.openrouter_dynamic_free_model, "openrouter/free")
         # v0.26.0: the direct Google route is opt-in. No key means the router

@@ -769,9 +769,47 @@ than an exception. Try it with `/admin server ai_status` open before relying on 
 No schema change. No game-rule change. AI remains narration-only.
 
 
-## Release status — v0.26.0
+**0.26.1** drops the dead GLM 5.2 hop, and stops calling a timeout a certificate failure.
 
-- Current release: v0.26.0: an optional direct Google AI Studio route leads both chains when a key is
+Two production findings from the first v0.26.0 deployment, both visible in one `ai_status` panel that
+showed every route at "NEVER SUCCEEDED" and narration 100% procedural.
+
+*The second hop was gone from OpenRouter's catalogue.* `z-ai/glm-5.2:free` now answers
+`404 - This model is unavailable for free. The paid version is available now - use this slug instead:
+z-ai/glm-5.2`. It was the second hop on BOTH tiers as of v0.25.3, so every narration paid an upstream
+call, and one of the 50 daily free-tier slots, to be told the route no longer exists. The paid slug
+cannot take its place: `OPENROUTER_REQUIRE_FREE` rejects it, correctly.
+
+There is deliberately no replacement literal. This is the second shipped default to die in the slot —
+MiniMax M3 for scratchpadding in v0.25.3, GLM 5.2 for leaving the free tier here — and a named free
+slug is only ever as good as OpenRouter's catalogue on the day it was written. Both fallback slots
+are now empty by default and `openrouter/free`, the dynamic router that resolves to whatever is
+actually free when the call is made, carries the tier. The capability is unchanged: set
+`OPENROUTER_ROUTINE_FALLBACK_MODEL` or `OPENROUTER_EPIC_FALLBACK_MODEL` to put a named hop back.
+
+This does retire an invariant from v0.19.38, which required a named non-Google route ahead of
+`openrouter/free` so a Google-side problem could not take both tiers procedural. It is no longer
+expressible without pinning a slug that may be withdrawn in its turn, and a hop that 404s is not a
+working non-Google route either — it is the same outage plus a wasted daily slot. The diversity
+guarantee now rests on `openrouter/free` being itself a router across many providers. The test that
+encoded the old rule says all of this rather than having quietly lost an assertion.
+
+*A timeout was being reported as a broken trust store.* `asyncio.wait_for` cancels the in-flight
+request, and a request cancelled mid-TLS-handshake leaves the half-finished SSL exception in the
+context chain — so `_looks_like_tls_failure` walked into it and flagged `TimeoutError` with the
+🚨 TLS/certificate banner, sending the operator to check `ca-certificates` and `SSL_CERT_FILE` for an
+upstream they simply could not reach in time. A timeout is now never a TLS failure; a genuinely bad
+trust store raises the SSL error itself, which is still detected exactly as before.
+
+Docs and defaults only, plus the one classifier line. No schema change, no game-rule change, AI
+remains narration-only.
+
+
+## Release status — v0.26.1
+
+- Current release: v0.26.1: the withdrawn `z-ai/glm-5.2:free` hop is out of both chains, and a
+  narration timeout is no longer misreported as a TLS/certificate failure.
+- v0.26.0: an optional direct Google AI Studio route leads both chains when a key is
   set, outside OpenRouter's daily free budget.
 - v0.25.4: the AI Studio key instructions say where to get the key, and the routine
   chain summary in `.env.example` matches the defaults under it.
