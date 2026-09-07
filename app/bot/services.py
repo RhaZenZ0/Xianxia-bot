@@ -93,8 +93,6 @@ QUEST_FORGE = QuestForge(
 NARRATOR = Narrator(
     world=WORLD,
     provider=SETTINGS.narrator_provider,
-    api_key=SETTINGS.openai_api_key,
-    model=SETTINGS.openai_model,
     ai_router=AI_ROUTER,
 )
 

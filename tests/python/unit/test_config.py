@@ -14,7 +14,6 @@ class ConfigTests(unittest.TestCase):
         return {
             "DISCORD_TOKEN": "test-token",
             "GUILD_ID": "123456789012345678",
-            "OPENAI_API_KEY": "",
             "DATABASE_PATH": "data/test.sqlite3",
         }
 
@@ -28,7 +27,8 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(settings.narrator_context_max_chars, 4000)
         self.assertEqual(settings.rag_context_cache_seconds, 4.0)
         self.assertEqual(settings.rag_canon_cache_seconds, 120.0)
-        self.assertIsNone(settings.openai_api_key)
+        self.assertFalse(hasattr(settings, "openai_api_key"))
+        self.assertFalse(hasattr(settings, "openai_model"))
         self.assertFalse(hasattr(settings, "ollama_model"))
         self.assertEqual(settings.unexpected_event_chance_percent, 28)
         self.assertEqual(settings.health_host, "0.0.0.0")
@@ -161,6 +161,16 @@ class ConfigTests(unittest.TestCase):
     def test_narrator_provider_validation_rejects_removed_ollama(self):
         env = self.base_env()
         env["NARRATOR_PROVIDER"] = "ollama"
+        with patch.dict(os.environ, env, clear=True):
+            with self.assertRaisesRegex(RuntimeError, "NARRATOR_PROVIDER"):
+                Settings.from_env()
+
+    def test_narrator_provider_validation_rejects_removed_openai(self):
+        # The direct OpenAI provider is gone: a .env still carrying it must fail
+        # loudly at startup rather than silently narrating procedurally.
+        env = self.base_env()
+        env["NARRATOR_PROVIDER"] = "openai"
+        env["OPENAI_API_KEY"] = "sk-test"
         with patch.dict(os.environ, env, clear=True):
             with self.assertRaisesRegex(RuntimeError, "NARRATOR_PROVIDER"):
                 Settings.from_env()

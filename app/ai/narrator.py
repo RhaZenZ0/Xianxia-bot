@@ -6,8 +6,6 @@ import re
 import time
 from typing import Any
 
-from openai import AsyncOpenAI
-
 from .ai_router import AITaskRouter, NarrationTier
 from ..rules.game import World
 from ..rules.sect import TERMINOLOGY_PROMPT
@@ -381,9 +379,10 @@ def _procedural_action_fallback(character: dict[str, Any], action: str) -> str:
 class Narrator:
     """Read-only narration facade.
 
-    OpenRouter is the recommended NAS provider. Provider failures never alter
-    canonical state: after the configured free cloud chain is exhausted, the
-    caller-supplied procedural narration is returned immediately.
+    OpenRouter is the only cloud provider; the direct OpenAI provider was
+    removed in favour of it. Provider failures never alter canonical state:
+    after the configured free cloud chain is exhausted, the caller-supplied
+    procedural narration is returned immediately.
     """
 
     def __init__(
@@ -391,14 +390,10 @@ class Narrator:
         *,
         world: World,
         provider: str = "procedural",
-        api_key: str | None = None,
-        model: str = "gpt-5-mini",
         ai_router: AITaskRouter | None = None,
     ):
         self.world = world
         self.provider = provider.strip().lower() or "procedural"
-        self.model = model
-        self.client = AsyncOpenAI(api_key=api_key) if api_key else None
         self.ai_router = ai_router
         # Monitoring counters.  A silent procedural fallback is exactly the
         # failure players notice ("the narration went flat") and operators do
@@ -416,8 +411,6 @@ class Narrator:
 
     @property
     def provider_label(self) -> str:
-        if self.provider == "openai":
-            return f"openai:{self.model}"
         if self.provider == "openrouter":
             return self.ai_router.label if self.ai_router else "openrouter:unconfigured"
         return self.provider
@@ -454,20 +447,6 @@ class Narrator:
                 )
                 self.narration_served += 1
                 return result.text
-            if self.provider == "openai":
-                if not self.client:
-                    raise RuntimeError("OPENAI_API_KEY is not configured")
-                response = await self.client.responses.create(
-                    model=self.model,
-                    instructions=system_prompt,
-                    input=prompt,
-                    max_output_tokens=max_output_tokens,
-                )
-                text = response.output_text.strip()
-                if not text:
-                    raise RuntimeError("OpenAI returned an empty narration")
-                self.narration_served += 1
-                return text
             raise RuntimeError(f"Unsupported narrator provider: {self.provider}")
         except Exception as exc:
             # Narration is descriptive only. Canonical mechanics have already been

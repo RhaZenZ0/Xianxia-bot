@@ -67,10 +67,10 @@ case "$NARRATOR_PROVIDER_VALUE" in
   ""|openrouter)
     [ -n "$OPENROUTER_KEY_VALUE" ] || fail "OPENROUTER_API_KEY is empty while NARRATOR_PROVIDER=openrouter"
     ;;
-  procedural|disabled|openai)
+  procedural|disabled)
     ;;
   *)
-    fail "Unsupported NARRATOR_PROVIDER=$NARRATOR_PROVIDER_VALUE. This NAS build has no local LLM provider."
+    fail "Unsupported NARRATOR_PROVIDER=$NARRATOR_PROVIDER_VALUE. Valid values are: openrouter, procedural, disabled. This NAS build has no local LLM provider, and the direct OpenAI provider was removed."
     ;;
 esac
 
