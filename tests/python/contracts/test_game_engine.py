@@ -1,6 +1,14 @@
 import unittest
 
 import httpx
+import pytest
+
+from tests.support import httpx_is_shimmed
+
+pytestmark = pytest.mark.skipif(
+    httpx_is_shimmed(),
+    reason="needs the real httpx: these drive httpx.MockTransport, which the stub in tests/support.py cannot provide",
+)
 
 from app.ops.game_engine import GameEngineClient, GameEngineError
 

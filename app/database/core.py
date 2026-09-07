@@ -35,7 +35,7 @@ from ..rules.sect_manor import (
 log = logging.getLogger("xianxia.database")
 
 
-SCHEMA_VERSION = 31
+SCHEMA_VERSION = 32
 # A readiness probe must validate more than the schema-version marker.  If the
 # SQLite file is removed or replaced while the bot is running, SQLite will
 # happily create a new empty file at the same path.  Checking these tables lets
@@ -1440,6 +1440,26 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
             # who separately walked to the same distant city would still count
             # as duelling each other in the street they left.
             "ALTER TABLE pvp_matches ADD COLUMN location TEXT NOT NULL DEFAULT ''",
+        ),
+    ),
+    (
+        32,
+        "pinned_quest_terms",
+        (
+            # v0.24.0. What a quest asks for and what it pays are recorded on
+            # the player's row when they accept it, and `quest.progress` reads
+            # them from there (go_core/internal/game/quest_terms.go).
+            #
+            # A commission already locked its variant and its deadline here for
+            # exactly this reason; ordinary quests did not, so editing a
+            # definition silently rewrote a deal somebody had already taken -
+            # and the terms reached the engine inside the caller's payload,
+            # which put Python in charge of what the work was worth.
+            #
+            # Rows accepted before this migration have no pin. They are
+            # backfilled from the current definition the first time they are
+            # touched, which is the deal they were already on.
+            "ALTER TABLE character_quests ADD COLUMN terms_json TEXT NOT NULL DEFAULT ''",
         ),
     ),
 
@@ -3574,6 +3594,15 @@ class Database:
                     data["progress"] = json.loads(str(data.pop("progress_json", "{}")))
                 except Exception:
                     data["progress"] = {}
+                # v0.24.0: the terms this player accepted, pinned by the engine
+                # at accept. Presentation must read these rather than today's
+                # definition, or a GM's edit changes what a held quest says it
+                # asks for and pays - which is the deal, not a display detail.
+                try:
+                    terms = json.loads(str(data.pop("terms_json", "") or "") or "{}")
+                except Exception:
+                    terms = {}
+                data["terms"] = terms if isinstance(terms, dict) else {}
                 result.append(data)
             return result
 

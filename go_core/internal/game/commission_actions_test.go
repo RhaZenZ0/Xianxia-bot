@@ -24,7 +24,7 @@ func setupCommissionDB(t *testing.T) string {
 		t.Fatal(err)
 	}
 	if err := conn.ExecScript(`
-CREATE TABLE character_quests(user_id INTEGER NOT NULL,quest_key TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'active',progress_json TEXT NOT NULL DEFAULT '{}',accepted_game_minute INTEGER NOT NULL DEFAULT 0,completed_game_minute INTEGER,created_at REAL NOT NULL,updated_at REAL NOT NULL,commission INTEGER NOT NULL DEFAULT 0,deadline_game_minute INTEGER,variant_index INTEGER NOT NULL DEFAULT 0,resolved_game_minute INTEGER,PRIMARY KEY(user_id,quest_key));
+CREATE TABLE character_quests(user_id INTEGER NOT NULL,quest_key TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'active',progress_json TEXT NOT NULL DEFAULT '{}',accepted_game_minute INTEGER NOT NULL DEFAULT 0,completed_game_minute INTEGER,created_at REAL NOT NULL,updated_at REAL NOT NULL,commission INTEGER NOT NULL DEFAULT 0,deadline_game_minute INTEGER,variant_index INTEGER NOT NULL DEFAULT 0,resolved_game_minute INTEGER,terms_json TEXT NOT NULL DEFAULT '',PRIMARY KEY(user_id,quest_key));
 CREATE TABLE quest_definitions(quest_key TEXT PRIMARY KEY,title TEXT NOT NULL,description TEXT NOT NULL DEFAULT '',source_type TEXT NOT NULL DEFAULT 'forge',source_key TEXT NOT NULL DEFAULT '',objectives_json TEXT NOT NULL DEFAULT '[]',rewards_json TEXT NOT NULL DEFAULT '{}',status TEXT NOT NULL DEFAULT 'draft',origin TEXT NOT NULL DEFAULT 'gm_prompt',story_prompt TEXT NOT NULL DEFAULT '',model TEXT NOT NULL DEFAULT '',created_by INTEGER NOT NULL DEFAULT 0,created_at REAL NOT NULL,reviewed_by INTEGER,reviewed_at REAL,updated_at REAL NOT NULL,giver_npc TEXT NOT NULL DEFAULT '',realm_band TEXT NOT NULL DEFAULT '',tier INTEGER NOT NULL DEFAULT 1,owner_user_id INTEGER,deadline_game_minutes INTEGER NOT NULL DEFAULT 0,variants_json TEXT NOT NULL DEFAULT '[]',seed_json TEXT NOT NULL DEFAULT '{}');
 CREATE TABLE npc_relationships(user_id INTEGER NOT NULL,npc_name TEXT NOT NULL,trust INTEGER NOT NULL DEFAULT 0,respect INTEGER NOT NULL DEFAULT 0,fear INTEGER NOT NULL DEFAULT 0,affection INTEGER NOT NULL DEFAULT 0,debt INTEGER NOT NULL DEFAULT 0,grudge INTEGER NOT NULL DEFAULT 0,encounter_count INTEGER NOT NULL DEFAULT 0,last_summary TEXT NOT NULL DEFAULT '',updated_at REAL NOT NULL,commission_cooldown_until_game_minute INTEGER NOT NULL DEFAULT 0,commissions_completed INTEGER NOT NULL DEFAULT 0,commissions_failed INTEGER NOT NULL DEFAULT 0,commissions_abandoned INTEGER NOT NULL DEFAULT 0,last_commission_outcome TEXT NOT NULL DEFAULT '',PRIMARY KEY(user_id,npc_name));
 CREATE TABLE event_log(event_id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,event_type TEXT NOT NULL,payload_json TEXT NOT NULL DEFAULT '{}',created_at REAL NOT NULL);
@@ -55,6 +55,25 @@ func seedCommission(t *testing.T, path, key string, owner any) {
 	batch4Exec(t, path, `INSERT INTO quest_definitions(quest_key,title,status,rewards_json,variants_json,giver_npc,tier,owner_user_id,deadline_game_minutes,created_at,updated_at)
 		VALUES(?,?,'approved','{"spirit_stones":40,"insight_xp":8}',?,'Steward Qiao',1,?,?,0,0)`,
 		key, "The Replaced Crate", string(variants), owner, 3*1440)
+}
+
+// seedOrdinaryQuest writes a definition with no giver - an ordinary quest,
+// which accepts through the same action but occupies no commission slot. The
+// terms live here because since v0.24.0 the engine reads them from the
+// definition and pins them onto the player, rather than being handed them.
+func seedOrdinaryQuest(t *testing.T, path, key string, objectives []map[string]any, rewards map[string]any) {
+	t.Helper()
+	objectivesJSON, err := json.Marshal(objectives)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rewardsJSON, err := json.Marshal(rewards)
+	if err != nil {
+		t.Fatal(err)
+	}
+	batch4Exec(t, path, `INSERT INTO quest_definitions(quest_key,title,status,objectives_json,rewards_json,giver_npc,tier,deadline_game_minutes,created_at,updated_at)
+		VALUES(?,?,'approved',?,?,'',1,0,0,0)`,
+		key, "First Steps Beneath Heaven", string(objectivesJSON), string(rewardsJSON))
 }
 
 func commissionApply(t *testing.T, path, op string, actor int64, seq int, payload map[string]any) (map[string]any, error) {

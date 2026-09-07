@@ -1,3 +1,18 @@
+/* GM dashboard front end (v0.25.0).
+
+   The layout changed; the views did not. Every loader below still asks the same
+   endpoint for the same data and still renders the same columns. What is new is
+   above them: a page template that gives each view a header, a density control
+   and - where a view has three or more sections - tabs instead of a stack.
+
+   Cultivation had eleven tables one under another, Crafting eleven more,
+   Exploration nine, Samsara eight. Reaching the last one meant scrolling past
+   the other ten, every time, with nothing on the page saying what was down
+   there. `sectionize` below is the whole fix, and it works by MOVING the nodes
+   a loader already rendered rather than re-serialising them - so every click
+   handler a loader attached survives, and no loader had to be rewritten to get
+   tabs. */
+
 const app=document.getElementById('app'); const drawer=document.getElementById('drawer'); const drawerBody=document.getElementById('drawerBody');
 const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 const n=v=>Number(v??0).toLocaleString();
@@ -14,10 +29,270 @@ async function adminPost(action,payload={}){const r=await fetch('/api/admin/acti
 function resultBox(v,ok=true){return `<div class="result ${ok?'goodbox':'badbox'}"><b>${ok?'Success':'Failed'}</b><pre>${esc(typeof v==='string'?v:JSON.stringify(v,null,2))}</pre></div>`}
 function optionRows(rows,value='user_id',label=r=>`${r.name} · ${r.discord_name}`){return rows.map(r=>`<option value="${esc(r[value])}">${esc(label(r))}</option>`).join('')}
 function fmtGM(m){m=Number(m||0); const y=Math.floor(m/(60*24*30*12))+1, remY=m%(60*24*30*12), mo=Math.floor(remY/(60*24*30))+1, remM=remY%(60*24*30), d=Math.floor(remM/(60*24))+1; return `Y${y} M${mo} D${d}`}
-function table(headers,rows){if(!rows.length)return '<div class="empty">No records.</div>';return `<div class="tablewrap"><table><thead><tr>${headers.map(h=>`<th>${esc(h[0])}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${headers.map(h=>`<td>${typeof h[1]==='function'?h[1](r):esc(r[h[1]])}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`}
-function timeline(rows){if(!rows.length)return '<div class="empty">No history recorded.</div>';return `<div class="timeline">${rows.map(r=>`<div class="timeline-item"><div>${pill(r.event_type,'purple')} ${pill(`sig ${r.significance}`,'warn')} ${pill(r.visibility)}</div><strong>${esc(r.title)}</strong><div>${esc(r.summary)}</div><div class="timeline-meta">${fmtGM(r.game_minute)} · ${esc(r.location||'Unknown location')} ${r.faction?`· ${esc(r.faction)}`:''}${r.actor_name?` · ${esc(r.actor_name)}`:''}</div></div>`).join('')}</div>`}
+
+/* One table for the whole dashboard. It carries its own row count, because
+   "No records." and "the first 300 of 4,000" used to look identical, and its
+   header sticks - which it never actually did before, the old wrapper having no
+   height for `position:sticky` to stick within. */
+function table(headers,rows,opts={}){
+  rows=rows||[];
+  if(!rows.length)return emptyState(opts.empty||'Nothing here yet.',opts.why);
+  const total=opts.total??rows.length;
+  const caption=rows.length<total?`showing ${n(rows.length)} of ${n(total)}`:`${n(rows.length)} row${rows.length===1?'':'s'}`;
+  return `<div class="tablewrap"><table><thead><tr>${headers.map(h=>`<th>${esc(h[0])}</th>`).join('')}</tr></thead>`
+    +`<tbody>${rows.map(r=>`<tr${opts.rowAttrs?' '+opts.rowAttrs(r):''}>${headers.map(h=>`<td>${typeof h[1]==='function'?h[1](r):esc(r[h[1]])}</td>`).join('')}</tr>`).join('')}</tbody>`
+    +`</table></div><div class="tablefoot">${caption}</div>`;
+}
+function emptyState(text,why){return `<div class="empty">${esc(text)}${why?`<span class="why">${esc(why)}</span>`:''}</div>`}
+function timeline(rows){if(!rows.length)return emptyState('No history recorded.');return `<div class="timeline">${rows.map(r=>`<div class="timeline-item"><div>${pill(r.event_type,'purple')} ${pill(`sig ${r.significance}`,'warn')} ${pill(r.visibility)}</div><strong>${esc(r.title)}</strong><div>${esc(r.summary)}</div><div class="timeline-meta">${fmtGM(r.game_minute)} · ${esc(r.location||'Unknown location')} ${r.faction?`· ${esc(r.faction)}`:''}${r.actor_name?` · ${esc(r.actor_name)}`:''}</div></div>`).join('')}</div>`}
 function filters(html){return `<div class="filters">${html}<button class="btn" id="applyFilters">Apply</button></div>`}
-async function loadOverview(){const [d,cap]=await Promise.all([api('/api/overview'),api('/api/capabilities')]);document.getElementById('worldClock').textContent=d.clock.display;document.getElementById('schema').textContent=`Schema ${d.schema_version} · API v${cap.api_version} · x${d.clock.scale} time`;const c=d.counts;const impl=cap.implementation||{};const coverage=Object.entries(cap.systems||{}).map(([name,s])=>`<div class="card"><small>${esc(name)} systems</small><div class="metric ${s.available?'good':'warn'}">${s.available?'READY':'PARTIAL'}</div>${s.missing_tables?.length?`<div class="muted">Missing: ${esc(s.missing_tables.join(', '))}</div>`:'<div class="muted">API + schema coverage present</div>'}</div>`).join('');const implCard=`<div class="card"><small>Standard implementation check</small><div class="metric ${impl.schema_review_current?'good':'warn'}">${impl.schema_review_current?'PASS':'REVIEW'}</div><div class="muted">Schema ${esc(cap.schema_version)} · reviewed ${esc(impl.reviewed_schema_version??'—')}</div></div>`;app.innerHTML=`<div class="cards">${[['Players',c.players],['Living NPCs',c.npcs_alive],['Injured NPCs',c.npcs_injured],['NPC Marriages',c.npc_marriages],['Descendants',c.npc_descendants],['Active Events',c.active_world_events],['Active Battles',c.active_battles],['Active Wars',c.active_wars],['World History',c.world_history],['RAG Memories',c.rag_memories],['Sects',c.sects],['Families',c.birth_families]].map(x=>`<div class="card"><small>${x[0]}</small><div class="metric">${n(x[1])}</div></div>`).join('')}</div><h2>Dashboard System Coverage</h2><div class="cards">${implCard}${coverage}</div><div class="grid2"><div><h2>World Simulation</h2>${table([['System','system'],['Interval',r=>`${n(r.interval_game_minutes)}m`],['Lag',r=>`${n(r.lag_game_minutes)}m`],['Runs','runs']],d.simulations)}</div><div><h2>Current Era</h2><div class="card">${d.active_era?`<h3>${esc(d.active_era.name)}</h3><div>${esc(d.active_era.description||'')}</div><div class="timeline-meta">Started ${fmtGM(d.active_era.started_game_minute)}</div>`:'No active era.'}</div></div></div><h2>Recent Canonical History</h2>${timeline(d.recent_history)}`}
+function panel(title,body,opts={}){return `<div class="panel ${opts.cls||''}"><div class="ptitle"><h3>${esc(title)}</h3>${opts.count?`<span class="count">${esc(opts.count)}</span>`:''}${opts.acts?`<div class="pacts">${opts.acts}</div>`:''}</div>${body}</div>`}
+function metric(label,value,delta,cls){return `<div class="m"><small>${esc(label)}</small><b class="${cls||''}">${value}</b>${delta?`<span class="delta">${delta}</span>`:''}</div>`}
+
+/* Every view: what it is called, the sentence under the title, where it sits in
+   the sidebar, and whether its sections become tabs. `stack` is for the two
+   pages that are meant to be read whole. */
+const VIEWS={
+  overview:{t:'Overview',g:'World',b:'What the world is doing right now, and whether the machinery underneath it is keeping up.',layout:'stack'},
+  timeline:{t:'Timeline',g:'World',b:'Every mechanically recorded event, permission-filtered exactly as the narrator sees it.'},
+  npcs:{t:'NPCs',g:'World',b:'Who is alive, where they are, and what they are trying to do. A card opens the full definition.'},
+  events:{t:'World Events',g:'World',b:'Active events, the regions they are happening to, and the eras they belong to.'},
+  sects:{t:'Sect Politics',g:'World',b:'Influence, cohesion and the treaties between the nine. Internal factions have their own agendas.'},
+  families:{t:'Families',g:'World',b:'Birth families, player-founded lines, and the autonomous marriages and descendants the simulation produces.'},
+  conflicts:{t:'Conflicts',g:'World',b:'Wars, battles, feuds, bounties and boss encounters — everything currently being fought over.'},
+  players:{t:'Player Activity',g:'Players',b:'Who is playing, where they are, and what they were last doing. A row opens the character sheet.'},
+  cultivation:{t:'Cultivation',g:'Players',b:'Every progression system a character carries — eleven tables, one at a time.'},
+  crafting:{t:'Crafting & Assets',g:'Players',b:'Professions, alchemy, bound companions, and everything a character owns or has built.'},
+  conditions:{t:'Conditions',g:'Players',b:'Active conditions by category and severity. A GM can clear one from the player sheet.'},
+  party:{t:'Parties & Formations',g:'Players',b:'Standing parties and the formations they have practised.'},
+  pvp:{t:'PvP',g:'Players',b:'Challenges and duels. A match re-checks its own preconditions on every action.'},
+  dynasties:{t:'Samsara Dynasties',g:'Players',b:'Reincarnation, soul legacy, and the claims and conflicts descendants raise over them.'},
+  quests:{t:'Quests',g:'Content',b:'Every definition players can be given — forged, hand-written, or a commission an NPC hands out.'},
+  commissions:{t:'Commissions',g:'Content',b:'The commission pipeline: what is on offer, who is carrying one, and how their givers feel about them.'},
+  exploration:{t:'Exploration',g:'Content',b:'Events, secret realms, discoveries, beasts and caravans — everything that happens away from a settlement.'},
+  economy:{t:'Economy',g:'Content',b:'Markets, auctions, the black market, and the crimes recorded against them.'},
+  rag:{t:'RAG Memory',g:'Systems',b:'What the narrator can retrieve, and at what visibility. Nothing here creates game truth.'},
+  decisions:{t:'Autonomous Decisions',g:'Systems',b:'What the simulation decided on its own, and which of those decisions reached permanent history.'},
+  threads:{t:'Discord Threads',g:'Systems',b:'Household, expedition and private scene threads bound to guild channels.'},
+  discord:{t:'Discord Setup',g:'Admin',b:'Provision and repair the server layout. Only discord.py touches guilds — no game mechanics happen here.'},
+  admin:{t:'Admin Console',g:'Admin',b:'Actions that change the world. Every one is applied by the engine and written to admin_audit_log with your name on it.'},
+};
+
+let CURRENT='overview';
+const SECTION={};
+
+function density(){try{return localStorage.getItem('xr.density')||'comfortable'}catch{return 'comfortable'}}
+function setDensity(v){document.documentElement.dataset.density=v;try{localStorage.setItem('xr.density',v)}catch{}
+  document.querySelectorAll('[data-density-btn]').forEach(b=>b.classList.toggle('primary',b.dataset.densityBtn===v))}
+
+/* Move what a loader rendered into a header + sections, without re-serialising
+   any of it. Node moves keep every listener the loader just attached, which is
+   why not one of the twenty-three loaders had to change to gain tabs. */
+function sectionize(view){
+  const cfg=VIEWS[view]||{t:view,b:''};
+  const nodes=Array.from(app.childNodes);
+  const lead=[]; let secs=[]; let cur=null;
+  for(const node of nodes){
+    if(node.nodeType===1&&node.tagName==='H2'){cur={label:node.textContent.trim(),nodes:[]};secs.push(cur);continue}
+    (cur?cur.nodes:lead).push(node);
+  }
+  // Several views open with a heading over nothing but the metric strip -
+  // "Cultivation & Aptitudes" above five cards, say. That is the page summary,
+  // not one of its sections, and left alone it became an empty first tab.
+  secs=secs.filter(sec=>{
+    const els=sec.nodes.filter(node=>node.nodeType===1);
+    if(!els.length||!els.every(el=>el.classList&&el.classList.contains('cards')))return true;
+    els.forEach(el=>lead.push(el));
+    return false;
+  });
+  const useTabs=cfg.layout!=='stack'&&secs.length>=3;
+  app.textContent='';
+
+  const head=document.createElement('div');
+  head.className='phead';
+  head.innerHTML=`<div><h2>${esc(cfg.t)}</h2>${cfg.b?`<p>${esc(cfg.b)}</p>`:''}</div>`
+    +`<div class="pheadacts"><button class="btn sm" data-density-btn="comfortable">Comfortable</button>`
+    +`<button class="btn sm" data-density-btn="compact">Compact</button></div>`;
+  app.appendChild(head);
+  // A view with page-level actions renders them into #pageActions; they are
+  // moved into the shared header rather than each view drawing its own.
+  const acts=lead.find(node=>node.nodeType===1&&node.id==='pageActions');
+  if(acts){
+    const slot=head.querySelector('.pheadacts');
+    Array.from(acts.children).forEach(child=>slot.insertBefore(child,slot.firstChild));
+    lead.splice(lead.indexOf(acts),1);
+  }
+  const current=density();
+  head.querySelectorAll('[data-density-btn]').forEach(b=>{
+    b.classList.toggle('primary',b.dataset.densityBtn===current);
+    b.onclick=()=>setDensity(b.dataset.densityBtn);
+  });
+
+  const leadWrap=document.createElement('div');
+  lead.forEach(node=>leadWrap.appendChild(node));
+  app.appendChild(leadWrap);
+
+  let tabsEl=null;
+  if(useTabs){
+    tabsEl=document.createElement('div');
+    tabsEl.className='tabs';
+    app.appendChild(tabsEl);
+  }
+  const active=Math.min(SECTION[view]??0,Math.max(0,secs.length-1));
+  secs.forEach((sec,i)=>{
+    const wrap=document.createElement('div');
+    wrap.className='sec';
+    wrap.dataset.sec=String(i);
+    if(!useTabs){const h=document.createElement('h2');h.textContent=sec.label;wrap.appendChild(h)}
+    sec.nodes.forEach(node=>wrap.appendChild(node));
+    if(useTabs&&i!==active)wrap.hidden=true;
+    app.appendChild(wrap);
+    if(tabsEl){
+      const b=document.createElement('button');
+      b.textContent=sec.label;
+      b.className=i===active?'active':'';
+      b.onclick=()=>selectSection(view,i);
+      tabsEl.appendChild(b);
+    }
+  });
+  if(useTabs&&secs.length)location.hash=`${view}/${active}`; else location.hash=view;
+}
+
+function selectSection(view,index){
+  SECTION[view]=index;
+  app.querySelectorAll('.sec').forEach(el=>{el.hidden=Number(el.dataset.sec)!==index});
+  app.querySelectorAll('.tabs button').forEach((b,i)=>b.classList.toggle('active',i===index));
+  location.hash=`${view}/${index}`;
+}
+
+async function switchView(v){
+  if(!VIEWS[v])v='overview';
+  CURRENT=v;
+  const cfg=VIEWS[v];
+  document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('active',b.dataset.view===v));
+  document.getElementById('crumb').textContent=`${cfg.g} / ${cfg.t}`;
+  app.innerHTML='<div class="skel"><i></i><i></i><i></i></div>';
+  try{await loaders[v]();sectionize(v)}
+  catch(e){app.innerHTML=`<div class="panel failed"><div class="ptitle"><h3 class="bad">${esc(cfg.t)} could not load</h3>`
+    +`<div class="pacts"><button class="btn sm" id="retryView">Retry</button></div></div>`
+    +`<div class="panelerr">The rest of the dashboard is fine.<code>${esc(e.message)}</code></div></div>`;
+   const r=document.getElementById('retryView');if(r)r.onclick=()=>switchView(v)}
+}
+
+/* Re-running the current view after an action, keeping the section you were on.
+   Deliberately not switchView: that paints a loading skeleton, and this runs on
+   the fifteen-second Overview poll where a flash every fifteen seconds would be
+   worse than the staleness it fixes. */
+async function refresh(){
+  const view=CURRENT;
+  await loaders[view]();
+  if(CURRENT===view)sectionize(view);
+}
+
+function bindShell(){
+  document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>{document.body.classList.remove('railopen');switchView(b.dataset.view)});
+  document.getElementById('closeDrawer').onclick=()=>drawer.classList.add('hidden');
+  drawer.onclick=e=>{if(e.target===drawer)drawer.classList.add('hidden')};
+  document.getElementById('railToggle').onclick=()=>document.body.classList.toggle('railopen');
+  const filter=document.getElementById('navFilter');
+  filter.oninput=()=>{
+    const q=filter.value.trim().toLowerCase();
+    document.querySelectorAll('#nav button').forEach(b=>{
+      b.classList.toggle('hiddenmatch',!!q&&!b.textContent.toLowerCase().includes(q));
+    });
+    document.querySelectorAll('.navgroup').forEach(g=>{g.style.display=q?'none':''});
+  };
+  filter.onkeydown=e=>{
+    if(e.key==='Escape'){filter.value='';filter.oninput();filter.blur()}
+    if(e.key==='Enter'){const first=document.querySelector('#nav button:not(.hiddenmatch)');if(first){filter.value='';filter.oninput();switchView(first.dataset.view)}}
+  };
+  document.addEventListener('keydown',e=>{
+    if(e.key==='/'&&document.activeElement!==filter&&!/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName||'')){e.preventDefault();filter.focus()}
+    if(e.key==='Escape'&&!drawer.classList.contains('hidden'))drawer.classList.add('hidden');
+  });
+  window.onhashchange=()=>{
+    const [v,s]=String(location.hash||'').replace('#','').split('/');
+    if(v&&VIEWS[v]&&v!==CURRENT){if(s!==undefined)SECTION[v]=Number(s)||0;switchView(v)}
+  };
+}
+
+/* Overview is the one view rewritten rather than re-laid-out, because it gained
+   the only genuinely new thing in this release: a short list of conditions that
+   already existed on other pages and that a GM had no reason to go looking for.
+   Everything in it is a row from somewhere else, with the page it lives on. */
+const SEV={bad:'bad',warn:'warn',info:'mut'};
+function attentionPanel(items){
+  if(!items||!items.length)
+    return panel('Wants your attention',emptyState('Nothing is waiting.','No drafts to review, no system behind its interval, no overdue commissions.'),{count:'0'});
+  const rows=items.map(a=>`<tr>
+    <td><span class="${SEV[a.severity]||''}">●</span> ${esc(a.text)}</td>
+    <td class="mut nowrap">${esc((VIEWS[a.view]||{}).t||a.view)}</td>
+    <td class="right"><button class="btn sm" data-attend="${esc(a.view)}" data-kind="${esc(a.kind)}" data-system="${esc(a.system||'')}">${esc(a.action||'Open')}</button></td>
+  </tr>`).join('');
+  return panel('Wants your attention',`<div class="tablewrap"><table><tbody>${rows}</tbody></table></div>`,{count:`${items.length}`});
+}
+
+async function loadOverview(){
+  const [d,cap]=await Promise.all([api('/api/overview'),api('/api/capabilities')]);
+  const clock=d.clock||{};
+  document.getElementById('worldClock').textContent=clock.display||'—';
+  document.getElementById('schema').textContent=`Schema ${d.schema_version} · API v${cap.api_version} · ×${clock.scale} time`;
+  const c=d.counts||{};const impl=cap.implementation||{};const att=d.attention||[];
+  const behind=att.filter(a=>a.kind==='simulation_lag').length;
+  document.getElementById('engineHealth').innerHTML=behind
+    ?`<span class="status-dot bad"></span>${behind} system${behind===1?'':'s'} behind`
+    :'<span class="status-dot"></span>simulation current';
+  const badge=document.getElementById('questBadge');
+  const drafts=att.find(a=>a.kind==='quest_drafts');
+  if(badge){if(drafts){badge.textContent=String(drafts.count);badge.hidden=false}else{badge.hidden=true}}
+
+  const coverage=Object.entries(cap.systems||{}).map(([name,s])=>
+    `<div class="row"><span>${esc(name)}</span><b class="${s.available?'good':'warn'}">${s.available?'ready':'partial'}</b></div>`
+    +(s.missing_tables?.length?`<div class="mut" style="font-size:11px">missing: ${esc(s.missing_tables.join(', '))}</div>`:'')).join('');
+
+  app.innerHTML=`
+  <div class="metrics">
+    ${metric('Players',n(c.players),`${n(c.players_alive)} alive`)}
+    ${metric('Living NPCs',n(c.npcs_alive),`${n(c.npc_marriages)} married · ${n(c.npc_descendants)} descendants`)}
+    ${metric('Injured NPCs',n(c.npcs_injured),'',Number(c.npcs_injured)?'warn':'')}
+    ${metric('Active events',n(c.active_world_events))}
+    ${metric('Active battles',n(c.active_battles),`${n(c.active_wars)} war${Number(c.active_wars)===1?'':'s'}`)}
+    ${metric('World history',n(c.world_history),`${n(c.rag_memories)} RAG memories`)}
+    ${metric('Sects',n(c.sects),`${n(c.birth_families)} birth families`)}
+    ${metric('Implementation gate',impl.schema_review_current?'PASS':'REVIEW','',impl.schema_review_current?'good':'warn')}
+  </div>
+  ${attentionPanel(att)}
+  <h2>Simulation &amp; coverage</h2>
+  <div class="grid2">
+    <div>${panel('Simulation health',table([['System','system'],['Interval',r=>`${n(r.interval_game_minutes)}m`],
+        ['Lag',r=>`<span class="${Number(r.lag_game_minutes)>Number(r.interval_game_minutes||0)?'bad':'good'}">${n(r.lag_game_minutes)}m</span>`],
+        ['Runs','runs']],d.simulations||[],{empty:'No simulation state recorded.'}),{count:`${(d.simulations||[]).length} systems`})}</div>
+    <div><div>${panel('Coverage & contract',`<div style="padding:12px 14px">
+        <div class="row"><span>Implementation check</span><b class="${impl.schema_review_current?'good':'warn'}">${impl.schema_review_current?'pass':'review'}</b></div>
+        <div class="row"><span>Schema / reviewed</span><b>${esc(cap.schema_version)} / ${esc(impl.reviewed_schema_version??'—')}</b></div>
+        <div class="row"><span>Dashboard API</span><b>v${esc(cap.api_version)}</b></div>
+        ${coverage}</div>`)}</div>
+    ${panel('Current era',d.active_era?`<div style="padding:12px 14px">
+        <h3 class="gold" style="font-family:Georgia,serif">${esc(d.active_era.name)}</h3>
+        <p class="mut" style="margin:7px 0 0;line-height:1.6">${esc(d.active_era.description||'')}</p>
+        <div class="row" style="margin-top:12px"><span>Started</span><b>${fmtGM(d.active_era.started_game_minute)}</b></div></div>`
+      :emptyState('No active era.','Eras are opened by the world simulation or by a GM.'))}</div></div>
+  </div>
+  <h2>Recent canonical history</h2>
+  ${timeline(d.recent_history||[])}`;
+
+  document.querySelectorAll('[data-attend]').forEach(b=>b.onclick=async()=>{
+    if(b.dataset.kind==='simulation_lag'&&b.dataset.system){
+      if(!confirm(`Force a ${b.dataset.system} tick now?`))return;
+      b.disabled=true;
+      try{await adminPost('simulation.force',{system:b.dataset.system,steps:1,reason:'GM dashboard overview'});await refresh()}
+      catch(e){alert(e.message);b.disabled=false}
+      return;
+    }
+    switchView(b.dataset.attend);
+  });
+}
+
 async function loadTimeline(){const d=await api('/api/timeline?limit=150');app.innerHTML=`<h2>Permanent World Timeline</h2>${filters(`<input id="q" placeholder="Search history"><select id="etype"><option value="">All event types</option>${d.event_types.map(x=>`<option>${esc(x)}</option>`).join('')}</select><select id="vis"><option value="">All visibility</option><option>public</option><option>participant</option><option>faction</option><option>hidden</option></select>`)}<div id="timelineRows">${timeline(d.rows)}</div>`;document.getElementById('applyFilters').onclick=async()=>{const p=new URLSearchParams({limit:'200',q:q.value,event_type:etype.value,visibility:vis.value});const x=await api('/api/timeline?'+p);document.getElementById('timelineRows').innerHTML=timeline(x.rows)}}
 async function loadNPCs(){const d=await api('/api/npcs?limit=300&status=alive');app.innerHTML=`<h2>Active NPCs</h2>${filters(`<input id="q" placeholder="Name, job, goal"><select id="loc"><option value="">All locations</option>${d.locations.map(x=>`<option>${esc(x)}</option>`).join('')}</select><select id="fac"><option value="">All factions</option>${d.factions.map(x=>`<option>${esc(x)}</option>`).join('')}</select><select id="status"><option>alive</option><option>dead</option><option>all</option></select>`)}<div id="npcRows">${npcCards(d.rows)}</div>`;bindNpc();document.getElementById('applyFilters').onclick=async()=>{const p=new URLSearchParams({limit:'300',q:q.value,location:loc.value,faction:fac.value,status:status.value});const x=await api('/api/npcs?'+p);document.getElementById('npcRows').innerHTML=npcCards(x.rows);bindNpc()}}
 function npcCards(rows){return `<div class="npc-grid">${rows.map(r=>`<div class="card npc-card" data-npc="${esc(r.npc_name)}"><h3><span class="status-dot ${r.status==='dead'?'dead':''}"></span>${esc(r.npc_name)}</h3><div class="tagline">${pill(`Realm ${r.realm_index}/${r.phase}`,'blue')}${pill(r.sect_rank||r.faction,'warn')}${r.injury_severity?pill(`Injury ${r.injury_severity}`,'bad'):''}</div><div class="row"><span>Location</span><b>${esc(r.current_location)}</b></div><div class="row"><span>Activity</span><b>${esc(r.activity)}</b></div><div class="row"><span>Mood</span><b>${esc(r.mood||'—')}</b></div><div class="row"><span>Goal</span><b>${esc(r.current_goal||'—')}</b></div><div class="row"><span>Family</span><b>${esc(r.relationship_status||'single')}${r.spouse_name?` · ${esc(r.spouse_name)}`:''}</b></div></div>`).join('')}</div>`}
@@ -29,11 +304,11 @@ async function loadSects(){const d=await api('/api/sects');app.innerHTML=`<h2>Se
 async function loadConflicts(){const d=await api('/api/conflicts');app.innerHTML=`<h2>Territorial Wars</h2>${table([['ID','war_id'],['Territory','territory_name'],['Attacker','attacker_key'],['Defender','defender_key'],['Status','status'],['Score',r=>`${r.attacker_score} : ${r.defender_score}`],['Siege','siege_progress'],['Resolution','resolution']],d.wars)}<h2>Battles</h2>${table([['Player','player_name'],['Opponent','npc_name'],['Location','location'],['Source','source'],['Status','status'],['HP',r=>`${r.player_hp}/${r.player_hp_max} vs ${r.npc_hp}/${r.npc_hp_max}`],['Outcome','final_outcome']],d.battles)}<h2>NPC Feuds</h2>${table([['NPC A','npc_a'],['NPC B','npc_b'],['Type','relation_type'],['Grudge','grudge'],['Affinity','affinity'],['Trust','trust']],d.npc_feuds)}<h2>Player Grudges & Bounties</h2>${table([['Player','player_name'],['Holder',r=>`${r.holder_type}:${r.holder_key}`],['Intensity','intensity'],['Reason','reason']],d.player_grudges)}${table([['Player','player_name'],['Amount','amount'],['Reason','reason'],['Hunter','hunter_name'],['Pursuit','pursuit_status'],['Pressure','pressure']],d.bounties)}<h2>Boss Encounters</h2>${table([['Boss','boss_name'],['Location','location'],['Status','status'],['HP',r=>`${r.boss_hp}/${r.boss_hp_max}`],['Round','round_index'],['Phase','phase_index']],d.bosses)}`}
 async function loadEvents(){const d=await api('/api/events');app.innerHTML=`<h2>World Events</h2>${table([['Title','title'],['Type','event_type'],['Location','location'],['Active',r=>pill(r.active?'ACTIVE':'closed',r.active?'good':'muted')],['Ends',r=>new Date(Number(r.ends_at)*1000).toLocaleString()]],d.world_events)}<h2>Regional Civilization State</h2>${table([['Location','location'],['World','world_name'],['Population',r=>n(r.population)],['Prosperity','prosperity'],['Security','security'],['Resources','spirit_resources'],['Food','food_supply'],['Migration','migration_pressure'],['Unrest','unrest']],d.regions)}<h2>Recent Regional Incidents</h2>${table([['Location','location'],['Event','event_text'],['Severity','severity'],['Time',r=>fmtGM(r.game_minute)]],d.civilization_events)}<h2>World Eras</h2>${table([['Era','name'],['Description','description'],['Active',r=>r.active?'Yes':'No'],['Started',r=>fmtGM(r.started_game_minute)]],d.eras)}`}
 async function loadPlayers(){const d=await api('/api/players');app.innerHTML=`<h2>Players</h2>${table([['Name','name'],['Discord','discord_name'],['Life','life_status'],['Realm',r=>`${r.realm_index}/${r.phase}`],['Body',r=>`${r.body_realm_index}/${r.body_phase}`],['Location','location'],['Sect',r=>r.sect_name?`${r.sect_name} · ${r.rank_name}`:'Independent'],['Vitality',r=>`${r.vitality}/${r.vitality_max}`],['Qi',r=>`${r.qi}/${r.qi_max}`],['Karma','karma_score'],['Memories','memory_count']],d.players)}<h2>Recent Player World Actions</h2>${table([['Player','player_name'],['Action','action_type'],['Target',r=>`${r.target_type}:${r.target_key}`],['Location','location'],['Severity','severity'],['Time',r=>fmtGM(r.game_minute)]],d.recent_actions)}<h2>Scene Activity</h2>${table([['Player','player_name'],['Messages','player_messages'],['Last Scene','last_scene_id'],['Last Real Time',r=>r.last_scene_at?new Date(Number(r.last_scene_at)*1000).toLocaleString():'—']],d.scene_activity)}`}
-async function loadCultivation(){const d=await api('/api/cultivation');const s=d.summary||{};app.innerHTML=`<h2>Cultivation & Aptitudes</h2><div class="cards">${[['Cultivators',s.roots],['Mutated Roots',s.mutated_roots],['Bloodlines',s.bloodlines],['Active Seclusion',s.active_seclusion],['Uncleared Tribulations',s.uncleared_tribulations]].map(x=>`<div class="card"><small>${x[0]}</small><div class="metric">${n(x[1])}</div></div>`).join('')}</div><h2>Spiritual Roots</h2>${table([['Player','name'],['Life','life_status'],['Realm',r=>`${r.realm_index}/${r.phase}`],['Path','path'],['Grade',r=>pill(r.root_grade||'Legacy','purple')],['Purity',r=>r.purity===undefined?'—':`${r.purity}%`],['Elements',r=>esc(jsonText(r.elements_json,r.legacy_root||'—'))],['Mutation',r=>esc(r.mutation||'—')],['Stability',r=>r.stability===undefined?'—':`${r.stability}%`],['Refinement',r=>r.refinement_progress===undefined?'—':`${r.refinement_progress}%`],['Compatibility',r=>r.compatibility===undefined?'—':`${r.compatibility}%`]],d.roots)}<h2>Bloodlines</h2>${table([['Player','player_name'],['Bloodline','name'],['Affinity','affinity'],['Purity',r=>`${r.purity}%`],['State','state'],['Evolution','evolution_stage'],['Progress',r=>`${r.progress}%`],['Mutation','mutation']],d.bloodlines)}<h2>Physiques</h2>${table([['Player','player_name'],['Physique','name'],['State','state'],['Evolution','evolution_stage'],['Progress',r=>`${r.progress}%`],['Stability',r=>`${r.stability}%`],['Instability','instability']],d.physiques)}<h2>Tribulations</h2>${table([['Player','player_name'],['Gate','gate_realm_index'],['Preparation','preparation'],['Attempts','attempts'],['Cleared',r=>pill(r.cleared?'CLEARED':'OPEN',r.cleared?'good':'warn')],['Last Result','last_result'],['Updated',r=>fmtGM(r.updated_game_minute)]],d.tribulations)}<h2>Recent Tribulation Attempts</h2>${table([['Player','player_name'],['Gate','gate_realm_index'],['Preparation','preparation_used'],['Result',r=>pill(r.success?'SUCCESS':'FAIL',r.success?'good':'bad')],['Waves',r=>esc(jsonText(r.waves_json))],['Time',r=>fmtGM(r.created_game_minute)]],d.tribulation_attempts)}<div class="grid2"><div><h2>Dao Progress</h2>${table([['Player','player_name'],['Dao','dao_id'],['Progress','progress']],d.dao)}</div><div><h2>Law Comprehension</h2>${table([['Player','player_name'],['Law','law_id'],['Comprehension','comprehension'],['Insights','insights']],d.laws)}</div></div><h2>Realm Perfection</h2>${table([['Player','player_name'],['Realm','realm_index'],['Active',r=>r.active?'Yes':'No'],['Completed',r=>r.completed?'Yes':'No'],['Progress',r=>`${r.progress}%`],['Training','training_progress'],['Quests','completed_quests']],d.realm_perfection)}<h2>Body Realm Perfection</h2>${table([['Player','player_name'],['Realm','realm_index'],['Active',r=>r.active?'Yes':'No'],['Completed',r=>r.completed?'Yes':'No'],['Progress',r=>`${r.progress}%`],['Training','training_progress'],['Quests','completed_quests']],d.body_realm_perfection)}<h2>Seclusion</h2>${table([['Player','player_name'],['Mode','mode'],['Status','status'],['Start','start_location'],['Environment','environment_mult'],['Gain','accumulated_gain'],['From',r=>fmtGM(r.started_game_minute)],['Until',r=>fmtGM(r.ends_game_minute)]],d.seclusion)}`}
+async function loadCultivation(){const d=await api('/api/cultivation');const s=d.summary||{};app.innerHTML=`<h2>Cultivation & Aptitudes</h2><div class="cards">${[['Cultivators',s.roots],['Mutated Roots',s.mutated_roots],['Bloodlines',s.bloodlines],['Active Seclusion',s.active_seclusion],['Uncleared Tribulations',s.uncleared_tribulations]].map(x=>`<div class="card"><small>${x[0]}</small><div class="metric">${n(x[1])}</div></div>`).join('')}</div><h2>Spiritual Roots</h2>${table([['Player','name'],['Life','life_status'],['Realm',r=>`${r.realm_index}/${r.phase}`],['Path','path'],['Grade',r=>pill(r.root_grade||'Legacy','purple')],['Purity',r=>r.purity===undefined?'—':`${r.purity}%`],['Elements',r=>esc(jsonText(r.elements_json,r.legacy_root||'—'))],['Mutation',r=>esc(r.mutation||'—')],['Stability',r=>r.stability===undefined?'—':`${r.stability}%`],['Refinement',r=>r.refinement_progress===undefined?'—':`${r.refinement_progress}%`],['Compatibility',r=>r.compatibility===undefined?'—':`${r.compatibility}%`]],d.roots)}<h2>Bloodlines</h2>${table([['Player','player_name'],['Bloodline','name'],['Affinity','affinity'],['Purity',r=>`${r.purity}%`],['State','state'],['Evolution','evolution_stage'],['Progress',r=>`${r.progress}%`],['Mutation','mutation']],d.bloodlines)}<h2>Physiques</h2>${table([['Player','player_name'],['Physique','name'],['State','state'],['Evolution','evolution_stage'],['Progress',r=>`${r.progress}%`],['Stability',r=>`${r.stability}%`],['Instability','instability']],d.physiques)}<h2>Tribulations</h2>${table([['Player','player_name'],['Gate','gate_realm_index'],['Preparation','preparation'],['Attempts','attempts'],['Cleared',r=>pill(r.cleared?'CLEARED':'OPEN',r.cleared?'good':'warn')],['Last Result','last_result'],['Updated',r=>fmtGM(r.updated_game_minute)]],d.tribulations)}<h2>Recent Tribulation Attempts</h2>${table([['Player','player_name'],['Gate','gate_realm_index'],['Preparation','preparation_used'],['Result',r=>pill(r.success?'SUCCESS':'FAIL',r.success?'good':'bad')],['Waves',r=>esc(jsonText(r.waves_json))],['Time',r=>fmtGM(r.created_game_minute)]],d.tribulation_attempts)}<h2>Dao Progress</h2>${table([['Player','player_name'],['Dao','dao_id'],['Progress','progress']],d.dao)}<h2>Law Comprehension</h2>${table([['Player','player_name'],['Law','law_id'],['Comprehension','comprehension'],['Insights','insights']],d.laws)}<h2>Realm Perfection</h2>${table([['Player','player_name'],['Realm','realm_index'],['Active',r=>r.active?'Yes':'No'],['Completed',r=>r.completed?'Yes':'No'],['Progress',r=>`${r.progress}%`],['Training','training_progress'],['Quests','completed_quests']],d.realm_perfection)}<h2>Body Realm Perfection</h2>${table([['Player','player_name'],['Realm','realm_index'],['Active',r=>r.active?'Yes':'No'],['Completed',r=>r.completed?'Yes':'No'],['Progress',r=>`${r.progress}%`],['Training','training_progress'],['Quests','completed_quests']],d.body_realm_perfection)}<h2>Seclusion</h2>${table([['Player','player_name'],['Mode','mode'],['Status','status'],['Start','start_location'],['Environment','environment_mult'],['Gain','accumulated_gain'],['From',r=>fmtGM(r.started_game_minute)],['Until',r=>fmtGM(r.ends_game_minute)]],d.seclusion)}`}
 
 async function loadCrafting(){const d=await api('/api/crafting');const s=d.summary||{};app.innerHTML=`<h2>Crafting, Companions & Property</h2><div class="cards">${[['Profession Tracks',s.profession_tracks],['Alchemy Users',s.alchemy_users],['Active Beasts',s.active_beasts],['Awakened Artifacts',s.awakened_artifacts],['Properties',s.properties],['Deployed Arrays',s.deployed_arrays]].map(x=>`<div class="card"><small>${x[0]}</small><div class="metric">${n(x[1])}</div></div>`).join('')}</div><h2>Profession Progress</h2>${table([['Player','player_name'],['Profession','profession'],['Level','level'],['XP','xp'],['Successes','successes'],['Failures','failures'],['Quality','quality_points']],d.professions)}<h2>Alchemy State</h2>${table([['Player','player_name'],['Toxicity',r=>pill(r.pill_toxicity,r.pill_toxicity>=80?'bad':r.pill_toxicity>=50?'warn':'good')],['Refinements','total_refinements'],['Successes','successful_refinements'],['Flawless','flawless_refinements'],['Best Margin','best_margin'],['Last Quality','last_quality']],d.alchemy)}<h2>Recent Alchemy Batches</h2>${table([['Player','player_name'],['Recipe','recipe_name'],['Quality','quality'],['Margin','margin'],['Success',r=>r.success?'Yes':'No'],['Output',r=>esc(jsonText(r.output_json))],['Location','location'],['Time',r=>fmtGM(r.game_minute)]],d.alchemy_batches)}<h2>Spirit Beasts</h2>${table([['Player','player_name'],['Beast','name'],['Species','species'],['Rank','rank'],['Element','element'],['Bloodline','bloodline'],['Evolution','evolution_stage'],['Loyalty','loyalty'],['Contract','contract_type'],['Active',r=>r.active?'Yes':'No']],d.spirit_beasts)}<h2>Artifact Bonds</h2>${table([['Player','player_name'],['Item','item_id'],['Bond','bond_level'],['Resonance','resonance'],['Awakened',r=>r.awakened?'Yes':'No'],['Spirit','spirit_name'],['Temperament','temperament']],d.artifact_bonds)}<h2>Cave Abodes & Properties</h2>${table([['Owner','owner_name'],['Name','name'],['Type','property_type'],['Base','base_location'],['Grade','grade'],['Cultivation','cultivation_level'],['Alchemy','alchemy_level'],['Forge','forge_level'],['Formation','formation_level'],['Defense','defense_level'],['Storage','storage_level'],['Garden','herb_garden_level'],['Beast Pen','beast_pen_level']],d.cave_abodes)}<h2>Sect Abodes</h2>${table([['Owner','owner_name'],['Sect','sect_name'],['Name','name'],['Base','base_location'],['Location Key','location_key']],d.sect_abodes)}<h2>Personal Worlds</h2>${table([['Owner','owner_name'],['Name','name'],['Stability','stability'],['Access','access_mode'],['Laws',r=>esc(jsonText(r.laws_json))]],d.personal_worlds)}<h2>Deployed Formations / Arrays</h2>${table([['Name','name'],['Location','location'],['Owner','owner_name'],['Sect','sect_name'],['Item','item_id'],['Effect',r=>esc(jsonText(r.effect_json))],['Starts',r=>fmtGM(r.starts_game_minute)],['Ends',r=>fmtGM(r.ends_game_minute)]],d.deployed_arrays)}<h2>Equipment Instances</h2>${table([['Player','player_name'],['Item','item_id'],['Slot','slot'],['Quality','quality'],['Durability',r=>`${r.durability}/${r.max_durability}`],['Equipped',r=>r.equipped?'Yes':'No']],d.equipment)}`}
 
-async function loadExploration(){const d=await api('/api/exploration');const s=d.summary||{};app.innerHTML=`<h2>Exploration & Travel Systems</h2><div class="cards">${[['Active Events',s.active_events],['Secret Realms',s.active_secret_realms],['Recent Discoveries',s.discoveries_shown],['Beast Encounters',s.active_beast_encounters],['Traveling Caravans',s.traveling_caravans]].map(x=>`<div class="card"><small>${x[0]}</small><div class="metric">${n(x[1])}</div></div>`).join('')}</div><h2>Exploration Events</h2>${table([['Title','title'],['Category','category'],['Kind','kind'],['Visibility','visibility'],['Location','location'],['Severity','severity'],['State','state'],['Stage','stage'],['Participants','participants'],['Time',r=>fmtGM(r.created_game_minute)]],d.events)}<h2>Event Participants</h2>${table([['Player','player_name'],['Event','title'],['Location','location'],['Stage','stage'],['Status','status'],['Joined',r=>fmtGM(r.joined_game_minute)]],d.participants)}<h2>Secret Realm Runs</h2>${table([['Player','player_name'],['Realm','realm_id'],['Event','event_key'],['Room','room_index'],['Danger','danger'],['Active',r=>r.active?'Yes':'No'],['Location','location'],['Expires',r=>new Date(Number(r.expires_at)*1000).toLocaleString()]],d.secret_realms)}<h2>Recent Location Discoveries</h2>${table([['Player','player_name'],['Location','location'],['Kind','discovery_kind'],['Time',r=>fmtGM(r.discovered_game_minute)]],d.discoveries)}<h2>Wild Beast Encounters</h2>${table([['Player','player_name'],['Species','species'],['Rank','rank'],['Element','element'],['Bloodline','bloodline'],['TN','taming_tn'],['Location','location'],['Status','status'],['Time',r=>fmtGM(r.created_game_minute)]],d.wild_beast_encounters)}<h2>Caravans</h2>${table([['ID','caravan_id'],['Owner',r=>`${r.owner_type}:${r.owner_key}`],['Route',r=>`${r.origin} → ${r.destination}`],['Status','status'],['Risk','risk'],['Escort','escort_strength'],['Concealment','concealment'],['Smuggling','smuggling'],['Toll','toll_paid'],['Outcome','outcome'],['Payout','payout_final'],['Depart',r=>fmtGM(r.depart_game_minute)],['Arrive',r=>fmtGM(r.arrive_game_minute)]],d.caravans)}<h2>Discord Expedition Threads</h2>${table([['Player','player_name'],['Guild','guild_id'],['Thread','thread_id'],['Parent','parent_channel_id'],['Last Location','last_location']],d.expedition_threads)}<h2>Forged Quests</h2>${table([['Key','quest_key'],['Title','title'],['Status',r=>pill(String(r.status).toUpperCase(),r.status==='approved'?'good':r.status==='draft'?'warn':'bad')],['Origin','origin'],['Source','source_key'],['Objectives',r=>esc(jsonText(r.objectives_json))],['Rewards',r=>esc(jsonText(r.rewards_json))],['Model','model'],['Created',r=>r.created_at?new Date(r.created_at*1000).toLocaleString():'—']],d.forged_quests||[])}`}
+async function loadExploration(){const d=await api('/api/exploration');const s=d.summary||{};app.innerHTML=`<h2>Exploration & Travel Systems</h2><div class="cards">${[['Active Events',s.active_events],['Secret Realms',s.active_secret_realms],['Recent Discoveries',s.discoveries_shown],['Beast Encounters',s.active_beast_encounters],['Traveling Caravans',s.traveling_caravans]].map(x=>`<div class="card"><small>${x[0]}</small><div class="metric">${n(x[1])}</div></div>`).join('')}</div><h2>Exploration Events</h2>${table([['Title','title'],['Category','category'],['Kind','kind'],['Visibility','visibility'],['Location','location'],['Severity','severity'],['State','state'],['Stage','stage'],['Participants','participants'],['Time',r=>fmtGM(r.created_game_minute)]],d.events)}<h2>Event Participants</h2>${table([['Player','player_name'],['Event','title'],['Location','location'],['Stage','stage'],['Status','status'],['Joined',r=>fmtGM(r.joined_game_minute)]],d.participants)}<h2>Secret Realm Runs</h2>${table([['Player','player_name'],['Realm','realm_id'],['Event','event_key'],['Room','room_index'],['Danger','danger'],['Active',r=>r.active?'Yes':'No'],['Location','location'],['Expires',r=>new Date(Number(r.expires_at)*1000).toLocaleString()]],d.secret_realms)}<h2>Recent Location Discoveries</h2>${table([['Player','player_name'],['Location','location'],['Kind','discovery_kind'],['Time',r=>fmtGM(r.discovered_game_minute)]],d.discoveries)}<h2>Wild Beast Encounters</h2>${table([['Player','player_name'],['Species','species'],['Rank','rank'],['Element','element'],['Bloodline','bloodline'],['TN','taming_tn'],['Location','location'],['Status','status'],['Time',r=>fmtGM(r.created_game_minute)]],d.wild_beast_encounters)}<h2>Caravans</h2>${table([['ID','caravan_id'],['Owner',r=>`${r.owner_type}:${r.owner_key}`],['Route',r=>`${r.origin} → ${r.destination}`],['Status','status'],['Risk','risk'],['Escort','escort_strength'],['Concealment','concealment'],['Smuggling','smuggling'],['Toll','toll_paid'],['Outcome','outcome'],['Payout','payout_final'],['Depart',r=>fmtGM(r.depart_game_minute)],['Arrive',r=>fmtGM(r.arrive_game_minute)]],d.caravans)}<h2>Discord Expedition Threads</h2>${table([['Player','player_name'],['Guild','guild_id'],['Thread','thread_id'],['Parent','parent_channel_id'],['Last Location','last_location']],d.expedition_threads)}<h2>Forged Quests</h2><div class="empty">Forged quests moved to the <b>Quests</b> page, where they can be edited, previewed and approved beside every other definition.</div>`}
 
 async function loadEconomy(){const d=await api('/api/economy');const s=d.summary||{};app.innerHTML=`<h2>Economy, Auctions & Crime</h2><div class="cards">${[['Market Rows',s.markets],['Active Auctions',s.active_auctions],['Black Markets',s.active_black_markets],['Open Crimes',s.open_crimes]].map(x=>`<div class="card"><small>${x[0]}</small><div class="metric">${n(x[1])}</div></div>`).join('')}</div><h2>Dynamic Markets</h2>${table([['Location','location'],['World','world_name'],['Item','item_id'],['Currency','currency_id'],['Base','base_price'],['Supply','supply'],['Demand','demand'],['Index',r=>Number(r.price_index||0).toFixed(2)],['Time',r=>fmtGM(r.last_game_minute)]],d.markets)}<h2>Recent Economy Events</h2>${table([['Location','location'],['Item','item_id'],['Event','event_text'],['Time',r=>fmtGM(r.game_minute)]],d.events)}<h2>Auctions</h2>${table([['ID','auction_id'],['House','house_id'],['Seller','seller_name'],['Item','item_id'],['Qty','quantity'],['Start','starting_bid'],['Current','current_bid'],['Bidder','bidder_name'],['Bids','bid_count'],['Anonymous',r=>r.anonymous?'Yes':'No'],['Active',r=>r.active?'Yes':'No'],['Ends',r=>new Date(Number(r.ends_at)*1000).toLocaleString()]],d.auctions)}<h2>Black Market Posts</h2>${table([['World','world_name'],['Location','location'],['Heat','heat'],['Active',r=>r.active?'Yes':'No'],['Opens',r=>fmtGM(r.opens_game_minute)],['Closes',r=>fmtGM(r.closes_game_minute)]],d.black_market_posts)}<h2>Black Market Stock</h2>${table([['World','world_name'],['Item','item_id'],['Currency','currency_id'],['Price','unit_price'],['Qty','quantity'],['Legal Status','legal_status']],d.black_market_stock)}<h2>Crime Records</h2>${table([['Player','player_name'],['Jurisdiction','jurisdiction'],['Crime','crime_type'],['Severity','severity'],['Evidence','evidence'],['Status','status'],['Description','description'],['Time',r=>fmtGM(r.created_game_minute)]],d.crimes)}`}
 
@@ -88,7 +363,7 @@ async function loadDiscordSetup(){
  <section class="card control dangerzone"><h3>🗑️ Teardown</h3><p>Deletes <b>everything this bot owns on Discord</b>: every tracked thread (expedition journals, households, sect/cave abodes, event scenes, battles), all 7 base channels including <b>#player-homes</b>, <b>#expeditions</b> and <b>#event-scenes</b>, all realm-capital hubs, <b>#bugs</b>, and the two Xianxia categories if nothing else is left in them. Then the bot forgets every channel and message id it held. <b>Nothing is recreated</b> - run Full Setup afterwards to rebuild from scratch - and <b>the database is not reset</b>: characters, sects and history survive; players get fresh threads on next use. Only channels a binding names are touched; channels you listed in <code>RP_CHANNEL_IDS</code>, the Xianxia realm roles and anything else you created are left alone. Type <code>DELETE</code> to confirm. Permanent - cannot be undone.</p><label>Type DELETE to confirm<input id="teardownConfirm" placeholder="DELETE" autocomplete="off"></label><button class="btn danger" id="teardownDiscord">Delete All Xianxia Channels</button></section>
  <section class="card control dangerzone"><h3>💀 Reset World</h3><p>Deletes every Discord thread this bot is tracking (expedition journals, household threads, sect/cave abodes, event scenes, battle threads) and posts a world-reset announcement in the world-events channel. This is the Discord half of a full world reset - it does not touch the database; run <code>./reset_database.sh</code> on the server for that (it calls this same cleanup automatically when the bot is running). Permanent - deleted threads cannot be recovered.</p><button class="btn danger" id="resetWorldDiscord">Delete All Threads &amp; Announce Reset</button></section>`;
  const out=document.getElementById('discordResult');
- const run=async(action,payload={},confirmText='')=>{if(confirmText&&!confirm(confirmText))return;out.innerHTML='<div class="loading">Applying Discord setup action…</div>';try{const r=await discordPost(action,{...payload,reason:discordReason?.value||'GM dashboard Discord setup'});out.innerHTML=resultBox(r.result??r);setTimeout(()=>loadDiscordSetup().catch(()=>{}),900)}catch(e){out.innerHTML=resultBox(e.message,false)}};
+ const run=async(action,payload={},confirmText='')=>{if(confirmText&&!confirm(confirmText))return;out.innerHTML='<div class="loading">Applying Discord setup action…</div>';try{const r=await discordPost(action,{...payload,reason:discordReason?.value||'GM dashboard Discord setup'});out.innerHTML=resultBox(r.result??r);setTimeout(()=>refresh().catch(()=>{}),900)}catch(e){out.innerHTML=resultBox(e.message,false)}};
  fullSetup.onclick=()=>run('setup',{},'Install/repair the recommended Xianxia RP Discord layout and sync slash commands?');
  repairSetup.onclick=()=>run('repair',{},'Repair Xianxia RP channels, permissions, realm roles and slash commands?');
  refreshDiscord.onclick=()=>loadDiscordSetup();
@@ -146,7 +421,7 @@ async function loadAdmin(){
  </div>
  <h2>Recent Admin Audit</h2><button class="btn danger" id="undoLastAction">↩️ Undo most recent action</button><p class="muted">Only a specific set of simple edits can be auto-undone (karma, realm, teleport, currency grants, realm/bloodline/physique/tribulation progress, item grants, force-end-scene, NPC relocation, single condition clears, and moderation). Bulk grants, Fate, sect changes, resource-cap edits, and world-time changes cannot be auto-undone.</p>${table([['ID','audit_id'],['Action','action'],['Target','target'],['Reason','reason'],['When',r=>new Date(Number(r.created_at)*1000).toLocaleString()]],d.audit||[])}`;
  const out=document.getElementById('adminResult');
- const run=async(action,payload,confirmText='')=>{if(confirmText&&!confirm(confirmText))return;out.innerHTML='<div class="loading">Applying authoritative action…</div>';try{const r=await adminPost(action,payload);out.innerHTML=resultBox(r.result??r);setTimeout(()=>loadAdmin().catch(()=>{}),900)}catch(e){out.innerHTML=resultBox(e.message,false)}};
+ const run=async(action,payload,confirmText='')=>{if(confirmText&&!confirm(confirmText))return;out.innerHTML='<div class="loading">Applying authoritative action…</div>';try{const r=await adminPost(action,payload);out.innerHTML=resultBox(r.result??r);setTimeout(()=>refresh().catch(()=>{}),900)}catch(e){out.innerHTML=resultBox(e.message,false)}};
  advanceTime.onclick=()=>{const payload={minutes:Number(timeMinutes.value),reason:timeReason.value};if(timeScale.value!=='')payload.scale=Number(timeScale.value);run('world.advance_time',payload,`Change canonical world time by ${timeMinutes.value} minutes${timeScale.value!==''?` and set scale to ${timeScale.value}x`:''}?`)};
  forceSim.onclick=()=>run('simulation.force',{system:simSystem.value,steps:Number(simSteps.value),reason:'GM dashboard forced simulation'},`Force ${simSystem.value} for ${simSteps.value} step(s)?`);
  setInterval.onclick=()=>run('simulation.interval',{system:simSystem.value,days:Number(simDays.value),reason:'GM dashboard interval change'});
@@ -231,11 +506,296 @@ async function loadCommissions(){const d=await api('/api/commissions');const s=d
    ['Completed','commissions_completed'],['Failed','commissions_failed'],['Abandoned','commissions_abandoned'],
    ['Last','last_commission_outcome'],['Cooldown',r=>Number(r.commission_cooldown_until_game_minute||0)>gm?`<span class="warn">${Math.ceil((Number(r.commission_cooldown_until_game_minute)-gm)/1440)}d</span>`:'—']],d.standing||[])}`;
  const out=document.getElementById('commissionOut');
- const act=async(action,payload,confirmText)=>{if(!confirm(confirmText))return;out.innerHTML='<div class="loading">Applying…</div>';try{const r=await adminPost(action,{...payload,reason:'GM dashboard commissions'});out.innerHTML=resultBox(r.result??r);setTimeout(()=>loadCommissions().catch(()=>{}),900)}catch(e){out.innerHTML=resultBox(e.message,false)}};
+ const act=async(action,payload,confirmText)=>{if(!confirm(confirmText))return;out.innerHTML='<div class="loading">Applying…</div>';try{const r=await adminPost(action,{...payload,reason:'GM dashboard commissions'});out.innerHTML=resultBox(r.result??r);setTimeout(()=>refresh().catch(()=>{}),900)}catch(e){out.innerHTML=resultBox(e.message,false)}};
  document.querySelectorAll('[data-review]').forEach(b=>b.onclick=()=>act('commission.review',{quest_key:b.dataset.review,status:b.dataset.status},`Set "${b.dataset.review}" to ${b.dataset.status}?`));
  document.querySelectorAll('[data-retire]').forEach(b=>b.onclick=()=>act('commission.retire',{user_id:b.dataset.user,quest_key:b.dataset.retire},'Retire this commission? The player pays no standing and receives no reward.'));
 }
+/* ---------------------------------------------------------------------------
+   Quests (v0.24.0). One page for every definition a player can be given -
+   forged, hand-written, or a commission an NPC hands out. Before this the same
+   quest was reviewable on two screens depending on whether it had a giver, and
+   editable on neither: a drafted quest that was ninety per cent right had to be
+   discarded and re-rolled. The editor here is the missing verb, and the hold
+   policy is the decision that comes with it.
+   --------------------------------------------------------------------------- */
+let QD=null, QDRAFT=null;
+const qOrigin=v=>({static:'muted',forge:'blue',world_event:'blue',commission:'warn',invented:'purple',authored:'good'}[v]||'');
+const qStatus=v=>pill(String(v||'—'),v==='approved'?'good':v==='draft'?'warn':'muted');
+const qJson=(v,fallback)=>{if(v===null||v===undefined||v==='')return fallback;if(typeof v!=='string')return v;try{return JSON.parse(v)}catch{return fallback}};
+const qRewardText=r=>{const e=Object.entries(r||{}).filter(([,v])=>v&&(typeof v!=='object'||Object.keys(v).length));if(!e.length)return '—';return e.map(([k,v])=>typeof v==='object'?Object.entries(v).map(([i,q])=>`${esc(i)}×${q}`).join(' '):`${n(v)} ${esc(k.replace(/_/g,' '))}`).join(' · ')};
+const qObjectiveText=o=>{const t=String(o.type||'');const target=String(o.target||'');const c=Math.max(1,Number(o.count||1));const label=o.label||(target?`${t} ${target}`:t);return `${esc(label)}${c>1?` ×${c}`:''}`};
+const qObjectiveList=v=>{const list=qJson(v,[])||[];if(!list.length)return '<span class="muted">no objectives</span>';return list.map(o=>qObjectiveText(o)).join('<br>')};
 
-const loaders={overview:loadOverview,timeline:loadTimeline,npcs:loadNPCs,families:loadFamilies,sects:loadSects,conflicts:loadConflicts,events:loadEvents,players:loadPlayers,cultivation:loadCultivation,crafting:loadCrafting,exploration:loadExploration,commissions:loadCommissions,economy:loadEconomy,dynasties:loadDynasties,party:loadParty,pvp:loadPvp,conditions:loadConditions,threads:loadThreads,rag:loadRag,decisions:loadDecisions,discord:loadDiscordSetup,admin:loadAdmin};
-async function switchView(v){document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('active',b.dataset.view===v));app.innerHTML='<div class="loading">Loading…</div>';try{await loaders[v]()}catch(e){app.innerHTML=`<div class="card"><h3>Dashboard error</h3><div class="bad">${esc(e.message)}</div></div>`}}
-document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>switchView(b.dataset.view));document.getElementById('closeDrawer').onclick=()=>drawer.classList.add('hidden');drawer.onclick=e=>{if(e.target===drawer)drawer.classList.add('hidden')};switchView('overview');setInterval(()=>{if(document.querySelector('#nav button.active')?.dataset.view==='overview')loadOverview().catch(()=>{})},15000);
+async function loadQuests(){
+ QD=await api('/api/quests');const s=QD.summary||{},cov=QD.coverage||{},vocab=QD.vocabulary||{};
+ const defs=QD.definitions||[];
+ const drafts=defs.filter(r=>String(r.status)==='draft');
+ const pool=defs.filter(r=>String(r.status)==='approved');
+ const budget=vocab.budget||{};
+ app.innerHTML=`
+ <div id="pageActions" hidden><button class="btn" id="qForge">Forge a draft</button><button class="btn primary" id="qNew">Write one</button></div>
+ <div class="cards">
+  ${[['Awaiting your review',s.drafts,'warn'],['Live pool',s.approved,''],['Held right now',s.held_active,''],['Approved, never taken',s.never_taken,'muted']]
+    .map(x=>`<div class="card"><small>${x[0]}</small><div class="metric ${x[2]}">${n(x[1])}</div></div>`).join('')}
+ </div>
+ <div id="questOut"></div>
+ <h2>Needs your review</h2>
+ ${drafts.length?table([
+   ['Quest',r=>`<b>${esc(r.title)}</b><div class="muted">${esc(r.quest_key)}</div><div class="muted">${esc(String(r.description||'').slice(0,160))}</div>`],
+   ['Origin',r=>`${pill(String(r.source||'').replace(/_/g,' '),qOrigin(r.source))}<div class="muted">${esc(r.giver_npc||r.source_key||'—')}</div><div class="muted">${esc(r.model||'')}</div>`],
+   ['Objectives',r=>qObjectiveList(r.objectives_json)],
+   ['Rewards',r=>qRewardText(qJson(r.rewards_json,{}))],
+   ['Review',r=>`<div class="btnrow">
+      <button class="btn" data-qedit="${esc(r.quest_key)}">Edit</button>
+      <button class="btn" data-qpreview="${esc(r.quest_key)}">Preview</button>
+      <button class="btn" data-qreview="${esc(r.quest_key)}" data-status="approved">Approve</button>
+      <button class="btn danger" data-qreview="${esc(r.quest_key)}" data-status="discarded">Discard</button></div>`],
+ ],drafts):'<div class="empty">Nothing waiting. Forge a draft or write one by hand.</div>'}
+ <h2>Live pool</h2>
+ ${filters(`<input id="qq" placeholder="Search title or key"><select id="qorigin"><option value="">Any origin</option>${['static','forge','world_event','commission','invented','authored'].map(x=>`<option value="${x}">${x.replace(/_/g,' ')}</option>`).join('')}</select><select id="qband"><option value="">Any band</option>${[...new Set(defs.map(r=>String(r.realm_band||'')).filter(Boolean))].map(x=>`<option>${esc(x)}</option>`).join('')}</select><select id="qstatus"><option value="approved">approved</option><option value="">all</option><option value="retired">retired</option><option value="discarded">discarded</option></select>`)}
+ <div id="qPool">${questPool(pool)}</div>
+ <h2>Where the pool is thin</h2>
+ <div class="grid3">
+  <div class="card"><h3>By realm band</h3>${(cov.realm_bands||[]).map(b=>`<div class="row"><span>${esc(b.band)}</span><b class="${b.count?'':'bad'}">${n(b.count)}</b></div>`).join('')||'<div class="muted">No approved quests yet.</div>'}</div>
+  <div class="card"><h3>By objective type</h3>${(cov.objective_types||[]).map(o=>`<div class="row"><span>${esc(o.type)}</span><b class="${o.count?'':'bad'}">${n(o.count)}</b></div>`).join('')}
+   <div class="muted" style="margin-top:10px">Every quest is a walk-and-talk when the bottom rows sit at zero.</div></div>
+  <div class="card"><h3>Places nothing points at</h3>
+   <div>${(cov.unreferenced_locations||[]).slice(0,12).map(x=>pill(x)).join(' ')||'<span class="muted">Every public location is served.</span>'}</div>
+   ${Number(cov.unreferenced_location_count||0)>12?`<div class="muted" style="margin-top:8px">…and ${n(Number(cov.unreferenced_location_count)-12)} more.</div>`:''}
+   ${(cov.unknown_targets||[]).length?`<div class="badbox" style="margin-top:12px"><b>Approved quests pointing at nothing</b>${cov.unknown_targets.map(t=>`<div>${esc(t.quest_key)} — ${esc(t.type)} “${esc(t.target)}” is not a known ${esc(t.expects)}</div>`).join('')}</div>`:''}
+  </div>
+ </div>
+ <h2>Held right now</h2>
+ ${table([['Player','player_name'],['Quest',r=>esc(r.title||r.quest_key)],['Accepted',r=>fmtGM(r.accepted_game_minute)],
+   ['Terms',r=>{const t=qJson(r.terms_json,null);return t?'<span class="good">fixed at acceptance</span>':'<span class="muted">not yet pinned</span>'}],
+   ['Status',r=>pill(r.status,String(r.status)==='active'?'warn':'muted')]],(QD.held||[]).filter(r=>String(r.status)==='active'))}
+ <div class="muted" style="margin-top:10px">Budget for a quest reward: ${n(budget.max_xp)} insight · ${n(budget.max_stones)} stones · ${n(budget.max_items)} items. A GM may go over; the change is audited.</div>`;
+ bindQuests();
+}
+
+function questPool(rows){
+ return table([
+  ['Quest',r=>`<b>${esc(r.title)}</b><div class="muted">${esc(r.quest_key)}</div>`],
+  ['Origin',r=>pill(String(r.source||'').replace(/_/g,' '),qOrigin(r.source))],
+  ['Giver',r=>esc(r.giver_npc||'—')],
+  ['Band',r=>esc(r.realm_band||'any')],
+  ['Held',r=>n(r.held_now)],
+  ['Completed',r=>n(r.completed)],
+  ['Status',r=>qStatus(r.status)],
+  ['',r=>`<div class="btnrow"><button class="btn" data-qedit="${esc(r.quest_key)}">Edit</button>
+     <button class="btn" data-qpreview="${esc(r.quest_key)}">Preview</button>
+     ${String(r.status)==='approved'?`<button class="btn" data-qreview="${esc(r.quest_key)}" data-status="retired">Retire</button>`
+       :`<button class="btn" data-qreview="${esc(r.quest_key)}" data-status="approved">Approve</button>`}</div>`],
+ ],rows);
+}
+
+function bindQuests(){
+ const out=document.getElementById('questOut');
+ const apply=()=>{const q=(document.getElementById('qq').value||'').toLowerCase(),o=document.getElementById('qorigin').value,b=document.getElementById('qband').value,st=document.getElementById('qstatus').value;
+   const rows=(QD.definitions||[]).filter(r=>(!st||String(r.status)===st)&&(!o||String(r.source)===o)&&(!b||String(r.realm_band||'')===b)&&(!q||`${r.title} ${r.quest_key}`.toLowerCase().includes(q)));
+   document.getElementById('qPool').innerHTML=questPool(rows);bindQuestRowButtons()};
+ const af=document.getElementById('applyFilters');if(af)af.onclick=apply;
+ document.getElementById('qNew').onclick=()=>openQuestEditor(null);
+ document.getElementById('qForge').onclick=()=>openForge();
+ bindQuestRowButtons();
+ window.__questAct=async(action,payload,confirmText)=>{if(confirmText&&!confirm(confirmText))return;out.innerHTML='<div class="loading">Applying…</div>';
+   try{const r=await adminPost(action,{...payload,reason:payload.reason||'GM dashboard quests'});out.innerHTML=resultBox(r.result??r);drawer.classList.add('hidden');setTimeout(()=>refresh().catch(()=>{}),700)}
+   catch(e){out.innerHTML=resultBox(e.message,false)}};
+}
+
+function bindQuestRowButtons(){
+ document.querySelectorAll('[data-qedit]').forEach(b=>b.onclick=()=>openQuestEditor(b.dataset.qedit));
+ document.querySelectorAll('[data-qpreview]').forEach(b=>b.onclick=()=>openQuestPreview(b.dataset.qpreview));
+ document.querySelectorAll('[data-qreview]').forEach(b=>b.onclick=()=>window.__questAct('quest.review',{quest_key:b.dataset.qreview,status:b.dataset.status},
+   `Set "${b.dataset.qreview}" to ${b.dataset.status}?`));
+}
+
+function questByKey(key){return (QD.definitions||[]).find(r=>String(r.quest_key)===String(key))}
+
+function questDraftFrom(row){
+ if(!row)return {quest_key:'',title:'',description:'',objectives:[],rewards:{},giver_npc:'',realm_band:'',tier:1,deadline_game_minutes:0,requires_sect:'',reward_visibility:'shown',boast:'',hold_policy:'keep',held_now:0,status:'new'};
+ return {quest_key:row.quest_key,title:row.title||'',description:row.description||'',
+   objectives:(qJson(row.objectives_json,[])||[]).map(o=>({...o})),rewards:qJson(row.rewards_json,{})||{},
+   giver_npc:row.giver_npc||'',realm_band:row.realm_band||'',tier:Number(row.tier||1),
+   deadline_game_minutes:Number(row.deadline_game_minutes||0),requires_sect:row.requires_sect||'',
+   reward_visibility:row.reward_visibility||'shown',boast:row.boast||'',hold_policy:'keep',
+   held_now:Number(row.held_now||0),status:row.status||'draft'};
+}
+
+function openQuestEditor(key){QDRAFT=questDraftFrom(key?questByKey(key):null);renderQuestEditor();drawer.classList.remove('hidden')}
+
+function renderQuestEditor(){
+ const v=QD.vocabulary||{},d=QDRAFT,budget=v.budget||{};
+ const types=Object.entries(v.objective_types||{});
+ const targetFor=t=>((v.objective_types||{})[t]||{}).target;
+ const overXp=Number(d.rewards.insight_xp||0)>Number(budget.max_xp||0);
+ const overStones=Number(d.rewards.spirit_stones||0)>Number(budget.max_stones||0);
+ drawerBody.innerHTML=`
+ <h2>${d.quest_key?'Edit quest':'New quest'}</h2>
+ <div class="tagline">${d.quest_key?pill(d.quest_key):pill('key derived from the title')} ${qStatus(d.status)}
+   ${d.held_now?pill(`${d.held_now} holding it`,'warn'):pill('nobody holds this yet','muted')}</div>
+ <div class="section"><h3>The quest</h3>
+  <label>Title<input id="qeTitle" value="${esc(d.title)}"></label>
+  <label>Summary — one or two lines, shown on the quest card<textarea id="qeDesc" rows="3">${esc(d.description)}</textarea></label>
+ </div>
+ <div class="section"><h3>Who can be given it</h3>
+  <div class="grid3">
+   <label>Realm band<input id="qeBand" value="${esc(d.realm_band)}" placeholder="e.g. 0-3"></label>
+   <label>Given by<input id="qeGiver" value="${esc(d.giver_npc)}" list="qeNpcs" placeholder="nobody — found in the world"></label>
+   <label>Tier<input id="qeTier" type="number" min="1" max="9" value="${Number(d.tier||1)}"></label>
+  </div>
+  <div class="grid3">
+   <label>Deadline (game minutes, 0 = none)<input id="qeDeadline" type="number" min="0" value="${Number(d.deadline_game_minutes||0)}"></label>
+   <label>Requires sect<input id="qeSect" value="${esc(d.requires_sect)}" placeholder="none"></label>
+   <label>Rewards<select id="qeVisibility"><option value="shown"${d.reward_visibility==='shown'?' selected':''}>stated up front</option><option value="hidden"${d.reward_visibility==='hidden'?' selected':''}>the giver will not say</option></select></label>
+  </div>
+  <div class="muted">A quest with a giver is a commission: it occupies the one-at-a-time slot and carries his deadline. One with no giver sits in the world pool.</div>
+ </div>
+ <div class="section"><h3>Objectives — ${d.objectives.length} of ${n(v.max_objectives)}</h3>
+  <div id="qeObjectives">${d.objectives.map((o,i)=>`
+   <div class="card" style="margin-bottom:8px" data-obj="${i}">
+    <div class="grid3">
+     <label>Type<select data-otype="${i}">${types.map(([t])=>`<option value="${esc(t)}"${String(o.type)===t?' selected':''}>${esc(t)}</option>`).join('')}</select></label>
+     <label>Target${targetFor(o.type)?'':' (none for this type)'}<input data-otarget="${i}" value="${esc(o.target||'')}" ${targetFor(o.type)?`list="${targetFor(o.type)==='location'?'qeLocations':targetFor(o.type)==='npc'?'qeNpcs':'qeScene'}"`:'disabled'}></label>
+     <label>Count<input data-ocount="${i}" type="number" min="1" max="${n(v.max_objective_count)}" value="${Math.max(1,Number(o.count||1))}"></label>
+    </div>
+    <button class="btn danger" data-odel="${i}">Remove</button>
+   </div>`).join('')||'<div class="empty">No objectives yet. A quest needs at least one.</div>'}</div>
+  <button class="btn" id="qeAdd"${d.objectives.length>=Number(v.max_objectives||4)?' disabled':''}>+ Add objective</button>
+  <div class="muted" style="margin-top:8px">Only these types can be completed by the engine, so only these can be chosen.</div>
+ </div>
+ <div class="section"><h3>Rewards on completion</h3>
+  <div class="grid3">
+   <label>Insight XP<input id="qeXp" type="number" min="0" value="${Number(d.rewards.insight_xp||0)}" class="${overXp?'bad':''}"></label>
+   <label>Spirit stones<input id="qeStones" type="number" min="0" value="${Number(d.rewards.spirit_stones||0)}" class="${overStones?'bad':''}"></label>
+   <label>Items — id×qty, comma separated<input id="qeItems" value="${esc(Object.entries(d.rewards.items||{}).map(([i,q])=>`${i}×${q}`).join(', '))}" list="qeItemIds"></label>
+  </div>
+  <div class="${overXp||overStones?'bad':'muted'}">Budget: ${n(budget.max_xp)} insight · ${n(budget.max_stones)} stones · ${n(budget.max_items)} items.</div>
+ </div>
+ ${d.held_now?`<div class="section"><h3>${d.held_now} cultivator${d.held_now===1?'':'s'} already holding this</h3>
+  <label><select id="qeHold">
+   <option value="keep">Leave them on the terms they took — recommended</option>
+   <option value="migrate">Move them onto the new terms — progress carries where the objective did not change</option>
+   <option value="revoke">Take it back from all of them — they can accept the fixed version fresh</option>
+  </select></label>
+  <div class="muted">Their copy was frozen when they accepted it. Migrating drops progress on any objective that now asks for something else; the count comes back in the result.</div>
+ </div>`:''}
+ <div class="section" style="display:flex;gap:8px;flex-wrap:wrap">
+  <button class="btn primary" id="qeSave">Save${d.held_now?' —':''}${d.held_now?' <span id="qeHoldLabel">keep the holders</span>':''}</button>
+  <button class="btn" id="qePreview">Preview as a player</button>
+  ${d.quest_key&&d.status!=='approved'?`<button class="btn" id="qeApprove">Approve</button>`:''}
+  ${d.quest_key&&d.status==='approved'?`<button class="btn" id="qeRetire">Retire</button>`:''}
+  ${d.quest_key?`<button class="btn danger" id="qeDiscard">Discard</button>`:''}
+ </div>
+ <div id="qeOut"></div>
+ <datalist id="qeLocations">${(v.locations||[]).map(x=>`<option value="${esc(x)}">`).join('')}</datalist>
+ <datalist id="qeNpcs">${(v.npcs||[]).map(x=>`<option value="${esc(x)}">`).join('')}</datalist>
+ <datalist id="qeScene">${(v.scene_actions||[]).map(x=>`<option value="${esc(x)}">`).join('')}</datalist>
+ <datalist id="qeItemIds">${(v.items||[]).map(x=>`<option value="${esc(x)}">`).join('')}</datalist>`;
+ bindQuestEditor();
+}
+
+function readQuestEditor(){
+ const d=QDRAFT;
+ d.title=document.getElementById('qeTitle').value.trim();
+ d.description=document.getElementById('qeDesc').value.trim();
+ d.realm_band=document.getElementById('qeBand').value.trim();
+ d.giver_npc=document.getElementById('qeGiver').value.trim();
+ d.tier=Math.max(1,Number(document.getElementById('qeTier').value||1));
+ d.deadline_game_minutes=Math.max(0,Number(document.getElementById('qeDeadline').value||0));
+ d.requires_sect=document.getElementById('qeSect').value.trim();
+ d.reward_visibility=document.getElementById('qeVisibility').value;
+ const items={};document.getElementById('qeItems').value.split(',').map(x=>x.trim()).filter(Boolean).forEach(part=>{
+   const m=part.split(/[×x*]/);const id=(m[0]||'').trim();const qty=Math.max(1,Number((m[1]||'1').trim())||1);if(id)items[id]=qty});
+ d.rewards={};
+ const xp=Number(document.getElementById('qeXp').value||0);if(xp>0)d.rewards.insight_xp=xp;
+ const stones=Number(document.getElementById('qeStones').value||0);if(stones>0)d.rewards.spirit_stones=stones;
+ if(Object.keys(items).length)d.rewards.items=items;
+ const hold=document.getElementById('qeHold');d.hold_policy=hold?hold.value:'keep';
+ return d;
+}
+
+function bindQuestEditor(){
+ const d=QDRAFT,out=document.getElementById('qeOut');
+ document.querySelectorAll('[data-otype]').forEach(el=>el.onchange=()=>{readQuestEditor();d.objectives[Number(el.dataset.otype)].type=el.value;d.objectives[Number(el.dataset.otype)].target='';renderQuestEditor()});
+ document.querySelectorAll('[data-otarget]').forEach(el=>el.onchange=()=>{d.objectives[Number(el.dataset.otarget)].target=el.value.trim()});
+ document.querySelectorAll('[data-ocount]').forEach(el=>el.onchange=()=>{d.objectives[Number(el.dataset.ocount)].count=Math.max(1,Number(el.value||1))});
+ document.querySelectorAll('[data-odel]').forEach(el=>el.onclick=()=>{readQuestEditor();d.objectives.splice(Number(el.dataset.odel),1);renderQuestEditor()});
+ const add=document.getElementById('qeAdd');if(add)add.onclick=()=>{readQuestEditor();d.objectives.push({type:'explore',target:'',count:1});renderQuestEditor()};
+ const hold=document.getElementById('qeHold');const label=document.getElementById('qeHoldLabel');
+ if(hold&&label)hold.onchange=()=>{label.textContent={keep:'keep the holders',migrate:'move the holders',revoke:'take it back'}[hold.value]};
+ document.getElementById('qeSave').onclick=async()=>{
+   const draft=readQuestEditor();out.innerHTML='<div class="loading">Saving…</div>';
+   try{const r=await adminPost('quest.save',{...draft,reason:'GM dashboard quest editor'});
+     out.innerHTML=resultBox(r.result??r);setTimeout(()=>refresh().catch(()=>{}),700)}
+   catch(e){out.innerHTML=resultBox(e.message,false)}};
+ document.getElementById('qePreview').onclick=()=>{readQuestEditor();openQuestPreview(null)};
+ const approve=document.getElementById('qeApprove');
+ if(approve)approve.onclick=()=>window.__questAct('quest.review',{quest_key:d.quest_key,status:'approved'},`Approve "${d.title}" and add it to the live pool?`);
+ const retire=document.getElementById('qeRetire');
+ if(retire)retire.onclick=()=>window.__questAct('quest.review',{quest_key:d.quest_key,status:'retired'},'Retire this quest? Nobody new may take it; everyone holding it keeps it and can still finish it.');
+ const discard=document.getElementById('qeDiscard');
+ if(discard)discard.onclick=()=>window.__questAct('quest.review',{quest_key:d.quest_key,status:'discarded'},'Discard this quest?');
+}
+
+function openQuestPreview(key){
+ const row=key?questByKey(key):null;
+ const d=row?questDraftFrom(row):QDRAFT;
+ if(!d)return;
+ const objectives=(d.objectives||[]).map(o=>`<div>▫️ ${qObjectiveText(o)}</div>`).join('')||'<div class="muted">No objectives.</div>';
+ const hidden=d.reward_visibility==='hidden';
+ drawerBody.innerHTML=`<h2>${esc(d.title||'Untitled quest')}</h2>
+  <div class="tagline">${pill(d.quest_key||'unsaved')} ${qStatus(d.status)} ${d.held_now?pill(`${d.held_now} holding it`,'warn'):''}</div>
+  <div class="section"><h3>What the player is shown</h3>
+   <div class="card"><b class="gold">${esc(d.title||'Untitled quest')}</b>
+    <p>${esc(d.description||'')}</p>
+    <div><b>Asked of you</b>${objectives}</div>
+    <div style="margin-top:8px"><b>Offered</b><div>${hidden?'<span class="muted">He will not say what it pays.</span>':qRewardText(d.rewards)}</div></div>
+    ${d.giver_npc?`<div class="muted" style="margin-top:8px">Offered by ${esc(d.giver_npc)}${d.deadline_game_minutes?` · ${Math.round(d.deadline_game_minutes/1440)} day deadline`:''}</div>`:''}
+   </div>
+   ${hidden?'<div class="muted">Presentation only: the engine still locks exact terms at acceptance and pays exactly those.</div>':''}
+  </div>
+  <div class="section"><h3>What the engine stores</h3>
+   <div class="code">${esc(JSON.stringify({quest_key:d.quest_key,realm_band:d.realm_band,giver_npc:d.giver_npc,tier:d.tier,objectives:d.objectives,rewards:d.rewards},null,2))}</div>
+  </div>
+  <div class="section" style="display:flex;gap:8px">
+   <button class="btn" id="qpBack">Back to editing</button>
+   ${d.quest_key&&d.status!=='approved'?'<button class="btn primary" id="qpApprove">Approve — add to the live pool</button>':''}
+  </div>`;
+ drawer.classList.remove('hidden');
+ document.getElementById('qpBack').onclick=()=>{QDRAFT=d;renderQuestEditor()};
+ const ap=document.getElementById('qpApprove');
+ if(ap)ap.onclick=()=>window.__questAct('quest.review',{quest_key:d.quest_key,status:'approved'},`Approve "${d.title}"?`);
+}
+
+function openForge(){
+ drawerBody.innerHTML=`<h2>Forge a draft</h2>
+  <p class="muted">The Forge is handed the world's locations, NPCs and items, so it can only name things that exist. Every draft is checked before you see it, and lands in <b>Needs your review</b> — nothing reaches a player until you approve it.</p>
+  <div class="section">
+   <label>What should come out of it<textarea id="qfStory" rows="5" placeholder="Something a low-realm cultivator can do alone. No fighting. The marsh flood uncovered records the local administration would rather stayed buried."></textarea></label>
+   <button class="btn primary" id="qfGo">Forge it</button>
+   <div class="muted" style="margin-top:8px">A sentence or two at least. Three words is a title, not a brief.</div>
+  </div>
+  <div id="qfOut"></div>`;
+ drawer.classList.remove('hidden');
+ document.getElementById('qfGo').onclick=async()=>{
+  const story=document.getElementById('qfStory').value.trim();const out=document.getElementById('qfOut');
+  out.innerHTML='<div class="loading">Forging… this asks a free-tier model and can take a moment.</div>';
+  try{const r=await discordPost('quest.forge',{story});
+    out.innerHTML=resultBox(r.result??r,r.ok!==false);
+    if(r.ok!==false)setTimeout(()=>{drawer.classList.add('hidden');refresh().catch(()=>{})},1200)}
+  catch(e){out.innerHTML=resultBox(e.message,false)}};
+}
+
+const loaders={overview:loadOverview,timeline:loadTimeline,npcs:loadNPCs,families:loadFamilies,sects:loadSects,conflicts:loadConflicts,events:loadEvents,players:loadPlayers,cultivation:loadCultivation,crafting:loadCrafting,exploration:loadExploration,commissions:loadCommissions,quests:loadQuests,economy:loadEconomy,dynasties:loadDynasties,party:loadParty,pvp:loadPvp,conditions:loadConditions,threads:loadThreads,rag:loadRag,decisions:loadDecisions,discord:loadDiscordSetup,admin:loadAdmin};
+
+setDensity(density());
+bindShell();
+const boot=String(location.hash||'').replace('#','').split('/')[0]||'overview';
+if(boot!=='overview'){
+  api('/api/overview').then(d=>{document.getElementById('worldClock').textContent=(d.clock||{}).display||'—'}).catch(()=>{});
+}
+switchView(boot);
+// Overview is the only view that refreshes itself; everything else is read on
+// demand. Fifteen seconds is the interval it has always used.
+setInterval(()=>{if(CURRENT==='overview')refresh().catch(()=>{})},15000);

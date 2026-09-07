@@ -241,7 +241,22 @@ func commissionAcceptAction(conn *storage.Conn, userID int64, raw json.RawMessag
 			VALUES(?,?,'active','{}',?,0,0,?,?)`, []any{userID, p.QuestKey, p.GameMinute, now, now}); err != nil {
 			return authoritativeMutation{}, err
 		}
-		out := map[string]any{"quest_key": p.QuestKey, "commission": false, "status": "active", "accepted_game_minute": p.GameMinute}
+		// v0.24.0: an ordinary quest pins its terms too. It has no giver and no
+		// deadline to lock, but it has objectives and a reward, and those were
+		// the half a GM's edit could still rewrite underneath the player.
+		pinned, _, pinErr := questDefinitionTerms(conn, p.QuestKey, 0)
+		if pinErr != nil {
+			return authoritativeMutation{}, pinErr
+		}
+		pinned.PinnedAtGameMinute = p.GameMinute
+		if err := pinQuestTermsTx(conn, userID, p.QuestKey, pinned); err != nil {
+			return authoritativeMutation{}, err
+		}
+		out := map[string]any{
+			"quest_key": p.QuestKey, "commission": false, "status": "active",
+			"accepted_game_minute": p.GameMinute,
+			"objectives":           pinned.Objectives, "rewards": pinned.Rewards,
+		}
 		return authoritativeMutation{Result: out, Event: eventledger.Event{
 			Domain: "quest", EventType: "quest.accept", EntityType: "character",
 			EntityID: fmt.Sprint(userID), SubjectType: "quest", SubjectID: p.QuestKey,
@@ -290,6 +305,19 @@ func commissionAcceptAction(conn *storage.Conn, userID int64, raw json.RawMessag
 	}
 	if _, err := conn.Execute(`INSERT INTO character_quests(user_id,quest_key,status,progress_json,accepted_game_minute,commission,deadline_game_minute,variant_index,created_at,updated_at)
 		VALUES(?,?,'active','{}',?,1,?,?,?,?)`, []any{userID, def.QuestKey, p.GameMinute, deadline, p.VariantIndex, now, now}); err != nil {
+		return authoritativeMutation{}, err
+	}
+	// The variant and the deadline were already locked onto this row; since
+	// v0.24.0 the objectives and the chosen terms are locked with them, so the
+	// whole agreement lives in one place instead of two.
+	pinned, _, pinErr := questDefinitionTerms(conn, def.QuestKey, p.VariantIndex)
+	if pinErr != nil {
+		return authoritativeMutation{}, pinErr
+	}
+	pinned.Rewards = terms.Rewards
+	pinned.Label = terms.Label
+	pinned.PinnedAtGameMinute = p.GameMinute
+	if err := pinQuestTermsTx(conn, userID, def.QuestKey, pinned); err != nil {
 		return authoritativeMutation{}, err
 	}
 	out := map[string]any{
@@ -583,7 +611,7 @@ func ExpireDueCommissions(conn *storage.Conn, gameMinute int64) ([]DueCommission
 // adminCommissionReview approves, retires or discards a commission definition.
 // Retiring hides it from new takers; the players already holding it keep the
 // terms they accepted, which is why this touches only quest_definitions.
-func adminCommissionReview(conn *storage.Conn, adminUserID int64, raw json.RawMessage) (any, error) {
+func adminQuestReview(conn *storage.Conn, adminUserID int64, raw json.RawMessage, auditAction string) (any, error) {
 	p, err := decodeMap(raw)
 	if err != nil {
 		return nil, err
@@ -612,7 +640,7 @@ func adminCommissionReview(conn *storage.Conn, adminUserID int64, raw json.RawMe
 	}
 	row := firstRowMap(res)
 	if row == nil {
-		return nil, errors.New("unknown commission")
+		return nil, errors.New("unknown quest")
 	}
 	before := fmt.Sprint(row["status"])
 	now := nowSeconds()
@@ -622,7 +650,7 @@ func adminCommissionReview(conn *storage.Conn, adminUserID int64, raw json.RawMe
 	}
 	out := map[string]any{"quest_key": questKey, "title": fmt.Sprint(row["title"]),
 		"giver_npc": fmt.Sprint(row["giver_npc"]), "status": status, "previous_status": before}
-	if err := auditAdmin(conn, adminUserID, "admin.commission.review", questKey,
+	if err := auditAdmin(conn, adminUserID, auditAction, questKey,
 		map[string]any{"status": before}, out, fmt.Sprint(p["reason"])); err != nil {
 		return nil, err
 	}

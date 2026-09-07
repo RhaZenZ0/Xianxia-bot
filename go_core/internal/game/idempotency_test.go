@@ -215,15 +215,17 @@ func TestAnActionIdCannotBeReusedForADifferentAction(t *testing.T) {
 
 func TestAnOrdinaryQuestIsPaidByTheTransactionThatCompletesIt(t *testing.T) {
 	path := setupCommissionDB(t)
+	seedOrdinaryQuest(t, path,
+		"first_steps",
+		[]map[string]any{{"id": "talk", "type": "talk", "target": "Elder Pine", "count": 1}},
+		map[string]any{"spirit_stones": 40, "insight_xp": 30, "items": map[string]any{"spirit_herb": 2}})
 	batch4Exec(t, path, `INSERT INTO character_quests(user_id,quest_key,status,progress_json,accepted_game_minute,commission,variant_index,created_at,updated_at)
 		VALUES(42,'first_steps','active','{}',0,0,0,0,0)`)
 	batch4SetCanonicalGameMinute(t, path, 130)
 
 	raw := payloadJSON(t, map[string]any{
 		"quest_key":      "first_steps",
-		"objectives":     []map[string]any{{"id": "talk", "type": "talk", "target": "Elder Pine", "count": 1}},
 		"objective_type": "talk", "target": "elder pine", "amount": 1,
-		"rewards": map[string]any{"spirit_stones": 40, "insight_xp": 30, "items": map[string]any{"spirit_herb": 2}},
 	})
 	out, err := Apply(path, ActionRequest{Operation: "quest.progress", ActorID: 42, Payload: raw})
 	if err != nil {
@@ -255,20 +257,22 @@ func TestAnOrdinaryQuestIsPaidByTheTransactionThatCompletesIt(t *testing.T) {
 
 func TestProgressThatCompletesNothingPaysNothing(t *testing.T) {
 	path := setupCommissionDB(t)
+	seedOrdinaryQuest(t, path,
+		"first_steps",
+		[]map[string]any{
+			{"id": "talk", "type": "talk", "target": "Elder Pine", "count": 1},
+			{"id": "explore", "type": "explore", "count": 1},
+		},
+		map[string]any{"spirit_stones": 40, "insight_xp": 30})
 	batch4Exec(t, path, `INSERT INTO character_quests(user_id,quest_key,status,progress_json,accepted_game_minute,commission,variant_index,created_at,updated_at)
 		VALUES(42,'first_steps','active','{}',0,0,0,0,0)`)
 	batch4SetCanonicalGameMinute(t, path, 130)
 
 	// Two objectives, one reported: the quest is touched but not complete, and
-	// the rewards travelling with the report must not be spent.
+	// nothing may be paid on the way past.
 	raw := payloadJSON(t, map[string]any{
-		"quest_key": "first_steps",
-		"objectives": []map[string]any{
-			{"id": "talk", "type": "talk", "target": "Elder Pine", "count": 1},
-			{"id": "explore", "type": "explore", "count": 1},
-		},
+		"quest_key":      "first_steps",
 		"objective_type": "talk", "target": "elder pine", "amount": 1,
-		"rewards": map[string]any{"spirit_stones": 40, "insight_xp": 30},
 	})
 	if _, err := Apply(path, ActionRequest{Operation: "quest.progress", ActorID: 42, Payload: raw}); err != nil {
 		t.Fatal(err)
@@ -278,20 +282,23 @@ func TestProgressThatCompletesNothingPaysNothing(t *testing.T) {
 	}
 }
 
-func TestQuestRewardsAreCappedIndependentlyOfTheCaller(t *testing.T) {
-	// The rewards arrive from the caller's catalog, so the engine keeps its own
-	// ceiling: a bug or a compromised caller must not be able to mint an
-	// economy through the quest path.
+func TestQuestRewardsAreCappedWhateverTheDefinitionAsksFor(t *testing.T) {
+	// The engine keeps its own ceiling on the quest payout path. Since v0.24.0
+	// the rewards come from the stored definition rather than the caller, so
+	// this is no longer a guard against a compromised caller - it is a guard
+	// against a definition, however it got written, that would mint an economy.
 	path := setupCommissionDB(t)
+	seedOrdinaryQuest(t, path,
+		"first_steps",
+		[]map[string]any{{"id": "talk", "type": "talk", "target": "Elder Pine", "count": 1}},
+		map[string]any{"spirit_stones": 999999, "insight_xp": -50})
 	batch4Exec(t, path, `INSERT INTO character_quests(user_id,quest_key,status,progress_json,accepted_game_minute,commission,variant_index,created_at,updated_at)
 		VALUES(42,'first_steps','active','{}',0,0,0,0,0)`)
 	batch4SetCanonicalGameMinute(t, path, 130)
 
 	raw := payloadJSON(t, map[string]any{
 		"quest_key":      "first_steps",
-		"objectives":     []map[string]any{{"id": "talk", "type": "talk", "target": "Elder Pine", "count": 1}},
 		"objective_type": "talk", "target": "elder pine", "amount": 1,
-		"rewards": map[string]any{"spirit_stones": 999999, "insight_xp": -50},
 	})
 	if _, err := Apply(path, ActionRequest{Operation: "quest.progress", ActorID: 42, Payload: raw}); err != nil {
 		t.Fatal(err)
