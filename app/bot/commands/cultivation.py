@@ -23,6 +23,7 @@ from ..character_state import current_effect_modifiers
 from ..formatting import roll_line
 from ..registry import registered_group_command, registered_root_command
 from ..runtime import (
+    _explain_engine_error,
     DB,
     ENGINE,
     SETTINGS,
@@ -54,7 +55,7 @@ async def cultivate(interaction: discord.Interaction) -> None:
             action_id=f"discord:{interaction.id}:cultivation.train",
         )
     except GameEngineError as exc:
-        await interaction.followup.send(f"❌ {exc}", ephemeral=False)
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
         return
     result = dict(envelope.get("result") or {})
     gain, total, cost = int(result.get("gain", 0)), int(result.get("total", 0)), int(result.get("cost", 0))
@@ -143,7 +144,7 @@ async def seclusion_start(
         )
         state = dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}", ephemeral=False)
+        await interaction.response.send_message(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
         return
     soul = await DB.get_soul_legacy(interaction.user.id)
     soul_mult = float(soul_legacy_modifiers(soul)["cultivation_mult"])
@@ -217,7 +218,7 @@ async def seclusion_end(interaction: discord.Interaction) -> None:
             action_id=f"discord:{interaction.id}:seclusion.end",
         )
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}", ephemeral=False)
+        await interaction.response.send_message(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
         return
     final = await DB.get_seclusion(interaction.user.id, active_only=False) or state
     await interaction.response.send_message(
@@ -338,7 +339,7 @@ async def body_cultivate(interaction: discord.Interaction) -> None:
             action_id=f"discord:{interaction.id}:cultivation.body_train",
         )
     except GameEngineError as exc:
-        await interaction.followup.send(f"❌ {exc}", ephemeral=False)
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
         return
     result = dict(envelope.get("result") or {})
     gain, total, cost = int(result.get("gain", 0)), int(result.get("total", 0)), int(result.get("cost", 0))

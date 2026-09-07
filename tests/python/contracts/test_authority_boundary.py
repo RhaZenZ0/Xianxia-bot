@@ -277,9 +277,15 @@ def test_python_go_authority_boundary_only_delegates_migrated_mechanics():
         "DB.get_alchemy_state",
         "DB.apply_effect",
         "DB.remove_effect",
-        "sync_pill_toxicity_effect",
     ):
         assert forbidden not in effect_reader_body
+
+    # v0.23.0: the Python mirror of the toxicity curve is gone entirely, not
+    # merely unused by this one reader. The engine settles the shared effect
+    # row wherever it reads the effect table, so nothing on the Discord side
+    # needs to remember to sync it - and nothing may start again.
+    assert "sync_pill_toxicity_effect" not in SOURCE
+    assert "medicine_toxicity_effect" not in SOURCE
 
     assert "async def _discover_next_location" not in SOURCE
     assert "sense.status" in SOURCE
@@ -527,32 +533,23 @@ import re
 APP_DIR = PROJECT_ROOT / "app"
 WRITE_SQL = re.compile(r"^\s*(INSERT|UPDATE|DELETE|REPLACE)\b", re.I | re.M)
 
-PLAYER_MUTATIONS = {
-    # (file under app/, enclosing function, DB method): engine action that replaces it
-    # v0.21.0: the five use_item_command rows became `item.use`.
-    ("bot/commands/exploration.py", "alchemy_purge", "spend_resources"): "alchemy.purge",
-    ("bot/commands/exploration.py", "alchemy_purge", "set_cooldown"): "alchemy.purge",
-    ("bot/commands/sect.py", "sect_shadow", "set_hidden_sect_status"): "sect.shadow",
-    ("bot/commands/sect.py", "sect_shadow", "initiate_hidden_sect"): "sect.shadow",
-    ("bot/commands/sect.py", "sect_shadow", "add_items"): "sect.shadow",
-    ("bot/commands/sect.py", "sect_shadow", "record_item_provenance"): "sect.shadow",
-    ("bot/commands/law.py", "law_technique_command", "apply_effect"): "law.technique (existing)",
-    ("bot/character_state.py", "sync_pill_toxicity_effect", "remove_effect"): "engine-owned toxicity curve",
-    ("bot/character_state.py", "sync_pill_toxicity_effect", "apply_effect"): "engine-owned toxicity curve",
-    ("bot/admin/world_ops.py", "admin_setsect", "set_sect_membership"): "admin.player.set_sect",
-    ("bot/admin/world_ops.py", "admin_removesect", "clear_sect_membership"): "admin.player.set_sect",
-    ("bot/admin/world_ops.py", "admin_setmaster", "set_master"): "admin.player.set_master",
-    ("bot/admin/world_ops.py", "admin_clearmaster", "clear_master"): "admin.player.set_master",
-    ("bot/admin/world_ops.py", "admin_sect_rank", "set_sect_rank"): "admin.player.set_sect_rank",
-    ("bot/admin/world_ops.py", "admin_master_attention", "adjust_master_attention"): "admin.player.master_attention",
-    ("bot/admin/world_ops.py", "admin_grant_storage", "set_storage_container"): "admin.player.grant_storage",
-    ("bot/admin/world_ops.py", "admin_spawnrealm", "activate_world_event"): "admin.world.spawn_realm",
-    ("bot/commands/character.py", "set_gender", "set_gender"): "character.set_gender",
-    ("bot/commands/sect.py", "sect_abode", "set_location"): "abode.enter (adjacent)",
-    ("bot/commands/exploration.py", "explore", "discover_sect"): "sect.discover",
-    ("bot/commands/sect.py", "_sync_sect_discoveries", "discover_sect"): "sect.discover",
-    ("ops/core_services.py", "accept", "accept_quest"): "quest.accept",
-}
+# Empty since v0.23.0: the Authority I milestone is closed. Nothing under
+# app/bot or app/ops writes a gameplay table any more, and this dict exists to
+# keep it that way - a new gameplay write from Python fails the gate below
+# rather than quietly joining a backlog.
+#
+# How it emptied, for anyone reading the shape of the migration:
+#   v0.21.0  the five use_item_command rows -> `item.use`
+#   v0.22.0  accept_quest -> `commission.accept`
+#   v0.23.0  four alchemy/toxicity rows -> `alchemy.purge`, plus an engine-side
+#            settle wherever the effect table is read
+#            eight admin rows -> `admin.player.*` / `admin.world.spawn_realm`
+#            set_gender -> `character.set_gender`
+#            two discover_sect rows -> a batched `sect.discover`
+#            abode set_location -> `sect.abode.enter` / `sect.abode.leave`
+#            the law technique effect -> `law.technique`
+#            four `/sect shadow` rows -> `sect.shadow`
+PLAYER_MUTATIONS: dict[tuple[str, str, str], str] = {}
 
 BOOKKEEPING_METHODS = {
     # narration and memory
@@ -564,8 +561,13 @@ BOOKKEEPING_METHODS = {
     "set_channel_message", "set_server_channels", "set_info_message_id", "set_bugs_channel_id", "set_realm_hub_channel",
     "set_expedition_thread", "set_birth_family_household_thread", "set_sect_abode_thread", "set_abode_thread",
     "register_event_thread", "close_event_thread", "ensure_sect_abode", "update_expedition_location",
+    "clear_discord_bindings",  # v0.21.2 teardown: forgets channel/message ids, touches no gameplay column
     # ops telemetry, startup, maintenance
     "init", "sync_world_catalog", "sync_rag_canon", "record_startup_event", "record_operational_alert",
+    # v0.22.0: seeds the authored commission pool from content/world.json into
+    # quest_definitions at startup, insert-only. Content, not player state -
+    # the same class of write as sync_world_catalog beside it.
+    "sync_commission_pool",
     "flush_slow_query_log", "maintenance_cleanup", "log_admin_action",
     # cosmetic / GM review of drafts (no gameplay table)
     "set_address_style", "set_quest_definition_status",
@@ -611,7 +613,7 @@ def _mutator_call_sites(mutators: set[str]) -> set[tuple[str, str, str]]:
 def test_the_mutator_scan_still_sees_the_database_layer():
     mutators = _database_mutators()
     assert len(mutators) >= 60, sorted(mutators)
-    for name in ("consume_item", "apply_effect", "accept_quest", "add_history"):
+    for name in ("consume_item", "apply_effect", "set_npc_memory", "add_history"):
         assert name in mutators
 
 
@@ -633,10 +635,12 @@ def test_v0_21_gate_every_db_write_from_bot_and_ops_is_allowlisted():
     assert not stale, f"bookkeeping methods no longer called from bot/ops: {sorted(stale)}"
 
 
-def test_the_v0_21_backlog_only_shrinks():
-    # The milestone is done when this is empty; until then every row names the
-    # action that will replace it. Reordering the roadmap changes the values,
-    # never adds keys.
-    assert len(PLAYER_MUTATIONS) <= 27, "v0.21 is about removing Python-side gameplay writes, not adding them"
-    for site, action in PLAYER_MUTATIONS.items():
-        assert action, site
+def test_the_v0_21_backlog_stays_closed():
+    # The milestone closed at v0.23.0 with this empty, and empty is now the
+    # contract rather than a target: a Python-side gameplay write cannot be
+    # added back by listing it here, only by moving it into the engine. The
+    # scan above is what enforces that; this is the statement of intent.
+    assert PLAYER_MUTATIONS == {}, (
+        "Authority I is closed - a new Python-side gameplay write belongs in an "
+        "engine action, not in this allowlist: " + ", ".join(map(str, PLAYER_MUTATIONS))
+    )

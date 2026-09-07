@@ -9,6 +9,7 @@ from ...rules.advanced_runtime import FORMATION_POSITIONS, FORMATION_STANCES
 from ...ops.game_engine import GameEngineError
 from ..registry import registered_group_command
 from ..runtime import (
+    _explain_engine_error,
     DB,
     ENGINE,
     current_world_time,
@@ -39,7 +40,7 @@ async def formation_create(interaction: discord.Interaction, name: str) -> None:
         )
         result = dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.followup.send(f"❌ {exc}", ephemeral=False)
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
         return
     await interaction.followup.send(f"🧿 Formation `#{result.get('formation_id')}` created.", ephemeral=False)
 
@@ -61,7 +62,7 @@ async def formation_assign(interaction: discord.Interaction, formation_id: int, 
         )
         _ = dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.followup.send(f"❌ {exc}", ephemeral=False)
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
         return
     await interaction.followup.send(f"🧿 Assigned {member.mention} to **{position.value}**.", ephemeral=False)
 
@@ -83,7 +84,7 @@ async def formation_activate(interaction: discord.Interaction, formation_id: int
         )
         _ = dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.followup.send(f"❌ {exc}", ephemeral=False)
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
         return
     await interaction.followup.send(f"🧿 Formation `#{formation_id}` activated in **{stance.value}** stance.", ephemeral=False)
 
@@ -105,7 +106,7 @@ async def formation_stance(interaction: discord.Interaction, stance: app_command
         )
         _ = dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.followup.send(f"❌ {exc}", ephemeral=False)
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
         return
     await interaction.followup.send(f"🧿 Active formation stance changed to **{stance.value}**.", ephemeral=False)
 

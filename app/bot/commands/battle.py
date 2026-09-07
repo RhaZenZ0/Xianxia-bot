@@ -26,6 +26,7 @@ from ..channels import _report_game_ui_error
 from ..formatting import human_duration, roll_line
 from ..registry import EVENT_HANDLERS, registered_group_command, registered_root_command
 from ..runtime import (
+    _explain_engine_error,
     DB,
     SETTINGS,
     WORLD,
@@ -229,7 +230,7 @@ async def _use_battle_recovery_item(interaction: discord.Interaction, battle_id:
             action_id=f"discord:{interaction.id}:combat.recovery_item:{int(battle_id)}:{item_id}",
         )
     except GameEngineError as exc:
-        return f"❌ {exc}"
+        return f"❌ {_explain_engine_error(exc)}"
     state = dict(envelope.get("result") or {})
     lines = [f"🧪 **Used {state.get('item_name', item_id)}**"]
     if int(state.get("vitality_restore", 0)):
@@ -252,7 +253,7 @@ async def _execute_battle_law_technique(interaction: discord.Interaction, battle
             action_id=f"discord:{interaction.id}:combat.technique:{int(battle['battle_id'])}:{technique}",
         )
     except GameEngineError as exc:
-        return f"❌ {exc}"
+        return f"❌ {_explain_engine_error(exc)}"
     result = dict(envelope.get("result") or {})
     roll = SimpleNamespace(**dict(result.get("roll") or {}))
     lines = [f"🌌 **{result.get('technique_name', technique)}**", roll_line(roll)]
@@ -318,7 +319,7 @@ async def _finish_battle(interaction:discord.Interaction,outcome:str,*,expected_
             action_id=f"discord:{interaction.id}:combat.finalize:{int(b['battle_id'])}:{outcome}",
         )
     except GameEngineError as exc:
-        await _battle_reply(interaction,content=f"❌ {exc}",view=None,ephemeral=False,edit_panel=edit_panel);return
+        await _battle_reply(interaction,content=f"❌ {_explain_engine_error(exc)}",view=None,ephemeral=False,edit_panel=edit_panel);return
     result=dict(envelope.get("result") or {})
     replayed=bool(envelope.get("replayed"))
     if result.get("event_manifestation"):
@@ -375,7 +376,7 @@ async def _resolve_battle_turn(interaction:discord.Interaction,style:str,action:
             action_id=f"discord:{interaction.id}:combat.turn:{int(b['battle_id'])}:{style}",
         )
     except GameEngineError as exc:
-        await _battle_reply(interaction,content=f"❌ {exc}",view=None,ephemeral=False,edit_panel=edit_panel);return
+        await _battle_reply(interaction,content=f"❌ {_explain_engine_error(exc)}",view=None,ephemeral=False,edit_panel=edit_panel);return
     result=dict(envelope.get("result") or {})
     lines=[]
     if str(result.get("action") or "").strip(): lines.append(f"Action: *{str(result['action'])[:300]}*")

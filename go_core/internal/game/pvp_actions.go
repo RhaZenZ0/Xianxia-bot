@@ -62,25 +62,14 @@ func pvpChallengeAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 	if e := json.Unmarshal(raw, &p); e != nil {
 		return authoritativeMutation{}, e
 	}
-	if p.TargetUserID <= 0 || p.TargetUserID == userID {
+	if p.TargetUserID <= 0 {
 		return authoritativeMutation{}, errors.New("target must be another cultivator")
 	}
-	actor, e := loadMechanicsCharacter(conn, userID)
-	if e != nil {
+	// The same four rules that are now re-checked at accept and on every act.
+	if breach, e := checkPvpParticipants(conn, catalog, userID, p.TargetUserID, ""); e != nil {
 		return authoritativeMutation{}, e
-	}
-	target, e := loadMechanicsCharacter(conn, p.TargetUserID)
-	if e != nil {
-		return authoritativeMutation{}, errors.New("target cultivator is unavailable")
-	}
-	if actor.LifeStatus != "alive" || target.LifeStatus != "alive" {
-		return authoritativeMutation{}, errors.New("both cultivators must be alive")
-	}
-	if actor.Location != target.Location {
-		return authoritativeMutation{}, errors.New("both cultivators must be at the same location")
-	}
-	if loc, ok := catalog.Locations[actor.Location]; ok && loc.SafeZone {
-		return authoritativeMutation{}, errors.New("local formations suppress PvP here")
+	} else if !breach.ok() {
+		return authoritativeMutation{}, errors.New(breach.Reason)
 	}
 	now := float64(time.Now().UnixNano()) / 1e9
 	if p.TTLSeconds <= 0 {
@@ -101,7 +90,7 @@ func pvpChallengeAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 	return authoritativeMutation{Result: result, Event: eventledger.Event{Domain: "pvp", EventType: "pvp.challenge", EntityType: "pvp_challenge", EntityID: fmt.Sprint(cur.LastInsertID), Payload: result}}, nil
 }
 
-func pvpRespondAction(conn *storage.Conn, _ worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
+func pvpRespondAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	var p pvpRespondPayload
 	if e := json.Unmarshal(raw, &p); e != nil {
 		return authoritativeMutation{}, e
@@ -122,6 +111,23 @@ func pvpRespondAction(conn *storage.Conn, _ worlddata.Catalog, userID int64, raw
 	status := "rejected"
 	result := map[string]any{"challenge_id": p.ChallengeID, "status": status}
 	if p.Accept {
+		// A challenge lives for five minutes and the world does not hold still
+		// for it. Re-check before a match exists: accepting from somewhere else,
+		// from inside a safe zone, or after someone has died must not start a
+		// duel. The challenge is closed as `void` rather than left pending, so
+		// it neither starts a fight nor sits there forever.
+		breach, e := checkPvpParticipants(conn, catalog, i64(ch["challenger_user_id"]), userID, "")
+		if e != nil {
+			return authoritativeMutation{}, e
+		}
+		if !breach.ok() {
+			result["status"] = "void"
+			result["reason"] = breach.Reason
+			if _, e := conn.Execute(`UPDATE pvp_challenges SET status='void' WHERE challenge_id=?`, []any{p.ChallengeID}); e != nil {
+				return authoritativeMutation{}, e
+			}
+			return authoritativeMutation{Result: result, Event: eventledger.Event{Domain: "pvp", EventType: "pvp.respond", EntityType: "pvp_challenge", EntityID: fmt.Sprint(p.ChallengeID), Payload: result}}, nil
+		}
 		active, e := conn.Execute(`SELECT 1 AS found FROM pvp_matches WHERE status='active' AND (player1_user_id IN (?,?) OR player2_user_id IN (?,?)) LIMIT 1`, []any{i64(ch["challenger_user_id"]), userID, i64(ch["challenger_user_id"]), userID})
 		if e != nil {
 			return authoritativeMutation{}, e
@@ -141,13 +147,22 @@ func pvpRespondAction(conn *storage.Conn, _ worlddata.Catalog, userID int64, raw
 		if r1 == nil || r2 == nil {
 			return authoritativeMutation{}, errors.New("duel character vitality unavailable")
 		}
-		cur, e := conn.Execute(`INSERT INTO pvp_matches(challenge_id,player1_user_id,player2_user_id,player1_hp,player2_hp,turn_user_id,status,created_at,updated_at) VALUES(?,?,?,?,?,?,'active',?,?)`, []any{p.ChallengeID, i64(ch["challenger_user_id"]), userID, max64(1, i64(r1["vitality_max"])), max64(1, i64(r2["vitality_max"])), i64(ch["challenger_user_id"]), now, now})
+		// The duel is fought where it was accepted. Storing that is what lets
+		// every later act ask "are you both still here" instead of "are you
+		// both in the same place", which two people who have each walked to
+		// the same distant city would also satisfy.
+		here, e := loadMechanicsCharacter(conn, userID)
+		if e != nil {
+			return authoritativeMutation{}, e
+		}
+		cur, e := conn.Execute(`INSERT INTO pvp_matches(challenge_id,player1_user_id,player2_user_id,player1_hp,player2_hp,turn_user_id,status,location,created_at,updated_at) VALUES(?,?,?,?,?,?,'active',?,?,?)`, []any{p.ChallengeID, i64(ch["challenger_user_id"]), userID, max64(1, i64(r1["vitality_max"])), max64(1, i64(r2["vitality_max"])), i64(ch["challenger_user_id"]), here.Location, now, now})
 		if e != nil {
 			return authoritativeMutation{}, e
 		}
 		status = "accepted"
 		result["status"] = status
 		result["match_id"] = cur.LastInsertID
+		result["location"] = here.Location
 	}
 	_, e = conn.Execute(`UPDATE pvp_challenges SET status=? WHERE challenge_id=?`, []any{status, p.ChallengeID})
 	if e != nil {
@@ -162,7 +177,7 @@ func max64(a, b int64) int64 {
 	return b
 }
 
-func pvpActAction(conn *storage.Conn, _ worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
+func pvpActAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	var p pvpActPayload
 	if e := json.Unmarshal(raw, &p); e != nil {
 		return authoritativeMutation{}, e
@@ -178,19 +193,48 @@ func pvpActAction(conn *storage.Conn, _ worlddata.Catalog, userID int64, raw jso
 	if m == nil || fmt.Sprint(m["status"]) != "active" {
 		return authoritativeMutation{}, errors.New("active duel not found")
 	}
-	if i64(m["turn_user_id"]) != userID {
-		return authoritativeMutation{}, errors.New("it is not your turn")
-	}
-	if p.MatchVersion != nil && i64(m["version"]) != *p.MatchVersion {
-		return authoritativeMutation{}, errors.New("stale duel state")
-	}
 	p1, p2 := i64(m["player1_user_id"]), i64(m["player2_user_id"])
+	if userID != p1 && userID != p2 {
+		return authoritativeMutation{}, errors.New("you are not in that duel")
+	}
 	actorP1 := userID == p1
 	opponentID := p1
 	if actorP1 {
 		opponentID = p2
 	}
 	now := float64(time.Now().UnixNano()) / 1e9
+	// The breach check runs BEFORE the turn check (v0.23.1, review finding #6).
+	//
+	// v0.22.4 added this on every act so a match whose preconditions had
+	// stopped holding would end rather than be refused - and then put it after
+	// `turn_user_id`, which is exactly the case it exists for. When the player
+	// holding the turn dies, they cannot act, and their opponent gets "it is
+	// not your turn" and never reaches the check. The match stays active, and
+	// pvpChallengeAction refuses a new duel while one is active, so the living
+	// player is locked out of duelling until the dead one reincarnates.
+	//
+	// Whose turn it is only matters in a duel that is still valid, so validity
+	// is decided first. Both participants are checked either way, so it does
+	// not matter which of them calls.
+	breach, e := checkPvpParticipants(conn, catalog, userID, opponentID, pvpMatchLocation(m))
+	if e != nil {
+		return authoritativeMutation{}, e
+	}
+	if !breach.ok() {
+		out, e := finishBreachedMatch(conn, p.MatchID, breach, now)
+		if e != nil {
+			return authoritativeMutation{}, e
+		}
+		out["style"] = p.Style
+		out["opponent_user_id"] = opponentID
+		return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "pvp", EventType: "pvp.breach", EntityType: "pvp_match", EntityID: fmt.Sprint(p.MatchID), Payload: out}}, nil
+	}
+	if i64(m["turn_user_id"]) != userID {
+		return authoritativeMutation{}, errors.New("it is not your turn")
+	}
+	if p.MatchVersion != nil && i64(m["version"]) != *p.MatchVersion {
+		return authoritativeMutation{}, errors.New("stale duel state")
+	}
 	result := map[string]any{"match_id": p.MatchID, "style": p.Style, "opponent_user_id": opponentID}
 	if p.Style == "surrender" {
 		// Reputation is meant to reward an honorable yield mid-fight, not a

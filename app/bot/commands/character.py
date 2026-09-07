@@ -13,6 +13,7 @@ from typing import Any
 import discord
 from discord import app_commands
 
+from ...rules import commissions as commission_rules
 from ...rules.advanced_runtime import ERA_CYCLE
 from ...rules.birthfamily import family_tier_name, karma_description, karma_label
 from ...rules.fate import fate_label
@@ -24,6 +25,7 @@ from ..character_state import current_effect_modifiers
 from ..formatting import human_duration, player_property_emoji, player_property_facility_lines
 from ..registry import registered_group_command, registered_root_command
 from ..runtime import (
+    _explain_engine_error,
     DB,
     ENGINE,
     GENDER_CHOICES,
@@ -38,8 +40,9 @@ from ..runtime import (
     require_character,
     serialized_user_action,
 )
+from ..ui.commissions import AbandonCommissionView, abandon_warning
 from ..ui.creation import BirthFamilyView
-from ..services import GUILD, NPC_RELATIONSHIPS, QUESTS, SCENES
+from ..services import COMMISSIONS, GUILD, NPC_RELATIONSHIPS, QUESTS, SCENES
 
 @registered_root_command(name="begin", description="Choose a family, cultivation style, and create your cultivator", guild=GUILD)
 async def begin(interaction: discord.Interaction) -> None:
@@ -91,10 +94,21 @@ async def set_gender(interaction: discord.Interaction, gender: app_commands.Choi
     c = await require_character(interaction)
     if not c:
         return
-    await DB.set_gender(interaction.user.id, gender.value)
+    # Ack first: the write is authoritative now, and an interaction token that
+    # expires before the first reply would have the player click again on a
+    # change that already landed.
+    await interaction.response.defer(ephemeral=False)
+    try:
+        await ENGINE.authoritative_action(
+            "character.set_gender", interaction.user.id, {"gender": gender.value},
+            action_id=f"discord:{interaction.id}:character.set_gender",
+        )
+    except GameEngineError as exc:
+        await interaction.followup.send(f"Character sex could not be set: {exc}", ephemeral=False)
+        return
     main_name = WORLD.realm_name(c["realm_index"], gender.value)
     body_name = WORLD.body_realm_name(c.get("body_realm_index", 0), gender.value)
-    await interaction.response.send_message(
+    await interaction.followup.send(
         f"✅ Character sex set to **{gender.name}**.\n"
         f"Qi realm title: **{main_name}**\nBody realm title: **{body_name}**\n"
         "This changes titles/names only; it never changes stats, rolls, or progression.",
@@ -422,17 +436,44 @@ class QuestAcceptSelect(discord.ui.Select):
     async def callback(self, interaction: discord.Interaction) -> None:
         if int(interaction.user.id) != self.user_id:
             await interaction.response.send_message("This quest panel belongs to another cultivator.", ephemeral=False); return
-        wt = await current_world_time()
-        row = await QUESTS.accept(self.user_id, self.values[0], game_minute=wt.total_minutes)
+        try:
+            row = await QUESTS.accept(
+                self.user_id, self.values[0],
+                action_id=f"discord:{interaction.id}:commission.accept",
+            )
+        except GameEngineError as exc:
+            await interaction.response.send_message(f"❌ {_explain_engine_error(exc)}", ephemeral=False); return
         definition = await QUESTS.definition(str(row["quest_key"])) or {}
         await interaction.response.send_message(f"📜 Quest accepted: **{definition.get('title', row['quest_key'])}**", ephemeral=False)
 
 
+class AbandonCommissionOpenButton(discord.ui.Button):
+    """The danger button lives behind a confirmation that states the cost, so
+    the journal itself can never abandon anything in one click."""
+
+    def __init__(self, user_id: int, held: dict) -> None:
+        super().__init__(label="Abandon commission", style=discord.ButtonStyle.danger, emoji="⚠️")
+        self.user_id = int(user_id)
+        self.held = dict(held)
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        if int(interaction.user.id) != self.user_id:
+            await interaction.response.send_message("This quest panel belongs to another cultivator.", ephemeral=False, delete_after=20)
+            return
+        await interaction.response.send_message(
+            abandon_warning(self.held),
+            view=AbandonCommissionView(self.user_id, str(self.held.get("quest_key") or "")),
+            ephemeral=False,
+        )
+
+
 class QuestDashboardView(discord.ui.View):
-    def __init__(self, user_id: int, available: list[dict]) -> None:
+    def __init__(self, user_id: int, available: list[dict], held: dict | None = None) -> None:
         super().__init__(timeout=300)
         if available:
             self.add_item(QuestAcceptSelect(user_id, available))
+        if held:
+            self.add_item(AbandonCommissionOpenButton(user_id, held))
 
 
 @registered_root_command(name="quests", description="View and accept objective-driven quests", guild=GUILD)
@@ -442,8 +483,10 @@ async def quests_command(interaction: discord.Interaction) -> None:
         return
     active = await DB.list_character_quests(interaction.user.id, status="active")
     available = await QUESTS.available(interaction.user.id)
+    held = await COMMISSIONS.held(interaction.user.id)
+    wt = await current_world_time()
     lines = ["📜 **Quest Journal**"]
-    catalog = await QUESTS.catalog()
+    catalog = await QUESTS.visible_catalog(interaction.user.id)
     if active:
         for row in active[:10]:
             definition = catalog.get(str(row["quest_key"]), {})
@@ -452,12 +495,24 @@ async def quests_command(interaction: discord.Interaction) -> None:
             for obj in definition.get("objectives", []):
                 cur=int(progress.get(str(obj["id"]),0)); req=max(1,int(obj.get("count",1)))
                 objectives.append(f"{'✅' if cur >= req else '▫️'} {obj.get('label',obj['id'])} {cur}/{req}")
-            lines.append(f"\n**{definition.get('title', row['quest_key'])}**\n" + "\n".join(objectives))
+            title = definition.get("title", row["quest_key"])
+            # A commission is marked, and carries its clock: a deadline you
+            # cannot see is a deadline you will miss.
+            if int(row.get("commission", 0) or 0):
+                giver = str(definition.get("giver_npc") or "")
+                due = row.get("deadline_game_minute")
+                clock = (f" · due in {commission_rules.format_wait_days(int(due) - wt.total_minutes)}" if due else "")
+                title = f"📜 {title} — for {giver}{clock}" if giver else f"📜 {title}{clock}"
+            lines.append(f"\n**{title}**\n" + "\n".join(objectives))
     else:
         lines.append("\nNo active quests.")
     if available:
         lines.append("\n**Available**\n" + "\n".join(f"• {q['title']}" for q in available[:10]))
-    await interaction.response.send_message("\n".join(lines), view=QuestDashboardView(interaction.user.id, available), ephemeral=False)
+    if held:
+        lines.append("\n-# Commissions come from the people who give them. "
+                     "Abandoning one costs the same standing as failing it.")
+    await interaction.response.send_message(
+        "\n".join(lines), view=QuestDashboardView(interaction.user.id, available, held), ephemeral=False)
 
 
 @registered_root_command(name="inventory", description="View your items and materials", guild=GUILD)
@@ -713,7 +768,7 @@ async def bond_propose(interaction:discord.Interaction,partner:discord.Member)->
         envelope=await ENGINE.authoritative_action("dao.propose",interaction.user.id,{"partner_user_id":partner.id},action_id=f"discord:{interaction.id}:dao.propose")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
     await interaction.followup.send(f"💞 Dao-partnership proposal **#{result.get('partnership_id')}** sent to {partner.mention}.",ephemeral=False)
 
 
@@ -728,7 +783,7 @@ async def bond_respond(interaction:discord.Interaction,partnership_id:int,decisi
         envelope=await ENGINE.authoritative_action("dao.respond",interaction.user.id,{"partnership_id":int(partnership_id),"accept":decision.value=='accept'},action_id=f"discord:{interaction.id}:dao.respond")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
     await interaction.followup.send("💞 Dao partnership response recorded.",ephemeral=False)
 
 
@@ -742,7 +797,7 @@ async def bond_dual_cultivate(interaction:discord.Interaction)->None:
         envelope=await ENGINE.authoritative_action("dao.dual_cultivate",interaction.user.id,{"cooldown_seconds":SETTINGS.cultivate_cooldown_minutes*60},action_id=f"discord:{interaction.id}:dao.dual_cultivate")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
     await interaction.followup.send(f"☯️ Paired meridians resonate at **{result.get('location','your shared location')}**.\nBond Resonance: **{int(result.get('resonance',0))}/100**",ephemeral=False)
 
 
@@ -756,7 +811,7 @@ async def bond_sever(interaction:discord.Interaction,confirm:bool=False)->None:
         envelope=await ENGINE.authoritative_action("dao.sever",interaction.user.id,{},action_id=f"discord:{interaction.id}:dao.sever")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
     await interaction.followup.send("🧵 Your Dao partnership is severed.",ephemeral=False)
 
 
@@ -860,7 +915,7 @@ async def reincarnate(interaction:discord.Interaction,name:str,path:str,gender:a
             action_id=f"discord:{interaction.id}:lifecycle.reincarnate",
         )
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
+        await interaction.response.send_message(f"❌ {_explain_engine_error(exc)}",ephemeral=False);return
     result=dict(envelope.get("result") or {})
     partner_echo=max(0,min(25,int(result.get("partner_echo",0))))
     partner_name=str(result.get("partner_name") or "")

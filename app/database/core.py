@@ -35,7 +35,7 @@ from ..rules.sect_manor import (
 log = logging.getLogger("xianxia.database")
 
 
-SCHEMA_VERSION = 28
+SCHEMA_VERSION = 31
 # A readiness probe must validate more than the schema-version marker.  If the
 # SQLite file is removed or replaced while the bot is running, SQLite will
 # happily create a new empty file at the same path.  Checking these tables lets
@@ -1369,6 +1369,77 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
                 updated_at REAL NOT NULL
             )""",
             "CREATE INDEX IF NOT EXISTS idx_quest_definitions_status ON quest_definitions(status, created_at)",
+        ),
+    ),
+    (
+        29,
+        "commissions",
+        (
+            # Commissions (v0.22.0, docs/COMMISSIONS_DESIGN.md): a quest a giver
+            # NPC offers in character, held one at a time, ending completed /
+            # failed / abandoned. Nothing here is a new quest pipeline - a
+            # commission is a quest_definitions row with a giver, and the
+            # one-at-a-time rule keys on character_quests.commission so a
+            # definition can be retired without freeing the player's slot.
+            "ALTER TABLE quest_definitions ADD COLUMN giver_npc TEXT NOT NULL DEFAULT ''",
+            "ALTER TABLE quest_definitions ADD COLUMN realm_band TEXT NOT NULL DEFAULT ''",
+            "ALTER TABLE quest_definitions ADD COLUMN tier INTEGER NOT NULL DEFAULT 1",
+            "ALTER TABLE quest_definitions ADD COLUMN owner_user_id INTEGER",
+            "ALTER TABLE quest_definitions ADD COLUMN deadline_game_minutes INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE quest_definitions ADD COLUMN variants_json TEXT NOT NULL DEFAULT '[]'",
+            "ALTER TABLE quest_definitions ADD COLUMN seed_json TEXT NOT NULL DEFAULT '{}'",
+            """CREATE INDEX IF NOT EXISTS idx_quest_definitions_giver
+               ON quest_definitions(giver_npc, status, tier)""",
+            # Absolute deadline and the accepted terms live on the player's row:
+            # a later edit to the definition can never change what a held
+            # commission pays or when it is due.
+            "ALTER TABLE character_quests ADD COLUMN commission INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE character_quests ADD COLUMN deadline_game_minute INTEGER",
+            "ALTER TABLE character_quests ADD COLUMN variant_index INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE character_quests ADD COLUMN resolved_game_minute INTEGER",
+            """CREATE INDEX IF NOT EXISTS idx_character_quests_commission_due
+               ON character_quests(status, commission, deadline_game_minute)""",
+            # Standing is derived (trust+respect-grudge); only the refusal
+            # cooldown and the outcome counters are stored.
+            "ALTER TABLE npc_relationships ADD COLUMN commission_cooldown_until_game_minute INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE npc_relationships ADD COLUMN commissions_completed INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE npc_relationships ADD COLUMN commissions_failed INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE npc_relationships ADD COLUMN commissions_abandoned INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE npc_relationships ADD COLUMN last_commission_outcome TEXT NOT NULL DEFAULT ''",
+        ),
+    ),
+    (
+        30,
+        "commission_givers_and_undisclosed_terms",
+        (
+            # v0.22.1. Three fields, all on the definition:
+            #  - `requires_sect` makes a commission sect business. Membership is
+            #    checked by the engine at accept, not only by the offer ladder.
+            #  - `reward_visibility='hidden'` means the giver will not say what
+            #    the work pays. Presentation only: the engine still locks exact
+            #    terms and pays exactly those, and completion states them in
+            #    full. An old beggar can be worth far more than he let on and a
+            #    self-declared hidden master far less, and the offer card cannot
+            #    tell you which - that is the mechanic.
+            #  - `boast` is the authored line such a giver may claim about the
+            #    work. Content, never a number, and the model may echo it but
+            #    may not make it specific.
+            "ALTER TABLE quest_definitions ADD COLUMN requires_sect TEXT NOT NULL DEFAULT ''",
+            "ALTER TABLE quest_definitions ADD COLUMN reward_visibility TEXT NOT NULL DEFAULT 'shown'",
+            "ALTER TABLE quest_definitions ADD COLUMN boast TEXT NOT NULL DEFAULT ''",
+        ),
+    ),
+    (
+        31,
+        "pvp_match_location",
+        (
+            # v0.22.3. A duel is fought somewhere, and until now nothing
+            # recorded where. The engine re-checks a match's preconditions on
+            # every action (go_core/internal/game/pvp_invariants.go), and
+            # "are you both still here" needs a `here` - otherwise two people
+            # who separately walked to the same distant city would still count
+            # as duelling each other in the street they left.
+            "ALTER TABLE pvp_matches ADD COLUMN location TEXT NOT NULL DEFAULT ''",
         ),
     ),
 
@@ -3307,6 +3378,8 @@ class Database:
             "user_id": int(user_id), "npc_name": str(npc_name), "trust": 0, "respect": 0,
             "fear": 0, "affection": 0, "debt": 0, "grudge": 0, "encounter_count": 0,
             "last_summary": "", "updated_at": 0.0,
+            "commission_cooldown_until_game_minute": 0, "commissions_completed": 0,
+            "commissions_failed": 0, "commissions_abandoned": 0, "last_commission_outcome": "",
         }
 
 
@@ -3320,26 +3393,18 @@ class Database:
             )
             return [dict(r) for r in await cur.fetchall()]
 
-    async def accept_quest(self, user_id: int, quest_key: str, *, game_minute: int = 0) -> dict[str, Any]:
-        now = time.time()
-        async with self._connect() as db:
-            await db.execute(
-                """INSERT INTO character_quests(
-                       user_id,quest_key,status,progress_json,accepted_game_minute,created_at,updated_at
-                   ) VALUES(?,?,'active','{}',?,?,?)
-                   ON CONFLICT(user_id,quest_key) DO NOTHING""",
-                (int(user_id), str(quest_key), int(game_minute), now, now),
-            )
-            await db.commit()
-        rows = await self.list_character_quests(int(user_id))
-        return next(r for r in rows if str(r["quest_key"]) == str(quest_key))
+    # Accepting a quest is an engine write (`commission.accept`, v0.22.0):
+    # the one-at-a-time rule, the deadline and the locked variant have to be
+    # decided in the same transaction as the insert, so there is no
+    # Python-side accept_quest any more. See app/ops/core_services.py.
 
     # ---- Quest Forge definitions (v0.20.6) --------------------------------
 
     @staticmethod
     def _quest_definition_row(data: dict[str, Any]) -> dict[str, Any]:
         row = dict(data)
-        for column, key, default in (("objectives_json", "objectives", []), ("rewards_json", "rewards", {})):
+        for column, key, default in (("objectives_json", "objectives", []), ("rewards_json", "rewards", {}),
+                                     ("variants_json", "variants", []), ("seed_json", "seed", {})):
             try:
                 row[key] = json.loads(str(row.pop(column, "") or "") or json.dumps(default))
             except Exception:
@@ -3368,26 +3433,115 @@ class Database:
                                     story_prompt: str = "", model: str = "", created_by: int = 0) -> dict[str, Any]:
         """Insert or replace a forged definition. `definition` is the catalog
         shape (title, description, source_type, source_key, objectives, rewards)
-        plus quest_key; validation is the caller's (app/rules/quests.py)."""
+        plus quest_key; validation is the caller's (app/rules/quests.py).
+
+        A commission carries the extra fields from migrations 29 and 30 -
+        giver_npc, realm_band, tier, owner_user_id, deadline_game_minutes,
+        variants, seed, requires_sect, reward_visibility and boast. They default
+        to the non-commission shape, so every existing caller keeps writing
+        exactly the row it wrote before."""
         now = time.time()
+        owner = definition.get("owner_user_id")
         async with self._connect() as db:
             await db.execute(
                 """INSERT INTO quest_definitions(quest_key,title,description,source_type,source_key,objectives_json,rewards_json,
-                       status,origin,story_prompt,model,created_by,created_at,updated_at)
-                   VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                       status,origin,story_prompt,model,created_by,created_at,updated_at,
+                       giver_npc,realm_band,tier,owner_user_id,deadline_game_minutes,variants_json,seed_json,
+                       requires_sect,reward_visibility,boast)
+                   VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                    ON CONFLICT(quest_key) DO UPDATE SET title=excluded.title,description=excluded.description,
                        source_type=excluded.source_type,source_key=excluded.source_key,objectives_json=excluded.objectives_json,
                        rewards_json=excluded.rewards_json,status=excluded.status,origin=excluded.origin,
-                       story_prompt=excluded.story_prompt,model=excluded.model,updated_at=excluded.updated_at""",
+                       story_prompt=excluded.story_prompt,model=excluded.model,updated_at=excluded.updated_at,
+                       giver_npc=excluded.giver_npc,realm_band=excluded.realm_band,tier=excluded.tier,
+                       owner_user_id=excluded.owner_user_id,deadline_game_minutes=excluded.deadline_game_minutes,
+                       variants_json=excluded.variants_json,seed_json=excluded.seed_json,
+                       requires_sect=excluded.requires_sect,reward_visibility=excluded.reward_visibility,
+                       boast=excluded.boast""",
                 (
                     str(definition["quest_key"]), str(definition["title"]), str(definition.get("description", "")),
                     str(definition.get("source_type", "forge")), str(definition.get("source_key", "")),
                     json.dumps(list(definition.get("objectives", []))), json.dumps(dict(definition.get("rewards", {}))),
                     str(status), str(origin), str(story_prompt)[:2000], str(model)[:120], int(created_by), now, now,
+                    str(definition.get("giver_npc", "") or ""), str(definition.get("realm_band", "") or ""),
+                    int(definition.get("tier", 1) or 1), None if owner in (None, "") else int(owner),
+                    int(definition.get("deadline_game_minutes", 0) or 0),
+                    json.dumps(list(definition.get("variants", []))), json.dumps(dict(definition.get("seed", {}))),
+                    str(definition.get("requires_sect", "") or ""),
+                    str(definition.get("reward_visibility", "shown") or "shown"),
+                    str(definition.get("boast", "") or ""),
                 ),
             )
             await db.commit()
         return await self.get_quest_definition(str(definition["quest_key"]))
+
+    async def sync_commission_pool(self, commissions: list[dict[str, Any]]) -> int:
+        """Seed authored content into `quest_definitions` as approved rows, once.
+
+        Two kinds of content come through here: the commission pool from
+        `content/world.json`, and the static quests from `app/rules/quests.py`,
+        which arrive with no `giver_npc` and are ordinary quests.
+
+        The static ones are seeded for the engine's benefit (v0.23.1). Accepting
+        a quest is `commission.accept`, and the engine told a legitimate static
+        quest apart from a nonexistent key by the same test - neither had a row -
+        so it accepted any string as an ordinary quest. Python validated the key
+        before asking, which protected the Discord path and left the authority
+        invariant wrong. A row here is what makes "no row" mean "no such quest".
+
+        Insert-only on purpose: a GM who edits the reward, retires a
+        commission, or approves a forged one keeps that decision across every
+        restart. Content is the starting pool, not the running one."""
+        inserted = 0
+        now = time.time()
+        async with self._connect() as db:
+            await db.execute("BEGIN IMMEDIATE")
+            for entry in commissions:
+                key = str(entry.get("quest_key") or "").strip()
+                if not key:
+                    continue
+                cur = await db.execute("SELECT 1 FROM quest_definitions WHERE quest_key=?", (key,))
+                if await cur.fetchone():
+                    continue
+                await db.execute(
+                    """INSERT INTO quest_definitions(quest_key,title,description,source_type,source_key,objectives_json,
+                           rewards_json,status,origin,created_by,created_at,updated_at,
+                           giver_npc,realm_band,tier,deadline_game_minutes,variants_json,
+                           requires_sect,reward_visibility,boast)
+                       VALUES(?,?,?,?,?,?,?,'approved','content',0,?,?,?,?,?,?,?,?,?,?)""",
+                    (
+                        key, str(entry.get("title", "")), str(entry.get("description", "")),
+                        str(entry.get("source_type", "commission")), str(entry.get("source_key", "")),
+                        json.dumps(list(entry.get("objectives", []))), json.dumps(dict(entry.get("rewards", {}))),
+                        now, now, str(entry.get("giver_npc", "")), str(entry.get("realm_band", "")),
+                        int(entry.get("tier", 1) or 1), int(entry.get("deadline_game_minutes", 0) or 0),
+                        json.dumps(list(entry.get("variants", []))),
+                        str(entry.get("requires_sect", "") or ""),
+                        str(entry.get("reward_visibility", "shown") or "shown"),
+                        str(entry.get("boast", "") or ""),
+                    ),
+                )
+                inserted += 1
+            await db.commit()
+        return inserted
+
+    async def list_commission_definitions(self, giver_npc: str, *, status: str = "approved",
+                                          user_id: int | None = None, limit: int = 60) -> list[dict[str, Any]]:
+        """Commissions this giver offers, visible to this viewer.
+
+        Pooled rows (`owner_user_id IS NULL`) are public content; an invented
+        one belongs to a single player and is never listed for anyone else.
+        The ordering is deterministic so the same player asking twice in a
+        row is offered the same commission until it resolves."""
+        async with self._connect() as db:
+            db.row_factory = aiosqlite.Row
+            cur = await db.execute(
+                """SELECT * FROM quest_definitions
+                   WHERE giver_npc=? AND status=? AND (owner_user_id IS NULL OR owner_user_id=?)
+                   ORDER BY tier, created_at, quest_key LIMIT ?""",
+                (str(giver_npc), str(status), -1 if user_id is None else int(user_id), max(1, min(200, int(limit)))),
+            )
+            return [self._quest_definition_row(dict(r)) for r in await cur.fetchall()]
 
     async def set_quest_definition_status(self, quest_key: str, status: str, *, reviewed_by: int = 0) -> bool:
         if status not in ("draft", "approved", "retired", "discarded"):
@@ -3694,6 +3848,38 @@ class Database:
                 (int(guild_id), int(channel_id) if channel_id else None, now),
             )
             await db.commit()
+
+    async def clear_discord_bindings(self, guild_id: int) -> dict[str, int]:
+        """Forget every Discord channel and message id the bot holds for a guild.
+
+        The Discord half of the dashboard's Teardown (v0.21.2): after the
+        managed channels are deleted, the ids that pointed at them are cleared
+        so the status readout says "missing" rather than "stale" and nothing
+        tries to post into a channel that no longer exists. GM-authored channel
+        message *text* is kept (only the posted message id is forgotten), so a
+        later Full Setup reposts the GM's words, not the defaults. Thread rows
+        are left alone on purpose - every thread owner recovers from a missing
+        thread by creating a new one on next use, exactly as after Reset World.
+        """
+        async with self._connect() as db:
+            cur = await db.execute(
+                """UPDATE server_config SET
+                       announcement_channel_id=NULL, event_scene_channel_id=NULL, home_scene_channel_id=NULL,
+                       log_channel_id=NULL, begin_channel_id=NULL, info_channel_id=NULL, exploration_channel_id=NULL,
+                       info_message_id=NULL, bugs_channel_id=NULL, updated_at=?
+                   WHERE guild_id=?""",
+                (time.time(), int(guild_id)),
+            )
+            config_rows = int(cur.rowcount or 0)
+            cur = await db.execute("DELETE FROM realm_hub_channels WHERE guild_id=?", (int(guild_id),))
+            hub_rows = int(cur.rowcount or 0)
+            cur = await db.execute(
+                "UPDATE channel_messages SET message_id=NULL, updated_at=? WHERE guild_id=? AND message_id IS NOT NULL",
+                (time.time(), int(guild_id)),
+            )
+            message_rows = int(cur.rowcount or 0)
+            await db.commit()
+        return {"server_config": config_rows, "realm_hubs": hub_rows, "channel_messages": message_rows}
 
     async def get_expedition_thread(self, guild_id: int, user_id: int) -> dict[str, Any] | None:
         async with self._connect() as db:

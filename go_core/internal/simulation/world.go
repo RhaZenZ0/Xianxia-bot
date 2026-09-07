@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"xianxia/core/internal/game"
 	"xianxia/core/internal/gamerng"
 	lifespanmodel "xianxia/core/internal/lifespan"
 	"xianxia/core/internal/storage"
@@ -53,6 +54,12 @@ type NPC struct {
 type Sect struct {
 	Alignment string `json:"alignment"`
 	Specialty string `json:"specialty"`
+	// A hidden lineage (the Heaven-Devouring Demon Sect) has no public
+	// politics, relations or NPC faction: it recruits through karma, not
+	// through the world's sect life. Since v0.21.3 the catalog on disk
+	// carries it (materialised from the advanced catalog), so bootstrap
+	// must skip it explicitly rather than by never having seen it.
+	Hidden bool `json:"hidden"`
 }
 
 type Item struct {
@@ -125,6 +132,10 @@ type Run struct {
 	Events       []SpawnedWorldEvent `json:"events,omitempty"`
 }
 type RunDueRequest struct {
+	// GameMinute is accepted for wire compatibility and deliberately ignored:
+	// RunDue derives the canonical world minute inside Go (see #6 in the
+	// v0.22.2 review). A scheduled tick must not be able to tell the world
+	// what time it is.
 	GameMinute int64           `json:"game_minute"`
 	Automation map[string]bool `json:"automation"`
 }
@@ -194,19 +205,31 @@ func maps(res storage.Result) []map[string]any {
 }
 func i64(v any) int64 { return storage.ParseInt(v) }
 
+// RunDue advances every simulation system that has fallen behind the canonical
+// clock.
+//
+// The whole of "how far behind is this system, and what does that make due" is
+// decided *inside* the system's own write transaction. It used to be decided
+// before the transaction was opened, from a snapshot read at the top of the
+// call, which is a textbook stale-decision race: two concurrent callers both
+// read anchor=0, both computed due=1, and SQLite dutifully serialised two
+// writes that each believed they were the only one. Under a 32-goroutine
+// stress test the same interval applied seven to fourteen times. Serialising
+// the writes cannot fix a decision made before the lock, so the read moved
+// under it.
+//
+// The UPDATE is additionally guarded on the anchor value the decision was made
+// from, so if this invariant is ever broken again the write fails loudly
+// instead of quietly double-applying.
 func (r *Runner) RunDue(req RunDueRequest) ([]Run, error) {
 	conn, err := storage.Open(r.DatabasePath)
 	if err != nil {
 		return nil, err
 	}
 	defer conn.Close()
-	res, err := conn.Execute(`SELECT system,last_game_minute,interval_game_minutes FROM world_simulation_state`, nil)
+	gameMinute, err := game.CanonicalWorldGameMinute(conn)
 	if err != nil {
 		return nil, err
-	}
-	states := map[string]map[string]any{}
-	for _, row := range maps(res) {
-		states[fmt.Sprint(row["system"])] = row
 	}
 	runs := []Run{}
 	for _, system := range orderedSystems {
@@ -217,43 +240,88 @@ func (r *Runner) RunDue(req RunDueRequest) ([]Run, error) {
 		} else if enabled, ok := req.Automation[system]; ok && !enabled {
 			continue
 		}
-		state := states[system]
-		if state == nil {
-			continue
-		}
-		interval := i64(state["interval_game_minutes"])
-		if interval < 1 {
-			interval = SystemIntervals[system]
-		}
-		last := i64(state["last_game_minute"])
-		delta := req.GameMinute - last
-		if delta < 0 {
-			delta = 0
-		}
-		due := delta / interval
-		if due <= 0 {
-			continue
-		}
-		applied := due
-		if applied > 120 {
-			applied = 120
-		}
-		processed := last + applied*interval
-		summary, events, err := r.runSystem(conn, system, applied, processed)
+		run, ran, err := r.runDueSystem(conn, system, gameMinute)
 		if err != nil {
 			return runs, fmt.Errorf("%s: %w", system, err)
 		}
-		if due > applied {
-			summary += fmt.Sprintf("; %d interval(s) remain queued for catch-up", due-applied)
+		if ran {
+			runs = append(runs, run)
 		}
-		runs = append(runs, Run{System: system, DueSteps: due, AppliedSteps: applied, Summary: summary, Events: events})
 	}
-	if maintenance, changed, err := r.advancedMaintenance(conn, req.GameMinute, req.Automation); err != nil {
+	if maintenance, changed, err := r.advancedMaintenance(conn, gameMinute, req.Automation); err != nil {
 		return runs, fmt.Errorf("advanced_world: %w", err)
 	} else if changed {
 		runs = append(runs, maintenance)
 	}
 	return runs, nil
+}
+
+// runDueSystem is one system's entire decide-and-apply cycle under one write
+// lock. It returns ran=false when the system is not due, having written
+// nothing.
+func (r *Runner) runDueSystem(conn *storage.Conn, system string, gameMinute int64) (Run, bool, error) {
+	if err := conn.ExecScript("BEGIN IMMEDIATE;"); err != nil {
+		return Run{}, false, err
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			_ = conn.Rollback()
+		}
+	}()
+	// Read under the write lock. Everything below is decided from this row.
+	res, err := conn.Execute(`SELECT last_game_minute,interval_game_minutes FROM world_simulation_state WHERE system=?`, []any{system})
+	if err != nil {
+		return Run{}, false, err
+	}
+	state := firstMap(res)
+	if state == nil {
+		return Run{}, false, conn.Rollback()
+	}
+	interval := i64(state["interval_game_minutes"])
+	if interval < 1 {
+		interval = SystemIntervals[system]
+	}
+	if interval < 1 {
+		return Run{}, false, conn.Rollback()
+	}
+	last := i64(state["last_game_minute"])
+	delta := gameMinute - last
+	if delta < 0 {
+		delta = 0
+	}
+	due := delta / interval
+	if due <= 0 {
+		return Run{}, false, conn.Rollback()
+	}
+	applied := due
+	if applied > 120 {
+		applied = 120
+	}
+	processed := last + applied*interval
+	summary, events, err := r.applySystem(conn, system, applied, processed)
+	if err != nil {
+		return Run{}, false, err
+	}
+	// Guarded on the anchor we decided from: if anything moved it since the
+	// read, this affects no rows and the run is refused rather than doubled.
+	update, err := conn.Execute(
+		`UPDATE world_simulation_state SET last_game_minute=?,last_run_real=?,runs=runs+? WHERE system=? AND last_game_minute=?`,
+		[]any{processed, nowFloat(), applied, system, last})
+	if err != nil {
+		return Run{}, false, err
+	}
+	if update.RowsAffected != 1 {
+		return Run{}, false, fmt.Errorf("simulation anchor for %s moved during the run (expected last_game_minute=%d)", system, last)
+	}
+	if err := conn.Commit(); err != nil {
+		return Run{}, false, err
+	}
+	committed = true
+	if due > applied {
+		summary += fmt.Sprintf("; %d interval(s) remain queued for catch-up", due-applied)
+	}
+	return Run{System: system, DueSteps: due, AppliedSteps: applied, Summary: summary, Events: events}, true, nil
 }
 
 func (r *Runner) Force(req ForceRequest) (Run, error) {
@@ -278,6 +346,10 @@ func (r *Runner) Force(req ForceRequest) (Run, error) {
 	return Run{System: req.System, DueSteps: req.Steps, AppliedSteps: req.Steps, Summary: summary, Events: events}, nil
 }
 
+// runSystem is the GM Force path: apply N steps and stamp the anchor at a
+// caller-chosen minute, in its own transaction. RunDue does not use it - a
+// scheduled tick has to decide how many steps are due under the same lock that
+// applies them, which runDueSystem does.
 func (r *Runner) runSystem(conn *storage.Conn, system string, steps, gameMinute int64) (string, []SpawnedWorldEvent, error) {
 	if err := conn.ExecScript("BEGIN IMMEDIATE;"); err != nil {
 		return "", nil, err
@@ -288,6 +360,23 @@ func (r *Runner) runSystem(conn *storage.Conn, system string, steps, gameMinute 
 			_ = conn.Rollback()
 		}
 	}()
+	summary, events, err := r.applySystem(conn, system, steps, gameMinute)
+	if err != nil {
+		return "", nil, err
+	}
+	_, err = conn.Execute(`UPDATE world_simulation_state SET last_game_minute=?,last_run_real=?,runs=runs+? WHERE system=?`, []any{gameMinute, nowFloat(), steps, system})
+	if err != nil {
+		return "", nil, err
+	}
+	if err = conn.Commit(); err != nil {
+		return "", nil, err
+	}
+	ok = true
+	return summary, events, nil
+}
+
+// applySystem runs one system's mutations. The caller owns the transaction.
+func (r *Runner) applySystem(conn *storage.Conn, system string, steps, gameMinute int64) (string, []SpawnedWorldEvent, error) {
 	var summary string
 	var events []SpawnedWorldEvent
 	var err error
@@ -312,14 +401,6 @@ func (r *Runner) runSystem(conn *storage.Conn, system string, steps, gameMinute 
 	if err != nil {
 		return "", nil, err
 	}
-	_, err = conn.Execute(`UPDATE world_simulation_state SET last_game_minute=?,last_run_real=?,runs=runs+? WHERE system=?`, []any{gameMinute, nowFloat(), steps, system})
-	if err != nil {
-		return "", nil, err
-	}
-	if err = conn.Commit(); err != nil {
-		return "", nil, err
-	}
-	ok = true
 	return summary, events, nil
 }
 

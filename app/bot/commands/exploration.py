@@ -14,14 +14,14 @@ from typing import Any
 import discord
 from discord import app_commands
 
-from ...rules.alchemy import toxicity_band
+from ...rules.alchemy import alchemy_purge_refusal, toxicity_band
 from ...rules.birthfamily import family_profession_bonus
 from ...ops.game_engine import GameEngineError
 from ...rules.progression_systems import profession_rank, profession_xp_needed
 from ...rules.realm_hubs import REALM_HUBS, realm_hub, realm_hub_by_location
 from ...rules.sect_manor import manor_craft_bonus
 from ..channels import send_long_to_thread
-from ..character_state import announce_quest_progress, sync_pill_toxicity_effect
+from ..character_state import announce_quest_progress
 from ..discovery import (
     LOCATION_DISCOVERY_IMAGES,
     send_location_discovery_image,
@@ -32,6 +32,7 @@ from ..locations import location_autocomplete
 from ..registry import registered_group_command, registered_root_command
 from ..runtime import (
     DB,
+    _sync_realm_presence_roles,
     ENGINE,
     SETTINGS,
     WORLD,
@@ -355,11 +356,15 @@ async def explore(interaction: discord.Interaction) -> None:
         )
         discovered_sects = _sect_recruitment_at_location(discovered_location)
         if discovered_sects:
-            for sect_name in discovered_sects:
-                await DB.discover_sect(
-                    interaction.user.id, sect_name, game_minute=wt_discovery.total_minutes,
-                    discovery_kind="exploration", source_key=discovered_location,
-                )
+            try:
+                await ENGINE.action("sect.discover", interaction.user.id, {
+                    "sects": discovered_sects,
+                    "discovery_kind": "exploration",
+                    "source_key": discovered_location,
+                    "game_minute": wt_discovery.total_minutes,
+                })
+            except GameEngineError:
+                log.exception("Sect discovery could not be recorded for %s", discovered_location)
             discovery_text += f"\n🏯 **Sect route discovered:** {', '.join(discovered_sects)}. Open **Sect → Recruitment** to learn about the gate."
             try:
                 await announce_quest_progress(interaction, await QUESTS.progress(interaction.user.id, "sect_discovery", amount=1, game_minute=wt_discovery.total_minutes))
@@ -609,7 +614,7 @@ async def alchemy_status(interaction: discord.Interaction) -> None:
     if not c:
         return
     wt = await current_world_time()
-    state = await sync_pill_toxicity_effect(interaction.user.id, game_minute=wt.total_minutes)
+    state = await DB.get_alchemy_state(interaction.user.id, game_minute=wt.total_minutes)
     profession = await DB.get_profession_progress(interaction.user.id, "Alchemy") or {}
     batches = await DB.get_alchemy_batches(interaction.user.id, limit=5)
     band, band_text = toxicity_band(int(state.get("pill_toxicity", 0)))
@@ -709,29 +714,34 @@ async def alchemy_purge(interaction: discord.Interaction) -> None:
     c = await require_character(interaction)
     if not c:
         return
+    # Ack first, unconditionally: the purge is an authoritative mutation, and
+    # an interaction token that expires before the first reply would have the
+    # player click again on a cycle that already ran.
+    await interaction.response.defer(ephemeral=False)
+    # The whole cycle - cooldown, Qi, toxicity, the shared effect row - is one
+    # engine transaction as of v0.23.0. The cooldown is still read here so the
+    # refusal can name the wait in words; every other check the command used to
+    # make read state the engine re-reads anyway, and passing them was never a
+    # guarantee that all four writes would land.
     remaining = await DB.cooldown_remaining(interaction.user.id, "alchemy_purge")
     if remaining:
-        await interaction.response.send_message(
+        await interaction.followup.send(
             f"Your meridians need time before another purge cycle: **{human_duration(remaining)}**.", ephemeral=False,
         )
         return
-    wt = await current_world_time()
-    state = await DB.get_alchemy_state(interaction.user.id, game_minute=wt.total_minutes)
-    current = int(state.get("pill_toxicity", 0))
-    if current <= 0:
-        await interaction.response.send_message("Your meridians contain no pill toxicity to purge.", ephemeral=False)
+    try:
+        envelope = await ENGINE.authoritative_action(
+            "alchemy.purge", interaction.user.id, {},
+            action_id=f"discord:{interaction.id}:alchemy.purge",
+        )
+    except GameEngineError as exc:
+        await interaction.followup.send(alchemy_purge_refusal(str(exc)), ephemeral=False)
         return
-    qi_cost = min(12, max(4, current // 8))
-    if not await DB.spend_resources(interaction.user.id, qi=qi_cost):
-        await interaction.response.send_message(f"You need **{qi_cost} Qi** for a controlled medicinal purge.", ephemeral=False)
-        return
-    purge = min(current, 8 + int(c['attributes'].get('will', 0)) // 2 + int(c['attributes'].get('spirit', 0)) // 3)
-    state = await DB.reduce_pill_toxicity(interaction.user.id, purge, game_minute=wt.total_minutes)
-    await sync_pill_toxicity_effect(interaction.user.id, game_minute=wt.total_minutes, state=state)
-    await DB.set_cooldown(interaction.user.id, "alchemy_purge", 60 * 60)
-    await interaction.response.send_message(
-        f"🫧 You circulate **{qi_cost} Qi** through the meridians and purge **{purge}** toxicity. "
-        f"Pill toxicity is now **{int(state.get('pill_toxicity',0))}/100**.", ephemeral=False,
+    result = dict(envelope.get("result") or {})
+    await interaction.followup.send(
+        f"🫧 You circulate **{int(result.get('qi_cost', 0))} Qi** through the meridians and purge "
+        f"**{int(result.get('purged', 0))}** toxicity. "
+        f"Pill toxicity is now **{int(result.get('pill_toxicity', 0))}/100**.", ephemeral=False,
     )
 
 
@@ -785,6 +795,9 @@ async def realmhub_go(interaction:discord.Interaction,world:str)->None:
     except GameEngineError as exc:
         await interaction.response.send_message(f"Realm-capital travel failed: {exc}",ephemeral=False);return
     result=dict(envelope.get("result") or {})
+    # Hub travel is instant: put the capital's presence role on now so the
+    # channel appears before the reply does (v0.21.6).
+    await _sync_realm_presence_roles(interaction.guild, interaction.user, {"location": str(hub["location"])})
     channel_line=""
     if interaction.guild:
         rows=await DB.get_realm_hub_channels(interaction.guild.id); row=next((r for r in rows if str(r['world_name'])==world),None)

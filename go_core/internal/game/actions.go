@@ -75,6 +75,10 @@ func ApplyWithWorld(databasePath, worldPath string, req ActionRequest) (ActionRe
 		result, err = adminAutomationSet(conn, req.ActorID, req.Payload)
 	case "admin.simulation.interval":
 		result, err = adminSimulationInterval(conn, req.ActorID, req.Payload)
+	case "admin.commission.review":
+		result, err = adminCommissionReview(conn, req.ActorID, req.Payload)
+	case "admin.commission.retire":
+		result, err = adminCommissionRetire(conn, req.ActorID, req.Payload)
 	case "admin.audit":
 		result, err = adminAuditOnly(conn, req.ActorID, req.Payload)
 	case "admin.player.set_realm":
@@ -97,6 +101,18 @@ func ApplyWithWorld(databasePath, worldPath string, req ActionRequest) (ActionRe
 		result, err = adminBulkResetCooldowns(conn, req.ActorID, req.Payload)
 	case "admin.player.set_sect":
 		result, err = adminSetSect(conn, req.ActorID, req.Payload)
+	case "sect.discover":
+		result, err = sectDiscoverAction(conn, req.ActorID, req.Payload)
+	case "admin.player.set_master":
+		result, err = adminSetMaster(conn, req.ActorID, req.Payload)
+	case "admin.player.set_sect_rank":
+		result, err = adminSetSectRank(conn, req.ActorID, req.Payload)
+	case "admin.player.master_attention":
+		result, err = adminMasterAttention(conn, req.ActorID, req.Payload)
+	case "admin.player.grant_storage":
+		result, err = adminGrantStorage(conn, req.ActorID, req.Payload)
+	case "admin.world.spawn_realm":
+		result, err = adminSpawnRealm(conn, req.ActorID, req.Payload)
 	case "admin.player.set_realm_perfection":
 		result, err = adminSetRealmPerfection(conn, req.ActorID, req.Payload)
 	case "admin.player.set_spiritual_root":
@@ -267,6 +283,92 @@ type questPayload struct {
 	ObjectiveType string           `json:"objective_type"`
 	Amount        *int64           `json:"amount"`
 	Target        *string          `json:"target"`
+	// Rewards the caller's catalog declares for this quest. Sent with every
+	// progress report so that the transaction which completes a quest is also
+	// the one that pays it (v0.22.2). They are still validated - by
+	// app/rules/quests.py before a definition is ever stored, and by the
+	// reward caps here - and they are only ever read on the tick that
+	// completes, so a report that does not complete anything can spend
+	// nothing.
+	Rewards map[string]any `json:"rewards"`
+}
+
+// Ceilings on what one quest completion may pay, as a backstop independent of
+// whatever the caller sent. The GM budget in app/ops/config.py is lower
+// (50 xp / 200 stones / 3 items); these exist so that a bug or a compromised
+// caller cannot mint an economy through the quest path.
+const (
+	questRewardMaxInsight = 500
+	questRewardMaxStones  = 2000
+	questRewardMaxItems   = 20
+)
+
+// grantQuestRewardTx pays a completed non-commission quest inside the caller's
+// transaction.
+//
+// Before v0.22.2 this was a second engine call made by Python after
+// quest.progress had already committed the completion. If anything went wrong
+// in between - a dropped connection, an engine restart, a killed worker - the
+// quest was completed and never paid, and no retry could fix it: the next
+// progress report skips a quest that is no longer active. Completion and
+// payment are now one commit.
+func grantQuestRewardTx(conn *storage.Conn, userID int64, questKey string, rewards map[string]any) (map[string]any, error) {
+	stones := clamp(i64(rewards["spirit_stones"]), 0, questRewardMaxStones)
+	insight := clamp(i64(rewards["insight_xp"]), 0, questRewardMaxInsight)
+	items := map[string]int64{}
+	total := int64(0)
+	if raw, ok := rewards["items"].(map[string]any); ok {
+		for id, qty := range raw {
+			n := i64(qty)
+			if n <= 0 {
+				continue
+			}
+			if total+n > questRewardMaxItems {
+				n = questRewardMaxItems - total
+			}
+			if n <= 0 {
+				break
+			}
+			items[id] = n
+			total += n
+		}
+	}
+	if stones == 0 && insight == 0 && len(items) == 0 {
+		return map[string]any{}, nil
+	}
+	now := float64(time.Now().UnixNano()) / 1e9
+	if stones != 0 || insight != 0 {
+		if _, err := conn.Execute(`UPDATE characters SET spirit_stones=spirit_stones+?,insight_xp=insight_xp+?,updated_at=? WHERE user_id=?`,
+			[]any{stones, insight, now, userID}); err != nil {
+			return nil, err
+		}
+	}
+	if stones != 0 {
+		if _, err := walletDeltaTx(conn, userID, "low_spirit_stone", stones, now); err != nil {
+			return nil, err
+		}
+	}
+	if len(items) > 0 {
+		if err := addInventoryTx(conn, userID, items); err != nil {
+			return nil, err
+		}
+	}
+	granted := map[string]any{}
+	if stones != 0 {
+		granted["spirit_stones"] = stones
+	}
+	if insight != 0 {
+		granted["insight_xp"] = insight
+	}
+	if len(items) > 0 {
+		granted["items"] = items
+	}
+	payload, _ := json.Marshal(granted)
+	if _, err := conn.Execute(`INSERT INTO event_log(user_id,event_type,payload_json,created_at) VALUES(?,?,?,?)`,
+		[]any{userID, "quest_reward:" + questKey, string(payload), now}); err != nil {
+		return nil, err
+	}
+	return granted, nil
 }
 
 func questProgress(conn *storage.Conn, userID int64, raw json.RawMessage) (any, error) {
@@ -292,7 +394,7 @@ func questProgress(conn *storage.Conn, userID int64, raw json.RawMessage) (any, 
 			rollback(conn)
 		}
 	}()
-	res, err := conn.Execute(`SELECT progress_json FROM character_quests WHERE user_id=? AND quest_key=? AND status='active'`, []any{userID, p.QuestKey})
+	res, err := conn.Execute(`SELECT progress_json,commission FROM character_quests WHERE user_id=? AND quest_key=? AND status='active'`, []any{userID, p.QuestKey})
 	if err != nil {
 		return nil, err
 	}
@@ -336,6 +438,24 @@ func questProgress(conn *storage.Conn, userID int64, raw json.RawMessage) (any, 
 	_, err = conn.Execute(`UPDATE character_quests SET progress_json=?,status=?,completed_game_minute=?,updated_at=? WHERE user_id=? AND quest_key=?`, []any{string(nextJSON), status, completed, now, userID, p.QuestKey})
 	if err != nil {
 		return nil, err
+	}
+	// A commission that just finished its objectives resolves here rather
+	// than simply flipping status: paying the locked terms and moving
+	// standing with the giver belongs in one place (commission_actions.go),
+	// so completion by progress and completion by any other route cannot
+	// drift apart. Python does not grant the reward for these.
+	if complete && i64(row["commission"]) == 1 {
+		resolved, resolveErr := resolveCommissionTx(conn, userID, p.QuestKey, "completed", gameMinute, true)
+		if resolveErr != nil {
+			return nil, resolveErr
+		}
+		transition["commission"] = resolved
+	} else if complete {
+		granted, grantErr := grantQuestRewardTx(conn, userID, p.QuestKey, p.Rewards)
+		if grantErr != nil {
+			return nil, grantErr
+		}
+		transition["rewards_granted"] = granted
 	}
 	if err := conn.Commit(); err != nil {
 		return nil, err
@@ -495,6 +615,20 @@ func requiredInt(p map[string]any, key string) (int64, error) {
 	return storage.ParseInt(v), nil
 }
 
+// stringField reads an optional string out of a decoded payload.
+//
+// fmt.Sprint on a missing key yields the four characters "<nil>", which is not
+// empty - so `stringField(p, "realm_id") == ""` never fires
+// for an absent field, and a required-field check written that way passes on
+// exactly the payload it was meant to reject.
+func stringField(p map[string]any, key string) string {
+	v, ok := p[key]
+	if !ok || v == nil {
+		return ""
+	}
+	return strings.TrimSpace(fmt.Sprint(v))
+}
+
 func adminAdvanceTime(conn *storage.Conn, adminUserID int64, raw json.RawMessage) (any, error) {
 	p, err := decodeMap(raw)
 	if err != nil {
@@ -590,7 +724,7 @@ func adminGrantCurrency(conn *storage.Conn, adminUserID int64, raw json.RawMessa
 	if err != nil {
 		return nil, err
 	}
-	currency := strings.TrimSpace(fmt.Sprint(p["currency_id"]))
+	currency := stringField(p, "currency_id")
 	if uid <= 0 || amount <= 0 || amount > 2000000000 || currency == "" || len(currency) > 80 {
 		return nil, errors.New("invalid user_id, amount, or currency_id")
 	}
@@ -673,7 +807,7 @@ func adminKarma(conn *storage.Conn, adminUserID int64, raw json.RawMessage) (any
 	if _, err = conn.Execute(`UPDATE characters SET karma_score=?,updated_at=? WHERE user_id=?`, []any{after, now, uid}); err != nil {
 		return nil, err
 	}
-	payload, _ := json.Marshal(map[string]any{"delta": delta, "reason": strings.TrimSpace(fmt.Sprint(p["reason"])), "score": after})
+	payload, _ := json.Marshal(map[string]any{"delta": delta, "reason": stringField(p, "reason"), "score": after})
 	if _, err = conn.Execute(`INSERT INTO event_log(user_id,event_type,payload_json,created_at) VALUES(?,?,?,?)`, []any{uid, "karma_change", string(payload), now}); err != nil {
 		return nil, err
 	}
@@ -738,7 +872,7 @@ func adminFate(conn *storage.Conn, adminUserID int64, raw json.RawMessage) (any,
 		before = i64(beforeRow["points"])
 	}
 	now := float64(time.Now().UnixNano()) / 1e9
-	reason := strings.TrimSpace(fmt.Sprint(p["reason"]))
+	reason := stringField(p, "reason")
 	after, err := adjustFateGo(conn, uid, delta, firstNonempty(reason, "GM dashboard fate adjustment"), gameMinute, now)
 	if err != nil {
 		return nil, err
@@ -761,7 +895,7 @@ func adminTeleport(conn *storage.Conn, adminUserID int64, raw json.RawMessage) (
 	if err != nil {
 		return nil, err
 	}
-	loc := strings.TrimSpace(fmt.Sprint(p["location"]))
+	loc := stringField(p, "location")
 	if uid <= 0 || loc == "" {
 		return nil, errors.New("user_id and location are required")
 	}
@@ -918,7 +1052,7 @@ func adminAutomationSet(conn *storage.Conn, adminUserID int64, raw json.RawMessa
 	if err != nil {
 		return nil, err
 	}
-	name := strings.TrimSpace(fmt.Sprint(p["system"]))
+	name := stringField(p, "system")
 	enabled, ok := p["enabled"].(bool)
 	if !ok {
 		return nil, errors.New("enabled must be boolean")
@@ -979,7 +1113,7 @@ func adminSimulationInterval(conn *storage.Conn, adminUserID int64, raw json.Raw
 	if err != nil {
 		return nil, err
 	}
-	name := strings.TrimSpace(fmt.Sprint(p["system"]))
+	name := stringField(p, "system")
 	days, err := requiredInt(p, "days")
 	if err != nil {
 		return nil, err
@@ -1022,8 +1156,8 @@ func adminAuditOnly(conn *storage.Conn, adminUserID int64, raw json.RawMessage) 
 	if err != nil {
 		return nil, err
 	}
-	action := strings.TrimSpace(fmt.Sprint(p["action"]))
-	target := strings.TrimSpace(fmt.Sprint(p["target"]))
+	action := stringField(p, "action")
+	target := stringField(p, "target")
 	if action == "" {
 		return nil, errors.New("action is required")
 	}
@@ -1207,7 +1341,7 @@ func adminAdjustItem(conn *storage.Conn, adminUserID int64, raw json.RawMessage)
 	if err != nil {
 		return nil, err
 	}
-	item := strings.TrimSpace(fmt.Sprint(p["item_id"]))
+	item := stringField(p, "item_id")
 	delta, err := requiredInt(p, "quantity")
 	if err != nil {
 		return nil, err
@@ -1290,7 +1424,7 @@ func adminResetCooldowns(conn *storage.Conn, adminUserID int64, raw json.RawMess
 	if uid <= 0 {
 		return nil, errors.New("invalid user_id")
 	}
-	action := strings.TrimSpace(fmt.Sprint(p["action"]))
+	action := stringField(p, "action")
 	if action == "<nil>" {
 		action = ""
 	}
@@ -1385,8 +1519,8 @@ func adminNpcRelocate(conn *storage.Conn, adminUserID int64, raw json.RawMessage
 	if err != nil {
 		return nil, err
 	}
-	name := strings.TrimSpace(fmt.Sprint(p["npc_name"]))
-	loc := strings.TrimSpace(fmt.Sprint(p["location"]))
+	name := stringField(p, "npc_name")
+	loc := stringField(p, "location")
 	if name == "" || loc == "" {
 		return nil, errors.New("npc_name and location are required")
 	}
@@ -1429,7 +1563,7 @@ func adminEndWorldEvent(conn *storage.Conn, adminUserID int64, raw json.RawMessa
 	if err != nil {
 		return nil, err
 	}
-	key := strings.TrimSpace(fmt.Sprint(p["event_key"]))
+	key := stringField(p, "event_key")
 	if key == "" {
 		return nil, errors.New("event_key is required")
 	}
@@ -1478,7 +1612,7 @@ func adminBulkGrantCurrency(conn *storage.Conn, adminUserID int64, raw json.RawM
 	if err != nil {
 		return nil, err
 	}
-	currency := strings.TrimSpace(fmt.Sprint(p["currency_id"]))
+	currency := stringField(p, "currency_id")
 	if amount <= 0 || amount > 2000000000 || currency == "" || len(currency) > 80 {
 		return nil, errors.New("invalid amount or currency_id")
 	}
@@ -1616,8 +1750,8 @@ func adminSetSect(conn *storage.Conn, adminUserID int64, raw json.RawMessage) (a
 		return map[string]any{"user_id": uid, "name": charRow["name"], "sect_name": nil}, nil
 	}
 
-	sectName := strings.TrimSpace(fmt.Sprint(p["sect_name"]))
-	rankName := strings.TrimSpace(fmt.Sprint(p["rank_name"]))
+	sectName := stringField(p, "sect_name")
+	rankName := stringField(p, "rank_name")
 	rankLevel, err := requiredInt(p, "rank_level")
 	if err != nil {
 		return nil, err
@@ -1666,7 +1800,7 @@ func adminSetRealmPerfection(conn *storage.Conn, adminUserID int64, raw json.Raw
 	if err != nil {
 		return nil, err
 	}
-	track := strings.ToLower(strings.TrimSpace(fmt.Sprint(p["track"])))
+	track := strings.ToLower(stringField(p, "track"))
 	var table string
 	switch track {
 	case "cultivation":
@@ -1735,7 +1869,7 @@ func adminSetSpiritualRoot(conn *storage.Conn, adminUserID int64, raw json.RawMe
 	if err != nil {
 		return nil, err
 	}
-	grade := strings.TrimSpace(fmt.Sprint(p["grade"]))
+	grade := stringField(p, "grade")
 	validGrades := map[string]bool{"Mortal": true, "Common": true, "Refined": true, "Earth": true, "Heaven": true, "Immortal": true}
 	if !validGrades[grade] {
 		return nil, errors.New("grade must be one of Mortal, Common, Refined, Earth, Heaven, Immortal")
@@ -1744,7 +1878,7 @@ func adminSetSpiritualRoot(conn *storage.Conn, adminUserID int64, raw json.RawMe
 	if err != nil {
 		return nil, err
 	}
-	mutation := strings.TrimSpace(fmt.Sprint(p["mutation"]))
+	mutation := stringField(p, "mutation")
 	if mutation == "<nil>" {
 		mutation = ""
 	}
@@ -1813,7 +1947,7 @@ func adminSetBloodline(conn *storage.Conn, adminUserID int64, raw json.RawMessag
 	if err != nil {
 		return nil, err
 	}
-	bloodlineID := strings.TrimSpace(fmt.Sprint(p["bloodline_id"]))
+	bloodlineID := stringField(p, "bloodline_id")
 	purity, err := requiredInt(p, "purity")
 	if err != nil {
 		return nil, err
@@ -1961,7 +2095,7 @@ func adminSetTribulation(conn *storage.Conn, adminUserID int64, raw json.RawMess
 	if _, ok := tribulationGates[gateRealmIndex]; !ok {
 		return nil, errors.New("gate_realm_index must be one of the tribulation gates (7, 15, 23)")
 	}
-	mode := strings.ToLower(strings.TrimSpace(fmt.Sprint(p["mode"])))
+	mode := strings.ToLower(stringField(p, "mode"))
 	if mode != "clear" && mode != "reset" {
 		return nil, errors.New(`mode must be "clear" or "reset"`)
 	}
@@ -2428,7 +2562,7 @@ func adminSetAbodeAccess(conn *storage.Conn, adminUserID int64, raw json.RawMess
 		}
 		return map[string]any{"owner_user_id": ownerID, "guest_user_id": guestID, "access": "revoked"}, nil
 	}
-	accessRole := strings.TrimSpace(fmt.Sprint(p["access_role"]))
+	accessRole := stringField(p, "access_role")
 	if accessRole == "" || accessRole == "<nil>" {
 		accessRole = "guest"
 	}

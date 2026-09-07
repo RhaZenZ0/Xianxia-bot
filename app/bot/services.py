@@ -23,6 +23,7 @@ from discord import app_commands
 from ..ai.ai_router import AITaskRouter
 from ..ops.core_services import (
     CombatService,
+    CommissionService,
     ExplorationService,
     LocationSceneService,
     NPCRelationshipService,
@@ -44,6 +45,11 @@ SCENES = LocationSceneService(DB, engine=ENGINE)
 NPC_RELATIONSHIPS = NPCRelationshipService(DB, engine=ENGINE)
 
 QUESTS = QuestService(DB, QUEST_DEFINITIONS, engine=ENGINE)
+
+# Commissions (v0.22.0): the giver's side of the quest pipeline. Sits beside
+# QUESTS rather than inside it because a commission is a social object - it
+# belongs to an NPC and to a standing - while a quest is a set of objectives.
+COMMISSIONS = CommissionService(DB, QUESTS, engine=ENGINE, world=WORLD)
 
 EXPLORATION = ExplorationService(SCENES)
 

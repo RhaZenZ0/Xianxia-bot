@@ -14,7 +14,7 @@ from ...ops.game_engine import GameEngineError
 from ..formatting import player_property_emoji, player_property_facility_lines
 from ..pickers import usable_item_autocomplete
 from ..registry import registered_group_command, registered_root_command
-from ..runtime import DB, ENGINE, WORLD, current_world_time, player_property_label, reply_long, require_character, serialized_user_action
+from ..runtime import _explain_engine_error, DB, ENGINE, WORLD, current_world_time, player_property_label, reply_long, require_character, serialized_user_action
 from ..services import GUILD, PLAYER_PROPERTY_FACILITY_KEYS, PLAYER_PROPERTY_FACILITY_LABELS, PLAYER_PROPERTY_TYPE_CHOICES
 from ..threads import ensure_abode_thread, open_expedition_thread_after_exit
 
@@ -39,7 +39,7 @@ async def abode_establish(interaction:discord.Interaction,name:str,property_type
         envelope=await ENGINE.authoritative_action("abode.establish",interaction.user.id,{"name":name,"property_type":property_type.value},action_id=f"discord:{interaction.id}:abode.establish")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
     await interaction.followup.send(f"🏡 **{result.get('name',name)}** established.",ephemeral=False)
 
 
@@ -88,7 +88,7 @@ async def abode_enter(interaction:discord.Interaction)->None:
         envelope=await ENGINE.authoritative_action("abode.enter",interaction.user.id,{},action_id=f"discord:{interaction.id}:abode.enter")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
     await interaction.followup.send(f"🏡 You enter **{result.get('name','your property')}**.",ephemeral=False)
 
 
@@ -102,7 +102,7 @@ async def abode_visit(interaction:discord.Interaction,owner:discord.Member)->Non
         envelope=await ENGINE.authoritative_action("abode.visit",interaction.user.id,{"owner_user_id":owner.id},action_id=f"discord:{interaction.id}:abode.visit")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
     await interaction.followup.send(f"🏡 You visit **{result.get('name','the property')}**.",ephemeral=False)
 
 
@@ -116,7 +116,7 @@ async def abode_leave(interaction:discord.Interaction)->None:
         envelope=await ENGINE.authoritative_action("abode.leave",interaction.user.id,{},action_id=f"discord:{interaction.id}:abode.leave")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
     await interaction.followup.send(f"🚪 You leave the property for **{result.get('outside','outside')}**.",ephemeral=False)
     await open_expedition_thread_after_exit(interaction)
 
@@ -130,7 +130,7 @@ async def abode_invite(interaction:discord.Interaction,member:discord.Member)->N
         envelope=await ENGINE.authoritative_action("abode.invite",interaction.user.id,{"guest_user_id":member.id},action_id=f"discord:{interaction.id}:abode.invite")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
     await interaction.followup.send(f"🔑 {member.mention} may now enter your property.",ephemeral=False)
 
 
@@ -144,7 +144,7 @@ async def abode_revoke(interaction:discord.Interaction,member:discord.Member)->N
         envelope=await ENGINE.authoritative_action("abode.revoke",interaction.user.id,{"guest_user_id":member.id},action_id=f"discord:{interaction.id}:abode.revoke")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
     await interaction.followup.send(f"🔒 Property access revoked for {member.mention}.",ephemeral=False)
 
 
@@ -175,7 +175,7 @@ async def abode_upgrade(interaction:discord.Interaction,facility:app_commands.Ch
         envelope=await ENGINE.authoritative_action("abode.upgrade",interaction.user.id,{"facility":facility.value},action_id=f"discord:{interaction.id}:abode.upgrade")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
     await interaction.followup.send(f"🏡 **{facility.value}** upgraded to level **{result.get('level','?')}**.",ephemeral=False)
 
 
@@ -190,7 +190,7 @@ async def abode_focus(interaction:discord.Interaction,facility:app_commands.Choi
         envelope=await ENGINE.authoritative_action("abode.focus",interaction.user.id,{"facility":facility.value},action_id=f"discord:{interaction.id}:abode.focus")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
     await interaction.followup.send(f"🏡 You focus within the **{facility.value}** facility.",ephemeral=False)
 
 
@@ -227,7 +227,7 @@ async def array_use(interaction:discord.Interaction,array:str)->None:
     try:
         e=await ENGINE.authoritative_action("array.use",interaction.user.id,{"array_id":array},action_id=f"discord:{interaction.id}:array.use"); r=dict(e.get('result') or {})
     except GameEngineError as exc:
-        await interaction.followup.send(f"❌ {exc}",ephemeral=False);return
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False);return
     await interaction.followup.send(f"🌀 The formation ignites and folds the route beneath you. You arrive at **{r.get('location',r.get('destination','your destination'))}**.",ephemeral=False)
 
 
@@ -241,7 +241,7 @@ async def spatial_key_command(interaction:discord.Interaction,item:str)->None:
     try:
         e=await ENGINE.authoritative_action("spatial_key.use",interaction.user.id,{"item_id":item},action_id=f"discord:{interaction.id}:spatial_key.use"); r=dict(e.get('result') or {})
     except GameEngineError as exc:
-        await interaction.followup.send(f"❌ {exc}",ephemeral=False);return
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False);return
     await interaction.followup.send(f"🗝️ The key tears open a temporary entrance to **{r.get('realm_name',r.get('realm_id','a secret realm'))}**.",ephemeral=False)
 
 
@@ -259,7 +259,7 @@ async def innerworld_create(interaction:discord.Interaction,name:str)->None:
         envelope=await ENGINE.authoritative_action("personal_world.create",interaction.user.id,{"name":name},action_id=f"discord:{interaction.id}:personal_world.create")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
     await interaction.followup.send(f"🌌 Personal world **{result.get('name',name)}** created.",ephemeral=False)
 
 
@@ -283,7 +283,7 @@ async def innerworld_setrule(interaction:discord.Interaction,rule:str,definition
         envelope=await ENGINE.authoritative_action("personal_world.set_rule",interaction.user.id,{"rule":rule,"definition":definition},action_id=f"discord:{interaction.id}:personal_world.set_rule")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
     await interaction.followup.send(f"🌌 Inner-world rule **{rule}** updated.",ephemeral=False)
 
 
@@ -297,7 +297,7 @@ async def innerworld_enter(interaction:discord.Interaction)->None:
         envelope=await ENGINE.authoritative_action("personal_world.enter",interaction.user.id,{},action_id=f"discord:{interaction.id}:personal_world.enter")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
     await interaction.followup.send("🌌 You enter your personal world.",ephemeral=False)
 
 
@@ -311,7 +311,7 @@ async def innerworld_leave(interaction:discord.Interaction)->None:
         envelope=await ENGINE.authoritative_action("personal_world.leave",interaction.user.id,{},action_id=f"discord:{interaction.id}:personal_world.leave")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
     await interaction.followup.send(f"🚪 You leave the personal world for **{result.get('outside','outside')}**.",ephemeral=False)
     await open_expedition_thread_after_exit(interaction)
 

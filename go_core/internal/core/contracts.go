@@ -260,7 +260,15 @@ func progressQuest(raw json.RawMessage) (any, *ContractError) {
 		}
 		current := clamp(updated[objective.ID], 0, required)
 		if objective.Type == payload.ObjectiveType {
-			matches := objective.Target == nil || payload.Target == nil || strings.EqualFold(*objective.Target, *payload.Target)
+			// An objective with no target accepts any event of its type. An
+			// objective that names one accepts only an event that names the
+			// same thing - an event with no target at all is not a wildcard.
+			// It used to be: `payload.Target == nil` short-circuited the
+			// comparison, so a bare "talk" event progressed "talk to Elder
+			// Pine", "talk to Steward Qiao" and every other targeted talk
+			// objective the character was carrying, all at once.
+			matches := objective.Target == nil ||
+				(payload.Target != nil && strings.EqualFold(*objective.Target, *payload.Target))
 			if matches {
 				amount := int64(1)
 				if payload.Amount != nil {

@@ -44,6 +44,7 @@ from ..channels import _get_thread
 from ..services import SIM
 from ..threads import ensure_birth_family_household_thread, open_expedition_thread_after_exit
 from ..runtime import (
+    _explain_engine_error,
     DB,
     ENGINE,
     GENDER_CHOICES,
@@ -252,7 +253,7 @@ async def birth_family_support(interaction:discord.Interaction)->None:
         envelope=await ENGINE.authoritative_action("family.support",interaction.user.id,{"cooldown_game_minutes":3*MINUTES_PER_MONTH},action_id=f"discord:{interaction.id}:family.support")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
     await interaction.followup.send(f"🏠 **{result.get('family_name','Your family')} supports you.**\nReceived: **{int(result.get('stones',0))} Low-Grade Spirit Stones**",ephemeral=False)
 
 @registered_group_command(family_group, name="history",description="View recent rises, setbacks and political changes in your family")
@@ -325,7 +326,7 @@ async def birth_family_investigate(interaction: discord.Interaction, history_id:
         )
         result = dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.followup.send(f"❌ {exc}", ephemeral=False)
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
         return
 
     state = str(result.get("investigation_state") or "unknown").replace("_", " ").title()
@@ -444,7 +445,7 @@ async def birth_family_quest(interaction: discord.Interaction, history_id: int, 
         )
         result = dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.followup.send(f"❌ {exc}", ephemeral=False)
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
         return
     lines = [
         f"🧭 **{result.get('title', 'Ancestral Investigation')}**",
@@ -498,7 +499,7 @@ async def birth_family_claim(
         )
         result = dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.followup.send(f"❌ {exc}", ephemeral=False)
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
         return
     lines = [
         f"⚖️ **{str(result.get('claim_type', 'claim')).replace('_', ' ').title()} — {result.get('dynasty_name', 'Unknown')}**",
@@ -541,7 +542,7 @@ async def birth_family_conflict(
         )
         result = dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.followup.send(f"❌ {exc}", ephemeral=False)
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
         return
     lines = [
         f"⚔️ **Dynasty Conflict vs {result.get('opponent', 'Unknown')}**",
@@ -587,7 +588,7 @@ async def birth_family_child(interaction:discord.Interaction,name:str,gender:app
     try:
         e=await ENGINE.authoritative_action("family.add_child",interaction.user.id,{"name":name,"gender":gender.value},action_id=f"discord:{interaction.id}:family.add_child"); result=dict(e.get('result') or {})
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
+        await interaction.response.send_message(f"❌ {_explain_engine_error(exc)}",ephemeral=False);return
     await interaction.response.send_message(f"👶 **{name.strip()}** is born as descendant `#{result.get('child_id')}`.",ephemeral=False)
 
 @registered_group_command(family_group, name="descendants",description="View descendants in your family branch and whether they can cultivate")

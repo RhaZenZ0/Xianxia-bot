@@ -25,7 +25,7 @@ from ...rules.creation_ui import (
 from ...ops.game_engine import GameEngineError
 from ..channels import _report_game_ui_error, post_server_log
 from ..discovery import LOCATION_DISCOVERY_IMAGES, location_discovery_embed, location_discovery_image_path
-from ..runtime import DB, ENGINE, GENDER_CHOICES, WORLD, current_world_time, log
+from ..runtime import DB, ENGINE, GENDER_CHOICES, WORLD, current_world_time, log, respond
 from ..threads import ensure_birth_family_household_thread, ensure_expedition_thread
 
 class CharacterModal(discord.ui.Modal):
@@ -64,9 +64,12 @@ class CharacterModal(discord.ui.Modal):
             self.add_item(field)
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
+        # Ack before character.create: a modal submit carries the same
+        # three-second token, and creating a character is not fast.
+        await interaction.response.defer(ephemeral=False)
         normalized_path = WORLD.normalize_path(self.selected_style)
         if not normalized_path:
-            await interaction.response.send_message(
+            await respond(interaction, 
                 "That cultivation path is no longer available. Use **/begin** again.", ephemeral=True
             )
             return
@@ -92,7 +95,7 @@ class CharacterModal(discord.ui.Modal):
         creation = dict(creation_envelope.get("result") or {})
         created = bool(creation.get("created"))
         if not created:
-            await interaction.response.send_message(
+            await respond(interaction, 
                 "You already have a character. Use **/character → Overview** to view it.",
                 ephemeral=True,
             )
@@ -167,7 +170,7 @@ class CharacterModal(discord.ui.Modal):
             inline=False,
         )
         embed.set_footer(text="The authoritative game engine owns mechanics; AI only narrates validated canonical results.")
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await respond(interaction, embed=embed, ephemeral=True)
         # First-sight art applies to every character, regardless of birthplace.
         # A character who starts in an illustrated location discovers it here;
         # everyone else receives the same art only when canonical exploration or

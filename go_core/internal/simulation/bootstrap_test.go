@@ -3,9 +3,11 @@ package simulation
 import (
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"xianxia/core/internal/storage"
+	"xianxia/core/internal/worlddata"
 )
 
 func bootstrapWorldPath(t *testing.T) string {
@@ -79,5 +81,92 @@ VALUES(1,'Han Clan','Han',2,'Han Patriarch',3,2,12,'active');
 	}
 	if got := simScalar(t, path, "SELECT COUNT(*) FROM martial_clan_relations WHERE family_id=1"); storage.ParseInt(got) != 1 {
 		t.Fatalf("relations=%v", got)
+	}
+}
+
+// v0.21.3: the catalog on disk now carries the hidden Heaven-Devouring Demon
+// Sect (materialised from the advanced catalog). A hidden lineage has no
+// public politics row, no relations, and never becomes an NPC's faction; and
+// the 142 generated manuals are inheritances, never town-market stock.
+func TestBootstrapSkipsHiddenSectsAndKeepsManualsOffTheMarket(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "bootstrap-hidden.sqlite3")
+	conn, err := storage.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := conn.ExecScript(`
+CREATE TABLE world_simulation_state(system TEXT PRIMARY KEY,last_game_minute INTEGER,interval_game_minutes INTEGER,last_run_real REAL,runs INTEGER);
+CREATE TABLE civilization_regions(location TEXT PRIMARY KEY,world_name TEXT,population INTEGER,prosperity INTEGER,security INTEGER,spirit_resources INTEGER,food_supply INTEGER,migration_pressure INTEGER,unrest INTEGER,last_game_minute INTEGER,updated_at REAL);
+CREATE TABLE npc_civilization_state(npc_name TEXT PRIMARY KEY,home_location TEXT,current_location TEXT,world_name TEXT,profession TEXT,faction TEXT,wealth INTEGER,influence INTEGER,ambition INTEGER,realm_index INTEGER,phase INTEGER,status TEXT,activity TEXT,last_game_minute INTEGER,updated_at REAL);
+CREATE TABLE npc_mind_state(npc_name TEXT PRIMARY KEY,current_goal TEXT,mood TEXT,focus_target TEXT,recent_event TEXT,goal_progress INTEGER,last_game_minute INTEGER,updated_at REAL);
+CREATE TABLE npc_life_state(npc_name TEXT PRIMARY KEY,birth_game_minute INTEGER,age_at_creation_years INTEGER,natural_lifespan_years INTEGER,health INTEGER,injury TEXT,injury_severity INTEGER,sect_rank TEXT,career_progress INTEGER,relationship_status TEXT,spouse_name TEXT,children_count INTEGER,last_social_game_minute INTEGER,last_cultivation_game_minute INTEGER,updated_at REAL);
+CREATE TABLE sect_politics_state(sect_name TEXT PRIMARY KEY,alignment TEXT,specialty TEXT,influence INTEGER,cohesion INTEGER,resources INTEGER,recruitment_pressure INTEGER,doctrine_pressure INTEGER,leader_policy TEXT,last_game_minute INTEGER,updated_at REAL);
+CREATE TABLE sect_factions(sect_name TEXT,faction_name TEXT,agenda TEXT,power INTEGER,loyalty INTEGER,updated_at REAL,PRIMARY KEY(sect_name,faction_name));
+CREATE TABLE sect_relations(sect_a TEXT,sect_b TEXT,relation_score INTEGER,relation_type TEXT,treaty_status TEXT,updated_at REAL,PRIMARY KEY(sect_a,sect_b));
+CREATE TABLE economy_markets(location TEXT,item_id TEXT,world_name TEXT,currency_id TEXT,base_price INTEGER,supply INTEGER,demand INTEGER,price_index REAL,last_game_minute INTEGER,updated_at REAL,PRIMARY KEY(location,item_id));
+CREATE TABLE birth_families(family_id INTEGER PRIMARY KEY,family_name TEXT,surname TEXT,tier INTEGER,head_name TEXT,head_realm_index INTEGER,branch_count INTEGER,retainer_count INTEGER,line_status TEXT);
+CREATE TABLE martial_clan_branches(branch_id INTEGER PRIMARY KEY AUTOINCREMENT,family_id INTEGER,branch_name TEXT,branch_type TEXT,leader_name TEXT,members_estimate INTEGER,martial_strength INTEGER,wealth_share INTEGER,loyalty INTEGER,status TEXT,updated_at REAL);
+CREATE TABLE martial_clan_retainers(retainer_id INTEGER PRIMARY KEY AUTOINCREMENT,family_id INTEGER,group_name TEXT,leader_name TEXT,role TEXT,members INTEGER,realm_index INTEGER,loyalty INTEGER,upkeep INTEGER,status TEXT,updated_at REAL);
+CREATE TABLE martial_clan_relations(relation_id INTEGER PRIMARY KEY AUTOINCREMENT,family_id INTEGER,partner_family_id INTEGER,partner_name TEXT,relation_type TEXT,relation_score INTEGER,active INTEGER,started_game_minute INTEGER,updated_at REAL);
+CREATE TABLE world_history_events(
+	source_key TEXT PRIMARY KEY,event_type TEXT,title TEXT,summary TEXT,significance INTEGER,visibility TEXT,
+	location TEXT,world_name TEXT,faction TEXT,actor_type TEXT,actor_key TEXT,actor_name TEXT,target_type TEXT,
+	target_key TEXT,target_name TEXT,related_user_id INTEGER,related_npc_name TEXT,tags TEXT,game_minute INTEGER,
+	metadata_json TEXT,created_at REAL,updated_at REAL
+);
+`); err != nil {
+		_ = conn.Close()
+		t.Fatal(err)
+	}
+	_ = conn.Close()
+
+	runner, err := NewRunner(path, bootstrapWorldPath(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := runner.Catalog.Sects["Heaven-Devouring Demon Sect"]; !ok {
+		t.Fatal("the materialised catalog should carry the hidden sect")
+	}
+	if !runner.Catalog.Sects["Heaven-Devouring Demon Sect"].Hidden {
+		t.Fatal("the hidden sect must be flagged hidden")
+	}
+	manualItems := 0
+	for id, item := range runner.Catalog.Items {
+		if strings.HasSuffix(id, "_manual") && item.Type == "manual" {
+			manualItems++
+			if !item.MarketExcluded {
+				t.Fatalf("manual item %s is not market_excluded", id)
+			}
+		}
+	}
+	// Derived, not a literal: v0.21.4 added six authored sect entry manuals
+	// and this assertion still said 148, so the count is now taken from the
+	// catalog itself. Every manual the world declares must reach Go as a
+	// market-excluded item; that is the property worth pinning, and it holds
+	// however many manuals a later content batch adds.
+	full, err := worlddata.Load(bootstrapWorldPath(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if manualItems != len(full.TechniqueSystem.Manuals) {
+		t.Fatalf("Go sees %d manual items for %d catalog manuals", manualItems, len(full.TechniqueSystem.Manuals))
+	}
+	if manualItems == 0 {
+		t.Fatal("the materialised catalog carries no manual items at all")
+	}
+	if _, err := runner.Bootstrap(BootstrapRequest{GameMinute: 100}); err != nil {
+		t.Fatal(err)
+	}
+	if got := storage.ParseInt(simScalar(t, path, `SELECT COUNT(*) FROM sect_politics_state WHERE sect_name='Heaven-Devouring Demon Sect'`)); got != 0 {
+		t.Fatalf("hidden sect has a public politics row: %d", got)
+	}
+	if got := storage.ParseInt(simScalar(t, path, `SELECT COUNT(*) FROM sect_relations WHERE sect_a='Heaven-Devouring Demon Sect' OR sect_b='Heaven-Devouring Demon Sect'`)); got != 0 {
+		t.Fatalf("hidden sect has public relations: %d", got)
+	}
+	if got := storage.ParseInt(simScalar(t, path, `SELECT COUNT(*) FROM sect_politics_state`)); got != 6 {
+		t.Fatalf("expected the six public sects, got %d", got)
+	}
+	if got := storage.ParseInt(simScalar(t, path, `SELECT COUNT(*) FROM economy_markets WHERE item_id LIKE '%_manual'`)); got != 0 {
+		t.Fatalf("manuals are stocked on town markets: %d rows", got)
 	}
 }

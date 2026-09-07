@@ -160,7 +160,122 @@ func sectRecommendationActionGo(conn *storage.Conn, _ worlddata.Catalog, userID 
 	out := map[string]any{"success": roll.Success, "roll": rollMapGo(roll), "recommendation_id": recID, "recommendation_bonus": bonus, "route_revealed": route, "sect_name": p.SectName, "npc_name": p.NPCName}
 	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "sect", EventType: "sect.recruitment.recommendation", EntityType: "character", EntityID: fmt.Sprint(userID), GameMinute: p.GameMinute, Payload: out}}, nil
 }
-func sectTrialActionGo(conn *storage.Conn, _ worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
+
+// sectEntryManual picks the one manual a sect bestows on a new Outer
+// Disciple (v0.21.3). Deterministic, from the catalog, on canon only:
+//
+//   - the sect's own entry inheritance first (v0.21.4): every public sect
+//     authors one in content/world.json, tier 0, marked with its "sect".
+//     Only when the character already has it does the general rule apply:
+//   - alignment follows the sect: an Orthodox sect gives an Orthodox manual,
+//     a Neutral sect a Neutral one (Orthodox if it has none), a Demonic sect a
+//     Demonic one. A righteous sect never hands out a forbidden art.
+//   - the character's own path first; any path of the right alignment only
+//     if their path has nothing, so a Beast Binder joining a sword sect still
+//     leaves with something.
+//   - the lowest tier the character can already study, or - when nothing of
+//     the right alignment and path is within reach yet, which is every
+//     fresh Mortal-realm disciple - the lowest tier there is, to grow into
+//     (manual.study still enforces min_realm_index at study time). The sect's
+//     entry manual, not its treasure. Ties break on the manual id so the
+//     choice never depends on map order.
+//   - never one the character has already learned or already carries.
+//
+// Returns "" when the catalog has nothing that fits; the trial still passes.
+func sectEntryManual(catalog worlddata.Catalog, sectName string, c mechanicsCharacter, owned map[string]bool) string {
+	sectAlignment := strings.ToLower(strings.TrimSpace(catalog.Sects[sectName].Alignment))
+	var allowed []string
+	switch sectAlignment {
+	case "demonic":
+		allowed = []string{"demonic"}
+	case "neutral":
+		allowed = []string{"neutral", "orthodox"}
+	default:
+		allowed = []string{"orthodox"}
+	}
+	path := strings.TrimSpace(c.Path)
+	own := ""
+	for id, m := range catalog.TechniqueSystem.Manuals {
+		if !strings.EqualFold(strings.TrimSpace(m.Sect), strings.TrimSpace(sectName)) || owned[id] || owned[m.ItemID] {
+			continue
+		}
+		if own == "" || m.MinRealmIndex < catalog.TechniqueSystem.Manuals[own].MinRealmIndex || (m.MinRealmIndex == catalog.TechniqueSystem.Manuals[own].MinRealmIndex && id < own) {
+			own = id
+		}
+	}
+	if own != "" {
+		return own
+	}
+	// Rank: within reach beats out of reach, then the lowest tier, then the id.
+	better := func(id string, m worlddata.ManualDefinition, chosen string, chosenM worlddata.ManualDefinition) bool {
+		if chosen == "" {
+			return true
+		}
+		reach, chosenReach := m.MinRealmIndex <= c.RealmIndex, chosenM.MinRealmIndex <= c.RealmIndex
+		if reach != chosenReach {
+			return reach
+		}
+		if m.MinRealmIndex != chosenM.MinRealmIndex {
+			return m.MinRealmIndex < chosenM.MinRealmIndex
+		}
+		return id < chosen
+	}
+	best := func(requirePath bool) string {
+		for _, alignment := range allowed {
+			chosen := ""
+			var chosenM worlddata.ManualDefinition
+			for id, m := range catalog.TechniqueSystem.Manuals {
+				if strings.ToLower(strings.TrimSpace(m.Alignment)) != alignment {
+					continue
+				}
+				if requirePath && !strings.EqualFold(strings.TrimSpace(m.Path), path) {
+					continue
+				}
+				if owned[id] || owned[m.ItemID] {
+					continue
+				}
+				if better(id, m, chosen, chosenM) {
+					chosen, chosenM = id, m
+				}
+			}
+			if chosen != "" {
+				return chosen // the first alignment in preference order that has one wins
+			}
+		}
+		return ""
+	}
+	if id := best(true); id != "" {
+		return id
+	}
+	return best(false)
+}
+
+// ownedManualKeys: every manual id the character has learned and every
+// manual item id they carry, so a gift is never a duplicate.
+func ownedManualKeys(conn *storage.Conn, userID int64) (map[string]bool, error) {
+	owned := map[string]bool{}
+	r, e := conn.Execute(`SELECT manual_id FROM character_manuals WHERE user_id=?`, []any{userID})
+	if e != nil {
+		return nil, e
+	}
+	for _, row := range r.Rows {
+		if len(row) > 0 {
+			owned[fmt.Sprint(row[0])] = true
+		}
+	}
+	r, e = conn.Execute(`SELECT item_id FROM inventory WHERE user_id=? AND quantity>0 AND item_id LIKE '%_manual'`, []any{userID})
+	if e != nil {
+		return nil, e
+	}
+	for _, row := range r.Rows {
+		if len(row) > 0 {
+			owned[fmt.Sprint(row[0])] = true
+		}
+	}
+	return owned, nil
+}
+
+func sectTrialActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	var p sectTrialPayload
 	if e := json.Unmarshal(raw, &p); e != nil {
 		return authoritativeMutation{}, e
@@ -240,6 +355,7 @@ func sectTrialActionGo(conn *storage.Conn, _ worlddata.Catalog, userID int64, ra
 			return authoritativeMutation{}, e
 		}
 	}
+	var granted map[string]any
 	if outcome == "pass" || outcome == "conditional_pass" {
 		_, e = conn.Execute(`INSERT INTO sect_membership(user_id,sect_name,rank_name,rank_level,joined_at) VALUES(?,?,'Outer Disciple',10,?) ON CONFLICT(user_id) DO UPDATE SET sect_name=excluded.sect_name,rank_name=excluded.rank_name,rank_level=excluded.rank_level,joined_at=excluded.joined_at`, []any{userID, p.SectName, now})
 		if e != nil {
@@ -247,6 +363,27 @@ func sectTrialActionGo(conn *storage.Conn, _ worlddata.Catalog, userID int64, ra
 		}
 		if _, e = adjustReputationTx(conn, userID, p.SectName, 5, "Passed sect entrance trial", now); e != nil {
 			return authoritativeMutation{}, e
+		}
+		// One manual on joining (v0.21.3): the sect's entry inheritance, in
+		// the same transaction as the membership, so a new Outer Disciple
+		// never exists without it and a rolled-back trial never grants one.
+		owned, e := ownedManualKeys(conn, userID)
+		if e != nil {
+			return authoritativeMutation{}, e
+		}
+		if manualID := sectEntryManual(catalog, p.SectName, c, owned); manualID != "" {
+			m := catalog.TechniqueSystem.Manuals[manualID]
+			if e = addInventoryTx(conn, userID, map[string]int64{m.ItemID: 1}); e != nil {
+				return authoritativeMutation{}, e
+			}
+			legal := "clean"
+			if manualForbidden(m) {
+				legal = "forbidden"
+			}
+			if _, e = conn.Execute(`INSERT INTO item_provenance(user_id,item_id,quantity,source_type,source_key,ownership_mark,legal_status,authenticity,tracking_strength,acquired_game_minute,created_at,updated_at) VALUES(?,?,1,'sect_entry',?,?,?,100,0,?,?,?)`, []any{userID, m.ItemID, p.SectName, p.SectName + " entry inheritance", legal, p.GameMinute, now, now}); e != nil {
+				return authoritativeMutation{}, e
+			}
+			granted = map[string]any{"manual_id": manualID, "name": m.Name, "item_id": m.ItemID, "alignment": m.Alignment, "path": m.Path, "min_realm_index": m.MinRealmIndex}
 		}
 	}
 	details := map[string]any{"trial_name": p.TrialName, "primary_roll": rollMapGo(primary), "secondary_roll": rollMapGo(secondary), "primary_factors": p.PrimaryDetails, "secondary_factors": p.SecondaryDetails}
@@ -257,6 +394,9 @@ func sectTrialActionGo(conn *storage.Conn, _ worlddata.Catalog, userID int64, ra
 		return authoritativeMutation{}, e
 	}
 	out := map[string]any{"outcome": outcome, "primary": rollMapGo(primary), "secondary": rollMapGo(secondary), "recommendation_bonus": recBonus, "sect_name": p.SectName}
+	if granted != nil {
+		out["granted_manual"] = granted
+	}
 	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "sect", EventType: "sect.recruitment.trial", EntityType: "character", EntityID: fmt.Sprint(userID), GameMinute: p.GameMinute, Payload: out}}, nil
 }
 func sectEconomyActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage, op string) (authoritativeMutation, error) {

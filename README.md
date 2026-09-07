@@ -179,11 +179,50 @@ mentioned in, and the digest tells you so rather than reporting an empty channel
 Turning the intent on also activates the existing `on_message` path: RP messages
 start being written to `scene_history`, and the bot replies to @-mentions from
 users without a character. `AUTO_NARRATE` stays `false`, so it does not begin
-narrating on its own.
+listening for typed play on its own (see below).
 
 > The bot's own `scene_history` table cannot answer this question — it keeps only
 > the newest 60 rows per channel as narrator context, and deletes the rest on
 > every insert. The digest reads Discord's message history instead.
+
+## Typed play (v0.21.1)
+
+With `AUTO_NARRATE=true`, the bot listens in realm hub channels, private scene
+threads and `RP_CHANNEL_IDS`. Before v0.21.1 every line there was one narration
+call that decided nothing: "I explore the ravine" produced a paragraph and no
+exploration. Now a line is one of three things:
+
+| You type | What happens | Narrator calls |
+| --- | --- | --- |
+| `> I explore the ravine` | The **prefix** marks an action. A deterministic router turns it into the same handler the hub button runs — `/explore`, `/hunt`, `/cultivate`, `/breakthrough`, a scene action (observe, investigate, influence, stealth, physical, qi, resolve, aid) or `/talk` — and the engine resolves it. | whatever that action already spends (routine actions: none) |
+| `Qiao, what is the caravan carrying?` | An un-prefixed line that **addresses an NPC who is present** (name in the first two words, or a question naming them), or @mentions the bot, is dialogue: `/talk` for the former, free narration for the latter. | one |
+| anything else | **Speech.** Recorded as history so the narrator sees it as context later. No reply, no call. This is most lines in a roleplay channel. | none |
+
+The router is three deterministic stages and never calls a model: a verb table
+(`content/typed_play.json` — aliases per action, grow it from what players type),
+entity resolution against who is actually present (naming an absent NPC is a
+refusal, never a guess), and a picker when two readings tie or nothing matches
+(the top candidates, **Narrate it**, and **Just say it in character**). Typed
+play defines no handler of its own and makes no engine call or database write;
+`tests/python/contracts/test_typed_play_surface.py` reads the source to hold
+that, and `tests/python/unit/test_typed_play_router.py` pins what each kind of
+line becomes.
+
+Every typed line that can reach the engine or the narrator first spends a token
+from a **per-player bucket** (`TYPED_PLAY_BURST` immediately, refilling at
+`TYPED_PLAY_PER_MINUTE`) — the v0.23 "per-user command budget" pulled forward,
+because before it one player pasting paragraphs could drain the shared 50/day
+allowance for everyone. Speech is free. A refused line is answered with the wait,
+not queued.
+
+```env
+TYPED_PLAY_PREFIX=>        # exactly one character; not a letter, digit or space
+TYPED_PLAY_BURST=4
+TYPED_PLAY_PER_MINUTE=6
+TYPED_PLAY_HINT=true       # once a day, tell a player how when their speech looked like an action
+```
+
+Design: `docs/COMMISSIONS_DESIGN.md` ("Typed play").
 
 ## Current database configuration
 
@@ -573,6 +612,25 @@ Short permission-scoped caches reduce repeated FTS work. Live structured state i
 
 No additional AI request is required for RAG.
 
+## Manuals and inheritances
+
+A manual is an item (`<manual_id>_manual`) that has to be in your inventory; **/cultivation →
+Manuals & Techniques → Study** then learns it through the engine's `manual.study`, which enforces the
+manual's realm requirement. Since v0.21.3 the whole 148-manual catalog is in `content/world.json`
+(`scripts/materialize_world_catalog.py`; a test fails if the file drifts), so the Go engine and Python
+read the same content. How players get one:
+
+- **Joining a sect.** Passing an entrance trial bestows the sect's own entry manual - every public
+  sect has an authored tier-0 one (v0.21.4), studyable the day you join - chosen and written by the
+  engine inside the trial transaction. A disciple who already holds it gets the next manual by the
+  sect's alignment (a righteous sect never gives a forbidden art), their own path and the lowest
+  tier, never a duplicate. Recorded in `item_provenance` as `sect_entry`.
+- **Hidden-sect initiation** (`/sect shadow`): one demonic manual matching your path and realm.
+- **The black market**: the forbidden, contraband and demonic stock.
+
+Manual items are `market_excluded`: town markets never list them, and Quest Forge's `rewardable_items`
+excludes them too (a deliberate follow-up decision for commissions, see `docs/COMMISSIONS_DESIGN.md`).
+
 ## Structured world history
 
 `world_history_events` stores events that actually happened mechanically. History answers **what happened**; current structured state answers **what is true now**.
@@ -777,11 +835,21 @@ Open **Discord Setup** in the GM dashboard after the bot has joined the configur
 - diagnose required Discord permissions and realm-role hierarchy problems
 - run an idempotent **Full Setup** that creates/reuses/repairs the canonical Xianxia RP base channels and realm-capital channels
 - run **Repair Server** without deleting unrelated Discord channels or resetting game/world data
+- gate every realm-capital hub behind its **presence role** `Xianxia • <capital name>` (v0.21.6:
+  `@everyone` denied, the presence role granted view/send/history/threads/reactions/files/slash commands,
+  the bot allowed; applied on every Setup/Repair). The bot puts the role on when a character's
+  location is that capital and takes it off when it is not, so a capital is visible only while you
+  are in the city. The Realm Capitals table shows a hub as **VISIBLE TO ALL** until it is gated.
 - synchronize guild slash commands
 - synchronize existing cultivators' generated realm-access roles
 - rebuild the persistent `#xianxia-info` guide
 - send a test message to the configured world-events channel
 - bind existing text channels manually for world events, event scenes, player homes, logs, onboarding, info and expeditions
+- **Fresh Start** (type nothing, confirm `CLEAR`): delete and recreate the message-safe channels
+- **Teardown** (v0.21.2, type `DELETE`): delete every thread, bound channel, `#bugs` and the two Xianxia
+  categories when empty, and forget their ids — nothing is recreated (run Full Setup after) and the
+  database is untouched; `RP_CHANNEL_IDS`, the realm roles and any channel Setup did not bind are left alone
+- **Reset World** (confirm `RESET`): delete every tracked thread and post the world-reset announcement
 
 Discord provisioning is intentionally owned by the Python `discord.py` process. The dashboard calls a private authenticated bot-control endpoint, and every state-changing dashboard Discord operation writes an `admin_audit_log` entry through the normal Go-owned database boundary.
 

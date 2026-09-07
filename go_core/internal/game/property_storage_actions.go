@@ -163,6 +163,33 @@ func storageUpgradeActionGo(conn *storage.Conn, catalog worlddata.Catalog, userI
 	if b, ok := item.StorageUpgrade["living_space"].(bool); ok && b {
 		living = 1
 	}
+	// An upgrade may not be a downgrade (v0.23.1). The command calls this
+	// operation an upgrade and the catalog runs from a 24-slot pouch to a
+	// 500-slot ring with living space, so using the wrong item after owning
+	// the better one silently traded 500 slots and a living world for 24 and
+	// nothing - consuming the pouch on the way. The occupied-slot floor above
+	// stopped items being *stranded*, which is not the same as stopping the
+	// container being made worse.
+	//
+	// The check happens after the item is consumed only in source order; the
+	// whole action is one transaction, so a refusal here returns the item too.
+	existing, e := conn.Execute(
+		`SELECT slot_capacity,living_space,name FROM storage_containers WHERE user_id=?`, []any{userID})
+	if e != nil {
+		return authoritativeMutation{}, e
+	}
+	if held := firstRowMap(existing); held != nil {
+		heldCap, heldLiving := i64(held["slot_capacity"]), i64(held["living_space"])
+		if cap < heldCap {
+			return authoritativeMutation{}, fmt.Errorf(
+				"%s holds %d stacks; %s would hold only %d",
+				held["name"], heldCap, item.Name, cap)
+		}
+		if heldLiving != 0 && living == 0 {
+			return authoritativeMutation{}, fmt.Errorf(
+				"%s has a living space and %s does not", held["name"], item.Name)
+		}
+	}
 	cid := strings.TrimSpace(fmt.Sprint(item.StorageUpgrade["container_id"]))
 	if cid == "" {
 		cid = p.ItemID

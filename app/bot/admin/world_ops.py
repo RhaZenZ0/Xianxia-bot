@@ -24,7 +24,7 @@ from ..formatting import human_duration
 from ..hubs import HubDynamicOption, register_hub_option_provider
 from ..pickers import auction_currency_autocomplete
 from ..registry import registered_group_command
-from ..runtime import DB, ENGINE, SETTINGS, WORLD, current_world_time, log, reply_long
+from ..runtime import DB, ENGINE, SETTINGS, WORLD, _explain_engine_error, current_world_time, log, reply_long
 from ..services import QUEST_FORGE, QUESTS, SIM
 from ...ai.quest_forge import store_draft
 from ...rules.quests import validate_quest_definition
@@ -81,12 +81,18 @@ async def admin_setsect(
         )
         return
     old_membership = await DB.get_sect_membership(member.id)
-    await DB.set_sect_membership(
-        member.id, sect_name=sect_name, rank_name=str(rank["name"]), rank_level=int(rank["level"])
-    )
+    try:
+        await ENGINE.action("admin.player.set_sect", interaction.user.id, {
+            "user_id": member.id, "sect_name": sect_name,
+            "rank_name": str(rank["name"]), "rank_level": int(rank["level"]),
+            "reason": "discord admin",
+        })
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
+        return
     abode = await ensure_sect_abode_record(member.id, c, await DB.get_sect_membership(member.id) or {"sect_name": sect_name, "rank_name": str(rank["name"])})
     abode_thread = await ensure_sect_abode_thread_for(interaction.guild, member, abode) if interaction.guild else None
-    await audit_admin(interaction, "sect.assign", target=f"user:{member.id}", before=old_membership or {}, after={"sect_name": sect_name, "rank_name": str(rank["name"]), "rank_level": int(rank["level"])})
+    await audit_admin(interaction, "sect.assign", target=f"user:{member.id}", before=old_membership or {}, after={"sect_name": sect_name, "rank_name": str(rank["name"]), "rank_level": int(rank["level"])}, database_log=False)
     await interaction.response.send_message(
         f"✅ **{c['name']}** is now recorded in **{sect_name}** as **{rank['name']}** (rank level {rank['level']})."
         + (f"\n🏯 Sect abode: {abode_thread.mention}" if abode_thread else ""),
@@ -123,8 +129,14 @@ async def admin_removesect(interaction: discord.Interaction, member: discord.Mem
         await interaction.response.send_message("That member has no character.", ephemeral=False)
         return
     old_membership = await DB.get_sect_membership(member.id)
-    await DB.clear_sect_membership(member.id)
-    await audit_admin(interaction, "sect.remove", target=f"user:{member.id}", before=old_membership or {})
+    try:
+        await ENGINE.action("admin.player.set_sect", interaction.user.id, {
+            "user_id": member.id, "remove": True, "reason": "discord admin",
+        })
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
+        return
+    await audit_admin(interaction, "sect.remove", target=f"user:{member.id}", before=old_membership or {}, database_log=False)
     await interaction.response.send_message(
         f"✅ Removed **{c['name']}** from their recorded sect and cleared attached lineage links.", ephemeral=False
     )
@@ -142,11 +154,13 @@ async def admin_setmaster(
         await interaction.response.send_message("Both members must have cultivation characters.", ephemeral=False)
         return
     try:
-        await DB.set_master(disciple.id, master.id)
-        await audit_admin(interaction, "sect.setmaster", target=f"user:{disciple.id}", after={"master_user_id": master.id})
-    except ValueError as exc:
-        await interaction.response.send_message(f"❌ {exc}", ephemeral=False)
+        await ENGINE.action("admin.player.set_master", interaction.user.id, {
+            "disciple_user_id": disciple.id, "master_user_id": master.id, "reason": "discord admin",
+        })
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
         return
+    await audit_admin(interaction, "sect.setmaster", target=f"user:{disciple.id}", after={"master_user_id": master.id}, database_log=False)
     await interaction.response.send_message(
         f"✅ **{mc['name']}** is now the recorded **Master** of **{dc['name']}**.", ephemeral=False
     )
@@ -160,8 +174,14 @@ async def admin_clearmaster(interaction: discord.Interaction, disciple: discord.
     if not c:
         await interaction.response.send_message("That member has no cultivation character.", ephemeral=False)
         return
-    await DB.clear_master(disciple.id)
-    await audit_admin(interaction, "sect.clearmaster", target=f"user:{disciple.id}")
+    try:
+        await ENGINE.action("admin.player.set_master", interaction.user.id, {
+            "disciple_user_id": disciple.id, "clear": True, "reason": "discord admin",
+        })
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
+        return
+    await audit_admin(interaction, "sect.clearmaster", target=f"user:{disciple.id}", database_log=False)
     await interaction.response.send_message(
         f"✅ Cleared the direct Master relationship for **{c['name']}**.", ephemeral=False
     )
@@ -189,16 +209,30 @@ async def admin_sect_rank(interaction:discord.Interaction,member:discord.Member,
     if not rank_def:
         await interaction.response.send_message("Unknown canonical sect rank.",ephemeral=False);return
     before_rank = await DB.get_sect_membership(member.id)
-    await DB.set_sect_rank(member.id,str(rank_def['name']),int(rank_def['level']))
-    await audit_admin(interaction, "sect.rank", target=f"user:{member.id}", before=before_rank or {}, after={"rank_name": str(rank_def['name']), "rank_level": int(rank_def['level'])})
+    try:
+        await ENGINE.action("admin.player.set_sect_rank", interaction.user.id, {
+            "user_id": member.id, "rank_name": str(rank_def['name']),
+            "rank_level": int(rank_def['level']), "reason": "discord admin",
+        })
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
+        return
+    await audit_admin(interaction, "sect.rank", target=f"user:{member.id}", before=before_rank or {}, after={"rank_name": str(rank_def['name']), "rank_level": int(rank_def['level'])}, database_log=False)
     await interaction.response.send_message(f"✅ {member.mention} is now **{rank_def['name']}** (level {rank_def['level']}).",ephemeral=False)
 
 
 @registered_group_command(admin_sect_group, name="masterattention",description="Adjust how much attention a master currently gives a disciple")
 async def admin_master_attention(interaction:discord.Interaction,disciple:discord.Member,amount:app_commands.Range[int,-100,100])->None:
     if not await require_admin(interaction):return
-    value=await DB.adjust_master_attention(disciple.id,int(amount))
-    await audit_admin(interaction, "sect.masterattention", target=f"user:{disciple.id}", after={"attention": value, "delta": int(amount)})
+    try:
+        result = dict(await ENGINE.action("admin.player.master_attention", interaction.user.id, {
+            "disciple_user_id": disciple.id, "delta": int(amount), "reason": "discord admin",
+        }) or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
+        return
+    value = int(result.get("attention", 0))
+    await audit_admin(interaction, "sect.masterattention", target=f"user:{disciple.id}", after={"attention": value, "delta": int(amount)}, database_log=False)
     await interaction.response.send_message(f"✅ Master attention for {disciple.mention}: **{value}**.",ephemeral=False)
 
 
@@ -208,11 +242,22 @@ async def admin_grant_storage(
     slots:app_commands.Range[int,1,5000]=80,living_space:bool=False
 )->None:
     if not await require_admin(interaction):return
-    if not await DB.get_character(member.id):
-        await interaction.response.send_message("That member has no character.",ephemeral=False);return
-    await DB.set_storage_container(member.id,container_id=name.casefold().replace(' ','_'),name=name,grade=grade,slot_capacity=int(slots),living_space=living_space)
-    await audit_admin(interaction, "player.grantstorage", target=f"user:{member.id}", after={"name": name, "grade": grade, "slots": int(slots), "living_space": living_space})
-    await interaction.response.send_message(f"✅ Granted **{name}** ({grade}, {slots} stacks, living space: {living_space}) to {member.mention}.",ephemeral=False)
+    try:
+        result = dict(await ENGINE.action("admin.player.grant_storage", interaction.user.id, {
+            "user_id": member.id, "container_id": name.casefold().replace(' ', '_'), "name": name,
+            "grade": grade, "slot_capacity": int(slots), "living_space": living_space,
+            "reason": "discord admin",
+        }) or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
+        return
+    # The engine refuses to shrink a container below what is already inside it,
+    # so the granted capacity is not always the one that was asked for. Report
+    # what the cultivator actually has.
+    granted = int(result.get("slot_capacity", slots))
+    await audit_admin(interaction, "player.grantstorage", target=f"user:{member.id}", after={"name": name, "grade": grade, "slots": granted, "living_space": living_space}, database_log=False)
+    floor_note = f" (raised from {slots} to fit what is already stored)" if granted != int(slots) else ""
+    await interaction.response.send_message(f"✅ Granted **{name}** ({grade}, {granted} stacks{floor_note}, living space: {living_space}) to {member.mention}.",ephemeral=False)
 
 
 @registered_group_command(admin_player_group, name="grantcurrency",description="Grant cultivation currency for events, testing or GM rewards")
@@ -328,7 +373,7 @@ async def admin_grant(
     try:
         result = dict(await ENGINE.action(operation, interaction.user.id, payload) or {})
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}", ephemeral=False)
+        await interaction.response.send_message(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
         return
     label = WORLD.currency_name(target) if kind.value == "currency" else WORLD.item_name(target)
     balance = result.get("balance") if kind.value == "currency" else result.get("quantity")
@@ -449,17 +494,22 @@ async def admin_spawnrealm(interaction: discord.Interaction, realm: str) -> None
         return
 
     info = WORLD.secret_realms[realm_id]
-    event_key = f"secret:{realm_id}:admin:{time.time_ns()}"
-    ends_at = time.time() + int(info.get("open_hours", 8)) * 3600
-    await DB.activate_world_event(
-        event_key=event_key,
-        event_type="secret_realm",
-        title=info["name"],
-        location=info["location"],
-        payload={"definition_id": "admin_spawn", "realm_id": realm_id},
-        ends_at=ends_at,
-    )
-    await audit_admin(interaction, "event.spawnrealm", target=event_key, after={"realm_id": realm_id, "ends_at": ends_at})
+    # The engine mints the event key and the closing time: both are derived
+    # from when the spawn actually commits, which Python does not know.
+    try:
+        result = dict(await ENGINE.action("admin.world.spawn_realm", interaction.user.id, {
+            "realm_id": realm_id,
+            "title": info["name"],
+            "location": info["location"],
+            "open_hours": int(info.get("open_hours", 8)),
+            "reason": "discord admin",
+        }) or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
+        return
+    event_key = str(result.get("event_key", ""))
+    ends_at = float(result.get("ends_at", 0.0))
+    await audit_admin(interaction, "event.spawnrealm", target=event_key, after={"realm_id": realm_id, "ends_at": ends_at}, database_log=False)
     await interaction.response.defer(ephemeral=False)
     thread = await spawn_event_thread(
         interaction,

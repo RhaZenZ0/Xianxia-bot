@@ -17,11 +17,36 @@ func setupSimulationDB(t *testing.T, schema string) string {
 		t.Fatal(err)
 	}
 	defer conn.Close()
-	if err := conn.ExecScript(schema); err != nil {
+	if err := conn.ExecScript(simulationClockSchema + "\n" + schema); err != nil {
 		t.Fatal(err)
 	}
 	return path
 }
+
+// The canonical world clock. RunDue derives the current minute from it rather
+// than from the request (v0.22.2), so a test that wants the world to be at
+// minute N says so here. scale=0 freezes it, which is what a deterministic
+// test wants.
+func setSimulationGameMinute(t *testing.T, path string, gameMinute int64) {
+	t.Helper()
+	conn, err := storage.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	state := fmt.Sprintf(`{"anchor_game_minute":%d,"anchor_real_ts":1,"scale":0}`, gameMinute)
+	if _, err := conn.Execute(`INSERT INTO world_state(key,value_json,updated_at) VALUES('world_clock',?,0)
+		ON CONFLICT(key) DO UPDATE SET value_json=excluded.value_json,updated_at=excluded.updated_at`, []any{state}); err != nil {
+		t.Fatal(err)
+	}
+	// storage.Conn opens an implicit transaction on the first statement, so a
+	// write is not visible to another connection until it is committed.
+	if err := conn.Commit(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+const simulationClockSchema = `CREATE TABLE IF NOT EXISTS world_state(key TEXT PRIMARY KEY,value_json TEXT NOT NULL,updated_at REAL NOT NULL DEFAULT 0);`
 
 func simScalar(t *testing.T, path, sql string, params ...any) any {
 	t.Helper()
@@ -53,7 +78,8 @@ INSERT INTO npc_civilization_state VALUES('Elder Test','Greenriver Town','Greenr
 	if err != nil {
 		t.Fatal(err)
 	}
-	runs, err := runner.RunDue(RunDueRequest{GameMinute: 200 * minutesPerDay, Automation: map[string]bool{"npc_civilization": true}})
+	setSimulationGameMinute(t, path, 200*minutesPerDay)
+	runs, err := runner.RunDue(RunDueRequest{Automation: map[string]bool{"npc_civilization": true}})
 	if err != nil {
 		t.Fatal(err)
 	}

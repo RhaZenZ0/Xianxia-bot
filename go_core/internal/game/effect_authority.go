@@ -64,6 +64,19 @@ func canonicalWorldGameMinute(conn *storage.Conn) (int64, error) {
 	return gameMinute, nil
 }
 
+// CanonicalWorldGameMinute is the world clock as the engine computes it, for
+// callers outside this package. Read-only: unlike canonicalWorldGameMinute it
+// never inserts a default clock row, so a scheduled tick cannot create one.
+//
+// It exists because "what time is it" must not be a request parameter. The
+// authoritative action path has always rejected a caller-supplied game_minute
+// (rejectCallerGameMinute); the simulation used to accept one, which let a
+// trusted client hand the world an arbitrary minute and make the tick catch up
+// to it. Both paths now derive it here.
+func CanonicalWorldGameMinute(conn *storage.Conn) (int64, error) {
+	return readCanonicalWorldGameMinute(conn)
+}
+
 func readCanonicalWorldGameMinute(conn *storage.Conn) (int64, error) {
 	now := float64(time.Now().UnixNano()) / 1e9
 	res, err := conn.Execute(`SELECT value_json FROM world_state WHERE key='world_clock'`, nil)
@@ -213,6 +226,31 @@ func currentEffectsAuthorityQuery(conn *storage.Conn, userID int64) (map[string]
 	}, nil
 }
 
+// settleDueToxicityTx brings the shared pill-toxicity effect row in line with
+// the time that has passed, before anything reads it.
+//
+// Toxicity decays on the clock, but the row that carries its penalty is only
+// rewritten when the player acts. Until v0.23.0 the sync ran from Python, and
+// only when someone happened to open `/alchemy status` - so a player who took
+// a heavy dose and then simply waited kept the full penalty on every
+// cultivation attempt until they thought to check a screen. Reading the effect
+// table is now the trigger, which is the only moment it can matter.
+//
+// It no-ops when there is nothing to settle: no alchemy_state table (a narrow
+// test fixture, or a database mid-migration) or no row for this player, so it
+// never conjures state for someone who has never touched alchemy.
+func settleDueToxicityTx(conn *storage.Conn, userID, gameMinute int64) error {
+	if !tableExistsTx(conn, "alchemy_state") || !tableExistsTx(conn, "active_effects") {
+		return nil
+	}
+	res, err := conn.Execute(`SELECT 1 FROM alchemy_state WHERE user_id=? LIMIT 1`, []any{userID})
+	if err != nil || len(res.Rows) == 0 {
+		return err
+	}
+	_, err = settlePillToxicityEffectTx(conn, userID, gameMinute)
+	return err
+}
+
 func settlePillToxicityEffectTx(conn *storage.Conn, userID, gameMinute int64) (int64, error) {
 	now := float64(time.Now().UnixNano()) / 1e9
 	res, err := conn.Execute(
@@ -347,6 +385,9 @@ func canonicalAdditiveEffectBonus(
 ) (int64, error) {
 	total := 0.0
 
+	if err := settleDueToxicityTx(conn, userID, gameMinute); err != nil {
+		return 0, err
+	}
 	res, err := conn.Execute(
 		`SELECT effect_json,stacks FROM active_effects
 		 WHERE user_id=? AND starts_game_minute<=?

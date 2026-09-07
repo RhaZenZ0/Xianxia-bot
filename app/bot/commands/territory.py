@@ -11,7 +11,7 @@ from discord import app_commands
 from ...ops.game_engine import GameEngineError
 from ..locations import location_autocomplete
 from ..registry import registered_group_command
-from ..runtime import DB, ENGINE, WORLD, current_world_time, reply_long, require_character, serialized_user_action
+from ..runtime import _explain_engine_error, DB, ENGINE, WORLD, current_world_time, reply_long, require_character, serialized_user_action
 
 # ---------- Advanced branch forward-port: beasts, artifacts, territory, caravans, parties, PvP, social state ----------
 territory_group = app_commands.Group(name="territory", description="Inspect or contest persistent territory control")
@@ -50,7 +50,7 @@ async def territory_claim(interaction: discord.Interaction) -> None:
     try:
         e=await ENGINE.authoritative_action("territory.claim",interaction.user.id,{"territory_key":str(t['territory_key'])},action_id=f"discord:{interaction.id}:territory.claim"); r=dict(e.get('result') or {})
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
+        await interaction.response.send_message(f"❌ {_explain_engine_error(exc)}",ephemeral=False);return
     if r.get('war_id'): text=f"⚔️ **Territorial War #{r['war_id']}** begins for **{t['name']}**."
     else: text=f"🏯 **{r.get('sect_name','Your sect')}** establishes a recognized claim over **{t['name']}**."
     await interaction.response.send_message(text,ephemeral=False)
@@ -81,7 +81,7 @@ async def war_act(interaction: discord.Interaction, war_id: int, tactic: app_com
     try:
         e=await ENGINE.authoritative_action("war.act",interaction.user.id,{"war_id":int(war_id),"tactic":tactic.value},action_id=f"discord:{interaction.id}:war.act"); r=dict(e.get('result') or {})
     except GameEngineError as exc:
-        await interaction.followup.send(f"❌ {exc}",ephemeral=False);return
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False);return
     op=dict(r.get('operations') or r)
     text=f"⚔️ **War #{war_id} — {tactic.name}**\nSiege **{op.get('siege_progress',0)}%** • morale A/D **{op.get('attacker_morale',100)}/{op.get('defender_morale',100)}** • forces A/D **{op.get('attacker_force',0)}/{op.get('defender_force',0)}**"
     if r.get('status') and r.get('status')!='active': text+=f"\n🏯 War resolved: **{op.get('winner_key','unknown')}**."
@@ -99,7 +99,7 @@ async def caravan_dispatch(interaction: discord.Interaction, destination: str, i
     try:
         e=await ENGINE.authoritative_action("caravan.dispatch",interaction.user.id,{"destination":destination,"item_id":item,"quantity":int(quantity),"escort":int(escort),"smuggle":bool(smuggle)},action_id=f"discord:{interaction.id}:caravan.dispatch"); r=dict(e.get('result') or {})
     except GameEngineError as exc:
-        await interaction.followup.send(f"❌ {exc}",ephemeral=False);return
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False);return
     await interaction.followup.send(f"🐫 Caravan **#{r.get('caravan_id')}** dispatched to **{destination}** carrying **{WORLD.item_name(item)} x{quantity}**.",ephemeral=False)
 
 
@@ -116,7 +116,7 @@ async def caravan_status(interaction: discord.Interaction) -> None:
         )
         arrived=list(dict(envelope.get("result") or {}).get("resolved") or [])
     except GameEngineError as exc:
-        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
     rows=[x for x in await DB.get_caravans() if x.get('owner_type')=='player' and str(x.get('owner_key'))==str(interaction.user.id)]
     if not rows:
         await interaction.followup.send("🐫 You have not dispatched a caravan.",ephemeral=False);return
@@ -154,7 +154,7 @@ async def party_create(interaction: discord.Interaction, name: str) -> None:
         envelope=await ENGINE.authoritative_action("party.create",interaction.user.id,{"name":name},action_id=f"discord:{interaction.id}:party.create")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
     await interaction.followup.send(f"👥 Party **{result.get('name',name)}** created.",ephemeral=False)
 
 
@@ -167,7 +167,7 @@ async def party_join(interaction: discord.Interaction, leader: discord.Member) -
         await interaction.response.send_message("That cultivator does not lead an active party.",ephemeral=False);return
     try: await ENGINE.authoritative_action("party.join",interaction.user.id,{"party_id":int(target['party_id'])},action_id=f"discord:{interaction.id}:party.join")
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
+        await interaction.response.send_message(f"❌ {_explain_engine_error(exc)}",ephemeral=False);return
     await interaction.response.send_message(f"👥 You joined {leader.mention}'s party.",ephemeral=False)
 
 
@@ -192,7 +192,7 @@ async def party_leave(interaction: discord.Interaction) -> None:
         envelope=await ENGINE.authoritative_action("party.leave",interaction.user.id,{},action_id=f"discord:{interaction.id}:party.leave")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
     await interaction.followup.send("👋 You left your active party.",ephemeral=False)
 
 

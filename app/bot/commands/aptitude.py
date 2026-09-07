@@ -14,7 +14,7 @@ from ...rules.aptitudes import bloodline_definition, root_compatibility
 from ...ops.game_engine import GameEngineError
 from ..formatting import roll_line
 from ..registry import registered_group_command
-from ..runtime import DB, ENGINE, SETTINGS, WORLD, current_world_time, reply_long, require_character, serialized_user_action
+from ..runtime import _explain_engine_error, DB, ENGINE, SETTINGS, WORLD, current_world_time, reply_long, require_character, serialized_user_action
 
 aptitude_group = app_commands.Group(
     name="aptitude",
@@ -150,7 +150,7 @@ async def aptitude_temper(interaction: discord.Interaction, target: app_commands
             action_id=f"discord:{interaction.id}:aptitude.temper:{target.value}",
         )
     except GameEngineError as exc:
-        await interaction.followup.send(f"❌ {exc}", ephemeral=False)
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
         return
     result = dict(envelope.get("result") or {})
     bundle = dict(result.get("aptitudes") or {})
@@ -183,7 +183,7 @@ async def aptitude_awaken(interaction: discord.Interaction, target: app_commands
             action_id=f"discord:{interaction.id}:aptitude.awaken:{target.value}",
         )
     except GameEngineError as exc:
-        await interaction.followup.send(f"❌ {exc}", ephemeral=False)
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
         return
     result = dict(envelope.get("result") or {})
     roll = SimpleNamespace(**dict(result.get("roll") or {}))
@@ -215,7 +215,7 @@ async def aptitude_evolve(interaction: discord.Interaction, target: app_commands
             action_id=f"discord:{interaction.id}:aptitude.evolve:{target.value}",
         )
     except GameEngineError as exc:
-        await interaction.followup.send(f"❌ {exc}", ephemeral=False)
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
         return
     result = dict(envelope.get("result") or {})
     roll = SimpleNamespace(**dict(result.get("roll") or {}))
@@ -259,7 +259,7 @@ async def aptitude_harmonize(interaction: discord.Interaction, target: app_comma
             action_id=f"discord:{interaction.id}:aptitude.harmonize:{target.value}",
         )
     except GameEngineError as exc:
-        await interaction.followup.send(f"❌ {exc}", ephemeral=False)
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
         return
     result = dict(envelope.get("result") or {})
     bundle = dict(result.get("aptitudes") or {})

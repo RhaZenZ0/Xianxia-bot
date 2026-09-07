@@ -28,17 +28,18 @@ from discord.ext import commands
 
 from ...ai import chat_monitor
 from ...database import SCHEMA_VERSION
-from ...rules.realm_hubs import REALM_HUBS, realm_hub
+from ...rules.realm_hubs import REALM_HUBS, realm_hub, realm_hub_visibility, realm_presence_role_name
 from ...version import RELEASE_VERSION
 from ..channels import (
     _ensure_realm_access_roles,
+    _ensure_realm_presence_roles,
     _resolve_text_channel,
     configured_info_channel,
     ensure_realm_hub_channels,
     post_server_log,
 )
 from ..registry import registered_group_command
-from ..runtime import DB, ENGINE, SETTINGS, WORLD, _realm_access_role_name, _sync_realm_access_roles, log, reply_long
+from ..runtime import DB, ENGINE, SETTINGS, WORLD, _realm_access_role_name, _sync_realm_access_roles, _sync_realm_presence_roles, log, reply_long
 from ..services import AI_ROUTER, ALERTS, GUILD, NARRATOR, SIM
 from .bugs_forum import (
     BUGS_CHANNEL_NAME,
@@ -239,6 +240,138 @@ async def clear_managed_channel_messages(guild: discord.Guild) -> dict[str, Any]
     return {"cleared": cleared, "skipped": skipped, "protected": ["player-homes", "expeditions", "event-scenes"]}
 
 
+async def teardown_managed_discord_layout(guild: discord.Guild) -> dict[str, Any]:
+    """Teardown (v0.21.2): delete everything the bot owns on this server.
+
+    The inverse of Full Setup. In order: every thread the database tracks
+    (expedition journals, household threads, sect/cave abodes, event scenes,
+    battle threads - the same set Reset World deletes), then every *bound*
+    channel (the seven base channels, every realm-capital hub, the #bugs
+    forum), then the two Xianxia categories if - and only if - they are empty
+    afterwards. Then the ids the database held for all of it are cleared
+    (`Database.clear_discord_bindings`), so the dashboard reads "missing", not
+    "stale", and Full Setup rebuilds from nothing.
+
+    What "the bot owns" means here is exactly what Setup binds: a channel is
+    deleted because a binding points at it, not because of its name or where
+    it sits. Setup binds by name, so a channel a GM made by hand and named
+    `bot-logs` counts as managed too - that is already how Fresh Start treats
+    it. A category with anything else left in it is never deleted, and no
+    channel outside the bindings is touched, whatever category it is in.
+    `RP_CHANNEL_IDS` in `.env` are the GM's own channels and are not managed.
+
+    Unlike Fresh Start nothing is recreated: the server is left without any
+    Xianxia channels until the GM runs Full Setup. Unlike Reset World the
+    database is not the target - characters, sects and history survive; only
+    Discord pointers are cleared, and every thread owner recovers from a
+    missing thread by creating a new one on next use.
+    """
+    me = guild.me
+    if me is None or not me.guild_permissions.manage_channels:
+        raise RuntimeError("the bot needs the Manage Channels permission to tear down its layout")
+
+    # 1. Threads the database tracks, wherever they are.
+    threads_deleted = 0
+    threads_already_gone = 0
+    threads_failed = 0
+    threads_by_kind: dict[str, int] = {}
+    for record in await DB.all_managed_thread_ids():
+        thread_id = int(record["thread_id"])
+        thread: discord.Thread | None = guild.get_thread(thread_id)
+        if thread is None:
+            try:
+                fetched = await guild.fetch_channel(thread_id)
+                thread = fetched if isinstance(fetched, discord.Thread) else None
+            except discord.NotFound:
+                threads_already_gone += 1
+                continue
+            except (discord.Forbidden, discord.HTTPException):
+                threads_failed += 1
+                continue
+        if thread is None:
+            threads_already_gone += 1
+            continue
+        try:
+            await thread.delete()
+        except discord.NotFound:
+            threads_already_gone += 1
+            continue
+        except (discord.Forbidden, discord.HTTPException):
+            threads_failed += 1
+            continue
+        threads_deleted += 1
+        threads_by_kind[str(record["kind"])] = threads_by_kind.get(str(record["kind"]), 0) + 1
+
+    # 2. Bound channels: base, realm hubs, #bugs. Only what a binding names.
+    cfg = await DB.get_server_config(guild.id)
+    targets: list[tuple[str, discord.abc.GuildChannel | None]] = []
+    for key, channel_id in _base_channel_bindings(cfg).items():
+        targets.append((key, guild.get_channel(int(channel_id)) if channel_id else None))
+    for row in await DB.get_realm_hub_channels(guild.id):
+        targets.append((f"realm:{row['world_name']}", guild.get_channel(int(row["channel_id"]))))
+    bugs_channel_id = cfg.get("bugs_channel_id")
+    targets.append(("bugs", guild.get_channel(int(bugs_channel_id)) if bugs_channel_id else None))
+
+    deleted: list[str] = []
+    already_gone: list[str] = []
+    failed: list[str] = []
+    seen_ids: set[int] = set()
+    for key, channel in targets:
+        if channel is None:
+            already_gone.append(key)
+            continue
+        if channel.id in seen_ids:  # two bindings on one channel: delete once
+            deleted.append(key)
+            continue
+        seen_ids.add(channel.id)
+        try:
+            await channel.delete(reason="Xianxia RP teardown (GM dashboard)")
+            deleted.append(key)
+        except discord.NotFound:
+            already_gone.append(key)
+        except (discord.Forbidden, discord.HTTPException):
+            log.exception("Teardown could not delete %s (#%s)", key, getattr(channel, "name", "?"))
+            failed.append(key)
+
+    # 3. The two Xianxia categories, only if nothing else is left inside.
+    categories_deleted: list[str] = []
+    categories_kept: list[str] = []
+    for name in (SERVER_BASE_CATEGORY, SERVER_REALM_CATEGORY):
+        category = next((item for item in guild.categories if item.name == name), None)
+        if category is None:
+            continue
+        remaining = [c for c in category.channels if c.id not in seen_ids]
+        if remaining:
+            categories_kept.append(f"{name} ({len(remaining)} other channel(s) inside)")
+            continue
+        try:
+            await category.delete(reason="Xianxia RP teardown (GM dashboard)")
+            categories_deleted.append(name)
+        except discord.NotFound:
+            pass
+        except (discord.Forbidden, discord.HTTPException):
+            log.exception("Teardown could not delete category %s", name)
+            categories_kept.append(f"{name} (delete failed)")
+
+    # 4. Forget the ids. Done last so a failure above leaves the bindings for a retry.
+    cleared = await DB.clear_discord_bindings(guild.id)
+
+    return {
+        "threads_deleted": threads_deleted,
+        "threads_already_gone": threads_already_gone,
+        "threads_failed": threads_failed,
+        "threads_deleted_by_kind": threads_by_kind,
+        "channels_deleted": deleted,
+        "channels_already_gone": already_gone,
+        "channels_failed": failed,
+        "categories_deleted": categories_deleted,
+        "categories_kept": categories_kept,
+        "bindings_cleared": cleared,
+        "untouched": ["RP_CHANNEL_IDS", "any channel no binding names", "the Xianxia realm roles", "the database (characters, sects, history)"],
+        "next": "Run Full Setup to rebuild the layout from nothing.",
+    }
+
+
 @registered_group_command(admin_server_group, name="basechannels", description="Inspect dashboard-managed base Xianxia Discord channels")
 @app_commands.choices(action=BASE_CHANNEL_SETUP_CHOICES)
 async def admin_base_channels(
@@ -331,8 +464,8 @@ def _server_permission_report(guild: discord.Guild) -> tuple[list[str], list[str
             warnings.append(f"{label}: {consequence}")
 
     realm_roles = [
-        role for world in REALM_HUBS
-        if (role := discord.utils.get(guild.roles, name=_realm_access_role_name(world))) is not None
+        role for world in REALM_HUBS for name in (_realm_access_role_name(world), realm_presence_role_name(world))
+        if (role := discord.utils.get(guild.roles, name=name)) is not None
     ]
     if not perms.manage_roles:
         lines.append("❌ **Realm Role Hierarchy**\n   Cannot validate/manage realm roles until **Manage Roles** is granted.")
@@ -375,10 +508,10 @@ async def _server_configuration_report(guild: discord.Guild) -> str:
     for world, hub in REALM_HUBS.items():
         row = rows.get(world)
         channel = guild.get_channel(int(row["channel_id"])) if row else None
-        role = discord.utils.get(guild.roles, name=_realm_access_role_name(world))
+        role = discord.utils.get(guild.roles, name=realm_presence_role_name(world))
         channel_text = channel.mention if isinstance(channel, discord.TextChannel) else "not configured"
         role_text = role.mention if role is not None else "not configured"
-        lines.append(f"• **{world}** — channel: {channel_text} • role: {role_text}")
+        lines.append(f"• **{world}** — channel: {channel_text} • presence role (visible while in the city): {role_text}")
 
     bugs_channel_id = cfg.get("bugs_channel_id")
     bugs_channel = guild.get_channel(int(bugs_channel_id)) if bugs_channel_id else None
@@ -400,7 +533,8 @@ async def _sync_all_realm_access_roles(guild: discord.Guild) -> dict[str, int]:
         raise PermissionError("Manage Roles is required")
 
     role_map = await _ensure_realm_access_roles(guild)
-    blocked = [role for role in role_map.values() if me.top_role.position <= role.position]
+    presence_map = await _ensure_realm_presence_roles(guild)
+    blocked = [role for role in list(role_map.values()) + list(presence_map.values()) if me.top_role.position <= role.position]
     if blocked:
         raise PermissionError(
             "Move the bot role above the generated realm roles before syncing: "
@@ -426,6 +560,7 @@ async def _sync_all_realm_access_roles(guild: discord.Guild) -> dict[str, int]:
             continue
         try:
             await _sync_realm_access_roles(guild, member, character)
+            await _sync_realm_presence_roles(guild, member, character)
             counts["synced"] += 1
         except Exception:
             counts["failed"] += 1
@@ -462,7 +597,11 @@ async def _dashboard_discord_snapshot(client: commands.Bot, guild: discord.Guild
     for world, hub in REALM_HUBS.items():
         row = realm_rows.get(world)
         channel = guild.get_channel(int(row["channel_id"])) if row else None
-        role = discord.utils.get(guild.roles, name=_realm_access_role_name(world))
+        role = discord.utils.get(guild.roles, name=realm_presence_role_name(world))
+        visibility = (
+            realm_hub_visibility(channel, role, guild.default_role)
+            if isinstance(channel, discord.TextChannel) else {"hidden": False}
+        )
         realm_hubs.append({
             "world": world,
             "display_name": str(hub.get("display_name") or world),
@@ -470,7 +609,8 @@ async def _dashboard_discord_snapshot(client: commands.Bot, guild: discord.Guild
             "channel_name": channel.name if isinstance(channel, discord.TextChannel) else None,
             "role_id": role.id if role else None,
             "role_name": role.name if role else None,
-            "ready": isinstance(channel, discord.TextChannel) and role is not None,
+            "hidden": bool(visibility.get("hidden")),
+            "ready": isinstance(channel, discord.TextChannel) and role is not None and bool(visibility.get("hidden")),
         })
 
     stored_messages = await DB.get_channel_messages(guild.id)
@@ -816,6 +956,17 @@ async def dashboard_discord_control(client: commands.Bot, action: str, payload: 
         }
         await _audit_dashboard_discord(action, guild, after=result, reason=reason)
         return {"ok": True, "action": action, "result": result}
+
+    if action == "teardown":
+        # Delete everything the bot owns on Discord - threads, bound channels,
+        # #bugs, the two categories when empty - and forget their ids. Nothing
+        # is recreated and the database is not reset; see
+        # teardown_managed_discord_layout for exactly what is and isn't touched.
+        if str(payload.get("confirm") or "").strip().upper() != "DELETE":
+            raise ValueError('confirmation required: payload "confirm" must be exactly "DELETE"')
+        result = await teardown_managed_discord_layout(guild)
+        await _audit_dashboard_discord(action, guild, after=result, reason=reason)
+        return {"ok": True, "action": action, "result": result, "status": await _dashboard_discord_snapshot(client, guild)}
 
     raise ValueError(f"Unsupported Discord dashboard action: {action}")
 

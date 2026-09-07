@@ -57,6 +57,12 @@ var authoritativeMutations = map[string]bool{
 	"combat.recovery_item":            true,
 	"law.comprehend":                  true,
 	"condition.treat":                 true,
+	"alchemy.purge":                   true,
+	"character.set_gender":            true,
+	"sect.abode.enter":                true,
+	"sect.abode.leave":                true,
+	"law.technique":                   true,
+	"sect.shadow":                     true,
 	"sense.inspect":                   true,
 	"sense.conceal":                   true,
 	"tribulation.prepare":             true,
@@ -148,6 +154,8 @@ var authoritativeMutations = map[string]bool{
 	"personal_world.set_rule":         true,
 	"personal_world.enter":            true,
 	"personal_world.leave":            true,
+	"commission.accept":               true,
+	"commission.resolve":              true,
 }
 var authoritativeQueries = map[string]bool{
 	"character.lifespan":        true,
@@ -212,6 +220,28 @@ func stage5CanonicalizeMutationPayload(conn *storage.Conn, operation string, raw
 	return encoded, gameMinute, nil
 }
 
+// replayResponse returns the stored response for an action_id that has already
+// been applied. `hit` is false when this action_id has never been seen; an
+// action_id belonging to a different actor or operation is an error, not a
+// replay, because reusing one is a client bug that would otherwise return
+// someone else's result.
+func replayResponse(conn *storage.Conn, actionID string, req ActionRequest) (ActionResponse, bool, error) {
+	replay, err := eventledger.Replay(conn, actionID)
+	if err != nil {
+		return ActionResponse{}, false, err
+	}
+	if replay == nil {
+		return ActionResponse{}, false, nil
+	}
+	if replay.ActorID != req.ActorID || replay.Operation != req.Operation {
+		return ActionResponse{}, false, errors.New("action_id already belongs to a different action")
+	}
+	return ActionResponse{
+		APIVersion: authoritativeAPIVersion, ActionID: actionID, Operation: req.Operation,
+		StateVersion: replay.StateVersion, Replayed: true, Result: replay.Result,
+	}, true, nil
+}
+
 func isAuthoritativeOperation(op string) bool {
 	return authoritativeMutations[op] || authoritativeQueries[op]
 }
@@ -242,13 +272,12 @@ func applyAuthoritative(databasePath, worldPath string, req ActionRequest) (Acti
 		return ActionResponse{}, err
 	}
 	defer conn.Close()
-	if replay, err := eventledger.Replay(conn, actionID); err != nil {
+	// The cheap check: most duplicates are a client retrying long after the
+	// original committed, and they never need the write lock at all.
+	if replayed, hit, err := replayResponse(conn, actionID, req); err != nil {
 		return ActionResponse{}, err
-	} else if replay != nil {
-		if replay.ActorID != req.ActorID || replay.Operation != req.Operation {
-			return ActionResponse{}, errors.New("action_id already belongs to a different action")
-		}
-		return ActionResponse{APIVersion: authoritativeAPIVersion, ActionID: actionID, Operation: req.Operation, StateVersion: replay.StateVersion, Replayed: true, Result: replay.Result}, nil
+	} else if hit {
+		return replayed, nil
 	}
 	if err := conn.ExecScript("BEGIN IMMEDIATE;"); err != nil {
 		return ActionResponse{}, err
@@ -258,6 +287,22 @@ func applyAuthoritative(databasePath, worldPath string, req ActionRequest) (Acti
 			_ = conn.Rollback()
 		}
 	}()
+	// And the one that matters: two callers can both miss the check above and
+	// then queue for the write lock. Whoever gets in second must see the
+	// winner's receipt, or it re-runs the mutation and dies on a unique
+	// constraint - the state stays correct, but the caller gets an error where
+	// the contract promises the original result. Under 24 concurrent requests
+	// with one action_id that was 10-23 spurious failures; this makes them all
+	// replays. The check has to be *inside* the transaction, because outside it
+	// is exactly the check that just failed.
+	if replayed, hit, err := replayResponse(conn, actionID, req); err != nil {
+		return ActionResponse{}, err
+	} else if hit {
+		if err := conn.Rollback(); err != nil {
+			return ActionResponse{}, err
+		}
+		return replayed, nil
+	}
 	current, err := eventledger.CurrentActorVersion(conn, req.ActorID)
 	if err != nil {
 		return ActionResponse{}, err
@@ -305,6 +350,18 @@ func applyAuthoritative(databasePath, worldPath string, req ActionRequest) (Acti
 			} else {
 				mutation, err = resolveSceneAction(conn, catalog, req.ActorID, req.Payload)
 			}
+		case "alchemy.purge":
+			mutation, err = alchemyPurgeAction(conn, req.ActorID, req.Payload)
+		case "character.set_gender":
+			mutation, err = setGenderAction(conn, req.ActorID, req.Payload)
+		case "sect.abode.enter":
+			mutation, err = sectAbodeMoveAction(conn, req.ActorID, req.Payload, "enter")
+		case "sect.abode.leave":
+			mutation, err = sectAbodeMoveAction(conn, req.ActorID, req.Payload, "leave")
+		case "commission.accept":
+			mutation, err = commissionAcceptAction(conn, req.ActorID, req.Payload)
+		case "commission.resolve":
+			mutation, err = commissionResolveAction(conn, req.ActorID, req.Payload)
 		case "lifecycle.true_death":
 			mutation, err = trueDeathAction(conn, req.ActorID, req.Payload)
 		case "combat.start":
@@ -341,7 +398,7 @@ func applyAuthoritative(databasePath, worldPath string, req ActionRequest) (Acti
 			"lifecycle.reincarnate", "combat.turn", "combat.technique", "combat.recovery_item",
 			"perfection.start", "perfection.quest", "perfection.trial", "perfection.abandon",
 			"perfection.body_start", "perfection.body_quest", "perfection.body_trial", "perfection.body_abandon", "law.comprehend",
-			"condition.treat", "sense.inspect", "sense.conceal", "tribulation.prepare", "tribulation.attempt",
+			"law.technique", "sect.shadow", "condition.treat", "sense.inspect", "sense.conceal", "tribulation.prepare", "tribulation.attempt",
 			"exploration.explore", "exploration.event.act", "exploration.event.leave", "exploration.travel", "exploration.hunt",
 			"secret_realm.enter", "secret_realm.explore", "secret_realm.leave", "craft.resolve", "forage.resolve",
 			"beast.tame", "beast.feed", "beast.train", "beast.evolve", "beast.active", "artifact.bond", "artifact.awaken",
@@ -396,6 +453,10 @@ func applyAuthoritative(databasePath, worldPath string, req ActionRequest) (Acti
 				mutation, err = perfectionAbandonAction(conn, catalog, req.ActorID, req.Payload, true)
 			case "law.comprehend":
 				mutation, err = lawComprehendAction(conn, catalog, req.ActorID, req.Payload)
+			case "law.technique":
+				mutation, err = lawTechniqueAction(conn, catalog, req.ActorID, req.Payload)
+			case "sect.shadow":
+				mutation, err = shadowAction(conn, catalog, req.ActorID, req.Payload)
 			case "condition.treat":
 				mutation, err = conditionTreatAction(conn, catalog, req.ActorID, req.Payload)
 			case "sense.inspect":

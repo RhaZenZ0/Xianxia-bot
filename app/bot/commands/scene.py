@@ -16,6 +16,7 @@ from discord import app_commands
 
 from ...ops.game_engine import GameEngineError
 from ...ai.narrator import roll_npc_memory
+from ...rules import commissions as commission_rules
 from ...rules.npc_memory import classify_memory, exchange_memory_summary, public_mood_hint
 from .. import scene_layout
 from ..character_state import announce_quest_progress, current_effect_modifiers
@@ -34,6 +35,7 @@ from ..runtime import (
     serialized_user_action,
 )
 from ..services import (
+    COMMISSIONS,
     GUILD,
     NARRATOR,
     NARRATOR_CONTEXT,
@@ -42,6 +44,7 @@ from ..services import (
     QUESTS,
     SIM,
 )
+from ..ui.commissions import commission_reply_extras, offer_for as commission_offer_for
 from ..threads import _private_scene_for_thread, active_private_location_thread, ensure_expedition_thread
 
 
@@ -100,6 +103,26 @@ async def talk(
         if visible_mood:
             social_context += f"\nCurrent outward demeanor: {visible_mood}."
         social_context += f"\nCurrent observable activity: {npc_state.get('activity','Following established routine')}."
+    # Commissions (v0.22.0): if this NPC gives work, the ladder runs here -
+    # before the model call, on stored state only - and its result is handed to
+    # the narrator as canon. The player's words influence *whether* he offers
+    # only in the sense that they reached him; they never shape the commission.
+    commission_offer = None
+    commission_block: dict[str, Any] | None = None
+    if COMMISSIONS.is_giver(npc):
+        try:
+            wt_offer = await current_world_time()
+            commission_offer = await commission_offer_for(
+                interaction.user.id, npc,
+                realm_index=int(c.get("realm_index", 0) or 0),
+                game_minute=wt_offer.total_minutes,
+            )
+            commission_block = commission_rules.commission_context(
+                commission_offer, item_names=COMMISSIONS.item_names())
+        except Exception:
+            log.exception("Commission selection failed for %s", npc)
+            commission_offer = None
+            commission_block = None
     await interaction.response.defer()
     try:
         answer = await NARRATOR_QUEUE.run(
@@ -114,6 +137,7 @@ async def talk(
                 scene_context=social_context,
                 npc_state=npc_state,
                 salient_memories=salient_memories,
+                commission_context=commission_block,
             ),
         )
     except Exception:
@@ -160,7 +184,18 @@ async def talk(
             f"\n\n🏯 **Sect connection:** {npc} is affiliated with **{npc_data.get('sect_affiliation')}**. "
             "After speaking with them, you may use **Sect → Recruitment → Recommendation** to ask for formal sponsorship."
         )
+    commission_card, commission_view = ("", None)
+    if commission_offer is not None:
+        try:
+            commission_card, commission_view = await commission_reply_extras(interaction.user.id, commission_offer)
+        except Exception:
+            log.exception("Commission card build failed for %s", npc)
+            commission_card, commission_view = ("", None)
     await reply_long(interaction, f"**{npc}**\n{answer}{recommendation_hint}")
+    if commission_card:
+        # Posted as its own message so the buttons are attached to the
+        # canonical card, never to a paragraph the model wrote.
+        await interaction.followup.send(commission_card, view=commission_view, ephemeral=False)
 
 
 SCENE_ACTION_TYPES: dict[str, dict[str, Any]] = {
@@ -655,6 +690,10 @@ async def scene_status(interaction: discord.Interaction) -> None:
 # Phase 8 (v0.19.43) routed EventSceneView to these through the registry;
 # phase 9e moved the bindings here with the panel helpers.
 EVENT_HANDLERS.register("scene_action_targets", _scene_action_targets)
+# Typed play (v0.21.1) resolves "> I sneak past the guards" through the same
+# function the /action panel's detail modal submits to - by name, so bot.py
+# and typed_play.py stay below this module in the import graph.
+EVENT_HANDLERS.register("scene_action_resolve", _resolve_scene_action)
 
 
 async def _scene_action_panel_handler(*args: Any, **kwargs: Any):

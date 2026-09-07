@@ -18,7 +18,7 @@ from ...rules.progression_systems import condition_definition, profession_rank, 
 from ..character_state import current_effect_modifiers
 from ..formatting import roll_line
 from ..registry import registered_group_command
-from ..runtime import DB, ENGINE, WORLD, current_world_time, reply_long, require_character, serialized_user_action
+from ..runtime import _explain_engine_error, DB, ENGINE, WORLD, current_world_time, reply_long, require_character, respond, serialized_user_action
 from .battle import _battle_panel, _execute_battle_law_technique
 
 
@@ -89,30 +89,40 @@ async def law_technique_autocomplete(interaction:discord.Interaction,current:str
 async def law_technique_command(interaction:discord.Interaction,technique:str)->None:
     c=await require_character(interaction)
     if not c:return
+    if not interaction.response.is_done():
+        await interaction.response.defer(ephemeral=False)
     t=WORLD.law_technique(technique)
-    if not t: await interaction.response.send_message("Unknown Law technique.",ephemeral=False);return
+    if not t: await respond(interaction, "Unknown Law technique.",ephemeral=False);return
     rows=await DB.get_law_progress(interaction.user.id,str(t['law'])); comp=int(rows[0]['comprehension']) if rows else 0; stage=WORLD.law_stage(comp)
     if int(stage['index'])<int(t.get('requires_stage',1)) or int(c['realm_index'])<int(t.get('min_realm_index',0)):
-        await interaction.response.send_message(f"You have not met the requirements for **{t['name']}**. Needed: Law stage {t.get('requires_stage')} and realm **{WORLD.realm_name(int(t.get('min_realm_index',0)))}**.",ephemeral=False);return
+        await respond(interaction, f"You have not met the requirements for **{t['name']}**. Needed: Law stage {t.get('requires_stage')} and realm **{WORLD.realm_name(int(t.get('min_realm_index',0)))}**.",ephemeral=False);return
     if technique=='world_collapse':
         pw=await DB.get_personal_world(interaction.user.id)
-        if not pw: await interaction.response.send_message("World Collapse requires a stabilized personal world.",ephemeral=False);return
+        if not pw: await respond(interaction, "World Collapse requires a stabilized personal world.",ephemeral=False);return
     battle=await DB.get_active_battle(interaction.user.id)
     if technique in {'spatial_lockdown','spatial_strangulation'} and not battle:
-        await interaction.response.send_message("That control technique currently requires an active battle target.",ephemeral=False);return
+        await respond(interaction, "That control technique currently requires an active battle target.",ephemeral=False);return
     if battle:
         result=await _execute_battle_law_technique(interaction,battle,technique)
         updated=await DB.get_battle(int(battle['battle_id']),user_id=interaction.user.id,active_only=True)
         if not updated:
-            await interaction.response.send_message("⌛ This battle has already ended.",ephemeral=False);return
+            await respond(interaction, "⌛ This battle has already ended.",ephemeral=False);return
         c=await DB.get_character(interaction.user.id) or c
         embed,view=await _battle_panel(interaction.user.id,c,updated,result_text=result)
-        await interaction.response.send_message(embed=embed,view=view);return
-    effect_id=str(t.get('effect',''))
-    effect=WORLD.special_effect(effect_id) if effect_id else None
-    if effect:
-        wt=await current_world_time(); payload=normalize_effect_payload({'effect_key':effect_id,'special':True,**effect}); await DB.apply_effect(interaction.user.id,effect_key=effect_id,name=str(effect['name']),source_type='law',source_id=technique,effect=payload,starts_game_minute=wt.total_minutes,duration_game_minutes=120)
-    await interaction.response.send_message(f"🌌 **{t['name']}** manifests.\n{t.get('description','')}")
+        await respond(interaction, embed=embed,view=view);return
+    # Out of battle the technique is an engine action too, as of v0.23.0: the
+    # requirement checks above and the effect write below used to sit on the
+    # same side of the boundary, so nothing but this file decided whether a
+    # player qualified. The engine re-checks them and owns the write.
+    try:
+        await ENGINE.authoritative_action(
+            "law.technique", interaction.user.id, {"technique": technique},
+            action_id=f"discord:{interaction.id}:law.technique:{technique}",
+        )
+    except GameEngineError as exc:
+        await respond(interaction, f"❌ {_explain_engine_error(exc)}", ephemeral=False)
+        return
+    await respond(interaction, f"🌌 **{t['name']}** manifests.\n{t.get('description','')}")
 
 # ---------- Manuals / forbidden cultivation ----------
 manual_group = app_commands.Group(name="manual", description="Study cultivation manuals and use learned techniques")

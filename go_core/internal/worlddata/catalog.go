@@ -128,8 +128,8 @@ type ItemUse struct {
 	LifespanYears       int64          `json:"lifespan_years"`
 }
 type Item struct {
-	Name             string         `json:"name"`
-	Use              ItemUse        `json:"use"`
+	Name string  `json:"name"`
+	Use  ItemUse `json:"use"`
 	// PillToxicity overrides the derived medicinal-residue value when the
 	// content sets it (nil = derive from tags/use, as app/rules/alchemy.py).
 	PillToxicity     *int64         `json:"pill_toxicity"`
@@ -294,6 +294,7 @@ type ManualDefinition struct {
 	Alignment     string   `json:"alignment"`
 	Path          string   `json:"path"`
 	Grade         string   `json:"grade"`
+	Sect          string   `json:"sect"` // the sect whose entry inheritance this is (v0.21.4); "" for the rest
 	MinRealmIndex int64    `json:"min_realm_index"`
 	Description   string   `json:"description"`
 	Techniques    []string `json:"techniques"`
@@ -322,6 +323,14 @@ type TechniqueSystemDefinition struct {
 
 type SectDefinition struct {
 	Alignment string `json:"alignment"`
+	Hidden    bool   `json:"hidden"` // the Heaven-Devouring Demon Sect: no public trial, no entry manual
+	// Karma gates and cell names for a hidden sect (v0.23.0). Only the
+	// Heaven-Devouring Demon Sect carries these today; a public sect leaves
+	// them zero and Branches empty.
+	Branches         map[string]string `json:"branches"`
+	KarmaObservation int64             `json:"karma_observation"`
+	KarmaInitiation  int64             `json:"karma_initiation"`
+	RighteousEnemy   int64             `json:"righteous_enemy"`
 }
 
 type Catalog struct {

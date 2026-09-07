@@ -33,6 +33,38 @@ QUEST_DEFINITIONS: dict[str, dict] = {
 }
 
 
+def static_quest_seed_rows(definitions: dict[str, dict] | None = None) -> list[dict[str, Any]]:
+    """The static quests, shaped for `Database.sync_commission_pool`.
+
+    They are seeded so the engine can tell a real quest key from an invented
+    one. `commission.accept` decides "is this a commission?" by looking for a
+    `quest_definitions` row with a giver; before v0.23.1 it decided "does this
+    quest exist?" the same way, so a key with no row - `first_steps` and
+    `totally_fake` alike - was accepted as an ordinary quest.
+
+    `giver_npc` is deliberately empty: these are not commissions, they occupy
+    no commission slot and carry no deadline. The row exists to be found.
+    """
+    source = QUEST_DEFINITIONS if definitions is None else definitions
+    rows: list[dict[str, Any]] = []
+    for key, definition in source.items():
+        rows.append({
+            "quest_key": key,
+            "title": str(definition.get("title", "")),
+            "description": str(definition.get("description", "")),
+            "source_type": str(definition.get("source_type", "system")),
+            "source_key": str(definition.get("source_key", "")),
+            "objectives": list(definition.get("objectives", [])),
+            "rewards": dict(definition.get("rewards", {})),
+            "giver_npc": "",
+            "realm_band": "",
+            "tier": 1,
+            "deadline_game_minutes": 0,
+            "variants": [],
+        })
+    return rows
+
+
 # ---------------------------------------------------------------------------
 # Quest Forge (v0.20.6): the vocabulary a drafted quest may use, validation
 # of a draft against the world, and a procedural draft for when no model is

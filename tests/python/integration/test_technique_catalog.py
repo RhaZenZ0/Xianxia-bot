@@ -23,12 +23,12 @@ class TechniqueCatalogTests(unittest.IsolatedAsyncioTestCase):
         self.tmp.cleanup()
 
     async def test_catalog_scale_and_the_demonic_branch(self):
-        self.assertEqual(len(self.world.manuals), 148)
-        self.assertEqual(len(self.world.techniques), 528)
+        self.assertEqual(len(self.world.manuals), 154)  # 148 generated + 6 authored sect entry manuals (v0.21.4)
+        self.assertEqual(len(self.world.techniques), 546)
         evil_manuals = [m for m in self.world.manuals.values() if str(m.get("alignment", "")).lower() == "demonic"]
         evil_techniques = [t for t in self.world.techniques.values() if str((self.world.manuals.get(str(t.get("manual"))) or {}).get("alignment", "")).lower() == "demonic"]
-        self.assertEqual(len(evil_manuals), 42)
-        self.assertEqual(len(evil_techniques), 160)
+        self.assertEqual(len(evil_manuals), 44)
+        self.assertEqual(len(evil_techniques), 166)
         self.assertIn("blood_sea_palm", self.world.techniques)
         self.assertEqual(self.world.sects["Blood River Sect"]["alignment"], "Demonic")
         hidden = self.world.sects.get("Heaven-Devouring Demon Sect")
@@ -57,9 +57,9 @@ class TechniqueCatalogTests(unittest.IsolatedAsyncioTestCase):
         await self.db.sync_world_catalog(self.world.data)
         async with self.db._connect() as conn:
             cur = await conn.execute("SELECT COUNT(*) FROM catalog_manuals")
-            self.assertEqual((await cur.fetchone())[0], 148)
+            self.assertEqual((await cur.fetchone())[0], 154)
             cur = await conn.execute("SELECT COUNT(*) FROM catalog_techniques")
-            self.assertEqual((await cur.fetchone())[0], 528)
+            self.assertEqual((await cur.fetchone())[0], 546)
         territories = await self.db.get_territories()
         self.assertEqual(len(territories), len(self.world.locations))
         era = await self.db.get_current_era()

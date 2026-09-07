@@ -245,7 +245,10 @@ VALUES(?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(location) DO NOTHING`,
 			role = "Wandering cultivator"
 		}
 		faction := "Independent"
-		for sectName := range r.Catalog.Sects {
+		for sectName, sect := range r.Catalog.Sects {
+			if sect.Hidden {
+				continue
+			}
 			if strings.Contains(strings.ToLower(role), strings.ToLower(sectName)) {
 				faction = sectName
 				break
@@ -283,6 +286,9 @@ VALUES(?,?,?,?,100,'',0,?,?, 'single','',0,?,?,?) ON CONFLICT(npc_name) DO NOTHI
 	}
 
 	for sectName, data := range r.Catalog.Sects {
+		if data.Hidden {
+			continue
+		}
 		seed := hash64(sectName)
 		alignment := strings.TrimSpace(data.Alignment)
 		if alignment == "" {
@@ -315,7 +321,10 @@ VALUES(?,?,?,?,?,?) ON CONFLICT(sect_name,faction_name) DO NOTHING`,
 	}
 
 	sectNames := make([]string, 0, len(r.Catalog.Sects))
-	for name := range r.Catalog.Sects {
+	for name, sect := range r.Catalog.Sects {
+		if sect.Hidden {
+			continue
+		}
 		sectNames = append(sectNames, name)
 	}
 	for i, a := range sectNames {

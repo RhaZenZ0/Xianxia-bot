@@ -9,12 +9,12 @@ from typing import Iterable
 # run before the bot/dashboard dependencies are installed.  Keep the browser/API,
 # schema-review, and newer-system coverage contract in one place.
 DASHBOARD_API_VERSION = 2
-DASHBOARD_REVIEWED_SCHEMA_VERSION = 28
+DASHBOARD_REVIEWED_SCHEMA_VERSION = 31
 
 DASHBOARD_GET_API_PATHS = frozenset({
     "/api/overview", "/api/capabilities", "/api/timeline", "/api/npcs", "/api/npc",
     "/api/families", "/api/sects", "/api/conflicts", "/api/events", "/api/players", "/api/player",
-    "/api/cultivation", "/api/crafting", "/api/exploration", "/api/economy", "/api/dynasties",
+    "/api/cultivation", "/api/crafting", "/api/exploration", "/api/commissions", "/api/economy", "/api/dynasties",
     "/api/party", "/api/pvp", "/api/conditions", "/api/threads",
     "/api/rag", "/api/decisions", "/api/admin", "/api/discord", "/api/health",
 })
@@ -36,6 +36,7 @@ DASHBOARD_VIEW_ENDPOINTS = {
     "cultivation": "/api/cultivation",
     "crafting": "/api/crafting",
     "exploration": "/api/exploration",
+    "commissions": "/api/commissions",
     "economy": "/api/economy",
     "dynasties": "/api/dynasties",
     "party": "/api/party",
@@ -68,6 +69,13 @@ DASHBOARD_SYSTEM_TABLES = {
         "exploration_events", "exploration_event_participants", "secret_realm_runs",
         "character_location_discoveries", "wild_beast_encounters", "caravans", "caravan_operations",
         "expedition_threads", "quest_definitions",
+    ),
+    # Commissions (v0.22.0, schema 29). `quest_definitions` stays registered to
+    # `exploration`, which owns forged non-commission quests; this view reads
+    # the commission rows out of it and owns the player-side table - which
+    # commission someone is carrying, on what terms, and until when.
+    "commissions": (
+        "character_quests",
     ),
     "economy": (
         "economy_markets", "economy_events", "auctions", "auction_bids", "black_market_posts",

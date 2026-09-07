@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import Any
 
 from ..rules.aptitudes import aptitude_effects
-from ..rules.effects import aggregate_modifiers, medicine_toxicity_effect, normalize_effect_payload
+from ..rules.effects import aggregate_modifiers, normalize_effect_payload
 from ..rules.npc_memory import classify_memory, scene_memory_summary
 from ..rules.worldtime import from_game_minutes
 from .runtime import DB, ENGINE, WORLD, log
@@ -67,23 +67,6 @@ async def current_effect_modifiers(user_id: int) -> tuple[list[dict], dict[str, 
     return effects, aggregate_modifiers(effects), wt
 
 
-async def sync_pill_toxicity_effect(user_id: int, *, game_minute: int, state: dict | None = None) -> dict:
-    state = state or await DB.get_alchemy_state(int(user_id), game_minute=int(game_minute))
-    toxicity = int(state.get("pill_toxicity", 0))
-    payload = medicine_toxicity_effect(toxicity)
-    if payload is None:
-        await DB.remove_effect(
-            int(user_id), effect_key="pill_toxicity", source_type="alchemy", source_id="pill_toxicity",
-        )
-    else:
-        await DB.apply_effect(
-            int(user_id), effect_key="pill_toxicity", name="Pill Toxicity",
-            source_type="alchemy", source_id="pill_toxicity", effect=normalize_effect_payload(payload),
-            starts_game_minute=int(game_minute), duration_game_minutes=None,
-        )
-    return state
-
-
 def _npc_name_mentioned(text: str, npc_name: str) -> bool:
     haystack = " ".join(str(text or "").casefold().split())
     words = [w for w in str(npc_name or "").casefold().split() if w]
@@ -126,6 +109,12 @@ async def _remember_freeform_npc_scene(
         )
 
 
+def _item_label(item_id: str) -> str:
+    """Name the item rather than printing its key at the player."""
+    item = dict(WORLD.items.get(str(item_id)) or {})
+    return str(item.get("name") or str(item_id).replace("_", " ").title())
+
+
 async def announce_quest_progress(interaction: Any, changed: list[dict[str, Any]]) -> None:
     """Tell the player what QUESTS.progress() just did - a completed quest used
     to flip to `completed` in silence (v0.20.6). Best effort: never raises."""
@@ -140,8 +129,21 @@ async def announce_quest_progress(interaction: Any, changed: list[dict[str, Any]
             if rewards.get("spirit_stones"):
                 parts.append(f"🪙 {int(rewards['spirit_stones'])} spirit stones")
             for item_id, qty in dict(rewards.get("items") or {}).items():
-                parts.append(f"🎁 {item_id} ×{int(qty)}")
-            lines.append(f"📜 **Quest complete: {title}**" + (" — " + ", ".join(parts) if parts else ""))
+                parts.append(f"🎁 {_item_label(item_id)} ×{int(qty)}")
+            commission = dict(row.get("commission") or {})
+            if commission:
+                # The payout line is the whole reveal for an undisclosed
+                # commission, so it is stated in full even when it is a
+                # disappointment - especially when it is a disappointment.
+                giver = str(commission.get("giver_npc") or "")
+                paid = ", ".join(parts) if parts else "nothing at all"
+                lines.append(f"📜 **Commission complete: {title}**"
+                             + (f" — {giver} pays: {paid}" if giver else f" — paid: {paid}"))
+                standing = dict(commission.get("standing") or {})
+                if standing:
+                    lines.append(f"-# Standing with {giver or 'them'} rises.")
+            else:
+                lines.append(f"📜 **Quest complete: {title}**" + (" — " + ", ".join(parts) if parts else ""))
         else:
             lines.append(f"📜 Quest progress: **{title}**")
     if not lines:

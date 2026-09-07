@@ -876,6 +876,90 @@ class ReadOnlyDashboardStore:
                 "caravans": caravans, "expedition_threads": expeditions, "forged_quests": forged_quests,
             }
 
+    async def commissions(self) -> dict[str, Any]:
+        """The GM's view of the commission pipeline (v0.22.0).
+
+        Three questions, in the order a GM asks them: what is waiting for my
+        approval, what are players carrying right now, and how have commissions
+        been ending. Personal (invented) definitions are shown with their owner
+        and their seed, because reviewing them after the fact is the only
+        control over that producer - retiring one before it completes costs the
+        player nothing and pays nothing.
+        """
+        async with self._connect() as db:
+            clock = await self._world_clock(db)
+            now_minute = int(clock.get("game_minute") or 0)
+            definitions = await self._fetchall_if_table(
+                db, "quest_definitions",
+                """SELECT q.quest_key,q.title,q.description,q.status,q.origin,q.source_key,q.giver_npc,q.realm_band,
+                          q.tier,q.owner_user_id,q.deadline_game_minutes,q.objectives_json,q.rewards_json,
+                          q.variants_json,q.seed_json,q.model,q.created_at,q.reviewed_by,q.reviewed_at,
+                          COALESCE(q.requires_sect,'') AS requires_sect,
+                          COALESCE(q.reward_visibility,'shown') AS reward_visibility,
+                          COALESCE(q.boast,'') AS boast,
+                          c.name AS owner_name,
+                          (SELECT COUNT(*) FROM character_quests h WHERE h.quest_key=q.quest_key) AS taken
+                   FROM quest_definitions q LEFT JOIN characters c ON c.user_id=q.owner_user_id
+                   WHERE q.giver_npc<>''
+                   ORDER BY (q.status='draft') DESC,q.tier,q.created_at DESC LIMIT 200""",
+            )
+            held = await self._fetchall_if_table(
+                db, "character_quests",
+                """SELECT h.user_id,h.quest_key,h.status,h.progress_json,h.accepted_game_minute,
+                          h.deadline_game_minute,h.variant_index,h.resolved_game_minute,
+                          c.name AS player_name,q.title,q.giver_npc,q.tier,q.owner_user_id,q.objectives_json,q.variants_json
+                   FROM character_quests h JOIN characters c ON c.user_id=h.user_id
+                   LEFT JOIN quest_definitions q ON q.quest_key=h.quest_key
+                   WHERE h.commission=1
+                   ORDER BY (h.status='active') DESC,h.deadline_game_minute,h.updated_at DESC LIMIT 200""",
+            )
+            standing = await self._fetchall_if_table(
+                db, "npc_relationships",
+                """SELECT r.user_id,r.npc_name,r.trust,r.respect,r.grudge,
+                          (r.trust+r.respect-r.grudge) AS standing,
+                          r.commission_cooldown_until_game_minute,r.commissions_completed,
+                          r.commissions_failed,r.commissions_abandoned,r.last_commission_outcome,
+                          c.name AS player_name
+                   FROM npc_relationships r JOIN characters c ON c.user_id=r.user_id
+                   WHERE r.commissions_completed+r.commissions_failed+r.commissions_abandoned > 0
+                   ORDER BY (r.commission_cooldown_until_game_minute > ?) DESC,r.updated_at DESC LIMIT 200""",
+                (now_minute,),
+            )
+            for row in held:
+                due = row.get("deadline_game_minute")
+                row["due_in_game_minutes"] = (int(due) - now_minute) if due is not None else None
+                row["overdue"] = bool(due is not None and int(due) <= now_minute and str(row.get("status")) == "active")
+            active = [r for r in held if str(r.get("status")) == "active"]
+            return {
+                "summary": {
+                    "approved_pool": sum(1 for r in definitions if str(r.get("status")) == "approved" and r.get("owner_user_id") is None),
+                    "drafts": sum(1 for r in definitions if str(r.get("status")) == "draft"),
+                    "personal": sum(1 for r in definitions if r.get("owner_user_id") is not None),
+                    "undisclosed": sum(1 for r in definitions if str(r.get("reward_visibility")) == "hidden"),
+                    "sect_gated": sum(1 for r in definitions if str(r.get("requires_sect") or "")),
+                    "held": len(active),
+                    "overdue": sum(1 for r in active if r.get("overdue")),
+                    "completed": sum(1 for r in held if str(r.get("status")) == "completed"),
+                    "failed": sum(1 for r in held if str(r.get("status")) == "failed"),
+                    "abandoned": sum(1 for r in held if str(r.get("status")) == "abandoned"),
+                },
+                "game_minute": now_minute,
+                "definitions": definitions,
+                "held": held,
+                "standing": standing,
+                # The engine's numbers, shown so a GM can see what the outcomes
+                # actually cost without reading Go. They are compiled constants
+                # in commission_actions.go, not settings, so they are read-only
+                # here rather than a form that would silently do nothing.
+                "rules": {
+                    "cooldown_world_days": 2,
+                    "completed": {"trust": 6, "respect": 4, "grudge": 0},
+                    "failed": {"trust": -5, "respect": -3, "grudge": 4},
+                    "abandoned": {"trust": -5, "respect": -3, "grudge": 4},
+                    "note": "Failed and abandoned cost the same. Nothing pays at accept; rewards move on completion only.",
+                },
+            }
+
     async def threads(self) -> dict[str, Any]:
         """Unified view of every Discord thread the bot tracks across all systems.
 
@@ -1137,6 +1221,11 @@ class AdminDashboardController:
         "player.set_physique": "admin.player.set_physique",
         "player.set_tribulation": "admin.player.set_tribulation",
         "player.clear_condition": "admin.player.clear_condition",
+        # Commissions (v0.22.0). review moves a definition between draft /
+        # approved / retired; retire ends one player's held commission at no
+        # cost to them. Both audit inside the engine transaction.
+        "commission.review": "admin.commission.review",
+        "commission.retire": "admin.commission.retire",
         "player.force_reincarnation_ready": "admin.player.force_reincarnation_ready",
         "player.set_pill_toxicity": "admin.player.set_pill_toxicity",
         "player.set_beast_stats": "admin.player.set_beast_stats",
@@ -1574,6 +1663,8 @@ class DashboardServer:
                 await self._send_json(writer, 200, await self.store.crafting()); return
             if path == "/api/exploration":
                 await self._send_json(writer, 200, await self.store.exploration()); return
+            if path == "/api/commissions":
+                await self._send_json(writer, 200, await self.store.commissions()); return
             if path == "/api/threads":
                 await self._send_json(writer, 200, await self.store.threads()); return
             if path == "/api/economy":

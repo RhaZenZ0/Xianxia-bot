@@ -247,3 +247,57 @@ func TestSceneTransitionNormalizationAndLimits(t *testing.T) {
 		requireContractCode(t, contractErr, "invalid_scene")
 	}
 }
+
+// The gap that let the wildcard survive: there was a test for a *wrong*
+// target ("Elder Oak" against "Elder Pine") and none for a *missing* one.
+// `payload.Target == nil` short-circuited the comparison, so a bare event
+// progressed every targeted objective of its type the character was carrying.
+func TestATargetlessEventDoesNotProgressTargetedObjectives(t *testing.T) {
+	untargeted := validRequest("quest.progress", `{
+        "progress":{"pine":0,"qiao":0,"any":0},
+        "objectives":[
+            {"id":"pine","type":"talk","target":"Elder Pine","count":1},
+            {"id":"qiao","type":"talk","target":"Steward Qiao","count":1},
+            {"id":"any","type":"talk","count":1}
+        ],
+        "objective_type":"talk","amount":1
+    }`)
+	response, err := Apply(untargeted)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result := response.Result.(map[string]any)
+	progress := result["progress"].(map[string]int64)
+
+	// The objective that names nobody is satisfied by talking to anyone.
+	if progress["any"] != 1 {
+		t.Fatalf("an untargeted objective did not progress: %#v", progress)
+	}
+	// The two that name someone are not.
+	for _, id := range []string{"pine", "qiao"} {
+		if progress[id] != 0 {
+			t.Fatalf("objective %q progressed on an event with no target: %#v", id, progress)
+		}
+	}
+	if result["complete"] == true {
+		t.Fatalf("a targetless event completed a targeted quest: %#v", result)
+	}
+}
+
+// And the case that must keep working: the right target still counts.
+func TestAMatchingTargetStillProgresses(t *testing.T) {
+	matching := validRequest("quest.progress", `{
+        "progress":{"pine":0},
+        "objectives":[{"id":"pine","type":"talk","target":"Elder Pine","count":1}],
+        "objective_type":"talk","target":"elder pine","amount":1
+    }`)
+	response, err := Apply(matching)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result := response.Result.(map[string]any)
+	progress := result["progress"].(map[string]int64)
+	if progress["pine"] != 1 {
+		t.Fatalf("a matching target did not progress (case-insensitively): %#v", progress)
+	}
+}
