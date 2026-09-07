@@ -114,6 +114,11 @@ def _add_manual(
         "sect_value": 18 + min_realm_index * 3,
         "base_price": 90 + min_realm_index * 25,
         "special": bool(demonic or min_realm_index >= 16),
+        # Inheritances are given (sect entry, hidden-sect initiation), found
+        # or traded under the counter - never stocked on a town market. Without
+        # this every regional market would list all 142 of them at base_price
+        # the moment the catalog is on disk (v0.21.3).
+        "market_excluded": True,
         "description": "A mechanically learnable cultivation manual from the expanded inheritance catalog.",
     }
 

@@ -1,0 +1,245 @@
+{
+  "_comment": "Typed play verb table (v0.21.1). A prefixed line ('> I explore the ravine') is matched against these aliases and dispatched to the EXISTING handler named here - the router never resolves an outcome itself. kind=root: a slash root command with no required parameters (app/bot/registry.py ACTIONS). kind=scene: one of the eight scene actions in app/bot/commands/scene.py, with the whole line as the detail and the named NPC/player as the target. kind=talk: /talk with the named NPC. Aliases are whole-word phrases, matched after the leading 'I / I'll / let me / I try to' is stripped; a longer alias beats a shorter one and an alias at the start of the line beats one in the middle. Two matches of equal standing become a picker, never a guess. Grow this file from what the picker shows players choosing.",
+  "actions": [
+    {
+      "key": "explore",
+      "kind": "root",
+      "command": "explore",
+      "label": "Explore the area",
+      "aliases": [
+        "explore",
+        "look around",
+        "search the area",
+        "scout",
+        "scout around",
+        "wander",
+        "survey the area",
+        "have a look around"
+      ]
+    },
+    {
+      "key": "hunt",
+      "kind": "root",
+      "command": "hunt",
+      "label": "Hunt a spirit beast",
+      "aliases": [
+        "hunt",
+        "go hunting",
+        "track a beast",
+        "stalk a beast",
+        "hunt for beasts"
+      ]
+    },
+    {
+      "key": "cultivate",
+      "kind": "root",
+      "command": "cultivate",
+      "label": "Cultivate",
+      "aliases": [
+        "cultivate",
+        "meditate",
+        "sit in meditation",
+        "gather qi",
+        "absorb qi",
+        "sit and cultivate",
+        "train my cultivation"
+      ]
+    },
+    {
+      "key": "breakthrough",
+      "kind": "root",
+      "command": "breakthrough",
+      "label": "Attempt a breakthrough",
+      "aliases": [
+        "break through",
+        "breakthrough",
+        "attempt a breakthrough",
+        "attempt to break through",
+        "push for a breakthrough"
+      ]
+    },
+    {
+      "key": "talk",
+      "kind": "talk",
+      "label": "Talk to {npc}",
+      "aliases": [
+        "talk",
+        "talk to",
+        "talk with",
+        "speak",
+        "speak to",
+        "speak with",
+        "chat with",
+        "ask",
+        "tell",
+        "greet",
+        "say to",
+        "approach",
+        "address",
+        "call out to",
+        "question"
+      ]
+    },
+    {
+      "key": "scene:observe",
+      "kind": "scene",
+      "scene_action": "observe",
+      "label": "Observe",
+      "aliases": [
+        "observe",
+        "look at",
+        "watch",
+        "study",
+        "examine",
+        "glance at",
+        "take in",
+        "read the room",
+        "size up"
+      ]
+    },
+    {
+      "key": "scene:investigate",
+      "kind": "scene",
+      "scene_action": "investigate",
+      "label": "Investigate",
+      "aliases": [
+        "investigate",
+        "search for",
+        "inspect",
+        "look for clues",
+        "examine closely",
+        "dig into",
+        "trace",
+        "follow the tracks",
+        "search the body",
+        "search the room"
+      ]
+    },
+    {
+      "key": "scene:influence",
+      "kind": "scene",
+      "scene_action": "influence",
+      "label": "Influence",
+      "aliases": [
+        "persuade",
+        "convince",
+        "intimidate",
+        "negotiate",
+        "bargain",
+        "threaten",
+        "flatter",
+        "bribe",
+        "haggle",
+        "plead with",
+        "charm"
+      ]
+    },
+    {
+      "key": "scene:stealth",
+      "kind": "scene",
+      "scene_action": "stealth",
+      "label": "Stealth",
+      "aliases": [
+        "sneak",
+        "hide",
+        "slip past",
+        "shadow",
+        "tail",
+        "creep",
+        "infiltrate",
+        "conceal myself",
+        "stay hidden",
+        "move quietly"
+      ]
+    },
+    {
+      "key": "scene:physical",
+      "kind": "scene",
+      "scene_action": "physical",
+      "label": "Physical feat",
+      "aliases": [
+        "climb",
+        "lift",
+        "force open",
+        "force the",
+        "push",
+        "jump",
+        "leap",
+        "swim",
+        "break down",
+        "smash",
+        "drag",
+        "haul",
+        "vault"
+      ]
+    },
+    {
+      "key": "scene:qi",
+      "kind": "scene",
+      "scene_action": "qi",
+      "label": "Qi control",
+      "aliases": [
+        "channel qi",
+        "channel my qi",
+        "sense qi",
+        "probe with qi",
+        "extend my sense",
+        "spread my sense",
+        "circulate",
+        "circulate qi",
+        "gather my qi",
+        "focus my qi"
+      ]
+    },
+    {
+      "key": "scene:resolve",
+      "kind": "scene",
+      "scene_action": "resolve",
+      "label": "Resolve",
+      "aliases": [
+        "steel myself",
+        "resist",
+        "endure",
+        "brace",
+        "hold firm",
+        "calm my mind",
+        "steady myself",
+        "bear it",
+        "withstand"
+      ]
+    },
+    {
+      "key": "scene:aid",
+      "kind": "scene",
+      "scene_action": "aid",
+      "label": "Aid",
+      "aliases": [
+        "help",
+        "assist",
+        "support",
+        "reassure",
+        "tend to",
+        "bandage",
+        "comfort",
+        "steady"
+      ]
+    }
+  ],
+  "leading_phrases": [
+    "i will",
+    "i'll",
+    "i try to",
+    "i attempt to",
+    "i want to",
+    "i am going to",
+    "i'm going to",
+    "let me",
+    "i go to",
+    "i go and",
+    "i start to",
+    "i begin to",
+    "i",
+    "we",
+    "my character"
+  ]
+}

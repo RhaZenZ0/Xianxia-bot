@@ -1,5 +1,6 @@
 import sqlite3
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -22,8 +23,29 @@ class RecordingEngine:
     It intentionally does not reimplement authoritative Go mechanics.
     """
 
-    def __init__(self):
+    def __init__(self, db=None):
         self.calls = []
+        self.db = db
+
+    async def authoritative_action(self, operation, actor_id, payload, *, action_id, expected_version=None):
+        payload = dict(payload)
+        self.calls.append((str(operation), int(actor_id), payload))
+        # v0.22.0: accepting a quest is `commission.accept`. The real rules -
+        # one at a time, the deadline, the locked terms - are Go's and are
+        # covered by go_core/internal/game/commission_actions_test.go; the fake
+        # only writes the row so the progress path downstream has one to find.
+        if operation == "commission.accept" and self.db is not None:
+            now = time.time()
+            async with self.db._connect() as conn:
+                await conn.execute(
+                    """INSERT INTO character_quests(user_id,quest_key,status,progress_json,accepted_game_minute,
+                           commission,variant_index,created_at,updated_at)
+                       VALUES(?,?,'active','{}',0,0,?,?,?)
+                       ON CONFLICT(user_id,quest_key) DO NOTHING""",
+                    (int(actor_id), str(payload["quest_key"]), int(payload.get("variant_index", 0)), now, now),
+                )
+                await conn.commit()
+        return {"result": {"quest_key": payload.get("quest_key"), "status": "active"}}
 
     async def action(self, operation, actor_id, payload):
         payload = dict(payload)
@@ -58,7 +80,7 @@ class CoreServiceTests(unittest.IsolatedAsyncioTestCase):
             concept="core service architecture test", location="Greenriver Town", attributes=ATTRS,
             qi_max=20, vitality_max=20, created_game_minute=10,
         ))
-        self.engine = RecordingEngine()
+        self.engine = RecordingEngine(self.db)
         self.scenes = LocationSceneService(self.db, engine=self.engine)
         self.relationships = NPCRelationshipService(self.db, engine=self.engine)
         self.quests = QuestService(self.db, QUEST_DEFINITIONS, engine=self.engine)
@@ -108,7 +130,7 @@ class CoreServiceTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(relationship["trust"], 12)
 
-        await self.quests.accept(7001, "first_steps", game_minute=100)
+        await self.quests.accept(7001, "first_steps", action_id="test:accept")
         changed = await self.quests.progress(7001, "explore", game_minute=110)
         self.assertEqual(changed, [])
 
@@ -116,6 +138,7 @@ class CoreServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((await combat.apply_damage(9, 7001, -5))["vitality"], 9)
         operations = [call[0] for call in self.engine.calls]
         self.assertIn("relationship.update", operations)
+        self.assertIn("commission.accept", operations)
         self.assertIn("quest.progress", operations)
         self.assertIn("combat.apply_damage", operations)
         combat_payload = next(call[2] for call in self.engine.calls if call[0] == "combat.apply_damage")

@@ -52,6 +52,13 @@ NOT_AN_INTERACTION_ENTRYPOINT = {
     "settle_seclusion_for_user",
 }
 
+# `if not interaction.response.is_done(): await interaction.response.defer(...)`
+# is an unconditional ack even though it is written as a branch: after it, the
+# interaction is acked either way. Handlers that may be reached with or without
+# an earlier ack (require_character defers on its own old-age path, so anything
+# calling it inherits that uncertainty) are supposed to use exactly this shape.
+IS_DONE_GUARD = "interaction.response.is_done()"
+
 
 def _late_ack_functions() -> list[tuple[Path, str, int]]:
     offenders: list[tuple[Path, str, int]] = []
@@ -96,6 +103,96 @@ def _late_ack_functions() -> list[tuple[Path, str, int]]:
     return offenders
 
 
+def _acks(src: str, stmt: ast.stmt) -> bool:
+    """True if this statement acks on every path through itself.
+
+    A bare ack does. So does the `if not interaction.response.is_done(): defer`
+    guard, which is a branch in source but not in effect - after it the
+    interaction is acked either way, which is exactly why handlers that may or
+    may not have been acked already are supposed to use it. Any other `if`,
+    `for` or `while` can be skipped, so it proves nothing.
+    """
+    segment = ast.get_source_segment(src, stmt) or ""
+    if not any(marker in segment for marker in ACK_MARKERS):
+        return False
+    if isinstance(stmt, ast.If):
+        test_src = ast.get_source_segment(src, stmt.test) or ""
+        if IS_DONE_GUARD not in test_src:
+            return False
+        return not any(
+            any(marker in (ast.get_source_segment(src, branch) or "") for marker in ACK_MARKERS)
+            for branch in stmt.orelse
+        )
+    return not isinstance(stmt, (ast.For, ast.While))
+
+
+def _mutation_is_acked(src: str, node: ast.AST) -> bool:
+    """Walk the blocks enclosing the mutation, innermost outwards.
+
+    An ack counts when it sits in the same block as the mutation (or as one of
+    the mutation's ancestors) and comes before it - that is what "runs on the
+    path that mutates" means. require_character is the reason this is not a
+    top-level scan: its authoritative call lives three branches deep, with the
+    is_done() defer immediately above it in that same branch.
+    """
+    def block_acked(body: list[ast.stmt]) -> bool | None:
+        for index, stmt in enumerate(body):
+            segment = ast.get_source_segment(src, stmt) or ""
+            if MUTATE_MARKER not in segment:
+                continue
+            # Anything earlier in this block that acks dominates the mutation.
+            if any(_acks(src, earlier) for earlier in body[:index]):
+                return True
+            if _acks(src, stmt) and not isinstance(stmt, ast.Expr):
+                return True
+            # Recurse into the statement that contains the mutation.
+            for child_body in _child_blocks(stmt):
+                inner = block_acked(child_body)
+                if inner is not None:
+                    return inner
+            return False
+        return None
+
+    result = block_acked(node.body)
+    return bool(result)
+
+
+def _child_blocks(stmt: ast.stmt) -> list[list[ast.stmt]]:
+    blocks: list[list[ast.stmt]] = []
+    for field in ("body", "orelse", "finalbody"):
+        value = getattr(stmt, field, None)
+        if isinstance(value, list) and value and isinstance(value[0], ast.stmt):
+            blocks.append(value)
+    for handler in getattr(stmt, "handlers", []) or []:
+        blocks.append(handler.body)
+    return blocks
+
+
+def _conditionally_acked_functions() -> list[tuple[Path, str, int]]:
+    offenders: list[tuple[Path, str, int]] = []
+    for path in sorted(BOT_DIR.rglob("*.py")):
+        src = path.read_text(encoding="utf-8")
+        tree = ast.parse(src, filename=str(path))
+        src_lines = src.split("\n")
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.AsyncFunctionDef):
+                continue
+            if node.name in NOT_AN_INTERACTION_ENTRYPOINT:
+                continue
+            if MUTATE_MARKER not in (ast.get_source_segment(src, node) or ""):
+                continue
+            mutate_line = None
+            for lineno in range(node.lineno, node.end_lineno + 1):
+                if MUTATE_MARKER in src_lines[lineno - 1]:
+                    mutate_line = lineno
+                    break
+            if mutate_line is None:
+                continue
+            if not _mutation_is_acked(src, node):
+                offenders.append((path.relative_to(PROJECT_ROOT), node.name, mutate_line))
+    return offenders
+
+
 def test_no_interaction_handler_mutates_before_acking():
     offenders = _late_ack_functions()
     assert offenders == [], (
@@ -130,3 +227,24 @@ def test_require_character_acks_before_its_own_slow_lifecycle_call():
     # not a bare unconditional send_message that would raise
     # InteractionResponded when called from an already-deferred handler.
     assert "interaction.response.send_message(" not in body
+
+
+def test_the_ack_is_not_hidden_inside_a_guard_branch():
+    """The ack must run on the path that actually mutates.
+
+    The line-order test above is satisfied by an ack anywhere earlier in the
+    function - including inside an `if ...: reply; return` guard, which never
+    executes on the path that reaches the engine. Three handlers had exactly
+    that shape (`use_item_command`, `sense_command`, the character-creation
+    modal's `on_submit`): every early-exit branch acked, and the one path that
+    committed a mutation acked only afterwards. That is the same failure the
+    module docstring describes, wearing a disguise the first test cannot see.
+    """
+    offenders = _conditionally_acked_functions()
+    assert offenders == [], (
+        "These handlers only ack inside a conditional branch, so the path that "
+        "reaches ENGINE.authoritative_action(...) is unacked. Defer as the "
+        "first statement of the handler and route replies through respond() or "
+        "interaction.followup.send(): "
+        + ", ".join(f"{path}:{name}() (mutate at line {line})" for path, name, line in offenders)
+    )

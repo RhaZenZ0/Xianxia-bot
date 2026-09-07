@@ -35,7 +35,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("open authoritative sqlite: %v", err)
 	}
-	defer engine.Close()
 	stop := make(chan struct{})
 	engine.StartReaper(stop)
 
@@ -44,11 +43,38 @@ func main() {
 		ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 30 * time.Second,
 		WriteTimeout: 60 * time.Second, IdleTimeout: 60 * time.Second,
 	}
+	// Drain rather than sever. Shutdown stops accepting connections and waits
+	// for the requests already running; only when that finishes (or the grace
+	// period runs out) does storage close, so a committed transaction always
+	// gets its response out.
+	grace := server.ShutdownGraceFromEnv()
+	drained := make(chan struct{})
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
-	go func() { <-signals; close(stop); _ = httpServer.Close() }()
+	go func() {
+		signal := <-signals
+		log.Printf("received %s; draining in-flight requests (up to %s)", signal, grace)
+		if err := server.Drain(httpServer, grace); err != nil {
+			// The grace expired with work still running. This is the one path
+			// that can still cut a response, so it is said out loud.
+			log.Printf("shutdown grace of %s expired with requests still running (%v)", grace, err)
+		} else {
+			log.Printf("in-flight requests finished; shutting down")
+		}
+		close(stop)
+		close(drained)
+	}()
 	log.Printf("xianxia authoritative Go engine listening on %s (sqlite=%s, WAL enabled)", address, databasePath)
-	if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+	err = httpServer.ListenAndServe()
+	if err != nil && err != http.ErrServerClosed {
+		// A listen failure is not a shutdown: nothing is draining, so close
+		// storage here rather than waiting for a signal that will not come.
+		engine.Close()
 		log.Fatal(err)
 	}
+	// ListenAndServe returns as soon as Shutdown is *called*, so wait for the
+	// drain itself before closing the database out from under it.
+	<-drained
+	engine.Close()
+	log.Print("xianxia authoritative Go engine stopped")
 }

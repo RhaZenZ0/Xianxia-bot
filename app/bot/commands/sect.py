@@ -65,6 +65,7 @@ from ..character_state import announce_quest_progress
 from ..services import QUESTS, SIM
 from ..threads import ensure_sect_abode_record, ensure_sect_abode_thread_for
 from ..runtime import (
+    _explain_engine_error,
     DB,
     ENGINE,
     WORLD,
@@ -74,6 +75,7 @@ from ..runtime import (
     log,
     reply_long,
     require_character,
+    respond,
     serialized_user_action,
 )
 
@@ -171,19 +173,29 @@ async def _sync_sect_discoveries(user_id: int, character: dict, *, game_minute: 
     if game_minute is None:
         game_minute = (await current_world_time()).total_minutes
     known_locations = await _known_locations(user_id, character)
-    newly_known: list[str] = []
-    for sect_name, sect_def in WORLD.sects.items():
+    reachable: dict[str, str] = {}
+    for sect_name in WORLD.sects:
         rec = recruitment_definition(WORLD.sects, sect_name)
         if not rec:
             continue
         location = str(rec.get("location") or "")
         if location and location in known_locations:
-            if await DB.discover_sect(
-                user_id, sect_name, game_minute=int(game_minute),
-                discovery_kind="recruitment_route", source_key=location,
-            ):
-                newly_known.append(sect_name)
-    return newly_known
+            reachable[sect_name] = location
+    if not reachable:
+        return []
+    # One call for the whole reconcile: this runs on a read path, every time
+    # the sect screen opens, and it used to be a write per sect.
+    try:
+        result = dict(await ENGINE.action("sect.discover", user_id, {
+            "sects": sorted(reachable),
+            "source_keys": reachable,
+            "discovery_kind": "recruitment_route",
+            "game_minute": int(game_minute),
+        }) or {})
+    except GameEngineError:
+        log.exception("Sect discovery reconcile failed for user %s", user_id)
+        return []
+    return [str(name) for name in (result.get("discovered") or [])]
 
 
 async def _known_sect_names(user_id: int, character: dict) -> list[str]:
@@ -347,7 +359,7 @@ async def sect_recruitment_recommendation(interaction: discord.Interaction, npc:
     try:
         e=await ENGINE.authoritative_action("sect.recruitment.recommendation",interaction.user.id,{"npc_name":npc,"sect_name":sect_name,"location":str(rec.get('location') or ''),"details":{"modifier_notes":notes}},action_id=f"discord:{interaction.id}:sect.recruitment.recommendation"); r=dict(e.get('result') or {})
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
+        await interaction.response.send_message(f"❌ {_explain_engine_error(exc)}",ephemeral=False);return
     roll=dict(r.get('roll') or {}); roll_text=f"2d10 {int(roll.get('modifier',0)):+d} = **{int(roll.get('total',0))}** vs TN **{int(roll.get('tn',0))}**"
     tail=f"📜 Recommendation secured: +{int(r.get('recommendation_bonus',0))}." if r.get('success') else "The recommendation was not granted."
     await interaction.response.send_message(f"{roll_text}\n{tail}",ephemeral=False)
@@ -387,9 +399,18 @@ async def sect_recruitment_trial(interaction: discord.Interaction, sect_name: st
     try:
         e=await ENGINE.authoritative_action("sect.recruitment.trial",interaction.user.id,{"sect_name":sect_name,"examiner":profile.examiner,"location":profile.location,"trial_name":profile.trial_name,"primary_details":primary_notes,"secondary_details":secondary_notes},action_id=f"discord:{interaction.id}:sect.recruitment.trial"); r=dict(e.get('result') or {})
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
+        await interaction.response.send_message(f"❌ {_explain_engine_error(exc)}",ephemeral=False);return
     outcome=str(r.get('outcome','fail')); p=dict(r.get('primary') or {}); q=dict(r.get('secondary') or {})
-    await interaction.response.send_message(f"**{profile.trial_name}** — {outcome.replace('_',' ').title()}\nPrimary: **{p.get('total','?')}** vs TN **{p.get('tn','?')}**\nSecondary: **{q.get('total','?')}** vs TN **{q.get('tn','?')}**",ephemeral=False)
+    text=f"**{profile.trial_name}** — {outcome.replace('_',' ').title()}\nPrimary: **{p.get('total','?')}** vs TN **{p.get('tn','?')}**\nSecondary: **{q.get('total','?')}** vs TN **{q.get('tn','?')}**"
+    granted=dict(r.get('granted_manual') or {})
+    if granted:
+        # v0.21.3: the engine bestows one entry manual on joining, in the same
+        # transaction as the membership. Python only says so.
+        tier=int(granted.get('min_realm_index',0) or 0)
+        when="study it now" if tier<=int(c.get('realm_index',0)) else f"study it once you reach **{WORLD.realm_name(tier)}**"
+        text+=(f"\n📕 **{sect_name}** bestows its entry inheritance: **{granted.get('name','a manual')}** is in your inventory — "
+               f"{when} with **/cultivation → Manuals & Techniques → Study**.")
+    await interaction.response.send_message(text,ephemeral=False)
     # The "A Road Toward a Sect" quest's sect_trial objective was never
     # reported anywhere, so the quest could not complete (found while building
     # the Quest Forge, v0.20.6).
@@ -503,7 +524,7 @@ async def sect_discipleship_request(interaction: discord.Interaction, master: di
         envelope=await ENGINE.authoritative_action("discipleship.request",interaction.user.id,{"master_user_id":master.id},action_id=f"discord:{interaction.id}:discipleship.request")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
     await interaction.followup.send(f"🙏 Discipleship request `#{result.get('request_id')}` sent to {master.mention}.",ephemeral=False)
 
 
@@ -517,7 +538,7 @@ async def sect_discipleship_accept(interaction: discord.Interaction, request_id:
         envelope=await ENGINE.authoritative_action("discipleship.resolve",interaction.user.id,{"request_id":int(request_id),"accept":True},action_id=f"discord:{interaction.id}:discipleship.resolve")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
     await interaction.followup.send("🙏 Discipleship request accepted.",ephemeral=False)
 
 
@@ -531,7 +552,7 @@ async def sect_discipleship_reject(interaction: discord.Interaction, request_id:
         envelope=await ENGINE.authoritative_action("discipleship.resolve",interaction.user.id,{"request_id":int(request_id),"accept":False},action_id=f"discord:{interaction.id}:discipleship.resolve")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
     await interaction.followup.send("Discipleship request rejected.",ephemeral=False)
 
 
@@ -545,7 +566,7 @@ async def sect_discipleship_leave(interaction: discord.Interaction, confirm: boo
         envelope=await ENGINE.authoritative_action("discipleship.leave",interaction.user.id,{},action_id=f"discord:{interaction.id}:discipleship.leave")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
     await interaction.followup.send("🧵 Your discipleship bond has been ended.",ephemeral=False)
 
 
@@ -563,14 +584,18 @@ async def sect_abode(interaction: discord.Interaction, action: app_commands.Choi
     c = await require_character(interaction)
     if not c:
         return
+    # Entering and leaving are authoritative moves now, so ack before any of
+    # the branches below can reach one.
+    if not interaction.response.is_done():
+        await interaction.response.defer(ephemeral=False)
     membership = await DB.get_sect_membership(interaction.user.id)
     if not membership:
-        await interaction.response.send_message("You are not a public sect member, so no sect abode is assigned.", ephemeral=False)
+        await respond(interaction, "You are not a public sect member, so no sect abode is assigned.", ephemeral=False)
         return
     abode = await ensure_sect_abode_record(interaction.user.id, c, membership)
     thread = await ensure_sect_abode_thread_for(interaction.guild, interaction.user, abode) if interaction.guild else None
     if action.value == "status":
-        await interaction.response.send_message(
+        await respond(interaction, 
             f"🏯 **{abode['name']}**\nSect: **{abode['sect_name']}**\nSect gate: **{abode['base_location']}**\n"
             f"Current location: **{await character_location_display(c)}**\n"
             + (f"Private scene: {thread.mention}" if thread else "⚠️ Private scene thread is unavailable; repair the base channels."),
@@ -578,25 +603,31 @@ async def sect_abode(interaction: discord.Interaction, action: app_commands.Choi
         )
         return
     if action.value == "leave":
-        if str(c.get("location") or "") != str(abode["location_key"]):
-            await interaction.response.send_message("You are not inside your sect abode.", ephemeral=False)
+        try:
+            await ENGINE.authoritative_action(
+                "sect.abode.leave", interaction.user.id, {},
+                action_id=f"discord:{interaction.id}:sect.abode.leave",
+            )
+        except GameEngineError as exc:
+            await respond(interaction, _explain_engine_error(exc), ephemeral=False)
             return
-        await DB.set_location(interaction.user.id, str(abode["base_location"]))
         if thread:
             try: await thread.send(f"🚪 **{c['name']}** leaves the sect abode and returns to **{abode['base_location']}**.")
             except discord.HTTPException: pass
-        await interaction.response.send_message(f"You leave your sect abode and return to **{abode['base_location']}**.", ephemeral=False)
+        await respond(interaction, f"You leave your sect abode and return to **{abode['base_location']}**.", ephemeral=False)
         return
-    if str(c.get("location") or "") != str(abode["base_location"]):
-        await interaction.response.send_message(
-            f"Travel to the sect gate at **{abode['base_location']}** before entering your assigned residence.", ephemeral=False
+    try:
+        await ENGINE.authoritative_action(
+            "sect.abode.enter", interaction.user.id, {},
+            action_id=f"discord:{interaction.id}:sect.abode.enter",
         )
+    except GameEngineError as exc:
+        await respond(interaction, _explain_engine_error(exc), ephemeral=False)
         return
-    await DB.set_location(interaction.user.id, str(abode["location_key"]))
     if thread:
         try: await thread.send(f"🏯 **{c['name']}** enters **{abode['name']}**. This private thread is now the active residence scene.")
         except discord.HTTPException: pass
-    await interaction.response.send_message(
+    await respond(interaction, 
         f"🏯 You enter **{abode['name']}**." + (f" Continue in {thread.mention}." if thread else ""), ephemeral=False
     )
 
@@ -611,49 +642,56 @@ async def sect_abode(interaction: discord.Interaction, action: app_commands.Choi
 async def sect_shadow(interaction: discord.Interaction, action: app_commands.Choice[str]) -> None:
     c=await require_character(interaction)
     if not c:return
-    sect_def=WORLD.sects.get("Heaven-Devouring Demon Sect",{})
-    karma=int(c.get('karma_score',0)); hidden=await DB.get_hidden_sect_membership(interaction.user.id)
-    world_name=WORLD.realm_world(int(c.get('realm_index',0)))
-    branch=str((sect_def.get('branches') or {}).get(world_name, 'Unknown Shadow Cell'))
-    righteous_enemy=int(sect_def.get('righteous_enemy',50)); observe=int(sect_def.get('karma_observation',-50)); initiate=int(sect_def.get('karma_initiation',-200))
-    if hidden and karma>=righteous_enemy and str(hidden.get('status'))!='enemy':
-        hidden=await DB.set_hidden_sect_status(interaction.user.id,'enemy',standing_delta=-100)
+    # The engine owns the karma gates, the hostile transition and the
+    # initiation (v0.23.0). A status read is an action too, because opening
+    # this screen is what settles a membership the player's karma has already
+    # turned - and that settling is a write, not a render.
+    if not interaction.response.is_done():
+        await interaction.response.defer(ephemeral=False)
+    try:
+        envelope=await ENGINE.authoritative_action(
+            "sect.shadow", interaction.user.id, {"mode":"status"},
+            action_id=f"discord:{interaction.id}:sect.shadow:status",
+        )
+    except GameEngineError as exc:
+        await respond(interaction, f"❌ {_explain_engine_error(exc)}", ephemeral=False); return
+    shadow=dict(envelope.get("result") or {})
+    karma=int(shadow.get("karma",0)); hidden=shadow.get("membership") or None
+    branch=str(shadow.get("branch") or "Unknown Shadow Cell")
+    righteous_enemy=int(shadow.get("righteous_enemy",50)); observe=int(shadow.get("karma_observation",-50)); initiate=int(shadow.get("karma_initiation",-200))
     if action.value=='status':
         if hidden:
-            await interaction.response.send_message(
+            await respond(interaction, 
                 f"🌑 **Heaven-Devouring Demon Sect**\nBranch: **{hidden['branch_name']}** • Rank **{hidden['rank_name']}** • Status **{hidden['status']}** • Standing **{hidden['standing']:+d}**\nKarma: **{karma:+d}**. Reaching righteous karma (**+{righteous_enemy}**) turns the hidden sect hostile.",ephemeral=False);return
         if karma<=observe:
-            await interaction.response.send_message(f"🌫️ Your karma **{karma:+d}** has attracted unseen observation from **{branch}**, but you are not initiated.",ephemeral=False);return
-        await interaction.response.send_message("🌫️ You find rumors and contradictory signs, but no hidden-sect contact reveals itself to this incarnation.",ephemeral=False);return
+            await respond(interaction, f"🌫️ Your karma **{karma:+d}** has attracted unseen observation from **{branch}**, but you are not initiated.",ephemeral=False);return
+        await respond(interaction, "🌫️ You find rumors and contradictory signs, but no hidden-sect contact reveals itself to this incarnation.",ephemeral=False);return
     if action.value=='investigate':
         if karma>=righteous_enemy:
-            await interaction.response.send_message(f"☀️ Your righteous karma **{karma:+d}** marks you as a probable enemy. Shadow messengers avoid open contact; concealed hostility is more likely than recruitment.",ephemeral=False);return
+            await respond(interaction, f"☀️ Your righteous karma **{karma:+d}** marks you as a probable enemy. Shadow messengers avoid open contact; concealed hostility is more likely than recruitment.",ephemeral=False);return
         if karma<=initiate:
-            await interaction.response.send_message(f"🌑 **{branch}** stops merely observing you. Your karma **{karma:+d}** satisfies the initiation gate. You may use **/sect → Sect → Shadow** and choose **Accept initiation**.",ephemeral=False);return
+            await respond(interaction, f"🌑 **{branch}** stops merely observing you. Your karma **{karma:+d}** satisfies the initiation gate. You may use **/sect → Sect → Shadow** and choose **Accept initiation**.",ephemeral=False);return
         if karma<=observe:
-            await interaction.response.send_message(f"👁️ You detect a watcher from **{branch}**. Your karma **{karma:+d}** is dark enough for observation, but initiation requires **{initiate}** or lower.",ephemeral=False);return
-        await interaction.response.send_message(f"You uncover only dead drops and false trails. A karma stain of **{observe}** or lower is normally required before the sect takes interest.",ephemeral=False);return
+            await respond(interaction, f"👁️ You detect a watcher from **{branch}**. Your karma **{karma:+d}** is dark enough for observation, but initiation requires **{initiate}** or lower.",ephemeral=False);return
+        await respond(interaction, f"You uncover only dead drops and false trails. A karma stain of **{observe}** or lower is normally required before the sect takes interest.",ephemeral=False);return
     if hidden and str(hidden.get('status'))=='active':
-        await interaction.response.send_message("You are already an active hidden-sect initiate.",ephemeral=False);return
+        await respond(interaction, "You are already an active hidden-sect initiate.",ephemeral=False);return
     if karma>initiate:
-        await interaction.response.send_message(f"The initiation seal remains cold. Required karma: **{initiate} or lower**; yours is **{karma:+d}**.",ephemeral=False);return
+        await respond(interaction, f"The initiation seal remains cold. Required karma: **{initiate} or lower**; yours is **{karma:+d}**.",ephemeral=False);return
     if karma>=righteous_enemy:
-        await interaction.response.send_message("The hidden sect recognizes you as a righteous enemy, not a recruit.",ephemeral=False);return
-    wt=await current_world_time(); hidden=await DB.initiate_hidden_sect(interaction.user.id,sect_name="Heaven-Devouring Demon Sect",branch_name=branch,game_minute=wt.total_minutes)
-    candidates=[]
-    for mid,m in WORLD.manuals.items():
-        if str(m.get('alignment','')).casefold()!='demonic': continue
-        if str(m.get('path',''))!=str(c.get('path','')): continue
-        if int(m.get('min_realm_index',0))<=int(c.get('realm_index',0)): candidates.append((int(m.get('min_realm_index',0)),mid,m))
-    granted=None
-    if candidates:
-        _,mid,m=max(candidates,key=lambda x:(x[0],x[1])); item_id=str(m.get('item_id',''))
-        if item_id:
-            await DB.add_items(interaction.user.id,{item_id:1}); granted=m
-            await DB.record_item_provenance(interaction.user.id,item_id,source_type='hidden_sect_initiation',source_key=branch,ownership_mark='Heaven-Devouring Seal',legal_status='forbidden',tracking_strength=70,game_minute=wt.total_minutes)
-    text=f"🌑 You accept the **Heaven-Devouring Demon Sect** initiation in **{branch}**. Hidden rank: **{hidden['rank_name']}**. This affiliation is stored separately from your public sect lineage."
-    if granted: text+=f"\n📕 Initiation inheritance: **{granted['name']}** was placed in your inventory; study it with **/cultivation → Manuals & Techniques → Study**."
-    await interaction.response.send_message(text,ephemeral=False)
+        await respond(interaction, "The hidden sect recognizes you as a righteous enemy, not a recruit.",ephemeral=False);return
+    try:
+        envelope=await ENGINE.authoritative_action(
+            "sect.shadow", interaction.user.id, {"mode":"initiate"},
+            action_id=f"discord:{interaction.id}:sect.shadow:initiate",
+        )
+    except GameEngineError as exc:
+        await respond(interaction, f"❌ {_explain_engine_error(exc)}", ephemeral=False); return
+    initiation=dict(envelope.get("result") or {})
+    hidden=initiation.get("membership") or {}
+    text=f"🌑 You accept the **Heaven-Devouring Demon Sect** initiation in **{initiation.get('branch',branch)}**. Hidden rank: **{hidden.get('rank_name','Shadow Initiate')}**. This affiliation is stored separately from your public sect lineage."
+    if initiation.get("manual_name"): text+=f"\n📕 Initiation inheritance: **{initiation['manual_name']}** was placed in your inventory; study it with **/cultivation → Manuals & Techniques → Study**."
+    await respond(interaction, text,ephemeral=False)
 
 
 @registered_group_command(sect_group, name="roster", description="Show your sect hierarchy, ranks, contribution and influence")
@@ -757,7 +795,7 @@ async def sect_contribute(interaction:discord.Interaction,item:str,quantity:app_
         envelope=await ENGINE.authoritative_action("sect.contribute",interaction.user.id,{"item_id":item,"quantity":int(quantity)},action_id=f"discord:{interaction.id}:sect.contribute")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
     await interaction.followup.send(f"🏯 Contributed **{WORLD.item_name(item)} x{quantity}** to the sect treasury.",ephemeral=False)
 
 
@@ -782,7 +820,7 @@ async def sect_redeem(interaction:discord.Interaction,item:str,quantity:app_comm
         envelope=await ENGINE.authoritative_action("sect.redeem",interaction.user.id,{"item_id":item,"quantity":int(quantity)},action_id=f"discord:{interaction.id}:sect.redeem")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
     await interaction.followup.send(f"🏯 Redeemed **{WORLD.item_name(item)} x{quantity}** from the sect treasury.",ephemeral=False)
 
 
@@ -848,7 +886,7 @@ async def sect_manor_establish(interaction: discord.Interaction, name: str, conf
     try:
         e=await ENGINE.authoritative_action("sect.manor.establish",interaction.user.id,{"name":name},action_id=f"discord:{interaction.id}:sect.manor.establish"); r=dict(e.get('result') or {})
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
+        await interaction.response.send_message(f"❌ {_explain_engine_error(exc)}",ephemeral=False);return
     established_location = r.get('base_location') or await character_location_display(c)
     await interaction.response.send_message(f"🏯 **{r.get('name',name)}** is established at **{established_location}**.",ephemeral=False)
 
@@ -866,7 +904,7 @@ async def sect_manor_upgrade(
     try:
         e=await ENGINE.authoritative_action("sect.manor.upgrade",interaction.user.id,{"facility":facility.value},action_id=f"discord:{interaction.id}:sect.manor.upgrade"); r=dict(e.get('result') or {})
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
+        await interaction.response.send_message(f"❌ {_explain_engine_error(exc)}",ephemeral=False);return
     await interaction.response.send_message(f"🏗️ **{facility.name} upgraded to Lv.{r.get('level','?')}**.",ephemeral=False)
 
 

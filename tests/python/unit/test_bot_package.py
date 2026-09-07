@@ -350,14 +350,14 @@ def _module_level_relative_imports(path):
 # noted (command modules read each other: law -> battle, exploration -> sect;
 # inspect_sim reads world_ops). The graph is also required to be acyclic.
 TIERS = (
-    ("registry.py", "scene_layout.py"),
+    ("registry.py", "scene_layout.py", "typed_play_router.py"),
     ("runtime.py", "hubs.py"),
-    ("services.py",),
+    ("services.py", "typed_play.py"),
     ("formatting.py", "locations.py", "pickers.py"),
     ("discovery.py", "character_state.py", "channels.py"),
     ("threads.py",),
     ("admin/core.py",),
-    ("admin/channel_messages.py", "admin/bugs_forum.py", "ui/event_scene.py", "ui/creation.py"),
+    ("admin/channel_messages.py", "admin/bugs_forum.py", "ui/event_scene.py", "ui/creation.py", "ui/commissions.py"),
     ("admin/server_setup.py",),
     ("bot.py",),
     ("admin/world_ops.py", "admin/inspect_sim.py", "commands/*"),
@@ -547,7 +547,7 @@ OWNERS = {
     "pickers.py": ("auction_currency_autocomplete", "_market_item_matches", "usable_item_autocomplete"),
     "discovery.py": ("LOCATION_DISCOVERY_IMAGES", "location_discovery_image_path", "location_discovery_embed",
                      "send_location_discovery_image", "travel_first_discovers_location"),
-    "character_state.py": ("settle_all_seclusions", "current_effect_modifiers", "sync_pill_toxicity_effect",
+    "character_state.py": ("settle_all_seclusions", "current_effect_modifiers",
                            "_npc_name_mentioned", "_remember_freeform_npc_scene"),
     "channels.py": ("_event_archive_minutes", "_resolve_text_channel", "_ensure_realm_access_roles",
                     "ensure_realm_hub_channels", "event_channels", "home_scene_channel", "exploration_scene_channel",
@@ -960,6 +960,7 @@ class RegistryBindingTests(unittest.TestCase):
         "battle_panel": "commands/battle.py",
         "scene_action_targets": "commands/scene.py",
         "scene_action_panel": "commands/scene.py",
+        "scene_action_resolve": "commands/scene.py",  # typed play (v0.21.1)
     }
 
     def test_the_event_view_dispatches_by_name_and_never_calls_directly(self):
@@ -968,7 +969,12 @@ class RegistryBindingTests(unittest.TestCase):
         for direct in ("_scene_action_targets(", "scene_action_panel(", "_battle_panel("):
             self.assertNotIn(direct, code, f"{direct} is called directly in ui/event_scene.py")
         for key in self.BINDINGS:
+            if key == "scene_action_resolve":
+                continue  # invoked from typed_play.py, checked below
             self.assertRegex(source, rf'EVENT_HANDLERS\.invoke\(\s*"{key}"')
+        typed = (BOT / "typed_play.py").read_text(encoding="utf-8")
+        self.assertNotIn("_resolve_scene_action(", typed, "typed play must reach the resolver by name")
+        self.assertRegex(typed, r'EVENT_HANDLERS\.invoke\(\s*"scene_action_resolve"')
 
     def test_each_binding_is_registered_once_beside_its_target(self):
         for key, owner in self.BINDINGS.items():

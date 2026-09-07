@@ -5,8 +5,13 @@ services:
       dockerfile: go_core/Dockerfile
     container_name: xianxia-game-engine
     labels:
-      xianxia.release: "0.21.0"
+      xianxia.release: "0.23.1"
     restart: unless-stopped
+    # The engine drains in-flight requests on SIGTERM (default 20s, see
+    # ENGINE_SHUTDOWN_GRACE_SECONDS). Docker's default grace is 10s, which
+    # would SIGKILL it mid-drain - and mid-restore, which holds the
+    # maintenance barrier for its whole duration.
+    stop_grace_period: 30s
     environment:
       ENGINE_ADDR: ":8081"
       DATABASE_PATH: "/data/xianxia.sqlite3"
@@ -40,7 +45,7 @@ services:
     build: .
     container_name: xianxia-roleplay-bot
     labels:
-      xianxia.release: "0.21.0"
+      xianxia.release: "0.23.1"
     restart: unless-stopped
     env_file:
       - .env

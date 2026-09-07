@@ -28,6 +28,9 @@ type Server struct {
 	simulation   *simulation.Runner
 	requests     atomic.Uint64
 	authToken    string
+	// Held shared by anything that can write and exclusively by restore and
+	// VACUUM, so maintenance never runs alongside traffic. See maintenance.go.
+	maintenance maintenanceBarrier
 }
 
 func New(databasePath string, worldPath string) (*Server, error) {
@@ -113,6 +116,15 @@ func (s *Server) Handler() http.Handler {
 			writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "engine_auth_required"})
 			return
 		}
+		// The maintenance barrier is taken here rather than inside each
+		// handler, so a future endpoint cannot forget it.
+		if exclusive, guarded := barrierFor(r.URL.Path); guarded {
+			if exclusive {
+				defer s.maintenance.enter()()
+			} else {
+				defer s.maintenance.begin()()
+			}
+		}
 		mux.ServeHTTP(w, r)
 	})
 }
@@ -130,6 +142,13 @@ func (s *Server) livez(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) readyz(w http.ResponseWriter, r *http.Request) {
+	// Deliberately outside the barrier: a health check that blocks for the
+	// length of a restore reads as an outage. It reports the maintenance
+	// instead.
+	if s.maintenance.busy() {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"status": "maintenance", "maintenance_in_progress": true})
+		return
+	}
 	conn, err := storage.Open(s.databasePath)
 	if err != nil {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"status": "not_ready", "error": err.Error()})
@@ -571,11 +590,24 @@ type restoreRequest struct {
 // exposes, so it never touches the live file without first taking its own
 // "just in case" backup of the current state - a restore that turns out to
 // be a mistake is then itself just one more restore away from being undone.
-// It also closes every open db-session before restoring: a session holds its
-// own long-lived connection and can be sitting mid-transaction, and
-// RestoreFrom's backup step would otherwise have to fight that connection
-// for the write lock (or worse, complete the restore only for the session to
-// immediately overwrite it with stale in-flight data on its next write).
+//
+// Order matters, and it used to be wrong (v0.22.3, review finding #4). The
+// safety backup was taken *first*, while ordinary requests were still
+// committing; a mutation that landed in the gap was acknowledged to the
+// player, then overwritten by the restore, and was in neither the live
+// database nor the safety backup. The sequence is now:
+//
+//  1. the maintenance barrier, taken exclusively by the middleware, which
+//     waits for every in-flight request and holds off every new one;
+//  2. close every open db-session, since a session's connection outlives the
+//     request that made it and can be sitting mid-transaction;
+//  3. only then the safety backup - a snapshot of a database nothing is
+//     writing to;
+//  4. the restore itself.
+//
+// So an acknowledged write is either in the safety backup (it finished before
+// the barrier) or in the live database (it ran after the restore). It is never
+// in neither.
 func (s *Server) dbRestore(w http.ResponseWriter, r *http.Request) {
 	if !method(w, r, http.MethodPost) {
 		return
@@ -607,6 +639,11 @@ func (s *Server) dbRestore(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "backup_dir_failed", "message": err.Error()})
 		return
 	}
+	// Quiesce before snapshotting. The barrier (taken by the middleware) has
+	// already drained in-flight requests; this closes the long-lived session
+	// connections that outlive them.
+	s.sessions.CloseAll()
+
 	safetyPath, err := reserveBackupPath(backupDir, time.Now().UTC())
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "safety_backup_name_failed", "message": err.Error()})
@@ -630,8 +667,6 @@ func (s *Server) dbRestore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	safetyInfo := backupInfo{Name: safetyStat.Name(), Size: safetyStat.Size(), ModifiedAt: float64(safetyStat.ModTime().UnixNano()) / 1e9}
-
-	s.sessions.CloseAll()
 
 	dest, err := storage.Open(s.databasePath)
 	if err != nil {

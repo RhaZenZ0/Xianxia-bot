@@ -13,7 +13,7 @@ from typing import Any
 
 import discord
 
-from ..rules.realm_hubs import REALM_HUBS
+from ..rules.realm_hubs import REALM_HUBS, REALM_HUB_MEMBER_PERMISSIONS, realm_hub_visibility, realm_presence_role_name
 from .runtime import DB, SETTINGS, _realm_access_role_name, chunk_text, log
 
 def _event_archive_minutes() -> int:
@@ -41,6 +41,30 @@ async def _resolve_text_channel(guild: discord.Guild, channel_id: int | None) ->
     return channel if isinstance(channel, discord.TextChannel) else None
 
 
+async def _ensure_realm_presence_roles(guild: discord.Guild) -> dict[str, discord.Role]:
+    """One "Xianxia • <capital>" role per realm hub (v0.21.6): held only while
+    a cultivator stands in that capital, and the only role the capital's
+    channel allows. Created with no guild permissions and not mentionable."""
+    roles: dict[str, discord.Role] = {}
+    me = guild.me
+    if not me or not me.guild_permissions.manage_roles:
+        return roles
+    for world_name in REALM_HUBS:
+        role_name = realm_presence_role_name(world_name)
+        role = discord.utils.get(guild.roles, name=role_name)
+        if role is None:
+            try:
+                role = await guild.create_role(
+                    name=role_name, mentionable=False, permissions=discord.Permissions.none(),
+                    reason="Xianxia realm-capital presence (visible only while in the city)",
+                )
+            except discord.HTTPException:
+                log.exception("Could not create realm presence role for %s", world_name)
+                continue
+        roles[world_name] = role
+    return roles
+
+
 async def _ensure_realm_access_roles(guild: discord.Guild) -> dict[str, discord.Role]:
     roles: dict[str, discord.Role] = {}
     me = guild.me
@@ -61,6 +85,49 @@ async def _ensure_realm_access_roles(guild: discord.Guild) -> dict[str, discord.
     return roles
 
 
+async def ensure_realm_hub_overwrites(
+    guild: discord.Guild, channel: discord.TextChannel, role: discord.Role | None, *, stale_roles: list[discord.Role] | None = None,
+) -> str:
+    """Make one realm hub visible to the cultivators standing in it and to nobody else.
+
+    ``role`` is the capital's presence role ("Xianxia • <capital>", v0.21.6).
+    @everyone is denied View Channel; the presence role gets the full member
+    set in REALM_HUB_MEMBER_PERMISSIONS; the bot keeps an explicit allow for
+    itself; and any ``stale_roles`` (the realm-access roles that gated these
+    channels in v0.21.2-v0.21.5, earned by cultivation rather than by being
+    there) lose their overwrite, so an unlocked-but-absent cultivator no
+    longer sees the room.
+
+    Returns "hidden" when nothing needed changing, "gated" when this call
+    changed it, "no-role" when the presence role does not exist yet (nothing
+    is changed: denying @everyone without an allow would lock every player
+    out), or "failed". Idempotent: an already-gated hub makes no API call.
+    """
+    if role is None:
+        return "no-role"
+    overwrites = channel.overwrites or {}
+    state = realm_hub_visibility(channel, role, guild.default_role)
+    me_view = getattr(overwrites.get(guild.me), "view_channel", None) if guild.me else True
+    member_ow = overwrites.get(role)
+    member_ok = state["role_view"] is True and all(getattr(member_ow, perm, None) is True for perm in REALM_HUB_MEMBER_PERMISSIONS)
+    stale = [r for r in (stale_roles or []) if r in overwrites]
+    if state["hidden"] and member_ok and me_view is True and not stale:
+        return "hidden"
+    try:
+        if state["everyone_view"] is not False:
+            await channel.set_permissions(guild.default_role, view_channel=False, reason="Xianxia realm-capital visibility gate")
+        if not member_ok:
+            await channel.set_permissions(role, reason="Xianxia realm-capital visibility gate", **REALM_HUB_MEMBER_PERMISSIONS)
+        if guild.me is not None and me_view is not True:
+            await channel.set_permissions(guild.me, view_channel=True, send_messages=True, manage_messages=True, read_message_history=True, reason="Xianxia realm-capital visibility gate")
+        for old in stale:
+            await channel.set_permissions(old, overwrite=None, reason="Xianxia: capitals are gated by presence, not by realm")
+    except (discord.Forbidden, discord.HTTPException):
+        log.exception("Could not gate realm hub #%s behind %s", channel.name, role.name)
+        return "failed"
+    return "gated"
+
+
 async def ensure_realm_hub_channels(
     guild: discord.Guild, *, category_name: str = "🌌 Realm Capitals", create_missing: bool = False,
 ) -> list[dict[str, Any]]:
@@ -73,6 +140,12 @@ async def ensure_realm_hub_channels(
     category = next((item for item in guild.categories if item.name == category_name), None)
     me = guild.me
     can_create = create_missing and bool(me) and me.guild_permissions.manage_channels
+    # The visibility gate is applied on the same dashboard-owned path that
+    # provisions channels (Setup/Repair, create_missing=True); the /admin
+    # slash path stays validate-only. Roles are created here too so a hub
+    # can be gated the moment it exists rather than after a separate sync.
+    access_roles = await _ensure_realm_access_roles(guild) if can_create else {}
+    roles = await _ensure_realm_presence_roles(guild) if can_create else {}
     if can_create and category is None:
         try:
             category = await guild.create_category(category_name, reason="Xianxia RP realm-capital setup")
@@ -97,6 +170,9 @@ async def ensure_realm_hub_channels(
                 log.exception("Could not create realm-capital channel #%s", hub["channel_name"])
         if channel is None:
             continue
+        if can_create:
+            stale = [r for w, r in access_roles.items() if w == world]
+            await ensure_realm_hub_overwrites(guild, channel, roles.get(world), stale_roles=stale)
         await DB.set_realm_hub_channel(
             guild_id=guild.id,
             world_name=world,

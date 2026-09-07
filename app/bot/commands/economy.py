@@ -18,7 +18,7 @@ from ...rules.trade_receipt import format_trade_receipt
 from ..formatting import human_duration
 from ..pickers import auction_currency_autocomplete, usable_item_autocomplete
 from ..registry import registered_group_command, registered_root_command
-from ..runtime import DB, ENGINE, WORLD, carried_item_autocomplete, character_location_display, current_world_time, log, reply_long, require_character, serialized_user_action
+from ..runtime import _explain_engine_error, DB, ENGINE, WORLD, carried_item_autocomplete, character_location_display, current_world_time, log, reply_long, require_character, respond, serialized_user_action
 from ..services import GUILD, SIM
 
 @registered_root_command(name="wallet", description="View all cultivation currencies you currently hold", guild=GUILD)
@@ -46,23 +46,26 @@ async def wallet_command(interaction: discord.Interaction) -> None:
 @app_commands.autocomplete(item=usable_item_autocomplete)
 @serialized_user_action
 async def use_item_command(interaction: discord.Interaction, item: str) -> None:
+    # Ack before the engine call: the guard branches above return early,
+    # so an ack inside one of them never runs on the path that mutates.
+    await interaction.response.defer(ephemeral=False)
     c = await require_character(interaction)
     if not c:
         return
     item_def = WORLD.items.get(item)
     if not item_def:
-        await interaction.response.send_message("Unknown item.", ephemeral=False)
+        await respond(interaction, "Unknown item.", ephemeral=False)
         return
     inv = await DB.get_inventory(interaction.user.id)
     if inv.get(item, 0) <= 0:
-        await interaction.response.send_message("You do not carry that item.", ephemeral=False)
+        await respond(interaction, "You do not carry that item.", ephemeral=False)
         return
 
     storage_upgrade = item_def.get("storage_upgrade")
     use = item_def.get("use", {})
     array_key = str(item_def.get("array_deploy") or "")
     if not storage_upgrade and not use and not array_key:
-        await interaction.response.send_message("That item has no implemented active use yet.", ephemeral=False)
+        await respond(interaction, "That item has no implemented active use yet.", ephemeral=False)
         return
 
     if array_key:
@@ -71,9 +74,9 @@ async def use_item_command(interaction: discord.Interaction, item: str) -> None:
             e=await ENGINE.authoritative_action("array.deploy",interaction.user.id,{"item_id":item},action_id=f"discord:{interaction.id}:array.deploy")
             deployed=dict(e.get("result") or {})
         except GameEngineError as exc:
-            await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
+            await respond(interaction, f"❌ {_explain_engine_error(exc)}",ephemeral=False);return
         deployed_location = deployed.get('location') or await character_location_display(c)
-        await interaction.response.send_message(f"🧿 **{deployed.get('name',item_def.get('name',item))} deployed at {deployed_location}.**",ephemeral=False)
+        await respond(interaction, f"🧿 **{deployed.get('name',item_def.get('name',item))} deployed at {deployed_location}.**",ephemeral=False)
         return
 
     if storage_upgrade:
@@ -82,8 +85,8 @@ async def use_item_command(interaction: discord.Interaction, item: str) -> None:
             e=await ENGINE.authoritative_action("storage.upgrade",interaction.user.id,{"item_id":item},action_id=f"discord:{interaction.id}:storage.upgrade")
             upgraded=dict(e.get("result") or {})
         except GameEngineError as exc:
-            await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
-        await interaction.response.send_message(f"✨ Spatial storage upgraded to **{item_def.get('name',item)}** — **{upgraded.get('slot_capacity',storage_upgrade.get('slot_capacity',24))} item stacks**.",ephemeral=False)
+            await respond(interaction, f"❌ {_explain_engine_error(exc)}",ephemeral=False);return
+        await respond(interaction, f"✨ Spatial storage upgraded to **{item_def.get('name',item)}** — **{upgraded.get('slot_capacity',storage_upgrade.get('slot_capacity',24))} item stacks**.",ephemeral=False)
         return
 
     # v0.21.0 (roadmap "Authority I"): consume -> restore -> life extension ->
@@ -95,7 +98,7 @@ async def use_item_command(interaction: discord.Interaction, item: str) -> None:
             "item.use", interaction.user.id, {"item_id": item}, action_id=f"discord:{interaction.id}:item.use:{item}",
         )
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}", ephemeral=False)
+        await respond(interaction, f"❌ {_explain_engine_error(exc)}", ephemeral=False)
         return
     state = dict(envelope.get("result") or {})
     lines = [f"✨ **Used {state.get('item_name', item_def.get('name', item))}**"]
@@ -115,7 +118,7 @@ async def use_item_command(interaction: discord.Interaction, item: str) -> None:
             f"⚗️ Medicinal residue **+{int(state['toxicity_gain'])}** → pill toxicity "
             f"**{int(state.get('pill_toxicity', 0))}/100 ({state.get('toxicity_band', '')})**."
         )
-    await interaction.response.send_message("\n".join(lines))
+    await respond(interaction, "\n".join(lines))
 
 
 storage_group = app_commands.Group(name="storage", description="Manage your spatial pouch, ring, or inner-space treasure")
@@ -153,7 +156,7 @@ async def storage_deposit(interaction:discord.Interaction,item:str,quantity:app_
         envelope=await ENGINE.authoritative_action("storage.deposit",interaction.user.id,{"item_id":item,"quantity":int(quantity)},action_id=f"discord:{interaction.id}:storage.deposit")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
     await interaction.followup.send(f"📦 Stored **{WORLD.item_name(item)} x{quantity}**.",ephemeral=False)
 
 
@@ -168,7 +171,7 @@ async def storage_withdraw(interaction:discord.Interaction,item:str,quantity:app
         envelope=await ENGINE.authoritative_action("storage.withdraw",interaction.user.id,{"item_id":item,"quantity":int(quantity)},action_id=f"discord:{interaction.id}:storage.withdraw")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
     await interaction.followup.send(f"🎒 Withdrew **{WORLD.item_name(item)} x{quantity}**.",ephemeral=False)
 
 
@@ -189,7 +192,7 @@ async def auction_enter(interaction:discord.Interaction)->None:
         envelope=await ENGINE.authoritative_action("auction.enter",interaction.user.id,{},action_id=f"discord:{interaction.id}:auction.enter")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
     await interaction.followup.send(f"🏮 You enter **{result.get('name','the auction hall')}**. Hidden experts and formations suppress violence inside.\n🛡️ **Protection applies only inside the hall. The moment you leave through the doors, it ends.**",ephemeral=False)
 
 
@@ -204,7 +207,7 @@ async def auction_leave(interaction:discord.Interaction)->None:
         envelope=await ENGINE.authoritative_action("auction.leave",interaction.user.id,{},action_id=f"discord:{interaction.id}:auction.leave")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.followup.send(f"❌ {exc}",ephemeral=False);return
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False);return
     lines=[f"🚪 You step out of **{result.get('name','the auction hall')}** into **{result.get('outside','outside')}**.","The Pavilion's protection ends at the door."]
     incident=dict(result.get('incident') or {})
     if incident.get('triggered'):
@@ -256,7 +259,7 @@ async def auction_sell(
         envelope=await ENGINE.authoritative_action("auction.sell",interaction.user.id,{"house_id":house_id,"item_id":item,"quantity":int(quantity),"currency_id":currency,"starting_bid":int(starting_bid),"anonymous":anonymous,"ends_at":time.time()+int(duration_minutes)*60},action_id=f"discord:{interaction.id}:auction.sell")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}",ephemeral=False); return
+        await interaction.response.send_message(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
     await interaction.response.send_message(f"🏮 Lot `#{result.get('auction_id')}` listed: **{WORLD.item_name(item)} x{quantity}** starting at **{starting_bid} {WORLD.currency_name(currency)}**.",ephemeral=False)
 
 
@@ -270,7 +273,7 @@ async def auction_bid(interaction:discord.Interaction,auction_id:int,amount:app_
         envelope=await ENGINE.authoritative_action("auction.bid",interaction.user.id,{"auction_id":int(auction_id),"amount":int(amount)},action_id=f"discord:{interaction.id}:auction.bid")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
     await interaction.followup.send(f"🔨 Bid accepted on lot `#{auction_id}`: **{amount} {WORLD.currency_name(str(result.get('currency_id','low_spirit_stone')))}**.",ephemeral=False)
 
 
@@ -456,7 +459,7 @@ async def blackmarket_buy(interaction:discord.Interaction,item:str,quantity:app_
         envelope=await ENGINE.authoritative_action("black_market.trade",interaction.user.id,{"location":str(c.get('location','')),"item_id":item,"quantity":int(quantity),"buy":True},action_id=f"discord:{interaction.id}:black_market.trade")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
     await interaction.followup.send(format_trade_receipt(icon="🌑",verb="Bought",item_label=WORLD.item_name(item),quantity=int(quantity),result=result,currency_name=WORLD.currency_name),ephemeral=False)
 
 
@@ -476,7 +479,7 @@ async def blackmarket_sell(interaction:discord.Interaction,item:str,quantity:app
         envelope=await ENGINE.authoritative_action("black_market.trade",interaction.user.id,{"location":str(c.get('location','')),"item_id":item,"quantity":int(quantity),"buy":False},action_id=f"discord:{interaction.id}:black_market.trade")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
     await interaction.followup.send(format_trade_receipt(icon="🌑",verb="Sold",item_label=WORLD.item_name(item),quantity=int(quantity),result=result,currency_name=WORLD.currency_name),ephemeral=False)
 
 
@@ -526,7 +529,7 @@ async def market_buy_command(interaction:discord.Interaction,item:str,quantity:a
         envelope=await ENGINE.authoritative_action("market.trade",interaction.user.id,{"location":str(c.get('location','')),"item_id":item,"quantity":int(quantity),"buy":True},action_id=f"discord:{interaction.id}:market.trade")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
     await interaction.followup.send(format_trade_receipt(icon="🪙",verb="Bought",item_label=WORLD.item_name(item),quantity=int(quantity),result=result,currency_name=WORLD.currency_name),ephemeral=False)
 
 
@@ -546,7 +549,7 @@ async def market_sell_command(interaction:discord.Interaction,item:str,quantity:
         envelope=await ENGINE.authoritative_action("market.trade",interaction.user.id,{"location":str(c.get('location','')),"item_id":item,"quantity":int(quantity),"buy":False},action_id=f"discord:{interaction.id}:market.trade")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.followup.send(f"❌ {exc}",ephemeral=False); return
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
     await interaction.followup.send(format_trade_receipt(icon="🪙",verb="Sold",item_label=WORLD.item_name(item),quantity=int(quantity),result=result,currency_name=WORLD.currency_name),ephemeral=False)
 
 

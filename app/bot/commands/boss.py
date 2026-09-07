@@ -9,6 +9,7 @@ from ...rules.advanced_runtime import BOSS_TEMPLATES
 from ...ops.game_engine import GameEngineError
 from ..registry import registered_group_command
 from ..runtime import (
+    _explain_engine_error,
     DB,
     ENGINE,
     WORLD,
@@ -67,7 +68,7 @@ async def boss_start(interaction: discord.Interaction, boss: str) -> None:
         )
         result = dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.followup.send(f"❌ {exc}", ephemeral=False)
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
         return
     await interaction.followup.send(
         f"👹 **Boss Encounter #{result.get('encounter_id')} — {result.get('boss_name', 'Boss')}** begins with **{result.get('boss_hp', 0)}/{result.get('boss_hp_max', 0)} HP**.",
@@ -122,7 +123,7 @@ async def boss_act(interaction: discord.Interaction, style: app_commands.Choice[
         )
         result = dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {exc}", ephemeral=False)
+        await interaction.response.send_message(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
         return
     events = "\n".join(f"• {event}" for event in list(result.get('events') or [])[:12])
     await interaction.response.send_message(
@@ -146,7 +147,7 @@ async def boss_claim(interaction: discord.Interaction, encounter_id: int) -> Non
         )
         result = dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.followup.send(f"❌ {exc}", ephemeral=False)
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
         return
     await interaction.followup.send(
         f"🏆 Claimed **{result.get('currency_amount', 0)} Low Spirit Stones** and **{WORLD.item_name(str(result.get('item_id', '')))} x{result.get('item_quantity', 0)}**.",
@@ -187,7 +188,7 @@ async def hunter_act(interaction: discord.Interaction, pursuit_id: int, action: 
         )
         result = dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.followup.send(f"❌ {exc}", ephemeral=False)
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
         return
     await interaction.followup.send(
         f"🎯 **{result.get('hunter_name', 'Hunter')}** • status **{result.get('status', 'active')}** • pressure {result.get('pressure', 0)}% • escape {result.get('escape_progress', 0)}% • capture {result.get('capture_progress', 0)}%",

@@ -19,7 +19,7 @@ import discord
 from ...ops.game_engine import GameEngineError
 from ..channels import _event_archive_minutes, _report_game_ui_error, _resolve_text_channel, event_channels
 from ..registry import EVENT_HANDLERS
-from ..runtime import DB, ENGINE, SETTINGS, WORLD, character_location_display, current_world_time, log, reply_long
+from ..runtime import DB, ENGINE, SETTINGS, WORLD, _explain_engine_error, character_location_display, current_world_time, log, reply_long
 from ..services import COMBAT, SIM
 
 EVENT_ACTION_RULES: dict[str, dict[str, Any]] = {
@@ -324,7 +324,7 @@ class EventSceneView(discord.ui.View):
                 action_id=f"discord:{interaction.id}:combat.start:{source}",
             )
         except GameEngineError as exc:
-            await interaction.response.send_message(f"❌ {exc}",ephemeral=False);return
+            await interaction.response.send_message(f"❌ {_explain_engine_error(exc)}",ephemeral=False);return
         result=dict(envelope.get("result") or {}); bid=int(result.get("battle_id") or 0)
         battle=await DB.get_active_battle(interaction.user.id); embed,view=await EVENT_HANDLERS.invoke("battle_panel", interaction.user.id,c,battle or result)
         await interaction.response.send_message(content=f"⚔️ **Event confrontation #{bid} begins.** Defeating this manifestation contributes to the event; it is not a persistent NPC life.",embed=embed,view=view)

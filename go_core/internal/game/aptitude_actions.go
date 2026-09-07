@@ -127,6 +127,9 @@ func loadAptitudes(conn *storage.Conn, userID int64) (AptitudeBundle, error) {
 
 func loadEffectModifiers(conn *storage.Conn, userID, gameMinute int64, bundle AptitudeBundle, c mechanicsCharacter, catalog worlddata.Catalog) (resolvedModifiers, error) {
 	mods := newResolvedModifiers()
+	if err := settleDueToxicityTx(conn, userID, gameMinute); err != nil {
+		return mods, err
+	}
 	res, err := conn.Execute(`SELECT effect_json,stacks FROM active_effects WHERE user_id=? AND starts_game_minute<=? AND (ends_game_minute IS NULL OR ends_game_minute>?)`, []any{userID, gameMinute, gameMinute})
 	if err != nil {
 		return mods, err

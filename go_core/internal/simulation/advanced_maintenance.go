@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"xianxia/core/internal/game"
 	"xianxia/core/internal/storage"
 )
 
@@ -156,6 +157,14 @@ func (r *Runner) advancedMaintenance(conn *storage.Conn, gm int64, automation ma
 			return Run{}, false, err
 		}
 	}
+	// Commissions (v0.22.0): a deadline that only fired when someone opened
+	// Discord would not be a deadline. The engine tick is what makes `failed`
+	// real, and it survives a restart because it reads the stored deadline
+	// rather than a timer.
+	counts["commissions_expired"], err = r.expireCommissions(conn, gm)
+	if err != nil {
+		return Run{}, false, err
+	}
 	if err = conn.Commit(); err != nil {
 		return Run{}, false, err
 	}
@@ -169,7 +178,7 @@ func (r *Runner) advancedMaintenance(conn *storage.Conn, gm int64, automation ma
 	if !changed {
 		return Run{}, false, nil
 	}
-	summary := fmt.Sprintf("auctions=%d hunters_spawned=%d hunters_updated=%d wars=%d occupations=%d caravans=%d seclusions=%d era_changed=%t", counts["auctions"], counts["hunters_spawned"], counts["hunters_updated"], counts["wars"], counts["occupations"], counts["caravans"], counts["seclusions"], eraChanged)
+	summary := fmt.Sprintf("auctions=%d hunters_spawned=%d hunters_updated=%d wars=%d occupations=%d caravans=%d seclusions=%d commissions_expired=%d era_changed=%t", counts["auctions"], counts["hunters_spawned"], counts["hunters_updated"], counts["wars"], counts["occupations"], counts["caravans"], counts["seclusions"], counts["commissions_expired"], eraChanged)
 	return Run{System: "advanced_world", DueSteps: 1, AppliedSteps: 1, Summary: summary}, true, nil
 }
 
@@ -635,7 +644,13 @@ func (r *Runner) advanceSeclusions(conn *storage.Conn, gm int64) (int64, error) 
 				return changed, err
 			}
 		}
-		completed := gm >= end && settled >= end
+		// See the note in internal/game/family_dao_actions.go: whole-day
+		// accounting can never reach an end that is not a whole number of days,
+		// so completion keys off the clock and the books are closed at the end.
+		completed := gm >= end
+		if completed {
+			settled = max64(settled, end)
+		}
 		status := "active"
 		reason := ""
 		if completed {
@@ -650,4 +665,23 @@ func (r *Runner) advanceSeclusions(conn *storage.Conn, gm int64) (int64, error) 
 		}
 	}
 	return changed, nil
+}
+
+// expireCommissions fails every commission whose deadline has passed. The
+// outcome table itself lives in the game package (commission_actions.go) so
+// that a deadline expiring and a player abandoning cost exactly the same
+// standing - there is only one implementation of that rule.
+func (r *Runner) expireCommissions(conn *storage.Conn, gm int64) (int64, error) {
+	probe, err := conn.Execute(`SELECT 1 AS ok FROM pragma_table_info('character_quests') WHERE name='commission' LIMIT 1`, nil)
+	if err != nil {
+		return 0, err
+	}
+	if firstMap(probe) == nil {
+		return 0, nil
+	}
+	expired, err := game.ExpireDueCommissions(conn, gm)
+	if err != nil {
+		return 0, err
+	}
+	return int64(len(expired)), nil
 }

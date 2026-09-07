@@ -33,6 +33,24 @@ def _as_float(value: str | None, default: float, *, name: str = "value") -> floa
         raise RuntimeError(f"{name} must be numeric") from exc
 
 
+
+def _typed_play_prefix(value: str | None) -> str:
+    """The one character that marks a typed line as an action to resolve.
+
+    Default ``>``: one keystroke, conventional for roleplay bots, and Discord
+    renders ``> text`` as a quote block so actions look different from speech.
+    Exactly one character, and not a letter, digit or whitespace - anything
+    else would swallow ordinary speech ("i explore" must never be an action
+    because someone set the prefix to "i").
+    """
+    prefix = (value if value is not None else ">").strip("\r\n")
+    if prefix == "":
+        prefix = ">"
+    if len(prefix) != 1 or prefix.isalnum() or prefix.isspace():
+        raise ValueError("TYPED_PLAY_PREFIX must be exactly one non-alphanumeric, non-space character")
+    return prefix
+
+
 def _as_int_set(value: str | None, *, name: str = "value") -> set[int]:
     if not value:
         return set()
@@ -114,6 +132,10 @@ class Settings:
     quest_reward_max_xp: int
     quest_reward_max_stones: int
     quest_reward_max_items: int
+    typed_play_prefix: str
+    typed_play_burst: int
+    typed_play_per_minute: float
+    typed_play_hint: bool
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -376,6 +398,13 @@ class Settings:
             quest_budget[key] = int(os.getenv(key, str(default)))
             if quest_budget[key] < 0:
                 raise ValueError(f"{key} cannot be negative")
+        typed_play_prefix = _typed_play_prefix(os.getenv("TYPED_PLAY_PREFIX"))
+        typed_play_burst = _as_int(os.getenv("TYPED_PLAY_BURST"), 4, name="TYPED_PLAY_BURST")
+        typed_play_per_minute = _as_float(os.getenv("TYPED_PLAY_PER_MINUTE"), 6.0, name="TYPED_PLAY_PER_MINUTE")
+        if typed_play_burst < 1:
+            raise ValueError("TYPED_PLAY_BURST must be at least 1")
+        if typed_play_per_minute <= 0:
+            raise ValueError("TYPED_PLAY_PER_MINUTE must be positive")
         return cls(
             discord_token=discord_token,
             guild_id=guild_id,
@@ -441,5 +470,9 @@ class Settings:
             quest_reward_max_xp=quest_budget["QUEST_REWARD_MAX_XP"],
             quest_reward_max_stones=quest_budget["QUEST_REWARD_MAX_STONES"],
             quest_reward_max_items=quest_budget["QUEST_REWARD_MAX_ITEMS"],
+            typed_play_prefix=typed_play_prefix,
+            typed_play_burst=typed_play_burst,
+            typed_play_per_minute=typed_play_per_minute,
+            typed_play_hint=_as_bool(os.getenv("TYPED_PLAY_HINT"), True),
             **cooldowns,
         )

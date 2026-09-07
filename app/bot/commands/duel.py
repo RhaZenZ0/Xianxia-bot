@@ -72,7 +72,14 @@ async def duel_respond(interaction: discord.Interaction, challenge_id: int, deci
         await interaction.followup.send(str(exc), ephemeral=False)
         return
     result = dict(envelope.get("result") or {})
-    if decision.value == "accept":
+    if str(result.get("status")) == "void":
+        # v0.22.3: the engine re-checks the duel's preconditions at accept, not
+        # only when the challenge was made. Five minutes is long enough to walk
+        # into a city, and a duel between two places is not a duel.
+        await interaction.followup.send(
+            f"⚔️ The challenge lapses: {result.get('reason', 'its terms no longer hold')}. No duel begins."
+        )
+    elif decision.value == "accept":
         await interaction.followup.send(
             f"⚔️ Duel accepted. Nonlethal PvP match **#{result['match_id']}** begins; challenger acts first. Use **/combat → Duels → Act**."
         )
@@ -137,6 +144,21 @@ async def duel_act(interaction: discord.Interaction, style: app_commands.Choice[
         await interaction.response.send_message(str(exc), ephemeral=False)
         return
     resolved = dict(envelope.get("result") or {})
+    if resolved.get("breach"):
+        # The duel's preconditions stopped holding - someone left, someone
+        # died, or the ground became a safe zone. The engine ends it rather
+        # than refusing forever; say which way it went.
+        if resolved.get("voided"):
+            await interaction.response.send_message(
+                f"⚔️ Duel **#{match['match_id']}** is void: {resolved['breach']}. No winner, no reputation."
+            )
+        else:
+            winner_id = int(resolved.get("winner_user_id", 0))
+            await interaction.response.send_message(
+                f"⚔️ Duel **#{match['match_id']}** ends: {resolved['breach']}. "
+                f"<@{winner_id}> takes it by forfeit; no reputation is recorded for a duel that was not fought out."
+            )
+        return
     if style.value == "surrender":
         await interaction.response.send_message(
             f"🏳️ You surrender duel **#{match['match_id']}**. <@{opponent_id}> wins; no true-death or injury roll occurs. Martial Society reputation records the honorable result."

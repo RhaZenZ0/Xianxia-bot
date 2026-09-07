@@ -312,13 +312,25 @@ func familySupportActionGo(conn *storage.Conn, _ worlddata.Catalog, userID int64
 		sumItems += q
 	}
 	cost := max64(2, stones/8+sumItems*2)
-	if wealth <= 0 {
-		return authoritativeMutation{}, errors.New("family currently has no spare resources")
+	// The family has to be able to afford what it is about to give (v0.23.1).
+	// `wealth <= 0` plus `MAX(0, wealth-cost)` let a family with 1 stone pay a
+	// 20-stone package: the subtraction floored at zero and the player got the
+	// full reward, so a household could be drained to nothing and keep giving.
+	if wealth < cost {
+		return authoritativeMutation{}, fmt.Errorf(
+			"family cannot spare that much: %d required, %d available", cost, wealth)
 	}
 	now := nowSeconds()
-	_, e = conn.Execute(`UPDATE birth_families SET wealth=MAX(0,wealth-?),updated_at=? WHERE family_id=?`, []any{cost, now, fid})
+	// Guarded so a second support arriving between the read and the write
+	// cannot overdraw either: the row must still hold what it promised.
+	spend, e := conn.Execute(
+		`UPDATE birth_families SET wealth=wealth-?,updated_at=? WHERE family_id=? AND wealth>=?`,
+		[]any{cost, now, fid, cost})
 	if e != nil {
 		return authoritativeMutation{}, e
+	}
+	if spend.RowsAffected != 1 {
+		return authoritativeMutation{}, errors.New("family wealth changed while the support was being arranged")
 	}
 	_, _ = conn.Execute(`UPDATE character_birth_family SET last_support_game_minute=? WHERE user_id=?`, []any{p.GameMinute, userID})
 	if stones > 0 {
@@ -555,7 +567,21 @@ func seclusionSettleActionGo(conn *storage.Conn, catalog worlddata.Catalog, user
 	}
 	awarded = min64(attempted, max64(0, cap-current))
 	settled := last + days*p.MinutesPerDay
-	completed := p.GameMinute >= end && settled >= end
+	// Completion is the clock reaching the end, not the whole-day accounting
+	// reaching it (v0.23.1). `settled` only ever advances in whole days, so a
+	// session whose duration is not a multiple of a day - 1500 minutes against
+	// a 1440-minute day - left `settled` 60 minutes short of `end` forever,
+	// and `target` is capped at `end`, so no amount of further waiting closed
+	// the gap. The session stayed active for the rest of the character's life.
+	//
+	// The leftover part-day pays nothing, which is what the UI already says:
+	// cultivation is awarded per whole day of seclusion.
+	completed := p.GameMinute >= end
+	if completed {
+		// Close the books at the end so a resumed session cannot re-count the
+		// part-day it was never paid for.
+		settled = max64(settled, end)
+	}
 	if p.ForceEnd {
 		completed = true
 		if p.EndReason == "" {

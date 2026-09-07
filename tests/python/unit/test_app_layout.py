@@ -18,14 +18,14 @@ APP = PROJECT_ROOT / "app"
 PACKAGES = {
     "rules": {
         "advanced_catalog", "advanced_runtime", "alchemy", "aptitudes", "battle", "birthfamily",
-        "black_market", "creation_ui", "effects", "family", "fate", "game", "inscription", "npc_memory",
-        "progression_systems", "quests", "realm_hubs", "samsara", "seclusion", "sect", "sect_manor",
-        "sect_recruitment", "sense", "trade_receipt", "worldtime",
+        "black_market", "commissions", "creation_ui", "effects", "family", "fate", "game",
+        "inscription", "npc_memory", "progression_systems", "quests", "realm_hubs", "samsara",
+        "seclusion", "sect", "sect_manor", "sect_recruitment", "sense", "trade_receipt", "worldtime",
     },
     "ai": {"ai_router", "chat_monitor", "narrator", "narrator_context", "quest_forge", "rag"},
     "ops": {
         "config", "core_services", "game_engine", "health", "healthcheck", "http_limits", "operations",
-        "performance", "release_channel",
+        "performance", "release_channel", "user_budget",
     },
     "dashboard": {"server", "contract"},
 }

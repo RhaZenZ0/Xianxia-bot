@@ -9,6 +9,7 @@ the bot worker.
 import asyncio
 import json
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -24,6 +25,7 @@ from app.rules.game import World
 from app.rules.quests import (
     OBJECTIVE_TYPES,
     QUEST_DEFINITIONS,
+    static_quest_seed_rows,
     procedural_quest_from_event,
     quest_key_for,
     rewardable_items,
@@ -220,16 +222,41 @@ class ForgeTests(unittest.TestCase):
 
 
 class _FakeEngine:
-    def __init__(self):
+    """Stands in for the Go engine. `commission.accept` (v0.22.0) writes the
+    character_quests row the real action writes, so the service tests still
+    exercise a real database - they just do not run Go to get there."""
+
+    def __init__(self, db=None):
         self.calls = []
+        self.db = db
 
     async def action(self, operation, user_id, payload):
         self.calls.append((operation, user_id, payload))
         if operation == "quest.progress":
             # Complete when every objective's type matches the reported one.
+            # The engine pays inside this call (v0.22.2) and reports what it
+            # paid, so the fake does the same.
             done = all(o["type"] == payload["objective_type"] for o in payload["objectives"])
-            return {"touched": True, "complete": done, "progress": {}}
+            transition = {"touched": True, "complete": done, "progress": {}}
+            if done:
+                transition["rewards_granted"] = dict(payload.get("rewards") or {})
+            return transition
         return {"cultivation_awarded": 0}
+
+    async def authoritative_action(self, operation, user_id, payload, *, action_id, expected_version=None):
+        self.calls.append((operation, user_id, payload))
+        if operation == "commission.accept" and self.db is not None:
+            now = time.time()
+            async with self.db._connect() as conn:
+                await conn.execute(
+                    """INSERT INTO character_quests(user_id,quest_key,status,progress_json,accepted_game_minute,
+                           commission,variant_index,created_at,updated_at)
+                       VALUES(?,?,'active','{}',0,0,?,?,?)
+                       ON CONFLICT(user_id,quest_key) DO NOTHING""",
+                    (int(user_id), str(payload["quest_key"]), int(payload.get("variant_index", 0)), now, now),
+                )
+                await conn.commit()
+        return {"result": {"quest_key": payload.get("quest_key"), "status": "active"}}
 
 
 class ServiceAndStorageTests(unittest.IsolatedAsyncioTestCase):
@@ -237,7 +264,7 @@ class ServiceAndStorageTests(unittest.IsolatedAsyncioTestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.db = Database(Path(self.tmp.name) / "forge.sqlite3")
         await self.db.init()
-        self.engine = _FakeEngine()
+        self.engine = _FakeEngine(self.db)
         self.service = QuestService(self.db, QUEST_DEFINITIONS, engine=self.engine)
         attrs = {"body": 4, "agility": 4, "spirit": 5, "insight": 5, "will": 4, "presence": 4}
         for uid in (3, 5, 6, 9):
@@ -250,10 +277,10 @@ class ServiceAndStorageTests(unittest.IsolatedAsyncioTestCase):
     async def asyncTearDown(self):
         self.tmp.cleanup()
 
-    async def test_schema_28_has_the_table_and_the_dashboard_reviewed_it(self):
+    async def test_the_forge_table_exists_and_the_dashboard_reviewed_the_schema(self):
         from app.dashboard.contract import DASHBOARD_REVIEWED_SCHEMA_VERSION, DASHBOARD_SYSTEM_TABLES
 
-        self.assertEqual(SCHEMA_VERSION, 28)
+        self.assertEqual(SCHEMA_VERSION, 31)
         self.assertEqual(DASHBOARD_REVIEWED_SCHEMA_VERSION, SCHEMA_VERSION)
         self.assertIn("quest_definitions", DASHBOARD_SYSTEM_TABLES["exploration"])
         rows = await self.db.list_quest_definitions()
@@ -282,7 +309,7 @@ class ServiceAndStorageTests(unittest.IsolatedAsyncioTestCase):
         row = await store_draft(self.db, ForgeResult(definition=definition), story="s", origin="gm_prompt", created_by=1)
         await self.db.set_quest_definition_status(row["quest_key"], "approved")
         await self.service.catalog(refresh=True)
-        await self.service.accept(5, row["quest_key"])
+        await self.service.accept(5, row["quest_key"], action_id="test:accept:5")
         await self.db.set_quest_definition_status(row["quest_key"], "retired")
         await self.service.catalog(refresh=True)
         self.assertNotIn(row["quest_key"], {q["quest_key"] for q in await self.service.available(6)})
@@ -291,27 +318,31 @@ class ServiceAndStorageTests(unittest.IsolatedAsyncioTestCase):
         # ... and progress on the held quest still resolves through the last-known definition.
         self.assertEqual(await self.service.progress(5, "explore", target="Greenriver Town"), [])
 
-    async def test_completion_grants_the_declared_rewards_through_the_engine(self):
+    async def test_completion_is_paid_by_the_transaction_that_completes_it(self):
         definition, _ = validate_quest_definition({**GOOD, "objectives": [{"type": "explore", "target": "Greenriver Town"}],
                                                    "rewards": {"insight_xp": 30, "spirit_stones": 40, "items": {"spirit_herb": 2}}}, WORLD, BUDGET)
         row = await store_draft(self.db, ForgeResult(definition=definition), story="s", origin="gm_prompt", created_by=1)
         await self.db.set_quest_definition_status(row["quest_key"], "approved")
         await self.service.catalog(refresh=True)
-        await self.service.accept(9, row["quest_key"])
+        await self.service.accept(9, row["quest_key"], action_id="test:accept:9")
         changed = await self.service.progress(9, "explore", target="Greenriver Town")
         self.assertEqual(len(changed), 1)
         self.assertTrue(changed[0]["just_completed"])
         self.assertEqual(changed[0]["title"], "The Reed Gate Whisper")
+        # What was paid comes back from the completing call itself.
         self.assertEqual(changed[0]["rewards_granted"], {"spirit_stones": 40, "insight_xp": 30, "items": {"spirit_herb": 2}})
         ops = [c[0] for c in self.engine.calls]
-        self.assertEqual(ops, ["quest.progress", "cultivation.reward"])
-        reward_call = self.engine.calls[1]
-        self.assertEqual(reward_call[1], 9)
-        self.assertEqual(reward_call[2]["event_type"], f"quest_reward:{row['quest_key']}")
-        self.assertEqual(reward_call[2]["cultivation"], 0)
+        self.assertEqual(ops, ["commission.accept", "quest.progress"],
+                         "completion and payment are one commit; a second reward call can be lost")
+        progress_call = self.engine.calls[1]
+        self.assertEqual(progress_call[1], 9)
+        # The declared rewards travel with the report so the engine can pay
+        # them on the tick that completes.
+        self.assertEqual(progress_call[2]["rewards"],
+                         {"insight_xp": 30, "spirit_stones": 40, "items": {"spirit_herb": 2}})
 
     async def test_a_quest_with_nothing_to_grant_makes_no_reward_call(self):
-        await self.service.accept(3, "first_steps")
+        await self.service.accept(3, "first_steps", action_id="test:accept:3")
         engine_calls_before = len(self.engine.calls)
         # first_steps needs explore + talk + scene_action; one report touches, does not complete
         changed = await self.service.progress(3, "explore")
@@ -321,7 +352,7 @@ class ServiceAndStorageTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_unknown_keys_are_refused_and_static_shadows_forged(self):
         with self.assertRaises(ValueError):
-            await self.service.accept(1, "forge_nope")
+            await self.service.accept(1, "forge_nope", action_id="test:accept:1")
         definition, _ = validate_quest_definition({**GOOD, "title": "First Steps Beneath Heaven"}, WORLD, BUDGET)
         definition = {**definition, "quest_key": "first_steps"}
         await self.db.save_quest_definition(definition, status="approved")
@@ -357,7 +388,11 @@ class SurfaceTests(unittest.TestCase):
             self.assertNotIn(forbidden, self.wo[self.wo.index("# Quest Forge (v0.20.6)"):])
         service = (PROJECT_ROOT / "app" / "ops" / "core_services.py").read_text(encoding="utf-8")
         body = service[service.index("class QuestService"):service.index("class ExplorationService")]
-        self.assertIn('await self.engine.action("cultivation.reward", user_id, payload)', body)
+        # v0.22.2: rewards are granted by the transaction that completes the
+        # quest (quest.progress in Go), not by a second call from here. A
+        # separate reward call is the defect, not the design.
+        self.assertNotIn("cultivation.reward", body)
+        self.assertIn('"rewards": dict(definition.get("rewards") or {})', body)
         self.assertNotIn("INSERT", body)
 
     def test_the_worker_is_opt_in_idempotent_and_announces(self):
@@ -384,3 +419,35 @@ class SurfaceTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class StaticQuestSeedTests(unittest.TestCase):
+    """v0.23.1: the static quests are seeded so the engine can find them.
+
+    `commission.accept` decides "does this quest exist?" by looking for a
+    `quest_definitions` row. Before this, a static quest had none, so the
+    engine could not tell `first_steps` from a key nobody defined and accepted
+    both. These assert the seed rows keep the shape that makes them ordinary
+    quests rather than commissions.
+    """
+
+    def test_every_static_quest_gets_a_row(self):
+        rows = static_quest_seed_rows()
+        self.assertEqual(
+            {row["quest_key"] for row in rows},
+            set(QUEST_DEFINITIONS),
+            "a static quest with no seed row is invisible to the engine",
+        )
+
+    def test_seed_rows_carry_no_giver_so_they_stay_ordinary_quests(self):
+        for row in static_quest_seed_rows():
+            self.assertEqual(row["giver_npc"], "", row["quest_key"])
+            self.assertEqual(row["deadline_game_minutes"], 0, row["quest_key"])
+            self.assertEqual(row["variants"], [], row["quest_key"])
+
+    def test_seed_rows_preserve_the_definition(self):
+        rows = {row["quest_key"]: row for row in static_quest_seed_rows()}
+        for key, definition in QUEST_DEFINITIONS.items():
+            self.assertEqual(rows[key]["title"], definition["title"])
+            self.assertEqual(rows[key]["objectives"], definition["objectives"])
+            self.assertEqual(rows[key]["rewards"], definition["rewards"])

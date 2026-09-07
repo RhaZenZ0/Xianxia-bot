@@ -16,6 +16,7 @@ from ...ops.game_engine import GameEngineError
 from ..hubs import HubDynamicOption, register_hub_option_hint, register_hub_option_provider
 from ..registry import registered_group_command
 from ..runtime import (
+    _explain_engine_error,
     DB,
     ENGINE,
     WORLD,
@@ -89,7 +90,7 @@ async def equipment_bind(interaction: discord.Interaction, item: str) -> None:
         )
         result = dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.followup.send(f"❌ {exc}", ephemeral=False)
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
         return
     await interaction.followup.send(
         f"🧷 Bound **{WORLD.item_name(item)}** as equipment `#{result.get('equipment_id')}`.",
@@ -113,7 +114,7 @@ async def equipment_equip(interaction: discord.Interaction, equipment_id: int) -
         )
         _ = dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.followup.send(f"❌ {exc}", ephemeral=False)
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
         return
     await interaction.followup.send(f"⚔️ Equipped {await _equipment_label(interaction.user.id, int(equipment_id))}.", ephemeral=False)
 
@@ -134,7 +135,7 @@ async def equipment_unequip(interaction: discord.Interaction, equipment_id: int)
         )
         _ = dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.followup.send(f"❌ {exc}", ephemeral=False)
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
         return
     await interaction.followup.send(f"🎒 Unequipped {await _equipment_label(interaction.user.id, int(equipment_id))}.", ephemeral=False)
 
@@ -155,7 +156,7 @@ async def equipment_repair(interaction: discord.Interaction, equipment_id: int) 
         )
         result = dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.followup.send(f"❌ {exc}", ephemeral=False)
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
         return
     await interaction.followup.send(
         f"🔧 Repaired {await _equipment_label(interaction.user.id, int(equipment_id))} for **{int(result.get('repair_cost', 0))} Spirit Iron**.",

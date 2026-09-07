@@ -30,6 +30,7 @@ from ..runtime import (
     log,
     reply_long,
     require_character,
+    respond,
     serialized_user_action,
 )
 from ..services import GUILD, NARRATOR, NARRATOR_CONTEXT
@@ -64,13 +65,16 @@ async def sense_command(
     npc: str | None = None,
     area: bool = False,
 ) -> None:
+    # Ack before the engine call: the guard branches above return early,
+    # so an ack inside one of them never runs on the path that mutates.
+    await interaction.response.defer(ephemeral=False)
     c = await require_character(interaction)
     if not c:
         return
 
     selected = int(target is not None) + int(bool(npc)) + int(area)
     if selected > 1:
-        await interaction.response.send_message(
+        await respond(interaction, 
             "Choose only one sense target: another player, an NPC, or `area:true`.",
             ephemeral=False,
         )
@@ -86,9 +90,9 @@ async def sense_command(
                 "sense.status", interaction.user.id, {},
             ) or {})
         except GameEngineError as exc:
-            await interaction.response.send_message(f"Spiritual Sense status could not resolve: {exc}", ephemeral=False)
+            await respond(interaction, f"Spiritual Sense status could not resolve: {exc}", ephemeral=False)
             return
-        await interaction.response.send_message(
+        await respond(interaction, 
             "🔍 **Spiritual Sense**\n"
             f"Power: **{int(status.get('power', 0))}**\n"
             f"Precision: **{int(status.get('precision', 0))}**\n"
@@ -103,7 +107,7 @@ async def sense_command(
     if target is not None:
         tc = await DB.get_character(target.id)
         if not tc:
-            await interaction.response.send_message(
+            await respond(interaction, 
                 f"{target.mention} does not have a cultivation character yet.", ephemeral=False
             )
             return
@@ -114,7 +118,7 @@ async def sense_command(
                 action_id=f"discord:{interaction.id}:sense.inspect:player:{target.id}",
             )
         except GameEngineError as exc:
-            await interaction.response.send_message(f"Spiritual Sense could not resolve: {exc}", ephemeral=False)
+            await respond(interaction, f"Spiritual Sense could not resolve: {exc}", ephemeral=False)
             return
         sensed = dict(envelope.get("result") or {})
         roll = SimpleNamespace(**dict(sensed.get("roll") or {}))
@@ -147,7 +151,7 @@ async def sense_command(
                 f"Main cultivation: **{WORLD.realm_name(int(sensed.get('target_realm_index', 0)), tc.get('gender'))} — Stage {int(sensed.get('target_phase', 1))}**.\n"
                 f"Body cultivation: **{body_name} — Stage {tc.get('body_phase', 1)}**."
             )
-        await interaction.response.send_message(
+        await respond(interaction, 
             f"🔍 **Spiritual Sense — {tc['name']}**\n{roll_line(roll)}\n"
             f"Precision: **{int(precision.get('total', 0))}** vs detail TN **{int(precision.get('tn', 0))}** — **{precision_tier.replace('_', ' ').title()}**\n\n"
             f"{reading}",
@@ -157,11 +161,11 @@ async def sense_command(
 
     if npc:
         if npc not in WORLD.npcs:
-            await interaction.response.send_message("Unknown NPC.", ephemeral=False)
+            await respond(interaction, "Unknown NPC.", ephemeral=False)
             return
         npc_location = await current_npc_location(npc, wt.period)
         if npc_location and npc_location != c.get("location"):
-            await interaction.response.send_message(
+            await respond(interaction, 
                 f"**{npc}** is not currently present at **{await character_location_display(c)}**.", ephemeral=False
             )
             return
@@ -172,7 +176,7 @@ async def sense_command(
                 action_id=f"discord:{interaction.id}:sense.inspect:npc:{npc}",
             )
         except GameEngineError as exc:
-            await interaction.response.send_message(f"Spiritual Sense could not resolve: {exc}", ephemeral=False)
+            await respond(interaction, f"Spiritual Sense could not resolve: {exc}", ephemeral=False)
             return
         sensed = dict(envelope.get("result") or {})
         roll = SimpleNamespace(**dict(sensed.get("roll") or {}))
@@ -186,7 +190,7 @@ async def sense_command(
             )
         lines.append("")
         lines.append(str(sensed.get("reading") or "You cannot obtain a stable reading from their aura."))
-        await interaction.response.send_message("\n".join(lines), ephemeral=False)
+        await respond(interaction, "\n".join(lines), ephemeral=False)
         return
 
     # Area sweep. Python supplies only which hidden NPCs are physically present;
@@ -207,7 +211,7 @@ async def sense_command(
             action_id=f"discord:{interaction.id}:sense.inspect:area",
         )
     except GameEngineError as exc:
-        await interaction.response.send_message(f"Spiritual Sense sweep could not resolve: {exc}", ephemeral=False)
+        await respond(interaction, f"Spiritual Sense sweep could not resolve: {exc}", ephemeral=False)
         return
     sensed = dict(envelope.get("result") or {})
     roll = SimpleNamespace(**dict(sensed.get("roll") or {}))
@@ -240,7 +244,7 @@ async def sense_command(
         elif signal == "concealed":
             lines.append("• One nearby presence is **far too perfectly concealed to feel ordinary**.")
 
-    await interaction.response.send_message("\n".join(lines), ephemeral=False)
+    await respond(interaction, "\n".join(lines), ephemeral=False)
 
 
 @registered_root_command(name="conceal", description="Turn your cultivation-aura concealment on or off", guild=GUILD)

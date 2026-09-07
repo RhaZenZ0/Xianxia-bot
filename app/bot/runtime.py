@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from functools import wraps
 from pathlib import Path
 from types import SimpleNamespace
@@ -52,7 +53,8 @@ from ..ops.config import Settings
 from ..database import Database
 from ..rules.game import World
 from ..ops.game_engine import GameEngineClient, GameEngineError
-from ..rules.realm_hubs import REALM_HUBS
+from ..ops.user_budget import UserBudget
+from ..rules.realm_hubs import REALM_HUBS, presence_world_for, realm_presence_role_name
 from ..simulation import MINUTES_PER_DAY
 from ..rules.worldtime import from_game_minutes, MINUTES_PER_YEAR
 
@@ -72,6 +74,10 @@ DB = Database(
     engine_url=SETTINGS.game_engine_url,
 )
 _USER_ACTION_LOCKS: dict[int, asyncio.Lock] = {}
+# Per-player token bucket for typed play (v0.21.1). Every typed line that can
+# reach the engine or the narrator spends a token; speech-only lines are free.
+# See app/ops/user_budget.py for why this exists and what it protects.
+TYPED_PLAY_BUDGET = UserBudget(burst=SETTINGS.typed_play_burst, per_minute=SETTINGS.typed_play_per_minute)
 def _player_property_types() -> dict[str, dict[str, Any]]:
     configured = WORLD.abode_system.get("property_types", {})
     if isinstance(configured, dict) and configured:
@@ -146,6 +152,27 @@ def private_location_exit(location: object) -> tuple[str, str] | None:
         if text.startswith(prefix):
             return command, description
     return None
+# The engine's three cooldown shapes: "cultivation cooldown remaining: 10520",
+# "cooldown active: 90 seconds" (explore/hunt), "manual study cooldown: 5 seconds".
+_COOLDOWN_REMAINING_RE = re.compile(
+    r"^(?P<what>[A-Za-z][A-Za-z /-]*?)?\s*cooldown(?: remaining| active)?:\s*(?P<seconds>\d+)(?:\s*seconds?)?\s*$"
+)
+
+
+def format_wait(seconds: int) -> str:
+    """10520 -> '2h 55m'; 90 -> '1m 30s'; 0 -> 'a moment'. Never a bare number."""
+    seconds = max(0, int(seconds))
+    if seconds == 0:
+        return "a moment"
+    hours, rest = divmod(seconds, 3600)
+    minutes, secs = divmod(rest, 60)
+    if hours:
+        return f"{hours}h {minutes}m" if minutes else f"{hours}h"
+    if minutes:
+        return f"{minutes}m {secs}s" if secs else f"{minutes}m"
+    return f"{secs}s"
+
+
 def _explain_engine_error(exc: Exception) -> str:
     """Append an actionable hint to specific known engine errors that otherwise
     leave the player stuck with no indication of what to do next - most notably
@@ -156,6 +183,15 @@ def _explain_engine_error(exc: Exception) -> str:
     the raw engine message unchanged for everything else.
     """
     text = str(exc)
+    # "cultivation cooldown remaining: 10520" is the engine's exact truth in raw
+    # seconds and no help to a player. Keep the truth, say it as a wait
+    # (v0.21.5). The number is real time: cooldowns are wall-clock, set from
+    # *_COOLDOWN_MINUTES, not world time.
+    cooldown = _COOLDOWN_REMAINING_RE.search(text)
+    if cooldown:
+        what = (cooldown.group("what") or "").strip() or "This action"
+        seconds = int(cooldown.group("seconds"))
+        text = f"⏳ {what[:1].upper()}{what[1:]} is still on cooldown — ready in **{format_wait(seconds)}**."
     if "private residence or personal world" in text:
         # Spell these the way a player can actually reach them. The individual
         # gameplay commands are not registered with Discord - only the 16 hub
@@ -279,6 +315,39 @@ async def _sync_realm_access_roles(
         log.warning("Could not synchronize realm access roles for user %s; check bot role hierarchy", member.id)
     except discord.HTTPException:
         log.exception("Could not synchronize realm access roles for user %s", member.id)
+async def _sync_realm_presence_roles(
+    guild: discord.Guild | None, member: discord.Member | discord.User, character: dict[str, Any]
+) -> None:
+    """Give the member exactly the presence role of the capital they stand in (v0.21.6).
+
+    Realm capitals are hidden until you are in the city: the channel allows
+    only "Xianxia • <capital>", and this puts that role on when the
+    character's location is the capital and takes it off the moment it is
+    not. Runs from require_character (every command), on_message and right
+    after hub travel, and makes no API call when nothing changed.
+    """
+    if guild is None or not isinstance(member, discord.Member):
+        return
+    me = guild.me
+    if not me or not me.guild_permissions.manage_roles:
+        return
+    role_map = {world: discord.utils.get(guild.roles, name=realm_presence_role_name(world)) for world in REALM_HUBS}
+    available = {world: role for world, role in role_map.items() if role is not None}
+    if not available:
+        return
+    here = presence_world_for(character.get("location"))
+    current_ids = {role.id for role in member.roles}
+    add_roles = [role for world, role in available.items() if world == here and role.id not in current_ids]
+    remove_roles = [role for world, role in available.items() if world != here and role.id in current_ids]
+    try:
+        if add_roles:
+            await member.add_roles(*add_roles, reason="Xianxia: arrived in a realm capital")
+        if remove_roles:
+            await member.remove_roles(*remove_roles, reason="Xianxia: left a realm capital")
+    except discord.Forbidden:
+        log.warning("Could not synchronize realm presence roles for user %s; check bot role hierarchy", member.id)
+    except discord.HTTPException:
+        log.exception("Could not synchronize realm presence roles for user %s", member.id)
 async def authoritative_lifespan(user_id: int) -> SimpleNamespace:
     result = await ENGINE.action("character.lifespan", int(user_id), {})
     return SimpleNamespace(**dict(result or {}))
@@ -382,6 +451,7 @@ async def require_character(interaction: discord.Interaction, *, allow_deceased:
         return None
     try:
         await _sync_realm_access_roles(interaction.guild, interaction.user, character)
+        await _sync_realm_presence_roles(interaction.guild, interaction.user, character)
     except Exception:
         log.exception("Realm access role synchronization failed")
     return character

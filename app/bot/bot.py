@@ -27,10 +27,18 @@ from .admin.channel_messages import XianxiaInfoView
 from .admin.server_setup import dashboard_discord_control
 from .channels import post_server_log
 from .character_state import _remember_freeform_npc_scene
-from .runtime import DB, ENGINE, SETTINGS, WORLD, character_location_display, chunk_text, current_world_time, log
+from .runtime import DB, ENGINE, SETTINGS, WORLD, _sync_realm_presence_roles, character_location_display, chunk_text, current_world_time, log
 from ..ai.quest_forge import store_draft
+from ..rules.quests import QUEST_DEFINITIONS, static_quest_seed_rows
 from .services import ALERTS, GUILD, NARRATOR, NARRATOR_CONTEXT, QUEST_FORGE, SIM
 from .threads import _private_scene_for_thread
+from .locations import current_npc_location
+from .registry import EVENT_HANDLERS
+from .typed_play import (
+    Candidate, MessageInteraction, TypedPlayPicker, TypedPlayUnsupported, VERB_TABLE,
+    budget_refusal, dispatch, hint_due, hint_text, picker_prompt,
+)
+from .typed_play_router import addressed_npc, parse_prefixed, resolve_entities, route_line
 from .ui.event_scene import spawn_system_event_thread
 
 class XianxiaBot(commands.Bot):
@@ -122,9 +130,19 @@ class XianxiaBot(commands.Bot):
             phase = "CATALOG_READY"
             await DB.sync_world_catalog(WORLD.data)
             await DB.sync_rag_canon(WORLD.data)
+            # v0.22.0: the authored commission pool. Insert-only, so a GM's
+            # edits and retirements survive every restart.
+            #
+            # v0.23.1: the static quests are seeded through the same path. They
+            # carry no giver, so they stay ordinary quests - the row exists so
+            # the engine can tell `first_steps` from a key nobody defined.
+            seeded_commissions = await DB.sync_commission_pool(
+                list(WORLD.data.get("commissions") or []) + static_quest_seed_rows(QUEST_DEFINITIONS)
+            )
             catalog_counts = await DB.catalog_counts()
             rag_counts = await DB.rag_stats()
-            await self._mark_startup_phase("CATALOG_READY", {**catalog_counts, **{f"rag_{k}": v for k, v in rag_counts.items()}})
+            await self._mark_startup_phase("CATALOG_READY", {**catalog_counts, "commissions_seeded": seeded_commissions,
+                                                             **{f"rag_{k}": v for k, v in rag_counts.items()}})
 
             phase = "SIMULATION_READY"
             wt_state = await DB.get_world_clock(scale=SETTINGS.world_time_scale)
@@ -472,6 +490,23 @@ class XianxiaBot(commands.Bot):
         self.health_state.set_check("discord_gateway", True, guild_id=SETTINGS.guild_id, resumed=True)
 
     async def on_message(self, message: discord.Message) -> None:
+        """Typed play (v0.21.1).
+
+        In the channels AUTO_NARRATE listens to, a line is one of three things:
+
+        * ``> action`` - the typed-play prefix. The router turns it into the
+          same handler a hub button would run; the engine resolves it; the
+          narration is whatever that action already produces.
+        * dialogue - un-prefixed, but it addresses an NPC who is present, or
+          @mentions the bot. ``/talk`` for the former, free narration for the
+          latter (a mention is an explicit "narrator, react").
+        * speech - everything else. Recorded in history, no reply, no model
+          call. This is most lines in a roleplay channel.
+
+        Every line that can reach the engine or the narrator first spends a
+        token from the per-player budget; speech is free. Before v0.21.1 every
+        line in these channels was a narration call that decided nothing.
+        """
         if message.author.bot or not message.guild:
             return
         if message.guild.id != SETTINGS.guild_id:
@@ -504,46 +539,164 @@ class XianxiaBot(commands.Bot):
         if not mentioned and not auto_channel and not active_event_thread:
             return
 
-        if not character:
-            await message.reply("Create your cultivator first with **/begin**.")
-            return
-        if isinstance(message.channel, discord.Thread) and parent_id:
-            cfg = await DB.get_server_config(message.guild.id)
-            if int(parent_id) == int(cfg.get("exploration_channel_id") or 0) and not private_scene:
-                await message.reply("This is not your active private expedition thread.")
-                return
-        if hub_record and str(character.get("location", "")) != str(hub_record.get("location", "")):
-            await message.reply(
-                f"🏙️ This channel represents **{hub_record['location']}** in **{hub_record['world_name']}**. "
-                f"Your cultivator is currently at **{await character_location_display(character)}**. "
-                "Use **/travel → Realm Capitals → Go** before roleplaying here."
-            )
-            return
-
         content = message.content
         if self.user:
             content = content.replace(f"<@{self.user.id}>", "").replace(f"<@!{self.user.id}>", "").strip()
         if not content:
             return
+        typed = parse_prefixed(content, SETTINGS.typed_play_prefix)
 
-        await DB.add_history(
-            message.channel.id,
-            user_id=message.author.id,
-            speaker=character["name"],
-            content=content,
-        )
-        if is_current_location_question(content):
-            narration = canonical_location_reply(character)
-            await DB.add_history(
-                message.channel.id,
-                user_id=None,
-                speaker="World",
-                content=narration,
-            )
-            await message.reply(narration, mention_author=False)
+        if not character:
+            # Speech from someone without a cultivator is just chat. Only an
+            # attempt to act, or a direct mention, earns the onboarding nudge.
+            if typed is not None or mentioned:
+                await message.reply("Create your cultivator first with **/begin**.")
             return
-        history = await DB.get_history(message.channel.id, 24)
+        if isinstance(message.channel, discord.Thread) and parent_id:
+            cfg = await DB.get_server_config(message.guild.id)
+            if int(parent_id) == int(cfg.get("exploration_channel_id") or 0) and not private_scene:
+                if typed is not None or mentioned:
+                    await message.reply("This is not your active private expedition thread.")
+                return
+        # Capitals are visible only while you stand in them (v0.21.6); a road
+        # journey settles in the engine, so keep the presence role honest on
+        # every line here too. No API call when nothing changed.
+        try:
+            await _sync_realm_presence_roles(message.guild, message.author, character)
+        except Exception:
+            log.exception("Realm presence role synchronization failed")
+        if hub_record and str(character.get("location", "")) != str(hub_record.get("location", "")):
+            if typed is not None or mentioned:
+                await message.reply(
+                    f"🏙️ This channel represents **{hub_record['location']}** in **{hub_record['world_name']}**. "
+                    f"Your cultivator is currently at **{await character_location_display(character)}**. "
+                    "Use **/travel → Realm Capitals → Go** before roleplaying here."
+                )
+            return
 
+        epic = bool(active_event_thread)
+
+        async def narrate(via: Any) -> None:
+            await self.narrate_freeform(
+                message=message, character=character, content=content,
+                private_scene=private_scene, epic=epic, via=via,
+            )
+
+        # --- un-prefixed: speech, unless it addresses someone -----------------
+        if typed is None:
+            npc = None if mentioned else await self._addressed_present_npc(content, character)
+            if npc is None:
+                # Speech is history. (A line that dispatches to a handler is
+                # not recorded here: /talk records it as "To Qiao: ...", the
+                # scene action records its own line - so the narrator's
+                # context never sees the same line twice.)
+                await DB.add_history(
+                    message.channel.id,
+                    user_id=message.author.id,
+                    speaker=character["name"],
+                    content=content,
+                )
+            if is_current_location_question(content):
+                narration = canonical_location_reply(character)
+                await DB.add_history(
+                    message.channel.id,
+                    user_id=None,
+                    speaker="World",
+                    content=narration,
+                )
+                await message.reply(narration, mention_author=False)
+                return
+            if mentioned:
+                refusal = budget_refusal(message.author.id)
+                if refusal:
+                    await message.reply(refusal, mention_author=False, delete_after=20)
+                    return
+                await narrate(None)
+                return
+            if npc is not None:
+                refusal = budget_refusal(message.author.id)
+                if refusal:
+                    await message.reply(refusal, mention_author=False, delete_after=20)
+                    return
+                candidate = Candidate("talk", f"Talk to {npc}", {"npc": npc, "message": content})
+                await self._dispatch_typed(message, candidate)
+                return
+            # Speech. Recorded above; nothing else happens. Once a day, if it
+            # looked like an action, say how to make it one.
+            if SETTINGS.typed_play_hint and VERB_TABLE.looks_like_action(content) and hint_due(message.author.id):
+                try:
+                    await message.reply(hint_text(), mention_author=False, delete_after=45)
+                except discord.HTTPException:
+                    pass
+            return
+
+        # --- prefixed: an action to resolve ----------------------------------
+        refusal = budget_refusal(message.author.id)
+        if refusal:
+            await message.reply(refusal, mention_author=False, delete_after=20)
+            return
+        present = await EVENT_HANDLERS.invoke("scene_action_targets", character)
+        route = route_line(typed, table=VERB_TABLE, present=present, all_npcs=WORLD.npcs)
+        if route.kind == "refusal":
+            await message.reply(route.message, mention_author=False)
+            return
+        if route.kind == "dispatch" and route.single is not None:
+            await self._dispatch_typed(message, route.single)
+            return
+        view = TypedPlayPicker(owner_id=message.author.id, route=route, narrate=narrate)
+        try:
+            view.message = await message.reply(picker_prompt(route), view=view, mention_author=False)
+        except discord.HTTPException:
+            log.exception("Typed play could not post its picker")
+
+    async def _addressed_present_npc(self, content: str, character: dict[str, Any]) -> str | None:
+        """The present NPC an un-prefixed line addresses, or None.
+
+        Cheap first: which NPC names the line could contain at all (pure string
+        work over the catalogue). Only those few are checked for presence, so
+        ordinary speech never pays for a presence lookup per NPC.
+        """
+        named = resolve_entities(content, WORLD.npcs)
+        if not named:
+            return None
+        wt = await current_world_time()
+        location = str(character.get("location") or "")
+        present = [npc for npc in named[:4] if await current_npc_location(npc, wt.period) == location]
+        return addressed_npc(content, present)
+
+    async def _dispatch_typed(self, message: discord.Message, candidate: Candidate) -> None:
+        interaction = MessageInteraction(message, self)
+        try:
+            await dispatch(interaction, candidate)
+        except TypedPlayUnsupported as exc:
+            await message.reply(f"That can't be done from a typed line: {exc}", mention_author=False)
+        except Exception as exc:
+            log.exception("Typed play dispatch failed: %s", candidate.id)
+            try:
+                await post_server_log(
+                    message.guild, "Typed play dispatch failed",
+                    f"{candidate.id} — {type(exc).__name__}: {str(exc)[:900]}",
+                )
+            except Exception:
+                log.exception("Could not mirror typed-play failure to the log channel")
+            await message.reply(
+                "❌ That action could not be completed. The game state was rechecked and nothing was applied.",
+                mention_author=False,
+            )
+
+    async def narrate_freeform(
+        self, *, message: discord.Message, character: dict[str, Any], content: str,
+        private_scene: Any, epic: bool, via: Any,
+    ) -> None:
+        """Free narration of a line that resolved to nothing - the pre-v0.21.1 path.
+
+        Reached only by an explicit ask: an @mention, or the picker's
+        "Narrate it". ``via`` is the picker's interaction when it came from
+        there (its replies go through the interaction), else None (replies go
+        to the message). The narrator is told this is a fixed-roll-less scene
+        and decides nothing; the RAG memory row is written as before.
+        """
+        history = await DB.get_history(message.channel.id, 24)
         lineage_context = await DB.describe_lineage_context(message.author.id)
         scene_context = await NARRATOR_CONTEXT.build(
             character,
@@ -559,11 +712,11 @@ class XianxiaBot(commands.Bot):
                     history=history,
                     social_context=lineage_context,
                     scene_context=scene_context.text,
-                    epic=active_event_thread,
+                    epic=epic,
                 )
             except Exception:
                 log.exception("Narration failed")
-                await message.reply("The spiritual currents are unstable; narration failed. Try again shortly.")
+                await self._deliver(message, via, "The spiritual currents are unstable; narration failed. Try again shortly.")
                 return
 
         await DB.add_history(
@@ -595,10 +748,22 @@ class XianxiaBot(commands.Bot):
             log.exception("Failed to persist freeform RAG/NPC episodic memory")
         for i, chunk in enumerate(chunk_text(narration)):
             if i == 0:
-                await message.reply(chunk, mention_author=False)
+                await self._deliver(message, via, chunk)
             else:
                 await message.channel.send(chunk)
 
+    @staticmethod
+    async def _deliver(message: discord.Message, via: Any, text: str) -> None:
+        if via is not None:
+            try:
+                if via.response.is_done():
+                    await via.followup.send(text)
+                else:
+                    await via.response.send_message(text)
+                return
+            except discord.HTTPException:
+                log.exception("Typed play could not deliver via the picker interaction")
+        await message.reply(text, mention_author=False)
 
 bot = XianxiaBot()
 

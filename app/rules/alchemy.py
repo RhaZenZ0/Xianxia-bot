@@ -100,6 +100,36 @@ def toxicity_band(value: int) -> tuple[str, str]:
     return "Severe Pill Toxicity", "Your body is overloaded with conflicting medicinal energies."
 
 
+def alchemy_purge_refusal(engine_error: str) -> str:
+    """Turn an `alchemy.purge` refusal into something a cultivator would hear.
+
+    The engine states the reason in its own terms - it is the authority on
+    whether a purge may happen, and it says so once. This is the only place
+    that translation lives, so the command does not re-derive the reason from
+    state it would have to read a second time (and could read differently).
+    Anything unrecognised is passed through: an unfamiliar refusal should
+    reach the player as words, not as silence.
+    """
+    reason = " ".join(str(engine_error or "").split())
+    lowered = reason.casefold()
+    if "no pill toxicity" in lowered:
+        return "Your meridians contain no pill toxicity to purge."
+    if "insufficient qi" in lowered:
+        required = ""
+        for token in reason.replace(":", " ").split():
+            if token.isdigit():
+                required = token
+                break
+        if required:
+            return f"You need **{required} Qi** for a controlled medicinal purge."
+        return "You lack the Qi for a controlled medicinal purge."
+    if "cooldown active" in lowered:
+        return "Your meridians need time before another purge cycle."
+    if "living character not found" in lowered:
+        return "You have no living character to purge."
+    return f"The purge could not resolve: {reason}"
+
+
 def forage_bonus_from_resources(spirit_resources: int) -> int:
     resources = max(0, min(100, int(spirit_resources)))
     if resources >= 85:

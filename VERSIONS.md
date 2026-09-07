@@ -340,12 +340,233 @@ bookkeeping writes that stay in Python), which must be empty before v0.21 is tag
 lands: the non-battle `/use` path is the engine action `item.use` (consume, restore, life extension,
 effect, toxicity in one transaction), and the handler only formats. 22 rows remain. No schema change.
 
-See `docs/V021_RELEASE_NOTES.md` for v0.21.0, `docs/V020_RELEASE_NOTES.md` for v0.20.0, `docs/V019_RELEASE_NOTES.md` for the full detail on every v0.19.x release above, `docs/V018_RELEASE_NOTES.md` and
+**0.21.1** is typed play. With `AUTO_NARRATE=true` every line in a hub channel or
+scene thread used to be one narration call that decided nothing. Now a line that
+starts with `TYPED_PLAY_PREFIX` (default `>`) is routed — deterministically, no
+model — to the handler a hub button would run (`/explore`, `/hunt`, `/cultivate`,
+`/breakthrough`, the eight scene actions, `/talk`); an un-prefixed line that
+addresses a present NPC by name, or @mentions the bot, is dialogue; everything
+else is speech, recorded and free. Ambiguity becomes a picker, never a guess.
+Every line that can reach the engine or the narrator spends a token from a new
+per-player bucket (`TYPED_PLAY_BURST` / `TYPED_PLAY_PER_MINUTE`). Typed play adds
+no handler, no engine action and no database write, so the v0.21 authority gate
+is unchanged. No schema change. See `docs/V021_RELEASE_NOTES.md` and
+`docs/COMMISSIONS_DESIGN.md`.
+
+**0.21.2** adds **Teardown** to the dashboard's Discord tab: delete every thread the bot
+tracks, every bound channel (all seven base channels, the realm hubs, `#bugs`) and the two
+Xianxia categories when nothing else is left in them, then forget the ids - typed `DELETE`
+to confirm, audited, nothing recreated, database untouched. It also fixes the realm-capital
+**visibility gate**: the `Xianxia • <world>` roles were created and assigned but no hub
+channel ever received a permission overwrite, so every capital was visible to everyone.
+Setup/Repair now denies `@everyone` and allows the world's role on each hub, the dashboard
+shows per-hub visibility, and a visible hub is not "ready". No schema change.
+
+**0.21.3** answers "how does a player get a manual?" - which, it turned out, they mostly
+could not. The 142 generated "Jade Manual" inheritances existed only in Python's memory
+(`augment_advanced_catalog`); the Go engine read `content/world.json` raw, so `manual.study`
+refused them as unknown and no righteous manual was obtainable. `scripts/materialize_world_catalog.py`
+writes the expansion into the file once (148 manuals, 528 techniques, 187 items; the hidden
+Heaven-Devouring Demon Sect flagged `hidden` and skipped by bootstrap; manual items
+`market_excluded` so town markets do not list them), and a test fails if the file ever drifts.
+On that footing, **passing a sect's entrance trial bestows one manual**, chosen by the engine
+inside the trial transaction: the sect's alignment (a righteous sect never hands out a forbidden
+art), the character's own path, the lowest tier - within reach, or the lowest there is to grow
+into - never a duplicate, recorded in `item_provenance` as `sect_entry`. No schema change.
+
+**0.21.4** gives every public sect a genuine tier-0 entry manual - six authored inheritances in
+`content/world.json` (Azure Cloud Foundation Sword Canon, Crimson Furnace Ember-Tempering Record,
+Frozen Moon First-Frost Sutra, Black Serpent Venom-Fang Primer, Blood River Crimson Tide Initiation,
+Corpse Lantern Pale-Flame Initiation), each with three techniques unlocking at mastery 0/1/2,
+aligned with its sect, path-agnostic, studyable the day a disciple joins. The engine's entry-manual
+selector takes the sect's own manual first; the v0.21.3 rules apply only once a character already
+has it. Catalog is 154 manuals / 546 techniques. No schema change.
+
+**0.21.5** is the first two of the AI changes: the **input fence** (every player-authored slot in a
+narrator prompt - dialogue, action, recent history, NPC memories - is wrapped in BEGIN/END markers,
+length-capped, and marker-safe, and both system prompts say what a fence means; v0.23's item pulled
+forward) and the **content batch** (encounters for the ten locations that had none - six of which
+hard-errored `/explore` - sense hints for seven, and real personality/speech/want/fear/secret for the
+four world rulers and Steward Qiao; v0.25's content gate landed as tests). Also: every engine
+cooldown error reaches the player as a wait ("ready in **2h 55m**"), never "cultivation cooldown
+remaining: 10520". No schema change.
+
+**0.21.6** hides each realm capital until you are in the city. Setup/Repair creates one presence
+role per capital (`Xianxia • <capital name>`, no guild permissions) and gates the capital channel on
+it: `@everyone` denied, the presence role granted the full member set (view, send, threads, history,
+reactions, embeds, files, slash commands), the bot allowed, and the v0.21.2 realm-access allow removed
+so an unlocked-but-absent cultivator no longer sees the room. The bot puts the role on when a
+character's location is that capital and takes it off when it is not - on every command, on every
+line in a scene channel, and immediately after hub travel - making no Discord call when nothing
+changed. The realm-access roles stay (Sync Realm Roles, diagnostics) but gate nothing. No schema change.
+
+**0.22.0** is the roadmap's **Commissions** milestone. A commission is a quest a giver NPC offers
+you in character: you hold one at a time, its terms and deadline are fixed at accept, and it ends
+completed, failed or abandoned - with **failed and abandoned costing exactly the same**, so
+abandoning is allowed without being a cheap reroll. `commission.accept` and `commission.resolve`
+are new authoritative engine actions and the first replaces `DB.accept_quest`, closing the last
+v0.21 row on the DB-write allowlist; the world tick fails past-deadline commissions, so a deadline
+survives a restart. Selection runs a pure ladder (held / on cooldown / a pool match within the
+standing-derived tier ceiling / nothing) before any model call, and the narrator is handed the
+result as canon with the standing as a band rather than a number - the accept buttons are built
+from that block, never from the reply. Ships with three givers and nine authored commissions, an
+abandon confirmation that states its cost, and a GM Commissions dashboard tab (approve / retire /
+discard, both audited). Schema **29** adds the giver/tier/variant/deadline columns to
+`quest_definitions`, the commission columns to `character_quests`, and the cooldown and outcome
+counters to `npc_relationships`. Seeded invention - the design's second producer - is deliberately
+not built yet. See `docs/V022_RELEASE_NOTES.md` and `docs/COMMISSIONS_DESIGN.md`.
+
+**0.22.1** finishes the giver roster. Eleven givers instead of three: the two old men who sleep and
+posture in Greenriver, and a quest board for every public sect. A commission may now keep its terms
+to itself (`reward_visibility: hidden`) - a presentation rule only, since the engine still locks
+exact rewards at accept and states the payout in full on completion, while the offer card says
+*undisclosed* and warns that it may be worth far more or far less. Old Beggar Chen, who is quietly
+the Void Sword Venerable, pays extravagantly for errands that look like nothing; Old Gou, the
+self-declared hidden expert, promises an emperor's inheritance and pays eight spirit stones - and
+from the offer card you cannot tell them apart. The narrator is explicitly forbidden from naming a
+figure for undisclosed work in either direction. Sect work (`requires_sect`) is checked in the engine
+at accept as well as by the offer ladder, and never appears in the quest journal: the board is a
+person, and you have to be a disciple. Schema **30** adds `requires_sect`, `reward_visibility` and
+`boast` to `quest_definitions`.
+
+**0.22.2** fixes the P0 findings from an external review. The world simulation could apply the same
+interval several times when `/run-due` calls overlapped - the anchor was read before the write
+transaction, so two callers both decided one interval was due (measured at 7-14 applications of one
+interval under 32 concurrent callers); the whole decide-and-apply cycle now runs inside one
+`BEGIN IMMEDIATE` per system, with the anchor update guarded on the value it decided from. A
+duplicate authoritative request that arrived while the original was still in flight failed on a
+unique constraint instead of replaying; the receipt is now re-checked inside the write transaction,
+so 32 concurrent identical requests produce one mutation, one event, one version bump and 32
+identical results. An ordinary quest could complete and never pay, because completion and reward
+were separate commits and no retry could reach a quest that was no longer active; rewards now travel
+with the progress report and are granted by the transaction that completes it, with an engine-side
+cap independent of the caller. And `RunDue` no longer accepts the world clock as a request
+parameter. Both concurrency fixes ship with regression tests verified against the defect. No schema
+change.
+
+**0.22.3** closes the review's finding #4: a restore could lose a write it had already acknowledged.
+The safety backup was taken before traffic was quiesced, so a mutation committing in the gap was
+reported as successful, overwritten by the restore, and absent from the safety backup meant to undo
+it - the only copy of an acknowledged change was gone. A process-wide maintenance barrier now runs
+in the request middleware: every write path takes it shared (so ordinary traffic is as concurrent as
+before), restore and VACUUM take it exclusively, and health checks stay outside it so a readiness
+probe does not fail for the length of a restore. Restore's order becomes barrier, close db sessions,
+*then* safety backup, then restore. The regression test fires 24 concurrent writes through the real
+handler with a restore landing in the middle and asserts that every acknowledged write is in the
+live database or the safety backup; against the old ordering it loses 2-8 of them. No schema change.
+
+**0.22.4** closes the review's finding #5: a duel was only checked when it was proposed. Location,
+life status and safe-zone were verified at challenge time and never again, so in the five minutes a
+challenge lives a target could walk into a city and still accept - starting a duel between two places,
+one of them inside formations meant to suppress PvP. One validator now runs at challenge, at accept,
+and on every action. The interesting part is the mid-duel answer: refusing an action would strand the
+match as permanently active and lock both players out of ever duelling again, so a breached duel is
+resolved instead - whoever left forfeits (walking away from a duel you are losing must not be cheaper
+than losing it), a death resolves to the living participant, and when nobody is at fault it is void.
+Neither pays reputation. Schema **31** adds `location` to `pvp_matches`, because "are you both still
+here" needs a here.
+
+**0.22.5** closes the review's finding #9. The engine answered a stop signal by severing every open
+connection, including one whose transaction had committed but whose response was not yet written -
+leaving the caller unable to tell "it did not happen" from "it happened and I did not hear". It now
+drains: stop accepting, wait for the requests already running (bounded, default 20s via
+`ENGINE_SHUTDOWN_GRACE_SECONDS`, an expired grace logged rather than swallowed), and only then close
+storage. That ordering is the subtle half - `Shutdown` makes `ListenAndServe` return as soon as it is
+*called*, so the old `defer engine.Close()` would have pulled the database out from under handlers
+still using it. `docker-compose.yml` gives the engine a 30s stop grace so Docker's 10s default cannot
+SIGKILL a drain, or a restore, part-way through. No schema change.
+
+**0.23.0** closes **Authority I**. `PLAYER_MUTATIONS` in
+`tests/python/contracts/test_authority_boundary.py` is empty: nothing under `app/bot` or `app/ops`
+writes a gameplay table any more. The last 21 rows became nine engine actions - `alchemy.purge`,
+`admin.player.set_master` / `set_sect_rank` / `master_attention` / `grant_storage`,
+`admin.world.spawn_realm`, `character.set_gender`, `sect.discover`, `sect.abode.enter` /
+`sect.abode.leave`, `law.technique` and `sect.shadow` - plus wiring for `admin.player.set_sect`,
+which already existed in Go and had simply never been called.
+
+The point was never tidiness. Each of these was a sequence of separate writes that could half-happen:
+`/alchemy purge` spent Qi, reduced toxicity, rewrote a shared effect row and set a cooldown as four
+round trips; `/sect shadow` wrote a membership, an item and its provenance as three; every admin
+command changed the world and then, separately, wrote the audit row that says who did it. Each is now
+one transaction, and the player-facing ones carry a receipt, so a retried click replays instead of
+charging twice.
+
+Behaviour changed in five places where the old code was simply wrong, each noted at the call site:
+`set_gender` refused nothing and coerced a typo to "neutral"; `adjust_master_attention` reported
+success for a disciple with no master; `set_master`'s cycle check gave up silently after 64 links;
+the pill-toxicity penalty only stopped applying if the player happened to open `/alchemy status`;
+and `sect.discover` could not tell a caller which sects were actually new, so screens announced
+sects the player already knew.
+
+Two defects older than this release turned up while writing its tests. `fmt.Sprint` on a missing map
+key yields the four characters `<nil>`, so 25 required-field guards written as
+`strings.TrimSpace(fmt.Sprint(p[key])) == ""` passed on exactly the payloads they existed to reject;
+they now go through `stringField`. And `test_ack_before_mutation` accepted an ack anywhere earlier in
+a handler, including inside a guard branch that returns - three handlers acked on every path except
+the one that mutated. The guard now walks the blocks enclosing the mutation and requires an ack that
+dominates it. No schema change.
+
+**0.23.1** answers a second external review: eight logic errors, all confirmed against the code
+before anything was changed.
+
+The serious one was an asset transfer across reincarnation. Reincarnation wipes inventory and wallets
+because they belong to one incarnation, but auctions, bids and caravans are asynchronous records keyed
+by the persistent Discord id and settled later by the maintenance sweep, which pays whoever that id
+names *at settlement time*. List a rare item on a long auction, die, reincarnate, and the item or its
+proceeds arrive in the new body. Bids were the same in reverse, since a bid escrows currency and a
+refund follows the id. Rather than stamping a generation on every asynchronous record and hoping every
+settlement path remembers to check it, true death now resolves the escrow: listings end and refund
+their bidder, the dead player's own bids are released and their lots revert to no bid, caravans are
+lost with their owner, and an active seclusion ends. There is one place a life ends, and it runs there.
+
+The other seven: a storage "upgrade" could trade a 500-slot ring with a living space for a 24-slot
+pouch, consuming the pouch on the way, because nothing compared the new container to the held one; a
+family with 1 stone paid for a 20-stone support package, because `wealth <= 0` guarded a subtraction
+that floored at zero; a seclusion whose duration was not a whole number of days could never complete,
+because completion required whole-day accounting to reach an end it could not reach; a PvP match
+deadlocked when the player holding the turn died, because v0.22.4's breach check sat *behind* the turn
+check and so was unreachable by the only player who could still call it; a quest event with no target
+progressed every targeted objective of its type, because a nil target short-circuited the comparison;
+and the engine accepted any string as an ordinary quest, because a legitimate static quest and an
+invented key both had no `quest_definitions` row — static quests are now seeded so that "no row" means
+"no such quest".
+
+Four of these had no Go tests at all before this release (`family.support`, `storage.upgrade`,
+`seclusion.start`, `seclusion.settle`), and the quest suite tested a *wrong* target but never a
+missing one. Every fix ships with tests verified against the defect. No schema change.
+
+See `docs/V021_RELEASE_NOTES.md` for v0.21.x, `docs/V020_RELEASE_NOTES.md` for v0.20.0, `docs/V019_RELEASE_NOTES.md` for the full detail on every v0.19.x release above, `docs/V018_RELEASE_NOTES.md` and
 `docs/V018_BUILD_HISTORY.md` (consolidated validation/audit record) for the prior staged-authority migration.
 
-## Release status — v0.21.0
+## Release status — v0.22.5
 
-- Current release: v0.21.0: Authority I begins - the v0.21 gate (DB-write allowlist) and `item.use`.
+- Current release: v0.22.5: the engine drains in-flight requests on shutdown instead of cutting them,
+  and closes storage only once the drain has finished.
+- v0.22.4: a duel's preconditions are re-checked at accept and on every action, and
+  a duel that stops being legitimate ends rather than erroring forever. Schema 31.
+- v0.22.3: a restore can no longer lose a write it already acknowledged - a
+  maintenance barrier quiesces traffic before the safety backup is taken.
+- v0.22.2: the P0 review findings - an atomic simulation tick, idempotent duplicate
+  authoritative requests, and quest rewards paid by the transaction that completes the quest.
+- v0.22.1: the rest of the giver roster - two old men whose terms are undisclosed
+  (one pays far above what he implies, one far below) and a disciples-only board for every public
+  sect. Schema 30.
+- v0.22.0: commissions - a giver NPC offers work in character, one at a time,
+  with terms fixed at accept and four engine-owned outcomes in which failing and abandoning cost
+  the same. Closes the last v0.21 authority row (`accept_quest`). Schema 29.
+- v0.21.6: realm capitals are visible only while you stand in them - a presence
+  role per capital the bot adds and removes by player location, with the channel permissions to match.
+- v0.21.5: the narrator's input fence, the v0.25 content batch (every location
+  has hints and encounters, every NPC has narrator fields), and cooldown errors as a wait.
+- v0.21.4: every public sect has an authored tier-0 entry manual, and it is the
+  one bestowed on joining.
+- v0.21.3: one manual on joining a sect (engine-owned), and the 148-manual
+  catalog materialised into `content/world.json` so Go and Python read the same content.
+- v0.21.2: Teardown (delete everything the bot owns on Discord, from the
+  dashboard, typed confirmation) and the realm-capital visibility gate actually gating.
+- v0.21.1: typed play - `> action` lines route to existing handlers, speech is free,
+  per-player budget on every line that can reach the engine or the narrator.
+- v0.21.0: Authority I begins - the v0.21 gate (DB-write allowlist) and `item.use`.
 - v0.20.9: the updater authenticates its backup call to the engine, aborts on a
   failed copy, and verifies the installed tree against the manifest before starting.
 - v0.20.8: fixes `update.sh` dropping the `.sha256` sidecar asset when it
@@ -456,6 +677,14 @@ See `docs/V021_RELEASE_NOTES.md` for v0.21.0, `docs/V020_RELEASE_NOTES.md` for v
 - **Schema 26** added the `#bugs` forum channel (`bugs_channel_id`).
 - **Schema 27** added the v0.19.29 mute/freeze moderation columns on `characters`
   (`is_muted`, `is_frozen`, `moderation_reason`).
+- **Schema 28** added the Quest Forge definition table (`quest_definitions`).
+- **Schema 31** added `location` to `pvp_matches`, so a duel in progress knows where it is fought.
+- **Schema 30** added the giver refinements: `requires_sect`, `reward_visibility` and `boast` on
+  `quest_definitions`.
+- **Schema 29** added commissions: giver, realm band, tier, owner, deadline, variants and seed on
+  `quest_definitions`; the commission flag, absolute deadline, accepted variant and resolved minute
+  on `character_quests`; and the refusal cooldown, per-outcome counters and last outcome on
+  `npc_relationships`.
 
 See `docs/V018_RELEASE_NOTES.md` and `docs/V019_RELEASE_NOTES.md` for the per-release detail.
 

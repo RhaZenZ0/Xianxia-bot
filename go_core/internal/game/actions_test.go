@@ -19,7 +19,7 @@ func setupActionDB(t *testing.T) string {
 	if err := conn.ExecScript(`
 CREATE TABLE npc_relationships(user_id INTEGER,npc_name TEXT,trust INTEGER,respect INTEGER,fear INTEGER,affection INTEGER,debt INTEGER,grudge INTEGER,encounter_count INTEGER,last_summary TEXT,updated_at REAL,PRIMARY KEY(user_id,npc_name));
 CREATE TABLE player_scene_state(user_id INTEGER PRIMARY KEY,physical_location TEXT,scene_type TEXT,scene_key TEXT,scene_label TEXT,channel_id INTEGER,metadata_json TEXT,updated_at REAL);
-CREATE TABLE character_quests(user_id INTEGER,quest_key TEXT,status TEXT,progress_json TEXT,completed_game_minute INTEGER,updated_at REAL,PRIMARY KEY(user_id,quest_key));
+CREATE TABLE character_quests(user_id INTEGER,quest_key TEXT,status TEXT,progress_json TEXT,completed_game_minute INTEGER,updated_at REAL,commission INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(user_id,quest_key));
 CREATE TABLE characters(user_id INTEGER PRIMARY KEY,vitality INTEGER,vitality_max INTEGER,cultivation INTEGER,spirit_stones INTEGER,insight_xp INTEGER,updated_at REAL);
 CREATE TABLE battles(battle_id INTEGER PRIMARY KEY,user_id INTEGER,player_hp INTEGER,player_hp_max INTEGER,status TEXT,version INTEGER,updated_at REAL);
 CREATE TABLE currency_wallets(user_id INTEGER,currency_id TEXT,balance INTEGER,PRIMARY KEY(user_id,currency_id));
@@ -28,7 +28,7 @@ CREATE TABLE event_log(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER,even
 CREATE TABLE world_state(key TEXT PRIMARY KEY,value_json TEXT NOT NULL,updated_at REAL NOT NULL DEFAULT 0);
 INSERT INTO characters VALUES(42,20,20,5,0,0,0);
 INSERT INTO battles VALUES(7,42,20,20,'active',0,0);
-INSERT INTO character_quests VALUES(42,'first_steps','active','{"talk":0}',NULL,0);
+INSERT INTO character_quests(user_id,quest_key,status,progress_json,completed_game_minute,updated_at) VALUES(42,'first_steps','active','{"talk":0}',NULL,0);
 `); err != nil {
 		t.Fatal(err)
 	}
