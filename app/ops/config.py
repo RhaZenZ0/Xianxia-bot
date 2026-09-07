@@ -128,6 +128,7 @@ class Settings:
     update_channel: str
     update_repository: str
     update_check_hours: int
+    route_audit_hours: int
     quest_forge_auto: bool
     quest_forge_min_significance: int
     quest_forge_interval_hours: int
@@ -416,6 +417,12 @@ class Settings:
         update_check_hours = int(os.getenv("UPDATE_CHECK_HOURS", "24"))
         if update_check_hours < 1:
             raise ValueError("UPDATE_CHECK_HOURS must be at least 1")
+        # v0.27.0: 0 disables the daily route audit outright. Anything else is
+        # how many hours between passes; the probe costs one free-tier slot per
+        # OpenRouter route, so a very short interval is a real budget decision.
+        route_audit_hours = int(os.getenv("ROUTE_AUDIT_HOURS", "24"))
+        if route_audit_hours < 0:
+            raise ValueError("ROUTE_AUDIT_HOURS must be 0 (off) or a positive number of hours")
         quest_forge_min_significance = int(os.getenv("QUEST_FORGE_MIN_SIGNIFICANCE", "80"))
         if not 0 <= quest_forge_min_significance <= 100:
             raise ValueError("QUEST_FORGE_MIN_SIGNIFICANCE must be 0-100")
@@ -495,6 +502,7 @@ class Settings:
             update_channel=update_channel,
             update_repository=(os.getenv("UPDATE_REPOSITORY") or "RhaZenZ0/Xianxia-bot").strip(),
             update_check_hours=update_check_hours,
+            route_audit_hours=route_audit_hours,
             quest_forge_auto=_as_bool(os.getenv("QUEST_FORGE_AUTO"), False),
             quest_forge_min_significance=quest_forge_min_significance,
             quest_forge_interval_hours=quest_forge_interval_hours,

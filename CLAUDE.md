@@ -175,6 +175,15 @@ still passes through `_validate_generated_text`, so it is not trusted more than 
 `google-genai` is an optional, lazily imported dependency: absent or incompatible, the route is left
 out of the chain and `ai_status` reports why.
 
+Every `ROUTE_AUDIT_HOURS` (v0.27.0, default 24, `0` off) `audit_routes()` pings each configured route
+with the cheapest call the API takes — one character in, `max_tokens=1`, reply discarded unread — and
+retires the ones that answer `401`/`403`/`404`, plus a `400` confirmed at an ordinary token size (the
+reasoning-mandatory case). `429`s and timeouts never retire anything; that is what the per-route
+cooldown is for. The audit spends the shared budget it uses, stands down below half the daily
+allowance, and retires nothing when *every* route fails at once (a local fault, not an empty
+catalogue). It proves reachability only — a scratchpadding model passes it, so
+`_validate_generated_text` remains the sole judge of whether a reply is usable prose.
+
 ### Dashboard (`app/dashboard`, `dashboard/`)
 
 Authenticated GM control plane; production reads go through Go-owned query sessions (dashboard never

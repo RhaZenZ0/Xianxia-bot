@@ -64,6 +64,43 @@ DEFAULT_DYNAMIC_FREE_MODEL = "openrouter/free"
 # models that do not, so this is safe to send to every route.
 REASONING_OFF: dict[str, Any] = {"reasoning": {"enabled": False, "exclude": True}}
 
+# v0.27.0: the daily liveness probe. The cheapest request the API will accept -
+# one character in, one token out - because the probe never reads the reply. The
+# failures it exists to catch (a withdrawn slug, a rejected key, an exhausted
+# quota, an unreachable host) all arrive as exceptions, so "did the call return"
+# is the whole verdict and content is irrelevant. That is also why a route that
+# answers a probe is only known to be REACHABLE, not fit to narrate: MiniMax M3
+# would have passed this every time. _validate_generated_text remains the only
+# judge of whether a reply is usable prose.
+PROBE_PROMPT = "."
+PROBE_MAX_TOKENS = 1
+PROBE_TIMEOUT_SECONDS = 20.0
+
+# Only a durable rejection retires a route until the next audit. A 429 or a
+# timeout says "not now" - the per-route cooldown and backoff already handle
+# that, and standing a route down for a day over congestion would throw away a
+# route that works fine an hour later. 401/403/404 say "not ever, as configured":
+# that is the GLM 5.2 withdrawal and the rejected AI Studio key.
+PROBE_DURABLE_STATUSES = frozenset({401, 403, 404})
+
+# 400 is the reasoning-mandatory case. Every narration request carries
+# REASONING_OFF, so a model whose provider REJECTS that parameter can never
+# serve narration as this bot calls it, and retiring it is right. But 400 is
+# also what a provider with a minimum token budget returns for `max_tokens=1`,
+# which would be an artifact of the probe rather than a fault in the route - so
+# a 400 is confirmed with one ordinary-sized call before it retires anything.
+#
+# This is NOT a scratchpad detector. MiniMax M3 accepted REASONING_OFF, returned
+# 200 and put its reasoning in `content` anyway (v0.25.3); no probe sees that.
+# _validate_generated_text remains the only thing that catches it.
+PROBE_REASONING_REJECTED_STATUS = 400
+PROBE_CONFIRM_MAX_TOKENS = 64
+
+# Diagnostics never outrank play. The audit spends real free-tier slots, so it
+# runs only while most of the day's budget is still unspent; below this it is
+# skipped entirely and the chain keeps whatever verdicts it already has.
+PROBE_BUDGET_HEADROOM = 0.5
+
 _PROMPT_LEAK_PATTERNS = (
     re.compile(r"\bsystem prompt\b", re.I),
     re.compile(r"\bdeveloper message\b", re.I),
@@ -608,6 +645,7 @@ class AITaskRouter:
         self._tls_failures = 0
         self._tls_warned = False
         self._model_stats: dict[str, dict[str, Any]] = {}
+        self._last_audit: dict[str, Any] = {}
         self._tier_stats: dict[str, dict[str, int]] = {
             tier.value: {"requests": 0, "served": 0, "exhausted": 0, "rate_limited": 0}
             for tier in NarrationTier
@@ -720,6 +758,13 @@ class AITaskRouter:
                 "reasoning_salvaged": 0,
                 "scratchpad_rejected": 0,
                 "skipped_route_limit": 0,
+                # None until the route has been probed at all: "not yet asked"
+                # and "asked, answered" must not render the same way.
+                "probe_ok": None,
+                "probe_at": 0.0,
+                "probe_error": "",
+                "probe_retired": False,
+                "skipped_probe_retired": 0,
                 "consecutive_failures": 0,
                 "cooldown_seconds": 0.0,
                 # Which upstream actually served the last success, and whether
@@ -781,6 +826,174 @@ class AITaskRouter:
                     exc,
                 )
 
+    async def probe_route(self, model: str) -> bool:
+        """Ask one route whether it is reachable, as cheaply as the API allows.
+
+        One character in, one token out, and the reply is discarded unread: the
+        verdict is whether the call returned at all. A route that fails with a
+        durable status (see PROBE_DURABLE_STATUSES) is retired from the chain
+        until the next audit; anything else is recorded and left in place,
+        because congestion is what the per-route cooldown is already for.
+        """
+        row = self._model_row(model)
+        row["probe_at"] = time.time()
+        try:
+            if is_aistudio_route(model):
+                # Not charged to the OpenRouter budget, for the same reason
+                # narration through this route is not: it never reaches them.
+                await self.google_route.complete(
+                    model=model,
+                    system_prompt="",
+                    prompt=PROBE_PROMPT,
+                    max_output_tokens=PROBE_MAX_TOKENS,
+                    temperature=0.0,
+                    timeout_seconds=PROBE_TIMEOUT_SECONDS,
+                )
+            else:
+                if not self.client:
+                    raise RuntimeError("OPENROUTER_API_KEY is not configured")
+                request = self.client.chat.completions.create(
+                    model=model,
+                    messages=[{"role": "user", "content": PROBE_PROMPT}],
+                    max_tokens=PROBE_MAX_TOKENS,
+                    extra_headers=self._headers(),
+                    extra_body=dict(REASONING_OFF) if self.disable_reasoning else None,
+                )
+                await asyncio.wait_for(request, timeout=PROBE_TIMEOUT_SECONDS)
+        except Exception as exc:
+            status = getattr(exc, "status_code", None)
+            if status is None:
+                status = getattr(getattr(exc, "response", None), "status_code", None)
+            durable = status in PROBE_DURABLE_STATUSES
+            if status == PROBE_REASONING_REJECTED_STATUS:
+                durable = await self._confirm_bad_request(model)
+            row["probe_ok"] = False
+            row["probe_error"] = f"{type(exc).__name__}: {exc}"[:300]
+            row["probe_retired"] = durable
+            log.warning(
+                "AI_PROBE_FAILED model=%s durable=%s: %s",
+                model,
+                durable,
+                exc,
+            )
+            return False
+        row["probe_ok"] = True
+        row["probe_error"] = ""
+        row["probe_retired"] = False
+        return True
+
+    async def _confirm_bad_request(self, model: str) -> bool:
+        """Decide whether a probe's 400 belongs to the route or to the probe.
+
+        Repeats the call with an ordinary token budget, still carrying
+        REASONING_OFF. A second 400 means the route rejects the way this bot
+        asks for narration - reasoning-mandatory, most often - and retires it.
+        Success means the first 400 was the one-token probe hitting a provider
+        minimum, and the route is left alone. If the budget will not fund the
+        confirmation, nothing is retired: an unconfirmed 400 is not evidence.
+        """
+        if is_aistudio_route(model) or not self.client:
+            return False
+        if not await self.limiter.try_acquire():
+            log.info("AI_PROBE_400_UNCONFIRMED model=%s: no budget to confirm", model)
+            return False
+        try:
+            request = self.client.chat.completions.create(
+                model=model,
+                messages=[{"role": "user", "content": PROBE_PROMPT}],
+                max_tokens=PROBE_CONFIRM_MAX_TOKENS,
+                extra_headers=self._headers(),
+                extra_body=dict(REASONING_OFF) if self.disable_reasoning else None,
+            )
+            await asyncio.wait_for(request, timeout=PROBE_TIMEOUT_SECONDS)
+        except Exception as exc:
+            status = getattr(exc, "status_code", None)
+            if status is None:
+                status = getattr(getattr(exc, "response", None), "status_code", None)
+            confirmed = status == PROBE_REASONING_REJECTED_STATUS
+            log.info(
+                "AI_PROBE_400_CONFIRM model=%s status=%s retiring=%s",
+                model,
+                status,
+                confirmed,
+            )
+            return confirmed
+        # It answered once it was given room: the 400 was about max_tokens=1.
+        log.info("AI_PROBE_400_WAS_THE_PROBE model=%s", model)
+        return False
+
+    async def audit_routes(self) -> dict[str, Any]:
+        """Probe every configured route once and retire the ones that are gone.
+
+        Returns a summary for the caller to log. Skipped entirely when most of
+        the daily free-tier budget is already spent - narration is what the
+        budget is for, and a diagnostic that starves it is worse than no
+        diagnostic at all.
+        """
+        models = _dedupe_chain(
+            model for tier in NarrationTier for model in self.chains[tier]
+        )
+        result: dict[str, Any] = {
+            "checked": [],
+            "retired": [],
+            "failed": [],
+            "skipped": "",
+            "at": time.time(),
+        }
+        if not self.enabled:
+            result["skipped"] = "no narration route is configured"
+            self._last_audit = result
+            return result
+
+        budget = self.limiter.snapshot()
+        per_day = max(1, int(budget["max_requests_per_day"]))
+        remaining = per_day - int(budget["used_today"])
+        # The audit costs one slot per OpenRouter route; the AI Studio route is
+        # free of this budget by construction and is not counted here.
+        cost = sum(1 for model in models if not is_aistudio_route(model))
+        if remaining - cost < per_day * PROBE_BUDGET_HEADROOM:
+            result["skipped"] = (
+                f"only {remaining}/{per_day} of the daily budget is left; "
+                "narration keeps it"
+            )
+            log.info("AI_AUDIT_SKIPPED %s", result["skipped"])
+            self._last_audit = result
+            return result
+
+        for model in models:
+            if not is_aistudio_route(model) and not await self.limiter.try_acquire():
+                result["skipped"] = "ran out of budget mid-audit"
+                break
+            result["checked"].append(model)
+            if await self.probe_route(model):
+                continue
+            result["failed"].append(model)
+            if self._model_row(model)["probe_retired"]:
+                result["retired"].append(model)
+
+        if result["checked"] and len(result["retired"]) == len(result["checked"]):
+            # Every route rejected at once is not a catalogue that emptied
+            # overnight; it is a proxy, a firewall or a revoked key in front of
+            # all of them. Retiring the whole chain on that reading would keep
+            # the bot on procedural prose long after the local fault cleared,
+            # so the verdicts are kept for the panel and none are enforced.
+            for model in result["retired"]:
+                self._model_row(model)["probe_retired"] = False
+            result["fail_open"] = True
+            log.error(
+                "AI_AUDIT every route (%d) failed durably - treating this as a "
+                "local fault and retiring none of them",
+                len(result["checked"]),
+            )
+        log.info(
+            "AI_AUDIT checked=%d failed=%d retired=%s",
+            len(result["checked"]),
+            len(result["failed"]),
+            ",".join(result["retired"]) if not result.get("fail_open") else "none (fail-open)",
+        )
+        self._last_audit = result
+        return result
+
     def health_snapshot(self) -> dict[str, Any]:
         """Administrator-readable view of how the free fallback chain is doing.
 
@@ -804,6 +1017,11 @@ class AITaskRouter:
                     "last_error_looks_like_tls": bool(row["last_error_looks_like_tls"]),
                     "empty_responses": int(row["empty_responses"]),
                     "skipped_route_limit": int(row["skipped_route_limit"]),
+                    "probe_ok": row["probe_ok"],
+                    "probe_at": float(row["probe_at"]),
+                    "probe_error": str(row["probe_error"]),
+                    "probe_retired": bool(row["probe_retired"]),
+                    "skipped_probe_retired": int(row["skipped_probe_retired"]),
                     "route_limits": (
                         self._route_limiters[model].snapshot()
                         if model in self._route_limiters
@@ -837,6 +1055,7 @@ class AITaskRouter:
                 "model": self.google_model,
                 "last_error": self.google_route.last_error,
             },
+            "audit": dict(self._last_audit),
             "tiers": {name: dict(counts) for name, counts in self._tier_stats.items()},
             "limiter": self.limiter.snapshot(),
             "models": models,
@@ -873,6 +1092,12 @@ class AITaskRouter:
         tier_counts["requests"] += 1
 
         for model in self.chains[tier_name]:
+            if self._model_row(model)["probe_retired"]:
+                # The daily audit got a 401/403/404 from this route. Spending a
+                # narration attempt - and a free-tier slot - to be told again is
+                # the exact waste that retired it.
+                self._model_row(model)["skipped_probe_retired"] += 1
+                continue
             if self._cooling_down(model):
                 self._model_row(model)["skipped_cooling"] += 1
                 continue

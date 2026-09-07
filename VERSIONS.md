@@ -805,9 +805,58 @@ Docs and defaults only, plus the one classifier line. No schema change, no game-
 remains narration-only.
 
 
-## Release status — v0.26.1
+**0.27.0** adds a daily liveness check that retires dead routes before a player finds them.
 
-- Current release: v0.26.1: the withdrawn `z-ai/glm-5.2:free` hop is out of both chains, and a
+Two of the last three releases were spent removing a shipped default after it died upstream, and both
+times the bot found out the same way: a player got procedural prose, and the failure was only visible
+afterwards in `/admin server ai_status`. MiniMax M3 was withdrawn in v0.25.3 for returning its
+scratchpad; `z-ai/glm-5.2:free` in v0.26.1 for leaving the free tier and 404ing every call. In each
+case the dead hop kept costing one of the ~50 daily free-tier slots per narration until a human
+noticed and shipped a release.
+
+Every `ROUTE_AUDIT_HOURS` (default 24, `0` disables) the bot now pings each configured route with the
+cheapest request the API will take: one character in, `max_tokens=1` out, no system prompt. It never
+reads the reply. That is the whole design — the failures worth catching (a withdrawn slug, a rejected
+key, a refusing proxy, an unreachable host) all arrive as exceptions, so "did the call return" is the
+entire verdict, and an empty reply from a reasoning model that spent its one token thinking still
+proves the route answers.
+
+Only `401`, `403` and `404` retire a route outright, and only until the next pass. A `429` or a
+timeout says "not now", which is what the per-route cooldown and the escalating backoff are already
+for; standing a route down for a day over congestion would throw away a route that works again within
+the hour. A retired route is skipped by `generate()` entirely, so the chain stops paying an upstream
+call — and a daily slot — to be told the same thing it was told yesterday.
+
+`400` is the fourth case and the one that needs care. Every narration request carries
+`reasoning.enabled=false`, so a provider that *rejects* that parameter can never serve narration as
+this bot calls it, and retiring it is right. But `400` is also what a provider with a minimum token
+budget returns for `max_tokens=1`, which would be an artifact of the probe rather than a fault in the
+route. So a `400` is confirmed with one ordinary-sized call before anything happens — same request,
+same `REASONING_OFF`, only the token budget changed. A second `400` retires the route; a success means
+the probe shape was at fault and the route is left alone. If the budget will not fund the
+confirmation, nothing is retired: an unconfirmed `400` is not evidence.
+
+Three guards keep the diagnostic subordinate to play. The audit spends the shared budget it uses, so
+the panel's gauge stays honest. It stands down entirely when less than half the daily budget is left:
+narration is what the budget is for. And if *every* route fails durably in one pass, that reads as a
+proxy, a firewall or a revoked key rather than a catalogue that emptied overnight — the verdicts are
+kept for the panel, none are enforced, and `ai_status` says so in as many words.
+
+What this deliberately does **not** do is judge quality. A route that answers a probe is known to be
+reachable and nothing more; MiniMax M3 would have passed this every time. `_validate_generated_text`
+remains the only judge of whether a reply is usable prose, and it still runs on every narration.
+Choosing a *replacement* slug is likewise still the operator's call: an empty fallback slot stays
+empty, because "it answered a ping" is not evidence that a model writes decent xianxia.
+
+16 new tests in `test_ai_router_health.py`. No schema change, no game-rule change, AI remains
+narration-only.
+
+
+## Release status — v0.27.0
+
+- Current release: v0.27.0: a daily one-token liveness check retires routes that answer
+  401/403/404, so a withdrawn slug stops costing a free-tier slot per narration.
+- v0.26.1: the withdrawn `z-ai/glm-5.2:free` hop is out of both chains, and a
   narration timeout is no longer misreported as a TLS/certificate failure.
 - v0.26.0: an optional direct Google AI Studio route leads both chains when a key is
   set, outside OpenRouter's daily free budget.

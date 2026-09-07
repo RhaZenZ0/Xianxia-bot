@@ -446,7 +446,7 @@ class SurfaceTests(unittest.TestCase):
 
     def test_the_worker_is_opt_in_idempotent_and_announces(self):
         self.assertIn("if SETTINGS.quest_forge_auto:", self.bot)
-        self.assertIn('"quest_forge_task"):', self.bot)
+        self.assertIn('"quest_forge_task"', self.bot)
         body = self.bot[self.bot.index("async def forge_quests_from_history"):self.bot.index("async def quest_forge_worker")]
         self.assertIn('source_key = f"history:{event.get(\'history_id\')}"', body)
         self.assertIn("if source_key in seen:", body)

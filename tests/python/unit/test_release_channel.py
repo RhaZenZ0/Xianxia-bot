@@ -160,7 +160,7 @@ class BotWorkerTests(unittest.TestCase):
     def test_the_worker_is_started_only_when_enabled_and_cancelled_on_close(self):
         self.assertIn("if SETTINGS.update_check_enabled:", BOT)
         self.assertIn("self.update_check_task = asyncio.create_task(self.update_check_worker())", BOT)
-        self.assertIn('for task_name in ("event_expiry_task", "operational_health_task", "update_check_task", "quest_forge_task"):', BOT)
+        self.assertIn('for task_name in ("event_expiry_task", "operational_health_task", "update_check_task", "quest_forge_task", "route_audit_task"):', BOT)
 
     def test_the_check_uses_the_shared_module_and_announces_once_per_version(self):
         body = BOT[BOT.index("async def check_for_release"):BOT.index("async def update_check_worker")]
