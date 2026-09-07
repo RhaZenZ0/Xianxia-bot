@@ -554,14 +554,108 @@ Worth recording: the suite already had a test for the post-install check, and it
 string `sha256sum -c --quiet RELEASE_MANIFEST.sha256`. It was holding the bug in place. It now asserts
 that the check happens and leaves the spelling to the helper.
 
+**0.24.0** is the Quests workbench, and the fix underneath it.
+
+Until now a quest definition could be created and its status could be changed, and that was the
+whole vocabulary. There was no edit. A drafted quest that was ninety per cent right had to be
+discarded and re-rolled, because nothing anywhere could change a word of it. The same quest was
+also reviewable on two different screens depending on whether it had a giver: the Commissions page
+queried `WHERE q.giver_npc<>''`, so forged drafts never appeared there, and the Exploration page
+listed them read-only, so the only way to approve one was the embed the Forge replied with in
+Discord. The two disjoint tables were the symptom; the missing verb was the disease.
+
+The **Quests** page is one view of every definition a player can be given - static, forged,
+hand-written, or a commission an NPC hands out - with a review inbox, the live pool, an editor, a
+player-facing preview, approve/retire/discard, and a coverage panel that says which realm bands,
+objective types and locations the pool leaves quiet. Quests can now be written by hand
+(`admin.quest.save`, keyed `quest_...` rather than `forge_...`), and every save is held to
+`validate_quest_definition` - the Forge's own gate - so a GM typing by hand and a model drafting
+cannot disagree about what a valid quest is.
+
+**Schema 32** is the fix underneath. Completion rewards were read from the *current* definition at
+the moment a player finished, and they arrived in the engine as fields of the caller's payload.
+Two faults in one coat: editing a definition silently rewrote a deal somebody had already accepted,
+and Python, not the engine, was deciding what the work asked for and what it paid. A commission
+never had the first fault - it locks its variant and deadline onto `character_quests` at accept.
+That lock is now general: `character_quests.terms_json` records the terms every quest was accepted
+under, `quest.progress` reads them off the row, and the `objectives`/`rewards` fields are gone from
+its payload. Rows accepted before this release are backfilled from the current definition the first
+time they are touched, which is the deal they were already on.
+
+That makes editing a live quest a real decision, so `admin.quest.save` takes a **hold policy**:
+`keep` (holders stay on the terms they took - the default, and the only one that cannot cost a
+player anything), `migrate` (holders move to the new terms, progress carrying across objective by
+objective wherever the objective still means the same thing, with the count of what was lost
+returned so the GM is told), or `revoke` (the quest is taken back and can be accepted again fresh).
+A migrated commission keeps the payment its giver agreed to; only the work moves. The holders are
+read *before* the definition is written, so "keep them as they are" also captures the old terms for
+anybody who accepted before pinning existed - otherwise it would have quietly done the opposite of
+what it says.
+
+Two consequences worth naming. Retiring a definition no longer strands the people carrying it:
+Python used to send progress only for quests in the approved catalog, so a retired quest froze
+every holder - unable to finish it, unable to be paid, holding it for good. And `admin.quest.review`
+is the general name for the status change `admin.commission.review` was always performing; the old
+name keeps working.
+
+Also in this release: the test suite runs about 150 more tests on a minimal machine. `httpx` is
+constructed at import time by the transport modules, so without it `from app.database import
+Database` raised during collection and took roughly twenty files - every integration test above the
+transport - out of the run. `tests/conftest.py` installs a stub that refuses to send a request; the
+two files that drive `httpx.MockTransport` skip with a reason instead of erroring.
+
+
 No application change; no schema change.
 
-See `docs/V021_RELEASE_NOTES.md` for v0.21.x, `docs/V020_RELEASE_NOTES.md` for v0.20.0, `docs/V019_RELEASE_NOTES.md` for the full detail on every v0.19.x release above, `docs/V018_RELEASE_NOTES.md` and
+See `docs/V025_RELEASE_NOTES.md` for v0.25.0, `docs/V024_RELEASE_NOTES.md` for v0.24.0, `docs/V021_RELEASE_NOTES.md` for v0.21.x, `docs/V020_RELEASE_NOTES.md` for v0.20.0, `docs/V019_RELEASE_NOTES.md` for the full detail on every v0.19.x release above, `docs/V018_RELEASE_NOTES.md` and
 `docs/V018_BUILD_HISTORY.md` (consolidated validation/audit record) for the prior staged-authority migration.
 
-## Release status — v0.22.5
+**0.25.0** remakes the dashboard, from the design canvas approved before the release. No endpoint
+changed, no query changed, and no data was added or removed except one small block on
+`/api/overview`.
 
-- Current release: v0.22.5: the engine drains in-flight requests on shutdown instead of cutting them,
+Two numbers describe what was wrong. There were **23 navigation tabs in one flat row**, and that row
+was sticky - between about 900px and 1400px it wrapped onto three lines and ate roughly 120px of
+every screen, permanently, before any content was drawn. And there were **102 stacked full-width
+tables** across the views: Cultivation was eleven tables one under another, Crafting eleven more,
+Exploration nine, Samsara eight, Economy seven. Reaching the last one meant scrolling past the other
+ten every time, with nothing on the page saying what was down there.
+
+The nav is now five groups with a jump-to filter, collapsing to an icon rail below 1280px and a
+drawer below 900px. Every view gets one page template: header, metric strip, section tabs when there
+are three or more sections, then panels. `sectionize` does that by MOVING the nodes a loader already
+rendered rather than re-serialising them, so every click handler survives and not one of the
+twenty-three loaders had to be rewritten to gain tabs.
+
+One table component now, with a header that sticks - it never did before, `position:sticky` having
+been applied inside a wrapper with no height - a row count under every table, and empty states that
+say what would put something there. Plus a density toggle, deep links (`#cultivation/4`), and a view
+that fails in its own panel with a retry instead of replacing the page.
+
+The one genuinely new thing is Overview's **"Wants your attention"**: quest drafts waiting, a
+simulation system that has missed its own tick, commissions past their deadline, players frozen with
+no reason recorded. Nothing in it is new data - every row already existed on another page, and what
+was missing was any reason to visit that page today. Lag is only reported when a system is further
+behind than its own interval (a 4,320-minute system 500 minutes behind is early, not late), and a
+frozen player only when no reason was recorded.
+
+The palette, the serif headings, the drawer, the authority split and the coverage gate are all
+unchanged. See `docs/V025_RELEASE_NOTES.md`.
+
+
+## Release status — v0.25.0
+
+- Current release: v0.25.0: the dashboard remade - 23 flat tabs become five grouped ones, and the
+  worst page goes from eleven stacked tables to eleven tabs. No schema change.
+- v0.24.0: the Quests workbench - one page for every definition a player can be
+  given, an editor where there was none, and pinned terms so an edit cannot rewrite a deal a player
+  already accepted. Schema 32.
+- v0.23.2: the updater could not install v0.23.0 or v0.23.1 on a QNAP; the post-install manifest
+  check used GNU-only checksum flags that BusyBox refuses.
+- v0.23.1: eight logic errors from a second external review, each with a regression test verified
+  against the defect.
+- v0.23.0: Authority I closes - the last 21 Python writer methods are engine actions.
+- v0.22.5: the engine drains in-flight requests on shutdown instead of cutting them,
   and closes storage only once the drain has finished.
 - v0.22.4: a duel's preconditions are re-checked at accept and on every action, and
   a duel that stops being legitimate ends rather than erroring forever. Schema 31.
@@ -699,6 +793,8 @@ See `docs/V021_RELEASE_NOTES.md` for v0.21.x, `docs/V020_RELEASE_NOTES.md` for v
 - **Schema 27** added the v0.19.29 mute/freeze moderation columns on `characters`
   (`is_muted`, `is_frozen`, `moderation_reason`).
 - **Schema 28** added the Quest Forge definition table (`quest_definitions`).
+- **Schema 32** added `terms_json` to `character_quests`: the objectives and rewards each player
+  accepted, so an edit to a definition cannot rewrite a deal that was already struck.
 - **Schema 31** added `location` to `pvp_matches`, so a duel in progress knows where it is fought.
 - **Schema 30** added the giver refinements: `requires_sect`, `reward_visibility` and `boast` on
   `quest_definitions`.

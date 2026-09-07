@@ -630,6 +630,16 @@ def _quest_draft_embed(row: dict[str, Any]) -> discord.Embed:
     for item_id, qty in dict(rewards.get("items") or {}).items():
         parts.append(f"🎁 {item_id} ×{qty}")
     embed.add_field(name="Rewards", value=", ".join(parts) or "none", inline=False)
+    # v0.24.0: Approve and Discard are still the whole vocabulary here, and that
+    # is now a deliberate limit rather than the only one there is. A draft that
+    # is nearly right no longer has to be thrown away and re-rolled - it can be
+    # fixed on the Quests page - so the embed says where, instead of leaving a
+    # GM to guess that discarding is their only option.
+    embed.add_field(
+        name="Not quite right?",
+        value="Open **Quests** in the GM dashboard to edit the objectives, targets and rewards, then approve it there.",
+        inline=False,
+    )
     embed.set_footer(text=f"{row['quest_key']} • {status} • {row.get('origin', '')} • {row.get('model') or 'procedural'}")
     return embed
 

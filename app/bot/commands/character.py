@@ -359,7 +359,8 @@ async def _player_dashboard_embed(user_id: int, *, guild_id: int | None, page: s
                 definition = catalog.get(str(row["quest_key"]), {})
                 progress = row.get("progress") or {}
                 parts = []
-                for obj in definition.get("objectives", []):
+                # As in the journal: the accepted terms, not today's definition.
+                for obj in list(dict(row.get("terms") or {}).get("objectives") or definition.get("objectives") or []):
                     cur = int(progress.get(str(obj["id"]), 0)); req = max(1, int(obj.get("count",1)))
                     parts.append(f"{'✅' if cur >= req else '▫️'} {obj.get('label',obj['id'])} **{cur}/{req}**")
                 embed.add_field(name=f"📜 {definition.get('title', row['quest_key'])}", value="\n".join(parts) or "In progress", inline=False)
@@ -492,7 +493,11 @@ async def quests_command(interaction: discord.Interaction) -> None:
             definition = catalog.get(str(row["quest_key"]), {})
             progress = row.get("progress") or {}
             objectives = []
-            for obj in definition.get("objectives", []):
+            # The journal shows the terms this player accepted (v0.24.0), not
+            # whatever the definition says today. Falling back to the definition
+            # covers rows taken before terms were pinned.
+            pinned = dict(row.get("terms") or {})
+            for obj in list(pinned.get("objectives") or definition.get("objectives") or []):
                 cur=int(progress.get(str(obj["id"]),0)); req=max(1,int(obj.get("count",1)))
                 objectives.append(f"{'✅' if cur >= req else '▫️'} {obj.get('label',obj['id'])} {cur}/{req}")
             title = definition.get("title", row["quest_key"])

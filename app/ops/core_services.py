@@ -297,22 +297,20 @@ class QuestService:
         changed: list[dict[str, Any]] = []
         catalog = await self.catalog()
         for row in await self.db.list_character_quests(int(user_id), status="active"):
-            definition = catalog.get(str(row.get("quest_key")))
-            if not definition:
-                continue
+            # v0.24.0: no definition lookup gates this any more, and no
+            # objectives or rewards are sent. The engine reads the terms this
+            # player accepted off their own row (quest_terms.go), which fixed
+            # two things at once - Python was deciding what the work paid, and
+            # a quest whose definition had been retired or edited stopped being
+            # progressable at all, stranding whoever was carrying it.
             transition = dict(await self.engine.action(
                 "quest.progress",
                 int(user_id),
                 {
                     "quest_key": str(row["quest_key"]),
-                    "objectives": list(definition.get("objectives", [])),
                     "objective_type": str(objective_type),
                     "amount": int(amount),
                     "target": target,
-                    # v0.22.2: the engine pays on the same commit that
-                    # completes, so the declared rewards travel with every
-                    # report rather than in a second call that can be lost.
-                    "rewards": dict(definition.get("rewards") or {}),
                 },
             ))
             if not transition.get("touched"):
@@ -322,7 +320,14 @@ class QuestService:
             if current is None:
                 continue
             current = dict(current)
-            current["title"] = definition.get("title", current["quest_key"])
+            definition = catalog.get(str(row.get("quest_key")))
+            if definition is None:
+                # Retired or discarded since this player took it. The row still
+                # names it; ask for the title rather than showing the key.
+                getter = getattr(self.db, "get_quest_definition", None)
+                if getter is not None:
+                    definition = await getter(str(row["quest_key"]))
+            current["title"] = (definition or {}).get("title") or current["quest_key"]
             if transition.get("complete"):
                 current["just_completed"] = True
                 resolved = dict(transition.get("commission") or {})
@@ -396,7 +401,11 @@ class CommissionService:
             if not int(row.get("commission", 0) or 0):
                 continue
             definition = dict(await self.quests.definition(str(row["quest_key"])) or {})
-            objectives = list(definition.get("objectives") or [])
+            # The objectives this player agreed to, not the ones the definition
+            # carries today (v0.24.0). They are the same until a GM edits it,
+            # and after that the pinned copy is the only honest answer.
+            pinned = dict(row.get("terms") or {})
+            objectives = list(pinned.get("objectives") or definition.get("objectives") or [])
             progress = dict(row.get("progress") or {})
             done = sum(1 for o in objectives if int(progress.get(str(o.get("id")), 0)) >= max(1, int(o.get("count", 1) or 1)))
             return {

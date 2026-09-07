@@ -38,6 +38,17 @@ from .contract import (
     DASHBOARD_VIEW_ENDPOINTS,
 )
 
+from ..rules.quests import (
+    MAX_OBJECTIVE_COUNT,
+    MAX_OBJECTIVES,
+    OBJECTIVE_TYPES,
+    REWARD_KEYS,
+    rewardable_items,
+    SCENE_ACTION_KEYS,
+    quest_key_for,
+    validate_quest_definition,
+)
+
 log = logging.getLogger("xianxia.dashboard")
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -45,6 +56,64 @@ STATIC_DIR = ROOT / "dashboard"
 
 # JavaScript numbers are IEEE-754 doubles, so integers above this lose precision.
 JS_MAX_SAFE_INTEGER = 2**53 - 1
+
+
+def _json_list(raw: Any) -> list[dict[str, Any]]:
+    """A stored JSON array as a list of objects, or nothing at all.
+
+    Rows come off the wire as text and a malformed one must not take the page
+    down - a single unreadable definition is a thing to notice on the row, not
+    a reason the GM cannot see any of the others.
+    """
+    if isinstance(raw, list):
+        return [item for item in raw if isinstance(item, dict)]
+    try:
+        parsed = json.loads(str(raw or "") or "[]")
+    except Exception:
+        return []
+    return [item for item in parsed if isinstance(item, dict)] if isinstance(parsed, list) else []
+
+
+def _quest_source(row: dict[str, Any]) -> str:
+    """One word for where a definition came from (v0.24.0).
+
+    Two columns decide it and neither alone is the answer a GM wants:
+    `source_type` says how the quest was written, `giver_npc` says how it
+    reaches a player. A commission is a commission whether a model drafted it
+    or somebody typed it; a forged quest with no giver is found in the world.
+    The Quests page filters and groups on this, so it lives here rather than in
+    the browser, where two screens once disagreed about it.
+    """
+    if row.get("owner_user_id") not in (None, ""):
+        # Invented for one player by their own commission ladder: never pooled,
+        # never listed for anyone else.
+        return "invented"
+    if str(row.get("giver_npc") or "").strip():
+        return "commission"
+    source_type = str(row.get("source_type") or "").strip().lower()
+    if source_type in {"system", "static"}:
+        return "static"
+    if source_type == "authored":
+        return "authored"
+    if str(row.get("source_key") or "").startswith("history:") or str(row.get("origin") or "") == "world_event":
+        return "world_event"
+    return "forge"
+
+
+class _QuestWorld:
+    """The three tables `validate_quest_definition` reads, and nothing else.
+
+    The validator is the single vocabulary for what a quest may name - the same
+    one the Forge is held to - so the dashboard uses it rather than a second
+    copy that could drift. It wants a World, but only for `.locations`, `.npcs`
+    and `.items`, and building a real one drags the whole rules tier into this
+    process for three dictionaries.
+    """
+
+    def __init__(self, data: dict[str, Any]):
+        self.locations = dict(data.get("locations") or {})
+        self.npcs = dict(data.get("npcs") or {})
+        self.items = dict(data.get("items") or {})
 
 
 def json_safe_numbers(value: Any) -> Any:
@@ -184,6 +253,39 @@ class ReadOnlyDashboardStore:
         self.path = Path(path)
         engine_url = os.getenv("GAME_ENGINE_URL", "").strip()
         self._go_transport = GoDatabaseTransport(engine_url) if engine_url else None
+        self._quest_world: _QuestWorld | None = None
+
+    def quest_world(self) -> _QuestWorld:
+        """The content pack, read once, for quest validation and coverage."""
+        if self._quest_world is None:
+            try:
+                data = json.loads((ROOT / "content" / "world.json").read_text(encoding="utf-8"))
+            except Exception:
+                log.warning("Could not load content/world.json for quest validation", exc_info=True)
+                data = {}
+            self._quest_world = _QuestWorld(data)
+        return self._quest_world
+
+    @staticmethod
+    def quest_budget() -> dict[str, int]:
+        """The GM reward budget, from the same environment the bot reads.
+
+        Not imported from app.ops.config: that builds the whole Settings object,
+        which wants a Discord token and an engine URL this process has no
+        business asserting. The keys and defaults are the ones in config.py and
+        are asserted to match by the dashboard contract test.
+        """
+        def _cap(name: str, default: int) -> int:
+            try:
+                return max(0, int(os.getenv(name, str(default))))
+            except ValueError:
+                return default
+
+        return {
+            "max_xp": _cap("QUEST_REWARD_MAX_XP", 50),
+            "max_stones": _cap("QUEST_REWARD_MAX_STONES", 200),
+            "max_items": _cap("QUEST_REWARD_MAX_ITEMS", 3),
+        }
 
     @asynccontextmanager
     async def _connect(self):
@@ -316,7 +418,83 @@ class ReadOnlyDashboardStore:
                 """SELECT history_id,event_type,title,summary,significance,visibility,location,faction,actor_name,target_name,game_minute
                    FROM world_history_events ORDER BY game_minute DESC,significance DESC,history_id DESC LIMIT 8""",
             ) if await self._table_exists(db, "world_history_events") else []
-            return {"schema_version": schema, "clock": clock, "counts": counts, "simulations": sims, "active_era": era, "recent_history": recent}
+            attention = await self._attention(db, clock, sims)
+            return {"schema_version": schema, "clock": clock, "counts": counts, "simulations": sims,
+                    "active_era": era, "recent_history": recent, "attention": attention}
+
+    async def _attention(self, db, clock: dict[str, Any], sims: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """The handful of rows a GM would otherwise have to go looking for (v0.25.0).
+
+        Nothing here is new data. Every item already exists on another page; what
+        was missing was any reason to visit that page today. A session used to
+        start on Overview, which showed twelve counts and some history, and the
+        three drafts waiting for review were two clicks away behind a tab that
+        looked exactly like the other twenty-two.
+
+        Deliberately short and deliberately boring. It reports only conditions
+        with an obvious next action, it never invents a severity the underlying
+        row does not have, and anything it cannot read it simply omits - an
+        attention feed that fails loudly on a missing table would be worse than
+        the absence it is fixing.
+        """
+        now_minute = int(clock.get("game_minute") or 0)
+        items: list[dict[str, Any]] = []
+
+        async def _count(sql: str, params: tuple = ()) -> int:
+            try:
+                return int(await self._scalar(db, sql, params) or 0)
+            except Exception:
+                return 0
+
+        if await self._table_exists(db, "quest_definitions"):
+            drafts = await _count("SELECT COUNT(*) FROM quest_definitions WHERE status='draft'")
+            if drafts:
+                items.append({
+                    "kind": "quest_drafts", "severity": "warn", "count": drafts,
+                    "text": f"{drafts} quest draft{'s' if drafts != 1 else ''} waiting for review",
+                    "view": "quests", "action": "Review",
+                })
+
+        # A system that is further behind than its own interval has missed a
+        # tick, which is the only lag reading that means anything: a 720-minute
+        # system 200 minutes behind is early, not late.
+        for row in sims:
+            interval = int(row.get("interval_game_minutes") or 0)
+            lag = int(row.get("lag_game_minutes") or 0)
+            if interval and lag > interval:
+                items.append({
+                    "kind": "simulation_lag", "severity": "bad", "count": lag,
+                    "text": f"{row.get('system')} is {lag} game-minutes behind a {interval}-minute interval",
+                    "view": "overview", "action": "Force a tick", "system": str(row.get("system") or ""),
+                })
+
+        if await self._table_exists(db, "character_quests"):
+            overdue = await _count(
+                """SELECT COUNT(*) FROM character_quests
+                   WHERE commission=1 AND status='active'
+                     AND deadline_game_minute IS NOT NULL AND deadline_game_minute<=?""",
+                (now_minute,),
+            )
+            if overdue:
+                items.append({
+                    "kind": "commissions_overdue", "severity": "warn", "count": overdue,
+                    "text": f"{overdue} commission{'s are' if overdue != 1 else ' is'} past the deadline its giver set",
+                    "view": "commissions", "action": "Open",
+                })
+
+        if await self._table_exists(db, "characters"):
+            held = await _count(
+                "SELECT COUNT(*) FROM characters WHERE (is_frozen=1 OR is_muted=1) AND COALESCE(moderation_reason,'')=''")
+            if held:
+                items.append({
+                    "kind": "moderation_unexplained", "severity": "warn", "count": held,
+                    "text": f"{held} player{'s are' if held != 1 else ' is'} frozen or muted with no reason recorded",
+                    "view": "players", "action": "Open",
+                })
+
+        order = {"bad": 0, "warn": 1, "info": 2}
+        items.sort(key=lambda item: (order.get(str(item.get("severity")), 3), -int(item.get("count") or 0)))
+        return items
 
     async def timeline(self, *, limit: int = 100, q: str = "", event_type: str = "", visibility: str = "") -> dict[str, Any]:
         limit = max(1, min(300, int(limit)))
@@ -876,6 +1054,156 @@ class ReadOnlyDashboardStore:
                 "caravans": caravans, "expedition_threads": expeditions, "forged_quests": forged_quests,
             }
 
+    async def quests(self) -> dict[str, Any]:
+        """Every quest definition, whatever produced it (v0.24.0).
+
+        There are four producers and they used to be reviewable in two
+        unconnected places. Static quests (`app/rules/quests.py`) and Forge
+        drafts had no giver, so the Commissions page filtered them out; the
+        Exploration page listed forged ones read-only, so the only way to
+        approve a draft was the Discord embed the Forge replied with. A GM
+        looking for "what is waiting for me" had to know which of three screens
+        a quest happened to land on.
+
+        One query, one `source` label, and the same review controls on all of
+        them - `status` is one column and always was.
+        """
+        async with self._connect() as db:
+            clock = await self._world_clock(db)
+            now_minute = int(clock.get("game_minute") or 0)
+            definitions = await self._fetchall_if_table(
+                db, "quest_definitions",
+                """SELECT q.quest_key,q.title,q.description,q.status,q.origin,q.source_type,q.source_key,
+                          q.giver_npc,q.realm_band,q.tier,q.owner_user_id,q.deadline_game_minutes,
+                          q.objectives_json,q.rewards_json,q.variants_json,q.seed_json,q.model,
+                          q.story_prompt,q.created_at,q.created_by,q.reviewed_by,q.reviewed_at,
+                          COALESCE(q.requires_sect,'') AS requires_sect,
+                          COALESCE(q.reward_visibility,'shown') AS reward_visibility,
+                          COALESCE(q.boast,'') AS boast,
+                          c.name AS owner_name,
+                          (SELECT COUNT(*) FROM character_quests h WHERE h.quest_key=q.quest_key) AS taken,
+                          (SELECT COUNT(*) FROM character_quests h WHERE h.quest_key=q.quest_key
+                             AND h.status='completed') AS completed
+                   FROM quest_definitions q LEFT JOIN characters c ON c.user_id=q.owner_user_id
+                   ORDER BY (q.status='draft') DESC,q.created_at DESC LIMIT 400""",
+            )
+            for row in definitions:
+                row["source"] = _quest_source(row)
+            held = await self._fetchall_if_table(
+                db, "character_quests",
+                """SELECT h.user_id,h.quest_key,h.status,h.progress_json,h.accepted_game_minute,
+                          h.deadline_game_minute,h.variant_index,h.resolved_game_minute,h.commission,
+                          COALESCE(h.terms_json,'') AS terms_json,
+                          c.name AS player_name,q.title,q.giver_npc,q.objectives_json
+                   FROM character_quests h JOIN characters c ON c.user_id=h.user_id
+                   LEFT JOIN quest_definitions q ON q.quest_key=h.quest_key
+                   ORDER BY (h.status='active') DESC,h.updated_at DESC LIMIT 200""",
+            )
+            for row in held:
+                due = row.get("deadline_game_minute")
+                row["due_in_game_minutes"] = (int(due) - now_minute) if due is not None else None
+                row["overdue"] = bool(due is not None and int(due) <= now_minute and str(row.get("status")) == "active")
+            drafts = [r for r in definitions if str(r.get("status")) == "draft"]
+            approved = [r for r in definitions if str(r.get("status")) == "approved"]
+            held_counts: dict[str, int] = {}
+            for row in held:
+                if str(row.get("status")) == "active":
+                    held_counts[str(row.get("quest_key"))] = held_counts.get(str(row.get("quest_key")), 0) + 1
+            for row in definitions:
+                row["held_now"] = held_counts.get(str(row.get("quest_key")), 0)
+            return {
+                "summary": {
+                    "drafts": len(drafts),
+                    "approved": len(approved),
+                    "retired": sum(1 for r in definitions if str(r.get("status")) in {"retired", "discarded"}),
+                    "forged": sum(1 for r in definitions if r["source"] == "forge"),
+                    "commissions": sum(1 for r in definitions if r["source"] in {"commission", "invented"}),
+                    "held_active": sum(1 for r in held if str(r.get("status")) == "active"),
+                    "never_taken": sum(1 for r in approved if not int(r.get("taken") or 0)),
+                },
+                "definitions": definitions,
+                "held": held,
+                "coverage": self._quest_coverage(approved),
+                "vocabulary": {
+                    "objective_types": {
+                        key: {"target": spec["target"], "label": spec["label"]}
+                        for key, spec in OBJECTIVE_TYPES.items()
+                    },
+                    "scene_actions": list(SCENE_ACTION_KEYS),
+                    "reward_keys": list(REWARD_KEYS),
+                    # What a target may name. The editor binds its pickers to
+                    # these, so a GM cannot type a place or a person the world
+                    # does not have - which is the failure the review inbox
+                    # spends most of its time reporting on forged drafts.
+                    "locations": sorted(
+                        name for name, loc in self.quest_world().locations.items() if not (loc or {}).get("private")
+                    ),
+                    "npcs": sorted(
+                        name for name, npc in self.quest_world().npcs.items()
+                        if not isinstance((npc or {}).get("hidden_master"), dict)
+                    ),
+                    "items": sorted(rewardable_items(self.quest_world())),
+                    "max_objectives": MAX_OBJECTIVES,
+                    "max_objective_count": MAX_OBJECTIVE_COUNT,
+                    "budget": self.quest_budget(),
+                    "hold_policies": ["keep", "migrate", "revoke"],
+                },
+                "game_minute": now_minute,
+            }
+
+    def _quest_coverage(self, approved: list[dict[str, Any]]) -> dict[str, Any]:
+        """Where the live pool is thin (v0.24.0).
+
+        Not a fault report - a map of quiet ground. A GM asking "what should I
+        forge next" was previously reduced to reading the whole table and
+        remembering, and the answer is nearly always a realm band nothing
+        serves or a city nothing sends anyone to.
+        """
+        world = self.quest_world()
+        bands: dict[str, int] = {}
+        objective_types: dict[str, int] = {}
+        referenced_locations: set[str] = set()
+        unknown_targets: list[dict[str, str]] = []
+        npc_names = {str(name).lower() for name in world.npcs}
+        location_names = {
+            str(name) for name, loc in world.locations.items() if not (loc or {}).get("private")
+        }
+        location_lookup = {name.lower(): name for name in location_names}
+        for row in approved:
+            bands[str(row.get("realm_band") or "any")] = bands.get(str(row.get("realm_band") or "any"), 0) + 1
+            for objective in _json_list(row.get("objectives_json")):
+                kind = str(objective.get("type") or "")
+                objective_types[kind] = objective_types.get(kind, 0) + 1
+                target = str(objective.get("target") or "").strip()
+                if not target:
+                    continue
+                expects = (OBJECTIVE_TYPES.get(kind) or {}).get("target")
+                if expects == "location":
+                    if target.lower() in location_lookup:
+                        referenced_locations.add(location_lookup[target.lower()])
+                    else:
+                        unknown_targets.append({"quest_key": str(row.get("quest_key")), "type": kind, "target": target,
+                                                "expects": "location"})
+                elif expects == "npc" and target.lower() not in npc_names:
+                    unknown_targets.append({"quest_key": str(row.get("quest_key")), "type": kind, "target": target,
+                                            "expects": "npc"})
+        return {
+            "realm_bands": sorted(({"band": band, "count": count} for band, count in bands.items()),
+                                  key=lambda item: item["band"]),
+            "objective_types": [
+                {"type": kind, "count": objective_types.get(kind, 0)} for kind in OBJECTIVE_TYPES
+            ],
+            # Places that exist, are public, and that no approved quest sends
+            # anyone to. Capped: the interesting answer is the shape of the
+            # list, not every entry in a large content pack.
+            "unreferenced_locations": sorted(location_names - referenced_locations)[:40],
+            "unreferenced_location_count": len(location_names - referenced_locations),
+            # An approved quest pointing at something the world does not have is
+            # a dead end a player can accept. Rare - the Forge is validated -
+            # but content edits can strand one, and it should be visible.
+            "unknown_targets": unknown_targets[:20],
+        }
+
     async def commissions(self) -> dict[str, Any]:
         """The GM's view of the commission pipeline (v0.22.0).
 
@@ -1226,6 +1554,13 @@ class AdminDashboardController:
         # cost to them. Both audit inside the engine transaction.
         "commission.review": "admin.commission.review",
         "commission.retire": "admin.commission.retire",
+        # Quests (v0.24.0). review is the same status change as the commission
+        # one - it always was - under a name that does not claim only
+        # commissions have a lifecycle. save is the verb that did not exist:
+        # it edits a definition and settles what happens to whoever is holding
+        # it, in the engine, in one transaction.
+        "quest.review": "admin.quest.review",
+        "quest.save": "admin.quest.save",
         "player.force_reincarnation_ready": "admin.player.force_reincarnation_ready",
         "player.set_pill_toxicity": "admin.player.set_pill_toxicity",
         "player.set_beast_stats": "admin.player.set_beast_stats",
@@ -1405,6 +1740,14 @@ class AdminDashboardController:
         reason = str(payload.get("reason") or "GM dashboard")[:500]
         if action == "player.adjust_item":
             payload["item_id"] = await self._adjust_item_target(payload)
+        if action == "quest.save":
+            saved, notes = await self._validated_quest(payload)
+            result = await self.engine.action(self.ACTION_MAP[action], self.actor_id, saved)
+            if notes:
+                # Non-fatal: a reward trimmed to the budget, a count clamped.
+                # The save happened; the GM is told what was changed on the way.
+                result = {**dict(result or {}), "validation_notes": notes}
+            return {"ok": True, "action": action, "result": result}
         if action in self.ACTION_MAP:
             result = await self.engine.action(self.ACTION_MAP[action], self.actor_id, payload)
             return {"ok": True, "action": action, "result": result}
@@ -1434,14 +1777,72 @@ class AdminDashboardController:
             return {"ok": True, "action": action, "result": result}
         raise ValueError(f"Unsupported dashboard admin action: {action}")
 
+    async def _validated_quest(self, payload: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
+        """Hold a hand-edited quest to the same rules a forged one meets.
+
+        `validate_quest_definition` is the Forge's own gate: it is what refuses
+        a drafted quest that names an NPC the world does not have or pays more
+        than the budget. An edit made in the dashboard goes through the same
+        function, so the two ways of authoring cannot disagree about what a
+        valid quest is - which was half of why forged drafts and commissions
+        ended up on separate screens with separate rules in the first place.
+
+        The engine still owns what happens to players; this owns only the
+        question of whether the content is sayable at all.
+        """
+        draft = dict(payload)
+        title = str(draft.get("title") or "").strip()
+        quest_key = str(draft.get("quest_key") or "").strip()
+        if not quest_key:
+            if not title:
+                raise ValueError("A quest needs a title before it can be saved.")
+            # A new quest derives its key from its title, and must not land on
+            # a key that already exists: `admin.quest.save` treats a known key
+            # as an edit, so a collision would silently overwrite a different
+            # quest that happened to be called something similar.
+            quest_key = quest_key_for(title, await self._existing_quest_keys(), prefix="quest")
+        definition, errors = validate_quest_definition(draft, self.store.quest_world(), self.store.quest_budget())
+        if definition is None:
+            raise ValueError("This quest cannot be saved yet:\n- " + "\n- ".join(errors[:8]))
+        saved = {
+            "quest_key": quest_key,
+            "title": definition["title"],
+            "description": definition["description"],
+            "objectives": definition["objectives"],
+            "rewards": definition["rewards"],
+            "giver_npc": str(draft.get("giver_npc") or "").strip(),
+            "realm_band": str(draft.get("realm_band") or "").strip(),
+            "tier": max(1, int(draft.get("tier") or 1)),
+            "deadline_game_minutes": max(0, int(draft.get("deadline_game_minutes") or 0)),
+            "variants": list(draft.get("variants") or []),
+            "requires_sect": str(draft.get("requires_sect") or "").strip(),
+            "reward_visibility": str(draft.get("reward_visibility") or "shown").strip().lower(),
+            "boast": str(draft.get("boast") or "").strip(),
+            "hold_policy": str(draft.get("hold_policy") or "keep").strip().lower(),
+            "reason": str(draft.get("reason") or "GM dashboard")[:500],
+        }
+        if draft.get("owner_user_id") not in (None, ""):
+            saved["owner_user_id"] = int(draft["owner_user_id"])
+        return saved, errors[:8]
+
+    async def _existing_quest_keys(self) -> set[str]:
+        async with self.store._connect() as db:
+            rows = await self.store._fetchall_if_table(db, "quest_definitions", "SELECT quest_key FROM quest_definitions")
+        return {str(row.get("quest_key")) for row in rows}
+
 
 class DiscordDashboardController:
     """Proxy Discord provisioning requests to the connected Python bot process."""
 
-    def __init__(self, base_url: str, token: str, enabled: bool) -> None:
+    def __init__(self, base_url: str, token: str, enabled: bool, actor_id: int = 1) -> None:
         self.base_url = str(base_url or "").rstrip("/")
         self.token = str(token or "")
         self.enabled = bool(enabled)
+        # The same distinguishable id the engine writes into admin_audit_log for
+        # dashboard-originated actions. Forging a quest is audited on the bot
+        # side (app/bot/admin/quest_control.py) and the browser cannot be
+        # trusted to say who it is, so the id is stamped here.
+        self.actor_id = int(actor_id)
 
     async def _request(self, action: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
         if not self.base_url:
@@ -1495,6 +1896,13 @@ class DiscordDashboardController:
     async def run(self, action: str, payload: dict[str, Any]) -> dict[str, Any]:
         if not self.enabled:
             raise PermissionError("Dashboard admin writes are disabled")
+        payload = dict(payload or {})
+        if str(action).startswith("quest."):
+            # Quest authoring is the one thing on this channel that writes a
+            # row and audits it (app/bot/admin/quest_control.py), so it needs to
+            # know who asked. Discord layout actions do not, and adding a field
+            # to their payloads would change a contract they already have.
+            payload["admin_user_id"] = self.actor_id
         return await self._request(action, payload)
 
 
@@ -1503,7 +1911,7 @@ class DashboardServer:
         self.settings = settings
         self.store = ReadOnlyDashboardStore(settings.database_path)
         self.admin = AdminDashboardController(self.store, settings.engine_url or os.getenv("GAME_ENGINE_URL", ""), settings.admin_writes, settings.dashboard_actor_id)
-        self.discord = DiscordDashboardController(settings.bot_control_url, settings.bot_control_token, settings.admin_writes)
+        self.discord = DiscordDashboardController(settings.bot_control_url, settings.bot_control_token, settings.admin_writes, settings.dashboard_actor_id)
         # Bounds for the pre-auth request head. See app/ops/http_limits.py: a per-line
         # timeout that resets on every line is not a limit, it is an invitation.
         self.header_limits = HeaderLimits(
@@ -1665,6 +2073,8 @@ class DashboardServer:
                 await self._send_json(writer, 200, await self.store.exploration()); return
             if path == "/api/commissions":
                 await self._send_json(writer, 200, await self.store.commissions()); return
+            if path == "/api/quests":
+                await self._send_json(writer, 200, await self.store.quests()); return
             if path == "/api/threads":
                 await self._send_json(writer, 200, await self.store.threads()); return
             if path == "/api/economy":

@@ -7,42 +7,79 @@
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-  <header class="topbar">
-    <div>
+<div class="shell">
+
+  <!-- Twenty-three views in five groups. They used to be one flat row of tabs
+       that wrapped onto three sticky rows at laptop width. -->
+  <aside class="side">
+    <div class="brand">
       <div class="eyebrow">GM ONLY · ADMIN CONTROL</div>
       <h1>Xianxia RP</h1>
-      <div class="subtitle">Authoritative world control & observability</div>
+      <small>Authoritative world control</small>
     </div>
-    <div class="clockbox"><span id="worldClock">Loading world time…</span><small id="schema">SQLite</small></div>
-  </header>
 
-  <nav id="nav" class="nav">
-    <button data-view="overview" class="active">Overview</button>
-    <button data-view="timeline">Timeline</button>
-    <button data-view="npcs">NPCs</button>
-    <button data-view="families">Families</button>
-    <button data-view="sects">Sect Politics</button>
-    <button data-view="conflicts">Conflicts</button>
-    <button data-view="events">World Events</button>
-    <button data-view="players">Player Activity</button>
-    <button data-view="cultivation">Cultivation</button>
-    <button data-view="crafting">Crafting & Assets</button>
-    <button data-view="exploration">Exploration</button>
-    <button data-view="commissions">Commissions</button>
-    <button data-view="economy">Economy</button>
-    <button data-view="dynasties">Samsara Dynasties</button>
-    <button data-view="party">Parties & Formations</button>
-    <button data-view="pvp">PvP</button>
-    <button data-view="conditions">Conditions</button>
-    <button data-view="threads">Threads</button>
-    <button data-view="rag">RAG Memory</button>
-    <button data-view="decisions">Autonomous Decisions</button>
-    <button data-view="discord" class="admin-tab">Discord Setup</button>
-    <button data-view="admin" class="admin-tab">Admin Console</button>
-  </nav>
+    <div class="navsearch">
+      <input id="navFilter" type="search" placeholder="Jump to anything…" autocomplete="off">
+      <kbd>/</kbd>
+    </div>
 
-  <main id="app"><div class="loading">Loading dashboard…</div></main>
-  <div id="drawer" class="drawer hidden"><div class="drawer-card"><button id="closeDrawer" class="close">×</button><div id="drawerBody"></div></div></div>
-  <script src="/app.js"></script>
+    <nav id="nav">
+      <div class="navgroup">World</div>
+      <button data-view="overview" class="active"><span class="ico">◈</span><span class="label">Overview</span></button>
+      <button data-view="timeline"><span class="ico">◷</span><span class="label">Timeline</span></button>
+      <button data-view="npcs"><span class="ico">☗</span><span class="label">NPCs</span></button>
+      <button data-view="events"><span class="ico">✦</span><span class="label">World Events</span></button>
+      <button data-view="sects"><span class="ico">⛩</span><span class="label">Sect Politics</span></button>
+      <button data-view="families"><span class="ico">♜</span><span class="label">Families</span></button>
+      <button data-view="conflicts"><span class="ico">⚔</span><span class="label">Conflicts</span></button>
+
+      <div class="navgroup">Players</div>
+      <button data-view="players"><span class="ico">◉</span><span class="label">Player Activity</span></button>
+      <button data-view="cultivation"><span class="ico">☯</span><span class="label">Cultivation</span></button>
+      <button data-view="crafting"><span class="ico">⚒</span><span class="label">Crafting &amp; Assets</span></button>
+      <button data-view="conditions"><span class="ico">✚</span><span class="label">Conditions</span></button>
+      <button data-view="party"><span class="ico">⛬</span><span class="label">Parties &amp; Formations</span></button>
+      <button data-view="pvp"><span class="ico">⚑</span><span class="label">PvP</span></button>
+      <button data-view="dynasties"><span class="ico">♻</span><span class="label">Samsara Dynasties</span></button>
+
+      <div class="navgroup">Content &amp; Economy</div>
+      <button data-view="quests"><span class="ico">📜</span><span class="label">Quests</span><span class="badge" id="questBadge" hidden></span></button>
+      <button data-view="commissions"><span class="ico">🤝</span><span class="label">Commissions</span></button>
+      <button data-view="exploration"><span class="ico">🗺</span><span class="label">Exploration</span></button>
+      <button data-view="economy"><span class="ico">⚖</span><span class="label">Economy</span></button>
+
+      <div class="navgroup">Systems</div>
+      <button data-view="rag"><span class="ico">🧠</span><span class="label">RAG Memory</span></button>
+      <button data-view="decisions"><span class="ico">⚙</span><span class="label">Autonomous Decisions</span></button>
+      <button data-view="threads"><span class="ico">#</span><span class="label">Discord Threads</span></button>
+
+      <div class="navgroup adminhead">Admin</div>
+      <button data-view="discord" class="admin-tab"><span class="ico">🛠</span><span class="label">Discord Setup</span></button>
+      <button data-view="admin" class="admin-tab"><span class="ico">⛔</span><span class="label">Admin Console</span></button>
+    </nav>
+
+    <div class="navfoot">
+      <span id="schema">SQLite</span><br>
+      <span id="engineHealth">engine —</span>
+    </div>
+  </aside>
+
+  <div class="content">
+    <header class="topbar">
+      <button class="railtoggle" id="railToggle" aria-label="Menu">☰</button>
+      <span class="crumb" id="crumb">World / Overview</span>
+      <div class="clockbox">
+        <span id="engineDot"><span class="status-dot"></span>engine authoritative</span>
+        <b id="worldClock">Loading world time…</b>
+      </div>
+    </header>
+    <main id="app"><div class="loading">Loading dashboard…</div></main>
+  </div>
+</div>
+
+<div id="drawer" class="drawer hidden">
+  <div class="drawer-card"><button id="closeDrawer" class="close">×</button><div id="drawerBody"></div></div>
+</div>
+<script src="/app.js"></script>
 </body>
 </html>

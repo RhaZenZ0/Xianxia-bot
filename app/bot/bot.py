@@ -25,6 +25,7 @@ from ..rules.npc_memory import classify_memory, exchange_memory_summary, public_
 from ..version import RELEASE_VERSION
 from .admin.channel_messages import XianxiaInfoView
 from .admin.server_setup import dashboard_discord_control
+from .admin.quest_control import dashboard_quest_control, owns as quest_control_owns
 from .channels import post_server_log
 from .character_state import _remember_freeform_npc_scene
 from .runtime import DB, ENGINE, SETTINGS, WORLD, _sync_realm_presence_roles, character_location_display, chunk_text, current_world_time, log
@@ -85,6 +86,13 @@ class XianxiaBot(commands.Bot):
         # The handler is intentionally hosted by the Discord process. The GM
         # dashboard can request Discord setup work, but only discord.py owns
         # guild/channel/role mutations. Game mechanics remain in Go.
+        #
+        # v0.24.0: quest authoring shares this channel because the Forge is an
+        # OpenRouter call and QUEST_FORGE is wired in this process. It is routed
+        # to its own module rather than through dashboard_discord_control, whose
+        # docstring promises it only ever touches Discord layout.
+        if quest_control_owns(action):
+            return await dashboard_quest_control(action, payload)
         return await dashboard_discord_control(self, action, payload)
 
     async def _mark_startup_phase(self, phase: str, detail: dict | None = None) -> None:

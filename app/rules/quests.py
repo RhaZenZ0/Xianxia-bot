@@ -88,13 +88,21 @@ MAX_OBJECTIVES = 4
 MAX_OBJECTIVE_COUNT = 5
 
 
-def quest_key_for(title: str, existing: set[str] | None = None) -> str:
+def quest_key_for(title: str, existing: set[str] | None = None, *, prefix: str = "forge") -> str:
+    """A stable key for a new quest, namespaced so it cannot shadow a static one.
+
+    `prefix` says who made it, and it is not decoration: `_quest_source` and the
+    GM reading the table both take `forge_` to mean a model wrote this. A quest
+    typed by hand in the dashboard passes `quest` (v0.24.0), so the pool does
+    not claim authorship the Forge never had.
+    """
     base = re.sub(r"[^a-z0-9]+", "_", str(title).lower()).strip("_")[:48] or "forged_quest"
-    key = f"forge_{base}"
+    namespace = re.sub(r"[^a-z0-9]+", "", str(prefix).lower()) or "forge"
+    key = f"{namespace}_{base}"
     if existing:
         n = 2
         while key in existing:
-            key = f"forge_{base}_{n}"
+            key = f"{namespace}_{base}_{n}"
             n += 1
     return key
 

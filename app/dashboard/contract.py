@@ -9,12 +9,13 @@ from typing import Iterable
 # run before the bot/dashboard dependencies are installed.  Keep the browser/API,
 # schema-review, and newer-system coverage contract in one place.
 DASHBOARD_API_VERSION = 2
-DASHBOARD_REVIEWED_SCHEMA_VERSION = 31
+DASHBOARD_REVIEWED_SCHEMA_VERSION = 32
 
 DASHBOARD_GET_API_PATHS = frozenset({
     "/api/overview", "/api/capabilities", "/api/timeline", "/api/npcs", "/api/npc",
     "/api/families", "/api/sects", "/api/conflicts", "/api/events", "/api/players", "/api/player",
-    "/api/cultivation", "/api/crafting", "/api/exploration", "/api/commissions", "/api/economy", "/api/dynasties",
+    "/api/cultivation", "/api/crafting", "/api/exploration", "/api/commissions", "/api/quests",
+    "/api/economy", "/api/dynasties",
     "/api/party", "/api/pvp", "/api/conditions", "/api/threads",
     "/api/rag", "/api/decisions", "/api/admin", "/api/discord", "/api/health",
 })
@@ -37,6 +38,7 @@ DASHBOARD_VIEW_ENDPOINTS = {
     "crafting": "/api/crafting",
     "exploration": "/api/exploration",
     "commissions": "/api/commissions",
+    "quests": "/api/quests",
     "economy": "/api/economy",
     "dynasties": "/api/dynasties",
     "party": "/api/party",
@@ -68,14 +70,22 @@ DASHBOARD_SYSTEM_TABLES = {
     "exploration": (
         "exploration_events", "exploration_event_participants", "secret_realm_runs",
         "character_location_discoveries", "wild_beast_encounters", "caravans", "caravan_operations",
-        "expedition_threads", "quest_definitions",
+        "expedition_threads",
     ),
-    # Commissions (v0.22.0, schema 29). `quest_definitions` stays registered to
-    # `exploration`, which owns forged non-commission quests; this view reads
-    # the commission rows out of it and owns the player-side table - which
-    # commission someone is carrying, on what terms, and until when.
+    # Commissions (v0.22.0, schema 29). This view owns the player-side table -
+    # which commission someone is carrying, on what terms, and until when. The
+    # definition table moved to `quests` in v0.24.0.
     "commissions": (
         "character_quests",
+    ),
+    # Quests (v0.24.0, schema 32). The workbench owns the definition table -
+    # every producer of a quest, in one place, with the same review controls -
+    # so `quest_definitions` moves here from `exploration`, which showed forged
+    # ones read-only and could not act on any of them. `character_quests` stays
+    # registered to `commissions`, which owns the player-side view of a held
+    # one; this view reads it only to count who is carrying what.
+    "quests": (
+        "quest_definitions",
     ),
     "economy": (
         "economy_markets", "economy_events", "auctions", "auction_bids", "black_market_posts",

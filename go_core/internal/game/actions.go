@@ -76,9 +76,18 @@ func ApplyWithWorld(databasePath, worldPath string, req ActionRequest) (ActionRe
 	case "admin.simulation.interval":
 		result, err = adminSimulationInterval(conn, req.ActorID, req.Payload)
 	case "admin.commission.review":
-		result, err = adminCommissionReview(conn, req.ActorID, req.Payload)
+		result, err = adminQuestReview(conn, req.ActorID, req.Payload, "admin.commission.review")
 	case "admin.commission.retire":
 		result, err = adminCommissionRetire(conn, req.ActorID, req.Payload)
+	// v0.24.0. The review action was always general - it changes the status of
+	// a quest_definitions row and never looked at whether the row had a giver -
+	// but it was named and audited as though commissions were the only thing
+	// with a status. The Quests workbench approves, retires and discards every
+	// kind of definition through this name; the older one keeps working.
+	case "admin.quest.review":
+		result, err = adminQuestReview(conn, req.ActorID, req.Payload, "admin.quest.review")
+	case "admin.quest.save":
+		result, err = adminQuestSave(conn, req.ActorID, req.Payload)
 	case "admin.audit":
 		result, err = adminAuditOnly(conn, req.ActorID, req.Payload)
 	case "admin.player.set_realm":
@@ -278,19 +287,16 @@ func sceneTransition(conn *storage.Conn, userID int64, raw json.RawMessage) (any
 }
 
 type questPayload struct {
-	QuestKey      string           `json:"quest_key"`
-	Objectives    []map[string]any `json:"objectives"`
-	ObjectiveType string           `json:"objective_type"`
-	Amount        *int64           `json:"amount"`
-	Target        *string          `json:"target"`
-	// Rewards the caller's catalog declares for this quest. Sent with every
-	// progress report so that the transaction which completes a quest is also
-	// the one that pays it (v0.22.2). They are still validated - by
-	// app/rules/quests.py before a definition is ever stored, and by the
-	// reward caps here - and they are only ever read on the tick that
-	// completes, so a report that does not complete anything can spend
-	// nothing.
-	Rewards map[string]any `json:"rewards"`
+	QuestKey      string  `json:"quest_key"`
+	ObjectiveType string  `json:"objective_type"`
+	Amount        *int64  `json:"amount"`
+	Target        *string `json:"target"`
+	// What the quest asks for and what it pays are deliberately NOT here.
+	// Until v0.24.0 the caller sent both with every progress report, which
+	// meant Python decided the terms and a GM editing a definition rewrote a
+	// deal a player had already accepted. Both now come off the player's own
+	// character_quests row (quest_terms.go). Callers may still send the old
+	// fields; they are ignored.
 }
 
 // Ceilings on what one quest completion may pay, as a backstop independent of
@@ -394,7 +400,21 @@ func questProgress(conn *storage.Conn, userID int64, raw json.RawMessage) (any, 
 			rollback(conn)
 		}
 	}()
-	res, err := conn.Execute(`SELECT progress_json,commission FROM character_quests WHERE user_id=? AND quest_key=? AND status='active'`, []any{userID, p.QuestKey})
+	// v0.24.0: the terms come off the player's own row, not out of the payload.
+	// `terms_json` is selected only when it exists, so an engine pointed at a
+	// database Python has not migrated yet still runs - it simply falls back to
+	// reading the definition, which is all it could ever do before.
+	pinnedTerms, err := tableHasColumns(conn, "character_quests", questTermsColumn)
+	if err != nil {
+		return nil, err
+	}
+	columns := `progress_json,commission,variant_index`
+	if pinnedTerms {
+		columns += `,` + questTermsColumn
+	}
+	res, err := conn.Execute(
+		`SELECT `+columns+` FROM character_quests WHERE user_id=? AND quest_key=? AND status='active'`,
+		[]any{userID, p.QuestKey})
 	if err != nil {
 		return nil, err
 	}
@@ -407,7 +427,11 @@ func questProgress(conn *storage.Conn, userID int64, raw json.RawMessage) (any, 
 	if text, ok := row["progress_json"].(string); ok && text != "" {
 		_ = json.Unmarshal([]byte(text), &progress)
 	}
-	payloadMap := map[string]any{"progress": progress, "objectives": p.Objectives, "objective_type": p.ObjectiveType, "target": p.Target}
+	terms, err := acceptedQuestTermsTx(conn, userID, p.QuestKey, i64(row["variant_index"]), row[questTermsColumn], gameMinute)
+	if err != nil {
+		return nil, err
+	}
+	payloadMap := map[string]any{"progress": progress, "objectives": terms.Objectives, "objective_type": p.ObjectiveType, "target": p.Target}
 	if p.Amount != nil {
 		payloadMap["amount"] = *p.Amount
 	}
@@ -451,7 +475,7 @@ func questProgress(conn *storage.Conn, userID int64, raw json.RawMessage) (any, 
 		}
 		transition["commission"] = resolved
 	} else if complete {
-		granted, grantErr := grantQuestRewardTx(conn, userID, p.QuestKey, p.Rewards)
+		granted, grantErr := grantQuestRewardTx(conn, userID, p.QuestKey, terms.Rewards)
 		if grantErr != nil {
 			return nil, grantErr
 		}

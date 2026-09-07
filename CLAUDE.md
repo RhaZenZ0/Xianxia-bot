@@ -133,7 +133,7 @@ internal/server/        HTTP control/data plane
 ```
 
 Every Go SQLite connection uses `journal_mode=WAL`, `foreign_keys=ON`, `busy_timeout=10000`,
-`synchronous=NORMAL`. Current schema version is 27; historical migrations are kept so old databases
+`synchronous=NORMAL`. Current schema version is 32; historical migrations are kept so old databases
 can upgrade in place — see `VERSIONS.md` for the full schema/release history.
 
 ### RAG / memory (`app/ai/rag`)

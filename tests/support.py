@@ -144,6 +144,98 @@ def install_openai_shim() -> None:
     sys.modules["openai"] = shim
 
 
+def httpx_is_shimmed() -> bool:
+    """True when httpx here is the stub above rather than the real library."""
+    import httpx  # noqa: PLC0415 - resolved after install_httpx_shim has run
+
+    return bool(getattr(httpx, "__xianxia_shim__", False))
+
+
+def install_httpx_shim() -> None:
+    """Provide the tiny httpx surface the transport modules touch at import.
+
+    `app.database.remote` and `app.ops.game_engine` construct an AsyncClient at
+    module scope, so a machine without httpx cannot even import the Database -
+    which took roughly twenty test files out of the run on any minimal
+    environment, including every integration test of the layers above it.
+
+    Nothing here pretends to be a client. Any attempt to send a request raises,
+    so a test that reaches the network fails loudly rather than passing against
+    a stub.
+    """
+    if "httpx" in sys.modules or importlib.util.find_spec("httpx") is not None:
+        return
+
+    class _Timeout:
+        def __init__(self, *args, **kwargs):
+            self.args, self.kwargs = args, kwargs
+
+    class _Limits:
+        def __init__(self, *args, **kwargs):
+            self.args, self.kwargs = args, kwargs
+
+    class _Response:
+        def __init__(self, status_code: int = 200, json_body: Any = None, text: str = ""):
+            self.status_code = status_code
+            self._json = json_body
+            self.text = text
+
+        def json(self):
+            return self._json
+
+        def raise_for_status(self):
+            if self.status_code >= 400:
+                raise _HTTPStatusError(f"HTTP {self.status_code}")
+
+    class _HTTPError(Exception):
+        pass
+
+    class _RequestError(_HTTPError):
+        pass
+
+    class _HTTPStatusError(_HTTPError):
+        pass
+
+    class _AsyncClient:
+        def __init__(self, *args, **kwargs):
+            self.args, self.kwargs = args, kwargs
+            self.is_closed = False
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *exc):
+            await self.aclose()
+            return False
+
+        async def request(self, *args, **kwargs):
+            raise RuntimeError("httpx shim cannot perform network requests")
+
+        async def get(self, *args, **kwargs):
+            return await self.request("GET", *args, **kwargs)
+
+        async def post(self, *args, **kwargs):
+            return await self.request("POST", *args, **kwargs)
+
+        async def aclose(self):
+            self.is_closed = True
+
+    shim = types.ModuleType("httpx")
+    shim.__spec__ = importlib.machinery.ModuleSpec("httpx", loader=None)
+    # Tests that drive httpx itself (MockTransport, request routing) cannot run
+    # against this; they check the flag and skip rather than assert against a
+    # stub that would agree with anything.
+    shim.__xianxia_shim__ = True
+    shim.AsyncClient = _AsyncClient
+    shim.Timeout = _Timeout
+    shim.Limits = _Limits
+    shim.Response = _Response
+    shim.HTTPError = _HTTPError
+    shim.RequestError = _RequestError
+    shim.HTTPStatusError = _HTTPStatusError
+    sys.modules["httpx"] = shim
+
+
 async def seed_simulation_fixture(db, world_data: dict, game_minute: int = 0) -> None:
     """Seed read-model simulation rows for Python tests without gameplay authority."""
     systems = {
