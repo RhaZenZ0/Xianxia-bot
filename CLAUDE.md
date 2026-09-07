@@ -181,7 +181,8 @@ retires the ones that answer `401`/`403`/`404`, plus a `400` confirmed at an ord
 reasoning-mandatory case). `429`s and timeouts never retire anything; that is what the per-route
 cooldown is for. The audit spends the shared budget it uses, stands down below half the daily
 allowance, and retires nothing when *every* route fails at once (a local fault, not an empty
-catalogue). It proves reachability only — a scratchpadding model passes it, so
+catalogue). The AI Studio route is never retired whatever it answers — it is the operator's own key
+on its own quota, outside the shared budget. It proves reachability only — a scratchpadding model passes it, so
 `_validate_generated_text` remains the sole judge of whether a reply is usable prose.
 
 ### Dashboard (`app/dashboard`, `dashboard/`)
@@ -189,7 +190,9 @@ catalogue). It proves reachability only — a scratchpadding model passes it, so
 Authenticated GM control plane; production reads go through Go-owned query sessions (dashboard never
 opens SQLite directly), and every state-changing GM action is written to `admin_audit_log`.
 `/api/capabilities` is the frontend/backend coverage contract checked by
-`scripts/check_dashboard_implementation.py` and CI.
+`scripts/check_dashboard_implementation.py` and CI. One view is not backed by SQLite: `ai_routing`
+reads the narration router's in-process chains, counters and audit verdicts through the bot control
+plane, and is read-only (no `admin_audit_log` row, and it sits under Systems, not Admin).
 
 ## Testing conventions
 

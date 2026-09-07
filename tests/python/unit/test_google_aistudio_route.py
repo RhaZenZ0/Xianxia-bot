@@ -240,3 +240,50 @@ def _router_with_openrouter_reply(text, *, google_key=None):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class GoogleRouteIsNeverRetiredTests(unittest.TestCase):
+    """The audit may report on the operator's own route; it may not remove it."""
+
+    def tearDown(self):
+        uninstall_genai_shim()
+
+    def _probe_failing_with(self, failure):
+        install_genai_shim(replies=[failure])
+        router = AITaskRouter(api_key="sk-or-test", google_api_key="k")
+        model = router.chains[NarrationTier.ROUTINE][0]
+        self.assertTrue(is_aistudio_route(model))
+        self.assertFalse(asyncio.run(router.probe_route(model)))
+        return router, model
+
+    def test_even_a_durable_rejection_leaves_it_in_the_chain(self):
+        # Losing this route for a day pushes every narration back onto the
+        # ~50-a-day OpenRouter allowance it was added to escape. Whatever
+        # Google said is recorded for the panel; the route stays.
+        for status in (401, 403, 404):
+            with self.subTest(status=status):
+                failure = RuntimeError(f"Error code: {status}")
+                failure.status_code = status
+                router, model = self._probe_failing_with(failure)
+                row = router._model_row(model)
+                self.assertFalse(row["probe_retired"])
+                self.assertIs(row["probe_ok"], False)
+                self.assertIn(str(status), row["probe_error"])
+
+    def test_a_timeout_leaves_it_in_the_chain_too(self):
+        router, model = self._probe_failing_with(asyncio.TimeoutError())
+        self.assertFalse(router._model_row(model)["probe_retired"])
+
+    def test_narration_still_tries_it_after_a_failed_probe(self):
+        router, model = self._probe_failing_with(asyncio.TimeoutError())
+        self.assertIn(model, router.chains[NarrationTier.ROUTINE])
+        self.assertEqual(router._model_row(model)["skipped_probe_retired"], 0)
+
+    def test_probing_it_costs_the_openrouter_budget_nothing(self):
+        # Same rule as narration through this route: it never reaches
+        # OpenRouter, so charging it against that budget would defeat the point.
+        install_genai_shim(replies=["ok"])
+        router = AITaskRouter(api_key="sk-or-test", google_api_key="k")
+        before = router.limiter.snapshot()["used_today"]
+        asyncio.run(router.probe_route(router.chains[NarrationTier.ROUTINE][0]))
+        self.assertEqual(router.limiter.snapshot()["used_today"], before)

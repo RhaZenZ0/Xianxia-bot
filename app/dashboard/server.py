@@ -1878,6 +1878,22 @@ class DiscordDashboardController:
 
         return await asyncio.to_thread(do_request)
 
+    async def ai_routing(self) -> dict[str, Any]:
+        """Narration routing as the bot process sees it.
+
+        Read-only, and it has to come through the bot: the router's chains,
+        health counters and audit verdicts live in that process's memory, not
+        in SQLite. Nothing here changes state, so there is no admin_audit_log
+        row to write.
+        """
+        try:
+            response = await self._request("ai_routing")
+            result = dict(response.get("result") or {})
+            result["control_available"] = True
+            return result
+        except Exception as exc:
+            return {"control_available": False, "message": str(exc)}
+
     async def snapshot(self) -> dict[str, Any]:
         try:
             response = await self._request("status")
@@ -2097,6 +2113,8 @@ class DashboardServer:
                 await self._send_json(writer, 200, await self.admin.snapshot()); return
             if path == "/api/discord":
                 await self._send_json(writer, 200, await self.discord.snapshot()); return
+            if path == "/api/ai_routing":
+                await self._send_json(writer, 200, await self.discord.ai_routing()); return
             if path == "/api/health":
                 await self._send_json(writer, 200, {"ok": True, "schema_version": await self.store.schema_version(), "database": str(self.settings.database_path), "admin_writes": self.settings.admin_writes}); return
             await self._send_json(writer, 404, {"error": "not_found"})
