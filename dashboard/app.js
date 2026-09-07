@@ -74,6 +74,7 @@ const VIEWS={
   rag:{t:'RAG Memory',g:'Systems',b:'What the narrator can retrieve, and at what visibility. Nothing here creates game truth.'},
   decisions:{t:'Autonomous Decisions',g:'Systems',b:'What the simulation decided on its own, and which of those decisions reached permanent history.'},
   threads:{t:'Discord Threads',g:'Systems',b:'Household, expedition and private scene threads bound to guild channels.'},
+  ai_routing:{t:'AI Routing',g:'Systems',b:'Which narration route serves a scene, what each one last answered, and what the daily liveness check retired. Read-only — narration is descriptive, never authoritative.'},
   discord:{t:'Discord Setup',g:'Admin',b:'Provision and repair the server layout. Only discord.py touches guilds — no game mechanics happen here.'},
   admin:{t:'Admin Console',g:'Admin',b:'Actions that change the world. Every one is applied by the engine and written to admin_audit_log with your name on it.'},
 };
@@ -328,6 +329,63 @@ async function loadDynasties(){const d=await api('/api/dynasties');const s=d.sum
 async function loadRag(){const d=await api('/api/rag?limit=200');app.innerHTML=`<h2>RAG Memory Inspector</h2><div class="cards"><div class="card"><small>Player memories</small><div class="metric">${n(d.memories.length)}</div></div><div class="card"><small>Safe canon documents</small><div class="metric">${n(d.canon_count)}</div></div><div class="card"><small>World-history events</small><div class="metric">${n(d.history_count)}</div></div></div>${filters(`<input id="q" placeholder="Search memory"><select id="uid"><option value="">All players</option>${d.players.map(x=>`<option value="${x.user_id}">${esc(x.name)}</option>`).join('')}</select><input id="npc" placeholder="NPC exact name">`)}<div id="ragRows">${ragTable(d.memories)}</div>`;document.getElementById('applyFilters').onclick=async()=>{const p=new URLSearchParams({limit:'250',q:q.value,user_id:uid.value,npc:npc.value});const x=await api('/api/rag?'+p);document.getElementById('ragRows').innerHTML=ragTable(x.memories)}}
 function ragTable(rows){return table([['Player','player_name'],['Kind','memory_kind'],['Summary','summary'],['Salience','salience'],['Location','location'],['NPC','npc_name'],['Source','source'],['Time',r=>fmtGM(r.game_minute)],['Recalls','recalled_count']],rows)}
 async function loadDecisions(){const d=await api('/api/decisions?limit=250');app.innerHTML=`<h2>Autonomous NPC Decisions</h2>${table([['NPC','npc_name'],['Status','status'],['Location','current_location'],['Faction','faction'],['Rank','sect_rank'],['Activity','activity'],['Mood','mood'],['Goal','current_goal'],['Progress',r=>`${r.goal_progress}%`],['Recent autonomous development','recent_event']],d.minds)}<h2>Autonomous Outcomes Written to History</h2>${timeline(d.history)}<h2>Simulation Clocks</h2>${table([['System','system'],['Last minute','last_game_minute'],['Interval','interval_game_minutes'],['Runs','runs']],d.simulation)}`}
+
+/* AI routing. Everything here is read from the bot process's own counters via
+   the control plane - the router's chains and audit verdicts are in memory, not
+   in SQLite - so this page reports and never commands. */
+async function loadAiRouting(){
+ const d=await api('/api/ai_routing');
+ if(!d.control_available){app.innerHTML=`<h2>AI Routing</h2><div class="card badbox"><b>The bot's router is unreachable.</b><div class="muted">${esc(d.message||'The dashboard cannot reach the Python bot.')}</div></div>`;return}
+ const chains=d.chains||{}, tiers=d.tiers||{}, lim=d.limiter||{}, google=d.google_route||{}, audit=d.audit||{}, models=d.models||[];
+ const used=Number(lim.used_today||0), cap=Number(lim.max_requests_per_day||0);
+ const req=Object.values(tiers).reduce((a,t)=>a+Number(t.requests||0),0);
+ const served=Object.values(tiers).reduce((a,t)=>a+Number(t.served||0),0);
+ // The number the whole page exists to explain: how much play is running on
+ // template prose because no route answered.
+ const fellBack=req-served, pct=req?Math.round(fellBack/req*100):0;
+ const ago=t=>{if(!t)return '—';const s=Math.max(0,Date.now()/1000-Number(t));if(s<90)return `${Math.round(s)}s ago`;if(s<5400)return `${Math.round(s/60)}m ago`;return `${Math.round(s/3600)}h ago`};
+ const chainRow=(tier,list)=>`<div class="card"><small>${esc(tier)} chain</small><div>${(list||[]).map((m,i)=>{
+   const row=models.find(x=>x.model===m)||{};
+   const cls=row.probe_retired?'bad':row.never_succeeded?'warn':row.successes?'good':'';
+   return `${i?' <span class="muted">→</span> ':''}${pill(m,cls)}`}).join('')||'<span class="muted">empty</span>'}</div></div>`;
+ const auditLine=()=>{
+  if(!audit.at)return `<div class="muted">The daily check has not run yet this process.</div>`;
+  if(audit.skipped)return `<div class="warnbox">Last check stood down — ${esc(audit.skipped)}</div>`;
+  if(audit.fail_open)return `<div class="badbox"><b>Every route failed at once.</b> Treated as a local fault (proxy, firewall, revoked key), so none were retired.</div>`;
+  const ret=audit.retired||[];
+  return ret.length
+   ? `<div class="warnbox"><b>${n(ret.length)} of ${n((audit.checked||[]).length)} retired</b> until the next pass: ${ret.map(m=>pill(m,'bad')).join(' ')}<div class="muted">They answered 401/403/404, so narration no longer spends a slot on them.</div></div>`
+   : `<div class="goodbox">All ${n((audit.checked||[]).length)} routes reachable, checked ${ago(audit.at)}.</div>`};
+ // No hero: sectionize() already renders the view's title and blurb from the
+ // registry above, and repeating them here just pushed the numbers down a screen.
+ app.innerHTML=`<div class="tagline">${pill(d.enabled?'narration enabled':'narration disabled',d.enabled?'good':'bad')}${pill(d.require_free?'free routes only':'paid routes allowed',d.require_free?'good':'warn')}${d.tls_failures?pill(`${n(d.tls_failures)} TLS failures`,'bad'):''}</div>
+ <div class="cards">
+  <div class="card"><small>Narration requests</small><div class="metric">${n(req)}</div></div>
+  <div class="card"><small>Served by AI</small><div class="metric">${n(served)}</div></div>
+  <div class="card"><small>Procedural fallbacks</small><div class="metric ${fellBack?'bad':''}">${n(fellBack)}</div><small>${pct}% of requests</small></div>
+  <div class="card"><small>Daily free budget</small><div class="metric">${n(used)}/${n(cap)}</div><small>refused ${n(lim.rejected||0)}</small></div>
+ </div>
+ <h2>Chains</h2><div class="cards">${Object.entries(chains).map(([t,l])=>chainRow(t,l)).join('')}</div>
+ <h2>Daily route check</h2>${auditLine()}
+ <h2>Google AI Studio</h2>${google.configured
+   ? (google.available
+     ? `<div class="goodbox">Route <b>on</b> (${esc(google.model||'')}) — your own key, its own quota, outside the OpenRouter daily budget. It is never retired by the daily check.</div>`
+     : `<div class="badbox"><b>A key is set but the route is off.</b><div class="muted">${esc(google.last_error||'the google-genai SDK could not be loaded')}</div></div>`)
+   : `<div class="muted">No key configured. Narration runs on OpenRouter only; setting GOOGLE_AI_STUDIO_API_KEY adds a route that does not spend the daily budget.</div>`}
+ <h2>Routes</h2>${table([
+   ['Route','model'],
+   ['State',r=>r.probe_retired?pill('retired','bad'):r.cooling_down?pill('cooling','warn'):r.never_succeeded?pill('never succeeded','warn'):r.successes?pill('serving','good'):pill('untried','')],
+   ['Attempts','attempts'],['OK','successes'],['Failed','failures'],
+   ['Skipped',r=>n(Number(r.skipped_cooling||0)+Number(r.skipped_route_limit||0)+Number(r.skipped_probe_retired||0))],
+   ['Scratchpad',r=>r.scratchpad_rejected?pill(r.scratchpad_rejected,'warn'):'0'],
+   ['Empty','empty_responses'],
+   ['Probe',r=>r.probe_ok===null||r.probe_ok===undefined?'<span class="muted">not probed</span>':(r.probe_ok?pill('ok','good'):pill('failed','bad'))],
+   ['Served by','last_provider'],
+   ['Own key',r=>r.byok===null||r.byok===undefined?'—':(r.byok?pill('yes','good'):pill('shared pool','warn'))],
+   ['Last success',r=>ago(r.last_success_at)],
+   ['Last error',r=>r.last_error?`<span class="muted" title="${esc(r.last_error)}">${esc(String(r.last_error).slice(0,80))}</span>`:'—'],
+ ],models,{empty:'No route has been called yet.',why:'Counters start empty on every bot restart.'})}`;
+}
 
 async function loadDiscordSetup(){
  const d=await api('/api/discord');
@@ -787,7 +845,7 @@ function openForge(){
   catch(e){out.innerHTML=resultBox(e.message,false)}};
 }
 
-const loaders={overview:loadOverview,timeline:loadTimeline,npcs:loadNPCs,families:loadFamilies,sects:loadSects,conflicts:loadConflicts,events:loadEvents,players:loadPlayers,cultivation:loadCultivation,crafting:loadCrafting,exploration:loadExploration,commissions:loadCommissions,quests:loadQuests,economy:loadEconomy,dynasties:loadDynasties,party:loadParty,pvp:loadPvp,conditions:loadConditions,threads:loadThreads,rag:loadRag,decisions:loadDecisions,discord:loadDiscordSetup,admin:loadAdmin};
+const loaders={overview:loadOverview,timeline:loadTimeline,npcs:loadNPCs,families:loadFamilies,sects:loadSects,conflicts:loadConflicts,events:loadEvents,players:loadPlayers,cultivation:loadCultivation,crafting:loadCrafting,exploration:loadExploration,commissions:loadCommissions,quests:loadQuests,economy:loadEconomy,dynasties:loadDynasties,party:loadParty,pvp:loadPvp,conditions:loadConditions,threads:loadThreads,rag:loadRag,decisions:loadDecisions,discord:loadDiscordSetup,ai_routing:loadAiRouting,admin:loadAdmin};
 
 setDensity(density());
 bindShell();
