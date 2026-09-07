@@ -656,9 +656,34 @@ or `+` would have been just as safe, and there is now a test that says so, becau
 action and becomes speech.
 
 
-## Release status — v0.25.1
+**0.25.2** reorganises `.env.example` and fixes what the first run tells you.
 
-- Current release: v0.25.1: the typed-play prefix default is `$` rather than `>`.
+The five values you must supply were scattered: `DISCORD_TOKEN` and `GUILD_ID` at the top,
+`ENGINE_AUTH_TOKEN` filed under "Discord" beside a commented-out engine shutdown knob,
+`OPENROUTER_API_KEY` sixty lines down in the AI section, and `DASHBOARD_TOKEN` at the very bottom of
+a 226-line file. They are now one block at the top, above everything that has a working default, and
+each says how to generate it. Nothing else moved except into the section it belonged in - the chat
+monitor and typed play out of "Discord", the engine shutdown grace into the engine section - and no
+key was added, removed or duplicated.
+
+`startup.sh` had the same fault as a bug it already carried a test for. Its first-run message named
+`DISCORD_TOKEN`, `GUILD_ID`, `OPENROUTER_API_KEY` and `DASHBOARD_TOKEN`, and then the script
+hard-failed on `ENGINE_AUTH_TOKEN` three lines later - a requirement the operator had never been
+told about. The message now names all five, and the test that was written for the first instance is
+generalised: it reads the required values out of the script's own `fail` lines and asserts each one
+is announced, so a new one fails the build until it is. It also looks only at what is echoed, since
+a comment in the same block mentioning the name would otherwise satisfy it.
+
+Also documented: the five `DASHBOARD_*` host and port keys, which look interchangeable and are not.
+`docker-compose.yml` publishes `<BIND_ADDRESS>:<PORT>:8090`, so under Docker the container side is
+fixed and only the first two should be changed.
+
+
+## Release status — v0.25.2
+
+- Current release: v0.25.2: `.env.example` reorganised so the five required values are the first
+  thing in it, and the first-run message names all five.
+- v0.25.1: the typed-play prefix default is `$` rather than `>`.
 - v0.25.0: the dashboard remade - 23 flat tabs become five grouped ones, and the
   worst page goes from eleven stacked tables to eleven tabs. No schema change.
 - v0.24.0: the Quests workbench - one page for every definition a player can be
