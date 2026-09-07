@@ -12,6 +12,13 @@ from typing import Any, Iterable
 
 from openai import AsyncOpenAI
 
+from app.ai.google_route import (
+    AISTUDIO_PREFIX,
+    DEFAULT_GOOGLE_MODEL,
+    GoogleAIStudioRoute,
+    is_aistudio_route,
+)
+
 log = logging.getLogger("xianxia.ai_router")
 
 
@@ -20,15 +27,20 @@ class NarrationTier(StrEnum):
     EPIC = "epic"
 
 
-# v0.19.38 defaults. Gemma 4 31B stays primary on both tiers: its :free route
+# v0.25.3 defaults. Gemma 4 31B stays primary on both tiers: its :free route
 # is served by Google AI Studio alone, whose shared pool 429s per user, so it
 # is only a good primary when the operator has added their own AI Studio key
 # on OpenRouter's Integrations page (then it runs on the operator's own, far
 # larger, quota). The fallbacks are the best multi-provider / high-uptime
 # prose-capable models on the free catalogue (September 2026). Nemotron 3
 # Super is gone: it narrated its own instructions 3 of 3 times in production.
+# MiniMax M3 is gone for the same reason (v0.25.3): it is reasoning-native,
+# ignores `reasoning.enabled=false`, and returned its scratchpad as `content`
+# often enough that the routine chain's second hop was effectively dead
+# ("ScratchpadResponse: AI response was reasoning scratchpad, not narration").
+# GLM 5.2 already served the epic tier's second hop, so both tiers now share it.
 DEFAULT_ROUTINE_MODEL = "google/gemma-4-31b-it:free"
-DEFAULT_ROUTINE_FALLBACK_MODEL = "minimax/minimax-m3:free"
+DEFAULT_ROUTINE_FALLBACK_MODEL = "z-ai/glm-5.2:free"
 DEFAULT_EPIC_MODEL = DEFAULT_ROUTINE_MODEL
 DEFAULT_EPIC_FALLBACK_MODEL = "z-ai/glm-5.2:free"
 DEFAULT_DYNAMIC_FREE_MODEL = "openrouter/free"
@@ -395,6 +407,13 @@ def _safe_free_model(model: str, *, require_free: bool) -> str:
     chosen = str(model or "").strip()
     if not chosen:
         raise ValueError("OpenRouter model cannot be empty")
+    # OPENROUTER_REQUIRE_FREE is a statement about OpenRouter's catalogue: it
+    # exists so a paid OpenRouter model cannot be configured by accident. A
+    # direct AI Studio route does not go through OpenRouter at all and is
+    # billed - or, on the free tier, not billed - by Google against the
+    # operator's own key, so the guard has nothing to say about it.
+    if is_aistudio_route(chosen):
+        return chosen
     if require_free and not _is_free_route(chosen):
         raise ValueError(f"OpenRouter narrator requires a free route, got: {chosen}")
     return chosen
@@ -444,6 +463,22 @@ def _validate_generated_text(text: str, *, max_chars: int = 7000, leak_guard: bo
     return value
 
 
+def _google_validated(raw_text: str, leak_guard: bool, row: dict[str, Any]) -> str:
+    """Run the shared output guard over a direct AI Studio reply.
+
+    Broken out only so the counter bookkeeping on a rejected scratchpad is
+    identical on both transports - `scratchpad_rejected` is what tells an
+    administrator that a route is answering with its own reasoning, and a route
+    that skipped it would look healthy while narrating nothing.
+    """
+    try:
+        return _validate_generated_text(raw_text, leak_guard=leak_guard)
+    except ScratchpadResponse:
+        row["scratchpad_rejected"] += 1
+        log.info("AI_SCRATCHPAD_REJECTED transport=aistudio")
+        raise
+
+
 def _dedupe_chain(models: Iterable[str]) -> tuple[str, ...]:
     seen: set[str] = set()
     ordered: list[str] = []
@@ -479,6 +514,8 @@ class AITaskRouter:
         epic_model: str = DEFAULT_EPIC_MODEL,
         epic_fallback_model: str = DEFAULT_EPIC_FALLBACK_MODEL,
         dynamic_free_model: str = DEFAULT_DYNAMIC_FREE_MODEL,
+        google_api_key: str | None = None,
+        google_model: str = DEFAULT_GOOGLE_MODEL,
         require_free: bool = True,
         max_requests_per_minute: int = 20,
         max_requests_per_day: int = 50,
@@ -508,9 +545,30 @@ class AITaskRouter:
         dynamic = _safe_free_model(dynamic_free_model, require_free=self.require_free)
         self.dynamic_free_model = dynamic
 
+        # v0.26.0: the operator's own Google AI Studio key, called directly.
+        # It leads both chains when configured because it draws on Google's own
+        # free-tier quota rather than OpenRouter's ~50-a-day budget, so a call
+        # here is the one narration that costs the shared allowance nothing.
+        # With no key - the default - nothing changes: the route is not built,
+        # not in the chains, and not in ai_status.
+        self.google_route = GoogleAIStudioRoute(google_api_key)
+        google = ""
+        if self.google_route.configured:
+            # The prefix is checked BEFORE the free-route guard so a missing
+            # prefix reports the actual mistake. Without this order the guard
+            # gets there first and blames OpenRouter for a Google model id.
+            google = str(google_model or "").strip()
+            if not is_aistudio_route(google):
+                raise ValueError(
+                    f"The Google AI Studio model must start with {AISTUDIO_PREFIX!r}, got: {google!r}"
+                )
+            google = _safe_free_model(google, require_free=self.require_free)
+        self.google_model = google
+
+        lead = (google,) if google else ()
         self.chains = {
-            NarrationTier.ROUTINE: _dedupe_chain((routine, routine_fallback, dynamic)),
-            NarrationTier.EPIC: _dedupe_chain((epic, epic_fallback, dynamic)),
+            NarrationTier.ROUTINE: _dedupe_chain((*lead, routine, routine_fallback, dynamic)),
+            NarrationTier.EPIC: _dedupe_chain((*lead, epic, epic_fallback, dynamic)),
         }
         self.limiter = OpenRouterRequestLimiter(max_requests_per_minute, max_requests_per_day)
         self._cooldown_until: dict[str, float] = {}
@@ -537,7 +595,9 @@ class AITaskRouter:
 
     @property
     def enabled(self) -> bool:
-        return self.client is not None
+        # Either transport on its own is enough to narrate. An operator with a
+        # Google AI Studio key and no OpenRouter key is a supported setup.
+        return self.client is not None or self.google_route.available
 
     @property
     def label(self) -> str:
@@ -739,6 +799,15 @@ class AITaskRouter:
             "route_requests_per_minute": self.route_requests_per_minute,
             "route_requests_per_day": self.route_requests_per_day,
             "chains": {tier.value: list(self.chains[tier]) for tier in NarrationTier},
+            # A key that is set but whose SDK will not load is the failure an
+            # operator cannot otherwise see: the route is simply absent from the
+            # chain and narration quietly stays on OpenRouter. Say it plainly.
+            "google_route": {
+                "configured": self.google_route.configured,
+                "available": self.google_route.available,
+                "model": self.google_model,
+                "last_error": self.google_route.last_error,
+            },
             "tiers": {name: dict(counts) for name, counts in self._tier_stats.items()},
             "limiter": self.limiter.snapshot(),
             "models": models,
@@ -784,7 +853,11 @@ class AITaskRouter:
                 # be told 429 is the waste this replaces.
                 self._model_row(model)["skipped_route_limit"] += 1
                 continue
-            if not await self.limiter.try_acquire():
+            google_call = is_aistudio_route(model)
+            # The OpenRouter budget is not spent on a call that never reaches
+            # OpenRouter. Charging the AI Studio route against it would defeat
+            # the entire reason the route exists.
+            if not google_call and not await self.limiter.try_acquire():
                 tier_counts["rate_limited"] += 1
                 snapshot = self.limiter.snapshot()
                 if snapshot["daily_exhausted"]:
@@ -807,6 +880,36 @@ class AITaskRouter:
                 output_tokens = max(32, int(max_output_tokens))
                 if model == self.dynamic_free_model:
                     output_tokens = max(output_tokens, DYNAMIC_FREE_MIN_OUTPUT_TOKENS)
+                if google_call:
+                    # Same guards, different transport: the text returned here
+                    # goes through _validate_generated_text below exactly like
+                    # an OpenRouter reply, so a scratchpad or a prompt leak is
+                    # rejected and the chain falls through to OpenRouter.
+                    raw_text = await self.google_route.complete(
+                        model=model,
+                        system_prompt=system_prompt,
+                        prompt=prompt,
+                        max_output_tokens=output_tokens,
+                        temperature=temperature,
+                        timeout_seconds=timeout_seconds,
+                    )
+                    text = _google_validated(raw_text, leak_guard, self._model_row(model))
+                    success_row = self._model_row(model)
+                    success_row["successes"] += 1
+                    success_row["last_success_at"] = time.time()
+                    success_row["consecutive_failures"] = 0
+                    success_row["cooldown_seconds"] = 0.0
+                    success_row["last_provider"] = "Google AI Studio"
+                    # Not a BYOK question: this IS the operator's own key, by
+                    # construction. Saying so keeps ai_status readable.
+                    success_row["byok"] = True
+                    tier_counts["served"] += 1
+                    return RoutedAIResult(
+                        text=text,
+                        tier=tier_name,
+                        model=model,
+                        attempted_models=tuple(attempted),
+                    )
                 request = self.client.chat.completions.create(
                     model=model,
                     messages=[

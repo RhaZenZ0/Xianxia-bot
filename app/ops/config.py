@@ -77,6 +77,8 @@ class Settings:
     openrouter_epic_model: str
     openrouter_epic_fallback_model: str
     openrouter_dynamic_free_model: str
+    google_ai_studio_api_key: str | None
+    google_ai_studio_model: str
     openrouter_require_free: bool
     openrouter_max_requests_per_minute: int
     openrouter_max_requests_per_day: int
@@ -179,7 +181,7 @@ class Settings:
             "OPENROUTER_ROUTINE_MODEL", "google/gemma-4-31b-it:free"
         ).strip()
         openrouter_routine_fallback_model = os.getenv(
-            "OPENROUTER_ROUTINE_FALLBACK_MODEL", "minimax/minimax-m3:free"
+            "OPENROUTER_ROUTINE_FALLBACK_MODEL", "z-ai/glm-5.2:free"
         ).strip()
         openrouter_epic_model = os.getenv(
             "OPENROUTER_EPIC_MODEL", "google/gemma-4-31b-it:free"
@@ -190,6 +192,23 @@ class Settings:
         openrouter_dynamic_free_model = os.getenv(
             "OPENROUTER_DYNAMIC_FREE_FALLBACK", "openrouter/free"
         ).strip()
+        # v0.26.0: optional direct Google AI Studio route. GEMINI_API_KEY is
+        # accepted as an alias because that is the name Google's own quickstart
+        # tells you to export, and an operator who followed it should not have
+        # to discover a second spelling.
+        google_ai_studio_api_key = (
+            os.getenv("GOOGLE_AI_STUDIO_API_KEY", "").strip()
+            or os.getenv("GEMINI_API_KEY", "").strip()
+            or None
+        )
+        google_ai_studio_model = os.getenv(
+            "GOOGLE_AI_STUDIO_MODEL", "aistudio/gemini-3.8-flash"
+        ).strip()
+        if google_ai_studio_api_key and not google_ai_studio_model.startswith("aistudio/"):
+            raise RuntimeError(
+                "GOOGLE_AI_STUDIO_MODEL must start with 'aistudio/' so the router can tell "
+                f"it apart from an OpenRouter route, got: {google_ai_studio_model}"
+            )
         openrouter_require_free = _as_bool(os.getenv("OPENROUTER_REQUIRE_FREE"), True)
         if openrouter_require_free:
             for env_name, route_model in (
@@ -421,6 +440,8 @@ class Settings:
             openrouter_epic_model=openrouter_epic_model,
             openrouter_epic_fallback_model=openrouter_epic_fallback_model,
             openrouter_dynamic_free_model=openrouter_dynamic_free_model,
+            google_ai_studio_api_key=google_ai_studio_api_key,
+            google_ai_studio_model=google_ai_studio_model,
             openrouter_require_free=openrouter_require_free,
             openrouter_max_requests_per_minute=openrouter_max_requests_per_minute,
             openrouter_max_requests_per_day=openrouter_max_requests_per_day,

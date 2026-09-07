@@ -679,9 +679,105 @@ Also documented: the five `DASHBOARD_*` host and port keys, which look interchan
 fixed and only the first two should be changed.
 
 
-## Release status — v0.25.2
+**0.25.3** drops MiniMax M3 from the routine narration chain.
 
-- Current release: v0.25.2: `.env.example` reorganised so the five required values are the first
+`minimax/minimax-m3:free` was the second hop on the routine tier. It is reasoning-native, it ignores
+OpenRouter's unified `reasoning.enabled=false` (which every narration request already sends), and it
+returns its own analysis in `content` rather than in a reasoning field. The guard added in v0.19.36
+catches that and refuses the reply - `ScratchpadResponse: AI response was reasoning scratchpad, not
+narration` - which is the correct outcome for a player, but it means the hop never served a single
+narration while still spending one of the 50 daily free-tier slots on every attempt: with Gemma
+throttled on the shared pool, routine narration paid two upstream calls to reach `openrouter/free`.
+
+The routine fallback is now `z-ai/glm-5.2:free`, which already served the same position on the epic
+tier. Both tiers now share it. Nothing else about the router changed: the scratchpad guard, the
+salvage path and the escalating per-route backoff are all as they were, and a reasoning route still
+gets rejected rather than shown to a player if one appears via `openrouter/free`.
+
+Three regression tests cover it. One pins both dropped routes - MiniMax M3 and Nemotron 3 Super - out
+of every default chain. One gates `README.md` and `.env.example` against `app/ai/ai_router.py`, so a
+default that moves only in the code cannot leave an operator copying the dead route back in by hand.
+The third is the existing chain-shape test, unchanged.
+
+No schema change, no game-rule change. Operators who set `OPENROUTER_ROUTINE_FALLBACK_MODEL`
+explicitly in `.env` keep whatever they set; to take the new default, remove the line or set it to
+`z-ai/glm-5.2:free`.
+
+
+**0.25.4** fixes the Google AI Studio key instructions, and a comment v0.25.3 missed.
+
+`.env.example` and `README.md` both explained where to *paste* an AI Studio key - OpenRouter's
+Integrations page - and never where to get one. That is the step an operator is actually missing, so
+both now name `https://aistudio.google.com/api-keys` first: AI Studio creates a project and a key for
+a new account by itself, so there is usually already one there to copy. Also stated, because both
+were reasonable things to assume and both are wrong: the free tier is enough (nothing here needs
+Cloud Billing), and no Gemini SDK is involved (OpenRouter makes the calls).
+
+The second fix is a v0.25.3 miss. That release changed `OPENROUTER_ROUTINE_FALLBACK_MODEL` in
+`.env.example` but left the chain summary in the comment three lines above it reading
+"Gemma 4 31B Free -> MiniMax M3 Free -> OpenRouter Free Models Router" - the line an operator reads
+before the assignment they copy. The v0.25.3 doc gate only compared `NAME=value` lines, so it passed.
+It now also refuses a dropped route's name in any `->` chain summary in the file, and a second test
+gates both key URLs.
+
+Docs and tests only. No schema change, no game-rule change, no router change.
+
+
+**0.26.0** adds an optional direct Google AI Studio narration route.
+
+Until now every narration route went through OpenRouter, whose free tier is capped at about 50
+requests a day across all free models. Once that budget is spent the router stops locally and play
+continues on procedural prose - correct behaviour, and the most common reason narration goes flat.
+
+Set `GOOGLE_AI_STUDIO_API_KEY` (or `GEMINI_API_KEY`, the name Google's own quickstart exports) and a
+new hop appears at the front of both chains: `aistudio/gemini-3.8-flash`, called directly with the
+`google-genai` SDK. It is the only route in the bot that does not go through OpenRouter, and that is
+the entire point - it is billed against the operator's own AI Studio key, so it deliberately does not
+spend `AITaskRouter.limiter`, and an exhausted OpenRouter budget no longer stops it. The model is
+configurable through `GOOGLE_AI_STUDIO_MODEL` and must carry the `aistudio/` prefix, which is how the
+router tells the two transports apart.
+
+Nothing changes for an operator who does not set the key: the route is not constructed, not in the
+chains and not in `ai_status`, and the OpenRouter chain behind it is byte-for-byte what v0.25.4
+shipped.
+
+The route is not trusted more than any other. Its reply goes through the same
+`_validate_generated_text` guard, so a reasoning scratchpad, a prompt leak or an empty reply is
+rejected and the chain falls through to OpenRouter and then to procedural prose, with the same
+per-route cooldown, escalating backoff and health counters as every other hop. `OPENROUTER_REQUIRE_FREE`
+does not apply to it, because it is a statement about OpenRouter's catalogue and this route has no
+OpenRouter catalogue entry; the prefix check runs first so a missing prefix reports the actual
+mistake rather than blaming the free-route guard.
+
+`google-genai` is imported lazily and is the one dependency in `requirements.txt` without an upper
+bound. If it is missing, too old, or fails to construct a client, the route is left out of the chain
+and the bot narrates through OpenRouter exactly as before - and `/admin server ai_status` says so in
+as many words, because a key that is set while the route is silently off is otherwise invisible.
+Google is mid-migration between the Interactions API and `models.generate_content`, so both call
+shapes are supported and whichever the installed SDK exposes is used; an unknown keyword is dropped
+and the call retried rather than presenting as a dead route.
+
+**Verification caveat, stated plainly.** `google-genai` could not be installed in the environment
+this release was built in, so every test here runs against a shim of the SDK, not the SDK. The
+router-side behaviour - chain placement, budget isolation, guard enforcement, fall-through, the
+opt-in default - is fully covered and proven. What is *not* proven is that the SDK's real keyword
+names match the ones sent. That is why the adapter drops unknown keywords and feature-detects both
+call shapes, and why the failure mode is "route off, OpenRouter narrates, ai_status explains" rather
+than an exception. Try it with `/admin server ai_status` open before relying on it.
+
+20 new tests in `tests/python/unit/test_google_aistudio_route.py`, plus four in `test_config.py`.
+No schema change. No game-rule change. AI remains narration-only.
+
+
+## Release status — v0.26.0
+
+- Current release: v0.26.0: an optional direct Google AI Studio route leads both chains when a key is
+  set, outside OpenRouter's daily free budget.
+- v0.25.4: the AI Studio key instructions say where to get the key, and the routine
+  chain summary in `.env.example` matches the defaults under it.
+- v0.25.3: MiniMax M3 is out of the routine chain; GLM 5.2 is the routine fallback
+  as well as the epic one.
+- v0.25.2: `.env.example` reorganised so the five required values are the first
   thing in it, and the first-run message names all five.
 - v0.25.1: the typed-play prefix default is `$` rather than `>`.
 - v0.25.0: the dashboard remade - 23 flat tabs become five grouped ones, and the

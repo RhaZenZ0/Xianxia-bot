@@ -8,3 +8,16 @@ python-dotenv>=1.2.2,<2
 # load-bearing path for every piece of game state. httpx2 is a separate package
 # name rather than httpx 2.x, so the two coexist without a version conflict.
 httpx>=0.28,<1
+
+# Optional: the direct Google AI Studio narration route (v0.26.0). Only used
+# when GOOGLE_AI_STUDIO_API_KEY (or GEMINI_API_KEY) is set; the router imports
+# it lazily and simply leaves the route out of the chain if it is missing, so
+# removing this line degrades narration to the OpenRouter chain rather than
+# breaking the bot.
+#
+# It is the one dependency here without an upper bound, deliberately. The rest
+# are pinned exactly because a surprise major breaks a load-bearing path; this
+# one cannot, because an SDK that no longer matches is caught at call time and
+# reported in /admin server ai_status as a route that is off. Pin it yourself
+# once you have seen which version your NAS actually installs.
+google-genai

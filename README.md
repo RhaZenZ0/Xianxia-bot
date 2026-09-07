@@ -57,15 +57,39 @@ Ownership rules:
 - **No local LLM runs on the NAS.** There is no Ollama service or Qwen model download.
 - **Gameplay survives AI outages.** When all OpenRouter routes fail or quota is exhausted, procedural narration is returned and canonical play continues.
 
-## OpenRouter narration routes
+## Narration routes
 
-### Routine
+### Direct Google AI Studio route (optional, v0.26.0)
+
+Set `GOOGLE_AI_STUDIO_API_KEY` (or `GEMINI_API_KEY`) and one more hop appears at
+the **front of both chains**:
+
+```text
+aistudio/gemini-3.8-flash       (your own AI Studio key, called directly)
+        | fail / timeout / empty / scratchpad
+        v
+   ... the OpenRouter chain below, unchanged ...
+```
+
+This is the only route that does not go through OpenRouter, and that is the
+whole point: it is not charged against OpenRouter's ~50-request daily free
+budget, so it is the most effective single change against procedural fallbacks.
+Set the key and nothing else changes; leave it empty and the router is exactly
+what v0.25.x shipped.
+
+It is narration only, and it is not trusted more than any other route — the
+reply goes through the same scratchpad, prompt-leak and length guards, and a
+rejected reply falls through to the OpenRouter chain. The SDK (`google-genai`)
+is imported lazily: if it is missing or incompatible the route is left out of
+the chain, `/admin → Server → Ai Status` says why, and narration carries on.
+
+### Routine (OpenRouter)
 
 ```text
 google/gemma-4-31b-it:free      (Google AI Studio only - add your own AI Studio key on OpenRouter)
         | fail / timeout / 429
         v
-minimax/minimax-m3:free
+z-ai/glm-5.2:free
         | fail
         v
 openrouter/free
@@ -79,12 +103,15 @@ Used for `/talk`, guided `/action` outcomes, exploration, hunts, ordinary events
 Every narration request tells OpenRouter to switch model reasoning off
 (`OPENROUTER_DISABLE_REASONING=true`): the two production failures of the free
 chain were a model spending the whole budget thinking and returning nothing, and
-a model returning its thinking as the narration. `/admin server ai_status` shows,
+a model returning its thinking as the narration. A model that is reasoning-native
+ignores the switch, so a route that keeps answering with its scratchpad is dropped
+from the defaults rather than kept and filtered: MiniMax M3 was the routine
+fallback until v0.25.3 and went this way, as Nemotron 3 Super did before it. `/admin server ai_status` shows,
 per route, which upstream served it, whether it went through your own provider
 key or OpenRouter's shared pool, and how long a repeatedly failing route is
 backing off.
 
-### Epic
+### Epic (OpenRouter)
 
 ```text
 google/gemma-4-31b-it:free
@@ -152,6 +179,17 @@ If narration keeps falling back to procedural prose, the two highest-leverage
 actions are outside this codebase: add $10 of credits, or add your own provider
 key at [openrouter.ai/settings/integrations](https://openrouter.ai/settings/integrations)
 so the free models draw on your own provider quota instead of the shared pool.
+
+For the Gemma primary that means a Google AI Studio key, which is two steps and
+neither of them is in this repo. Copy the key from
+[aistudio.google.com/api-keys](https://aistudio.google.com/api-keys) — AI Studio
+creates a project and a key for a new account by itself, so it is usually already
+sitting there — then paste it into OpenRouter's **Google AI Studio** integration
+(not Vertex) and save. Google's free tier is enough; the key does not need Cloud
+Billing, and the bot never calls Google directly, so no Gemini SDK is involved.
+On that key, set "shared capacity fallback" to *never use shared capacity for
+models this key applies to*, so a failure of your key shows up in `ai_status` as
+Google's own error rather than the shared pool's 429.
 
 ## Administrator AI monitor
 
@@ -273,7 +311,7 @@ The default cloud-only narrator configuration is:
 ```env
 NARRATOR_PROVIDER=openrouter
 OPENROUTER_ROUTINE_MODEL=google/gemma-4-31b-it:free
-OPENROUTER_ROUTINE_FALLBACK_MODEL=minimax/minimax-m3:free
+OPENROUTER_ROUTINE_FALLBACK_MODEL=z-ai/glm-5.2:free
 OPENROUTER_EPIC_MODEL=google/gemma-4-31b-it:free
 OPENROUTER_EPIC_FALLBACK_MODEL=z-ai/glm-5.2:free
 OPENROUTER_DYNAMIC_FREE_FALLBACK=openrouter/free

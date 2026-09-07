@@ -144,6 +144,84 @@ def install_openai_shim() -> None:
     sys.modules["openai"] = shim
 
 
+def install_genai_shim(replies=None, *, shape: str = "interactions", fail: bool = False) -> list:
+    """Provide a fake `google.genai` so the AI Studio route is testable offline.
+
+    `google-genai` is an optional dependency and is not installed in the
+    artifact-only test environment. The shim records every call so a test can
+    assert what was sent, and `shape` selects which SDK surface exists - the
+    route has to work against either, and a test that only ever sees one of
+    them would not prove that.
+
+    Returns the call log: a list of the kwargs each create/generate saw.
+    """
+    calls: list = []
+    queue = list(replies or [])
+
+    def _next_reply():
+        if fail:
+            raise RuntimeError("google upstream exploded")
+        if not queue:
+            return types.SimpleNamespace(output_text="", text="")
+        value = queue.pop(0)
+        if isinstance(value, Exception):
+            raise value
+        if isinstance(value, str):
+            return types.SimpleNamespace(output_text=value, text=value)
+        return value
+
+    class _AsyncCallable:
+        def __init__(self, name):
+            self._name = name
+
+        async def _call(self, **kwargs):
+            calls.append({"surface": self._name, **kwargs})
+            return _next_reply()
+
+    class _Interactions:
+        async def create(self, **kwargs):
+            calls.append({"surface": "interactions", **kwargs})
+            return _next_reply()
+
+    class _Models:
+        async def generate_content(self, **kwargs):
+            calls.append({"surface": "generate_content", **kwargs})
+            return _next_reply()
+
+    class _Aio:
+        def __init__(self):
+            if shape == "interactions":
+                self.interactions = _Interactions()
+            else:
+                self.models = _Models()
+
+    class _Client:
+        def __init__(self, *args, **kwargs):
+            self.api_key = kwargs.get("api_key")
+            self.aio = _Aio()
+
+    genai = types.ModuleType("google.genai")
+    genai.__spec__ = importlib.machinery.ModuleSpec("google.genai", loader=None)
+    genai.Client = _Client
+    google_pkg = sys.modules.get("google")
+    if google_pkg is None or not hasattr(google_pkg, "__path__"):
+        google_pkg = types.ModuleType("google")
+        google_pkg.__spec__ = importlib.machinery.ModuleSpec("google", loader=None)
+        google_pkg.__path__ = []  # namespace package, so `from google import genai` works
+        sys.modules["google"] = google_pkg
+    google_pkg.genai = genai
+    sys.modules["google.genai"] = genai
+    return calls
+
+
+def uninstall_genai_shim() -> None:
+    """Remove the shim so a test can prove the route is off without the SDK."""
+    sys.modules.pop("google.genai", None)
+    google_pkg = sys.modules.get("google")
+    if google_pkg is not None and hasattr(google_pkg, "genai"):
+        del google_pkg.genai
+
+
 def httpx_is_shimmed() -> bool:
     """True when httpx here is the stub above rather than the real library."""
     import httpx  # noqa: PLC0415 - resolved after install_httpx_shim has run
