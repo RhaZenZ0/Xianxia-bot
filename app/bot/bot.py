@@ -31,7 +31,7 @@ from .character_state import _remember_freeform_npc_scene
 from .runtime import DB, ENGINE, SETTINGS, WORLD, _sync_realm_presence_roles, character_location_display, chunk_text, current_world_time, log
 from ..ai.quest_forge import store_draft
 from ..rules.quests import QUEST_DEFINITIONS, static_quest_seed_rows
-from .services import ALERTS, GUILD, NARRATOR, NARRATOR_CONTEXT, QUEST_FORGE, SIM
+from .services import AI_ROUTER, ALERTS, GUILD, NARRATOR, NARRATOR_CONTEXT, QUEST_FORGE, SIM
 from .threads import _private_scene_for_thread
 from .locations import current_npc_location
 from .registry import EVENT_HANDLERS
@@ -80,6 +80,7 @@ class XianxiaBot(commands.Bot):
         self.operational_health_task: asyncio.Task | None = None
         self.update_check_task: asyncio.Task | None = None
         self.quest_forge_task: asyncio.Task | None = None
+        self.route_audit_task: asyncio.Task | None = None
         self.announced_release: str | None = None
 
     async def _dashboard_discord_control(self, action: str, payload: dict[str, Any]) -> dict[str, Any]:
@@ -168,6 +169,8 @@ class XianxiaBot(commands.Bot):
                 self.update_check_task = asyncio.create_task(self.update_check_worker())
             if SETTINGS.quest_forge_auto:
                 self.quest_forge_task = asyncio.create_task(self.quest_forge_worker())
+            if SETTINGS.route_audit_hours:
+                self.route_audit_task = asyncio.create_task(self.route_audit_worker())
         except Exception as exc:
             self.health_state.fail(phase, exc)
             failure_detail = {
@@ -360,6 +363,23 @@ class XianxiaBot(commands.Bot):
         except asyncio.CancelledError:
             pass
 
+    async def route_audit_worker(self) -> None:
+        # Same per-iteration exception boundary as the workers above. The first
+        # pass waits for the rate limiter to have a settled view of the day's
+        # budget rather than probing into a cold start.
+        try:
+            await asyncio.sleep(120)
+            while not self.is_closed():
+                try:
+                    await AI_ROUTER.audit_routes()
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
+                    log.exception("Route audit iteration failed")
+                await asyncio.sleep(SETTINGS.route_audit_hours * 3600)
+        except asyncio.CancelledError:
+            pass
+
     async def close_event_scene(self, record: dict, *, manual: bool = False) -> None:
         guild = self.get_guild(SETTINGS.guild_id)
         if guild is None:
@@ -457,7 +477,7 @@ class XianxiaBot(commands.Bot):
             pass
 
     async def close(self) -> None:
-        for task_name in ("event_expiry_task", "operational_health_task", "update_check_task", "quest_forge_task"):
+        for task_name in ("event_expiry_task", "operational_health_task", "update_check_task", "quest_forge_task", "route_audit_task"):
             task = getattr(self, task_name, None)
             if task:
                 task.cancel()

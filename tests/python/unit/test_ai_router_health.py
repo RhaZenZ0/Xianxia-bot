@@ -25,6 +25,8 @@ from app.ai.ai_router import (
     _looks_like_tls_failure,
     _retry_after_seconds,
     _validate_generated_text,
+    ScratchpadResponse,
+    REASONING_OFF,
 )
 
 
@@ -963,3 +965,160 @@ def _return(value):
     async def create(**kwargs):
         return value
     return create
+
+
+class _HTTPError(Exception):
+    """An SDK error carrying the status the router keys its verdict off."""
+
+    def __init__(self, status_code, message="upstream said no"):
+        super().__init__(f"Error code: {status_code} - {message}")
+        self.status_code = status_code
+        self.response = SimpleNamespace(status_code=status_code, headers={})
+
+
+class RouteAuditTests(unittest.TestCase):
+    """v0.27.0: the daily liveness probe and what it is allowed to conclude."""
+
+    def test_the_probe_sends_one_token_and_never_reads_the_reply(self):
+        router = _router(["ignored"])
+        self.assertTrue(asyncio.run(router.probe_route(DEFAULT_ROUTINE_MODEL)))
+        call = router.client.completions.calls[0]
+        self.assertEqual(call["max_tokens"], 1)
+        self.assertEqual(call["messages"], [{"role": "user", "content": "."}])
+        # No system prompt: the probe is a reachability question, so every
+        # token beyond the one the API demands is waste.
+        self.assertEqual(len(call["messages"]), 1)
+
+    def test_an_empty_reply_still_counts_as_reachable(self):
+        # The whole reason max_tokens=1 is safe: a reasoning model spends its
+        # single token thinking and returns nothing, which proves the route
+        # answers. Judging the CONTENT here would retire good routes.
+        router = _router([_reply(content="")])
+        self.assertTrue(asyncio.run(router.probe_route(DEFAULT_ROUTINE_MODEL)))
+        self.assertFalse(router._model_row(DEFAULT_ROUTINE_MODEL)["probe_retired"])
+
+    def test_a_withdrawn_route_is_retired(self):
+        # The GLM 5.2 case: OpenRouter 404s a slug that left the free tier.
+        router = _router([_HTTPError(404, "unavailable for free")])
+        self.assertFalse(asyncio.run(router.probe_route(DEFAULT_ROUTINE_MODEL)))
+        row = router._model_row(DEFAULT_ROUTINE_MODEL)
+        self.assertTrue(row["probe_retired"])
+        self.assertIn("404", row["probe_error"])
+
+    def test_a_rejected_key_is_retired(self):
+        router = _router([_HTTPError(401, "invalid authentication credentials")])
+        self.assertFalse(asyncio.run(router.probe_route(DEFAULT_ROUTINE_MODEL)))
+        self.assertTrue(router._model_row(DEFAULT_ROUTINE_MODEL)["probe_retired"])
+
+    def test_congestion_and_timeouts_never_retire_a_route(self):
+        # A 429 means "not now" and the per-route cooldown already handles it.
+        # Standing a route down for a day over congestion throws away a route
+        # that works again in an hour.
+        for failure in (_RateLimit(), _HTTPError(503), asyncio.TimeoutError()):
+            with self.subTest(failure=type(failure).__name__):
+                router = _router([failure])
+                self.assertFalse(asyncio.run(router.probe_route(DEFAULT_ROUTINE_MODEL)))
+                row = router._model_row(DEFAULT_ROUTINE_MODEL)
+                self.assertFalse(row["probe_retired"])
+                self.assertIs(row["probe_ok"], False)
+
+    def test_a_retired_route_is_skipped_by_narration(self):
+        router = _router([_HTTPError(404), "narration from the next hop"])
+        asyncio.run(router.probe_route(DEFAULT_ROUTINE_MODEL))
+        result = _generate(router)
+        self.assertNotEqual(result.model, DEFAULT_ROUTINE_MODEL)
+        self.assertNotIn(DEFAULT_ROUTINE_MODEL, result.attempted_models)
+        self.assertEqual(
+            router._model_row(DEFAULT_ROUTINE_MODEL)["skipped_probe_retired"], 1
+        )
+
+    def test_every_route_failing_at_once_retires_none_of_them(self):
+        # A proxy or a revoked key 404s the whole chain. Reading that as "the
+        # catalogue emptied" would keep the bot on procedural prose long after
+        # the local fault cleared.
+        router = _router([_HTTPError(404)] * 6)
+        report = asyncio.run(router.audit_routes())
+        self.assertTrue(report["fail_open"])
+        self.assertTrue(report["checked"])
+        for model in report["checked"]:
+            self.assertFalse(router._model_row(model)["probe_retired"])
+
+    def test_one_dead_route_among_healthy_ones_is_retired(self):
+        router = _router([_HTTPError(404), "ok", "ok"])
+        report = asyncio.run(router.audit_routes())
+        self.assertFalse(report.get("fail_open"))
+        self.assertEqual(len(report["retired"]), 1)
+
+    def test_the_audit_stands_down_when_the_daily_budget_is_mostly_spent(self):
+        # Narration is what the budget is for; a diagnostic that starves it is
+        # worse than no diagnostic.
+        router = _router(["ok"] * 6, max_requests_per_day=10)
+        for _ in range(8):
+            asyncio.run(router.limiter.try_acquire())
+        report = asyncio.run(router.audit_routes())
+        self.assertIn("daily budget", report["skipped"])
+        self.assertEqual(report["checked"], [])
+        self.assertEqual(router.client.completions.calls, [])
+
+    def test_the_audit_spends_the_shared_budget_it_uses(self):
+        # A probe is a real OpenRouter request. Not charging it would make the
+        # panel's budget gauge lie about what the day has left.
+        router = _router(["ok"] * 6)
+        before = router.limiter.snapshot()["used_today"]
+        report = asyncio.run(router.audit_routes())
+        after = router.limiter.snapshot()["used_today"]
+        self.assertEqual(after - before, len(report["checked"]))
+
+    def test_the_snapshot_carries_the_audit_for_the_panel(self):
+        router = _router([_HTTPError(404), "ok", "ok"])
+        asyncio.run(router.audit_routes())
+        snapshot = router.health_snapshot()
+        self.assertTrue(snapshot["audit"]["at"])
+        retired = [row for row in snapshot["models"] if row["probe_retired"]]
+        self.assertEqual(len(retired), 1)
+        self.assertIn("404", retired[0]["probe_error"])
+
+
+class ReasoningRejectedProbeTests(unittest.TestCase):
+    """A 400 on REASONING_OFF retires the route; a 400 on max_tokens=1 does not."""
+
+    def test_a_route_that_rejects_reasoning_off_twice_is_retired(self):
+        # Every narration request carries REASONING_OFF, so a provider that
+        # refuses it can never serve narration as this bot calls it.
+        router = _router([_HTTPError(400, "reasoning cannot be disabled")] * 2)
+        self.assertFalse(asyncio.run(router.probe_route(DEFAULT_ROUTINE_MODEL)))
+        self.assertTrue(router._model_row(DEFAULT_ROUTINE_MODEL)["probe_retired"])
+
+    def test_a_400_that_was_only_the_one_token_probe_retires_nothing(self):
+        # Some providers reject max_tokens=1 outright. That is an artifact of
+        # the probe, not a fault in the route, and retiring on it would throw
+        # away a route that narrates perfectly well.
+        router = _router([_HTTPError(400, "max_tokens too small"), "it answers fine"])
+        self.assertFalse(asyncio.run(router.probe_route(DEFAULT_ROUTINE_MODEL)))
+        self.assertFalse(router._model_row(DEFAULT_ROUTINE_MODEL)["probe_retired"])
+
+    def test_the_confirmation_asks_with_room_and_still_disables_reasoning(self):
+        router = _router([_HTTPError(400), "answer"])
+        asyncio.run(router.probe_route(DEFAULT_ROUTINE_MODEL))
+        confirm = router.client.completions.calls[1]
+        self.assertGreater(confirm["max_tokens"], 1)
+        self.assertEqual(confirm["extra_body"], dict(REASONING_OFF))
+
+    def test_an_unconfirmable_400_retires_nothing(self):
+        # No budget to ask again means no evidence, and no evidence means the
+        # route stays in the chain.
+        router = _router([_HTTPError(400)], max_requests_per_day=1)
+        asyncio.run(router.limiter.try_acquire())
+        self.assertFalse(asyncio.run(router.probe_route(DEFAULT_ROUTINE_MODEL)))
+        self.assertFalse(router._model_row(DEFAULT_ROUTINE_MODEL)["probe_retired"])
+
+    def test_the_probe_cannot_see_a_scratchpad_model(self):
+        # MiniMax M3 accepted REASONING_OFF, returned 200, and put its reasoning
+        # in content anyway. The probe passes it; only the narration-time guard
+        # catches it. Pinning this so nobody mistakes the probe for a quality gate.
+        scratchpad = "Okay, let me analyze the user request and plan the scene."
+        router = _router([_reply(content=scratchpad)])
+        self.assertTrue(asyncio.run(router.probe_route(DEFAULT_ROUTINE_MODEL)))
+        self.assertFalse(router._model_row(DEFAULT_ROUTINE_MODEL)["probe_retired"])
+        with self.assertRaises(ScratchpadResponse):
+            _validate_generated_text(scratchpad)

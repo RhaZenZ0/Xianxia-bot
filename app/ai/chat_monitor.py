@@ -435,6 +435,28 @@ def render_health(snapshot: dict[str, Any]) -> str:
                 "`pip install -U google-genai`."
             )
 
+    audit = router.get("audit") or {}
+    if audit.get("at"):
+        checked = len(audit.get("checked") or [])
+        retired = list(audit.get("retired") or [])
+        if audit.get("skipped"):
+            lines.append(f"Daily route check **skipped** — {audit['skipped']}.")
+        elif audit.get("fail_open"):
+            # Every route failing at once reads as a local fault, so none were
+            # retired. Say so, or the panel looks like it did nothing.
+            lines.append(
+                f"⚠️ Daily route check: **all {checked} routes** failed durably — treated as a "
+                "local fault (proxy, firewall or a revoked key), so none were retired."
+            )
+        elif retired:
+            lines.append(
+                f"Daily route check: **{len(retired)} of {checked} retired** until the next pass — "
+                + ", ".join(f"`{model}`" for model in retired)
+                + ". They answered 401/403/404, so narration no longer spends a slot on them."
+            )
+        else:
+            lines.append(f"Daily route check: all **{checked}** routes reachable.")
+
     limiter = router.get("limiter") or {}
     lines.append(
         f"Local rate ceiling **{limiter.get('max_requests_per_minute', 0)}/min** • "
