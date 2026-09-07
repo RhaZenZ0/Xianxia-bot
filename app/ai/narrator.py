@@ -240,7 +240,7 @@ def _style_memory(history: list[dict[str, Any]], *, player_name: str = "", npc_n
     """Create a tiny cross-turn anti-repetition memory without another model call.
 
     The raw scene history remains authoritative only as untrusted RP. This helper
-    extracts narrator/NPC openings and closing beats so local models can avoid
+    extracts narrator/NPC openings and closing beats so the narrator can avoid
     recycling the same prose on the next turn.
     """
     player_key = str(player_name or "").strip().casefold()
@@ -379,10 +379,9 @@ def _procedural_action_fallback(character: dict[str, Any], action: str) -> str:
 class Narrator:
     """Read-only narration facade.
 
-    OpenRouter is the only cloud provider; the direct OpenAI provider was
-    removed in favour of it. Provider failures never alter canonical state:
-    after the configured free cloud chain is exhausted, the caller-supplied
-    procedural narration is returned immediately.
+    OpenRouter is the only cloud provider. Provider failures never alter
+    canonical state: after the configured free cloud chain is exhausted, the
+    caller-supplied procedural narration is returned immediately.
     """
 
     def __init__(

@@ -70,7 +70,7 @@ case "$NARRATOR_PROVIDER_VALUE" in
   procedural|disabled)
     ;;
   *)
-    fail "Unsupported NARRATOR_PROVIDER=$NARRATOR_PROVIDER_VALUE. Valid values are: openrouter, procedural, disabled. This NAS build has no local LLM provider, and the direct OpenAI provider was removed."
+    fail "Unsupported NARRATOR_PROVIDER=$NARRATOR_PROVIDER_VALUE. Valid values are: openrouter, procedural, disabled."
     ;;
 esac
 

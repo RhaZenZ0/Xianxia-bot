@@ -6,9 +6,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A persistent Xianxia role-playing Discord bot. Python owns Discord, RAG, dashboard, and presentation
 orchestration; Go owns canonical gameplay rules, current game time, simulation mutations, and SQLite
-WAL state. Designed for CPU-only QNAP/NAS deployment — no local LLM, narration comes from cloud
-free-tier models (OpenRouter, plus an optional direct Google AI Studio route) with a fallback chain
-ending in procedural (non-AI) narration.
+WAL state. Designed for CPU-only QNAP/NAS deployment — narration comes from cloud free-tier models
+(OpenRouter, plus an optional direct Google AI Studio route) with a fallback chain ending in
+procedural (non-AI) narration.
 
 ## Commands
 
@@ -92,7 +92,7 @@ Docker/QNAP: `./startup.sh` / `./stop.sh`. Reset the world (takes a safety backu
   rewards, deaths, relationships, travel, or history. Narration falls back to procedural (template)
   text if every OpenRouter route fails or the daily free-tier quota is exhausted — gameplay must
   survive AI outages.
-- There is intentionally no Go "shadow mode" duplicating Python calculations, and no local LLM/Ollama.
+- There is intentionally no Go "shadow mode" duplicating Python calculations.
 
 ### Design rules for future work (from README, enforced by intent)
 

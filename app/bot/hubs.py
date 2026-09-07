@@ -798,8 +798,9 @@ async def _acknowledge_hub_action(interaction: discord.Interaction) -> None:
     """Acknowledge a hub action before any potentially slow game/Narrator work.
 
     Discord component/modal interactions must be acknowledged within a few seconds.
-    Local LLM calls can take minutes on NAS hardware, so waiting for the registered
-    handler before deferring causes 10062/10015 interaction-token failures.
+    A narration call walking the fallback chain can take tens of seconds, so waiting
+    for the registered handler before deferring causes 10062/10015 interaction-token
+    failures.
     """
     if interaction.response.is_done():
         return

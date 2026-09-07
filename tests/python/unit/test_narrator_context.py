@@ -232,7 +232,7 @@ class NarratorContextTests(unittest.IsolatedAsyncioTestCase):
 
 
 # Provider routing (merged from test_narrator_providers.py, v0.20.3). The
-# "no local LLM provider" check that file also carried is test_config's.
+# provider-whitelist check that file also carried is test_config's.
 
 class NarratorProviderTests(unittest.TestCase):
     def test_procedural_provider_returns_safe_fallback(self):
