@@ -83,18 +83,29 @@ PROBE_TIMEOUT_SECONDS = 20.0
 # that is the GLM 5.2 withdrawal and the rejected AI Studio key.
 PROBE_DURABLE_STATUSES = frozenset({401, 403, 404})
 
-# 400 is the reasoning-mandatory case. Every narration request carries
-# REASONING_OFF, so a model whose provider REJECTS that parameter can never
-# serve narration as this bot calls it, and retiring it is right. But 400 is
-# also what a provider with a minimum token budget returns for `max_tokens=1`,
-# which would be an artifact of the probe rather than a fault in the route - so
-# a 400 is confirmed with one ordinary-sized call before it retires anything.
+# 400 is not a verdict. It is a family of causes - a rejected parameter, a
+# provider minimum on `max_tokens`, a context overflow, a malformed body, a
+# moderation filter - and exactly one of them ("this endpoint will not accept
+# REASONING_OFF") is a reason to stand a route down. The probe differs from a
+# narration call in two ways at once, so a single confirmation cannot say which
+# one the provider objected to; `_classify_bad_request` therefore asks twice,
+# changing ONE variable each time. See that method for the ladder.
 #
 # This is NOT a scratchpad detector. MiniMax M3 accepted REASONING_OFF, returned
 # 200 and put its reasoning in `content` anyway (v0.25.3); no probe sees that.
 # _validate_generated_text remains the only thing that catches it.
 PROBE_REASONING_REJECTED_STATUS = 400
 PROBE_CONFIRM_MAX_TOKENS = 64
+
+# Classifications recorded on the model row for the admin panel. Only
+# PROBE_400_REASONING retires anything; the rest exist so an operator can see
+# WHY a 400 was left alone instead of having to guess from a raw error string.
+PROBE_400_REASONING = "reasoning-rejected"
+PROBE_400_TOKEN_BUDGET = "token-budget"
+PROBE_400_OTHER_STATUS = "other-status"
+PROBE_400_UNCLASSIFIED = "unclassified"
+PROBE_400_UNCONFIRMED = "unconfirmed"
+PROBE_400_NO_PARAMETER = "no-reasoning-parameter"
 
 # Diagnostics never outrank play. The audit spends real free-tier slots, so it
 # runs only while most of the day's budget is still unspent; below this it is
@@ -124,6 +135,30 @@ _TLS_ERROR_PATTERN = re.compile(
     r"|unable to get local issuer|CA bundle|trust store",
     re.I,
 )
+
+
+def _error_status(exc: BaseException | None) -> int | None:
+    """Pull an HTTP status off a client exception, whichever SDK raised it.
+
+    The openai SDK carries it on `status_code` (and again on `.response`).
+    google-genai collapses EVERY 4xx into a bare `ClientError` - there is no
+    BadRequestError, no AuthenticationError, no RateLimitError - and puts the
+    number on `.code` instead. Reading only `status_code` therefore made a
+    rejected AI Studio key look like "no status at all", which is precisely the
+    case PROBE_DURABLE_STATUSES was written for.
+
+    `.code` is checked last and only when it is a real int: the openai SDK also
+    has a `.code`, but its value is a symbolic string ("invalid_api_key"), and
+    bool is excluded because it is an int subclass.
+    """
+    for candidate in (
+        getattr(exc, "status_code", None),
+        getattr(getattr(exc, "response", None), "status_code", None),
+        getattr(exc, "code", None),
+    ):
+        if isinstance(candidate, int) and not isinstance(candidate, bool):
+            return candidate
+    return None
 
 
 def _looks_like_tls_failure(exc: BaseException | None) -> bool:
@@ -764,6 +799,9 @@ class AITaskRouter:
                 "probe_at": 0.0,
                 "probe_error": "",
                 "probe_retired": False,
+                # Why the last 400 was or was not acted on; "" when the last
+                # probe did not answer 400 at all.
+                "probe_400_class": "",
                 "skipped_probe_retired": 0,
                 "consecutive_failures": 0,
                 "cooldown_seconds": 0.0,
@@ -861,15 +899,15 @@ class AITaskRouter:
                 )
                 await asyncio.wait_for(request, timeout=PROBE_TIMEOUT_SECONDS)
         except Exception as exc:
-            status = getattr(exc, "status_code", None)
-            if status is None:
-                status = getattr(getattr(exc, "response", None), "status_code", None)
+            status = _error_status(exc)
             durable = status in PROBE_DURABLE_STATUSES
+            classification = ""
             if status == PROBE_REASONING_REJECTED_STATUS:
-                durable = await self._confirm_bad_request(model)
+                durable, classification = await self._classify_bad_request(model)
             row["probe_ok"] = False
             row["probe_error"] = f"{type(exc).__name__}: {exc}"[:300]
             row["probe_retired"] = durable
+            row["probe_400_class"] = classification
             log.warning(
                 "AI_PROBE_FAILED model=%s durable=%s: %s",
                 model,
@@ -880,47 +918,104 @@ class AITaskRouter:
         row["probe_ok"] = True
         row["probe_error"] = ""
         row["probe_retired"] = False
+        row["probe_400_class"] = ""
         return True
 
-    async def _confirm_bad_request(self, model: str) -> bool:
-        """Decide whether a probe's 400 belongs to the route or to the probe.
+    async def _reprobe(self, model: str, *, disable_reasoning: bool) -> int | None:
+        """Re-issue the probe at an ordinary token budget, one variable changed.
 
-        Repeats the call with an ordinary token budget, still carrying
-        REASONING_OFF. A second 400 means the route rejects the way this bot
-        asks for narration - reasoning-mandatory, most often - and retires it.
-        Success means the first 400 was the one-token probe hitting a provider
-        minimum, and the route is left alone. If the budget will not fund the
-        confirmation, nothing is retired: an unconfirmed 400 is not evidence.
+        Returns None when the route answered, otherwise the HTTP status it
+        failed with (or -1 when the exception carried no readable status).
+        Built through the same call shape narration uses, so the classification
+        describes the request this bot actually sends.
         """
-        if is_aistudio_route(model) or not self.client:
-            return False
-        if not await self.limiter.try_acquire():
-            log.info("AI_PROBE_400_UNCONFIRMED model=%s: no budget to confirm", model)
-            return False
         try:
             request = self.client.chat.completions.create(
                 model=model,
                 messages=[{"role": "user", "content": PROBE_PROMPT}],
                 max_tokens=PROBE_CONFIRM_MAX_TOKENS,
                 extra_headers=self._headers(),
-                extra_body=dict(REASONING_OFF) if self.disable_reasoning else None,
+                extra_body=dict(REASONING_OFF) if disable_reasoning else None,
             )
             await asyncio.wait_for(request, timeout=PROBE_TIMEOUT_SECONDS)
         except Exception as exc:
-            status = getattr(exc, "status_code", None)
-            if status is None:
-                status = getattr(getattr(exc, "response", None), "status_code", None)
-            confirmed = status == PROBE_REASONING_REJECTED_STATUS
-            log.info(
-                "AI_PROBE_400_CONFIRM model=%s status=%s retiring=%s",
+            status = _error_status(exc)
+            return -1 if status is None else status
+        return None
+
+    async def _classify_bad_request(self, model: str) -> tuple[bool, str]:
+        """Work out what a probe's 400 actually meant, one variable at a time.
+
+        The probe differs from a narration call in two ways - `max_tokens=1`,
+        and (when configured) the REASONING_OFF body - so asking again with
+        both changed at once cannot say which the provider objected to. A
+        provider that merely enforces a minimum token budget would then be
+        misread as reasoning-mandatory and retired for a fault in the
+        diagnostic. So the ladder changes ONE thing per call:
+
+          A. ordinary token budget, REASONING_OFF still attached.
+             It answers  -> the 400 was the one-token probe hitting a provider
+                            minimum. An artifact of the diagnostic; nothing is
+                            wrong with the route. Leave it alone.
+             Other status -> a different failure entirely; not ours to judge.
+          B. ordinary token budget, `reasoning` removed.
+             It answers  -> the parameter WAS the cause. Every narration
+                            request carries REASONING_OFF and that is not
+                            negotiable (it exists because reasoning models
+                            returned empty content in v0.19.20 and their
+                            scratchpad AS content in v0.25.3), so this route
+                            cannot serve narration as this bot calls it.
+                            Retire it - until the next audit, which is the
+                            right lifetime: OpenRouter fans one slug across
+                            provider endpoints and the mix changes without
+                            notice, so the verdict decays by construction.
+             Still 400   -> not parameter-caused at all. Context length, a
+                            malformed body, a moderation filter: nothing here
+                            can tell which, and retiring on a cause we cannot
+                            name is guessing. Record it and move on.
+
+        Returns (retire, classification). Every path records a classification
+        so the panel says WHY a 400 was left alone. An unfunded confirmation is
+        not evidence either way, so it retires nothing.
+        """
+        if is_aistudio_route(model) or not self.client:
+            # The Google route sends no reasoning/thinking parameter at all, so
+            # there is no second variable to isolate and nothing to conclude.
+            return False, PROBE_400_NO_PARAMETER
+        if not await self.limiter.try_acquire():
+            log.info("AI_PROBE_400_UNCONFIRMED model=%s: no budget to confirm", model)
+            return False, PROBE_400_UNCONFIRMED
+
+        status = await self._reprobe(model, disable_reasoning=self.disable_reasoning)
+        if status is None:
+            log.info("AI_PROBE_400_WAS_THE_PROBE model=%s", model)
+            return False, PROBE_400_TOKEN_BUDGET
+        if status != PROBE_REASONING_REJECTED_STATUS:
+            log.info("AI_PROBE_400_MOVED model=%s status=%s", model, status)
+            return False, PROBE_400_OTHER_STATUS
+        if not self.disable_reasoning:
+            # Nothing was added to remove: the 400 cannot be about a parameter
+            # this bot never sent.
+            return False, PROBE_400_UNCLASSIFIED
+        if not await self.limiter.try_acquire():
+            log.info("AI_PROBE_400_UNCONFIRMED model=%s: no budget to differentiate", model)
+            return False, PROBE_400_UNCONFIRMED
+
+        without_reasoning = await self._reprobe(model, disable_reasoning=False)
+        if without_reasoning is None:
+            log.warning(
+                "AI_PROBE_400_REASONING model=%s: answers without REASONING_OFF "
+                "and 400s with it - retiring until the next audit",
                 model,
-                status,
-                confirmed,
             )
-            return confirmed
-        # It answered once it was given room: the 400 was about max_tokens=1.
-        log.info("AI_PROBE_400_WAS_THE_PROBE model=%s", model)
-        return False
+            return True, PROBE_400_REASONING
+        log.info(
+            "AI_PROBE_400_UNCLASSIFIED model=%s status=%s: 400s with and without "
+            "REASONING_OFF, so the parameter is not the cause - retiring nothing",
+            model,
+            without_reasoning,
+        )
+        return False, PROBE_400_UNCLASSIFIED
 
     async def audit_routes(self) -> dict[str, Any]:
         """Probe every configured route once and retire the ones that are gone.
@@ -949,7 +1044,11 @@ class AITaskRouter:
         per_day = max(1, int(budget["max_requests_per_day"]))
         remaining = per_day - int(budget["used_today"])
         # The audit costs one slot per OpenRouter route; the AI Studio route is
-        # free of this budget by construction and is not counted here.
+        # free of this budget by construction and is not counted here. A route
+        # that answers 400 can cost up to two more while _classify_bad_request
+        # isolates the cause, which is what the headroom below is for - those
+        # are not counted here because a chain where every route 400s is not
+        # the case worth sizing for.
         cost = sum(1 for model in models if not is_aistudio_route(model))
         if remaining - cost < per_day * PROBE_BUDGET_HEADROOM:
             result["skipped"] = (
@@ -1021,6 +1120,7 @@ class AITaskRouter:
                     "probe_at": float(row["probe_at"]),
                     "probe_error": str(row["probe_error"]),
                     "probe_retired": bool(row["probe_retired"]),
+                    "probe_400_class": str(row["probe_400_class"]),
                     "skipped_probe_retired": int(row["skipped_probe_retired"]),
                     "route_limits": (
                         self._route_limiters[model].snapshot()

@@ -27,6 +27,13 @@ from app.ai.ai_router import (
     _validate_generated_text,
     ScratchpadResponse,
     REASONING_OFF,
+    PROBE_400_NO_PARAMETER,
+    PROBE_400_OTHER_STATUS,
+    PROBE_400_REASONING,
+    PROBE_400_TOKEN_BUDGET,
+    PROBE_400_UNCLASSIFIED,
+    PROBE_400_UNCONFIRMED,
+    _error_status,
 )
 
 
@@ -1079,30 +1086,82 @@ class RouteAuditTests(unittest.TestCase):
         self.assertIn("404", retired[0]["probe_error"])
 
 
-class ReasoningRejectedProbeTests(unittest.TestCase):
-    """A 400 on REASONING_OFF retires the route; a 400 on max_tokens=1 does not."""
+class BadRequestClassifierTests(unittest.TestCase):
+    """What a probe's 400 is allowed to prove, one variable at a time.
 
-    def test_a_route_that_rejects_reasoning_off_twice_is_retired(self):
-        # Every narration request carries REASONING_OFF, so a provider that
-        # refuses it can never serve narration as this bot calls it.
-        router = _router([_HTTPError(400, "reasoning cannot be disabled")] * 2)
+    The probe differs from a narration call in two ways at once - max_tokens=1
+    and the REASONING_OFF body - so the classifier changes exactly one of them
+    per confirmation. Only "answers without REASONING_OFF, 400s with it"
+    retires anything.
+    """
+
+    def _row(self, router):
+        return router._model_row(DEFAULT_ROUTINE_MODEL)
+
+    def test_a_route_that_answers_only_without_reasoning_off_is_retired(self):
+        # Probe 400s; same call with room still 400s; same call with the
+        # `reasoning` object removed answers. The parameter was the cause, and
+        # every narration request carries it, so this route cannot serve us.
+        router = _router([
+            _HTTPError(400, "reasoning cannot be disabled"),
+            _HTTPError(400, "reasoning cannot be disabled"),
+            "it answers without the parameter",
+        ])
         self.assertFalse(asyncio.run(router.probe_route(DEFAULT_ROUTINE_MODEL)))
-        self.assertTrue(router._model_row(DEFAULT_ROUTINE_MODEL)["probe_retired"])
+        row = self._row(router)
+        self.assertTrue(row["probe_retired"])
+        self.assertEqual(row["probe_400_class"], PROBE_400_REASONING)
+
+    def test_a_400_that_survives_removing_reasoning_retires_nothing(self):
+        # This is the case the old confirmation got wrong: it read a second 400
+        # as "reasoning-mandatory" and retired. A 400 that persists WITHOUT the
+        # parameter is not about the parameter - context length, a malformed
+        # body, a moderation filter - and none of those are nameable from here.
+        router = _router([_HTTPError(400, "context length exceeded")] * 3)
+        self.assertFalse(asyncio.run(router.probe_route(DEFAULT_ROUTINE_MODEL)))
+        row = self._row(router)
+        self.assertFalse(row["probe_retired"])
+        self.assertEqual(row["probe_400_class"], PROBE_400_UNCLASSIFIED)
 
     def test_a_400_that_was_only_the_one_token_probe_retires_nothing(self):
         # Some providers reject max_tokens=1 outright. That is an artifact of
         # the probe, not a fault in the route, and retiring on it would throw
-        # away a route that narrates perfectly well.
+        # away a route that narrates perfectly well. Caught by the FIRST rung,
+        # before the reasoning parameter is ever touched.
         router = _router([_HTTPError(400, "max_tokens too small"), "it answers fine"])
         self.assertFalse(asyncio.run(router.probe_route(DEFAULT_ROUTINE_MODEL)))
-        self.assertFalse(router._model_row(DEFAULT_ROUTINE_MODEL)["probe_retired"])
+        row = self._row(router)
+        self.assertFalse(row["probe_retired"])
+        self.assertEqual(row["probe_400_class"], PROBE_400_TOKEN_BUDGET)
+        # Only one confirmation was needed, so the second rung never spent a slot.
+        self.assertEqual(len(router.client.completions.calls), 2)
 
-    def test_the_confirmation_asks_with_room_and_still_disables_reasoning(self):
+    def test_the_first_confirmation_changes_only_the_token_budget(self):
+        # If it dropped REASONING_OFF here too, a provider minimum on
+        # max_tokens would be indistinguishable from a reasoning-mandatory
+        # endpoint and would retire a healthy route.
         router = _router([_HTTPError(400), "answer"])
         asyncio.run(router.probe_route(DEFAULT_ROUTINE_MODEL))
         confirm = router.client.completions.calls[1]
         self.assertGreater(confirm["max_tokens"], 1)
         self.assertEqual(confirm["extra_body"], dict(REASONING_OFF))
+
+    def test_the_second_confirmation_changes_only_the_reasoning_parameter(self):
+        router = _router([_HTTPError(400), _HTTPError(400), "answer"])
+        asyncio.run(router.probe_route(DEFAULT_ROUTINE_MODEL))
+        first, second = router.client.completions.calls[1:3]
+        self.assertEqual(first["max_tokens"], second["max_tokens"])
+        self.assertEqual(first["extra_body"], dict(REASONING_OFF))
+        self.assertIsNone(second["extra_body"])
+
+    def test_a_400_that_becomes_another_status_is_left_alone(self):
+        # The route stopped saying 400 the moment it was asked again. Whatever
+        # that is, it is not a parameter this bot can stop sending.
+        router = _router([_HTTPError(400), _HTTPError(429, "slow down")])
+        self.assertFalse(asyncio.run(router.probe_route(DEFAULT_ROUTINE_MODEL)))
+        row = self._row(router)
+        self.assertFalse(row["probe_retired"])
+        self.assertEqual(row["probe_400_class"], PROBE_400_OTHER_STATUS)
 
     def test_an_unconfirmable_400_retires_nothing(self):
         # No budget to ask again means no evidence, and no evidence means the
@@ -1110,7 +1169,89 @@ class ReasoningRejectedProbeTests(unittest.TestCase):
         router = _router([_HTTPError(400)], max_requests_per_day=1)
         asyncio.run(router.limiter.try_acquire())
         self.assertFalse(asyncio.run(router.probe_route(DEFAULT_ROUTINE_MODEL)))
-        self.assertFalse(router._model_row(DEFAULT_ROUTINE_MODEL)["probe_retired"])
+        row = self._row(router)
+        self.assertFalse(row["probe_retired"])
+        self.assertEqual(row["probe_400_class"], PROBE_400_UNCONFIRMED)
+
+    def test_the_differential_rung_is_skipped_when_it_cannot_be_funded(self):
+        # Rung A spends the last slot; rung B has nothing to spend, so the 400
+        # stays unproven rather than being guessed at.
+        router = _router([_HTTPError(400), _HTTPError(400)], max_requests_per_day=2)
+        asyncio.run(router.limiter.try_acquire())
+        self.assertFalse(asyncio.run(router.probe_route(DEFAULT_ROUTINE_MODEL)))
+        row = self._row(router)
+        self.assertFalse(row["probe_retired"])
+        self.assertEqual(row["probe_400_class"], PROBE_400_UNCONFIRMED)
+
+    def test_a_400_with_reasoning_already_off_the_wire_is_not_classified(self):
+        # OPENROUTER_DISABLE_REASONING=false means nothing was added to remove,
+        # so the 400 cannot be about a parameter this bot never sent.
+        router = _router([_HTTPError(400), _HTTPError(400)], disable_reasoning=False)
+        self.assertFalse(asyncio.run(router.probe_route(DEFAULT_ROUTINE_MODEL)))
+        row = self._row(router)
+        self.assertFalse(row["probe_retired"])
+        self.assertEqual(row["probe_400_class"], PROBE_400_UNCLASSIFIED)
+
+    def test_a_successful_probe_clears_a_stale_classification(self):
+        router = _router([_HTTPError(400), _HTTPError(400), _HTTPError(400), "ok"])
+        asyncio.run(router.probe_route(DEFAULT_ROUTINE_MODEL))
+        self.assertEqual(self._row(router)["probe_400_class"], PROBE_400_UNCLASSIFIED)
+        self.assertTrue(asyncio.run(router.probe_route(DEFAULT_ROUTINE_MODEL)))
+        self.assertEqual(self._row(router)["probe_400_class"], "")
+
+    def test_the_panel_carries_the_classification(self):
+        router = _router([_HTTPError(400)] * 3)
+        asyncio.run(router.probe_route(DEFAULT_ROUTINE_MODEL))
+        row = next(
+            r for r in router.health_snapshot()["models"]
+            if r["model"] == DEFAULT_ROUTINE_MODEL
+        )
+        self.assertEqual(row["probe_400_class"], PROBE_400_UNCLASSIFIED)
+
+
+class ErrorStatusExtractionTests(unittest.TestCase):
+    """google-genai collapses every 4xx into a bare ClientError.
+
+    It carries the number on `.code`, not `status_code`, so reading only the
+    openai SDK's attribute made a rejected AI Studio key look like "no status
+    at all" - and PROBE_DURABLE_STATUSES exists precisely for that key.
+    """
+
+    def test_an_openai_style_error_is_read_from_status_code(self):
+        self.assertEqual(_error_status(_HTTPError(404)), 404)
+
+    def test_a_google_style_client_error_is_read_from_code(self):
+        exc = RuntimeError("400 INVALID_ARGUMENT")
+        exc.code = 400
+        exc.status = "INVALID_ARGUMENT"
+        self.assertEqual(_error_status(exc), 400)
+
+    def test_a_symbolic_string_code_is_not_mistaken_for_a_status(self):
+        # The openai SDK also has `.code`, but its value is a symbolic string.
+        exc = RuntimeError("nope")
+        exc.code = "invalid_api_key"
+        self.assertIsNone(_error_status(exc))
+
+    def test_an_exception_with_no_status_reads_as_none(self):
+        self.assertIsNone(_error_status(asyncio.TimeoutError()))
+
+
+class AIStudioProbeClassifierTests(unittest.TestCase):
+    """The Google route has no reasoning parameter to differentiate on."""
+
+    def test_an_aistudio_400_is_recorded_and_never_retired(self):
+        router = _router(["unused"])
+        retire, classification = asyncio.run(
+            router._classify_bad_request("aistudio/gemini-3.8-flash")
+        )
+        self.assertFalse(retire)
+        self.assertEqual(classification, PROBE_400_NO_PARAMETER)
+
+    def test_classifying_an_aistudio_route_spends_no_openrouter_budget(self):
+        router = _router(["unused"])
+        before = router.limiter.snapshot()["used_today"]
+        asyncio.run(router._classify_bad_request("aistudio/gemini-3.8-flash"))
+        self.assertEqual(router.limiter.snapshot()["used_today"], before)
 
     def test_the_probe_cannot_see_a_scratchpad_model(self):
         # MiniMax M3 accepted REASONING_OFF, returned 200, and put its reasoning

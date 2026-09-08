@@ -177,9 +177,13 @@ out of the chain and `ai_status` reports why.
 
 Every `ROUTE_AUDIT_HOURS` (v0.27.0, default 24, `0` off) `audit_routes()` pings each configured route
 with the cheapest call the API takes — one character in, `max_tokens=1`, reply discarded unread — and
-retires the ones that answer `401`/`403`/`404`, plus a `400` confirmed at an ordinary token size (the
-reasoning-mandatory case). `429`s and timeouts never retire anything; that is what the per-route
-cooldown is for. The audit spends the shared budget it uses, stands down below half the daily
+retires the ones that answer `401`/`403`/`404`. A `400` is not a verdict but a family of causes, so
+`_classify_bad_request` isolates one variable per confirmation: first an ordinary token budget with
+`REASONING_OFF` still attached (success means the 400 was the one-token probe hitting a provider
+minimum), then the same call with the `reasoning` object removed (success means the parameter was
+the cause, and only that retires). A 400 that survives both is not parameter-caused and is recorded,
+not acted on; the verdict is stored per route as `probe_400_class` for the panel. `429`s and
+timeouts never retire anything; that is what the per-route cooldown is for. The audit spends the shared budget it uses, stands down below half the daily
 allowance, and retires nothing when *every* route fails at once (a local fault, not an empty
 catalogue). It proves reachability only — a scratchpadding model passes it, so
 `_validate_generated_text` remains the sole judge of whether a reply is usable prose.
