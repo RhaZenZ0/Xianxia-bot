@@ -19,6 +19,7 @@ DASHBOARD_GET_API_PATHS = frozenset({
     "/api/party", "/api/pvp", "/api/conditions", "/api/threads",
     "/api/rag", "/api/decisions", "/api/admin", "/api/discord", "/api/health",
     "/api/narration",
+    "/api/ai_routing",
 })
 
 DASHBOARD_POST_API_PATHS = frozenset({
@@ -50,6 +51,7 @@ DASHBOARD_VIEW_ENDPOINTS = {
     "rag": "/api/rag",
     "decisions": "/api/decisions",
     "discord": "/api/discord",
+    "ai_routing": "/api/ai_routing",
     "narration": "/api/narration",
     "admin": "/api/admin",
 }

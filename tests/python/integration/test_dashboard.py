@@ -632,3 +632,48 @@ class AttentionFeedTests(unittest.IsolatedAsyncioTestCase):
         items = (await self.store.overview())["attention"]
         self.assertEqual([a["kind"] for a in items][:2], ["simulation_lag", "quest_drafts"])
         self.assertEqual(items[0]["severity"], "bad")
+
+
+class AiRoutingViewTests(unittest.TestCase):
+    """v0.27.0: the GM page for narration routing.
+
+    The router's chains, counters and audit verdicts live in the bot process's
+    memory rather than in SQLite, so this view is the one that has to come
+    through the bot control plane. It reads and never commands, which is why it
+    writes no admin_audit_log row.
+    """
+
+    def setUp(self):
+        self.server = (ROOT / "app" / "dashboard" / "server.py").read_text(encoding="utf-8")
+        self.bot = (ROOT / "app" / "bot" / "bot.py").read_text(encoding="utf-8")
+        self.js = (ROOT / "dashboard" / "app.js").read_text(encoding="utf-8")
+
+    def test_the_endpoint_is_served_off_the_bot_control_plane_not_sqlite(self):
+        self.assertIn('if path == "/api/ai_routing":', self.server)
+        self.assertIn("await self.discord.ai_routing()", self.server)
+        start = self.server.index("async def ai_routing")
+        body = self.server[start:self.server.index("async def snapshot", start)]
+        self.assertIn('self._request("ai_routing")', body)
+        # No database session: the numbers this page shows are not in SQLite.
+        self.assertNotIn("_connect()", body)
+
+    def test_the_bot_answers_the_action_with_the_routers_own_snapshot(self):
+        self.assertIn('if action == "ai_routing":', self.bot)
+        self.assertIn("AI_ROUTER.health_snapshot()", self.bot)
+
+    def test_it_is_read_only(self):
+        # Every state-changing GM action writes to admin_audit_log. This one
+        # changes nothing, so it must not be reachable as a POST action either.
+        from app.dashboard.contract import DASHBOARD_POST_API_PATHS
+        self.assertNotIn("/api/ai_routing", DASHBOARD_POST_API_PATHS)
+        loader = self.js[self.js.index("async function loadAiRouting"):self.js.index("async function loadDiscordSetup")]
+        for mutation in ("adminPost(", "discordPost(", "method:'POST'"):
+            self.assertNotIn(mutation, loader)
+
+    def test_the_page_explains_a_route_that_is_off_rather_than_hiding_it(self):
+        # The failure an operator cannot otherwise see: a key is set, the route
+        # is silently absent, and narration quietly runs on everything else.
+        loader = self.js[self.js.index("async function loadAiRouting"):self.js.index("async function loadDiscordSetup")]
+        self.assertIn("probe_retired", loader)
+        self.assertIn("google", loader.lower())
+        self.assertIn("never retired", loader)

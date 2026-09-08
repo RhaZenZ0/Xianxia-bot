@@ -1098,6 +1098,19 @@ class AITaskRouter:
             classification = ""
             if status == PROBE_REASONING_REJECTED_STATUS:
                 durable, classification = await self._classify_bad_request(model)
+            if is_aistudio_route(model):
+                # The operator's own key, on its own quota, outside OpenRouter's
+                # daily budget - the entire reason this route exists. It is the
+                # last route that should ever be stood down for a day: losing it
+                # pushes every narration back onto the ~50-a-day allowance it was
+                # added to escape. Whatever Google said is recorded and shown in
+                # ai_status, and the ordinary per-route cooldown still applies,
+                # but the route stays in the chain.
+                #
+                # This covers 401/403/404 as well as the 400 ladder, which
+                # declines to classify an AI Studio route on its own account
+                # (there is no reasoning parameter there to differentiate on).
+                durable = False
             row["probe_ok"] = False
             row["probe_error"] = f"{type(exc).__name__}: {exc}"[:300]
             row["probe_retired"] = durable

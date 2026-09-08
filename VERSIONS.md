@@ -836,6 +836,11 @@ same `REASONING_OFF`, only the token budget changed. A second `400` retires the 
 the probe shape was at fault and the route is left alone. If the budget will not fund the
 confirmation, nothing is retired: an unconfirmed `400` is not evidence.
 
+The Google AI Studio route is never retired, whatever it answers. It is the operator's own key on its
+own quota, outside OpenRouter's daily budget, and standing it down for a day would push every
+narration back onto the ~50-a-day allowance it was added to escape. Its verdict is still recorded and
+shown in `ai_status`, and the ordinary per-route cooldown still applies - it simply stays in the chain.
+
 Three guards keep the diagnostic subordinate to play. The audit spends the shared budget it uses, so
 the panel's gauge stays honest. It stands down entirely when less than half the daily budget is left:
 narration is what the budget is for. And if *every* route fails durably in one pass, that reads as a
@@ -848,8 +853,17 @@ remains the only judge of whether a reply is usable prose, and it still runs on 
 Choosing a *replacement* slug is likewise still the operator's call: an empty fallback slot stays
 empty, because "it answered a ping" is not evidence that a model writes decent xianxia.
 
-16 new tests in `test_ai_router_health.py`. No schema change, no game-rule change, AI remains
-narration-only.
+**A dashboard page for it.** `Systems -> AI Routing` shows the chains as they are actually ordered,
+how many narrations were served by AI versus fell back to procedural prose, what the daily check
+retired, whether the Google route is on, and a per-route table carrying attempts, successes,
+scratchpad rejections, probe verdict, which upstream served it and whether it went via the operator's
+own provider key. It reads through the bot control plane rather than SQLite, because none of that
+lives in the database - it is the router's own in-process state. It is strictly read-only, so it
+writes no `admin_audit_log` row, and it sits under Systems rather than Admin for the same reason: the
+Admin group is for the two views that can change the world.
+
+16 new tests in `test_ai_router_health.py`, 4 for the Google route's exemption, 4 for the dashboard
+page. No schema change, no game-rule change, AI remains narration-only.
 
 
 **0.28.0** corrects what a `400` is allowed to prove, and moves route selection into the dashboard.
@@ -914,6 +928,12 @@ tiered fallback entirely — the one way to spend real money by editing a single
 Nothing in the shipped configuration used it. A `.env` still naming it now fails loudly at startup
 rather than silently narrating procedurally. The `openai` package itself stays: it is the client
 `AITaskRouter` points at OpenRouter's `base_url`, not a provider.
+
+This sits beside the read-only `Systems -> AI Routing` page rather than replacing it: that one is
+telemetry any GM can open, this one is the write half and lives under Admin because it changes what
+every player reads. The Google route's exemption from retirement holds across the new 400 ladder as
+well as 401/403/404 — the ladder declines to classify an AI Studio route on its own account, since
+there is no reasoning parameter there to differentiate on.
 
 38 new tests across `test_ai_router_health.py`, a new `test_narration_control.py` contract module
 and four Go tests for the engine action. No schema change (still 32), no game-rule change, AI

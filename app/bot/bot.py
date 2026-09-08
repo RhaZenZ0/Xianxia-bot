@@ -99,6 +99,12 @@ class XianxiaBot(commands.Bot):
         # docstring promises it only ever touches Discord layout.
         if quest_control_owns(action):
             return await dashboard_quest_control(action, payload)
+        # Routed here rather than into dashboard_discord_control for the same
+        # reason quest authoring is: that function's docstring promises it only
+        # ever touches Discord layout. This is a read of the router's own
+        # in-process counters, so it changes nothing and audits nothing.
+        if action == "ai_routing":
+            return {"ok": True, "action": action, "result": AI_ROUTER.health_snapshot()}
         if owns_narration_action(action):
             return await dashboard_narration_control(action, payload)
         return await dashboard_discord_control(self, action, payload)
