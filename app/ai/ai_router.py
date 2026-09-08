@@ -460,6 +460,54 @@ def _response_provider(response: Any) -> str:
     return str(value or "").strip()
 
 
+def _response_error(response: Any) -> str:
+    """Describe the error OpenRouter can attach to a 200 with no `choices`.
+
+    An upstream failure does not always arrive as an HTTP status: OpenRouter
+    also answers 200 with an empty `choices` array and a top-level `error`
+    object, so the SDK raises nothing and the router saw only "returned no
+    choices" - true, useless, and identical for a provider outage, a moderation
+    block and an upstream rate limit.
+
+    The envelope is {code, message, metadata}. `metadata` is absent on errors
+    OpenRouter generates itself and present with `provider_name`/`raw` when it
+    is relaying an upstream one, so its ABSENCE is the gateway-vs-provider
+    tell and is worth reporting either way. `provider_name` can be null, and
+    `raw` is whatever the upstream sent - sometimes structured JSON, sometimes
+    a bare string like "error code: 1015" - so it is stringified, never parsed.
+    """
+    error = getattr(response, "error", None)
+    if error is None:
+        extra = getattr(response, "model_extra", None)
+        if isinstance(extra, dict):
+            error = extra.get("error")
+    if not error:
+        return ""
+    if not isinstance(error, dict):
+        error = getattr(error, "model_extra", None) or getattr(error, "__dict__", None) or {}
+    if not isinstance(error, dict):
+        return ""
+    parts: list[str] = []
+    code = error.get("code")
+    if code not in (None, ""):
+        parts.append(f"code={code}")
+    message = str(error.get("message") or "").strip()
+    if message:
+        parts.append(message)
+    metadata = error.get("metadata")
+    if isinstance(metadata, dict):
+        provider = str(metadata.get("provider_name") or "").strip()
+        parts.append(f"provider={provider}" if provider else "provider=unnamed")
+        raw = metadata.get("raw")
+        if raw not in (None, ""):
+            parts.append(f"raw={str(raw)[:120]}")
+    else:
+        # No metadata means OpenRouter rejected this itself rather than
+        # relaying a provider - i.e. the request never reached an upstream.
+        parts.append("provider=none (gateway-generated)")
+    return "; ".join(parts)[:280]
+
+
 BYOK_RECHECK_SECONDS = 3600.0
 
 
@@ -1277,7 +1325,12 @@ class AITaskRouter:
                 )
                 response = await asyncio.wait_for(request, timeout=timeout_seconds)
                 if not response.choices:
-                    raise RuntimeError("OpenRouter returned no choices")
+                    detail = _response_error(response)
+                    raise RuntimeError(
+                        f"OpenRouter returned no choices ({detail})"
+                        if detail
+                        else "OpenRouter returned no choices and no error body"
+                    )
                 message = response.choices[0].message
                 raw_text = _extract_text(getattr(message, "content", None))
                 if not raw_text:

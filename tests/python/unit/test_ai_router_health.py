@@ -53,6 +53,16 @@ class _RateLimit(Exception):
         self.response = SimpleNamespace(status_code=status_code, headers=headers)
 
 
+class _RawResponse(SimpleNamespace):
+    """A completion handed back verbatim.
+
+    The helpers above build the happy shape (one choice carrying a message);
+    this is for shapes they cannot express - notably an empty `choices` array
+    with an `error` object beside it, which is how OpenRouter relays an
+    upstream failure without an HTTP status.
+    """
+
+
 class _FakeCompletions:
     def __init__(self, payloads):
         self.payloads = list(payloads)
@@ -63,6 +73,8 @@ class _FakeCompletions:
         payload = self.payloads.pop(0)
         if isinstance(payload, BaseException):
             raise payload
+        if isinstance(payload, _RawResponse):
+            return payload
         if isinstance(payload, _Message):
             return SimpleNamespace(choices=[SimpleNamespace(message=payload)])
         return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=payload))])
@@ -1207,6 +1219,64 @@ class BadRequestClassifierTests(unittest.TestCase):
             if r["model"] == DEFAULT_ROUTINE_MODEL
         )
         self.assertEqual(row["probe_400_class"], PROBE_400_UNCLASSIFIED)
+
+
+class EmptyChoicesDiagnosticTests(unittest.TestCase):
+    """A 200 with no `choices` is how OpenRouter relays an upstream failure.
+
+    The SDK raises nothing, so the router used to record only "returned no
+    choices" - identical for a provider outage, a moderation block and an
+    upstream rate limit, and useless in the panel.
+    """
+
+    def _last_error(self, router, model=DEFAULT_ROUTINE_MODEL):
+        return router._model_row(model)["last_error"]
+
+    def test_a_relayed_provider_error_names_the_provider_and_raw_body(self):
+        router = _router([
+            _RawResponse(choices=[], error={
+                "code": 429,
+                "message": "Provider returned error",
+                "metadata": {"provider_name": "Kluster", "raw": "error code: 1015"},
+            }),
+            "the next hop answers",
+        ])
+        _generate(router)
+        recorded = self._last_error(router)
+        self.assertIn("Kluster", recorded)
+        self.assertIn("error code: 1015", recorded)
+        self.assertIn("Provider returned error", recorded)
+
+    def test_a_gateway_generated_error_is_marked_as_having_no_provider(self):
+        # No metadata means OpenRouter rejected it itself - the request never
+        # reached an upstream, which is a different problem to chase.
+        router = _router([
+            _RawResponse(choices=[], error={"code": 400, "message": "bad body"}),
+            "the next hop answers",
+        ])
+        _generate(router)
+        self.assertIn("gateway-generated", self._last_error(router))
+
+    def test_an_empty_body_with_no_error_says_so_rather_than_guessing(self):
+        router = _router([_RawResponse(choices=[]), "the next hop answers"])
+        _generate(router)
+        self.assertIn("no error body", self._last_error(router))
+
+    def test_the_error_is_read_from_sdk_extras_when_not_an_attribute(self):
+        # The OpenAI SDK parks unknown top-level fields in model_extra.
+        router = _router([
+            _RawResponse(choices=[], model_extra={"error": {"message": "upstream died"}}),
+            "the next hop answers",
+        ])
+        _generate(router)
+        self.assertIn("upstream died", self._last_error(router))
+
+    def test_an_empty_choices_response_still_falls_through_to_the_next_hop(self):
+        # The diagnostic must not change what play sees: narration continues.
+        router = _router([_RawResponse(choices=[]), "the next hop answers"])
+        result = _generate(router)
+        self.assertEqual(result.text, "the next hop answers")
+        self.assertNotEqual(result.model, DEFAULT_ROUTINE_MODEL)
 
 
 class ErrorStatusExtractionTests(unittest.TestCase):
