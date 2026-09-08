@@ -7,7 +7,7 @@ from typing import Any, Awaitable
 
 
 class AsyncWorkQueue:
-    """Small concurrency gate for expensive external work such as Ollama narration."""
+    """Small concurrency gate for expensive external work such as cloud narration."""
 
     def __init__(self, max_concurrency: int = 2, history: int = 200):
         self._sem = asyncio.Semaphore(max(1, int(max_concurrency)))

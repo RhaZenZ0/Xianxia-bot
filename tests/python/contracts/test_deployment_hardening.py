@@ -240,8 +240,8 @@ class RequestHeadLimitTests(unittest.TestCase):
 
 class ContainerBootstrapTests(unittest.TestCase):
     """The compose stack's shape (merged from test_container_bootstrap.py in
-    v0.20.3; its "no Ollama service" check is the finished removal that
-    test_config already pins)."""
+    v0.20.3; its retired-service check is the finished removal that
+    test_config's provider whitelist already pins)."""
 
     def test_database_bootstrap_is_a_required_one_shot_gate(self):
         self.assertIn("xianxia-db-init:", COMPOSE)

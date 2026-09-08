@@ -73,6 +73,8 @@ func ApplyWithWorld(databasePath, worldPath string, req ActionRequest) (ActionRe
 		result, err = adminClearBattle(conn, req.ActorID, req.Payload)
 	case "admin.automation.set":
 		result, err = adminAutomationSet(conn, req.ActorID, req.Payload)
+	case "admin.narration.set_chain":
+		result, err = adminNarrationSetChain(conn, req.ActorID, req.Payload)
 	case "admin.simulation.interval":
 		result, err = adminSimulationInterval(conn, req.ActorID, req.Payload)
 	case "admin.commission.review":
@@ -2602,4 +2604,92 @@ func adminSetAbodeAccess(conn *storage.Conn, adminUserID int64, raw json.RawMess
 		return nil, err
 	}
 	return map[string]any{"owner_user_id": ownerID, "guest_user_id": guestID, "access_role": accessRole}, nil
+}
+
+// narrationSlots are the chain positions a GM may set from the dashboard. The
+// engine stores them and audits the change; it deliberately does NOT validate
+// the slug against OpenRouter's catalogue. Which model ids are real, and which
+// are free, is Python's question (it holds the key and the catalogue) and the
+// route audit's - Go's job here is durable state and an audit row.
+var narrationSlots = []string{
+	"routine_model",
+	"routine_fallback_model",
+	"epic_model",
+	"epic_fallback_model",
+	"dynamic_free_model",
+}
+
+// adminNarrationSetChain persists the GM-chosen narration chain in world_state.
+//
+// It follows admin.automation.set exactly - one JSON blob under a world_state
+// key, written in the same transaction as its audit row - so it needs no schema
+// change. Narration is presentation, not canonical mechanics, so this is the
+// rare engine action that stores a setting the engine itself never reads: the
+// bot reads it back at startup and when the dashboard pokes it.
+func adminNarrationSetChain(conn *storage.Conn, adminUserID int64, raw json.RawMessage) (any, error) {
+	p, err := decodeMap(raw)
+	if err != nil {
+		return nil, err
+	}
+	incoming, ok := p["slots"].(map[string]any)
+	if !ok {
+		return nil, errors.New("slots must be an object")
+	}
+	for key := range incoming {
+		known := false
+		for _, slot := range narrationSlots {
+			if slot == key {
+				known = true
+				break
+			}
+		}
+		if !known {
+			return nil, fmt.Errorf("unknown narration slot: %s", key)
+		}
+	}
+	if err := begin(conn); err != nil {
+		return nil, err
+	}
+	defer func() {
+		if conn.InTransaction() {
+			rollback(conn)
+		}
+	}()
+	res, err := conn.Execute(`SELECT value_json FROM world_state WHERE key='narration_chain'`, nil)
+	if err != nil {
+		return nil, err
+	}
+	stored := map[string]any{}
+	if row := firstRowMap(res); row != nil {
+		if text, ok := row["value_json"].(string); ok {
+			_ = json.Unmarshal([]byte(text), &stored)
+		}
+	}
+	before := map[string]any{}
+	for _, slot := range narrationSlots {
+		if value, ok := stored[slot]; ok {
+			before[slot] = value
+		}
+	}
+	for key, value := range incoming {
+		// An empty fallback slot is a real answer ("no named second hop"), so
+		// it is stored as "" rather than dropped - otherwise clearing a slot
+		// would read back as "never set" and fall through to the .env default.
+		stored[key] = fmt.Sprint(value)
+	}
+	encoded, err := json.Marshal(stored)
+	if err != nil {
+		return nil, err
+	}
+	now := float64(time.Now().UnixNano()) / 1e9
+	if _, err = conn.Execute(`INSERT INTO world_state(key,value_json,updated_at) VALUES('narration_chain',?,?) ON CONFLICT(key) DO UPDATE SET value_json=excluded.value_json,updated_at=excluded.updated_at`, []any{string(encoded), now}); err != nil {
+		return nil, err
+	}
+	if err := auditAdmin(conn, adminUserID, "admin.narration.set_chain", "narration_chain", before, stored, fmt.Sprint(p["reason"])); err != nil {
+		return nil, err
+	}
+	if err := conn.Commit(); err != nil {
+		return nil, err
+	}
+	return map[string]any{"slots": stored}, nil
 }

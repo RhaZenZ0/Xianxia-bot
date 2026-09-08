@@ -68,8 +68,6 @@ class Settings:
     narrator_context_max_chars: int
     rag_context_cache_seconds: float
     rag_canon_cache_seconds: float
-    openai_api_key: str | None
-    openai_model: str
     openrouter_api_key: str | None
     openrouter_base_url: str
     openrouter_routine_model: str
@@ -152,8 +150,8 @@ class Settings:
         openrouter_key = os.getenv("OPENROUTER_API_KEY", "").strip() or None
         default_provider = "openrouter" if openrouter_key else "procedural"
         narrator_provider = os.getenv("NARRATOR_PROVIDER", default_provider).strip().lower() or default_provider
-        if narrator_provider not in {"openrouter", "openai", "procedural", "disabled"}:
-            raise RuntimeError("NARRATOR_PROVIDER must be one of: openrouter, openai, procedural, disabled")
+        if narrator_provider not in {"openrouter", "procedural", "disabled"}:
+            raise RuntimeError("NARRATOR_PROVIDER must be one of: openrouter, procedural, disabled")
         if narrator_provider == "openrouter" and not openrouter_key:
             raise RuntimeError("OPENROUTER_API_KEY is required when NARRATOR_PROVIDER=openrouter")
         narrator_context_max_chars = _as_int(
@@ -171,9 +169,6 @@ class Settings:
         )
         if not 0 <= rag_canon_cache_seconds <= 3600:
             raise RuntimeError("RAG_CANON_CACHE_SECONDS must be between 0 and 3600")
-
-        openai_key = os.getenv("OPENAI_API_KEY", "").strip() or None
-        model = os.getenv("OPENAI_MODEL", "gpt-5-mini").strip() or "gpt-5-mini"
 
         openrouter_base_url = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1").strip().rstrip("/")
         if not openrouter_base_url.startswith(("http://", "https://")):
@@ -448,8 +443,6 @@ class Settings:
             narrator_context_max_chars=narrator_context_max_chars,
             rag_context_cache_seconds=rag_context_cache_seconds,
             rag_canon_cache_seconds=rag_canon_cache_seconds,
-            openai_api_key=openai_key,
-            openai_model=model,
             openrouter_api_key=openrouter_key,
             openrouter_base_url=openrouter_base_url,
             openrouter_routine_model=openrouter_routine_model,

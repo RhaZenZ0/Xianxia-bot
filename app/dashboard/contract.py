@@ -18,12 +18,14 @@ DASHBOARD_GET_API_PATHS = frozenset({
     "/api/economy", "/api/dynasties",
     "/api/party", "/api/pvp", "/api/conditions", "/api/threads",
     "/api/rag", "/api/decisions", "/api/admin", "/api/discord", "/api/health",
+    "/api/narration",
     "/api/ai_routing",
 })
 
 DASHBOARD_POST_API_PATHS = frozenset({
     "/api/admin/action",
     "/api/discord/action",
+    "/api/narration/action",
 })
 
 DASHBOARD_VIEW_ENDPOINTS = {
@@ -50,6 +52,7 @@ DASHBOARD_VIEW_ENDPOINTS = {
     "decisions": "/api/decisions",
     "discord": "/api/discord",
     "ai_routing": "/api/ai_routing",
+    "narration": "/api/narration",
     "admin": "/api/admin",
 }
 

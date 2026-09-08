@@ -6,9 +6,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A persistent Xianxia role-playing Discord bot. Python owns Discord, RAG, dashboard, and presentation
 orchestration; Go owns canonical gameplay rules, current game time, simulation mutations, and SQLite
-WAL state. Designed for CPU-only QNAP/NAS deployment — no local LLM, narration comes from cloud
-free-tier models (OpenRouter, plus an optional direct Google AI Studio route) with a fallback chain
-ending in procedural (non-AI) narration.
+WAL state. Designed for CPU-only QNAP/NAS deployment — narration comes from cloud free-tier models
+(OpenRouter, plus an optional direct Google AI Studio route) with a fallback chain ending in
+procedural (non-AI) narration.
 
 ## Commands
 
@@ -92,7 +92,7 @@ Docker/QNAP: `./startup.sh` / `./stop.sh`. Reset the world (takes a safety backu
   rewards, deaths, relationships, travel, or history. Narration falls back to procedural (template)
   text if every OpenRouter route fails or the daily free-tier quota is exhausted — gameplay must
   survive AI outages.
-- There is intentionally no Go "shadow mode" duplicating Python calculations, and no local LLM/Ollama.
+- There is intentionally no Go "shadow mode" duplicating Python calculations.
 
 ### Design rules for future work (from README, enforced by intent)
 
@@ -177,13 +177,39 @@ out of the chain and `ai_status` reports why.
 
 Every `ROUTE_AUDIT_HOURS` (v0.27.0, default 24, `0` off) `audit_routes()` pings each configured route
 with the cheapest call the API takes — one character in, `max_tokens=1`, reply discarded unread — and
-retires the ones that answer `401`/`403`/`404`, plus a `400` confirmed at an ordinary token size (the
-reasoning-mandatory case). `429`s and timeouts never retire anything; that is what the per-route
-cooldown is for. The audit spends the shared budget it uses, stands down below half the daily
+retires the ones that answer `401`/`403`/`404`. A `400` is not a verdict but a family of causes, so
+`_classify_bad_request` isolates one variable per confirmation: first an ordinary token budget with
+`REASONING_OFF` still attached (success means the 400 was the one-token probe hitting a provider
+minimum), then the same call with the `reasoning` object removed (success means the parameter was
+the cause, and only that retires). A 400 that survives both is not parameter-caused and is recorded,
+not acted on; the verdict is stored per route as `probe_400_class` for the panel. `429`s and
+timeouts never retire anything; that is what the per-route cooldown is for. The audit spends the shared budget it uses, stands down below half the daily
 allowance, and retires nothing when *every* route fails at once (a local fault, not an empty
 catalogue). The AI Studio route is never retired whatever it answers — it is the operator's own key
 on its own quota, outside the shared budget. It proves reachability only — a scratchpadding model passes it, so
 `_validate_generated_text` remains the sole judge of whether a reply is usable prose.
+
+### Narration routes in the dashboard
+
+The GM dashboard's **Narration Routes** panel picks the five chain slots
+(`routine_model`, `routine_fallback_model`, `epic_model`, `epic_fallback_model`,
+`dynamic_free_model`) from OpenRouter's live free catalogue rather than from a list kept in this
+repo — a list kept here is how `z-ai/glm-5.2:free` and `minimax/minimax-m3:free` both shipped as
+defaults that no longer existed. The AI Studio lead is not settable: it exists only when the
+operator has put their own Google key in the environment.
+
+Three processes, and the order is the point. The browser posts to the dashboard; the dashboard
+writes through the engine (`admin.narration.set_chain` → `world_state['narration_chain']` +
+`admin_audit_log`, no schema change — it follows `admin.automation.set`); then it pokes the bot
+over the existing `/control/discord` channel (`narration.apply`) to re-read and apply it live.
+The engine write is what makes a choice durable and audited, so it happens first and independently
+— an unreachable bot means "stored, applies at next restart", not a failure. The bot also applies
+the stored chain at startup, so `.env` is the baseline rather than the last word.
+
+`AITaskRouter` keeps the slots as slots (not only as assembled chains) so `set_slots()` can rebuild
+in place; `OPENROUTER_REQUIRE_FREE` still applies, every slot is validated before any is assigned,
+and a newly chosen route has its probe verdict cleared so it does not inherit the previous
+occupant's retirement.
 
 ### Dashboard (`app/dashboard`, `dashboard/`)
 

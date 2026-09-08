@@ -83,18 +83,29 @@ PROBE_TIMEOUT_SECONDS = 20.0
 # that is the GLM 5.2 withdrawal and the rejected AI Studio key.
 PROBE_DURABLE_STATUSES = frozenset({401, 403, 404})
 
-# 400 is the reasoning-mandatory case. Every narration request carries
-# REASONING_OFF, so a model whose provider REJECTS that parameter can never
-# serve narration as this bot calls it, and retiring it is right. But 400 is
-# also what a provider with a minimum token budget returns for `max_tokens=1`,
-# which would be an artifact of the probe rather than a fault in the route - so
-# a 400 is confirmed with one ordinary-sized call before it retires anything.
+# 400 is not a verdict. It is a family of causes - a rejected parameter, a
+# provider minimum on `max_tokens`, a context overflow, a malformed body, a
+# moderation filter - and exactly one of them ("this endpoint will not accept
+# REASONING_OFF") is a reason to stand a route down. The probe differs from a
+# narration call in two ways at once, so a single confirmation cannot say which
+# one the provider objected to; `_classify_bad_request` therefore asks twice,
+# changing ONE variable each time. See that method for the ladder.
 #
 # This is NOT a scratchpad detector. MiniMax M3 accepted REASONING_OFF, returned
 # 200 and put its reasoning in `content` anyway (v0.25.3); no probe sees that.
 # _validate_generated_text remains the only thing that catches it.
 PROBE_REASONING_REJECTED_STATUS = 400
 PROBE_CONFIRM_MAX_TOKENS = 64
+
+# Classifications recorded on the model row for the admin panel. Only
+# PROBE_400_REASONING retires anything; the rest exist so an operator can see
+# WHY a 400 was left alone instead of having to guess from a raw error string.
+PROBE_400_REASONING = "reasoning-rejected"
+PROBE_400_TOKEN_BUDGET = "token-budget"
+PROBE_400_OTHER_STATUS = "other-status"
+PROBE_400_UNCLASSIFIED = "unclassified"
+PROBE_400_UNCONFIRMED = "unconfirmed"
+PROBE_400_NO_PARAMETER = "no-reasoning-parameter"
 
 # Diagnostics never outrank play. The audit spends real free-tier slots, so it
 # runs only while most of the day's budget is still unspent; below this it is
@@ -124,6 +135,30 @@ _TLS_ERROR_PATTERN = re.compile(
     r"|unable to get local issuer|CA bundle|trust store",
     re.I,
 )
+
+
+def _error_status(exc: BaseException | None) -> int | None:
+    """Pull an HTTP status off a client exception, whichever SDK raised it.
+
+    The openai SDK carries it on `status_code` (and again on `.response`).
+    google-genai collapses EVERY 4xx into a bare `ClientError` - there is no
+    BadRequestError, no AuthenticationError, no RateLimitError - and puts the
+    number on `.code` instead. Reading only `status_code` therefore made a
+    rejected AI Studio key look like "no status at all", which is precisely the
+    case PROBE_DURABLE_STATUSES was written for.
+
+    `.code` is checked last and only when it is a real int: the openai SDK also
+    has a `.code`, but its value is a symbolic string ("invalid_api_key"), and
+    bool is excluded because it is an int subclass.
+    """
+    for candidate in (
+        getattr(exc, "status_code", None),
+        getattr(getattr(exc, "response", None), "status_code", None),
+        getattr(exc, "code", None),
+    ):
+        if isinstance(candidate, int) and not isinstance(candidate, bool):
+            return candidate
+    return None
 
 
 def _looks_like_tls_failure(exc: BaseException | None) -> bool:
@@ -425,6 +460,73 @@ def _response_provider(response: Any) -> str:
     return str(value or "").strip()
 
 
+def _response_error(response: Any) -> str:
+    """Describe the error OpenRouter can attach to a 200 with no `choices`.
+
+    An upstream failure does not always arrive as an HTTP status: OpenRouter
+    also answers 200 with an empty `choices` array and a top-level `error`
+    object, so the SDK raises nothing and the router saw only "returned no
+    choices" - true, useless, and identical for a provider outage, a moderation
+    block and an upstream rate limit.
+
+    The envelope is {code, message, metadata}. `metadata` is absent on errors
+    OpenRouter generates itself and present with `provider_name`/`raw` when it
+    is relaying an upstream one, so its ABSENCE is the gateway-vs-provider
+    tell and is worth reporting either way. `provider_name` can be null, and
+    `raw` is whatever the upstream sent - sometimes structured JSON, sometimes
+    a bare string like "error code: 1015" - so it is stringified, never parsed.
+    """
+    error = getattr(response, "error", None)
+    if error is None:
+        extra = getattr(response, "model_extra", None)
+        if isinstance(extra, dict):
+            error = extra.get("error")
+    if not error:
+        return ""
+    if not isinstance(error, dict):
+        error = getattr(error, "model_extra", None) or getattr(error, "__dict__", None) or {}
+    if not isinstance(error, dict):
+        return ""
+    parts: list[str] = []
+    code = error.get("code")
+    if code not in (None, ""):
+        parts.append(f"code={code}")
+    message = str(error.get("message") or "").strip()
+    if message:
+        parts.append(message)
+    metadata = error.get("metadata")
+    if isinstance(metadata, dict):
+        provider = str(metadata.get("provider_name") or "").strip()
+        parts.append(f"provider={provider}" if provider else "provider=unnamed")
+        raw = metadata.get("raw")
+        if raw not in (None, ""):
+            parts.append(f"raw={str(raw)[:120]}")
+    else:
+        # No metadata means OpenRouter rejected this itself rather than
+        # relaying a provider - i.e. the request never reached an upstream.
+        parts.append("provider=none (gateway-generated)")
+    return "; ".join(parts)[:280]
+
+
+# The chain slots a GM may set from the dashboard. The AI Studio lead is not
+# among them: it exists only when the operator has put their own Google key in
+# the environment, and a browser cannot add one.
+NARRATION_SLOTS = (
+    "routine_model",
+    "routine_fallback_model",
+    "epic_model",
+    "epic_fallback_model",
+    "dynamic_free_model",
+)
+# The two slots that may be emptied: "this tier has no named second hop, go
+# straight to the dynamic free router".
+NARRATION_OPTIONAL_SLOTS = frozenset({"routine_fallback_model", "epic_fallback_model"})
+
+# The catalogue moves on OpenRouter's schedule, not ours, but a GM opening the
+# panel twice in a minute should not spend two round trips on it.
+CATALOGUE_CACHE_SECONDS = 900.0
+CATALOGUE_TIMEOUT_SECONDS = 20.0
+
 BYOK_RECHECK_SECONDS = 3600.0
 
 
@@ -631,11 +733,17 @@ class AITaskRouter:
             google = _safe_free_model(google, require_free=self.require_free)
         self.google_model = google
 
-        lead = (google,) if google else ()
-        self.chains = {
-            NarrationTier.ROUTINE: _dedupe_chain((*lead, routine, routine_fallback, dynamic)),
-            NarrationTier.EPIC: _dedupe_chain((*lead, epic, epic_fallback, dynamic)),
-        }
+        # The operator-settable slots are kept AS slots, not only as the
+        # assembled chains, so the GM dashboard can change one and have the
+        # chains rebuilt in place - no .env edit, no restart. The assembled
+        # chains stay the only thing narration reads.
+        self.routine_model = routine
+        self.routine_fallback_model = routine_fallback
+        self.epic_model = epic
+        self.epic_fallback_model = epic_fallback
+        self._rebuild_chains()
+        self._catalogue: dict[str, Any] = {}
+        self._catalogue_at = 0.0
         self.limiter = OpenRouterRequestLimiter(max_requests_per_minute, max_requests_per_day)
         self._cooldown_until: dict[str, float] = {}
         self._started_at = time.time()
@@ -659,6 +767,127 @@ class AITaskRouter:
             if self.api_key
             else None
         )
+
+    def _rebuild_chains(self) -> None:
+        """Reassemble both chains from the current slots.
+
+        The AI Studio route leads both tiers when configured, and the dynamic
+        free router closes both; the dedupe keeps a slug that appears twice
+        (an operator picking the same model for primary and fallback) from
+        being attempted twice in a row.
+        """
+        lead = (self.google_model,) if self.google_model else ()
+        self.chains = {
+            NarrationTier.ROUTINE: _dedupe_chain(
+                (*lead, self.routine_model, self.routine_fallback_model, self.dynamic_free_model)
+            ),
+            NarrationTier.EPIC: _dedupe_chain(
+                (*lead, self.epic_model, self.epic_fallback_model, self.dynamic_free_model)
+            ),
+        }
+
+    def slots_snapshot(self) -> dict[str, str]:
+        """The five settable slots, as the dashboard renders them."""
+        return {name: getattr(self, name) for name in NARRATION_SLOTS}
+
+    def set_slots(self, slots: dict[str, str]) -> dict[str, Any]:
+        """Replace one or more chain slots at runtime.
+
+        Every slot is validated BEFORE any is applied, so a rejected value
+        leaves the router exactly as it was rather than half-changed. The free
+        guard still applies: OPENROUTER_REQUIRE_FREE is a promise that no paid
+        slug can be configured by accident, and a dashboard is an easier place
+        to make that accident than a .env file, not a harder one.
+
+        Retirement verdicts are cleared for slots that actually changed: a
+        newly chosen route has not been probed yet, and inheriting the previous
+        occupant's "retired" flag would skip it until the next audit.
+        """
+        unknown = sorted(set(slots) - set(NARRATION_SLOTS))
+        if unknown:
+            raise ValueError(f"Unknown narration slot(s): {', '.join(unknown)}")
+        validated: dict[str, str] = {}
+        for name, value in slots.items():
+            validated[name] = _safe_free_model(
+                value,
+                require_free=self.require_free,
+                allow_empty=name in NARRATION_OPTIONAL_SLOTS,
+            )
+        before = self.slots_snapshot()
+        changed = {n: v for n, v in validated.items() if before.get(n) != v}
+        for name, value in validated.items():
+            setattr(self, name, value)
+        self._rebuild_chains()
+        for value in changed.values():
+            if value:
+                row = self._model_row(value)
+                row["probe_retired"] = False
+                row["probe_ok"] = None
+                row["probe_400_class"] = ""
+        if changed:
+            log.info(
+                "AI_CHAIN_SET %s",
+                ", ".join(f"{name}={value or '(none)'}" for name, value in sorted(changed.items())),
+            )
+        return {"slots": self.slots_snapshot(), "changed": sorted(changed), "chains": {
+            tier.value: list(self.chains[tier]) for tier in NarrationTier
+        }}
+
+    async def fetch_free_catalogue(self, *, force: bool = False) -> dict[str, Any]:
+        """The free half of OpenRouter's live catalogue, for the dashboard picker.
+
+        Read from the catalogue endpoint rather than a list kept in this repo,
+        because a list kept in this repo is how `z-ai/glm-5.2:free` and
+        `minimax/minimax-m3:free` both shipped as defaults that no longer
+        existed. This costs no narration budget: the models endpoint is not a
+        completion and the daily limiter does not meter it.
+
+        Reachability is all this proves. A slug here can still turn out to
+        reject REASONING_OFF or to answer with its own scratchpad - the route
+        audit and `_validate_generated_text` remain the judges of that - so the
+        picker offers candidates, not guarantees.
+        """
+        now = time.time()
+        if not force and self._catalogue and now - self._catalogue_at < CATALOGUE_CACHE_SECONDS:
+            return {**self._catalogue, "cached": True}
+        if not self.client:
+            return {"models": [], "at": 0.0, "cached": False, "error": "OPENROUTER_API_KEY is not configured"}
+        try:
+            listing = await asyncio.wait_for(
+                self.client.models.list(), timeout=CATALOGUE_TIMEOUT_SECONDS
+            )
+        except Exception as exc:
+            log.warning("AI_CATALOGUE_FAILED: %s", exc)
+            stale = {**self._catalogue, "cached": True} if self._catalogue else {"models": [], "at": 0.0}
+            return {**stale, "error": f"{type(exc).__name__}: {exc}"[:300]}
+        models = []
+        for entry in getattr(listing, "data", None) or []:
+            model_id = str(getattr(entry, "id", "") or "").strip()
+            if not model_id or not _is_free_route(model_id):
+                continue
+            extra = getattr(entry, "model_extra", None)
+            extra = extra if isinstance(extra, dict) else {}
+            models.append(
+                {
+                    "id": model_id,
+                    "name": str(getattr(entry, "name", None) or extra.get("name") or model_id),
+                    "context_length": int(
+                        getattr(entry, "context_length", None) or extra.get("context_length") or 0
+                    ),
+                }
+            )
+        models.sort(key=lambda row: row["id"])
+        # openrouter/free is a router, not a catalogue entry, so it is added
+        # rather than found - it is the one slug that is always selectable.
+        if not any(row["id"] == DEFAULT_DYNAMIC_FREE_MODEL for row in models):
+            models.insert(0, {
+                "id": DEFAULT_DYNAMIC_FREE_MODEL,
+                "name": "OpenRouter dynamic free router",
+                "context_length": 0,
+            })
+        self._catalogue = {"models": models, "at": now}
+        self._catalogue_at = now
+        return {**self._catalogue, "cached": False}
 
     @property
     def enabled(self) -> bool:
@@ -764,6 +993,9 @@ class AITaskRouter:
                 "probe_at": 0.0,
                 "probe_error": "",
                 "probe_retired": False,
+                # Why the last 400 was or was not acted on; "" when the last
+                # probe did not answer 400 at all.
+                "probe_400_class": "",
                 "skipped_probe_retired": 0,
                 "consecutive_failures": 0,
                 "cooldown_seconds": 0.0,
@@ -861,12 +1093,11 @@ class AITaskRouter:
                 )
                 await asyncio.wait_for(request, timeout=PROBE_TIMEOUT_SECONDS)
         except Exception as exc:
-            status = getattr(exc, "status_code", None)
-            if status is None:
-                status = getattr(getattr(exc, "response", None), "status_code", None)
+            status = _error_status(exc)
             durable = status in PROBE_DURABLE_STATUSES
+            classification = ""
             if status == PROBE_REASONING_REJECTED_STATUS:
-                durable = await self._confirm_bad_request(model)
+                durable, classification = await self._classify_bad_request(model)
             if is_aistudio_route(model):
                 # The operator's own key, on its own quota, outside OpenRouter's
                 # daily budget - the entire reason this route exists. It is the
@@ -875,10 +1106,15 @@ class AITaskRouter:
                 # added to escape. Whatever Google said is recorded and shown in
                 # ai_status, and the ordinary per-route cooldown still applies,
                 # but the route stays in the chain.
+                #
+                # This covers 401/403/404 as well as the 400 ladder, which
+                # declines to classify an AI Studio route on its own account
+                # (there is no reasoning parameter there to differentiate on).
                 durable = False
             row["probe_ok"] = False
             row["probe_error"] = f"{type(exc).__name__}: {exc}"[:300]
             row["probe_retired"] = durable
+            row["probe_400_class"] = classification
             log.warning(
                 "AI_PROBE_FAILED model=%s durable=%s: %s",
                 model,
@@ -889,47 +1125,104 @@ class AITaskRouter:
         row["probe_ok"] = True
         row["probe_error"] = ""
         row["probe_retired"] = False
+        row["probe_400_class"] = ""
         return True
 
-    async def _confirm_bad_request(self, model: str) -> bool:
-        """Decide whether a probe's 400 belongs to the route or to the probe.
+    async def _reprobe(self, model: str, *, disable_reasoning: bool) -> int | None:
+        """Re-issue the probe at an ordinary token budget, one variable changed.
 
-        Repeats the call with an ordinary token budget, still carrying
-        REASONING_OFF. A second 400 means the route rejects the way this bot
-        asks for narration - reasoning-mandatory, most often - and retires it.
-        Success means the first 400 was the one-token probe hitting a provider
-        minimum, and the route is left alone. If the budget will not fund the
-        confirmation, nothing is retired: an unconfirmed 400 is not evidence.
+        Returns None when the route answered, otherwise the HTTP status it
+        failed with (or -1 when the exception carried no readable status).
+        Built through the same call shape narration uses, so the classification
+        describes the request this bot actually sends.
         """
-        if is_aistudio_route(model) or not self.client:
-            return False
-        if not await self.limiter.try_acquire():
-            log.info("AI_PROBE_400_UNCONFIRMED model=%s: no budget to confirm", model)
-            return False
         try:
             request = self.client.chat.completions.create(
                 model=model,
                 messages=[{"role": "user", "content": PROBE_PROMPT}],
                 max_tokens=PROBE_CONFIRM_MAX_TOKENS,
                 extra_headers=self._headers(),
-                extra_body=dict(REASONING_OFF) if self.disable_reasoning else None,
+                extra_body=dict(REASONING_OFF) if disable_reasoning else None,
             )
             await asyncio.wait_for(request, timeout=PROBE_TIMEOUT_SECONDS)
         except Exception as exc:
-            status = getattr(exc, "status_code", None)
-            if status is None:
-                status = getattr(getattr(exc, "response", None), "status_code", None)
-            confirmed = status == PROBE_REASONING_REJECTED_STATUS
-            log.info(
-                "AI_PROBE_400_CONFIRM model=%s status=%s retiring=%s",
+            status = _error_status(exc)
+            return -1 if status is None else status
+        return None
+
+    async def _classify_bad_request(self, model: str) -> tuple[bool, str]:
+        """Work out what a probe's 400 actually meant, one variable at a time.
+
+        The probe differs from a narration call in two ways - `max_tokens=1`,
+        and (when configured) the REASONING_OFF body - so asking again with
+        both changed at once cannot say which the provider objected to. A
+        provider that merely enforces a minimum token budget would then be
+        misread as reasoning-mandatory and retired for a fault in the
+        diagnostic. So the ladder changes ONE thing per call:
+
+          A. ordinary token budget, REASONING_OFF still attached.
+             It answers  -> the 400 was the one-token probe hitting a provider
+                            minimum. An artifact of the diagnostic; nothing is
+                            wrong with the route. Leave it alone.
+             Other status -> a different failure entirely; not ours to judge.
+          B. ordinary token budget, `reasoning` removed.
+             It answers  -> the parameter WAS the cause. Every narration
+                            request carries REASONING_OFF and that is not
+                            negotiable (it exists because reasoning models
+                            returned empty content in v0.19.20 and their
+                            scratchpad AS content in v0.25.3), so this route
+                            cannot serve narration as this bot calls it.
+                            Retire it - until the next audit, which is the
+                            right lifetime: OpenRouter fans one slug across
+                            provider endpoints and the mix changes without
+                            notice, so the verdict decays by construction.
+             Still 400   -> not parameter-caused at all. Context length, a
+                            malformed body, a moderation filter: nothing here
+                            can tell which, and retiring on a cause we cannot
+                            name is guessing. Record it and move on.
+
+        Returns (retire, classification). Every path records a classification
+        so the panel says WHY a 400 was left alone. An unfunded confirmation is
+        not evidence either way, so it retires nothing.
+        """
+        if is_aistudio_route(model) or not self.client:
+            # The Google route sends no reasoning/thinking parameter at all, so
+            # there is no second variable to isolate and nothing to conclude.
+            return False, PROBE_400_NO_PARAMETER
+        if not await self.limiter.try_acquire():
+            log.info("AI_PROBE_400_UNCONFIRMED model=%s: no budget to confirm", model)
+            return False, PROBE_400_UNCONFIRMED
+
+        status = await self._reprobe(model, disable_reasoning=self.disable_reasoning)
+        if status is None:
+            log.info("AI_PROBE_400_WAS_THE_PROBE model=%s", model)
+            return False, PROBE_400_TOKEN_BUDGET
+        if status != PROBE_REASONING_REJECTED_STATUS:
+            log.info("AI_PROBE_400_MOVED model=%s status=%s", model, status)
+            return False, PROBE_400_OTHER_STATUS
+        if not self.disable_reasoning:
+            # Nothing was added to remove: the 400 cannot be about a parameter
+            # this bot never sent.
+            return False, PROBE_400_UNCLASSIFIED
+        if not await self.limiter.try_acquire():
+            log.info("AI_PROBE_400_UNCONFIRMED model=%s: no budget to differentiate", model)
+            return False, PROBE_400_UNCONFIRMED
+
+        without_reasoning = await self._reprobe(model, disable_reasoning=False)
+        if without_reasoning is None:
+            log.warning(
+                "AI_PROBE_400_REASONING model=%s: answers without REASONING_OFF "
+                "and 400s with it - retiring until the next audit",
                 model,
-                status,
-                confirmed,
             )
-            return confirmed
-        # It answered once it was given room: the 400 was about max_tokens=1.
-        log.info("AI_PROBE_400_WAS_THE_PROBE model=%s", model)
-        return False
+            return True, PROBE_400_REASONING
+        log.info(
+            "AI_PROBE_400_UNCLASSIFIED model=%s status=%s: 400s with and without "
+            "REASONING_OFF, so the parameter is not the cause - retiring nothing",
+            model,
+            without_reasoning,
+        )
+        return False, PROBE_400_UNCLASSIFIED
 
     async def audit_routes(self) -> dict[str, Any]:
         """Probe every configured route once and retire the ones that are gone.
@@ -958,7 +1251,11 @@ class AITaskRouter:
         per_day = max(1, int(budget["max_requests_per_day"]))
         remaining = per_day - int(budget["used_today"])
         # The audit costs one slot per OpenRouter route; the AI Studio route is
-        # free of this budget by construction and is not counted here.
+        # free of this budget by construction and is not counted here. A route
+        # that answers 400 can cost up to two more while _classify_bad_request
+        # isolates the cause, which is what the headroom below is for - those
+        # are not counted here because a chain where every route 400s is not
+        # the case worth sizing for.
         cost = sum(1 for model in models if not is_aistudio_route(model))
         if remaining - cost < per_day * PROBE_BUDGET_HEADROOM:
             result["skipped"] = (
@@ -1030,6 +1327,7 @@ class AITaskRouter:
                     "probe_at": float(row["probe_at"]),
                     "probe_error": str(row["probe_error"]),
                     "probe_retired": bool(row["probe_retired"]),
+                    "probe_400_class": str(row["probe_400_class"]),
                     "skipped_probe_retired": int(row["skipped_probe_retired"]),
                     "route_limits": (
                         self._route_limiters[model].snapshot()
@@ -1186,7 +1484,12 @@ class AITaskRouter:
                 )
                 response = await asyncio.wait_for(request, timeout=timeout_seconds)
                 if not response.choices:
-                    raise RuntimeError("OpenRouter returned no choices")
+                    detail = _response_error(response)
+                    raise RuntimeError(
+                        f"OpenRouter returned no choices ({detail})"
+                        if detail
+                        else "OpenRouter returned no choices and no error body"
+                    )
                 message = response.choices[0].message
                 raw_text = _extract_text(getattr(message, "content", None))
                 if not raw_text:

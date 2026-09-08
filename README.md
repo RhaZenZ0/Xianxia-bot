@@ -54,7 +54,6 @@ Ownership rules:
 - **Go owns canonical mechanics and production SQLite access.**
 - **Python owns Discord commands/views, RAG/context assembly, permissions and presentation.**
 - **AI is narration-only.** `/action` selects intent through the UI; deterministic mechanics fix the result before narration.
-- **No local LLM runs on the NAS.** There is no Ollama service or Qwen model download.
 - **Gameplay survives AI outages.** When all OpenRouter routes fail or quota is exhausted, procedural narration is returned and canonical play continues.
 
 ## Narration routes
@@ -280,7 +279,7 @@ Recommended QNAP/NAS deployment:
 - Discord bot token and guild ID
 - OpenRouter API key
 - persistent `./data` directory
-- **no GPU and no local LLM required**
+- **no GPU required**
 
 For development without Docker:
 
@@ -345,7 +344,7 @@ chmod +x startup.sh stop.sh
 sudo ./startup.sh
 ```
 
-`startup.sh` validates Docker/Compose, checks required secrets, creates `./data`, builds the Go engine + Python bot, and starts the GM dashboard when `DASHBOARD_ENABLED=true`. It never starts or downloads a local model.
+`startup.sh` validates Docker/Compose, checks required secrets, creates `./data`, builds the Go engine + Python bot, and starts the GM dashboard when `DASHBOARD_ENABLED=true`.
 
 Useful logs:
 
@@ -394,8 +393,6 @@ Optional authenticated GM control plane. `startup.sh` starts it when:
 ```env
 DASHBOARD_ENABLED=true
 ```
-
-No Ollama/local-LLM service exists.
 
 ## Player interface and Discord GUI
 

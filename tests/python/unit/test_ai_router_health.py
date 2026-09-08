@@ -27,6 +27,14 @@ from app.ai.ai_router import (
     _validate_generated_text,
     ScratchpadResponse,
     REASONING_OFF,
+    PROBE_400_NO_PARAMETER,
+    PROBE_400_OTHER_STATUS,
+    PROBE_400_REASONING,
+    PROBE_400_TOKEN_BUDGET,
+    PROBE_400_UNCLASSIFIED,
+    PROBE_400_UNCONFIRMED,
+    NARRATION_SLOTS,
+    _error_status,
 )
 
 
@@ -46,6 +54,16 @@ class _RateLimit(Exception):
         self.response = SimpleNamespace(status_code=status_code, headers=headers)
 
 
+class _RawResponse(SimpleNamespace):
+    """A completion handed back verbatim.
+
+    The helpers above build the happy shape (one choice carrying a message);
+    this is for shapes they cannot express - notably an empty `choices` array
+    with an `error` object beside it, which is how OpenRouter relays an
+    upstream failure without an HTTP status.
+    """
+
+
 class _FakeCompletions:
     def __init__(self, payloads):
         self.payloads = list(payloads)
@@ -56,6 +74,8 @@ class _FakeCompletions:
         payload = self.payloads.pop(0)
         if isinstance(payload, BaseException):
             raise payload
+        if isinstance(payload, _RawResponse):
+            return payload
         if isinstance(payload, _Message):
             return SimpleNamespace(choices=[SimpleNamespace(message=payload)])
         return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=payload))])
@@ -1079,30 +1099,82 @@ class RouteAuditTests(unittest.TestCase):
         self.assertIn("404", retired[0]["probe_error"])
 
 
-class ReasoningRejectedProbeTests(unittest.TestCase):
-    """A 400 on REASONING_OFF retires the route; a 400 on max_tokens=1 does not."""
+class BadRequestClassifierTests(unittest.TestCase):
+    """What a probe's 400 is allowed to prove, one variable at a time.
 
-    def test_a_route_that_rejects_reasoning_off_twice_is_retired(self):
-        # Every narration request carries REASONING_OFF, so a provider that
-        # refuses it can never serve narration as this bot calls it.
-        router = _router([_HTTPError(400, "reasoning cannot be disabled")] * 2)
+    The probe differs from a narration call in two ways at once - max_tokens=1
+    and the REASONING_OFF body - so the classifier changes exactly one of them
+    per confirmation. Only "answers without REASONING_OFF, 400s with it"
+    retires anything.
+    """
+
+    def _row(self, router):
+        return router._model_row(DEFAULT_ROUTINE_MODEL)
+
+    def test_a_route_that_answers_only_without_reasoning_off_is_retired(self):
+        # Probe 400s; same call with room still 400s; same call with the
+        # `reasoning` object removed answers. The parameter was the cause, and
+        # every narration request carries it, so this route cannot serve us.
+        router = _router([
+            _HTTPError(400, "reasoning cannot be disabled"),
+            _HTTPError(400, "reasoning cannot be disabled"),
+            "it answers without the parameter",
+        ])
         self.assertFalse(asyncio.run(router.probe_route(DEFAULT_ROUTINE_MODEL)))
-        self.assertTrue(router._model_row(DEFAULT_ROUTINE_MODEL)["probe_retired"])
+        row = self._row(router)
+        self.assertTrue(row["probe_retired"])
+        self.assertEqual(row["probe_400_class"], PROBE_400_REASONING)
+
+    def test_a_400_that_survives_removing_reasoning_retires_nothing(self):
+        # This is the case the old confirmation got wrong: it read a second 400
+        # as "reasoning-mandatory" and retired. A 400 that persists WITHOUT the
+        # parameter is not about the parameter - context length, a malformed
+        # body, a moderation filter - and none of those are nameable from here.
+        router = _router([_HTTPError(400, "context length exceeded")] * 3)
+        self.assertFalse(asyncio.run(router.probe_route(DEFAULT_ROUTINE_MODEL)))
+        row = self._row(router)
+        self.assertFalse(row["probe_retired"])
+        self.assertEqual(row["probe_400_class"], PROBE_400_UNCLASSIFIED)
 
     def test_a_400_that_was_only_the_one_token_probe_retires_nothing(self):
         # Some providers reject max_tokens=1 outright. That is an artifact of
         # the probe, not a fault in the route, and retiring on it would throw
-        # away a route that narrates perfectly well.
+        # away a route that narrates perfectly well. Caught by the FIRST rung,
+        # before the reasoning parameter is ever touched.
         router = _router([_HTTPError(400, "max_tokens too small"), "it answers fine"])
         self.assertFalse(asyncio.run(router.probe_route(DEFAULT_ROUTINE_MODEL)))
-        self.assertFalse(router._model_row(DEFAULT_ROUTINE_MODEL)["probe_retired"])
+        row = self._row(router)
+        self.assertFalse(row["probe_retired"])
+        self.assertEqual(row["probe_400_class"], PROBE_400_TOKEN_BUDGET)
+        # Only one confirmation was needed, so the second rung never spent a slot.
+        self.assertEqual(len(router.client.completions.calls), 2)
 
-    def test_the_confirmation_asks_with_room_and_still_disables_reasoning(self):
+    def test_the_first_confirmation_changes_only_the_token_budget(self):
+        # If it dropped REASONING_OFF here too, a provider minimum on
+        # max_tokens would be indistinguishable from a reasoning-mandatory
+        # endpoint and would retire a healthy route.
         router = _router([_HTTPError(400), "answer"])
         asyncio.run(router.probe_route(DEFAULT_ROUTINE_MODEL))
         confirm = router.client.completions.calls[1]
         self.assertGreater(confirm["max_tokens"], 1)
         self.assertEqual(confirm["extra_body"], dict(REASONING_OFF))
+
+    def test_the_second_confirmation_changes_only_the_reasoning_parameter(self):
+        router = _router([_HTTPError(400), _HTTPError(400), "answer"])
+        asyncio.run(router.probe_route(DEFAULT_ROUTINE_MODEL))
+        first, second = router.client.completions.calls[1:3]
+        self.assertEqual(first["max_tokens"], second["max_tokens"])
+        self.assertEqual(first["extra_body"], dict(REASONING_OFF))
+        self.assertIsNone(second["extra_body"])
+
+    def test_a_400_that_becomes_another_status_is_left_alone(self):
+        # The route stopped saying 400 the moment it was asked again. Whatever
+        # that is, it is not a parameter this bot can stop sending.
+        router = _router([_HTTPError(400), _HTTPError(429, "slow down")])
+        self.assertFalse(asyncio.run(router.probe_route(DEFAULT_ROUTINE_MODEL)))
+        row = self._row(router)
+        self.assertFalse(row["probe_retired"])
+        self.assertEqual(row["probe_400_class"], PROBE_400_OTHER_STATUS)
 
     def test_an_unconfirmable_400_retires_nothing(self):
         # No budget to ask again means no evidence, and no evidence means the
@@ -1110,7 +1182,147 @@ class ReasoningRejectedProbeTests(unittest.TestCase):
         router = _router([_HTTPError(400)], max_requests_per_day=1)
         asyncio.run(router.limiter.try_acquire())
         self.assertFalse(asyncio.run(router.probe_route(DEFAULT_ROUTINE_MODEL)))
-        self.assertFalse(router._model_row(DEFAULT_ROUTINE_MODEL)["probe_retired"])
+        row = self._row(router)
+        self.assertFalse(row["probe_retired"])
+        self.assertEqual(row["probe_400_class"], PROBE_400_UNCONFIRMED)
+
+    def test_the_differential_rung_is_skipped_when_it_cannot_be_funded(self):
+        # Rung A spends the last slot; rung B has nothing to spend, so the 400
+        # stays unproven rather than being guessed at.
+        router = _router([_HTTPError(400), _HTTPError(400)], max_requests_per_day=2)
+        asyncio.run(router.limiter.try_acquire())
+        self.assertFalse(asyncio.run(router.probe_route(DEFAULT_ROUTINE_MODEL)))
+        row = self._row(router)
+        self.assertFalse(row["probe_retired"])
+        self.assertEqual(row["probe_400_class"], PROBE_400_UNCONFIRMED)
+
+    def test_a_400_with_reasoning_already_off_the_wire_is_not_classified(self):
+        # OPENROUTER_DISABLE_REASONING=false means nothing was added to remove,
+        # so the 400 cannot be about a parameter this bot never sent.
+        router = _router([_HTTPError(400), _HTTPError(400)], disable_reasoning=False)
+        self.assertFalse(asyncio.run(router.probe_route(DEFAULT_ROUTINE_MODEL)))
+        row = self._row(router)
+        self.assertFalse(row["probe_retired"])
+        self.assertEqual(row["probe_400_class"], PROBE_400_UNCLASSIFIED)
+
+    def test_a_successful_probe_clears_a_stale_classification(self):
+        router = _router([_HTTPError(400), _HTTPError(400), _HTTPError(400), "ok"])
+        asyncio.run(router.probe_route(DEFAULT_ROUTINE_MODEL))
+        self.assertEqual(self._row(router)["probe_400_class"], PROBE_400_UNCLASSIFIED)
+        self.assertTrue(asyncio.run(router.probe_route(DEFAULT_ROUTINE_MODEL)))
+        self.assertEqual(self._row(router)["probe_400_class"], "")
+
+    def test_the_panel_carries_the_classification(self):
+        router = _router([_HTTPError(400)] * 3)
+        asyncio.run(router.probe_route(DEFAULT_ROUTINE_MODEL))
+        row = next(
+            r for r in router.health_snapshot()["models"]
+            if r["model"] == DEFAULT_ROUTINE_MODEL
+        )
+        self.assertEqual(row["probe_400_class"], PROBE_400_UNCLASSIFIED)
+
+
+class EmptyChoicesDiagnosticTests(unittest.TestCase):
+    """A 200 with no `choices` is how OpenRouter relays an upstream failure.
+
+    The SDK raises nothing, so the router used to record only "returned no
+    choices" - identical for a provider outage, a moderation block and an
+    upstream rate limit, and useless in the panel.
+    """
+
+    def _last_error(self, router, model=DEFAULT_ROUTINE_MODEL):
+        return router._model_row(model)["last_error"]
+
+    def test_a_relayed_provider_error_names_the_provider_and_raw_body(self):
+        router = _router([
+            _RawResponse(choices=[], error={
+                "code": 429,
+                "message": "Provider returned error",
+                "metadata": {"provider_name": "Kluster", "raw": "error code: 1015"},
+            }),
+            "the next hop answers",
+        ])
+        _generate(router)
+        recorded = self._last_error(router)
+        self.assertIn("Kluster", recorded)
+        self.assertIn("error code: 1015", recorded)
+        self.assertIn("Provider returned error", recorded)
+
+    def test_a_gateway_generated_error_is_marked_as_having_no_provider(self):
+        # No metadata means OpenRouter rejected it itself - the request never
+        # reached an upstream, which is a different problem to chase.
+        router = _router([
+            _RawResponse(choices=[], error={"code": 400, "message": "bad body"}),
+            "the next hop answers",
+        ])
+        _generate(router)
+        self.assertIn("gateway-generated", self._last_error(router))
+
+    def test_an_empty_body_with_no_error_says_so_rather_than_guessing(self):
+        router = _router([_RawResponse(choices=[]), "the next hop answers"])
+        _generate(router)
+        self.assertIn("no error body", self._last_error(router))
+
+    def test_the_error_is_read_from_sdk_extras_when_not_an_attribute(self):
+        # The OpenAI SDK parks unknown top-level fields in model_extra.
+        router = _router([
+            _RawResponse(choices=[], model_extra={"error": {"message": "upstream died"}}),
+            "the next hop answers",
+        ])
+        _generate(router)
+        self.assertIn("upstream died", self._last_error(router))
+
+    def test_an_empty_choices_response_still_falls_through_to_the_next_hop(self):
+        # The diagnostic must not change what play sees: narration continues.
+        router = _router([_RawResponse(choices=[]), "the next hop answers"])
+        result = _generate(router)
+        self.assertEqual(result.text, "the next hop answers")
+        self.assertNotEqual(result.model, DEFAULT_ROUTINE_MODEL)
+
+
+class ErrorStatusExtractionTests(unittest.TestCase):
+    """google-genai collapses every 4xx into a bare ClientError.
+
+    It carries the number on `.code`, not `status_code`, so reading only the
+    openai SDK's attribute made a rejected AI Studio key look like "no status
+    at all" - and PROBE_DURABLE_STATUSES exists precisely for that key.
+    """
+
+    def test_an_openai_style_error_is_read_from_status_code(self):
+        self.assertEqual(_error_status(_HTTPError(404)), 404)
+
+    def test_a_google_style_client_error_is_read_from_code(self):
+        exc = RuntimeError("400 INVALID_ARGUMENT")
+        exc.code = 400
+        exc.status = "INVALID_ARGUMENT"
+        self.assertEqual(_error_status(exc), 400)
+
+    def test_a_symbolic_string_code_is_not_mistaken_for_a_status(self):
+        # The openai SDK also has `.code`, but its value is a symbolic string.
+        exc = RuntimeError("nope")
+        exc.code = "invalid_api_key"
+        self.assertIsNone(_error_status(exc))
+
+    def test_an_exception_with_no_status_reads_as_none(self):
+        self.assertIsNone(_error_status(asyncio.TimeoutError()))
+
+
+class AIStudioProbeClassifierTests(unittest.TestCase):
+    """The Google route has no reasoning parameter to differentiate on."""
+
+    def test_an_aistudio_400_is_recorded_and_never_retired(self):
+        router = _router(["unused"])
+        retire, classification = asyncio.run(
+            router._classify_bad_request("aistudio/gemini-3.8-flash")
+        )
+        self.assertFalse(retire)
+        self.assertEqual(classification, PROBE_400_NO_PARAMETER)
+
+    def test_classifying_an_aistudio_route_spends_no_openrouter_budget(self):
+        router = _router(["unused"])
+        before = router.limiter.snapshot()["used_today"]
+        asyncio.run(router._classify_bad_request("aistudio/gemini-3.8-flash"))
+        self.assertEqual(router.limiter.snapshot()["used_today"], before)
 
     def test_the_probe_cannot_see_a_scratchpad_model(self):
         # MiniMax M3 accepted REASONING_OFF, returned 200, and put its reasoning
@@ -1122,3 +1334,141 @@ class ReasoningRejectedProbeTests(unittest.TestCase):
         self.assertFalse(router._model_row(DEFAULT_ROUTINE_MODEL)["probe_retired"])
         with self.assertRaises(ScratchpadResponse):
             _validate_generated_text(scratchpad)
+
+
+class NarrationSlotTests(unittest.TestCase):
+    """The chain slots a GM can change from the dashboard, at runtime."""
+
+    def test_the_chains_are_rebuilt_from_the_new_slots(self):
+        router = _router(["unused"])
+        result = router.set_slots({"routine_model": "vendor/new-routine:free"})
+        self.assertIn("vendor/new-routine:free", router.models_for(NarrationTier.ROUTINE))
+        self.assertEqual(result["changed"], ["routine_model"])
+        self.assertEqual(
+            result["chains"]["routine"], list(router.models_for(NarrationTier.ROUTINE))
+        )
+
+    def test_a_paid_slug_is_refused_while_the_free_guard_is_on(self):
+        # A dashboard is an easier place to make this mistake than a .env file,
+        # not a harder one.
+        router = _router(["unused"])
+        with self.assertRaisesRegex(ValueError, "free route"):
+            router.set_slots({"routine_model": "openai/gpt-5"})
+
+    def test_a_rejected_value_leaves_every_slot_untouched(self):
+        # Validation happens before any assignment, so a bad slot in a batch
+        # cannot leave the router half-changed.
+        router = _router(["unused"])
+        before = router.slots_snapshot()
+        with self.assertRaises(ValueError):
+            router.set_slots({
+                "epic_model": "vendor/good:free",
+                "routine_model": "vendor/paid-by-mistake",
+            })
+        self.assertEqual(router.slots_snapshot(), before)
+
+    def test_an_unknown_slot_name_is_refused(self):
+        router = _router(["unused"])
+        with self.assertRaisesRegex(ValueError, "Unknown narration slot"):
+            router.set_slots({"reasoning": "off"})
+
+    def test_a_fallback_slot_may_be_cleared_but_a_primary_may_not(self):
+        router = _router(["unused"])
+        router.set_slots({"routine_fallback_model": ""})
+        self.assertEqual(router.slots_snapshot()["routine_fallback_model"], "")
+        with self.assertRaises(ValueError):
+            router.set_slots({"routine_model": ""})
+
+    def test_a_newly_chosen_route_does_not_inherit_a_retirement(self):
+        # The slot's previous occupant being retired says nothing about the
+        # model just put there; inheriting it would skip the new route until
+        # the next audit.
+        router = _router(["unused"])
+        row = router._model_row("vendor/fresh:free")
+        row["probe_retired"] = True
+        row["probe_ok"] = False
+        row["probe_400_class"] = PROBE_400_REASONING
+        router.set_slots({"routine_model": "vendor/fresh:free"})
+        self.assertFalse(row["probe_retired"])
+        self.assertIsNone(row["probe_ok"])
+        self.assertEqual(row["probe_400_class"], "")
+
+    def test_setting_a_slot_to_what_it_already_was_changes_nothing(self):
+        router = _router(["unused"])
+        current = router.slots_snapshot()
+        result = router.set_slots({"routine_model": current["routine_model"]})
+        self.assertEqual(result["changed"], [])
+
+    def test_the_aistudio_lead_is_not_a_settable_slot(self):
+        # It exists only when the operator put their own Google key in the
+        # environment, and a browser cannot add one.
+        self.assertNotIn("google_model", NARRATION_SLOTS)
+
+
+class FreeCatalogueTests(unittest.TestCase):
+    """The picker's list comes from OpenRouter, not from a list in this repo.
+
+    A list in this repo is how `z-ai/glm-5.2:free` and `minimax/minimax-m3:free`
+    both shipped as defaults that no longer existed.
+    """
+
+    def _router_with_catalogue(self, entries):
+        router = _router(["unused"])
+        router.client.models = SimpleNamespace(
+            list=_return(SimpleNamespace(data=entries))
+        )
+        return router
+
+    def test_only_free_endpoints_are_offered(self):
+        router = self._router_with_catalogue([
+            SimpleNamespace(id="vendor/free-one:free", name="Free One", context_length=8192),
+            SimpleNamespace(id="vendor/paid-one", name="Paid One", context_length=8192),
+        ])
+        ids = [row["id"] for row in asyncio.run(router.fetch_free_catalogue())["models"]]
+        self.assertIn("vendor/free-one:free", ids)
+        self.assertNotIn("vendor/paid-one", ids)
+
+    def test_the_dynamic_router_is_always_selectable(self):
+        # It is a router, not a catalogue entry, so it is added rather than found.
+        router = self._router_with_catalogue([
+            SimpleNamespace(id="vendor/free-one:free", name="Free One", context_length=0),
+        ])
+        ids = [row["id"] for row in asyncio.run(router.fetch_free_catalogue())["models"]]
+        self.assertIn(DEFAULT_DYNAMIC_FREE_MODEL, ids)
+
+    def test_a_second_read_is_served_from_cache(self):
+        router = self._router_with_catalogue([
+            SimpleNamespace(id="vendor/free-one:free", name="Free One", context_length=0),
+        ])
+        self.assertFalse(asyncio.run(router.fetch_free_catalogue())["cached"])
+        self.assertTrue(asyncio.run(router.fetch_free_catalogue())["cached"])
+
+    def test_a_failed_fetch_reports_the_error_and_keeps_the_last_good_list(self):
+        router = self._router_with_catalogue([
+            SimpleNamespace(id="vendor/free-one:free", name="Free One", context_length=0),
+        ])
+        asyncio.run(router.fetch_free_catalogue())
+
+        async def boom():
+            raise RuntimeError("catalogue is down")
+
+        router.client.models = SimpleNamespace(list=lambda: boom())
+        result = asyncio.run(router.fetch_free_catalogue(force=True))
+        self.assertIn("catalogue is down", result["error"])
+        self.assertTrue(result["models"])
+
+    def test_the_catalogue_spends_no_narration_budget(self):
+        # The models endpoint is not a completion, and narration is what the
+        # daily allowance is for.
+        router = self._router_with_catalogue([
+            SimpleNamespace(id="vendor/free-one:free", name="Free One", context_length=0),
+        ])
+        before = router.limiter.snapshot()["used_today"]
+        asyncio.run(router.fetch_free_catalogue())
+        self.assertEqual(router.limiter.snapshot()["used_today"], before)
+
+    def test_no_key_reports_why_rather_than_raising(self):
+        router = AITaskRouter(api_key=None)
+        result = asyncio.run(router.fetch_free_catalogue())
+        self.assertEqual(result["models"], [])
+        self.assertIn("OPENROUTER_API_KEY", result["error"])

@@ -28,8 +28,8 @@ class ReleaseVersionTests(unittest.TestCase):
             (root / "docker-compose.yml").read_text(encoding="utf-8"),
         )
 
-    def test_release_is_marked_v0_21_6(self):
-        self.assertEqual(__version__, "0.27.0")
+    def test_release_is_the_expected_version(self):
+        self.assertEqual(__version__, "0.28.0")
 
     def test_health_metadata_exposes_release_version(self):
         state = HealthState(supported_schema_version=4)

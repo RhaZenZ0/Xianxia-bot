@@ -358,7 +358,7 @@ TIERS = (
     ("threads.py",),
     ("admin/core.py",),
     ("admin/channel_messages.py", "admin/bugs_forum.py", "ui/event_scene.py", "ui/creation.py", "ui/commissions.py"),
-    ("admin/quest_control.py", "admin/server_setup.py"),
+    ("admin/quest_control.py", "admin/narration_control.py", "admin/server_setup.py"),
     ("bot.py",),
     ("admin/world_ops.py", "admin/inspect_sim.py", "commands/*"),
     ("surface.py",),

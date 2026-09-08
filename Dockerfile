@@ -1,7 +1,7 @@
 FROM python:3.12-slim
 
 LABEL org.opencontainers.image.title="Jade Meridian Realm Xianxia Discord Bot" \
-      org.opencontainers.image.version="0.27.0"
+      org.opencontainers.image.version="0.28.0"
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \

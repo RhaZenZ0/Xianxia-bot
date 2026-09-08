@@ -403,7 +403,7 @@ def render_health(snapshot: dict[str, Any]) -> str:
 
     router = snapshot.get("router")
     if not router:
-        lines.append("No OpenRouter router is attached (procedural or OpenAI provider).")
+        lines.append("No OpenRouter router is attached (narration is procedural or disabled).")
         return "\n".join(lines)
 
     tls_failures = int(router.get("tls_failures") or 0)

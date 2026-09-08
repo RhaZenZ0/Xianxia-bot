@@ -24,6 +24,7 @@ const sameId=(a,b)=>String(a??'')===String(b??'');
 const jsonText=(v,empty='—')=>{if(v===null||v===undefined||v==='')return empty;try{const x=typeof v==='string'?JSON.parse(v):v;if(Array.isArray(x))return x.length?x.join(', '):empty;if(x&&typeof x==='object')return Object.entries(x).map(([k,val])=>`${k}: ${val}`).join(', ')||empty;return String(x)}catch{return String(v)}};
 const pill=(v,cls='')=>`<span class="pill ${cls}">${esc(v??'—')}</span>`;
 async function api(path){const r=await fetch(path,{cache:'no-store'}); if(!r.ok) throw new Error(`${r.status} ${await r.text()}`); return r.json()}
+async function narrationPost(action,payload={}){const r=await fetch('/api/narration/action',{method:'POST',cache:'no-store',headers:{'Content-Type':'application/json','X-Xianxia-Admin':'1'},body:JSON.stringify({action,payload})});let d={};try{d=await r.json()}catch{}if(!r.ok)throw new Error(d.message||d.error||`Narration action failed (${r.status})`);return d}
 async function discordPost(action,payload={}){const r=await fetch('/api/discord/action',{method:'POST',cache:'no-store',headers:{'Content-Type':'application/json','X-Xianxia-Admin':'1'},body:JSON.stringify({action,payload})});let d={};try{d=await r.json()}catch{}if(!r.ok)throw new Error(d.message||d.error||`Discord setup action failed (${r.status})`);return d}
 async function adminPost(action,payload={}){const r=await fetch('/api/admin/action',{method:'POST',cache:'no-store',headers:{'Content-Type':'application/json','X-Xianxia-Admin':'1'},body:JSON.stringify({action,payload})});let d={};try{d=await r.json()}catch{}if(!r.ok)throw new Error(d.message||d.error||`Admin action failed (${r.status})`);return d}
 function resultBox(v,ok=true){return `<div class="result ${ok?'goodbox':'badbox'}"><b>${ok?'Success':'Failed'}</b><pre>${esc(typeof v==='string'?v:JSON.stringify(v,null,2))}</pre></div>`}
@@ -76,6 +77,7 @@ const VIEWS={
   threads:{t:'Discord Threads',g:'Systems',b:'Household, expedition and private scene threads bound to guild channels.'},
   ai_routing:{t:'AI Routing',g:'Systems',b:'Which narration route serves a scene, what each one last answered, and what the daily liveness check retired. Read-only — narration is descriptive, never authoritative.'},
   discord:{t:'Discord Setup',g:'Admin',b:'Provision and repair the server layout. Only discord.py touches guilds — no game mechanics happen here.'},
+  narration:{t:'Narration Routes',g:'Admin',b:'Which free models narrate, in what order, and what the daily probe found out about each one. Narration is descriptive only — nothing here can change canonical state.'},
   admin:{t:'Admin Console',g:'Admin',b:'Actions that change the world. Every one is applied by the engine and written to admin_audit_log with your name on it.'},
 };
 
@@ -438,6 +440,52 @@ async function loadDiscordSetup(){
  freshStartDiscord.onclick=()=>run('fresh_start',{confirm:'CLEAR'},'PERMANENTLY delete and recreate world-events, bot-logs, begin-here, xianxia-info, the realm hubs and bugs - wiping all messages in them? player-homes, expeditions and event-scenes are left untouched. This cannot be undone.');
  teardownDiscord.onclick=()=>{const typed=(teardownConfirm.value||'').trim().toUpperCase();if(typed!=='DELETE'){out.innerHTML=resultBox('Type DELETE in the box to confirm the teardown.',false);return}run('teardown',{confirm:typed},'PERMANENTLY delete every Xianxia channel, category and thread this bot owns on Discord? Nothing is recreated and the database is not reset. This cannot be undone.')};
  resetWorldDiscord.onclick=()=>run('reset_world',{confirm:'RESET'},'PERMANENTLY delete every Discord thread this bot is tracking and post a world-reset announcement? This cannot be undone.');
+}
+
+async function loadNarration(){
+ const d=await api('/api/narration');
+ if(!d.connected){app.innerHTML=`<h2>Narration Routes</h2><div class="card badbox"><b>The narrator is unreachable.</b><div class="muted">${esc(d.message||'The dashboard cannot reach the Python bot process, so it cannot read or change the live chain.')}</div></div>`;return}
+ const slots=d.slots||{}, st=d.status||{}, cat=d.catalogue||{}, models=cat.models||[], rows=st.models||[], chains=st.chains||{};
+ // A slug the GM already has selected may not be in the catalogue any more -
+ // that is exactly the case this panel exists to make visible - so it is added
+ // to its own picker rather than silently reset to the first option.
+ const options=(current,allowEmpty)=>{const ids=models.map(m=>m.id);const extra=current&&!ids.includes(current)?[{id:current,name:current+' (not in the free catalogue)',context_length:0}]:[];
+  return (allowEmpty?`<option value="" ${current?'':'selected'}>— none: go straight to the dynamic router —</option>`:'')+[...extra,...models].map(m=>`<option value="${esc(m.id)}" ${sameId(current,m.id)?'selected':''}>${esc(m.name||m.id)}${m.context_length?` · ${n(m.context_length)} ctx`:''}</option>`).join('')}
+ const slot=(id,label,key,allowEmpty,hint)=>`<label>${label}<select id="${id}">${options(slots[key]||'',allowEmpty)}</select><small class="muted">${esc(hint)}</small></label>`;
+ const verdict=r=>{if(r.probe_retired)return pill('retired','bad');if(r.probe_ok===true)return pill('reachable','good');if(r.probe_ok===false)return pill('failed','warn');return pill('not probed','blue')};
+ const budget=st.limiter||{};
+ app.innerHTML=`<div class="admin-hero"><div><div class="eyebrow">NARRATION ROUTING</div><h2>Narration Routes</h2><p>Pick which free models narrate and in what order. Choices are stored by the Go engine and written to <code>admin_audit_log</code>, then applied to the running bot — they survive a restart. Narration is descriptive only: nothing chosen here can write rewards, deaths, relationships or history.</p></div><div class="tagline">${pill(st.enabled?'router live':'no route configured',st.enabled?'good':'bad')}${pill(`${n(budget.used_today||0)}/${n(budget.max_requests_per_day||0)} today`,'blue')}${pill(`${models.length} free models`,models.length?'good':'warn')}</div></div>
+ <div id="narrationResult"></div>
+ ${cat.error?`<div class="card warnbox"><b>The catalogue could not be refreshed.</b><div class="muted">${esc(cat.error)} — the pickers below show what is already selected, so you can still change the order.</div></div>`:''}
+ <div class="cards">
+  <div class="card"><small>Routine chain</small><div class="muted">${(chains.routine||[]).map(esc).join(' → ')||'—'}</div></div>
+  <div class="card"><small>Epic chain</small><div class="muted">${(chains.epic||[]).map(esc).join(' → ')||'—'}</div></div>
+ </div>
+ <h2>Choose Routes</h2>
+ <section class="card control"><p>Only free endpoints are offered while <code>OPENROUTER_REQUIRE_FREE</code> is on. A newly chosen route is treated as un-probed, so a retirement left by whatever occupied the slot before does not carry over.</p>
+ <div class="grid2">
+  ${slot('slotRoutine','Routine — primary','routine_model',false,'Ordinary scenes. Tried first.')}
+  ${slot('slotRoutineFallback','Routine — second hop','routine_fallback_model',true,'Optional. Tried when the primary fails.')}
+  ${slot('slotEpic','Epic — primary','epic_model',false,'Breakthroughs, sect trials, major events.')}
+  ${slot('slotEpicFallback','Epic — second hop','epic_fallback_model',true,'Optional. Tried when the epic primary fails.')}
+  ${slot('slotDynamic','Last hop — dynamic router','dynamic_free_model',false,'Closes both chains. After this one fails, narration is procedural.')}
+ </div>
+ <label>Audit reason<input id="narrationReason" value="GM dashboard narration routing"></label>
+ <div class="buttonrow"><button class="btn primary" id="saveNarration">Save Routes</button><button class="btn" id="refreshCatalogue">Refresh Catalogue</button><button class="btn" id="refreshNarration">Refresh Status</button></div></section>
+ <h2>What The Daily Probe Found</h2>
+ <p class="muted">The audit proves a route <b>answers</b>, nothing more — a model that replies with its own reasoning instead of prose passes this and is still rejected at narration time. A 400 is only acted on when the route answers without the reasoning-off parameter and fails with it.</p>
+ ${table([['Route','model'],['Probe',verdict],['400 verdict',r=>r.probe_400_class?esc(r.probe_400_class):'—'],['Attempts','attempts'],['Served','successes'],['Failed','failures'],['Empty','empty_responses'],['Scratchpad','scratchpad_rejected'],['Cooling',r=>r.cooling_down?`${r.cooldown_remaining_seconds}s`:'—'],['Last error',r=>esc(r.last_error||r.probe_error||'—')]],rows)}`;
+ const out=document.getElementById('narrationResult');
+ saveNarration.onclick=async()=>{
+  const slotsOut={routine_model:slotRoutine.value,routine_fallback_model:slotRoutineFallback.value,epic_model:slotEpic.value,epic_fallback_model:slotEpicFallback.value,dynamic_free_model:slotDynamic.value};
+  if(!confirm('Save these narration routes? They are audited and applied to the running bot immediately.'))return;
+  out.innerHTML='<div class="loading">Saving narration routes…</div>';
+  try{const r=await narrationPost('narration.set_chain',{slots:slotsOut,reason:narrationReason?.value||'GM dashboard narration routing'});
+   out.innerHTML=resultBox(r.applied?r:{...r,note:'Stored and audited, but the running bot did not pick it up — it will apply on the next restart.'},!!r.applied);
+   setTimeout(()=>loadNarration().catch(()=>{}),900)}
+  catch(e){out.innerHTML=resultBox(e.message,false)}};
+ refreshCatalogue.onclick=async()=>{out.innerHTML='<div class="loading">Asking OpenRouter what is free right now…</div>';try{await narrationPost('narration.refresh_catalogue');await loadNarration()}catch(e){out.innerHTML=resultBox(e.message,false)}};
+ refreshNarration.onclick=()=>loadNarration();
 }
 
 async function loadAdmin(){
@@ -845,7 +893,7 @@ function openForge(){
   catch(e){out.innerHTML=resultBox(e.message,false)}};
 }
 
-const loaders={overview:loadOverview,timeline:loadTimeline,npcs:loadNPCs,families:loadFamilies,sects:loadSects,conflicts:loadConflicts,events:loadEvents,players:loadPlayers,cultivation:loadCultivation,crafting:loadCrafting,exploration:loadExploration,commissions:loadCommissions,quests:loadQuests,economy:loadEconomy,dynasties:loadDynasties,party:loadParty,pvp:loadPvp,conditions:loadConditions,threads:loadThreads,rag:loadRag,decisions:loadDecisions,discord:loadDiscordSetup,ai_routing:loadAiRouting,admin:loadAdmin};
+const loaders={overview:loadOverview,timeline:loadTimeline,npcs:loadNPCs,families:loadFamilies,sects:loadSects,conflicts:loadConflicts,events:loadEvents,players:loadPlayers,cultivation:loadCultivation,crafting:loadCrafting,exploration:loadExploration,commissions:loadCommissions,quests:loadQuests,economy:loadEconomy,dynasties:loadDynasties,party:loadParty,pvp:loadPvp,conditions:loadConditions,threads:loadThreads,rag:loadRag,decisions:loadDecisions,discord:loadDiscordSetup,ai_routing:loadAiRouting,narration:loadNarration,admin:loadAdmin};
 
 setDensity(density());
 bindShell();
