@@ -852,9 +852,80 @@ empty, because "it answered a ping" is not evidence that a model writes decent x
 narration-only.
 
 
-## Release status — v0.27.0
+**0.28.0** corrects what a `400` is allowed to prove, and moves route selection into the dashboard.
 
-- Current release: v0.27.0: a daily one-token liveness check retires routes that answer
+The v0.27.0 audit read a `400` that repeated at `max_tokens=64` as proof that the route rejects
+`REASONING_OFF`, and retired it. That inference does not hold. The probe differs from a narration
+call in *two* ways at once — `max_tokens=1` and the `REASONING_OFF` body — and the confirmation
+changed only the first, so a reasoning-mandatory endpoint, a context-length overflow, a malformed
+body and a moderation block all reproduced identically. Every one of them retired the route.
+
+`_classify_bad_request` now changes one variable per call. First an ordinary token budget with
+`REASONING_OFF` still attached: if it answers, the `400` was the one-token probe hitting a provider
+minimum — an artifact of the diagnostic, and the route is left alone. Then the same ordinary-budget
+call with the `reasoning` object removed: if *that* answers, the parameter was the cause, and since
+`REASONING_OFF` is on every narration request and is not negotiable, the route cannot serve
+narration as this bot calls it and is retired until the next audit. A `400` that survives both is
+not parameter-caused at all, and a cause that cannot be named is not a cause to act on: it is
+recorded and ignored. Every path now records a verdict — `reasoning-rejected`, `token-budget`,
+`other-status`, `unclassified`, `unconfirmed`, `no-reasoning-parameter` — surfaced as
+`probe_400_class` so the panel says *why* a `400` was left alone.
+
+The single-call version of this — drop `reasoning` and raise `max_tokens` together — is deliberately
+not what shipped. It reintroduces the same conflation in the other direction, retiring a healthy
+route whose only fault is a provider minimum on `max_tokens`.
+
+Two fixes fell out of the same review. `google-genai` collapses *every* 4xx into a bare
+`ClientError` — there is no `BadRequestError`, no `AuthenticationError` — and carries the number on
+`.code`, not `status_code`. The probe read only the openai SDK's attribute, so a rejected AI Studio
+key produced no status at all and was never retired: the exact case `PROBE_DURABLE_STATUSES` names
+in its own comment. And a `200` with an empty `choices` array — how OpenRouter relays an upstream
+failure without an HTTP status — recorded only "OpenRouter returned no choices", which is true and
+identical for a provider outage, a moderation block, an upstream rate limit and a gateway
+rejection. The `error` object beside the empty array is now read and reported, including whether
+`metadata` was there at all: its absence means OpenRouter rejected the call itself and it never
+reached a provider, which is a different problem to chase.
+
+The other half of the release is the **Narration Routes** dashboard panel. Editing `.env` and
+restarting the container was the only way to change a route, which fits badly with a catalogue that
+moves without notice — `z-ai/glm-5.2:free` and `minimax/minimax-m3:free` both died in place as
+shipped defaults. The five chain slots are now picked from OpenRouter's *live* free catalogue
+(`GET /api/v1/models`, cached 15 minutes) rather than from a list kept in this repo, because a list
+kept in this repo is how those two rotted. Beside the pickers is a read-only view of the daily
+probe: per-route verdict, `probe_400_class`, attempts, cooldown and last error, so a GM can see why
+a route is retired before choosing its replacement.
+
+The write path crosses three processes and the ordering is the design. The dashboard writes through
+the engine — `admin.narration.set_chain` stores the chain in `world_state` and an `admin_audit_log`
+row in one transaction, following `admin.automation.set` closely enough to need **no schema
+change** — and only then pokes the bot over the existing control channel to apply it live. The
+engine write is what makes the choice durable and audited, so it happens first and independently: an
+unreachable bot reports "stored, applies at next restart" rather than failing, because telling a GM
+their change did not happen when it did invites them to make it twice. The bot also applies the
+stored chain at startup, so `.env` is the baseline rather than the last word.
+`OPENROUTER_REQUIRE_FREE` still applies — a dashboard is an easier place to pick a paid slug by
+accident than a `.env` file, not a harder one — every slot is validated before any is assigned, and
+a newly chosen route has its probe verdict cleared so it does not inherit the previous occupant's
+retirement.
+
+Also removed: the direct OpenAI narration provider (`NARRATOR_PROVIDER=openai`). It was a second,
+paid path parallel to the OpenRouter chain, bypassing the free-tier limiter, the route audit and the
+tiered fallback entirely — the one way to spend real money by editing a single line of `.env`.
+Nothing in the shipped configuration used it. A `.env` still naming it now fails loudly at startup
+rather than silently narrating procedurally. The `openai` package itself stays: it is the client
+`AITaskRouter` points at OpenRouter's `base_url`, not a provider.
+
+38 new tests across `test_ai_router_health.py`, a new `test_narration_control.py` contract module
+and four Go tests for the engine action. No schema change (still 32), no game-rule change, AI
+remains narration-only.
+
+
+## Release status — v0.28.0
+
+- Current release: v0.28.0: a `400` no longer retires a route unless removing the reasoning
+  parameter is what fixes it, and narration routes are chosen from the dashboard against
+  OpenRouter's live free catalogue.
+- v0.27.0: a daily one-token liveness check retires routes that answer
   401/403/404, so a withdrawn slug stops costing a free-tier slot per narration.
 - v0.26.1: the withdrawn `z-ai/glm-5.2:free` hop is out of both chains, and a
   narration timeout is no longer misreported as a TLS/certificate failure.
