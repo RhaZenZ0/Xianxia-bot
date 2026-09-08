@@ -33,6 +33,7 @@ from app.ai.ai_router import (
     PROBE_400_TOKEN_BUDGET,
     PROBE_400_UNCLASSIFIED,
     PROBE_400_UNCONFIRMED,
+    NARRATION_SLOTS,
     _error_status,
 )
 
@@ -1333,3 +1334,141 @@ class AIStudioProbeClassifierTests(unittest.TestCase):
         self.assertFalse(router._model_row(DEFAULT_ROUTINE_MODEL)["probe_retired"])
         with self.assertRaises(ScratchpadResponse):
             _validate_generated_text(scratchpad)
+
+
+class NarrationSlotTests(unittest.TestCase):
+    """The chain slots a GM can change from the dashboard, at runtime."""
+
+    def test_the_chains_are_rebuilt_from_the_new_slots(self):
+        router = _router(["unused"])
+        result = router.set_slots({"routine_model": "vendor/new-routine:free"})
+        self.assertIn("vendor/new-routine:free", router.models_for(NarrationTier.ROUTINE))
+        self.assertEqual(result["changed"], ["routine_model"])
+        self.assertEqual(
+            result["chains"]["routine"], list(router.models_for(NarrationTier.ROUTINE))
+        )
+
+    def test_a_paid_slug_is_refused_while_the_free_guard_is_on(self):
+        # A dashboard is an easier place to make this mistake than a .env file,
+        # not a harder one.
+        router = _router(["unused"])
+        with self.assertRaisesRegex(ValueError, "free route"):
+            router.set_slots({"routine_model": "openai/gpt-5"})
+
+    def test_a_rejected_value_leaves_every_slot_untouched(self):
+        # Validation happens before any assignment, so a bad slot in a batch
+        # cannot leave the router half-changed.
+        router = _router(["unused"])
+        before = router.slots_snapshot()
+        with self.assertRaises(ValueError):
+            router.set_slots({
+                "epic_model": "vendor/good:free",
+                "routine_model": "vendor/paid-by-mistake",
+            })
+        self.assertEqual(router.slots_snapshot(), before)
+
+    def test_an_unknown_slot_name_is_refused(self):
+        router = _router(["unused"])
+        with self.assertRaisesRegex(ValueError, "Unknown narration slot"):
+            router.set_slots({"reasoning": "off"})
+
+    def test_a_fallback_slot_may_be_cleared_but_a_primary_may_not(self):
+        router = _router(["unused"])
+        router.set_slots({"routine_fallback_model": ""})
+        self.assertEqual(router.slots_snapshot()["routine_fallback_model"], "")
+        with self.assertRaises(ValueError):
+            router.set_slots({"routine_model": ""})
+
+    def test_a_newly_chosen_route_does_not_inherit_a_retirement(self):
+        # The slot's previous occupant being retired says nothing about the
+        # model just put there; inheriting it would skip the new route until
+        # the next audit.
+        router = _router(["unused"])
+        row = router._model_row("vendor/fresh:free")
+        row["probe_retired"] = True
+        row["probe_ok"] = False
+        row["probe_400_class"] = PROBE_400_REASONING
+        router.set_slots({"routine_model": "vendor/fresh:free"})
+        self.assertFalse(row["probe_retired"])
+        self.assertIsNone(row["probe_ok"])
+        self.assertEqual(row["probe_400_class"], "")
+
+    def test_setting_a_slot_to_what_it_already_was_changes_nothing(self):
+        router = _router(["unused"])
+        current = router.slots_snapshot()
+        result = router.set_slots({"routine_model": current["routine_model"]})
+        self.assertEqual(result["changed"], [])
+
+    def test_the_aistudio_lead_is_not_a_settable_slot(self):
+        # It exists only when the operator put their own Google key in the
+        # environment, and a browser cannot add one.
+        self.assertNotIn("google_model", NARRATION_SLOTS)
+
+
+class FreeCatalogueTests(unittest.TestCase):
+    """The picker's list comes from OpenRouter, not from a list in this repo.
+
+    A list in this repo is how `z-ai/glm-5.2:free` and `minimax/minimax-m3:free`
+    both shipped as defaults that no longer existed.
+    """
+
+    def _router_with_catalogue(self, entries):
+        router = _router(["unused"])
+        router.client.models = SimpleNamespace(
+            list=_return(SimpleNamespace(data=entries))
+        )
+        return router
+
+    def test_only_free_endpoints_are_offered(self):
+        router = self._router_with_catalogue([
+            SimpleNamespace(id="vendor/free-one:free", name="Free One", context_length=8192),
+            SimpleNamespace(id="vendor/paid-one", name="Paid One", context_length=8192),
+        ])
+        ids = [row["id"] for row in asyncio.run(router.fetch_free_catalogue())["models"]]
+        self.assertIn("vendor/free-one:free", ids)
+        self.assertNotIn("vendor/paid-one", ids)
+
+    def test_the_dynamic_router_is_always_selectable(self):
+        # It is a router, not a catalogue entry, so it is added rather than found.
+        router = self._router_with_catalogue([
+            SimpleNamespace(id="vendor/free-one:free", name="Free One", context_length=0),
+        ])
+        ids = [row["id"] for row in asyncio.run(router.fetch_free_catalogue())["models"]]
+        self.assertIn(DEFAULT_DYNAMIC_FREE_MODEL, ids)
+
+    def test_a_second_read_is_served_from_cache(self):
+        router = self._router_with_catalogue([
+            SimpleNamespace(id="vendor/free-one:free", name="Free One", context_length=0),
+        ])
+        self.assertFalse(asyncio.run(router.fetch_free_catalogue())["cached"])
+        self.assertTrue(asyncio.run(router.fetch_free_catalogue())["cached"])
+
+    def test_a_failed_fetch_reports_the_error_and_keeps_the_last_good_list(self):
+        router = self._router_with_catalogue([
+            SimpleNamespace(id="vendor/free-one:free", name="Free One", context_length=0),
+        ])
+        asyncio.run(router.fetch_free_catalogue())
+
+        async def boom():
+            raise RuntimeError("catalogue is down")
+
+        router.client.models = SimpleNamespace(list=lambda: boom())
+        result = asyncio.run(router.fetch_free_catalogue(force=True))
+        self.assertIn("catalogue is down", result["error"])
+        self.assertTrue(result["models"])
+
+    def test_the_catalogue_spends_no_narration_budget(self):
+        # The models endpoint is not a completion, and narration is what the
+        # daily allowance is for.
+        router = self._router_with_catalogue([
+            SimpleNamespace(id="vendor/free-one:free", name="Free One", context_length=0),
+        ])
+        before = router.limiter.snapshot()["used_today"]
+        asyncio.run(router.fetch_free_catalogue())
+        self.assertEqual(router.limiter.snapshot()["used_today"], before)
+
+    def test_no_key_reports_why_rather_than_raising(self):
+        router = AITaskRouter(api_key=None)
+        result = asyncio.run(router.fetch_free_catalogue())
+        self.assertEqual(result["models"], [])
+        self.assertIn("OPENROUTER_API_KEY", result["error"])

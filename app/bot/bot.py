@@ -26,6 +26,11 @@ from ..version import RELEASE_VERSION
 from .admin.channel_messages import XianxiaInfoView
 from .admin.server_setup import dashboard_discord_control
 from .admin.quest_control import dashboard_quest_control, owns as quest_control_owns
+from .admin.narration_control import (
+    apply_stored_chain,
+    dashboard_narration_control,
+    owns_narration_action,
+)
 from .channels import post_server_log
 from .character_state import _remember_freeform_npc_scene
 from .runtime import DB, ENGINE, SETTINGS, WORLD, _sync_realm_presence_roles, character_location_display, chunk_text, current_world_time, log
@@ -94,6 +99,8 @@ class XianxiaBot(commands.Bot):
         # docstring promises it only ever touches Discord layout.
         if quest_control_owns(action):
             return await dashboard_quest_control(action, payload)
+        if owns_narration_action(action):
+            return await dashboard_narration_control(action, payload)
         return await dashboard_discord_control(self, action, payload)
 
     async def _mark_startup_phase(self, phase: str, detail: dict | None = None) -> None:
@@ -163,6 +170,16 @@ class XianxiaBot(commands.Bot):
             phase = "COMMAND_SYNC"
             synced = await self.tree.sync(guild=GUILD)
             log.info("COMMANDS_READY count=%s guild=%s", len(synced), SETTINGS.guild_id)
+            # The GM's dashboard-chosen chain, if there is one, before any
+            # narration goes out: the .env values are the baseline, not the
+            # last word. A failure here must never block startup - narration
+            # falls back to .env and then to procedural prose either way.
+            try:
+                applied = await apply_stored_chain()
+                if applied.get("applied"):
+                    log.info("AI_CHAIN_RESTORED %s", applied.get("slots"))
+            except Exception:
+                log.exception("Could not apply the stored narration chain")
             self.event_expiry_task = asyncio.create_task(self.event_expiry_worker())
             self.operational_health_task = asyncio.create_task(self.operational_health_worker())
             if SETTINGS.update_check_enabled:

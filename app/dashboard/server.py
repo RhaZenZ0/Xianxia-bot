@@ -1893,6 +1893,16 @@ class DiscordDashboardController:
                 "message": str(exc),
             }
 
+    async def run_readonly(self, action: str, payload: dict[str, Any]) -> dict[str, Any]:
+        """Ask the bot something without claiming admin-write permission.
+
+        The narration panel reads the live router and OpenRouter's catalogue on
+        every open. Neither mutates anything, so gating them behind
+        DASHBOARD_ADMIN_WRITES would blank the panel for a read-only GM and
+        teach nobody anything.
+        """
+        return await self._request(action, dict(payload or {}))
+
     async def run(self, action: str, payload: dict[str, Any]) -> dict[str, Any]:
         if not self.enabled:
             raise PermissionError("Dashboard admin writes are disabled")
@@ -1906,12 +1916,95 @@ class DiscordDashboardController:
         return await self._request(action, payload)
 
 
+class NarrationDashboardController:
+    """The GM's view of, and control over, the narration chain.
+
+    Reads go to the bot process, because that is where the router lives and
+    where the OpenRouter key is; the WRITE goes to the engine, because that is
+    what makes a GM choice durable and audited. The dashboard never edits the
+    chain in its own memory - it has no router to edit - so the order is
+    always: engine accepts and audits, then the bot is told to re-read.
+
+    A failed poke is reported, not raised. The choice is already stored and
+    will be applied at the next restart either way, and telling a GM "that
+    did not work" when it did is worse than telling them it is not live yet.
+    """
+
+    def __init__(self, control: "DiscordDashboardController", engine_url: str, enabled: bool, actor_id: int = 1) -> None:
+        self.control = control
+        self.enabled = bool(enabled)
+        self.engine_url = str(engine_url or "").strip().rstrip("/")
+        self.engine = GameEngineClient(self.engine_url) if self.engine_url else None
+        self.actor_id = int(actor_id)
+
+    async def snapshot(self) -> dict[str, Any]:
+        out: dict[str, Any] = {
+            "admin_writes": self.enabled,
+            "slots": {},
+            "status": {},
+            "catalogue": {"models": []},
+            "connected": False,
+        }
+        try:
+            status = await self.control.run_readonly("narration.status", {})
+            out["slots"] = dict((status.get("result") or {}).get("slots") or {})
+            out["status"] = dict((status.get("result") or {}).get("status") or {})
+            out["connected"] = True
+        except Exception as exc:
+            out["message"] = str(exc)[:300]
+            return out
+        try:
+            catalogue = await self.control.run_readonly("narration.catalogue", {})
+            out["catalogue"] = dict(catalogue.get("result") or {})
+        except Exception as exc:
+            # The picker degrades to "keep what you have": the chain and its
+            # probe verdicts are still worth rendering without a catalogue.
+            out["catalogue"] = {"models": [], "error": str(exc)[:300]}
+        return out
+
+    async def run(self, action: str, payload: dict[str, Any]) -> dict[str, Any]:
+        if not self.enabled:
+            raise PermissionError("Dashboard admin writes are disabled")
+        action = str(action or "").strip().lower()
+        if action == "narration.refresh_catalogue":
+            return await self.control.run_readonly("narration.catalogue", {"refresh": True})
+        if action != "narration.set_chain":
+            raise ValueError(f"Unsupported narration action: {action}")
+        if self.engine is None:
+            raise RuntimeError("GAME_ENGINE_URL is not configured")
+        slots = {str(k): str(v or "") for k, v in dict(payload.get("slots") or {}).items()}
+        if not slots:
+            raise ValueError("Choose at least one route to change")
+        stored = await self.engine.action(
+            "admin.narration.set_chain",
+            self.actor_id,
+            {"slots": slots, "reason": str(payload.get("reason") or "")},
+        )
+        applied: dict[str, Any]
+        try:
+            applied = await self.control.run_readonly("narration.apply", {})
+        except Exception as exc:
+            applied = {"ok": False, "result": {"applied": False, "reason": str(exc)[:300]}}
+        return {
+            "ok": True,
+            "stored": stored,
+            "applied": bool(applied.get("ok")),
+            "apply_detail": applied.get("result") or {},
+        }
+
+
 class DashboardServer:
     def __init__(self, settings: DashboardSettings):
         self.settings = settings
         self.store = ReadOnlyDashboardStore(settings.database_path)
         self.admin = AdminDashboardController(self.store, settings.engine_url or os.getenv("GAME_ENGINE_URL", ""), settings.admin_writes, settings.dashboard_actor_id)
         self.discord = DiscordDashboardController(settings.bot_control_url, settings.bot_control_token, settings.admin_writes, settings.dashboard_actor_id)
+        self.narration = NarrationDashboardController(
+            self.discord,
+            settings.engine_url or os.getenv("GAME_ENGINE_URL", ""),
+            settings.admin_writes,
+            settings.dashboard_actor_id,
+        )
         # Bounds for the pre-auth request head. See app/ops/http_limits.py: a per-line
         # timeout that resets on every line is not a limit, it is an invitation.
         self.header_limits = HeaderLimits(
@@ -2004,7 +2097,7 @@ class DashboardServer:
                 return
 
             if method == "POST":
-                if path not in {"/api/admin/action", "/api/discord/action"}:
+                if path not in {"/api/admin/action", "/api/discord/action", "/api/narration/action"}:
                     await self._send_json(writer, 404, {"error": "not_found"}); return
                 if not self.settings.admin_writes:
                     await self._send_json(writer, 403, {"error": "admin_writes_disabled"}); return
@@ -2021,7 +2114,12 @@ class DashboardServer:
                     body = json.loads(raw.decode("utf-8"))
                     action = str(body.get("action") or "")
                     payload = dict(body.get("payload") or {})
-                    result = await (self.discord.run(action, payload) if path == "/api/discord/action" else self.admin.run(action, payload))
+                    if path == "/api/discord/action":
+                        result = await self.discord.run(action, payload)
+                    elif path == "/api/narration/action":
+                        result = await self.narration.run(action, payload)
+                    else:
+                        result = await self.admin.run(action, payload)
                 except PermissionError as exc:
                     await self._send_json(writer, 403, {"error": "forbidden", "message": str(exc)}); return
                 except (ValueError, TypeError, RuntimeError, GameEngineError, RemoteDatabaseError) as exc:
@@ -2097,6 +2195,8 @@ class DashboardServer:
                 await self._send_json(writer, 200, await self.admin.snapshot()); return
             if path == "/api/discord":
                 await self._send_json(writer, 200, await self.discord.snapshot()); return
+            if path == "/api/narration":
+                await self._send_json(writer, 200, await self.narration.snapshot()); return
             if path == "/api/health":
                 await self._send_json(writer, 200, {"ok": True, "schema_version": await self.store.schema_version(), "database": str(self.settings.database_path), "admin_writes": self.settings.admin_writes}); return
             await self._send_json(writer, 404, {"error": "not_found"})

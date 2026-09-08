@@ -537,9 +537,11 @@ class NavigationGroupingTests(unittest.TestCase):
         self.assertEqual(sorted(placed), sorted(DASHBOARD_VIEW_ENDPOINTS))
         self.assertEqual(len(placed), len(set(placed)), "a view is listed in two groups")
         self.assertEqual(len(groups), 5, f"expected five groups, got {list(groups)}")
-        # The two views that can change the world are kept apart from the
-        # twenty-one that only read it.
-        self.assertEqual(groups["Admin"], ["discord", "admin"])
+        # The views that can change the world are kept apart from the
+        # twenty-one that only read it. Narration routing joined them: it
+        # cannot touch canonical state, but it is an audited engine write and
+        # it decides what every player reads, so it belongs on this side.
+        self.assertEqual(groups["Admin"], ["discord", "narration", "admin"])
 
     def test_the_shell_carries_the_pieces_the_page_template_needs(self):
         for required in ('id="navFilter"', 'id="crumb"', 'id="railToggle"', 'id="worldClock"', 'id="drawer"'):

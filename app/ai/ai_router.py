@@ -508,6 +508,25 @@ def _response_error(response: Any) -> str:
     return "; ".join(parts)[:280]
 
 
+# The chain slots a GM may set from the dashboard. The AI Studio lead is not
+# among them: it exists only when the operator has put their own Google key in
+# the environment, and a browser cannot add one.
+NARRATION_SLOTS = (
+    "routine_model",
+    "routine_fallback_model",
+    "epic_model",
+    "epic_fallback_model",
+    "dynamic_free_model",
+)
+# The two slots that may be emptied: "this tier has no named second hop, go
+# straight to the dynamic free router".
+NARRATION_OPTIONAL_SLOTS = frozenset({"routine_fallback_model", "epic_fallback_model"})
+
+# The catalogue moves on OpenRouter's schedule, not ours, but a GM opening the
+# panel twice in a minute should not spend two round trips on it.
+CATALOGUE_CACHE_SECONDS = 900.0
+CATALOGUE_TIMEOUT_SECONDS = 20.0
+
 BYOK_RECHECK_SECONDS = 3600.0
 
 
@@ -714,11 +733,17 @@ class AITaskRouter:
             google = _safe_free_model(google, require_free=self.require_free)
         self.google_model = google
 
-        lead = (google,) if google else ()
-        self.chains = {
-            NarrationTier.ROUTINE: _dedupe_chain((*lead, routine, routine_fallback, dynamic)),
-            NarrationTier.EPIC: _dedupe_chain((*lead, epic, epic_fallback, dynamic)),
-        }
+        # The operator-settable slots are kept AS slots, not only as the
+        # assembled chains, so the GM dashboard can change one and have the
+        # chains rebuilt in place - no .env edit, no restart. The assembled
+        # chains stay the only thing narration reads.
+        self.routine_model = routine
+        self.routine_fallback_model = routine_fallback
+        self.epic_model = epic
+        self.epic_fallback_model = epic_fallback
+        self._rebuild_chains()
+        self._catalogue: dict[str, Any] = {}
+        self._catalogue_at = 0.0
         self.limiter = OpenRouterRequestLimiter(max_requests_per_minute, max_requests_per_day)
         self._cooldown_until: dict[str, float] = {}
         self._started_at = time.time()
@@ -742,6 +767,127 @@ class AITaskRouter:
             if self.api_key
             else None
         )
+
+    def _rebuild_chains(self) -> None:
+        """Reassemble both chains from the current slots.
+
+        The AI Studio route leads both tiers when configured, and the dynamic
+        free router closes both; the dedupe keeps a slug that appears twice
+        (an operator picking the same model for primary and fallback) from
+        being attempted twice in a row.
+        """
+        lead = (self.google_model,) if self.google_model else ()
+        self.chains = {
+            NarrationTier.ROUTINE: _dedupe_chain(
+                (*lead, self.routine_model, self.routine_fallback_model, self.dynamic_free_model)
+            ),
+            NarrationTier.EPIC: _dedupe_chain(
+                (*lead, self.epic_model, self.epic_fallback_model, self.dynamic_free_model)
+            ),
+        }
+
+    def slots_snapshot(self) -> dict[str, str]:
+        """The five settable slots, as the dashboard renders them."""
+        return {name: getattr(self, name) for name in NARRATION_SLOTS}
+
+    def set_slots(self, slots: dict[str, str]) -> dict[str, Any]:
+        """Replace one or more chain slots at runtime.
+
+        Every slot is validated BEFORE any is applied, so a rejected value
+        leaves the router exactly as it was rather than half-changed. The free
+        guard still applies: OPENROUTER_REQUIRE_FREE is a promise that no paid
+        slug can be configured by accident, and a dashboard is an easier place
+        to make that accident than a .env file, not a harder one.
+
+        Retirement verdicts are cleared for slots that actually changed: a
+        newly chosen route has not been probed yet, and inheriting the previous
+        occupant's "retired" flag would skip it until the next audit.
+        """
+        unknown = sorted(set(slots) - set(NARRATION_SLOTS))
+        if unknown:
+            raise ValueError(f"Unknown narration slot(s): {', '.join(unknown)}")
+        validated: dict[str, str] = {}
+        for name, value in slots.items():
+            validated[name] = _safe_free_model(
+                value,
+                require_free=self.require_free,
+                allow_empty=name in NARRATION_OPTIONAL_SLOTS,
+            )
+        before = self.slots_snapshot()
+        changed = {n: v for n, v in validated.items() if before.get(n) != v}
+        for name, value in validated.items():
+            setattr(self, name, value)
+        self._rebuild_chains()
+        for value in changed.values():
+            if value:
+                row = self._model_row(value)
+                row["probe_retired"] = False
+                row["probe_ok"] = None
+                row["probe_400_class"] = ""
+        if changed:
+            log.info(
+                "AI_CHAIN_SET %s",
+                ", ".join(f"{name}={value or '(none)'}" for name, value in sorted(changed.items())),
+            )
+        return {"slots": self.slots_snapshot(), "changed": sorted(changed), "chains": {
+            tier.value: list(self.chains[tier]) for tier in NarrationTier
+        }}
+
+    async def fetch_free_catalogue(self, *, force: bool = False) -> dict[str, Any]:
+        """The free half of OpenRouter's live catalogue, for the dashboard picker.
+
+        Read from the catalogue endpoint rather than a list kept in this repo,
+        because a list kept in this repo is how `z-ai/glm-5.2:free` and
+        `minimax/minimax-m3:free` both shipped as defaults that no longer
+        existed. This costs no narration budget: the models endpoint is not a
+        completion and the daily limiter does not meter it.
+
+        Reachability is all this proves. A slug here can still turn out to
+        reject REASONING_OFF or to answer with its own scratchpad - the route
+        audit and `_validate_generated_text` remain the judges of that - so the
+        picker offers candidates, not guarantees.
+        """
+        now = time.time()
+        if not force and self._catalogue and now - self._catalogue_at < CATALOGUE_CACHE_SECONDS:
+            return {**self._catalogue, "cached": True}
+        if not self.client:
+            return {"models": [], "at": 0.0, "cached": False, "error": "OPENROUTER_API_KEY is not configured"}
+        try:
+            listing = await asyncio.wait_for(
+                self.client.models.list(), timeout=CATALOGUE_TIMEOUT_SECONDS
+            )
+        except Exception as exc:
+            log.warning("AI_CATALOGUE_FAILED: %s", exc)
+            stale = {**self._catalogue, "cached": True} if self._catalogue else {"models": [], "at": 0.0}
+            return {**stale, "error": f"{type(exc).__name__}: {exc}"[:300]}
+        models = []
+        for entry in getattr(listing, "data", None) or []:
+            model_id = str(getattr(entry, "id", "") or "").strip()
+            if not model_id or not _is_free_route(model_id):
+                continue
+            extra = getattr(entry, "model_extra", None)
+            extra = extra if isinstance(extra, dict) else {}
+            models.append(
+                {
+                    "id": model_id,
+                    "name": str(getattr(entry, "name", None) or extra.get("name") or model_id),
+                    "context_length": int(
+                        getattr(entry, "context_length", None) or extra.get("context_length") or 0
+                    ),
+                }
+            )
+        models.sort(key=lambda row: row["id"])
+        # openrouter/free is a router, not a catalogue entry, so it is added
+        # rather than found - it is the one slug that is always selectable.
+        if not any(row["id"] == DEFAULT_DYNAMIC_FREE_MODEL for row in models):
+            models.insert(0, {
+                "id": DEFAULT_DYNAMIC_FREE_MODEL,
+                "name": "OpenRouter dynamic free router",
+                "context_length": 0,
+            })
+        self._catalogue = {"models": models, "at": now}
+        self._catalogue_at = now
+        return {**self._catalogue, "cached": False}
 
     @property
     def enabled(self) -> bool:

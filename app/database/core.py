@@ -6226,6 +6226,28 @@ class Database:
             out.append(item)
         return out
 
+    async def get_narration_chain(self) -> dict[str, str]:
+        """The GM-chosen narration chain, or {} when none has ever been set.
+
+        Written by the engine's admin.narration.set_chain (world_state, one
+        JSON blob, audited); read here so the bot can apply it at startup
+        instead of only ever seeing the .env defaults. An empty dict means
+        "the dashboard has never chosen", which is different from a slot the
+        GM deliberately cleared - that one is stored as "".
+        """
+        async with self._connect() as db:
+            cur = await db.execute("SELECT value_json FROM world_state WHERE key='narration_chain'")
+            row = await cur.fetchone()
+        if not row:
+            return {}
+        try:
+            stored = json.loads(row[0])
+        except Exception:
+            return {}
+        if not isinstance(stored, dict):
+            return {}
+        return {str(key): str(value or "") for key, value in stored.items()}
+
     async def get_automation_settings(self) -> dict[str, bool]:
         defaults = {
             "event_expiry": True,

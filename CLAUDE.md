@@ -188,6 +188,28 @@ allowance, and retires nothing when *every* route fails at once (a local fault, 
 catalogue). It proves reachability only — a scratchpadding model passes it, so
 `_validate_generated_text` remains the sole judge of whether a reply is usable prose.
 
+### Narration routes in the dashboard
+
+The GM dashboard's **Narration Routes** panel picks the five chain slots
+(`routine_model`, `routine_fallback_model`, `epic_model`, `epic_fallback_model`,
+`dynamic_free_model`) from OpenRouter's live free catalogue rather than from a list kept in this
+repo — a list kept here is how `z-ai/glm-5.2:free` and `minimax/minimax-m3:free` both shipped as
+defaults that no longer existed. The AI Studio lead is not settable: it exists only when the
+operator has put their own Google key in the environment.
+
+Three processes, and the order is the point. The browser posts to the dashboard; the dashboard
+writes through the engine (`admin.narration.set_chain` → `world_state['narration_chain']` +
+`admin_audit_log`, no schema change — it follows `admin.automation.set`); then it pokes the bot
+over the existing `/control/discord` channel (`narration.apply`) to re-read and apply it live.
+The engine write is what makes a choice durable and audited, so it happens first and independently
+— an unreachable bot means "stored, applies at next restart", not a failure. The bot also applies
+the stored chain at startup, so `.env` is the baseline rather than the last word.
+
+`AITaskRouter` keeps the slots as slots (not only as assembled chains) so `set_slots()` can rebuild
+in place; `OPENROUTER_REQUIRE_FREE` still applies, every slot is validated before any is assigned,
+and a newly chosen route has its probe verdict cleared so it does not inherit the previous
+occupant's retirement.
+
 ### Dashboard (`app/dashboard`, `dashboard/`)
 
 Authenticated GM control plane; production reads go through Go-owned query sessions (dashboard never
