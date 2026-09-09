@@ -241,11 +241,10 @@ source check that moderation commands audit.
   `/use` and the group commands fall to the picker. Let a candidate carry
   one resolved argument (a destination, an item) when entity resolution
   found it, growing the table from what the picker shows players choosing.
-- **Three locations with no NPC:** Nine-Heavens Rebirth Terrace, Spirit
-  Jade Rebirth Enclave, Celestial Cradle Province. All three are samsara
-  arrival grounds, so "no NPC" may be the design; decide, and either place
-  one or exempt them by name in the content gate so the rule is written
-  down.
+- ~~Three locations with no NPC~~ — done ahead of the milestone: the three
+  samsara arrival grounds each have a keeper (Ledger Warden Wen Shuang,
+  Terrace Matron Gu Yanli, Provincial Registrar Mo Qingyan), and
+  `test_world_content_gate.py` now requires every location to have one.
 - `fate.adjust` is allowlisted and implemented in the engine with no Discord
   caller: wire it or remove it.
 
