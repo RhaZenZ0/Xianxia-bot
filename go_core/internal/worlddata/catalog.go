@@ -142,6 +142,26 @@ type Item struct {
 	StorageUpgrade   map[string]any `json:"storage_upgrade"`
 	ArrayDeploy      string         `json:"array_deploy"`
 	SpatialKey       map[string]any `json:"spatial_key"`
+	MarketExcluded   bool           `json:"market_excluded"`
+}
+
+// MarketTradeable is the one rule for whether an item belongs in ordinary
+// regional markets (v0.30.0). Secret-realm keys and auction-interest
+// special/legendary items are progression rewards, auction lots or event
+// objects rather than infinite shop stock, and an explicit market_excluded
+// content flag removes anything else. The simulation bootstrap and the
+// market.catalog query both ask here; Python no longer holds a copy.
+func MarketTradeable(marketExcluded, hasSpatialKey bool, auctionInterest string) bool {
+	if marketExcluded || hasSpatialKey {
+		return false
+	}
+	interest := strings.ToLower(strings.TrimSpace(auctionInterest))
+	return interest != "special" && interest != "legendary"
+}
+
+// MarketTradeable applies the catalog rule to this item.
+func (i Item) MarketTradeable() bool {
+	return MarketTradeable(i.MarketExcluded, i.SpatialKey != nil, i.AuctionInterest)
 }
 
 type AuctionHouse struct {

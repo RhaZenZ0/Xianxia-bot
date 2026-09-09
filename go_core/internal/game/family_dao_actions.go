@@ -29,11 +29,10 @@ type familyChildPayload struct {
 	GameMinute int64  `json:"game_minute"`
 }
 type seclusionStartPayload struct {
-	Mode                string  `json:"mode"`
-	GameMinute          int64   `json:"game_minute"`
-	DurationGameMinutes int64   `json:"duration_game_minutes"`
-	Location            string  `json:"location"`
-	EnvironmentMult     float64 `json:"environment_mult"`
+	Mode                string `json:"mode"`
+	GameMinute          int64  `json:"game_minute"`
+	DurationGameMinutes int64  `json:"duration_game_minutes"`
+	Location            string `json:"location"`
 }
 type seclusionSettlePayload struct {
 	GameMinute    int64  `json:"game_minute"`
@@ -467,10 +466,18 @@ func soulCultivationMultGo(conn *storage.Conn, userID int64) float64 {
 	}
 	return math.Min(1.25, math.Max(1, mult))
 }
-func seclusionStartActionGo(conn *storage.Conn, _ worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
+func seclusionStartActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	var p seclusionStartPayload
 	if e := json.Unmarshal(raw, &p); e != nil {
 		return authoritativeMutation{}, e
+	}
+	// v0.30.0: the environment is derived from state the engine holds. A
+	// caller that still sends one is a stale client, not a second opinion.
+	var probe map[string]json.RawMessage
+	if json.Unmarshal(raw, &probe) == nil {
+		if _, supplied := probe["environment_mult"]; supplied {
+			return authoritativeMutation{}, errors.New("environment_mult is derived by the engine and cannot be supplied by the caller")
+		}
 	}
 	p.Mode = strings.ToLower(strings.TrimSpace(p.Mode))
 	if p.Mode != "qi" && p.Mode != "body" {
@@ -479,7 +486,7 @@ func seclusionStartActionGo(conn *storage.Conn, _ worlddata.Catalog, userID int6
 	if p.DurationGameMinutes <= 0 {
 		p.DurationGameMinutes = 1
 	}
-	r, e := conn.Execute(`SELECT life_status,location FROM characters WHERE user_id=?`, []any{userID})
+	r, e := conn.Execute(`SELECT life_status,location,realm_index,body_realm_index,attributes_json FROM characters WHERE user_id=?`, []any{userID})
 	if e != nil {
 		return authoritativeMutation{}, e
 	}
@@ -504,17 +511,18 @@ func seclusionStartActionGo(conn *storage.Conn, _ worlddata.Catalog, userID int6
 	if x := firstRowMap(r); x != nil && fmt.Sprint(x["status"]) == "active" {
 		return authoritativeMutation{}, errors.New("already in seclusion")
 	}
-	if p.EnvironmentMult <= 0 {
-		p.EnvironmentMult = 1
-	}
-	p.EnvironmentMult = math.Max(.5, math.Min(1.75, p.EnvironmentMult))
-	end := p.GameMinute + p.DurationGameMinutes
-	now := nowSeconds()
-	_, e = conn.Execute(`INSERT INTO seclusion_sessions(user_id,mode,started_game_minute,ends_game_minute,last_settled_game_minute,start_location,environment_mult,accumulated_gain,status,ended_reason,created_at,updated_at) VALUES(?,?,?,?,?,?,?,0,'active','',?,?) ON CONFLICT(user_id) DO UPDATE SET mode=excluded.mode,started_game_minute=excluded.started_game_minute,ends_game_minute=excluded.ends_game_minute,last_settled_game_minute=excluded.last_settled_game_minute,start_location=excluded.start_location,environment_mult=excluded.environment_mult,accumulated_gain=0,status='active',ended_reason='',created_at=excluded.created_at,updated_at=excluded.updated_at`, []any{userID, p.Mode, p.GameMinute, end, p.GameMinute, p.Location, p.EnvironmentMult, now, now})
+	environment, environmentMult, e := seclusionEnvironmentGo(conn, catalog, userID, p.Location, p.Mode, p.GameMinute)
 	if e != nil {
 		return authoritativeMutation{}, e
 	}
-	out := map[string]any{"mode": p.Mode, "started_game_minute": p.GameMinute, "ends_game_minute": end, "last_settled_game_minute": p.GameMinute, "start_location": p.Location, "environment_mult": p.EnvironmentMult, "status": "active"}
+	projected := seclusionDailyGainGo(c, p.Mode, environmentMult, soulCultivationMultGo(conn, userID))
+	end := p.GameMinute + p.DurationGameMinutes
+	now := nowSeconds()
+	_, e = conn.Execute(`INSERT INTO seclusion_sessions(user_id,mode,started_game_minute,ends_game_minute,last_settled_game_minute,start_location,environment_mult,accumulated_gain,status,ended_reason,created_at,updated_at) VALUES(?,?,?,?,?,?,?,0,'active','',?,?) ON CONFLICT(user_id) DO UPDATE SET mode=excluded.mode,started_game_minute=excluded.started_game_minute,ends_game_minute=excluded.ends_game_minute,last_settled_game_minute=excluded.last_settled_game_minute,start_location=excluded.start_location,environment_mult=excluded.environment_mult,accumulated_gain=0,status='active',ended_reason='',created_at=excluded.created_at,updated_at=excluded.updated_at`, []any{userID, p.Mode, p.GameMinute, end, p.GameMinute, p.Location, environmentMult, now, now})
+	if e != nil {
+		return authoritativeMutation{}, e
+	}
+	out := map[string]any{"mode": p.Mode, "started_game_minute": p.GameMinute, "ends_game_minute": end, "last_settled_game_minute": p.GameMinute, "start_location": p.Location, "environment_mult": environmentMult, "environment": environment, "projected_daily_gain": projected, "status": "active"}
 	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "cultivation", EventType: "seclusion.start", EntityType: "character", EntityID: fmt.Sprint(userID), GameMinute: p.GameMinute, Payload: out}}, nil
 }
 func seclusionSettleActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
@@ -545,16 +553,9 @@ func seclusionSettleActionGo(conn *storage.Conn, catalog worlddata.Catalog, user
 	end := i64(s["ends_game_minute"])
 	target := min64(p.GameMinute, end)
 	days := max64(0, (target-last)/p.MinutesPerDay)
-	attrs := decodeJSONMap(c["attributes_json"])
 	mode := fmt.Sprint(s["mode"])
-	base := int64(0)
-	if mode == "body" {
-		base = 7 + i64(attrs["body"]) + i64(attrs["will"])/3 + i64(c["body_realm_index"])/2
-	} else {
-		base = 8 + i64(attrs["will"]) + i64(attrs["insight"])/2 + i64(c["realm_index"])/2
-	}
 	env, _ := strconvFloat(s["environment_mult"])
-	daily := max64(1, int64(math.Round(float64(base)*.60*math.Max(.5, math.Min(1.75, env))*soulCultivationMultGo(conn, userID))))
+	daily := seclusionDailyGainGo(c, mode, env, soulCultivationMultGo(conn, userID))
 	attempted := daily * days
 	awarded := int64(0)
 	field := "cultivation"

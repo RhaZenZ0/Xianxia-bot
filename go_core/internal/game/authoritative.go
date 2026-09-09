@@ -166,6 +166,21 @@ var authoritativeQueries = map[string]bool{
 	"secret_realm.status":       true,
 	"exploration.event.status":  true,
 	"exploration.travel_status": true,
+	// v0.30.0: the world-status reads that app/simulation/world.py ran as raw
+	// SQL, plus the market prices and the equipment power Python still
+	// computed. Listed in world_status_queries.go.
+	"market.rows":          true,
+	"market.quote":         true,
+	"market.catalog":       true,
+	"combat.targets":       true,
+	"simulation.state":     true,
+	"simulation.status":    true,
+	"world.recent_actions": true,
+	"civilization.status":  true,
+	"npc.status":           true,
+	"sect.status":          true,
+	"clan.status":          true,
+	"equipment.power":      true,
 }
 
 var stage5CanonicalTimeNativeOperations = map[string]bool{
@@ -694,6 +709,9 @@ func applyAuthoritativeQuery(databasePath, worldPath string, req ActionRequest) 
 		}
 		v, _ := eventledger.CurrentActorVersion(conn, req.ActorID)
 		return ActionResponse{APIVersion: authoritativeAPIVersion, Operation: req.Operation, StateVersion: v, Result: status}, nil
+	}
+	if worldStatusQueries[req.Operation] {
+		return applyWorldStatusQuery(conn, worldPath, req)
 	}
 	return ActionResponse{}, fmt.Errorf("unsupported authoritative query: %s", req.Operation)
 }
