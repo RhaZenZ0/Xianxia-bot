@@ -66,7 +66,7 @@ still announces v0.21.0 in its title and "Current release" line;
 ## The release channel
 
 Unchanged: GitHub Releases on `RhaZenZ0/Xianxia-bot`, built by
-`.github/workflows/release.yml` from a tag, with a `.sha256` sidecar that
+the `release` job of `.github/workflows/ci.yml` from a tag, with a `.sha256` sidecar that
 `update.sh --check/--fetch/--upgrade` verifies on the NAS
 (`UPDATE_CHANNEL=stable` or `beta`). A hand-delivered release is the zip
 alone, with `RELEASE_MANIFEST.sha256` inside the tree as the integrity

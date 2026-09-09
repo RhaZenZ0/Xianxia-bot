@@ -28,7 +28,7 @@ from app.ops.release_channel import (
 )
 
 UPDATE_SH = (PROJECT_ROOT / "update.sh").read_text(encoding="utf-8")
-WORKFLOW = (PROJECT_ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
+WORKFLOW = (PROJECT_ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
 BOT = (PROJECT_ROOT / "app" / "bot" / "bot.py").read_text(encoding="utf-8")
 ENV_EXAMPLE = (PROJECT_ROOT / ".env.example").read_text(encoding="utf-8")
 
@@ -238,19 +238,41 @@ class UpdaterTests(unittest.TestCase):
 
 
 class WorkflowTests(unittest.TestCase):
-    def test_runs_on_version_tags_and_can_write_releases(self):
+    """One workflow: the CI checks run on every push and pull request, and a
+    v* tag adds a release job behind them. There is no second workflow file."""
+
+    def test_there_is_exactly_one_workflow(self):
+        names = sorted(p.name for p in (PROJECT_ROOT / ".github" / "workflows").iterdir())
+        self.assertEqual(names, ["ci.yml"])
+
+    def test_runs_on_version_tags_and_only_the_release_job_can_write(self):
         self.assertIn('tags: ["v*"]', WORKFLOW)
-        self.assertIn("contents: write", WORKFLOW)
+        self.assertIn("branches: [main]", WORKFLOW)
+        self.assertIn("pull_request:", WORKFLOW)
+        self.assertIn("permissions:\n  contents: read", WORKFLOW)
+        release = WORKFLOW[WORKFLOW.index("  release:"):]
+        self.assertIn("contents: write", release)
+        self.assertNotIn("contents: write", WORKFLOW[:WORKFLOW.index("  release:")])
+
+    def test_the_release_job_waits_for_every_check_on_the_tagged_commit(self):
+        release = WORKFLOW[WORKFLOW.index("  release:"):]
+        self.assertIn("if: startsWith(github.ref, 'refs/tags/v')", release)
+        self.assertIn("needs: [python, go, containers]", release)
 
     def test_the_tag_must_match_the_stamped_version(self):
         self.assertIn('version="${version%%-*}"', WORKFLOW)
         self.assertIn('if [ "$version" != "$stamped" ]; then', WORKFLOW)
         self.assertIn("case \"$tag\" in *-*) prerelease=true ;; esac", WORKFLOW)
 
-    def test_it_runs_the_same_checks_as_ci_plus_the_manifest(self):
-        for step in ("python -m ruff check app scripts", "python -m pytest -q", "python scripts/release_manifest.py --verify",
-                     "CGO_ENABLED=1 go vet ./... && CGO_ENABLED=1 go test ./..."):
-            self.assertIn(step, WORKFLOW, step)
+    def test_the_checks_run_once_and_the_release_adds_the_manifest(self):
+        checks = WORKFLOW[:WORKFLOW.index("  release:")]
+        release = WORKFLOW[WORKFLOW.index("  release:"):]
+        for step in ("python -m ruff check app scripts", "python -m pytest -q", 'test -z "$(gofmt -l go_core)"',
+                     "CGO_ENABLED=1 go vet ./...", "CGO_ENABLED=1 go test -race ./...", "docker build -f Dockerfile",
+                     "docker build -f go_core/Dockerfile"):
+            self.assertIn(step, checks, step)
+            self.assertNotIn(step, release, f"{step} would run twice on a tag")
+        self.assertIn("python scripts/release_manifest.py --verify", release)
 
     def test_the_assets_are_what_the_updater_and_the_bot_look_for(self):
         self.assertIn('echo "asset=xianxia_rp_v${version}.zip"', WORKFLOW)

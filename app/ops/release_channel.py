@@ -2,7 +2,8 @@
 
 Releases are GitHub Releases on the project repository (v0.20.4,
 docs/V020_RELEASE_NOTES.md). Each carries `xianxia_rp_v<version>.zip` and a
-`.sha256` sidecar, built by .github/workflows/release.yml from the tag. Two
+`.sha256` sidecar, built by the release job in .github/workflows/ci.yml from
+the tag. Two
 channels:
 
   stable - full releases (tag `vX.Y.Z`);

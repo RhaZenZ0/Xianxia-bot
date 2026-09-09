@@ -1,8 +1,24 @@
 name: CI
 
+# The one workflow. Every push to main and every pull request runs the checks
+# (python, go, containers). A v* tag runs the same checks and then, only once
+# all three are green, the release job builds and publishes the archive.
+#
+#   git tag v0.20.4 && git push origin v0.20.4          -> stable release
+#   git tag v0.21.0-beta.1 && git push origin ...       -> pre-release (beta channel)
+#
+# The tag must match the stamped VERSION (the -beta.N / -rc.N suffix is
+# dropped for the comparison; VERSION never carries it, so the on-disk
+# updater keeps comparing plain numbers). The release job verifies the release
+# manifest, builds xianxia_rp_v<version>.zip exactly as the hand-packaged
+# releases were built, writes its SHA-256 sidecar, and attaches both to a
+# GitHub Release. update.sh --fetch and the bot's update-check worker read
+# nothing else. (Release channel: v0.20.4, docs/V020_RELEASE_NOTES.md.)
+
 on:
   push:
     branches: [main]
+    tags: ["v*"]
   pull_request:
 
 permissions:
@@ -42,3 +58,65 @@ jobs:
       - uses: actions/checkout@v4
       - run: docker build -f Dockerfile -t xianxia-bot:ci .
       - run: docker build -f go_core/Dockerfile -t xianxia-engine:ci .
+
+  release:
+    # Only a v* tag reaches this job, and only after every check above passed
+    # on that same commit: the release is built from a tree CI has just proven.
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [python, go, containers]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Tag matches VERSION
+        id: version
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          version="${tag#v}"
+          version="${version%%-*}"
+          stamped="$(tr -d '[:space:]' < VERSION)"
+          if [ "$version" != "$stamped" ]; then
+            echo "tag $tag does not match VERSION $stamped" >&2
+            exit 1
+          fi
+          prerelease=false
+          case "$tag" in *-*) prerelease=true ;; esac
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
+          echo "asset=xianxia_rp_v${version}.zip" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Release manifest is current
+        run: python scripts/release_manifest.py --verify
+
+      - name: Build the archive
+        run: |
+          asset="${{ steps.version.outputs.asset }}"
+          zip -qr "/tmp/$asset" . -x '*/__pycache__/*' '*.pyc' '.env' 'data/*' '.git/*' '.pytest_cache/*' '.ruff_cache/*' '.claude/*'
+          (cd /tmp && sha256sum "$asset" > "$asset.sha256")
+          unzip -p "/tmp/$asset" VERSION
+          cat "/tmp/$asset.sha256"
+
+      - name: Release notes from VERSIONS.md
+        id: notes
+        run: |
+          version="${{ steps.version.outputs.version }}"
+          # The paragraph in VERSIONS.md that starts with **<version>**, if any.
+          awk -v v="$version" 'BEGIN{p=0} /^\*\*[0-9]/{p=($0 ~ "^\\*\\*" v "\\*\\*")} p{print}' VERSIONS.md > /tmp/notes.md
+          if [ ! -s /tmp/notes.md ]; then
+            echo "Xianxia RP v$version. See VERSIONS.md and docs/ for the release notes." > /tmp/notes.md
+          fi
+          printf '\n\nInstall on the NAS: `./update.sh --fetch` then `./update.sh --install`, or `./update.sh --upgrade`.\n' >> /tmp/notes.md
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: Xianxia RP v${{ steps.version.outputs.version }}
+          prerelease: ${{ steps.version.outputs.prerelease }}
+          body_path: /tmp/notes.md
+          files: |
+            /tmp/${{ steps.version.outputs.asset }}
+            /tmp/${{ steps.version.outputs.asset }}.sha256

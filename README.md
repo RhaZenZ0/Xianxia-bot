@@ -788,7 +788,7 @@ the stack so a fresh schema is created automatically.
 ## Updates and the release channel
 
 Releases are GitHub Releases on `RhaZenZ0/Xianxia-bot`, built by CI from a tag
-(`.github/workflows/release.yml`): `v0.21.0` is a **stable** release,
+(the `release` job in `.github/workflows/ci.yml`, after the checks pass): `v0.21.0` is a **stable** release,
 `v0.21.0-beta.1` a **beta** (pre-release). Each carries
 `xianxia_rp_v<version>.zip` and its `.sha256`.
 
