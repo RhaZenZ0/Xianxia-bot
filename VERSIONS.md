@@ -1009,9 +1009,36 @@ Gate: `tests/python/contracts/test_security_defaults.py` and `TestNewRefusesAnEn
 No schema change (still 32), no game-rule change, AI remains narration-only.
 
 
-## Release status — v0.29.0
+**0.29.1** is a release-channel point release: one GitHub workflow instead of two. No gameplay
+change, no schema change.
 
-- Current release: v0.29.0: the doors fail closed - the engine refuses to run or answer without
+`ci.yml` and `release.yml` were two copies of the same check list. A `v*` tag ran ruff, pytest,
+`go vet` and `go test` a second time in the second workflow - without the `gofmt` check and without
+the container builds that stand in front of every pull request - and the archive was built from
+whatever that second run happened to see. Now there is one workflow. Every push to `main` and every
+pull request runs the `python`, `go` and `containers` jobs as before; a `v*` tag runs those same
+three jobs and then a `release` job that `needs` all of them, so the archive is only ever built
+from a commit CI has just proven on every check, and the checks run once. The file keeps the
+`ci.yml` name so the README badge keeps resolving; the `contents: write` permission lives on the
+release job alone and the workflow default stays `contents: read`. The release steps themselves
+(the tag must match `VERSION`, `release_manifest.py --verify`, the zip and its `.sha256` sidecar,
+notes from this file) are unchanged, and the archive now excludes `.claude/` beside the other
+non-shipped trees.
+
+Also in this release: `.claude/settings.json` allowlists the project's own check commands so a
+Claude Code session does not stall on the tooling the repo asks for. It is development tooling,
+not release content - the manifest script and the release zip both leave it out.
+
+Gate: `WorkflowTests` in `tests/python/unit/test_release_channel.py` holds the workflows
+directory to one file, requires each check to appear before the release job and not inside it,
+and requires the release job to wait on all three.
+
+
+## Release status — v0.29.1
+
+- Current release: v0.29.1: one GitHub workflow - the release job runs behind the same CI
+  checks every pull request gets, on the commit they just proved.
+- v0.29.0: the doors fail closed - the engine refuses to run or answer without
   a token, the dashboard locks an address that keeps guessing and refuses cross-origin mutations,
   both listeners default to loopback outside Docker, dependencies are hash-locked and images
   digest-pinned, and CI runs the Go suite under `-race`.

@@ -397,6 +397,8 @@ once the playtest shows the giver pool reads well.
   removed, the AI Studio route, the daily liveness audit and its 400 ladder,
   route selection from the dashboard through `admin.narration.set_chain`,
   the direct OpenAI provider removed.
+- **v0.29.1** — one GitHub workflow: the release job runs behind the CI checks
+  on the commit they proved, instead of re-running its own copy of them.
 
 ## Keeping this file honest
 
