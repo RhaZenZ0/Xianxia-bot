@@ -153,7 +153,7 @@ find_latest_update() {
 # Mirrors app/ops/release_channel.py: stable = GitHub's "latest" (full releases
 # only); beta = the newest release in the listing, pre-releases included. The
 # archive is xianxia_rp_v<version>.zip with a .sha256 sidecar; both are
-# release assets attached by .github/workflows/release.yml.
+# release assets attached by the release job in .github/workflows/ci.yml.
 env_value() {
     # $1 = key; from $PROJECT_DIR/.env, ignoring comments, quotes stripped.
     [ -f "$PROJECT_DIR/.env" ] || return 0

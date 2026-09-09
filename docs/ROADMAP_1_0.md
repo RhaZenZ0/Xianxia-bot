@@ -55,7 +55,7 @@ this code needs, ahead of any further milestone.
 ## The release channel
 
 Unchanged from v0.20.4: GitHub Releases on `RhaZenZ0/Xianxia-bot`, built by
-`.github/workflows/release.yml` from a tag; `UPDATE_CHANNEL=stable` (default)
+the `release` job of `.github/workflows/ci.yml` from a tag; `UPDATE_CHANNEL=stable` (default)
 or `beta`; `./update.sh --check/--fetch/--upgrade` on the NAS with the
 SHA-256 sidecar verified. Each milestone ships as **one or more betas first**,
 then stable. Point releases are fixes only — the v0.21.x series bent that
