@@ -60,6 +60,7 @@ Other checks:
 python scripts/check_dashboard_implementation.py   # dashboard frontend/backend drift + coverage gate, part of the release gate
 python -m compileall -q app                        # compile-check production Python
 python -m json.tool content/world.json >/dev/null  # validate world content JSON
+make lock                                          # regenerate requirements.lock (uv) after editing requirements.txt; the Dockerfile installs it under --require-hashes
 ```
 
 Run without Docker:

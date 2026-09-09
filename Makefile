@@ -1,10 +1,15 @@
 PYTHON ?= python3
 GO ?= go
 
-.PHONY: install-dev test test-python test-go lint format-check check docker-build
+.PHONY: install-dev lock test test-python test-go lint format-check check docker-build
 
 install-dev:
 	$(PYTHON) -m pip install -r requirements-dev.txt
+
+# requirements.lock is what the Dockerfile installs (under --require-hashes).
+# Regenerate it after any change to requirements.txt; needs uv.
+lock:
+	uv pip compile requirements.txt --generate-hashes --python-version 3.12 --python-platform linux --custom-compile-command "make lock" -o requirements.lock
 
 test: test-python test-go
 

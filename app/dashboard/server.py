@@ -24,6 +24,7 @@ from ..ops.http_limits import (
     HeaderLimits,
     RequestHeadRejected,
     read_request_head,
+    LoginThrottle,
 )
 from ..rules.worldtime import from_game_minutes
 from ..database.remote import GoDatabaseTransport, RemoteDatabaseError
@@ -150,6 +151,32 @@ def json_safe_numbers(value: Any) -> Any:
     return value
 
 
+def origin_allowed(headers: dict[str, str], allowed_origins: tuple[str, ...] = ()) -> bool:
+    """Is this mutation from the dashboard's own origin?
+
+    Basic Auth rides on every request the browser makes, so a page on another
+    origin that can make the browser POST here posts as the logged-in GM. The
+    ``x-xianxia-admin`` header already stops a plain HTML form; this stops a
+    cross-origin ``fetch`` too. A browser sends ``Origin`` on every POST, so a
+    present ``Origin`` must name the ``Host`` the request arrived at (or an
+    operator-listed public origin, for a proxy that rewrites ``Host``). A
+    request with no ``Origin`` is not from a browser page - curl, a script -
+    and is allowed unless ``Sec-Fetch-Site`` says otherwise. ``Origin: null``
+    (a sandboxed frame, a redirect from elsewhere) is refused. Header names
+    are already lower-cased by the request-head reader.
+    """
+    origin = headers.get("origin", "").strip().lower()
+    site = headers.get("sec-fetch-site", "").strip().lower()
+    if not origin:
+        return site not in {"cross-site", "same-site"}
+    if origin == "null":
+        return False
+    if origin in {o.strip().lower() for o in allowed_origins if o.strip()}:
+        return True
+    host = headers.get("host", "").strip().lower()
+    return bool(host) and urlsplit(origin).netloc.lower() == host
+
+
 @dataclass(frozen=True)
 class DashboardSettings:
     database_path: Path
@@ -170,11 +197,21 @@ class DashboardSettings:
     header_deadline_seconds: float = 10.0
     header_line_timeout_seconds: float = 5.0
     max_connections: int = 64
+    # Failed-login lockout per source address, and the origins a browser
+    # mutation may come from besides the Host it was sent to (v0.29.0).
+    login_max_failures: int = 5
+    login_window_seconds: float = 300.0
+    login_lockout_seconds: float = 900.0
+    allowed_origins: tuple[str, ...] = ()
 
     @classmethod
     def from_env(cls) -> "DashboardSettings":
         database_path = Path(os.getenv("DATABASE_PATH", "data/xianxia.sqlite3"))
-        host = os.getenv("DASHBOARD_HOST", "0.0.0.0").strip() or "0.0.0.0"
+        # Loopback unless told otherwise (v0.29.0). docker-compose.yml sets
+        # 0.0.0.0 inside the container, where the published port needs it; a
+        # bare-metal run should not offer Basic Auth in plaintext to the LAN by
+        # default - README, "Configure dashboard access", for the proxy recipe.
+        host = os.getenv("DASHBOARD_HOST", "127.0.0.1").strip() or "127.0.0.1"
         try:
             port = int(os.getenv("DASHBOARD_INTERNAL_PORT", "8090"))
         except ValueError as exc:
@@ -205,6 +242,16 @@ class DashboardSettings:
         engine_url = os.getenv("GAME_ENGINE_URL", "").strip().rstrip("/")
         if admin_writes and not engine_url:
             raise RuntimeError("GAME_ENGINE_URL is required when DASHBOARD_ADMIN_WRITES is enabled")
+        # The same rule the bot and the engine apply. The engine transports read
+        # the variable themselves; checking it here turns "every engine call
+        # answers 401" into one sentence at startup.
+        if engine_url and len(os.getenv("ENGINE_AUTH_TOKEN", "").strip()) < 20:
+            raise RuntimeError(
+                "ENGINE_AUTH_TOKEN must be set to at least 20 characters, the same value the Go engine runs with"
+            )
+        allowed_origins = tuple(
+            o.strip().lower() for o in os.getenv("DASHBOARD_ALLOWED_ORIGINS", "").split(",") if o.strip()
+        )
         bot_control_url = os.getenv("BOT_CONTROL_URL", "http://127.0.0.1:8080").strip().rstrip("/")
         bot_control_token = os.getenv("BOT_CONTROL_TOKEN", "").strip() or token
 
@@ -238,6 +285,10 @@ class DashboardSettings:
             header_deadline_seconds=_seconds("HTTP_HEADER_DEADLINE_SECONDS", 10.0, 1.0, 120.0),
             header_line_timeout_seconds=_seconds("HTTP_HEADER_LINE_TIMEOUT_SECONDS", 5.0, 0.5, 60.0),
             max_connections=_limit("HTTP_MAX_CONNECTIONS", 64, 4, 4096),
+            login_max_failures=_limit("DASHBOARD_LOGIN_MAX_FAILURES", 5, 1, 100),
+            login_window_seconds=_seconds("DASHBOARD_LOGIN_WINDOW_SECONDS", 300.0, 1.0, 86400.0),
+            login_lockout_seconds=_seconds("DASHBOARD_LOGIN_LOCKOUT_SECONDS", 900.0, 1.0, 86400.0),
+            allowed_origins=allowed_origins,
         )
 
 
@@ -2031,6 +2082,11 @@ class DashboardServer:
             line_timeout_seconds=settings.header_line_timeout_seconds,
         ).validated()
         self.connections = ConnectionLimiter(settings.max_connections)
+        self.logins = LoginThrottle(
+            max_failures=settings.login_max_failures,
+            window_seconds=settings.login_window_seconds,
+            lockout_seconds=settings.login_lockout_seconds,
+        )
         self.rejected_heads = 0
         self._server: asyncio.AbstractServer | None = None
 
@@ -2044,6 +2100,13 @@ class DashboardServer:
         except Exception:
             return False
         return hmac.compare_digest(username, self.settings.username) and hmac.compare_digest(password, self.settings.token)
+
+    @staticmethod
+    def _peer(writer: asyncio.StreamWriter) -> str:
+        peer = writer.get_extra_info("peername")
+        if isinstance(peer, (tuple, list)) and peer:
+            return str(peer[0])
+        return str(peer or "unknown")
 
     async def serve(self) -> None:
         if self.store._go_transport is None and not self.settings.database_path.exists():
@@ -2102,7 +2165,22 @@ class DashboardServer:
                 await self._send_json(writer, 405, {"error": "method_not_allowed"}, extra_headers={"Allow": "GET, POST"})
                 return
 
+            # The lock is consulted before the credentials are read, so a locked
+            # address learns nothing from its next guess; and it is keyed by the
+            # socket peer, never a forwarded-for header an unknown peer could set.
+            peer = self._peer(writer)
+            retry_after = self.logins.locked_for(peer)
+            if retry_after > 0:
+                wait = int(retry_after) + 1
+                await self._send_json(
+                    writer, 429, {"error": "login_locked", "retry_after_seconds": wait},
+                    extra_headers={"Retry-After": str(wait)},
+                )
+                return
+
             if not self._authorized(headers):
+                if self.logins.failure(peer):
+                    log.warning("DASHBOARD_LOGIN_LOCKED peer=%s after %d failures", peer, self.logins.max_failures)
                 await self._send_text(
                     writer,
                     401,
@@ -2111,12 +2189,15 @@ class DashboardServer:
                     extra_headers={"WWW-Authenticate": 'Basic realm="Xianxia RP GM Dashboard", charset="UTF-8"'},
                 )
                 return
+            self.logins.success(peer)
 
             if method == "POST":
                 if path not in {"/api/admin/action", "/api/discord/action", "/api/narration/action"}:
                     await self._send_json(writer, 404, {"error": "not_found"}); return
                 if not self.settings.admin_writes:
                     await self._send_json(writer, 403, {"error": "admin_writes_disabled"}); return
+                if not origin_allowed(headers, self.settings.allowed_origins):
+                    await self._send_json(writer, 403, {"error": "origin_mismatch"}); return
                 if headers.get("x-xianxia-admin") != "1" or "application/json" not in headers.get("content-type", "").lower():
                     await self._send_json(writer, 403, {"error": "admin_header_required"}); return
                 try:

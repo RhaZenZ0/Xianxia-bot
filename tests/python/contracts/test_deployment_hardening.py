@@ -137,7 +137,8 @@ class OpenAISDKMajorBumpTests(unittest.TestCase):
         # openai 3.x installs httpx2 and no longer installs httpx at all, but
         # app/database/remote.py and app/ops/game_engine.py import httpx directly for
         # the Go engine transport - the path every piece of game state uses.
-        self.assertRegex(REQUIREMENTS, r"(?m)^httpx>=")
+        # A range until v0.29.0; an exact pin since, with the lock carrying the hash.
+        self.assertRegex(REQUIREMENTS, r"(?m)^httpx==")
         for module in ("app/database/remote.py", "app/ops/game_engine.py"):
             self.assertIn(
                 "import httpx",

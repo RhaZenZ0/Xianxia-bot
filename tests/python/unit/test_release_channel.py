@@ -127,7 +127,7 @@ class ListingTests(unittest.TestCase):
 
 class SettingsTests(unittest.TestCase):
     def base_env(self):
-        return {"DISCORD_TOKEN": "test-token", "GUILD_ID": "123456789012345678", "DATABASE_PATH": "data/test.sqlite3"}
+        return {"DISCORD_TOKEN": "test-token", "GUILD_ID": "123456789012345678", "DATABASE_PATH": "data/test.sqlite3", "ENGINE_AUTH_TOKEN": "test-engine-token-1234567890"}
 
     def test_defaults_check_the_stable_channel_daily(self):
         with patch.dict(os.environ, self.base_env(), clear=True):

@@ -17,6 +17,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -32,6 +33,7 @@ import (
 // and useless here.
 func through(engine *Server, method, path, body string) *httptest.ResponseRecorder {
 	request := httptest.NewRequest(method, path, strings.NewReader(body))
+	request.Header.Set("X-Xianxia-Engine-Token", os.Getenv("ENGINE_AUTH_TOKEN"))
 	response := httptest.NewRecorder()
 	engine.Handler().ServeHTTP(response, request)
 	return response

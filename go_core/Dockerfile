@@ -1,4 +1,6 @@
-FROM golang:1.26-bookworm AS build
+# Both base images are pinned by digest as well as tag (v0.29.0); see the
+# note in the root Dockerfile for how to move them.
+FROM golang:1.26-bookworm@sha256:9fdc884aacc3bec89b20ffc69f4bb369c78210e3e4f600387b5128b12c199f81 AS build
 WORKDIR /src
 RUN apt-get update \
     && apt-get install -y --no-install-recommends libsqlite3-dev \
@@ -17,7 +19,7 @@ WORKDIR /src/go_core
 RUN CGO_ENABLED=1 go test ./...
 RUN CGO_ENABLED=1 go build -trimpath -ldflags="-s -w" -o /out/xianxia-engine ./cmd/xianxia-core
 
-FROM debian:bookworm-slim
+FROM debian:bookworm-slim@sha256:88200866dfff7ea7f5cbcb6ec7c8a701889efe6fe859fe64d6990e4b07ea4171
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates libsqlite3-0 wget gosu \
     && rm -rf /var/lib/apt/lists/* \

@@ -5,7 +5,7 @@ services:
       dockerfile: go_core/Dockerfile
     container_name: xianxia-game-engine
     labels:
-      xianxia.release: "0.28.0"
+      xianxia.release: "0.29.0"
     restart: unless-stopped
     # The engine drains in-flight requests on SIGTERM (default 20s, see
     # ENGINE_SHUTDOWN_GRACE_SECONDS). Docker's default grace is 10s, which
@@ -45,7 +45,7 @@ services:
     build: .
     container_name: xianxia-roleplay-bot
     labels:
-      xianxia.release: "0.28.0"
+      xianxia.release: "0.29.0"
     restart: unless-stopped
     env_file:
       - .env
@@ -56,6 +56,11 @@ services:
         condition: service_completed_successfully
     environment:
       GAME_ENGINE_URL: "http://xianxia-engine:8081"
+      # The health/control listener defaults to loopback (v0.29.0). Here it
+      # must answer the dashboard container over the compose network, and
+      # `expose` keeps it off the host, so all interfaces is the right bind
+      # inside this container and only here.
+      HEALTH_HOST: "0.0.0.0"
     expose:
       - "8080"
     healthcheck:
@@ -83,6 +88,10 @@ services:
     environment:
       GAME_ENGINE_URL: "http://xianxia-engine:8081"
       BOT_CONTROL_URL: "http://xianxia-bot:8080"
+      # Defaults to loopback (v0.29.0); inside the container it must bind all
+      # interfaces for the `ports` line below to reach it. Which host
+      # interface that port is published on is DASHBOARD_BIND_ADDRESS.
+      DASHBOARD_HOST: "0.0.0.0"
     command: ["python", "-m", "app.dashboard"]
     ports:
       - "${DASHBOARD_BIND_ADDRESS:-127.0.0.1}:${DASHBOARD_PORT:-8090}:8090"
