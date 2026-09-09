@@ -379,7 +379,11 @@ class Settings:
         # should not offer /metrics and the control channel to the LAN by
         # default (v0.29.0).
         health_host = os.getenv("HEALTH_HOST", "127.0.0.1").strip() or "127.0.0.1"
-        health_port = _as_int(os.getenv("HEALTH_PORT"), 8080, name="HEALTH_PORT")
+        # 8082, not 8080: on a QNAP, 8080 is the QTS web admin, so a bare-metal
+        # listener on all interfaces collided with it. Under compose the port is
+        # expose-only and set explicitly beside HEALTH_HOST, so the value here
+        # is the bare-metal default (v0.29.0).
+        health_port = _as_int(os.getenv("HEALTH_PORT"), 8082, name="HEALTH_PORT")
         if not 1 <= health_port <= 65535:
             raise RuntimeError("HEALTH_PORT must be between 1 and 65535")
         slow_query_ms = _as_float(os.getenv("SLOW_QUERY_MS"), 100.0, name="SLOW_QUERY_MS")

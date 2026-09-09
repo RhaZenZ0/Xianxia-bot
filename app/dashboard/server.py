@@ -252,7 +252,7 @@ class DashboardSettings:
         allowed_origins = tuple(
             o.strip().lower() for o in os.getenv("DASHBOARD_ALLOWED_ORIGINS", "").split(",") if o.strip()
         )
-        bot_control_url = os.getenv("BOT_CONTROL_URL", "http://127.0.0.1:8080").strip().rstrip("/")
+        bot_control_url = os.getenv("BOT_CONTROL_URL", "http://127.0.0.1:8082").strip().rstrip("/")
         bot_control_token = os.getenv("BOT_CONTROL_TOKEN", "").strip() or token
 
 

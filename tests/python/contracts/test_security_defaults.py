@@ -193,8 +193,13 @@ class BindDefaultTests(unittest.TestCase):
     def test_compose_asks_for_all_interfaces_explicitly_where_a_neighbour_needs_it(self):
         self.assertIn('HEALTH_HOST: "0.0.0.0"', COMPOSE)
         self.assertIn('DASHBOARD_HOST: "0.0.0.0"', COMPOSE)
-        # The bot's listener is still never published on the host.
-        self.assertNotRegex(COMPOSE, r'ports:\s*\n\s*-\s*"[^"]*8080')
+        # The bot's listener is still never published on the host, and it is
+        # not on 8080, which a QNAP's QTS admin already owns.
+        self.assertNotRegex(COMPOSE, r'ports:\s*\n\s*-\s*"[^"]*808[02]')
+        live_compose = "\n".join(line for line in COMPOSE.splitlines() if not line.strip().startswith("#"))
+        self.assertNotIn("8080", live_compose)
+        with patch.dict(os.environ, bot_env(), clear=True):
+            self.assertEqual(Settings.from_env().health_port, 8082)
 
     def test_the_env_example_binds_all_interfaces_as_a_stated_choice(self):
         # startup.sh copies .env.example to .env, so this file is the operator's

@@ -8,7 +8,7 @@ import urllib.request
 
 def main() -> int:
     host = os.getenv("HEALTHCHECK_HOST", "127.0.0.1").strip() or "127.0.0.1"
-    port = os.getenv("HEALTH_PORT", "8080").strip() or "8080"
+    port = os.getenv("HEALTH_PORT", "8082").strip() or "8082"
     url = os.getenv("HEALTHCHECK_URL", f"http://{host}:{port}/healthz").strip()
     try:
         with urllib.request.urlopen(url, timeout=3.0) as response:

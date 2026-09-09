@@ -61,8 +61,12 @@ services:
       # `expose` keeps it off the host, so all interfaces is the right bind
       # inside this container and only here.
       HEALTH_HOST: "0.0.0.0"
+      # Pinned here so it cannot drift from the dashboard's BOT_CONTROL_URL
+      # below when an older .env still says 8080 (the QTS admin port; moved in
+      # v0.29.0). expose-only, so it never meets the host's 8080 anyway.
+      HEALTH_PORT: "8082"
     expose:
-      - "8080"
+      - "8082"
     healthcheck:
       test: ["CMD", "python", "-m", "app.ops.healthcheck"]
       interval: 15s
@@ -87,7 +91,7 @@ services:
         condition: service_healthy
     environment:
       GAME_ENGINE_URL: "http://xianxia-engine:8081"
-      BOT_CONTROL_URL: "http://xianxia-bot:8080"
+      BOT_CONTROL_URL: "http://xianxia-bot:8082"
       # Defaults to loopback (v0.29.0); inside the container it must bind all
       # interfaces for the `ports` line below to reach it. Which host
       # interface that port is published on is DASHBOARD_BIND_ADDRESS.

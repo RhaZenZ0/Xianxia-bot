@@ -969,8 +969,11 @@ that rewrites `Host`.
 
 *Loopback by default outside Docker.* `DASHBOARD_HOST` and `HEALTH_HOST` defaulted to `0.0.0.0`,
 which under compose was harmless (the dashboard port is published on `DASHBOARD_BIND_ADDRESS`, the
-bot's 8080 is `expose`-only) and on bare metal offered Basic Auth in plaintext, `/metrics` and the
-bot control channel to the LAN. Both now default to `127.0.0.1` when unset; `docker-compose.yml` sets `0.0.0.0`
+bot's health port is `expose`-only) and on bare metal offered Basic Auth in plaintext, `/metrics` and the
+bot control channel to the LAN. The health port itself moves from 8080 to **8082**: on a QNAP, 8080
+is the QTS web admin, and a bare-metal listener on all interfaces collided with it. `HEALTH_PORT`
+still overrides it; compose pins 8082 inside the bot container beside the dashboard's
+`BOT_CONTROL_URL` so an older `.env` cannot pull the two apart. Both now default to `127.0.0.1` when unset; `docker-compose.yml` sets `0.0.0.0`
 explicitly on the two services whose neighbours need it, with the reason beside each line, and the
 README carries a reverse-proxy recipe for LAN access with TLS. The shipped `.env.example` - which
 `startup.sh` copies to `.env` on first run - sets `DASHBOARD_BIND_ADDRESS`, `DASHBOARD_HOST` and

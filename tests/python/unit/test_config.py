@@ -30,7 +30,7 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(settings.rag_canon_cache_seconds, 120.0)
         self.assertEqual(settings.unexpected_event_chance_percent, 28)
         self.assertEqual(settings.health_host, "127.0.0.1")  # loopback off Docker since v0.29.0
-        self.assertEqual(settings.health_port, 8080)
+        self.assertEqual(settings.health_port, 8082)  # 8080 is the QNAP QTS admin port
         self.assertEqual(settings.slow_query_ms, 100.0)
         self.assertIsNone(settings.alert_webhook_url)
         self.assertEqual(settings.alert_cooldown_seconds, 300)

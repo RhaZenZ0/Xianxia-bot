@@ -117,7 +117,7 @@ left to leave the engine door open while the larger milestones run.
   source address in `_authorized`; Origin check on mutations alongside the
   `x-xianxia-admin` header.
 - **Bind defaults.** Under compose, `DASHBOARD_BIND_ADDRESS=127.0.0.1`
-  publishes the port and the bot's `8080` is `expose`-only, which is right
+  publishes the port and the bot's health port is `expose`-only, which is right
   and was documented in v0.25.2. Bare metal still defaults `DASHBOARD_HOST`
   and `HEALTH_HOST` to `0.0.0.0`: default both to loopback when not under
   Docker, with a documented reverse-proxy recipe for LAN access with TLS.

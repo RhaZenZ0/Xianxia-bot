@@ -253,7 +253,9 @@ class ContainerBootstrapTests(unittest.TestCase):
         self.assertIn("docker compose --profile dashboard up", STARTUP)
         self.assertIn("OPENROUTER_API_KEY", STARTUP)
         self.assertIn("DASHBOARD_TOKEN", STARTUP)
-        self.assertIn('BOT_CONTROL_URL: "http://xianxia-bot:8080"', COMPOSE)
+        self.assertIn('BOT_CONTROL_URL: "http://xianxia-bot:8082"', COMPOSE)
+        # The bot listens where the dashboard looks, whatever an older .env says.
+        self.assertIn('HEALTH_PORT: "8082"', COMPOSE)
         self.assertIn('test: ["CMD", "python", "-m", "app.ops.healthcheck"]', COMPOSE)
         self.assertIn("docker compose --profile dashboard down", STOP)
 
