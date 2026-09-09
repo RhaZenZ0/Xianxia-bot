@@ -1,7 +1,11 @@
-FROM python:3.12-slim
+# Pinned by digest as well as tag (v0.29.0). A tag is a moving pointer; the
+# digest is the exact multi-arch index that was reviewed. To move it, look up
+# the new index digest (`docker buildx imagetools inspect python:3.12-slim`)
+# and change both lines together.
+FROM python:3.12-slim@sha256:78387bc3881b8273120a12ebe6c1ab22b018ccc2c9adf565ae1ac9b536e184ea
 
 LABEL org.opencontainers.image.title="Jade Meridian Realm Xianxia Discord Bot" \
-      org.opencontainers.image.version="0.28.0"
+      org.opencontainers.image.version="0.29.0"
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -29,8 +33,14 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && test -s /etc/ssl/certs/ca-certificates.crt
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# requirements.txt says what the bot needs; requirements.lock says exactly
+# which files satisfy it, with a SHA-256 for every wheel and sdist, transitive
+# dependencies included. The image installs the lock under --require-hashes,
+# so a package that changes on the index without a version bump - or a
+# resolver that quietly picks a newer transitive release - fails the build
+# instead of shipping. Regenerate with `make lock` after editing requirements.txt.
+COPY requirements.txt requirements.lock ./
+RUN pip install --no-cache-dir --require-hashes -r requirements.lock
 
 COPY . .
 

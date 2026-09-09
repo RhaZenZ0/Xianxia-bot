@@ -4958,6 +4958,60 @@
         "Evening": "Worldstone Celestial City",
         "Night": "Worldstone Celestial City"
       }
+    },
+    "Ledger Warden Wen Shuang": {
+      "role": "Rebirth ledger keeper and formation warden of the Spirit Jade Rebirth Enclave",
+      "realm": "Soul Transformation",
+      "stage": 4,
+      "personality": "Patient, dry, unhurried; listens to a reborn soul's whole story before writing three words of it, and never confuses a claim with a fact.",
+      "speech": "Low and even, the cadence of someone reading aloud; asks what year you think it is before anything else.",
+      "want": "Every soul that arrives entered in the ledger under the name it will live by, and every stabilising tile whole before the pressure outside rises again.",
+      "fear": "That the enclave is genuinely smaller each time the old woman says so, and that one day a tile cracks while she is on the road with the list of names.",
+      "secret": "She has read the enclave's oldest ledger, the one that records the Jade line's true heir dying in infancy, and keeps that page under a tile only she replaces; she has told no one, including the Sovereign.",
+      "location": "Spirit Jade Rebirth Enclave",
+      "schedule": {
+        "Dawn": "Spirit Jade Rebirth Enclave",
+        "Morning": "Spirit Jade Rebirth Enclave",
+        "Afternoon": "Spirit Jade Capital",
+        "Evening": "Spirit Jade Rebirth Enclave",
+        "Night": "Spirit Jade Rebirth Enclave"
+      }
+    },
+    "Terrace Matron Gu Yanli": {
+      "role": "Terrace attendant of the Nine-Heavens Rebirth Terrace, keeper of the cradle formations and the rebirth ledger",
+      "realm": "Earth Immortal",
+      "stage": 6,
+      "personality": "Brisk, kind in deeds rather than words, unimpressed by any rank a soul held in a previous life; treats a weeping newborn immortal and a fallen court minister identically, because on the terrace they are.",
+      "speech": "Short terrace idiom; calls everyone 'child' whatever they used to be, and answers questions about the court by pointing at the sky filter.",
+      "want": "Keep every cradle formation whole and every newborn breathing until their body can bear the unfiltered sky, and keep the court paying for it.",
+      "fear": "That the visiting elder will find the face he is looking for among her charges, and that the court will decide the terrace is a liability the day after.",
+      "secret": "The servant caught copying names was hers. She keeps a second ledger of which reborn souls carry old-court blood and moves them to the inner ring before the court's inspectors reach the outer one.",
+      "location": "Nine-Heavens Rebirth Terrace",
+      "schedule": {
+        "Dawn": "Nine-Heavens Rebirth Terrace",
+        "Morning": "Nine-Heavens Rebirth Terrace",
+        "Afternoon": "Nine-Heavens Immortal Court",
+        "Evening": "Nine-Heavens Rebirth Terrace",
+        "Night": "Nine-Heavens Rebirth Terrace"
+      }
+    },
+    "Provincial Registrar Mo Qingyan": {
+      "role": "Registrar of reborn souls and clerk of the sovereign law formation in the Celestial Cradle Province",
+      "realm": "Celestial Duke",
+      "stage": 3,
+      "personality": "Meticulous, courteous, quietly frightened; believes a correct entry in the register is the only protection a mortal-strength body has in the Celestial World, and behaves accordingly.",
+      "speech": "Formal registrar's phrasing; answers a question with a question about which form it belongs on, and lowers her voice whenever the formation's hum changes pitch.",
+      "want": "Every reborn soul registered under a name that will keep it alive, and the formation's note back where it was last season.",
+      "fear": "That the sovereign law formation has begun choosing which souls it shelters, and that the register is recording its choices rather than the Empress's.",
+      "secret": "Not every re-registration order arrives from the Celestial Mandate Palace. Some appear sealed on her desk in her own handwriting, and she files them, because the families named in them are the ones the formation stops crushing.",
+      "location": "Celestial Cradle Province",
+      "schedule": {
+        "Dawn": "Celestial Cradle Province",
+        "Morning": "Celestial Mandate Palace",
+        "Afternoon": "Celestial Cradle Province",
+        "Evening": "Celestial Cradle Province",
+        "Night": "Celestial Cradle Province"
+      }
     }
   },
   "items": {

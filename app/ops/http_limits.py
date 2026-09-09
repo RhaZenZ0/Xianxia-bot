@@ -234,3 +234,101 @@ class ConnectionLimiter:
             "peak": self.peak,
             "refused": self.refused,
         }
+
+
+class LoginThrottle:
+    """Per-source-address lockout for the dashboard's Basic Auth.
+
+    Basic Auth has no session, so every request is a login attempt, and a
+    dashboard on a LAN port with no throttle is a token that can be guessed
+    at line rate. This counts failed attempts per peer address inside a
+    sliding window and, once ``max_failures`` are reached, refuses that
+    address for ``lockout_seconds`` *before* the credentials are looked at -
+    a locked address learns nothing about whether its next guess was right.
+
+    A successful login clears the address. The table is bounded: expired
+    entries are pruned on every call, and past ``max_tracked`` distinct
+    addresses the oldest are dropped, so an attacker cycling source addresses
+    costs memory proportional to the cap rather than to the attack.
+
+    Behind a reverse proxy every request arrives from the proxy's address and
+    the lock is shared by everyone behind it. That is documented rather than
+    worked around: trusting a forwarded-for header from an unknown peer would
+    let the attacker choose whose lock to fill.
+    """
+
+    def __init__(
+        self,
+        *,
+        max_failures: int = 5,
+        window_seconds: float = 300.0,
+        lockout_seconds: float = 900.0,
+        max_tracked: int = 4096,
+        clock: Callable[[], float] = time.monotonic,
+    ) -> None:
+        self.max_failures = max(1, int(max_failures))
+        self.window_seconds = max(1.0, float(window_seconds))
+        self.lockout_seconds = max(1.0, float(lockout_seconds))
+        self.max_tracked = max(1, int(max_tracked))
+        self._clock = clock
+        self._failures: dict[str, list[float]] = {}
+        self._locked_until: dict[str, float] = {}
+        self.lockouts = 0
+        self.refused = 0
+
+    def _prune(self, now: float) -> None:
+        for address, until in list(self._locked_until.items()):
+            if until <= now:
+                del self._locked_until[address]
+        horizon = now - self.window_seconds
+        for address, stamps in list(self._failures.items()):
+            kept = [stamp for stamp in stamps if stamp > horizon]
+            if kept:
+                self._failures[address] = kept
+            else:
+                del self._failures[address]
+        overflow = len(self._failures) - self.max_tracked
+        if overflow > 0:
+            oldest = sorted(self._failures, key=lambda a: self._failures[a][-1])[:overflow]
+            for address in oldest:
+                del self._failures[address]
+
+    def locked_for(self, address: str) -> float:
+        """Seconds the address stays refused, or 0.0 when it may attempt a login."""
+        now = self._clock()
+        self._prune(now)
+        remaining = self._locked_until.get(address, 0.0) - now
+        if remaining > 0:
+            self.refused += 1
+            return remaining
+        return 0.0
+
+    def failure(self, address: str) -> bool:
+        """Record a failed login. Returns True when this failure locked the address."""
+        now = self._clock()
+        self._prune(now)
+        stamps = self._failures.setdefault(address, [])
+        stamps.append(now)
+        if len(stamps) >= self.max_failures:
+            self._locked_until[address] = now + self.lockout_seconds
+            del self._failures[address]
+            self.lockouts += 1
+            return True
+        return False
+
+    def success(self, address: str) -> None:
+        self._failures.pop(address, None)
+        self._locked_until.pop(address, None)
+
+    def snapshot(self) -> dict[str, Any]:
+        now = self._clock()
+        self._prune(now)
+        return {
+            "max_failures": self.max_failures,
+            "window_seconds": self.window_seconds,
+            "lockout_seconds": self.lockout_seconds,
+            "tracked": len(self._failures),
+            "locked": len(self._locked_until),
+            "lockouts": self.lockouts,
+            "refused": self.refused,
+        }

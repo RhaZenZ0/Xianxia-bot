@@ -60,6 +60,7 @@ func countProbeRows(t *testing.T, engine *Server) int {
 func postBatch(t *testing.T, engine *Server, body string) *httptest.ResponseRecorder {
 	t.Helper()
 	request := httptest.NewRequest("POST", "/v1/db/batch", strings.NewReader(body))
+	request.Header.Set("X-Xianxia-Engine-Token", os.Getenv("ENGINE_AUTH_TOKEN"))
 	response := httptest.NewRecorder()
 	engine.dbBatch(response, request)
 	return response

@@ -54,8 +54,22 @@ func New(databasePath string, worldPath string) (*Server, error) {
 	if err != nil {
 		return nil, fmt.Errorf("load world catalog: %w", err)
 	}
-	return &Server{databasePath: databasePath, worldPath: worldPath, sessions: storage.NewSessionManager(databasePath), simulation: runner, authToken: strings.TrimSpace(os.Getenv("ENGINE_AUTH_TOKEN"))}, nil
+	// The token is read here, not only in main, so that every way of
+	// constructing a Server - the binary, a test, a future embedder - is held
+	// to the same rule. Until v0.29.0 a blank token made authorized() answer
+	// true for every request: the engine door stood open whenever the
+	// variable was unset, and only startup.sh stood between an operator and
+	// that state.
+	token := strings.TrimSpace(os.Getenv("ENGINE_AUTH_TOKEN"))
+	if len(token) < minEngineTokenLength {
+		return nil, fmt.Errorf("ENGINE_AUTH_TOKEN must be set to at least %d characters", minEngineTokenLength)
+	}
+	return &Server{databasePath: databasePath, worldPath: worldPath, sessions: storage.NewSessionManager(databasePath), simulation: runner, authToken: token}, nil
 }
+
+// minEngineTokenLength is the shortest ENGINE_AUTH_TOKEN the engine will run
+// with. startup.sh and cmd/xianxia-core/main.go state the same number.
+const minEngineTokenLength = 20
 
 func (s *Server) Close() { s.sessions.CloseAll() }
 
@@ -130,8 +144,11 @@ func (s *Server) Handler() http.Handler {
 }
 
 func (s *Server) authorized(r *http.Request) bool {
+	// Fail closed. New() refuses to build a Server without a token, so this
+	// branch is unreachable in practice; it exists so that a Server built any
+	// other way (a zero value, a future constructor) denies rather than admits.
 	if s.authToken == "" {
-		return true
+		return false
 	}
 	provided := r.Header.Get("X-Xianxia-Engine-Token")
 	return len(provided) == len(s.authToken) && subtle.ConstantTimeCompare([]byte(provided), []byte(s.authToken)) == 1

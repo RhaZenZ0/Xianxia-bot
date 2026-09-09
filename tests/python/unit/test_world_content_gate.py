@@ -37,6 +37,14 @@ class LocationContentTests(unittest.TestCase):
                 for text in encounters:
                     self.assertGreater(len(text.strip()), 20)
 
+    def test_every_location_has_at_least_one_npc(self):
+        # A location the narrator can be asked about needs someone to voice
+        # it. The three samsara arrival grounds were the last without one.
+        homes = {npc["location"] for npc in WORLD["npcs"].values()}
+        for name in WORLD["locations"]:
+            with self.subTest(location=name):
+                self.assertIn(name, homes, f"{name} has no NPC")
+
     def test_safe_zone_encounters_do_not_start_violence(self):
         # A protected interior forbids violence (system prompt rule 15); its
         # encounters must be things that happen around you, not attacks on you.

@@ -373,8 +373,17 @@ class Settings:
         )
         if not 4 <= http_max_connections <= 4096:
             raise RuntimeError("HTTP_MAX_CONNECTIONS must be between 4 and 4096")
-        health_host = os.getenv("HEALTH_HOST", "0.0.0.0").strip() or "0.0.0.0"
-        health_port = _as_int(os.getenv("HEALTH_PORT"), 8080, name="HEALTH_PORT")
+        # Loopback unless told otherwise. docker-compose.yml sets 0.0.0.0
+        # explicitly, because the dashboard container reaches this listener
+        # over the compose network; a bare-metal run has no such neighbour and
+        # should not offer /metrics and the control channel to the LAN by
+        # default (v0.29.0).
+        health_host = os.getenv("HEALTH_HOST", "127.0.0.1").strip() or "127.0.0.1"
+        # 8082, not 8080: on a QNAP, 8080 is the QTS web admin, so a bare-metal
+        # listener on all interfaces collided with it. Under compose the port is
+        # expose-only and set explicitly beside HEALTH_HOST, so the value here
+        # is the bare-metal default (v0.29.0).
+        health_port = _as_int(os.getenv("HEALTH_PORT"), 8082, name="HEALTH_PORT")
         if not 1 <= health_port <= 65535:
             raise RuntimeError("HEALTH_PORT must be between 1 and 65535")
         slow_query_ms = _as_float(os.getenv("SLOW_QUERY_MS"), 100.0, name="SLOW_QUERY_MS")
@@ -393,6 +402,17 @@ class Settings:
         if not 1 <= game_engine_timeout_seconds <= 300:
             raise RuntimeError("GAME_ENGINE_TIMEOUT_SECONDS must be between 1 and 300")
         game_engine_auth_token = os.getenv("ENGINE_AUTH_TOKEN", "").strip()
+        # Same rule as DASHBOARD_TOKEN, and the same number the Go engine and
+        # startup.sh enforce. Until v0.29.0 only startup.sh checked this, so a
+        # bare-metal `python -m app.bot` with no token started, sent every
+        # engine request unauthenticated, and - because the engine then also
+        # accepted a blank token - worked, with the engine door open.
+        if len(game_engine_auth_token) < 20:
+            raise RuntimeError(
+                "ENGINE_AUTH_TOKEN must be set to at least 20 characters, the same value for "
+                "the Python services and the Go engine. Generate one with: "
+                "python3 -c \"import secrets; print(secrets.token_urlsafe(32))\""
+            )
 
         cooldowns = {
             "cultivate_cooldown_minutes": _as_int(os.getenv("CULTIVATE_COOLDOWN_MINUTES"), 180, name="CULTIVATE_COOLDOWN_MINUTES"),

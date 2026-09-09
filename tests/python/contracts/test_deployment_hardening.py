@@ -137,7 +137,8 @@ class OpenAISDKMajorBumpTests(unittest.TestCase):
         # openai 3.x installs httpx2 and no longer installs httpx at all, but
         # app/database/remote.py and app/ops/game_engine.py import httpx directly for
         # the Go engine transport - the path every piece of game state uses.
-        self.assertRegex(REQUIREMENTS, r"(?m)^httpx>=")
+        # A range until v0.29.0; an exact pin since, with the lock carrying the hash.
+        self.assertRegex(REQUIREMENTS, r"(?m)^httpx==")
         for module in ("app/database/remote.py", "app/ops/game_engine.py"):
             self.assertIn(
                 "import httpx",
@@ -252,7 +253,9 @@ class ContainerBootstrapTests(unittest.TestCase):
         self.assertIn("docker compose --profile dashboard up", STARTUP)
         self.assertIn("OPENROUTER_API_KEY", STARTUP)
         self.assertIn("DASHBOARD_TOKEN", STARTUP)
-        self.assertIn('BOT_CONTROL_URL: "http://xianxia-bot:8080"', COMPOSE)
+        self.assertIn('BOT_CONTROL_URL: "http://xianxia-bot:8082"', COMPOSE)
+        # The bot listens where the dashboard looks, whatever an older .env says.
+        self.assertIn('HEALTH_PORT: "8082"', COMPOSE)
         self.assertIn('test: ["CMD", "python", "-m", "app.ops.healthcheck"]', COMPOSE)
         self.assertIn("docker compose --profile dashboard down", STOP)
 
