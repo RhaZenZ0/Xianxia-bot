@@ -992,6 +992,14 @@ digest as well as tag.
 *`-race` in CI.* The v0.21.6 roadmap said the Go suite was green under the race detector; that was
 a local run. `ci.yml` now runs it.
 
+*`.env.example` is keys and separators only.* At 368 lines, 250 of them comments, the file an
+operator copies to `.env` had become the manual; the operator asked for the manual to be a manual.
+Every explanation moved, section for section, to `docs/CONFIGURATION.md`, and the file keeps the
+keys, their defaults and the section rules, with its header naming where the words went. The tests
+that gated prose in the file - the AI Studio key URLs, the arrow chain summaries, the loopback
+alternative beside each bind key - now gate the reference instead, and a new one holds the file to
+the rule so a comment cannot creep back in.
+
 Worth recording: twelve Go tests in `internal/server` had been constructing engines with no token and
 issuing requests with no header, passing only because the door was open. They now run under a token
 supplied by `TestMain` and send it, and one of them - the restore-never-loses-a-write test - was

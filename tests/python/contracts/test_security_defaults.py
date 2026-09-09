@@ -24,6 +24,7 @@ GO_AUTH_TEST = (PROJECT_ROOT / "go_core" / "internal" / "server" / "auth_test.go
 DASHBOARD = (PROJECT_ROOT / "app" / "dashboard" / "server.py").read_text(encoding="utf-8")
 COMPOSE = (PROJECT_ROOT / "docker-compose.yml").read_text(encoding="utf-8")
 ENV_EXAMPLE = (PROJECT_ROOT / ".env.example").read_text(encoding="utf-8")
+CONFIGURATION = (PROJECT_ROOT / "docs" / "CONFIGURATION.md").read_text(encoding="utf-8")
 DOCKERFILE = (PROJECT_ROOT / "Dockerfile").read_text(encoding="utf-8")
 GO_DOCKERFILE = (PROJECT_ROOT / "go_core" / "Dockerfile").read_text(encoding="utf-8")
 REQUIREMENTS = (PROJECT_ROOT / "requirements.txt").read_text(encoding="utf-8")
@@ -205,12 +206,35 @@ class BindDefaultTests(unittest.TestCase):
         # startup.sh copies .env.example to .env, so this file is the operator's
         # effective default. The operator chose all interfaces (a headless NAS
         # must answer a PC on the LAN); the test holds that the choice is
-        # written beside its narrowing alternative, and that the application's
-        # own default for an unset variable stays loopback (the test above).
+        # explained beside its narrowing alternative in the configuration
+        # reference, and that the application's own default for an unset
+        # variable stays loopback (the test above).
         for key in ("DASHBOARD_BIND_ADDRESS", "DASHBOARD_HOST", "HEALTH_HOST"):
             self.assertIn(f"{key}=0.0.0.0", ENV_EXAMPLE, key)
-            at = ENV_EXAMPLE.index(f"{key}=")
-            self.assertIn("127.0.0.1", ENV_EXAMPLE[max(0, at - 900):at], f"{key}: the loopback alternative is not documented beside it")
+            at = CONFIGURATION.index(f"`{key}`")
+            window = CONFIGURATION[at:at + 1200]
+            self.assertIn("127.0.0.1", window, f"{key}: the loopback alternative is not documented beside it")
+
+    def test_the_env_example_is_keys_and_separators_only(self):
+        # The operator's rule (v0.29.0): the file you copy to .env carries the
+        # keys, their defaults and the section separators, nothing else. The
+        # explanations live in docs/CONFIGURATION.md, which the header names.
+        separator = re.compile(r"^# [=-]{3,}|^# --- .+ -{3,}$")
+        assignment = re.compile(r"^#? ?[A-Z][A-Z0-9_]*=")
+        inside_title = False
+        for number, line in enumerate(ENV_EXAMPLE.splitlines(), start=1):
+            if not line.strip():
+                continue
+            if re.match(r"^# ={3,}", line):
+                inside_title = not inside_title
+                continue
+            if separator.match(line) or assignment.match(line):
+                continue
+            if line.startswith("#") and inside_title:
+                continue  # the section's name, between its two rules
+            self.fail(f".env.example line {number} is prose, not a key or a separator: {line!r}")
+        self.assertIn("docs/CONFIGURATION.md", ENV_EXAMPLE)
+        self.assertTrue((PROJECT_ROOT / "docs" / "CONFIGURATION.md").exists())
 
 
 class SupplyChainTests(unittest.TestCase):

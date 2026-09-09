@@ -831,7 +831,9 @@ Although development currently allows architectural/database changes, the migrat
 
 ## Configuration highlights
 
-See `.env.example` for the complete set. Important groups include:
+`.env.example` carries the complete set of keys and their defaults, and only
+those; `docs/CONFIGURATION.md` explains every one of them, section by section.
+Important groups include:
 
 - Discord token/guild/channel behavior
 - OpenRouter routine/epic free fallback chains, rate limiting and timeouts

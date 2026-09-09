@@ -964,21 +964,29 @@ class ReasoningOffTests(unittest.TestCase):
         # v0.25.4: the `NAME=value` lines were corrected in v0.25.3 but the
         # prose chain summary right above them still read "Gemma 4 31B Free ->
         # MiniMax M3 Free -> ...", which is the line an operator actually reads.
-        # Every arrow summary is gated, not just the assignments.
-        for line in env_example.splitlines():
-            if line.startswith("#") and line.count("->") >= 2:
-                for dead in ("MiniMax", "Nemotron"):
-                    self.assertNotIn(dead, line, line)
+        # Every arrow summary is gated, not just the assignments. Since v0.29.0
+        # the prose lives in docs/CONFIGURATION.md, so that is gated too.
+        configuration = (PROJECT_ROOT / "docs" / "CONFIGURATION.md").read_text(encoding="utf-8")
+        for text in (env_example, configuration):
+            for line in text.splitlines():
+                if line.count("->") >= 2:
+                    for dead in ("MiniMax", "Nemotron", "GLM"):
+                        self.assertNotIn(dead, line, line)
+        self.assertNotIn("minimax/minimax-m3:free", configuration)
 
-    def test_the_env_example_says_where_the_ai_studio_key_comes_from(self):
+    def test_the_configuration_reference_says_where_the_ai_studio_key_comes_from(self):
         # The BYOK instructions said where to PASTE the key and never where to
-        # get it, which is the step an operator is actually missing.
+        # get it, which is the step an operator is actually missing. The
+        # explanation moved from .env.example to docs/CONFIGURATION.md in
+        # v0.29.0; the keys-only .env.example points there.
         from tests.support import PROJECT_ROOT
-        env_example = (PROJECT_ROOT / ".env.example").read_text(encoding="utf-8")
+        configuration = (PROJECT_ROOT / "docs" / "CONFIGURATION.md").read_text(encoding="utf-8")
         readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
-        for text in (env_example, readme):
+        for text in (configuration, readme):
             self.assertIn("aistudio.google.com/api-keys", text)
             self.assertIn("openrouter.ai/settings/integrations", text)
+        env_example = (PROJECT_ROOT / ".env.example").read_text(encoding="utf-8")
+        self.assertIn("docs/CONFIGURATION.md", env_example)
 
 
 def _return(value):
