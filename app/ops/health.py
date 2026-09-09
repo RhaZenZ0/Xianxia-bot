@@ -176,7 +176,7 @@ class HealthServer:
         state: HealthState,
         *,
         host: str = "0.0.0.0",
-        port: int = 8080,
+        port: int = 8082,
         control_handler: Callable[[str, dict[str, Any]], Awaitable[dict[str, Any]]] | None = None,
         control_token: str = "",
         header_limits: HeaderLimits | None = None,

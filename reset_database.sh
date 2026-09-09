@@ -116,7 +116,7 @@ if [ "$SKIP_DISCORD" -ne 1 ]; then
             response=$(cd "$PROJECT_DIR" && docker compose exec -T xianxia-bot \
                 wget -q -O - --header="X-Xianxia-Control: $CONTROL_TOKEN" --header='Content-Type: application/json' \
                 --post-data='{"action":"reset_world","payload":{"confirm":"RESET","reason":"reset_database.sh"}}' \
-                http://127.0.0.1:8080/control/discord 2>/dev/null || true)
+                "http://127.0.0.1:${HEALTH_PORT:-8082}/control/discord" 2>/dev/null || true)
             deleted=$(printf '%s' "$response" | sed -n 's/.*"threads_deleted"[[:space:]]*:[[:space:]]*\([0-9]*\).*/\1/p')
             found=$(printf '%s' "$response" | sed -n 's/.*"threads_found"[[:space:]]*:[[:space:]]*\([0-9]*\).*/\1/p')
             if [ -n "$deleted" ]; then

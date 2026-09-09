@@ -127,7 +127,7 @@ class ListingTests(unittest.TestCase):
 
 class SettingsTests(unittest.TestCase):
     def base_env(self):
-        return {"DISCORD_TOKEN": "test-token", "GUILD_ID": "123456789012345678", "DATABASE_PATH": "data/test.sqlite3"}
+        return {"DISCORD_TOKEN": "test-token", "GUILD_ID": "123456789012345678", "DATABASE_PATH": "data/test.sqlite3", "ENGINE_AUTH_TOKEN": "test-engine-token-1234567890"}
 
     def test_defaults_check_the_stable_channel_daily(self):
         with patch.dict(os.environ, self.base_env(), clear=True):
@@ -268,7 +268,7 @@ class WorkflowTests(unittest.TestCase):
         checks = WORKFLOW[:WORKFLOW.index("  release:")]
         release = WORKFLOW[WORKFLOW.index("  release:"):]
         for step in ("python -m ruff check app scripts", "python -m pytest -q", 'test -z "$(gofmt -l go_core)"',
-                     "CGO_ENABLED=1 go vet ./...", "CGO_ENABLED=1 go test ./...", "docker build -f Dockerfile",
+                     "CGO_ENABLED=1 go vet ./...", "CGO_ENABLED=1 go test -race ./...", "docker build -f Dockerfile",
                      "docker build -f go_core/Dockerfile"):
             self.assertIn(step, checks, step)
             self.assertNotIn(step, release, f"{step} would run twice on a tag")

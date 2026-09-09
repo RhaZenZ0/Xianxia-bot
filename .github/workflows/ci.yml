@@ -49,7 +49,7 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install --yes libsqlite3-dev
       - run: test -z "$(gofmt -l go_core)"
       - run: cd go_core && CGO_ENABLED=1 go vet ./...
-      - run: cd go_core && CGO_ENABLED=1 go test ./...
+      - run: cd go_core && CGO_ENABLED=1 go test -race ./...
 
   containers:
     runs-on: ubuntu-latest
@@ -96,7 +96,7 @@ jobs:
       - name: Build the archive
         run: |
           asset="${{ steps.version.outputs.asset }}"
-          zip -qr "/tmp/$asset" . -x '*/__pycache__/*' '*.pyc' '.env' 'data/*' '.git/*' '.pytest_cache/*' '.ruff_cache/*'
+          zip -qr "/tmp/$asset" . -x '*/__pycache__/*' '*.pyc' '.env' 'data/*' '.git/*' '.pytest_cache/*' '.ruff_cache/*' '.claude/*'
           (cd /tmp && sha256sum "$asset" > "$asset.sha256")
           unzip -p "/tmp/$asset" VERSION
           cat "/tmp/$asset.sha256"

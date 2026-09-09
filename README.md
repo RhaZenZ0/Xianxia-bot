@@ -147,9 +147,11 @@ The deadline is **absolute**: each read gets whichever is smaller, the per-line
 timeout or the time remaining for the whole head. Defaults are generous for a
 browser (Chrome sends roughly 15 headers, 1–2 KiB) and mean for an attacker.
 
-> The GM dashboard publishes to `${DASHBOARD_BIND_ADDRESS:-127.0.0.1}:8090` —
-> loopback-only by default. Setting `DASHBOARD_BIND_ADDRESS=0.0.0.0` exposes it
-> to your whole network; everything above then matters a great deal more.
+> The GM dashboard publishes to `${DASHBOARD_BIND_ADDRESS}:8090`. The shipped
+> `.env.example` sets that to `0.0.0.0` so the dashboard is reachable from a PC
+> on the LAN, which is what a headless NAS needs; everything above then
+> matters a great deal more. Unset, compose falls back to loopback. Set the
+> NAS's LAN address to narrow it to one interface.
 
 ## Free-tier budget
 
@@ -454,18 +456,48 @@ Set:
 ```env
 DASHBOARD_USERNAME=admin
 DASHBOARD_TOKEN=<long random secret>
-DASHBOARD_BIND_ADDRESS=127.0.0.1
+DASHBOARD_BIND_ADDRESS=0.0.0.0
 DASHBOARD_PORT=8090
 DASHBOARD_ADMIN_WRITES=true
 ```
 
-Open:
+Open, from a PC on the same LAN:
 
 ```text
-http://127.0.0.1:8090
+http://<NAS LAN address>:8090
 ```
 
 For LAN use, bind to the QNAP/server's exact LAN address where possible. Do **not** port-forward the GM dashboard directly to the public internet.
+
+Since v0.29.0 the dashboard has two more locks. After five wrong passwords
+from one source address in five minutes, that address is answered `429` for
+fifteen minutes before its credentials are read
+(`DASHBOARD_LOGIN_MAX_FAILURES`, `DASHBOARD_LOGIN_WINDOW_SECONDS`,
+`DASHBOARD_LOGIN_LOCKOUT_SECONDS`). And a browser `POST` whose `Origin` does
+not match the `Host` it was sent to is refused with `403 origin_mismatch`, so
+another tab cannot post admin actions with your session.
+
+**Outside Docker** the process binds `127.0.0.1` when `DASHBOARD_HOST` is
+unset, as does the bot's health/control listener when `HEALTH_HOST` is; the
+shipped `.env.example` sets both to `0.0.0.0` so a bare-metal run behaves
+like the Docker one. Whichever way it is reached from another machine, a TLS
+reverse proxy in front is the right door - Basic Auth is plaintext without it. The proxy must pass the
+original `Host` through, or you must list the public origin in
+`DASHBOARD_ALLOWED_ORIGINS`; note that behind a proxy every visitor shares
+the proxy's address and therefore its login lock. A minimal nginx site:
+
+```nginx
+server {
+    listen 443 ssl;
+    server_name gm.example.lan;
+    ssl_certificate     /etc/ssl/gm.example.lan.crt;
+    ssl_certificate_key /etc/ssl/gm.example.lan.key;
+    location / {
+        proxy_pass http://127.0.0.1:8090;
+        proxy_set_header Host $host;
+    }
+}
+```
 
 ### Security model
 
@@ -799,7 +831,9 @@ Although development currently allows architectural/database changes, the migrat
 
 ## Configuration highlights
 
-See `.env.example` for the complete set. Important groups include:
+`.env.example` carries the complete set of keys and their defaults, and only
+those; `docs/CONFIGURATION.md` explains every one of them, section by section.
+Important groups include:
 
 - Discord token/guild/channel behavior
 - OpenRouter routine/epic free fallback chains, rate limiting and timeouts

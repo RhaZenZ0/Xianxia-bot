@@ -14,6 +14,7 @@ import (
 func postBackupCreate(t *testing.T, engine *Server) map[string]any {
 	t.Helper()
 	request := httptest.NewRequest("POST", "/v1/db/backups", strings.NewReader("{}"))
+	request.Header.Set("X-Xianxia-Engine-Token", os.Getenv("ENGINE_AUTH_TOKEN"))
 	response := httptest.NewRecorder()
 	engine.dbBackups(response, request)
 	if response.Code != 201 {
@@ -29,6 +30,7 @@ func postBackupCreate(t *testing.T, engine *Server) map[string]any {
 func postRestore(t *testing.T, engine *Server, body string) *httptest.ResponseRecorder {
 	t.Helper()
 	request := httptest.NewRequest("POST", "/v1/db/restore", strings.NewReader(body))
+	request.Header.Set("X-Xianxia-Engine-Token", os.Getenv("ENGINE_AUTH_TOKEN"))
 	response := httptest.NewRecorder()
 	engine.dbRestore(response, request)
 	return response

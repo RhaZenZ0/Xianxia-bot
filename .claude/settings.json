@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(uv run *)",
+      "Bash(uv pip *)",
+      "Bash(uv venv *)",
+      "Bash(pytest *)",
+      "Bash(python -m pytest *)",
+      "Bash(python3 -m pytest *)",
+      "Bash(python3 -m unittest *)",
+      "Bash(python3 scripts/release_manifest.py *)",
+      "Bash(python3 scripts/materialize_world_catalog.py *)",
+      "Bash(python3 scripts/check_dashboard_implementation.py)",
+      "Bash(ruff check *)",
+      "Bash(python -m ruff check *)",
+      "Bash(go test *)",
+      "Bash(go vet *)",
+      "Bash(gofmt *)",
+      "Bash(make check)",
+      "Bash(make test*)",
+      "Bash(make lint)",
+      "Bash(make format-check)",
+      "Bash(make lock)"
+    ]
+  }
+}

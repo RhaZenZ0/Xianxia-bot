@@ -30,7 +30,7 @@ MANIFEST_NAME = "RELEASE_MANIFEST.sha256"
 EXCLUDED_DIRS = frozenset({
     ".git", "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache",
     "node_modules", "data", "updates", "update_backups", ".venv", "venv",
-    ".idea", ".vscode",
+    ".idea", ".vscode", ".claude",
 })
 
 # Files excluded by exact name anywhere in the tree.

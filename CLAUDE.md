@@ -22,7 +22,9 @@ make install-dev
 
 Set `ENGINE_AUTH_TOKEN` in `.env` to the same value for both the Python services and the Go engine
 (`python3 -c "import secrets; print(secrets.token_urlsafe(32))"`). The Go engine needs CGO SQLite
-bindings (`libsqlite3-dev` on Debian/Ubuntu).
+bindings (`libsqlite3-dev` on Debian/Ubuntu). `.env.example` is keys, defaults and section
+separators only — a contract test holds it to that — and `docs/CONFIGURATION.md` is where every
+key is explained; a new key gets its line in both.
 
 Full local check suite (mirrors CI):
 
@@ -60,6 +62,7 @@ Other checks:
 python scripts/check_dashboard_implementation.py   # dashboard frontend/backend drift + coverage gate, part of the release gate
 python -m compileall -q app                        # compile-check production Python
 python -m json.tool content/world.json >/dev/null  # validate world content JSON
+make lock                                          # regenerate requirements.lock (uv) after editing requirements.txt; the Dockerfile installs it under --require-hashes
 ```
 
 Run without Docker:
