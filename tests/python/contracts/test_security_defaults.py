@@ -196,10 +196,16 @@ class BindDefaultTests(unittest.TestCase):
         # The bot's listener is still never published on the host.
         self.assertNotRegex(COMPOSE, r'ports:\s*\n\s*-\s*"[^"]*8080')
 
-    def test_the_env_example_does_not_teach_the_old_default(self):
-        self.assertIn("HEALTH_HOST=127.0.0.1", ENV_EXAMPLE)
-        self.assertIn("DASHBOARD_HOST=127.0.0.1", ENV_EXAMPLE)
-        self.assertNotIn("HOST=0.0.0.0", ENV_EXAMPLE)
+    def test_the_env_example_binds_all_interfaces_as_a_stated_choice(self):
+        # startup.sh copies .env.example to .env, so this file is the operator's
+        # effective default. The operator chose all interfaces (a headless NAS
+        # must answer a PC on the LAN); the test holds that the choice is
+        # written beside its narrowing alternative, and that the application's
+        # own default for an unset variable stays loopback (the test above).
+        for key in ("DASHBOARD_BIND_ADDRESS", "DASHBOARD_HOST", "HEALTH_HOST"):
+            self.assertIn(f"{key}=0.0.0.0", ENV_EXAMPLE, key)
+            at = ENV_EXAMPLE.index(f"{key}=")
+            self.assertIn("127.0.0.1", ENV_EXAMPLE[max(0, at - 900):at], f"{key}: the loopback alternative is not documented beside it")
 
 
 class SupplyChainTests(unittest.TestCase):
