@@ -313,6 +313,9 @@ type NPCDefinition struct {
 	Realm        string                  `json:"realm"`
 	Location     string                  `json:"location"`
 	HiddenMaster *HiddenMasterDefinition `json:"hidden_master"`
+	// Merchant (v0.34.1) names the catalog merchant this NPC is the face of,
+	// so the trader's relocation moves the NPC too.
+	Merchant string `json:"merchant"`
 }
 
 type ManualDefinition struct {
@@ -389,6 +392,25 @@ type Catalog struct {
 	TechniqueSystem     TechniqueSystemDefinition      `json:"technique_system"`
 	WorldRules          map[string]any                 `json:"world_rules"`
 	Sects               map[string]SectDefinition      `json:"sects"`
+	// Merchants (v0.34.1): travelling traders who buy what an auction floor
+	// could not sell, carry it along a fixed route of cities and resell it
+	// at a markup. They are met in a city while they dwell there, or on the
+	// road while a player is in transit over the same leg.
+	Merchants map[string]Merchant `json:"merchants"`
+}
+
+// Merchant is one travelling trader. Home is the city the trader starts in
+// and Route is the loop of cities it walks; the first stop after Home is the
+// route entry after Home's index, so Home should be in the route.
+type Merchant struct {
+	Name          string   `json:"name"`
+	World         string   `json:"world"`
+	Home          string   `json:"home"`
+	Route         []string `json:"route"`
+	Budget        int64    `json:"budget"`
+	Currency      string   `json:"currency"`
+	MarkupPercent int64    `json:"markup_percent"`
+	DwellMinutes  int64    `json:"dwell_minutes"`
 }
 
 func Load(path string) (Catalog, error) {

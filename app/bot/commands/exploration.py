@@ -980,6 +980,13 @@ async def travel(interaction: discord.Interaction, destination: str) -> None:
             damage=int(encounter.get("vitality_damage") or 0)
             if delay or damage:
                 road+=f" (**+{delay} min**, **-{damage} Vitality**)"
+    merchants=""
+    for row in list(result.get("merchant_encounters") or []):
+        if not isinstance(row,dict):continue
+        if str(row.get("met"))=="road":
+            merchants+=f"\n🧳 **{row.get('name')}** is on this road ({row.get('location')} → {row.get('destination')}) — trade by the roadside with **/economy → Merchants → Buy**."
+        else:
+            merchants+=f"\n🧳 **{row.get('name')}** is trading at **{row.get('location')}** along the way."
     meeting=""
     hub_match=realm_hub_by_location(str(result.get("destination") or destination))
     if hub_match and interaction.guild:
@@ -988,7 +995,7 @@ async def travel(interaction: discord.Interaction, destination: str) -> None:
         row=next((r for r in rows if str(r.get("world_name"))==world_name),None)
         if row: meeting=f"\n💬 Public meeting channel: <#{int(row['channel_id'])}>."
     await interaction.followup.send(
-        f"🗺️ **{c['name']} travels to {result.get('destination') or destination}.**\n{desc}{road}{safe}{meeting}"
+        f"🗺️ **{c['name']} travels to {result.get('destination') or destination}.**\n{desc}{road}{merchants}{safe}{meeting}"
     )
     for location in sorted(undiscovered_image_locations):
         if travel_first_discovers_location(

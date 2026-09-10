@@ -36,6 +36,7 @@ BASE_CHANNEL_SPECS = {
     "begin-here": "New cultivators begin here with /begin before entering the wider cultivation world.",
     "xianxia-info": "Read-only game guide, onboarding and system information maintained by the Xianxia bot.",
     "expeditions": "Read-only anchor for private player expedition threads; normal roleplay happens inside the private threads, not this channel.",
+    "playtest": "The playtest board: one post per hub page. React ✅ if it works, ❌ if it fails, 💡 if you want it changed - and say what in a reply.",
 }
 
 
@@ -51,6 +52,7 @@ def _base_channel_bindings(cfg: dict[str, Any]) -> dict[str, Any]:
         "begin-here": cfg.get("begin_channel_id"),
         "xianxia-info": cfg.get("info_channel_id"),
         "expeditions": cfg.get("exploration_channel_id"),
+        "playtest": cfg.get("playtest_channel_id"),
     }
 
 
@@ -421,6 +423,7 @@ async def ensure_base_xianxia_channels(
             begin_channel_id=_bound_id("begin-here"),
             info_channel_id=_bound_id("xianxia-info"),
             exploration_channel_id=_bound_id("expeditions"),
+            playtest_channel_id=_bound_id("playtest"),
         )
     elif channels or bindings.get("world-events") or bindings.get("event-scenes"):
         warnings.append(

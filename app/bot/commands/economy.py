@@ -1,4 +1,4 @@
-"""The economy: wallet, use, /storage, /auction, /market, /blackmarket and /civilization.
+"""The economy: wallet, use, /storage, /auction, /merchant, /market, /blackmarket and /civilization.
 
 Split phase 9b (v0.19.45, docs/MAIN_SPLIT_PLAN.md). Cut verbatim from
 main.py in definition order; reads only modules below main.py.
@@ -290,6 +290,113 @@ async def auction_bid(interaction:discord.Interaction,auction_id:int,amount:app_
         await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
     await refresh_lot(interaction.guild,int(auction_id))
     await interaction.followup.send(f"🔨 Bid accepted on lot `#{auction_id}`: **{amount} {WORLD.currency_name(str(result.get('currency_id','low_spirit_stone')))}**.",ephemeral=False)
+
+
+merchant_group=app_commands.Group(name="merchant",description="Find the travelling merchants and buy what they carry")
+
+
+def _merchant_where(row:dict[str,Any])->str:
+    if bool(row.get("on_the_road")):
+        return f"on the road from **{row.get('location')}** to **{row.get('destination')}** (arrives in {human_duration(int(row.get('arrives_in_minutes') or 0))})"
+    where=f"at **{row.get('location')}**"
+    if row.get("next_stop"):
+        where+=f" (leaves for {row.get('next_stop')} in {human_duration(int(row.get('departs_in_minutes') or 0))})"
+    return where
+
+
+def _merchant_stock_lines(row:dict[str,Any])->list[str]:
+    currency=WORLD.currency_name(str(row.get("currency_id") or "low_spirit_stone"))
+    lines=[]
+    for line in list(row.get("stock") or []):
+        lines.append(f"    • {WORLD.item_name(str(line.get('item_id') or ''))} ×{int(line.get('quantity') or 0)} — {int(line.get('price') or 0)} {currency} each")
+    return lines or ["    • an empty pack — nothing bought from the floors yet"]
+
+
+async def _merchant_status(user_id:int)->dict[str,Any]:
+    return dict(await ENGINE.action("merchant.status",user_id,{}) or {})
+
+
+@registered_group_command(merchant_group, name="status",description="Where every travelling merchant is, what they carry, and who you can reach")
+async def merchant_status(interaction:discord.Interaction)->None:
+    c=await require_character(interaction)
+    if not c:return
+    try:
+        status=await _merchant_status(interaction.user.id)
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {_explain_engine_error(exc)}",ephemeral=False);return
+    rows=list(status.get("merchants") or [])
+    if not rows:
+        await interaction.response.send_message("No merchant walks these roads yet.",ephemeral=False);return
+    lines=["🧳 **Travelling merchants**"]
+    road=status.get("actor_road")
+    if isinstance(road,dict):
+        lines.append(f"You are on the road from **{road.get('from')}** to **{road.get('to')}**.")
+    reachable=[r for r in rows if bool(r.get("meetable"))]
+    for row in reachable:
+        lines.append(f"🤝 **{row.get('name')}** — within reach, {_merchant_where(row)}")
+        lines.extend(_merchant_stock_lines(row))
+    for row in rows:
+        if bool(row.get("meetable")):continue
+        stock=len(list(row.get("stock") or []))
+        lines.append(f"• **{row.get('name')}** ({row.get('world')}) — {_merchant_where(row)}; carrying {stock} kind{'s' if stock!=1 else ''} of goods")
+    lines.append("Buy with **/economy → Merchants → Buy** when one is within reach — in the same city, or on the same stretch of road.")
+    await reply_long(interaction,"\n".join(lines))
+
+
+@registered_group_command(merchant_group, name="buy",description="Buy from a travelling merchant you can reach — in your city or on your road")
+@serialized_user_action
+async def merchant_buy(interaction:discord.Interaction,merchant:str,item:str,quantity:app_commands.Range[int,1,100]=1)->None:
+    await interaction.response.defer(ephemeral=False)
+    if not await require_character(interaction): return
+    try:
+        envelope=await ENGINE.authoritative_action("merchant.buy",interaction.user.id,{"merchant":merchant,"item_id":item,"quantity":int(quantity)},action_id=f"discord:{interaction.id}:merchant.buy")
+        result=dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
+    where="by the roadside" if bool(result.get("on_the_road")) else f"at {result.get('whereabouts')}"
+    await interaction.followup.send(
+        f"🧳 **{result.get('merchant_name')}** sells you **{WORLD.item_name(str(result.get('item_id') or item))} ×{int(result.get('quantity') or quantity)}** {where} "
+        f"for **{int(result.get('total') or 0)} {WORLD.currency_name(str(result.get('currency_id') or 'low_spirit_stone'))}** "
+        f"({int(result.get('unit_price') or 0)} each). Balance: **{int(result.get('balance') or 0)}**.",
+        ephemeral=False,
+    )
+
+
+@merchant_buy.autocomplete("merchant")
+async def merchant_buy_merchant_autocomplete(interaction:discord.Interaction,current:str)->list[app_commands.Choice[str]]:
+    try:
+        rows=list((await _merchant_status(interaction.user.id)).get("merchants") or [])
+    except Exception:
+        rows=[]
+    needle=current.lower().strip()
+    reachable=[r for r in rows if bool(r.get("meetable"))]
+    choices=[]
+    for row in reachable+[r for r in rows if not bool(r.get("meetable"))]:
+        name=str(row.get("name") or row.get("merchant"))
+        if needle and needle not in name.lower():continue
+        label=f"{name} — {'within reach' if bool(row.get('meetable')) else str(row.get('whereabouts') or '')}"
+        choices.append(app_commands.Choice(name=label[:100],value=str(row.get("merchant"))))
+    return choices[:25]
+
+
+@merchant_buy.autocomplete("item")
+async def merchant_buy_item_autocomplete(interaction:discord.Interaction,current:str)->list[app_commands.Choice[str]]:
+    chosen=str(getattr(interaction.namespace,"merchant","") or "")
+    try:
+        rows=list((await _merchant_status(interaction.user.id)).get("merchants") or [])
+    except Exception:
+        rows=[]
+    needle=current.lower().strip()
+    choices=[]
+    for row in rows:
+        if chosen and str(row.get("merchant"))!=chosen:continue
+        currency=WORLD.currency_name(str(row.get("currency_id") or "low_spirit_stone"))
+        for line in list(row.get("stock") or []):
+            item_id=str(line.get("item_id") or "")
+            name=WORLD.item_name(item_id)
+            if needle and needle not in name.lower() and needle not in item_id.lower():continue
+            choices.append(app_commands.Choice(name=f"{name} ×{int(line.get('quantity') or 0)} — {int(line.get('price') or 0)} {currency}"[:100],value=item_id))
+    return choices[:25]
 
 
 civilization_group=app_commands.Group(name="civilization",description="Inspect the living population, security and activity of world regions")

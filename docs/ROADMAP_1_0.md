@@ -292,6 +292,12 @@ columns filled; its three live columns are the pass on the live server and
 are Mitchell's to tick. `docs/KNOWN_LIMITATIONS.md` is the punch list. Gate:
 `tests/python/contracts/test_playtest_gate.py`.*
 
+*v0.34.1 gave the live half its instrument: the `#playtest` board, one
+message per hub page that testers mark ✅ ❌ 💡 and reply under, tallied by
+`/admin → Server → Playtest → Report`. It also shipped the travelling
+merchants, the first feature ask from the playtest: the floor's last bidder,
+walking loops of cities, met in a city or on the road.*
+
 A written pass over all sixteen player hubs on the live server, hub by hub,
 page by page, with a checklist per action (reachable, picker present, error
 text actionable, narration fallback fired, engine result keys read), plus
@@ -453,7 +459,7 @@ drift for seven versions as happened between v0.21.6 and v0.28.0.
 | v0.31 Narrator budget | v0.31.0 | shipped |
 | v0.32 Hardened II | v0.32.0 | shipped |
 | v0.33 Gameplay I | v0.33.0 | shipped |
-| v0.34 Playtest | v0.34.0 | shipped; the engine loops run and the checklist is on file, the live columns are open |
+| v0.34 Playtest | v0.34.1 | shipped; the engine loops run, the checklist is on file, and the `#playtest` board collects the live pass; travelling merchants shipped beside it |
 | v1.0.0-rc | | |
 | v1.0.0 | | |
 | Content track | | after rc |

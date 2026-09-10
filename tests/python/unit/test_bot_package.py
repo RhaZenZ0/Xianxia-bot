@@ -358,7 +358,7 @@ TIERS = (
     ("threads.py", "auction_feed.py"),
     ("admin/core.py",),
     ("admin/channel_messages.py", "admin/bugs_forum.py", "ui/event_scene.py", "ui/creation.py", "ui/commissions.py"),
-    ("admin/quest_control.py", "admin/narration_control.py", "admin/server_setup.py"),
+    ("admin/quest_control.py", "admin/narration_control.py", "admin/server_setup.py", "admin/playtest_board.py"),
     ("bot.py",),
     ("admin/world_ops.py", "admin/inspect_sim.py", "commands/*"),
     ("surface.py",),
@@ -685,6 +685,13 @@ SURFACE = {
             "admin_server_group": ('bind_channels', 'status', 'basechannels', 'setup', 'realmhubs', 'observability', 'ai_status', 'chat_digest'),
         },
     },
+    "admin/playtest_board.py": {
+        "groups": (),
+        "roots": (),
+        "leaves": {
+            "admin_server_group": ('playtest',),
+        },
+    },
     "admin/world_ops.py": {
         "groups": (),
         "roots": (),
@@ -767,11 +774,12 @@ SURFACE = {
         },
     },
     "commands/economy.py": {
-        "groups": ('storage_group', 'auction_group', 'civilization_group', 'market_group', 'blackmarket_group'),
+        "groups": ('storage_group', 'auction_group', 'merchant_group', 'civilization_group', 'market_group', 'blackmarket_group'),
         "roots": ('wallet', 'use'),
         "leaves": {
             "storage_group": ('status', 'deposit', 'withdraw'),
             "auction_group": ('enter', 'leave', 'browse', 'sell', 'bid'),
+            "merchant_group": ('status', 'buy'),
             "civilization_group": ('status', 'npcs'),
             "blackmarket_group": ('rumors', 'status', 'buy', 'sell'),
             "market_group": ('prices', 'buy', 'sell'),

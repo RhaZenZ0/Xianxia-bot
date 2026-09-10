@@ -1009,6 +1009,32 @@ Gate: `tests/python/contracts/test_security_defaults.py` and `TestNewRefusesAnEn
 No schema change (still 32), no game-rule change, AI remains narration-only.
 
 
+**0.34.1** is a feature point release: **the playtest board and the travelling merchants.** Schema **36**.
+
+*The playtest board.* A `#playtest` base channel beside `#bugs`, created by Setup/Repair like the
+others and bound by the slash path or the dashboard. `/admin → Server → Playtest → Post` puts one
+message per hub page in it, each pre-reacted ✅ ❌ 💡 - works, fails, change wanted - and testers
+react and reply under the page with what they saw. `Report` tallies the reactions with the names of
+who left them and links every flagged page, so the GM reads the changes wanted where they were
+written rather than in a summary of them. The board stores message ids and nothing else
+(`playtest_items`), and `Clear` empties it. Every one of the three is audited.
+
+*Travelling merchants.* Eight merchants - two a world, each a named NPC with a want, a fear and a
+secret - walk fixed loops of cities: Old Hu the Peddler from Greenriver Town round the Mortal
+capitals, Madam Wen of the Silk Road, Brother Lan the jade trader and the rest. They are the auction
+floor's last bidder: when a lot ends with no bid, a merchant whose loop passes the house's city and
+whose purse covers the starting bid takes it at that price, the seller is paid, and the item goes
+into the merchant's pack at a markup (never below base price). The pack is sold back to any player
+who can reach the merchant: in the same city while it dwells there, or on the same stretch of road
+while both are travelling it - `merchant.buy` is the one action the engine allows mid-journey, and
+the travel reply names who is on the road ahead. `/economy → Merchants` shows every merchant's
+whereabouts, pack and prices and who is within reach; the pickers on `Buy` list reachable merchants
+first and the chosen merchant's stock. The tick walks them (`merchants` automation switch, on by
+default; leg time from the road planner, four hours where the loop skips a road), the NPC moves with
+the merchant so `/npcinfo` and the region panels agree, and a merchant's purchase reads **Struck to**
+on the live auction card. Go owns all of it (`merchant_actions.go`); Python never writes
+`merchant_state` or `merchant_stock`.
+
 **0.34.0** is the roadmap's **Gameplay-complete II** milestone: the playtest, in the half of it a
 machine can run, with the live half laid out for the person who can. No schema change.
 
@@ -1321,9 +1347,13 @@ directory to one file, requires each check to appear before the release job and 
 and requires the release job to wait on all three.
 
 
-## Release status — v0.34.0
+## Release status — v0.34.1
 
-- Current release: v0.34.0: Gameplay-complete II - the engine half of the playtest as a script,
+- Current release: v0.34.1 (schema 36): the `#playtest` board - one message per hub page,
+  testers react ✅ ❌ 💡 and the GM reads the tally - and the travelling merchants, who buy what an
+  auction floor could not sell, walk fixed loops of cities and resell it to whoever meets them in a
+  city or on the road.
+- v0.34.0: Gameplay-complete II - the engine half of the playtest as a script,
   the checklist for the live half on file, the punch list, and the two defects the run found
   fixed (a commission could never be turned in; Reset Cooldowns missed the trial retry).
 - v0.33.1 (schema 35): an auction house in every city - grand in the capitals,
@@ -1513,6 +1543,8 @@ and requires the release job to wait on all three.
 - **Schema 27** added the v0.19.29 mute/freeze moderation columns on `characters`
   (`is_muted`, `is_frozen`, `moderation_reason`).
 - **Schema 28** added the Quest Forge definition table (`quest_definitions`).
+- **Schema 36** added the playtest board (`playtest_channel_id`, `playtest_items`) and the travelling
+  merchants (`merchant_state`, `merchant_stock`, `auctions.merchant_buyer`) (v0.34.1).
 - **Schema 35** added the live-auction channel per house (`auction_house_channels`) and the card per
   open lot (`auction_lot_messages`), Discord ids only (v0.33.1).
 - **Schema 34** added the moderation expiry pair (`muted_until`, `frozen_until`) and `is_banned` to

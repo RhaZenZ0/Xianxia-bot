@@ -1105,6 +1105,7 @@ func adminAutomationSet(conn *storage.Conn, adminUserID int64, raw json.RawMessa
 		"background_seclusion":    true,
 		"black_markets":           true,
 		"autonomous_world_events": true,
+		"merchants":               true,
 		// v0.31.0: when on, exploration openings and hunt results are
 		// narrated by the model without being asked; off, they read from
 		// the procedural pool and offer a Narrate-it button.

@@ -573,6 +573,7 @@ BOOKKEEPING_METHODS = {
     # Discord ids: channels, messages, threads
     "set_channel_message", "set_server_channels", "set_info_message_id", "set_bugs_channel_id", "set_realm_hub_channel",
     "set_auction_house_channel", "remember_auction_lot_message", "forget_auction_lot_message",  # v0.33.1 live auction cards
+    "set_playtest_item", "clear_playtest_items",  # v0.34.1 the playtest board's message ids
     "set_expedition_thread", "set_birth_family_household_thread", "set_sect_abode_thread", "set_abode_thread",
     "register_event_thread", "close_event_thread", "ensure_sect_abode", "update_expedition_location",
     "clear_discord_bindings",  # v0.21.2 teardown: forgets channel/message ids, touches no gameplay column
@@ -692,7 +693,9 @@ PRESENTATION_WRITES: dict[str, set[str]] = {
     "set_server_channels": {"server_config"},
     "set_info_message_id": {"server_config"},
     "set_bugs_channel_id": {"server_config"},
-    "clear_discord_bindings": {"auction_house_channels", "auction_lot_messages", "channel_messages", "realm_hub_channels", "server_config"},
+    "clear_discord_bindings": {"auction_house_channels", "auction_lot_messages", "channel_messages", "playtest_items", "realm_hub_channels", "server_config"},
+    "set_playtest_item": {"playtest_items"},
+    "clear_playtest_items": {"playtest_items"},
     "set_channel_message": {"channel_messages"},
     "set_realm_hub_channel": {"realm_hub_channels"},
     # v0.33.1: the live-auction channel per house and the card per open lot -

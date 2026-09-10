@@ -249,6 +249,19 @@ class HubAction:
     description: str
 
 
+# Every hub the surface built, in order (v0.34.1). surface.py registers them
+# once its definitions exist; anything below surface in the package - the
+# playtest board, which posts one message per hub page - reads them here
+# rather than importing surface.
+REGISTERED_HUBS: list[HubDefinition] = []
+
+
+def register_hubs(*definitions: HubDefinition) -> None:
+    for definition in definitions:
+        if all(existing.name != definition.name for existing in REGISTERED_HUBS):
+            REGISTERED_HUBS.append(definition)
+
+
 _HUB_OPTION_PROVIDERS: dict[tuple[str, str], Any] = {}
 
 # What to say when a live provider returns nothing.

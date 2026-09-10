@@ -6751,6 +6751,158 @@
       },
       "personality": "Urbane, discreet, unreadable in public and sharply funny in private.",
       "secret": "He holds the promissory notes of half the houses on the floor, bought quietly at auction under another name."
+    },
+    "Old Hu the Peddler": {
+      "role": "travelling peddler",
+      "location": "Greenriver Town",
+      "realm": "Qi Refining",
+      "stage": 5,
+      "merchant": "old_hu_the_peddler",
+      "speech": "Wheedling and warm; every price comes with a story and a sigh.",
+      "want": "Keep the mule loaded and the road under his feet; a full cart is a good week.",
+      "fear": "A road that goes quiet - no buyers, no bandits, no news - which means the world has moved on without him.",
+      "schedule": {
+        "Dawn": "Greenriver Town",
+        "Morning": "Greenriver Town",
+        "Afternoon": "Greenriver Town",
+        "Evening": "Greenriver Town",
+        "Night": "Greenriver Town"
+      },
+      "personality": "Cheerful, nosy, unhurried and impossible to insult; remembers what every town needs.",
+      "secret": "Half his 'auction finds' are bought unsold at the Pavilion for the reserve; the stories are the markup."
+    },
+    "Madam Wen of the Silk Road": {
+      "role": "caravan mistress and travelling merchant",
+      "location": "Four-Roads Caravan City",
+      "realm": "Foundation Establishment",
+      "stage": 4,
+      "merchant": "madam_wen_of_the_silk_road",
+      "speech": "Crisp, courteous and final; she names one price and means it.",
+      "want": "Run the four-roads circuit so tightly that the caravan guilds set their calendars by her.",
+      "fear": "A rival buying her whole circuit's stock out from under her at one auction.",
+      "schedule": {
+        "Dawn": "Four-Roads Caravan City",
+        "Morning": "Four-Roads Caravan City",
+        "Afternoon": "Four-Roads Caravan City",
+        "Evening": "Four-Roads Caravan City",
+        "Night": "Four-Roads Caravan City"
+      },
+      "personality": "Formidable, fair, dry-humoured and generous to anyone who keeps to a bargain.",
+      "secret": "She carries letters between the plains garrisons that no caravan guild knows she carries."
+    },
+    "Brother Lan the Jade Trader": {
+      "role": "travelling jade trader",
+      "location": "Spirit Jade Capital",
+      "realm": "Nirvana",
+      "stage": 2,
+      "merchant": "brother_lan_jade_trader",
+      "speech": "Soft and precise, with the patience of someone who prices by the carat.",
+      "want": "Find the one ascended heirloom every family has forgotten it owns, and sell it back to the family.",
+      "fear": "Carrying a piece an ascended clan decides was stolen from them.",
+      "schedule": {
+        "Dawn": "Spirit Jade Capital",
+        "Morning": "Spirit Jade Capital",
+        "Afternoon": "Spirit Jade Capital",
+        "Evening": "Spirit Jade Capital",
+        "Night": "Spirit Jade Capital"
+      },
+      "personality": "Courtly, observant, a little vain about his eye for jade, unfailingly discreet.",
+      "secret": "He grades every piece a shade lower than he believes and has never been caught."
+    },
+    "Sister Qiu of the Frost Road": {
+      "role": "travelling merchant of the northern circuit",
+      "location": "Northwind Spirit City",
+      "realm": "Law Manifestation",
+      "stage": 1,
+      "merchant": "sister_qiu_of_the_frost_road",
+      "speech": "Few words, warm hands; she talks prices like weather.",
+      "want": "Keep the northern cities supplied through the cold months when no one else will make the run.",
+      "fear": "Losing the sled and the season's stock to a single storm.",
+      "schedule": {
+        "Dawn": "Northwind Spirit City",
+        "Morning": "Northwind Spirit City",
+        "Afternoon": "Northwind Spirit City",
+        "Evening": "Northwind Spirit City",
+        "Night": "Northwind Spirit City"
+      },
+      "personality": "Steady, wry, tougher than the road and kind to anyone half-frozen on it.",
+      "secret": "She buys the lots nobody else bids on out of pity as often as profit, and it has never once lost her money."
+    },
+    "Elder Fang the Relic Trader": {
+      "role": "travelling relic trader",
+      "location": "Nine-Heavens Immortal Court",
+      "realm": "Golden Immortal",
+      "stage": 3,
+      "merchant": "elder_fang_the_relic_trader",
+      "speech": "Measured, dry, faintly amused; he treats every buyer as a promising student.",
+      "want": "Find what the Court's law has not yet catalogued, before the Court does.",
+      "fear": "A relic in his wagon waking up.",
+      "schedule": {
+        "Dawn": "Nine-Heavens Immortal Court",
+        "Morning": "Nine-Heavens Immortal Court",
+        "Afternoon": "Nine-Heavens Immortal Court",
+        "Evening": "Nine-Heavens Immortal Court",
+        "Night": "Nine-Heavens Immortal Court"
+      },
+      "personality": "Learned, patient, quietly greedy for knowledge and only mildly for stones.",
+      "secret": "One crate in the wagon has never been opened for sale; he bought it to keep it from a buyer he distrusts."
+    },
+    "Lady Shu of the Sky Road": {
+      "role": "travelling merchant of the sky road",
+      "location": "Skyroad Immortal City",
+      "realm": "Earth Immortal",
+      "stage": 4,
+      "merchant": "lady_shu_of_the_sky_road",
+      "speech": "Bright, quick and unbothered; she sells the way a swallow flies.",
+      "want": "Be the merchant every immortal city waits for, and never wait for any of them.",
+      "fear": "Being tied to one shop, one city, one sky.",
+      "schedule": {
+        "Dawn": "Skyroad Immortal City",
+        "Morning": "Skyroad Immortal City",
+        "Afternoon": "Skyroad Immortal City",
+        "Evening": "Skyroad Immortal City",
+        "Night": "Skyroad Immortal City"
+      },
+      "personality": "Restless, generous, sharp with a fool and gentle with the poor.",
+      "secret": "The sky road she names is not on any map; she found it herself and has told no one the turnings."
+    },
+    "Sage Ming the Star Peddler": {
+      "role": "travelling merchant of the star roads",
+      "location": "Celestial Mandate Palace",
+      "realm": "Celestial Duke",
+      "stage": 2,
+      "merchant": "sage_ming_the_star_peddler",
+      "speech": "Serene and a little distant, as if pricing from a great height.",
+      "want": "Trade in the treasures sovereigns discard and the ones they have not yet noticed.",
+      "fear": "A sovereign deciding one of his wares was never his to sell.",
+      "schedule": {
+        "Dawn": "Celestial Mandate Palace",
+        "Morning": "Celestial Mandate Palace",
+        "Afternoon": "Celestial Mandate Palace",
+        "Evening": "Celestial Mandate Palace",
+        "Night": "Celestial Mandate Palace"
+      },
+      "personality": "Calm, curious, faintly mischievous, utterly unimpressed by rank.",
+      "secret": "He was once a court appraiser and left with the catalogue in his head."
+    },
+    "Granny Zhu of the Border Road": {
+      "role": "travelling merchant of the border road",
+      "location": "Froststar Border City",
+      "realm": "Celestial Lord",
+      "stage": 1,
+      "merchant": "granny_zhu_of_the_border_road",
+      "speech": "Blunt, fond and tireless; she calls every buyer child and every price final.",
+      "want": "Keep the border cities fed with what the centre throws away.",
+      "fear": "The border going quiet the way borders do before something crosses them.",
+      "schedule": {
+        "Dawn": "Froststar Border City",
+        "Morning": "Froststar Border City",
+        "Afternoon": "Froststar Border City",
+        "Evening": "Froststar Border City",
+        "Night": "Froststar Border City"
+      },
+      "personality": "Indomitable, shrewd, warm-hearted and merciless at a bargain.",
+      "secret": "She has crossed the border more than once, and what she brought back is not on the cart."
     }
   },
   "items": {
@@ -26620,5 +26772,127 @@
       "source_type": "commission",
       "source_key": "giver:Lantern Registrar Wu Ming"
     }
-  ]
+  ],
+  "merchants": {
+    "old_hu_the_peddler": {
+      "name": "Old Hu the Peddler",
+      "world": "Mortal World",
+      "home": "Greenriver Town",
+      "route": [
+        "Greenriver Town",
+        "Azure Crown Imperial City",
+        "Riverguard City",
+        "Jadewood Medicine City"
+      ],
+      "budget": 400,
+      "currency": "low_spirit_stone",
+      "markup_percent": 160,
+      "dwell_minutes": 360
+    },
+    "madam_wen_of_the_silk_road": {
+      "name": "Madam Wen of the Silk Road",
+      "world": "Mortal World",
+      "home": "Four-Roads Caravan City",
+      "route": [
+        "Four-Roads Caravan City",
+        "Ironbanner City",
+        "Emberforge City",
+        "Stoneback Mountain City"
+      ],
+      "budget": 900,
+      "currency": "low_spirit_stone",
+      "markup_percent": 150,
+      "dwell_minutes": 480
+    },
+    "brother_lan_jade_trader": {
+      "name": "Brother Lan the Jade Trader",
+      "world": "Spiritual World",
+      "home": "Spirit Jade Capital",
+      "route": [
+        "Spirit Jade Capital",
+        "Jadeflow Spirit City",
+        "Galevein Spirit City",
+        "Hundred Herb Spirit City"
+      ],
+      "budget": 600,
+      "currency": "low_spirit_crystal",
+      "markup_percent": 170,
+      "dwell_minutes": 360
+    },
+    "sister_qiu_of_the_frost_road": {
+      "name": "Sister Qiu of the Frost Road",
+      "world": "Spiritual World",
+      "home": "Northwind Spirit City",
+      "route": [
+        "Northwind Spirit City",
+        "Moonfrost Spirit City",
+        "Stoneheart Spirit City",
+        "Cloudedge Spirit City"
+      ],
+      "budget": 500,
+      "currency": "low_spirit_crystal",
+      "markup_percent": 165,
+      "dwell_minutes": 420
+    },
+    "elder_fang_the_relic_trader": {
+      "name": "Elder Fang the Relic Trader",
+      "world": "Immortal World",
+      "home": "Nine-Heavens Immortal Court",
+      "route": [
+        "Nine-Heavens Immortal Court",
+        "Ninefold Noble Immortal City",
+        "Immortal River City",
+        "Fallen Star Immortal City"
+      ],
+      "budget": 800,
+      "currency": "low_immortal_stone",
+      "markup_percent": 175,
+      "dwell_minutes": 480
+    },
+    "lady_shu_of_the_sky_road": {
+      "name": "Lady Shu of the Sky Road",
+      "world": "Immortal World",
+      "home": "Skyroad Immortal City",
+      "route": [
+        "Skyroad Immortal City",
+        "Solar Furnace Immortal City",
+        "Adamant Body Immortal City",
+        "Heavenblade Immortal City"
+      ],
+      "budget": 700,
+      "currency": "low_immortal_stone",
+      "markup_percent": 160,
+      "dwell_minutes": 360
+    },
+    "sage_ming_the_star_peddler": {
+      "name": "Sage Ming the Star Peddler",
+      "world": "Celestial World",
+      "home": "Celestial Mandate Palace",
+      "route": [
+        "Celestial Mandate Palace",
+        "Mandate Crown Celestial City",
+        "Celestial River City",
+        "Ruined Constellation City"
+      ],
+      "budget": 1000,
+      "currency": "low_celestial_crystal",
+      "markup_percent": 180,
+      "dwell_minutes": 480
+    },
+    "granny_zhu_of_the_border_road": {
+      "name": "Granny Zhu of the Border Road",
+      "world": "Celestial World",
+      "home": "Froststar Border City",
+      "route": [
+        "Froststar Border City",
+        "Lunar Shadow Celestial City",
+        "Worldstone Celestial City",
+        "Firmament Blade City"
+      ],
+      "budget": 650,
+      "currency": "low_celestial_crystal",
+      "markup_percent": 165,
+      "dwell_minutes": 420
+    }
+  }
 }
