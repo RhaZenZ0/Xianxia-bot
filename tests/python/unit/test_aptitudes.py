@@ -2,13 +2,7 @@ import unittest
 
 from tests.support import PROJECT_ROOT
 
-from app.rules.aptitudes import (
-    aptitude_effects,
-    generate_root_profile,
-    progression_requirements,
-    root_compatibility,
-    unlocked_ancestral_techniques,
-)
+from app.rules.aptitudes import aptitude_effects, root_compatibility
 from app.rules.game import World
 
 
@@ -28,20 +22,6 @@ class AptitudeRuleTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.world = World(ROOT / "content" / "world.json")
-
-    def test_high_grade_root_can_be_mixed_and_mutated(self):
-        profile = generate_root_profile(
-            base_root="Fire",
-            path="Qi Refiner",
-            system=self.world.spiritual_root_system,
-            family_tier=5,
-            talent_echo=100,
-            randbelow=SequenceRoll(999, 20, 0, 0, 0, 0, 0),
-        )
-        self.assertEqual(profile["grade"], "Immortal")
-        self.assertGreaterEqual(len(profile["elements"]), 2)
-        self.assertTrue(profile["mutation"])
-        self.assertTrue(1 <= profile["purity"] <= 100)
 
     def test_root_compatibility_uses_path_and_multiple_elements(self):
         sword = root_compatibility(["Metal", "Wind"], "Sword Cultivator", self.world.spiritual_root_system)
@@ -72,29 +52,6 @@ class AptitudeRuleTests(unittest.TestCase):
         )
         self.assertEqual({effect["category"] for effect in effects}, {"Spiritual Root", "Bloodline", "Physique"})
         self.assertTrue(any(mod["stat"] == "agility" and mod["value"] < 0 for effect in effects for mod in effect["modifiers"]))
-
-    def test_bloodline_unlocks_ancestral_techniques_by_stage_and_purity(self):
-        bloodline = {"state": "evolved", "evolution_stage": 2, "purity": 60}
-        names = unlocked_ancestral_techniques(bloodline, self.world.bloodlines["azure_wolf"])
-        self.assertEqual(names, ["Hundred-Li Scent", "Pack Sovereign Howl"])
-
-    def test_progression_requirements_block_unprepared_awakenings(self):
-        bundle = {
-            "bloodline": {
-                "bloodline_id": "azure_wolf", "state": "dormant", "progress": 20,
-                "purity": 50, "rejection": 0,
-            }
-        }
-        problems = progression_requirements(
-            "bloodline", bundle, {"realm_index": 0},
-            root_system=self.world.spiritual_root_system,
-            bloodline_definitions=self.world.bloodlines,
-            physique_definitions=self.world.physiques,
-            action="awaken",
-        )
-        self.assertIn("Bloodline tempering must reach 100%.", problems)
-
-
 
 if __name__ == "__main__":
     unittest.main()

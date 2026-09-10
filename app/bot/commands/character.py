@@ -14,7 +14,7 @@ import discord
 from discord import app_commands
 
 from ...rules import commissions as commission_rules
-from ...rules.advanced_runtime import ERA_CYCLE
+from ...rules.advanced_runtime import describe_era
 from ...rules.birthfamily import family_tier_name, karma_description, karma_label
 from ...rules.fate import fate_label
 from ...ops.game_engine import GameEngineError
@@ -631,12 +631,11 @@ async def provenance_command(interaction: discord.Interaction, item: str) -> Non
 async def era_command(interaction: discord.Interaction) -> None:
     c=await require_character(interaction)
     if not c:return
-    wt=await current_world_time(); era=await DB.get_current_era()
+    wt=await current_world_time(); era=describe_era(await DB.get_current_era())
     if not era:
         await interaction.response.send_message("No active world era is recorded.",ephemeral=False);return
     mods=", ".join(f"{k}={v}" for k,v in (era.get('modifiers') or {}).items()) or "baseline laws"
-    template=next((x for x in ERA_CYCLE if x['name']==era['name']),None)
-    remaining=max(0,int(template['duration_days'])*MINUTES_PER_DAY-(wt.total_minutes-int(era['started_game_minute']))) if template else 0
+    remaining=max(0,int(era['duration_days'])*MINUTES_PER_DAY-(wt.total_minutes-int(era['started_game_minute']))) if era.get('duration_days') else 0
     events=await DB.get_world_era_events(limit=5)
     lines=[f"🌌 **{era['name']}**",str(era.get('description','')),f"Started at game minute **{era['started_game_minute']}** • automatic transition in about **{remaining/MINUTES_PER_DAY:.1f} world-days**",f"Modifiers: **{mods}**"]
     if events:

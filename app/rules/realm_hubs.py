@@ -47,14 +47,6 @@ def realm_hub_by_location(location: str) -> tuple[str, dict[str, Any]] | None:
     return None
 
 
-def realm_hub_by_channel_name(channel_name: str) -> tuple[str, dict[str, Any]] | None:
-    target = str(channel_name)
-    for world_name, hub in REALM_HUBS.items():
-        if str(hub["channel_name"]) == target:
-            return world_name, dict(hub)
-    return None
-
-
 def realm_hub_visibility(channel: Any, role: Any, everyone: Any) -> dict[str, Any]:
     """What a realm hub's overwrites say today, and whether it is actually gated.
 

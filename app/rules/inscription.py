@@ -30,6 +30,3 @@ ARRAY_DEPLOYMENTS: dict[str, dict[str, Any]] = {
 }
 
 
-def array_definition(item_id: str) -> dict[str, Any] | None:
-    definition = ARRAY_DEPLOYMENTS.get(str(item_id))
-    return dict(definition) if definition else None

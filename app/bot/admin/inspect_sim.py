@@ -296,7 +296,7 @@ async def admin_automation_status(interaction: discord.Interaction) -> None:
 async def admin_simulation_status(interaction: discord.Interaction) -> None:
     if not await require_admin(interaction): return
     wt=await current_world_time()
-    rows=await SIM.simulation_status(wt.total_minutes)
+    rows=await SIM.simulation_status()
     if not rows:
         await interaction.response.send_message("No simulation state has been initialized yet.",ephemeral=False);return
     labels={c.value:c.name for c in SIMULATION_SINGLE_SYSTEM_CHOICES}
@@ -423,7 +423,7 @@ async def admin_simulation_market_location_autocomplete(interaction:discord.Inte
 
 @admin_simulation_market.autocomplete("item")
 async def admin_simulation_market_item_autocomplete(interaction:discord.Interaction,current:str)->list[app_commands.Choice[str]]:
-    return _market_item_matches(current)
+    return await _market_item_matches(current)
 
 
 @registered_group_command(admin_sim_group, name="clan", description="Inspect mechanical clan branches, retainers and alliances for a player")

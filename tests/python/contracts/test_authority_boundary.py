@@ -83,6 +83,9 @@ def test_python_go_authority_boundary_only_delegates_migrated_mechanics():
         "artifact_awaken": "artifact.awaken",
         "birth_family_child": "family.add_child",
         "use_item_command": "item.use",  # v0.21.0
+        "seclusion_start": "seclusion.start",  # v0.30.0: the engine derives the environment
+        "equipment_status": "equipment.power",  # v0.30.0: the engine's figure, not a Python sum
+        "alchemy_status": "effects.current",  # v0.30.0: settled toxicity is the engine's preview
     }
     for function_name, operation in expected_operations.items():
         assert function_name in FUNCTIONS, function_name
@@ -379,6 +382,16 @@ def test_python_gameplay_purge_is_a_one_way_authority_boundary():
     assert "ensure_all_clans" not in world_methods
     assert "_npc_mood" not in simulation_source
     assert "secrets." not in simulation_source
+    # v0.30.0: the reads that stayed here as raw SQL through a Go-hosted
+    # session are engine queries now. Nothing in this module speaks SQL.
+    assert "._connect(" not in simulation_source
+    assert "aiosqlite" not in simulation_source
+    assert "SELECT " not in simulation_source
+    assert "_market_tradeable" not in simulation_source
+    for query in ("market.quote", "market.rows", "market.catalog", "combat.targets", "simulation.state",
+                  "simulation.status", "world.recent_actions", "civilization.status", "npc.status",
+                  "sect.status", "clan.status"):
+        assert f'"{query}"' in simulation_source, query
     birthfamily_source = (PROJECT_ROOT / "app" / "rules" / "birthfamily.py").read_text(encoding="utf-8")
     assert "def inherited_root" not in birthfamily_source
     init_node = next(node for node in world_class.body if isinstance(node, ast.AsyncFunctionDef) and node.name == "initialize")
@@ -555,7 +568,7 @@ BOOKKEEPING_METHODS = {
     # narration and memory
     "add_history", "add_rag_memory", "add_npc_player_memory", "set_npc_memory", "record_world_history_event",
     # reads whose bodies also expire stale rows
-    "get_active_world_events", "get_alchemy_state", "get_secret_realm_run", "get_social_state", "get_world_clock",
+    "get_active_world_events", "get_secret_realm_run", "get_social_state", "get_world_clock",
     "list_npc_player_memories",
     # Discord ids: channels, messages, threads
     "set_channel_message", "set_server_channels", "set_info_message_id", "set_bugs_channel_id", "set_realm_hub_channel",
@@ -611,9 +624,13 @@ def _mutator_call_sites(mutators: set[str]) -> set[tuple[str, str, str]]:
 
 
 def test_the_mutator_scan_still_sees_the_database_layer():
+    # v0.30.0 cut the layer to its presentation writers (PRESENTATION_WRITES
+    # below is the whole list), so the floor is what is left, not the 60 of
+    # v0.21; the point of the check is unchanged - a scan that sees nothing
+    # would pass the gates above vacuously.
     mutators = _database_mutators()
-    assert len(mutators) >= 60, sorted(mutators)
-    for name in ("consume_item", "apply_effect", "set_npc_memory", "add_history"):
+    assert len(mutators) >= 30, sorted(mutators)
+    for name in ("log_admin_action", "add_rag_memory", "set_npc_memory", "add_history"):
         assert name in mutators
 
 
@@ -644,3 +661,231 @@ def test_the_v0_21_backlog_stays_closed():
         "Authority I is closed - a new Python-side gameplay write belongs in an "
         "engine action, not in this allowlist: " + ", ".join(map(str, PLAYER_MUTATIONS))
     )
+
+
+# ---------------------------------------------------------------------------
+# v0.30 gate (docs/ROADMAP_1_0.md, "Authority II"): the DB layer itself, not
+# only its callers. Every method of app/database that writes is listed here
+# with the tables it may touch and the reason it is Python's to write. A
+# write to any other table, or a new writer, fails; a listed writer that no
+# longer writes fails too, so the list cannot rot into an allowance.
+# ---------------------------------------------------------------------------
+
+PRESENTATION_WRITES: dict[str, set[str]] = {
+    # schema bookkeeping and startup seeding (content and defaults, not player state)
+    "init": {"battles", "character_bloodlines", "character_physiques", "character_spiritual_roots",
+             "currency_wallets", "storage_containers"},
+    "_run_schema_migrations": {"schema_migrations", "schema_version"},
+    "sync_world_catalog": {"territory_state", "world_eras"},
+    "sync_commission_pool": {"quest_definitions"},
+    "sync_rag_canon": {"rag_canon_documents"},
+    # narration history, RAG memory and the world-history ledger
+    "add_history": {"scene_history"},
+    "set_npc_memory": {"npc_memory"},
+    "add_npc_player_memory": {"npc_player_memories"},
+    "list_npc_player_memories": {"npc_player_memories"},
+    "add_rag_memory": {"rag_memories"},
+    "search_rag_memories": {"rag_memories"},
+    "record_world_history_event": {"world_history_events"},
+    # Discord ids: channels, messages, threads, the GM's server layout
+    "set_server_channels": {"server_config"},
+    "set_info_message_id": {"server_config"},
+    "set_bugs_channel_id": {"server_config"},
+    "clear_discord_bindings": {"channel_messages", "realm_hub_channels", "server_config"},
+    "set_channel_message": {"channel_messages"},
+    "set_realm_hub_channel": {"realm_hub_channels"},
+    "set_expedition_thread": {"expedition_threads"},
+    "update_expedition_location": {"expedition_threads"},
+    "set_birth_family_household_thread": {"birth_family_household_threads"},
+    "ensure_sect_abode": {"sect_abodes"},
+    "set_sect_abode_thread": {"sect_abodes"},
+    "set_abode_thread": {"cave_abodes"},
+    "register_event_thread": {"event_threads", "world_events"},
+    "close_event_thread": {"event_threads", "secret_realm_runs", "world_events"},
+    # reads whose bodies expire stale rows or seed a default row
+    "get_active_world_events": {"world_events"},
+    "get_secret_realm_run": {"secret_realm_runs"},
+    "get_social_state": {"character_social_state"},
+    # The world clock: Python reads the anchor the engine owns and re-anchors
+    # only when the configured scale changes or no row exists yet. Still a
+    # second copy of the clock arithmetic - named here so it is not mistaken
+    # for a settled matter; it is on the roadmap's remaining-authority list.
+    "get_world_clock": {"world_state"},
+    # cosmetic
+    "set_address_style": {"characters"},
+    # GM review of quest drafts (no gameplay table), the audit log, ops telemetry
+    "save_quest_definition": {"quest_definitions"},
+    "set_quest_definition_status": {"quest_definitions"},
+    "log_admin_action": {"admin_audit_log"},
+    "record_startup_event": {"startup_events"},
+    "record_operational_alert": {"operational_alerts"},
+    "flush_slow_query_log": {"slow_query_log"},
+    "maintenance_cleanup": {"active_effects", "civilization_events", "cooldowns", "economy_events", "event_threads",
+                            "sect_politics_events", "wild_beast_encounters", "world_action_events"},
+}
+
+# Uppercase keywords only, as the layer writes them; `DO UPDATE SET` inside an
+# upsert names no table.
+TABLE_WRITE = re.compile(r"(?:INSERT(?: OR [A-Z]+)? INTO|UPDATE|DELETE FROM)\s+(?!SET\b)([a-z_]+)")
+
+
+def _database_writes() -> dict[str, set[str]]:
+    """Every Database method that writes, with the tables it writes."""
+    source = (PROJECT_ROOT / "app" / "database" / "core.py").read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    cls = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == "Database")
+    out: dict[str, set[str]] = {}
+    for fn in cls.body:
+        if not isinstance(fn, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        tables = {
+            m.group(1).lower()
+            for c in ast.walk(fn)
+            if isinstance(c, ast.Constant) and isinstance(c.value, str)
+            for m in TABLE_WRITE.finditer(c.value)
+        }
+        if tables:
+            out[fn.name] = tables
+    return out
+
+
+def test_v0_30_gate_the_db_layer_writes_only_presentation_tables():
+    writes = _database_writes()
+    unlisted = {name: tables for name, tables in writes.items() if name not in PRESENTATION_WRITES}
+    assert not unlisted, (
+        "app/database writes that are not presentation (a gameplay outcome belongs in an engine action):\n"
+        + "\n".join(f"  {name}: {sorted(tables)}" for name, tables in sorted(unlisted.items()))
+    )
+    widened = {
+        name: sorted(tables - PRESENTATION_WRITES[name])
+        for name, tables in writes.items()
+        if name in PRESENTATION_WRITES and tables - PRESENTATION_WRITES[name]
+    }
+    assert not widened, f"presentation writers touching tables they are not listed for: {widened}"
+    gone = set(PRESENTATION_WRITES) - set(writes)
+    assert not gone, f"listed writers that no longer write - delete them from PRESENTATION_WRITES: {sorted(gone)}"
+
+
+def test_v0_30_gate_removed_db_mutators_stay_removed():
+    # The dead bin of Authority II: gameplay writers that had no caller after
+    # v0.23 and were deleted with their methods, plus the two rule
+    # computations the layer still hosted.
+    source = (PROJECT_ROOT / "app" / "database" / "core.py").read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    cls = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == "Database")
+    methods = {n.name for n in cls.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))}
+    removed = {
+        "add_items", "set_location", "set_cooldown", "activate_world_event", "discover_sect", "set_sect_membership",
+        "clear_sect_membership", "clear_master", "set_master", "set_sect_rank", "set_gender", "consume_item",
+        "spend_resources", "restore_resources", "apply_effect", "remove_effect", "_wallet_delta",
+        "set_storage_container", "adjust_master_attention", "create_battle", "add_life_extension",
+        "add_pill_toxicity", "reduce_pill_toxicity", "record_item_provenance", "initiate_hidden_sect",
+        "set_hidden_sect_status", "_ensure_war_operation_locked",
+        # rule computations: equipment power and the formation bonus are the engine's (equipment.power)
+        "equipment_bonus", "_formation_combat_bonus_locked",
+        # the address rule is applied beside its caller in app/bot, from a repository snapshot
+        "get_address_context",
+    }
+    assert removed.isdisjoint(methods), sorted(removed & methods)
+    # get_alchemy_state stayed as a reader: the Python copy of the toxicity
+    # decay it used to apply is gone with the constants it imported.
+    method = next(n for n in cls.body if isinstance(n, ast.AsyncFunctionDef) and n.name == "get_alchemy_state")
+    body = ast.get_source_segment(source, method) or ""
+    assert "PILL_TOXICITY" not in body
+    assert "UPDATE alchemy_state" not in body and "INSERT INTO alchemy_state" not in body
+
+
+def _rules_imports(package: str) -> set[str]:
+    """app.rules modules imported anywhere under app/<package>."""
+    out: set[str] = set()
+    for path in sorted((APP_DIR / package).rglob("*.py")):
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            if isinstance(node, ast.ImportFrom) and node.module:
+                parts = node.module.split(".")
+                if node.level and parts[0] == "rules":
+                    out.add(parts[1] if len(parts) > 1 else "*")
+                elif not node.level and parts[:2] == ["app", "rules"]:
+                    out.add(parts[2] if len(parts) > 2 else "*")
+            elif isinstance(node, ast.Import):
+                for alias in node.names:
+                    if alias.name.startswith("app.rules"):
+                        out.add(alias.name.split(".")[2] if alias.name.count(".") > 1 else "*")
+    return out
+
+
+def test_v0_30_gate_the_state_layers_import_no_rules():
+    # database and simulation hold state and plumbing; a rule imported there
+    # is a rule applied to state on the Python side. bot and ai import rules
+    # for formatting and narration context; the dashboard keeps exactly two,
+    # both presentation: game-time formatting and the GM's quest-draft
+    # validation (a draft is content, not player state).
+    assert _rules_imports("database") == set(), _rules_imports("database")
+    assert _rules_imports("simulation") == set(), _rules_imports("simulation")
+    assert _rules_imports("ops") == set(), _rules_imports("ops")
+    assert _rules_imports("dashboard") <= {"worldtime", "quests"}, _rules_imports("dashboard")
+
+
+def _rules_without_a_production_caller() -> list[str]:
+    texts = {p: p.read_text(encoding="utf-8") for p in APP_DIR.rglob("*.py")}
+    dead: list[str] = []
+    for path in sorted((APP_DIR / "rules").glob("*.py")):
+        tree = ast.parse(texts[path])
+
+        def check(node, label):
+            if node.name.startswith("_"):
+                return
+            pattern = re.compile(rf"\b{re.escape(node.name)}\b")
+            references = sum(len(pattern.findall(text)) for text in texts.values()) - 1
+            if references == 0:
+                dead.append(f"{path.name}:{label}")
+
+        for node in tree.body:
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                check(node, node.name)
+            elif isinstance(node, ast.ClassDef):
+                for child in node.body:
+                    if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                        check(child, f"{node.name}.{child.name}")
+    return dead
+
+
+def test_v0_30_gate_every_rules_function_has_a_production_caller():
+    # A rule with no caller in app/ is a Python copy of something the engine
+    # owns, kept alive by the test that exercised it. Eighty-one went in
+    # v0.30.0 (roadmap: random_encounter, random_explore_rewards, random_hunt,
+    # roll_unexpected_event, craft_quality, tribulation_tns, condition_effect,
+    # boss_phase, stable_percent, manor_qi_multiplier,
+    # manor_defense_power_bonus, and everything only they or their tests
+    # reached). Tests count as callers of nothing.
+    assert _rules_without_a_production_caller() == []
+    for name in ("random_encounter", "random_explore_rewards", "random_hunt", "roll_unexpected_event", "craft_quality",
+                 "tribulation_tns", "condition_effect", "boss_phase", "stable_percent", "manor_qi_multiplier",
+                 "manor_defense_power_bonus", "seclusion_daily_gain", "seclusion_environment_multiplier",
+                 "manor_seclusion_multiplier", "equipment_power", "formation_bonus", "roll_2d10"):
+        assert not any(re.search(rf"\bdef {name}\b", t) for p, t in
+                       ((p, p.read_text(encoding="utf-8")) for p in (APP_DIR / "rules").glob("*.py"))), name
+    assert not (APP_DIR / "rules" / "seclusion.py").exists()
+
+
+def test_v0_30_gate_derived_inputs_are_not_sent_to_the_engine():
+    # seclusion.start: the environment multiplier (abode chamber, safe zone,
+    # sect manor array, deployed formation) is derived by the engine from
+    # state it holds. forage.resolve closed the same way at v0.23 and this
+    # holds it there.
+    assert _authoritative_action_payload_keys("seclusion_start") == {"mode", "duration_game_minutes", "location"}
+    assert _authoritative_action_payload_keys("alchemy_forage") == set()
+    body = _source("seclusion_start")
+    for token in ('"environment_mult":', "seclusion_environment_multiplier", "manor_seclusion_multiplier",
+                  "aggregate_modifiers", "DB.get_abode_by_location", "DB.get_member_sect_manor",
+                  "DB.get_active_location_array", "seclusion_daily_gain", "soul_legacy_modifiers"):
+        assert token not in body, token
+    assert '"projected_daily_gain"' in body
+    # Market pricing: no Python copy of the sell share or the tradeable rule.
+    for path in sorted(APP_DIR.rglob("*.py")):
+        text = path.read_text(encoding="utf-8")
+        assert "* 0.70" not in text and "*0.70" not in text, f"{path}: a sell-price copy"
+        assert "market_allows_item" not in text, f"{path}: the tradeable rule is the engine's (market.catalog)"
+    equipment_body = _source("equipment_status")
+    assert "DB.equipment_bonus" not in equipment_body
+    alchemy_body = _source("alchemy_status")
+    assert "game_minute=" not in alchemy_body

@@ -1009,9 +1009,92 @@ Gate: `tests/python/contracts/test_security_defaults.py` and `TestNewRefusesAnEn
 No schema change (still 32), no game-rule change, AI remains narration-only.
 
 
-## Release status — v0.29.0
+**0.30.0** is the roadmap's **Authority II** milestone: derived inputs, market pricing and the
+Python DB layer. No schema change (still 32); no new content. Where Python did not mutate but
+*computed the input* the engine then trusted, or kept a second copy of an engine rule, the copy is
+gone and the engine computes.
 
-- Current release: v0.29.0: the doors fail closed - the engine refuses to run or answer without
+*The engine derives the seclusion environment.* `seclusion.start` used to receive an
+`environment_mult` the Discord handler had computed from the abode chamber level, the safe-zone
+flag, the sect manor's qi array and any deployed formation, and the engine only clamped it. The
+engine holds every one of those facts, so it derives the multiplier itself, enforces the
+protected-site rule the handler used to enforce, and returns the parts (`environment`) and a
+`projected_daily_gain` computed by the same helper `seclusion.settle` pays through - the rate has one
+copy now. A payload that still carries `environment_mult` is refused, not clamped.
+`app/rules/seclusion.py` is deleted with `manor_seclusion_multiplier` and `soul_legacy_modifiers`.
+
+*Market pricing lives once.* Which items an ordinary market may stock is `worlddata.MarketTradeable`,
+asked by the simulation bootstrap and by the new `market.catalog` query; the sell share is the
+figure `market.trade` pays. `app/simulation/world.py` runs no SQL of any kind: the reads that stayed
+there as raw SQL through a Go-hosted session - market rows and quotes, challengeable targets (with
+the hidden-master filter), simulation state and lag against the engine's own clock, the
+recent-action ledger, the NPC/sect/clan/region status panels - are twelve read-only engine queries
+(`market.rows/quote/catalog`, `combat.targets`, `simulation.state/status`, `world.recent_actions`,
+`civilization/npc/sect/clan.status`, `equipment.power`), each with a Go test.
+
+*The DB layer writes only presentation.* The ~121 write statements in `app/database/core.py` were
+sorted once, by method. Twenty-seven writers with no caller left in the tree - `add_items`,
+`set_location`, `set_cooldown`, `activate_world_event`, `create_battle`, `apply_effect`,
+`consume_item`, `set_sect_membership`, `set_gender`, `set_master` and their kin - are deleted with
+their methods and the tests that only they served. The two rule computations the layer hosted
+(`equipment_bonus` over `equipment_power`, the formation bonus) are the engine's `equipment.power`;
+the address rule is applied beside its only caller in `app/bot` from a lineage snapshot; the
+Python copy of pill-toxicity decay that `get_alchemy_state` applied on every read is gone, and
+`/alchemy status` reads the settled figure from `effects.current`. The era and boss template merges
+became rules helpers (`describe_era`, `boss_encounter_phase`) used by the presenters, so the layer
+imports nothing from `app/rules`. What remains is thirty-eight writers, every one listed with the
+tables it may touch in `PRESENTATION_WRITES`: schema bookkeeping and startup seeding, narration
+history and RAG memory, Discord ids, the audit log, ops telemetry, and three reads that expire or
+seed a row. One of them is named as still open: `get_world_clock` re-anchors `world_state` when
+the configured scale changes and is a second copy of the clock arithmetic; it is on the roadmap's
+remaining-authority list rather than quietly allowlisted.
+
+*Dead rule code is deleted.* The eleven functions the roadmap named at zero callers went, and so
+did everything only they or their tests reached: eighty-one functions and `World` methods in all
+(the Python `roll_2d10`, `random_hunt`, `breakthrough_tn`, the secret-realm tables, the samsara and
+aptitude generators, the sense checks, the manor maths). Tests count as callers of nothing.
+`docs/V018_AUTHORITY_CLEANUP_ROADMAP.md` joins the V015/V016 lists under `docs/migration_history/`.
+
+Gate: `test_authority_boundary.py` - every DB-layer writer is in `PRESENTATION_WRITES` with its
+tables and nothing else may write; `database`, `simulation` and `ops` import no rules and the
+dashboard keeps exactly two presentation imports (game-time formatting, quest-draft validation);
+every public `app/rules` function and `World` method has a production caller; `seclusion.start`
+and `forage.resolve` carry no derived input; no Python copy of the sell share or the tradeable
+rule remains. Go: `authority2_test.go`.
+
+**0.29.1** is a release-channel point release: one GitHub workflow instead of two. No gameplay
+change, no schema change.
+
+`ci.yml` and `release.yml` were two copies of the same check list. A `v*` tag ran ruff, pytest,
+`go vet` and `go test` a second time in the second workflow - without the `gofmt` check and without
+the container builds that stand in front of every pull request - and the archive was built from
+whatever that second run happened to see. Now there is one workflow. Every push to `main` and every
+pull request runs the `python`, `go` and `containers` jobs as before; a `v*` tag runs those same
+three jobs and then a `release` job that `needs` all of them, so the archive is only ever built
+from a commit CI has just proven on every check, and the checks run once. The file keeps the
+`ci.yml` name so the README badge keeps resolving; the `contents: write` permission lives on the
+release job alone and the workflow default stays `contents: read`. The release steps themselves
+(the tag must match `VERSION`, `release_manifest.py --verify`, the zip and its `.sha256` sidecar,
+notes from this file) are unchanged, and the archive now excludes `.claude/` beside the other
+non-shipped trees.
+
+Also in this release: `.claude/settings.json` allowlists the project's own check commands so a
+Claude Code session does not stall on the tooling the repo asks for. It is development tooling,
+not release content - the manifest script and the release zip both leave it out.
+
+Gate: `WorkflowTests` in `tests/python/unit/test_release_channel.py` holds the workflows
+directory to one file, requires each check to appear before the release job and not inside it,
+and requires the release job to wait on all three.
+
+
+## Release status — v0.30.0
+
+- Current release: v0.30.0: Authority II - the engine derives the seclusion environment,
+  market pricing and the world-status reads are engine queries, the DB layer writes only
+  presentation tables, and eighty-one dead rule functions are gone.
+- v0.29.1: one GitHub workflow - the release job runs behind the same CI
+  checks every pull request gets, on the commit they just proved.
+- v0.29.0: the doors fail closed - the engine refuses to run or answer without
   a token, the dashboard locks an address that keeps guessing and refuses cross-origin mutations,
   both listeners default to loopback outside Docker, dependencies are hash-locked and images
   digest-pinned, and CI runs the Go suite under `-race`.

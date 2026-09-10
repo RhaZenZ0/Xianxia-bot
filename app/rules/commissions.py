@@ -75,10 +75,6 @@ def standing_band(value: int) -> str:
     return STANDING_BANDS[-1][1]
 
 
-def tier_ceiling(relationship: dict[str, Any] | None) -> int:
-    return TIER_CEILING[standing_band(standing_value(relationship))]
-
-
 def sect_allows(required: str, player_sect: str) -> bool:
     """A sect commission is sect business. No standing, realm or tier substitutes
     for membership - an outsider is not refused for being unworthy, they are

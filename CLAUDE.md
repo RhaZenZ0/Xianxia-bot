@@ -118,7 +118,7 @@ ai/          ai_router (OpenRouter routing), narrator + narrator_context, rag, c
 ops/         config, health/http_limits, game_engine (Go client), core_services, healthcheck entrypoint
 dashboard/   authenticated GM web control plane (server.py) + front-end contract
 database/    Python repository API, Go remote DB transport, bootstrap entrypoint
-simulation/  Python orchestration/compatibility during migration
+simulation/  Python orchestration over engine queries (no SQL since v0.30.0)
 version.py   the release stamp
 ```
 

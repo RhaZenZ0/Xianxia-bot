@@ -58,7 +58,11 @@ class PrivateSceneRoutingTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((await self.db.get_birth_family_household_thread_by_thread(8101))["family_id"], family_id)
 
     async def test_sect_abode_is_one_persistent_private_location_per_member(self):
-        await self.db.set_sect_membership(1801, sect_name="Azure Cloud Sect", rank_name="Outer Disciple", rank_level=10)
+        async with self.db._connect() as db:
+            await db.execute(
+                "INSERT INTO sect_membership(user_id,sect_name,rank_name,rank_level,joined_at) VALUES(1801,'Azure Cloud Sect','Outer Disciple',10,0)"
+            )
+            await db.commit()
         abode = await self.db.ensure_sect_abode(
             1801, sect_name="Azure Cloud Sect", name="Jin Wei's Disciple Courtyard", base_location="Cloudspine Foothills"
         )

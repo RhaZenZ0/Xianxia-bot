@@ -9,6 +9,7 @@ import (
 	"xianxia/core/internal/gamerng"
 	lifespanmodel "xianxia/core/internal/lifespan"
 	"xianxia/core/internal/storage"
+	"xianxia/core/internal/worlddata"
 )
 
 type BootstrapRequest struct {
@@ -58,11 +59,7 @@ func realmIndexFromName(name string, realms []Realm) int64 {
 }
 
 func marketTradeable(item Item) bool {
-	if item.MarketExcluded || item.SpatialKey != nil {
-		return false
-	}
-	interest := strings.ToLower(strings.TrimSpace(item.AuctionInterest))
-	return interest != "special" && interest != "legendary"
+	return worlddata.MarketTradeable(item.MarketExcluded, item.SpatialKey != nil, item.AuctionInterest)
 }
 
 func worldMultiplier(world string) int64 {

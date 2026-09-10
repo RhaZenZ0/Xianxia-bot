@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import Any, Iterable
 
+from ..rules.advanced_runtime import describe_era
 from ..rules.birthfamily import family_tier_name, karma_label
 from ..rules.realm_hubs import realm_hub_by_location
 from ..rules.worldtime import from_game_minutes
@@ -193,7 +194,7 @@ class NarratorContextBuilder:
                     "effects": await maybe(self.db.get_active_effects(user_id, game_minute), []),
                     "conditions": await maybe(self.db.get_conditions(user_id, active_only=True), []),
                     "events": await maybe(self.db.get_active_world_events(location), []),
-                    "era": await maybe(self.db.get_current_era()),
+                    "era": describe_era(await maybe(self.db.get_current_era())),
                     "beasts": await maybe(self.db.get_spirit_beasts(user_id), []),
                     "party": await maybe(self.db.get_party(user_id)),
                     "equipment": await maybe(self.db.get_equipment(user_id, equipped_only=True), []),
@@ -218,7 +219,7 @@ class NarratorContextBuilder:
                     "effects": [],
                     "conditions": [],
                     "events": await maybe(self.db.get_active_world_events(location), []),
-                    "era": await maybe(self.db.get_current_era()),
+                    "era": describe_era(await maybe(self.db.get_current_era())),
                     "beasts": [],
                     "party": None,
                     "equipment": [],

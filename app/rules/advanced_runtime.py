@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 from typing import Any
 
 
@@ -126,53 +125,36 @@ BOUNTY_HUNTER_TITLES = (
 )
 
 
-def stable_percent(*parts: object) -> int:
-    payload = "|".join(str(p) for p in parts).encode("utf-8")
-    return int.from_bytes(hashlib.sha256(payload).digest()[:4], "big") % 100
+def boss_encounter_phase(encounter: dict[str, Any]) -> dict[str, Any]:
+    """The phase an engine-owned boss encounter is in, for display.
+
+    The engine advances `phase_index`; the phase's name and numbers come
+    from the template the encounter was started from.
+    """
+    template = BOSS_TEMPLATES.get(str(encounter.get("template_key")), {})
+    phases = list(template.get("phases") or [])
+    if not phases:
+        return {}
+    return dict(phases[min(max(0, int(encounter.get("phase_index", 0))), len(phases) - 1)])
 
 
-def boss_phase(template: dict[str, Any], current_hp: int) -> tuple[int, dict[str, Any]]:
-    maximum = max(1, int(template["max_hp"]))
-    ratio = max(0.0, min(1.0, int(current_hp) / maximum))
-    phases = list(template["phases"])
-    for idx, phase in enumerate(phases):
-        if ratio > float(phase["threshold"]):
-            return idx, phase
-    return len(phases) - 1, phases[-1]
+def describe_era(era: dict[str, Any] | None) -> dict[str, Any] | None:
+    """An era row with the cycle template's modifiers and duration folded in.
+
+    Old databases stored the baseline era before modifiers became
+    mechanical; resolving the template by name gives them the mechanics
+    without rewriting historical rows. The engine owns the era clock; this
+    is presentation over the row it stores.
+    """
+    if not era:
+        return None
+    out = dict(era)
+    template = next((entry for entry in ERA_CYCLE if entry["name"] == str(out.get("name"))), None)
+    if template:
+        merged = dict(template.get("modifiers") or {})
+        merged.update(out.get("modifiers") or {})
+        out["modifiers"] = merged
+        out["duration_days"] = int(template["duration_days"])
+    return out
 
 
-def equipment_definition(item_id: str) -> dict[str, Any] | None:
-    data = EQUIPMENT_DEFINITIONS.get(str(item_id))
-    return dict(data) if data else None
-
-
-def equipment_power(rows: list[dict[str, Any]]) -> dict[str, int]:
-    total = {"attack": 0, "defense": 0, "spirit": 0, "agility": 0}
-    for row in rows:
-        if not row.get("equipped") or int(row.get("durability", 0)) <= 0:
-            continue
-        definition = EQUIPMENT_DEFINITIONS.get(str(row.get("item_id")), {})
-        condition = max(0.25, min(1.0, int(row.get("durability", 0)) / max(1, int(row.get("max_durability", 1)))))
-        quality = max(0.5, 1.0 + (int(row.get("quality", 100)) - 100) / 200)
-        for key in total:
-            total[key] += int(round(int(definition.get(key, 0)) * condition * quality))
-    return total
-
-
-def formation_bonus(position: str | None, stance: str = "balanced", cohesion: int = 100) -> dict[str, int]:
-    base = FORMATION_POSITIONS.get(str(position or "").lower(), {"attack": 0, "defense": 0, "support": 0})
-    stance_mod = FORMATION_STANCES.get(str(stance).lower(), FORMATION_STANCES["balanced"])
-    scale = max(0.25, min(1.0, int(cohesion) / 100))
-    return {
-        "attack": int(round((base["attack"] + stance_mod["attack"]) * scale)),
-        "defense": int(round((base["defense"] + stance_mod["defense"]) * scale)),
-        "support": int(round(base["support"] * scale)),
-        "cohesion_cost": int(stance_mod["cohesion_cost"]),
-    }
-
-
-def era_index(name: str) -> int:
-    for idx, era in enumerate(ERA_CYCLE):
-        if era["name"] == name:
-            return idx
-    return 0

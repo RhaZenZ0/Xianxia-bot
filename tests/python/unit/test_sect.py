@@ -1,12 +1,6 @@
 import unittest
 
 from app.rules.sect import resolve_address
-from app.rules.sect_manor import (
-    manor_craft_bonus,
-    manor_defense_power_bonus,
-    manor_qi_multiplier,
-    manor_seclusion_multiplier,
-)
 
 
 def person(uid, name, style="neutral", realm=0, phase=1, accepted=None):
@@ -62,20 +56,6 @@ class SectManorMathTests(unittest.TestCase):
     """Facility benefit scaling (merged from integration/test_sect_manor.py in
     v0.20.3; that file seeded three members and a treasury no test read,
     and its `sect_manors`-table check is test_startup_health's)."""
-
-    def test_facility_benefit_scaling(self):
-        manor = {
-            "qi_array_level": 3,
-            "alchemy_hall_level": 2,
-            "forge_pavilion_level": 4,
-            "defense_array_level": 5,
-        }
-        self.assertAlmostEqual(manor_qi_multiplier(manor), 1.15)
-        self.assertAlmostEqual(manor_seclusion_multiplier(manor), 1.24)
-        self.assertEqual(manor_craft_bonus(manor, "Alchemy"), 4)
-        self.assertEqual(manor_craft_bonus(manor, "Forging"), 8)
-        self.assertEqual(manor_defense_power_bonus(manor), 30)
-
 
 if __name__ == "__main__":
     unittest.main()

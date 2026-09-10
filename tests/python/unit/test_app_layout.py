@@ -20,7 +20,7 @@ PACKAGES = {
         "advanced_catalog", "advanced_runtime", "alchemy", "aptitudes", "battle", "birthfamily",
         "black_market", "commissions", "creation_ui", "effects", "family", "fate", "game",
         "inscription", "npc_memory", "progression_systems", "quests", "realm_hubs", "samsara",
-        "seclusion", "sect", "sect_manor", "sect_recruitment", "sense", "trade_receipt", "worldtime",
+        "sect", "sect_manor", "sect_recruitment", "sense", "trade_receipt", "worldtime",
     },
     "ai": {
         "ai_router",

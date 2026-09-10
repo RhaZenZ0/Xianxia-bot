@@ -46,7 +46,7 @@ async def equipment_status(interaction: discord.Interaction) -> None:
             ephemeral=False,
         )
         return
-    bonus = await DB.equipment_bonus(interaction.user.id)
+    bonus = dict(await ENGINE.action("equipment.power", interaction.user.id, {}) or {})
     lines = [
         f"🛡️ **Equipment — {c['name']}**",
         f"Active bonuses: ATK **+{bonus['attack']}** • DEF **+{bonus['defense']}** • Spirit **+{bonus['spirit']}** • Agility **+{bonus['agility']}**",

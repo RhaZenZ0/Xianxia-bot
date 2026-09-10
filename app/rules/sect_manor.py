@@ -54,16 +54,6 @@ def manor_upgrade_cost(facility: str, current_level: int) -> dict[str, int]:
     }
 
 
-def manor_qi_multiplier(manor: dict[str, Any] | None) -> float:
-    level = int((manor or {}).get("qi_array_level", 0))
-    return 1.0 + 0.05 * max(0, min(MAX_MANOR_FACILITY_LEVEL, level))
-
-
-def manor_seclusion_multiplier(manor: dict[str, Any] | None) -> float:
-    level = int((manor or {}).get("qi_array_level", 0))
-    return 1.0 + 0.08 * max(0, min(MAX_MANOR_FACILITY_LEVEL, level))
-
-
 def manor_craft_bonus(manor: dict[str, Any] | None, profession: str) -> int:
     profession_key = str(profession).strip().casefold()
     if profession_key == "alchemy":
@@ -78,11 +68,6 @@ def manor_craft_bonus(manor: dict[str, Any] | None, profession: str) -> int:
     else:
         return 0
     return 2 * max(0, min(MAX_MANOR_FACILITY_LEVEL, level))
-
-
-def manor_defense_power_bonus(manor: dict[str, Any] | None) -> int:
-    level = int((manor or {}).get("defense_array_level", 0))
-    return 6 * max(0, min(MAX_MANOR_FACILITY_LEVEL, level))
 
 
 def manor_benefit_lines(manor: dict[str, Any]) -> list[str]:
