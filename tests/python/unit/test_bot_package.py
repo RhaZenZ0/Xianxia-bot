@@ -355,7 +355,7 @@ TIERS = (
     ("services.py", "typed_play.py"),
     ("formatting.py", "locations.py", "pickers.py"),
     ("discovery.py", "character_state.py", "channels.py"),
-    ("threads.py",),
+    ("threads.py", "auction_feed.py"),
     ("admin/core.py",),
     ("admin/channel_messages.py", "admin/bugs_forum.py", "ui/event_scene.py", "ui/creation.py", "ui/commissions.py"),
     ("admin/quest_control.py", "admin/narration_control.py", "admin/server_setup.py"),
@@ -860,7 +860,7 @@ SURFACE = {
     },
     "surface.py": {
         "groups": (),
-        "roots": ('admin',),
+        "roots": ('menu', 'admin'),
         "leaves": {
         },
     },

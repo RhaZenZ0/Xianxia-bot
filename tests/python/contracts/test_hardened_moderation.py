@@ -156,8 +156,8 @@ class TheEngineOwnsExpiryAndAudit(unittest.TestCase):
     def test_schema_34_carries_the_columns(self):
         from app.database.core import SCHEMA_MIGRATIONS, SCHEMA_VERSION
 
-        self.assertEqual(SCHEMA_VERSION, 34)
-        version, name, statements = SCHEMA_MIGRATIONS[-1]
+        self.assertGreaterEqual(SCHEMA_VERSION, 34)
+        version, name, statements = next(m for m in SCHEMA_MIGRATIONS if m[0] == 34)
         self.assertEqual((version, name), (34, "player_moderation_expiry"))
         joined = "\n".join(statements)
         for column in ("muted_until", "frozen_until", "is_banned"):

@@ -57,6 +57,29 @@ class LocationContentTests(unittest.TestCase):
                     self.assertFalse(any(w in text.lower() for w in attack_words), text)
 
 
+class AuctionHouseContentTests(unittest.TestCase):
+    def test_every_realm_capital_has_an_auction_house_with_a_channel_name(self):
+        # v0.33.1: a live-auction channel per main city means a house per
+        # realm capital, each entered from the capital and named for its channel.
+        from app.rules.realm_hubs import REALM_HUBS
+
+        houses = WORLD["auction_houses"]
+        entrances = {str(h.get("entrance_location")) for h in houses.values()}
+        for world, hub in REALM_HUBS.items():
+            with self.subTest(world=world):
+                self.assertIn(hub["location"], entrances, f"{hub['location']} has no auction house")
+        names = [str(h.get("channel_name") or "") for h in houses.values()]
+        self.assertTrue(all(names), "every auction house names its channel")
+        self.assertEqual(len(names), len(set(names)), "channel names collide")
+        for key, house in houses.items():
+            with self.subTest(house=key):
+                interior = WORLD["locations"][house["location"]]
+                self.assertTrue(interior.get("safe_zone"), "an auction floor is protected")
+                self.assertEqual(interior.get("auction_house"), key)
+                self.assertEqual(interior.get("outside_location"), house["entrance_location"])
+                self.assertIn(house["default_currency"], WORLD["currencies"])
+
+
 class NpcContentTests(unittest.TestCase):
     def test_every_npc_has_the_narrator_fields(self):
         for name, npc in WORLD["npcs"].items():

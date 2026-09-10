@@ -1009,6 +1009,38 @@ Gate: `tests/python/contracts/test_security_defaults.py` and `TestNewRefusesAnEn
 No schema change (still 32), no game-rule change, AI remains narration-only.
 
 
+**0.33.1** is a feature point release: **live auctions in every capital, and the main menu.** Schema
+**35**.
+
+*An auction house in every main city.* The Golden Pavilion, entered from Greenriver Town, was the
+only auction house in the world. Each realm capital has one now - the Azure Crown Treasure Exchange
+(Azure Crown Imperial City), the Spirit Jade Auction Pavilion (Spirit Jade Capital), the Nine-Heavens
+Treasure Hall (Nine-Heavens Immortal Court) and the Celestial Mandate Auction Hall (Celestial
+Mandate Palace) - each a protected interior in its world's currency with its own steward, entered
+and left through the same `auction.enter` / `auction.leave` doors, protection ending at them. The
+engine already resolved a house by its entrance, so no engine change was needed.
+
+*A live channel per house.* Beside the realm capitals the dashboard's Setup/Repair now creates one
+channel per auction house (`channel_name` in content; the `/admin server realmhubs` path binds only,
+as it does for the capitals), visible to the cultivators whose realm can reach that house's world.
+A lot listed with `/economy → Auction House → Sell` is posted there the moment the engine writes it;
+every bid refreshes its card (current bid, high bidder - anonymous stays anonymous - next minimum,
+closing time); and the tick that settles auctions (`finalizeAuctions`) is followed by the bot
+striking the card SOLD, with hammer price and buyer, or Unsold. The feed (`app/bot/auction_feed.py`)
+writes nothing but Discord message ids (`auction_lot_messages`): the lot is the engine's row, and a
+missing card is never a missing lot. Teardown forgets the channels and cards with everything else;
+the Discord Setup page lists the houses with their channel and open-lot count.
+
+*The main menu.* Sixteen hub commands is a lot to remember. `/menu` opens one panel that lists every
+hub - and Admin, for an administrator - and picking one opens that hub exactly as its own slash
+command does. The hub commands remain.
+
+Gate: `tests/python/contracts/test_live_auctions.py` (the engine write precedes the card; the feed
+reaches no engine action and no gameplay table; settlement follows the tick; the channels are
+dashboard-created and slash-bound; the menu lists every hub and gates admin) and
+`test_world_content_gate.py` (a house per realm capital, each a protected interior with a unique
+channel name and a currency the world defines).
+
 **0.33.0** is the roadmap's **Gameplay-complete I** milestone: the pickers. No schema change.
 
 *Every id has a picker.* Five parameters took a typed id with nothing to choose from - `/artifact
@@ -1245,9 +1277,12 @@ directory to one file, requires each check to appear before the release job and 
 and requires the release job to wait on all three.
 
 
-## Release status — v0.33.0
+## Release status — v0.33.1
 
-- Current release: v0.33.0: Gameplay-complete I - every id parameter has a picker, typed play
+- Current release: v0.33.1 (schema 35): an auction house in every realm capital, a live channel
+  per house where lots are posted, bid on and struck as it happens, and `/menu`, one panel that
+  opens any hub.
+- v0.33.0: Gameplay-complete I - every id parameter has a picker, typed play
   fills one argument for `/travel` and `/use` from the line, and the callerless `fate.adjust` is gone.
 - v0.32.0 (schema 34): Hardened II - mute, freeze and ban from Discord with a
   duration the engine expires, force-end-scene beside them, every moderation audited so undo covers
@@ -1431,6 +1466,8 @@ and requires the release job to wait on all three.
 - **Schema 27** added the v0.19.29 mute/freeze moderation columns on `characters`
   (`is_muted`, `is_frozen`, `moderation_reason`).
 - **Schema 28** added the Quest Forge definition table (`quest_definitions`).
+- **Schema 35** added the live-auction channel per house (`auction_house_channels`) and the card per
+  open lot (`auction_lot_messages`), Discord ids only (v0.33.1).
 - **Schema 34** added the moderation expiry pair (`muted_until`, `frozen_until`) and `is_banned` to
   `characters` (v0.32.0).
 - **Schema 33** gave the sect residence (`sect_abodes`) its six facility levels (v0.30.1).

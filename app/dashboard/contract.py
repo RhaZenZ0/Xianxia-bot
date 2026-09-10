@@ -9,7 +9,7 @@ from typing import Iterable
 # run before the bot/dashboard dependencies are installed.  Keep the browser/API,
 # schema-review, and newer-system coverage contract in one place.
 DASHBOARD_API_VERSION = 2
-DASHBOARD_REVIEWED_SCHEMA_VERSION = 34
+DASHBOARD_REVIEWED_SCHEMA_VERSION = 35
 
 DASHBOARD_GET_API_PATHS = frozenset({
     "/api/overview", "/api/capabilities", "/api/timeline", "/api/npcs", "/api/npc",

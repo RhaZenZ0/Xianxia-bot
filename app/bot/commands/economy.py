@@ -15,6 +15,7 @@ from ...rules.black_market import access_reason as black_market_access_reason
 from ...ops.game_engine import GameEngineError
 from ..locations import _known_locations, _location_is_visible, _world_is_unlocked, location_autocomplete
 from ...rules.trade_receipt import format_trade_receipt
+from ..auction_feed import announce_lot, refresh_lot
 from ..formatting import human_duration
 from ..pickers import auction_currency_autocomplete, usable_item_autocomplete
 from ..registry import registered_group_command, registered_root_command
@@ -260,7 +261,9 @@ async def auction_sell(
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
         await interaction.response.send_message(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
-    await interaction.response.send_message(f"🏮 Lot `#{result.get('auction_id')}` listed: **{WORLD.item_name(item)} x{quantity}** starting at **{starting_bid} {WORLD.currency_name(currency)}**.",ephemeral=False)
+    live=await announce_lot(interaction.guild,house_id,int(result.get('auction_id') or 0))
+    where=f" Live in {live.mention}." if live is not None else ""
+    await interaction.response.send_message(f"🏮 Lot `#{result.get('auction_id')}` listed: **{WORLD.item_name(item)} x{quantity}** starting at **{starting_bid} {WORLD.currency_name(currency)}**.{where}",ephemeral=False)
 
 
 @registered_group_command(auction_group, name="bid",description="Place an escrowed bid on an active auction lot")
@@ -274,6 +277,7 @@ async def auction_bid(interaction:discord.Interaction,auction_id:int,amount:app_
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
         await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
+    await refresh_lot(interaction.guild,int(auction_id))
     await interaction.followup.send(f"🔨 Bid accepted on lot `#{auction_id}`: **{amount} {WORLD.currency_name(str(result.get('currency_id','low_spirit_stone')))}**.",ephemeral=False)
 
 

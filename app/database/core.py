@@ -26,7 +26,7 @@ from .remote import GoDatabaseTransport
 log = logging.getLogger("xianxia.database")
 
 
-SCHEMA_VERSION = 34
+SCHEMA_VERSION = 35
 # A readiness probe must validate more than the schema-version marker.  If the
 # SQLite file is removed or replaced while the bot is running, SQLite will
 # happily create a new empty file at the same path.  Checking these tables lets
@@ -1481,6 +1481,33 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
             "ALTER TABLE characters ADD COLUMN muted_until REAL NOT NULL DEFAULT 0",
             "ALTER TABLE characters ADD COLUMN frozen_until REAL NOT NULL DEFAULT 0",
             "ALTER TABLE characters ADD COLUMN is_banned INTEGER NOT NULL DEFAULT 0",
+        ),
+    ),
+    (
+        35,
+        "live_auction_channels",
+        (
+            # v0.33.1: one live-auction channel per auction house, created by
+            # the dashboard's Setup/Repair beside the realm capitals, and the
+            # lot card the bot keeps current in it while a lot is open.
+            """CREATE TABLE IF NOT EXISTS auction_house_channels (
+                guild_id INTEGER NOT NULL,
+                house_id TEXT NOT NULL,
+                location TEXT NOT NULL,
+                channel_id INTEGER NOT NULL,
+                category_id INTEGER,
+                created_at REAL NOT NULL,
+                updated_at REAL NOT NULL,
+                PRIMARY KEY(guild_id, house_id)
+            )""",
+            """CREATE TABLE IF NOT EXISTS auction_lot_messages (
+                auction_id INTEGER PRIMARY KEY,
+                guild_id INTEGER NOT NULL,
+                house_id TEXT NOT NULL,
+                channel_id INTEGER NOT NULL,
+                message_id INTEGER NOT NULL,
+                created_at REAL NOT NULL
+            )""",
         ),
     ),
 )
@@ -3798,13 +3825,16 @@ class Database:
             config_rows = int(cur.rowcount or 0)
             cur = await db.execute("DELETE FROM realm_hub_channels WHERE guild_id=?", (int(guild_id),))
             hub_rows = int(cur.rowcount or 0)
+            cur = await db.execute("DELETE FROM auction_house_channels WHERE guild_id=?", (int(guild_id),))
+            auction_rows = int(cur.rowcount or 0)
+            await db.execute("DELETE FROM auction_lot_messages WHERE guild_id=?", (int(guild_id),))
             cur = await db.execute(
                 "UPDATE channel_messages SET message_id=NULL, updated_at=? WHERE guild_id=? AND message_id IS NOT NULL",
                 (time.time(), int(guild_id)),
             )
             message_rows = int(cur.rowcount or 0)
             await db.commit()
-        return {"server_config": config_rows, "realm_hubs": hub_rows, "channel_messages": message_rows}
+        return {"server_config": config_rows, "realm_hubs": hub_rows, "auction_houses": auction_rows, "channel_messages": message_rows}
 
     async def get_expedition_thread(self, guild_id: int, user_id: int) -> dict[str, Any] | None:
         async with self._connect() as db:
@@ -4969,6 +4999,56 @@ class Database:
                    location=excluded.location,channel_id=excluded.channel_id,category_id=excluded.category_id,updated_at=excluded.updated_at""",
                 (int(guild_id), str(world_name), str(location), int(channel_id), int(category_id) if category_id else None, now, now),
             )
+            await db.commit()
+
+    async def set_auction_house_channel(self, *, guild_id: int, house_id: str, location: str, channel_id: int, category_id: int | None) -> None:
+        now = time.time()
+        async with self._connect() as db:
+            await db.execute(
+                """INSERT INTO auction_house_channels(guild_id,house_id,location,channel_id,category_id,created_at,updated_at)
+                   VALUES(?,?,?,?,?,?,?) ON CONFLICT(guild_id,house_id) DO UPDATE SET
+                   location=excluded.location,channel_id=excluded.channel_id,category_id=excluded.category_id,updated_at=excluded.updated_at""",
+                (int(guild_id), str(house_id), str(location), int(channel_id), int(category_id) if category_id else None, now, now),
+            )
+            await db.commit()
+
+    async def get_auction_house_channels(self, guild_id: int) -> list[dict[str, Any]]:
+        async with self._connect() as db:
+            db.row_factory = aiosqlite.Row
+            cur = await db.execute("SELECT * FROM auction_house_channels WHERE guild_id=? ORDER BY house_id", (int(guild_id),))
+            return [dict(row) for row in await cur.fetchall()]
+
+    async def get_auction(self, auction_id: int) -> dict[str, Any] | None:
+        async with self._connect() as db:
+            db.row_factory = aiosqlite.Row
+            cur = await db.execute("SELECT * FROM auctions WHERE auction_id=?", (int(auction_id),))
+            row = await cur.fetchone()
+            return dict(row) if row else None
+
+    async def remember_auction_lot_message(self, *, auction_id: int, guild_id: int, house_id: str, channel_id: int, message_id: int) -> None:
+        """The live card for one lot (v0.33.1): a Discord message id, nothing
+        about the lot itself - the auctions row the engine owns is the lot."""
+        async with self._connect() as db:
+            await db.execute(
+                """INSERT INTO auction_lot_messages(auction_id,guild_id,house_id,channel_id,message_id,created_at)
+                   VALUES(?,?,?,?,?,?) ON CONFLICT(auction_id) DO UPDATE SET
+                   guild_id=excluded.guild_id,house_id=excluded.house_id,channel_id=excluded.channel_id,message_id=excluded.message_id""",
+                (int(auction_id), int(guild_id), str(house_id), int(channel_id), int(message_id), time.time()),
+            )
+            await db.commit()
+
+    async def list_auction_lot_messages(self, guild_id: int | None = None) -> list[dict[str, Any]]:
+        async with self._connect() as db:
+            db.row_factory = aiosqlite.Row
+            if guild_id is None:
+                cur = await db.execute("SELECT * FROM auction_lot_messages ORDER BY auction_id")
+            else:
+                cur = await db.execute("SELECT * FROM auction_lot_messages WHERE guild_id=? ORDER BY auction_id", (int(guild_id),))
+            return [dict(row) for row in await cur.fetchall()]
+
+    async def forget_auction_lot_message(self, auction_id: int) -> None:
+        async with self._connect() as db:
+            await db.execute("DELETE FROM auction_lot_messages WHERE auction_id=?", (int(auction_id),))
             await db.commit()
 
     async def get_realm_hub_channels(self, guild_id: int) -> list[dict[str, Any]]:

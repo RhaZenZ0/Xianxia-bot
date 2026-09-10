@@ -3637,6 +3637,82 @@
         "Divine Herb Celestial City",
         "Ruined Constellation City"
       ]
+    },
+    "Azure Crown Treasure Exchange": {
+      "description": "A colonnaded hall under the imperial crest where licensed brokers call lots from a raised dais. Court formations hum in the pillars; imperial guards line the gallery. Violence inside is a crime against the throne; the licence, and the guard, end at the gate.",
+      "world": "Mortal World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "auction_house": "azure_crown_exchange",
+      "outside_location": "Azure Crown Imperial City",
+      "encounters": [
+        "A broker rings the dais bell three times and a whole gallery of buyers goes silent for a sealed imperial lot.",
+        "Two merchant heirs bid each other into ruin over a jade seal neither can read.",
+        "A court appraiser turns a spirit herb in the lamplight and quietly moves it to the reserve table.",
+        "A palace runner arrives with a scroll, and one lot is withdrawn without explanation."
+      ],
+      "sense_hints": [
+        "The court formation in the pillars presses down evenly; qi raised above a whisper is flattened at once.",
+        "Imperial guards along the gallery carry more cultivation than their plain armour admits.",
+        "Greed and caution thread through the crowd in equal measure, sharpening at every call of the bell."
+      ]
+    },
+    "Spirit Jade Auction Pavilion": {
+      "description": "A pavilion of pale jade tiers rising around a suspended auction dais, lit from within by the capital's spirit veins. An array woven into the jade suppresses every technique on the floor; ascended families bid from private balconies. Past the jade doors the array ends.",
+      "world": "Spiritual World",
+      "min_realm_index": 8,
+      "safe_zone": true,
+      "auction_house": "spirit_jade_pavilion",
+      "outside_location": "Spirit Jade Capital",
+      "encounters": [
+        "A masked family elder bids from a private balcony through a veiled attendant, never once showing her face.",
+        "An appraiser cracks a spirit stone to test its grade and the whole tier smells of rain for a breath.",
+        "A lot of ascended-beast marrow draws three sect envoys to their feet at the same instant.",
+        "The jade array chimes once, softly, and a would-be technique on the floor dies unborn."
+      ],
+      "sense_hints": [
+        "The jade array threads every tier; qi gathered for a technique thins to nothing before it can form.",
+        "Ascended cultivators sit behind the balcony veils, their auras folded to embers.",
+        "Old money and older grudges hang in the pavilion air, patient and cold."
+      ]
+    },
+    "Nine-Heavens Treasure Hall": {
+      "description": "A vast hall of white stone and star-metal beneath the Court's own law formation, where immortal clans auction relics older than the Mortal World's dynasties. The formation forbids a raised hand as firmly as a raised blade. The law stops at the threshold.",
+      "world": "Immortal World",
+      "min_realm_index": 16,
+      "safe_zone": true,
+      "auction_house": "nine_heavens_hall",
+      "outside_location": "Nine-Heavens Immortal Court",
+      "encounters": [
+        "A clan patriarch bids a whole mountain estate for a single immortal seed and does not look up from his tea.",
+        "The law formation brightens above one balcony and every voice in the hall lowers at once.",
+        "An arbiter's clerk reads a relic's provenance aloud for a quarter of an hour, and nobody interrupts.",
+        "A lot is struck from the register mid-call; the hall learns later that its seller no longer exists."
+      ],
+      "sense_hints": [
+        "The Court's law formation reads intent itself; a hostile thought draws a pressure like a held breath.",
+        "Immortal auras crowd the balconies, ancient and unhurried, each one a weight on the air.",
+        "Relics on the dais hum with ages of accumulated law; the hall feels older than the Court around it."
+      ]
+    },
+    "Celestial Mandate Auction Hall": {
+      "description": "A hall of pale gold and living cloud beneath the Mandate's own seal, where sovereign courts trade in treasures that shape worlds. A blow struck on this floor is a blow against heaven, and heaven answers. The Mandate's shelter ends at the hall doors.",
+      "world": "Celestial World",
+      "min_realm_index": 24,
+      "safe_zone": true,
+      "auction_house": "celestial_mandate_hall",
+      "outside_location": "Celestial Mandate Palace",
+      "encounters": [
+        "A sovereign's envoy bids with a single raised finger and the price doubles in silence.",
+        "The Mandate seal overhead flares as a lot of world-essence is uncovered, and the cloud floor goes still.",
+        "Two heavenly factions trade through intermediaries who never look at each other.",
+        "A steward's herald announces a lot withdrawn by decree; no one asks whose."
+      ],
+      "sense_hints": [
+        "The Mandate seal overhead weighs on every aura in the hall; even celestial qi bends to it.",
+        "Sovereign presences fill the upper cloud tiers like slow storms, each aware of the others.",
+        "Treasures on the dais carry the pull of whole worlds; the floor itself seems to lean toward them."
+      ]
     }
   },
   "npcs": {
@@ -5012,6 +5088,78 @@
         "Evening": "Celestial Cradle Province",
         "Night": "Celestial Cradle Province"
       }
+    },
+    "Exchange Warden Bai Ruolan": {
+      "role": "Azure Crown Treasure Exchange steward",
+      "location": "Azure Crown Treasure Exchange",
+      "realm": "Nascent Soul",
+      "stage": 3,
+      "speech": "Formal, brisk and courtly; every sentence ends where the ledger says it should.",
+      "want": "Keep the Exchange's imperial licence unblemished and its ledgers balanced to the last stone.",
+      "fear": "A lot traced to a forbidden art passing under her seal, and the throne's auditors arriving to ask how.",
+      "schedule": {
+        "Dawn": "Azure Crown Treasure Exchange",
+        "Morning": "Azure Crown Treasure Exchange",
+        "Afternoon": "Azure Crown Treasure Exchange",
+        "Evening": "Azure Crown Treasure Exchange",
+        "Night": "Azure Crown Treasure Exchange"
+      },
+      "personality": "Precise, unhurried, incorruptible in public and pragmatic in private; remembers every face that has ever bid.",
+      "secret": "She keeps a private list of which noble houses are quietly selling heirlooms to stay solvent, and sells silence about it."
+    },
+    "Pavilion Mistress Wen Qingluo": {
+      "role": "Spirit Jade Auction Pavilion steward",
+      "location": "Spirit Jade Auction Pavilion",
+      "realm": "Nirvana",
+      "stage": 2,
+      "speech": "Soft, elegant and faintly amused; she never raises her voice and never repeats a price.",
+      "want": "Keep the ascended families bidding against one another in her pavilion rather than settling matters outside it.",
+      "fear": "Two great families deciding the pavilion's neutrality is worth less than a single lot.",
+      "schedule": {
+        "Dawn": "Spirit Jade Auction Pavilion",
+        "Morning": "Spirit Jade Auction Pavilion",
+        "Afternoon": "Spirit Jade Auction Pavilion",
+        "Evening": "Spirit Jade Auction Pavilion",
+        "Night": "Spirit Jade Auction Pavilion"
+      },
+      "personality": "Serene, watchful and endlessly patient; treats every bidder as a guest and every guest as a ledger entry.",
+      "secret": "She brokers marriages between ascended families in the same private rooms she brokers heirlooms, and takes a fee for both."
+    },
+    "Hall Arbiter Gu Zhenhai": {
+      "role": "Nine-Heavens Treasure Hall steward",
+      "location": "Nine-Heavens Treasure Hall",
+      "realm": "Golden Immortal",
+      "stage": 4,
+      "speech": "Measured and judicial; he speaks in rulings and expects them to be recorded.",
+      "want": "Keep the Treasure Hall the one place in the Immortal World where clans settle a matter with stones instead of war.",
+      "fear": "A relic passing through his hall that the Court's law cannot bind, and the Court asking why he let it.",
+      "schedule": {
+        "Dawn": "Nine-Heavens Treasure Hall",
+        "Morning": "Nine-Heavens Treasure Hall",
+        "Afternoon": "Nine-Heavens Treasure Hall",
+        "Evening": "Nine-Heavens Treasure Hall",
+        "Night": "Nine-Heavens Treasure Hall"
+      },
+      "personality": "Grave, exact, incorruptible about the law and generous about everything the law does not cover.",
+      "secret": "He has quietly ruled in favour of the same clan three times, and keeps the case records where only he can read them."
+    },
+    "Mandate Steward Xie Lingzhen": {
+      "role": "Celestial Mandate Auction Hall steward",
+      "location": "Celestial Mandate Auction Hall",
+      "realm": "Celestial Lord",
+      "stage": 5,
+      "speech": "Courtly, distant and precise; she addresses sovereigns and disciples in exactly the same tone.",
+      "want": "Keep the Mandate's hall above every faction's quarrel and every sovereign's pride.",
+      "fear": "A sovereign deciding the Mandate's shelter does not apply to him, and being right.",
+      "schedule": {
+        "Dawn": "Celestial Mandate Auction Hall",
+        "Morning": "Celestial Mandate Auction Hall",
+        "Afternoon": "Celestial Mandate Auction Hall",
+        "Evening": "Celestial Mandate Auction Hall",
+        "Night": "Celestial Mandate Auction Hall"
+      },
+      "personality": "Composed to the point of stillness, formidably well informed, and courteous as a blade is polished.",
+      "secret": "She has withdrawn lots by 'decree' on her own authority more than once, and heaven has never contradicted her."
     }
   },
   "items": {
@@ -9407,7 +9555,48 @@
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_spirit_stone",
-      "description": "Violence is suppressed by formations and hidden guards inside. Once a bidder leaves through the doors, the Pavilion no longer guarantees protection."
+      "description": "Violence is suppressed by formations and hidden guards inside. Once a bidder leaves through the doors, the Pavilion no longer guarantees protection.",
+      "channel_name": "golden-pavilion-auctions"
+    },
+    "azure_crown_exchange": {
+      "name": "Azure Crown Treasure Exchange",
+      "location": "Azure Crown Treasure Exchange",
+      "entrance_location": "Azure Crown Imperial City",
+      "protected_interior": true,
+      "door_rule": true,
+      "default_currency": "low_spirit_stone",
+      "channel_name": "azure-crown-auctions",
+      "description": "The imperial capital's licensed exchange: imperial guards and a court formation keep the floor bloodless. The licence ends at the gate, and so does the guard."
+    },
+    "spirit_jade_pavilion": {
+      "name": "Spirit Jade Auction Pavilion",
+      "location": "Spirit Jade Auction Pavilion",
+      "entrance_location": "Spirit Jade Capital",
+      "protected_interior": true,
+      "door_rule": true,
+      "default_currency": "low_spirit_crystal",
+      "channel_name": "spirit-jade-auctions",
+      "description": "Ascended families and old sects trade under a jade array that suppresses every technique on the floor. Past the jade doors the array, and its courtesy, end."
+    },
+    "nine_heavens_hall": {
+      "name": "Nine-Heavens Treasure Hall",
+      "location": "Nine-Heavens Treasure Hall",
+      "entrance_location": "Nine-Heavens Immortal Court",
+      "protected_interior": true,
+      "door_rule": true,
+      "default_currency": "low_immortal_stone",
+      "channel_name": "nine-heavens-auctions",
+      "description": "Immortal clans auction under the Court's own law formation, which forbids a raised hand as firmly as a raised blade. The law stops at the hall's threshold."
+    },
+    "celestial_mandate_hall": {
+      "name": "Celestial Mandate Auction Hall",
+      "location": "Celestial Mandate Auction Hall",
+      "entrance_location": "Celestial Mandate Palace",
+      "protected_interior": true,
+      "door_rule": true,
+      "default_currency": "low_celestial_crystal",
+      "channel_name": "celestial-mandate-auctions",
+      "description": "Sovereign courts trade under the Mandate itself; a blow struck on this floor is a blow against heaven. The Mandate's shelter ends at the hall doors."
     }
   },
   "world_rulers": {

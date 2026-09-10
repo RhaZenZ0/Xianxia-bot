@@ -141,7 +141,7 @@ class ClearBindingsDatabaseTests(unittest.IsolatedAsyncioTestCase):
 
             counts = await db.clear_discord_bindings(1)
 
-            self.assertEqual(counts, {"server_config": 1, "realm_hubs": 2, "channel_messages": 1})
+            self.assertEqual(counts, {"server_config": 1, "realm_hubs": 2, "auction_houses": 0, "channel_messages": 1})
             cfg = await db.get_server_config(1)
             for column in ("announcement_channel_id", "event_scene_channel_id", "home_scene_channel_id", "log_channel_id",
                            "begin_channel_id", "info_channel_id", "exploration_channel_id", "info_message_id", "bugs_channel_id"):
@@ -161,12 +161,12 @@ class ClearBindingsDatabaseTests(unittest.IsolatedAsyncioTestCase):
         with tempfile.TemporaryDirectory() as tmp:
             db = Database(Path(tmp) / "teardown.sqlite3")
             await db.init()
-            self.assertEqual(await db.clear_discord_bindings(7), {"server_config": 0, "realm_hubs": 0, "channel_messages": 0})
+            self.assertEqual(await db.clear_discord_bindings(7), {"server_config": 0, "realm_hubs": 0, "auction_houses": 0, "channel_messages": 0})
             await db.set_server_channels(7, announcement_channel_id=1, event_scene_channel_id=2)
             first = await db.clear_discord_bindings(7)
             second = await db.clear_discord_bindings(7)
             self.assertEqual(first["server_config"], 1)
-            self.assertEqual(second, {"server_config": 1, "realm_hubs": 0, "channel_messages": 0})  # the row exists; nothing else to forget
+            self.assertEqual(second, {"server_config": 1, "realm_hubs": 0, "auction_houses": 0, "channel_messages": 0})  # the row exists; nothing else to forget
 
 
 if __name__ == "__main__":

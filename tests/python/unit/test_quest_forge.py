@@ -309,7 +309,7 @@ class ServiceAndStorageTests(unittest.IsolatedAsyncioTestCase):
     async def test_the_forge_table_exists_and_the_dashboard_reviewed_the_schema(self):
         from app.dashboard.contract import DASHBOARD_REVIEWED_SCHEMA_VERSION, DASHBOARD_SYSTEM_TABLES
 
-        self.assertEqual(SCHEMA_VERSION, 34)
+        self.assertEqual(SCHEMA_VERSION, 35)
         self.assertEqual(DASHBOARD_REVIEWED_SCHEMA_VERSION, SCHEMA_VERSION)
         # v0.24.0: the definition table belongs to the Quests workbench, which
         # can act on every row in it. Exploration showed forged ones read-only.

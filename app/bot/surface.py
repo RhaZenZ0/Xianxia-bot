@@ -59,7 +59,7 @@ from .commands.secretrealm import secret_group, secret_status
 from .commands.sect import sect_group
 from .commands import sense as _commands_sense  # noqa: F401  (registers its root commands on import)
 from .commands.territory import caravan_group, party_group, party_status, territory_group, war_group, war_status
-from .hubs import HubDefinition, HubPage, HubStatusField, send_hub
+from .hubs import HubDefinition, HubPage, HubStatusField, _hub_icon, send_hub
 from .registry import ACTIONS, EVENT_HANDLERS, registered_root_command
 from .runtime import DB, WORLD, character_location_display, log
 from .services import GUILD, SIM
@@ -444,6 +444,65 @@ _ADMIN_HUB_DEFINITION = HubDefinition(
 )
 
 
+class MenuView(discord.ui.View):
+    """The one door (v0.33.1): a select listing every hub, Admin included for
+    an administrator. Picking one opens that hub exactly as its own slash
+    command does; the sixteen hub commands remain beside it."""
+
+    def __init__(self, *, owner_id: int, is_admin: bool) -> None:
+        super().__init__(timeout=300)
+        self.owner_id = int(owner_id)
+        self.add_item(MenuSelect(is_admin=is_admin))
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if int(interaction.user.id) != self.owner_id:
+            await interaction.response.send_message("Open your own menu with **/menu**.", ephemeral=False, delete_after=15)
+            return False
+        return True
+
+
+class MenuSelect(discord.ui.Select):
+    def __init__(self, *, is_admin: bool) -> None:
+        options = [
+            discord.SelectOption(
+                label=definition.title.split("—")[-1].strip()[:100] if "—" in definition.title else definition.name.title(),
+                value=definition.name,
+                description=definition.description[:100],
+                emoji=_hub_icon(definition.name),
+            )
+            for definition in _HUB_DEFINITIONS
+        ]
+        if is_admin:
+            options.append(discord.SelectOption(
+                label="Administrator Control Panel", value="admin",
+                description="Server setup, GM controls and world simulation.", emoji=_hub_icon("admin"),
+            ))
+        super().__init__(placeholder="Choose a hub…", min_values=1, max_values=1, options=options[:25])
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        choice = str(self.values[0])
+        if choice == "admin":
+            await admin_panel.callback(interaction)
+            return
+        definition = _HUB_BY_NAME[choice]
+        provider = _economy_hub_status if definition.name == "economy" else _player_hub_status
+        await send_hub(interaction, definition, status_provider=provider)
+
+
+@registered_root_command(
+    name="menu",
+    description="Open the main menu: every hub in one place",
+    guild=GUILD,
+)
+async def menu(interaction: discord.Interaction) -> None:
+    member = interaction.user
+    is_admin = isinstance(member, discord.Member) and member.guild_permissions.administrator
+    lines = ["🧭 **Xianxia RP — Main Menu**", "Pick a hub below. Each opens the same panel as its own slash command."]
+    await interaction.response.send_message(
+        "\n".join(lines), view=MenuView(owner_id=member.id, is_admin=bool(is_admin)), ephemeral=False,
+    )
+
+
 @registered_root_command(
     name="admin",
     description="Open the Xianxia administrator control panel",
@@ -491,7 +550,7 @@ def register_command_surface(client: XianxiaBot) -> None:
     # - see registered_group_command call sites above), never its own root
     # command, so it was never registered into ACTIONS._roots and
     # ACTIONS.root("act") raised KeyError on every bot startup.
-    for name in ("begin", "me", "quests", "action", "check", "admin"):
+    for name in ("begin", "me", "quests", "action", "check", "admin", "menu"):
         client.tree.add_command(ACTIONS.root(name), guild=GUILD)
     for command in _HUB_COMMANDS:
         client.tree.add_command(command, guild=GUILD)

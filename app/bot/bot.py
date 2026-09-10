@@ -38,6 +38,7 @@ from ..ai.quest_forge import store_draft
 from ..rules.quests import QUEST_DEFINITIONS, static_quest_seed_rows
 from .services import AI_ROUTER, ALERTS, GUILD, NARRATOR, NARRATOR_CONTEXT, QUEST_FORGE, SIM
 from .threads import _private_scene_for_thread
+from .auction_feed import settle_lots
 from .locations import _known_locations, current_npc_location
 from .registry import EVENT_HANDLERS
 from .typed_play import (
@@ -482,6 +483,13 @@ class XianxiaBot(commands.Bot):
                     wt = await current_world_time()
                     # Autonomous world-event selection, activation, RNG and persistent consequences are Go-owned.
                     simulation_runs = await SIM.run_due(wt.total_minutes, automation)
+                    # The tick is what settles auctions (finalizeAuctions in
+                    # Go); the live cards follow it here, every cycle, so a
+                    # struck lot reads as struck within a tick of the gavel.
+                    try:
+                        await settle_lots(self.get_guild(SETTINGS.guild_id))
+                    except Exception:
+                        log.exception("Could not settle live auction cards")
                     for sim_run in simulation_runs:
                         log.info("World simulation %s: %s", sim_run.system, sim_run.summary)
                         for event in sim_run.events:
