@@ -46,6 +46,7 @@ import discord
 from discord import app_commands
 
 from ...ops.game_engine import GameEngineError
+from ...rules.sect import resolve_address
 from ...rules.sect_manor import (
     MAX_MANOR_FACILITY_LEVEL,
     SECT_MANOR_ESTABLISHMENT_COST,
@@ -120,6 +121,40 @@ def _relationship_label(rel: dict[str, Any] | None, *, show_chinese: bool) -> st
     return english
 
 
+async def _address_context(observer_user_id: int, target_user_id: int) -> dict[str, Any] | None:
+    """How the observer addresses the target, from two lineage snapshots.
+
+    The snapshot is the repository's; the rule (resolve_address) is the
+    rules tier's; putting them together is presentation, so it happens here
+    and not in app/database (v0.30.0).
+    """
+    observer_snapshot = await DB.get_lineage_snapshot(observer_user_id)
+    target_snapshot = await DB.get_lineage_snapshot(target_user_id)
+    if not observer_snapshot or not target_snapshot:
+        return None
+    result = resolve_address(
+        observer_snapshot["person"],
+        target_snapshot["person"],
+        observer_membership=observer_snapshot.get("membership"),
+        target_membership=target_snapshot.get("membership"),
+        observer_master=observer_snapshot.get("master"),
+        target_master=target_snapshot.get("master"),
+        observer_grandmaster=observer_snapshot.get("grandmaster"),
+        observer_master_master=observer_snapshot.get("grandmaster"),
+        sibling_rows=observer_snapshot.get("siblings", []),
+        master_sibling_rows=observer_snapshot.get("master_siblings", []),
+    )
+    return {
+        "title": result.title,
+        "pinyin": result.pinyin,
+        "hanzi": result.hanzi,
+        "translation": result.translation,
+        "reason": result.reason,
+        "display": result.display,
+        "display_chinese": result.display_chinese,
+    }
+
+
 async def _build_family_text(user_id: int, *, show_chinese: bool = False) -> str | None:
     c = await DB.get_character(user_id)
     if not c:
@@ -148,13 +183,13 @@ async def _build_family_text(user_id: int, *, show_chinese: bool = False) -> str
     if snap.get("master_siblings"):
         lines.append("\n**Your master's martial siblings:**")
         for row in snap["master_siblings"][:15]:
-            rel = await DB.get_address_context(user_id, int(row["user_id"]))
+            rel = await _address_context(user_id, int(row["user_id"]))
             lines.append(f"• {_relationship_label(rel, show_chinese=show_chinese)}: {row['name']}")
 
     if snap.get("siblings"):
         lines.append("\n**Your martial siblings:**")
         for row in snap["siblings"][:20]:
-            rel = await DB.get_address_context(user_id, int(row["user_id"]))
+            rel = await _address_context(user_id, int(row["user_id"]))
             lines.append(f"• {_relationship_label(rel, show_chinese=show_chinese)}: {row['name']}")
 
     if snap.get("disciples"):
@@ -919,7 +954,7 @@ async def sect_address(
     if not target:
         await interaction.response.send_message("That member has no cultivation character.", ephemeral=False)
         return
-    result = await DB.get_address_context(interaction.user.id, member.id)
+    result = await _address_context(interaction.user.id, member.id)
     if not result:
         await interaction.response.send_message("No relationship information could be resolved.", ephemeral=False)
         return

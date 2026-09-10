@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import secrets
 from typing import Any, Callable
 
 
@@ -234,66 +233,6 @@ _ROOT_BASE_WEIGHTS: dict[str, int] = {
 def family_root_tendencies(family: dict[str, Any] | None) -> tuple[str, ...]:
     """Public root tendencies shown during character creation."""
     return tuple(FAMILY_ROOT_AFFINITIES.get(family_archetype_id(family), ()))
-
-
-def family_root_weights(
-    family: dict[str, Any] | None,
-    valid_roots: list[str] | tuple[str, ...],
-) -> dict[str, int]:
-    """Return public/background-biased weights for an innate root roll.
-
-    Family archetype and homeland have the strongest influence. A generated
-    ancestral bloodline affinity may add a small hidden nudge, but it never
-    guarantees the result and is not exposed by the creation UI.
-    """
-    family = family or {}
-    roots = [str(root) for root in valid_roots]
-    weights = {root: max(1, int(_ROOT_BASE_WEIGHTS.get(root, 6))) for root in roots}
-
-    favored = FAMILY_ROOT_AFFINITIES.get(family_archetype_id(family), ())
-    for index, root in enumerate(favored):
-        if root in weights:
-            weights[root] += (28, 18, 12)[min(index, 2)]
-
-    location = str(family.get("location") or "")
-    for index, root in enumerate(LOCATION_ROOT_AFFINITIES.get(location, ())):
-        if root in weights:
-            weights[root] += (10, 7, 5)[min(index, 2)]
-
-    hidden_affinity = str(family.get("bloodline_affinity") or "")
-    if hidden_affinity in weights:
-        weights[hidden_affinity] += 10
-
-    # Better-established cultivation families are slightly less likely to have
-    # a completely ordinary root, but Mortal Root is never removed.
-    if "Mortal Root" in weights:
-        tier = max(1, min(5, int(family.get("tier", 1))))
-        weights["Mortal Root"] = max(5, weights["Mortal Root"] - (tier - 1) * 2)
-    return weights
-
-
-def roll_family_spiritual_root(
-    family: dict[str, Any] | None,
-    valid_roots: list[str] | tuple[str, ...],
-    *,
-    randbelow: RandBelow = secrets.randbelow,
-) -> str:
-    """Roll an innate spiritual root with family/location weighted odds.
-
-    The chosen cultivation style intentionally does not alter this roll: the
-    root is innate, while the cultivation path is the player's deliberate choice.
-    """
-    weights = family_root_weights(family, valid_roots)
-    if not weights:
-        return "Mortal Root"
-    total = sum(max(1, int(weight)) for weight in weights.values())
-    roll = randbelow(total)
-    running = 0
-    for root, weight in weights.items():
-        running += max(1, int(weight))
-        if roll < running:
-            return root
-    return next(reversed(weights))
 
 
 def _status_band(value: int, bands: tuple[tuple[int, str], ...]) -> str:

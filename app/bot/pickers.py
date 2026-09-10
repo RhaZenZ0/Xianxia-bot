@@ -24,11 +24,12 @@ async def auction_currency_autocomplete(interaction:discord.Interaction,current:
     return out[:25]
 
 
-def _market_item_matches(current:str)->list[app_commands.Choice[str]]:
+async def _market_item_matches(current:str)->list[app_commands.Choice[str]]:
+    # Which items an ordinary market may stock is the engine's rule
+    # (market.catalog, v0.30.0); WORLD supplies only the display names.
     q=current.lower().strip(); out=[]
-    for iid,item in WORLD.items.items():
-        if not SIM.market_allows_item(iid):
-            continue
+    for iid in await SIM.market_item_ids():
+        item=WORLD.items.get(iid) or {}
         name=str(item.get('name',iid))
         if q and q not in name.lower() and q not in iid.lower(): continue
         out.append(app_commands.Choice(name=name[:100],value=iid[:100]))

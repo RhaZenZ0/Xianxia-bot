@@ -214,7 +214,9 @@ class DashboardTests(unittest.IsolatedAsyncioTestCase):
             attributes={"body": 2, "agility": 2, "spirit": 2, "insight": 2, "will": 2, "presence": 2},
             qi_max=10, vitality_max=20,
         ))
-        await self.db.add_items(7, {"Bugslayer Sword": 1})
+        async with self.db._connect() as db:
+            await db.execute("INSERT INTO inventory(user_id,item_id,quantity) VALUES(7,'Bugslayer Sword',1)")
+            await db.commit()
         admin = AdminDashboardController(self.store, "http://fake-engine.invalid", True, 42)
         calls: list[dict] = []
 

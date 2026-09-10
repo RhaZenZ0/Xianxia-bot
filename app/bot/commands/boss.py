@@ -5,7 +5,7 @@ from __future__ import annotations
 import discord
 from discord import app_commands
 
-from ...rules.advanced_runtime import BOSS_TEMPLATES
+from ...rules.advanced_runtime import BOSS_TEMPLATES, boss_encounter_phase
 from ...ops.game_engine import GameEngineError
 from ..registry import registered_group_command
 from ..runtime import (
@@ -87,7 +87,7 @@ async def boss_status(interaction: discord.Interaction) -> None:
         return
     lines = [
         f"👹 **#{encounter['encounter_id']} {encounter['boss_name']}** • Round **{encounter['round_index']}**",
-        f"Boss HP **{encounter['boss_hp']}/{encounter['boss_hp_max']}** • Phase **{encounter['phase'].get('name', 'Unknown')}**",
+        f"Boss HP **{encounter['boss_hp']}/{encounter['boss_hp_max']}** • Phase **{boss_encounter_phase(encounter).get('name', 'Unknown')}**",
     ]
     for participant in encounter['participants']:
         lines.append(f"• <@{participant['user_id']}> — **{participant['vitality']}/{participant['vitality_max']}** • {participant['status']} • damage {participant['total_damage']}")

@@ -12,12 +12,8 @@ from typing import Any
 import discord
 from discord import app_commands
 
-from ...rules.effects import aggregate_modifiers, normalize_effect_payload
 from ...ops.game_engine import GameEngineError
 from ...rules.progression_systems import ascension_gate
-from ...rules.samsara import soul_legacy_modifiers
-from ...rules.seclusion import seclusion_daily_gain, seclusion_environment_multiplier
-from ...rules.sect_manor import manor_seclusion_multiplier
 from ...simulation import MINUTES_PER_DAY
 from ..character_state import current_effect_modifiers
 from ..formatting import roll_line
@@ -105,59 +101,39 @@ async def seclusion_start(
     mode: app_commands.Choice[str],
     days: app_commands.Range[int, 1, 365] = 7,
 ) -> None:
+    await interaction.response.defer(ephemeral=False)
     c = await require_character(interaction)
     if not c:
         return
-    wt = await current_world_time()
-    abode = await DB.get_abode_by_location(str(c.get("location", "")))
-    member_manor = await DB.get_member_sect_manor(interaction.user.id)
-    manor_here = (
-        member_manor
-        if member_manor and str(member_manor.get("base_location", "")) == str(c.get("location", ""))
-        else None
-    )
-    loc_def = await DB.get_location_definition(str(c.get("location", ""))) or WORLD.locations.get(str(c.get("location", "")), {})
-    safe = bool(loc_def.get("safe_zone", False))
-    if not abode and not safe and not manor_here:
-        await interaction.response.send_message(
-            "Closed-door seclusion requires a **protected/safe location**, a **player-owned property with a cultivation chamber**, or your sect's **Manor**. "
-            "You cannot safely disappear into meditation while exposed to ordinary danger.",
-            ephemeral=False,
-        )
-        return
-    abode_level = int(abode.get("cultivation_level", 0)) if abode else 0
-    env_mult = seclusion_environment_multiplier(abode_cultivation_level=abode_level, safe_zone=safe)
-    if manor_here:
-        env_mult *= manor_seclusion_multiplier(manor_here)
-    array_here = await DB.get_active_location_array(str(c.get("location", "")), wt.total_minutes)
-    array_seclusion_mult = 1.0
-    if array_here and mode.value == "qi":
-        payload = normalize_effect_payload(dict(array_here.get("effect") or {}))
-        array_seclusion_mult = float(aggregate_modifiers([payload]).get("cultivation_gain_mult", 1.0))
-        env_mult *= array_seclusion_mult
+    # The engine decides whether this location can hold a seclusion and what
+    # the environment is worth (abode chamber, safe zone, sect manor array,
+    # deployed formation): it holds every one of those facts. Since v0.30.0
+    # this handler sends the intent and formats the answer.
     try:
         envelope = await ENGINE.authoritative_action(
             "seclusion.start", interaction.user.id,
             {"mode": mode.value, "duration_game_minutes": int(days) * MINUTES_PER_DAY,
-             "location": str(c.get("location", "")), "environment_mult": env_mult},
+             "location": str(c.get("location", ""))},
             action_id=f"discord:{interaction.id}:seclusion.start",
         )
         state = dict(envelope.get("result") or {})
     except GameEngineError as exc:
-        await interaction.response.send_message(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
         return
-    soul = await DB.get_soul_legacy(interaction.user.id)
-    soul_mult = float(soul_legacy_modifiers(soul)["cultivation_mult"])
-    daily = seclusion_daily_gain(c, mode=mode.value, environment_mult=env_mult, soul_cultivation_mult=soul_mult)
-    if abode:
-        env_label = f"{player_property_label(abode)} cultivation chamber Lv.{abode_level}"
-    elif manor_here:
-        env_label = f"{manor_here.get('name','Sect Manor')} • Qi Gathering Array Lv.{int(manor_here.get('qi_array_level',0))}"
+    environment = dict(state.get("environment") or {})
+    env_mult = float(state.get("environment_mult", 1.0))
+    daily = int(state.get("projected_daily_gain", 0))
+    if environment.get("site") == "abode":
+        property_label = player_property_label({"property_type": environment.get("abode_property_type")})
+        env_label = f"{property_label} cultivation chamber Lv.{int(environment.get('abode_level', 0))}"
+    elif environment.get("manor_name"):
+        env_label = f"{environment.get('manor_name')} • Qi Gathering Array Lv.{int(environment.get('manor_level', 0))}"
     else:
         env_label = "protected meditation site"
-    if array_seclusion_mult != 1.0 and array_here:
-        env_label += f" • {array_here.get('name','Deployed Formation')} x{array_seclusion_mult:.2f}"
-    await interaction.response.send_message(
+    array_mult = float(environment.get("array_mult", 1.0))
+    if environment.get("array_name") and array_mult != 1.0:
+        env_label += f" • {environment.get('array_name')} x{array_mult:.2f}"
+    await interaction.followup.send(
         f"🔒 **Closed-Door Seclusion Begun**\n"
         f"Path: **{'Qi' if mode.value == 'qi' else 'Body'} Cultivation**\n"
         f"Duration: **{int(days)} world-days**\n"

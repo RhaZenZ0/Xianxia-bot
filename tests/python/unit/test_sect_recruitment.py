@@ -3,11 +3,7 @@ import unittest
 from tests.support import PROJECT_ROOT
 
 from app.rules.game import World
-from app.rules.sect_recruitment import (
-    recruitment_definition,
-    trial_modifier,
-    trial_outcome,
-)
+from app.rules.sect_recruitment import recruitment_definition, trial_modifier
 
 ROOT = PROJECT_ROOT
 ATTRS = {"body": 4, "agility": 4, "spirit": 5, "insight": 5, "will": 4, "presence": 5}
@@ -50,11 +46,6 @@ class SectRecruitmentTests(unittest.TestCase):
         text = " ".join(notes)
         self.assertIn("family tradition", text)
         self.assertIn("NPC recommendation", text)
-
-    def test_trial_outcome_allows_sponsor_backed_conditional_pass(self):
-        self.assertEqual(trial_outcome(1, -3, has_recommendation=True), "conditional_pass")
-        self.assertEqual(trial_outcome(1, -3, has_recommendation=False), "fail")
-        self.assertEqual(trial_outcome(2, 1, has_recommendation=False), "pass")
 
     def test_source_contains_story_and_npc_recommendation_gui_paths(self):
         # /sect -> Recruitment moved to app/bot/commands/sect.py in split stage 3

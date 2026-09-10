@@ -3,17 +3,7 @@ from pathlib import Path
 
 from tests.support import bot_class_source, bot_package_source
 
-from app.rules.creation_ui import (
-    CULTIVATION_STYLE_PROFILES,
-    cultivation_style_profile,
-    family_root_tendencies,
-    family_root_weights,
-    family_status_summary,
-    location_theme,
-    origin_vignette,
-    recommended_cultivation_styles,
-    roll_family_spiritual_root,
-)
+from app.rules.creation_ui import CULTIVATION_STYLE_PROFILES, cultivation_style_profile, family_root_tendencies, family_status_summary, location_theme, origin_vignette, recommended_cultivation_styles
 
 
 class CharacterCreationUITests(unittest.TestCase):
@@ -35,16 +25,37 @@ class CharacterCreationUITests(unittest.TestCase):
         styles = recommended_cultivation_styles(family)
         self.assertEqual(styles[:2], ("Qi Refiner", "Formation Adept"))
         self.assertEqual(family_root_tendencies(family), ("Wood", "Fire", "Water"))
-        weights = family_root_weights(family, ["Wood", "Metal", "Mortal Root"])
-        self.assertGreater(weights["Wood"], weights["Metal"])
 
-    def test_spiritual_root_is_random_but_family_weighted(self):
-        roots = ["Wood", "Metal", "Mortal Root"]
-        alchemy = {"id": "alchemy_family", "location": "Greenriver Town", "tier": 3}
-        martial = {"id": "martial_household", "location": "Greenriver Town", "tier": 2}
-        # The same deterministic roll lands in different weighted buckets.
-        self.assertEqual(roll_family_spiritual_root(alchemy, roots, randbelow=lambda n: 30), "Wood")
-        self.assertEqual(roll_family_spiritual_root(martial, roots, randbelow=lambda n: 30), "Metal")
+    def test_bot_uses_one_family_at_a_time_then_style_dropdown(self):
+        # Phase 1 of the main.py split: read the package, the creation UI
+        # classes move to ui/creation.py in phase 8 of the plan.
+        source = bot_package_source()
+        self.assertIn("class BirthFamilyPreviousButton", source)
+        self.assertIn("class BirthFamilyNextButton", source)
+        self.assertIn('label="Choose Family"', source)
+        self.assertNotIn("class BirthFamilySelect", source)
+        self.assertIn("class CultivationStyleSelect", source)
+        self.assertIn('placeholder="Choose your cultivation path"', source)
+        self.assertIn("class BirthSexSelect", source)
+        self.assertIn('placeholder="Choose birth sex"', source)
+        self.assertIn('label="Male", value="male"', source)
+        self.assertIn('label="Female", value="female"', source)
+        # v0.30.0: the Python root roll is gone from the rules tier entirely,
+        # not merely unused by the creation flow.
+        self.assertNotIn("roll_family_spiritual_root", source)
+        self.assertIn("ENGINE.authoritative_action(", source)
+        self.assertIn('"character.create"', source)
+        self.assertIn('"character.family_options"', source)
+        self.assertIn('"family_choice_id"', source)
+        modal_source = bot_class_source("CharacterModal")
+        self.assertNotIn('"family": family', modal_source)
+        self.assertIn("for field in (self.name_input, self.concept_input)", source)
+        self.assertNotIn("self.style_input = discord.ui.TextInput", source)
+        self.assertNotIn("self.root_input = discord.ui.TextInput", source)
+        self.assertNotIn("self.gender_input = discord.ui.TextInput", source)
+        self.assertIn('"gender": self.selected_gender', source)
+        self.assertNotIn('app_commands.Choice(name="Neutral", value="neutral")', source)
+        self.assertIn("Open Character Form", source)
 
     def test_public_root_tendencies_do_not_leak_hidden_bloodline(self):
         family = {"id": "martial_household", "bloodline_affinity": "Lightning"}
@@ -75,36 +86,6 @@ class CharacterCreationUITests(unittest.TestCase):
 
     def test_style_profile_has_safe_fallback(self):
         self.assertEqual(cultivation_style_profile("Unknown")["emoji"], "☯️")
-
-    def test_bot_uses_one_family_at_a_time_then_style_dropdown(self):
-        # Phase 1 of the main.py split: read the package, the creation UI
-        # classes move to ui/creation.py in phase 8 of the plan.
-        source = bot_package_source()
-        self.assertIn("class BirthFamilyPreviousButton", source)
-        self.assertIn("class BirthFamilyNextButton", source)
-        self.assertIn('label="Choose Family"', source)
-        self.assertNotIn("class BirthFamilySelect", source)
-        self.assertIn("class CultivationStyleSelect", source)
-        self.assertIn('placeholder="Choose your cultivation path"', source)
-        self.assertIn("class BirthSexSelect", source)
-        self.assertIn('placeholder="Choose birth sex"', source)
-        self.assertIn('label="Male", value="male"', source)
-        self.assertIn('label="Female", value="female"', source)
-        self.assertNotIn("roll_family_spiritual_root(family, tuple(WORLD.roots))", source)
-        self.assertIn("ENGINE.authoritative_action(", source)
-        self.assertIn('"character.create"', source)
-        self.assertIn('"character.family_options"', source)
-        self.assertIn('"family_choice_id"', source)
-        modal_source = bot_class_source("CharacterModal")
-        self.assertNotIn('"family": family', modal_source)
-        self.assertIn("for field in (self.name_input, self.concept_input)", source)
-        self.assertNotIn("self.style_input = discord.ui.TextInput", source)
-        self.assertNotIn("self.root_input = discord.ui.TextInput", source)
-        self.assertNotIn("self.gender_input = discord.ui.TextInput", source)
-        self.assertIn('"gender": self.selected_gender', source)
-        self.assertNotIn('app_commands.Choice(name="Neutral", value="neutral")', source)
-        self.assertIn("Open Character Form", source)
-
 
 if __name__ == "__main__":
     unittest.main()

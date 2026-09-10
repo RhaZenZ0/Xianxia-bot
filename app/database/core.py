@@ -22,15 +22,6 @@ except ModuleNotFoundError:  # Production remote-DB mode does not import a SQLit
     aiosqlite = _AioSQLiteRemoteOnly()  # type: ignore[assignment]
 
 from .remote import GoDatabaseTransport
-from ..rules.advanced_runtime import (
-    BOSS_TEMPLATES, BOUNTY_HUNTER_TITLES, ERA_CYCLE,
-    FORMATION_POSITIONS, FORMATION_STANCES, equipment_definition,
-    equipment_power, era_index, formation_bonus, stable_percent,
-)
-from ..rules.sect_manor import (
-    MAX_MANOR_FACILITY_LEVEL, SECT_MANOR_ESTABLISHMENT_COST, SECT_MANOR_ESTABLISH_RANK_LEVEL,
-    SECT_MANOR_FACILITIES, SECT_MANOR_UPGRADE_RANK_LEVEL, manor_upgrade_cost,
-)
 
 log = logging.getLogger("xianxia.database")
 
@@ -3159,17 +3150,6 @@ class Database:
             return [dict(r) for r in await cur.fetchall()]
 
 
-    async def set_gender(self, user_id: int, gender: str) -> None:
-        gender = gender if gender in {"male", "female", "neutral"} else "neutral"
-        async with self._connect() as db:
-            await db.execute(
-                "UPDATE characters SET gender=?, updated_at=? WHERE user_id=?",
-                (gender, time.time(), user_id),
-            )
-            await db.commit()
-
-
-
     async def get_inventory(self, user_id: int) -> dict[str, int]:
         async with self._connect() as db:
             cur = await db.execute(
@@ -3178,54 +3158,6 @@ class Database:
             )
             rows = await cur.fetchall()
             return {str(item_id): int(qty) for item_id, qty in rows}
-
-    async def add_items(self, user_id: int, rewards: dict[str, int]) -> None:
-        if not rewards:
-            return
-        now = time.time()
-        async with self._connect() as db:
-            await db.execute("BEGIN IMMEDIATE")
-            for item_id, qty in rewards.items():
-                if qty <= 0:
-                    continue
-                await db.execute(
-                    """
-                    INSERT INTO inventory(user_id, item_id, quantity)
-                    VALUES (?, ?, ?)
-                    ON CONFLICT(user_id, item_id)
-                    DO UPDATE SET quantity = quantity + excluded.quantity
-                    """,
-                    (user_id, item_id, qty),
-                )
-            await db.execute(
-                "INSERT INTO event_log(user_id, event_type, payload_json, created_at) VALUES (?, ?, ?, ?)",
-                (user_id, "items_added", json.dumps(rewards), now),
-            )
-            await db.commit()
-
-
-
-    async def set_location(self, user_id: int, location: str) -> None:
-        async with self._connect() as db:
-            await db.execute(
-                "UPDATE characters SET location = ?, updated_at = ? WHERE user_id = ?",
-                (location, time.time(), user_id),
-            )
-            await db.commit()
-
-    async def set_cooldown(self, user_id: int, action: str, seconds: int) -> None:
-        available_at = time.time() + seconds
-        async with self._connect() as db:
-            await db.execute(
-                """
-                INSERT INTO cooldowns(user_id, action, available_at)
-                VALUES (?, ?, ?)
-                ON CONFLICT(user_id, action)
-                DO UPDATE SET available_at = excluded.available_at
-                """,
-                (user_id, action, available_at),
-            )
-            await db.commit()
 
     async def cooldown_remaining(self, user_id: int, action: str) -> int:
         async with self._connect() as db:
@@ -3666,39 +3598,6 @@ class Database:
             return await cur.fetchone() is not None
 
     # ---------- Shared world events ----------
-    async def activate_world_event(
-        self, *, event_key: str, event_type: str, title: str, location: str, payload: dict[str, Any], ends_at: float,
-        dedupe_key: str = "",
-    ) -> bool:
-        now = time.time()
-        async with self._connect() as db:
-            await db.execute("BEGIN IMMEDIATE")
-            await db.execute("UPDATE world_events SET active=0 WHERE active=1 AND ends_at<=?", (now,))
-            key = str(dedupe_key).strip()
-            if key:
-                cur = await db.execute(
-                    "SELECT 1 FROM world_events WHERE dedupe_key=? AND location=? AND active=1 AND ends_at>? LIMIT 1",
-                    (key, str(location), now),
-                )
-                if await cur.fetchone():
-                    await db.rollback()
-                    return False
-            try:
-                await db.execute(
-                    """
-                    INSERT INTO world_events(event_key,dedupe_key,event_type,title,location,payload_json,active,starts_at,ends_at)
-                    VALUES(?,?,?,?,?,?,1,?,?)
-                    ON CONFLICT(event_key) DO UPDATE SET active=1,dedupe_key=excluded.dedupe_key,
-                        payload_json=excluded.payload_json,ends_at=excluded.ends_at
-                    """,
-                    (event_key, key, event_type, title, location, json.dumps(payload), now, ends_at),
-                )
-            except (aiosqlite.IntegrityError, sqlite3.IntegrityError):
-                await db.rollback()
-                return False
-            await db.commit()
-            return True
-
     async def get_active_world_events(self, location: str | None = None) -> list[dict[str, Any]]:
         now = time.time()
         async with self._connect() as db:
@@ -4158,24 +4057,6 @@ class Database:
 
 
     # ---------- Sect recruitment, discovery, and NPC recommendations ----------
-    async def discover_sect(
-        self, user_id: int, sect_name: str, *, game_minute: int = 0,
-        discovery_kind: str = "rumor", source_key: str = ""
-    ) -> bool:
-        sect_name = str(sect_name).strip()
-        if not sect_name:
-            return False
-        now = time.time()
-        async with self._connect() as db:
-            cur = await db.execute(
-                """INSERT OR IGNORE INTO character_sect_discoveries(
-                       user_id,sect_name,discovery_kind,source_key,discovered_game_minute,created_at
-                   ) VALUES(?,?,?,?,?,?)""",
-                (int(user_id), sect_name, str(discovery_kind)[:40], str(source_key)[:160], max(0, int(game_minute)), now),
-            )
-            await db.commit()
-            return bool(cur.rowcount)
-
     async def get_discovered_sects(self, user_id: int) -> list[dict[str, Any]]:
         async with self._connect() as db:
             db.row_factory = aiosqlite.Row
@@ -4263,101 +4144,12 @@ class Database:
             )
             await db.commit()
 
-    async def set_sect_membership(
-        self, user_id: int, *, sect_name: str, rank_name: str, rank_level: int = 0
-    ) -> None:
-        now = time.time()
-        async with self._connect() as db:
-            await db.execute("PRAGMA foreign_keys=ON;")
-            await db.execute(
-                "INSERT INTO sects(sect_name,updated_at) VALUES(?,?) ON CONFLICT(sect_name) DO NOTHING",
-                (sect_name.strip(), now),
-            )
-            await db.execute(
-                """
-                INSERT INTO sect_membership(user_id,sect_name,rank_name,rank_level,joined_at)
-                VALUES(?,?,?,?,?)
-                ON CONFLICT(user_id) DO UPDATE SET
-                    sect_name=excluded.sect_name,
-                    rank_name=excluded.rank_name,
-                    rank_level=excluded.rank_level
-                """,
-                (user_id, sect_name.strip(), rank_name.strip(), int(rank_level), now),
-            )
-            # Public membership resolves any outstanding recruitment sponsorships;
-            # stale recommendation tokens must never survive canonical admission.
-            await db.execute(
-                "UPDATE sect_recommendations SET status='resolved',updated_at=? WHERE user_id=? AND status='active'",
-                (now, int(user_id)),
-            )
-            await db.commit()
-
-    async def clear_sect_membership(self, user_id: int) -> None:
-        async with self._connect() as db:
-            await db.execute("DELETE FROM sect_lineage WHERE disciple_user_id=? OR master_user_id=?", (user_id, user_id))
-            await db.execute("DELETE FROM dao_partnerships WHERE user_a=? OR user_b=?", (user_id, user_id))
-            await db.execute("DELETE FROM sect_membership WHERE user_id=?", (user_id,))
-            await db.execute("DELETE FROM sect_abodes WHERE user_id=?", (user_id,))
-            await db.commit()
-
     async def get_sect_membership(self, user_id: int) -> dict[str, Any] | None:
         async with self._connect() as db:
             db.row_factory = aiosqlite.Row
             cur = await db.execute("SELECT * FROM sect_membership WHERE user_id=?", (user_id,))
             row = await cur.fetchone()
             return dict(row) if row else None
-
-    async def set_master(self, disciple_user_id: int, master_user_id: int) -> None:
-        if disciple_user_id == master_user_id:
-            raise ValueError("A cultivator cannot be their own master.")
-        now = time.time()
-        async with self._connect() as db:
-            await db.execute("PRAGMA foreign_keys=ON;")
-            # Both must exist and should belong to the same sect when memberships are present.
-            cur = await db.execute(
-                "SELECT user_id FROM characters WHERE user_id IN (?,?)", (disciple_user_id, master_user_id)
-            )
-            if len(await cur.fetchall()) != 2:
-                raise ValueError("Both master and disciple must have characters.")
-            cur = await db.execute(
-                "SELECT user_id, sect_name FROM sect_membership WHERE user_id IN (?,?)",
-                (disciple_user_id, master_user_id),
-            )
-            memberships = {int(r[0]): str(r[1]) for r in await cur.fetchall()}
-            if len(memberships) == 2 and memberships[disciple_user_id] != memberships[master_user_id]:
-                raise ValueError("Master and disciple must belong to the same sect.")
-
-            # Prevent direct or indirect lineage cycles.
-            cursor = master_user_id
-            seen = {disciple_user_id}
-            for _ in range(64):
-                if cursor in seen:
-                    raise ValueError("That master assignment would create a lineage cycle.")
-                seen.add(cursor)
-                cur = await db.execute(
-                    "SELECT master_user_id FROM sect_lineage WHERE disciple_user_id=?", (cursor,)
-                )
-                row = await cur.fetchone()
-                if not row:
-                    break
-                cursor = int(row[0])
-
-            await db.execute(
-                """
-                INSERT INTO sect_lineage(disciple_user_id,master_user_id,accepted_at)
-                VALUES(?,?,?)
-                ON CONFLICT(disciple_user_id) DO UPDATE SET
-                    master_user_id=excluded.master_user_id,
-                    accepted_at=excluded.accepted_at
-                """,
-                (disciple_user_id, master_user_id, now),
-            )
-            await db.commit()
-
-    async def clear_master(self, disciple_user_id: int) -> None:
-        async with self._connect() as db:
-            await db.execute("DELETE FROM sect_lineage WHERE disciple_user_id=?", (disciple_user_id,))
-            await db.commit()
 
     async def _lineage_person(self, db: aiosqlite.Connection, user_id: int) -> dict[str, Any] | None:
         db.row_factory = aiosqlite.Row
@@ -4471,37 +4263,6 @@ class Database:
                 "disciples": disciples,
             }
 
-    async def get_address_context(self, observer_user_id: int, target_user_id: int) -> dict[str, Any] | None:
-        from ..rules.sect import resolve_address
-
-        observer_snapshot = await self.get_lineage_snapshot(observer_user_id)
-        target_snapshot = await self.get_lineage_snapshot(target_user_id)
-        if not observer_snapshot or not target_snapshot:
-            return None
-        observer = observer_snapshot["person"]
-        target = target_snapshot["person"]
-        result = resolve_address(
-            observer,
-            target,
-            observer_membership=observer_snapshot.get("membership"),
-            target_membership=target_snapshot.get("membership"),
-            observer_master=observer_snapshot.get("master"),
-            target_master=target_snapshot.get("master"),
-            observer_grandmaster=observer_snapshot.get("grandmaster"),
-            observer_master_master=observer_snapshot.get("grandmaster"),
-            sibling_rows=observer_snapshot.get("siblings", []),
-            master_sibling_rows=observer_snapshot.get("master_siblings", []),
-        )
-        return {
-            "title": result.title,
-            "pinyin": result.pinyin,
-            "hanzi": result.hanzi,
-            "translation": result.translation,
-            "reason": result.reason,
-            "display": result.display,
-            "display_chinese": result.display_chinese,
-        }
-
     async def describe_lineage_context(self, user_id: int) -> str:
         snap = await self.get_lineage_snapshot(user_id)
         if not snap:
@@ -4529,61 +4290,6 @@ class Database:
             ordered = ", ".join(r["name"] for r in snap["disciples"][:12])
             lines.append(f"Direct disciples: {ordered}")
         return "\n".join(lines)
-
-    async def consume_item(self, user_id: int, item_id: str, quantity: int = 1) -> bool:
-        quantity = max(1, int(quantity))
-        async with self._connect() as db:
-            await db.execute("BEGIN IMMEDIATE")
-            cur = await db.execute(
-                "SELECT quantity FROM inventory WHERE user_id=? AND item_id=?", (user_id, item_id)
-            )
-            row = await cur.fetchone()
-            if not row or int(row[0]) < quantity:
-                await db.rollback()
-                return False
-            await db.execute(
-                "UPDATE inventory SET quantity=quantity-? WHERE user_id=? AND item_id=?",
-                (quantity, user_id, item_id),
-            )
-            await db.commit()
-            return True
-
-    async def spend_resources(self, user_id: int, *, qi: int = 0, vitality: int = 0) -> dict[str, int] | None:
-        qi_cost=max(0,int(qi)); vit_cost=max(0,int(vitality))
-        async with self._connect() as db:
-            await db.execute("BEGIN IMMEDIATE")
-            cur=await db.execute("SELECT qi,qi_max,vitality,vitality_max FROM characters WHERE user_id=?",(int(user_id),))
-            row=await cur.fetchone()
-            if not row or int(row[0])<qi_cost or int(row[2])<=vit_cost:
-                await db.rollback(); return None
-            new_qi=int(row[0])-qi_cost; new_vit=int(row[2])-vit_cost; now=time.time()
-            await db.execute("UPDATE characters SET qi=?,vitality=?,updated_at=? WHERE user_id=?",(new_qi,new_vit,now,int(user_id)))
-            if vit_cost:
-                await db.execute("UPDATE battles SET player_hp=MIN(player_hp,?),version=version+1,updated_at=? WHERE user_id=? AND status='active'",(new_vit,now,int(user_id)))
-            await db.commit()
-            return {"qi":new_qi,"qi_max":int(row[1]),"vitality":new_vit,"vitality_max":int(row[3])}
-
-    async def restore_resources(self, user_id: int, *, qi: int = 0, vitality: int = 0) -> dict[str, int]:
-        async with self._connect() as db:
-            await db.execute("BEGIN IMMEDIATE")
-            await db.execute(
-                """UPDATE characters SET
-                       qi=MIN(qi_max,qi+?), vitality=MIN(vitality_max,vitality+?), updated_at=?
-                   WHERE user_id=?""",
-                (max(0, int(qi)), max(0, int(vitality)), time.time(), user_id),
-            )
-            cur = await db.execute("SELECT qi,qi_max,vitality,vitality_max FROM characters WHERE user_id=?", (user_id,))
-            row = await cur.fetchone()
-            if row and int(vitality) > 0:
-                await db.execute(
-                    """UPDATE battles SET player_hp=?,player_hp_max=MAX(player_hp_max,?),
-                           version=version+1,updated_at=?
-                       WHERE user_id=? AND status='active'""",
-                    (int(row[2]), int(row[3]), time.time(), int(user_id)),
-                )
-            await db.commit()
-            return {"qi":int(row[0]),"qi_max":int(row[1]),"vitality":int(row[2]),"vitality_max":int(row[3])} if row else {}
-
 
     # ------------------------------------------------------------------
     # Memory / RAG v1 (SQLite FTS5 + deterministic retrieval)
@@ -5075,35 +4781,6 @@ class Database:
 
     # Generic effects
     # ------------------------------------------------------------------
-    async def apply_effect(
-        self, user_id: int, *, effect_key: str, name: str, source_type: str, source_id: str,
-        effect: dict[str, Any], starts_game_minute: int, duration_game_minutes: int | None = None,
-        stacks: int = 1,
-    ) -> None:
-        ends = None if duration_game_minutes is None else int(starts_game_minute) + max(0, int(duration_game_minutes))
-        now = time.time()
-        async with self._connect() as db:
-            await db.execute(
-                """INSERT INTO active_effects(
-                       user_id,effect_key,name,source_type,source_id,effect_json,stacks,starts_game_minute,ends_game_minute,created_at
-                   ) VALUES(?,?,?,?,?,?,?,?,?,?)
-                   ON CONFLICT(user_id,effect_key,source_type,source_id) DO UPDATE SET
-                       name=excluded.name,effect_json=excluded.effect_json,stacks=excluded.stacks,
-                       starts_game_minute=excluded.starts_game_minute,ends_game_minute=excluded.ends_game_minute,
-                       created_at=excluded.created_at""",
-                (user_id,effect_key,name,source_type,source_id,json.dumps(effect),max(1,int(stacks)),int(starts_game_minute),ends,now),
-            )
-            await db.commit()
-
-    async def remove_effect(self, user_id: int, *, effect_key: str, source_type: str, source_id: str) -> bool:
-        async with self._connect() as db:
-            cur = await db.execute(
-                "DELETE FROM active_effects WHERE user_id=? AND effect_key=? AND source_type=? AND source_id=?",
-                (int(user_id), str(effect_key), str(source_type), str(source_id)),
-            )
-            await db.commit()
-            return bool(int(cur.rowcount or 0) > 0)
-
     async def get_active_effects(self, user_id: int, game_minute: int) -> list[dict[str, Any]]:
         async with self._connect() as db:
             db.row_factory = aiosqlite.Row
@@ -5132,25 +4809,6 @@ class Database:
             return {str(k): int(v) for k,v in await cur.fetchall()}
 
 
-    async def _wallet_delta(self, db: aiosqlite.Connection, user_id: int, currency_id: str, delta: int) -> int:
-        cur=await db.execute(
-            "SELECT balance FROM currency_wallets WHERE user_id=? AND currency_id=?", (user_id,currency_id)
-        )
-        row=await cur.fetchone(); current=int(row[0]) if row else 0
-        new=current+int(delta)
-        if new < 0:
-            raise ValueError("Insufficient currency")
-        await db.execute(
-            """INSERT INTO currency_wallets(user_id,currency_id,balance) VALUES(?,?,?)
-               ON CONFLICT(user_id,currency_id) DO UPDATE SET balance=excluded.balance""",
-            (user_id,currency_id,new),
-        )
-        if currency_id == "low_spirit_stone":
-            await db.execute(
-                "UPDATE characters SET spirit_stones=?,updated_at=? WHERE user_id=?", (new,time.time(),user_id)
-            )
-        return new
-
     # ------------------------------------------------------------------
     # Spatial storage
     # ------------------------------------------------------------------
@@ -5166,25 +4824,6 @@ class Database:
             )
             data["items"]={str(k):int(v) for k,v in await cur.fetchall()}
             data["used_slots"]=len(data["items"]); return data
-
-    async def set_storage_container(
-        self,user_id:int,*,container_id:str,name:str,grade:str,slot_capacity:int,living_space:bool=False
-    )->None:
-        async with self._connect() as db:
-            cur = await db.execute(
-                "SELECT COUNT(*) FROM storage_inventory WHERE user_id=? AND quantity>0", (user_id,)
-            )
-            used = int((await cur.fetchone())[0])
-            safe_capacity = max(used, max(1, int(slot_capacity)))
-            await db.execute(
-                """INSERT INTO storage_containers(user_id,container_id,name,grade,slot_capacity,living_space,updated_at)
-                   VALUES(?,?,?,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET
-                   container_id=excluded.container_id,name=excluded.name,grade=excluded.grade,
-                   slot_capacity=excluded.slot_capacity,living_space=excluded.living_space,updated_at=excluded.updated_at""",
-                (user_id,container_id,name,grade,safe_capacity,1 if living_space else 0,time.time()),
-            ); await db.commit()
-
-
 
     # ------------------------------------------------------------------
     # Sect hierarchy/resources
@@ -5246,15 +4885,6 @@ class Database:
             return rows
 
 
-
-    async def set_sect_rank(self,user_id:int,rank_name:str,rank_level:int)->None:
-        async with self._connect() as db:
-            await db.execute("UPDATE sect_membership SET rank_name=?,rank_level=? WHERE user_id=?",(rank_name,int(rank_level),user_id)); await db.commit()
-
-    async def adjust_master_attention(self,disciple_user_id:int,amount:int)->int:
-        async with self._connect() as db:
-            await db.execute("UPDATE sect_lineage SET attention=MAX(0,attention+?) WHERE disciple_user_id=?",(int(amount),disciple_user_id))
-            cur=await db.execute("SELECT attention FROM sect_lineage WHERE disciple_user_id=?",(disciple_user_id,)); row=await cur.fetchone(); await db.commit(); return int(row[0]) if row else 0
 
     # ------------------------------------------------------------------
     # Fate, player discipleship, deployable arrays, black markets, realm hubs
@@ -5438,39 +5068,6 @@ class Database:
     # Auction door risks, temporary battles, and player families
     # ------------------------------------------------------------------
 
-    async def create_battle(
-        self, *, user_id:int, npc_name:str, npc_realm_index:int, npc_stage:int,
-        player_hp:int, npc_hp:int, location:str, source:str, target_key:str="",
-        player_hp_max:int|None=None,
-    )->int:
-        now=time.time(); player=max(1,int(player_hp)); player_max=max(player,int(player_hp_max or player)); opponent=max(1,int(npc_hp)); target=str(target_key).strip()
-        async with self._connect() as db:
-            await db.execute("BEGIN IMMEDIATE")
-            if target:
-                cur=await db.execute(
-                    "SELECT battle_id FROM battles WHERE target_key=? AND status='active' AND user_id<>? LIMIT 1",
-                    (target,int(user_id)),
-                )
-                if await cur.fetchone():
-                    await db.rollback()
-                    raise ValueError("That opponent is already locked in an unresolved battle")
-            await db.execute(
-                "UPDATE battles SET status='abandoned',version=version+1,updated_at=? WHERE user_id=? AND status='active'",
-                (now,user_id),
-            )
-            try:
-                cur=await db.execute(
-                    """INSERT INTO battles(
-                           user_id,npc_name,npc_realm_index,npc_stage,player_hp,player_hp_max,npc_hp,npc_hp_max,
-                           status,location,source,target_key,created_at,updated_at
-                       ) VALUES(?,?,?,?,?,?,?,?, 'active',?,?,?,?,?)""",
-                    (user_id,npc_name,int(npc_realm_index),int(npc_stage),player,player_max,opponent,opponent,location,source,target,now,now),
-                )
-            except (aiosqlite.IntegrityError, sqlite3.IntegrityError) as exc:
-                await db.rollback()
-                raise ValueError("That opponent is already locked in an unresolved battle") from exc
-            bid=int(cur.lastrowid); await db.commit(); return bid
-
     async def get_active_battle(self,user_id:int)->dict[str,Any]|None:
         async with self._connect() as db:
             db.row_factory=aiosqlite.Row; cur=await db.execute("SELECT * FROM battles WHERE user_id=? AND status='active' ORDER BY battle_id DESC LIMIT 1",(user_id,)); row=await cur.fetchone(); return dict(row) if row else None
@@ -5496,14 +5093,6 @@ class Database:
     # ------------------------------------------------------------------
     # Lifespan / descendants
     # ------------------------------------------------------------------
-
-    async def add_life_extension(self,user_id:int,years:int)->int:
-        years=max(0,int(years))
-        async with self._connect() as db:
-            await db.execute("BEGIN IMMEDIATE")
-            await db.execute("UPDATE characters SET life_extension_years=life_extension_years+?,updated_at=? WHERE user_id=?",(years,time.time(),user_id))
-            cur=await db.execute("SELECT life_extension_years FROM characters WHERE user_id=?",(user_id,)); row=await cur.fetchone(); await db.commit(); return int(row[0]) if row else 0
-
 
     async def get_family_children(self,family_id:int)->list[dict[str,Any]]:
         async with self._connect() as db:
@@ -5871,73 +5460,24 @@ class Database:
             )
             return [dict(row) for row in await cur.fetchall()]
 
-    async def get_alchemy_state(self, user_id: int, *, game_minute: int | None = None) -> dict[str, Any]:
-        """Return persistent alchemy state, settling natural pill-toxicity decay."""
-        from ..rules.alchemy import PILL_TOXICITY_DECAY_AMOUNT, PILL_TOXICITY_DECAY_MINUTES
+    async def get_alchemy_state(self, user_id: int) -> dict[str, Any]:
+        """The stored alchemy counters, read as they are.
 
-        now = time.time()
-        async with self._connect() as db:
-            db.row_factory = aiosqlite.Row
-            await db.execute("BEGIN IMMEDIATE")
-            cur = await db.execute("SELECT * FROM alchemy_state WHERE user_id=?", (int(user_id),))
-            row = await cur.fetchone()
-            if row is None:
-                anchor = max(0, int(game_minute or 0))
-                await db.execute(
-                    """INSERT INTO alchemy_state(
-                           user_id,pill_toxicity,last_toxicity_game_minute,total_refinements,
-                           successful_refinements,flawless_refinements,best_margin,last_quality,updated_at
-                       ) VALUES(?,0,?,0,0,0,-99,'',?)""",
-                    (int(user_id), anchor, now),
-                )
-            elif game_minute is not None:
-                state = dict(row)
-                last = int(state.get("last_toxicity_game_minute", 0))
-                current = max(last, int(game_minute))
-                if last <= 0:
-                    await db.execute(
-                        "UPDATE alchemy_state SET last_toxicity_game_minute=?,updated_at=? WHERE user_id=?",
-                        (current, now, int(user_id)),
-                    )
-                else:
-                    steps = max(0, (current - last) // PILL_TOXICITY_DECAY_MINUTES)
-                    if steps:
-                        decay = int(steps) * int(PILL_TOXICITY_DECAY_AMOUNT)
-                        advanced = last + int(steps) * PILL_TOXICITY_DECAY_MINUTES
-                        await db.execute(
-                            """UPDATE alchemy_state
-                               SET pill_toxicity=MAX(0,pill_toxicity-?),last_toxicity_game_minute=?,updated_at=?
-                               WHERE user_id=?""",
-                            (decay, advanced, now, int(user_id)),
-                        )
-            await db.commit()
+        Until v0.30.0 this read also settled natural pill-toxicity decay with
+        a Python copy of the decay constants. The engine settles toxicity
+        wherever it reads the table and `effects.current` previews the
+        settled figure, so a presenter that wants the decayed value asks the
+        engine; this returns what is stored, and writes nothing.
+        """
         async with self._connect() as db:
             db.row_factory = aiosqlite.Row
             cur = await db.execute("SELECT * FROM alchemy_state WHERE user_id=?", (int(user_id),))
             row = await cur.fetchone()
             return dict(row) if row else {
-                "user_id": int(user_id), "pill_toxicity": 0, "last_toxicity_game_minute": int(game_minute or 0),
+                "user_id": int(user_id), "pill_toxicity": 0, "last_toxicity_game_minute": 0,
                 "total_refinements": 0, "successful_refinements": 0, "flawless_refinements": 0,
                 "best_margin": -99, "last_quality": "",
             }
-
-    async def add_pill_toxicity(self, user_id: int, amount: int, *, game_minute: int) -> dict[str, Any]:
-        await self.get_alchemy_state(user_id, game_minute=int(game_minute))
-        now = time.time()
-        async with self._connect() as db:
-            await db.execute("BEGIN IMMEDIATE")
-            await db.execute(
-                """UPDATE alchemy_state
-                   SET pill_toxicity=MIN(100,MAX(0,pill_toxicity+?)),last_toxicity_game_minute=?,updated_at=?
-                   WHERE user_id=?""",
-                (int(amount), int(game_minute), now, int(user_id)),
-            )
-            await db.commit()
-        return await self.get_alchemy_state(user_id, game_minute=int(game_minute))
-
-    async def reduce_pill_toxicity(self, user_id: int, amount: int, *, game_minute: int) -> dict[str, Any]:
-        return await self.add_pill_toxicity(user_id, -abs(int(amount)), game_minute=int(game_minute))
-
 
     async def get_alchemy_batches(self, user_id: int, *, limit: int = 10) -> list[dict[str, Any]]:
         async with self._connect() as db:
@@ -6086,15 +5626,6 @@ class Database:
 
 
 
-    async def record_item_provenance(self, user_id: int, item_id: str, *, quantity: int=1, source_type: str="unknown", source_key: str="", ownership_mark: str="", legal_status: str="clean", authenticity: int=100, tracking_strength: int=0, game_minute: int=0) -> int:
-        now=time.time()
-        async with self._connect() as db:
-            cur=await db.execute(
-                """INSERT INTO item_provenance(user_id,item_id,quantity,source_type,source_key,ownership_mark,legal_status,authenticity,tracking_strength,acquired_game_minute,created_at,updated_at)
-                   VALUES(?,?,?,?,?,?,?,?,?,?,?,?)""",
-                (int(user_id),str(item_id),max(1,int(quantity)),str(source_type),str(source_key),str(ownership_mark),str(legal_status),max(0,min(100,int(authenticity))),max(0,min(100,int(tracking_strength))),int(game_minute),now,now),
-            ); await db.commit(); return int(cur.lastrowid)
-
     async def get_item_provenance(self, user_id: int, item_id: str | None=None) -> list[dict[str, Any]]:
         sql="SELECT * FROM item_provenance WHERE user_id=?"; params:list[Any]=[int(user_id)]
         if item_id: sql+=" AND item_id=?"; params.append(str(item_id))
@@ -6119,15 +5650,8 @@ class Database:
         out=dict(row)
         try: out["modifiers"]=json.loads(out.pop("modifiers_json") or "{}")
         except Exception: out["modifiers"]={}
-        # Old databases stored the baseline era before modifiers became
-        # mechanical. Resolve canonical cycle defaults by name so upgrades
-        # gain the mechanics without rewriting historical rows.
-        template = next((era for era in ERA_CYCLE if era["name"] == str(out.get("name"))), None)
-        if template:
-            merged = dict(template.get("modifiers") or {})
-            merged.update(out.get("modifiers") or {})
-            out["modifiers"] = merged
-            out["duration_days"] = int(template["duration_days"])
+        # The cycle template (modifiers, duration) is folded in by
+        # app.rules.advanced_runtime.describe_era at the presenter (v0.30.0).
         return out
 
 
@@ -6143,24 +5667,6 @@ class Database:
     async def get_hidden_sect_membership(self, user_id: int) -> dict[str, Any] | None:
         async with self._connect() as db:
             db.row_factory=aiosqlite.Row; cur=await db.execute("SELECT * FROM hidden_sect_membership WHERE user_id=?",(int(user_id),)); row=await cur.fetchone(); return dict(row) if row else None
-
-    async def initiate_hidden_sect(self, user_id: int, *, sect_name: str, branch_name: str, game_minute: int) -> dict[str, Any]:
-        now=time.time()
-        async with self._connect() as db:
-            await db.execute(
-                """INSERT INTO hidden_sect_membership(user_id,sect_name,rank_name,branch_name,standing,status,joined_game_minute,updated_at)
-                   VALUES(?,?,'Shadow Initiate',?,0,'active',?,?)
-                   ON CONFLICT(user_id) DO UPDATE SET sect_name=excluded.sect_name,branch_name=excluded.branch_name,
-                       status='active',updated_at=excluded.updated_at""",
-                (int(user_id),str(sect_name),str(branch_name),int(game_minute),now),
-            ); await db.commit()
-        return (await self.get_hidden_sect_membership(user_id)) or {}
-
-    async def set_hidden_sect_status(self, user_id: int, status: str, *, standing_delta: int=0) -> dict[str, Any] | None:
-        async with self._connect() as db:
-            await db.execute("UPDATE hidden_sect_membership SET status=?,standing=standing+?,updated_at=? WHERE user_id=?",(str(status),int(standing_delta),time.time(),int(user_id))); await db.commit()
-        return await self.get_hidden_sect_membership(user_id)
-
 
     async def get_pvp_challenges(self, user_id: int, *, pending_only: bool=False) -> list[dict[str, Any]]:
         sql="SELECT * FROM pvp_challenges WHERE (challenger_user_id=? OR target_user_id=?)"
@@ -6347,10 +5853,6 @@ class Database:
 
 
 
-    async def equipment_bonus(self, user_id: int) -> dict[str, int]:
-        return equipment_power(await self.get_equipment(user_id, equipped_only=True))
-
-
     async def get_formations(self, party_id: int) -> list[dict[str, Any]]:
         async with self._connect() as db:
             db.row_factory = aiosqlite.Row
@@ -6366,17 +5868,6 @@ class Database:
         return next((x for x in rows if int(x.get("active", 0)) == 1), None)
 
 
-
-
-    async def _formation_combat_bonus_locked(self, db: Any, party_id: int, user_id: int) -> dict[str, int]:
-        db.row_factory = aiosqlite.Row
-        cur = await db.execute("SELECT * FROM party_formations WHERE party_id=? AND active=1 ORDER BY formation_id DESC LIMIT 1", (int(party_id),))
-        formation = await cur.fetchone()
-        if not formation:
-            return {"attack": 0, "defense": 0, "support": 0, "cohesion_cost": 0}
-        cur = await db.execute("SELECT position FROM formation_positions WHERE formation_id=? AND user_id=?", (int(formation["formation_id"]), int(user_id)))
-        row = await cur.fetchone()
-        return formation_bonus(str(row[0]) if row else None, str(formation["stance"]), int(formation["cohesion"]))
 
 
     async def get_boss_encounter(self, *, user_id: int | None = None, party_id: int | None = None, encounter_id: int | None = None) -> dict[str, Any] | None:
@@ -6403,9 +5894,9 @@ class Database:
             out = dict(row)
             cur = await db.execute("SELECT * FROM boss_participants WHERE encounter_id=? ORDER BY user_id", (int(out["encounter_id"]),))
             out["participants"] = [dict(r) for r in await cur.fetchall()]
-            template = BOSS_TEMPLATES.get(str(out["template_key"]), {})
-            phases = list(template.get("phases") or [])
-            out["phase"] = phases[min(max(0, int(out["phase_index"])), max(0, len(phases)-1))] if phases else {}
+            # The phase's name and numbers come from the boss template at
+            # the presenter (boss_encounter_phase, v0.30.0); the row keeps
+            # the engine's phase_index.
             return out
 
 
@@ -6420,15 +5911,6 @@ class Database:
         sql += " ORDER BY p.pursuit_id DESC LIMIT 1"
         async with self._connect() as db:
             db.row_factory = aiosqlite.Row; cur = await db.execute(sql, tuple(params)); row = await cur.fetchone(); return dict(row) if row else None
-
-
-
-    async def _ensure_war_operation_locked(self, db: Any, war_id: int, game_minute: int) -> None:
-        await db.execute(
-            """INSERT INTO territory_war_operations(war_id,siege_progress,attacker_morale,defender_morale,attacker_force,defender_force,last_tick_game_minute,winner_key,resolution,occupation_until_game_minute,updated_at)
-               VALUES(?,0,100,100,0,0,?,'','',0,?) ON CONFLICT(war_id) DO NOTHING""",
-            (int(war_id), int(game_minute), time.time()),
-        )
 
 
 

@@ -613,11 +613,14 @@ async def alchemy_status(interaction: discord.Interaction) -> None:
     c = await require_character(interaction)
     if not c:
         return
-    wt = await current_world_time()
-    state = await DB.get_alchemy_state(interaction.user.id, game_minute=wt.total_minutes)
+    state = await DB.get_alchemy_state(interaction.user.id)
+    # The decayed figure is the engine's (v0.30.0): effects.current settles
+    # natural decay against the canonical clock without writing anything.
+    settled = dict(await ENGINE.action("effects.current", interaction.user.id, {}) or {})
+    pill_toxicity = int(settled.get("pill_toxicity", state.get("pill_toxicity", 0)))
     profession = await DB.get_profession_progress(interaction.user.id, "Alchemy") or {}
     batches = await DB.get_alchemy_batches(interaction.user.id, limit=5)
-    band, band_text = toxicity_band(int(state.get("pill_toxicity", 0)))
+    band, band_text = toxicity_band(pill_toxicity)
     member_manor = await DB.get_member_sect_manor(interaction.user.id)
     birth_family = await DB.get_birth_family(interaction.user.id)
     inherited_family_bonus = family_profession_bonus(birth_family, "Alchemy")
@@ -632,7 +635,7 @@ async def alchemy_status(interaction: discord.Interaction) -> None:
         f"⚗️ **Alchemy — {c['name']}**",
         f"Mastery: **{profession_rank(int(profession.get('level', 0)))}** • Level **{int(profession.get('level', 0))}** • XP **{int(profession.get('xp', 0))}**",
         f"Refinements: **{int(state.get('successful_refinements',0))}/{int(state.get('total_refinements',0))}** successful • Flawless **{int(state.get('flawless_refinements',0))}**",
-        f"Pill toxicity: **{int(state.get('pill_toxicity',0))}/100 — {band}**\n{band_text}",
+        f"Pill toxicity: **{pill_toxicity}/100 — {band}**\n{band_text}",
         f"Local facilities: player property **+{abode_bonus}** • sect manor **+{manor_bonus}**",
         f"Birth-family tradition: **+{inherited_family_bonus} Alchemy**" if inherited_family_bonus else "Birth-family tradition: **none**",
     ]

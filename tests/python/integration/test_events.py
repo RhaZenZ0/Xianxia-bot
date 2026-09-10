@@ -1,16 +1,11 @@
 import json
-import tempfile
-import time
 import unittest
-from pathlib import Path
 
 from tests.support import install_aiosqlite_shim, PROJECT_ROOT
 
 install_aiosqlite_shim()
 
-import aiosqlite
 
-from app.database import Database
 from app.rules.game import World
 
 
@@ -134,74 +129,6 @@ class RandomEventCatalogTests(unittest.TestCase):
                     self.assertTrue(-25 <= float(effect["region"]["population_percent"]) <= 25)
                 if "price_index" in effect.get("market", {}):
                     self.assertTrue(-1.5 <= float(effect["market"]["price_index"]) <= 1.5)
-
-    def test_location_world_and_realm_filters(self):
-        mortal = {event["id"] for event in self.world.eligible_unexpected_events(
-            location="Greenriver Town", character={"realm_index": 0}
-        )}
-        immortal = {event["id"] for event in self.world.eligible_unexpected_events(
-            location="Nine-Heavens Immortal Court", character={"realm_index": 20}
-        )}
-        pavilion = {event["id"] for event in self.world.eligible_unexpected_events(
-            location="Golden Pavilion Auction House", character={"realm_index": 0}
-        )}
-        foothills = {event["id"] for event in self.world.eligible_unexpected_events(
-            location="Cloudspine Foothills", character={"realm_index": 0}
-        )}
-
-        self.assertIn("beast_tide", mortal)
-        self.assertNotIn("beast_tide", immortal)
-        self.assertIn("auction_house_chaos", pavilion)
-        self.assertNotIn("auction_house_chaos", mortal)
-        self.assertIn("ancient_ruin_appears", foothills)
-        self.assertNotIn("ancient_ruin_appears", mortal)
-
-
-class RandomEventPersistenceTests(unittest.IsolatedAsyncioTestCase):
-    async def asyncSetUp(self):
-        self.tmp = tempfile.TemporaryDirectory()
-        self.db = Database(Path(self.tmp.name) / "events.sqlite3")
-        await self.db.init()
-
-    async def asyncTearDown(self):
-        self.tmp.cleanup()
-
-    async def test_active_event_deduplication_is_atomic_per_location(self):
-        ends_at = time.time() + 3600
-        first = await self.db.activate_world_event(
-            event_key="beast-tide:one",
-            dedupe_key="random:beast_tide",
-            event_type="random_event",
-            title="Beast Tide",
-            location="Greenriver Town",
-            payload={"definition_id": "beast_tide"},
-            ends_at=ends_at,
-        )
-        duplicate = await self.db.activate_world_event(
-            event_key="beast-tide:two",
-            dedupe_key="random:beast_tide",
-            event_type="random_event",
-            title="Beast Tide",
-            location="Greenriver Town",
-            payload={"definition_id": "beast_tide"},
-            ends_at=ends_at,
-        )
-        other_location = await self.db.activate_world_event(
-            event_key="beast-tide:three",
-            dedupe_key="random:beast_tide",
-            event_type="random_event",
-            title="Beast Tide",
-            location="Cloudspine Foothills",
-            payload={"definition_id": "beast_tide"},
-            ends_at=ends_at,
-        )
-
-        self.assertTrue(first)
-        self.assertFalse(duplicate)
-        self.assertTrue(other_location)
-        active = await self.db.get_active_world_events()
-        self.assertEqual({row["event_key"] for row in active}, {"beast-tide:one", "beast-tide:three"})
-
 
 if __name__ == "__main__":
     unittest.main()

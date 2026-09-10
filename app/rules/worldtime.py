@@ -128,5 +128,3 @@ def cultivation_cycle_summary(
     return "\n".join(lines)
 
 
-def advance_anchor(anchor_game_minute: int, amount_minutes: int) -> int:
-    return max(0, int(anchor_game_minute) + int(amount_minutes))

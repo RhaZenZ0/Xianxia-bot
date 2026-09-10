@@ -157,11 +157,3 @@ def recommendation_modifier(
     return base, notes
 
 
-def trial_outcome(primary_margin: int, secondary_margin: int, *, has_recommendation: bool) -> str:
-    successes = int(primary_margin >= 0) + int(secondary_margin >= 0)
-    combined = int(primary_margin) + int(secondary_margin)
-    if successes == 2 or combined >= 2:
-        return "pass"
-    if has_recommendation and successes >= 1 and combined >= -2:
-        return "conditional_pass"
-    return "fail"

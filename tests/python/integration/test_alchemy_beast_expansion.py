@@ -5,9 +5,6 @@ from pathlib import Path
 from tests.support import install_aiosqlite_shim, PROJECT_ROOT, seed_character
 install_aiosqlite_shim()
 
-from app.rules.alchemy import alchemy_output, alchemy_quality, pill_toxicity_value, medicine_toxicity_effect
-from app.rules.effects import medicine_toxicity_effect
-from app.rules.birthfamily import family_forage_bonus, family_profession_bonus, generate_family_options
 from app.database import Database, SCHEMA_VERSION
 from app.rules.game import World
 from app.simulation import WorldSimulator
@@ -95,77 +92,6 @@ class AlchemyBeastExpansionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(character["name"], "Azure Alchemist")
         status = await self.db.get_schema_status()
         self.assertEqual(status["current"], SCHEMA_VERSION)
-
-    def test_alchemy_quality_scales_output_without_item_instances(self):
-        self.assertEqual(alchemy_quality(0, success=True).label, "Ordinary")
-        self.assertEqual(alchemy_quality(5, success=True).label, "Superior")
-        flawless = alchemy_quality(9, success=True)
-        self.assertEqual(flawless.output_multiplier, 3)
-        self.assertEqual(alchemy_output({"qi_pill": 1}, flawless), {"qi_pill": 3})
-
-    def test_alchemy_family_has_bounded_inherited_bonus(self):
-        family = next(item for item in generate_family_options() if item["id"] == "alchemy_family")
-        self.assertEqual(family_profession_bonus(family, "Alchemy"), 2)
-        self.assertEqual(family_profession_bonus(family, "Forging"), 0)
-        self.assertEqual(family_forage_bonus(family), 2)
-
-    async def test_pill_toxicity_persists_and_decays_with_world_time(self):
-        state = await self.db.add_pill_toxicity(909, 50, game_minute=100)
-        self.assertEqual(state["pill_toxicity"], 50)
-        later = await self.db.get_alchemy_state(909, game_minute=100 + 24 * 60)
-        self.assertEqual(later["pill_toxicity"], 48)
-        payload = medicine_toxicity_effect(later["pill_toxicity"])
-        self.assertIsNotNone(payload)
-        self.assertTrue(any(m["stat"] == "cultivation_gain" for m in payload["modifiers"]))
-
-
-    async def test_active_effect_reads_filter_time_without_deleting_rows(self):
-        await self.db.apply_effect(
-            909,
-            effect_key="expired_test",
-            name="Expired Test",
-            source_type="test",
-            source_id="expired",
-            effect={"modifiers": [{"stat": "alchemy_bonus", "operation": "add", "value": 2}]},
-            starts_game_minute=100,
-            duration_game_minutes=10,
-        )
-        await self.db.apply_effect(
-            909,
-            effect_key="future_test",
-            name="Future Test",
-            source_type="test",
-            source_id="future",
-            effect={"modifiers": [{"stat": "alchemy_bonus", "operation": "add", "value": 3}]},
-            starts_game_minute=200,
-            duration_game_minutes=100,
-        )
-
-        effects = await self.db.get_active_effects(909, 150)
-        keys = {effect["effect_key"] for effect in effects}
-        self.assertNotIn("expired_test", keys)
-        self.assertNotIn("future_test", keys)
-
-        import sqlite3
-        with sqlite3.connect(self.path) as conn:
-            count = conn.execute(
-                "SELECT COUNT(*) FROM active_effects WHERE user_id=? AND source_type='test'",
-                (909,),
-            ).fetchone()[0]
-        self.assertEqual(count, 2)
-
-
-
-    def test_hunt_candidates_expose_taming_traits(self):
-        beast = self.world.random_hunt(4)
-        for key in ("taming_tn", "rank", "element", "temperament", "bloodline", "intelligence"):
-            self.assertIn(key, beast)
-
-    def test_pill_detection_assigns_medicinal_residue(self):
-        qi_pill = self.world.items["qi_pill"]
-        self.assertGreater(pill_toxicity_value("qi_pill", qi_pill), 0)
-        self.assertEqual(pill_toxicity_value("spirit_iron", self.world.items["spirit_iron"]), 0)
-
 
 if __name__ == "__main__":
     unittest.main()

@@ -76,17 +76,5 @@ class ExpandedSystemsTests(unittest.TestCase):
             self.assertIsNotNone(use, item_id)
             self.assertTrue(use.get("instant") or use.get("effect"), item_id)
 
-    def test_only_special_items_have_auction_door_profiles(self):
-        self.assertIsNone(self.world.auction_door_profile("spirit_herb"))
-        self.assertEqual(self.world.auction_door_profile("nine_echo_sword_tablet")["level"], "legendary")
-        self.assertGreater(self.world.auction_door_profile("nine_echo_sword_tablet")["chance_percent"], 0)
-
-    def test_higher_power_comparison(self):
-        c={"realm_index":2,"phase":5}
-        self.assertTrue(self.world.is_higher_power(3,1,c))
-        self.assertTrue(self.world.is_higher_power(2,6,c))
-        self.assertFalse(self.world.is_higher_power(2,5,c))
-
-
 if __name__ == "__main__":
     unittest.main()
