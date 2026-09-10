@@ -8,6 +8,7 @@ below main.py. `_run_crafting` stays here because `craft` and
 from __future__ import annotations
 
 import time
+from collections.abc import Awaitable, Callable
 from types import SimpleNamespace
 from typing import Any
 
@@ -37,6 +38,7 @@ from ..runtime import (
     SETTINGS,
     WORLD,
     _explain_engine_error,
+    budget_refusal_line,
     character_location_display,
     current_world_time,
     log,
@@ -394,10 +396,18 @@ async def explore(interaction: discord.Interaction) -> None:
     await DB.add_history(history_channel_id, user_id=interaction.user.id, speaker=c["name"], content=f"Explores {c['location']}")
     history = await DB.get_history(history_channel_id, 20)
     exploration_context = await NARRATOR_CONTEXT.build(c, scene_type="exploration", query_text=encounter)
+    # v0.31.0: the encounter is the engine's; the pool describes it at once.
+    # The model is asked only on the GM flag (here) or the player's button (below).
+    narrate_with_model = await _routine_narration_by_default()
+
+    def _ask_model():
+        return NARRATOR.narrate_exploration(c, encounter, history, scene_context=exploration_context.text, upgrade=True)
+
     try:
-        narration = await NARRATOR_QUEUE.run(
-            "exploration", NARRATOR.narrate_exploration(c, encounter, history, scene_context=exploration_context.text),
-        )
+        if narrate_with_model:
+            narration = await NARRATOR_QUEUE.run("exploration", _ask_model())
+        else:
+            narration = await NARRATOR.narrate_exploration(c, encounter, history, scene_context=exploration_context.text)
     except Exception:
         log.exception("Exploration narration failed")
         narration = encounter
@@ -417,6 +427,17 @@ async def explore(interaction: discord.Interaction) -> None:
         reward_text += "\n**Active event participation:** " + ", ".join(shared_claims)
     await DB.add_history(history_channel_id, user_id=None, speaker="World", content=narration + surprise_text + discovery_text)
     full_exploration = narration + reward_text + surprise_text + discovery_text
+
+    async def _deliver_prose(text: str) -> None:
+        await DB.add_history(history_channel_id, user_id=None, speaker="World", content=text)
+        if expedition_thread is not None:
+            await send_long_to_thread(expedition_thread, f"📜 {text}")
+        else:
+            await interaction.followup.send(f"📜 {text}", ephemeral=False)
+
+    narrate_view = None if narrate_with_model else NarrateItView(
+        owner_id=interaction.user.id, narrate=_ask_model, deliver=_deliver_prose, label="exploration",
+    )
     if expedition_thread is not None:
         try:
             await send_long_to_thread(expedition_thread, full_exploration)
@@ -426,12 +447,17 @@ async def explore(interaction: discord.Interaction) -> None:
                 )
             if personal_event_view is not None:
                 await expedition_thread.send(embed=personal_event_view.embed(), view=personal_event_view)
-            await interaction.followup.send(f"🧭 Exploration recorded in your private expedition journal: {expedition_thread.mention}", ephemeral=False)
+            await interaction.followup.send(
+                f"🧭 Exploration recorded in your private expedition journal: {expedition_thread.mention}",
+                ephemeral=False, view=narrate_view,
+            )
         except discord.HTTPException:
             log.exception("Could not write exploration result to private expedition thread")
             await reply_long(interaction, full_exploration, ephemeral=False)
             if personal_event_view is not None:
                 await interaction.followup.send(embed=personal_event_view.embed(), view=personal_event_view, ephemeral=False)
+            if narrate_view is not None:
+                await interaction.followup.send("The account above is the world's plain record.", view=narrate_view, ephemeral=False)
     else:
         await reply_long(
             interaction, full_exploration + "\n\n⚠️ No private expedition thread is configured. Ask an admin to bind the existing channel in the admin dashboard, then run **/admin → Server → Base Channels → Validate / bind**.",
@@ -441,6 +467,8 @@ async def explore(interaction: discord.Interaction) -> None:
             await send_location_discovery_image(interaction, discovered_location)
         if personal_event_view is not None:
             await interaction.followup.send(embed=personal_event_view.embed(), view=personal_event_view, ephemeral=False)
+        if narrate_view is not None:
+            await interaction.followup.send("The account above is the world's plain record.", view=narrate_view, ephemeral=False)
 
 
 @registered_root_command(name="hunt", description="Hunt a spirit beast for materials", guild=GUILD)
@@ -469,8 +497,16 @@ async def hunt(interaction: discord.Interaction) -> None:
     hunt_context = await NARRATOR_CONTEXT.build(
         c, scene_type="spirit beast hunt", query_text=f"hunt {beast.get('name','spirit beast')} {beast.get('element','')}"
     )
+    narrate_with_model = await _routine_narration_by_default()
+
+    def _ask_model():
+        return NARRATOR.narrate_hunt_result(c, beast, roll_line(roll), success, scene_context=hunt_context.text, upgrade=True)
+
     try:
-        narration = await NARRATOR.narrate_hunt_result(c, beast, roll_line(roll), success, scene_context=hunt_context.text)
+        if narrate_with_model:
+            narration = await NARRATOR_QUEUE.run("hunt", _ask_model())
+        else:
+            narration = await NARRATOR.narrate_hunt_result(c, beast, roll_line(roll), success, scene_context=hunt_context.text)
     except Exception:
         log.exception("Hunt narration failed")
         narration = f"You encounter a {beast.get('name','spirit beast')}."
@@ -509,6 +545,14 @@ async def hunt(interaction: discord.Interaction) -> None:
     else:
         text += "\n\nThe beast escapes. No permanent injury or item loss is applied."
     await reply_long(interaction, text)
+    if not narrate_with_model:
+        async def _deliver_prose(prose: str) -> None:
+            await interaction.followup.send(f"📜 {prose}", ephemeral=False)
+        await interaction.followup.send(
+            "The clash above is the world's plain record.",
+            view=NarrateItView(owner_id=interaction.user.id, narrate=_ask_model, deliver=_deliver_prose, label="hunt"),
+            ephemeral=False,
+        )
 
 
 async def recipe_autocomplete(
@@ -603,6 +647,62 @@ async def _run_crafting(
 @serialized_user_action
 async def craft(interaction: discord.Interaction, recipe: str) -> None:
     await _run_crafting(interaction, recipe)
+
+
+class NarrateItView(discord.ui.View):
+    """One button under a procedural result: ask the model for prose (v0.31.0).
+
+    An exploration opening or a hunt result is decided by the engine and
+    read from the procedural pool. The model is asked only when the player
+    presses this - an explicit ask, metered on its own door of the per-player
+    budget - or when the GM's `ai_routine_narration` flag is on, in which case
+    the handler narrates up front and this view is never shown.
+    """
+
+    def __init__(
+        self, *, owner_id: int, narrate: Callable[[], Awaitable[str]],
+        deliver: Callable[[str], Awaitable[None]], label: str = "exploration",
+    ) -> None:
+        super().__init__(timeout=600)
+        self.owner_id = int(owner_id)
+        self.narrate = narrate
+        self.deliver = deliver
+        self.label = label
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if int(interaction.user.id) != self.owner_id:
+            await interaction.response.send_message("That scene belongs to the cultivator who played it.", ephemeral=False, delete_after=15)
+            return False
+        return True
+
+    @discord.ui.button(label="Narrate it", style=discord.ButtonStyle.secondary, emoji="📜")
+    async def narrate_it(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        refusal = budget_refusal_line(interaction.user.id, "narrate_it")
+        if refusal:
+            await interaction.response.send_message(refusal, ephemeral=False, delete_after=20)
+            return
+        button.disabled = True
+        button.label = "Narrated"
+        self.stop()
+        await interaction.response.edit_message(view=self)
+        try:
+            text = await NARRATOR_QUEUE.run(f"narrate_it:{self.label}", self.narrate())
+        except Exception:
+            log.exception("Narrate-it narration failed (%s)", self.label)
+            text = "The spiritual currents are unstable; the narrator could not be reached. The procedural account above stands."
+        try:
+            await self.deliver(text)
+        except discord.HTTPException:
+            log.exception("Could not deliver Narrate-it prose (%s)", self.label)
+
+
+async def _routine_narration_by_default() -> bool:
+    """The GM scene flag: narrate explore and hunt with the model unasked."""
+    try:
+        return bool((await DB.get_automation_settings()).get("ai_routine_narration"))
+    except Exception:
+        log.exception("Could not read automation settings; treating routine narration as procedural")
+        return False
 
 
 alchemy_group = app_commands.Group(name="alchemy", description="Refine pills, gather medicinal herbs and manage pill toxicity")

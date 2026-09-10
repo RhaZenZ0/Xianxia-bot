@@ -72,6 +72,7 @@ AI_ROUTER = AITaskRouter(
     require_free=SETTINGS.openrouter_require_free,
     max_requests_per_minute=SETTINGS.openrouter_max_requests_per_minute,
     max_requests_per_day=SETTINGS.openrouter_max_requests_per_day,
+    credits_topped_up=SETTINGS.openrouter_credits_topped_up,
     route_requests_per_minute=SETTINGS.openrouter_route_requests_per_minute,
     route_requests_per_day=SETTINGS.openrouter_route_requests_per_day,
     routine_timeout_seconds=SETTINGS.openrouter_timeout_seconds,

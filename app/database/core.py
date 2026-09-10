@@ -5784,6 +5784,9 @@ class Database:
             "background_seclusion": True,
             "black_markets": True,
             "autonomous_world_events": True,
+            # v0.31.0: the GM scene flag - model narration for explore and
+            # hunt by default, instead of the procedural pool plus a button.
+            "ai_routine_narration": False,
         }
         async with self._connect() as db:
             cur = await db.execute("SELECT value_json FROM world_state WHERE key='automation_settings'")

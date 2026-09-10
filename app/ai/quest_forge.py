@@ -118,6 +118,7 @@ class QuestForge:
             system_prompt=system_prompt(self.world, self.budget),
             prompt=fenced,
             max_output_tokens=self.max_output_tokens,
+            purpose="forge",
             # The player-facing leak guard stays on (only the chat monitor may
             # opt out): a reply it rejects is a failed attempt, retried once,
             # then the procedural draft covers it.

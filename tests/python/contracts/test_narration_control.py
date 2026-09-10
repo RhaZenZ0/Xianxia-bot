@@ -58,6 +58,18 @@ class NarrationWriteOrderingTests(unittest.TestCase):
         self.assertEqual(control.calls[0][0], "narration.apply")
         self.assertTrue(result["applied"])
 
+    def test_the_ten_dollar_switch_is_stored_with_the_chain(self):
+        # v0.31.0: the switch is one more key in the same engine write, so it
+        # gets the same durability and the same audit row as the routes.
+        controller, control = _controller()
+        asyncio.run(controller.run("narration.set_chain", {
+            "slots": {"routine_model": "a/b:free", "credits_topped_up": "true"}, "reason": "credits bought",
+        }))
+        name, _, payload = controller.engine.calls[0]
+        self.assertEqual(name, "admin.narration.set_chain")
+        self.assertEqual(payload["slots"]["credits_topped_up"], "true")
+        self.assertEqual(control.calls[-1][0], "narration.apply")
+
     def test_the_write_carries_the_dashboard_actor_so_the_audit_row_has_a_name(self):
         controller, _ = _controller()
         asyncio.run(

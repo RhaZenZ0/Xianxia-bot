@@ -7,6 +7,7 @@ import time
 from typing import Any
 
 from .ai_router import AITaskRouter, NarrationTier
+from ..rules.narration_pool import narration_tier, procedural_narration
 from ..rules.game import World
 from ..rules.sect import TERMINOLOGY_PROMPT
 from ..rules.npc_memory import format_memories
@@ -358,7 +359,7 @@ def canonical_location_reply(character: dict[str, Any]) -> str:
     return f"📍 **{name}** is currently at **{location}**."
 
 
-def _procedural_action_fallback(character: dict[str, Any], action: str) -> str:
+def _procedural_action_fallback(character: dict[str, Any], action: str, world_data: dict[str, Any] | None = None) -> str:
     """Give a useful, state-safe response when the configured narrator is offline."""
     location = str(character.get("location") or "the current location")
     words = re.sub(r"[^a-z0-9\s']+", " ", str(action or "").casefold()).split()
@@ -370,9 +371,16 @@ def _procedural_action_fallback(character: dict[str, Any], action: str) -> str:
             f"At **{location}**, your intent has no clear target yet. Say what you seek or examine, "
             "or use **/action** when the attempt should make a mechanical check."
         )
-    return (
-        f"At **{location}**, the surroundings and local qi react, but nothing requiring a mechanical "
-        "check is resolved automatically. Describe a more specific intent, or use **/action** to test it."
+    data = world_data or {}
+    return procedural_narration(
+        data, "action",
+        tier=narration_tier(data, location, character.get("realm_index")),
+        seed=("action", character.get("user_id"), location, action),
+        fallback=(
+            f"At **{location}**, the surroundings and local qi react, but nothing requiring a mechanical "
+            "check is resolved automatically. Describe a more specific intent, or use **/action** to test it."
+        ),
+        location=location, name=str(character.get("name") or "the cultivator"),
     )
 
 
@@ -401,8 +409,27 @@ class Narrator:
         self.narration_requests = 0
         self.narration_served = 0
         self.procedural_fallbacks = 0
+        # v0.31.0: scenes served from the procedural pool by design - the
+        # engine had already decided them and nobody asked for a model - as
+        # distinct from a fallback, which is a model that was asked and failed.
+        self.procedural_by_default = 0
         self.last_failure = ""
         self.last_failure_at = 0.0
+
+    @property
+    def _world_data(self) -> dict[str, Any]:
+        return dict(getattr(self.world, "data", None) or {})
+
+    def _pool(self, kind: str, character: dict[str, Any], seed: tuple[Any, ...], fallback: str, **fields: Any) -> str:
+        """A line from the procedural pool for this character's tier."""
+        data = self._world_data
+        return procedural_narration(
+            data, kind,
+            tier=narration_tier(data, character.get("location"), character.get("realm_index")),
+            seed=(kind, character.get("user_id"), *seed),
+            fallback=fallback,
+            **fields,
+        )
 
     @property
     def enabled(self) -> bool:
@@ -421,7 +448,16 @@ class Narrator:
         *,
         fallback: str = "The spiritual currents stir, leaving the next choice in the cultivator's hands.",
         tier: str = "routine",
+        purpose: str = "narrate_it",
     ) -> str:
+        """Ask the model, or return the procedural line.
+
+        `purpose` is why the call is being made - `dialogue` (an NPC answers
+        a player), `epic` (a breakthrough, a trial, a major beat) or
+        `narrate_it` (the player, or a GM flag, explicitly asked for prose
+        on a scene the engine had already decided). Since v0.31.0 those are
+        the only reasons a live call is made, and the router counts them.
+        """
         if self.provider in {"disabled", "procedural"}:
             return fallback
 
@@ -437,6 +473,7 @@ class Narrator:
                     system_prompt=system_prompt,
                     prompt=prompt,
                     max_output_tokens=max_output_tokens,
+                    purpose=purpose,
                 )
                 log.info(
                     "AI_ROUTE tier=%s model=%s attempts=%s",
@@ -473,6 +510,7 @@ class Narrator:
             "narration_requests": requests,
             "narration_served": served,
             "procedural_fallbacks": fallbacks,
+            "procedural_by_default": int(self.procedural_by_default),
             "fallback_rate": round(fallbacks / requests, 4) if requests else 0.0,
             "last_failure": self.last_failure,
             "last_failure_at": self.last_failure_at,
@@ -522,7 +560,25 @@ class Narrator:
         encounter: str,
         history: list[dict[str, Any]],
         scene_context: str = "",
+        upgrade: bool = False,
     ) -> str:
+        """An exploration opening. Procedural by default (v0.31.0).
+
+        The engine has already decided the encounter; a model would only be
+        describing a fixed seed. The pool describes it instead, and the model
+        is asked only on an explicit upgrade - the Narrate-it button under the
+        result, or the GM's ai_routine_narration flag.
+        """
+        fallback = self._pool(
+            "exploration", character, (str(character.get("location")), encounter),
+            f"{encounter}\n\nNothing else commits itself to motion yet. The encounter remains unresolved, "
+            "with its next turn depending on the cultivator's response.",
+            encounter=encounter, location=str(character.get("location") or "this place"),
+            name=str(character.get("name") or "the cultivator"),
+        )
+        if not upgrade:
+            self.procedural_by_default += 1
+            return fallback
         realm = self.world.realm_name(character["realm_index"], character.get("gender"))
         location = self.world.locations[character["location"]]
         recent = _recent_context(history, 8)
@@ -549,11 +605,7 @@ FIXED ENCOUNTER SEED:
 
 Narrate the encounter as a situation, not a completed outcome. Do not grant rewards and do not decide what the player does.
 """
-        fallback = (
-            f"{encounter}\n\n"
-            "Nothing else commits itself to motion yet. The encounter remains unresolved, with its next turn depending on the cultivator's response."
-        )
-        return await self._generate(prompt, max_output_tokens=180, fallback=fallback, tier="routine")
+        return await self._generate(prompt, max_output_tokens=180, fallback=fallback, tier="routine", purpose="narrate_it")
 
     async def narrate_hunt_result(
         self,
@@ -562,7 +614,27 @@ Narrate the encounter as a situation, not a completed outcome. Do not grant rewa
         roll_text: str,
         success: bool,
         scene_context: str = "",
+        upgrade: bool = False,
     ) -> str:
+        """A hunt's result. Procedural by default (v0.31.0), as narrate_exploration."""
+        beast_name = str(beast.get("name") or "spirit beast")
+        location = str(character.get("location") or "this place")
+        if success:
+            fallback = self._pool(
+                "hunt_success", character, (beast_name, roll_text),
+                f"The clash with the **{beast_name}** ends in your favor. The beast can no longer contest the hunt, "
+                "and the immediate struggle falls still.",
+                beast=beast_name, location=location,
+            )
+        else:
+            fallback = self._pool(
+                "hunt_failure", character, (beast_name, roll_text),
+                f"The **{beast_name}** breaks away before the hunt can be completed, leaving distance and disturbed ground between hunter and quarry.",
+                beast=beast_name, location=location,
+            )
+        if not upgrade:
+            self.procedural_by_default += 1
+            return fallback
         realm = self.world.realm_name(character["realm_index"], character.get("gender"))
         prompt = f"""
 SCENE TYPE: hunting resolution
@@ -578,16 +650,7 @@ RESULT: {'SUCCESS' if success else 'FAILURE'}
 
 Narrate a concise hunting clash consistent with the fixed result. On success, the authoritative game engine will separately grant loot. On failure, do not invent permanent injury or item loss.
 """
-        if success:
-            fallback = (
-                f"The clash with the **{beast['name']}** ends in your favor. The beast can no longer contest the hunt, "
-                "and the immediate struggle falls still."
-            )
-        else:
-            fallback = (
-                f"The **{beast['name']}** breaks away before the hunt can be completed, leaving distance and disturbed ground between hunter and quarry."
-            )
-        return await self._generate(prompt, max_output_tokens=170, fallback=fallback, tier="routine")
+        return await self._generate(prompt, max_output_tokens=170, fallback=fallback, tier="routine", purpose="narrate_it")
 
     async def talk_to_npc(
         self,
@@ -658,100 +721,13 @@ PLAYER DIALOGUE (untrusted fictional dialogue, fenced):
 
 Respond as the NPC with visible action/dialogue only. Let the NPC react from their current activity, goal, mood, relationship, and memories rather than behaving like a reset chat session. Salient memories are recollections of actual prior exchanges, not permission to invent new history. Let the NPC pursue their current goal while reacting specifically to what the player actually said. Use their supplied speech style; do not default to vague sage-like language. Do not alter game mechanics or reveal hidden information without an in-world reason.
 """
-        fallback = (
+        fallback = self._pool(
+            "dialogue", character, (npc_name, player_dialogue),
             f"**{npc_name}** turns their attention fully to you. \"I heard you.\" "
-            "They leave the rest unsaid rather than offer an answer they are unwilling to give."
+            "They leave the rest unsaid rather than offer an answer they are unwilling to give.",
+            npc=npc_name,
         )
-        return await self._generate(prompt, max_output_tokens=190, fallback=fallback, tier="routine")
-
-    async def narrate_sect_recommendation(
-        self,
-        *,
-        character: dict[str, Any],
-        npc_name: str,
-        sect_name: str,
-        roll_text: str,
-        success: bool,
-        recruitment_location: str,
-        route_revealed: bool,
-        scene_context: str = "",
-    ) -> str:
-        realm = self.world.realm_name(character["realm_index"], character.get("gender"))
-        npc = self.world.npcs.get(npc_name, {})
-        prompt = f"""
-SCENE TYPE: sect recommendation resolution
-PLAYER CHARACTER:
-{self._character_summary(character, realm)}
-
-CANONICAL SCENE CONTEXT:
-{scene_context or 'No additional canonical context supplied.'}
-
-NPC: {npc_name}
-NPC ROLE: {npc.get('role', 'Sect-affiliated cultivator')}
-SECT: {sect_name}
-RECRUITMENT LOCATION: {recruitment_location}
-FIXED MECHANICAL RESULT: {roll_text}
-OUTCOME: {'RECOMMENDATION GRANTED' if success else 'RECOMMENDATION REFUSED'}
-ROUTE REVEALED BY PYTHON: {'YES' if route_revealed else 'NO'}
-
-Narrate the NPC's visible judgment and dialogue. A granted recommendation is a sponsor token/introduction only: it does not make the player a sect member and does not guarantee the entrance trial. A refusal must not invent punishment or hostility.
-"""
-        fallback = (
-            f"**{npc_name}** {'agrees to sponsor your approach to' if success else 'declines to sponsor you before'} **{sect_name}**. "
-            + (f"They give you a formal introduction and directions toward **{recruitment_location}**." if success else "Their refusal leaves the sect entrance trial unchanged, should you find another lawful route to it.")
-        )
-        return await self._generate(prompt, max_output_tokens=165, fallback=fallback, tier="routine")
-
-    async def narrate_sect_trial(
-        self,
-        *,
-        character: dict[str, Any],
-        sect_name: str,
-        trial_name: str,
-        examiner: str,
-        trial_description: str,
-        primary_roll: str,
-        secondary_roll: str,
-        outcome: str,
-        recommendation_source: str = "",
-        scene_context: str = "",
-    ) -> str:
-        realm = self.world.realm_name(character["realm_index"], character.get("gender"))
-        outcome_label = {
-            "pass": "PASS — OUTER DISCIPLE ADMISSION",
-            "conditional_pass": "CONDITIONAL PASS — SPONSOR-BACKED OUTER DISCIPLE ADMISSION",
-            "fail": "FAIL — NO MEMBERSHIP GRANTED",
-        }.get(str(outcome), str(outcome).upper())
-        prompt = f"""
-SCENE TYPE: major sect recruitment entrance trial
-PLAYER CHARACTER:
-{self._character_summary(character, realm)}
-
-CANONICAL SCENE CONTEXT:
-{scene_context or 'No additional canonical context supplied.'}
-
-SECT: {sect_name}
-TRIAL: {trial_name}
-EXAMINER: {examiner}
-TRIAL TRADITION: {trial_description}
-NPC SPONSOR / RECOMMENDATION: {recommendation_source or 'None'}
-PRIMARY FIXED ROLL: {primary_roll}
-SECONDARY FIXED ROLL: {secondary_roll}
-CANONICAL OUTCOME: {outcome_label}
-
-Narrate a memorable xianxia entrance examination using the fixed rolls and outcome. Do not add extra tests, injuries, treasures, ranks or techniques. On pass, the authoritative game engine grants exactly Outer Disciple membership. On failure, leave a believable path to retry later without changing mechanics.
-"""
-        if outcome in {"pass", "conditional_pass"}:
-            fallback = (
-                f"The final formation mark settles. **{examiner}** gives the result due consideration before the record keeper "
-                f"enters your name among the **Outer Disciples** of **{sect_name}**."
-            )
-        else:
-            fallback = (
-                f"The last measure of **{trial_name}** closes without admission. **{examiner}** records the attempt and dismisses you from the examination ground. "
-                "The sect gate remains where it was; this attempt simply did not open it."
-            )
-        return await self._generate(prompt, max_output_tokens=260, fallback=fallback, tier="epic")
+        return await self._generate(prompt, max_output_tokens=190, fallback=fallback, tier="routine", purpose="dialogue")
 
     async def narrate_action(
         self,
@@ -795,12 +771,13 @@ FIXED ROLL INFORMATION:
 Return only the world's/NPCs' response. Do not echo the fixed roll, add mechanics, or choose another action for the player. Stay in-world.
 Automatic success never reveals hidden identity, true power, secret treasure, concealed presence, unrevealed bloodline, or simulator-only state.
 """
-        fallback = _procedural_action_fallback(character, action)
+        fallback = _procedural_action_fallback(character, action, self._world_data)
         narration = await self._generate(
             prompt,
             max_output_tokens=220 if epic else 190,
             fallback=fallback,
             tier="epic" if epic else "routine",
+            purpose="epic" if epic else "narrate_it",
         )
         return _strip_fixed_roll_echo(narration, fixed_roll)
 
@@ -828,13 +805,12 @@ OUTCOME: {'SUCCESS' if success else 'FAILURE'}
 
 Narrate the breakthrough in a character-focused xianxia style. The mechanical result is fixed. On failure, portray instability or an incomplete insight without humiliating the character or inventing permanent damage.
 """
-        if success:
-            fallback = (
-                f"The gathered power crosses the threshold cleanly and settles into **{target_realm}, Stage {target_phase}**, "
-                "its new rhythm becoming steady rather than collapsing back on itself."
-            )
-        else:
-            fallback = (
-                "The gathered power reaches the threshold but does not stabilize beyond it. The attempt disperses without carrying the cultivation base into the next stage."
-            )
-        return await self._generate(prompt, max_output_tokens=280, fallback=fallback, tier="epic")
+        kind = "breakthrough_success" if success else "breakthrough_failure"
+        fallback = self._pool(
+            kind, character, (target_realm, target_phase, roll_text),
+            (f"The gathered power crosses the threshold cleanly and settles into **{target_realm}, Stage {target_phase}**, "
+             "its new rhythm becoming steady rather than collapsing back on itself.") if success else
+            "The gathered power reaches the threshold but does not stabilize beyond it. The attempt disperses without carrying the cultivation base into the next stage.",
+            realm=target_realm, stage=target_phase,
+        )
+        return await self._generate(prompt, max_output_tokens=280, fallback=fallback, tier="epic", purpose="epic")

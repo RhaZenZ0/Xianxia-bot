@@ -279,6 +279,7 @@ async def analyse_transcript(
     for index, chunk in enumerate(chunks, start=1):
         try:
             result = await router.generate(
+                purpose="monitor",
                 tier=NarrationTier.ROUTINE,
                 system_prompt=MONITOR_SYSTEM_PROMPT,
                 prompt=chunk_prompt(chunk, index, len(chunks)),
@@ -309,6 +310,7 @@ async def analyse_transcript(
     else:
         try:
             merged = await router.generate(
+                purpose="monitor",
                 tier=NarrationTier.EPIC,
                 system_prompt=MONITOR_SYSTEM_PROMPT,
                 prompt=synthesis_prompt(notes, stats),

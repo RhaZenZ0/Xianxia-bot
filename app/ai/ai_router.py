@@ -518,6 +518,10 @@ NARRATION_SLOTS = (
     "epic_fallback_model",
     "dynamic_free_model",
 )
+# The ten-dollar switch (v0.31.0), stored beside the slots by the engine and
+# applied through set_slots; OpenRouter's topped-up free allowance per day.
+CREDITS_SWITCH_SLOT = "credits_topped_up"
+TOPPED_UP_DAILY_CAP = 1000
 # The two slots that may be emptied: "this tier has no named second hop, go
 # straight to the dynamic free router".
 NARRATION_OPTIONAL_SLOTS = frozenset({"routine_fallback_model", "epic_fallback_model"})
@@ -683,6 +687,7 @@ class AITaskRouter:
         require_free: bool = True,
         max_requests_per_minute: int = 20,
         max_requests_per_day: int = 50,
+        credits_topped_up: bool = False,
         route_requests_per_minute: int = 15,
         route_requests_per_day: int = 1500,
         routine_timeout_seconds: float = 30.0,
@@ -745,6 +750,14 @@ class AITaskRouter:
         self._catalogue: dict[str, Any] = {}
         self._catalogue_at = 0.0
         self.limiter = OpenRouterRequestLimiter(max_requests_per_minute, max_requests_per_day)
+        # The ten-dollar switch (v0.31.0). OpenRouter's free allowance is 50 a
+        # day until the account has bought ten dollars of credit, then 1000.
+        # The configured cap is the baseline; the switch raises it to the
+        # topped-up figure, and may be flipped live from the dashboard.
+        self.daily_cap_configured = self.limiter.max_requests_per_day
+        self.credits_topped_up = False
+        if credits_topped_up:
+            self.set_credits_topped_up(True)
         self._cooldown_until: dict[str, float] = {}
         self._started_at = time.time()
         self.route_requests_per_minute = max(1, int(route_requests_per_minute))
@@ -754,6 +767,7 @@ class AITaskRouter:
         self._tls_warned = False
         self._model_stats: dict[str, dict[str, Any]] = {}
         self._last_audit: dict[str, Any] = {}
+        self._purpose_stats: dict[str, dict[str, int]] = {}
         self._tier_stats: dict[str, dict[str, int]] = {
             tier.value: {"requests": 0, "served": 0, "exhausted": 0, "rate_limited": 0}
             for tier in NarrationTier
@@ -790,6 +804,15 @@ class AITaskRouter:
         """The five settable slots, as the dashboard renders them."""
         return {name: getattr(self, name) for name in NARRATION_SLOTS}
 
+    def set_credits_topped_up(self, flag: bool) -> dict[str, Any]:
+        """Apply the ten-dollar switch: 1000 a day topped up, the baseline otherwise."""
+        self.credits_topped_up = bool(flag)
+        cap = max(self.daily_cap_configured, TOPPED_UP_DAILY_CAP) if self.credits_topped_up else self.daily_cap_configured
+        if cap != self.limiter.max_requests_per_day:
+            log.info("AI_DAILY_CAP %s -> %s (credits_topped_up=%s)", self.limiter.max_requests_per_day, cap, self.credits_topped_up)
+        self.limiter.max_requests_per_day = cap
+        return {"credits_topped_up": self.credits_topped_up, "max_requests_per_day": cap}
+
     def set_slots(self, slots: dict[str, str]) -> dict[str, Any]:
         """Replace one or more chain slots at runtime.
 
@@ -803,6 +826,15 @@ class AITaskRouter:
         newly chosen route has not been probed yet, and inheriting the previous
         occupant's "retired" flag would skip it until the next audit.
         """
+        slots = dict(slots)
+        # The ten-dollar switch rides in the same stored blob as the chain
+        # (admin.narration.set_chain accepts the key), so one dashboard save
+        # and one audit row carry both. It is not a model slug, so it is
+        # taken out before the slugs are validated.
+        topped_up: bool | None = None
+        if CREDITS_SWITCH_SLOT in slots:
+            raw = str(slots.pop(CREDITS_SWITCH_SLOT) or "").strip().lower()
+            topped_up = raw in {"1", "true", "yes", "on"}
         unknown = sorted(set(slots) - set(NARRATION_SLOTS))
         if unknown:
             raise ValueError(f"Unknown narration slot(s): {', '.join(unknown)}")
@@ -818,6 +850,9 @@ class AITaskRouter:
         for name, value in validated.items():
             setattr(self, name, value)
         self._rebuild_chains()
+        if topped_up is not None and topped_up != self.credits_topped_up:
+            self.set_credits_topped_up(topped_up)
+            changed[CREDITS_SWITCH_SLOT] = "true" if topped_up else "false"
         for value in changed.values():
             if value:
                 row = self._model_row(value)
@@ -1364,6 +1399,9 @@ class AITaskRouter:
             },
             "audit": dict(self._last_audit),
             "tiers": {name: dict(counts) for name, counts in self._tier_stats.items()},
+            "purposes": {name: dict(counts) for name, counts in sorted(self._purpose_stats.items())},
+            "credits_topped_up": self.credits_topped_up,
+            "daily_cap_configured": self.daily_cap_configured,
             "limiter": self.limiter.snapshot(),
             "models": models,
         }
@@ -1377,9 +1415,17 @@ class AITaskRouter:
         max_output_tokens: int,
         leak_guard: bool = True,
         temperature: float | None = None,
+        purpose: str = "routine",
     ) -> RoutedAIResult:
         if not self.client:
             raise RuntimeError("OPENROUTER_API_KEY is not configured")
+        # v0.31.0: why the call is made, beside which tier serves it -
+        # dialogue, epic, narrate_it (an explicit ask), forge, monitor - so
+        # the AI Routing page can show what the allowance is spent on.
+        purpose_counts = self._purpose_stats.setdefault(
+            str(purpose or "routine").strip().lower() or "routine", {"requests": 0, "served": 0}
+        )
+        purpose_counts["requests"] += 1
         try:
             tier_name = NarrationTier(str(tier))
         except ValueError:
@@ -1465,6 +1511,7 @@ class AITaskRouter:
                     # construction. Saying so keeps ai_status readable.
                     success_row["byok"] = True
                     tier_counts["served"] += 1
+                    purpose_counts["served"] += 1
                     return RoutedAIResult(
                         text=text,
                         tier=tier_name,
@@ -1516,6 +1563,7 @@ class AITaskRouter:
                     success_row["last_provider"] = provider_name
                 await self._maybe_check_byok(model, response)
                 tier_counts["served"] += 1
+                purpose_counts["served"] += 1
                 return RoutedAIResult(
                     text=text,
                     tier=tier_name,

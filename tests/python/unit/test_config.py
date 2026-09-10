@@ -37,6 +37,21 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(settings.game_engine_url, "http://127.0.0.1:8081")
         self.assertEqual(settings.game_engine_timeout_seconds, 30.0)
 
+    def test_the_ten_dollar_switch_picks_the_daily_allowance(self):
+        # v0.31.0: 50 a day under ten dollars of credit, 1000 at ten or more;
+        # an explicit cap still wins over both.
+        with patch.dict(os.environ, self.base_env(), clear=True):
+            settings = Settings.from_env()
+        self.assertFalse(settings.openrouter_credits_topped_up)
+        self.assertEqual(settings.openrouter_max_requests_per_day, 50)
+        with patch.dict(os.environ, {**self.base_env(), "OPENROUTER_CREDITS_TOPPED_UP": "true"}, clear=True):
+            settings = Settings.from_env()
+        self.assertTrue(settings.openrouter_credits_topped_up)
+        self.assertEqual(settings.openrouter_max_requests_per_day, 1000)
+        env = {**self.base_env(), "OPENROUTER_CREDITS_TOPPED_UP": "true", "OPENROUTER_MAX_REQUESTS_PER_DAY": "300"}
+        with patch.dict(os.environ, env, clear=True):
+            self.assertEqual(Settings.from_env().openrouter_max_requests_per_day, 300)
+
     def test_openrouter_key_selects_cloud_router_by_default(self):
         env = self.base_env()
         env["OPENROUTER_API_KEY"] = "sk-or-test"

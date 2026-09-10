@@ -33,7 +33,7 @@ from .admin.narration_control import (
 )
 from .channels import post_server_log
 from .character_state import _remember_freeform_npc_scene
-from .runtime import DB, ENGINE, SETTINGS, WORLD, _sync_realm_presence_roles, character_location_display, chunk_text, current_world_time, log
+from .runtime import DB, ENGINE, SETTINGS, TYPED_PLAY_BUDGET, WORLD, _sync_realm_presence_roles, character_location_display, chunk_text, current_world_time, log
 from ..ai.quest_forge import store_draft
 from ..rules.quests import QUEST_DEFINITIONS, static_quest_seed_rows
 from .services import AI_ROUTER, ALERTS, GUILD, NARRATOR, NARRATOR_CONTEXT, QUEST_FORGE, SIM
@@ -104,7 +104,14 @@ class XianxiaBot(commands.Bot):
         # ever touches Discord layout. This is a read of the router's own
         # in-process counters, so it changes nothing and audits nothing.
         if action == "ai_routing":
-            return {"ok": True, "action": action, "result": AI_ROUTER.health_snapshot()}
+            # v0.31.0: beside the router's counters, the narrator's (calls
+            # served procedurally by design) and the per-player budget's
+            # (refusals by door), so the page shows what the milestone did.
+            return {"ok": True, "action": action, "result": {
+                **AI_ROUTER.health_snapshot(),
+                "narrator": NARRATOR.health_snapshot(),
+                "user_budget": TYPED_PLAY_BUDGET.snapshot(),
+            }}
         if owns_narration_action(action):
             return await dashboard_narration_control(action, payload)
         return await dashboard_discord_control(self, action, payload)

@@ -156,8 +156,18 @@ users wait through long retries.
 requests/**minute** and 50 requests/**day** while the account has under $10 of
 lifetime credits, 1000/day at $10 or more. Every failed route walks to the next
 one and each walk spends a daily slot, so the allowance drains faster than the
-narration count suggests. **Raise this to 1000** once credits are on the
-account.
+narration count suggests. Leave it unset and use the switch below.
+
+`OPENROUTER_CREDITS_TOPPED_UP` — the ten-dollar switch (v0.31.0). `false`
+means the 50-a-day allowance, `true` means the account has bought ten dollars
+of credit and the daily cap is 1000. The dashboard's **Narration Routes**
+panel has the same switch and its choice is stored by the engine and applied
+live, so this key is the baseline for a fresh install rather than the last
+word. An explicit `OPENROUTER_MAX_REQUESTS_PER_DAY` overrides both.
+
+`TYPED_PLAY_BURST` / `TYPED_PLAY_PER_MINUTE` (above) are, since v0.31.0, the
+budget on **every** door - typed lines, slash commands and hub buttons, and
+the *Narrate it* asks - one bucket per player, however they reach the engine.
 
 `OPENROUTER_ROUTE_REQUESTS_PER_MINUTE` / `OPENROUTER_ROUTE_REQUESTS_PER_DAY` —
 **per-route** ceilings. The two above are account-wide (OpenRouter's own);
