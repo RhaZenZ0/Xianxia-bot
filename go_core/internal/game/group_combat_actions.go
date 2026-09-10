@@ -69,11 +69,6 @@ func indestructibleEquipmentIDsGo() []string {
 	return ids
 }
 
-func isIndestructibleEquipmentGo(itemID string) bool {
-	d, ok := equipmentDefinitionsGo()[itemID]
-	return ok && d.Indestructible
-}
-
 // uniqueEquipmentIDsGo mirrors the "unique" flag on EQUIPMENT_DEFINITIONS in
 // app/rules/advanced_runtime.py: one-of-a-kind rewards a character may hold
 // at most one of, carried or bound. The Discord /admin player grant path

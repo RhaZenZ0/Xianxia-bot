@@ -333,12 +333,6 @@ class MemoryRAGRetriever:
             "history": self._history_cache.stats(),
         }
 
-    def clear_caches(self) -> None:
-        self._context_cache.clear()
-        self._memory_cache.clear()
-        self._canon_cache.clear()
-        self._history_cache.clear()
-
     async def retrieve(
         self,
         character: dict[str, Any],

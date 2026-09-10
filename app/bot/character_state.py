@@ -16,12 +16,6 @@ from ..rules.worldtime import from_game_minutes
 from .runtime import DB, ENGINE, WORLD, log
 from .services import SIM
 
-async def settle_all_seclusions(current_game_minute: int) -> int:
-    # Background settlement is owned by Go's simulation runner. Retained as a read-only
-    # compatibility helper for callers outside the production worker.
-    return len(await DB.list_active_seclusions())
-
-
 async def current_effect_modifiers(user_id: int) -> tuple[list[dict], dict[str, float], object]:
     authority = dict(await ENGINE.action("effects.current", int(user_id), {}))
     wt = from_game_minutes(int(authority.get("game_minute", 0)))

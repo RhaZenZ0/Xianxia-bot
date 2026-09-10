@@ -3586,19 +3586,6 @@ class Database:
             return data
 
 
-    async def has_completed_perfection(self, user_id: int) -> bool:
-        """Return True once the character has perfected at least one Qi realm.
-
-        This makes the +2 Perfect-foundation breakthrough benefit genuinely permanent
-        instead of disappearing immediately after entering the next realm.
-        """
-        async with self._connect() as db:
-            cur = await db.execute(
-                "SELECT 1 FROM realm_perfection WHERE user_id=? AND completed=1 LIMIT 1",
-                (user_id,),
-            )
-            return await cur.fetchone() is not None
-
     # ---------- Body Realm Perfection ----------
     async def get_body_perfection(self, user_id: int, realm_index: int) -> dict[str, Any] | None:
         async with self._connect() as db:
@@ -3616,15 +3603,6 @@ class Database:
             data["discovered"] = json.loads(data.pop("discovered_json"))
             return data
 
-
-    async def has_completed_body_perfection(self, user_id: int) -> bool:
-        """Return True once the character has perfected at least one Body realm."""
-        async with self._connect() as db:
-            cur = await db.execute(
-                "SELECT 1 FROM body_realm_perfection WHERE user_id=? AND completed=1 LIMIT 1",
-                (user_id,),
-            )
-            return await cur.fetchone() is not None
 
     # ---------- Shared world events ----------
     async def get_active_world_events(self, location: str | None = None) -> list[dict[str, Any]]:
@@ -3664,16 +3642,6 @@ class Database:
             out["payload"] = {}
         return out
 
-
-    async def get_world_event_participation(self, event_key: str, user_id: int) -> dict[str, Any] | None:
-        async with self._connect() as db:
-            db.row_factory = aiosqlite.Row
-            cur = await db.execute(
-                "SELECT * FROM world_event_participation WHERE event_key=? AND user_id=?",
-                (str(event_key), int(user_id)),
-            )
-            row = await cur.fetchone()
-            return dict(row) if row else None
 
     async def list_world_event_participants(self, event_key: str, *, limit: int = 25) -> list[dict[str, Any]]:
         async with self._connect() as db:
@@ -4096,15 +4064,6 @@ class Database:
             )
             return [dict(row) for row in await cur.fetchall()]
 
-    async def has_discovered_sect(self, user_id: int, sect_name: str) -> bool:
-        async with self._connect() as db:
-            cur = await db.execute(
-                "SELECT 1 FROM character_sect_discoveries WHERE user_id=? AND sect_name=?",
-                (int(user_id), str(sect_name)),
-            )
-            return await cur.fetchone() is not None
-
-
     async def get_active_sect_recommendations(self, user_id: int) -> list[dict[str, Any]]:
         async with self._connect() as db:
             db.row_factory = aiosqlite.Row
@@ -4141,25 +4100,6 @@ class Database:
                 except json.JSONDecodeError: item["details"] = {}
                 rows.append(item)
             return rows
-
-    async def get_latest_sect_recruitment_attempt(
-        self, user_id: int, sect_name: str, attempt_type: str
-    ) -> dict[str, Any] | None:
-        async with self._connect() as db:
-            db.row_factory = aiosqlite.Row
-            cur = await db.execute(
-                """SELECT * FROM sect_recruitment_attempts
-                   WHERE user_id=? AND sect_name=? AND attempt_type=?
-                   ORDER BY attempt_id DESC LIMIT 1""",
-                (int(user_id), str(sect_name), str(attempt_type)),
-            )
-            row = await cur.fetchone()
-            if not row: return None
-            item = dict(row)
-            try: item["details"] = json.loads(item.pop("details_json", "{}") or "{}")
-            except json.JSONDecodeError: item["details"] = {}
-            return item
-
 
     # ---------- Sects, lineage, and forms of address ----------
     async def set_address_style(self, user_id: int, style: str) -> None:
@@ -5112,21 +5052,9 @@ class Database:
 
 
 
-    async def get_player_family(self,user_id:int)->dict[str,Any]|None:
-        async with self._connect() as db:
-            db.row_factory=aiosqlite.Row; cur=await db.execute("SELECT f.* FROM player_families f JOIN player_family_members m ON m.family_id=f.family_id WHERE m.user_id=?",(user_id,)); row=await cur.fetchone()
-            if not row: return None
-            data=dict(row); cur=await db.execute("SELECT m.user_id,m.seniority_order,m.joined_at,c.name,c.address_style,c.gender,c.realm_index,c.phase FROM player_family_members m JOIN characters c ON c.user_id=m.user_id WHERE m.family_id=? ORDER BY m.seniority_order",(int(data['family_id']),)); data['members']=[dict(r) for r in await cur.fetchall()]; return data
-
-
     # ------------------------------------------------------------------
     # Lifespan / descendants
     # ------------------------------------------------------------------
-
-    async def get_family_children(self,family_id:int)->list[dict[str,Any]]:
-        async with self._connect() as db:
-            db.row_factory=aiosqlite.Row; cur=await db.execute("SELECT fc.*,c.name AS parent_name FROM family_children fc JOIN characters c ON c.user_id=fc.parent_user_id WHERE fc.family_id=? ORDER BY fc.birth_game_minute,fc.child_id",(int(family_id),)); return [dict(r) for r in await cur.fetchall()]
-
 
     async def set_abode_thread(self,user_id:int,*,thread_id:int,thread_channel_id:int)->None:
         async with self._connect() as db:
@@ -5212,13 +5140,6 @@ class Database:
             row = await cur.fetchone()
             return dict(row) if row else None
 
-    async def list_active_seclusions(self) -> list[dict[str, Any]]:
-        async with self._connect() as db:
-            db.row_factory = aiosqlite.Row
-            cur = await db.execute("SELECT * FROM seclusion_sessions WHERE status='active' ORDER BY ends_game_minute")
-            return [dict(r) for r in await cur.fetchall()]
-
-
     # ------------------------------------------------------------------
     # Maintenance
     # ------------------------------------------------------------------
@@ -5288,23 +5209,6 @@ class Database:
             )
             data["npcs"] = [dict(r) for r in await cur.fetchall()]
             return data
-
-
-    async def get_birth_family_by_id(self, family_id: int) -> dict[str, Any] | None:
-        async with self._connect() as db:
-            db.row_factory = aiosqlite.Row
-            cur = await db.execute("SELECT * FROM birth_families WHERE family_id=?", (int(family_id),))
-            row = await cur.fetchone()
-            if not row: return None
-            data=dict(row)
-            try: data["history"]=json.loads(data.pop("history_json"))
-            except Exception: data["history"]=[]
-            cur=await db.execute("SELECT * FROM birth_family_npcs WHERE family_id=? ORDER BY relation,npc_id",(int(family_id),))
-            data["npcs"]=[dict(r) for r in await cur.fetchall()]
-            return data
-
-
-
 
 
     async def get_reincarnation_state(self, user_id: int) -> dict[str, Any] | None:
@@ -5406,23 +5310,6 @@ class Database:
     # Persistent conditions, tribulations, professions and social justice
     # ------------------------------------------------------------------
 
-    async def get_condition(self, user_id: int, condition_key: str) -> dict[str, Any] | None:
-        async with self._connect() as db:
-            db.row_factory = aiosqlite.Row
-            cur = await db.execute(
-                "SELECT * FROM character_conditions WHERE user_id=? AND condition_key=? AND state='active'",
-                (int(user_id), str(condition_key)),
-            )
-            row = await cur.fetchone()
-        if not row:
-            return None
-        data = dict(row)
-        try:
-            data["effect"] = json.loads(data.pop("effect_json") or "{}")
-        except Exception:
-            data["effect"] = {}
-        return data
-
     async def get_conditions(self, user_id: int, *, active_only: bool = True) -> list[dict[str, Any]]:
         sql = "SELECT * FROM character_conditions WHERE user_id=?"
         params: list[Any] = [int(user_id)]
@@ -5453,25 +5340,6 @@ class Database:
             )
             row = await cur.fetchone()
             return dict(row) if row else None
-
-
-    async def get_tribulation_attempts(self, user_id: int, limit: int = 5) -> list[dict[str, Any]]:
-        async with self._connect() as db:
-            db.row_factory = aiosqlite.Row
-            cur = await db.execute(
-                "SELECT * FROM tribulation_attempts WHERE user_id=? ORDER BY attempt_id DESC LIMIT ?",
-                (int(user_id), max(1, min(20, int(limit)))),
-            )
-            rows = await cur.fetchall()
-        out = []
-        for row in rows:
-            data = dict(row)
-            try:
-                data["waves"] = json.loads(data.pop("waves_json") or "[]")
-            except Exception:
-                data["waves"] = []
-            out.append(data)
-        return out
 
 
     async def get_profession_progress(self, user_id: int, profession: str | None = None) -> dict[str, Any] | None | list[dict[str, Any]]:
@@ -5693,10 +5561,6 @@ class Database:
 
 
 
-    async def get_hidden_sect_membership(self, user_id: int) -> dict[str, Any] | None:
-        async with self._connect() as db:
-            db.row_factory=aiosqlite.Row; cur=await db.execute("SELECT * FROM hidden_sect_membership WHERE user_id=?",(int(user_id),)); row=await cur.fetchone(); return dict(row) if row else None
-
     async def get_pvp_challenges(self, user_id: int, *, pending_only: bool=False) -> list[dict[str, Any]]:
         sql="SELECT * FROM pvp_challenges WHERE (challenger_user_id=? OR target_user_id=?)"
         params:list[Any]=[int(user_id),int(user_id)]
@@ -5895,13 +5759,6 @@ class Database:
                 row["positions"] = [dict(r) for r in await cur.fetchall()]
             return rows
 
-    async def get_active_formation(self, party_id: int) -> dict[str, Any] | None:
-        rows = await self.get_formations(party_id)
-        return next((x for x in rows if int(x.get("active", 0)) == 1), None)
-
-
-
-
     async def get_boss_encounter(self, *, user_id: int | None = None, party_id: int | None = None, encounter_id: int | None = None) -> dict[str, Any] | None:
         where = []
         params: list[Any] = []
@@ -5944,11 +5801,6 @@ class Database:
         async with self._connect() as db:
             db.row_factory = aiosqlite.Row; cur = await db.execute(sql, tuple(params)); row = await cur.fetchone(); return dict(row) if row else None
 
-
-
-    async def get_territory_war_actions(self, war_id: int, *, limit: int = 20) -> list[dict[str, Any]]:
-        async with self._connect() as db:
-            db.row_factory = aiosqlite.Row; cur = await db.execute("SELECT * FROM territory_war_actions WHERE war_id=? ORDER BY action_id DESC LIMIT ?", (int(war_id), max(1,min(100,int(limit))))); return [dict(r) for r in await cur.fetchall()]
 
 
     async def get_caravan_events(self, caravan_id: int, *, limit: int = 20) -> list[dict[str, Any]]:

@@ -651,10 +651,6 @@ func rollSamsaraLineage(previousFamilyName, previousArchetype, world string, fam
 	return status, summary, nil
 }
 
-func generateSamsaraFamily(world string, karma int64) (BirthFamily, error) {
-	return generateSamsaraFamilyWithLineage(world, karma, "", "")
-}
-
 func generateSamsaraFamilyWithLineage(world string, karma int64, previousFamilyName, previousArchetype string) (BirthFamily, error) {
 	floor := map[string]int64{"Mortal World": 0, "Spiritual World": 8, "Immortal World": 16, "Celestial World": 24}
 	if _, ok := floor[world]; !ok {
@@ -780,8 +776,6 @@ func generateSamsaraFamilyWithLineage(world string, karma int64, previousFamilyN
 	}
 	return f, nil
 }
-
-func samsaraFamiliesLen() int { return len(samsaraFamilies) }
 
 func maxIntLife(a, b int) int {
 	if a > b {

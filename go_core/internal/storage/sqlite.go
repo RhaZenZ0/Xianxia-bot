@@ -444,19 +444,6 @@ func (c *Conn) InTransaction() bool {
 	return c.handle != nil && C.sqlite3_get_autocommit(c.handle) == 0
 }
 
-func DecodeBlob(value any) ([]byte, bool) {
-	obj, ok := value.(map[string]any)
-	if !ok {
-		return nil, false
-	}
-	raw, ok := obj["__blob_b64"].(string)
-	if !ok {
-		return nil, false
-	}
-	data, err := base64.StdEncoding.DecodeString(raw)
-	return data, err == nil
-}
-
 func ParseInt(value any) int64 {
 	switch v := value.(type) {
 	case int64:

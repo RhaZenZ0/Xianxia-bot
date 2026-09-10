@@ -410,13 +410,3 @@ func (c Catalog) NormalizePath(raw string) (string, bool) {
 	v, ok := aliases[needle]
 	return v, ok
 }
-
-func (c Catalog) NormalizeRoot(raw string) (string, bool) {
-	needle := strings.TrimSpace(strings.ToLower(raw))
-	for _, root := range c.Roots {
-		if strings.ToLower(root) == needle {
-			return root, true
-		}
-	}
-	return "", false
-}

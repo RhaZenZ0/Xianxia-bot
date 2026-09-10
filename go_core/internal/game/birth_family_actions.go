@@ -222,18 +222,6 @@ func birthFamilyRelative(surname, relation, gender string, age, realm, phase int
 	return FamilyRelative{Name: surname + " " + given, Relation: relation, Gender: gender, Age: age, RealmIndex: realm, Phase: phase}, nil
 }
 
-func shuffledBirthFamilySurnames() ([]string, error) {
-	out := append([]string(nil), birthFamilySurnames...)
-	for i := len(out) - 1; i > 0; i-- {
-		j, err := gamerng.Intn(i + 1)
-		if err != nil {
-			return nil, err
-		}
-		out[i], out[j] = out[j], out[i]
-	}
-	return out, nil
-}
-
 func generateBirthFamilyOptions(worldName string) ([]BirthFamily, error) {
 	if worldName != "Mortal World" && worldName != "Spiritual World" && worldName != "Immortal World" && worldName != "Celestial World" {
 		worldName = "Mortal World"

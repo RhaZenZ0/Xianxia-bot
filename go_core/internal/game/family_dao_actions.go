@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"sort"
 	"strings"
 
 	"xianxia/core/internal/eventledger"
@@ -814,12 +813,4 @@ func daoPartnershipActionGo(conn *storage.Conn, catalog worlddata.Catalog, userI
 		out = map[string]any{"partnership_id": i64(bond["partnership_id"]), "partner_user_id": partner, "partner_name": fmt.Sprint(chars[partner]["name"]), "location": fmt.Sprint(chars[a]["location"]), "resonance": newRes, "previous_resonance": oldRes, "milestone": milestone, "awarded": awarded}
 	}
 	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "dao", EventType: op, EntityType: "character", EntityID: fmt.Sprint(userID), Payload: out}}, nil
-}
-func sortedKeys(m map[string]int64) []string {
-	out := make([]string, 0, len(m))
-	for k := range m {
-		out = append(out, k)
-	}
-	sort.Strings(out)
-	return out
 }

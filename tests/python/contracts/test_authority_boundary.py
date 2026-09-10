@@ -825,19 +825,25 @@ def test_v0_30_gate_the_state_layers_import_no_rules():
     assert _rules_imports("dashboard") <= {"worldtime", "quests"}, _rules_imports("dashboard")
 
 
-def _rules_without_a_production_caller() -> list[str]:
-    texts = {p: p.read_text(encoding="utf-8") for p in APP_DIR.rglob("*.py")}
+def _functions_without_a_production_caller(layer: str, *, include_private: bool) -> list[str]:
+    """Every function or method under app/<layer> whose name appears nowhere in
+    app/ or scripts/ except its own definition. Tests count as callers of
+    nothing; a decorated definition (a property, a registered handler) is
+    reached by the framework and skipped; dunders are the language's."""
+    texts = {p: p.read_text(encoding="utf-8") for p in list(APP_DIR.rglob("*.py")) + list((PROJECT_ROOT / "scripts").glob("*.py"))}
     dead: list[str] = []
-    for path in sorted((APP_DIR / "rules").glob("*.py")):
+    for path in sorted((APP_DIR / layer).rglob("*.py")):
         tree = ast.parse(texts[path])
 
         def check(node, label):
-            if node.name.startswith("_"):
+            if node.name.startswith("__") or node.decorator_list:
+                return
+            if node.name.startswith("_") and not include_private:
                 return
             pattern = re.compile(rf"\b{re.escape(node.name)}\b")
             references = sum(len(pattern.findall(text)) for text in texts.values()) - 1
             if references == 0:
-                dead.append(f"{path.name}:{label}")
+                dead.append(f"{path.relative_to(APP_DIR)}:{label}")
 
         for node in tree.body:
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
@@ -847,6 +853,10 @@ def _rules_without_a_production_caller() -> list[str]:
                     if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
                         check(child, f"{node.name}.{child.name}")
     return dead
+
+
+def _rules_without_a_production_caller() -> list[str]:
+    return _functions_without_a_production_caller("rules", include_private=False)
 
 
 def test_v0_30_gate_every_rules_function_has_a_production_caller():
@@ -865,6 +875,25 @@ def test_v0_30_gate_every_rules_function_has_a_production_caller():
         assert not any(re.search(rf"\bdef {name}\b", t) for p, t in
                        ((p, p.read_text(encoding="utf-8")) for p in (APP_DIR / "rules").glob("*.py"))), name
     assert not (APP_DIR / "rules" / "seclusion.py").exists()
+
+
+def test_v0_32_gate_every_state_and_ai_function_has_a_production_caller():
+    # The v0.30 gate above held app/rules clean and nothing held the layers
+    # beside it: v0.32.0 found thirteen repository readers, two router
+    # helpers, a narrator-context budget and a RAG cache reset that nothing
+    # called, plus two bot helpers alive only because an export pin named
+    # them. Private names are included here - the narrator budget was one -
+    # since a helper only its own file could reach and does not is as dead
+    # as a public one. The dashboard is left out: its HTTP handlers are
+    # reached by name from the framework.
+    dead = []
+    for layer in ("database", "ai", "simulation", "ops"):
+        dead += _functions_without_a_production_caller(layer, include_private=True)
+    assert dead == []
+    for name in ("has_completed_perfection", "get_world_event_participation", "get_hidden_sect_membership",
+                 "get_territory_war_actions", "list_active_seclusions", "model_for", "models_for",
+                 "_scene_budget", "clear_caches", "settle_all_seclusions", "effective_attribute"):
+        assert not re.search(rf"\bdef {name}\b", "\n".join(p.read_text(encoding="utf-8") for p in APP_DIR.rglob("*.py"))), name
 
 
 def test_v0_30_gate_derived_inputs_are_not_sent_to_the_engine():

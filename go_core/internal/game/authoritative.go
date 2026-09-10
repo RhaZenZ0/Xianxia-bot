@@ -717,45 +717,6 @@ func applyAuthoritativeQuery(databasePath, worldPath string, req ActionRequest) 
 	return ActionResponse{}, fmt.Errorf("unsupported authoritative query: %s", req.Operation)
 }
 
-type canonicalCheckPayload struct {
-	Modifier   int64  `json:"modifier"`
-	TN         int64  `json:"tn"`
-	GameMinute int64  `json:"game_minute"`
-	Label      string `json:"label"`
-}
-
-func resolveCanonicalCheck(actorID int64, raw json.RawMessage) (authoritativeMutation, error) {
-	var p canonicalCheckPayload
-	if err := json.Unmarshal(raw, &p); err != nil {
-		return authoritativeMutation{}, err
-	}
-	d1, err := gamerng.D10()
-	if err != nil {
-		return authoritativeMutation{}, err
-	}
-	d2, err := gamerng.D10()
-	if err != nil {
-		return authoritativeMutation{}, err
-	}
-	total := d1 + d2 + p.Modifier
-	margin := total - p.TN
-	degree := "Severe Failure"
-	switch {
-	case margin >= 10:
-		degree = "Overwhelming Success"
-	case margin >= 5:
-		degree = "Strong Success"
-	case margin >= 0:
-		degree = "Success"
-	case margin >= -3:
-		degree = "Soft Failure"
-	case margin >= -7:
-		degree = "Hard Failure"
-	}
-	result := map[string]any{"die1": d1, "die2": d2, "modifier": p.Modifier, "tn": p.TN, "total": total, "margin": margin, "success": total >= p.TN, "degree": degree, "label": p.Label}
-	return authoritativeMutation{Result: result, Event: eventledger.Event{Domain: "character", EventType: "check_resolved", EntityType: "character", EntityID: fmt.Sprint(actorID), GameMinute: p.GameMinute, Payload: result}}, nil
-}
-
 type characterCreatePayload struct {
 	DiscordName    string `json:"discord_name"`
 	Name           string `json:"name"`

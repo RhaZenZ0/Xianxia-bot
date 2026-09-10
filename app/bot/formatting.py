@@ -53,6 +53,3 @@ def roll_line(result) -> str:
         f"**{result.total}** vs TN **{result.tn}** — **{result.degree}**"
     )
 
-def effective_attribute(character: dict, modifiers: dict[str, float], attr: str) -> int:
-    return int(round(character["attributes"].get(attr, 0) + modifiers.get(attr, 0.0)))
-
