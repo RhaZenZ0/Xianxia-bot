@@ -242,7 +242,11 @@ func applyWorldStatusQuery(conn *storage.Conn, worldPath string, req ActionReque
 		if err != nil {
 			return ActionResponse{}, err
 		}
-		return queryResponse(conn, req, power), nil
+		result := make(map[string]any, len(power))
+		for stat, value := range power {
+			result[stat] = value
+		}
+		return queryResponse(conn, req, result), nil
 	}
 	return ActionResponse{}, fmt.Errorf("unsupported authoritative query: %s", req.Operation)
 }
