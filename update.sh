@@ -481,6 +481,26 @@ create_database_backup() {
 }
 create_database_backup
 
+# Off-box copy (v0.32.0). A backup on the disk that holds the database
+# protects against a bad update, not against the disk. XIANXIA_OFFBOX_BACKUP_DIR
+# (environment or .env) names a second place - a mounted share, a USB disk -
+# and the pre-update backup is copied there too. It is sealed if the engine
+# seals backups (XIANXIA_BACKUP_KEY), so the copy is safe to leave on a
+# share; `xianxia-engine decrypt-backup` opens it. A copy that fails is said
+# out loud and does not stop the update: the local backup is still there and
+# the rollback below still works from it.
+copy_backup_offbox() {
+    [ -n "$DB_BACKUP_PATH" ] || return 0
+    target=${XIANXIA_OFFBOX_BACKUP_DIR:-$(env_value XIANXIA_OFFBOX_BACKUP_DIR)}
+    [ -n "$target" ] || return 0
+    if mkdir -p "$target" 2>/dev/null && cp -p "$DB_BACKUP_PATH" "$target/" 2>/dev/null; then
+        echo "Off-box copy: $target/$(basename "$DB_BACKUP_PATH")"
+    else
+        echo "WARNING: could not copy the backup to XIANXIA_OFFBOX_BACKUP_DIR=$target (is it mounted and writable?). Continuing with the local copy only." >&2
+    fi
+}
+copy_backup_offbox
+
 restore_code() {
     echo "Restoring code snapshot..." >&2
     for old_item in "$PROJECT_DIR"/* "$PROJECT_DIR"/.[!.]* "$PROJECT_DIR"/..?*; do
@@ -496,7 +516,26 @@ restore_code() {
 restore_database() {
     [ -n "$DB_BACKUP_PATH" ] || return 0
     echo "Restoring SQLite backup..." >&2
-    cp -a "$DB_BACKUP_PATH" "$DB_PATH"
+    case "$DB_BACKUP_PATH" in
+        *.enc)
+            # A sealed backup (XIANXIA_BACKUP_KEY, v0.32.0) is opened by the
+            # engine image's own binary - the stack is down at this point, so
+            # it runs as a one-off container over the same ./data mount, with
+            # the key from the installed .env.
+            echo "The backup is encrypted; opening it with the engine image..." >&2
+            if ! (cd "$PROJECT_DIR" && docker compose run --rm --no-deps -T --entrypoint /usr/local/bin/xianxia-engine xianxia-engine \
+                    decrypt-backup "/data/backups/$(basename "$DB_BACKUP_PATH")" /data/xianxia.restore.sqlite3 >/dev/null 2>&1) \
+               || [ ! -s "$PROJECT_DIR/data/xianxia.restore.sqlite3" ]; then
+                echo "ERROR: could not decrypt $DB_BACKUP_PATH. Check XIANXIA_BACKUP_KEY in .env, then run:" >&2
+                echo "       docker compose run --rm --no-deps --entrypoint /usr/local/bin/xianxia-engine xianxia-engine decrypt-backup /data/backups/$(basename "$DB_BACKUP_PATH") /data/xianxia.sqlite3" >&2
+                return 1
+            fi
+            mv -f "$PROJECT_DIR/data/xianxia.restore.sqlite3" "$DB_PATH"
+            ;;
+        *)
+            cp -a "$DB_BACKUP_PATH" "$DB_PATH"
+            ;;
+    esac
     rm -f "$DB_PATH-wal" "$DB_PATH-shm"
 }
 rollback_install() {

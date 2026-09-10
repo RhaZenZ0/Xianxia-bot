@@ -26,7 +26,7 @@ from .remote import GoDatabaseTransport
 log = logging.getLogger("xianxia.database")
 
 
-SCHEMA_VERSION = 33
+SCHEMA_VERSION = 34
 # A readiness probe must validate more than the schema-version marker.  If the
 # SQLite file is removed or replaced while the bot is running, SQLite will
 # happily create a new empty file at the same path.  Checking these tables lets
@@ -1468,6 +1468,19 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
             "ALTER TABLE sect_abodes ADD COLUMN formation_level INTEGER NOT NULL DEFAULT 0",
             "ALTER TABLE sect_abodes ADD COLUMN storage_level INTEGER NOT NULL DEFAULT 1",
             "ALTER TABLE sect_abodes ADD COLUMN herb_garden_level INTEGER NOT NULL DEFAULT 0",
+        ),
+    ),
+    (
+        34,
+        "player_moderation_expiry",
+        (
+            # v0.32.0: a mute or freeze can carry an expiry (unix seconds, 0 =
+            # until a GM lifts it) that the engine's simulation tick honours,
+            # and a ban is its own flag that blocks every authoritative action
+            # and never expires (admin.player.set_moderation, moderation.go).
+            "ALTER TABLE characters ADD COLUMN muted_until REAL NOT NULL DEFAULT 0",
+            "ALTER TABLE characters ADD COLUMN frozen_until REAL NOT NULL DEFAULT 0",
+            "ALTER TABLE characters ADD COLUMN is_banned INTEGER NOT NULL DEFAULT 0",
         ),
     ),
 )

@@ -227,7 +227,12 @@ the epic tier and the explicit-upgrade path runs by default;
 `test_user_budget.py` extended to the slash path; a content test for the
 fallback pool.
 
-### v0.32 — Hardened II: moderation and data *(was v0.26)*
+### v0.32 — Hardened II: moderation and data *(was v0.26)* — **shipped v0.32.0**
+
+*Shipped. Gate: `tests/python/contracts/test_hardened_moderation.py` and the
+Go expiry and retention tests it names. Every item below landed as written;
+`ban` is its own flag that never expires and leaves the mute/freeze pair as
+it found them. Detail in `VERSIONS.md` under 0.32.0.*
 
 - **Moderation from Discord.** `admin.player.set_moderation` exists in the
   engine and is reachable only from the dashboard. Add `/admin player
@@ -432,7 +437,7 @@ drift for seven versions as happened between v0.21.6 and v0.28.0.
 | v0.29 Hardened I | v0.29.0 | shipped |
 | v0.30 Authority II | v0.30.0 | shipped; the world clock read-through is the one named leftover |
 | v0.31 Narrator budget | v0.31.0 | shipped |
-| v0.32 Hardened II | | `admin.audit.undo_last` shipped; moderation and backups open |
+| v0.32 Hardened II | v0.32.0 | shipped |
 | v0.33 Gameplay I | | seven autocompletes and `/battle challenge` picker done; five params, typed-play args, three locations open |
 | v0.34 Playtest | | |
 | v1.0.0-rc | | |

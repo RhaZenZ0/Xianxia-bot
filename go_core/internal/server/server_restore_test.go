@@ -193,3 +193,19 @@ func TestDbRestoreClosesOpenSessionsFirst(t *testing.T) {
 		t.Fatalf("session %s is still open after restore, want closed", session.ID)
 	}
 }
+
+func postListBackups(t *testing.T, engine *Server) map[string]any {
+	t.Helper()
+	request := httptest.NewRequest("GET", "/v1/db/backups", nil)
+	request.Header.Set("X-Xianxia-Engine-Token", os.Getenv("ENGINE_AUTH_TOKEN"))
+	response := httptest.NewRecorder()
+	engine.dbBackups(response, request)
+	if response.Code != 200 {
+		t.Fatalf("backup list: expected 200, got %d: %s", response.Code, response.Body.String())
+	}
+	var out map[string]any
+	if err := json.Unmarshal(response.Body.Bytes(), &out); err != nil {
+		t.Fatalf("backup list: bad JSON: %v", err)
+	}
+	return out
+}

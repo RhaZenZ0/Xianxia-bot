@@ -114,6 +114,9 @@ CREATE TABLE characters(
     is_muted INTEGER NOT NULL DEFAULT 0,
     is_frozen INTEGER NOT NULL DEFAULT 0,
     moderation_reason TEXT NOT NULL DEFAULT '',
+    muted_until REAL NOT NULL DEFAULT 0,
+    frozen_until REAL NOT NULL DEFAULT 0,
+    is_banned INTEGER NOT NULL DEFAULT 0,
     updated_at REAL NOT NULL DEFAULT 0
 );
 CREATE TABLE cooldowns(user_id INTEGER NOT NULL,action TEXT NOT NULL,available_at REAL NOT NULL,PRIMARY KEY(user_id,action));

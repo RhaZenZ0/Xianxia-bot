@@ -8,10 +8,25 @@ import (
 	"syscall"
 	"time"
 
+	"xianxia/core/internal/backupcrypt"
 	"xianxia/core/internal/server"
 )
 
 func main() {
+	// `xianxia-engine decrypt-backup <in.sqlite3.enc> <out.sqlite3>` opens a
+	// sealed backup with XIANXIA_BACKUP_KEY and exits (v0.32.0). It is how an
+	// off-box copy is read without the engine, and how update.sh's rollback
+	// turns the pre-update backup back into a database.
+	if len(os.Args) > 1 && os.Args[1] == "decrypt-backup" {
+		if len(os.Args) != 4 {
+			log.Fatal("usage: xianxia-engine decrypt-backup <in.sqlite3.enc> <out.sqlite3>")
+		}
+		if err := backupcrypt.DecryptFile(os.Args[2], os.Args[3], os.Getenv("XIANXIA_BACKUP_KEY")); err != nil {
+			log.Fatal(err)
+		}
+		log.Printf("decrypted %s -> %s", os.Args[2], os.Args[3])
+		return
+	}
 	address := os.Getenv("ENGINE_ADDR")
 	if address == "" {
 		address = os.Getenv("CORE_ADDR")

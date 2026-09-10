@@ -251,8 +251,10 @@ var reversibleAdminActions = map[string]reverseFunc{
 		if reason == "<nil>" {
 			reason = ""
 		}
-		return []sqlStmt{{`UPDATE characters SET is_muted=?,is_frozen=?,moderation_reason=? WHERE user_id=?`,
-			[]any{i64(snap["is_muted"]), i64(snap["is_frozen"]), reason, uid}}}, nil
+		// v0.32.0 added the expiry pair and the ban flag to the snapshot; an
+		// older row without them reads as 0, which is what it stored.
+		return []sqlStmt{{`UPDATE characters SET is_muted=?,muted_until=?,is_frozen=?,frozen_until=?,is_banned=?,moderation_reason=? WHERE user_id=?`,
+			[]any{i64(snap["is_muted"]), toFloat(snap["muted_until"]), i64(snap["is_frozen"]), toFloat(snap["frozen_until"]), i64(snap["is_banned"]), reason, uid}}}, nil
 	},
 }
 

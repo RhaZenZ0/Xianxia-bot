@@ -35,7 +35,8 @@ CREATE TABLE characters(
     attributes_json TEXT NOT NULL DEFAULT '{}', created_at REAL NOT NULL DEFAULT 0, updated_at REAL NOT NULL DEFAULT 0,
     -- checkPlayerModerationTx (moderation.go) also runs ahead of every
     -- authoritative mutation; see the same note in batch4_authority_test.go.
-    is_muted INTEGER NOT NULL DEFAULT 0, is_frozen INTEGER NOT NULL DEFAULT 0, moderation_reason TEXT NOT NULL DEFAULT ''
+    is_muted INTEGER NOT NULL DEFAULT 0, is_frozen INTEGER NOT NULL DEFAULT 0, moderation_reason TEXT NOT NULL DEFAULT '',
+    muted_until REAL NOT NULL DEFAULT 0, frozen_until REAL NOT NULL DEFAULT 0, is_banned INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE inventory(user_id INTEGER NOT NULL,item_id TEXT NOT NULL,quantity INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(user_id,item_id));
 CREATE TABLE currency_wallets(user_id INTEGER NOT NULL,currency_id TEXT NOT NULL,balance INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(user_id,currency_id));

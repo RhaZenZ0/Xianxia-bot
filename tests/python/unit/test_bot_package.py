@@ -671,7 +671,7 @@ SURFACE = {
         "groups": (),
         "roots": (),
         "leaves": {
-            "admin_player_group": ('inspect', 'teleport', 'revive', 'clearbattle'),
+            "admin_player_group": ('inspect', 'teleport', 'revive', 'clearbattle', 'forceendscene', 'mute', 'unmute', 'freeze', 'unfreeze', 'ban', 'unban'),
             "admin_family_group": ('familyinspect',),
             "admin_npc_group": ('npcinspect',),
             "admin_sim_group": ('toggle', 'automation', 'status', 'run', 'interval', 'region', 'npc', 'sect', 'market', 'clan', 'actions', 'world'),

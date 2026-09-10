@@ -10,11 +10,11 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 	"sync/atomic"
 	"time"
 
+	"xianxia/core/internal/backupcrypt"
 	"xianxia/core/internal/core"
 	"xianxia/core/internal/game"
 	"xianxia/core/internal/simulation"
@@ -31,6 +31,8 @@ type Server struct {
 	// Held shared by anything that can write and exclusively by restore and
 	// VACUUM, so maintenance never runs alongside traffic. See maintenance.go.
 	maintenance maintenanceBarrier
+	// Retention, size cap and the optional key for data/backups (backups.go).
+	backups backupPolicy
 }
 
 func New(databasePath string, worldPath string) (*Server, error) {
@@ -64,7 +66,7 @@ func New(databasePath string, worldPath string) (*Server, error) {
 	if len(token) < minEngineTokenLength {
 		return nil, fmt.Errorf("ENGINE_AUTH_TOKEN must be set to at least %d characters", minEngineTokenLength)
 	}
-	return &Server{databasePath: databasePath, worldPath: worldPath, sessions: storage.NewSessionManager(databasePath), simulation: runner, authToken: token}, nil
+	return &Server{databasePath: databasePath, worldPath: worldPath, sessions: storage.NewSessionManager(databasePath), simulation: runner, authToken: token, backups: backupPolicyFromEnv()}, nil
 }
 
 // minEngineTokenLength is the shortest ENGINE_AUTH_TOKEN the engine will run
@@ -499,6 +501,13 @@ type backupInfo struct {
 	Name       string  `json:"name"`
 	Size       int64   `json:"size"`
 	ModifiedAt float64 `json:"modified_at"`
+	// Encrypted says the file is sealed with XIANXIA_BACKUP_KEY (v0.32.0) -
+	// the name says so too, but a caller should not have to parse it.
+	Encrypted bool `json:"encrypted"`
+	// when is the stamp in the name, what retention sorts by; not exposed
+	// because modified_at already is and the two agree for a file nothing
+	// has touched.
+	when time.Time
 }
 
 func (s *Server) backupDir() string { return filepath.Join(filepath.Dir(s.databasePath), "backups") }
@@ -565,34 +574,51 @@ func (s *Server) dbBackups(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "backup_failed", "message": err.Error()})
 			return
 		}
+		// Sealing (v0.32.0): the plain file is written first because that is
+		// what the SQLite backup API produces, then sealed beside it and the
+		// plain copy removed. A failure to seal removes both - a backup the
+		// operator asked to be encrypted is not left in the clear.
+		if s.backups.Key != "" {
+			sealed := destination + backupcrypt.Suffix
+			if err := backupcrypt.EncryptFile(destination, sealed, s.backups.Key); err != nil {
+				_ = os.Remove(destination)
+				_ = os.Remove(sealed)
+				writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "backup_encrypt_failed", "message": err.Error()})
+				return
+			}
+			_ = os.Remove(destination)
+			destination = sealed
+		}
 		info, err := os.Stat(destination)
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "backup_stat_failed", "message": err.Error()})
 			return
 		}
-		writeJSON(w, http.StatusCreated, backupInfo{Name: info.Name(), Size: info.Size(), ModifiedAt: float64(info.ModTime().UnixNano()) / 1e9})
+		// Retention runs after every successful backup, so the directory is
+		// bounded by the same act that grows it. The file just written is
+		// the newest and is never among the pruned.
+		pruned, pruneErr := pruneBackups(backupDir, s.backups)
+		if pruneErr != nil {
+			log.Printf("backup retention: %v", pruneErr)
+		}
+		response := backupInfoFor(info)
+		writeJSON(w, http.StatusCreated, map[string]any{
+			"name": response.Name, "size": response.Size, "modified_at": response.ModifiedAt, "encrypted": response.Encrypted,
+			"pruned": pruned,
+		})
 	case http.MethodGet:
-		entries, err := os.ReadDir(backupDir)
-		if err != nil && !os.IsNotExist(err) {
+		items, err := listBackups(backupDir)
+		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "backup_list_failed", "message": err.Error()})
 			return
 		}
-		items := make([]backupInfo, 0)
-		for _, entry := range entries {
-			if entry.IsDir() || !strings.HasPrefix(entry.Name(), "xianxia-") || !strings.HasSuffix(entry.Name(), ".sqlite3") {
-				continue
-			}
-			info, err := entry.Info()
-			if err != nil {
-				continue
-			}
-			items = append(items, backupInfo{Name: info.Name(), Size: info.Size(), ModifiedAt: float64(info.ModTime().UnixNano()) / 1e9})
-		}
-		sort.Slice(items, func(i, j int) bool { return items[i].ModifiedAt > items[j].ModifiedAt })
 		if len(items) > 50 {
 			items = items[:50]
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"backups": items})
+		writeJSON(w, http.StatusOK, map[string]any{"backups": items, "policy": map[string]any{
+			"keep_daily": s.backups.KeepDaily, "keep_weekly": s.backups.KeepWeekly,
+			"max_bytes": s.backups.MaxBytes, "encrypted": s.backups.Key != "",
+		}})
 	default:
 		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"error": "method_not_allowed"})
 	}
@@ -641,7 +667,7 @@ func (s *Server) dbRestore(w http.ResponseWriter, r *http.Request) {
 	// listing accepts - so a restore can only ever target a file that
 	// endpoint would itself have listed as a real backup.
 	name := filepath.Base(strings.TrimSpace(input.Name))
-	if name == "" || name == "." || name == string(filepath.Separator) || !strings.HasPrefix(name, "xianxia-") || !strings.HasSuffix(name, ".sqlite3") {
+	if name == "" || name == "." || name == string(filepath.Separator) || !isBackupName(name) {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid_backup_name"})
 		return
 	}
@@ -650,6 +676,23 @@ func (s *Server) dbRestore(w http.ResponseWriter, r *http.Request) {
 	if info, err := os.Stat(sourcePath); err != nil || info.IsDir() {
 		writeJSON(w, http.StatusNotFound, map[string]any{"error": "backup_not_found"})
 		return
+	}
+	// A sealed backup (v0.32.0) is opened into a scratch file beside it that
+	// lives only for this restore. The key check happens before anything is
+	// quiesced, so a wrong key costs nothing.
+	if backupcrypt.IsEncryptedName(name) {
+		if s.backups.Key == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "backup_key_required", "message": "this backup is encrypted; set XIANXIA_BACKUP_KEY on the engine to restore it"})
+			return
+		}
+		opened := filepath.Join(backupDir, ".restore-"+strings.TrimSuffix(name, backupcrypt.Suffix))
+		if err := backupcrypt.DecryptFile(sourcePath, opened, s.backups.Key); err != nil {
+			_ = os.Remove(opened)
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "backup_decrypt_failed", "message": err.Error()})
+			return
+		}
+		defer os.Remove(opened)
+		sourcePath = opened
 	}
 
 	if err := os.MkdirAll(backupDir, 0o755); err != nil {
