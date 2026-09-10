@@ -1030,6 +1030,29 @@ refuses a retired or unknown one by name, where before an unknown type silently 
 Gate: `property_types_test.go` (the buildable set, the bare founding, the refusals, a build and a
 refused second upgrade that spends nothing) and `test_player_property_system.py`.
 
+*The sect residence grows, and the homestead is earned.* The residence a public sect assigns
+(`/sect abode`) was a thread and a door: a name from the disciple's rank, enter, leave, and no way
+to seclude in it, because the seclusion site check knew founded properties, safe zones and a manor
+at a world location and the residence is none of those. **Schema 33** gives `sect_abodes` the six
+facilities a courtyard can hold - cultivation chamber, alchemy furnace, forge, formation core,
+storeroom, herb garden - starting as a chamber and a storeroom like a homestead. `/sect → Abode →
+Build or raise a facility` pays in **sect contribution points** (`sect.abode.upgrade`; the base
+times the square of the level, 40/160/360… by default), and the sect holds two gates the content
+names in `sect_abode_system`: each rank caps the level a facility may reach (Outer Disciple 1,
+Inner 2, Core 3, Deacon 4, Elder 5, Grand Elder 6, Sect Master 8, Ancestor 9), and each level asks
+a cultivation stage one realm below it. A refusal names the rank or stage it wants. Inside the
+residence, seclusion uses its chamber (and the sect manor's array, since the residence stands at
+the sect's seat), crafting uses its workshops and foraging its garden, for the disciple it belongs
+to - a sect residence has no guest list.
+
+With the residence a real starter home, founding a homestead of one's own is earned part-way up
+the ladder: `abode.establish` asks standing in a public sect of **Deacon** (rank 40) or higher
+(`abode_system.founding_rank_level`), and says so. An unaffiliated cultivator has the sect's
+courtyard to earn first. Gate: `sect_abode_upgrade_test.go` (a build paid in points, the stage gate
+and the rank cap refusing without spending, the unaffiliated and the unopened refused, seclusion
+inside the residence at its chamber's rate, the founding gate at Deacon) and
+`test_player_property_system.py` (the columns, the content, the gate's place on the ladder).
+
 **0.30.0** is the roadmap's **Authority II** milestone: derived inputs, market pricing and the
 Python DB layer. No schema change (still 32); no new content. Where Python did not mutate but
 *computed the input* the engine then trusted, or kept a second copy of an engine rule, the copy is
@@ -1110,8 +1133,9 @@ and requires the release job to wait on all three.
 
 ## Release status — v0.30.1
 
-- Current release: v0.30.1: the player property is one home, the homestead, founded bare and
-  built up facility by facility; the six archetypes stay only for the rows that carry them.
+- Current release: v0.30.1 (schema 33): one home built up facility by facility - the sect
+  residence grows with contribution points under rank and stage gates, and a homestead of one's own
+  is founded at Deacon or higher.
 - v0.30.0: Authority II - the engine derives the seclusion environment,
   market pricing and the world-status reads are engine queries, the DB layer writes only
   presentation tables, and eighty-one dead rule functions are gone.
@@ -1285,6 +1309,7 @@ and requires the release job to wait on all three.
 - **Schema 27** added the v0.19.29 mute/freeze moderation columns on `characters`
   (`is_muted`, `is_frozen`, `moderation_reason`).
 - **Schema 28** added the Quest Forge definition table (`quest_definitions`).
+- **Schema 33** gave the sect residence (`sect_abodes`) its six facility levels (v0.30.1).
 - **Schema 32** added `terms_json` to `character_quests`: the objectives and rewards each player
   accepted, so an edit to a definition cannot rewrite a deal that was already struck.
 - **Schema 31** added `location` to `pvp_matches`, so a duel in progress knows where it is fought.

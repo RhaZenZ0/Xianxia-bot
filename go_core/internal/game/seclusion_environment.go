@@ -38,6 +38,20 @@ func seclusionEnvironmentGo(conn *storage.Conn, catalog worlddata.Catalog, userI
 		return nil, 0, e
 	}
 	abode := firstRowMap(r)
+	// The residence a sect assigns (v0.30.1) is a site too: its chamber
+	// counts like a homestead's, and the sect manor's array reaches it
+	// because the residence stands inside the sect, at the manor's seat.
+	residenceBase := location
+	var sectAbode map[string]any
+	if abode == nil && strings.HasPrefix(location, "sect_abode:") {
+		r, e = conn.Execute(`SELECT name,base_location,cultivation_level FROM sect_abodes WHERE location_key=? AND user_id=?`, []any{location, userID})
+		if e != nil {
+			return nil, 0, e
+		}
+		if sectAbode = firstRowMap(r); sectAbode != nil {
+			residenceBase = fmt.Sprint(sectAbode["base_location"])
+		}
+	}
 	safe := false
 	if def, ok := catalog.Locations[location]; ok {
 		safe = def.SafeZone
@@ -48,11 +62,11 @@ func seclusionEnvironmentGo(conn *storage.Conn, catalog worlddata.Catalog, userI
 		return nil, 0, e
 	}
 	manor := firstRowMap(r)
-	if manor != nil && fmt.Sprint(manor["base_location"]) != location {
+	if manor != nil && fmt.Sprint(manor["base_location"]) != residenceBase {
 		manor = nil
 	}
-	if abode == nil && !safe && manor == nil {
-		return nil, 0, errors.New("closed-door seclusion requires a protected/safe location, a player-owned property with a cultivation chamber, or your sect's manor")
+	if abode == nil && sectAbode == nil && !safe && manor == nil {
+		return nil, 0, errors.New("closed-door seclusion requires a protected/safe location, a residence with a cultivation chamber, or your sect's manor")
 	}
 	base := 0.85
 	switch {
@@ -62,6 +76,12 @@ func seclusionEnvironmentGo(conn *storage.Conn, catalog worlddata.Catalog, userI
 		env["site"] = "abode"
 		env["abode_name"] = fmt.Sprint(abode["name"])
 		env["abode_property_type"] = fmt.Sprint(abode["property_type"])
+		env["abode_level"] = level
+	case sectAbode != nil:
+		level := max64(0, i64(sectAbode["cultivation_level"]))
+		base = math.Min(1.45, 1.05+0.05*float64(level))
+		env["site"] = "sect_abode"
+		env["abode_name"] = fmt.Sprint(sectAbode["name"])
 		env["abode_level"] = level
 	case safe:
 		base = 1.0

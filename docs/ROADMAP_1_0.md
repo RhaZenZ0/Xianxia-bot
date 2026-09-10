@@ -406,8 +406,9 @@ once the playtest shows the giver pool reads well.
   removed, the AI Studio route, the daily liveness audit and its 400 ladder,
   route selection from the dashboard through `admin.narration.set_chain`,
   the direct OpenAI provider removed.
-- **v0.30.1** — one home: `/abode establish` founds a bare homestead and every
-  facility is built with an upgrade; the six archetypes stay only for existing rows.
+- **v0.30.1** — one home, built up (schema 33): the sect residence grows with
+  contribution points under rank and stage gates, and a homestead of one's own
+  is founded at Deacon or higher; the six archetypes stay only for existing rows.
 - **v0.29.1** — one GitHub workflow: the release job runs behind the CI checks
   on the commit they proved, instead of re-running its own copy of them.
 

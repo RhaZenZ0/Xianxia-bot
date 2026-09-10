@@ -9752,6 +9752,53 @@
       "min_realm_index": 24
     }
   },
+  "sect_abode_system": {
+    "facilities": [
+      "cultivation",
+      "alchemy",
+      "forge",
+      "formation",
+      "storage",
+      "herb_garden"
+    ],
+    "max_level": 9,
+    "upgrade_base_points": 40,
+    "rank_caps": [
+      {
+        "rank_level": 10,
+        "max_level": 1
+      },
+      {
+        "rank_level": 20,
+        "max_level": 2
+      },
+      {
+        "rank_level": 30,
+        "max_level": 3
+      },
+      {
+        "rank_level": 40,
+        "max_level": 4
+      },
+      {
+        "rank_level": 50,
+        "max_level": 5
+      },
+      {
+        "rank_level": 60,
+        "max_level": 6
+      },
+      {
+        "rank_level": 70,
+        "max_level": 8
+      },
+      {
+        "rank_level": 80,
+        "max_level": 9
+      }
+    ],
+    "realm_floor_per_level": 1
+  },
   "abode_system": {
     "facilities": [
       "cultivation",
@@ -9767,6 +9814,7 @@
     "max_level": 9,
     "upgrade_base_cost": 100,
     "currency": "low_spirit_stone",
+    "founding_rank_level": 40,
     "property_types": {
       "homestead": {
         "name": "Homestead",

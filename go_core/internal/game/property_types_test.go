@@ -47,10 +47,21 @@ ALTER TABLE characters ADD COLUMN spirit_stones INTEGER NOT NULL DEFAULT 0;
 	return path
 }
 
+var establishSeq int
+
+// deaconMembership gives the fixture character the standing founding asks
+// (abode_system.founding_rank_level); the gate itself is tested in
+// sect_abode_upgrade_test.go.
+func deaconMembership(t *testing.T, path string) {
+	t.Helper()
+	batch4Exec(t, path, `INSERT INTO sect_membership(user_id,sect_name,rank_name,rank_level) VALUES(42,'Azure Cloud Sect','Deacon',40) ON CONFLICT(user_id) DO UPDATE SET rank_name=excluded.rank_name,rank_level=excluded.rank_level`)
+}
+
 func establishProperty(t *testing.T, path, world, propertyType string) (map[string]any, error) {
 	t.Helper()
+	establishSeq++
 	raw, _ := json.Marshal(map[string]any{"name": "Test Holding", "property_type": propertyType})
-	out, err := ApplyWithWorld(path, world, ActionRequest{APIVersion: authoritativeAPIVersion, ActionID: "prop-" + propertyType, Operation: "abode.establish", ActorID: 42, Payload: raw})
+	out, err := ApplyWithWorld(path, world, ActionRequest{APIVersion: authoritativeAPIVersion, ActionID: fmt.Sprintf("prop-%s-%d", propertyType, establishSeq), Operation: "abode.establish", ActorID: 42, Payload: raw})
 	if err != nil {
 		return nil, err
 	}
@@ -81,6 +92,7 @@ func TestEstablishFoundsTheHomesteadBareWhenNoTypeIsNamed(t *testing.T) {
 	for _, propertyType := range []string{"", "homestead"} {
 		t.Run("type="+propertyType, func(t *testing.T) {
 			path := setupPropertyTypesDB(t)
+			deaconMembership(t, path)
 			result, err := establishProperty(t, path, world, propertyType)
 			if err != nil {
 				t.Fatal(err)
@@ -121,6 +133,7 @@ func TestUpgradeBuildsAFacilityTheHomeLacks(t *testing.T) {
 	world := batch4WorldPath(t)
 	path := setupPropertyTypesDB(t)
 	batch4Exec(t, path, `INSERT INTO currency_wallets(user_id,currency_id,balance) VALUES(42,'low_spirit_stone',250)`)
+	deaconMembership(t, path)
 	if _, err := establishProperty(t, path, world, ""); err != nil {
 		t.Fatal(err)
 	}

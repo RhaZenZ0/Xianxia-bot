@@ -74,6 +74,14 @@ func canonicalCraftAbodeBonus(conn *storage.Conn, userID int64, location, profes
 	}
 	row := firstRowMap(res)
 	if row == nil {
+		// The sect residence (v0.30.1) has the same workshops, for its holder.
+		level, _, found, residenceErr := sectResidenceFacilityLevel(conn, userID, location, column)
+		if residenceErr != nil {
+			return 0, residenceErr
+		}
+		if found {
+			return level * 2, nil
+		}
 		return 0, nil
 	}
 	ownerID := i64(row["user_id"])
@@ -580,6 +588,14 @@ func forageResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID i
 				}
 				gardenLevel = maxI64(0, i64(row["herb_garden_level"]))
 			}
+		} else if level, base, found, residenceErr := sectResidenceFacilityLevel(conn, userID, physicalLocation, "herb_garden_level"); residenceErr != nil {
+			return authoritativeMutation{}, residenceErr
+		} else if found {
+			// The sect residence's garden (v0.30.1): foraged at the sect's seat.
+			if base != "" {
+				forageLocation = base
+			}
+			gardenLevel = level
 		}
 	}
 	if forageLocation == "" {

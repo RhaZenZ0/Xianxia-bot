@@ -126,6 +126,8 @@ async def seclusion_start(
     if environment.get("site") == "abode":
         property_label = player_property_label({"property_type": environment.get("abode_property_type")})
         env_label = f"{property_label} cultivation chamber Lv.{int(environment.get('abode_level', 0))}"
+    elif environment.get("site") == "sect_abode":
+        env_label = f"{environment.get('abode_name') or 'sect residence'} cultivation chamber Lv.{int(environment.get('abode_level', 0))}"
     elif environment.get("manor_name"):
         env_label = f"{environment.get('manor_name')} • Qi Gathering Array Lv.{int(environment.get('manor_level', 0))}"
     else:

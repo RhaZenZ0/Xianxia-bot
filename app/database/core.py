@@ -26,7 +26,7 @@ from .remote import GoDatabaseTransport
 log = logging.getLogger("xianxia.database")
 
 
-SCHEMA_VERSION = 32
+SCHEMA_VERSION = 33
 # A readiness probe must validate more than the schema-version marker.  If the
 # SQLite file is removed or replaced while the bot is running, SQLite will
 # happily create a new empty file at the same path.  Checking these tables lets
@@ -1454,6 +1454,22 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
         ),
     ),
 
+    (
+        33,
+        "sect_abode_facilities",
+        (
+            # v0.30.1: the residence a public sect assigns grows the way a
+            # homestead does - a cultivation chamber and a storeroom to begin
+            # with, the rest built with contribution points and gated by
+            # rank and stage (sect.abode.upgrade, content sect_abode_system).
+            "ALTER TABLE sect_abodes ADD COLUMN cultivation_level INTEGER NOT NULL DEFAULT 1",
+            "ALTER TABLE sect_abodes ADD COLUMN alchemy_level INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE sect_abodes ADD COLUMN forge_level INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE sect_abodes ADD COLUMN formation_level INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE sect_abodes ADD COLUMN storage_level INTEGER NOT NULL DEFAULT 1",
+            "ALTER TABLE sect_abodes ADD COLUMN herb_garden_level INTEGER NOT NULL DEFAULT 0",
+        ),
+    ),
 )
 
 

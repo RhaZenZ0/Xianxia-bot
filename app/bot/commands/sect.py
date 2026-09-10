@@ -63,7 +63,8 @@ from ...rules.sect_recruitment import (
 from ..registry import registered_group_command
 from ..locations import _known_locations, current_npc_location
 from ..character_state import announce_quest_progress
-from ..services import QUESTS, SIM
+from ..formatting import player_property_facility_lines, player_property_unbuilt
+from ..services import PLAYER_PROPERTY_FACILITY_LABELS, QUESTS, SIM
 from ..threads import ensure_sect_abode_record, ensure_sect_abode_thread_for
 from ..runtime import (
     _explain_engine_error,
@@ -609,13 +610,47 @@ SECT_ABODE_ACTIONS = [
     app_commands.Choice(name="Status / Open Thread", value="status"),
     app_commands.Choice(name="Enter Sect Abode", value="enter"),
     app_commands.Choice(name="Leave Sect Abode", value="leave"),
+    app_commands.Choice(name="Build or raise a facility", value="upgrade"),
 ]
+# The residence a sect assigns grows the way a homestead does (v0.30.1),
+# paid in contribution points and capped by rank and stage - the engine
+# holds every one of those rules (sect.abode.upgrade). The content names
+# which facilities a sect residence has.
+SECT_ABODE_FACILITY_KEYS: tuple[str, ...] = tuple(
+    str(key) for key in (WORLD.data.get("sect_abode_system") or {}).get("facilities", ())
+) or ("cultivation", "alchemy", "forge", "formation", "storage", "herb_garden")
+SECT_ABODE_FACILITIES = [
+    app_commands.Choice(name=PLAYER_PROPERTY_FACILITY_LABELS.get(key, key.replace("_", " ").title()), value=key)
+    for key in SECT_ABODE_FACILITY_KEYS
+][:25]
 
 
-@registered_group_command(sect_group, name="abode", description="Open, enter or leave the private residence assigned by your public sect")
-@app_commands.choices(action=SECT_ABODE_ACTIONS)
+async def _sect_residence_upgrade(interaction: discord.Interaction, abode: dict[str, Any], facility: app_commands.Choice[str]) -> None:
+    """Build or raise one facility of the sect residence through the engine (v0.30.1)."""
+    if not interaction.response.is_done():
+        await interaction.response.defer(ephemeral=False)
+    try:
+        envelope = await ENGINE.authoritative_action(
+            "sect.abode.upgrade", interaction.user.id, {"facility": facility.value},
+            action_id=f"discord:{interaction.id}:sect.abode.upgrade",
+        )
+        result = dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await respond(interaction, f"❌ {_explain_engine_error(exc)}", ephemeral=False)
+        return
+    label = PLAYER_PROPERTY_FACILITY_LABELS.get(facility.value, facility.name)
+    level = int(result.get("level", 0) or 0)
+    spent = f"for **{int(result.get('cost', 0) or 0)}** contribution points (**{int(result.get('remaining_points', 0) or 0)}** left)"
+    if result.get("built") or level <= 1:
+        await respond(interaction, f"🏯 The sect's artisans build a **{label}** in **{abode['name']}** {spent}.", ephemeral=False)
+    else:
+        await respond(interaction, f"🏯 **{label}** in **{abode['name']}** raised to level **{level}** {spent}.", ephemeral=False)
+
+
+@registered_group_command(sect_group, name="abode", description="Open, enter, leave or develop the private residence assigned by your public sect")
+@app_commands.choices(action=SECT_ABODE_ACTIONS, facility=SECT_ABODE_FACILITIES)
 @serialized_user_action
-async def sect_abode(interaction: discord.Interaction, action: app_commands.Choice[str]) -> None:
+async def sect_abode(interaction: discord.Interaction, action: app_commands.Choice[str], facility: app_commands.Choice[str] | None = None) -> None:
     c = await require_character(interaction)
     if not c:
         return
@@ -630,12 +665,25 @@ async def sect_abode(interaction: discord.Interaction, action: app_commands.Choi
     abode = await ensure_sect_abode_record(interaction.user.id, c, membership)
     thread = await ensure_sect_abode_thread_for(interaction.guild, interaction.user, abode) if interaction.guild else None
     if action.value == "status":
+        facilities = " • ".join(player_property_facility_lines(abode, SECT_ABODE_FACILITY_KEYS)) or "No developed facilities"
+        unbuilt = player_property_unbuilt(abode, SECT_ABODE_FACILITY_KEYS)
         await respond(interaction, 
-            f"🏯 **{abode['name']}**\nSect: **{abode['sect_name']}**\nSect gate: **{abode['base_location']}**\n"
+            f"🏯 **{abode['name']}**\nSect: **{abode['sect_name']}** • Rank: **{membership.get('rank_name', 'Disciple')}**\n"
+            f"Sect gate: **{abode['base_location']}**\n"
             f"Current location: **{await character_location_display(c)}**\n"
+            f"Facilities: {facilities}\n"
+            + (f"Not yet built: {', '.join(unbuilt)}\n" if unbuilt else "")
+            + f"Contribution points: **{int(membership.get('contribution_points', 0) or 0)}** - a facility is built or raised with "
+            "**/sect → Sect → Abode** and **Build or raise a facility**; the sect caps each level by your rank and stage.\n"
             + (f"Private scene: {thread.mention}" if thread else "⚠️ Private scene thread is unavailable; repair the base channels."),
             ephemeral=False,
         )
+        return
+    if action.value == "upgrade":
+        if facility is None:
+            await respond(interaction, "Choose which facility to build or raise: " + ", ".join(choice.name for choice in SECT_ABODE_FACILITIES) + ".", ephemeral=False)
+            return
+        await _sect_residence_upgrade(interaction, abode, facility)
         return
     if action.value == "leave":
         try:
