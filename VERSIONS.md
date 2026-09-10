@@ -1009,6 +1009,19 @@ Gate: `tests/python/contracts/test_security_defaults.py` and `TestNewRefusesAnEn
 No schema change (still 32), no game-rule change, AI remains narration-only.
 
 
+**0.30.1** retires the cave abode from the property a player founds. No schema change, no
+mechanical change to any existing property.
+
+A public sect assigns each disciple an abode - the `sect_abodes` residence behind `/sect abode`,
+named for the disciple's rank - so a "Cave Abode" a cultivator digs beside a town by hand was the
+same idea twice, and it sat first in the `/abode establish` list. The content marks it
+`"buildable": false`: it stays defined so the rows that already carry it keep their name and emoji,
+the founding picker offers only the five estates (alchemy estate, spirit herb estate, spirit beast
+ranch, merchant pavilion, clan estate), and the engine holds the same rule - `abode.establish`
+refuses a retired, unknown or empty type and names what can be founded, where before an unknown
+type silently became a cave abode with generic defaults. Gate: `property_types_test.go` and
+`test_player_property_system.py`.
+
 **0.30.0** is the roadmap's **Authority II** milestone: derived inputs, market pricing and the
 Python DB layer. No schema change (still 32); no new content. Where Python did not mutate but
 *computed the input* the engine then trusted, or kept a second copy of an engine rule, the copy is
@@ -1087,9 +1100,11 @@ directory to one file, requires each check to appear before the release job and 
 and requires the release job to wait on all three.
 
 
-## Release status — v0.30.0
+## Release status — v0.30.1
 
-- Current release: v0.30.0: Authority II - the engine derives the seclusion environment,
+- Current release: v0.30.1: the cave abode is what a sect assigns, not something a player founds;
+  the founding picker offers the five estates and the engine refuses the rest.
+- v0.30.0: Authority II - the engine derives the seclusion environment,
   market pricing and the world-status reads are engine queries, the DB layer writes only
   presentation tables, and eighty-one dead rule functions are gone.
 - v0.29.1: one GitHub workflow - the release job runs behind the same CI

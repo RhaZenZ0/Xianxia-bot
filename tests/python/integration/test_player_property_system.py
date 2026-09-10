@@ -50,7 +50,7 @@ class PlayerPropertySystemTests(unittest.IsolatedAsyncioTestCase):
         cfg = await self.db.get_server_config(88)
         self.assertEqual(cfg["info_message_id"], 123456)
 
-    def test_world_has_six_player_property_archetypes(self):
+    def test_world_has_six_player_property_archetypes_and_founds_five(self):
         world = World(ROOT / "content" / "world.json")
         types = world.abode_system.get("property_types", {})
         self.assertEqual(set(types), {
@@ -59,6 +59,26 @@ class PlayerPropertySystemTests(unittest.IsolatedAsyncioTestCase):
         })
         self.assertEqual(types["alchemy_estate"]["defaults"]["alchemy"], 1)
         self.assertEqual(types["spirit_beast_ranch"]["defaults"]["beast_pen"], 2)
+        # v0.30.1: a sect assigns its disciples an abode, so the cave abode is
+        # no longer something a cultivator founds. It stays defined for the
+        # rows that already carry it.
+        self.assertIs(types["cave_abode"].get("buildable"), False)
+        buildable = {key for key, defn in types.items() if defn.get("buildable", True)}
+        self.assertEqual(buildable, {
+            "alchemy_estate", "spirit_herb_estate", "spirit_beast_ranch", "merchant_pavilion", "clan_estate",
+        })
+
+    def test_the_founding_picker_offers_only_buildable_types(self):
+        # services.py imports discord at module level, so the rule is held in
+        # source: the choice list is filtered on the content flag, and the
+        # engine refuses the rest (property_types_test.go).
+        source = (ROOT / "app" / "bot" / "services.py").read_text(encoding="utf-8")
+        start = source.index("PLAYER_PROPERTY_TYPE_CHOICES = [")
+        block = source[start:source.index("][:25]", start)]
+        self.assertIn('if defn.get("buildable", True)', block)
+        establish = (ROOT / "go_core" / "internal" / "game" / "property_storage_actions.go").read_text(encoding="utf-8")
+        self.assertIn("propertyTypeBuildable(catalog, p.PropertyType)", establish)
+        self.assertNotIn('p.PropertyType = "cave_abode"', establish)
 
 
 if __name__ == "__main__":

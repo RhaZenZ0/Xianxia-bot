@@ -109,9 +109,14 @@ NARRATOR_CONTEXT = NarratorContextBuilder(
 
 ALERTS = AlertDispatcher(SETTINGS.alert_webhook_url, cooldown_seconds=SETTINGS.alert_cooldown_seconds)
 
+# Only the property types a player may found (v0.30.1). A type the content
+# marks `"buildable": false` stays defined so existing rows keep their label,
+# but is not offered: the cave abode is what a sect assigns, not something a
+# cultivator digs beside a town.
 PLAYER_PROPERTY_TYPE_CHOICES = [
     app_commands.Choice(name=str(defn.get("name", key.replace("_", " ").title()))[:100], value=key)
     for key, defn in PLAYER_PROPERTY_TYPES.items()
+    if defn.get("buildable", True)
 ][:25]
 
 PLAYER_PROPERTY_FACILITY_KEYS = tuple(str(x) for x in WORLD.abode_system.get("facilities", (

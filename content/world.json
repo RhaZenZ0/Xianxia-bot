@@ -9771,7 +9771,8 @@
       "cave_abode": {
         "name": "Cave Abode",
         "emoji": "🏡",
-        "description": "A secluded cultivation residence balanced around cultivation, storage and formations.",
+        "buildable": false,
+        "description": "A secluded cultivation residence balanced around cultivation, storage and formations. Not founded by hand since v0.30.1: a sect assigns its disciples an abode, and a property a player founds is one of the estates below.",
         "defaults": {
           "cultivation": 1,
           "storage": 1

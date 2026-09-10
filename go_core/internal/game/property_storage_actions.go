@@ -251,8 +251,9 @@ func abodeEstablishActionGo(conn *storage.Conn, catalog worlddata.Catalog, userI
 	if len(rr) > 60 {
 		p.Name = string(rr[:60])
 	}
-	if p.PropertyType == "" {
-		p.PropertyType = "cave_abode"
+	p.PropertyType = strings.TrimSpace(p.PropertyType)
+	if !propertyTypeBuildable(catalog, p.PropertyType) {
+		return authoritativeMutation{}, fmt.Errorf("choose a property type to found: %s", strings.Join(buildablePropertyTypes(catalog), ", "))
 	}
 	r, e := conn.Execute(`SELECT location FROM characters WHERE user_id=?`, []any{userID})
 	if e != nil {
