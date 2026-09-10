@@ -64,8 +64,6 @@ func applyLateMigrationAction(conn *storage.Conn, catalog worlddata.Catalog, use
 		return seclusionStartActionGo(conn, catalog, userID, raw)
 	case "seclusion.settle":
 		return seclusionSettleActionGo(conn, catalog, userID, raw)
-	case "fate.adjust":
-		return fateAdjustActionGo(conn, catalog, userID, raw)
 	case "dao.propose", "dao.respond", "dao.sever", "dao.dual_cultivate":
 		return daoPartnershipActionGo(conn, catalog, userID, raw, op)
 	case "storage.deposit":

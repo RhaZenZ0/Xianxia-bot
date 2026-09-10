@@ -109,15 +109,3 @@ func decodeJSONMap(raw any) map[string]any {
 	}
 	return out
 }
-
-func decodeJSONStringMap(raw any) map[string]string {
-	s := strings.TrimSpace(fmt.Sprint(raw))
-	if s == "" || s == "<nil>" {
-		return map[string]string{}
-	}
-	var out map[string]string
-	if json.Unmarshal([]byte(s), &out) != nil || out == nil {
-		return map[string]string{}
-	}
-	return out
-}

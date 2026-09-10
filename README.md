@@ -546,7 +546,7 @@ The Admin Console currently supports:
 - adjust canonical karma
 - revive a character, restore Vitality/Qi, cancel pending Samsara and abandon active battles
 - force-clear a player's active battle state
-- create safe SQLite backups
+- create safe SQLite backups (retention, a size cap and optional sealing with an operator key since v0.32.0 — `docs/CONFIGURATION.md`, "Backups")
 - run `PRAGMA optimize`
 - run `VACUUM`
 - inspect recent admin audit records

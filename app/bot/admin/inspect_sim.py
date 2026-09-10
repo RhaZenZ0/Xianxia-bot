@@ -1,5 +1,6 @@
-"""/admin player inspect/teleport/revive/clearbattle, /admin family, /admin
-npc, /admin simulation, /admin server backup and audit.
+"""/admin player inspect/teleport/revive/clearbattle/forceendscene and the
+moderation verbs (mute/unmute/freeze/unfreeze/ban/unban), /admin family,
+/admin npc, /admin simulation, /admin server backup and audit.
 
 Phase 7 of the main.py split (v0.19.42, docs/MAIN_SPLIT_PLAN.md). Reads core,
 runtime, services, locations, pickers, formatting and app.*; never main.py.
@@ -15,6 +16,7 @@ from discord import app_commands
 
 from ...ops.game_engine import GameEngineError
 from ...simulation import MINUTES_PER_DAY
+from ...rules.moderation import moderation_summary, parse_duration_seconds
 from ..formatting import human_duration
 from ..hubs import register_hub_option_provider
 from ..locations import location_autocomplete
@@ -101,6 +103,7 @@ async def admin_inspect(interaction: discord.Interaction, member: discord.Member
         f"\nSoul incarnation: **{soul.get('incarnation_count',1)}** • Legacy: **{soul.get('legacy_points',0)}**",
         f"\nReincarnation pending: **{'yes' if reinc else 'no'}** • Seclusion: **{seclusion.get('mode').upper() if seclusion else 'none'}** • Active effects: **{len(effects)}** • Laws: **{len(laws)}**",
         f"\nWallet entries: **{len([v for v in wallet.values() if int(v)!=0])}** • Inventory stacks: **{len([v for v in inventory.values() if int(v)>0])}**",
+        f"\nModeration: {moderation_summary(c)}",
     ]
     await audit_admin(interaction, "player.inspect", target=f"user:{member.id}")
     await interaction.response.send_message("".join(lines), ephemeral=False)
@@ -190,6 +193,123 @@ async def admin_clearbattle(interaction: discord.Interaction, member: discord.Me
         database_log=False,
     )
     await interaction.response.send_message(f"✅ Cleared **{count}** active battle state(s) for {member.mention}.", ephemeral=False)
+
+
+@registered_group_command(admin_player_group, name="forceendscene", description="Reset a player's stuck scene to the world at their current location")
+async def admin_forceendscene(interaction: discord.Interaction, member: discord.Member, reason: str = "GM recovery") -> None:
+    if not await require_admin(interaction): return
+    try:
+        ended = dict(
+            await ENGINE.action(
+                "admin.player.force_end_scene",
+                interaction.user.id,
+                {"user_id": member.id, "reason": reason},
+            )
+            or {}
+        )
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"⚠️ {exc}", ephemeral=False); return
+    await audit_admin(
+        interaction,
+        "player.forceendscene",
+        target=f"user:{member.id}",
+        after={"scene_type": ended.get("scene_type", "world")},
+        reason=reason,
+        database_log=False,
+    )
+    await interaction.response.send_message(f"✅ Ended {member.mention}'s scene; they are back in the world where they stand.", ephemeral=False)
+
+
+# Moderation from Discord (v0.32.0). Every verb is the one engine action,
+# admin.player.set_moderation, which writes the flags, the expiry and the
+# admin_audit_log row (actor, target, reason, expiry) in one transaction -
+# so undo covers a mute from here exactly as it covers one from the
+# dashboard. audit_admin() mirrors the row to the server log only.
+async def _moderate(
+    interaction: discord.Interaction,
+    member: discord.Member,
+    *,
+    verb: str,
+    fields: dict[str, Any],
+    reason: str,
+    duration: str | None = None,
+    duration_key: str | None = None,
+) -> None:
+    if not await require_admin(interaction): return
+    c = await DB.get_character(member.id)
+    if not c:
+        await interaction.response.send_message("That member has no cultivation character.", ephemeral=False); return
+    payload: dict[str, Any] = {"user_id": member.id, "reason": reason, **fields}
+    seconds = 0
+    if duration_key:
+        try:
+            seconds = parse_duration_seconds(duration)
+        except ValueError as exc:
+            await interaction.response.send_message(f"⚠️ {exc}", ephemeral=False); return
+        payload[duration_key] = seconds
+    lifting = not any(bool(v) for k, v in fields.items() if k in {"muted", "frozen", "banned"})
+    if lifting:
+        # Lifting the last hold clears the note shown to the player with it;
+        # a hold that remains keeps its reason.
+        remaining = {
+            "is_muted": int(c.get("is_muted") or 0), "is_frozen": int(c.get("is_frozen") or 0), "is_banned": int(c.get("is_banned") or 0),
+        }
+        for key in fields:
+            remaining[f"is_{key}"] = 0
+        if not any(remaining.values()):
+            payload["moderation_reason"] = ""
+    else:
+        payload["moderation_reason"] = reason
+    before = {k: c.get(k) for k in ("is_muted", "muted_until", "is_frozen", "frozen_until", "is_banned", "moderation_reason")}
+    try:
+        result = dict(await ENGINE.action("admin.player.set_moderation", interaction.user.id, payload) or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"⚠️ {exc}", ephemeral=False); return
+    after = {k: result.get(k) for k in before}
+    await audit_admin(
+        interaction,
+        f"player.{verb}",
+        target=f"user:{member.id}",
+        before=before,
+        after=after,
+        reason=reason,
+        database_log=False,
+    )
+    until = f" for {human_duration(seconds)} (until <t:{int(time.time()) + seconds}:R>)" if seconds else ""
+    await interaction.response.send_message(
+        f"✅ {member.mention} is now **{verb}**{until}. Standing: {moderation_summary(result)}",
+        ephemeral=False,
+    )
+
+
+@registered_group_command(admin_player_group, name="mute", description="Block a player's free-form roleplay scene actions, optionally for a duration")
+async def admin_mute(interaction: discord.Interaction, member: discord.Member, reason: str, duration: str = "") -> None:
+    await _moderate(interaction, member, verb="muted", fields={"muted": True}, reason=reason, duration=duration, duration_key="muted_seconds")
+
+
+@registered_group_command(admin_player_group, name="unmute", description="Lift a player's mute")
+async def admin_unmute(interaction: discord.Interaction, member: discord.Member, reason: str = "GM lifted the mute") -> None:
+    await _moderate(interaction, member, verb="unmuted", fields={"muted": False}, reason=reason)
+
+
+@registered_group_command(admin_player_group, name="freeze", description="Block every action a player takes, optionally for a duration")
+async def admin_freeze(interaction: discord.Interaction, member: discord.Member, reason: str, duration: str = "") -> None:
+    await _moderate(interaction, member, verb="frozen", fields={"frozen": True}, reason=reason, duration=duration, duration_key="frozen_seconds")
+
+
+@registered_group_command(admin_player_group, name="unfreeze", description="Lift a player's freeze")
+async def admin_unfreeze(interaction: discord.Interaction, member: discord.Member, reason: str = "GM lifted the freeze") -> None:
+    await _moderate(interaction, member, verb="unfrozen", fields={"frozen": False}, reason=reason)
+
+
+@registered_group_command(admin_player_group, name="ban", description="Ban a player's character from every action until unbanned")
+async def admin_ban(interaction: discord.Interaction, member: discord.Member, reason: str) -> None:
+    await _moderate(interaction, member, verb="banned", fields={"banned": True}, reason=reason)
+
+
+@registered_group_command(admin_player_group, name="unban", description="Lift a player's ban")
+async def admin_unban(interaction: discord.Interaction, member: discord.Member, reason: str = "GM lifted the ban") -> None:
+    await _moderate(interaction, member, verb="unbanned", fields={"banned": False}, reason=reason)
 
 
 @registered_group_command(admin_family_group, name="familyinspect", description="Inspect a player's NPC birth family")

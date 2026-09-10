@@ -49,14 +49,23 @@ _TITLE_TOKENS = frozenset({
 _WORD_RE = re.compile(r"[a-z0-9']+")
 
 
+ARGUMENT_SOURCES = ("location", "item")
+
+
 @dataclass(frozen=True)
 class VerbAction:
     key: str
     kind: str                # "root" | "scene" | "talk"
     label: str
     aliases: tuple[str, ...]
-    command: str = ""        # kind == root
+    command: str = ""        # kind == root; a root name or a group leaf ("travel go")
     scene_action: str = ""   # kind == scene
+    # A root that takes one argument (v0.33.0): the handler parameter it fills
+    # and what the line is searched for to fill it - a known location or a
+    # carried item. Unresolved, the action is not offered; the router never
+    # guesses a destination.
+    parameter: str = ""
+    source: str = ""
 
 
 @dataclass(frozen=True)
@@ -70,7 +79,9 @@ class Candidate:
     @property
     def id(self) -> str:
         if self.kind == "root":
-            return f"root:{self.payload.get('command','')}"
+            arguments = dict(self.payload.get("arguments") or {})
+            suffix = "".join(f":{value}" for value in arguments.values())
+            return f"root:{self.payload.get('command','')}{suffix}"
         if self.kind == "scene":
             return f"scene:{self.payload.get('scene_action','')}:{self.payload.get('target','')}"
         if self.kind == "talk":
@@ -127,10 +138,16 @@ class VerbTable:
                 raise ValueError(f"typed_play.json: root action {key!r} needs a command")
             if kind == "scene" and not str(raw.get("scene_action") or "").strip():
                 raise ValueError(f"typed_play.json: scene action {key!r} needs a scene_action")
+            argument = dict(raw.get("argument") or {})
+            parameter = str(argument.get("parameter") or "").strip()
+            source = str(argument.get("source") or "").strip()
+            if argument and (kind != "root" or not parameter or source not in ARGUMENT_SOURCES):
+                raise ValueError(f"typed_play.json: action {key!r} argument needs a parameter and a source of {'/'.join(ARGUMENT_SOURCES)}, on a root")
             actions.append(VerbAction(
                 key=key, kind=kind, label=str(raw.get("label") or key),
                 aliases=tuple(str(a) for a in (raw.get("aliases") or []) if str(a).strip()),
                 command=str(raw.get("command") or ""), scene_action=str(raw.get("scene_action") or ""),
+                parameter=parameter, source=source,
             ))
         return cls(actions, [str(p) for p in (data.get("leading_phrases") or [])])
 
@@ -241,6 +258,38 @@ def resolve_entities(text: str, present: Iterable[str]) -> list[str]:
     return [target for target, _ in sorted(scored.items(), key=lambda item: (-item[1], item[0]))]
 
 
+def resolve_argument(text: str, names: Iterable[tuple[str, str]]) -> tuple[str, str] | None:
+    """The one (value, display) pair the line names, or None (v0.33.0).
+
+    ``names`` maps a value the handler takes (an item id, a location name) to
+    the display name a player would type. Matching is resolve_entities' rule -
+    full name, then a distinctive token - so "go to greenriver" finds
+    Greenriver Town and "drink a pill" finds nothing when three carried pills
+    share the token. Two names of equal standing resolve to neither: an
+    argument is dispatched with, never guessed.
+    """
+    by_display: dict[str, str] = {}
+    for value, display in names:
+        display = str(display).strip()
+        if display and display not in by_display:
+            by_display[display] = str(value)
+    if not by_display:
+        return None
+    ranked = resolve_entities(text, by_display.keys())
+    if not ranked:
+        return None
+    # resolve_entities puts full-name matches first, longest first, so the
+    # most specific name a line spells out wins ("Cloud Pill of the East"
+    # over "Cloud Pill"). Without a full name, one token hit stands and two
+    # different token hits ("greenriver and frostwatch") name nobody.
+    normalised = " " + _normalise(text) + " "
+    if " " + _normalise(ranked[0]) + " " in normalised:
+        return by_display[ranked[0]], ranked[0]
+    if len(ranked) > 1:
+        return None
+    return by_display[ranked[0]], ranked[0]
+
+
 def named_absent_npc(text: str, present: Iterable[str], all_npcs: Iterable[str]) -> str | None:
     """An NPC the line names by full name who is NOT present - a refusal, not a guess.
 
@@ -311,9 +360,21 @@ def route_line(
     table: VerbTable,
     present: Sequence[str],
     all_npcs: Iterable[str] = (),
+    locations: Iterable[str] = (),
+    items: Iterable[tuple[str, str]] = (),
 ) -> Route:
-    """Turn the text of a prefixed line into a Route. See the module docstring."""
+    """Turn the text of a prefixed line into a Route. See the module docstring.
+
+    ``locations`` are the places this player knows and ``items`` the
+    (id, name) pairs they carry: what a root with an argument is resolved
+    against (v0.33.0).
+    """
     text = text.strip()[:MAX_LINE_CHARS]
+    sources = {
+        "location": [(name, name) for name in locations],
+        "item": list(items),
+    }
+    unresolved: list[VerbAction] = []
     entities = resolve_entities(text, present)
     npc = next((e for e in entities if not _player_target_name(e)), None)
     player_target = next((e for e in entities if _player_target_name(e)), None)
@@ -328,6 +389,15 @@ def route_line(
     candidates: list[Candidate] = []
     for action, score in ranked:
         if action.kind == "root":
+            if action.parameter:
+                found = resolve_argument(text, sources.get(action.source, ()))
+                if found is None:
+                    unresolved.append(action)
+                    continue
+                value, display = found
+                candidates.append(Candidate("root", f"{action.label} → {display}",
+                                            {"command": action.command, "arguments": {action.parameter: value}}, score))
+                continue
             candidates.append(Candidate("root", action.label, {"command": action.command}, score))
         elif action.kind == "scene":
             label = action.label if target == "Environment" else f"{action.label} → {_player_target_name(target) or target}"
@@ -345,6 +415,10 @@ def route_line(
         candidates.append(Candidate("talk", f"Talk to {npc}", {"npc": npc, "message": text}, 100))
 
     if not candidates:
+        if unresolved:
+            wants = {"location": "a place you know", "item": "something you carry"}
+            asks = sorted({f"{a.label.lower()} needs {wants.get(a.source, 'a name')}" for a in unresolved})
+            return Route("picker", (), message="; ".join(asks).capitalize() + ".", text=text)
         return Route("picker", (), text=text)
 
     top = candidates[0]

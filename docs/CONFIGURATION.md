@@ -226,6 +226,51 @@ caller unable to tell whether it happened. Keep this below the orchestrator's
 own kill timeout — `docker-compose.yml` gives the engine a 30s stop grace — or
 the wait is a fiction.
 
+### Backups (v0.32.0)
+
+The engine takes every backup (`/admin server backup`, the dashboard's
+*Create backup*, the pre-update backup `update.sh` takes) into
+`data/backups/` beside the database, and until this release that was the
+whole story: every backup stayed forever, in the clear, on the disk that
+holds the database it protects. Four keys change that; the engine reads them
+and `docker-compose.yml` passes them through.
+
+`XIANXIA_BACKUP_KEEP_DAILY` (14) — every backup from the newest N days that
+have one is kept whole, so a safety backup taken before a restore is never
+pruned the day it was made. `XIANXIA_BACKUP_KEEP_WEEKLY` (8) — older than
+that, the newest backup of each of the next M weeks survives and the rest
+go. Days and weeks are counted among the backups that exist, not against the
+calendar, so a NAS that was off for a month does not come back and delete
+everything as stale. Both at `0` turns retention off, which is what every
+deployment had before. Pruning runs after each backup, so the directory is
+bounded by the same act that grows it, and only files the engine itself
+named (`xianxia-<stamp>.sqlite3`, or `.sqlite3.enc`) are ever touched.
+
+`XIANXIA_BACKUP_MAX_MB` (0 = no cap) — after retention, the oldest survivors
+are dropped until the directory fits. The newest backup is never dropped,
+whatever the cap.
+
+`XIANXIA_BACKUP_KEY` (unset = plain) — when set, every new backup is sealed
+with AES-256-GCM under this passphrase (`go_core/internal/backupcrypt`) and
+named `.sqlite3.enc`; the plain file never stays on disk. Restore, from the
+dashboard or the API, opens it with the same key and refuses without it
+(`backup_key_required`) or with the wrong one (`backup_decrypt_failed`) before
+anything is quiesced. Off the box, `docker compose run --rm --no-deps
+--entrypoint /usr/local/bin/xianxia-engine xianxia-engine decrypt-backup
+/data/backups/<name>.sqlite3.enc /data/<out>.sqlite3` opens one with the
+key from `.env`, and `update.sh`'s rollback does exactly that when the
+pre-update backup is sealed. The whole file is sealed and opened in one piece
+- fine at the tens of megabytes this bot keeps, and stated so nobody expects
+it to stream. Changing the key does not re-seal older backups: keep the old
+key until they have aged out. Losing the key loses the backups.
+
+`XIANXIA_OFFBOX_BACKUP_DIR` (unset = off) — read by `update.sh` only. When
+set to a second place — a mounted share, a USB disk — the pre-update backup
+is copied there too, sealed if the engine seals. A copy that fails is a
+warning, not a stop: the local backup is still there and the rollback still
+works from it. It covers the update path; for the routine backups the
+dashboard and Discord take, point a NAS backup job at `data/backups/`.
+
 ## Health, limits and alerting
 
 `HEALTH_HOST` — The application binds loopback (`127.0.0.1`) when this is

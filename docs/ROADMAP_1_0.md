@@ -45,7 +45,7 @@ same as spending fewer calls, which is still open below.
 |---|---|
 | Authority | **Player side closed** (v0.23.0): `PLAYER_MUTATIONS` is empty and the gate asserts it stays so. **Derived inputs and the DB layer closed** (v0.30.0): the engine derives the seclusion environment; market pricing and every `app/simulation/world.py` read are engine queries; `app/database/core.py` writes only the thirty-eight presentation writers listed in `PRESENTATION_WRITES`; no rules are imported below `bot`/`ai`/`dashboard`; every `app/rules` function has a production caller. **Still open:** `get_world_clock` re-anchors `world_state` on a scale change (a second copy of the clock arithmetic), and `current_world_time` reads the anchor with Python arithmetic rather than asking the engine - the last Python-side clock. |
 | Hardened | **Hardened I shipped (v0.29.0):** the engine refuses to run or answer without a token on both sides, the dashboard locks a guessing address and refuses cross-origin mutations, both listeners default to loopback outside Docker, requirements are hash-locked and images digest-pinned, CI runs `-race`. Also: input fence and typed-play budget (v0.21.1, v0.21.5), `admin.audit.undo_last`, the P0 and second external reviews (v0.22.2, v0.23.1). **Still open (Hardened II):** no moderation from Discord and no moderation expiry; backups have no retention. |
-| Gameplay | Catalog materialised (154 manuals); every location has encounters and sense hints; every NPC has narrator fields; the seven orphaned autocompletes are attached and `/battle challenge` has a picker. Every location has an NPC (the three samsara arrival grounds got keepers after v0.28.0). **Open:** five id parameters without a picker, typed play covers only parameterless roots, `fate.adjust` has no Discord caller, no `KNOWN_LIMITATIONS.md`, no playtest. |
+| Gameplay | Catalog materialised (154 manuals); every location has encounters and sense hints; every NPC has narrator fields; the seven orphaned autocompletes are attached and `/battle challenge` has a picker. Every location has an NPC (the three samsara arrival grounds got keepers after v0.28.0). **Pickers closed (v0.33.0):** every id parameter has one, typed play fills `/travel` and `/use` from the line, `fate.adjust` is gone. **Open:** no `KNOWN_LIMITATIONS.md`, no playtest. |
 | The AI | **Closed as a bar (v0.31.0):** a call fires only for dialogue, an epic beat, or an explicit ask - `/explore` and `/hunt` read from the procedural pool and offer a *Narrate it* button (or the GM's `ai_routine_narration` flag); one per-player bucket meters every door; the pool has 84 variants across seven scene kinds and four world tiers; the ten-dollar switch picks the 50 or 1000 a day allowance from the dashboard; the AI Routing page shows calls by purpose and refusals by door. The AI Studio route (v0.26.0) remains the way past the ceiling for an operator with a key. |
 
 Test surface: ~960 Python test functions across unit, integration and
@@ -227,7 +227,12 @@ the epic tier and the explicit-upgrade path runs by default;
 `test_user_budget.py` extended to the slash path; a content test for the
 fallback pool.
 
-### v0.32 — Hardened II: moderation and data *(was v0.26)*
+### v0.32 — Hardened II: moderation and data *(was v0.26)* — **shipped v0.32.0**
+
+*Shipped. Gate: `tests/python/contracts/test_hardened_moderation.py` and the
+Go expiry and retention tests it names. Every item below landed as written;
+`ban` is its own flag that never expires and leaves the mute/freeze pair as
+it found them. Detail in `VERSIONS.md` under 0.32.0.*
 
 - **Moderation from Discord.** `admin.player.set_moderation` exists in the
   engine and is reachable only from the dashboard. Add `/admin player
@@ -246,7 +251,13 @@ fallback pool.
 that every "GM needs it live" dashboard op has a Discord registration; a
 source check that moderation commands audit.
 
-### v0.33 — Gameplay-complete I: the pickers *(was v0.27)*
+### v0.33 — Gameplay-complete I: the pickers *(was v0.27)* — **shipped v0.33.0**
+
+*Shipped. Gate: `tests/python/contracts/test_hub_pickers.py`, which walks every
+registered command rather than the five named below - and found three more
+(`caravan_dispatch(item)`, `provenance_command(item)`, `reincarnate(path)`),
+now covered. `fate.adjust` was removed, not wired. Detail in `VERSIONS.md`
+under 0.33.0.*
 
 - ~~Attach the seven orphaned autocompletes~~ — done; all seven in
   `economy.py` are decorated.
@@ -432,8 +443,8 @@ drift for seven versions as happened between v0.21.6 and v0.28.0.
 | v0.29 Hardened I | v0.29.0 | shipped |
 | v0.30 Authority II | v0.30.0 | shipped; the world clock read-through is the one named leftover |
 | v0.31 Narrator budget | v0.31.0 | shipped |
-| v0.32 Hardened II | | `admin.audit.undo_last` shipped; moderation and backups open |
-| v0.33 Gameplay I | | seven autocompletes and `/battle challenge` picker done; five params, typed-play args, three locations open |
+| v0.32 Hardened II | v0.32.0 | shipped |
+| v0.33 Gameplay I | v0.33.0 | shipped |
 | v0.34 Playtest | | |
 | v1.0.0-rc | | |
 | v1.0.0 | | |

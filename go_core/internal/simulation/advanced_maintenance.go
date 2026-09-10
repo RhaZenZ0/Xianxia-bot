@@ -165,6 +165,14 @@ func (r *Runner) advancedMaintenance(conn *storage.Conn, gm int64, automation ma
 	if err != nil {
 		return Run{}, false, err
 	}
+	// Moderation (v0.32.0): a mute or freeze given a duration ends when the
+	// clock says so. checkPlayerModerationTx already treats a lapsed flag as
+	// over; this is what clears the row so the dashboard and /admin player
+	// inspect agree with it.
+	counts["moderations_expired"], err = r.expireModerations(conn)
+	if err != nil {
+		return Run{}, false, err
+	}
 	if err = conn.Commit(); err != nil {
 		return Run{}, false, err
 	}
@@ -178,7 +186,7 @@ func (r *Runner) advancedMaintenance(conn *storage.Conn, gm int64, automation ma
 	if !changed {
 		return Run{}, false, nil
 	}
-	summary := fmt.Sprintf("auctions=%d hunters_spawned=%d hunters_updated=%d wars=%d occupations=%d caravans=%d seclusions=%d commissions_expired=%d era_changed=%t", counts["auctions"], counts["hunters_spawned"], counts["hunters_updated"], counts["wars"], counts["occupations"], counts["caravans"], counts["seclusions"], counts["commissions_expired"], eraChanged)
+	summary := fmt.Sprintf("auctions=%d hunters_spawned=%d hunters_updated=%d wars=%d occupations=%d caravans=%d seclusions=%d commissions_expired=%d moderations_expired=%d era_changed=%t", counts["auctions"], counts["hunters_spawned"], counts["hunters_updated"], counts["wars"], counts["occupations"], counts["caravans"], counts["seclusions"], counts["commissions_expired"], counts["moderations_expired"], eraChanged)
 	return Run{System: "advanced_world", DueSteps: 1, AppliedSteps: 1, Summary: summary}, true, nil
 }
 
@@ -684,4 +692,16 @@ func (r *Runner) expireCommissions(conn *storage.Conn, gm int64) (int64, error) 
 		return 0, err
 	}
 	return int64(len(expired)), nil
+}
+
+// expireModerations clears lapsed mutes and freezes. The rule - what a
+// duration means and what lifting it restores - lives in the game package
+// beside admin.player.set_moderation, so the tick and the GM action can never
+// disagree about it.
+func (r *Runner) expireModerations(conn *storage.Conn) (int64, error) {
+	cleared, err := game.ExpireDueModerations(conn, nowFloat())
+	if err != nil {
+		return 0, err
+	}
+	return int64(len(cleared)), nil
 }

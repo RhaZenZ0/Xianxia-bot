@@ -131,7 +131,6 @@ var authoritativeMutations = map[string]bool{
 	"family.add_child":                true,
 	"seclusion.start":                 true,
 	"seclusion.settle":                true,
-	"fate.adjust":                     true,
 	"dao.propose":                     true,
 	"dao.respond":                     true,
 	"dao.sever":                       true,
@@ -400,7 +399,7 @@ func applyAuthoritative(databasePath, worldPath string, req ActionRequest) (Acti
 			mutation, err = dynastyClaimAction(conn, req.ActorID, req.Payload)
 		case "family.dynasty.conflict":
 			mutation, err = dynastyConflictAction(conn, req.ActorID, req.Payload)
-		case "auction.enter", "auction.leave", "auction.sell", "auction.bid", "black_market.trade", "market.trade", "bounty_hunter.act", "equipment.bind", "equipment.equip", "equipment.unequip", "equipment.repair", "party.create", "party.join", "party.leave", "formation.create", "formation.assign", "formation.activate", "formation.stance", "boss.start", "boss.act", "boss.claim", "territory.claim", "war.act", "caravan.dispatch", "caravan.settle", "sect.recruitment.recommendation", "sect.recruitment.trial", "sect.contribute", "sect.redeem", "discipleship.request", "discipleship.resolve", "discipleship.leave", "sect.manor.establish", "sect.manor.upgrade", "family.simulate", "family.support", "family.add_child", "seclusion.start", "seclusion.settle", "fate.adjust", "dao.propose", "dao.respond", "dao.sever", "dao.dual_cultivate", "storage.deposit", "storage.withdraw", "storage.upgrade", "abode.establish", "abode.enter", "abode.visit", "abode.leave", "abode.invite", "abode.revoke", "abode.upgrade", "abode.focus", "array.use", "array.deploy", "spatial_key.use", "personal_world.create", "personal_world.set_rule", "personal_world.enter", "personal_world.leave", "item.use", "sect.abode.upgrade":
+		case "auction.enter", "auction.leave", "auction.sell", "auction.bid", "black_market.trade", "market.trade", "bounty_hunter.act", "equipment.bind", "equipment.equip", "equipment.unequip", "equipment.repair", "party.create", "party.join", "party.leave", "formation.create", "formation.assign", "formation.activate", "formation.stance", "boss.start", "boss.act", "boss.claim", "territory.claim", "war.act", "caravan.dispatch", "caravan.settle", "sect.recruitment.recommendation", "sect.recruitment.trial", "sect.contribute", "sect.redeem", "discipleship.request", "discipleship.resolve", "discipleship.leave", "sect.manor.establish", "sect.manor.upgrade", "family.simulate", "family.support", "family.add_child", "seclusion.start", "seclusion.settle", "dao.propose", "dao.respond", "dao.sever", "dao.dual_cultivate", "storage.deposit", "storage.withdraw", "storage.upgrade", "abode.establish", "abode.enter", "abode.visit", "abode.leave", "abode.invite", "abode.revoke", "abode.upgrade", "abode.focus", "array.use", "array.deploy", "spatial_key.use", "personal_world.create", "personal_world.set_rule", "personal_world.enter", "personal_world.leave", "item.use", "sect.abode.upgrade":
 			if strings.TrimSpace(worldPath) == "" {
 				return ActionResponse{}, errors.New("world catalog path is required")
 			}
@@ -715,45 +714,6 @@ func applyAuthoritativeQuery(databasePath, worldPath string, req ActionRequest) 
 		return applyWorldStatusQuery(conn, worldPath, req)
 	}
 	return ActionResponse{}, fmt.Errorf("unsupported authoritative query: %s", req.Operation)
-}
-
-type canonicalCheckPayload struct {
-	Modifier   int64  `json:"modifier"`
-	TN         int64  `json:"tn"`
-	GameMinute int64  `json:"game_minute"`
-	Label      string `json:"label"`
-}
-
-func resolveCanonicalCheck(actorID int64, raw json.RawMessage) (authoritativeMutation, error) {
-	var p canonicalCheckPayload
-	if err := json.Unmarshal(raw, &p); err != nil {
-		return authoritativeMutation{}, err
-	}
-	d1, err := gamerng.D10()
-	if err != nil {
-		return authoritativeMutation{}, err
-	}
-	d2, err := gamerng.D10()
-	if err != nil {
-		return authoritativeMutation{}, err
-	}
-	total := d1 + d2 + p.Modifier
-	margin := total - p.TN
-	degree := "Severe Failure"
-	switch {
-	case margin >= 10:
-		degree = "Overwhelming Success"
-	case margin >= 5:
-		degree = "Strong Success"
-	case margin >= 0:
-		degree = "Success"
-	case margin >= -3:
-		degree = "Soft Failure"
-	case margin >= -7:
-		degree = "Hard Failure"
-	}
-	result := map[string]any{"die1": d1, "die2": d2, "modifier": p.Modifier, "tn": p.TN, "total": total, "margin": margin, "success": total >= p.TN, "degree": degree, "label": p.Label}
-	return authoritativeMutation{Result: result, Event: eventledger.Event{Domain: "character", EventType: "check_resolved", EntityType: "character", EntityID: fmt.Sprint(actorID), GameMinute: p.GameMinute, Payload: result}}, nil
 }
 
 type characterCreatePayload struct {

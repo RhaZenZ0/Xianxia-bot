@@ -38,7 +38,7 @@ from ..ai.quest_forge import store_draft
 from ..rules.quests import QUEST_DEFINITIONS, static_quest_seed_rows
 from .services import AI_ROUTER, ALERTS, GUILD, NARRATOR, NARRATOR_CONTEXT, QUEST_FORGE, SIM
 from .threads import _private_scene_for_thread
-from .locations import current_npc_location
+from .locations import _known_locations, current_npc_location
 from .registry import EVENT_HANDLERS
 from .typed_play import (
     Candidate, MessageInteraction, TypedPlayPicker, TypedPlayUnsupported, VERB_TABLE,
@@ -694,7 +694,13 @@ class XianxiaBot(commands.Bot):
             await message.reply(refusal, mention_author=False, delete_after=20)
             return
         present = await EVENT_HANDLERS.invoke("scene_action_targets", character)
-        route = route_line(typed, table=VERB_TABLE, present=present, all_npcs=WORLD.npcs)
+        # What a root with an argument is resolved against (v0.33.0): the
+        # places this player knows and the things they carry. Two reads, only
+        # on a prefixed line that has already spent its token.
+        known = await _known_locations(message.author.id, character)
+        inventory = await DB.get_inventory(message.author.id)
+        carried = [(item_id, WORLD.item_name(item_id)) for item_id, quantity in dict(inventory or {}).items() if int(quantity or 0) > 0]
+        route = route_line(typed, table=VERB_TABLE, present=present, all_npcs=WORLD.npcs, locations=sorted(known), items=carried)
         if route.kind == "refusal":
             await message.reply(route.message, mention_author=False)
             return

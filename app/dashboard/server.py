@@ -535,11 +535,11 @@ class ReadOnlyDashboardStore:
 
         if await self._table_exists(db, "characters"):
             held = await _count(
-                "SELECT COUNT(*) FROM characters WHERE (is_frozen=1 OR is_muted=1) AND COALESCE(moderation_reason,'')=''")
+                "SELECT COUNT(*) FROM characters WHERE (is_frozen=1 OR is_muted=1 OR is_banned=1) AND COALESCE(moderation_reason,'')=''")
             if held:
                 items.append({
                     "kind": "moderation_unexplained", "severity": "warn", "count": held,
-                    "text": f"{held} player{'s are' if held != 1 else ' is'} frozen or muted with no reason recorded",
+                    "text": f"{held} player{'s are' if held != 1 else ' is'} frozen, muted or banned with no reason recorded",
                     "view": "players", "action": "Open",
                 })
 
@@ -1717,7 +1717,7 @@ class AdminDashboardController:
         async with self.store._connect() as db:
             players = await self.store._fetchall(
                 db,
-                "SELECT user_id,name,discord_name,life_status,location,realm_index,phase,karma_score,vitality,vitality_max,qi,qi_max,is_muted,is_frozen,moderation_reason FROM characters ORDER BY name",
+                "SELECT user_id,name,discord_name,life_status,location,realm_index,phase,karma_score,vitality,vitality_max,qi,qi_max,is_muted,is_frozen,is_banned,muted_until,frozen_until,moderation_reason FROM characters ORDER BY name",
             )
             locations = [str(r["name"]) for r in await self.store._fetchall(db, "SELECT name FROM catalog_locations ORDER BY name")]
             if not locations:

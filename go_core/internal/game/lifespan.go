@@ -38,10 +38,6 @@ type playerLifespanClockSnapshot struct {
 	AgingPaused         bool
 }
 
-func realmLifespanRange(realm int64) *[2]int64 {
-	return lifespanmodel.RealmRange(realm)
-}
-
 func realmLifespanCeiling(realm, phase, natural int64) *int64 {
 	return lifespanmodel.RealmCeiling(realm, phase, natural)
 }

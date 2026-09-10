@@ -74,6 +74,18 @@ class ActionRegistry:
     def root(self, name: str) -> app_commands.Command[Any, ..., Any]:
         return self._roots[name]
 
+    def qualified(self, name: str) -> app_commands.Command[Any, ..., Any]:
+        """A bound command by its qualified name ("travel go"), root or leaf.
+
+        Typed play (v0.33.0) reaches group leaves this way; roots keep the
+        cheaper dictionary above."""
+        if name in self._roots:
+            return self._roots[name]
+        for binding in self._bindings.values():
+            if str(getattr(binding.command, "qualified_name", "")) == name:
+                return binding.command
+        raise KeyError(f"Unregistered action command: {name!r}")
+
     def roots(self) -> dict[str, app_commands.Command[Any, ..., Any]]:
         return dict(self._roots)
 

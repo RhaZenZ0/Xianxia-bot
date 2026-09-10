@@ -936,16 +936,6 @@ class AITaskRouter:
         epic = " -> ".join(self.chains[NarrationTier.EPIC])
         return f"openrouter[routine={routine}; epic={epic}]"
 
-    def models_for(self, tier: NarrationTier | str) -> tuple[str, ...]:
-        try:
-            tier_name = NarrationTier(str(tier))
-        except ValueError:
-            tier_name = NarrationTier.ROUTINE
-        return self.chains[tier_name]
-
-    def model_for(self, tier: NarrationTier | str) -> str:
-        return self.models_for(tier)[0]
-
     def _headers(self) -> dict[str, str] | None:
         headers: dict[str, str] = {}
         if self.app_url:

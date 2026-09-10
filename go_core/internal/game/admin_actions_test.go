@@ -20,7 +20,7 @@ func setupAdminDB(t *testing.T) string {
 	}
 	defer conn.Close()
 	schema := `
-CREATE TABLE characters(user_id INTEGER PRIMARY KEY,name TEXT,life_status TEXT,location TEXT,karma_score INTEGER,vitality INTEGER,vitality_max INTEGER,qi INTEGER,qi_max INTEGER,spirit_stones INTEGER,realm_index INTEGER,phase INTEGER,death_game_minute INTEGER,reincarnation_ready_game_minute INTEGER,updated_at REAL,is_muted INTEGER NOT NULL DEFAULT 0,is_frozen INTEGER NOT NULL DEFAULT 0,moderation_reason TEXT NOT NULL DEFAULT '');
+CREATE TABLE characters(user_id INTEGER PRIMARY KEY,name TEXT,life_status TEXT,location TEXT,karma_score INTEGER,vitality INTEGER,vitality_max INTEGER,qi INTEGER,qi_max INTEGER,spirit_stones INTEGER,realm_index INTEGER,phase INTEGER,death_game_minute INTEGER,reincarnation_ready_game_minute INTEGER,updated_at REAL,is_muted INTEGER NOT NULL DEFAULT 0,is_frozen INTEGER NOT NULL DEFAULT 0,moderation_reason TEXT NOT NULL DEFAULT '',muted_until REAL NOT NULL DEFAULT 0,frozen_until REAL NOT NULL DEFAULT 0,is_banned INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE currency_wallets(user_id INTEGER,currency_id TEXT,balance INTEGER,PRIMARY KEY(user_id,currency_id));
 CREATE TABLE catalog_locations(name TEXT PRIMARY KEY,data_json TEXT,updated_at REAL);
 CREATE TABLE player_scene_state(user_id INTEGER PRIMARY KEY,physical_location TEXT,scene_type TEXT,scene_key TEXT,scene_label TEXT,channel_id INTEGER,metadata_json TEXT,updated_at REAL);
@@ -54,7 +54,7 @@ CREATE TABLE spirit_beasts(beast_id INTEGER PRIMARY KEY AUTOINCREMENT,user_id IN
 CREATE TABLE equipment_instances(equipment_id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,item_id TEXT NOT NULL,slot TEXT NOT NULL,durability INTEGER NOT NULL,max_durability INTEGER NOT NULL,quality INTEGER NOT NULL DEFAULT 100,equipped INTEGER NOT NULL DEFAULT 0,bound_at REAL NOT NULL,updated_at REAL NOT NULL);
 CREATE TABLE cave_abodes(user_id INTEGER PRIMARY KEY,location_key TEXT NOT NULL UNIQUE,name TEXT NOT NULL,base_location TEXT NOT NULL,grade TEXT NOT NULL DEFAULT 'Mortal',cultivation_level INTEGER NOT NULL DEFAULT 1,alchemy_level INTEGER NOT NULL DEFAULT 0,forge_level INTEGER NOT NULL DEFAULT 0,formation_level INTEGER NOT NULL DEFAULT 0,defense_level INTEGER NOT NULL DEFAULT 0,thread_id INTEGER,thread_channel_id INTEGER,created_at REAL NOT NULL,updated_at REAL NOT NULL);
 CREATE TABLE cave_abode_access(owner_user_id INTEGER NOT NULL,guest_user_id INTEGER NOT NULL,access_role TEXT NOT NULL DEFAULT 'guest',created_at REAL NOT NULL,PRIMARY KEY(owner_user_id,guest_user_id));
-INSERT INTO characters VALUES(42,'Lin Test','dead','Old Place',5,0,20,0,30,10,2,3,100,200,0,0,0,'');
+INSERT INTO characters VALUES(42,'Lin Test','dead','Old Place',5,0,20,0,30,10,2,3,100,200,0,0,0,'',0,0,0);
 INSERT INTO catalog_locations VALUES('Greenriver Town','{}',0);
 INSERT INTO reincarnation_state VALUES(42,1,0,'Lin Previous');
 INSERT INTO battles VALUES(1,42,'active',0);
@@ -472,7 +472,7 @@ func TestAdminRemoveEquipmentRejectsWrongOwnerOrMissing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = conn.Execute(`INSERT INTO characters VALUES(43,'Second Test','alive','Old Place',0,10,10,10,10,0,0,1,NULL,NULL,0,0,0,'')`, nil); err != nil {
+	if _, err = conn.Execute(`INSERT INTO characters VALUES(43,'Second Test','alive','Old Place',0,10,10,10,10,0,0,1,NULL,NULL,0,0,0,'',0,0,0)`, nil); err != nil {
 		conn.Close()
 		t.Fatal(err)
 	}
@@ -503,7 +503,7 @@ func TestAdminSetAbodeAccessGrantsAndRevokesAndAudits(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = conn.Execute(`INSERT INTO characters VALUES(43,'Second Test','alive','Old Place',0,10,10,10,10,0,0,1,NULL,NULL,0,0,0,'')`, nil); err != nil {
+	if _, err = conn.Execute(`INSERT INTO characters VALUES(43,'Second Test','alive','Old Place',0,10,10,10,10,0,0,1,NULL,NULL,0,0,0,'',0,0,0)`, nil); err != nil {
 		conn.Close()
 		t.Fatal(err)
 	}
@@ -538,7 +538,7 @@ func TestAdminSetAbodeAccessRejectsOwnerWithNoAbode(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = conn.Execute(`INSERT INTO characters VALUES(43,'Second Test','alive','Old Place',0,10,10,10,10,0,0,1,NULL,NULL,0,0,0,'')`, nil); err != nil {
+	if _, err = conn.Execute(`INSERT INTO characters VALUES(43,'Second Test','alive','Old Place',0,10,10,10,10,0,0,1,NULL,NULL,0,0,0,'',0,0,0)`, nil); err != nil {
 		conn.Close()
 		t.Fatal(err)
 	}
@@ -603,7 +603,7 @@ func TestAdminSetModerationRejectsEmptyPayloadAndUnknownCharacter(t *testing.T) 
 	path := setupAdminDB(t)
 	if _, err := Apply(path, ActionRequest{Operation: "admin.player.set_moderation", Payload: mustJSON(map[string]any{"user_id": 42, "reason": "test"})}); err == nil {
 		t.Fatal("expected error when no moderation field is supplied")
-	} else if !strings.Contains(err.Error(), "muted, frozen, or moderation_reason is required") {
+	} else if !strings.Contains(err.Error(), "muted, frozen, banned, or moderation_reason is required") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if _, err := Apply(path, ActionRequest{Operation: "admin.player.set_moderation", Payload: mustJSON(map[string]any{"user_id": 999, "muted": true, "reason": "test"})}); err == nil {
@@ -747,7 +747,7 @@ func TestAdminAdjustItemRefusesUniqueEquipmentAlreadyBound(t *testing.T) {
 		conn.Close()
 		t.Fatal(err)
 	}
-	if _, err = conn.Execute(`INSERT INTO characters VALUES(43,'Second Test','alive','Old Place',0,10,10,10,10,0,0,1,NULL,NULL,0,0,0,'')`, nil); err != nil {
+	if _, err = conn.Execute(`INSERT INTO characters VALUES(43,'Second Test','alive','Old Place',0,10,10,10,10,0,0,1,NULL,NULL,0,0,0,'',0,0,0)`, nil); err != nil {
 		conn.Close()
 		t.Fatal(err)
 	}
@@ -940,7 +940,7 @@ func TestAdminBulkGrantCurrencyAppliesToEveryCharacterInOneAuditEntry(t *testing
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = conn.Execute(`INSERT INTO characters VALUES(43,'Second Test','alive','Old Place',0,10,10,10,10,0,0,1,NULL,NULL,0,0,0,'')`, nil); err != nil {
+	if _, err = conn.Execute(`INSERT INTO characters VALUES(43,'Second Test','alive','Old Place',0,10,10,10,10,0,0,1,NULL,NULL,0,0,0,'',0,0,0)`, nil); err != nil {
 		conn.Close()
 		t.Fatal(err)
 	}

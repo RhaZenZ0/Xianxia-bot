@@ -123,9 +123,6 @@ class NarratorContextBuilder:
             routine_cap=self.max_chars, epic_cap=self.epic_max_chars,
         )
 
-    def _scene_budget(self, scene_type: str, *, focus_npc: str = "") -> int:
-        return self._profile(scene_type, focus_npc=focus_npc).context_chars
-
     def cache_stats(self) -> dict[str, dict[str, int]]:
         return self.rag.cache_stats()
 

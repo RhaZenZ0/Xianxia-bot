@@ -25,6 +25,7 @@ from ..character_state import current_effect_modifiers
 from ..formatting import human_duration, player_property_emoji, player_property_facility_lines
 from ..registry import registered_group_command, registered_root_command
 from ..runtime import (
+    carried_item_autocomplete,
     _explain_engine_error,
     DB,
     ENGINE,
@@ -616,6 +617,7 @@ async def daoheart_command(interaction: discord.Interaction) -> None:
 
 
 @registered_root_command(name="provenance", description="Inspect ownership marks, legality and tracking on one carried item", guild=GUILD)
+@app_commands.autocomplete(item=carried_item_autocomplete)
 async def provenance_command(interaction: discord.Interaction, item: str) -> None:
     c=await require_character(interaction)
     if not c:return
@@ -887,8 +889,22 @@ async def afterlife_status(interaction:discord.Interaction)->None:
     await reply_long(interaction,"\n".join(lines),ephemeral=False)
 
 
+async def cultivation_path_autocomplete(interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
+    """The cultivation paths the world defines (v0.33.0) - the same set
+    reincarnate refuses anything outside of."""
+    needle = current.casefold().strip()
+    out = []
+    for name, definition in WORLD.paths.items():
+        if needle and needle not in name.casefold():
+            continue
+        summary = str(dict(definition or {}).get("description") or "")[:60]
+        out.append(app_commands.Choice(name=(f"{name} — {summary}" if summary else name)[:100], value=name[:100]))
+    return out[:25]
+
+
 @registered_root_command(name="reincarnate",description="Complete Samsara and be born again in the world chosen by the wheel",guild=GUILD)
 @app_commands.choices(gender=GENDER_CHOICES)
+@app_commands.autocomplete(path=cultivation_path_autocomplete)
 @serialized_user_action
 async def reincarnate(interaction:discord.Interaction,name:str,path:str,gender:app_commands.Choice[str])->None:
     c=await DB.get_character(interaction.user.id)

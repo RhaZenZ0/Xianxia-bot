@@ -167,3 +167,49 @@ func TestModerationOldAgeDeathStillFiresForFrozenCharacter(t *testing.T) {
 		t.Fatalf("character was not recorded as deceased from old age, life_status count=%d", got)
 	}
 }
+
+// A lapsed mute is over the moment the clock passes it, whether or not the
+// simulation tick has cleared the row yet (v0.32.0).
+func TestModerationLapsedMuteNoLongerBlocks(t *testing.T) {
+	path := setupModerationAuthorityDB(t)
+	world := batch4WorldPath(t)
+	batch4SetCanonicalGameMinute(t, path, 3000)
+	batch4Exec(t, path, `UPDATE characters SET is_muted=1,muted_until=?,moderation_reason='lapsed' WHERE user_id=42`, nowSeconds()-30)
+
+	if _, err := applyModerationOp(t, path, world, "scene.action", validSceneActionPayload()); err != nil {
+		t.Fatalf("a lapsed mute must not block scene.action: %v", err)
+	}
+}
+
+func TestModerationRunningFreezeStillBlocks(t *testing.T) {
+	path := setupModerationAuthorityDB(t)
+	world := batch4WorldPath(t)
+	batch4SetCanonicalGameMinute(t, path, 3000)
+	batch4Exec(t, path, `UPDATE characters SET is_frozen=1,frozen_until=?,moderation_reason='an hour' WHERE user_id=42`, nowSeconds()+3600)
+
+	if _, err := applyModerationOp(t, path, world, "check.resolve", validCheckResolvePayload()); err == nil {
+		t.Fatal("a freeze with time left must still block")
+	} else if !strings.Contains(err.Error(), "frozen") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+// A ban blocks everything, mute-scoped ops included, and names itself.
+func TestModerationBannedPlayerBlockedFromEverything(t *testing.T) {
+	path := setupModerationAuthorityDB(t)
+	world := batch4WorldPath(t)
+	batch4SetCanonicalGameMinute(t, path, 3000)
+	batch4Exec(t, path, `UPDATE characters SET is_banned=1,moderation_reason='gone for good' WHERE user_id=42`)
+
+	for _, op := range []string{"check.resolve", "scene.action"} {
+		payload := validCheckResolvePayload()
+		if op == "scene.action" {
+			payload = validSceneActionPayload()
+		}
+		if _, err := applyModerationOp(t, path, world, op, payload); err == nil {
+			t.Fatalf("expected banned character to be blocked from %s", op)
+		} else if !strings.Contains(err.Error(), "banned") || !strings.Contains(err.Error(), "gone for good") {
+			t.Fatalf("%s: unexpected error: %v", op, err)
+		}
+	}
+}

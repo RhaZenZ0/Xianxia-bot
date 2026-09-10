@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"sort"
 	"strings"
 
 	"xianxia/core/internal/eventledger"
@@ -50,11 +49,6 @@ type daoRespondPayload struct {
 type daoDualPayload struct {
 	GameMinute      int64 `json:"game_minute"`
 	CooldownSeconds int64 `json:"cooldown_seconds"`
-}
-type fateAdjustPayload struct {
-	Delta      int64  `json:"delta"`
-	Reason     string `json:"reason"`
-	GameMinute int64  `json:"game_minute"`
 }
 
 func birthFamilyForUserGo(conn *storage.Conn, userID int64) (map[string]any, error) {
@@ -647,19 +641,6 @@ func adjustFateGo(conn *storage.Conn, userID, delta int64, reason string, gm int
 	}
 	return target, e
 }
-func fateAdjustActionGo(conn *storage.Conn, _ worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
-	var p fateAdjustPayload
-	if e := json.Unmarshal(raw, &p); e != nil {
-		return authoritativeMutation{}, e
-	}
-	now := nowSeconds()
-	balance, e := adjustFateGo(conn, userID, p.Delta, p.Reason, p.GameMinute, now)
-	if e != nil {
-		return authoritativeMutation{}, e
-	}
-	out := map[string]any{"balance": balance, "delta_requested": p.Delta, "reason": p.Reason}
-	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "fate", EventType: "fate.adjust", EntityType: "character", EntityID: fmt.Sprint(userID), GameMinute: p.GameMinute, Payload: out}}, nil
-}
 func daoPartnershipActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage, op string) (authoritativeMutation, error) {
 	now := nowSeconds()
 	out := map[string]any{}
@@ -814,12 +795,4 @@ func daoPartnershipActionGo(conn *storage.Conn, catalog worlddata.Catalog, userI
 		out = map[string]any{"partnership_id": i64(bond["partnership_id"]), "partner_user_id": partner, "partner_name": fmt.Sprint(chars[partner]["name"]), "location": fmt.Sprint(chars[a]["location"]), "resonance": newRes, "previous_resonance": oldRes, "milestone": milestone, "awarded": awarded}
 	}
 	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "dao", EventType: op, EntityType: "character", EntityID: fmt.Sprint(userID), Payload: out}}, nil
-}
-func sortedKeys(m map[string]int64) []string {
-	out := make([]string, 0, len(m))
-	for k := range m {
-		out = append(out, k)
-	}
-	sort.Strings(out)
-	return out
 }

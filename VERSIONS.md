@@ -1009,6 +1009,76 @@ Gate: `tests/python/contracts/test_security_defaults.py` and `TestNewRefusesAnEn
 No schema change (still 32), no game-rule change, AI remains narration-only.
 
 
+**0.33.0** is the roadmap's **Gameplay-complete I** milestone: the pickers. No schema change.
+
+*Every id has a picker.* Five parameters took a typed id with nothing to choose from - `/artifact
+bond` and `awaken` (item), `/boss start` (boss), `/secretrealm enter` (realm), `/battle act`
+(action) - and the walk that found them found three more beside them: `/caravan dispatch` (item),
+`/provenance` (item) and `/reincarnate` (path). Each has a slash autocomplete now, which the hub
+reads as its dropdown: bond offers what is carried with the bond it already has, awaken the bonds
+still dormant with their resonance, boss every boss with the one at your location first and the
+others' places named, secret realm the entrances open where you stand from the same engine query
+the status line reads, caravan and provenance what is carried, reincarnate the world's paths.
+`/battle act`'s action was prose all along and now says so on the parameter. The pickers that can
+be empty explain themselves in hub terms - what to do first, and where. `/admin player grantstorage`
+gained grade choices on the way.
+
+*Typed play, roots with parameters.* `content/typed_play.json` covered roots without parameters,
+the eight scene actions and `/talk`; `/travel` and `/use` fell to the picker. A root may now declare
+one argument - a handler parameter and a source, `location` or `item` - and the router fills it from
+the line against what the player knows or carries: `$ I travel to Greenriver Town`, `$ go to
+greenriver`, `$ I drink a healing pill`. The rule is resolve_entities' - a full name, then one
+distinctive token; the longest full name wins, a token two names share names neither. Unresolved,
+the action is not offered and the empty picker says what it needed ("travel needs a place you
+know"); the router never guesses a destination. Group leaves (`travel go`) are reached through the
+registry by qualified name. "I go to" is a verb now, not throat-clearing, so it left the leading
+phrases.
+
+*`fate.adjust` removed.* Implemented in Go with no caller anywhere since v0.18, a player writing
+their own Fate was never a feature; the GM path (`admin.player.fate`) remains.
+
+Gate: `tests/python/contracts/test_hub_pickers.py` walks every registered command's `str`
+parameters and requires each to be guided (choices, autocomplete, hub provider) or declared prose by
+name - a new id parameter fails until its picker exists. `test_typed_play_router.py` pins the
+argument rules. `test_world_content_gate.py` already required every location to have an NPC with
+no exemption list, which is stricter than the roadmap asked; it stays so.
+
+**0.32.0** is the roadmap's **Hardened II** milestone: moderation from Discord, with expiry; backups
+that are bounded, sealed and copied off the box. Schema **34**.
+
+*Moderation from Discord.* `admin.player.set_moderation` existed in the engine and was reachable only
+from the dashboard, and nothing ever expired a mute. `/admin player mute|freeze` now take a duration
+(`30m`, `2h`, `1d`, `1w`, `1h30m`; empty for until lifted) and a reason; `unmute`, `unfreeze`, `ban`
+and `unban` sit beside them, and `forceendscene` joins `teleport` and `clearbattle` so every op a GM
+needs live has a Discord door. The engine stores the expiry (`muted_until`, `frozen_until`) and a
+ban is its own flag (`is_banned`) that blocks every authoritative action and never expires; lifting
+it restores whatever mute or freeze it sat on. Expiry is read two ways on purpose: the check ahead
+of every authoritative action treats a lapsed flag as over the moment the clock passes it, and the
+simulation tick clears the row so the dashboard and `/admin player inspect` agree with it. The one
+engine action writes the `admin_audit_log` row - actor, target, reason, all six columns before and
+after - so `admin.audit.undo_last` reverses a mute from Discord exactly as it reverses one from the
+dashboard, expiry and ban included. The dashboard's Moderation card gained the ban toggle, an
+expires-after field and a standing line. Moderation remains what it was: a nudge on the engine's
+dispatch layer, not anti-cheat.
+
+*Backups.* `storage.BackupTo` was the whole story: every backup stayed forever, in the clear, on the
+disk that holds the database. Retention (`XIANXIA_BACKUP_KEEP_DAILY` 14 / `KEEP_WEEKLY` 8) keeps
+every backup from the newest N days that have one and the newest of each of the next M weeks,
+counted among the backups that exist rather than against the calendar, and runs after every backup.
+`XIANXIA_BACKUP_MAX_MB` sheds the oldest survivors to fit and never the newest. `XIANXIA_BACKUP_KEY`
+seals every new backup with AES-256-GCM (`go_core/internal/backupcrypt`, PBKDF2 key, whole file in
+one piece); restore opens it with the same key and refuses without it before anything is quiesced,
+and `xianxia-engine decrypt-backup` opens one off the box. `update.sh` copies its pre-update backup
+to `XIANXIA_OFFBOX_BACKUP_DIR` when set and can roll back from a sealed one. Only files the engine
+itself named are ever pruned.
+
+Gate: `tests/python/contracts/test_hardened_moderation.py` (every live GM op has a Discord
+registration, the moderation commands audit, the engine owns expiry and the backup policy), Go
+`TestExpireDueModerationsClearsOnlyLapsedFlags`, `TestModerationLapsedMuteNoLongerBlocks`,
+`TestModerationBannedPlayerBlockedFromEverything`, `TestAdminUndoLastRestoresModerationExpiryAndBan`,
+`TestRetainBackupsKeepsDailyWholeThenOnePerWeek`, `TestSizeCapShedsOldestButNeverTheNewest`,
+`TestEncryptedBackupIsSealedListedAndRestorable`. AI remains narration-only.
+
 **0.31.0** is the roadmap's **Narrator budget** milestone. No schema change. The routes were made
 resilient in v0.26–v0.28; this release spends fewer calls on them, meters every door a player can
 spend them through, and makes the procedural floor read well.
@@ -1175,9 +1245,14 @@ directory to one file, requires each check to appear before the release job and 
 and requires the release job to wait on all three.
 
 
-## Release status — v0.31.0
+## Release status — v0.33.0
 
-- Current release: v0.31.0: the narrator budget - explore and hunt read from a procedural pool
+- Current release: v0.33.0: Gameplay-complete I - every id parameter has a picker, typed play
+  fills one argument for `/travel` and `/use` from the line, and the callerless `fate.adjust` is gone.
+- v0.32.0 (schema 34): Hardened II - mute, freeze and ban from Discord with a
+  duration the engine expires, force-end-scene beside them, every moderation audited so undo covers
+  it, and backups that are pruned, capped, sealed with an operator key and copied off the box.
+- v0.31.0: the narrator budget - explore and hunt read from a procedural pool
   unless a player presses Narrate it, one per-player bucket meters every door, and the ten-dollar
   switch picks the 50 or 1000 a day allowance from the dashboard.
 - v0.30.1 (schema 33): one home built up facility by facility - the sect
@@ -1356,6 +1431,8 @@ and requires the release job to wait on all three.
 - **Schema 27** added the v0.19.29 mute/freeze moderation columns on `characters`
   (`is_muted`, `is_frozen`, `moderation_reason`).
 - **Schema 28** added the Quest Forge definition table (`quest_definitions`).
+- **Schema 34** added the moderation expiry pair (`muted_until`, `frozen_until`) and `is_banned` to
+  `characters` (v0.32.0).
 - **Schema 33** gave the sect residence (`sect_abodes`) its six facility levels (v0.30.1).
 - **Schema 32** added `terms_json` to `character_quests`: the objectives and rewards each player
   accepted, so an edit to a definition cannot rewrite a deal that was already struck.

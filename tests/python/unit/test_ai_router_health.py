@@ -814,11 +814,11 @@ class AITaskRouterTests(unittest.TestCase):
     def test_default_free_fallback_chains(self):
         router = AITaskRouter(api_key=None)
         self.assertEqual(
-            router.models_for(NarrationTier.ROUTINE),
+            router.chains[NarrationTier.ROUTINE],
             (DEFAULT_ROUTINE_MODEL, DEFAULT_DYNAMIC_FREE_MODEL),
         )
         self.assertEqual(
-            router.models_for(NarrationTier.EPIC),
+            router.chains[NarrationTier.EPIC],
             (DEFAULT_EPIC_MODEL, DEFAULT_DYNAMIC_FREE_MODEL),
         )
         # The fallback slots are empty by default (v0.26.1) and an empty slot is
@@ -833,7 +833,7 @@ class AITaskRouterTests(unittest.TestCase):
 
     def test_openrouter_free_is_accepted_by_free_guard(self):
         router = AITaskRouter(api_key=None, dynamic_free_model="openrouter/free")
-        self.assertIn("openrouter/free", router.models_for(NarrationTier.ROUTINE))
+        self.assertIn("openrouter/free", router.chains[NarrationTier.ROUTINE])
 
     def test_routine_uses_known_fallback_after_primary_failure(self):
         router = AITaskRouter(api_key=None)
@@ -1377,10 +1377,10 @@ class NarrationSlotTests(unittest.TestCase):
     def test_the_chains_are_rebuilt_from_the_new_slots(self):
         router = _router(["unused"])
         result = router.set_slots({"routine_model": "vendor/new-routine:free"})
-        self.assertIn("vendor/new-routine:free", router.models_for(NarrationTier.ROUTINE))
+        self.assertIn("vendor/new-routine:free", router.chains[NarrationTier.ROUTINE])
         self.assertEqual(result["changed"], ["routine_model"])
         self.assertEqual(
-            result["chains"]["routine"], list(router.models_for(NarrationTier.ROUTINE))
+            result["chains"]["routine"], list(router.chains[NarrationTier.ROUTINE])
         )
 
     def test_a_paid_slug_is_refused_while_the_free_guard_is_on(self):

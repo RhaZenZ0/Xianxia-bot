@@ -27,7 +27,7 @@ func TestMortalSamsaraUsesCanonicalStartingFamilies(t *testing.T) {
 
 	for _, karma := range []int64{-1000, -250, 0, 250, 1000} {
 		for i := 0; i < 100; i++ {
-			family, err := generateSamsaraFamily("Mortal World", karma)
+			family, err := generateSamsaraFamilyWithLineage("Mortal World", karma, "", "")
 			if err != nil {
 				t.Fatal(err)
 			}

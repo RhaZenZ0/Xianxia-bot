@@ -1,5 +1,5 @@
 {
-  "_comment": "Typed play verb table (v0.21.1). A prefixed line ('> I explore the ravine') is matched against these aliases and dispatched to the EXISTING handler named here - the router never resolves an outcome itself. kind=root: a slash root command with no required parameters (app/bot/registry.py ACTIONS). kind=scene: one of the eight scene actions in app/bot/commands/scene.py, with the whole line as the detail and the named NPC/player as the target. kind=talk: /talk with the named NPC. Aliases are whole-word phrases, matched after the leading 'I / I'll / let me / I try to' is stripped; a longer alias beats a shorter one and an alias at the start of the line beats one in the middle. Two matches of equal standing become a picker, never a guess. Grow this file from what the picker shows players choosing.",
+  "_comment": "Typed play verb table (v0.21.1). A prefixed line ('> I explore the ravine') is matched against these aliases and dispatched to the EXISTING handler named here - the router never resolves an outcome itself. kind=root: a slash root command with no required parameters (app/bot/registry.py ACTIONS), or - with an 'argument' of {parameter, source} (v0.33.0) - a root or group leaf ('travel go') taking exactly one, filled from the line: source=location resolves against the places the player knows, source=item against what they carry. Unresolved, the action is not offered; the router never guesses a destination. kind=scene: one of the eight scene actions in app/bot/commands/scene.py, with the whole line as the detail and the named NPC/player as the target. kind=talk: /talk with the named NPC. Aliases are whole-word phrases, matched after the leading 'I / I'll / let me / I try to' is stripped; a longer alias beats a shorter one and an alias at the start of the line beats one in the middle. Two matches of equal standing become a picker, never a guess. Grow this file from what the picker shows players choosing.",
   "actions": [
     {
       "key": "explore",
@@ -56,6 +56,51 @@
         "attempt a breakthrough",
         "attempt to break through",
         "push for a breakthrough"
+      ]
+    },
+    {
+      "key": "travel",
+      "kind": "root",
+      "command": "travel go",
+      "label": "Travel",
+      "argument": {
+        "parameter": "destination",
+        "source": "location"
+      },
+      "aliases": [
+        "travel to",
+        "go to",
+        "head to",
+        "walk to",
+        "journey to",
+        "set out for",
+        "make for",
+        "leave for",
+        "head for",
+        "ride to",
+        "return to"
+      ]
+    },
+    {
+      "key": "use",
+      "kind": "root",
+      "command": "use",
+      "label": "Use",
+      "argument": {
+        "parameter": "item",
+        "source": "item"
+      },
+      "aliases": [
+        "use",
+        "drink",
+        "swallow",
+        "consume",
+        "eat",
+        "apply",
+        "activate",
+        "take a",
+        "take the",
+        "take my"
       ]
     },
     {
@@ -234,8 +279,6 @@
     "i am going to",
     "i'm going to",
     "let me",
-    "i go to",
-    "i go and",
     "i start to",
     "i begin to",
     "i",

@@ -7,6 +7,7 @@ from discord import app_commands
 
 from ...rules.advanced_runtime import BOSS_TEMPLATES, boss_encounter_phase
 from ...ops.game_engine import GameEngineError
+from ..hubs import register_hub_option_hint
 from ..registry import registered_group_command
 from ..runtime import (
     _explain_engine_error,
@@ -74,6 +75,32 @@ async def boss_start(interaction: discord.Interaction, boss: str) -> None:
         f"👹 **Boss Encounter #{result.get('encounter_id')} — {result.get('boss_name', 'Boss')}** begins with **{result.get('boss_hp', 0)}/{result.get('boss_hp_max', 0)} HP**.",
         ephemeral=False,
     )
+
+
+@boss_start.autocomplete("boss")
+async def boss_template_autocomplete(interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
+    """Every boss, the ones at the player's location first (v0.33.0). The
+    engine refuses a boss fought from the wrong place; the label says where
+    each one is so the refusal is never the first time a player learns it."""
+    c = await DB.get_character(interaction.user.id)
+    here = str(c.get("location") or "") if c else ""
+    needle = current.casefold().strip()
+    choices: list[tuple[int, str, app_commands.Choice[str]]] = []
+    for key, boss in BOSS_TEMPLATES.items():
+        name = str(boss.get("name", key))
+        location = str(boss.get("location", ""))
+        if needle and needle not in name.casefold() and needle not in key.casefold() and needle not in location.casefold():
+            continue
+        marker = "here" if location == here else location
+        choices.append((0 if location == here else 1, name, app_commands.Choice(name=f"{name} — {marker}, {len(boss.get('phases', []))} phases"[:100], value=key[:100])))
+    return [choice for _, _, choice in sorted(choices, key=lambda row: row[:2])][:25]
+
+
+register_hub_option_hint(
+    boss_start,
+    "boss",
+    "No boss encounter is defined in the world content. **/combat → Boss Raids → List** shows the catalogue when there is one.",
+)
 
 
 @registered_group_command(boss_group, name="status", description="View the active party boss phase, HP, raid vitality and round")

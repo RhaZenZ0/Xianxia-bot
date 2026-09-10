@@ -50,15 +50,19 @@ func TestBugslayerBossPassiveTriggers(t *testing.T) {
 	}
 }
 
-func TestIsIndestructibleEquipmentGo(t *testing.T) {
-	if !isIndestructibleEquipmentGo(bugslayerSwordItemID) {
+// The Bugslayer Sword is the one item the group-combat durability pass
+// skips (group_combat_actions.go reads d.Indestructible straight off the
+// definition), so the flag is asserted here on the catalogue itself.
+func TestBugslayerSwordIsTheOnlyIndestructibleEquipment(t *testing.T) {
+	definitions := equipmentDefinitionsGo()
+	if d, ok := definitions[bugslayerSwordItemID]; !ok || !d.Indestructible {
 		t.Fatal("the Bugslayer Sword must be indestructible")
 	}
-	if isIndestructibleEquipmentGo("spirit_iron_sword") {
+	if d, ok := definitions["spirit_iron_sword"]; !ok || d.Indestructible {
 		t.Fatal("an ordinary item must not be treated as indestructible")
 	}
-	if isIndestructibleEquipmentGo("not_a_real_item") {
-		t.Fatal("an unknown item id must not be treated as indestructible")
+	if _, ok := definitions["not_a_real_item"]; ok {
+		t.Fatal("an unknown item id must not be in the catalogue")
 	}
 }
 

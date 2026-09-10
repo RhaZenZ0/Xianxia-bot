@@ -164,35 +164,63 @@ class VerbTableContentTests(unittest.TestCase):
         table = router.VerbTable.from_data(data)
         self.assertGreaterEqual(len(table.actions), 10)
 
-    def test_every_root_command_is_a_registered_root(self):
-        roots = set()
+    @staticmethod
+    def _registered_commands() -> dict[str, ast.AsyncFunctionDef]:
+        """Every registered root by name and every group leaf by qualified name."""
+        groups: dict[str, str] = {}
         for path in (PROJECT_ROOT / "app" / "bot" / "commands").glob("*.py"):
-            roots |= set(re.findall(r'@registered_root_command\(name="([^"]+)"', path.read_text(encoding="utf-8")))
-        for action in TABLE.actions:
-            if action.kind == "root":
-                with self.subTest(action=action.key):
-                    self.assertIn(action.command, roots)
-
-    def test_root_commands_take_no_required_parameters(self):
-        """A typed line carries no arguments; a root that needs one would fail at call time."""
-        source = {}
+            for var, name in re.findall(r'^(\w+)\s*=\s*app_commands\.Group\(\s*name="([^"]+)"', path.read_text(encoding="utf-8"), re.M):
+                groups[var] = name
+        out: dict[str, ast.AsyncFunctionDef] = {}
         for path in (PROJECT_ROOT / "app" / "bot" / "commands").glob("*.py"):
             tree = ast.parse(path.read_text(encoding="utf-8"))
             for node in ast.walk(tree):
-                if isinstance(node, ast.AsyncFunctionDef):
-                    for dec in node.decorator_list:
-                        if isinstance(dec, ast.Call) and getattr(dec.func, "id", "") == "registered_root_command":
-                            name = next((k.value.value for k in dec.keywords if k.arg == "name"), None)
-                            if name:
-                                source[name] = node
+                if not isinstance(node, ast.AsyncFunctionDef):
+                    continue
+                for dec in node.decorator_list:
+                    if not isinstance(dec, ast.Call):
+                        continue
+                    kind = getattr(dec.func, "id", "")
+                    name = next((k.value.value for k in dec.keywords if k.arg == "name"), None)
+                    if not name:
+                        continue
+                    if kind == "registered_root_command":
+                        out[name] = node
+                    elif kind == "registered_group_command" and dec.args and isinstance(dec.args[0], ast.Name):
+                        group = groups.get(dec.args[0].id)
+                        if group:
+                            out[f"{group} {name}"] = node
+        return out
+
+    def test_every_root_command_is_a_registered_root_or_leaf(self):
+        commands = self._registered_commands()
+        for action in TABLE.actions:
+            if action.kind == "root":
+                with self.subTest(action=action.key):
+                    self.assertIn(action.command, commands)
+
+    def test_root_commands_take_exactly_the_declared_parameters(self):
+        """A typed line carries the one argument the table declares, or none;
+        a root that needs more would fail at call time (v0.33.0)."""
+        commands = self._registered_commands()
         for action in TABLE.actions:
             if action.kind != "root":
                 continue
-            node = source[action.command]
+            node = commands[action.command]
             args = node.args
-            required = len(args.args) - len(args.defaults)
+            required = [a.arg for a in args.args[: len(args.args) - len(args.defaults)]][1:]
             with self.subTest(action=action.key):
-                self.assertEqual(required, 1, f"{action.command} takes required parameters beyond the interaction")
+                if action.parameter:
+                    self.assertEqual(required, [action.parameter], f"{action.command} must take exactly {action.parameter}")
+                else:
+                    self.assertEqual(required, [], f"{action.command} takes required parameters beyond the interaction")
+
+    def test_every_argument_source_is_one_the_bot_supplies(self):
+        bot = (PROJECT_ROOT / "app" / "bot" / "bot.py").read_text(encoding="utf-8")
+        self.assertIn("locations=sorted(known), items=carried", bot)
+        for action in TABLE.actions:
+            if action.parameter:
+                self.assertIn(action.source, router.ARGUMENT_SOURCES)
 
     def test_every_scene_action_exists(self):
         scene = (PROJECT_ROOT / "app" / "bot" / "commands" / "scene.py").read_text(encoding="utf-8")
@@ -230,3 +258,69 @@ class VerbTableContentTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+KNOWN = ["Greenriver Town", "Azure Crown Imperial City", "Jadewood Medicine City", "Frostwatch City"]
+CARRIED = [("qi_gathering_pill", "Qi Gathering Pill"), ("healing_pill", "Healing Pill"), ("spirit_iron_sword", "Spirit-Iron Sword")]
+
+
+def _route_with(text: str):
+    return router.route_line(text, table=TABLE, present=PRESENT, all_npcs=ALL_NPCS, locations=KNOWN, items=CARRIED)
+
+
+class ArgumentRootTests(unittest.TestCase):
+    """v0.33.0: a root with one argument dispatches only with it resolved."""
+
+    def test_a_full_place_name_travels(self):
+        route = _route_with("I travel to Greenriver Town")
+        self.assertEqual(route.kind, "dispatch", route)
+        self.assertEqual(_ids(route), ["root:travel go:Greenriver Town"])
+        self.assertEqual(route.single.payload["arguments"], {"destination": "Greenriver Town"})
+        self.assertEqual(route.single.label, "Travel → Greenriver Town")
+
+    def test_a_distinctive_token_is_enough(self):
+        self.assertEqual(_ids(_route_with("go to greenriver")), ["root:travel go:Greenriver Town"])
+        self.assertEqual(_ids(_route_with("I head for Frostwatch")), ["root:travel go:Frostwatch City"])
+
+    def test_a_shared_token_names_no_place(self):
+        # "City" belongs to three known places.
+        route = _route_with("I go to the city")
+        self.assertEqual(route.kind, "picker")
+        self.assertEqual(route.candidates, ())
+        self.assertIn("a place you know", route.message)
+
+    def test_an_unknown_place_is_not_guessed(self):
+        route = _route_with("I travel to Ashenwall City")
+        self.assertEqual(route.kind, "picker")
+        self.assertEqual(route.candidates, ())
+
+    def test_an_item_by_name_or_token(self):
+        self.assertEqual(_ids(_route_with("I drink a Healing Pill")), ["root:use:healing_pill"])
+        self.assertEqual(_ids(_route_with("I use the healing pill")), ["root:use:healing_pill"])
+        route = _route_with("I swallow a pill")
+        self.assertEqual(route.kind, "picker")
+        self.assertEqual(route.candidates, ())
+        self.assertIn("something you carry", route.message)
+
+    def test_without_sources_nothing_is_offered(self):
+        route = _route("I travel to Greenriver Town")
+        self.assertEqual(route.kind, "picker")
+        self.assertEqual(route.candidates, ())
+
+    def test_an_argument_root_and_a_scene_verb_still_pick(self):
+        route = _route_with("I sneak to Greenriver Town")
+        # "sneak" leads the line; the travel alias "to" alone is not one.
+        self.assertEqual(route.kind, "dispatch")
+        self.assertEqual(_ids(route), ["scene:stealth:Environment"])
+
+    def test_resolve_argument_ties_break_only_on_a_full_name(self):
+        pairs = [("a", "Cloud Pill"), ("b", "Cloud Pill of the East")]
+        self.assertEqual(router.resolve_argument("I take a cloud pill of the east", pairs), ("b", "Cloud Pill of the East"))
+        self.assertIsNone(router.resolve_argument("I take a cloud", pairs))
+        self.assertIsNone(router.resolve_argument("nothing here", []))
+
+    def test_the_table_rejects_a_bad_argument(self):
+        with self.assertRaises(ValueError):
+            router.VerbTable.from_data({"actions": [{"key": "x", "kind": "root", "command": "use", "argument": {"parameter": "item", "source": "planet"}}]})
+        with self.assertRaises(ValueError):
+            router.VerbTable.from_data({"actions": [{"key": "x", "kind": "scene", "scene_action": "observe", "argument": {"parameter": "item", "source": "item"}}]})
