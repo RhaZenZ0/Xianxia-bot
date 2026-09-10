@@ -625,6 +625,7 @@ async def _dashboard_discord_snapshot(client: commands.Bot, guild: discord.Guild
         auction_halls.append({
             "house_id": house_id,
             "name": str(house.get("name") or house_id),
+            "size": str(house.get("size") or "grand"),
             "world": str(interior.get("world") or ""),
             "entrance": str(house.get("entrance_location") or ""),
             "channel_id": channel.id if isinstance(channel, discord.TextChannel) else None,

@@ -1009,21 +1009,31 @@ Gate: `tests/python/contracts/test_security_defaults.py` and `TestNewRefusesAnEn
 No schema change (still 32), no game-rule change, AI remains narration-only.
 
 
-**0.33.1** is a feature point release: **live auctions in every capital, and the main menu.** Schema
-**35**.
+**0.33.1** is a feature point release: **an auction house in every city, live auction channels, and
+the main menu.** Schema **35**.
 
-*An auction house in every main city.* The Golden Pavilion, entered from Greenriver Town, was the
-only auction house in the world. Each realm capital has one now - the Azure Crown Treasure Exchange
-(Azure Crown Imperial City), the Spirit Jade Auction Pavilion (Spirit Jade Capital), the Nine-Heavens
-Treasure Hall (Nine-Heavens Immortal Court) and the Celestial Mandate Auction Hall (Celestial
-Mandate Palace) - each a protected interior in its world's currency with its own steward, entered
-and left through the same `auction.enter` / `auction.leave` doors, protection ending at them. The
-engine already resolved a house by its entrance, so no engine change was needed.
+*An auction house in every city.* The Golden Pavilion, entered from Greenriver Town, was the only
+auction house in the world. Every city has one now - forty-eight houses across the four worlds, each
+a protected interior in its world's currency with its own steward, entered and left through the
+same `auction.enter` / `auction.leave` doors, protection ending at them. A capital's house is
+**grand** - the Azure Crown Treasure Exchange, the Spirit Jade Auction Pavilion, the Nine-Heavens
+Treasure Hall and the Celestial Mandate Auction Hall, beside the Golden Pavilion - and takes
+twenty-five lots at once for up to a day. A smaller city has a smaller house: a **local** floor
+holds six lots at once and none for longer than six hours, and the engine refuses the seventh lot
+or the seven-hour sale with the house's limit named and the capital's house suggested
+(`max_active_lots`, `max_lot_minutes` in content; a house without them is uncapped). The floors are
+written from their city's character - a riverside hall on stilts over the martial landings, a
+furnace gallery cut into the forge terraces, a relic court on the old battlefield walls - each with
+its own steward, want, fear and secret. The Quest Forge's prompt leaves the floors and their
+stewards off its capped target lists - a floor is a door, not a destination - so the town a story
+is set in is still offered; validation accepts them regardless.
 
-*A live channel per house.* Beside the realm capitals the dashboard's Setup/Repair now creates one
-channel per auction house (`channel_name` in content; the `/admin server realmhubs` path binds only,
-as it does for the capitals), visible to the cultivators whose realm can reach that house's world.
-A lot listed with `/economy → Auction House → Sell` is posted there the moment the engine writes it;
+*Live channels.* Beside the realm capitals the dashboard's Setup/Repair now creates the auction
+channels (`channel_name` in content; the `/admin server realmhubs` path binds only, as it does for
+the capitals): a grand house has a channel of its own, and the local floors of a world share one -
+nine channels for forty-eight houses, not forty-eight - visible to the cultivators whose realm can
+reach that world. A lot listed with `/economy → Auction House → Sell` is posted there the moment
+the engine writes it;
 every bid refreshes its card (current bid, high bidder - anonymous stays anonymous - next minimum,
 closing time); and the tick that settles auctions (`finalizeAuctions`) is followed by the bot
 striking the card SOLD, with hammer price and buyer, or Unsold. The feed (`app/bot/auction_feed.py`)
@@ -1038,8 +1048,9 @@ command does. The hub commands remain.
 Gate: `tests/python/contracts/test_live_auctions.py` (the engine write precedes the card; the feed
 reaches no engine action and no gameplay table; settlement follows the tick; the channels are
 dashboard-created and slash-bound; the menu lists every hub and gates admin) and
-`test_world_content_gate.py` (a house per realm capital, each a protected interior with a unique
-channel name and a currency the world defines).
+`test_world_content_gate.py` (a house per city, grand in every capital, local floors sharing one
+channel per world, each a protected interior in a currency the world defines) and the Go
+`TestALocalFloorHoldsSixLotsAndNoneLongerThanSixHours`.
 
 **0.33.0** is the roadmap's **Gameplay-complete I** milestone: the pickers. No schema change.
 
@@ -1279,9 +1290,9 @@ and requires the release job to wait on all three.
 
 ## Release status — v0.33.1
 
-- Current release: v0.33.1 (schema 35): an auction house in every realm capital, a live channel
-  per house where lots are posted, bid on and struck as it happens, and `/menu`, one panel that
-  opens any hub.
+- Current release: v0.33.1 (schema 35): an auction house in every city - grand in the capitals,
+  local and smaller elsewhere - live channels where lots are posted, bid on and struck as it
+  happens, and `/menu`, one panel that opens any hub.
 - v0.33.0: Gameplay-complete I - every id parameter has a picker, typed play
   fills one argument for `/travel` and `/use` from the line, and the callerless `fate.adjust` is gone.
 - v0.32.0 (schema 34): Hardened II - mute, freeze and ban from Discord with a

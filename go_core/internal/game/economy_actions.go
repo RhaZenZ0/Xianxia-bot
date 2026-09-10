@@ -216,12 +216,27 @@ func auctionSellAction(conn *storage.Conn, catalog worlddata.Catalog, userID int
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
-	houseID, _, ok := catalogHouseAt(catalog, fmt.Sprint(c["location"]))
+	houseID, house, ok := catalogHouseAt(catalog, fmt.Sprint(c["location"]))
 	if !ok {
 		return authoritativeMutation{}, errors.New("must be inside an auction house")
 	}
 	if p.HouseID != "" && p.HouseID != houseID {
 		return authoritativeMutation{}, errors.New("auction house mismatch")
+	}
+	// A smaller city has a smaller house (v0.33.1): the floor holds only so
+	// many lots at once, and none for longer than the house's limit. Both
+	// come from content; a house without them is uncapped.
+	if house.MaxActiveLots > 0 {
+		open, err := conn.Execute(`SELECT COUNT(*) AS n FROM auctions WHERE house_id=? AND active=1`, []any{houseID})
+		if err != nil {
+			return authoritativeMutation{}, err
+		}
+		if row := firstRowMap(open); row != nil && i64(row["n"]) >= house.MaxActiveLots {
+			return authoritativeMutation{}, fmt.Errorf("%s holds at most %d lots at once and its floor is full; wait for a lot to close or list at a larger house", house.Name, house.MaxActiveLots)
+		}
+	}
+	if house.MaxLotMinutes > 0 && p.EndsAt > nowSeconds()+float64(house.MaxLotMinutes)*60+1 {
+		return authoritativeMutation{}, fmt.Errorf("%s runs a lot for at most %d minutes; a longer sale belongs at a capital's house", house.Name, house.MaxLotMinutes)
 	}
 	p.Quantity = clamp(p.Quantity, 1, 999999)
 	p.StartingBid = max64(1, p.StartingBid)

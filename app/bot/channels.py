@@ -193,11 +193,13 @@ async def ensure_auction_house_channels(
     guild: discord.Guild, *, category_name: str = "🌌 Realm Capitals", create_missing: bool = False,
 ) -> list[dict[str, Any]]:
     """Bind existing live-auction channels and, when create_missing, create any
-    that are missing (v0.33.1). One per auction house in content/world.json,
-    beside the realm capitals, visible to the cultivators who can reach that
-    house's world - the same access role that gates the world - and to nobody
-    else. Like the capitals, the /admin slash path only binds; the dashboard's
-    Setup/Repair is what creates.
+    that are missing (v0.33.1). A grand house (a capital's) has a channel of
+    its own; the local floors of a world share one, named in content - so a
+    world of twelve cities is one channel, not twelve. Every house is bound to
+    the channel its content names, beside the realm capitals, visible to the
+    cultivators who can reach that world - the same access role that gates it
+    - and to nobody else. Like the capitals, the /admin slash path only binds;
+    the dashboard's Setup/Repair is what creates.
     """
     existing = {str(row["house_id"]): row for row in await DB.get_auction_house_channels(guild.id)}
     category = next((item for item in guild.categories if item.name == category_name), None)
@@ -219,7 +221,10 @@ async def ensure_auction_house_channels(
         if not isinstance(channel, discord.TextChannel):
             channel = next((item for item in guild.text_channels if item.name == name), None)
         if channel is None and can_create:
-            topic = f"Live lots at {house.get('name', house_id)} — listed, bid on and struck as it happens. Bid with /economy → Auction House → Bid."
+            if str(house.get("size") or "grand") == "local":
+                topic = f"Live lots from every local auction floor of the {world} — listed, bid on and struck as it happens. Bid with /economy → Auction House → Bid."
+            else:
+                topic = f"Live lots at {house.get('name', house_id)} — listed, bid on and struck as it happens. Bid with /economy → Auction House → Bid."
             try:
                 channel = await guild.create_text_channel(
                     name, category=category, topic=topic[:1024], reason="Xianxia RP auction-house setup",

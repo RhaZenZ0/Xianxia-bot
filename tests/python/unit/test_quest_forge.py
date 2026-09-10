@@ -158,6 +158,11 @@ class ForgeTests(unittest.TestCase):
     def test_the_system_prompt_names_only_public_content_and_the_budget(self):
         text = system_prompt(WORLD, BUDGET)
         self.assertIn("Greenriver Town", text)
+        # v0.33.1: forty-eight auction floors and their stewards would fill the
+        # capped lists before the town a story is set in; they stay off the
+        # prompt (validation still accepts them).
+        self.assertNotIn("Auction", text.split("NPCs:")[0].split("Locations:")[1])
+        self.assertNotIn("Exchange Warden", text)
         self.assertIn("insight_xp <= 50", text)
         self.assertIn("total item quantity <= 3", text)
         self.assertNotIn("bugslayer_sword", text)

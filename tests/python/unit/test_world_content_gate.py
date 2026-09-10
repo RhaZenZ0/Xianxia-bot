@@ -58,19 +58,35 @@ class LocationContentTests(unittest.TestCase):
 
 
 class AuctionHouseContentTests(unittest.TestCase):
-    def test_every_realm_capital_has_an_auction_house_with_a_channel_name(self):
-        # v0.33.1: a live-auction channel per main city means a house per
-        # realm capital, each entered from the capital and named for its channel.
+    def test_every_city_has_an_auction_house_and_capitals_have_grand_ones(self):
+        # v0.33.1: a house per city. A capital's is grand, with a live channel
+        # of its own; an ordinary city's is local - smaller, and its world's
+        # local floors share one channel, so a world is one channel, not twelve.
         from app.rules.realm_hubs import REALM_HUBS
 
         houses = WORLD["auction_houses"]
-        entrances = {str(h.get("entrance_location")) for h in houses.values()}
+        by_entrance = {str(h.get("entrance_location")): h for h in houses.values()}
+        for name, loc in WORLD["locations"].items():
+            if loc.get("auction_house") or loc.get("private"):
+                continue
+            if "City" in name or "Town" in name or loc.get("realm_hub"):
+                with self.subTest(city=name):
+                    self.assertIn(name, by_entrance, f"{name} has no auction house")
         for world, hub in REALM_HUBS.items():
             with self.subTest(world=world):
-                self.assertIn(hub["location"], entrances, f"{hub['location']} has no auction house")
-        names = [str(h.get("channel_name") or "") for h in houses.values()]
-        self.assertTrue(all(names), "every auction house names its channel")
-        self.assertEqual(len(names), len(set(names)), "channel names collide")
+                self.assertEqual(by_entrance[hub["location"]].get("size"), "grand")
+        grand = [h for h in houses.values() if h.get("size") == "grand"]
+        local = [h for h in houses.values() if h.get("size") == "local"]
+        self.assertEqual(len(grand) + len(local), len(houses), "every house is grand or local")
+        grand_channels = [h["channel_name"] for h in grand]
+        self.assertEqual(len(grand_channels), len(set(grand_channels)), "grand houses have channels of their own")
+        local_channels = {WORLD["locations"][h["location"]]["world"]: set() for h in local}
+        for h in local:
+            local_channels[WORLD["locations"][h["location"]]["world"]].add(h["channel_name"])
+        for world, names in local_channels.items():
+            with self.subTest(world=world):
+                self.assertEqual(len(names), 1, f"the local floors of {world} share one channel")
+        self.assertTrue(set(grand_channels).isdisjoint(set().union(*local_channels.values())))
         for key, house in houses.items():
             with self.subTest(house=key):
                 interior = WORLD["locations"][house["location"]]
@@ -78,6 +94,12 @@ class AuctionHouseContentTests(unittest.TestCase):
                 self.assertEqual(interior.get("auction_house"), key)
                 self.assertEqual(interior.get("outside_location"), house["entrance_location"])
                 self.assertIn(house["default_currency"], WORLD["currencies"])
+                self.assertTrue(house.get("channel_name"))
+                if house["size"] == "local":
+                    self.assertLess(int(house["max_active_lots"]), 10, "a local floor is small")
+                    self.assertLessEqual(int(house["max_lot_minutes"]), 720, "a local lot is short")
+                else:
+                    self.assertGreaterEqual(int(house["max_active_lots"]), 20)
 
 
 class NpcContentTests(unittest.TestCase):
