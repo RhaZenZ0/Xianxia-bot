@@ -1,6 +1,6 @@
 # Roadmap to v1.0.0
 
-Revised at **v0.28.0** (2026-09-09). The first version of this file was
+Revised at **v0.28.0** (2026-09-09), Authority II marked shipped at **v0.30.0** (2026-09-10). The first version of this file was
 written at v0.20.4 from an inventory of the tree and revised once at v0.21.6.
 Since then seven minor releases shipped, and only two of them were milestones
 this file had planned: Authority I closed (v0.23.0) and Commissions landed
@@ -43,7 +43,7 @@ same as spending fewer calls, which is still open below.
 
 | Bar | State at v0.28.0 |
 |---|---|
-| Authority | **Player side closed** (v0.23.0): `PLAYER_MUTATIONS` is empty and the gate asserts it stays so. **Derived inputs and the DB layer open:** seclusion still receives an `environment_mult` Python computed; market pricing lives in both `app/simulation/world.py` and `bootstrap.go`; `app/database/core.py` still carries ~150 write statements across ~85 tables and 227 methods; `app/simulation/world.py` reads 21 tables by raw SQL; `equipment_power` and `formation_bonus` are still reached from the DB layer; eleven rule functions have zero callers. Nothing here has moved since v0.21.6. |
+| Authority | **Player side closed** (v0.23.0): `PLAYER_MUTATIONS` is empty and the gate asserts it stays so. **Derived inputs and the DB layer closed** (v0.30.0): the engine derives the seclusion environment; market pricing and every `app/simulation/world.py` read are engine queries; `app/database/core.py` writes only the thirty-eight presentation writers listed in `PRESENTATION_WRITES`; no rules are imported below `bot`/`ai`/`dashboard`; every `app/rules` function has a production caller. **Still open:** `get_world_clock` re-anchors `world_state` on a scale change (a second copy of the clock arithmetic), and `current_world_time` reads the anchor with Python arithmetic rather than asking the engine - the last Python-side clock. |
 | Hardened | **Hardened I shipped (v0.29.0):** the engine refuses to run or answer without a token on both sides, the dashboard locks a guessing address and refuses cross-origin mutations, both listeners default to loopback outside Docker, requirements are hash-locked and images digest-pinned, CI runs `-race`. Also: input fence and typed-play budget (v0.21.1, v0.21.5), `admin.audit.undo_last`, the P0 and second external reviews (v0.22.2, v0.23.1). **Still open (Hardened II):** no moderation from Discord and no moderation expiry; backups have no retention. |
 | Gameplay | Catalog materialised (154 manuals); every location has encounters and sense hints; every NPC has narrator fields; the seven orphaned autocompletes are attached and `/battle challenge` has a picker. Every location has an NPC (the three samsara arrival grounds got keepers after v0.28.0). **Open:** five id parameters without a picker, typed play covers only parameterless roots, `fate.adjust` has no Discord caller, no `KNOWN_LIMITATIONS.md`, no playtest. |
 | The AI | Typed play means a call fires only for dialogue, an epic beat, or an explicit "Narrate it" — except `/explore` and `/hunt`, which still spend a routine call each on a result the engine already decided. The AI Studio route (v0.26.0) lifts the hard 50-a-day ceiling for an operator with a key; the OpenRouter-only operator still has it. The AI Routing page (v0.27.0) shows AI-served versus procedural share. |
@@ -138,7 +138,16 @@ left to leave the engine door open while the larger milestones run.
 `NewServer` (Go); N failed logins lock; bare-metal defaults are loopback;
 requirements are hash-locked; CI runs `-race`.
 
-### v0.30 — Authority II: derived inputs, pricing, the DB layer *(was v0.24)*
+### v0.30 — Authority II: derived inputs, pricing, the DB layer *(was v0.24)* — **shipped v0.30.0**
+
+*Shipped. Gate: the `test_v0_30_gate_*` tests in
+`tests/python/contracts/test_authority_boundary.py` and `authority2_test.go`.
+Every item below landed as written, with two things named rather than
+claimed: `test_equipment_stat_parity.py` never existed (the DB-layer copy it
+was said to hold together is simply gone), and the world clock is the one
+Python-side copy of an engine rule left in the DB layer - listed in
+`PRESENTATION_WRITES` with that reason, and in the table above as open.
+Detail in `VERSIONS.md` under 0.30.0.*
 
 Where Python does not mutate but *computes the input* the engine then
 trusts, or keeps a second copy of an engine rule. None of it moved between
@@ -174,8 +183,8 @@ v0.21.6 and v0.28.0.
   `roll_unexpected_event`, `craft_quality`, `tribulation_tns`,
   `condition_effect`, `boss_phase`, `stable_percent`, `manor_qi_multiplier`,
   `manor_defense_power_bonus` — all confirmed at zero callers on 2026-09-09.
-- `docs/V018_AUTHORITY_CLEANUP_ROADMAP.md` joins the V015/V016 lists under
-  `docs/migration_history/`.
+- `docs/migration_history/V018_AUTHORITY_CLEANUP_ROADMAP.md` joined the V015/V016 lists
+  there (v0.30.0).
 
 **Gate:** `test_authority_boundary.py` asserts (a) no INSERT/UPDATE/DELETE
 against a gameplay table in `core.py` outside a named presentation allowlist,
@@ -413,7 +422,7 @@ drift for seven versions as happened between v0.21.6 and v0.28.0.
 | Authority I | v0.23.0 | shipped |
 | Commissions | v0.22.0 / v0.24.0 | shipped, less seeded invention |
 | v0.29 Hardened I | v0.29.0 | shipped |
-| v0.30 Authority II | | nothing moved since v0.21.6 |
+| v0.30 Authority II | v0.30.0 | shipped; the world clock read-through is the one named leftover |
 | v0.31 Narrator budget | | routes resilient (v0.26–v0.28); calls and floor open |
 | v0.32 Hardened II | | `admin.audit.undo_last` shipped; moderation and backups open |
 | v0.33 Gameplay I | | seven autocompletes and `/battle challenge` picker done; five params, typed-play args, three locations open |
