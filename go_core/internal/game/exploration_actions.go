@@ -1359,6 +1359,15 @@ func explorationTravelAction(conn *storage.Conn, catalog worlddata.Catalog, user
 		"road_encounters":               roadEncounters,
 		"traveling":                     roadConnection && travelMinutes > 0,
 	}
+	// Merchants on the way (v0.34.1): whoever walks a leg of this route or
+	// waits in a city it passes is named, so the traveller knows to stop.
+	if roadConnection {
+		encounters, err := merchantEncountersOnRoute(conn, catalog, route, p.GameMinute)
+		if err != nil {
+			return authoritativeMutation{}, err
+		}
+		result["merchant_encounters"] = encounters
+	}
 	// Best-effort: hand back real Unix timestamps for departure/arrival too,
 	// so the reply can show a live Discord countdown instead of a bare
 	// game-minute figure. Not fatal if the world clock can't be read - the

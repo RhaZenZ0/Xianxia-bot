@@ -870,6 +870,7 @@ async def dashboard_discord_control(client: commands.Bot, action: str, payload: 
             "begin_channel_id": "begin",
             "info_channel_id": "info",
             "exploration_channel_id": "exploration",
+            "playtest_channel_id": "playtest",
         }
         values: dict[str, int | None] = {}
         for db_key, payload_key in mapping.items():

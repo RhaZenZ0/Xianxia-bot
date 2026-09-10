@@ -54,7 +54,9 @@ class TheFeedFollowsTheLot(unittest.TestCase):
 
     def test_a_struck_lot_reads_sold_or_unsold(self):
         settle = _body(FEED, "settle_lots")
-        self.assertIn('"sold" if lot.get("current_bidder_user_id")', settle)
+        # v0.34.1: a merchant that took the lot is a sale too - the seller was paid.
+        self.assertIn('(lot.get("current_bidder_user_id") or lot.get("merchant_buyer"))', settle)
+        self.assertIn('"sold" if struck else "unsold"', settle)
         self.assertIn('int(lot.get("active") or 0)', settle)
         self.assertIn("forget_auction_lot_message", settle)
 

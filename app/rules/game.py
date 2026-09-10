@@ -168,6 +168,11 @@ class World:
         return self.data.get("world_rulers", {})
 
     @property
+    def merchants(self) -> dict[str, dict[str, Any]]:
+        """Travelling merchants (v0.34.1), keyed by merchant key."""
+        return self.data.get("merchants", {})
+
+    @property
     def law_system(self) -> dict[str, Any]:
         return self.data.get("law_system", {})
 

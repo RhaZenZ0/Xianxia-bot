@@ -1,0 +1,45 @@
+# Known limitations — the punch list
+
+The v0.34 playtest's findings (`docs/ROADMAP_1_0.md`, Gameplay-complete II). Every entry is
+either **fixed** in the release named, or **deferred** past 1.0 with the reason. Nothing is left
+open without one of those two words; `tests/python/contracts/test_playtest_gate.py` holds the
+file to that. Add to it from the live pass (`docs/playtest/`) as findings come in.
+
+The engine half of the playtest is `scripts/playtest_engine.py --launch`: every loop the roadmap
+names, driven through the engine's HTTP API the way the bot's handlers drive it, against a scratch
+database. Its findings are the first two entries.
+
+## Findings
+
+- **fixed (v0.34.0)** — *A commission's last objective could never be turned in.* `quest.progress`
+  wrote the row `completed` and then asked `resolveCommissionTx` for an `active` row, which failed
+  with "no active commission by that name" and rolled the whole progress back. Every commission
+  since v0.24.0 could be taken and worked but not finished; only the dashboard's manual close
+  completed one. The row now stays `active` until the resolution flips it, and
+  `TestACommissionCompletesThroughProgressAlone` drives one through progress alone.
+- **fixed (v0.34.0)** — *Reset Cooldowns did not reset the sect trial's retry wait.* The wait is
+  read off the last failed `sect_recruitment_attempts` row, not the `cooldowns` table, so a GM
+  resetting a disciple's cooldowns left them waiting a day anyway. A full reset ages the failed
+  attempts out (the history stays) and reports `trial_retries_cleared`;
+  `TestResetCooldownsClearsTheTrialRetryWait` pins it.
+- **fixed (v0.33.1)** — *The Quest Forge's prompt listed forty-eight auction floors before the
+  town a story is set in.* Floors and their stewards are off the capped lists; validation accepts
+  them regardless.
+- **deferred (past 1.0)** — *The three live columns of the checklist are unticked.* Reachable
+  from the hub, error text actionable, narration or fallback fired: a person at the keyboard on
+  the live server ticks these, hub by hub. The static columns and the engine loops are done here;
+  the live pass is Mitchell's and the file keeps his ticks across regeneration.
+- **deferred (roadmap, Authority)** — *`get_world_clock` in Python re-anchors the clock the
+  engine owns when the configured scale changes.* Named on the roadmap's remaining-authority list
+  since v0.30.0; a read-through of the engine's clock is the fix, and it is not a gameplay defect.
+- **deferred (design)** — *Moderation is a nudge on the engine's dispatch layer, not anti-cheat.*
+  A muted or frozen player is blocked from the ~150 authoritative ops; raw `/v1/db` writes the
+  bot makes on their behalf and the simulation runner are not intercepted. Stated in
+  `moderation.go`; a stronger guarantee would need every presentation write to carry the actor.
+- **deferred (content)** — *The forty-three local auction floors share archetype prose.* Twelve
+  archetypes, four worlds; a riverside hall reads like a riverside hall in every world, with the
+  world's stones and wardens swapped in. Hand-written floors are content work for the content
+  track after rc.
+- **deferred (scope)** — *Typed play fills one argument, not two.* `$ I give the pill to Qiao`
+  routes to talk or use, not to a two-argument command; the roadmap asked for one argument and a
+  second is a picker question, not a router one.

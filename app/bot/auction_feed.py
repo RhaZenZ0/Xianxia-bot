@@ -39,6 +39,12 @@ async def lot_embed(house_id: str, lot: dict[str, Any], *, state: str = "open") 
     bidder_id = lot.get("current_bidder_user_id")
     anonymous = bool(lot.get("anonymous"))
     bidder = "Anonymous" if anonymous and bidder_id else await _name(bidder_id)
+    merchant_key = str(lot.get("merchant_buyer") or "")
+    if merchant_key:
+        # v0.34.1: no bidder reached the reserve, but a travelling merchant
+        # took the lot at its starting bid; the seller is paid all the same.
+        merchant = dict(WORLD.merchants.get(merchant_key) or {})
+        bidder = f"{merchant.get('name') or merchant_key} (travelling merchant)"
     seller = await _name(lot.get("seller_user_id"))
     minimum = max(int(lot.get("starting_bid") or 0), bid + 1)
     ends_at = int(float(lot.get("ends_at") or time.time()))
@@ -133,7 +139,8 @@ async def settle_lots(guild: discord.Guild | None) -> int:
             continue
         if int(lot.get("active") or 0):
             continue
-        state = "sold" if lot.get("current_bidder_user_id") and int(lot.get("current_bid") or 0) > 0 else "unsold"
+        struck = (lot.get("current_bidder_user_id") or lot.get("merchant_buyer")) and int(lot.get("current_bid") or 0) > 0
+        state = "sold" if struck else "unsold"
         await _edit_card(guild, record, lot, state=state)
         await DB.forget_auction_lot_message(int(record["auction_id"]))
         closed += 1

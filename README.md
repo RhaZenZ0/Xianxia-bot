@@ -737,6 +737,8 @@ The simulation maintains dynamic regional markets, black-market rotations, sect 
 
 Every city has a protected auction house (v0.33.1), entered with **/economy → Auction House → Enter**; protection ends at the doors. A capital's house is grand and takes twenty-five lots at once for up to a day; a smaller city's is a local floor of six lots, none longer than six hours. Each grand house has a live Discord channel of its own and the local floors of a world share one, where lots are posted, bid on and struck as it happens.
 
+Travelling merchants (v0.34.1) are the floor's last bidder: a lot that ends with no bid is taken at its starting bid by a merchant whose loop passes that city, the seller is paid, and the item travels in the merchant's pack at a markup. Eight merchants, two a world and each a named NPC, walk fixed loops of cities on the simulation tick; **/economy → Merchants** shows where each one is and what it carries, and **Buy** works in the same city or on the same stretch of road - the one trade a traveller can make mid-journey. The travel reply names who is on the road ahead.
+
 The design goal is that progression and world simulation never pause each other.
 
 ## Administration in Discord
@@ -905,6 +907,9 @@ Open **Discord Setup** in the GM dashboard after the bot has joined the configur
   floors - where a lot is posted the moment it is listed, its card follows every bid, and it is struck when the
   simulation tick settles it
 - run **Repair Server** without deleting unrelated Discord channels or resetting game/world data
+- keep a **#playtest** board (v0.34.1): `/admin → Server → Playtest → Post` puts one message per hub page in the
+  channel, pre-reacted ✅ ❌ 💡; testers react (works / fails / change wanted) and reply with what they saw, and
+  `Report` tallies the reactions with names and links the flagged pages for the GM to read
 - gate every realm-capital hub behind its **presence role** `Xianxia • <capital name>` (v0.21.6:
   `@everyone` denied, the presence role granted view/send/history/threads/reactions/files/slash commands,
   the bot allowed; applied on every Setup/Repair). The bot puts the role on when a character's

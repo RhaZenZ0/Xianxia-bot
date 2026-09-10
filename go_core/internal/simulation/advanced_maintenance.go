@@ -122,7 +122,16 @@ func (r *Runner) advancedMaintenance(conn *storage.Conn, gm int64, automation ma
 	counts := map[string]int64{}
 	eraChanged := false
 	if !hasBoolKey(automation, "auction_settlement") || automation["auction_settlement"] {
-		counts["auctions"], err = r.finalizeAuctions(conn)
+		counts["auctions"], err = r.finalizeAuctions(conn, gm)
+		if err != nil {
+			return Run{}, false, err
+		}
+	}
+	// Merchants (v0.34.1): the traders walk their loops on the same tick
+	// that settles the floors, after settlement so a lot bought this tick
+	// is in a pack before the pack moves.
+	if !hasBoolKey(automation, "merchants") || automation["merchants"] {
+		counts["merchants"], err = game.AdvanceMerchants(conn, r.World, gm)
 		if err != nil {
 			return Run{}, false, err
 		}
@@ -186,11 +195,11 @@ func (r *Runner) advancedMaintenance(conn *storage.Conn, gm int64, automation ma
 	if !changed {
 		return Run{}, false, nil
 	}
-	summary := fmt.Sprintf("auctions=%d hunters_spawned=%d hunters_updated=%d wars=%d occupations=%d caravans=%d seclusions=%d commissions_expired=%d moderations_expired=%d era_changed=%t", counts["auctions"], counts["hunters_spawned"], counts["hunters_updated"], counts["wars"], counts["occupations"], counts["caravans"], counts["seclusions"], counts["commissions_expired"], counts["moderations_expired"], eraChanged)
+	summary := fmt.Sprintf("auctions=%d merchants=%d hunters_spawned=%d hunters_updated=%d wars=%d occupations=%d caravans=%d seclusions=%d commissions_expired=%d moderations_expired=%d era_changed=%t", counts["auctions"], counts["merchants"], counts["hunters_spawned"], counts["hunters_updated"], counts["wars"], counts["occupations"], counts["caravans"], counts["seclusions"], counts["commissions_expired"], counts["moderations_expired"], eraChanged)
 	return Run{System: "advanced_world", DueSteps: 1, AppliedSteps: 1, Summary: summary}, true, nil
 }
 
-func (r *Runner) finalizeAuctions(conn *storage.Conn) (int64, error) {
+func (r *Runner) finalizeAuctions(conn *storage.Conn, gm int64) (int64, error) {
 	now := nowFloat()
 	res, err := conn.Execute(`SELECT * FROM auctions WHERE active=1 AND ends_at<=? ORDER BY ends_at`, []any{now})
 	if err != nil {
@@ -222,8 +231,19 @@ func (r *Runner) finalizeAuctions(conn *storage.Conn) (int64, error) {
 					return 0, err
 				}
 			}
-		} else if _, err = conn.Execute(`INSERT INTO inventory(user_id,item_id,quantity) VALUES(?,?,?) ON CONFLICT(user_id,item_id) DO UPDATE SET quantity=inventory.quantity+excluded.quantity`, []any{i64(a["seller_user_id"]), fmt.Sprint(a["item_id"]), i64(a["quantity"])}); err != nil {
-			return 0, err
+		} else {
+			// No bidder: a travelling merchant whose loop passes this city
+			// may take the lot at its starting bid (v0.34.1); otherwise it
+			// goes back to the seller.
+			_, bought, err := game.MerchantBuysUnsoldLot(conn, r.World, a, gm)
+			if err != nil {
+				return 0, err
+			}
+			if !bought {
+				if _, err = conn.Execute(`INSERT INTO inventory(user_id,item_id,quantity) VALUES(?,?,?) ON CONFLICT(user_id,item_id) DO UPDATE SET quantity=inventory.quantity+excluded.quantity`, []any{i64(a["seller_user_id"]), fmt.Sprint(a["item_id"]), i64(a["quantity"])}); err != nil {
+					return 0, err
+				}
+			}
 		}
 		if _, err = conn.Execute(`UPDATE auctions SET active=0 WHERE auction_id=?`, []any{i64(a["auction_id"])}); err != nil {
 			return 0, err

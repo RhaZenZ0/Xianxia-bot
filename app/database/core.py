@@ -26,7 +26,7 @@ from .remote import GoDatabaseTransport
 log = logging.getLogger("xianxia.database")
 
 
-SCHEMA_VERSION = 35
+SCHEMA_VERSION = 36
 # A readiness probe must validate more than the schema-version marker.  If the
 # SQLite file is removed or replaced while the bot is running, SQLite will
 # happily create a new empty file at the same path.  Checking these tables lets
@@ -1508,6 +1508,46 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
                 message_id INTEGER NOT NULL,
                 created_at REAL NOT NULL
             )""",
+        ),
+    ),
+    (
+        36,
+        "playtest_board_and_merchants",
+        (
+            # v0.34.1: the playtest board - one channel where each hub page is
+            # a post testers react to - and the travelling merchants' state:
+            # where each one is, what they carry, and which lot they bought.
+            "ALTER TABLE server_config ADD COLUMN playtest_channel_id INTEGER",
+            """CREATE TABLE IF NOT EXISTS playtest_items (
+                guild_id INTEGER NOT NULL,
+                item_key TEXT NOT NULL,
+                channel_id INTEGER NOT NULL,
+                message_id INTEGER NOT NULL,
+                created_at REAL NOT NULL,
+                PRIMARY KEY(guild_id, item_key)
+            )""",
+            """CREATE TABLE IF NOT EXISTS merchant_state (
+                merchant TEXT PRIMARY KEY,
+                location TEXT NOT NULL,
+                destination TEXT NOT NULL DEFAULT '',
+                depart_game_minute INTEGER NOT NULL DEFAULT 0,
+                arrive_game_minute INTEGER NOT NULL DEFAULT 0,
+                dwell_until_game_minute INTEGER NOT NULL DEFAULT 0,
+                budget INTEGER NOT NULL DEFAULT 0,
+                route_index INTEGER NOT NULL DEFAULT 0,
+                updated_at REAL NOT NULL
+            )""",
+            """CREATE TABLE IF NOT EXISTS merchant_stock (
+                merchant TEXT NOT NULL,
+                item_id TEXT NOT NULL,
+                quantity INTEGER NOT NULL DEFAULT 0,
+                cost INTEGER NOT NULL DEFAULT 0,
+                price INTEGER NOT NULL DEFAULT 0,
+                acquired_game_minute INTEGER NOT NULL DEFAULT 0,
+                updated_at REAL NOT NULL,
+                PRIMARY KEY(merchant, item_id)
+            )""",
+            "ALTER TABLE auctions ADD COLUMN merchant_buyer TEXT NOT NULL DEFAULT ''",
         ),
     ),
 )
@@ -3757,15 +3797,15 @@ class Database:
         self, guild_id: int, *, announcement_channel_id: int, event_scene_channel_id: int,
         home_scene_channel_id: int | None = None, log_channel_id: int | None = None,
         begin_channel_id: int | None = None, info_channel_id: int | None = None,
-        exploration_channel_id: int | None = None,
+        exploration_channel_id: int | None = None, playtest_channel_id: int | None = None,
     ) -> None:
         now = time.time()
         async with self._connect() as db:
             await db.execute(
                 """INSERT INTO server_config(
                        guild_id,announcement_channel_id,event_scene_channel_id,home_scene_channel_id,
-                       log_channel_id,begin_channel_id,info_channel_id,exploration_channel_id,updated_at
-                   ) VALUES(?,?,?,?,?,?,?,?,?)
+                       log_channel_id,begin_channel_id,info_channel_id,exploration_channel_id,playtest_channel_id,updated_at
+                   ) VALUES(?,?,?,?,?,?,?,?,?,?)
                    ON CONFLICT(guild_id) DO UPDATE SET
                        announcement_channel_id=excluded.announcement_channel_id,
                        event_scene_channel_id=excluded.event_scene_channel_id,
@@ -3774,13 +3814,36 @@ class Database:
                        begin_channel_id=COALESCE(excluded.begin_channel_id,server_config.begin_channel_id),
                        info_channel_id=COALESCE(excluded.info_channel_id,server_config.info_channel_id),
                        exploration_channel_id=COALESCE(excluded.exploration_channel_id,server_config.exploration_channel_id),
+                       playtest_channel_id=COALESCE(excluded.playtest_channel_id,server_config.playtest_channel_id),
                        updated_at=excluded.updated_at""",
                 (
                     guild_id, announcement_channel_id, event_scene_channel_id, home_scene_channel_id,
-                    log_channel_id, begin_channel_id, info_channel_id, exploration_channel_id, now,
+                    log_channel_id, begin_channel_id, info_channel_id, exploration_channel_id, playtest_channel_id, now,
                 ),
             )
             await db.commit()
+
+    async def set_playtest_item(self, *, guild_id: int, item_key: str, channel_id: int, message_id: int) -> None:
+        """One board post per hub page (v0.34.1): a Discord message id, nothing more."""
+        async with self._connect() as db:
+            await db.execute(
+                """INSERT INTO playtest_items(guild_id,item_key,channel_id,message_id,created_at) VALUES(?,?,?,?,?)
+                   ON CONFLICT(guild_id,item_key) DO UPDATE SET channel_id=excluded.channel_id,message_id=excluded.message_id,created_at=excluded.created_at""",
+                (int(guild_id), str(item_key), int(channel_id), int(message_id), time.time()),
+            )
+            await db.commit()
+
+    async def get_playtest_items(self, guild_id: int) -> list[dict[str, Any]]:
+        async with self._connect() as db:
+            db.row_factory = aiosqlite.Row
+            cur = await db.execute("SELECT * FROM playtest_items WHERE guild_id=? ORDER BY created_at, item_key", (int(guild_id),))
+            return [dict(row) for row in await cur.fetchall()]
+
+    async def clear_playtest_items(self, guild_id: int) -> int:
+        async with self._connect() as db:
+            cur = await db.execute("DELETE FROM playtest_items WHERE guild_id=?", (int(guild_id),))
+            await db.commit()
+            return int(cur.rowcount or 0)
 
     async def set_info_message_id(self, guild_id: int, message_id: int | None) -> None:
         async with self._connect() as db:
@@ -3818,7 +3881,7 @@ class Database:
                 """UPDATE server_config SET
                        announcement_channel_id=NULL, event_scene_channel_id=NULL, home_scene_channel_id=NULL,
                        log_channel_id=NULL, begin_channel_id=NULL, info_channel_id=NULL, exploration_channel_id=NULL,
-                       info_message_id=NULL, bugs_channel_id=NULL, updated_at=?
+                       info_message_id=NULL, bugs_channel_id=NULL, playtest_channel_id=NULL, updated_at=?
                    WHERE guild_id=?""",
                 (time.time(), int(guild_id)),
             )
@@ -3828,6 +3891,7 @@ class Database:
             cur = await db.execute("DELETE FROM auction_house_channels WHERE guild_id=?", (int(guild_id),))
             auction_rows = int(cur.rowcount or 0)
             await db.execute("DELETE FROM auction_lot_messages WHERE guild_id=?", (int(guild_id),))
+            await db.execute("DELETE FROM playtest_items WHERE guild_id=?", (int(guild_id),))
             cur = await db.execute(
                 "UPDATE channel_messages SET message_id=NULL, updated_at=? WHERE guild_id=? AND message_id IS NOT NULL",
                 (time.time(), int(guild_id)),
@@ -5741,6 +5805,7 @@ class Database:
             "background_seclusion": True,
             "black_markets": True,
             "autonomous_world_events": True,
+            "merchants": True,
             # v0.31.0: the GM scene flag - model narration for explore and
             # hunt by default, instead of the procedural pool plus a button.
             "ai_routine_narration": False,

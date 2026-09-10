@@ -27,6 +27,7 @@ from .admin.core import (
     require_admin,
 )
 from .admin import inspect_sim as _admin_inspect_sim  # noqa: F401  (registers commands)
+from .admin import playtest_board as _admin_playtest_board  # noqa: F401  (registers commands)
 from .admin import world_ops as _admin_world_ops  # noqa: F401  (registers commands)
 from .bot import XianxiaBot
 from .channels import post_server_log
@@ -47,6 +48,7 @@ from .commands.economy import (
     civilization_group,
     civilization_status_command,
     market_group,
+    merchant_group,
     storage_group,
 )
 from .commands.equipment import equipment_group
@@ -59,7 +61,7 @@ from .commands.secretrealm import secret_group, secret_status
 from .commands.sect import sect_group
 from .commands import sense as _commands_sense  # noqa: F401  (registers its root commands on import)
 from .commands.territory import caravan_group, party_group, party_status, territory_group, war_group, war_status
-from .hubs import HubDefinition, HubPage, HubStatusField, _hub_icon, send_hub
+from .hubs import HubDefinition, HubPage, HubStatusField, _hub_icon, register_hubs, send_hub
 from .registry import ACTIONS, EVENT_HANDLERS, registered_root_command
 from .runtime import DB, WORLD, character_location_display, log
 from .services import GUILD, SIM
@@ -107,6 +109,7 @@ _GROUP_ACTION_ROOTS = {
     "family": family_group,
     "civilization": civilization_group,
     "market": market_group,
+    "merchant": merchant_group,
     "blackmarket": blackmarket_group,
     "realmhub": realmhub_group,
     "fate": fate_group,
@@ -120,7 +123,7 @@ _MIGRATED_ROOTS = {
     "civilization", "conceal", "condition", "craft", "crime", "cultivate",
     "daoheart", "duel", "effects", "equipment", "era", "explore", "family",
     "formation", "gender", "grudges", "hunt", "hunter", "inheritances", "fate",
-    "innerworld", "inventory", "karma", "law", "lifespan", "manual", "market", "blackmarket",
+    "innerworld", "inventory", "karma", "law", "lifespan", "manual", "market", "merchant", "blackmarket",
     "npcinfo", "party", "perfect", "profession", "provenance", "reincarnate",
     "reputation", "rulers", "scene", "seclusion", "secretrealm", "sect", "sense",
     "sheet", "soul", "spatialkey", "specialeffects", "storage", "talk", "territory",
@@ -261,12 +264,13 @@ _HUB_DEFINITIONS = (
     HubDefinition(
         name="economy",
         title="💰 Economy Hub",
-        description="Wallet, local markets, black markets, protected auctions and trade caravans.",
+        description="Wallet, local markets, black markets, protected auctions, travelling merchants and trade caravans.",
         pages=(
             _hub_page("wallet", "Wallet", "View cultivation currencies."),
             _hub_page("market", "Local Market", "Buy and sell in the dynamic local economy."),
             _hub_page("blackmarket", "Black Market", "Locate rotating underworld posts and trade forbidden goods."),
             _hub_page("auction", "Auction House", "Browse, list and bid in protected auctions."),
+            _hub_page("merchant", "Merchants", "Find the travelling merchants and buy what the auction floors could not sell."),
             _hub_page("caravan", "Caravans", "Dispatch and inspect persistent trade caravans."),
         ),
     ),
@@ -501,6 +505,9 @@ async def menu(interaction: discord.Interaction) -> None:
     await interaction.response.send_message(
         "\n".join(lines), view=MenuView(owner_id=member.id, is_admin=bool(is_admin)), ephemeral=False,
     )
+
+
+register_hubs(*_HUB_DEFINITIONS, _ADMIN_HUB_DEFINITION)
 
 
 @registered_root_command(

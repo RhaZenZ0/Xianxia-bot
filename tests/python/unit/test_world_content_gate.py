@@ -125,3 +125,50 @@ class NpcContentTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TravellingMerchantContentTests(unittest.TestCase):
+    """v0.34.1: a merchant is content - a loop of cities in one world, a
+    purse in that world's low currency, and an NPC that is its face."""
+
+    def test_every_merchant_walks_real_cities_of_one_world_and_has_a_face(self):
+        merchants = WORLD["merchants"]
+        self.assertGreaterEqual(len(merchants), 8)
+        locations = WORLD["locations"]
+        faces = {str(npc.get("merchant")): name for name, npc in WORLD["npcs"].items() if npc.get("merchant")}
+        for key, m in merchants.items():
+            with self.subTest(merchant=key):
+                self.assertIn(m["home"], m["route"], "home must be a route stop")
+                self.assertGreaterEqual(len(m["route"]), 3)
+                self.assertEqual(len(set(m["route"])), len(m["route"]), "a loop visits each stop once")
+                for stop in m["route"]:
+                    self.assertIn(stop, locations)
+                    self.assertEqual(locations[stop]["world"], m["world"])
+                    self.assertFalse(locations[stop].get("private"))
+                self.assertGreater(int(m["budget"]), 0)
+                self.assertGreaterEqual(int(m["markup_percent"]), 100)
+                self.assertGreater(int(m["dwell_minutes"]), 0)
+                self.assertIn(m["currency"], WORLD["currencies"])
+                self.assertEqual(WORLD["currencies"][m["currency"]]["world"], m["world"])
+                self.assertIn(key, faces, "no NPC fronts this merchant")
+                self.assertEqual(WORLD["npcs"][faces[key]]["location"], m["home"])
+
+    def test_every_world_with_an_auction_house_has_a_merchant_on_its_floors(self):
+        houses = WORLD["auction_houses"]
+        locations = WORLD["locations"]
+        route_stops = {m["world"]: set() for m in WORLD["merchants"].values()}
+        for m in WORLD["merchants"].values():
+            route_stops[m["world"]].update(m["route"])
+        for house_id, house in houses.items():
+            city = house["entrance_location"]
+            world = locations[city]["world"]
+            with self.subTest(house=house_id):
+                self.assertIn(world, route_stops, f"{world} has no merchant at all")
+        # Every grand house (a capital) lies on at least one merchant loop, so
+        # an unsold lot in a capital always has a buyer with a route there.
+        for house_id, house in houses.items():
+            if house.get("size") != "grand":
+                continue
+            city = house["entrance_location"]
+            with self.subTest(grand_house=house_id):
+                self.assertIn(city, route_stops[locations[city]["world"]], f"no merchant passes {city}")

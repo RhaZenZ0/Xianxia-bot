@@ -454,11 +454,20 @@ func questProgress(conn *storage.Conn, userID int64, raw json.RawMessage) (any, 
 	}
 	nextJSON, _ := json.Marshal(transition["progress"])
 	complete, _ := transition["complete"].(bool)
+	isCommission := i64(row["commission"]) == 1
 	status := "active"
 	var completed any = nil
 	if complete {
-		status = "completed"
 		completed = gameMinute
+		// A commission's status is flipped by resolveCommissionTx below,
+		// which looks the row up as `active` first. Writing `completed` here
+		// made that lookup fail on the last objective of every commission
+		// (v0.34.0 playtest finding: "no active commission by that name"),
+		// rolling the whole progress back - so the final objective could
+		// never be turned in. Only an ordinary quest completes on this line.
+		if !isCommission {
+			status = "completed"
+		}
 	}
 	now := float64(time.Now().UnixNano()) / 1e9
 	_, err = conn.Execute(`UPDATE character_quests SET progress_json=?,status=?,completed_game_minute=?,updated_at=? WHERE user_id=? AND quest_key=?`, []any{string(nextJSON), status, completed, now, userID, p.QuestKey})
@@ -470,7 +479,7 @@ func questProgress(conn *storage.Conn, userID int64, raw json.RawMessage) (any, 
 	// standing with the giver belongs in one place (commission_actions.go),
 	// so completion by progress and completion by any other route cannot
 	// drift apart. Python does not grant the reward for these.
-	if complete && i64(row["commission"]) == 1 {
+	if complete && isCommission {
 		resolved, resolveErr := resolveCommissionTx(conn, userID, p.QuestKey, "completed", gameMinute, true)
 		if resolveErr != nil {
 			return nil, resolveErr
@@ -1096,6 +1105,7 @@ func adminAutomationSet(conn *storage.Conn, adminUserID int64, raw json.RawMessa
 		"background_seclusion":    true,
 		"black_markets":           true,
 		"autonomous_world_events": true,
+		"merchants":               true,
 		// v0.31.0: when on, exploration openings and hunt results are
 		// narrated by the model without being asked; off, they read from
 		// the procedural pool and offer a Narrate-it button.
@@ -1442,6 +1452,14 @@ func adminAdjustItem(conn *storage.Conn, adminUserID int64, raw json.RawMessage)
 // adminResetCooldowns clears a player's cooldowns table rows - all of them,
 // or just one named action if "action" is supplied. There was previously no
 // admin path to this simple keyed table at all.
+//
+// The sect entrance trial's retry wait is not a cooldowns row: it is read
+// off the last failed sect_recruitment_attempts row (a day, sect_actions.go),
+// so "reset cooldowns" left it standing (v0.34.0 playtest finding). A full
+// reset now ages those rows out too - the attempt history stays, dated a day
+// earlier than it was, which is exactly "the wait is over" to that check
+// whatever the world's age (a world younger than a day cannot be helped by
+// dating them to zero).
 func adminResetCooldowns(conn *storage.Conn, adminUserID int64, raw json.RawMessage) (any, error) {
 	p, err := decodeMap(raw)
 	if err != nil {
@@ -1476,13 +1494,23 @@ func adminResetCooldowns(conn *storage.Conn, adminUserID int64, raw json.RawMess
 		return nil, err
 	}
 	cleared := res.RowsAffected
-	if err := auditAdmin(conn, adminUserID, "admin.player.reset_cooldowns", fmt.Sprintf("user:%d", uid), map[string]any{}, map[string]any{"cleared": cleared, "action": action}, fmt.Sprint(p["reason"])); err != nil {
+	trialRetries := int64(0)
+	if action == "" || action == "sect_trial" {
+		aged, err := conn.Execute(`UPDATE sect_recruitment_attempts SET game_minute=game_minute-1440 WHERE user_id=? AND attempt_type='trial' AND result='fail'`, []any{uid})
+		if err != nil && !strings.Contains(err.Error(), "no such table") {
+			return nil, err
+		}
+		if err == nil {
+			trialRetries = aged.RowsAffected
+		}
+	}
+	if err := auditAdmin(conn, adminUserID, "admin.player.reset_cooldowns", fmt.Sprintf("user:%d", uid), map[string]any{}, map[string]any{"cleared": cleared, "trial_retries_cleared": trialRetries, "action": action}, fmt.Sprint(p["reason"])); err != nil {
 		return nil, err
 	}
 	if err := conn.Commit(); err != nil {
 		return nil, err
 	}
-	return map[string]any{"user_id": uid, "cleared": cleared}, nil
+	return map[string]any{"user_id": uid, "cleared": cleared, "trial_retries_cleared": trialRetries}, nil
 }
 
 // adminForceEndScene resets a stuck player_scene_state row back to

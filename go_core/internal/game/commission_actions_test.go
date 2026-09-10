@@ -631,3 +631,54 @@ func TestASeededStaticQuestStillAcceptsAsAnOrdinaryQuest(t *testing.T) {
 		t.Fatalf("an ordinary quest was given a deadline: %v", row["deadline_game_minute"])
 	}
 }
+
+// v0.34.0 playtest finding: the last objective of a commission was refused
+// with "no active commission by that name" - questProgress wrote `completed`
+// before resolveCommissionTx looked the row up as `active`, and the whole
+// progress rolled back. A commission could be taken and worked but never
+// turned in. This drives one through quest.progress alone, the way play does.
+func TestACommissionCompletesThroughProgressAlone(t *testing.T) {
+	path := setupCommissionDB(t)
+	seedCommission(t, path, "commission_crate", nil)
+	objectives, _ := json.Marshal([]map[string]any{
+		{"id": "docks", "type": "scene_action", "count": 1, "target": "investigate", "label": "Investigate"},
+		{"id": "report", "type": "talk", "count": 1, "target": "Steward Qiao", "label": "Report"},
+	})
+	batch4Exec(t, path, `UPDATE quest_definitions SET objectives_json=? WHERE quest_key='commission_crate'`, string(objectives))
+	commissionMustApply(t, path, "commission.accept", 42, 1,
+		map[string]any{"quest_key": "commission_crate", "variant_index": 0, "game_minute": 1000})
+
+	first, err := commissionApply(t, path, "quest.progress", 42, 2,
+		map[string]any{"quest_key": "commission_crate", "objective_type": "scene_action", "amount": 1, "target": "investigate"})
+	if err != nil {
+		t.Fatalf("first objective: %v", err)
+	}
+	if touched, _ := first["touched"].(bool); !touched {
+		t.Fatalf("first objective not touched: %v", first)
+	}
+	if got := fmt.Sprint(questRow(t, path, 42, "commission_crate")["status"]); got != "active" {
+		t.Fatalf("status after one objective=%s, want active", got)
+	}
+	last, err := commissionApply(t, path, "quest.progress", 42, 3,
+		map[string]any{"quest_key": "commission_crate", "objective_type": "talk", "amount": 1, "target": "Steward Qiao"})
+	if err != nil {
+		t.Fatalf("the last objective must turn the commission in, got: %v", err)
+	}
+	if complete, _ := last["complete"].(bool); !complete {
+		t.Fatalf("last objective did not complete: %v", last)
+	}
+	if _, ok := last["commission"].(map[string]any); !ok {
+		t.Fatalf("completion should carry the commission resolution: %v", last)
+	}
+	row := questRow(t, path, 42, "commission_crate")
+	if got := fmt.Sprint(row["status"]); got != "completed" {
+		t.Fatalf("status=%s, want completed", got)
+	}
+	if row["completed_game_minute"] == nil || row["resolved_game_minute"] == nil {
+		t.Fatalf("both completion minutes should be set: %v", row)
+	}
+	stones, insight := characterPurse(t, path, 42)
+	if stones != 40 || insight != 8 {
+		t.Fatalf("paid %d stones / %d insight, want the standard terms 40 / 8", stones, insight)
+	}
+}

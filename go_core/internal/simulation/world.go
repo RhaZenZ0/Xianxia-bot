@@ -14,6 +14,7 @@ import (
 	"xianxia/core/internal/gamerng"
 	lifespanmodel "xianxia/core/internal/lifespan"
 	"xianxia/core/internal/storage"
+	"xianxia/core/internal/worlddata"
 )
 
 const (
@@ -123,6 +124,9 @@ type SpawnedWorldEvent struct {
 type Runner struct {
 	DatabasePath string
 	Catalog      Catalog
+	// World is the same content as Catalog in the game package's shape, for
+	// the tick steps that call into game rules (the merchants' road planner).
+	World worlddata.Catalog
 }
 type Run struct {
 	System       string              `json:"system"`
@@ -157,6 +161,11 @@ func NewRunner(databasePath, worldPath string) (*Runner, error) {
 	if err := json.Unmarshal(data, &r.Catalog); err != nil {
 		return nil, err
 	}
+	world, err := worlddata.Load(worldPath)
+	if err != nil {
+		return nil, err
+	}
+	r.World = world
 	return r, nil
 }
 

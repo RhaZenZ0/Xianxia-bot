@@ -78,7 +78,8 @@ class GUIIntegrityTests(unittest.TestCase):
         # added or lost by accident. 40 through v0.19.14, +2 in v0.19.15 (chat monitor).
         # 42 through v0.20.5; +2 in v0.20.6 for the Quest Forge (world questforge, world quests).
         # 44 through v0.31.0; +7 in v0.32.0 (player forceendscene, mute, unmute, freeze, unfreeze, ban, unban).
-        self.assertEqual(sum(counts), 51)
+        # +1 in v0.34.1 (server playtest, the board).
+        self.assertEqual(sum(counts), 52)
         self.assertLessEqual(max(counts), 25)
         # (from test_command_cleanup's twin of this test, folded in v0.20.3)
         self.assertIn('title="🛡️ Xianxia — Administrator Control Panel"', panel)
