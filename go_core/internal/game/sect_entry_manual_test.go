@@ -1,6 +1,7 @@
 package game
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -193,5 +194,34 @@ func TestSectTrialFailGrantsNothing(t *testing.T) {
 	}
 	if got := storage.ParseInt(actionScalar(t, path, `SELECT COUNT(*) FROM inventory WHERE user_id=42 AND item_id LIKE '%_manual'`)); got != 0 {
 		t.Fatalf("inventory has %d manuals after a failed trial", got)
+	}
+}
+
+// v0.34.0 playtest finding: the trial's retry wait is read off the last
+// failed attempt, not the cooldowns table, so the GM's Reset Cooldowns left
+// a failed disciple waiting a day regardless. A full reset ages it out.
+func TestResetCooldownsClearsTheTrialRetryWait(t *testing.T) {
+	path := setupSectTrialDB(t)
+	world := batch4WorldPath(t)
+	batch4SetCanonicalGameMinute(t, path, 5000)
+	batch4Exec(t, path, `CREATE TABLE IF NOT EXISTS admin_audit_log(audit_id INTEGER PRIMARY KEY AUTOINCREMENT,admin_user_id INTEGER NOT NULL,action TEXT,target TEXT,before_json TEXT,after_json TEXT,reason TEXT,created_at REAL)`)
+	batch4Exec(t, path, `INSERT INTO sect_recruitment_attempts(user_id,sect_name,attempt_type,result,game_minute,created_at) VALUES(42,'Azure Cloud Sect','trial','fail',4900,0)`)
+
+	raw, _ := json.Marshal(map[string]any{"sect_name": "Azure Cloud Sect", "examiner": "Gate Elder Jian Mu", "location": "Azure Cloud Mountain Gate", "trial_name": "Entrance"})
+	_, err := ApplyWithWorld(path, world, ActionRequest{APIVersion: authoritativeAPIVersion, ActionID: "trial-retry-1", Operation: "sect.recruitment.trial", ActorID: 42, Payload: raw})
+	if err == nil || !strings.Contains(err.Error(), "retry cooldown") {
+		t.Fatalf("a trial an hour after a failure should wait, got %v", err)
+	}
+
+	reset, _ := json.Marshal(map[string]any{"user_id": 42, "reason": "playtest"})
+	out, err := Apply(path, ActionRequest{Operation: "admin.player.reset_cooldowns", ActorID: 1, Payload: reset})
+	if err != nil {
+		t.Fatalf("reset: %v", err)
+	}
+	if result, _ := out.Result.(map[string]any); i64(result["trial_retries_cleared"]) != 1 {
+		t.Fatalf("reset should report the aged retry: %v", out.Result)
+	}
+	if _, err := ApplyWithWorld(path, world, ActionRequest{APIVersion: authoritativeAPIVersion, ActionID: "trial-retry-2", Operation: "sect.recruitment.trial", ActorID: 42, Payload: raw}); err != nil {
+		t.Fatalf("after a reset the trial should be sat again: %v", err)
 	}
 }

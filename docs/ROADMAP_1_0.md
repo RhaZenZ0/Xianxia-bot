@@ -282,7 +282,15 @@ and requires each id-typed one to have a provider or a hint;
 `test_world_content_gate.py` gains "every location has at least one NPC, or
 is on the named exemption list".
 
-### v0.34 — Gameplay-complete II: the playtest *(was v0.28)*
+### v0.34 — Gameplay-complete II: the playtest *(was v0.28)* — **shipped v0.34.0, live columns open**
+
+*Shipped as far as a machine can take it. `scripts/playtest_engine.py` drives
+every loop named below through the engine and found two defects, both fixed
+(a commission could never be turned in; Reset Cooldowns missed the trial
+retry). `docs/playtest/v0.34.0.md` lists all 218 actions with the static
+columns filled; its three live columns are the pass on the live server and
+are Mitchell's to tick. `docs/KNOWN_LIMITATIONS.md` is the punch list. Gate:
+`tests/python/contracts/test_playtest_gate.py`.*
 
 A written pass over all sixteen player hubs on the live server, hub by hub,
 page by page, with a checklist per action (reachable, picker present, error
@@ -445,7 +453,7 @@ drift for seven versions as happened between v0.21.6 and v0.28.0.
 | v0.31 Narrator budget | v0.31.0 | shipped |
 | v0.32 Hardened II | v0.32.0 | shipped |
 | v0.33 Gameplay I | v0.33.0 | shipped |
-| v0.34 Playtest | | |
+| v0.34 Playtest | v0.34.0 | shipped; the engine loops run and the checklist is on file, the live columns are open |
 | v1.0.0-rc | | |
 | v1.0.0 | | |
 | Content track | | after rc |

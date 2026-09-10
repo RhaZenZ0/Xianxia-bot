@@ -1009,6 +1009,39 @@ Gate: `tests/python/contracts/test_security_defaults.py` and `TestNewRefusesAnEn
 No schema change (still 32), no game-rule change, AI remains narration-only.
 
 
+**0.34.0** is the roadmap's **Gameplay-complete II** milestone: the playtest, in the half of it a
+machine can run, with the live half laid out for the person who can. No schema change.
+
+*The engine half.* `scripts/playtest_engine.py --launch` builds and starts a scratch engine,
+bootstraps it, and drives every loop the roadmap names through the engine's HTTP API the way the
+bot's handlers do: two characters created from the family offers, `$ I explore`, a sect entrance
+trial sat and the gift manual studied, a commission from Steward Qiao taken and turned in, another
+abandoned and its cooldown felt, a third failed by the tick past its deadline, a live quest edited
+under keep, migrate and revoke with a holder on it, a narration route stored and read back, a timed
+mute enforced and undone, a lot listed, bid on and struck, a local floor refusing its seventh lot,
+and a backup taken, listed and restored - one line per step, and a non-zero exit if any fails.
+
+*What it found.* Two defects, both fixed here. A commission's last objective could never be turned
+in: `quest.progress` wrote the row `completed` and then asked the commission resolution for an
+`active` row, which refused and rolled the progress back - every commission since v0.24.0 could be
+taken and worked but not finished. And the GM's Reset Cooldowns did not reset the sect trial's
+retry wait, which lives on the last failed attempt rather than in the cooldowns table; a full reset
+ages it out now. `TestACommissionCompletesThroughProgressAlone` and
+`TestResetCooldownsClearsTheTrialRetryWait` pin both.
+
+*The checklist.* `scripts/playtest_checklist.py` writes `docs/playtest/v<version>.md`: every hub,
+page and action - 218 actions across sixteen hubs and the admin panel - with each parameter's
+picker and each handler's acknowledgement filled from the tree, and three live columns (reachable
+from the hub, error text actionable, narration or fallback fired) as checkboxes for the pass on
+the live server. Regeneration keeps what was ticked.
+
+*The punch list.* `docs/KNOWN_LIMITATIONS.md`: every finding fixed in a named release or deferred
+with its reason, and nothing open without one of those words.
+
+Gate: `tests/python/contracts/test_playtest_gate.py` (the punch list is honest, the checklist for
+this release names every registered command and every hub, the engine script drives every loop
+and the two findings have their Go tests).
+
 **0.33.1** is a feature point release: **an auction house in every city, live auction channels, and
 the main menu.** Schema **35**.
 
@@ -1288,9 +1321,12 @@ directory to one file, requires each check to appear before the release job and 
 and requires the release job to wait on all three.
 
 
-## Release status — v0.33.1
+## Release status — v0.34.0
 
-- Current release: v0.33.1 (schema 35): an auction house in every city - grand in the capitals,
+- Current release: v0.34.0: Gameplay-complete II - the engine half of the playtest as a script,
+  the checklist for the live half on file, the punch list, and the two defects the run found
+  fixed (a commission could never be turned in; Reset Cooldowns missed the trial retry).
+- v0.33.1 (schema 35): an auction house in every city - grand in the capitals,
   local and smaller elsewhere - live channels where lots are posted, bid on and struck as it
   happens, and `/menu`, one panel that opens any hub.
 - v0.33.0: Gameplay-complete I - every id parameter has a picker, typed play
