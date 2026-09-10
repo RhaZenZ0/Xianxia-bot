@@ -1009,6 +1009,50 @@ Gate: `tests/python/contracts/test_security_defaults.py` and `TestNewRefusesAnEn
 No schema change (still 32), no game-rule change, AI remains narration-only.
 
 
+**0.31.0** is the roadmap's **Narrator budget** milestone. No schema change. The routes were made
+resilient in v0.26–v0.28; this release spends fewer calls on them, meters every door a player can
+spend them through, and makes the procedural floor read well.
+
+*Route by tier.* An exploration opening and a hunt result are decided by the engine, and the model
+was spending a routine call describing each. They are procedural by default now: the pool describes
+the scene at once, and a **Narrate it** button under the result asks the model only when the player
+presses it - an explicit ask, metered on its own door. A GM who wants model prose on every such
+scene turns on the new `ai_routine_narration` automation flag (`/admin → Simulation → Automation`),
+and the button is not shown. The two sect narrations nothing called are deleted. Every live call
+now declares why it is made - `dialogue`, `epic`, `narrate_it`, `forge`, `monitor` - and the router
+counts them; the narrator counts the scenes it served procedurally by design, apart from the
+fallbacks a model failed.
+
+*Budget on every door.* The per-player bucket (`TYPED_PLAY_BURST` / `TYPED_PLAY_PER_MINUTE`) used to
+meter typed lines only. `serialized_user_action` - every state-changing slash command and hub
+button - spends the same bucket now and refuses with the same line, so a player cannot route around
+it by changing doors, and the bucket reports grants and refusals per door. The per-player action
+locks the wrapper takes are evicted once idle for half an hour, which closes the unbounded-growth
+note the v0.23 roadmap carried.
+
+*A fallback pool.* `content/world.json` carries `narration_pool`: seven scene kinds (an exploration
+opening, a hunt won and lost, an action without a roll, an NPC's reply, a breakthrough made and
+missed) by four world tiers (Mortal, Spiritual, Immortal, Celestial), three variants each, 84 in
+all. `app/rules/narration_pool.py` picks one deterministically from the scene's seed - a retry does
+not reshuffle what a player already read - and fills it; the tier is the location's world, or in a
+private place the world the character's realm has reached. Every narrator fallback reads from it,
+so the floor a player sees when the allowance is spent or every route is retired varies and fits
+the place. A content test holds every cell filled and every line free of rewards.
+
+*The ten-dollar switch.* OpenRouter's free allowance is 50 requests a day until ten dollars of
+credit are on the account, then 1000. `OPENROUTER_CREDITS_TOPPED_UP` names the regime as a
+baseline, and the dashboard's **Narration Routes** panel has the same switch: it is stored by the
+engine beside the chain (`admin.narration.set_chain` accepts the key, so one save is one audit row)
+and applied live through the router's `set_slots`, the way the routes are. An explicit
+`OPENROUTER_MAX_REQUESTS_PER_DAY` still overrides both. The **AI Routing** page shows calls by
+purpose, scenes served procedurally by design, which regime the allowance is in, and the
+per-player refusals by door, so the effect of this release is visible where the routes already were.
+
+Gate: `tests/python/contracts/test_narrator_budget.py` - no `_generate` call site outside dialogue,
+the epic tier and the explicit-upgrade path runs by default, and the two procedural-first narrators
+return before the model unless upgraded; the slash and hub path spends the bucket before it takes
+the lock; the pool has three variants in every cell.
+
 **0.30.1** makes the player property one home, built up. No schema change, no mechanical change
 to any property that already exists.
 
@@ -1131,9 +1175,12 @@ directory to one file, requires each check to appear before the release job and 
 and requires the release job to wait on all three.
 
 
-## Release status — v0.30.1
+## Release status — v0.31.0
 
-- Current release: v0.30.1 (schema 33): one home built up facility by facility - the sect
+- Current release: v0.31.0: the narrator budget - explore and hunt read from a procedural pool
+  unless a player presses Narrate it, one per-player bucket meters every door, and the ten-dollar
+  switch picks the 50 or 1000 a day allowance from the dashboard.
+- v0.30.1 (schema 33): one home built up facility by facility - the sect
   residence grows with contribution points under rank and stage gates, and a homestead of one's own
   is founded at Deacon or higher.
 - v0.30.0: Authority II - the engine derives the seclusion environment,
