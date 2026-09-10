@@ -538,7 +538,7 @@ OWNERS = {
                    "reply_long", "_explain_engine_error", "carried_item_autocomplete", "current_world_time",
                    "character_location_display", "authoritative_lifespan", "_record_true_death_history"),
     "services.py": ("GUILD", "SCENES", "NPC_RELATIONSHIPS", "QUESTS", "EXPLORATION", "COMBAT", "NARRATOR_QUEUE",
-                    "SIM", "AI_ROUTER", "NARRATOR", "NARRATOR_CONTEXT", "ALERTS", "PLAYER_PROPERTY_TYPE_CHOICES",
+                    "SIM", "AI_ROUTER", "NARRATOR", "NARRATOR_CONTEXT", "ALERTS", "PLAYER_PROPERTY_HOME_TYPES",
                     "PLAYER_PROPERTY_FACILITY_KEYS", "PLAYER_PROPERTY_FACILITY_LABELS"),
     "formatting.py": ("player_property_emoji", "player_property_facility_lines", "human_duration", "roll_line",
                       "effective_attribute"),

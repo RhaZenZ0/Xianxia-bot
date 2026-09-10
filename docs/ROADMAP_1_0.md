@@ -1,6 +1,6 @@
 # Roadmap to v1.0.0
 
-Revised at **v0.28.0** (2026-09-09), Authority II marked shipped at **v0.30.0** (2026-09-10). The first version of this file was
+Revised at **v0.28.0** (2026-09-09), Authority II marked shipped at **v0.30.0** and the Narrator budget at **v0.31.0** (2026-09-10). The first version of this file was
 written at v0.20.4 from an inventory of the tree and revised once at v0.21.6.
 Since then seven minor releases shipped, and only two of them were milestones
 this file had planned: Authority I closed (v0.23.0) and Commissions landed
@@ -46,7 +46,7 @@ same as spending fewer calls, which is still open below.
 | Authority | **Player side closed** (v0.23.0): `PLAYER_MUTATIONS` is empty and the gate asserts it stays so. **Derived inputs and the DB layer closed** (v0.30.0): the engine derives the seclusion environment; market pricing and every `app/simulation/world.py` read are engine queries; `app/database/core.py` writes only the thirty-eight presentation writers listed in `PRESENTATION_WRITES`; no rules are imported below `bot`/`ai`/`dashboard`; every `app/rules` function has a production caller. **Still open:** `get_world_clock` re-anchors `world_state` on a scale change (a second copy of the clock arithmetic), and `current_world_time` reads the anchor with Python arithmetic rather than asking the engine - the last Python-side clock. |
 | Hardened | **Hardened I shipped (v0.29.0):** the engine refuses to run or answer without a token on both sides, the dashboard locks a guessing address and refuses cross-origin mutations, both listeners default to loopback outside Docker, requirements are hash-locked and images digest-pinned, CI runs `-race`. Also: input fence and typed-play budget (v0.21.1, v0.21.5), `admin.audit.undo_last`, the P0 and second external reviews (v0.22.2, v0.23.1). **Still open (Hardened II):** no moderation from Discord and no moderation expiry; backups have no retention. |
 | Gameplay | Catalog materialised (154 manuals); every location has encounters and sense hints; every NPC has narrator fields; the seven orphaned autocompletes are attached and `/battle challenge` has a picker. Every location has an NPC (the three samsara arrival grounds got keepers after v0.28.0). **Open:** five id parameters without a picker, typed play covers only parameterless roots, `fate.adjust` has no Discord caller, no `KNOWN_LIMITATIONS.md`, no playtest. |
-| The AI | Typed play means a call fires only for dialogue, an epic beat, or an explicit "Narrate it" — except `/explore` and `/hunt`, which still spend a routine call each on a result the engine already decided. The AI Studio route (v0.26.0) lifts the hard 50-a-day ceiling for an operator with a key; the OpenRouter-only operator still has it. The AI Routing page (v0.27.0) shows AI-served versus procedural share. |
+| The AI | **Closed as a bar (v0.31.0):** a call fires only for dialogue, an epic beat, or an explicit ask - `/explore` and `/hunt` read from the procedural pool and offer a *Narrate it* button (or the GM's `ai_routine_narration` flag); one per-player bucket meters every door; the pool has 84 variants across seven scene kinds and four world tiers; the ten-dollar switch picks the 50 or 1000 a day allowance from the dashboard; the AI Routing page shows calls by purpose and refusals by door. The AI Studio route (v0.26.0) remains the way past the ceiling for an operator with a key. |
 
 Test surface: ~960 Python test functions across unit, integration and
 contract layers; 360 Go test functions in 52 files. CI runs the Go suite
@@ -192,7 +192,12 @@ against a gameplay table in `core.py` outside a named presentation allowlist,
 and `app/ai/` (`test_app_layout.py`), (c) every `app/rules` function has a
 caller, (d) `seclusion.start`'s payload carries no multiplier.
 
-### v0.31 — The narrator budget *(was v0.23)*
+### v0.31 — The narrator budget *(was v0.23)* — **shipped v0.31.0**
+
+*Shipped. Gate: `tests/python/contracts/test_narrator_budget.py`. Every item
+below landed as written; the ten-dollar switch (OpenRouter's 50 versus 1000 a
+day) was added beside it because the budget page is where an operator looks
+for it. Detail in `VERSIONS.md` under 0.31.0.*
 
 Reshaped by what v0.26–v0.28 shipped. The routes are now resilient; the
 remaining problem is that two handlers spend calls they do not need, the
@@ -406,6 +411,9 @@ once the playtest shows the giver pool reads well.
   removed, the AI Studio route, the daily liveness audit and its 400 ladder,
   route selection from the dashboard through `admin.narration.set_chain`,
   the direct OpenAI provider removed.
+- **v0.30.1** — one home, built up (schema 33): the sect residence grows with
+  contribution points under rank and stage gates, and a homestead of one's own
+  is founded at Deacon or higher; the six archetypes stay only for existing rows.
 - **v0.29.1** — one GitHub workflow: the release job runs behind the CI checks
   on the commit they proved, instead of re-running its own copy of them.
 
@@ -423,7 +431,7 @@ drift for seven versions as happened between v0.21.6 and v0.28.0.
 | Commissions | v0.22.0 / v0.24.0 | shipped, less seeded invention |
 | v0.29 Hardened I | v0.29.0 | shipped |
 | v0.30 Authority II | v0.30.0 | shipped; the world clock read-through is the one named leftover |
-| v0.31 Narrator budget | | routes resilient (v0.26–v0.28); calls and floor open |
+| v0.31 Narrator budget | v0.31.0 | shipped |
 | v0.32 Hardened II | | `admin.audit.undo_last` shipped; moderation and backups open |
 | v0.33 Gameplay I | | seven autocompletes and `/battle challenge` picker done; five params, typed-play args, three locations open |
 | v0.34 Playtest | | |

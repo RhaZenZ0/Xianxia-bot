@@ -14,16 +14,28 @@ from .runtime import player_property_definition
 from .services import PLAYER_PROPERTY_FACILITY_KEYS, PLAYER_PROPERTY_FACILITY_LABELS
 
 def player_property_emoji(abode: dict[str, Any]) -> str:
-    definition = player_property_definition(str(abode.get("property_type") or "cave_abode"))
+    definition = player_property_definition(str(abode.get("property_type") or "homestead"))
     return str(definition.get("emoji") or "🏡")
 
-def player_property_facility_lines(abode: dict[str, Any]) -> list[str]:
+def player_property_facility_lines(abode: dict[str, Any], keys: tuple[str, ...] | None = None) -> list[str]:
     lines: list[str] = []
-    for key in PLAYER_PROPERTY_FACILITY_KEYS:
+    for key in (keys if keys is not None else PLAYER_PROPERTY_FACILITY_KEYS):
         value = int(abode.get(f"{key}_level", 0) or 0)
         if value > 0 or key in {"cultivation", "storage"}:
             lines.append(f"{PLAYER_PROPERTY_FACILITY_LABELS.get(key, key.replace('_', ' ').title())} **Lv.{value}**")
     return lines
+
+def player_property_unbuilt(abode: dict[str, Any], keys: tuple[str, ...] | None = None) -> list[str]:
+    """Facilities a home does not have yet - what an upgrade can build (v0.30.1).
+
+    `keys` narrows the set: a homestead has all nine, a sect residence the six
+    the content's sect_abode_system names.
+    """
+    return [
+        PLAYER_PROPERTY_FACILITY_LABELS.get(key, key.replace("_", " ").title())
+        for key in (keys if keys is not None else PLAYER_PROPERTY_FACILITY_KEYS)
+        if int(abode.get(f"{key}_level", 0) or 0) <= 0
+    ]
 
 def human_duration(seconds: int) -> str:
     minutes, sec = divmod(max(0, seconds), 60)

@@ -13,6 +13,7 @@ of the split possible, and it is asserted by tests/python/unit/test_bot_package.
 from __future__ import annotations
 
 import asyncio
+import time
 import logging
 import re
 from functools import wraps
@@ -74,6 +75,11 @@ DB = Database(
     engine_url=SETTINGS.game_engine_url,
 )
 _USER_ACTION_LOCKS: dict[int, asyncio.Lock] = {}
+# When each lock was last taken. A lock is evicted once its holder has been
+# idle this long and nothing is waiting on it, so the table follows the
+# players who are actually playing rather than everyone who ever has.
+_USER_ACTION_LOCK_SEEN: dict[int, float] = {}
+USER_ACTION_LOCK_IDLE_SECONDS = 1800.0
 # Per-player token bucket for typed play (v0.21.1). Every typed line that can
 # reach the engine or the narrator spends a token; speech-only lines are free.
 # See app/ops/user_budget.py for why this exists and what it protects.
@@ -83,14 +89,14 @@ def _player_property_types() -> dict[str, dict[str, Any]]:
     if isinstance(configured, dict) and configured:
         return {str(key): dict(value) for key, value in configured.items() if isinstance(value, dict)}
     return {
-        "cave_abode": {"name": "Cave Abode", "emoji": "🏡", "defaults": {"cultivation": 1, "storage": 1}},
+        "homestead": {"name": "Homestead", "emoji": "🏡", "defaults": {"cultivation": 1, "storage": 1}},
     }
 PLAYER_PROPERTY_TYPES = _player_property_types()
 def player_property_definition(property_type: str | None) -> dict[str, Any]:
-    key = str(property_type or "cave_abode")
-    return PLAYER_PROPERTY_TYPES.get(key, PLAYER_PROPERTY_TYPES.get("cave_abode", {}))
+    key = str(property_type or "homestead")
+    return PLAYER_PROPERTY_TYPES.get(key, PLAYER_PROPERTY_TYPES.get("homestead", {}))
 def player_property_label(abode: dict[str, Any]) -> str:
-    definition = player_property_definition(str(abode.get("property_type") or "cave_abode"))
+    definition = player_property_definition(str(abode.get("property_type") or "homestead"))
     return str(definition.get("name") or "Player Property")
 async def character_location_display(character: dict[str, Any]) -> str:
     """Resolve a character's raw `location` column into a player-facing label.
@@ -226,16 +232,55 @@ async def settle_seclusion_for_user(user_id: int, current_game_minute: int | Non
         if "no active seclusion" not in str(exc).lower():
             raise
     return await DB.get_seclusion(int(user_id), active_only=False)
+def budget_refusal_line(user_id: int, door: str) -> str | None:
+    """None if the player may spend a token on this door now; else the reply.
+
+    One bucket, every door (v0.31.0): a player who is refused a typed line
+    is refused the same action as a slash command or a hub button, and the
+    per-door counts on the AI Routing page say which door it was.
+    """
+    if TYPED_PLAY_BUDGET.try_acquire(int(user_id), door=door):
+        return None
+    wait = TYPED_PLAY_BUDGET.seconds_until_token(int(user_id))
+    return (
+        f"⏳ Actions are limited to about {SETTINGS.typed_play_per_minute:g} a minute. "
+        f"Try again in {max(1, int(round(wait)))}s — or just say it in character, that's free."
+    )
+
+
+def _user_action_lock(user_id: int) -> asyncio.Lock:
+    now = time.monotonic()
+    cutoff = now - USER_ACTION_LOCK_IDLE_SECONDS
+    for stale_id in [uid for uid, seen in _USER_ACTION_LOCK_SEEN.items() if seen <= cutoff]:
+        lock = _USER_ACTION_LOCKS.get(stale_id)
+        if lock is None or not lock.locked():
+            _USER_ACTION_LOCKS.pop(stale_id, None)
+            _USER_ACTION_LOCK_SEEN.pop(stale_id, None)
+    _USER_ACTION_LOCK_SEEN[int(user_id)] = now
+    return _USER_ACTION_LOCKS.setdefault(int(user_id), asyncio.Lock())
+
+
 def serialized_user_action(func):
     """Serialize state-changing commands per Discord user in this bot process.
 
     Cooldown checks and game-state writes often span more than one SQLite call.
     Without this guard, two near-simultaneous slash commands from the same user
     could both pass a cooldown/read check before either write completed.
+
+    Since v0.31.0 the wrapper is also a door of the per-player budget: every
+    state-changing command spends a token from the same bucket typed play
+    spends, and a refused one is answered rather than queued.
     """
     @wraps(func)
     async def wrapper(interaction: discord.Interaction, *args, **kwargs):
-        lock = _USER_ACTION_LOCKS.setdefault(interaction.user.id, asyncio.Lock())
+        refusal = budget_refusal_line(interaction.user.id, "slash")
+        if refusal:
+            if interaction.response.is_done():
+                await interaction.followup.send(refusal, ephemeral=False)
+            else:
+                await interaction.response.send_message(refusal, ephemeral=False)
+            return None
+        lock = _user_action_lock(interaction.user.id)
         async with lock:
             if not func.__name__.startswith("seclusion_"):
                 seclusion = await settle_seclusion_for_user(interaction.user.id)

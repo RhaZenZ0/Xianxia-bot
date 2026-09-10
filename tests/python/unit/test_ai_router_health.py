@@ -186,6 +186,33 @@ class RouterHealthTests(unittest.TestCase):
         self.assertIn("routine", snapshot["chains"])
 
 
+class TenDollarSwitchTests(unittest.TestCase):
+    def test_the_switch_raises_the_daily_cap_and_set_slots_flips_it(self):
+        router = AITaskRouter(api_key="test-key", max_requests_per_day=50)
+        self.assertEqual(router.limiter.max_requests_per_day, 50)
+        self.assertFalse(router.health_snapshot()["credits_topped_up"])
+        # Stored beside the chain as "true"/"false"; not a model slug, so the
+        # free-route guard never sees it and the chain is untouched.
+        result = router.set_slots({"credits_topped_up": "true"})
+        self.assertIn("credits_topped_up", result["changed"])
+        self.assertEqual(router.limiter.max_requests_per_day, 1000)
+        self.assertTrue(router.health_snapshot()["credits_topped_up"])
+        router.set_slots({"credits_topped_up": "false"})
+        self.assertEqual(router.limiter.max_requests_per_day, 50)
+        # A configured cap above the topped-up figure is kept.
+        big = AITaskRouter(api_key="test-key", max_requests_per_day=5000, credits_topped_up=True)
+        self.assertEqual(big.limiter.max_requests_per_day, 5000)
+        self.assertEqual(big.health_snapshot()["daily_cap_configured"], 5000)
+
+    def test_calls_are_counted_by_purpose(self):
+        router = _router([_reply("An old man nods.")])
+        result = _generate(router, purpose="dialogue")
+        self.assertTrue(result.text)
+        purposes = router.health_snapshot()["purposes"]
+        self.assertEqual(purposes["dialogue"], {"requests": 1, "served": 1})
+        self.assertNotIn("routine", purposes)
+
+
 class LeakGuardTests(unittest.TestCase):
     def test_narration_still_rejects_implementation_leaks_by_default(self):
         with self.assertRaises(ValueError):

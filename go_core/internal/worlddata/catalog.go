@@ -369,6 +369,7 @@ type Catalog struct {
 	AuctionHouses       map[string]AuctionHouse        `json:"auction_houses"`
 	TeleportArrays      map[string]TeleportArray       `json:"teleport_arrays"`
 	AbodeSystem         map[string]any                 `json:"abode_system"`
+	SectAbodeSystem     map[string]any                 `json:"sect_abode_system"`
 	SectSystem          map[string]any                 `json:"sect_system"`
 	SpecialEffects      map[string]map[string]any      `json:"special_effects"`
 	Recipes             map[string]Recipe              `json:"recipes"`

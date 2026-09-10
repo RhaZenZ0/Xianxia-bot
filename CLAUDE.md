@@ -137,7 +137,7 @@ internal/server/        HTTP control/data plane
 ```
 
 Every Go SQLite connection uses `journal_mode=WAL`, `foreign_keys=ON`, `busy_timeout=10000`,
-`synchronous=NORMAL`. Current schema version is 32; historical migrations are kept so old databases
+`synchronous=NORMAL`. Current schema version is 33; historical migrations are kept so old databases
 can upgrade in place — see `VERSIONS.md` for the full schema/release history.
 
 ### RAG / memory (`app/ai/rag`)
@@ -192,9 +192,23 @@ catalogue). The AI Studio route is never retired whatever it answers — it is t
 on its own quota, outside the shared budget. It proves reachability only — a scratchpadding model passes it, so
 `_validate_generated_text` remains the sole judge of whether a reply is usable prose.
 
+Since v0.31.0 a live call is made for three reasons only: an NPC answering a player (`dialogue`),
+an epic beat (`epic`), or an explicit ask (`narrate_it` - the typed-play picker's *Narrate it*, the
+button under an exploration or hunt result, an @mention, or the GM's `ai_routine_narration`
+automation flag). `narrate_exploration` and `narrate_hunt_result` are procedural by default and
+take `upgrade=True` for the explicit path; every `_generate` call names its purpose and the router
+counts purposes for the AI Routing page. The procedural floor is content: `narration_pool` in
+`content/world.json` (seven scene kinds by four world tiers), chosen deterministically by
+`app/rules/narration_pool.py`. One per-player bucket (`TYPED_PLAY_BURST` / `TYPED_PLAY_PER_MINUTE`)
+meters every door - typed lines, `serialized_user_action` (slash and hub), Narrate-it - and reports
+per door. `tests/python/contracts/test_narrator_budget.py` holds all of it.
+
 ### Narration routes in the dashboard
 
-The GM dashboard's **Narration Routes** panel picks the five chain slots
+The GM dashboard's **Narration Routes** panel also carries the ten-dollar switch (v0.31.0):
+OpenRouter's free allowance is 50 requests a day under ten dollars of credit and 1000 above, so
+`credits_topped_up` is stored beside the slots by the same engine write and applied through
+`set_slots`; `OPENROUTER_CREDITS_TOPPED_UP` is the `.env` baseline. The panel picks the five chain slots
 (`routine_model`, `routine_fallback_model`, `epic_model`, `epic_fallback_model`,
 `dynamic_free_model`) from OpenRouter's live free catalogue rather than from a list kept in this
 repo — a list kept here is how `z-ai/glm-5.2:free` and `minimax/minimax-m3:free` both shipped as

@@ -1,4 +1,8 @@
-"""Per-user token bucket for player-typed input (typed play, v0.21.1).
+"""Per-user token bucket on every door a player can spend the narrator through.
+
+Typed play first (v0.21.1); since v0.31.0 the same bucket also meters the
+slash and hub paths (``serialized_user_action``) and the explicit "Narrate
+it" asks, so a player cannot route around it by changing doors.
 
 The narrator's daily allowance is shared by the whole server (README, "Free-tier
 budget"): 50 free requests a day under $10 of credits. ``serialized_user_action``
@@ -42,6 +46,9 @@ class UserBudget:
     _buckets: dict[int, _Bucket] = field(default_factory=dict, repr=False)
     granted: int = 0
     refused: int = 0
+    # Per door (typed / slash / narrate_it), so the AI Routing page can say
+    # which path the refusals come from.
+    doors: dict[str, dict[str, int]] = field(default_factory=dict, repr=False)
 
     def __post_init__(self) -> None:
         self.burst = max(1, int(self.burst))
@@ -60,7 +67,10 @@ class UserBudget:
         for uid in stale:
             del self._buckets[uid]
 
-    def try_acquire(self, user_id: int) -> bool:
+    def _door(self, door: str) -> dict[str, int]:
+        return self.doors.setdefault(str(door or "typed"), {"granted": 0, "refused": 0})
+
+    def try_acquire(self, user_id: int, door: str = "typed") -> bool:
         """Spend one token for ``user_id`` if one is available. Never blocks."""
         now = self.clock()
         self._evict_idle(now)
@@ -73,8 +83,10 @@ class UserBudget:
         if bucket.tokens >= 1.0:
             bucket.tokens -= 1.0
             self.granted += 1
+            self._door(door)["granted"] += 1
             return True
         self.refused += 1
+        self._door(door)["refused"] += 1
         return False
 
     def seconds_until_token(self, user_id: int) -> float:
@@ -95,4 +107,5 @@ class UserBudget:
             "tracked_users": len(self._buckets),
             "granted": self.granted,
             "refused": self.refused,
+            "doors": {door: dict(counts) for door, counts in sorted(self.doors.items())},
         }

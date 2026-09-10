@@ -9752,6 +9752,259 @@
       "min_realm_index": 24
     }
   },
+  "narration_pool": {
+    "tiers": [
+      "Mortal World",
+      "Spiritual World",
+      "Immortal World",
+      "Celestial World"
+    ],
+    "scenes": {
+      "exploration": {
+        "placeholders": [
+          "encounter",
+          "location",
+          "name"
+        ],
+        "variants": {
+          "Mortal World": [
+            "{encounter}\n\nThe ordinary sounds of {location} - cart wheels, a dog, wind in dry grass - carry on around it, as if the world has not yet decided this matters. {name} has the next move.",
+            "{encounter}\n\nDust settles. Nothing here presses for an answer, and nothing offers one; the moment simply waits at {location} for {name} to act on it.",
+            "{encounter}\n\nAt {location} the air is plain and the ground is honest, and whatever this becomes will be decided by what {name} does next, not by any sign from the heavens."
+          ],
+          "Spiritual World": [
+            "{encounter}\n\nThin spirit qi moves through {location} like a current under ice, and it bends a little toward the scene. {name} feels it and holds still; the choice is still theirs.",
+            "{encounter}\n\nThe light at {location} has the faint, washed clarity of the Spiritual World, and in it the situation stands sharp-edged and unresolved. It waits on {name}.",
+            "{encounter}\n\nSomewhere above {location} a formation hums that mortals would never hear. Down here, nothing has committed itself. {name} decides what happens next."
+          ],
+          "Immortal World": [
+            "{encounter}\n\nAt {location} the qi is dense enough to taste, and it carries the weight of things that have stood for ten thousand years. The scene does not hurry {name}; it has all the time there is.",
+            "{encounter}\n\nThe Immortal World does not explain itself. {location} offers the situation whole and says nothing further, and {name} must choose without being told the stakes.",
+            "{encounter}\n\nA stillness settles over {location} that is not peace but attention, as if the land itself were watching to see what {name} will do."
+          ],
+          "Celestial World": [
+            "{encounter}\n\nAt {location} the laws of the Celestial World press close, and even an unresolved moment feels weighed and recorded. {name} stands in it, unhurried and unforgiven.",
+            "{encounter}\n\nThe air of {location} is so clear it rings. Nothing here is accidental, and nothing has yet been decided; the next decision belongs to {name}.",
+            "{encounter}\n\nHigh over {location}, something vast turns its regard elsewhere. The scene remains, exact and open, for {name} to answer."
+          ]
+        }
+      },
+      "hunt_success": {
+        "placeholders": [
+          "beast",
+          "location"
+        ],
+        "variants": {
+          "Mortal World": [
+            "The clash with the **{beast}** ends in your favor near {location}. It can no longer contest the hunt, and the immediate struggle falls still.",
+            "Mud, torn brush, and then quiet: the **{beast}** is down, and {location} goes back to being an ordinary place with one less thing in it.",
+            "The **{beast}** gives one last lunge and falls short. The hunt at {location} is yours; the ground is trampled and the air smells of blood and crushed grass."
+          ],
+          "Spiritual World": [
+            "The **{beast}** falters as its qi scatters, and the hunt at {location} closes in your favor. What it was is settling back into the land.",
+            "Spirit light flickers along the wounds you opened; then the **{beast}** is still. {location} holds its breath a moment longer and then lets it go.",
+            "The **{beast}** breaks under the last exchange. Around {location} the thin spirit qi stirs, drawn briefly to the kill, and drifts on."
+          ],
+          "Immortal World": [
+            "The **{beast}** falls, and the dense qi of {location} closes over the place it stood like water over a dropped stone. The hunt is yours.",
+            "An old creature dies slowly and with dignity. The **{beast}** does both, and {location} keeps its silence as the struggle ends in your favor.",
+            "Your last strike lands where the **{beast}** had no more strength to guard. It goes down at {location}, and the immortal land takes no notice at all."
+          ],
+          "Celestial World": [
+            "The **{beast}** yields to the final exchange, and for a heartbeat the laws that hold {location} together seem to weigh what you have done. The hunt is yours.",
+            "The **{beast}** falls with a sound like a bell struck once. At {location}, nothing else moves; the struggle is finished and the outcome is plainly yours.",
+            "Even here, a kill is a kill. The **{beast}** is down at {location}, and the clear celestial air does not soften it."
+          ]
+        }
+      },
+      "hunt_failure": {
+        "placeholders": [
+          "beast",
+          "location"
+        ],
+        "variants": {
+          "Mortal World": [
+            "The **{beast}** breaks away before the hunt can be completed, leaving distance and disturbed ground between hunter and quarry at {location}.",
+            "A wrong step, a wrong moment, and the **{beast}** is gone into the cover around {location}. You are unhurt and it is unhurt, and the hunt is over for now.",
+            "The **{beast}** slips the exchange and puts {location} between you. Nothing is lost but the chance."
+          ],
+          "Spiritual World": [
+            "The **{beast}** twists out of reach on a thread of spirit qi and is gone from {location}. You keep your footing and your hide; the hunt does not.",
+            "For a moment the **{beast}** is there in the pale light of {location}, then it is not, and the air closes over the place it stood.",
+            "The **{beast}** reads your intent a breath before you commit and is already moving. {location} swallows it. The hunt ends without a kill."
+          ],
+          "Immortal World": [
+            "The **{beast}** withdraws through the dense qi of {location} as if through a door, and the hunt closes without a result. It will remember you; that is all.",
+            "You lose the **{beast}** in the deep stillness of {location}. Nothing was taken from you, and nothing was won.",
+            "The **{beast}** declines the fight and vanishes into the old land around {location}. The hunt is over, unfinished."
+          ],
+          "Celestial World": [
+            "The **{beast}** parts from the clash and is gone across {location} before your next breath. In the Celestial World, that is a kind of answer.",
+            "The **{beast}** slips the exchange with contempt and leaves {location} to you. You are whole; the hunt is not.",
+            "Between one heartbeat and the next the **{beast}** is elsewhere. {location} keeps its clear silence, and the hunt ends without a kill."
+          ]
+        }
+      },
+      "action": {
+        "placeholders": [
+          "location",
+          "name"
+        ],
+        "variants": {
+          "Mortal World": [
+            "At **{location}**, the surroundings react in small, ordinary ways - a glance, a shift of weight, the quiet of people deciding not to notice. Nothing requiring a mechanical check resolves on its own; say more, or use **/action** to test it.",
+            "The moment passes at **{location}** without anything committing itself. {name}'s intent is understood by the scene but not yet tested; a clearer aim, or **/action**, would settle it.",
+            "At **{location}** the world takes the attempt in and gives nothing back yet. What it becomes depends on a more specific move, or on **/action** to put it to a check."
+          ],
+          "Spiritual World": [
+            "At **{location}** the thin spirit qi answers {name}'s intent with a faint stir and no verdict. Nothing is resolved by itself; a more specific aim, or **/action**, would test it.",
+            "The scene at **{location}** acknowledges the attempt the way the Spiritual World acknowledges most things: quietly, and without deciding. Use **/action** when the attempt should make a check.",
+            "At **{location}**, {name}'s move leaves a ripple in the local qi and nothing more. Say what it is aimed at, or use **/action** to let the dice weigh it."
+          ],
+          "Immortal World": [
+            "At **{location}** the dense qi of the Immortal World absorbs {name}'s intent without comment. Nothing resolves on its own here; a sharper aim, or **/action**, would.",
+            "The old land around **{location}** does not react to gestures. {name}'s attempt stands unanswered until it is made specific, or put to a check with **/action**.",
+            "At **{location}** the scene holds still around the attempt, neither refusing nor yielding. Describe the exact intent, or use **/action** to test it."
+          ],
+          "Celestial World": [
+            "At **{location}** the laws of the Celestial World note {name}'s intent and withhold judgment. Nothing is resolved automatically; state the aim, or use **/action** to make the check.",
+            "The clear air of **{location}** carries the attempt and returns no answer. In this world an act is weighed when it is committed - use **/action** to commit it.",
+            "At **{location}** {name}'s move is seen, and that is all that happens. A more specific intent, or **/action**, would put it to the test."
+          ]
+        }
+      },
+      "dialogue": {
+        "placeholders": [
+          "npc"
+        ],
+        "variants": {
+          "Mortal World": [
+            "**{npc}** turns their attention fully to you. \"I heard you.\" They leave the rest unsaid rather than offer an answer they are unwilling to give.",
+            "**{npc}** considers you for a moment, then goes back to what they were doing. \"Say it plainer, or say it later.\"",
+            "**{npc}** nods once, slowly. It is not agreement, and it is not refusal; it is the look of someone who will remember what you said."
+          ],
+          "Spiritual World": [
+            "**{npc}** lets the silence stretch a breath longer than is comfortable. \"I heard you.\" Nothing more is offered, and nothing is denied.",
+            "**{npc}** studies you with the patience of someone whose years are not counted in seasons. \"We will see,\" they say, and mean exactly that.",
+            "**{npc}** inclines their head a fraction. \"Noted.\" The word carries more weight here than it would below."
+          ],
+          "Immortal World": [
+            "**{npc}** regards you as an old tree regards weather. \"I heard you,\" they say, and the matter is neither settled nor dismissed.",
+            "**{npc}** does not answer at once. When they do, it is only, \"Go on,\" and the qi around them does not so much as stir.",
+            "**{npc}** turns their gaze on you, and for a moment the age of them is plain. \"Speak clearly, or not at all.\""
+          ],
+          "Celestial World": [
+            "**{npc}** hears you out without expression. \"So you say.\" In the Celestial World, that is not nothing.",
+            "**{npc}** looks at you the way the sky looks at a bird. \"I have heard.\" They do not say what they will do with it.",
+            "**{npc}** allows a pause that could hold a lifetime. \"Continue,\" they say, and the word is a door left ajar."
+          ]
+        }
+      },
+      "breakthrough_success": {
+        "placeholders": [
+          "realm",
+          "stage"
+        ],
+        "variants": {
+          "Mortal World": [
+            "The gathered power crosses the threshold cleanly and settles into **{realm}, Stage {stage}**, its new rhythm steady rather than collapsing back on itself.",
+            "Something gives, and then something holds. The cultivation base finds its new footing in **{realm}, Stage {stage}**, and the body knows it before the mind does.",
+            "The qi that strained at the barrier pours through and stills. **{realm}, Stage {stage}** - the meridians settle into it like a river finding a wider bed."
+          ],
+          "Spiritual World": [
+            "The barrier thins, parts, and closes behind you. **{realm}, Stage {stage}** settles in with a clarity the Spiritual World lends to those who earn it.",
+            "The gathered power crosses over and holds. **{realm}, Stage {stage}**: the world's thin qi threads itself through the new base and stays.",
+            "There is a moment of falling and then of standing on something solid. **{realm}, Stage {stage}** is yours, steady and quiet."
+          ],
+          "Immortal World": [
+            "The threshold gives way like old stone under patient water. **{realm}, Stage {stage}** settles deep, the dense qi of the Immortal World filling every channel it opens.",
+            "The power crosses cleanly and the Immortal World, which notices little, notices this. **{realm}, Stage {stage}** holds.",
+            "A long pressure ends. **{realm}, Stage {stage}** settles into place with the finality of a door closing on a room you will not enter again."
+          ],
+          "Celestial World": [
+            "The gathered power crosses the threshold and the laws of the Celestial World accept it. **{realm}, Stage {stage}** settles in, exact and permanent.",
+            "The barrier does not break; it acknowledges you and stands aside. **{realm}, Stage {stage}** holds, and the clear air rings with it.",
+            "Something in the heavens is amended. **{realm}, Stage {stage}**: the new base settles, and nothing that follows will be quite as it was."
+          ]
+        }
+      },
+      "breakthrough_failure": {
+        "placeholders": [
+          "realm",
+          "stage"
+        ],
+        "variants": {
+          "Mortal World": [
+            "The gathered power reaches the threshold but does not stabilize beyond it. The attempt disperses without carrying the cultivation base into **{realm}, Stage {stage}**.",
+            "For a breath it is almost there. Then the pressure slips, the qi scatters back to where it was, and **{realm}, Stage {stage}** remains a step away.",
+            "The barrier holds. The power that pressed against it drains back, and the body is left tired and whole, **{realm}, Stage {stage}** untouched."
+          ],
+          "Spiritual World": [
+            "The threshold to **{realm}, Stage {stage}** thins and does not part. The gathered qi settles back, unspent and unwilling.",
+            "The attempt reaches the edge and finds nothing to hold. The Spiritual World offers no second chance in this breath; **{realm}, Stage {stage}** waits.",
+            "The power gathers, rises, and falls back like a tide that did not quite reach the mark. **{realm}, Stage {stage}** stays where it was."
+          ],
+          "Immortal World": [
+            "The Immortal World's dense qi presses back harder than the attempt pushed. **{realm}, Stage {stage}** does not open, and the gathered power disperses without harm.",
+            "The threshold to **{realm}, Stage {stage}** stands like a mountain and the attempt, for all its force, is weather. It passes.",
+            "Almost. The word hangs in the channels as the power drains back, and **{realm}, Stage {stage}** remains on the far side of the barrier."
+          ],
+          "Celestial World": [
+            "The laws of the Celestial World weigh the attempt and find it not yet enough. **{realm}, Stage {stage}** does not open; the gathered power disperses without judgment.",
+            "The barrier to **{realm}, Stage {stage}** answers with silence. What was gathered scatters, and nothing is taken but the moment.",
+            "The threshold acknowledges the attempt and declines it. **{realm}, Stage {stage}** waits, unmoved; the cultivator is unharmed and unfinished."
+          ]
+        }
+      }
+    }
+  },
+  "sect_abode_system": {
+    "facilities": [
+      "cultivation",
+      "alchemy",
+      "forge",
+      "formation",
+      "storage",
+      "herb_garden"
+    ],
+    "max_level": 9,
+    "upgrade_base_points": 40,
+    "rank_caps": [
+      {
+        "rank_level": 10,
+        "max_level": 1
+      },
+      {
+        "rank_level": 20,
+        "max_level": 2
+      },
+      {
+        "rank_level": 30,
+        "max_level": 3
+      },
+      {
+        "rank_level": 40,
+        "max_level": 4
+      },
+      {
+        "rank_level": 50,
+        "max_level": 5
+      },
+      {
+        "rank_level": 60,
+        "max_level": 6
+      },
+      {
+        "rank_level": 70,
+        "max_level": 8
+      },
+      {
+        "rank_level": 80,
+        "max_level": 9
+      }
+    ],
+    "realm_floor_per_level": 1
+  },
   "abode_system": {
     "facilities": [
       "cultivation",
@@ -9767,11 +10020,22 @@
     "max_level": 9,
     "upgrade_base_cost": 100,
     "currency": "low_spirit_stone",
+    "founding_rank_level": 40,
     "property_types": {
+      "homestead": {
+        "name": "Homestead",
+        "emoji": "🏡",
+        "description": "A cultivator's one home. It begins as a cultivation chamber and a storeroom; the herb garden, alchemy furnace, forge, formation core, beast pen, merchant hall and defensive formation are built and raised with upgrades.",
+        "defaults": {
+          "cultivation": 1,
+          "storage": 1
+        }
+      },
       "cave_abode": {
         "name": "Cave Abode",
         "emoji": "🏡",
-        "description": "A secluded cultivation residence balanced around cultivation, storage and formations.",
+        "buildable": false,
+        "description": "A secluded cultivation residence balanced around cultivation, storage and formations. Retired at v0.30.1: a sect assigns its disciples an abode, and the property a player founds is the homestead.",
         "defaults": {
           "cultivation": 1,
           "storage": 1
@@ -9780,6 +10044,7 @@
       "alchemy_estate": {
         "name": "Alchemy Estate",
         "emoji": "⚗️",
+        "buildable": false,
         "description": "A private estate centered on pill refinement, medicinal herbs and secure storage.",
         "defaults": {
           "alchemy": 1,
@@ -9790,6 +10055,7 @@
       "spirit_herb_estate": {
         "name": "Spirit Herb Estate",
         "emoji": "🌿",
+        "buildable": false,
         "description": "A spiritual garden estate specializing in herb cultivation and medicinal preparation.",
         "defaults": {
           "herb_garden": 2,
@@ -9800,6 +10066,7 @@
       "spirit_beast_ranch": {
         "name": "Spirit Beast Ranch",
         "emoji": "🐉",
+        "buildable": false,
         "description": "A protected private holding for contracted beasts, training and recovery.",
         "defaults": {
           "beast_pen": 2,
@@ -9810,6 +10077,7 @@
       "merchant_pavilion": {
         "name": "Merchant Pavilion",
         "emoji": "🏪",
+        "buildable": false,
         "description": "A player-owned commercial residence with expanded storage and merchant facilities.",
         "defaults": {
           "merchant": 1,
@@ -9820,6 +10088,7 @@
       "clan_estate": {
         "name": "Clan Estate",
         "emoji": "🏯",
+        "buildable": false,
         "description": "A fortified family estate suited to cultivation, guests, formations and long-term clan scenes.",
         "defaults": {
           "cultivation": 1,

@@ -72,6 +72,7 @@ AI_ROUTER = AITaskRouter(
     require_free=SETTINGS.openrouter_require_free,
     max_requests_per_minute=SETTINGS.openrouter_max_requests_per_minute,
     max_requests_per_day=SETTINGS.openrouter_max_requests_per_day,
+    credits_topped_up=SETTINGS.openrouter_credits_topped_up,
     route_requests_per_minute=SETTINGS.openrouter_route_requests_per_minute,
     route_requests_per_day=SETTINGS.openrouter_route_requests_per_day,
     routine_timeout_seconds=SETTINGS.openrouter_timeout_seconds,
@@ -109,10 +110,15 @@ NARRATOR_CONTEXT = NarratorContextBuilder(
 
 ALERTS = AlertDispatcher(SETTINGS.alert_webhook_url, cooldown_seconds=SETTINGS.alert_cooldown_seconds)
 
-PLAYER_PROPERTY_TYPE_CHOICES = [
-    app_commands.Choice(name=str(defn.get("name", key.replace("_", " ").title()))[:100], value=key)
-    for key, defn in PLAYER_PROPERTY_TYPES.items()
-][:25]
+# The property types a player may found (v0.30.1): one, the homestead. The
+# archetypes that used to be chosen at founding (cave abode, the five
+# estates) stay defined so existing rows keep their label, but are marked
+# `"buildable": false` in the content: a home is one place you build up,
+# facility by facility, not a choice made at the door. The engine holds the
+# same rule (property_types.go).
+PLAYER_PROPERTY_HOME_TYPES = tuple(
+    key for key, defn in PLAYER_PROPERTY_TYPES.items() if defn.get("buildable", True)
+)
 
 PLAYER_PROPERTY_FACILITY_KEYS = tuple(str(x) for x in WORLD.abode_system.get("facilities", (
     "cultivation", "alchemy", "forge", "formation", "defense", "storage", "herb_garden", "beast_pen", "merchant"

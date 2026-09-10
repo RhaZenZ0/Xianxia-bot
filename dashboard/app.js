@@ -365,7 +365,19 @@ async function loadAiRouting(){
   <div class="card"><small>Narration requests</small><div class="metric">${n(req)}</div></div>
   <div class="card"><small>Served by AI</small><div class="metric">${n(served)}</div></div>
   <div class="card"><small>Procedural fallbacks</small><div class="metric ${fellBack?'bad':''}">${n(fellBack)}</div><small>${pct}% of requests</small></div>
-  <div class="card"><small>Daily free budget</small><div class="metric">${n(used)}/${n(cap)}</div><small>refused ${n(lim.rejected||0)}</small></div>
+  <div class="card"><small>Daily free budget</small><div class="metric">${n(used)}/${n(cap)}</div><small>refused ${n(lim.rejected||0)} · ${d.credits_topped_up?'ten dollars on the account':'under ten dollars of credit'}</small></div>
+ </div>
+ <h2>What the calls are for</h2>
+ <p class="muted">Since v0.31.0 a live call is made for three reasons only: an NPC answering a player, an epic beat, or an explicit ask (the picker's <b>Narrate it</b>, the button under an exploration or hunt, an @mention). Everything else reads from the procedural pool by design.</p>
+ <div class="cards">
+  ${['dialogue','epic','narrate_it','forge','monitor'].map(k=>{const p=(d.purposes||{})[k]||{};return `<div class="card"><small>${esc({dialogue:'Dialogue',epic:'Epic beats',narrate_it:'Narrate it',forge:'Quest forge',monitor:'Chat digest'}[k])}</small><div class="metric">${n(p.served||0)}</div><small>of ${n(p.requests||0)} asked</small></div>`}).join('')}
+  <div class="card"><small>Procedural by design</small><div class="metric">${n((d.narrator||{}).procedural_by_default||0)}</div><small>explore and hunt results served from the pool</small></div>
+ </div>
+ <h2>Per-player budget</h2>
+ <p class="muted">One bucket per player, every door: typed lines, slash commands and hub buttons, and Narrate-it asks. A refusal is answered, never queued.</p>
+ <div class="cards">
+  ${Object.entries((d.user_budget||{}).doors||{}).map(([door,c])=>`<div class="card"><small>${esc({typed:'Typed play',slash:'Slash and hub',narrate_it:'Narrate it'}[door]||door)}</small><div class="metric ${c.refused?'warn':''}">${n(c.refused||0)} refused</div><small>${n(c.granted||0)} granted</small></div>`).join('')||'<div class="card"><small>No door has been used yet.</small></div>'}
+  <div class="card"><small>Bucket</small><div class="metric">${n((d.user_budget||{}).burst||0)}</div><small>burst, refilling ${n((d.user_budget||{}).per_minute||0)} a minute · ${n((d.user_budget||{}).tracked_users||0)} players tracked</small></div>
  </div>
  <h2>Chains</h2><div class="cards">${Object.entries(chains).map(([t,l])=>chainRow(t,l)).join('')}</div>
  <h2>Daily route check</h2>${auditLine()}
@@ -470,6 +482,7 @@ async function loadNarration(){
   ${slot('slotEpicFallback','Epic — second hop','epic_fallback_model',true,'Optional. Tried when the epic primary fails.')}
   ${slot('slotDynamic','Last hop — dynamic router','dynamic_free_model',false,'Closes both chains. After this one fails, narration is procedural.')}
  </div>
+ <label class="check"><input type="checkbox" id="creditsToppedUp" ${st.credits_topped_up?'checked':''}> Ten dollars of credit are on the OpenRouter account<small class="muted">Off: the free tier is 50 narrations a day. On: 1000. Currently ${n(budget.max_requests_per_day||0)} a day; stored and audited with the routes.</small></label>
  <label>Audit reason<input id="narrationReason" value="GM dashboard narration routing"></label>
  <div class="buttonrow"><button class="btn primary" id="saveNarration">Save Routes</button><button class="btn" id="refreshCatalogue">Refresh Catalogue</button><button class="btn" id="refreshNarration">Refresh Status</button></div></section>
  <h2>What The Daily Probe Found</h2>
@@ -477,7 +490,7 @@ async function loadNarration(){
  ${table([['Route','model'],['Probe',verdict],['400 verdict',r=>r.probe_400_class?esc(r.probe_400_class):'—'],['Attempts','attempts'],['Served','successes'],['Failed','failures'],['Empty','empty_responses'],['Scratchpad','scratchpad_rejected'],['Cooling',r=>r.cooling_down?`${r.cooldown_remaining_seconds}s`:'—'],['Last error',r=>esc(r.last_error||r.probe_error||'—')]],rows)}`;
  const out=document.getElementById('narrationResult');
  saveNarration.onclick=async()=>{
-  const slotsOut={routine_model:slotRoutine.value,routine_fallback_model:slotRoutineFallback.value,epic_model:slotEpic.value,epic_fallback_model:slotEpicFallback.value,dynamic_free_model:slotDynamic.value};
+  const slotsOut={routine_model:slotRoutine.value,routine_fallback_model:slotRoutineFallback.value,epic_model:slotEpic.value,epic_fallback_model:slotEpicFallback.value,dynamic_free_model:slotDynamic.value,credits_topped_up:creditsToppedUp.checked?'true':'false'};
   if(!confirm('Save these narration routes? They are audited and applied to the running bot immediately.'))return;
   out.innerHTML='<div class="loading">Saving narration routes…</div>';
   try{const r=await narrationPost('narration.set_chain',{slots:slotsOut,reason:narrationReason?.value||'GM dashboard narration routing'});

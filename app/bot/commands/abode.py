@@ -11,15 +11,15 @@ import discord
 from discord import app_commands
 
 from ...ops.game_engine import GameEngineError
-from ..formatting import player_property_emoji, player_property_facility_lines
+from ..formatting import player_property_emoji, player_property_facility_lines, player_property_unbuilt
 from ..pickers import usable_item_autocomplete
 from ..registry import registered_group_command, registered_root_command
 from ..runtime import _explain_engine_error, DB, ENGINE, WORLD, current_world_time, player_property_label, reply_long, require_character, serialized_user_action
-from ..services import GUILD, PLAYER_PROPERTY_FACILITY_KEYS, PLAYER_PROPERTY_FACILITY_LABELS, PLAYER_PROPERTY_TYPE_CHOICES
+from ..services import GUILD, PLAYER_PROPERTY_FACILITY_KEYS, PLAYER_PROPERTY_FACILITY_LABELS
 from ..threads import ensure_abode_thread, open_expedition_thread_after_exit
 
 # ---------- Player-owned locations / homes ----------
-abode_group=app_commands.Group(name="abode",description="Own and develop a persistent private player-owned location")
+abode_group=app_commands.Group(name="abode",description="Your one home: found it, then build and raise its facilities")
 
 
 ABODE_FACILITIES=[
@@ -28,19 +28,26 @@ ABODE_FACILITIES=[
 ][:25]
 
 
-@registered_group_command(abode_group, name="establish",description="Establish your one persistent player-owned property at the current normal location")
-@app_commands.choices(property_type=PLAYER_PROPERTY_TYPE_CHOICES)
+@registered_group_command(abode_group, name="establish",description="Found your one home at the current normal location; build its facilities with Upgrade")
 @serialized_user_action
-async def abode_establish(interaction:discord.Interaction,name:str,property_type:app_commands.Choice[str])->None:
+async def abode_establish(interaction:discord.Interaction,name:str)->None:
     await interaction.response.defer(ephemeral=False)
     if not await require_character(interaction): return
     wt=await current_world_time()
+    # One home, one shape (v0.30.1): the engine founds the homestead - a
+    # cultivation chamber and a storeroom - and everything else is built
+    # with /abode → Upgrade. There is no type to choose at the door.
     try:
-        envelope=await ENGINE.authoritative_action("abode.establish",interaction.user.id,{"name":name,"property_type":property_type.value},action_id=f"discord:{interaction.id}:abode.establish")
+        envelope=await ENGINE.authoritative_action("abode.establish",interaction.user.id,{"name":name},action_id=f"discord:{interaction.id}:abode.establish")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
         await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
-    await interaction.followup.send(f"🏡 **{result.get('name',name)}** established.",ephemeral=False)
+    unbuilt=player_property_unbuilt(result)
+    await interaction.followup.send(
+        f"🏡 **{result.get('name',name)}** founded at **{result.get('base_location','your location')}**: a cultivation chamber and a storeroom.\n"
+        + (f"Not yet built: {', '.join(unbuilt)}. Use **/abode → Upgrade** to build one." if unbuilt else ""),
+        ephemeral=False,
+    )
 
 
 @registered_group_command(abode_group, name="status",description="Inspect your player-owned property, facilities and guest access")
@@ -53,11 +60,13 @@ async def abode_status(interaction:discord.Interaction)->None:
     guests=await DB.get_abode_guests(interaction.user.id)
     thread_text=f"<#{a['thread_id']}>" if a.get('thread_id') else "not created"
     facilities=" • ".join(player_property_facility_lines(a)) or "No developed facilities"
+    unbuilt=player_property_unbuilt(a)
     await interaction.response.send_message(
         f"{player_property_emoji(a)} **{a['name']} — {player_property_label(a)}**\n"
         f"Entrance: **{a['base_location']}** • Grade: **{a['grade']}**\n"
         f"Facilities: {facilities}\n"
-        f"Invited guests: **{len(guests)}**\n"
+        + (f"Not yet built: {', '.join(unbuilt)}\n" if unbuilt else "")
+        + f"Invited guests: **{len(guests)}**\n"
         f"Private location thread: {thread_text}\n\n"
         "The Discord thread is the scene for the property; the world location remains authoritative for entering and leaving.",
         ephemeral=False,
@@ -164,7 +173,7 @@ async def abode_guests(interaction:discord.Interaction)->None:
     await interaction.response.send_message("\n".join(lines),ephemeral=False)
 
 
-@registered_group_command(abode_group, name="upgrade",description="Upgrade one facility in your player-owned property")
+@registered_group_command(abode_group, name="upgrade",description="Build a facility your home lacks, or raise one it has")
 @app_commands.choices(facility=ABODE_FACILITIES)
 @serialized_user_action
 async def abode_upgrade(interaction:discord.Interaction,facility:app_commands.Choice[str])->None:
@@ -176,7 +185,13 @@ async def abode_upgrade(interaction:discord.Interaction,facility:app_commands.Ch
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
         await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
-    await interaction.followup.send(f"🏡 **{facility.value}** upgraded to level **{result.get('level','?')}**.",ephemeral=False)
+    label=PLAYER_PROPERTY_FACILITY_LABELS.get(facility.value,facility.value.replace('_',' ').title())
+    level=int(result.get('level',0) or 0)
+    cost=f" for **{result.get('cost','?')}** {WORLD.currency_name(str(result.get('currency','')))}" if result.get('cost') is not None else ""
+    if level<=1:
+        await interaction.followup.send(f"🏡 You build a **{label}**{cost}.",ephemeral=False)
+    else:
+        await interaction.followup.send(f"🏡 **{label}** raised to level **{level}**{cost}.",ephemeral=False)
 
 
 @registered_group_command(abode_group, name="focus",description="Use a developed property facility for a temporary specialization effect or scene benefit")

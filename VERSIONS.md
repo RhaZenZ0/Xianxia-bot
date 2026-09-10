@@ -1009,6 +1009,94 @@ Gate: `tests/python/contracts/test_security_defaults.py` and `TestNewRefusesAnEn
 No schema change (still 32), no game-rule change, AI remains narration-only.
 
 
+**0.31.0** is the roadmap's **Narrator budget** milestone. No schema change. The routes were made
+resilient in v0.26–v0.28; this release spends fewer calls on them, meters every door a player can
+spend them through, and makes the procedural floor read well.
+
+*Route by tier.* An exploration opening and a hunt result are decided by the engine, and the model
+was spending a routine call describing each. They are procedural by default now: the pool describes
+the scene at once, and a **Narrate it** button under the result asks the model only when the player
+presses it - an explicit ask, metered on its own door. A GM who wants model prose on every such
+scene turns on the new `ai_routine_narration` automation flag (`/admin → Simulation → Automation`),
+and the button is not shown. The two sect narrations nothing called are deleted. Every live call
+now declares why it is made - `dialogue`, `epic`, `narrate_it`, `forge`, `monitor` - and the router
+counts them; the narrator counts the scenes it served procedurally by design, apart from the
+fallbacks a model failed.
+
+*Budget on every door.* The per-player bucket (`TYPED_PLAY_BURST` / `TYPED_PLAY_PER_MINUTE`) used to
+meter typed lines only. `serialized_user_action` - every state-changing slash command and hub
+button - spends the same bucket now and refuses with the same line, so a player cannot route around
+it by changing doors, and the bucket reports grants and refusals per door. The per-player action
+locks the wrapper takes are evicted once idle for half an hour, which closes the unbounded-growth
+note the v0.23 roadmap carried.
+
+*A fallback pool.* `content/world.json` carries `narration_pool`: seven scene kinds (an exploration
+opening, a hunt won and lost, an action without a roll, an NPC's reply, a breakthrough made and
+missed) by four world tiers (Mortal, Spiritual, Immortal, Celestial), three variants each, 84 in
+all. `app/rules/narration_pool.py` picks one deterministically from the scene's seed - a retry does
+not reshuffle what a player already read - and fills it; the tier is the location's world, or in a
+private place the world the character's realm has reached. Every narrator fallback reads from it,
+so the floor a player sees when the allowance is spent or every route is retired varies and fits
+the place. A content test holds every cell filled and every line free of rewards.
+
+*The ten-dollar switch.* OpenRouter's free allowance is 50 requests a day until ten dollars of
+credit are on the account, then 1000. `OPENROUTER_CREDITS_TOPPED_UP` names the regime as a
+baseline, and the dashboard's **Narration Routes** panel has the same switch: it is stored by the
+engine beside the chain (`admin.narration.set_chain` accepts the key, so one save is one audit row)
+and applied live through the router's `set_slots`, the way the routes are. An explicit
+`OPENROUTER_MAX_REQUESTS_PER_DAY` still overrides both. The **AI Routing** page shows calls by
+purpose, scenes served procedurally by design, which regime the allowance is in, and the
+per-player refusals by door, so the effect of this release is visible where the routes already were.
+
+Gate: `tests/python/contracts/test_narrator_budget.py` - no `_generate` call site outside dialogue,
+the epic tier and the explicit-upgrade path runs by default, and the two procedural-first narrators
+return before the model unless upgraded; the slash and hub path spends the bucket before it takes
+the lock; the pool has three variants in every cell.
+
+**0.30.1** makes the player property one home, built up. No schema change, no mechanical change
+to any property that already exists.
+
+`/abode establish` used to open with a choice of six archetypes - cave abode, alchemy estate,
+spirit herb estate, spirit beast ranch, merchant pavilion, clan estate - each a preset of the same
+nine facilities. A public sect already assigns each disciple an abode (the `sect_abodes` residence
+behind `/sect abode`), so the cave abode was the same idea twice, and the estates were a choice
+made at the door about a place the player then developed anyway. Now there is one shape: the
+**homestead**, founded with a name and nothing else, as a cultivation chamber and a storeroom. The
+herb garden, alchemy furnace, forge, formation core, beast pen, merchant hall and defensive
+formation start at nothing and are built with `/abode → Upgrade` - level 0 to 1 is the build, at
+the base cost, and each level after costs the square. `/abode status` and the founding reply list
+what is not yet built so the next step is never a guess.
+
+The six archetypes stay defined in the content, marked `"buildable": false`, so a property founded
+before this release keeps its type, label and facilities; nothing is migrated. The engine holds the
+rule, not only the picker: `abode.establish` founds the one buildable type when none is named and
+refuses a retired or unknown one by name, where before an unknown type silently became a cave abode.
+Gate: `property_types_test.go` (the buildable set, the bare founding, the refusals, a build and a
+refused second upgrade that spends nothing) and `test_player_property_system.py`.
+
+*The sect residence grows, and the homestead is earned.* The residence a public sect assigns
+(`/sect abode`) was a thread and a door: a name from the disciple's rank, enter, leave, and no way
+to seclude in it, because the seclusion site check knew founded properties, safe zones and a manor
+at a world location and the residence is none of those. **Schema 33** gives `sect_abodes` the six
+facilities a courtyard can hold - cultivation chamber, alchemy furnace, forge, formation core,
+storeroom, herb garden - starting as a chamber and a storeroom like a homestead. `/sect → Abode →
+Build or raise a facility` pays in **sect contribution points** (`sect.abode.upgrade`; the base
+times the square of the level, 40/160/360… by default), and the sect holds two gates the content
+names in `sect_abode_system`: each rank caps the level a facility may reach (Outer Disciple 1,
+Inner 2, Core 3, Deacon 4, Elder 5, Grand Elder 6, Sect Master 8, Ancestor 9), and each level asks
+a cultivation stage one realm below it. A refusal names the rank or stage it wants. Inside the
+residence, seclusion uses its chamber (and the sect manor's array, since the residence stands at
+the sect's seat), crafting uses its workshops and foraging its garden, for the disciple it belongs
+to - a sect residence has no guest list.
+
+With the residence a real starter home, founding a homestead of one's own is earned part-way up
+the ladder: `abode.establish` asks standing in a public sect of **Deacon** (rank 40) or higher
+(`abode_system.founding_rank_level`), and says so. An unaffiliated cultivator has the sect's
+courtyard to earn first. Gate: `sect_abode_upgrade_test.go` (a build paid in points, the stage gate
+and the rank cap refusing without spending, the unaffiliated and the unopened refused, seclusion
+inside the residence at its chamber's rate, the founding gate at Deacon) and
+`test_player_property_system.py` (the columns, the content, the gate's place on the ladder).
+
 **0.30.0** is the roadmap's **Authority II** milestone: derived inputs, market pricing and the
 Python DB layer. No schema change (still 32); no new content. Where Python did not mutate but
 *computed the input* the engine then trusted, or kept a second copy of an engine rule, the copy is
@@ -1087,9 +1175,15 @@ directory to one file, requires each check to appear before the release job and 
 and requires the release job to wait on all three.
 
 
-## Release status — v0.30.0
+## Release status — v0.31.0
 
-- Current release: v0.30.0: Authority II - the engine derives the seclusion environment,
+- Current release: v0.31.0: the narrator budget - explore and hunt read from a procedural pool
+  unless a player presses Narrate it, one per-player bucket meters every door, and the ten-dollar
+  switch picks the 50 or 1000 a day allowance from the dashboard.
+- v0.30.1 (schema 33): one home built up facility by facility - the sect
+  residence grows with contribution points under rank and stage gates, and a homestead of one's own
+  is founded at Deacon or higher.
+- v0.30.0: Authority II - the engine derives the seclusion environment,
   market pricing and the world-status reads are engine queries, the DB layer writes only
   presentation tables, and eighty-one dead rule functions are gone.
 - v0.29.1: one GitHub workflow - the release job runs behind the same CI
@@ -1262,6 +1356,7 @@ and requires the release job to wait on all three.
 - **Schema 27** added the v0.19.29 mute/freeze moderation columns on `characters`
   (`is_muted`, `is_frozen`, `moderation_reason`).
 - **Schema 28** added the Quest Forge definition table (`quest_definitions`).
+- **Schema 33** gave the sect residence (`sect_abodes`) its six facility levels (v0.30.1).
 - **Schema 32** added `terms_json` to `character_quests`: the objectives and rewards each player
   accepted, so an edit to a definition cannot rewrite a deal that was already struck.
 - **Schema 31** added `location` to `pvp_matches`, so a duel in progress knows where it is fought.

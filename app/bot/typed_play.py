@@ -182,9 +182,9 @@ async def dispatch(interaction: Any, candidate: Candidate) -> None:
     raise TypedPlayUnsupported(f"unknown candidate kind {candidate.kind!r}")
 
 
-def budget_refusal(user_id: int) -> str | None:
+def budget_refusal(user_id: int, door: str = "typed") -> str | None:
     """None if the player may spend a token now; otherwise the line to reply with."""
-    if TYPED_PLAY_BUDGET.try_acquire(int(user_id)):
+    if TYPED_PLAY_BUDGET.try_acquire(int(user_id), door=door):
         return None
     wait = TYPED_PLAY_BUDGET.seconds_until_token(int(user_id))
     return (
@@ -258,7 +258,7 @@ class _NarrateButton(discord.ui.Button):
 
     async def callback(self, interaction: discord.Interaction) -> None:
         view: TypedPlayPicker = self.view  # type: ignore[assignment]
-        refusal = budget_refusal(interaction.user.id)
+        refusal = budget_refusal(interaction.user.id, door="narrate_it")
         if refusal:
             await interaction.response.send_message(refusal, ephemeral=False, delete_after=20)
             return

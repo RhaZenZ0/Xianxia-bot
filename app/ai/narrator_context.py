@@ -354,7 +354,7 @@ class NarratorContextBuilder:
         sect_abode = state.get("sect_abode")
         personal_world = state.get("personal_world")
         if abode:
-            property_type = str(abode.get("property_type") or "cave_abode").replace("_", " ").title()
+            property_type = str(abode.get("property_type") or "homestead").replace("_", " ").title()
             loc.update({"world": "Private Player Property", "safe_zone": True, "description": f"Private {property_type}: {abode.get('name', location)}"})
         elif sect_abode:
             loc.update({"world": "Sect Abode", "safe_zone": True, "description": f"Private sect residence: {sect_abode.get('name', location)} in {sect_abode.get('sect_name', 'Unknown Sect')}"})
@@ -774,7 +774,7 @@ class NarratorContextBuilder:
             lines.append("Active canonical events at this location: " + " | ".join(event_bits))
 
         if abode:
-            property_type = str(abode.get("property_type") or "cave_abode").replace("_", " ").title()
+            property_type = str(abode.get("property_type") or "homestead").replace("_", " ").title()
             lines.append(
                 f"Private player-owned location: {_clip(abode.get('name'), 100)} | type {property_type} | "
                 f"entrance {_clip(abode.get('base_location'), 120)} | facilities cultivation {abode.get('cultivation_level', 0)}, "

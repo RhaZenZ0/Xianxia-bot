@@ -28,7 +28,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from ...ai.ai_router import NARRATION_SLOTS
+from ...ai.ai_router import CREDITS_SWITCH_SLOT, NARRATION_SLOTS
 from ..runtime import DB, log
 from ..services import AI_ROUTER
 
@@ -55,7 +55,7 @@ async def apply_stored_chain() -> dict[str, Any]:
     survives a dead route.
     """
     stored = await DB.get_narration_chain()
-    slots = {name: stored[name] for name in NARRATION_SLOTS if name in stored}
+    slots = {name: stored[name] for name in (*NARRATION_SLOTS, CREDITS_SWITCH_SLOT) if name in stored}
     if not slots:
         return {"applied": False, "reason": "no stored chain", "slots": AI_ROUTER.slots_snapshot()}
     try:

@@ -106,6 +106,8 @@ func applyLateMigrationAction(conn *storage.Conn, catalog worlddata.Catalog, use
 		return personalWorldMoveActionGo(conn, userID, raw, true)
 	case "item.use":
 		return itemUseActionGo(conn, catalog, userID, raw)
+	case "sect.abode.upgrade":
+		return sectAbodeUpgradeAction(conn, catalog, userID, raw)
 	default:
 		return authoritativeMutation{}, fmt.Errorf("unsupported late migration operation: %s", op)
 	}

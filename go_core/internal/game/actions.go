@@ -1096,6 +1096,10 @@ func adminAutomationSet(conn *storage.Conn, adminUserID int64, raw json.RawMessa
 		"background_seclusion":    true,
 		"black_markets":           true,
 		"autonomous_world_events": true,
+		// v0.31.0: when on, exploration openings and hunt results are
+		// narrated by the model without being asked; off, they read from
+		// the procedural pool and offer a Narrate-it button.
+		"ai_routine_narration": false,
 	}
 	if _, ok := defaults[name]; !ok {
 		return nil, errors.New("unknown automation system")
@@ -2617,6 +2621,9 @@ var narrationSlots = []string{
 	"epic_model",
 	"epic_fallback_model",
 	"dynamic_free_model",
+	// v0.31.0: the ten-dollar switch, stored as "true"/"false" beside the
+	// chain so one save and one audit row carry both.
+	"credits_topped_up",
 }
 
 // adminNarrationSetChain persists the GM-chosen narration chain in world_state.

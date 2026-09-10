@@ -80,6 +80,7 @@ class Settings:
     openrouter_require_free: bool
     openrouter_max_requests_per_minute: int
     openrouter_max_requests_per_day: int
+    openrouter_credits_topped_up: bool
     openrouter_route_requests_per_minute: int
     openrouter_route_requests_per_day: int
     openrouter_timeout_seconds: float
@@ -257,10 +258,15 @@ class Settings:
         if not 1 <= openrouter_max_requests_per_minute <= 120:
             raise RuntimeError("OPENROUTER_MAX_REQUESTS_PER_MINUTE must be between 1 and 120")
         # OpenRouter's free tier is 20 req/min AND 50 req/day under $10 of lifetime
-        # credits - 1000/day at $10 or more. The default here is the smaller,
-        # honest number; raise it to 1000 once credits are on the account.
+        # credits - 1000/day at $10 or more. The switch says which regime the
+        # account is in (v0.31.0); the dashboard's Narration Routes panel can
+        # flip it live and the stored choice wins over this baseline. An
+        # explicit OPENROUTER_MAX_REQUESTS_PER_DAY still overrides both.
+        openrouter_credits_topped_up = _as_bool(os.getenv("OPENROUTER_CREDITS_TOPPED_UP"), False)
         openrouter_max_requests_per_day = _as_int(
-            os.getenv("OPENROUTER_MAX_REQUESTS_PER_DAY"), 50, name="OPENROUTER_MAX_REQUESTS_PER_DAY"
+            os.getenv("OPENROUTER_MAX_REQUESTS_PER_DAY"),
+            1000 if openrouter_credits_topped_up else 50,
+            name="OPENROUTER_MAX_REQUESTS_PER_DAY",
         )
         if not 10 <= openrouter_max_requests_per_day <= 200000:
             raise RuntimeError("OPENROUTER_MAX_REQUESTS_PER_DAY must be between 10 and 200000")
@@ -475,6 +481,7 @@ class Settings:
             openrouter_require_free=openrouter_require_free,
             openrouter_max_requests_per_minute=openrouter_max_requests_per_minute,
             openrouter_max_requests_per_day=openrouter_max_requests_per_day,
+            openrouter_credits_topped_up=openrouter_credits_topped_up,
             openrouter_route_requests_per_minute=openrouter_route_requests_per_minute,
             openrouter_route_requests_per_day=openrouter_route_requests_per_day,
             openrouter_timeout_seconds=openrouter_timeout_seconds,

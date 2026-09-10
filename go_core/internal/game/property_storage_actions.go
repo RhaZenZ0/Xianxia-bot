@@ -251,8 +251,13 @@ func abodeEstablishActionGo(conn *storage.Conn, catalog worlddata.Catalog, userI
 	if len(rr) > 60 {
 		p.Name = string(rr[:60])
 	}
-	if p.PropertyType == "" {
-		p.PropertyType = "cave_abode"
+	p.PropertyType = strings.TrimSpace(p.PropertyType)
+	buildable := buildablePropertyTypes(catalog)
+	if p.PropertyType == "" && len(buildable) == 1 {
+		p.PropertyType = buildable[0]
+	}
+	if !propertyTypeBuildable(catalog, p.PropertyType) {
+		return authoritativeMutation{}, fmt.Errorf("a home is founded as one of: %s; its facilities are built with abode.upgrade", strings.Join(buildable, ", "))
 	}
 	r, e := conn.Execute(`SELECT location FROM characters WHERE user_id=?`, []any{userID})
 	if e != nil {
@@ -268,6 +273,18 @@ func abodeEstablishActionGo(conn *storage.Conn, catalog worlddata.Catalog, userI
 	}
 	if a, _ := abodeByOwnerGo(conn, userID); a != nil {
 		return authoritativeMutation{}, errors.New("you already own a player property")
+	}
+	if floor := homesteadFoundingRankGo(catalog); floor > 0 {
+		// v0.30.1: the sect residence is the starter home; land of one's own
+		// comes with standing. The content names the rank.
+		mr, e := conn.Execute(`SELECT rank_name,rank_level FROM sect_membership WHERE user_id=?`, []any{userID})
+		if e != nil {
+			return authoritativeMutation{}, e
+		}
+		membership := firstRowMap(mr)
+		if membership == nil || i64(membership["rank_level"]) < floor {
+			return authoritativeMutation{}, fmt.Errorf("founding a homestead asks standing in a public sect: %s (rank %d) or higher", sectRankName(catalog, floor), floor)
+		}
 	}
 	lv := propertyDefaults(catalog, p.PropertyType)
 	now := nowSeconds()
