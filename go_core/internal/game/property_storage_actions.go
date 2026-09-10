@@ -252,8 +252,12 @@ func abodeEstablishActionGo(conn *storage.Conn, catalog worlddata.Catalog, userI
 		p.Name = string(rr[:60])
 	}
 	p.PropertyType = strings.TrimSpace(p.PropertyType)
+	buildable := buildablePropertyTypes(catalog)
+	if p.PropertyType == "" && len(buildable) == 1 {
+		p.PropertyType = buildable[0]
+	}
 	if !propertyTypeBuildable(catalog, p.PropertyType) {
-		return authoritativeMutation{}, fmt.Errorf("choose a property type to found: %s", strings.Join(buildablePropertyTypes(catalog), ", "))
+		return authoritativeMutation{}, fmt.Errorf("a home is founded as one of: %s; its facilities are built with abode.upgrade", strings.Join(buildable, ", "))
 	}
 	r, e := conn.Execute(`SELECT location FROM characters WHERE user_id=?`, []any{userID})
 	if e != nil {

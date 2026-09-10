@@ -1009,18 +1009,26 @@ Gate: `tests/python/contracts/test_security_defaults.py` and `TestNewRefusesAnEn
 No schema change (still 32), no game-rule change, AI remains narration-only.
 
 
-**0.30.1** retires the cave abode from the property a player founds. No schema change, no
-mechanical change to any existing property.
+**0.30.1** makes the player property one home, built up. No schema change, no mechanical change
+to any property that already exists.
 
-A public sect assigns each disciple an abode - the `sect_abodes` residence behind `/sect abode`,
-named for the disciple's rank - so a "Cave Abode" a cultivator digs beside a town by hand was the
-same idea twice, and it sat first in the `/abode establish` list. The content marks it
-`"buildable": false`: it stays defined so the rows that already carry it keep their name and emoji,
-the founding picker offers only the five estates (alchemy estate, spirit herb estate, spirit beast
-ranch, merchant pavilion, clan estate), and the engine holds the same rule - `abode.establish`
-refuses a retired, unknown or empty type and names what can be founded, where before an unknown
-type silently became a cave abode with generic defaults. Gate: `property_types_test.go` and
-`test_player_property_system.py`.
+`/abode establish` used to open with a choice of six archetypes - cave abode, alchemy estate,
+spirit herb estate, spirit beast ranch, merchant pavilion, clan estate - each a preset of the same
+nine facilities. A public sect already assigns each disciple an abode (the `sect_abodes` residence
+behind `/sect abode`), so the cave abode was the same idea twice, and the estates were a choice
+made at the door about a place the player then developed anyway. Now there is one shape: the
+**homestead**, founded with a name and nothing else, as a cultivation chamber and a storeroom. The
+herb garden, alchemy furnace, forge, formation core, beast pen, merchant hall and defensive
+formation start at nothing and are built with `/abode → Upgrade` - level 0 to 1 is the build, at
+the base cost, and each level after costs the square. `/abode status` and the founding reply list
+what is not yet built so the next step is never a guess.
+
+The six archetypes stay defined in the content, marked `"buildable": false`, so a property founded
+before this release keeps its type, label and facilities; nothing is migrated. The engine holds the
+rule, not only the picker: `abode.establish` founds the one buildable type when none is named and
+refuses a retired or unknown one by name, where before an unknown type silently became a cave abode.
+Gate: `property_types_test.go` (the buildable set, the bare founding, the refusals, a build and a
+refused second upgrade that spends nothing) and `test_player_property_system.py`.
 
 **0.30.0** is the roadmap's **Authority II** milestone: derived inputs, market pricing and the
 Python DB layer. No schema change (still 32); no new content. Where Python did not mutate but
@@ -1102,8 +1110,8 @@ and requires the release job to wait on all three.
 
 ## Release status — v0.30.1
 
-- Current release: v0.30.1: the cave abode is what a sect assigns, not something a player founds;
-  the founding picker offers the five estates and the engine refuses the rest.
+- Current release: v0.30.1: the player property is one home, the homestead, founded bare and
+  built up facility by facility; the six archetypes stay only for the rows that carry them.
 - v0.30.0: Authority II - the engine derives the seclusion environment,
   market pricing and the world-status reads are engine queries, the DB layer writes only
   presentation tables, and eighty-one dead rule functions are gone.

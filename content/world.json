@@ -9768,11 +9768,20 @@
     "upgrade_base_cost": 100,
     "currency": "low_spirit_stone",
     "property_types": {
+      "homestead": {
+        "name": "Homestead",
+        "emoji": "🏡",
+        "description": "A cultivator's one home. It begins as a cultivation chamber and a storeroom; the herb garden, alchemy furnace, forge, formation core, beast pen, merchant hall and defensive formation are built and raised with upgrades.",
+        "defaults": {
+          "cultivation": 1,
+          "storage": 1
+        }
+      },
       "cave_abode": {
         "name": "Cave Abode",
         "emoji": "🏡",
         "buildable": false,
-        "description": "A secluded cultivation residence balanced around cultivation, storage and formations. Not founded by hand since v0.30.1: a sect assigns its disciples an abode, and a property a player founds is one of the estates below.",
+        "description": "A secluded cultivation residence balanced around cultivation, storage and formations. Retired at v0.30.1: a sect assigns its disciples an abode, and the property a player founds is the homestead.",
         "defaults": {
           "cultivation": 1,
           "storage": 1
@@ -9781,6 +9790,7 @@
       "alchemy_estate": {
         "name": "Alchemy Estate",
         "emoji": "⚗️",
+        "buildable": false,
         "description": "A private estate centered on pill refinement, medicinal herbs and secure storage.",
         "defaults": {
           "alchemy": 1,
@@ -9791,6 +9801,7 @@
       "spirit_herb_estate": {
         "name": "Spirit Herb Estate",
         "emoji": "🌿",
+        "buildable": false,
         "description": "A spiritual garden estate specializing in herb cultivation and medicinal preparation.",
         "defaults": {
           "herb_garden": 2,
@@ -9801,6 +9812,7 @@
       "spirit_beast_ranch": {
         "name": "Spirit Beast Ranch",
         "emoji": "🐉",
+        "buildable": false,
         "description": "A protected private holding for contracted beasts, training and recovery.",
         "defaults": {
           "beast_pen": 2,
@@ -9811,6 +9823,7 @@
       "merchant_pavilion": {
         "name": "Merchant Pavilion",
         "emoji": "🏪",
+        "buildable": false,
         "description": "A player-owned commercial residence with expanded storage and merchant facilities.",
         "defaults": {
           "merchant": 1,
@@ -9821,6 +9834,7 @@
       "clan_estate": {
         "name": "Clan Estate",
         "emoji": "🏯",
+        "buildable": false,
         "description": "A fortified family estate suited to cultivation, guests, formations and long-term clan scenes.",
         "defaults": {
           "cultivation": 1,

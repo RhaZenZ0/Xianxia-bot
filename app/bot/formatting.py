@@ -14,7 +14,7 @@ from .runtime import player_property_definition
 from .services import PLAYER_PROPERTY_FACILITY_KEYS, PLAYER_PROPERTY_FACILITY_LABELS
 
 def player_property_emoji(abode: dict[str, Any]) -> str:
-    definition = player_property_definition(str(abode.get("property_type") or "cave_abode"))
+    definition = player_property_definition(str(abode.get("property_type") or "homestead"))
     return str(definition.get("emoji") or "🏡")
 
 def player_property_facility_lines(abode: dict[str, Any]) -> list[str]:
@@ -24,6 +24,14 @@ def player_property_facility_lines(abode: dict[str, Any]) -> list[str]:
         if value > 0 or key in {"cultivation", "storage"}:
             lines.append(f"{PLAYER_PROPERTY_FACILITY_LABELS.get(key, key.replace('_', ' ').title())} **Lv.{value}**")
     return lines
+
+def player_property_unbuilt(abode: dict[str, Any]) -> list[str]:
+    """Facilities a home does not have yet - what /abode → Upgrade can build (v0.30.1)."""
+    return [
+        PLAYER_PROPERTY_FACILITY_LABELS.get(key, key.replace("_", " ").title())
+        for key in PLAYER_PROPERTY_FACILITY_KEYS
+        if int(abode.get(f"{key}_level", 0) or 0) <= 0
+    ]
 
 def human_duration(seconds: int) -> str:
     minutes, sec = divmod(max(0, seconds), 60)

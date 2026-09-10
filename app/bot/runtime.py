@@ -83,14 +83,14 @@ def _player_property_types() -> dict[str, dict[str, Any]]:
     if isinstance(configured, dict) and configured:
         return {str(key): dict(value) for key, value in configured.items() if isinstance(value, dict)}
     return {
-        "cave_abode": {"name": "Cave Abode", "emoji": "🏡", "defaults": {"cultivation": 1, "storage": 1}},
+        "homestead": {"name": "Homestead", "emoji": "🏡", "defaults": {"cultivation": 1, "storage": 1}},
     }
 PLAYER_PROPERTY_TYPES = _player_property_types()
 def player_property_definition(property_type: str | None) -> dict[str, Any]:
-    key = str(property_type or "cave_abode")
-    return PLAYER_PROPERTY_TYPES.get(key, PLAYER_PROPERTY_TYPES.get("cave_abode", {}))
+    key = str(property_type or "homestead")
+    return PLAYER_PROPERTY_TYPES.get(key, PLAYER_PROPERTY_TYPES.get("homestead", {}))
 def player_property_label(abode: dict[str, Any]) -> str:
-    definition = player_property_definition(str(abode.get("property_type") or "cave_abode"))
+    definition = player_property_definition(str(abode.get("property_type") or "homestead"))
     return str(definition.get("name") or "Player Property")
 async def character_location_display(character: dict[str, Any]) -> str:
     """Resolve a character's raw `location` column into a player-facing label.

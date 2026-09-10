@@ -50,35 +50,42 @@ class PlayerPropertySystemTests(unittest.IsolatedAsyncioTestCase):
         cfg = await self.db.get_server_config(88)
         self.assertEqual(cfg["info_message_id"], 123456)
 
-    def test_world_has_six_player_property_archetypes_and_founds_five(self):
+    def test_one_home_is_founded_and_the_archetypes_stay_for_their_rows(self):
+        # v0.30.1: a home is one place built up facility by facility. The
+        # homestead is the only type founded; the cave abode (what a sect
+        # assigns) and the five estate archetypes stay defined so rows that
+        # carry them keep their label, and are marked not buildable.
         world = World(ROOT / "content" / "world.json")
         types = world.abode_system.get("property_types", {})
         self.assertEqual(set(types), {
-            "cave_abode", "alchemy_estate", "spirit_herb_estate",
+            "homestead", "cave_abode", "alchemy_estate", "spirit_herb_estate",
             "spirit_beast_ranch", "merchant_pavilion", "clan_estate",
         })
-        self.assertEqual(types["alchemy_estate"]["defaults"]["alchemy"], 1)
-        self.assertEqual(types["spirit_beast_ranch"]["defaults"]["beast_pen"], 2)
-        # v0.30.1: a sect assigns its disciples an abode, so the cave abode is
-        # no longer something a cultivator founds. It stays defined for the
-        # rows that already carry it.
-        self.assertIs(types["cave_abode"].get("buildable"), False)
         buildable = {key for key, defn in types.items() if defn.get("buildable", True)}
-        self.assertEqual(buildable, {
-            "alchemy_estate", "spirit_herb_estate", "spirit_beast_ranch", "merchant_pavilion", "clan_estate",
+        self.assertEqual(buildable, {"homestead"})
+        self.assertEqual(types["homestead"]["defaults"], {"cultivation": 1, "storage": 1})
+        # Every other facility is built with an upgrade, so none may be a default.
+        facilities = set(world.abode_system["facilities"])
+        self.assertEqual(facilities - set(types["homestead"]["defaults"]), {
+            "alchemy", "forge", "formation", "defense", "herb_garden", "beast_pen", "merchant",
         })
 
-    def test_the_founding_picker_offers_only_buildable_types(self):
+    def test_founding_asks_for_a_name_and_nothing_else(self):
         # services.py imports discord at module level, so the rule is held in
-        # source: the choice list is filtered on the content flag, and the
-        # engine refuses the rest (property_types_test.go).
-        source = (ROOT / "app" / "bot" / "services.py").read_text(encoding="utf-8")
-        start = source.index("PLAYER_PROPERTY_TYPE_CHOICES = [")
-        block = source[start:source.index("][:25]", start)]
-        self.assertIn('if defn.get("buildable", True)', block)
-        establish = (ROOT / "go_core" / "internal" / "game" / "property_storage_actions.go").read_text(encoding="utf-8")
-        self.assertIn("propertyTypeBuildable(catalog, p.PropertyType)", establish)
-        self.assertNotIn('p.PropertyType = "cave_abode"', establish)
+        # source: /abode establish sends only the name, the home-type list is
+        # the content's buildable set, and the engine founds that one type and
+        # refuses the rest (property_types_test.go).
+        abode = (ROOT / "app" / "bot" / "commands" / "abode.py").read_text(encoding="utf-8")
+        establish = abode[abode.index("async def abode_establish("):abode.index("async def abode_status(")]
+        self.assertIn("async def abode_establish(interaction:discord.Interaction,name:str)->None:", establish)
+        self.assertIn('{"name":name}', establish)
+        self.assertNotIn("property_type", establish)
+        self.assertNotIn("PLAYER_PROPERTY_TYPE_CHOICES", abode)
+        services = (ROOT / "app" / "bot" / "services.py").read_text(encoding="utf-8")
+        self.assertIn('if defn.get("buildable", True)', services[services.index("PLAYER_PROPERTY_HOME_TYPES"):])
+        engine = (ROOT / "go_core" / "internal" / "game" / "property_storage_actions.go").read_text(encoding="utf-8")
+        self.assertIn("propertyTypeBuildable(catalog, p.PropertyType)", engine)
+        self.assertNotIn('p.PropertyType = "cave_abode"', engine)
 
 
 if __name__ == "__main__":

@@ -8,10 +8,13 @@ import (
 
 // Player property types (v0.30.1). The catalogue's abode_system defines
 // every type a cave_abodes row may carry; only those not marked
-// `"buildable": false` may be founded. The cave abode is the one retired so
-// far: a public sect assigns its disciples an abode (sect_abodes), so the
-// property a cultivator founds by hand is one of the specialised estates.
-// Rows founded before the flag keep their type and its label.
+// `"buildable": false` may be founded, and there is one: the homestead. A
+// home is one place built up facility by facility with abode.upgrade, not a
+// choice made at the door - the cave abode (what a sect assigns its
+// disciples) and the five estate archetypes are retired from founding and
+// stay defined only so the rows that carry them keep their label. When the
+// content names exactly one buildable type, abode.establish founds it
+// without being told.
 
 func propertyTypeDefinition(c worlddata.Catalog, propertyType string) (map[string]any, bool) {
 	types, _ := c.AbodeSystem["property_types"].(map[string]any)
