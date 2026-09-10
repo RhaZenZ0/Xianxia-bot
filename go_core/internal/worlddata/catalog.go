@@ -172,6 +172,13 @@ type AuctionHouse struct {
 	DoorRule          bool   `json:"door_rule"`
 	DefaultCurrency   string `json:"default_currency"`
 	Description       string `json:"description"`
+	// Size (v0.33.1): "grand" for a capital's house, "local" for an ordinary
+	// city's. A local floor holds fewer lots at once and none for as long;
+	// zero means no cap, which is what content without the fields gets.
+	Size          string `json:"size"`
+	MaxActiveLots int64  `json:"max_active_lots"`
+	MaxLotMinutes int64  `json:"max_lot_minutes"`
+	ChannelName   string `json:"channel_name"`
 }
 
 type CurrencyDefinition struct {

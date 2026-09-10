@@ -35,6 +35,7 @@ from ..channels import (
     _ensure_realm_presence_roles,
     _resolve_text_channel,
     configured_info_channel,
+    ensure_auction_house_channels,
     ensure_realm_hub_channels,
     post_server_log,
 )
@@ -573,6 +574,7 @@ async def _run_complete_server_setup(
 ) -> tuple[dict[str, Any], list[dict[str, Any]], str | None]:
     base_result = await ensure_base_xianxia_channels(guild, category_name=SERVER_BASE_CATEGORY, create_missing=create_missing)
     realm_rows = await ensure_realm_hub_channels(guild, category_name=SERVER_REALM_CATEGORY, create_missing=create_missing)
+    await ensure_auction_house_channels(guild, category_name=SERVER_REALM_CATEGORY, create_missing=create_missing)
     _bugs_channel, bugs_warning = await ensure_bugs_forum_channel(guild, category_name=SERVER_BASE_CATEGORY, create_missing=create_missing)
     return base_result, realm_rows, bugs_warning
 
@@ -611,6 +613,25 @@ async def _dashboard_discord_snapshot(client: commands.Bot, guild: discord.Guild
             "role_name": role.name if role else None,
             "hidden": bool(visibility.get("hidden")),
             "ready": isinstance(channel, discord.TextChannel) and role is not None and bool(visibility.get("hidden")),
+        })
+
+    auction_rows = {str(row["house_id"]): row for row in await DB.get_auction_house_channels(guild.id)}
+    auction_halls: list[dict[str, Any]] = []
+    for house_id, house in WORLD.auction_houses.items():
+        row = auction_rows.get(house_id)
+        channel = guild.get_channel(int(row["channel_id"])) if row else None
+        interior = WORLD.locations.get(str(house.get("location"))) or {}
+        open_lots = len(await DB.list_active_auctions(house_id))
+        auction_halls.append({
+            "house_id": house_id,
+            "name": str(house.get("name") or house_id),
+            "size": str(house.get("size") or "grand"),
+            "world": str(interior.get("world") or ""),
+            "entrance": str(house.get("entrance_location") or ""),
+            "channel_id": channel.id if isinstance(channel, discord.TextChannel) else None,
+            "channel_name": channel.name if isinstance(channel, discord.TextChannel) else None,
+            "open_lots": open_lots,
+            "ready": isinstance(channel, discord.TextChannel),
         })
 
     stored_messages = await DB.get_channel_messages(guild.id)
@@ -715,6 +736,7 @@ async def _dashboard_discord_snapshot(client: commands.Bot, guild: discord.Guild
         "base_ready": ready_base,
         "base_total": len(base_channels),
         "realm_hubs": realm_hubs,
+        "auction_halls": auction_halls,
         "realm_ready": ready_realms,
         "realm_total": len(realm_hubs),
         "text_channels": all_channels,
@@ -1123,6 +1145,7 @@ async def admin_realm_hubs(interaction: discord.Interaction, action: app_command
         return
     if action.value == "refresh":
         await ensure_realm_hub_channels(guild, category_name=category_name)
+        await ensure_auction_house_channels(guild, category_name=category_name)
     existing = {str(row["world_name"]): row for row in await DB.get_realm_hub_channels(guild.id)}
     lines = [
         "🏙️ **Realm-Capital Meeting Channels**",

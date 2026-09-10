@@ -14,7 +14,7 @@ from typing import Any
 import discord
 
 from ..rules.realm_hubs import REALM_HUBS, REALM_HUB_MEMBER_PERMISSIONS, realm_hub_visibility, realm_presence_role_name
-from .runtime import DB, SETTINGS, _realm_access_role_name, chunk_text, log
+from .runtime import DB, SETTINGS, WORLD, _realm_access_role_name, chunk_text, log
 
 def _event_archive_minutes() -> int:
     allowed = {60, 1440, 4320, 10080}
@@ -181,6 +181,65 @@ async def ensure_realm_hub_channels(
             category_id=channel.category_id if channel.category_id is not None else (category.id if category else None),
         )
     return await DB.get_realm_hub_channels(guild.id)
+
+
+def auction_house_channel_name(house_id: str, house: dict[str, Any]) -> str:
+    """The channel a house's lots are posted in: content names it
+    (`channel_name`), falling back to the house id."""
+    return str(house.get("channel_name") or f"{house_id.replace('_', '-')}-auctions")[:100]
+
+
+async def ensure_auction_house_channels(
+    guild: discord.Guild, *, category_name: str = "🌌 Realm Capitals", create_missing: bool = False,
+) -> list[dict[str, Any]]:
+    """Bind existing live-auction channels and, when create_missing, create any
+    that are missing (v0.33.1). A grand house (a capital's) has a channel of
+    its own; the local floors of a world share one, named in content - so a
+    world of twelve cities is one channel, not twelve. Every house is bound to
+    the channel its content names, beside the realm capitals, visible to the
+    cultivators who can reach that world - the same access role that gates it
+    - and to nobody else. Like the capitals, the /admin slash path only binds;
+    the dashboard's Setup/Repair is what creates.
+    """
+    existing = {str(row["house_id"]): row for row in await DB.get_auction_house_channels(guild.id)}
+    category = next((item for item in guild.categories if item.name == category_name), None)
+    me = guild.me
+    can_create = create_missing and bool(me) and me.guild_permissions.manage_channels
+    access_roles = await _ensure_realm_access_roles(guild) if can_create else {}
+    if can_create and category is None:
+        try:
+            category = await guild.create_category(category_name, reason="Xianxia RP auction-house setup")
+        except discord.HTTPException:
+            log.exception("Could not create category %s", category_name)
+
+    for house_id, house in WORLD.auction_houses.items():
+        name = auction_house_channel_name(house_id, house)
+        interior = WORLD.locations.get(str(house.get("location"))) or {}
+        world = str(interior.get("world") or "Mortal World")
+        row = existing.get(house_id)
+        channel = guild.get_channel(int(row["channel_id"])) if row else None
+        if not isinstance(channel, discord.TextChannel):
+            channel = next((item for item in guild.text_channels if item.name == name), None)
+        if channel is None and can_create:
+            if str(house.get("size") or "grand") == "local":
+                topic = f"Live lots from every local auction floor of the {world} — listed, bid on and struck as it happens. Bid with /economy → Auction House → Bid."
+            else:
+                topic = f"Live lots at {house.get('name', house_id)} — listed, bid on and struck as it happens. Bid with /economy → Auction House → Bid."
+            try:
+                channel = await guild.create_text_channel(
+                    name, category=category, topic=topic[:1024], reason="Xianxia RP auction-house setup",
+                )
+            except discord.HTTPException:
+                log.exception("Could not create auction channel #%s", name)
+        if channel is None:
+            continue
+        if can_create and access_roles.get(world) is not None:
+            await ensure_realm_hub_overwrites(guild, channel, access_roles.get(world))
+        await DB.set_auction_house_channel(
+            guild_id=guild.id, house_id=house_id, location=str(house.get("location") or ""), channel_id=channel.id,
+            category_id=channel.category_id if channel.category_id is not None else (category.id if category else None),
+        )
+    return await DB.get_auction_house_channels(guild.id)
 
 
 async def event_channels(interaction: discord.Interaction) -> tuple[discord.TextChannel | None, discord.TextChannel | None]:

@@ -73,11 +73,29 @@ def extract_json_object(text: str) -> dict[str, Any] | None:
     return None
 
 
-def system_prompt(world: Any, budget: dict[str, int]) -> str:
-    locations = sorted(public_locations(world))[:MAX_CONTEXT_LOCATIONS]
+def forge_targets(world: Any) -> tuple[list[str], list[str]]:
+    """The places and people the Forge is offered as objective targets.
+
+    An auction floor is a protected interior behind a door (v0.33.1: every
+    city has one), not somewhere a quest sends you, and its steward is met
+    on that floor - so both are left off the lists, which are capped and
+    would otherwise fill with forty-eight halls and their stewards before
+    the town the story is set in. Validation still accepts them: a draft
+    that names one is not wrong, only unprompted.
+    """
+    floors = {name for name, loc in public_locations(world).items() if loc.get("auction_house")}
+    locations = sorted(name for name in public_locations(world) if name not in floors)
     npcs = sorted(
-        name for name, npc in dict(world.npcs).items() if not isinstance(npc.get("hidden_master"), dict)
-    )[:MAX_CONTEXT_NPCS]
+        name for name, npc in dict(world.npcs).items()
+        if not isinstance(npc.get("hidden_master"), dict) and str(npc.get("location") or "") not in floors
+    )
+    return locations, npcs
+
+
+def system_prompt(world: Any, budget: dict[str, int]) -> str:
+    all_locations, all_npcs = forge_targets(world)
+    locations = all_locations[:MAX_CONTEXT_LOCATIONS]
+    npcs = all_npcs[:MAX_CONTEXT_NPCS]
     items = sorted(rewardable_items(world))[:MAX_CONTEXT_ITEMS]
     kinds = ", ".join(f"{k} (target: {v['target'] or 'none'})" for k, v in OBJECTIVE_TYPES.items())
     return (

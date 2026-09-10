@@ -15,6 +15,7 @@ from ...rules.black_market import access_reason as black_market_access_reason
 from ...ops.game_engine import GameEngineError
 from ..locations import _known_locations, _location_is_visible, _world_is_unlocked, location_autocomplete
 from ...rules.trade_receipt import format_trade_receipt
+from ..auction_feed import announce_lot, refresh_lot
 from ..formatting import human_duration
 from ..pickers import auction_currency_autocomplete, usable_item_autocomplete
 from ..registry import registered_group_command, registered_root_command
@@ -182,6 +183,16 @@ def _house_for_character(c:dict):
     return WORLD.auction_house_at(c.get("location",""))
 
 
+def _house_size_note(house:dict)->str:
+    """A local floor is smaller (v0.33.1): fewer lots at once, none for as long."""
+    if str(house.get("size") or "grand")!="local": return ""
+    lots=int(house.get("max_active_lots") or 0); minutes=int(house.get("max_lot_minutes") or 0)
+    parts=[]
+    if lots: parts.append(f"up to {lots} lots at once")
+    if minutes: parts.append(f"lots run at most {human_duration(minutes*60)}")
+    return f"\n*Local floor — {', '.join(parts)}. The capital's house takes more.*" if parts else ""
+
+
 @registered_group_command(auction_group, name="enter",description="Enter the local protected auction hall")
 @serialized_user_action
 async def auction_enter(interaction:discord.Interaction)->None:
@@ -193,7 +204,8 @@ async def auction_enter(interaction:discord.Interaction)->None:
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
         await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
-    await interaction.followup.send(f"🏮 You enter **{result.get('name','the auction hall')}**. Hidden experts and formations suppress violence inside.\n🛡️ **Protection applies only inside the hall. The moment you leave through the doors, it ends.**",ephemeral=False)
+    house=dict((WORLD.auction_houses.get(str(result.get('house_id') or '')) or {}))
+    await interaction.followup.send(f"🏮 You enter **{result.get('name','the auction hall')}**. Hidden experts and formations suppress violence inside.{_house_size_note(house)}\n🛡️ **Protection applies only inside the hall. The moment you leave through the doors, it ends.**",ephemeral=False)
 
 
 @registered_group_command(auction_group, name="leave",description="Leave the auction hall; its protection ends at the door")
@@ -226,7 +238,7 @@ async def auction_browse(interaction:discord.Interaction)->None:
     house_id,house=found; lots=await DB.list_active_auctions(house_id)
     if not lots:
         await interaction.response.send_message("The auction board currently has no active player lots.",ephemeral=False);return
-    now=time.time(); lines=[f"🏮 **{house['name']} — Active Lots**"]
+    now=time.time(); lines=[f"🏮 **{house['name']} — Active Lots**"+_house_size_note(house)]
     for lot in lots[:25]:
         item_name=WORLD.item_name(str(lot['item_id'])); bid=int(lot.get('current_bid') or 0); minimum=max(int(lot['starting_bid']),bid+1)
         bidder="Anonymous" if lot.get('anonymous') and lot.get('current_bidder_user_id') else "None"
@@ -260,7 +272,9 @@ async def auction_sell(
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
         await interaction.response.send_message(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
-    await interaction.response.send_message(f"🏮 Lot `#{result.get('auction_id')}` listed: **{WORLD.item_name(item)} x{quantity}** starting at **{starting_bid} {WORLD.currency_name(currency)}**.",ephemeral=False)
+    live=await announce_lot(interaction.guild,house_id,int(result.get('auction_id') or 0))
+    where=f" Live in {live.mention}." if live is not None else ""
+    await interaction.response.send_message(f"🏮 Lot `#{result.get('auction_id')}` listed: **{WORLD.item_name(item)} x{quantity}** starting at **{starting_bid} {WORLD.currency_name(currency)}**.{where}",ephemeral=False)
 
 
 @registered_group_command(auction_group, name="bid",description="Place an escrowed bid on an active auction lot")
@@ -274,6 +288,7 @@ async def auction_bid(interaction:discord.Interaction,auction_id:int,amount:app_
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
         await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
+    await refresh_lot(interaction.guild,int(auction_id))
     await interaction.followup.send(f"🔨 Bid accepted on lot `#{auction_id}`: **{amount} {WORLD.currency_name(str(result.get('currency_id','low_spirit_stone')))}**.",ephemeral=False)
 
 

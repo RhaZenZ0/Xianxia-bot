@@ -158,6 +158,11 @@ class ForgeTests(unittest.TestCase):
     def test_the_system_prompt_names_only_public_content_and_the_budget(self):
         text = system_prompt(WORLD, BUDGET)
         self.assertIn("Greenriver Town", text)
+        # v0.33.1: forty-eight auction floors and their stewards would fill the
+        # capped lists before the town a story is set in; they stay off the
+        # prompt (validation still accepts them).
+        self.assertNotIn("Auction", text.split("NPCs:")[0].split("Locations:")[1])
+        self.assertNotIn("Exchange Warden", text)
         self.assertIn("insight_xp <= 50", text)
         self.assertIn("total item quantity <= 3", text)
         self.assertNotIn("bugslayer_sword", text)
@@ -309,7 +314,7 @@ class ServiceAndStorageTests(unittest.IsolatedAsyncioTestCase):
     async def test_the_forge_table_exists_and_the_dashboard_reviewed_the_schema(self):
         from app.dashboard.contract import DASHBOARD_REVIEWED_SCHEMA_VERSION, DASHBOARD_SYSTEM_TABLES
 
-        self.assertEqual(SCHEMA_VERSION, 34)
+        self.assertEqual(SCHEMA_VERSION, 35)
         self.assertEqual(DASHBOARD_REVIEWED_SCHEMA_VERSION, SCHEMA_VERSION)
         # v0.24.0: the definition table belongs to the Quests workbench, which
         # can act on every row in it. Exploration showed forged ones read-only.

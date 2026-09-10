@@ -402,7 +402,9 @@ The bot uses interactive panels rather than requiring players to memorize every 
 
 ### Player dashboard
 
-`/me` opens the player dashboard with current character state and guided actions. System panels provide:
+`/me` opens the player dashboard with current character state and guided actions, and `/menu` (v0.33.1)
+opens one panel that lists every hub - Admin included, for an administrator - and opens the one you
+pick exactly as its own slash command would. System panels provide:
 
 - clear active-page hierarchy
 - Vitality and Qi bars with percentages and exact values
@@ -733,6 +735,8 @@ Current structured state always overrides old historical state.
 
 The simulation maintains dynamic regional markets, black-market rotations, sect politics and clan dynamics. Player actions can write persistent world actions/history, and autonomous changes continue while players are absent or in seclusion.
 
+Every city has a protected auction house (v0.33.1), entered with **/economy → Auction House → Enter**; protection ends at the doors. A capital's house is grand and takes twenty-five lots at once for up to a day; a smaller city's is a local floor of six lots, none longer than six hours. Each grand house has a live Discord channel of its own and the local floors of a world share one, where lots are posted, bid on and struck as it happens.
+
 The design goal is that progression and world simulation never pause each other.
 
 ## Administration in Discord
@@ -896,7 +900,10 @@ Open **Discord Setup** in the GM dashboard after the bot has joined the configur
 
 - inspect the connected Xianxia RP guild and bot identity
 - diagnose required Discord permissions and realm-role hierarchy problems
-- run an idempotent **Full Setup** that creates/reuses/repairs the canonical Xianxia RP base channels and realm-capital channels
+- run an idempotent **Full Setup** that creates/reuses/repairs the canonical Xianxia RP base channels, realm-capital channels and,
+  since v0.33.1, the live-auction channels beside the capitals - one per grand house, one shared by a world's local
+  floors - where a lot is posted the moment it is listed, its card follows every bid, and it is struck when the
+  simulation tick settles it
 - run **Repair Server** without deleting unrelated Discord channels or resetting game/world data
 - gate every realm-capital hub behind its **presence role** `Xianxia • <capital name>` (v0.21.6:
   `@everyone` denied, the presence role granted view/send/history/threads/reactions/files/slash commands,

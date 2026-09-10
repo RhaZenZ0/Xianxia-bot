@@ -3637,6 +3637,899 @@
         "Divine Herb Celestial City",
         "Ruined Constellation City"
       ]
+    },
+    "Azure Crown Treasure Exchange": {
+      "description": "A colonnaded hall under the imperial crest where licensed brokers call lots from a raised dais. Court formations hum in the pillars; imperial guards line the gallery. Violence inside is a crime against the throne; the licence, and the guard, end at the gate.",
+      "world": "Mortal World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "auction_house": "azure_crown_exchange",
+      "outside_location": "Azure Crown Imperial City",
+      "encounters": [
+        "A broker rings the dais bell three times and a whole gallery of buyers goes silent for a sealed imperial lot.",
+        "Two merchant heirs bid each other into ruin over a jade seal neither can read.",
+        "A court appraiser turns a spirit herb in the lamplight and quietly moves it to the reserve table.",
+        "A palace runner arrives with a scroll, and one lot is withdrawn without explanation."
+      ],
+      "sense_hints": [
+        "The court formation in the pillars presses down evenly; qi raised above a whisper is flattened at once.",
+        "Imperial guards along the gallery carry more cultivation than their plain armour admits.",
+        "Greed and caution thread through the crowd in equal measure, sharpening at every call of the bell."
+      ]
+    },
+    "Spirit Jade Auction Pavilion": {
+      "description": "A pavilion of pale jade tiers rising around a suspended auction dais, lit from within by the capital's spirit veins. An array woven into the jade suppresses every technique on the floor; ascended families bid from private balconies. Past the jade doors the array ends.",
+      "world": "Spiritual World",
+      "min_realm_index": 8,
+      "safe_zone": true,
+      "auction_house": "spirit_jade_pavilion",
+      "outside_location": "Spirit Jade Capital",
+      "encounters": [
+        "A masked family elder bids from a private balcony through a veiled attendant, never once showing her face.",
+        "An appraiser cracks a spirit stone to test its grade and the whole tier smells of rain for a breath.",
+        "A lot of ascended-beast marrow draws three sect envoys to their feet at the same instant.",
+        "The jade array chimes once, softly, and a would-be technique on the floor dies unborn."
+      ],
+      "sense_hints": [
+        "The jade array threads every tier; qi gathered for a technique thins to nothing before it can form.",
+        "Ascended cultivators sit behind the balcony veils, their auras folded to embers.",
+        "Old money and older grudges hang in the pavilion air, patient and cold."
+      ]
+    },
+    "Nine-Heavens Treasure Hall": {
+      "description": "A vast hall of white stone and star-metal beneath the Court's own law formation, where immortal clans auction relics older than the Mortal World's dynasties. The formation forbids a raised hand as firmly as a raised blade. The law stops at the threshold.",
+      "world": "Immortal World",
+      "min_realm_index": 16,
+      "safe_zone": true,
+      "auction_house": "nine_heavens_hall",
+      "outside_location": "Nine-Heavens Immortal Court",
+      "encounters": [
+        "A clan patriarch bids a whole mountain estate for a single immortal seed and does not look up from his tea.",
+        "The law formation brightens above one balcony and every voice in the hall lowers at once.",
+        "An arbiter's clerk reads a relic's provenance aloud for a quarter of an hour, and nobody interrupts.",
+        "A lot is struck from the register mid-call; the hall learns later that its seller no longer exists."
+      ],
+      "sense_hints": [
+        "The Court's law formation reads intent itself; a hostile thought draws a pressure like a held breath.",
+        "Immortal auras crowd the balconies, ancient and unhurried, each one a weight on the air.",
+        "Relics on the dais hum with ages of accumulated law; the hall feels older than the Court around it."
+      ]
+    },
+    "Celestial Mandate Auction Hall": {
+      "description": "A hall of pale gold and living cloud beneath the Mandate's own seal, where sovereign courts trade in treasures that shape worlds. A blow struck on this floor is a blow against heaven, and heaven answers. The Mandate's shelter ends at the hall doors.",
+      "world": "Celestial World",
+      "min_realm_index": 24,
+      "safe_zone": true,
+      "auction_house": "celestial_mandate_hall",
+      "outside_location": "Celestial Mandate Palace",
+      "encounters": [
+        "A sovereign's envoy bids with a single raised finger and the price doubles in silence.",
+        "The Mandate seal overhead flares as a lot of world-essence is uncovered, and the cloud floor goes still.",
+        "Two heavenly factions trade through intermediaries who never look at each other.",
+        "A steward's herald announces a lot withdrawn by decree; no one asks whose."
+      ],
+      "sense_hints": [
+        "The Mandate seal overhead weighs on every aura in the hall; even celestial qi bends to it.",
+        "Sovereign presences fill the upper cloud tiers like slow storms, each aware of the others.",
+        "Treasures on the dais carry the pull of whole worlds; the floor itself seems to lean toward them."
+      ]
+    },
+    "Riverguard Riverside Auction Hall": {
+      "description": "A long hall on stilts over Riverguard City's martial landings, where river barges unload lots straight onto the auction floor. A water formation stills every blade on the floor; the city guards watch the landings. The stilling ends at the gangway.",
+      "world": "Mortal World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "auction_house": "riverguard_riverside_auction_hall",
+      "outside_location": "Riverguard City",
+      "encounters": [
+        "A barge master sells a crate unopened and the whole floor bids on the sound it makes when it is set down.",
+        "Two martial-district captains bid against each other for a spirit stone lot and settle it with a bow instead of a blade.",
+        "An appraiser weighs a river pearl in her palm and quietly halves its reserve.",
+        "The landing bell rings for a lot arriving late by water, and the bidding starts before it is ashore."
+      ],
+      "sense_hints": [
+        "The water formation under the floor hums through the planks; a raised blade would stop mid-draw.",
+        "River qi moves under the hall in slow, cold pulses, carrying the smell of wet stone and spirit stone dust.",
+        "The martial district's pride sits in every posture on the floor, held carefully in check."
+      ]
+    },
+    "Jadeflow Riverside Auction Hall": {
+      "description": "A long hall on stilts over Jadeflow Spirit City's martial landings, where river barges unload lots straight onto the auction floor. A water formation stills every blade on the floor; the ascended wardens watch the landings. The stilling ends at the gangway.",
+      "world": "Spiritual World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "auction_house": "jadeflow_riverside_auction_hall",
+      "outside_location": "Jadeflow Spirit City",
+      "encounters": [
+        "A barge master sells a crate unopened and the whole floor bids on the sound it makes when it is set down.",
+        "Two martial-district captains bid against each other for a spirit crystal lot and settle it with a bow instead of a blade.",
+        "An appraiser weighs a river pearl in her palm and quietly halves its reserve.",
+        "The landing bell rings for a lot arriving late by water, and the bidding starts before it is ashore."
+      ],
+      "sense_hints": [
+        "The water formation under the floor hums through the planks; a raised blade would stop mid-draw.",
+        "River qi moves under the hall in slow, cold pulses, carrying the smell of wet stone and spirit crystal dust.",
+        "The martial district's pride sits in every posture on the floor, held carefully in check."
+      ]
+    },
+    "Immortal River Riverside Auction Hall": {
+      "description": "A long hall on stilts over Immortal River City's martial landings, where river barges unload lots straight onto the auction floor. A water formation stills every blade on the floor; the immortal wardens watch the landings. The stilling ends at the gangway.",
+      "world": "Immortal World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "auction_house": "immortal_river_riverside_auction_hall",
+      "outside_location": "Immortal River City",
+      "encounters": [
+        "A barge master sells a crate unopened and the whole floor bids on the sound it makes when it is set down.",
+        "Two martial-district captains bid against each other for a immortal stone lot and settle it with a bow instead of a blade.",
+        "An appraiser weighs a river pearl in her palm and quietly halves its reserve.",
+        "The landing bell rings for a lot arriving late by water, and the bidding starts before it is ashore."
+      ],
+      "sense_hints": [
+        "The water formation under the floor hums through the planks; a raised blade would stop mid-draw.",
+        "River qi moves under the hall in slow, cold pulses, carrying the smell of wet stone and immortal stone dust.",
+        "The martial district's pride sits in every posture on the floor, held carefully in check."
+      ]
+    },
+    "Celestial River Riverside Auction Hall": {
+      "description": "A long hall on stilts over Celestial River City's martial landings, where river barges unload lots straight onto the auction floor. A water formation stills every blade on the floor; the celestial wardens watch the landings. The stilling ends at the gangway.",
+      "world": "Celestial World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "auction_house": "celestial_river_riverside_auction_hall",
+      "outside_location": "Celestial River City",
+      "encounters": [
+        "A barge master sells a crate unopened and the whole floor bids on the sound it makes when it is set down.",
+        "Two martial-district captains bid against each other for a celestial crystal lot and settle it with a bow instead of a blade.",
+        "An appraiser weighs a river pearl in her palm and quietly halves its reserve.",
+        "The landing bell rings for a lot arriving late by water, and the bidding starts before it is ashore."
+      ],
+      "sense_hints": [
+        "The water formation under the floor hums through the planks; a raised blade would stop mid-draw.",
+        "River qi moves under the hall in slow, cold pulses, carrying the smell of wet stone and celestial crystal dust.",
+        "The martial district's pride sits in every posture on the floor, held carefully in check."
+      ]
+    },
+    "Four-Roads Caravan Crossroads Auction Yard": {
+      "description": "A walled yard at the meeting of Four-Roads Caravan City's trade roads, roofed in canvas and lit by lanterns, where caravans auction whole loads at once. A road formation in the flagstones keeps the peace; the city guards keep the gates. Peace, and the gates, end at the road.",
+      "world": "Mortal World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "auction_house": "four_roads_caravan_crossroads_auction_yard",
+      "outside_location": "Four-Roads Caravan City",
+      "encounters": [
+        "A caravan master auctions an entire wagon sight unseen and three trading houses bid on the dust it arrived in.",
+        "A lantern goes out over one stall and the yard's auctioneer calls the next lot without missing a breath.",
+        "Two rival guilds send the same clerk to bid for both, and nobody on the floor is fooled.",
+        "A spirit stone purse changes hands under the canvas so quickly that the yard's tally clerk has to ask twice."
+      ],
+      "sense_hints": [
+        "The road formation in the flagstones pulls hostile intent flat, like a wind dying at a wall.",
+        "Dust, lantern smoke and a dozen caravans' worth of spirit stone scent hang under the canvas.",
+        "Every guild on the floor is counting every other guild's purses, and pretending not to."
+      ]
+    },
+    "Galevein Crossroads Auction Yard": {
+      "description": "A walled yard at the meeting of Galevein Spirit City's trade roads, roofed in canvas and lit by lanterns, where caravans auction whole loads at once. A road formation in the flagstones keeps the peace; the ascended wardens keep the gates. Peace, and the gates, end at the road.",
+      "world": "Spiritual World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "auction_house": "galevein_crossroads_auction_yard",
+      "outside_location": "Galevein Spirit City",
+      "encounters": [
+        "A caravan master auctions an entire wagon sight unseen and three trading houses bid on the dust it arrived in.",
+        "A lantern goes out over one stall and the yard's auctioneer calls the next lot without missing a breath.",
+        "Two rival guilds send the same clerk to bid for both, and nobody on the floor is fooled.",
+        "A spirit crystal purse changes hands under the canvas so quickly that the yard's tally clerk has to ask twice."
+      ],
+      "sense_hints": [
+        "The road formation in the flagstones pulls hostile intent flat, like a wind dying at a wall.",
+        "Dust, lantern smoke and a dozen caravans' worth of spirit crystal scent hang under the canvas.",
+        "Every guild on the floor is counting every other guild's purses, and pretending not to."
+      ]
+    },
+    "Skyroad Crossroads Auction Yard": {
+      "description": "A walled yard at the meeting of Skyroad Immortal City's trade roads, roofed in canvas and lit by lanterns, where caravans auction whole loads at once. A road formation in the flagstones keeps the peace; the immortal wardens keep the gates. Peace, and the gates, end at the road.",
+      "world": "Immortal World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "auction_house": "skyroad_crossroads_auction_yard",
+      "outside_location": "Skyroad Immortal City",
+      "encounters": [
+        "A caravan master auctions an entire wagon sight unseen and three trading houses bid on the dust it arrived in.",
+        "A lantern goes out over one stall and the yard's auctioneer calls the next lot without missing a breath.",
+        "Two rival guilds send the same clerk to bid for both, and nobody on the floor is fooled.",
+        "A immortal stone purse changes hands under the canvas so quickly that the yard's tally clerk has to ask twice."
+      ],
+      "sense_hints": [
+        "The road formation in the flagstones pulls hostile intent flat, like a wind dying at a wall.",
+        "Dust, lantern smoke and a dozen caravans' worth of immortal stone scent hang under the canvas.",
+        "Every guild on the floor is counting every other guild's purses, and pretending not to."
+      ]
+    },
+    "Starroad Crossroads Auction Yard": {
+      "description": "A walled yard at the meeting of Starroad Celestial City's trade roads, roofed in canvas and lit by lanterns, where caravans auction whole loads at once. A road formation in the flagstones keeps the peace; the celestial wardens keep the gates. Peace, and the gates, end at the road.",
+      "world": "Celestial World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "auction_house": "starroad_crossroads_auction_yard",
+      "outside_location": "Starroad Celestial City",
+      "encounters": [
+        "A caravan master auctions an entire wagon sight unseen and three trading houses bid on the dust it arrived in.",
+        "A lantern goes out over one stall and the yard's auctioneer calls the next lot without missing a breath.",
+        "Two rival guilds send the same clerk to bid for both, and nobody on the floor is fooled.",
+        "A celestial crystal purse changes hands under the canvas so quickly that the yard's tally clerk has to ask twice."
+      ],
+      "sense_hints": [
+        "The road formation in the flagstones pulls hostile intent flat, like a wind dying at a wall.",
+        "Dust, lantern smoke and a dozen caravans' worth of celestial crystal scent hang under the canvas.",
+        "Every guild on the floor is counting every other guild's purses, and pretending not to."
+      ]
+    },
+    "Emberforge Furnace Auction Gallery": {
+      "description": "A gallery cut into Emberforge City's forge terraces, its floor warmed by the volcanic veins below, where smiths and miners auction ore, blades and furnace-born treasures. A fire formation keeps every blade cool on the floor; the city guards stand at the vents. The formation cools nothing past the gallery mouth.",
+      "world": "Mortal World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "auction_house": "emberforge_furnace_auction_gallery",
+      "outside_location": "Emberforge City",
+      "encounters": [
+        "A smith's apprentice carries a still-warm blade to the dais and the gallery leans forward as one.",
+        "An ore lot cracks in its crate from the heat and the reserve is quietly doubled.",
+        "Two forge clans bid on the same furnace core until the auctioneer stops the call for the good of both.",
+        "A vent sighs below the floor and every spirit stone on the tally table shifts a finger's width."
+      ],
+      "sense_hints": [
+        "The fire formation drinks the heat of a raised blade before it can be drawn; the gallery stays cool as stone.",
+        "Volcanic qi breathes up through the floor in slow waves, sharp with sulphur and spirit stone smoke.",
+        "Forge clans keep their tempers folded like good steel, and the gallery feels it."
+      ]
+    },
+    "Vermilion Furnace Furnace Auction Gallery": {
+      "description": "A gallery cut into Vermilion Furnace City's forge terraces, its floor warmed by the volcanic veins below, where smiths and miners auction ore, blades and furnace-born treasures. A fire formation keeps every blade cool on the floor; the ascended wardens stand at the vents. The formation cools nothing past the gallery mouth.",
+      "world": "Spiritual World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "auction_house": "vermilion_furnace_furnace_auction_gallery",
+      "outside_location": "Vermilion Furnace City",
+      "encounters": [
+        "A smith's apprentice carries a still-warm blade to the dais and the gallery leans forward as one.",
+        "An ore lot cracks in its crate from the heat and the reserve is quietly doubled.",
+        "Two forge clans bid on the same furnace core until the auctioneer stops the call for the good of both.",
+        "A vent sighs below the floor and every spirit crystal on the tally table shifts a finger's width."
+      ],
+      "sense_hints": [
+        "The fire formation drinks the heat of a raised blade before it can be drawn; the gallery stays cool as stone.",
+        "Volcanic qi breathes up through the floor in slow waves, sharp with sulphur and spirit crystal smoke.",
+        "Forge clans keep their tempers folded like good steel, and the gallery feels it."
+      ]
+    },
+    "Solar Furnace Furnace Auction Gallery": {
+      "description": "A gallery cut into Solar Furnace Immortal City's forge terraces, its floor warmed by the volcanic veins below, where smiths and miners auction ore, blades and furnace-born treasures. A fire formation keeps every blade cool on the floor; the immortal wardens stand at the vents. The formation cools nothing past the gallery mouth.",
+      "world": "Immortal World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "auction_house": "solar_furnace_furnace_auction_gallery",
+      "outside_location": "Solar Furnace Immortal City",
+      "encounters": [
+        "A smith's apprentice carries a still-warm blade to the dais and the gallery leans forward as one.",
+        "An ore lot cracks in its crate from the heat and the reserve is quietly doubled.",
+        "Two forge clans bid on the same furnace core until the auctioneer stops the call for the good of both.",
+        "A vent sighs below the floor and every immortal stone on the tally table shifts a finger's width."
+      ],
+      "sense_hints": [
+        "The fire formation drinks the heat of a raised blade before it can be drawn; the gallery stays cool as stone.",
+        "Volcanic qi breathes up through the floor in slow waves, sharp with sulphur and immortal stone smoke.",
+        "Forge clans keep their tempers folded like good steel, and the gallery feels it."
+      ]
+    },
+    "Solar Crucible Furnace Auction Gallery": {
+      "description": "A gallery cut into Solar Crucible Celestial City's forge terraces, its floor warmed by the volcanic veins below, where smiths and miners auction ore, blades and furnace-born treasures. A fire formation keeps every blade cool on the floor; the celestial wardens stand at the vents. The formation cools nothing past the gallery mouth.",
+      "world": "Celestial World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "auction_house": "solar_crucible_furnace_auction_gallery",
+      "outside_location": "Solar Crucible Celestial City",
+      "encounters": [
+        "A smith's apprentice carries a still-warm blade to the dais and the gallery leans forward as one.",
+        "An ore lot cracks in its crate from the heat and the reserve is quietly doubled.",
+        "Two forge clans bid on the same furnace core until the auctioneer stops the call for the good of both.",
+        "A vent sighs below the floor and every celestial crystal on the tally table shifts a finger's width."
+      ],
+      "sense_hints": [
+        "The fire formation drinks the heat of a raised blade before it can be drawn; the gallery stays cool as stone.",
+        "Volcanic qi breathes up through the floor in slow waves, sharp with sulphur and celestial crystal smoke.",
+        "Forge clans keep their tempers folded like good steel, and the gallery feels it."
+      ]
+    },
+    "Stoneback Mountain Highland Auction Lodge": {
+      "description": "A timber-and-stone lodge on Stoneback Mountain City's highest terrace, where hunters, miners and highland clans auction pelts, ore and mountain-born spirit herbs. A stone formation holds the floor still; the city guards keep the lodge doors. The stillness, and the wardens, end on the path.",
+      "world": "Mortal World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "auction_house": "stoneback_mountain_highland_auction_lodge",
+      "outside_location": "Stoneback Mountain City",
+      "encounters": [
+        "A highland hunter unrolls a pelt across the dais and the lodge goes quiet at the size of it.",
+        "A mountain clan bids in ore by weight, and the tally clerk fetches a second scale.",
+        "Snow slides from the lodge roof mid-call and nobody on the floor looks up.",
+        "An old prospector sells a single spirit stone the size of a fist and refuses every offer for the vein it came from."
+      ],
+      "sense_hints": [
+        "The stone formation in the lodge floor grounds every surge of qi like a mountain taking a footstep.",
+        "Thin cold air and pine resin fill the lodge, cut with the mineral bite of spirit stone ore.",
+        "Highland clans watch one another across the floor with the patience of people who wait out winters."
+      ]
+    },
+    "Stoneheart Highland Auction Lodge": {
+      "description": "A timber-and-stone lodge on Stoneheart Spirit City's highest terrace, where hunters, miners and highland clans auction pelts, ore and mountain-born spirit herbs. A stone formation holds the floor still; the ascended wardens keep the lodge doors. The stillness, and the wardens, end on the path.",
+      "world": "Spiritual World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "auction_house": "stoneheart_highland_auction_lodge",
+      "outside_location": "Stoneheart Spirit City",
+      "encounters": [
+        "A highland hunter unrolls a pelt across the dais and the lodge goes quiet at the size of it.",
+        "A mountain clan bids in ore by weight, and the tally clerk fetches a second scale.",
+        "Snow slides from the lodge roof mid-call and nobody on the floor looks up.",
+        "An old prospector sells a single spirit crystal the size of a fist and refuses every offer for the vein it came from."
+      ],
+      "sense_hints": [
+        "The stone formation in the lodge floor grounds every surge of qi like a mountain taking a footstep.",
+        "Thin cold air and pine resin fill the lodge, cut with the mineral bite of spirit crystal ore.",
+        "Highland clans watch one another across the floor with the patience of people who wait out winters."
+      ]
+    },
+    "Adamant Body Highland Auction Lodge": {
+      "description": "A timber-and-stone lodge on Adamant Body Immortal City's highest terrace, where hunters, miners and highland clans auction pelts, ore and mountain-born spirit herbs. A stone formation holds the floor still; the immortal wardens keep the lodge doors. The stillness, and the wardens, end on the path.",
+      "world": "Immortal World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "auction_house": "adamant_body_highland_auction_lodge",
+      "outside_location": "Adamant Body Immortal City",
+      "encounters": [
+        "A highland hunter unrolls a pelt across the dais and the lodge goes quiet at the size of it.",
+        "A mountain clan bids in ore by weight, and the tally clerk fetches a second scale.",
+        "Snow slides from the lodge roof mid-call and nobody on the floor looks up.",
+        "An old prospector sells a single immortal stone the size of a fist and refuses every offer for the vein it came from."
+      ],
+      "sense_hints": [
+        "The stone formation in the lodge floor grounds every surge of qi like a mountain taking a footstep.",
+        "Thin cold air and pine resin fill the lodge, cut with the mineral bite of immortal stone ore.",
+        "Highland clans watch one another across the floor with the patience of people who wait out winters."
+      ]
+    },
+    "Worldstone Highland Auction Lodge": {
+      "description": "A timber-and-stone lodge on Worldstone Celestial City's highest terrace, where hunters, miners and highland clans auction pelts, ore and mountain-born spirit herbs. A stone formation holds the floor still; the celestial wardens keep the lodge doors. The stillness, and the wardens, end on the path.",
+      "world": "Celestial World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "auction_house": "worldstone_highland_auction_lodge",
+      "outside_location": "Worldstone Celestial City",
+      "encounters": [
+        "A highland hunter unrolls a pelt across the dais and the lodge goes quiet at the size of it.",
+        "A mountain clan bids in ore by weight, and the tally clerk fetches a second scale.",
+        "Snow slides from the lodge roof mid-call and nobody on the floor looks up.",
+        "An old prospector sells a single celestial crystal the size of a fist and refuses every offer for the vein it came from."
+      ],
+      "sense_hints": [
+        "The stone formation in the lodge floor grounds every surge of qi like a mountain taking a footstep.",
+        "Thin cold air and pine resin fill the lodge, cut with the mineral bite of celestial crystal ore.",
+        "Highland clans watch one another across the floor with the patience of people who wait out winters."
+      ]
+    },
+    "Cloudblade Sword Peak Auction Terrace": {
+      "description": "An open terrace on the highest of Cloudblade City's sword peaks, walled by wind, where sword cultivators auction blades, manuals and battle-won trophies. A wind formation turns every drawn sword aside; the city guards keep the stair. Past the stair the wind, and the peace, are the peaks' own.",
+      "world": "Mortal World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "auction_house": "cloudblade_sword_peak_auction_terrace",
+      "outside_location": "Cloudblade City",
+      "encounters": [
+        "A sword cultivator lays her blade on the dais and the wind on the terrace changes direction.",
+        "Two disciples of rival peaks bid on one manual and their masters pretend not to watch.",
+        "A trophy from a duel is auctioned by the loser, who stands at the back and does not bid.",
+        "The wind formation sings once as a blade half-clears its sheath, and the sheath swallows it again."
+      ],
+      "sense_hints": [
+        "The wind formation on the terrace tugs every raised blade wide; sword qi cannot hold a line here.",
+        "High cold wind scours the terrace, carrying the ring of spirit stone on stone and distant sword drills.",
+        "Sword intent crowds the terrace from every side, sharp, proud and carefully sheathed."
+      ]
+    },
+    "Cloudedge Sword Peak Auction Terrace": {
+      "description": "An open terrace on the highest of Cloudedge Spirit City's sword peaks, walled by wind, where sword cultivators auction blades, manuals and battle-won trophies. A wind formation turns every drawn sword aside; the ascended wardens keep the stair. Past the stair the wind, and the peace, are the peaks' own.",
+      "world": "Spiritual World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "auction_house": "cloudedge_sword_peak_auction_terrace",
+      "outside_location": "Cloudedge Spirit City",
+      "encounters": [
+        "A sword cultivator lays her blade on the dais and the wind on the terrace changes direction.",
+        "Two disciples of rival peaks bid on one manual and their masters pretend not to watch.",
+        "A trophy from a duel is auctioned by the loser, who stands at the back and does not bid.",
+        "The wind formation sings once as a blade half-clears its sheath, and the sheath swallows it again."
+      ],
+      "sense_hints": [
+        "The wind formation on the terrace tugs every raised blade wide; sword qi cannot hold a line here.",
+        "High cold wind scours the terrace, carrying the ring of spirit crystal on stone and distant sword drills.",
+        "Sword intent crowds the terrace from every side, sharp, proud and carefully sheathed."
+      ]
+    },
+    "Heavenblade Sword Peak Auction Terrace": {
+      "description": "An open terrace on the highest of Heavenblade Immortal City's sword peaks, walled by wind, where sword cultivators auction blades, manuals and battle-won trophies. A wind formation turns every drawn sword aside; the immortal wardens keep the stair. Past the stair the wind, and the peace, are the peaks' own.",
+      "world": "Immortal World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "auction_house": "heavenblade_sword_peak_auction_terrace",
+      "outside_location": "Heavenblade Immortal City",
+      "encounters": [
+        "A sword cultivator lays her blade on the dais and the wind on the terrace changes direction.",
+        "Two disciples of rival peaks bid on one manual and their masters pretend not to watch.",
+        "A trophy from a duel is auctioned by the loser, who stands at the back and does not bid.",
+        "The wind formation sings once as a blade half-clears its sheath, and the sheath swallows it again."
+      ],
+      "sense_hints": [
+        "The wind formation on the terrace tugs every raised blade wide; sword qi cannot hold a line here.",
+        "High cold wind scours the terrace, carrying the ring of immortal stone on stone and distant sword drills.",
+        "Sword intent crowds the terrace from every side, sharp, proud and carefully sheathed."
+      ]
+    },
+    "Firmament Blade Sword Peak Auction Terrace": {
+      "description": "An open terrace on the highest of Firmament Blade City's sword peaks, walled by wind, where sword cultivators auction blades, manuals and battle-won trophies. A wind formation turns every drawn sword aside; the celestial wardens keep the stair. Past the stair the wind, and the peace, are the peaks' own.",
+      "world": "Celestial World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "auction_house": "firmament_blade_sword_peak_auction_terrace",
+      "outside_location": "Firmament Blade City",
+      "encounters": [
+        "A sword cultivator lays her blade on the dais and the wind on the terrace changes direction.",
+        "Two disciples of rival peaks bid on one manual and their masters pretend not to watch.",
+        "A trophy from a duel is auctioned by the loser, who stands at the back and does not bid.",
+        "The wind formation sings once as a blade half-clears its sheath, and the sheath swallows it again."
+      ],
+      "sense_hints": [
+        "The wind formation on the terrace tugs every raised blade wide; sword qi cannot hold a line here.",
+        "High cold wind scours the terrace, carrying the ring of celestial crystal on stone and distant sword drills.",
+        "Sword intent crowds the terrace from every side, sharp, proud and carefully sheathed."
+      ]
+    },
+    "Ironbanner Bannered Auction Ground": {
+      "description": "A drilled square inside Ironbanner City's walls, hung with clan banners, where garrisons and plains clans auction arms, mounts and the spoils of the frontier. A banner formation forbids a drawn weapon on the ground; the city guards hold the gate. The banner's peace ends at the wall.",
+      "world": "Mortal World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "auction_house": "ironbanner_bannered_auction_ground",
+      "outside_location": "Ironbanner City",
+      "encounters": [
+        "A garrison captain auctions a captured banner and the clan it belonged to sends a bidder anyway.",
+        "A string of plains mounts is walked across the ground and the bidding follows their hooves.",
+        "A dust wind crosses the square and the auctioneer calls through it without a pause.",
+        "A spirit stone purse is thrown onto the dais from the back rank, and the tally clerk counts it twice."
+      ],
+      "sense_hints": [
+        "The banner formation over the ground weighs on every hand that drifts toward a hilt.",
+        "Dry wind, horse and iron: the square smells of a garrison, with spirit stone dust under it.",
+        "Clan pride stands in ranks on this ground, banners up, tempers held at parade rest."
+      ]
+    },
+    "Spearwall Bannered Auction Ground": {
+      "description": "A drilled square inside Spearwall Spirit City's walls, hung with clan banners, where garrisons and plains clans auction arms, mounts and the spoils of the frontier. A banner formation forbids a drawn weapon on the ground; the ascended wardens hold the gate. The banner's peace ends at the wall.",
+      "world": "Spiritual World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "auction_house": "spearwall_bannered_auction_ground",
+      "outside_location": "Spearwall Spirit City",
+      "encounters": [
+        "A garrison captain auctions a captured banner and the clan it belonged to sends a bidder anyway.",
+        "A string of plains mounts is walked across the ground and the bidding follows their hooves.",
+        "A dust wind crosses the square and the auctioneer calls through it without a pause.",
+        "A spirit crystal purse is thrown onto the dais from the back rank, and the tally clerk counts it twice."
+      ],
+      "sense_hints": [
+        "The banner formation over the ground weighs on every hand that drifts toward a hilt.",
+        "Dry wind, horse and iron: the square smells of a garrison, with spirit crystal dust under it.",
+        "Clan pride stands in ranks on this ground, banners up, tempers held at parade rest."
+      ]
+    },
+    "Golden Spear Bannered Auction Ground": {
+      "description": "A drilled square inside Golden Spear Immortal City's walls, hung with clan banners, where garrisons and plains clans auction arms, mounts and the spoils of the frontier. A banner formation forbids a drawn weapon on the ground; the immortal wardens hold the gate. The banner's peace ends at the wall.",
+      "world": "Immortal World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "auction_house": "golden_spear_bannered_auction_ground",
+      "outside_location": "Golden Spear Immortal City",
+      "encounters": [
+        "A garrison captain auctions a captured banner and the clan it belonged to sends a bidder anyway.",
+        "A string of plains mounts is walked across the ground and the bidding follows their hooves.",
+        "A dust wind crosses the square and the auctioneer calls through it without a pause.",
+        "A immortal stone purse is thrown onto the dais from the back rank, and the tally clerk counts it twice."
+      ],
+      "sense_hints": [
+        "The banner formation over the ground weighs on every hand that drifts toward a hilt.",
+        "Dry wind, horse and iron: the square smells of a garrison, with immortal stone dust under it.",
+        "Clan pride stands in ranks on this ground, banners up, tempers held at parade rest."
+      ]
+    },
+    "Mandate Spear Bannered Auction Ground": {
+      "description": "A drilled square inside Mandate Spear City's walls, hung with clan banners, where garrisons and plains clans auction arms, mounts and the spoils of the frontier. A banner formation forbids a drawn weapon on the ground; the celestial wardens hold the gate. The banner's peace ends at the wall.",
+      "world": "Celestial World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "auction_house": "mandate_spear_bannered_auction_ground",
+      "outside_location": "Mandate Spear City",
+      "encounters": [
+        "A garrison captain auctions a captured banner and the clan it belonged to sends a bidder anyway.",
+        "A string of plains mounts is walked across the ground and the bidding follows their hooves.",
+        "A dust wind crosses the square and the auctioneer calls through it without a pause.",
+        "A celestial crystal purse is thrown onto the dais from the back rank, and the tally clerk counts it twice."
+      ],
+      "sense_hints": [
+        "The banner formation over the ground weighs on every hand that drifts toward a hilt.",
+        "Dry wind, horse and iron: the square smells of a garrison, with celestial crystal dust under it.",
+        "Clan pride stands in ranks on this ground, banners up, tempers held at parade rest."
+      ]
+    },
+    "Moonfen Mistwater Auction Pavilion": {
+      "description": "A lantern-lit pavilion on pilings over Moonfen City's marsh channels, where yin cultivators, herbalists and fen traders auction reagents, relics and things pulled from the mist. A water-mirror formation stills the floor; the city guards pole the channels. The mirror ends at the last piling.",
+      "world": "Mortal World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "auction_house": "moonfen_mistwater_auction_pavilion",
+      "outside_location": "Moonfen City",
+      "encounters": [
+        "A fen trader sets a sealed jar on the dais and the mist inside it moves against the lantern light.",
+        "A yin cultivator bids without speaking, and the keeper reads the price off the cold in the air.",
+        "A relic dredged from the channels is auctioned still wet, and no one asks what it was attached to.",
+        "The lanterns dim as a lot of spirit stone is uncovered, and brighten when the reserve is met."
+      ],
+      "sense_hints": [
+        "The water-mirror formation under the pilings shows every hostile thought back at its owner, chilled.",
+        "Mist, rot and cold marsh qi seep through the pavilion, threaded with spirit stone light.",
+        "The fen's yin cultivators sit very still on the floor, and the stillness has weight."
+      ]
+    },
+    "Moonfrost Mistwater Auction Pavilion": {
+      "description": "A lantern-lit pavilion on pilings over Moonfrost Spirit City's marsh channels, where yin cultivators, herbalists and fen traders auction reagents, relics and things pulled from the mist. A water-mirror formation stills the floor; the ascended wardens pole the channels. The mirror ends at the last piling.",
+      "world": "Spiritual World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "auction_house": "moonfrost_mistwater_auction_pavilion",
+      "outside_location": "Moonfrost Spirit City",
+      "encounters": [
+        "A fen trader sets a sealed jar on the dais and the mist inside it moves against the lantern light.",
+        "A yin cultivator bids without speaking, and the keeper reads the price off the cold in the air.",
+        "A relic dredged from the channels is auctioned still wet, and no one asks what it was attached to.",
+        "The lanterns dim as a lot of spirit crystal is uncovered, and brighten when the reserve is met."
+      ],
+      "sense_hints": [
+        "The water-mirror formation under the pilings shows every hostile thought back at its owner, chilled.",
+        "Mist, rot and cold marsh qi seep through the pavilion, threaded with spirit crystal light.",
+        "The fen's yin cultivators sit very still on the floor, and the stillness has weight."
+      ]
+    },
+    "Lunar Veil Mistwater Auction Pavilion": {
+      "description": "A lantern-lit pavilion on pilings over Lunar Veil Immortal City's marsh channels, where yin cultivators, herbalists and fen traders auction reagents, relics and things pulled from the mist. A water-mirror formation stills the floor; the immortal wardens pole the channels. The mirror ends at the last piling.",
+      "world": "Immortal World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "auction_house": "lunar_veil_mistwater_auction_pavilion",
+      "outside_location": "Lunar Veil Immortal City",
+      "encounters": [
+        "A fen trader sets a sealed jar on the dais and the mist inside it moves against the lantern light.",
+        "A yin cultivator bids without speaking, and the keeper reads the price off the cold in the air.",
+        "A relic dredged from the channels is auctioned still wet, and no one asks what it was attached to.",
+        "The lanterns dim as a lot of immortal stone is uncovered, and brighten when the reserve is met."
+      ],
+      "sense_hints": [
+        "The water-mirror formation under the pilings shows every hostile thought back at its owner, chilled.",
+        "Mist, rot and cold marsh qi seep through the pavilion, threaded with immortal stone light.",
+        "The fen's yin cultivators sit very still on the floor, and the stillness has weight."
+      ]
+    },
+    "Lunar Shadow Mistwater Auction Pavilion": {
+      "description": "A lantern-lit pavilion on pilings over Lunar Shadow Celestial City's marsh channels, where yin cultivators, herbalists and fen traders auction reagents, relics and things pulled from the mist. A water-mirror formation stills the floor; the celestial wardens pole the channels. The mirror ends at the last piling.",
+      "world": "Celestial World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "auction_house": "lunar_shadow_mistwater_auction_pavilion",
+      "outside_location": "Lunar Shadow Celestial City",
+      "encounters": [
+        "A fen trader sets a sealed jar on the dais and the mist inside it moves against the lantern light.",
+        "A yin cultivator bids without speaking, and the keeper reads the price off the cold in the air.",
+        "A relic dredged from the channels is auctioned still wet, and no one asks what it was attached to.",
+        "The lanterns dim as a lot of celestial crystal is uncovered, and brighten when the reserve is met."
+      ],
+      "sense_hints": [
+        "The water-mirror formation under the pilings shows every hostile thought back at its owner, chilled.",
+        "Mist, rot and cold marsh qi seep through the pavilion, threaded with celestial crystal light.",
+        "The fen's yin cultivators sit very still on the floor, and the stillness has weight."
+      ]
+    },
+    "Frostwatch Frontier Auction Hall": {
+      "description": "A stone hall banked with snow at Frostwatch City's frontier gate, where scouts, trappers and border clans auction furs, ice-born spirit herbs and what the frozen wastes give up. A frost formation stops every blade in its sheath; the city guards man the gate. The frost's peace ends where the road turns north.",
+      "world": "Mortal World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "auction_house": "frostwatch_frontier_auction_hall",
+      "outside_location": "Frostwatch City",
+      "encounters": [
+        "A scout auctions a map of the wastes drawn in her own blood, and two border clans bid without reading it.",
+        "An ice-born herb is carried in frozen and auctioned before it can thaw.",
+        "The gate horn sounds for a patrol returning, and the floor pauses to count them in.",
+        "A trapper drops a pelt worth a season's spirit stone on the dais and asks only for a warm bed in exchange."
+      ],
+      "sense_hints": [
+        "The frost formation lays a rime on any hand that closes on a weapon; steel here is too cold to draw.",
+        "Woodsmoke, wet fur and the clean bite of the wastes fill the hall, with spirit stone glinting in the frost.",
+        "Border clans keep their eyes on the gate as much as the dais; the frontier is never quite outside."
+      ]
+    },
+    "Northwind Frontier Auction Hall": {
+      "description": "A stone hall banked with snow at Northwind Spirit City's frontier gate, where scouts, trappers and border clans auction furs, ice-born spirit herbs and what the frozen wastes give up. A frost formation stops every blade in its sheath; the ascended wardens man the gate. The frost's peace ends where the road turns north.",
+      "world": "Spiritual World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "auction_house": "northwind_frontier_auction_hall",
+      "outside_location": "Northwind Spirit City",
+      "encounters": [
+        "A scout auctions a map of the wastes drawn in her own blood, and two border clans bid without reading it.",
+        "An ice-born herb is carried in frozen and auctioned before it can thaw.",
+        "The gate horn sounds for a patrol returning, and the floor pauses to count them in.",
+        "A trapper drops a pelt worth a season's spirit crystal on the dais and asks only for a warm bed in exchange."
+      ],
+      "sense_hints": [
+        "The frost formation lays a rime on any hand that closes on a weapon; steel here is too cold to draw.",
+        "Woodsmoke, wet fur and the clean bite of the wastes fill the hall, with spirit crystal glinting in the frost.",
+        "Border clans keep their eyes on the gate as much as the dais; the frontier is never quite outside."
+      ]
+    },
+    "Polar Gate Frontier Auction Hall": {
+      "description": "A stone hall banked with snow at Polar Gate Immortal City's frontier gate, where scouts, trappers and border clans auction furs, ice-born spirit herbs and what the frozen wastes give up. A frost formation stops every blade in its sheath; the immortal wardens man the gate. The frost's peace ends where the road turns north.",
+      "world": "Immortal World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "auction_house": "polar_gate_frontier_auction_hall",
+      "outside_location": "Polar Gate Immortal City",
+      "encounters": [
+        "A scout auctions a map of the wastes drawn in her own blood, and two border clans bid without reading it.",
+        "An ice-born herb is carried in frozen and auctioned before it can thaw.",
+        "The gate horn sounds for a patrol returning, and the floor pauses to count them in.",
+        "A trapper drops a pelt worth a season's immortal stone on the dais and asks only for a warm bed in exchange."
+      ],
+      "sense_hints": [
+        "The frost formation lays a rime on any hand that closes on a weapon; steel here is too cold to draw.",
+        "Woodsmoke, wet fur and the clean bite of the wastes fill the hall, with immortal stone glinting in the frost.",
+        "Border clans keep their eyes on the gate as much as the dais; the frontier is never quite outside."
+      ]
+    },
+    "Froststar Frontier Auction Hall": {
+      "description": "A stone hall banked with snow at Froststar Border City's frontier gate, where scouts, trappers and border clans auction furs, ice-born spirit herbs and what the frozen wastes give up. A frost formation stops every blade in its sheath; the celestial wardens man the gate. The frost's peace ends where the road turns north.",
+      "world": "Celestial World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "auction_house": "froststar_frontier_auction_hall",
+      "outside_location": "Froststar Border City",
+      "encounters": [
+        "A scout auctions a map of the wastes drawn in her own blood, and two border clans bid without reading it.",
+        "An ice-born herb is carried in frozen and auctioned before it can thaw.",
+        "The gate horn sounds for a patrol returning, and the floor pauses to count them in.",
+        "A trapper drops a pelt worth a season's celestial crystal on the dais and asks only for a warm bed in exchange."
+      ],
+      "sense_hints": [
+        "The frost formation lays a rime on any hand that closes on a weapon; steel here is too cold to draw.",
+        "Woodsmoke, wet fur and the clean bite of the wastes fill the hall, with celestial crystal glinting in the frost.",
+        "Border clans keep their eyes on the gate as much as the dais; the frontier is never quite outside."
+      ]
+    },
+    "Ashenwall Relic Auction Court": {
+      "description": "A roofed court raised on the old battlefield walls of Ashenwall City, where relic hunters, scholars and salvage clans auction what the ruins give up. A ward formation older than the city keeps the floor bloodless; the city guards guard the arches. Beyond the arches the old ground keeps its own rules.",
+      "world": "Mortal World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "auction_house": "ashenwall_relic_auction_court",
+      "outside_location": "Ashenwall City",
+      "encounters": [
+        "A relic hunter uncovers a broken standard on the dais and three salvage clans claim its lineage at once.",
+        "A scholar bids a year's stipend for a single inscribed shard and reads it aloud before the gavel.",
+        "Something in a sealed crate answers the auctioneer's bell, and the reserve goes up.",
+        "A salvage clan pays in spirit stone pried from a battlefield vault, still stamped with a dead army's seal."
+      ],
+      "sense_hints": [
+        "The ward formation in the old walls presses down like a sleeping army's discipline; it predates the city.",
+        "Dust, old iron and the faint residue of ancient qi hang in the court, with spirit stone glimmering in the cracks.",
+        "The ruins' past crowds the arches; every relic on the dais remembers a battle."
+      ]
+    },
+    "Broken Halo Relic Auction Court": {
+      "description": "A roofed court raised on the old battlefield walls of Broken Halo Spirit City, where relic hunters, scholars and salvage clans auction what the ruins give up. A ward formation older than the city keeps the floor bloodless; the ascended wardens guard the arches. Beyond the arches the old ground keeps its own rules.",
+      "world": "Spiritual World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "auction_house": "broken_halo_relic_auction_court",
+      "outside_location": "Broken Halo Spirit City",
+      "encounters": [
+        "A relic hunter uncovers a broken standard on the dais and three salvage clans claim its lineage at once.",
+        "A scholar bids a year's stipend for a single inscribed shard and reads it aloud before the gavel.",
+        "Something in a sealed crate answers the auctioneer's bell, and the reserve goes up.",
+        "A salvage clan pays in spirit crystal pried from a battlefield vault, still stamped with a dead army's seal."
+      ],
+      "sense_hints": [
+        "The ward formation in the old walls presses down like a sleeping army's discipline; it predates the city.",
+        "Dust, old iron and the faint residue of ancient qi hang in the court, with spirit crystal glimmering in the cracks.",
+        "The ruins' past crowds the arches; every relic on the dais remembers a battle."
+      ]
+    },
+    "Fallen Star Relic Auction Court": {
+      "description": "A roofed court raised on the old battlefield walls of Fallen Star Immortal City, where relic hunters, scholars and salvage clans auction what the ruins give up. A ward formation older than the city keeps the floor bloodless; the immortal wardens guard the arches. Beyond the arches the old ground keeps its own rules.",
+      "world": "Immortal World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "auction_house": "fallen_star_relic_auction_court",
+      "outside_location": "Fallen Star Immortal City",
+      "encounters": [
+        "A relic hunter uncovers a broken standard on the dais and three salvage clans claim its lineage at once.",
+        "A scholar bids a year's stipend for a single inscribed shard and reads it aloud before the gavel.",
+        "Something in a sealed crate answers the auctioneer's bell, and the reserve goes up.",
+        "A salvage clan pays in immortal stone pried from a battlefield vault, still stamped with a dead army's seal."
+      ],
+      "sense_hints": [
+        "The ward formation in the old walls presses down like a sleeping army's discipline; it predates the city.",
+        "Dust, old iron and the faint residue of ancient qi hang in the court, with immortal stone glimmering in the cracks.",
+        "The ruins' past crowds the arches; every relic on the dais remembers a battle."
+      ]
+    },
+    "Ruined Constellation Relic Auction Court": {
+      "description": "A roofed court raised on the old battlefield walls of Ruined Constellation City, where relic hunters, scholars and salvage clans auction what the ruins give up. A ward formation older than the city keeps the floor bloodless; the celestial wardens guard the arches. Beyond the arches the old ground keeps its own rules.",
+      "world": "Celestial World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "auction_house": "ruined_constellation_relic_auction_court",
+      "outside_location": "Ruined Constellation City",
+      "encounters": [
+        "A relic hunter uncovers a broken standard on the dais and three salvage clans claim its lineage at once.",
+        "A scholar bids a year's stipend for a single inscribed shard and reads it aloud before the gavel.",
+        "Something in a sealed crate answers the auctioneer's bell, and the reserve goes up.",
+        "A salvage clan pays in celestial crystal pried from a battlefield vault, still stamped with a dead army's seal."
+      ],
+      "sense_hints": [
+        "The ward formation in the old walls presses down like a sleeping army's discipline; it predates the city.",
+        "Dust, old iron and the faint residue of ancient qi hang in the court, with celestial crystal glimmering in the cracks.",
+        "The ruins' past crowds the arches; every relic on the dais remembers a battle."
+      ]
+    },
+    "Jadewood Medicine Garden Auction Hall": {
+      "description": "An airy hall among Jadewood Medicine City's medicine gardens, its floor open to the herb terraces, where physicians, alchemists and garden clans auction herbs, pills and rare seeds. A verdant formation soothes every temper on the floor; the city guards walk the terraces. The soothing ends at the garden gate.",
+      "world": "Mortal World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "auction_house": "jadewood_medicine_garden_auction_hall",
+      "outside_location": "Jadewood Medicine City",
+      "encounters": [
+        "An alchemist opens a pill case on the dais and the hall's physicians lean in to read the fragrance.",
+        "A garden clan auctions a single seed with a century's pedigree and a caveat about its temper.",
+        "A patient in the gallery bids on a remedy for himself, and the hall lets him win it cheaply.",
+        "A basket of rare herbs is sold for spirit stone and carried out under a wet cloth before it can wilt."
+      ],
+      "sense_hints": [
+        "The verdant formation in the floor cools anger like shade; nobody on this floor stays furious long.",
+        "Crushed herbs, damp earth and pill fire scent the hall, with the green tang of spirit stone in the soil.",
+        "Physicians and garden clans study every lot the way they study a patient, and each other the same."
+      ]
+    },
+    "Hundred Herb Garden Auction Hall": {
+      "description": "An airy hall among Hundred Herb Spirit City's medicine gardens, its floor open to the herb terraces, where physicians, alchemists and garden clans auction herbs, pills and rare seeds. A verdant formation soothes every temper on the floor; the ascended wardens walk the terraces. The soothing ends at the garden gate.",
+      "world": "Spiritual World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "auction_house": "hundred_herb_garden_auction_hall",
+      "outside_location": "Hundred Herb Spirit City",
+      "encounters": [
+        "An alchemist opens a pill case on the dais and the hall's physicians lean in to read the fragrance.",
+        "A garden clan auctions a single seed with a century's pedigree and a caveat about its temper.",
+        "A patient in the gallery bids on a remedy for himself, and the hall lets him win it cheaply.",
+        "A basket of rare herbs is sold for spirit crystal and carried out under a wet cloth before it can wilt."
+      ],
+      "sense_hints": [
+        "The verdant formation in the floor cools anger like shade; nobody on this floor stays furious long.",
+        "Crushed herbs, damp earth and pill fire scent the hall, with the green tang of spirit crystal in the soil.",
+        "Physicians and garden clans study every lot the way they study a patient, and each other the same."
+      ]
+    },
+    "Jade Cauldron Garden Auction Hall": {
+      "description": "An airy hall among Jade Cauldron Immortal City's medicine gardens, its floor open to the herb terraces, where physicians, alchemists and garden clans auction herbs, pills and rare seeds. A verdant formation soothes every temper on the floor; the immortal wardens walk the terraces. The soothing ends at the garden gate.",
+      "world": "Immortal World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "auction_house": "jade_cauldron_garden_auction_hall",
+      "outside_location": "Jade Cauldron Immortal City",
+      "encounters": [
+        "An alchemist opens a pill case on the dais and the hall's physicians lean in to read the fragrance.",
+        "A garden clan auctions a single seed with a century's pedigree and a caveat about its temper.",
+        "A patient in the gallery bids on a remedy for himself, and the hall lets him win it cheaply.",
+        "A basket of rare herbs is sold for immortal stone and carried out under a wet cloth before it can wilt."
+      ],
+      "sense_hints": [
+        "The verdant formation in the floor cools anger like shade; nobody on this floor stays furious long.",
+        "Crushed herbs, damp earth and pill fire scent the hall, with the green tang of immortal stone in the soil.",
+        "Physicians and garden clans study every lot the way they study a patient, and each other the same."
+      ]
+    },
+    "Divine Herb Garden Auction Hall": {
+      "description": "An airy hall among Divine Herb Celestial City's medicine gardens, its floor open to the herb terraces, where physicians, alchemists and garden clans auction herbs, pills and rare seeds. A verdant formation soothes every temper on the floor; the celestial wardens walk the terraces. The soothing ends at the garden gate.",
+      "world": "Celestial World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "auction_house": "divine_herb_garden_auction_hall",
+      "outside_location": "Divine Herb Celestial City",
+      "encounters": [
+        "An alchemist opens a pill case on the dais and the hall's physicians lean in to read the fragrance.",
+        "A garden clan auctions a single seed with a century's pedigree and a caveat about its temper.",
+        "A patient in the gallery bids on a remedy for himself, and the hall lets him win it cheaply.",
+        "A basket of rare herbs is sold for celestial crystal and carried out under a wet cloth before it can wilt."
+      ],
+      "sense_hints": [
+        "The verdant formation in the floor cools anger like shade; nobody on this floor stays furious long.",
+        "Crushed herbs, damp earth and pill fire scent the hall, with the green tang of celestial crystal in the soil.",
+        "Physicians and garden clans study every lot the way they study a patient, and each other the same."
+      ]
+    },
+    "Jade Crown Noble Auction Court": {
+      "description": "A marble court in Jade Crown Spirit City's noble quarter, hung with house crests, where old families auction heirlooms, estates and the favours of the heartland. A court formation forbids a raised voice as well as a raised hand; the ascended wardens attend the doors. Past the doors the families keep their own courtesies.",
+      "world": "Spiritual World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "auction_house": "jade_crown_noble_auction_court",
+      "outside_location": "Jade Crown Spirit City",
+      "encounters": [
+        "A noble house auctions a lesser heirloom to settle a debt and every rival house bids to be seen doing it.",
+        "A crest is quietly taken down from the wall before a lot is called, and quietly returned after.",
+        "Two young heirs bid against each other for an estate neither has visited.",
+        "A matriarch buys back her own family's jade for spirit crystal and does not look at who sold it."
+      ],
+      "sense_hints": [
+        "The court formation smooths every aura on the floor to a courtier's calm; sharp intent simply fails to form.",
+        "Polished marble, sandalwood and old money scent the court, with spirit crystal light in the crests.",
+        "Every house on the floor is keeping score of every other, in silence, and always has."
+      ]
+    },
+    "Ninefold Noble Noble Auction Court": {
+      "description": "A marble court in Ninefold Noble Immortal City's noble quarter, hung with house crests, where old families auction heirlooms, estates and the favours of the heartland. A court formation forbids a raised voice as well as a raised hand; the immortal wardens attend the doors. Past the doors the families keep their own courtesies.",
+      "world": "Immortal World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "auction_house": "ninefold_noble_noble_auction_court",
+      "outside_location": "Ninefold Noble Immortal City",
+      "encounters": [
+        "A noble house auctions a lesser heirloom to settle a debt and every rival house bids to be seen doing it.",
+        "A crest is quietly taken down from the wall before a lot is called, and quietly returned after.",
+        "Two young heirs bid against each other for an estate neither has visited.",
+        "A matriarch buys back her own family's jade for immortal stone and does not look at who sold it."
+      ],
+      "sense_hints": [
+        "The court formation smooths every aura on the floor to a courtier's calm; sharp intent simply fails to form.",
+        "Polished marble, sandalwood and old money scent the court, with immortal stone light in the crests.",
+        "Every house on the floor is keeping score of every other, in silence, and always has."
+      ]
+    },
+    "Mandate Crown Noble Auction Court": {
+      "description": "A marble court in Mandate Crown Celestial City's noble quarter, hung with house crests, where old families auction heirlooms, estates and the favours of the heartland. A court formation forbids a raised voice as well as a raised hand; the celestial wardens attend the doors. Past the doors the families keep their own courtesies.",
+      "world": "Celestial World",
+      "min_realm_index": 0,
+      "safe_zone": true,
+      "auction_house": "mandate_crown_noble_auction_court",
+      "outside_location": "Mandate Crown Celestial City",
+      "encounters": [
+        "A noble house auctions a lesser heirloom to settle a debt and every rival house bids to be seen doing it.",
+        "A crest is quietly taken down from the wall before a lot is called, and quietly returned after.",
+        "Two young heirs bid against each other for an estate neither has visited.",
+        "A matriarch buys back her own family's jade for celestial crystal and does not look at who sold it."
+      ],
+      "sense_hints": [
+        "The court formation smooths every aura on the floor to a courtier's calm; sharp intent simply fails to form.",
+        "Polished marble, sandalwood and old money scent the court, with celestial crystal light in the crests.",
+        "Every house on the floor is keeping score of every other, in silence, and always has."
+      ]
     }
   },
   "npcs": {
@@ -5012,6 +5905,852 @@
         "Evening": "Celestial Cradle Province",
         "Night": "Celestial Cradle Province"
       }
+    },
+    "Exchange Warden Bai Ruolan": {
+      "role": "Azure Crown Treasure Exchange steward",
+      "location": "Azure Crown Treasure Exchange",
+      "realm": "Nascent Soul",
+      "stage": 3,
+      "speech": "Formal, brisk and courtly; every sentence ends where the ledger says it should.",
+      "want": "Keep the Exchange's imperial licence unblemished and its ledgers balanced to the last stone.",
+      "fear": "A lot traced to a forbidden art passing under her seal, and the throne's auditors arriving to ask how.",
+      "schedule": {
+        "Dawn": "Azure Crown Treasure Exchange",
+        "Morning": "Azure Crown Treasure Exchange",
+        "Afternoon": "Azure Crown Treasure Exchange",
+        "Evening": "Azure Crown Treasure Exchange",
+        "Night": "Azure Crown Treasure Exchange"
+      },
+      "personality": "Precise, unhurried, incorruptible in public and pragmatic in private; remembers every face that has ever bid.",
+      "secret": "She keeps a private list of which noble houses are quietly selling heirlooms to stay solvent, and sells silence about it."
+    },
+    "Pavilion Mistress Wen Qingluo": {
+      "role": "Spirit Jade Auction Pavilion steward",
+      "location": "Spirit Jade Auction Pavilion",
+      "realm": "Nirvana",
+      "stage": 2,
+      "speech": "Soft, elegant and faintly amused; she never raises her voice and never repeats a price.",
+      "want": "Keep the ascended families bidding against one another in her pavilion rather than settling matters outside it.",
+      "fear": "Two great families deciding the pavilion's neutrality is worth less than a single lot.",
+      "schedule": {
+        "Dawn": "Spirit Jade Auction Pavilion",
+        "Morning": "Spirit Jade Auction Pavilion",
+        "Afternoon": "Spirit Jade Auction Pavilion",
+        "Evening": "Spirit Jade Auction Pavilion",
+        "Night": "Spirit Jade Auction Pavilion"
+      },
+      "personality": "Serene, watchful and endlessly patient; treats every bidder as a guest and every guest as a ledger entry.",
+      "secret": "She brokers marriages between ascended families in the same private rooms she brokers heirlooms, and takes a fee for both."
+    },
+    "Hall Arbiter Gu Zhenhai": {
+      "role": "Nine-Heavens Treasure Hall steward",
+      "location": "Nine-Heavens Treasure Hall",
+      "realm": "Golden Immortal",
+      "stage": 4,
+      "speech": "Measured and judicial; he speaks in rulings and expects them to be recorded.",
+      "want": "Keep the Treasure Hall the one place in the Immortal World where clans settle a matter with stones instead of war.",
+      "fear": "A relic passing through his hall that the Court's law cannot bind, and the Court asking why he let it.",
+      "schedule": {
+        "Dawn": "Nine-Heavens Treasure Hall",
+        "Morning": "Nine-Heavens Treasure Hall",
+        "Afternoon": "Nine-Heavens Treasure Hall",
+        "Evening": "Nine-Heavens Treasure Hall",
+        "Night": "Nine-Heavens Treasure Hall"
+      },
+      "personality": "Grave, exact, incorruptible about the law and generous about everything the law does not cover.",
+      "secret": "He has quietly ruled in favour of the same clan three times, and keeps the case records where only he can read them."
+    },
+    "Mandate Steward Xie Lingzhen": {
+      "role": "Celestial Mandate Auction Hall steward",
+      "location": "Celestial Mandate Auction Hall",
+      "realm": "Celestial Lord",
+      "stage": 5,
+      "speech": "Courtly, distant and precise; she addresses sovereigns and disciples in exactly the same tone.",
+      "want": "Keep the Mandate's hall above every faction's quarrel and every sovereign's pride.",
+      "fear": "A sovereign deciding the Mandate's shelter does not apply to him, and being right.",
+      "schedule": {
+        "Dawn": "Celestial Mandate Auction Hall",
+        "Morning": "Celestial Mandate Auction Hall",
+        "Afternoon": "Celestial Mandate Auction Hall",
+        "Evening": "Celestial Mandate Auction Hall",
+        "Night": "Celestial Mandate Auction Hall"
+      },
+      "personality": "Composed to the point of stillness, formidably well informed, and courteous as a blade is polished.",
+      "secret": "She has withdrawn lots by 'decree' on her own authority more than once, and heaven has never contradicted her."
+    },
+    "Landing Broker Bai Ruolan": {
+      "role": "Riverguard Riverside Auction Hall landing broker",
+      "location": "Riverguard Riverside Auction Hall",
+      "realm": "Nascent Soul",
+      "stage": 3,
+      "speech": "Plain-spoken and quick; she talks like the river, always moving and never repeating herself.",
+      "want": "Keep Riverguard City's landings the place the whole river brings its finds, and keep the blades on the floor sheathed.",
+      "fear": "A martial-district feud settling itself on her floor, and the barges finding another landing.",
+      "schedule": {
+        "Dawn": "Riverguard Riverside Auction Hall",
+        "Morning": "Riverguard Riverside Auction Hall",
+        "Afternoon": "Riverguard Riverside Auction Hall",
+        "Evening": "Riverguard Riverside Auction Hall",
+        "Night": "Riverguard Riverside Auction Hall"
+      },
+      "personality": "Brisk, fair, unimpressed by rank and fond of anyone who bids in good faith.",
+      "secret": "She knows which barge masters are smuggling under their manifests, and takes a cut to keep the landing bell quiet."
+    },
+    "Landing Broker Chen Xiulan": {
+      "role": "Jadeflow Riverside Auction Hall landing broker",
+      "location": "Jadeflow Riverside Auction Hall",
+      "realm": "Law Manifestation",
+      "stage": 2,
+      "speech": "Plain-spoken and quick; she talks like the river, always moving and never repeating herself.",
+      "want": "Keep Jadeflow Spirit City's landings the place the whole river brings its finds, and keep the blades on the floor sheathed.",
+      "fear": "A martial-district feud settling itself on her floor, and the barges finding another landing.",
+      "schedule": {
+        "Dawn": "Jadeflow Riverside Auction Hall",
+        "Morning": "Jadeflow Riverside Auction Hall",
+        "Afternoon": "Jadeflow Riverside Auction Hall",
+        "Evening": "Jadeflow Riverside Auction Hall",
+        "Night": "Jadeflow Riverside Auction Hall"
+      },
+      "personality": "Brisk, fair, unimpressed by rank and fond of anyone who bids in good faith.",
+      "secret": "She knows which barge masters are smuggling under their manifests, and takes a cut to keep the landing bell quiet."
+    },
+    "Landing Broker Deng Wanqing": {
+      "role": "Immortal River Riverside Auction Hall landing broker",
+      "location": "Immortal River Riverside Auction Hall",
+      "realm": "Earth Immortal",
+      "stage": 4,
+      "speech": "Plain-spoken and quick; she talks like the river, always moving and never repeating herself.",
+      "want": "Keep Immortal River City's landings the place the whole river brings its finds, and keep the blades on the floor sheathed.",
+      "fear": "A martial-district feud settling itself on her floor, and the barges finding another landing.",
+      "schedule": {
+        "Dawn": "Immortal River Riverside Auction Hall",
+        "Morning": "Immortal River Riverside Auction Hall",
+        "Afternoon": "Immortal River Riverside Auction Hall",
+        "Evening": "Immortal River Riverside Auction Hall",
+        "Night": "Immortal River Riverside Auction Hall"
+      },
+      "personality": "Brisk, fair, unimpressed by rank and fond of anyone who bids in good faith.",
+      "secret": "She knows which barge masters are smuggling under their manifests, and takes a cut to keep the landing bell quiet."
+    },
+    "Landing Broker Fang Zhengmin": {
+      "role": "Celestial River Riverside Auction Hall landing broker",
+      "location": "Celestial River Riverside Auction Hall",
+      "realm": "Celestial Duke",
+      "stage": 3,
+      "speech": "Plain-spoken and quick; she talks like the river, always moving and never repeating herself.",
+      "want": "Keep Celestial River City's landings the place the whole river brings its finds, and keep the blades on the floor sheathed.",
+      "fear": "A martial-district feud settling itself on her floor, and the barges finding another landing.",
+      "schedule": {
+        "Dawn": "Celestial River Riverside Auction Hall",
+        "Morning": "Celestial River Riverside Auction Hall",
+        "Afternoon": "Celestial River Riverside Auction Hall",
+        "Evening": "Celestial River Riverside Auction Hall",
+        "Night": "Celestial River Riverside Auction Hall"
+      },
+      "personality": "Brisk, fair, unimpressed by rank and fond of anyone who bids in good faith.",
+      "secret": "She knows which barge masters are smuggling under their manifests, and takes a cut to keep the landing bell quiet."
+    },
+    "Yard Auctioneer Gao Xinyue": {
+      "role": "Four-Roads Caravan Crossroads Auction Yard yard auctioneer",
+      "location": "Four-Roads Caravan Crossroads Auction Yard",
+      "realm": "Nascent Soul",
+      "stage": 3,
+      "speech": "Loud, cheerful and relentless; he can call a lot, a joke and a warning in the same breath.",
+      "want": "Keep every caravan that passes Four-Roads Caravan City stopping at his yard before it stops anywhere else.",
+      "fear": "The trade roads shifting, and the yard becoming a walled field with a bell in it.",
+      "schedule": {
+        "Dawn": "Four-Roads Caravan Crossroads Auction Yard",
+        "Morning": "Four-Roads Caravan Crossroads Auction Yard",
+        "Afternoon": "Four-Roads Caravan Crossroads Auction Yard",
+        "Evening": "Four-Roads Caravan Crossroads Auction Yard",
+        "Night": "Four-Roads Caravan Crossroads Auction Yard"
+      },
+      "personality": "Genial, shrewd and tireless; treats every stranger as next season's regular.",
+      "secret": "He keeps a second tally book of lots that never went under his hammer, sold in the yard's back rooms to buyers who prefer no witnesses."
+    },
+    "Yard Auctioneer Han Yongzhi": {
+      "role": "Galevein Crossroads Auction Yard yard auctioneer",
+      "location": "Galevein Crossroads Auction Yard",
+      "realm": "Law Manifestation",
+      "stage": 2,
+      "speech": "Loud, cheerful and relentless; he can call a lot, a joke and a warning in the same breath.",
+      "want": "Keep every caravan that passes Galevein Spirit City stopping at his yard before it stops anywhere else.",
+      "fear": "The trade roads shifting, and the yard becoming a walled field with a bell in it.",
+      "schedule": {
+        "Dawn": "Galevein Crossroads Auction Yard",
+        "Morning": "Galevein Crossroads Auction Yard",
+        "Afternoon": "Galevein Crossroads Auction Yard",
+        "Evening": "Galevein Crossroads Auction Yard",
+        "Night": "Galevein Crossroads Auction Yard"
+      },
+      "personality": "Genial, shrewd and tireless; treats every stranger as next season's regular.",
+      "secret": "He keeps a second tally book of lots that never went under his hammer, sold in the yard's back rooms to buyers who prefer no witnesses."
+    },
+    "Yard Auctioneer Hu Xueying": {
+      "role": "Skyroad Crossroads Auction Yard yard auctioneer",
+      "location": "Skyroad Crossroads Auction Yard",
+      "realm": "Earth Immortal",
+      "stage": 4,
+      "speech": "Loud, cheerful and relentless; he can call a lot, a joke and a warning in the same breath.",
+      "want": "Keep every caravan that passes Skyroad Immortal City stopping at his yard before it stops anywhere else.",
+      "fear": "The trade roads shifting, and the yard becoming a walled field with a bell in it.",
+      "schedule": {
+        "Dawn": "Skyroad Crossroads Auction Yard",
+        "Morning": "Skyroad Crossroads Auction Yard",
+        "Afternoon": "Skyroad Crossroads Auction Yard",
+        "Evening": "Skyroad Crossroads Auction Yard",
+        "Night": "Skyroad Crossroads Auction Yard"
+      },
+      "personality": "Genial, shrewd and tireless; treats every stranger as next season's regular.",
+      "secret": "He keeps a second tally book of lots that never went under his hammer, sold in the yard's back rooms to buyers who prefer no witnesses."
+    },
+    "Yard Auctioneer Jiang Chunhua": {
+      "role": "Starroad Crossroads Auction Yard yard auctioneer",
+      "location": "Starroad Crossroads Auction Yard",
+      "realm": "Celestial Duke",
+      "stage": 3,
+      "speech": "Loud, cheerful and relentless; he can call a lot, a joke and a warning in the same breath.",
+      "want": "Keep every caravan that passes Starroad Celestial City stopping at his yard before it stops anywhere else.",
+      "fear": "The trade roads shifting, and the yard becoming a walled field with a bell in it.",
+      "schedule": {
+        "Dawn": "Starroad Crossroads Auction Yard",
+        "Morning": "Starroad Crossroads Auction Yard",
+        "Afternoon": "Starroad Crossroads Auction Yard",
+        "Evening": "Starroad Crossroads Auction Yard",
+        "Night": "Starroad Crossroads Auction Yard"
+      },
+      "personality": "Genial, shrewd and tireless; treats every stranger as next season's regular.",
+      "secret": "He keeps a second tally book of lots that never went under his hammer, sold in the yard's back rooms to buyers who prefer no witnesses."
+    },
+    "Furnace Auctioneer Kong Jinghe": {
+      "role": "Emberforge Furnace Auction Gallery furnace auctioneer",
+      "location": "Emberforge Furnace Auction Gallery",
+      "realm": "Nascent Soul",
+      "stage": 3,
+      "speech": "Gravelled and direct; every sentence sounds hammered flat and finished.",
+      "want": "Keep Emberforge City's furnace-born treasures selling under her hammer rather than melting back into clan vaults.",
+      "fear": "A forge clan deciding a lost lot was an insult, and answering it on her floor.",
+      "schedule": {
+        "Dawn": "Emberforge Furnace Auction Gallery",
+        "Morning": "Emberforge Furnace Auction Gallery",
+        "Afternoon": "Emberforge Furnace Auction Gallery",
+        "Evening": "Emberforge Furnace Auction Gallery",
+        "Night": "Emberforge Furnace Auction Gallery"
+      },
+      "personality": "Blunt, warm, patient with apprentices and immovable with masters.",
+      "secret": "She has quietly re-struck a flawed blade's maker's mark before auction more than once, and the buyers have never known."
+    },
+    "Furnace Auctioneer Lei Chengfeng": {
+      "role": "Vermilion Furnace Furnace Auction Gallery furnace auctioneer",
+      "location": "Vermilion Furnace Furnace Auction Gallery",
+      "realm": "Law Manifestation",
+      "stage": 2,
+      "speech": "Gravelled and direct; every sentence sounds hammered flat and finished.",
+      "want": "Keep Vermilion Furnace City's furnace-born treasures selling under her hammer rather than melting back into clan vaults.",
+      "fear": "A forge clan deciding a lost lot was an insult, and answering it on her floor.",
+      "schedule": {
+        "Dawn": "Vermilion Furnace Furnace Auction Gallery",
+        "Morning": "Vermilion Furnace Furnace Auction Gallery",
+        "Afternoon": "Vermilion Furnace Furnace Auction Gallery",
+        "Evening": "Vermilion Furnace Furnace Auction Gallery",
+        "Night": "Vermilion Furnace Furnace Auction Gallery"
+      },
+      "personality": "Blunt, warm, patient with apprentices and immovable with masters.",
+      "secret": "She has quietly re-struck a flawed blade's maker's mark before auction more than once, and the buyers have never known."
+    },
+    "Furnace Auctioneer Liang Yuxin": {
+      "role": "Solar Furnace Furnace Auction Gallery furnace auctioneer",
+      "location": "Solar Furnace Furnace Auction Gallery",
+      "realm": "Earth Immortal",
+      "stage": 4,
+      "speech": "Gravelled and direct; every sentence sounds hammered flat and finished.",
+      "want": "Keep Solar Furnace Immortal City's furnace-born treasures selling under her hammer rather than melting back into clan vaults.",
+      "fear": "A forge clan deciding a lost lot was an insult, and answering it on her floor.",
+      "schedule": {
+        "Dawn": "Solar Furnace Furnace Auction Gallery",
+        "Morning": "Solar Furnace Furnace Auction Gallery",
+        "Afternoon": "Solar Furnace Furnace Auction Gallery",
+        "Evening": "Solar Furnace Furnace Auction Gallery",
+        "Night": "Solar Furnace Furnace Auction Gallery"
+      },
+      "personality": "Blunt, warm, patient with apprentices and immovable with masters.",
+      "secret": "She has quietly re-struck a flawed blade's maker's mark before auction more than once, and the buyers have never known."
+    },
+    "Furnace Auctioneer Luo Dehua": {
+      "role": "Solar Crucible Furnace Auction Gallery furnace auctioneer",
+      "location": "Solar Crucible Furnace Auction Gallery",
+      "realm": "Celestial Duke",
+      "stage": 3,
+      "speech": "Gravelled and direct; every sentence sounds hammered flat and finished.",
+      "want": "Keep Solar Crucible Celestial City's furnace-born treasures selling under her hammer rather than melting back into clan vaults.",
+      "fear": "A forge clan deciding a lost lot was an insult, and answering it on her floor.",
+      "schedule": {
+        "Dawn": "Solar Crucible Furnace Auction Gallery",
+        "Morning": "Solar Crucible Furnace Auction Gallery",
+        "Afternoon": "Solar Crucible Furnace Auction Gallery",
+        "Evening": "Solar Crucible Furnace Auction Gallery",
+        "Night": "Solar Crucible Furnace Auction Gallery"
+      },
+      "personality": "Blunt, warm, patient with apprentices and immovable with masters.",
+      "secret": "She has quietly re-struck a flawed blade's maker's mark before auction more than once, and the buyers have never known."
+    },
+    "Lodge Steward Meng Jialan": {
+      "role": "Stoneback Mountain Highland Auction Lodge lodge steward",
+      "location": "Stoneback Mountain Highland Auction Lodge",
+      "realm": "Nascent Soul",
+      "stage": 3,
+      "speech": "Slow, dry and exact; he says a price once and lets the silence do the rest.",
+      "want": "Keep Stoneback Mountain City's mountain finds coming down to the lodge instead of vanishing into clan holds.",
+      "fear": "A landslide, a feud or a winter closing the passes with a lot still on his floor.",
+      "schedule": {
+        "Dawn": "Stoneback Mountain Highland Auction Lodge",
+        "Morning": "Stoneback Mountain Highland Auction Lodge",
+        "Afternoon": "Stoneback Mountain Highland Auction Lodge",
+        "Evening": "Stoneback Mountain Highland Auction Lodge",
+        "Night": "Stoneback Mountain Highland Auction Lodge"
+      },
+      "personality": "Taciturn, honest, unhurried and quietly generous with anyone who arrives half-frozen.",
+      "secret": "He knows the location of a vein the prospectors have been fighting over for years, and has told no one."
+    },
+    "Lodge Steward Ning Huangfu": {
+      "role": "Stoneheart Highland Auction Lodge lodge steward",
+      "location": "Stoneheart Highland Auction Lodge",
+      "realm": "Law Manifestation",
+      "stage": 2,
+      "speech": "Slow, dry and exact; he says a price once and lets the silence do the rest.",
+      "want": "Keep Stoneheart Spirit City's mountain finds coming down to the lodge instead of vanishing into clan holds.",
+      "fear": "A landslide, a feud or a winter closing the passes with a lot still on his floor.",
+      "schedule": {
+        "Dawn": "Stoneheart Highland Auction Lodge",
+        "Morning": "Stoneheart Highland Auction Lodge",
+        "Afternoon": "Stoneheart Highland Auction Lodge",
+        "Evening": "Stoneheart Highland Auction Lodge",
+        "Night": "Stoneheart Highland Auction Lodge"
+      },
+      "personality": "Taciturn, honest, unhurried and quietly generous with anyone who arrives half-frozen.",
+      "secret": "He knows the location of a vein the prospectors have been fighting over for years, and has told no one."
+    },
+    "Lodge Steward Ouyang Yingzhu": {
+      "role": "Adamant Body Highland Auction Lodge lodge steward",
+      "location": "Adamant Body Highland Auction Lodge",
+      "realm": "Earth Immortal",
+      "stage": 4,
+      "speech": "Slow, dry and exact; he says a price once and lets the silence do the rest.",
+      "want": "Keep Adamant Body Immortal City's mountain finds coming down to the lodge instead of vanishing into clan holds.",
+      "fear": "A landslide, a feud or a winter closing the passes with a lot still on his floor.",
+      "schedule": {
+        "Dawn": "Adamant Body Highland Auction Lodge",
+        "Morning": "Adamant Body Highland Auction Lodge",
+        "Afternoon": "Adamant Body Highland Auction Lodge",
+        "Evening": "Adamant Body Highland Auction Lodge",
+        "Night": "Adamant Body Highland Auction Lodge"
+      },
+      "personality": "Taciturn, honest, unhurried and quietly generous with anyone who arrives half-frozen.",
+      "secret": "He knows the location of a vein the prospectors have been fighting over for years, and has told no one."
+    },
+    "Lodge Steward Pang Weiran": {
+      "role": "Worldstone Highland Auction Lodge lodge steward",
+      "location": "Worldstone Highland Auction Lodge",
+      "realm": "Celestial Duke",
+      "stage": 3,
+      "speech": "Slow, dry and exact; he says a price once and lets the silence do the rest.",
+      "want": "Keep Worldstone Celestial City's mountain finds coming down to the lodge instead of vanishing into clan holds.",
+      "fear": "A landslide, a feud or a winter closing the passes with a lot still on his floor.",
+      "schedule": {
+        "Dawn": "Worldstone Highland Auction Lodge",
+        "Morning": "Worldstone Highland Auction Lodge",
+        "Afternoon": "Worldstone Highland Auction Lodge",
+        "Evening": "Worldstone Highland Auction Lodge",
+        "Night": "Worldstone Highland Auction Lodge"
+      },
+      "personality": "Taciturn, honest, unhurried and quietly generous with anyone who arrives half-frozen.",
+      "secret": "He knows the location of a vein the prospectors have been fighting over for years, and has told no one."
+    },
+    "Terrace Steward Qin Yunshu": {
+      "role": "Cloudblade Sword Peak Auction Terrace terrace steward",
+      "location": "Cloudblade Sword Peak Auction Terrace",
+      "realm": "Nascent Soul",
+      "stage": 3,
+      "speech": "Clipped and courteous; she speaks as a duellist salutes, exactly and without waste.",
+      "want": "Keep Cloudblade City's blades passing hand to hand under her hammer rather than through anyone's ribs.",
+      "fear": "A peak deciding the terrace's neutrality is a challenge, and answering it as one.",
+      "schedule": {
+        "Dawn": "Cloudblade Sword Peak Auction Terrace",
+        "Morning": "Cloudblade Sword Peak Auction Terrace",
+        "Afternoon": "Cloudblade Sword Peak Auction Terrace",
+        "Evening": "Cloudblade Sword Peak Auction Terrace",
+        "Night": "Cloudblade Sword Peak Auction Terrace"
+      },
+      "personality": "Composed, precise, fiercely fair and dryly amused by young swordsmen.",
+      "secret": "She was once the finest blade on these peaks and threw a duel to keep the terrace neutral; only one living person knows."
+    },
+    "Terrace Steward Rong Guangli": {
+      "role": "Cloudedge Sword Peak Auction Terrace terrace steward",
+      "location": "Cloudedge Sword Peak Auction Terrace",
+      "realm": "Law Manifestation",
+      "stage": 2,
+      "speech": "Clipped and courteous; she speaks as a duellist salutes, exactly and without waste.",
+      "want": "Keep Cloudedge Spirit City's blades passing hand to hand under her hammer rather than through anyone's ribs.",
+      "fear": "A peak deciding the terrace's neutrality is a challenge, and answering it as one.",
+      "schedule": {
+        "Dawn": "Cloudedge Sword Peak Auction Terrace",
+        "Morning": "Cloudedge Sword Peak Auction Terrace",
+        "Afternoon": "Cloudedge Sword Peak Auction Terrace",
+        "Evening": "Cloudedge Sword Peak Auction Terrace",
+        "Night": "Cloudedge Sword Peak Auction Terrace"
+      },
+      "personality": "Composed, precise, fiercely fair and dryly amused by young swordsmen.",
+      "secret": "She was once the finest blade on these peaks and threw a duel to keep the terrace neutral; only one living person knows."
+    },
+    "Terrace Steward Shen Peiyun": {
+      "role": "Heavenblade Sword Peak Auction Terrace terrace steward",
+      "location": "Heavenblade Sword Peak Auction Terrace",
+      "realm": "Earth Immortal",
+      "stage": 4,
+      "speech": "Clipped and courteous; she speaks as a duellist salutes, exactly and without waste.",
+      "want": "Keep Heavenblade Immortal City's blades passing hand to hand under her hammer rather than through anyone's ribs.",
+      "fear": "A peak deciding the terrace's neutrality is a challenge, and answering it as one.",
+      "schedule": {
+        "Dawn": "Heavenblade Sword Peak Auction Terrace",
+        "Morning": "Heavenblade Sword Peak Auction Terrace",
+        "Afternoon": "Heavenblade Sword Peak Auction Terrace",
+        "Evening": "Heavenblade Sword Peak Auction Terrace",
+        "Night": "Heavenblade Sword Peak Auction Terrace"
+      },
+      "personality": "Composed, precise, fiercely fair and dryly amused by young swordsmen.",
+      "secret": "She was once the finest blade on these peaks and threw a duel to keep the terrace neutral; only one living person knows."
+    },
+    "Terrace Steward Tang Zongwei": {
+      "role": "Firmament Blade Sword Peak Auction Terrace terrace steward",
+      "location": "Firmament Blade Sword Peak Auction Terrace",
+      "realm": "Celestial Duke",
+      "stage": 3,
+      "speech": "Clipped and courteous; she speaks as a duellist salutes, exactly and without waste.",
+      "want": "Keep Firmament Blade City's blades passing hand to hand under her hammer rather than through anyone's ribs.",
+      "fear": "A peak deciding the terrace's neutrality is a challenge, and answering it as one.",
+      "schedule": {
+        "Dawn": "Firmament Blade Sword Peak Auction Terrace",
+        "Morning": "Firmament Blade Sword Peak Auction Terrace",
+        "Afternoon": "Firmament Blade Sword Peak Auction Terrace",
+        "Evening": "Firmament Blade Sword Peak Auction Terrace",
+        "Night": "Firmament Blade Sword Peak Auction Terrace"
+      },
+      "personality": "Composed, precise, fiercely fair and dryly amused by young swordsmen.",
+      "secret": "She was once the finest blade on these peaks and threw a duel to keep the terrace neutral; only one living person knows."
+    },
+    "Ground Master Wei Anning": {
+      "role": "Ironbanner Bannered Auction Ground ground master",
+      "location": "Ironbanner Bannered Auction Ground",
+      "realm": "Nascent Soul",
+      "stage": 3,
+      "speech": "Barked and cheerful, a drill-yard voice; he counts bids like paces.",
+      "want": "Keep Ironbanner City's clans buying their arms under his banners instead of taking them from each other.",
+      "fear": "A frontier war reaching the walls with his ground full of the arms that started it.",
+      "schedule": {
+        "Dawn": "Ironbanner Bannered Auction Ground",
+        "Morning": "Ironbanner Bannered Auction Ground",
+        "Afternoon": "Ironbanner Bannered Auction Ground",
+        "Evening": "Ironbanner Bannered Auction Ground",
+        "Night": "Ironbanner Bannered Auction Ground"
+      },
+      "personality": "Bluff, loyal, fair to the bone and quick to laugh at a bad bid.",
+      "secret": "He sold the same captured banner three times to three clans, and each believes it holds the original."
+    },
+    "Ground Master Xu Daoming": {
+      "role": "Spearwall Bannered Auction Ground ground master",
+      "location": "Spearwall Bannered Auction Ground",
+      "realm": "Law Manifestation",
+      "stage": 2,
+      "speech": "Barked and cheerful, a drill-yard voice; he counts bids like paces.",
+      "want": "Keep Spearwall Spirit City's clans buying their arms under his banners instead of taking them from each other.",
+      "fear": "A frontier war reaching the walls with his ground full of the arms that started it.",
+      "schedule": {
+        "Dawn": "Spearwall Bannered Auction Ground",
+        "Morning": "Spearwall Bannered Auction Ground",
+        "Afternoon": "Spearwall Bannered Auction Ground",
+        "Evening": "Spearwall Bannered Auction Ground",
+        "Night": "Spearwall Bannered Auction Ground"
+      },
+      "personality": "Bluff, loyal, fair to the bone and quick to laugh at a bad bid.",
+      "secret": "He sold the same captured banner three times to three clans, and each believes it holds the original."
+    },
+    "Ground Master Yan Shuyan": {
+      "role": "Golden Spear Bannered Auction Ground ground master",
+      "location": "Golden Spear Bannered Auction Ground",
+      "realm": "Earth Immortal",
+      "stage": 4,
+      "speech": "Barked and cheerful, a drill-yard voice; he counts bids like paces.",
+      "want": "Keep Golden Spear Immortal City's clans buying their arms under his banners instead of taking them from each other.",
+      "fear": "A frontier war reaching the walls with his ground full of the arms that started it.",
+      "schedule": {
+        "Dawn": "Golden Spear Bannered Auction Ground",
+        "Morning": "Golden Spear Bannered Auction Ground",
+        "Afternoon": "Golden Spear Bannered Auction Ground",
+        "Evening": "Golden Spear Bannered Auction Ground",
+        "Night": "Golden Spear Bannered Auction Ground"
+      },
+      "personality": "Bluff, loyal, fair to the bone and quick to laugh at a bad bid.",
+      "secret": "He sold the same captured banner three times to three clans, and each believes it holds the original."
+    },
+    "Ground Master Yuan Haoran": {
+      "role": "Mandate Spear Bannered Auction Ground ground master",
+      "location": "Mandate Spear Bannered Auction Ground",
+      "realm": "Celestial Duke",
+      "stage": 3,
+      "speech": "Barked and cheerful, a drill-yard voice; he counts bids like paces.",
+      "want": "Keep Mandate Spear City's clans buying their arms under his banners instead of taking them from each other.",
+      "fear": "A frontier war reaching the walls with his ground full of the arms that started it.",
+      "schedule": {
+        "Dawn": "Mandate Spear Bannered Auction Ground",
+        "Morning": "Mandate Spear Bannered Auction Ground",
+        "Afternoon": "Mandate Spear Bannered Auction Ground",
+        "Evening": "Mandate Spear Bannered Auction Ground",
+        "Night": "Mandate Spear Bannered Auction Ground"
+      },
+      "personality": "Bluff, loyal, fair to the bone and quick to laugh at a bad bid.",
+      "secret": "He sold the same captured banner three times to three clans, and each believes it holds the original."
+    },
+    "Pavilion Keeper Zhou Suqin": {
+      "role": "Moonfen Mistwater Auction Pavilion pavilion keeper",
+      "location": "Moonfen Mistwater Auction Pavilion",
+      "realm": "Nascent Soul",
+      "stage": 3,
+      "speech": "Low, unhurried and faintly damp, like the marsh; she rarely finishes a sentence anyone else would.",
+      "want": "Keep what the mist gives up passing through her pavilion, catalogued and paid for.",
+      "fear": "A relic from the channels that should have stayed in them, sold under her lanterns.",
+      "schedule": {
+        "Dawn": "Moonfen Mistwater Auction Pavilion",
+        "Morning": "Moonfen Mistwater Auction Pavilion",
+        "Afternoon": "Moonfen Mistwater Auction Pavilion",
+        "Evening": "Moonfen Mistwater Auction Pavilion",
+        "Night": "Moonfen Mistwater Auction Pavilion"
+      },
+      "personality": "Quiet, patient, unsettling to strangers and unexpectedly kind to the frightened.",
+      "secret": "She keeps one dredged relic that was never listed, and speaks to it after the last lantern is out."
+    },
+    "Pavilion Keeper Zhu Shaoyu": {
+      "role": "Moonfrost Mistwater Auction Pavilion pavilion keeper",
+      "location": "Moonfrost Mistwater Auction Pavilion",
+      "realm": "Law Manifestation",
+      "stage": 2,
+      "speech": "Low, unhurried and faintly damp, like the marsh; she rarely finishes a sentence anyone else would.",
+      "want": "Keep what the mist gives up passing through her pavilion, catalogued and paid for.",
+      "fear": "A relic from the channels that should have stayed in them, sold under her lanterns.",
+      "schedule": {
+        "Dawn": "Moonfrost Mistwater Auction Pavilion",
+        "Morning": "Moonfrost Mistwater Auction Pavilion",
+        "Afternoon": "Moonfrost Mistwater Auction Pavilion",
+        "Evening": "Moonfrost Mistwater Auction Pavilion",
+        "Night": "Moonfrost Mistwater Auction Pavilion"
+      },
+      "personality": "Quiet, patient, unsettling to strangers and unexpectedly kind to the frightened.",
+      "secret": "She keeps one dredged relic that was never listed, and speaks to it after the last lantern is out."
+    },
+    "Pavilion Keeper Cao Huiying": {
+      "role": "Lunar Veil Mistwater Auction Pavilion pavilion keeper",
+      "location": "Lunar Veil Mistwater Auction Pavilion",
+      "realm": "Earth Immortal",
+      "stage": 4,
+      "speech": "Low, unhurried and faintly damp, like the marsh; she rarely finishes a sentence anyone else would.",
+      "want": "Keep what the mist gives up passing through her pavilion, catalogued and paid for.",
+      "fear": "A relic from the channels that should have stayed in them, sold under her lanterns.",
+      "schedule": {
+        "Dawn": "Lunar Veil Mistwater Auction Pavilion",
+        "Morning": "Lunar Veil Mistwater Auction Pavilion",
+        "Afternoon": "Lunar Veil Mistwater Auction Pavilion",
+        "Evening": "Lunar Veil Mistwater Auction Pavilion",
+        "Night": "Lunar Veil Mistwater Auction Pavilion"
+      },
+      "personality": "Quiet, patient, unsettling to strangers and unexpectedly kind to the frightened.",
+      "secret": "She keeps one dredged relic that was never listed, and speaks to it after the last lantern is out."
+    },
+    "Pavilion Keeper Ding Fengjun": {
+      "role": "Lunar Shadow Mistwater Auction Pavilion pavilion keeper",
+      "location": "Lunar Shadow Mistwater Auction Pavilion",
+      "realm": "Celestial Duke",
+      "stage": 3,
+      "speech": "Low, unhurried and faintly damp, like the marsh; she rarely finishes a sentence anyone else would.",
+      "want": "Keep what the mist gives up passing through her pavilion, catalogued and paid for.",
+      "fear": "A relic from the channels that should have stayed in them, sold under her lanterns.",
+      "schedule": {
+        "Dawn": "Lunar Shadow Mistwater Auction Pavilion",
+        "Morning": "Lunar Shadow Mistwater Auction Pavilion",
+        "Afternoon": "Lunar Shadow Mistwater Auction Pavilion",
+        "Evening": "Lunar Shadow Mistwater Auction Pavilion",
+        "Night": "Lunar Shadow Mistwater Auction Pavilion"
+      },
+      "personality": "Quiet, patient, unsettling to strangers and unexpectedly kind to the frightened.",
+      "secret": "She keeps one dredged relic that was never listed, and speaks to it after the last lantern is out."
+    },
+    "Hall Warden Feng Shuhua": {
+      "role": "Frostwatch Frontier Auction Hall hall warden",
+      "location": "Frostwatch Frontier Auction Hall",
+      "realm": "Nascent Soul",
+      "stage": 3,
+      "speech": "Curt, warm underneath, and economical; every word has been carried a long way in the cold.",
+      "want": "Keep Frostwatch City's frontier finds sold under his roof, and the people who bring them alive to bring more.",
+      "fear": "The wastes sending back something the frost formation cannot hold.",
+      "schedule": {
+        "Dawn": "Frostwatch Frontier Auction Hall",
+        "Morning": "Frostwatch Frontier Auction Hall",
+        "Afternoon": "Frostwatch Frontier Auction Hall",
+        "Evening": "Frostwatch Frontier Auction Hall",
+        "Night": "Frostwatch Frontier Auction Hall"
+      },
+      "personality": "Steady, weathered, protective of scouts and unforgiving of anyone who cheats one.",
+      "secret": "He paid for a scout's ransom from the hall's own strongbox and has been quietly replacing it ever since."
+    },
+    "Hall Warden Guo Lingzhen": {
+      "role": "Northwind Frontier Auction Hall hall warden",
+      "location": "Northwind Frontier Auction Hall",
+      "realm": "Law Manifestation",
+      "stage": 2,
+      "speech": "Curt, warm underneath, and economical; every word has been carried a long way in the cold.",
+      "want": "Keep Northwind Spirit City's frontier finds sold under his roof, and the people who bring them alive to bring more.",
+      "fear": "The wastes sending back something the frost formation cannot hold.",
+      "schedule": {
+        "Dawn": "Northwind Frontier Auction Hall",
+        "Morning": "Northwind Frontier Auction Hall",
+        "Afternoon": "Northwind Frontier Auction Hall",
+        "Evening": "Northwind Frontier Auction Hall",
+        "Night": "Northwind Frontier Auction Hall"
+      },
+      "personality": "Steady, weathered, protective of scouts and unforgiving of anyone who cheats one.",
+      "secret": "He paid for a scout's ransom from the hall's own strongbox and has been quietly replacing it ever since."
+    },
+    "Hall Warden He Zhirou": {
+      "role": "Polar Gate Frontier Auction Hall hall warden",
+      "location": "Polar Gate Frontier Auction Hall",
+      "realm": "Earth Immortal",
+      "stage": 4,
+      "speech": "Curt, warm underneath, and economical; every word has been carried a long way in the cold.",
+      "want": "Keep Polar Gate Immortal City's frontier finds sold under his roof, and the people who bring them alive to bring more.",
+      "fear": "The wastes sending back something the frost formation cannot hold.",
+      "schedule": {
+        "Dawn": "Polar Gate Frontier Auction Hall",
+        "Morning": "Polar Gate Frontier Auction Hall",
+        "Afternoon": "Polar Gate Frontier Auction Hall",
+        "Evening": "Polar Gate Frontier Auction Hall",
+        "Night": "Polar Gate Frontier Auction Hall"
+      },
+      "personality": "Steady, weathered, protective of scouts and unforgiving of anyone who cheats one.",
+      "secret": "He paid for a scout's ransom from the hall's own strongbox and has been quietly replacing it ever since."
+    },
+    "Hall Warden Ji Tianyu": {
+      "role": "Froststar Frontier Auction Hall hall warden",
+      "location": "Froststar Frontier Auction Hall",
+      "realm": "Celestial Duke",
+      "stage": 3,
+      "speech": "Curt, warm underneath, and economical; every word has been carried a long way in the cold.",
+      "want": "Keep Froststar Border City's frontier finds sold under his roof, and the people who bring them alive to bring more.",
+      "fear": "The wastes sending back something the frost formation cannot hold.",
+      "schedule": {
+        "Dawn": "Froststar Frontier Auction Hall",
+        "Morning": "Froststar Frontier Auction Hall",
+        "Afternoon": "Froststar Frontier Auction Hall",
+        "Evening": "Froststar Frontier Auction Hall",
+        "Night": "Froststar Frontier Auction Hall"
+      },
+      "personality": "Steady, weathered, protective of scouts and unforgiving of anyone who cheats one.",
+      "secret": "He paid for a scout's ransom from the hall's own strongbox and has been quietly replacing it ever since."
+    },
+    "Court Curator Kang Lanying": {
+      "role": "Ashenwall Relic Auction Court court curator",
+      "location": "Ashenwall Relic Auction Court",
+      "realm": "Nascent Soul",
+      "stage": 3,
+      "speech": "Scholarly and dry; he describes a lot as if reading its epitaph.",
+      "want": "See every relic Ashenwall City's ruins surrender catalogued, provenanced and sold in the open.",
+      "fear": "An intact relic of the old war passing through his court to someone who knows how to use it.",
+      "schedule": {
+        "Dawn": "Ashenwall Relic Auction Court",
+        "Morning": "Ashenwall Relic Auction Court",
+        "Afternoon": "Ashenwall Relic Auction Court",
+        "Evening": "Ashenwall Relic Auction Court",
+        "Night": "Ashenwall Relic Auction Court"
+      },
+      "personality": "Meticulous, melancholy, generous with knowledge and stingy with certainty.",
+      "secret": "He has misdated one relic on purpose to keep it from a buyer he distrusts, and keeps the true date in his own hand."
+    },
+    "Court Curator Lin Baoshan": {
+      "role": "Broken Halo Relic Auction Court court curator",
+      "location": "Broken Halo Relic Auction Court",
+      "realm": "Law Manifestation",
+      "stage": 2,
+      "speech": "Scholarly and dry; he describes a lot as if reading its epitaph.",
+      "want": "See every relic Broken Halo Spirit City's ruins surrender catalogued, provenanced and sold in the open.",
+      "fear": "An intact relic of the old war passing through his court to someone who knows how to use it.",
+      "schedule": {
+        "Dawn": "Broken Halo Relic Auction Court",
+        "Morning": "Broken Halo Relic Auction Court",
+        "Afternoon": "Broken Halo Relic Auction Court",
+        "Evening": "Broken Halo Relic Auction Court",
+        "Night": "Broken Halo Relic Auction Court"
+      },
+      "personality": "Meticulous, melancholy, generous with knowledge and stingy with certainty.",
+      "secret": "He has misdated one relic on purpose to keep it from a buyer he distrusts, and keeps the true date in his own hand."
+    },
+    "Court Curator Ma Yaqing": {
+      "role": "Fallen Star Relic Auction Court court curator",
+      "location": "Fallen Star Relic Auction Court",
+      "realm": "Earth Immortal",
+      "stage": 4,
+      "speech": "Scholarly and dry; he describes a lot as if reading its epitaph.",
+      "want": "See every relic Fallen Star Immortal City's ruins surrender catalogued, provenanced and sold in the open.",
+      "fear": "An intact relic of the old war passing through his court to someone who knows how to use it.",
+      "schedule": {
+        "Dawn": "Fallen Star Relic Auction Court",
+        "Morning": "Fallen Star Relic Auction Court",
+        "Afternoon": "Fallen Star Relic Auction Court",
+        "Evening": "Fallen Star Relic Auction Court",
+        "Night": "Fallen Star Relic Auction Court"
+      },
+      "personality": "Meticulous, melancholy, generous with knowledge and stingy with certainty.",
+      "secret": "He has misdated one relic on purpose to keep it from a buyer he distrusts, and keeps the true date in his own hand."
+    },
+    "Court Curator Nie Kuncheng": {
+      "role": "Ruined Constellation Relic Auction Court court curator",
+      "location": "Ruined Constellation Relic Auction Court",
+      "realm": "Celestial Duke",
+      "stage": 3,
+      "speech": "Scholarly and dry; he describes a lot as if reading its epitaph.",
+      "want": "See every relic Ruined Constellation City's ruins surrender catalogued, provenanced and sold in the open.",
+      "fear": "An intact relic of the old war passing through his court to someone who knows how to use it.",
+      "schedule": {
+        "Dawn": "Ruined Constellation Relic Auction Court",
+        "Morning": "Ruined Constellation Relic Auction Court",
+        "Afternoon": "Ruined Constellation Relic Auction Court",
+        "Evening": "Ruined Constellation Relic Auction Court",
+        "Night": "Ruined Constellation Relic Auction Court"
+      },
+      "personality": "Meticulous, melancholy, generous with knowledge and stingy with certainty.",
+      "secret": "He has misdated one relic on purpose to keep it from a buyer he distrusts, and keeps the true date in his own hand."
+    },
+    "Garden Steward Pei Qingluo": {
+      "role": "Jadewood Medicine Garden Auction Hall garden steward",
+      "location": "Jadewood Medicine Garden Auction Hall",
+      "realm": "Nascent Soul",
+      "stage": 3,
+      "speech": "Gentle, exact and clinical; she names a lot's virtues and its risks in the same breath.",
+      "want": "Keep Jadewood Medicine City's gardens selling their harvest here, priced by what it heals rather than who wants it.",
+      "fear": "A poisoned or mislabelled lot leaving her hall with her hammer's blessing on it.",
+      "schedule": {
+        "Dawn": "Jadewood Medicine Garden Auction Hall",
+        "Morning": "Jadewood Medicine Garden Auction Hall",
+        "Afternoon": "Jadewood Medicine Garden Auction Hall",
+        "Evening": "Jadewood Medicine Garden Auction Hall",
+        "Night": "Jadewood Medicine Garden Auction Hall"
+      },
+      "personality": "Calm, observant, quietly funny and unable to leave a wound untreated.",
+      "secret": "She grows one forbidden herb in the hall's own garden for a patient the law has given up on."
+    },
+    "Garden Steward Qi Mingxia": {
+      "role": "Hundred Herb Garden Auction Hall garden steward",
+      "location": "Hundred Herb Garden Auction Hall",
+      "realm": "Law Manifestation",
+      "stage": 2,
+      "speech": "Gentle, exact and clinical; she names a lot's virtues and its risks in the same breath.",
+      "want": "Keep Hundred Herb Spirit City's gardens selling their harvest here, priced by what it heals rather than who wants it.",
+      "fear": "A poisoned or mislabelled lot leaving her hall with her hammer's blessing on it.",
+      "schedule": {
+        "Dawn": "Hundred Herb Garden Auction Hall",
+        "Morning": "Hundred Herb Garden Auction Hall",
+        "Afternoon": "Hundred Herb Garden Auction Hall",
+        "Evening": "Hundred Herb Garden Auction Hall",
+        "Night": "Hundred Herb Garden Auction Hall"
+      },
+      "personality": "Calm, observant, quietly funny and unable to leave a wound untreated.",
+      "secret": "She grows one forbidden herb in the hall's own garden for a patient the law has given up on."
+    },
+    "Garden Steward Ren Meilin": {
+      "role": "Jade Cauldron Garden Auction Hall garden steward",
+      "location": "Jade Cauldron Garden Auction Hall",
+      "realm": "Earth Immortal",
+      "stage": 4,
+      "speech": "Gentle, exact and clinical; she names a lot's virtues and its risks in the same breath.",
+      "want": "Keep Jade Cauldron Immortal City's gardens selling their harvest here, priced by what it heals rather than who wants it.",
+      "fear": "A poisoned or mislabelled lot leaving her hall with her hammer's blessing on it.",
+      "schedule": {
+        "Dawn": "Jade Cauldron Garden Auction Hall",
+        "Morning": "Jade Cauldron Garden Auction Hall",
+        "Afternoon": "Jade Cauldron Garden Auction Hall",
+        "Evening": "Jade Cauldron Garden Auction Hall",
+        "Night": "Jade Cauldron Garden Auction Hall"
+      },
+      "personality": "Calm, observant, quietly funny and unable to leave a wound untreated.",
+      "secret": "She grows one forbidden herb in the hall's own garden for a patient the law has given up on."
+    },
+    "Garden Steward Song Kaijun": {
+      "role": "Divine Herb Garden Auction Hall garden steward",
+      "location": "Divine Herb Garden Auction Hall",
+      "realm": "Celestial Duke",
+      "stage": 3,
+      "speech": "Gentle, exact and clinical; she names a lot's virtues and its risks in the same breath.",
+      "want": "Keep Divine Herb Celestial City's gardens selling their harvest here, priced by what it heals rather than who wants it.",
+      "fear": "A poisoned or mislabelled lot leaving her hall with her hammer's blessing on it.",
+      "schedule": {
+        "Dawn": "Divine Herb Garden Auction Hall",
+        "Morning": "Divine Herb Garden Auction Hall",
+        "Afternoon": "Divine Herb Garden Auction Hall",
+        "Evening": "Divine Herb Garden Auction Hall",
+        "Night": "Divine Herb Garden Auction Hall"
+      },
+      "personality": "Calm, observant, quietly funny and unable to leave a wound untreated.",
+      "secret": "She grows one forbidden herb in the hall's own garden for a patient the law has given up on."
+    },
+    "Court Chamberlain Tan Qiaoling": {
+      "role": "Jade Crown Noble Auction Court court chamberlain",
+      "location": "Jade Crown Noble Auction Court",
+      "realm": "Law Manifestation",
+      "stage": 2,
+      "speech": "Silken, formal and unfailingly polite; he can decline a bid so gracefully it feels like a compliment.",
+      "want": "Keep the heartland's houses trading their heirlooms and their debts under his crest instead of in the dark.",
+      "fear": "A house ruined on his floor deciding the court was the cause.",
+      "schedule": {
+        "Dawn": "Jade Crown Noble Auction Court",
+        "Morning": "Jade Crown Noble Auction Court",
+        "Afternoon": "Jade Crown Noble Auction Court",
+        "Evening": "Jade Crown Noble Auction Court",
+        "Night": "Jade Crown Noble Auction Court"
+      },
+      "personality": "Urbane, discreet, unreadable in public and sharply funny in private.",
+      "secret": "He holds the promissory notes of half the houses on the floor, bought quietly at auction under another name."
+    },
+    "Court Chamberlain Wang Shirong": {
+      "role": "Ninefold Noble Noble Auction Court court chamberlain",
+      "location": "Ninefold Noble Noble Auction Court",
+      "realm": "Earth Immortal",
+      "stage": 4,
+      "speech": "Silken, formal and unfailingly polite; he can decline a bid so gracefully it feels like a compliment.",
+      "want": "Keep the heartland's houses trading their heirlooms and their debts under his crest instead of in the dark.",
+      "fear": "A house ruined on his floor deciding the court was the cause.",
+      "schedule": {
+        "Dawn": "Ninefold Noble Noble Auction Court",
+        "Morning": "Ninefold Noble Noble Auction Court",
+        "Afternoon": "Ninefold Noble Noble Auction Court",
+        "Evening": "Ninefold Noble Noble Auction Court",
+        "Night": "Ninefold Noble Noble Auction Court"
+      },
+      "personality": "Urbane, discreet, unreadable in public and sharply funny in private.",
+      "secret": "He holds the promissory notes of half the houses on the floor, bought quietly at auction under another name."
+    },
+    "Court Chamberlain Xiao Lihua": {
+      "role": "Mandate Crown Noble Auction Court court chamberlain",
+      "location": "Mandate Crown Noble Auction Court",
+      "realm": "Celestial Duke",
+      "stage": 3,
+      "speech": "Silken, formal and unfailingly polite; he can decline a bid so gracefully it feels like a compliment.",
+      "want": "Keep the heartland's houses trading their heirlooms and their debts under his crest instead of in the dark.",
+      "fear": "A house ruined on his floor deciding the court was the cause.",
+      "schedule": {
+        "Dawn": "Mandate Crown Noble Auction Court",
+        "Morning": "Mandate Crown Noble Auction Court",
+        "Afternoon": "Mandate Crown Noble Auction Court",
+        "Evening": "Mandate Crown Noble Auction Court",
+        "Night": "Mandate Crown Noble Auction Court"
+      },
+      "personality": "Urbane, discreet, unreadable in public and sharply funny in private.",
+      "secret": "He holds the promissory notes of half the houses on the floor, bought quietly at auction under another name."
     }
   },
   "items": {
@@ -9404,10 +11143,625 @@
       "name": "Golden Pavilion Auction House",
       "location": "Golden Pavilion Auction House",
       "entrance_location": "Greenriver Town",
+      "size": "grand",
+      "max_active_lots": 25,
+      "max_lot_minutes": 1440,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_spirit_stone",
+      "channel_name": "golden-pavilion-auctions",
       "description": "Violence is suppressed by formations and hidden guards inside. Once a bidder leaves through the doors, the Pavilion no longer guarantees protection."
+    },
+    "azure_crown_exchange": {
+      "name": "Azure Crown Treasure Exchange",
+      "location": "Azure Crown Treasure Exchange",
+      "entrance_location": "Azure Crown Imperial City",
+      "size": "grand",
+      "max_active_lots": 25,
+      "max_lot_minutes": 1440,
+      "protected_interior": true,
+      "door_rule": true,
+      "default_currency": "low_spirit_stone",
+      "channel_name": "azure-crown-auctions",
+      "description": "The imperial capital's licensed exchange: imperial guards and a court formation keep the floor bloodless. The licence ends at the gate, and so does the guard."
+    },
+    "spirit_jade_pavilion": {
+      "name": "Spirit Jade Auction Pavilion",
+      "location": "Spirit Jade Auction Pavilion",
+      "entrance_location": "Spirit Jade Capital",
+      "size": "grand",
+      "max_active_lots": 25,
+      "max_lot_minutes": 1440,
+      "protected_interior": true,
+      "door_rule": true,
+      "default_currency": "low_spirit_crystal",
+      "channel_name": "spirit-jade-auctions",
+      "description": "Ascended families and old sects trade under a jade array that suppresses every technique on the floor. Past the jade doors the array, and its courtesy, end."
+    },
+    "nine_heavens_hall": {
+      "name": "Nine-Heavens Treasure Hall",
+      "location": "Nine-Heavens Treasure Hall",
+      "entrance_location": "Nine-Heavens Immortal Court",
+      "size": "grand",
+      "max_active_lots": 25,
+      "max_lot_minutes": 1440,
+      "protected_interior": true,
+      "door_rule": true,
+      "default_currency": "low_immortal_stone",
+      "channel_name": "nine-heavens-auctions",
+      "description": "Immortal clans auction under the Court's own law formation, which forbids a raised hand as firmly as a raised blade. The law stops at the hall's threshold."
+    },
+    "celestial_mandate_hall": {
+      "name": "Celestial Mandate Auction Hall",
+      "location": "Celestial Mandate Auction Hall",
+      "entrance_location": "Celestial Mandate Palace",
+      "size": "grand",
+      "max_active_lots": 25,
+      "max_lot_minutes": 1440,
+      "protected_interior": true,
+      "door_rule": true,
+      "default_currency": "low_celestial_crystal",
+      "channel_name": "celestial-mandate-auctions",
+      "description": "Sovereign courts trade under the Mandate itself; a blow struck on this floor is a blow against heaven. The Mandate's shelter ends at the hall doors."
+    },
+    "riverguard_riverside_auction_hall": {
+      "name": "Riverguard Riverside Auction Hall",
+      "location": "Riverguard Riverside Auction Hall",
+      "entrance_location": "Riverguard City",
+      "size": "local",
+      "max_active_lots": 6,
+      "max_lot_minutes": 360,
+      "protected_interior": true,
+      "door_rule": true,
+      "default_currency": "low_spirit_stone",
+      "channel_name": "mortal-world-auctions",
+      "description": "Riverguard City's local auction floor - six lots at a time, none longer than six hours - protected by its formation and the city guards. Once a bidder leaves through the doors, the protection ends."
+    },
+    "jadeflow_riverside_auction_hall": {
+      "name": "Jadeflow Riverside Auction Hall",
+      "location": "Jadeflow Riverside Auction Hall",
+      "entrance_location": "Jadeflow Spirit City",
+      "size": "local",
+      "max_active_lots": 6,
+      "max_lot_minutes": 360,
+      "protected_interior": true,
+      "door_rule": true,
+      "default_currency": "low_spirit_crystal",
+      "channel_name": "spiritual-world-auctions",
+      "description": "Jadeflow Spirit City's local auction floor - six lots at a time, none longer than six hours - protected by its formation and the ascended wardens. Once a bidder leaves through the doors, the protection ends."
+    },
+    "immortal_river_riverside_auction_hall": {
+      "name": "Immortal River Riverside Auction Hall",
+      "location": "Immortal River Riverside Auction Hall",
+      "entrance_location": "Immortal River City",
+      "size": "local",
+      "max_active_lots": 6,
+      "max_lot_minutes": 360,
+      "protected_interior": true,
+      "door_rule": true,
+      "default_currency": "low_immortal_stone",
+      "channel_name": "immortal-world-auctions",
+      "description": "Immortal River City's local auction floor - six lots at a time, none longer than six hours - protected by its formation and the immortal wardens. Once a bidder leaves through the doors, the protection ends."
+    },
+    "celestial_river_riverside_auction_hall": {
+      "name": "Celestial River Riverside Auction Hall",
+      "location": "Celestial River Riverside Auction Hall",
+      "entrance_location": "Celestial River City",
+      "size": "local",
+      "max_active_lots": 6,
+      "max_lot_minutes": 360,
+      "protected_interior": true,
+      "door_rule": true,
+      "default_currency": "low_celestial_crystal",
+      "channel_name": "celestial-world-auctions",
+      "description": "Celestial River City's local auction floor - six lots at a time, none longer than six hours - protected by its formation and the celestial wardens. Once a bidder leaves through the doors, the protection ends."
+    },
+    "four_roads_caravan_crossroads_auction_yard": {
+      "name": "Four-Roads Caravan Crossroads Auction Yard",
+      "location": "Four-Roads Caravan Crossroads Auction Yard",
+      "entrance_location": "Four-Roads Caravan City",
+      "size": "local",
+      "max_active_lots": 6,
+      "max_lot_minutes": 360,
+      "protected_interior": true,
+      "door_rule": true,
+      "default_currency": "low_spirit_stone",
+      "channel_name": "mortal-world-auctions",
+      "description": "Four-Roads Caravan City's local auction floor - six lots at a time, none longer than six hours - protected by its formation and the city guards. Once a bidder leaves through the doors, the protection ends."
+    },
+    "galevein_crossroads_auction_yard": {
+      "name": "Galevein Crossroads Auction Yard",
+      "location": "Galevein Crossroads Auction Yard",
+      "entrance_location": "Galevein Spirit City",
+      "size": "local",
+      "max_active_lots": 6,
+      "max_lot_minutes": 360,
+      "protected_interior": true,
+      "door_rule": true,
+      "default_currency": "low_spirit_crystal",
+      "channel_name": "spiritual-world-auctions",
+      "description": "Galevein Spirit City's local auction floor - six lots at a time, none longer than six hours - protected by its formation and the ascended wardens. Once a bidder leaves through the doors, the protection ends."
+    },
+    "skyroad_crossroads_auction_yard": {
+      "name": "Skyroad Crossroads Auction Yard",
+      "location": "Skyroad Crossroads Auction Yard",
+      "entrance_location": "Skyroad Immortal City",
+      "size": "local",
+      "max_active_lots": 6,
+      "max_lot_minutes": 360,
+      "protected_interior": true,
+      "door_rule": true,
+      "default_currency": "low_immortal_stone",
+      "channel_name": "immortal-world-auctions",
+      "description": "Skyroad Immortal City's local auction floor - six lots at a time, none longer than six hours - protected by its formation and the immortal wardens. Once a bidder leaves through the doors, the protection ends."
+    },
+    "starroad_crossroads_auction_yard": {
+      "name": "Starroad Crossroads Auction Yard",
+      "location": "Starroad Crossroads Auction Yard",
+      "entrance_location": "Starroad Celestial City",
+      "size": "local",
+      "max_active_lots": 6,
+      "max_lot_minutes": 360,
+      "protected_interior": true,
+      "door_rule": true,
+      "default_currency": "low_celestial_crystal",
+      "channel_name": "celestial-world-auctions",
+      "description": "Starroad Celestial City's local auction floor - six lots at a time, none longer than six hours - protected by its formation and the celestial wardens. Once a bidder leaves through the doors, the protection ends."
+    },
+    "emberforge_furnace_auction_gallery": {
+      "name": "Emberforge Furnace Auction Gallery",
+      "location": "Emberforge Furnace Auction Gallery",
+      "entrance_location": "Emberforge City",
+      "size": "local",
+      "max_active_lots": 6,
+      "max_lot_minutes": 360,
+      "protected_interior": true,
+      "door_rule": true,
+      "default_currency": "low_spirit_stone",
+      "channel_name": "mortal-world-auctions",
+      "description": "Emberforge City's local auction floor - six lots at a time, none longer than six hours - protected by its formation and the city guards. Once a bidder leaves through the doors, the protection ends."
+    },
+    "vermilion_furnace_furnace_auction_gallery": {
+      "name": "Vermilion Furnace Furnace Auction Gallery",
+      "location": "Vermilion Furnace Furnace Auction Gallery",
+      "entrance_location": "Vermilion Furnace City",
+      "size": "local",
+      "max_active_lots": 6,
+      "max_lot_minutes": 360,
+      "protected_interior": true,
+      "door_rule": true,
+      "default_currency": "low_spirit_crystal",
+      "channel_name": "spiritual-world-auctions",
+      "description": "Vermilion Furnace City's local auction floor - six lots at a time, none longer than six hours - protected by its formation and the ascended wardens. Once a bidder leaves through the doors, the protection ends."
+    },
+    "solar_furnace_furnace_auction_gallery": {
+      "name": "Solar Furnace Furnace Auction Gallery",
+      "location": "Solar Furnace Furnace Auction Gallery",
+      "entrance_location": "Solar Furnace Immortal City",
+      "size": "local",
+      "max_active_lots": 6,
+      "max_lot_minutes": 360,
+      "protected_interior": true,
+      "door_rule": true,
+      "default_currency": "low_immortal_stone",
+      "channel_name": "immortal-world-auctions",
+      "description": "Solar Furnace Immortal City's local auction floor - six lots at a time, none longer than six hours - protected by its formation and the immortal wardens. Once a bidder leaves through the doors, the protection ends."
+    },
+    "solar_crucible_furnace_auction_gallery": {
+      "name": "Solar Crucible Furnace Auction Gallery",
+      "location": "Solar Crucible Furnace Auction Gallery",
+      "entrance_location": "Solar Crucible Celestial City",
+      "size": "local",
+      "max_active_lots": 6,
+      "max_lot_minutes": 360,
+      "protected_interior": true,
+      "door_rule": true,
+      "default_currency": "low_celestial_crystal",
+      "channel_name": "celestial-world-auctions",
+      "description": "Solar Crucible Celestial City's local auction floor - six lots at a time, none longer than six hours - protected by its formation and the celestial wardens. Once a bidder leaves through the doors, the protection ends."
+    },
+    "stoneback_mountain_highland_auction_lodge": {
+      "name": "Stoneback Mountain Highland Auction Lodge",
+      "location": "Stoneback Mountain Highland Auction Lodge",
+      "entrance_location": "Stoneback Mountain City",
+      "size": "local",
+      "max_active_lots": 6,
+      "max_lot_minutes": 360,
+      "protected_interior": true,
+      "door_rule": true,
+      "default_currency": "low_spirit_stone",
+      "channel_name": "mortal-world-auctions",
+      "description": "Stoneback Mountain City's local auction floor - six lots at a time, none longer than six hours - protected by its formation and the city guards. Once a bidder leaves through the doors, the protection ends."
+    },
+    "stoneheart_highland_auction_lodge": {
+      "name": "Stoneheart Highland Auction Lodge",
+      "location": "Stoneheart Highland Auction Lodge",
+      "entrance_location": "Stoneheart Spirit City",
+      "size": "local",
+      "max_active_lots": 6,
+      "max_lot_minutes": 360,
+      "protected_interior": true,
+      "door_rule": true,
+      "default_currency": "low_spirit_crystal",
+      "channel_name": "spiritual-world-auctions",
+      "description": "Stoneheart Spirit City's local auction floor - six lots at a time, none longer than six hours - protected by its formation and the ascended wardens. Once a bidder leaves through the doors, the protection ends."
+    },
+    "adamant_body_highland_auction_lodge": {
+      "name": "Adamant Body Highland Auction Lodge",
+      "location": "Adamant Body Highland Auction Lodge",
+      "entrance_location": "Adamant Body Immortal City",
+      "size": "local",
+      "max_active_lots": 6,
+      "max_lot_minutes": 360,
+      "protected_interior": true,
+      "door_rule": true,
+      "default_currency": "low_immortal_stone",
+      "channel_name": "immortal-world-auctions",
+      "description": "Adamant Body Immortal City's local auction floor - six lots at a time, none longer than six hours - protected by its formation and the immortal wardens. Once a bidder leaves through the doors, the protection ends."
+    },
+    "worldstone_highland_auction_lodge": {
+      "name": "Worldstone Highland Auction Lodge",
+      "location": "Worldstone Highland Auction Lodge",
+      "entrance_location": "Worldstone Celestial City",
+      "size": "local",
+      "max_active_lots": 6,
+      "max_lot_minutes": 360,
+      "protected_interior": true,
+      "door_rule": true,
+      "default_currency": "low_celestial_crystal",
+      "channel_name": "celestial-world-auctions",
+      "description": "Worldstone Celestial City's local auction floor - six lots at a time, none longer than six hours - protected by its formation and the celestial wardens. Once a bidder leaves through the doors, the protection ends."
+    },
+    "cloudblade_sword_peak_auction_terrace": {
+      "name": "Cloudblade Sword Peak Auction Terrace",
+      "location": "Cloudblade Sword Peak Auction Terrace",
+      "entrance_location": "Cloudblade City",
+      "size": "local",
+      "max_active_lots": 6,
+      "max_lot_minutes": 360,
+      "protected_interior": true,
+      "door_rule": true,
+      "default_currency": "low_spirit_stone",
+      "channel_name": "mortal-world-auctions",
+      "description": "Cloudblade City's local auction floor - six lots at a time, none longer than six hours - protected by its formation and the city guards. Once a bidder leaves through the doors, the protection ends."
+    },
+    "cloudedge_sword_peak_auction_terrace": {
+      "name": "Cloudedge Sword Peak Auction Terrace",
+      "location": "Cloudedge Sword Peak Auction Terrace",
+      "entrance_location": "Cloudedge Spirit City",
+      "size": "local",
+      "max_active_lots": 6,
+      "max_lot_minutes": 360,
+      "protected_interior": true,
+      "door_rule": true,
+      "default_currency": "low_spirit_crystal",
+      "channel_name": "spiritual-world-auctions",
+      "description": "Cloudedge Spirit City's local auction floor - six lots at a time, none longer than six hours - protected by its formation and the ascended wardens. Once a bidder leaves through the doors, the protection ends."
+    },
+    "heavenblade_sword_peak_auction_terrace": {
+      "name": "Heavenblade Sword Peak Auction Terrace",
+      "location": "Heavenblade Sword Peak Auction Terrace",
+      "entrance_location": "Heavenblade Immortal City",
+      "size": "local",
+      "max_active_lots": 6,
+      "max_lot_minutes": 360,
+      "protected_interior": true,
+      "door_rule": true,
+      "default_currency": "low_immortal_stone",
+      "channel_name": "immortal-world-auctions",
+      "description": "Heavenblade Immortal City's local auction floor - six lots at a time, none longer than six hours - protected by its formation and the immortal wardens. Once a bidder leaves through the doors, the protection ends."
+    },
+    "firmament_blade_sword_peak_auction_terrace": {
+      "name": "Firmament Blade Sword Peak Auction Terrace",
+      "location": "Firmament Blade Sword Peak Auction Terrace",
+      "entrance_location": "Firmament Blade City",
+      "size": "local",
+      "max_active_lots": 6,
+      "max_lot_minutes": 360,
+      "protected_interior": true,
+      "door_rule": true,
+      "default_currency": "low_celestial_crystal",
+      "channel_name": "celestial-world-auctions",
+      "description": "Firmament Blade City's local auction floor - six lots at a time, none longer than six hours - protected by its formation and the celestial wardens. Once a bidder leaves through the doors, the protection ends."
+    },
+    "ironbanner_bannered_auction_ground": {
+      "name": "Ironbanner Bannered Auction Ground",
+      "location": "Ironbanner Bannered Auction Ground",
+      "entrance_location": "Ironbanner City",
+      "size": "local",
+      "max_active_lots": 6,
+      "max_lot_minutes": 360,
+      "protected_interior": true,
+      "door_rule": true,
+      "default_currency": "low_spirit_stone",
+      "channel_name": "mortal-world-auctions",
+      "description": "Ironbanner City's local auction floor - six lots at a time, none longer than six hours - protected by its formation and the city guards. Once a bidder leaves through the doors, the protection ends."
+    },
+    "spearwall_bannered_auction_ground": {
+      "name": "Spearwall Bannered Auction Ground",
+      "location": "Spearwall Bannered Auction Ground",
+      "entrance_location": "Spearwall Spirit City",
+      "size": "local",
+      "max_active_lots": 6,
+      "max_lot_minutes": 360,
+      "protected_interior": true,
+      "door_rule": true,
+      "default_currency": "low_spirit_crystal",
+      "channel_name": "spiritual-world-auctions",
+      "description": "Spearwall Spirit City's local auction floor - six lots at a time, none longer than six hours - protected by its formation and the ascended wardens. Once a bidder leaves through the doors, the protection ends."
+    },
+    "golden_spear_bannered_auction_ground": {
+      "name": "Golden Spear Bannered Auction Ground",
+      "location": "Golden Spear Bannered Auction Ground",
+      "entrance_location": "Golden Spear Immortal City",
+      "size": "local",
+      "max_active_lots": 6,
+      "max_lot_minutes": 360,
+      "protected_interior": true,
+      "door_rule": true,
+      "default_currency": "low_immortal_stone",
+      "channel_name": "immortal-world-auctions",
+      "description": "Golden Spear Immortal City's local auction floor - six lots at a time, none longer than six hours - protected by its formation and the immortal wardens. Once a bidder leaves through the doors, the protection ends."
+    },
+    "mandate_spear_bannered_auction_ground": {
+      "name": "Mandate Spear Bannered Auction Ground",
+      "location": "Mandate Spear Bannered Auction Ground",
+      "entrance_location": "Mandate Spear City",
+      "size": "local",
+      "max_active_lots": 6,
+      "max_lot_minutes": 360,
+      "protected_interior": true,
+      "door_rule": true,
+      "default_currency": "low_celestial_crystal",
+      "channel_name": "celestial-world-auctions",
+      "description": "Mandate Spear City's local auction floor - six lots at a time, none longer than six hours - protected by its formation and the celestial wardens. Once a bidder leaves through the doors, the protection ends."
+    },
+    "moonfen_mistwater_auction_pavilion": {
+      "name": "Moonfen Mistwater Auction Pavilion",
+      "location": "Moonfen Mistwater Auction Pavilion",
+      "entrance_location": "Moonfen City",
+      "size": "local",
+      "max_active_lots": 6,
+      "max_lot_minutes": 360,
+      "protected_interior": true,
+      "door_rule": true,
+      "default_currency": "low_spirit_stone",
+      "channel_name": "mortal-world-auctions",
+      "description": "Moonfen City's local auction floor - six lots at a time, none longer than six hours - protected by its formation and the city guards. Once a bidder leaves through the doors, the protection ends."
+    },
+    "moonfrost_mistwater_auction_pavilion": {
+      "name": "Moonfrost Mistwater Auction Pavilion",
+      "location": "Moonfrost Mistwater Auction Pavilion",
+      "entrance_location": "Moonfrost Spirit City",
+      "size": "local",
+      "max_active_lots": 6,
+      "max_lot_minutes": 360,
+      "protected_interior": true,
+      "door_rule": true,
+      "default_currency": "low_spirit_crystal",
+      "channel_name": "spiritual-world-auctions",
+      "description": "Moonfrost Spirit City's local auction floor - six lots at a time, none longer than six hours - protected by its formation and the ascended wardens. Once a bidder leaves through the doors, the protection ends."
+    },
+    "lunar_veil_mistwater_auction_pavilion": {
+      "name": "Lunar Veil Mistwater Auction Pavilion",
+      "location": "Lunar Veil Mistwater Auction Pavilion",
+      "entrance_location": "Lunar Veil Immortal City",
+      "size": "local",
+      "max_active_lots": 6,
+      "max_lot_minutes": 360,
+      "protected_interior": true,
+      "door_rule": true,
+      "default_currency": "low_immortal_stone",
+      "channel_name": "immortal-world-auctions",
+      "description": "Lunar Veil Immortal City's local auction floor - six lots at a time, none longer than six hours - protected by its formation and the immortal wardens. Once a bidder leaves through the doors, the protection ends."
+    },
+    "lunar_shadow_mistwater_auction_pavilion": {
+      "name": "Lunar Shadow Mistwater Auction Pavilion",
+      "location": "Lunar Shadow Mistwater Auction Pavilion",
+      "entrance_location": "Lunar Shadow Celestial City",
+      "size": "local",
+      "max_active_lots": 6,
+      "max_lot_minutes": 360,
+      "protected_interior": true,
+      "door_rule": true,
+      "default_currency": "low_celestial_crystal",
+      "channel_name": "celestial-world-auctions",
+      "description": "Lunar Shadow Celestial City's local auction floor - six lots at a time, none longer than six hours - protected by its formation and the celestial wardens. Once a bidder leaves through the doors, the protection ends."
+    },
+    "frostwatch_frontier_auction_hall": {
+      "name": "Frostwatch Frontier Auction Hall",
+      "location": "Frostwatch Frontier Auction Hall",
+      "entrance_location": "Frostwatch City",
+      "size": "local",
+      "max_active_lots": 6,
+      "max_lot_minutes": 360,
+      "protected_interior": true,
+      "door_rule": true,
+      "default_currency": "low_spirit_stone",
+      "channel_name": "mortal-world-auctions",
+      "description": "Frostwatch City's local auction floor - six lots at a time, none longer than six hours - protected by its formation and the city guards. Once a bidder leaves through the doors, the protection ends."
+    },
+    "northwind_frontier_auction_hall": {
+      "name": "Northwind Frontier Auction Hall",
+      "location": "Northwind Frontier Auction Hall",
+      "entrance_location": "Northwind Spirit City",
+      "size": "local",
+      "max_active_lots": 6,
+      "max_lot_minutes": 360,
+      "protected_interior": true,
+      "door_rule": true,
+      "default_currency": "low_spirit_crystal",
+      "channel_name": "spiritual-world-auctions",
+      "description": "Northwind Spirit City's local auction floor - six lots at a time, none longer than six hours - protected by its formation and the ascended wardens. Once a bidder leaves through the doors, the protection ends."
+    },
+    "polar_gate_frontier_auction_hall": {
+      "name": "Polar Gate Frontier Auction Hall",
+      "location": "Polar Gate Frontier Auction Hall",
+      "entrance_location": "Polar Gate Immortal City",
+      "size": "local",
+      "max_active_lots": 6,
+      "max_lot_minutes": 360,
+      "protected_interior": true,
+      "door_rule": true,
+      "default_currency": "low_immortal_stone",
+      "channel_name": "immortal-world-auctions",
+      "description": "Polar Gate Immortal City's local auction floor - six lots at a time, none longer than six hours - protected by its formation and the immortal wardens. Once a bidder leaves through the doors, the protection ends."
+    },
+    "froststar_frontier_auction_hall": {
+      "name": "Froststar Frontier Auction Hall",
+      "location": "Froststar Frontier Auction Hall",
+      "entrance_location": "Froststar Border City",
+      "size": "local",
+      "max_active_lots": 6,
+      "max_lot_minutes": 360,
+      "protected_interior": true,
+      "door_rule": true,
+      "default_currency": "low_celestial_crystal",
+      "channel_name": "celestial-world-auctions",
+      "description": "Froststar Border City's local auction floor - six lots at a time, none longer than six hours - protected by its formation and the celestial wardens. Once a bidder leaves through the doors, the protection ends."
+    },
+    "ashenwall_relic_auction_court": {
+      "name": "Ashenwall Relic Auction Court",
+      "location": "Ashenwall Relic Auction Court",
+      "entrance_location": "Ashenwall City",
+      "size": "local",
+      "max_active_lots": 6,
+      "max_lot_minutes": 360,
+      "protected_interior": true,
+      "door_rule": true,
+      "default_currency": "low_spirit_stone",
+      "channel_name": "mortal-world-auctions",
+      "description": "Ashenwall City's local auction floor - six lots at a time, none longer than six hours - protected by its formation and the city guards. Once a bidder leaves through the doors, the protection ends."
+    },
+    "broken_halo_relic_auction_court": {
+      "name": "Broken Halo Relic Auction Court",
+      "location": "Broken Halo Relic Auction Court",
+      "entrance_location": "Broken Halo Spirit City",
+      "size": "local",
+      "max_active_lots": 6,
+      "max_lot_minutes": 360,
+      "protected_interior": true,
+      "door_rule": true,
+      "default_currency": "low_spirit_crystal",
+      "channel_name": "spiritual-world-auctions",
+      "description": "Broken Halo Spirit City's local auction floor - six lots at a time, none longer than six hours - protected by its formation and the ascended wardens. Once a bidder leaves through the doors, the protection ends."
+    },
+    "fallen_star_relic_auction_court": {
+      "name": "Fallen Star Relic Auction Court",
+      "location": "Fallen Star Relic Auction Court",
+      "entrance_location": "Fallen Star Immortal City",
+      "size": "local",
+      "max_active_lots": 6,
+      "max_lot_minutes": 360,
+      "protected_interior": true,
+      "door_rule": true,
+      "default_currency": "low_immortal_stone",
+      "channel_name": "immortal-world-auctions",
+      "description": "Fallen Star Immortal City's local auction floor - six lots at a time, none longer than six hours - protected by its formation and the immortal wardens. Once a bidder leaves through the doors, the protection ends."
+    },
+    "ruined_constellation_relic_auction_court": {
+      "name": "Ruined Constellation Relic Auction Court",
+      "location": "Ruined Constellation Relic Auction Court",
+      "entrance_location": "Ruined Constellation City",
+      "size": "local",
+      "max_active_lots": 6,
+      "max_lot_minutes": 360,
+      "protected_interior": true,
+      "door_rule": true,
+      "default_currency": "low_celestial_crystal",
+      "channel_name": "celestial-world-auctions",
+      "description": "Ruined Constellation City's local auction floor - six lots at a time, none longer than six hours - protected by its formation and the celestial wardens. Once a bidder leaves through the doors, the protection ends."
+    },
+    "jadewood_medicine_garden_auction_hall": {
+      "name": "Jadewood Medicine Garden Auction Hall",
+      "location": "Jadewood Medicine Garden Auction Hall",
+      "entrance_location": "Jadewood Medicine City",
+      "size": "local",
+      "max_active_lots": 6,
+      "max_lot_minutes": 360,
+      "protected_interior": true,
+      "door_rule": true,
+      "default_currency": "low_spirit_stone",
+      "channel_name": "mortal-world-auctions",
+      "description": "Jadewood Medicine City's local auction floor - six lots at a time, none longer than six hours - protected by its formation and the city guards. Once a bidder leaves through the doors, the protection ends."
+    },
+    "hundred_herb_garden_auction_hall": {
+      "name": "Hundred Herb Garden Auction Hall",
+      "location": "Hundred Herb Garden Auction Hall",
+      "entrance_location": "Hundred Herb Spirit City",
+      "size": "local",
+      "max_active_lots": 6,
+      "max_lot_minutes": 360,
+      "protected_interior": true,
+      "door_rule": true,
+      "default_currency": "low_spirit_crystal",
+      "channel_name": "spiritual-world-auctions",
+      "description": "Hundred Herb Spirit City's local auction floor - six lots at a time, none longer than six hours - protected by its formation and the ascended wardens. Once a bidder leaves through the doors, the protection ends."
+    },
+    "jade_cauldron_garden_auction_hall": {
+      "name": "Jade Cauldron Garden Auction Hall",
+      "location": "Jade Cauldron Garden Auction Hall",
+      "entrance_location": "Jade Cauldron Immortal City",
+      "size": "local",
+      "max_active_lots": 6,
+      "max_lot_minutes": 360,
+      "protected_interior": true,
+      "door_rule": true,
+      "default_currency": "low_immortal_stone",
+      "channel_name": "immortal-world-auctions",
+      "description": "Jade Cauldron Immortal City's local auction floor - six lots at a time, none longer than six hours - protected by its formation and the immortal wardens. Once a bidder leaves through the doors, the protection ends."
+    },
+    "divine_herb_garden_auction_hall": {
+      "name": "Divine Herb Garden Auction Hall",
+      "location": "Divine Herb Garden Auction Hall",
+      "entrance_location": "Divine Herb Celestial City",
+      "size": "local",
+      "max_active_lots": 6,
+      "max_lot_minutes": 360,
+      "protected_interior": true,
+      "door_rule": true,
+      "default_currency": "low_celestial_crystal",
+      "channel_name": "celestial-world-auctions",
+      "description": "Divine Herb Celestial City's local auction floor - six lots at a time, none longer than six hours - protected by its formation and the celestial wardens. Once a bidder leaves through the doors, the protection ends."
+    },
+    "jade_crown_noble_auction_court": {
+      "name": "Jade Crown Noble Auction Court",
+      "location": "Jade Crown Noble Auction Court",
+      "entrance_location": "Jade Crown Spirit City",
+      "size": "local",
+      "max_active_lots": 6,
+      "max_lot_minutes": 360,
+      "protected_interior": true,
+      "door_rule": true,
+      "default_currency": "low_spirit_crystal",
+      "channel_name": "spiritual-world-auctions",
+      "description": "Jade Crown Spirit City's local auction floor - six lots at a time, none longer than six hours - protected by its formation and the ascended wardens. Once a bidder leaves through the doors, the protection ends."
+    },
+    "ninefold_noble_noble_auction_court": {
+      "name": "Ninefold Noble Noble Auction Court",
+      "location": "Ninefold Noble Noble Auction Court",
+      "entrance_location": "Ninefold Noble Immortal City",
+      "size": "local",
+      "max_active_lots": 6,
+      "max_lot_minutes": 360,
+      "protected_interior": true,
+      "door_rule": true,
+      "default_currency": "low_immortal_stone",
+      "channel_name": "immortal-world-auctions",
+      "description": "Ninefold Noble Immortal City's local auction floor - six lots at a time, none longer than six hours - protected by its formation and the immortal wardens. Once a bidder leaves through the doors, the protection ends."
+    },
+    "mandate_crown_noble_auction_court": {
+      "name": "Mandate Crown Noble Auction Court",
+      "location": "Mandate Crown Noble Auction Court",
+      "entrance_location": "Mandate Crown Celestial City",
+      "size": "local",
+      "max_active_lots": 6,
+      "max_lot_minutes": 360,
+      "protected_interior": true,
+      "door_rule": true,
+      "default_currency": "low_celestial_crystal",
+      "channel_name": "celestial-world-auctions",
+      "description": "Mandate Crown Celestial City's local auction floor - six lots at a time, none longer than six hours - protected by its formation and the celestial wardens. Once a bidder leaves through the doors, the protection ends."
     }
   },
   "world_rulers": {
