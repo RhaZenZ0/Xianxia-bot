@@ -155,11 +155,14 @@ async def dispatch(interaction: Any, candidate: Candidate) -> None:
     the registered one; typed play adds nothing in between.
     """
     if candidate.kind == "root":
-        command = ACTIONS.root(str(candidate.payload["command"]))
+        name = str(candidate.payload["command"])
+        # A root by name; a group leaf ("travel go", v0.33.0) by its qualified name.
+        command = ACTIONS.root(name) if " " not in name else ACTIONS.qualified(name)
         handler = ACTIONS.handler_for(command)
         if isinstance(interaction, MessageInteraction):
             interaction.command = command
-        await handler(interaction)
+        arguments = {str(k): v for k, v in dict(candidate.payload.get("arguments") or {}).items()}
+        await handler(interaction, **arguments)
         return
     if candidate.kind == "talk":
         command = ACTIONS.root("talk")
@@ -293,6 +296,8 @@ async def _say(interaction: discord.Interaction, text: str) -> None:
 def picker_prompt(route: Route) -> str:
     if route.candidates:
         return f"“{route.text[:120]}” — which do you mean?"
+    if route.message:
+        return f"“{route.text[:120]}” — {route.message} Narrate it, or just say it in character."
     return f"“{route.text[:120]}” — nothing I can resolve. Narrate it, or just say it in character."
 
 

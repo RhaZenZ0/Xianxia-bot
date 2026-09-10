@@ -16,6 +16,7 @@ from typing import Any
 import discord
 from discord import app_commands
 
+from ...rules.advanced_catalog import GRADES
 from ...rules.advanced_runtime import EQUIPMENT_DEFINITIONS
 from ...rules.birthfamily import karma_label
 from ...ops.game_engine import GameEngineError
@@ -237,15 +238,17 @@ async def admin_master_attention(interaction:discord.Interaction,disciple:discor
 
 
 @registered_group_command(admin_player_group, name="grantstorage",description="Grant or replace a cultivator's spatial storage container")
+@app_commands.choices(grade=[app_commands.Choice(name=grade, value=grade) for grade in GRADES])
 async def admin_grant_storage(
-    interaction:discord.Interaction,member:discord.Member,name:str,grade:str="Earth",
+    interaction:discord.Interaction,member:discord.Member,name:str,grade:app_commands.Choice[str]|None=None,
     slots:app_commands.Range[int,1,5000]=80,living_space:bool=False
 )->None:
     if not await require_admin(interaction):return
+    grade_name = grade.value if grade else "Earth"
     try:
         result = dict(await ENGINE.action("admin.player.grant_storage", interaction.user.id, {
             "user_id": member.id, "container_id": name.casefold().replace(' ', '_'), "name": name,
-            "grade": grade, "slot_capacity": int(slots), "living_space": living_space,
+            "grade": grade_name, "slot_capacity": int(slots), "living_space": living_space,
             "reason": "discord admin",
         }) or {})
     except GameEngineError as exc:
@@ -255,9 +258,9 @@ async def admin_grant_storage(
     # so the granted capacity is not always the one that was asked for. Report
     # what the cultivator actually has.
     granted = int(result.get("slot_capacity", slots))
-    await audit_admin(interaction, "player.grantstorage", target=f"user:{member.id}", after={"name": name, "grade": grade, "slots": granted, "living_space": living_space}, database_log=False)
+    await audit_admin(interaction, "player.grantstorage", target=f"user:{member.id}", after={"name": name, "grade": grade_name, "slots": granted, "living_space": living_space}, database_log=False)
     floor_note = f" (raised from {slots} to fit what is already stored)" if granted != int(slots) else ""
-    await interaction.response.send_message(f"✅ Granted **{name}** ({grade}, {granted} stacks{floor_note}, living space: {living_space}) to {member.mention}.",ephemeral=False)
+    await interaction.response.send_message(f"✅ Granted **{name}** ({grade_name}, {granted} stacks{floor_note}, living space: {living_space}) to {member.mention}.",ephemeral=False)
 
 
 @registered_group_command(admin_player_group, name="grantcurrency",description="Grant cultivation currency for events, testing or GM rewards")

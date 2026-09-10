@@ -1009,6 +1009,40 @@ Gate: `tests/python/contracts/test_security_defaults.py` and `TestNewRefusesAnEn
 No schema change (still 32), no game-rule change, AI remains narration-only.
 
 
+**0.33.0** is the roadmap's **Gameplay-complete I** milestone: the pickers. No schema change.
+
+*Every id has a picker.* Five parameters took a typed id with nothing to choose from - `/artifact
+bond` and `awaken` (item), `/boss start` (boss), `/secretrealm enter` (realm), `/battle act`
+(action) - and the walk that found them found three more beside them: `/caravan dispatch` (item),
+`/provenance` (item) and `/reincarnate` (path). Each has a slash autocomplete now, which the hub
+reads as its dropdown: bond offers what is carried with the bond it already has, awaken the bonds
+still dormant with their resonance, boss every boss with the one at your location first and the
+others' places named, secret realm the entrances open where you stand from the same engine query
+the status line reads, caravan and provenance what is carried, reincarnate the world's paths.
+`/battle act`'s action was prose all along and now says so on the parameter. The pickers that can
+be empty explain themselves in hub terms - what to do first, and where. `/admin player grantstorage`
+gained grade choices on the way.
+
+*Typed play, roots with parameters.* `content/typed_play.json` covered roots without parameters,
+the eight scene actions and `/talk`; `/travel` and `/use` fell to the picker. A root may now declare
+one argument - a handler parameter and a source, `location` or `item` - and the router fills it from
+the line against what the player knows or carries: `$ I travel to Greenriver Town`, `$ go to
+greenriver`, `$ I drink a healing pill`. The rule is resolve_entities' - a full name, then one
+distinctive token; the longest full name wins, a token two names share names neither. Unresolved,
+the action is not offered and the empty picker says what it needed ("travel needs a place you
+know"); the router never guesses a destination. Group leaves (`travel go`) are reached through the
+registry by qualified name. "I go to" is a verb now, not throat-clearing, so it left the leading
+phrases.
+
+*`fate.adjust` removed.* Implemented in Go with no caller anywhere since v0.18, a player writing
+their own Fate was never a feature; the GM path (`admin.player.fate`) remains.
+
+Gate: `tests/python/contracts/test_hub_pickers.py` walks every registered command's `str`
+parameters and requires each to be guided (choices, autocomplete, hub provider) or declared prose by
+name - a new id parameter fails until its picker exists. `test_typed_play_router.py` pins the
+argument rules. `test_world_content_gate.py` already required every location to have an NPC with
+no exemption list, which is stricter than the roadmap asked; it stays so.
+
 **0.32.0** is the roadmap's **Hardened II** milestone: moderation from Discord, with expiry; backups
 that are bounded, sealed and copied off the box. Schema **34**.
 
@@ -1211,9 +1245,11 @@ directory to one file, requires each check to appear before the release job and 
 and requires the release job to wait on all three.
 
 
-## Release status — v0.32.0
+## Release status — v0.33.0
 
-- Current release: v0.32.0 (schema 34): Hardened II - mute, freeze and ban from Discord with a
+- Current release: v0.33.0: Gameplay-complete I - every id parameter has a picker, typed play
+  fills one argument for `/travel` and `/use` from the line, and the callerless `fate.adjust` is gone.
+- v0.32.0 (schema 34): Hardened II - mute, freeze and ban from Discord with a
   duration the engine expires, force-end-scene beside them, every moderation audited so undo covers
   it, and backups that are pruned, capped, sealed with an operator key and copied off the box.
 - v0.31.0: the narrator budget - explore and hunt read from a procedural pool

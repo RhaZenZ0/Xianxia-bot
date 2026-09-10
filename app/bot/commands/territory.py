@@ -11,7 +11,7 @@ from discord import app_commands
 from ...ops.game_engine import GameEngineError
 from ..locations import location_autocomplete
 from ..registry import registered_group_command
-from ..runtime import _explain_engine_error, DB, ENGINE, WORLD, current_world_time, reply_long, require_character, serialized_user_action
+from ..runtime import carried_item_autocomplete, _explain_engine_error, DB, ENGINE, WORLD, current_world_time, reply_long, require_character, serialized_user_action
 
 # ---------- Advanced branch forward-port: beasts, artifacts, territory, caravans, parties, PvP, social state ----------
 territory_group = app_commands.Group(name="territory", description="Inspect or contest persistent territory control")
@@ -90,6 +90,7 @@ async def war_act(interaction: discord.Interaction, war_id: int, tactic: app_com
 
 @registered_group_command(caravan_group, name="dispatch", description="Send goods with optional escorts, smuggling and destination tax exposure")
 @app_commands.autocomplete(destination=location_autocomplete)
+@app_commands.autocomplete(item=carried_item_autocomplete)
 @serialized_user_action
 async def caravan_dispatch(interaction: discord.Interaction, destination: str, item: str, quantity: app_commands.Range[int,1,50]=1, escort: app_commands.Range[int,0,20]=0, smuggle: bool=False) -> None:
     await interaction.response.defer(ephemeral=False)

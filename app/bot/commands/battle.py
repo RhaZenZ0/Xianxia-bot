@@ -497,6 +497,7 @@ async def battle_challenge_autocomplete(interaction:discord.Interaction,current:
 
 @registered_group_command(battle_group, name="act",description="Take one action in your active battle")
 @app_commands.choices(style=BATTLE_STYLE_CHOICES)
+@app_commands.describe(style="Attack, defend or flee - the mechanics", action="Optional: a few words on how you do it - colours the narration only")
 @serialized_user_action
 async def battle_act(interaction:discord.Interaction,style:app_commands.Choice[str],action:str="")->None:
     await _resolve_battle_turn(interaction,style.value,action)

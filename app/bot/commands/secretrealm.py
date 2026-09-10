@@ -13,6 +13,7 @@ from discord import app_commands
 
 from ...ops.game_engine import GameEngineError
 from ..formatting import human_duration, roll_line
+from ..hubs import register_hub_option_hint
 from ..registry import registered_group_command
 from ..runtime import ENGINE, SETTINGS, WORLD, current_world_time, require_character, serialized_user_action
 
@@ -88,6 +89,41 @@ async def secret_enter(interaction: discord.Interaction, realm: str) -> None:
         f"{first.get('description', '')}\nUse **/realm → Secret Realms → Explore**.{thread_ref}",
         ephemeral=False,
     )
+
+
+@secret_enter.autocomplete("realm")
+async def open_realm_autocomplete(interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
+    """The realms open at the player's location right now (v0.33.0), read
+    from the same engine query /secretrealm status shows - so the picker
+    never offers an entrance the status line would not."""
+    try:
+        envelope = await ENGINE.action("secret_realm.status", interaction.user.id, {})
+    except GameEngineError:
+        return []
+    result = dict(envelope.get("result") or {})
+    needle = current.casefold().strip()
+    choices: list[app_commands.Choice[str]] = []
+    for entry in list(result.get("available") or []):
+        entry = dict(entry or {})
+        realm = dict(entry.get("realm") or {})
+        realm_id = str(entry.get("realm_id") or realm.get("id") or "")
+        name = str(realm.get("name") or realm_id)
+        if not realm_id or (needle and needle not in name.casefold() and needle not in realm_id.casefold()):
+            continue
+        remaining = max(0, int(float(entry.get("ends_at") or 0) - time.time()))
+        choices.append(app_commands.Choice(
+            name=f"{name} — min. {WORLD.realm_name(int(realm.get('min_realm_index') or 0))}, closes in {human_duration(remaining)}"[:100],
+            value=realm_id[:100],
+        ))
+    return choices[:25]
+
+
+register_hub_option_hint(
+    secret_enter,
+    "realm",
+    "No secret-realm entrance is open where you stand. They open as world events — "
+    "**/world → Events** lists the ones running, with their locations.",
+)
 
 
 @registered_group_command(secret_group, name="explore", description="Attempt the next area of your active secret realm")

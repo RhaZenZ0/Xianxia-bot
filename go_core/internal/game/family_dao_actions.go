@@ -50,11 +50,6 @@ type daoDualPayload struct {
 	GameMinute      int64 `json:"game_minute"`
 	CooldownSeconds int64 `json:"cooldown_seconds"`
 }
-type fateAdjustPayload struct {
-	Delta      int64  `json:"delta"`
-	Reason     string `json:"reason"`
-	GameMinute int64  `json:"game_minute"`
-}
 
 func birthFamilyForUserGo(conn *storage.Conn, userID int64) (map[string]any, error) {
 	r, e := conn.Execute(`SELECT bf.*,cbf.birth_order,cbf.generation AS character_generation,cbf.last_support_game_minute FROM character_birth_family cbf JOIN birth_families bf ON bf.family_id=cbf.family_id WHERE cbf.user_id=?`, []any{userID})
@@ -645,19 +640,6 @@ func adjustFateGo(conn *storage.Conn, userID, delta int64, reason string, gm int
 		_, e = conn.Execute(`INSERT INTO fate_ledger(user_id,delta,balance_after,reason,game_minute,created_at) VALUES(?,?,?,?,?,?)`, []any{userID, applied, target, reason, gm, now})
 	}
 	return target, e
-}
-func fateAdjustActionGo(conn *storage.Conn, _ worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
-	var p fateAdjustPayload
-	if e := json.Unmarshal(raw, &p); e != nil {
-		return authoritativeMutation{}, e
-	}
-	now := nowSeconds()
-	balance, e := adjustFateGo(conn, userID, p.Delta, p.Reason, p.GameMinute, now)
-	if e != nil {
-		return authoritativeMutation{}, e
-	}
-	out := map[string]any{"balance": balance, "delta_requested": p.Delta, "reason": p.Reason}
-	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "fate", EventType: "fate.adjust", EntityType: "character", EntityID: fmt.Sprint(userID), GameMinute: p.GameMinute, Payload: out}}, nil
 }
 func daoPartnershipActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage, op string) (authoritativeMutation, error) {
 	now := nowSeconds()
