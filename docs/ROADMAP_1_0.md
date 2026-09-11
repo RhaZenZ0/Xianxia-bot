@@ -462,4 +462,4 @@ drift for seven versions as happened between v0.21.6 and v0.28.0.
 | v0.34 Playtest | v0.34.2 | shipped; the engine loops run, the checklist is on file, and the `#playtest` board collects the live pass; travelling merchants shipped beside it |
 | v1.0.0-rc | | |
 | v1.0.0 | | |
-| Content track | | after rc |
+| Content track | v0.35.0 | started early: the city shops - 104 across 48 cities, differing by city in kind, tier and shelf |

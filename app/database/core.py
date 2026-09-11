@@ -26,7 +26,7 @@ from .remote import GoDatabaseTransport
 log = logging.getLogger("xianxia.database")
 
 
-SCHEMA_VERSION = 36
+SCHEMA_VERSION = 37
 # A readiness probe must validate more than the schema-version marker.  If the
 # SQLite file is removed or replaced while the bot is running, SQLite will
 # happily create a new empty file at the same path.  Checking these tables lets
@@ -1548,6 +1548,28 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
                 PRIMARY KEY(merchant, item_id)
             )""",
             "ALTER TABLE auctions ADD COLUMN merchant_buyer TEXT NOT NULL DEFAULT ''",
+        ),
+    ),
+    (
+        37,
+        "city_shops",
+        (
+            # v0.35.0: the city shops' shelves - what each shop holds right
+            # now and when it last refilled. The shops themselves are content.
+            """CREATE TABLE IF NOT EXISTS shop_state (
+                shop TEXT PRIMARY KEY,
+                last_restock_game_minute INTEGER NOT NULL DEFAULT 0,
+                updated_at REAL NOT NULL
+            )""",
+            """CREATE TABLE IF NOT EXISTS shop_stock (
+                shop TEXT NOT NULL,
+                item_id TEXT NOT NULL,
+                quantity INTEGER NOT NULL DEFAULT 0,
+                price INTEGER NOT NULL DEFAULT 0,
+                made_here INTEGER NOT NULL DEFAULT 0,
+                updated_at REAL NOT NULL,
+                PRIMARY KEY(shop, item_id)
+            )""",
         ),
     ),
 )

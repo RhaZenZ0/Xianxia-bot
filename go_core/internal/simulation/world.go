@@ -41,7 +41,15 @@ type Location struct {
 	SafeZone     bool   `json:"safe_zone"`
 	Private      bool   `json:"private"`
 	AuctionHouse any    `json:"auction_house"`
+	Shop         any    `json:"shop"`
 }
+
+// interior says whether a location is the inside of an auction house or a
+// city shop - somewhere NPC life and world events do not wander into.
+func (l Location) interior() bool {
+	return (l.AuctionHouse != nil && strings.TrimSpace(fmt.Sprint(l.AuctionHouse)) != "") || (l.Shop != nil && strings.TrimSpace(fmt.Sprint(l.Shop)) != "")
+}
+
 type NPC struct {
 	Role         string         `json:"role"`
 	Personality  string         `json:"personality"`
@@ -608,7 +616,7 @@ func (r *Runner) blackMarkets(conn *storage.Conn, steps, gm int64) (string, erro
 		locs := []string{}
 		rough := []string{}
 		for name, loc := range r.Catalog.Locations {
-			if loc.World != world || (loc.AuctionHouse != nil && strings.TrimSpace(fmt.Sprint(loc.AuctionHouse)) != "") || strings.Contains(name, "Rebirth") || strings.Contains(name, "Cradle") {
+			if loc.World != world || loc.interior() || strings.Contains(name, "Rebirth") || strings.Contains(name, "Cradle") {
 				continue
 			}
 			locs = append(locs, name)
@@ -845,7 +853,7 @@ func (r *Runner) autonomousWorldEvents(conn *storage.Conn, steps, gm int64) (str
 	}
 	candidates := []candidate{}
 	for location, loc := range r.Catalog.Locations {
-		if loc.Private || strings.HasPrefix(location, "abode:") || strings.HasPrefix(location, "personal_world:") || (loc.AuctionHouse != nil && strings.TrimSpace(fmt.Sprint(loc.AuctionHouse)) != "") {
+		if loc.Private || strings.HasPrefix(location, "abode:") || strings.HasPrefix(location, "personal_world:") || loc.interior() {
 			continue
 		}
 		for _, event := range r.Catalog.UnexpectedEvents {

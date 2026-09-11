@@ -189,3 +189,61 @@ class TravellingMerchantContentTests(unittest.TestCase):
             city = house["entrance_location"]
             with self.subTest(grand_house=house_id):
                 self.assertIn(city, route_stops[locations[city]["world"]], f"no merchant passes {city}")
+
+
+class CityShopContentTests(unittest.TestCase):
+    """v0.35.0: every city has shops; a shop is an interior location with a
+    keeper, a shelf of real tradeable goods and a board of what it buys,
+    and the cities differ - in kind, in tier by world, in stock."""
+
+    def test_every_city_has_shops_and_capitals_have_four(self):
+        shops = WORLD["shops"]
+        cities = {h["entrance_location"] for h in WORLD["auction_houses"].values()}
+        by_city = {}
+        for key, shop in shops.items():
+            by_city.setdefault(shop["city"], []).append(key)
+        for city in cities:
+            with self.subTest(city=city):
+                self.assertIn(city, by_city, f"{city} has no shops")
+                want = 4 if WORLD["locations"][city].get("realm_hub") else 2
+                self.assertGreaterEqual(len(by_city[city]), want)
+                kinds = [shops[k]["kind"] for k in by_city[city]]
+                self.assertEqual(len(set(kinds)), len(kinds), "two shops of one kind in one city")
+
+    def test_every_shop_is_a_kept_interior_with_a_real_shelf(self):
+        items, locations, npcs = WORLD["items"], WORLD["locations"], WORLD["npcs"]
+        tier_of = {"Mortal World": 1, "Spiritual World": 2, "Immortal World": 3, "Celestial World": 4}
+        for key, shop in WORLD["shops"].items():
+            with self.subTest(shop=key):
+                interior = locations[shop["location"]]
+                self.assertEqual(interior.get("shop"), key)
+                self.assertEqual(interior.get("outside_location"), shop["city"])
+                self.assertTrue(interior.get("safe_zone"), "a shop is a protected interior")
+                self.assertEqual(interior["world"], shop["world"])
+                self.assertEqual(shop["tier"], tier_of[shop["world"]])
+                self.assertEqual(npcs[shop["keeper"]]["location"], shop["location"])
+                self.assertEqual(npcs[shop["keeper"]].get("shop"), key)
+                self.assertGreaterEqual(len(shop["sells"]), 2)
+                self.assertEqual(len({line["item_id"] for line in shop["sells"]}), len(shop["sells"]))
+                for line in shop["sells"]:
+                    item = items[line["item_id"]]
+                    self.assertFalse(item.get("market_excluded"), line["item_id"])
+                    self.assertFalse(item.get("auction_interest"), f"{line['item_id']} is auction-grade, not shelf stock")
+                    self.assertGreater(int(line["quantity"]), 0)
+                    self.assertGreater(int(line["price"]), 0)
+                self.assertGreaterEqual(len(shop["buys"]), 2)
+                for item_id, price in shop["buys"].items():
+                    self.assertIn(item_id, items)
+                    self.assertGreater(int(price), 0)
+                self.assertIn(shop["currency"], WORLD["currencies"])
+                self.assertEqual(WORLD["currencies"][shop["currency"]]["world"], shop["world"])
+                self.assertGreater(int(shop["restock_minutes"]), 0)
+
+    def test_a_smithy_makes_its_own_blades(self):
+        # "the products they make": a made-here line is the keeper's craft,
+        # and every weaponsmith and apothecary has at least one.
+        for key, shop in WORLD["shops"].items():
+            if shop["kind"] not in ("weaponsmith", "apothecary", "talisman", "array"):
+                continue
+            with self.subTest(shop=key):
+                self.assertTrue(any(line.get("made_here") for line in shop["sells"]), f"{key} makes nothing")

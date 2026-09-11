@@ -49,6 +49,7 @@ from .commands.economy import (
     civilization_status_command,
     market_group,
     merchant_group,
+    shop_group,
     storage_group,
 )
 from .commands.equipment import equipment_group
@@ -110,6 +111,7 @@ _GROUP_ACTION_ROOTS = {
     "civilization": civilization_group,
     "market": market_group,
     "merchant": merchant_group,
+    "shop": shop_group,
     "blackmarket": blackmarket_group,
     "realmhub": realmhub_group,
     "fate": fate_group,
@@ -123,7 +125,7 @@ _MIGRATED_ROOTS = {
     "civilization", "conceal", "condition", "craft", "crime", "cultivate",
     "daoheart", "duel", "effects", "equipment", "era", "explore", "family",
     "formation", "gender", "grudges", "hunt", "hunter", "inheritances", "fate",
-    "innerworld", "inventory", "karma", "law", "lifespan", "manual", "market", "merchant", "blackmarket",
+    "innerworld", "inventory", "karma", "law", "lifespan", "manual", "market", "merchant", "shop", "blackmarket",
     "npcinfo", "party", "perfect", "profession", "provenance", "reincarnate",
     "reputation", "rulers", "scene", "seclusion", "secretrealm", "sect", "sense",
     "sheet", "soul", "spatialkey", "specialeffects", "storage", "talk", "territory",
@@ -264,9 +266,10 @@ _HUB_DEFINITIONS = (
     HubDefinition(
         name="economy",
         title="💰 Economy Hub",
-        description="Wallet, local markets, black markets, protected auctions, travelling merchants and trade caravans.",
+        description="Wallet, city shops, local markets, black markets, protected auctions, travelling merchants and trade caravans.",
         pages=(
             _hub_page("wallet", "Wallet", "View cultivation currencies."),
+            _hub_page("shop", "City Shops", "The smithy, apothecary and talisman hall of each city: find them by exploring, enter them by travelling, buy and sell inside."),
             _hub_page("market", "Local Market", "Buy and sell in the dynamic local economy."),
             _hub_page("blackmarket", "Black Market", "Locate rotating underworld posts and trade forbidden goods."),
             _hub_page("auction", "Auction House", "Browse, list and bid in protected auctions."),

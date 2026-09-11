@@ -1,4 +1,4 @@
-"""The economy: wallet, use, /storage, /auction, /merchant, /market, /blackmarket and /civilization.
+"""The economy: wallet, use, /storage, /auction, /merchant, /shop, /market, /blackmarket and /civilization.
 
 Split phase 9b (v0.19.45, docs/MAIN_SPLIT_PLAN.md). Cut verbatim from
 main.py in definition order; reads only modules below main.py.
@@ -403,6 +403,139 @@ async def merchant_buy_item_autocomplete(interaction:discord.Interaction,current
             if needle and needle not in name.lower() and needle not in item_id.lower():continue
             tag="shop" if str(line.get("source"))=="wares" else "floor find"
             choices.append(app_commands.Choice(name=f"{name} ×{int(line.get('quantity') or 0)} — {int(line.get('price') or 0)} {currency} ({tag})"[:100],value=item_id))
+    return choices[:25]
+
+
+shop_group=app_commands.Group(name="shop",description="The city's shops - found by exploring, entered by travelling to them")
+
+SHOP_KIND_ICON={"weaponsmith":"⚒️","apothecary":"🌿","talisman":"📜","array":"🔷","provisioner":"🧺","beastwares":"🐾"}
+SHOP_KIND_LABEL={"weaponsmith":"weaponsmith","apothecary":"apothecary","talisman":"talisman hall","array":"array workshop","provisioner":"general store","beastwares":"beast-wares hall"}
+
+
+def _shop_kind(kind:str)->str:
+    return f"{SHOP_KIND_ICON.get(kind,'🏪')} {SHOP_KIND_LABEL.get(kind,kind)}"
+
+
+async def _shop_browse(user_id:int)->dict[str,Any]:
+    return dict(await ENGINE.action("shop.browse",user_id,{}) or {})
+
+
+@registered_group_command(shop_group, name="here",description="Which shops this city has, and which of them you have found")
+async def shop_here(interaction:discord.Interaction)->None:
+    c=await require_character(interaction)
+    if not c:return
+    try:
+        here=dict(await ENGINE.action("shop.here",interaction.user.id,{}) or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {_explain_engine_error(exc)}",ephemeral=False);return
+    if not bool(here.get("is_city")):
+        await interaction.response.send_message("No shops here - this is not a city. Travel to one and explore it.",ephemeral=False);return
+    lines=[f"🏙️ **{here.get('city')}** — you have found **{int(here.get('found') or 0)}** of **{int(here.get('total') or 0)}** shops."]
+    for row in list(here.get("shops") or []):
+        if bool(row.get("discovered")):
+            lines.append(f"• {_shop_kind(str(row.get('kind')))} **{row.get('name')}** (tier {int(row.get('tier') or 1)}) — kept by {row.get('keeper')}. Enter with **/travel**.")
+        else:
+            lines.append(f"• {_shop_kind(str(row.get('kind')))} — not found yet (tier {int(row.get('tier') or 1)}).")
+    if int(here.get("found") or 0)<int(here.get("total") or 0):
+        lines.append("Walk the city with **/world → Explore** to find the rest.")
+    await interaction.response.send_message("\n".join(lines),ephemeral=False)
+
+
+@registered_group_command(shop_group, name="browse",description="See the shelf and what the keeper buys, inside a shop")
+async def shop_browse(interaction:discord.Interaction)->None:
+    c=await require_character(interaction)
+    if not c:return
+    try:
+        shop=await _shop_browse(interaction.user.id)
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {_explain_engine_error(exc)}",ephemeral=False);return
+    currency=WORLD.currency_name(str(shop.get("currency_id") or "low_spirit_stone"))
+    lines=[f"{_shop_kind(str(shop.get('kind')))} **{shop.get('name')}** — tier {int(shop.get('tier') or 1)}, kept by **{shop.get('keeper')}**.",str(shop.get("description") or ""),"","**On the shelf**"]
+    stock=list(shop.get("stock") or [])
+    for line in stock:
+        made=" · made here" if bool(line.get("made_here")) else ""
+        lines.append(f"• {WORLD.item_name(str(line.get('item_id') or ''))} ×{int(line.get('quantity') or 0)} — {int(line.get('price') or 0)} {currency}{made}")
+    if not stock:
+        lines.append("• nothing left - the shelf refills on the shop's own clock")
+    lines.append("")
+    lines.append("**The keeper buys**")
+    for line in list(shop.get("buys") or []):
+        lines.append(f"• {WORLD.item_name(str(line.get('item_id') or ''))} — {int(line.get('price') or 0)} {currency} each")
+    lines.append("")
+    lines.append("Trade with **/economy → City Shops → Buy** and **Sell**. The door opens back onto the street with **/travel**.")
+    await reply_long(interaction,"\n".join(lines))
+
+
+@registered_group_command(shop_group, name="buy",description="Buy from the shelf of the shop you are inside")
+@serialized_user_action
+async def shop_buy(interaction:discord.Interaction,item:str,quantity:app_commands.Range[int,1,100]=1)->None:
+    await interaction.response.defer(ephemeral=False)
+    if not await require_character(interaction): return
+    try:
+        envelope=await ENGINE.authoritative_action("shop.buy",interaction.user.id,{"item_id":item,"quantity":int(quantity)},action_id=f"discord:{interaction.id}:shop.buy")
+        result=dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
+    made=" - the keeper's own work" if bool(result.get("made_here")) else ""
+    await interaction.followup.send(
+        f"🏪 **{result.get('shop_name')}** sells you **{WORLD.item_name(str(result.get('item_id') or item))} ×{int(result.get('quantity') or quantity)}**{made} "
+        f"for **{int(result.get('total') or 0)} {WORLD.currency_name(str(result.get('currency_id') or 'low_spirit_stone'))}** "
+        f"({int(result.get('unit_price') or 0)} each). Balance: **{int(result.get('balance') or 0)}**.",
+        ephemeral=False,
+    )
+
+
+@shop_buy.autocomplete("item")
+async def shop_buy_item_autocomplete(interaction:discord.Interaction,current:str)->list[app_commands.Choice[str]]:
+    try:
+        shop=await _shop_browse(interaction.user.id)
+    except Exception:
+        return []
+    currency=WORLD.currency_name(str(shop.get("currency_id") or "low_spirit_stone"))
+    needle=current.lower().strip()
+    choices=[]
+    for line in list(shop.get("stock") or []):
+        item_id=str(line.get("item_id") or ""); name=WORLD.item_name(item_id)
+        if needle and needle not in name.lower() and needle not in item_id.lower():continue
+        choices.append(app_commands.Choice(name=f"{name} ×{int(line.get('quantity') or 0)} — {int(line.get('price') or 0)} {currency}"[:100],value=item_id))
+    return choices[:25]
+
+
+@registered_group_command(shop_group, name="sell",description="Sell carried goods the keeper wants, inside a shop")
+@serialized_user_action
+async def shop_sell(interaction:discord.Interaction,item:str,quantity:app_commands.Range[int,1,100]=1)->None:
+    await interaction.response.defer(ephemeral=False)
+    if not await require_character(interaction): return
+    try:
+        envelope=await ENGINE.authoritative_action("shop.sell",interaction.user.id,{"item_id":item,"quantity":int(quantity)},action_id=f"discord:{interaction.id}:shop.sell")
+        result=dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
+    shelf=" It goes straight onto the shelf." if bool(result.get("on_the_shelf")) else ""
+    await interaction.followup.send(
+        f"🏪 **{result.get('shop_name')}** buys **{WORLD.item_name(str(result.get('item_id') or item))} ×{int(result.get('quantity') or quantity)}** "
+        f"for **{int(result.get('total') or 0)} {WORLD.currency_name(str(result.get('currency_id') or 'low_spirit_stone'))}** "
+        f"({int(result.get('unit_price') or 0)} each). Balance: **{int(result.get('balance') or 0)}**.{shelf}",
+        ephemeral=False,
+    )
+
+
+@shop_sell.autocomplete("item")
+async def shop_sell_item_autocomplete(interaction:discord.Interaction,current:str)->list[app_commands.Choice[str]]:
+    try:
+        shop=await _shop_browse(interaction.user.id)
+    except Exception:
+        return []
+    inventory=await DB.get_inventory(interaction.user.id)
+    currency=WORLD.currency_name(str(shop.get("currency_id") or "low_spirit_stone"))
+    needle=current.lower().strip()
+    choices=[]
+    for line in list(shop.get("buys") or []):
+        item_id=str(line.get("item_id") or ""); have=int(inventory.get(item_id,0) or 0)
+        if have<=0:continue
+        name=WORLD.item_name(item_id)
+        if needle and needle not in name.lower() and needle not in item_id.lower():continue
+        choices.append(app_commands.Choice(name=f"{name} (you carry {have}) — {int(line.get('price') or 0)} {currency} each"[:100],value=item_id))
     return choices[:25]
 
 

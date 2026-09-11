@@ -350,6 +350,12 @@ async def explore(interaction: discord.Interaction) -> None:
             surprise_text += f"\n💬 **Live event thread:** {event_thread.mention}"
 
     discovery_text = ""
+    discovered_shop = outcome.get("discovered_shop")
+    if isinstance(discovered_shop, dict):
+        discovery_text += (
+            f"\n\n🏪 **You find {discovered_shop.get('name')}** — a tier {int(discovered_shop.get('tier') or 1)} {str(discovered_shop.get('kind') or 'shop').replace('_', ' ')} kept by {discovered_shop.get('keeper')}.\n"
+            f"{discovered_shop.get('description') or ''}\nEnter it with **/travel**, then **/economy → City Shops → Browse**."
+        )
     discovered_location = str(outcome.get("discovered_location") or "")
     if discovered_location:
         discovery_text = (
@@ -980,6 +986,11 @@ async def travel(interaction: discord.Interaction, destination: str) -> None:
             damage=int(encounter.get("vitality_damage") or 0)
             if delay or damage:
                 road+=f" (**+{delay} min**, **-{damage} Vitality**)"
+    shop_line=""
+    shop_key=str((WORLD.locations.get(str(result.get("destination") or destination)) or {}).get("shop") or "")
+    if shop_key:
+        shop=dict(WORLD.shops.get(shop_key) or {})
+        shop_line=f"\n🏪 You step inside; **{shop.get('keeper')}** looks up from the counter. Browse with **/economy → City Shops → Browse**; the door opens back onto {shop.get('city')} with **/travel**."
     merchants=""
     for row in list(result.get("merchant_encounters") or []):
         if not isinstance(row,dict):continue
@@ -995,7 +1006,7 @@ async def travel(interaction: discord.Interaction, destination: str) -> None:
         row=next((r for r in rows if str(r.get("world_name"))==world_name),None)
         if row: meeting=f"\n💬 Public meeting channel: <#{int(row['channel_id'])}>."
     await interaction.followup.send(
-        f"🗺️ **{c['name']} travels to {result.get('destination') or destination}.**\n{desc}{road}{merchants}{safe}{meeting}"
+        f"🗺️ **{c['name']} travels to {result.get('destination') or destination}.**\n{desc}{shop_line}{road}{merchants}{safe}{meeting}"
     )
     for location in sorted(undiscovered_image_locations):
         if travel_first_discovers_location(

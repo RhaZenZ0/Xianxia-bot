@@ -80,10 +80,11 @@ def forge_targets(world: Any) -> tuple[list[str], list[str]]:
     city has one), not somewhere a quest sends you, and its steward is met
     on that floor - so both are left off the lists, which are capped and
     would otherwise fill with forty-eight halls and their stewards before
-    the town the story is set in. Validation still accepts them: a draft
+    the town the story is set in. A city shop (v0.35.0) and its keeper are
+    left off for the same reason: a hundred shopfronts would bury the city. Validation still accepts them: a draft
     that names one is not wrong, only unprompted.
     """
-    floors = {name for name, loc in public_locations(world).items() if loc.get("auction_house")}
+    floors = {name for name, loc in public_locations(world).items() if loc.get("auction_house") or loc.get("shop")}
     locations = sorted(name for name in public_locations(world) if name not in floors)
     npcs = sorted(
         name for name, npc in dict(world.npcs).items()

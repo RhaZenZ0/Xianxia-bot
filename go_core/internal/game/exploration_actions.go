@@ -658,6 +658,14 @@ func knownLocationsTx(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 		for _, neighbor := range canonicalRoadNeighbors(catalog, c.Location, c.RealmIndex) {
 			known[neighbor] = true
 		}
+		// Inside a shop or an auction hall (v0.35.0) the street outside the
+		// door is known too, and the roads that leave it.
+		if cur, ok := catalog.Locations[c.Location]; ok && (cur.Shop != "" || cur.AuctionHouse != "") && cur.OutsideLocation != "" {
+			known[cur.OutsideLocation] = true
+			for _, neighbor := range canonicalRoadNeighbors(catalog, cur.OutsideLocation, c.RealmIndex) {
+				known[neighbor] = true
+			}
+		}
 	}
 	for name, loc := range catalog.Locations {
 		if loc.RealmHub && c.RealmIndex >= worldMinRealm(catalog, loc.World) {
@@ -1146,6 +1154,16 @@ func explorationExploreAction(conn *storage.Conn, catalog worlddata.Catalog, use
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
+	// Walking a city finds its shops (v0.35.0), independently of the road
+	// beyond the gate.
+	foundShop, err := discoverCityShopTx(conn, catalog, userID, c, p.GameMinute, now)
+	if err != nil {
+		return authoritativeMutation{}, err
+	}
+	var discoveredShop any
+	if foundShop != "" {
+		discoveredShop = shopDiscoveryView(catalog, foundShop)
+	}
 	enabled, err := unexpectedEventsEnabledTx(conn, p.UnexpectedEventsEnabled)
 	if err != nil {
 		return authoritativeMutation{}, err
@@ -1168,7 +1186,7 @@ func explorationExploreAction(conn *storage.Conn, catalog worlddata.Catalog, use
 	if surpriseOut != nil {
 		kind = "event_started"
 	}
-	result := map[string]any{"kind": kind, "location": c.Location, "encounter": encounter, "cultivation_awarded": awarded, "spirit_stones": reward.SpiritStones, "items": reward.Items, "shared_claims": shared, "discovered_location": discovered, "surprise": surpriseOut, "event": surpriseOut}
+	result := map[string]any{"kind": kind, "location": c.Location, "encounter": encounter, "cultivation_awarded": awarded, "spirit_stones": reward.SpiritStones, "items": reward.Items, "shared_claims": shared, "discovered_location": discovered, "discovered_shop": discoveredShop, "surprise": surpriseOut, "event": surpriseOut}
 	return authoritativeMutation{Result: result, Event: eventledger.Event{Domain: "exploration", EventType: "exploration_resolved", EntityType: "character", EntityID: fmt.Sprint(userID), GameMinute: p.GameMinute, Payload: result}}, nil
 }
 
@@ -1224,6 +1242,16 @@ func explorationTravelAction(conn *storage.Conn, catalog worlddata.Catalog, user
 		if p.Destination != outside {
 			return authoritativeMutation{}, fmt.Errorf("warded auction exit leads first to %s", outside)
 		}
+	}
+	// A shop (v0.35.0) is entered from its city's street or from another
+	// shop of the same city, and its door opens back onto that street.
+	if dest.Shop != "" {
+		cur := catalog.Locations[c.Location]
+		if c.Location != dest.OutsideLocation && !(cur.Shop != "" && cur.OutsideLocation == dest.OutsideLocation) {
+			return authoritativeMutation{}, fmt.Errorf("%s is in %s; travel there first", p.Destination, dest.OutsideLocation)
+		}
+	} else if cur, ok := catalog.Locations[c.Location]; ok && cur.Shop != "" && p.Destination != cur.OutsideLocation {
+		return authoritativeMutation{}, fmt.Errorf("the shop door opens onto %s", cur.OutsideLocation)
 	}
 	if c.RealmIndex < dest.MinRealmIndex {
 		return authoritativeMutation{}, errors.New("destination lies beyond the character's current cultivation")

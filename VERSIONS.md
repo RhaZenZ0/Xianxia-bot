@@ -1009,6 +1009,31 @@ Gate: `tests/python/contracts/test_security_defaults.py` and `TestNewRefusesAnEn
 No schema change (still 32), no game-rule change, AI remains narration-only.
 
 
+**0.35.0** is a feature release: **the city shops.** Schema **37**.
+
+A city was one place: you arrived, you explored, you left. Every city now has its shops - a
+hundred and four across the forty-eight cities, four in each capital and two everywhere else -
+and they differ by city. The kind follows the city's character (Emberforge's smithy, Jadewood's
+apothecary, Moonfen's talisman hall, Ashenwall's array workshop, Four-Roads' provisions,
+Riverguard's beast hall), the tier follows the world (mortal-grade in the Mortal World up to
+celestial-grade in the Celestial), and the shelf follows both: a tier-one smithy sells spirit-iron
+swords of its own making and the ore; a tier-three one adds lamellar and beast cores. Every shop is
+an interior location with a keeper NPC of its own - a want, a fear, a secret - four encounters and
+sense hints, generated from the city's terrain and climate and held to the content gate like any
+other place.
+
+*Finding and entering.* A shop is found by walking the city: each `/world → Explore` in a city
+has a fair chance of turning up one of its shops the player has not found, recorded as a location
+discovery of kind `shop`, so `/travel` offers it and enters it - instantly, from the city's street
+or from another shop of the same city - and the door opens back onto the street and nowhere else.
+`/economy → City Shops → Here` says how many of the city's shops you have found and which kinds
+remain. Inside, `Browse` shows the shelf (the keeper's own craft first, marked *made here*) and the
+board of what the keeper buys; `Buy` and `Sell` trade against them, and what a shop also sells goes
+straight back onto its shelf. The shelf refills to the content quantities on the shop's own clock
+(twelve game hours), written by the next trade after it is due. Go owns all of it
+(`shop_actions.go`); Python never writes `shop_state` or `shop_stock`. The Quest Forge leaves
+shopfronts and keepers off its capped lists, and NPC life and world events do not wander into them.
+
 **0.34.2** is a feature point release: **the merchant's own shop.** No schema change.
 
 A merchant carried only what the auction floors could not sell, so a pack was empty until a lot
@@ -1360,9 +1385,12 @@ directory to one file, requires each check to appear before the release job and 
 and requires the release job to wait on all three.
 
 
-## Release status — v0.34.2
+## Release status — v0.35.0
 
-- Current release: v0.34.2: the merchant's own shop - three to five lines of ordinary goods per
+- Current release: v0.35.0 (schema 37): the city shops - a hundred and four across the forty-eight
+  cities, differing by city in kind, tier and shelf, found by exploring the city, entered by
+  travelling to them, with a keeper to buy from and sell to inside.
+- v0.34.2: the merchant's own shop - three to five lines of ordinary goods per
   merchant in content, restocked every time it comes home, listed beside the floor finds.
 - v0.34.1 (schema 36): the `#playtest` board - one message per hub page,
   testers react ✅ ❌ 💡 and the GM reads the tally - and the travelling merchants, who buy what an
@@ -1558,6 +1586,7 @@ and requires the release job to wait on all three.
 - **Schema 27** added the v0.19.29 mute/freeze moderation columns on `characters`
   (`is_muted`, `is_frozen`, `moderation_reason`).
 - **Schema 28** added the Quest Forge definition table (`quest_definitions`).
+- **Schema 37** added the city shops' shelves (`shop_state`, `shop_stock`) (v0.35.0).
 - **Schema 36** added the playtest board (`playtest_channel_id`, `playtest_items`) and the travelling
   merchants (`merchant_state`, `merchant_stock`, `auctions.merchant_buyer`) (v0.34.1).
 - **Schema 35** added the live-auction channel per house (`auction_house_channels`) and the card per
