@@ -1,4 +1,4 @@
-# Xianxia RP Discord Bot v0.21.0
+# Xianxia RP Discord Bot v0.38.1
 
 [![CI](https://github.com/RhaZenZ0/Xianxia-bot/actions/workflows/ci.yml/badge.svg)](https://github.com/RhaZenZ0/Xianxia-bot/actions/workflows/ci.yml)
 
@@ -412,6 +412,9 @@ pick exactly as its own slash command would. System panels provide:
 - selectors and guided inputs
 - in-place refresh
 - owner locking and timeout protection
+- results shown inside the panel (v0.38.1): a short plain reply edits the panel in place, in a result
+  block above the actions, and Refresh clears it; an embed, a reply with its own buttons, a file or a
+  long reply lands beside the panel, which stays live underneath
 
 ### Battle interface
 
@@ -733,23 +736,77 @@ Current structured state always overrides old historical state.
 
 ## Economy, sects, clans and world consequences
 
-The simulation maintains dynamic regional markets, black-market rotations, sect politics and clan dynamics. Player actions can write persistent world actions/history, and autonomous changes continue while players are absent or in seclusion.
+The simulation maintains dynamic regional markets, black-market rotations, sect politics and clan
+dynamics. Player actions can write persistent world actions/history, and autonomous changes continue
+while players are absent or in seclusion. The design goal is that progression and world simulation
+never pause each other.
 
-Every city has a protected auction house (v0.33.1), entered with **/economy → Auction House → Enter**; protection ends at the doors. A capital's house is grand and takes twenty-five lots at once for up to a day; a smaller city's is a local floor of six lots, none longer than six hours. Each grand house has a live Discord channel of its own and the local floors of a world share one, where lots are posted, bid on and struck as it happens.
+## Cities
 
-A hub action's result is shown inside the hub panel where it can be (v0.38.1) - a short plain reply edits the panel in place, and Refresh clears it; an embed, a reply with buttons, a file or a long reply lands beside the panel as before.
+Forty-eight cities across the four worlds, and since v0.35.0 each is a place rather than a name.
 
-A city has a life of its own (v0.38.0), all under **/world → City**: a quest pavilion in every capital and a notice board at every gate, with work given by the people who live there; a sect envoys' hall in the capitals' temple quarter that puts every gate in the world on your map; rumours retold through the same viewpoint gate the narrator uses; an inn in every city where the merchants sit, with a common-room thread for whoever is in town; and prosperity that every trade moves and the shelves and the gate queue show.
+### Arriving, and walking the city (v0.36.0)
 
-A city is a walled place you arrive at from a direction (v0.36.0): a road journey ends at the gate facing the road you came by, the capitals have four compass districts behind their gates and every other city one drawn from its terrain, and every gate and district has its own people. Inside the walls everything is a walk apart with **/travel**; **/world → City → Look** shows the gates, the districts and who is about where you stand. A capital's shops are a tier better than their world's and a quarter dearer.
+- Every walled city has a gate on each compass side that has a road; both ends of a road agree on
+  the compass. A road journey ends at the gate facing the road you came by, and the travel reply
+  names the gate you left by and what lies inside the walls. Greenriver Town joined the roads in
+  v0.36.1, so the first journey out of the starting town is a real one.
+- The capitals have four compass districts behind their gates (the noble quarter north, the temple
+  quarter east, the lower town south, ministry row west); every other city has one drawn from its
+  terrain - forge terraces, herb gardens, mist docks, a ruin quarter. Every gate and district has its
+  own named people, and only the people of the part you stand in are in the scene.
+- Inside the walls everything is a walk apart with **/travel**: gates, districts, the centre, the inn
+  and the shops. **/world → City → Look** shows the gates and what each faces, the districts, where
+  you stand, who is here, and whether the city is thriving, getting by or struggling.
 
-Every city has its shops (v0.35.0) - four in a capital, two elsewhere, a hundred and four in all - and they differ by city: the kind follows the city's character (a smithy in Emberforge, an apothecary in Jadewood, a talisman hall in Moonfen), the tier follows the world, and the shelf follows both. A shop is found by walking the city with **/world → Explore**, entered with **/travel**, and traded in with **/economy → City Shops** - the keeper's own craft is marked *made here*, the board says what the keeper buys, and the shelf refills on the shop's own clock.
+### Shops (v0.35.0)
 
-Travelling merchants bid on the floors (v0.37.0): on every tick a merchant may bid the next minimum on an open lot, up to the market's value of the goods, its purse paying as escrow; outbid it, and the purse is refunded; leave it holding the high bid at the close, and it wins. It never bids in the last five minutes.
+- A hundred and four shops, four in a capital and two elsewhere, differing by city: the kind follows
+  the city's character (a smithy in Emberforge, an apothecary in Jadewood, a talisman hall in
+  Moonfen, an array workshop in Ashenwall), the tier follows the world, and a capital's shops are a
+  tier better and a quarter dearer. Each is an interior with a keeper NPC of its own.
+- A shop is found by walking the city with **/world → Explore**, entered with **/travel**, and traded
+  in with **/economy → City Shops**: Here (how many you have found), Browse (the shelf, the keeper's
+  own craft marked *made here*, and what the keeper buys), Buy and Sell. Shelves refill on the shop's
+  own clock, a line fuller in a thriving city and a line thinner in a struggling one.
 
-Travelling merchants (v0.34.1) are the floor's last bidder: a lot that ends with no bid is taken at its starting bid by a merchant whose loop passes that city, the seller is paid, and the item travels in the merchant's pack at a markup. Eight merchants, two a world and each a named NPC, walk fixed loops of cities on the simulation tick; **/economy → Merchants** shows where each one is and what it carries, and **Buy** works in the same city or on the same stretch of road - the one trade a traveller can make mid-journey. The travel reply names who is on the road ahead. Each merchant also keeps a shop of its own (v0.34.2) - a few lines of ordinary goods at content prices, restocked every time it comes home - listed before the floor finds.
+### City life (v0.38.0), under **/world → City**
 
-The design goal is that progression and world simulation never pause each other.
+- **Board**: a quest pavilion in every capital and a notice board at every gate, with commissions
+  given by the people who live there and, in a capital, the wanted list of active bounties.
+  **Accept** takes one while you are in that city; the giver is found in their own district.
+- **Envoys**: the sect envoys' hall in each capital's temple quarter names every sect with a public
+  gate in that world and puts its route on your map.
+- **Rumours**: what the city has heard, retold through the same viewpoint gate the narrator uses, by
+  the innkeeper or beggar king in a capital and the gate captain elsewhere.
+- **Inn**: every city keeps one. It names who is in town and which merchants are at the corner
+  table, and opens the inn's common room - one public thread per inn in the world's realm-hub
+  channel.
+- **Prosperity**: every trade moves the city's prosperity a point - a sale at a shelf, at a
+  merchant's pack or on the auction floor - and the shelves, the gate queue and Look show it.
+
+### Auction houses (v0.33.1)
+
+Every city has a protected auction house, entered with **/economy → Auction House → Enter**;
+protection ends at the doors. A capital's house is grand and takes twenty-five lots at once for up
+to a day; a smaller city's is a local floor of six lots, none longer than six hours. Each grand house
+has a live Discord channel of its own and the local floors of a world share one, where lots are
+posted, bid on and struck as it happens.
+
+### Travelling merchants (v0.34.1 - v0.37.0)
+
+- Eight merchants, two a world and each a named NPC, walk fixed loops of cities on the simulation
+  tick and sit at the inn's corner table when in town. **/economy → Merchants** shows where each one
+  is and what it carries; **Buy** works in the same city or on the same stretch of road - the one
+  trade a traveller can make mid-journey - and the travel reply names who is on the road ahead.
+- Each merchant keeps a shop of its own, a few lines of ordinary goods at content prices restocked
+  every time it comes home, listed before the floor finds.
+- On the floors a merchant is a bidder: on every tick it may bid the next minimum on an open lot,
+  up to the market's value of the goods, its purse paying as escrow; outbid it and the purse is
+  refunded; leave it holding the high bid at the close and it wins. It never bids in the last five
+  minutes. A lot that ends with no bid at all is taken at its starting bid by a merchant whose loop
+  passes that city, so the seller is always paid, and the goods travel in the merchant's pack for
+  resale.
 
 ## Administration in Discord
 
