@@ -411,6 +411,16 @@ type Merchant struct {
 	Currency      string   `json:"currency"`
 	MarkupPercent int64    `json:"markup_percent"`
 	DwellMinutes  int64    `json:"dwell_minutes"`
+	// Wares (v0.34.2) is the merchant's own shop: the goods it always
+	// carries, at the prices content sets, restocked every time it comes
+	// home. Auction leftovers sit beside them in the same pack.
+	Wares []MerchantWare `json:"wares"`
+}
+
+type MerchantWare struct {
+	ItemID   string `json:"item_id"`
+	Quantity int64  `json:"quantity"`
+	Price    int64  `json:"price"`
 }
 
 func Load(path string) (Catalog, error) {

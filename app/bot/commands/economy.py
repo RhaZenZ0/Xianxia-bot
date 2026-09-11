@@ -305,11 +305,14 @@ def _merchant_where(row:dict[str,Any])->str:
 
 
 def _merchant_stock_lines(row:dict[str,Any])->list[str]:
+    """The shop's own wares first (🛒), then what was bought off an auction
+    floor and carried along (🏮)."""
     currency=WORLD.currency_name(str(row.get("currency_id") or "low_spirit_stone"))
     lines=[]
     for line in list(row.get("stock") or []):
-        lines.append(f"    • {WORLD.item_name(str(line.get('item_id') or ''))} ×{int(line.get('quantity') or 0)} — {int(line.get('price') or 0)} {currency} each")
-    return lines or ["    • an empty pack — nothing bought from the floors yet"]
+        icon="🛒" if str(line.get("source"))=="wares" else "🏮"
+        lines.append(f"    {icon} {WORLD.item_name(str(line.get('item_id') or ''))} ×{int(line.get('quantity') or 0)} — {int(line.get('price') or 0)} {currency} each")
+    return lines or ["    • an empty pack — the shop restocks at home, and nothing has been bought from the floors yet"]
 
 
 async def _merchant_status(user_id:int)->dict[str,Any]:
@@ -337,9 +340,11 @@ async def merchant_status(interaction:discord.Interaction)->None:
         lines.extend(_merchant_stock_lines(row))
     for row in rows:
         if bool(row.get("meetable")):continue
-        stock=len(list(row.get("stock") or []))
-        lines.append(f"• **{row.get('name')}** ({row.get('world')}) — {_merchant_where(row)}; carrying {stock} kind{'s' if stock!=1 else ''} of goods")
-    lines.append("Buy with **/economy → Merchants → Buy** when one is within reach — in the same city, or on the same stretch of road.")
+        stock=list(row.get("stock") or [])
+        shop=sum(1 for line in stock if str(line.get("source"))=="wares")
+        finds=len(stock)-shop
+        lines.append(f"• **{row.get('name')}** ({row.get('world')}) — {_merchant_where(row)}; {shop} shop line{'s' if shop!=1 else ''}, {finds} floor find{'s' if finds!=1 else ''}")
+    lines.append("🛒 is the merchant's own shop, restocked at home; 🏮 was bought off an auction floor. Buy with **/economy → Merchants → Buy** when one is within reach — in the same city, or on the same stretch of road.")
     await reply_long(interaction,"\n".join(lines))
 
 
@@ -354,6 +359,7 @@ async def merchant_buy(interaction:discord.Interaction,merchant:str,item:str,qua
     except GameEngineError as exc:
         await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
     where="by the roadside" if bool(result.get("on_the_road")) else f"at {result.get('whereabouts')}"
+    where+=" from the shop" if str(result.get("source"))=="wares" else " from the floor finds"
     await interaction.followup.send(
         f"🧳 **{result.get('merchant_name')}** sells you **{WORLD.item_name(str(result.get('item_id') or item))} ×{int(result.get('quantity') or quantity)}** {where} "
         f"for **{int(result.get('total') or 0)} {WORLD.currency_name(str(result.get('currency_id') or 'low_spirit_stone'))}** "
@@ -395,7 +401,8 @@ async def merchant_buy_item_autocomplete(interaction:discord.Interaction,current
             item_id=str(line.get("item_id") or "")
             name=WORLD.item_name(item_id)
             if needle and needle not in name.lower() and needle not in item_id.lower():continue
-            choices.append(app_commands.Choice(name=f"{name} ×{int(line.get('quantity') or 0)} — {int(line.get('price') or 0)} {currency}"[:100],value=item_id))
+            tag="shop" if str(line.get("source"))=="wares" else "floor find"
+            choices.append(app_commands.Choice(name=f"{name} ×{int(line.get('quantity') or 0)} — {int(line.get('price') or 0)} {currency} ({tag})"[:100],value=item_id))
     return choices[:25]
 
 

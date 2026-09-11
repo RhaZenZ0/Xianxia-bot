@@ -73,6 +73,18 @@ class TheSlashSurface(unittest.TestCase):
         self.assertIn('ENGINE.action("merchant.status"', _body(ECONOMY, "_merchant_status"))
         self.assertIn("/economy → Merchants → Buy", status)
 
+    def test_the_shop_and_the_floor_finds_are_told_apart(self):
+        # v0.34.2: the engine marks every stock line "wares" or "auction";
+        # the status, the buy reply and the picker all say which.
+        go = (GO / "game" / "merchant_actions.go").read_text(encoding="utf-8")
+        self.assertIn("func restockMerchantWaresTx(", go)
+        self.assertIn("if state.Location == m.Home {", go)
+        self.assertIn('source = "wares"', go)
+        lines = _body(ECONOMY, "_merchant_stock_lines")
+        self.assertIn('"🛒" if str(line.get("source"))=="wares" else "🏮"', lines)
+        self.assertIn('" from the shop" if str(result.get("source"))=="wares"', _body(ECONOMY, "merchant_buy"))
+        self.assertIn('"shop" if str(line.get("source"))=="wares" else "floor find"', _body(ECONOMY, "merchant_buy_item_autocomplete"))
+
     def test_the_item_picker_follows_the_chosen_merchant(self):
         picker = _body(ECONOMY, "merchant_buy_item_autocomplete")
         self.assertIn('getattr(interaction.namespace,"merchant","")', picker)

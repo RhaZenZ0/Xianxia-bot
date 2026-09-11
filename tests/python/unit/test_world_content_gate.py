@@ -153,6 +153,23 @@ class TravellingMerchantContentTests(unittest.TestCase):
                 self.assertIn(key, faces, "no NPC fronts this merchant")
                 self.assertEqual(WORLD["npcs"][faces[key]]["location"], m["home"])
 
+    def test_every_merchant_keeps_a_shop_of_ordinary_tradeable_goods(self):
+        # v0.34.2: the shop is content - real items, market-tradeable, not
+        # auction-grade, each with a quantity and a price in the merchant's currency.
+        items = WORLD["items"]
+        for key, m in WORLD["merchants"].items():
+            with self.subTest(merchant=key):
+                wares = m.get("wares") or []
+                self.assertGreaterEqual(len(wares), 3, "a shop needs a few lines")
+                self.assertEqual(len({w["item_id"] for w in wares}), len(wares), "one line per item")
+                for ware in wares:
+                    item = items[ware["item_id"]]
+                    self.assertFalse(item.get("market_excluded"), ware["item_id"])
+                    self.assertFalse(item.get("auction_interest"), f"{ware['item_id']} is auction-grade, not shop stock")
+                    self.assertNotEqual(item.get("category"), "manual", ware["item_id"])
+                    self.assertGreater(int(ware["quantity"]), 0)
+                    self.assertGreater(int(ware["price"]), 0)
+
     def test_every_world_with_an_auction_house_has_a_merchant_on_its_floors(self):
         houses = WORLD["auction_houses"]
         locations = WORLD["locations"]

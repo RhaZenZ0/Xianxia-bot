@@ -1009,6 +1009,19 @@ Gate: `tests/python/contracts/test_security_defaults.py` and `TestNewRefusesAnEn
 No schema change (still 32), no game-rule change, AI remains narration-only.
 
 
+**0.34.2** is a feature point release: **the merchant's own shop.** No schema change.
+
+A merchant carried only what the auction floors could not sell, so a pack was empty until a lot
+went unsold. Each merchant now keeps a shop of its own beside the floor finds: three to five lines
+of ordinary tradeable goods in content (`wares` - Old Hu's herbs and pills, Madam Wen's talismans
+and ink, Brother Lan's spirit iron and beast cores, Elder Fang's array disks), each with a quantity
+and a price in the merchant's currency, stocked when the merchant is first seeded and restocked to
+the content quantity every time it comes home. Every stock line now says which it is (`source`:
+`wares` or `auction`); the status lists the shop first with 🛒 and the floor finds after with 🏮,
+the buy reply says "from the shop" or "from the floor finds", and the item picker tags each line.
+A floor find of an item the shop also sells takes the shop's price. Gate: the wares rule in
+`test_world_content_gate.py` and the Go `TestAMerchantsOwnShopIsStockedAtSeedAndRestockedAtHome`.
+
 **0.34.1** is a feature point release: **the playtest board and the travelling merchants.** Schema **36**.
 
 *The playtest board.* A `#playtest` base channel beside `#bugs`, created by Setup/Repair like the
@@ -1347,9 +1360,11 @@ directory to one file, requires each check to appear before the release job and 
 and requires the release job to wait on all three.
 
 
-## Release status — v0.34.1
+## Release status — v0.34.2
 
-- Current release: v0.34.1 (schema 36): the `#playtest` board - one message per hub page,
+- Current release: v0.34.2: the merchant's own shop - three to five lines of ordinary goods per
+  merchant in content, restocked every time it comes home, listed beside the floor finds.
+- v0.34.1 (schema 36): the `#playtest` board - one message per hub page,
   testers react ✅ ❌ 💡 and the GM reads the tally - and the travelling merchants, who buy what an
   auction floor could not sell, walk fixed loops of cities and resell it to whoever meets them in a
   city or on the road.

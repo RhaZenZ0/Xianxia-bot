@@ -68,6 +68,34 @@ func merchantRouteHas(m worlddata.Merchant, location string) bool {
 	return false
 }
 
+// merchantWare is the content line for an item the merchant always stocks,
+// or false when the item is only ever an auction leftover in this pack.
+func merchantWare(m worlddata.Merchant, itemID string) (worlddata.MerchantWare, bool) {
+	for _, ware := range m.Wares {
+		if ware.ItemID == itemID {
+			return ware, true
+		}
+	}
+	return worlddata.MerchantWare{}, false
+}
+
+// restockMerchantWaresTx fills the merchant's shop back up to its content
+// quantities at content prices. A line that still has more than the content
+// quantity (bought cheap off a floor) keeps what it has.
+func restockMerchantWaresTx(conn *storage.Conn, m worlddata.Merchant, key string, gm int64, now float64) error {
+	for _, ware := range m.Wares {
+		if strings.TrimSpace(ware.ItemID) == "" || ware.Quantity <= 0 {
+			continue
+		}
+		if _, err := conn.Execute(`INSERT INTO merchant_stock(merchant,item_id,quantity,cost,price,acquired_game_minute,updated_at) VALUES(?,?,?,?,?,?,?)
+		ON CONFLICT(merchant,item_id) DO UPDATE SET quantity=MAX(merchant_stock.quantity,excluded.quantity),price=excluded.price,updated_at=excluded.updated_at`,
+			[]any{key, ware.ItemID, ware.Quantity, 0, max64(1, ware.Price), gm, now}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func merchantRouteIndex(m worlddata.Merchant, location string) int64 {
 	for i, stop := range m.Route {
 		if stop == location {
@@ -138,6 +166,9 @@ func ensureMerchantState(conn *storage.Conn, catalog worlddata.Catalog, key stri
 	if err := writeMerchantState(conn, state, now); err != nil {
 		return merchantState{}, err
 	}
+	if err := restockMerchantWaresTx(conn, m, key, gm, now); err != nil {
+		return merchantState{}, err
+	}
 	return state, nil
 }
 
@@ -199,6 +230,12 @@ func AdvanceMerchants(conn *storage.Conn, catalog worlddata.Catalog, gm int64) (
 			state.Destination = ""
 			state.RouteIndex = merchantRouteIndex(m, state.Location)
 			state.DwellUntil = gm + m.DwellMinutes
+			if state.Location == m.Home {
+				// Home is where the shop is restocked (v0.34.2).
+				if err := restockMerchantWaresTx(conn, m, key, gm, now); err != nil {
+					return moved, err
+				}
+			}
 		case gm >= state.DwellUntil && len(m.Route) > 1:
 			next := m.Route[(state.RouteIndex+1)%int64(len(m.Route))]
 			if next == state.Location {
@@ -300,6 +337,10 @@ func MerchantBuysUnsoldLot(conn *storage.Conn, catalog worlddata.Catalog, auctio
 	}
 	unitCost := (price + quantity - 1) / quantity
 	resale := merchantResalePrice(catalog, m, itemID, unitCost)
+	if ware, ok := merchantWare(m, itemID); ok {
+		// The shop's own line keeps the shop's price.
+		resale = max64(1, ware.Price)
+	}
 	if _, err := conn.Execute(`INSERT INTO merchant_stock(merchant,item_id,quantity,cost,price,acquired_game_minute,updated_at) VALUES(?,?,?,?,?,?,?)
 		ON CONFLICT(merchant,item_id) DO UPDATE SET quantity=merchant_stock.quantity+excluded.quantity,cost=excluded.cost,price=excluded.price,acquired_game_minute=excluded.acquired_game_minute,updated_at=excluded.updated_at`,
 		[]any{chosen, itemID, quantity, unitCost, resale, gm, now}); err != nil {
@@ -379,6 +420,7 @@ func merchantStockRows(conn *storage.Conn, catalog worlddata.Catalog, key string
 	if err != nil {
 		return nil, err
 	}
+	m := catalog.Merchants[key]
 	rows := []map[string]any{}
 	for _, row := range rowsToMaps(res) {
 		itemID := fmt.Sprint(row["item_id"])
@@ -386,8 +428,18 @@ func merchantStockRows(conn *storage.Conn, catalog worlddata.Catalog, key string
 		if name == "" {
 			name = itemID
 		}
-		rows = append(rows, map[string]any{"item_id": itemID, "name": name, "quantity": i64(row["quantity"]), "price": i64(row["price"]), "acquired_game_minute": i64(row["acquired_game_minute"])})
+		// "wares" is the shop's own line; "auction" is a leftover bought
+		// off a floor and carried along to resell.
+		source := "auction"
+		if _, ok := merchantWare(m, itemID); ok {
+			source = "wares"
+		}
+		rows = append(rows, map[string]any{"item_id": itemID, "name": name, "quantity": i64(row["quantity"]), "price": i64(row["price"]), "source": source, "acquired_game_minute": i64(row["acquired_game_minute"])})
 	}
+	// The shop first, then the floor finds.
+	sort.SliceStable(rows, func(i, j int) bool {
+		return rows[i]["source"] == "wares" && rows[j]["source"] != "wares"
+	})
 	return rows, nil
 }
 
@@ -540,7 +592,12 @@ func merchantBuyAction(conn *storage.Conn, catalog worlddata.Catalog, userID int
 	if name == "" {
 		name = p.ItemID
 	}
+	source := "auction"
+	if _, ok := merchantWare(m, p.ItemID); ok {
+		source = "wares"
+	}
 	out := map[string]any{
+		"source":        source,
 		"merchant":      p.Merchant,
 		"merchant_name": m.Name,
 		"item_id":       p.ItemID,

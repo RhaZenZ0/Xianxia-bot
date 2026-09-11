@@ -26787,7 +26787,29 @@
       "budget": 400,
       "currency": "low_spirit_stone",
       "markup_percent": 160,
-      "dwell_minutes": 360
+      "dwell_minutes": 360,
+      "wares": [
+        {
+          "item_id": "spirit_herb",
+          "quantity": 12,
+          "price": 4
+        },
+        {
+          "item_id": "recovery_pill",
+          "quantity": 6,
+          "price": 13
+        },
+        {
+          "item_id": "qi_pill",
+          "quantity": 6,
+          "price": 13
+        },
+        {
+          "item_id": "talisman_paper",
+          "quantity": 10,
+          "price": 4
+        }
+      ]
     },
     "madam_wen_of_the_silk_road": {
       "name": "Madam Wen of the Silk Road",
@@ -26802,7 +26824,34 @@
       "budget": 900,
       "currency": "low_spirit_stone",
       "markup_percent": 150,
-      "dwell_minutes": 480
+      "dwell_minutes": 480,
+      "wares": [
+        {
+          "item_id": "swift_wind_talisman",
+          "quantity": 4,
+          "price": 12
+        },
+        {
+          "item_id": "stone_skin_talisman",
+          "quantity": 4,
+          "price": 14
+        },
+        {
+          "item_id": "spirit_focus_talisman",
+          "quantity": 3,
+          "price": 15
+        },
+        {
+          "item_id": "spirit_ink",
+          "quantity": 8,
+          "price": 5
+        },
+        {
+          "item_id": "heart_calming_pill",
+          "quantity": 4,
+          "price": 12
+        }
+      ]
     },
     "brother_lan_jade_trader": {
       "name": "Brother Lan the Jade Trader",
@@ -26817,7 +26866,29 @@
       "budget": 600,
       "currency": "low_spirit_crystal",
       "markup_percent": 170,
-      "dwell_minutes": 360
+      "dwell_minutes": 360,
+      "wares": [
+        {
+          "item_id": "spirit_iron",
+          "quantity": 10,
+          "price": 7
+        },
+        {
+          "item_id": "beast_core",
+          "quantity": 6,
+          "price": 11
+        },
+        {
+          "item_id": "spirit_iron_sword",
+          "quantity": 2,
+          "price": 17
+        },
+        {
+          "item_id": "array_disk_blank",
+          "quantity": 4,
+          "price": 13
+        }
+      ]
     },
     "sister_qiu_of_the_frost_road": {
       "name": "Sister Qiu of the Frost Road",
@@ -26832,7 +26903,29 @@
       "budget": 500,
       "currency": "low_spirit_crystal",
       "markup_percent": 165,
-      "dwell_minutes": 420
+      "dwell_minutes": 420,
+      "wares": [
+        {
+          "item_id": "qi_replenishment_pill",
+          "quantity": 6,
+          "price": 16
+        },
+        {
+          "item_id": "heart_calming_pill",
+          "quantity": 5,
+          "price": 16
+        },
+        {
+          "item_id": "formation_flags",
+          "quantity": 3,
+          "price": 16
+        },
+        {
+          "item_id": "spirit_herb",
+          "quantity": 10,
+          "price": 4
+        }
+      ]
     },
     "elder_fang_the_relic_trader": {
       "name": "Elder Fang the Relic Trader",
@@ -26847,7 +26940,29 @@
       "budget": 800,
       "currency": "low_immortal_stone",
       "markup_percent": 175,
-      "dwell_minutes": 480
+      "dwell_minutes": 480,
+      "wares": [
+        {
+          "item_id": "minor_qi_gathering_array_disk",
+          "quantity": 2,
+          "price": 48
+        },
+        {
+          "item_id": "minor_warding_array_disk",
+          "quantity": 2,
+          "price": 53
+        },
+        {
+          "item_id": "array_disk_blank",
+          "quantity": 4,
+          "price": 16
+        },
+        {
+          "item_id": "spirit_iron_armor",
+          "quantity": 1,
+          "price": 27
+        }
+      ]
     },
     "lady_shu_of_the_sky_road": {
       "name": "Lady Shu of the Sky Road",
@@ -26862,7 +26977,29 @@
       "budget": 700,
       "currency": "low_immortal_stone",
       "markup_percent": 160,
-      "dwell_minutes": 360
+      "dwell_minutes": 360,
+      "wares": [
+        {
+          "item_id": "purging_phoenix_pill",
+          "quantity": 4,
+          "price": 20
+        },
+        {
+          "item_id": "qi_pill",
+          "quantity": 8,
+          "price": 20
+        },
+        {
+          "item_id": "fire_spirit_root_herb",
+          "quantity": 3,
+          "price": 20
+        },
+        {
+          "item_id": "swift_wind_talisman",
+          "quantity": 4,
+          "price": 20
+        }
+      ]
     },
     "sage_ming_the_star_peddler": {
       "name": "Sage Ming the Star Peddler",
@@ -26877,7 +27014,29 @@
       "budget": 1000,
       "currency": "low_celestial_crystal",
       "markup_percent": 180,
-      "dwell_minutes": 480
+      "dwell_minutes": 480,
+      "wares": [
+        {
+          "item_id": "spirit_focus_talisman",
+          "quantity": 4,
+          "price": 36
+        },
+        {
+          "item_id": "spatial_pouch",
+          "quantity": 1,
+          "price": 72
+        },
+        {
+          "item_id": "recovery_pill",
+          "quantity": 6,
+          "price": 29
+        },
+        {
+          "item_id": "qi_replenishment_pill",
+          "quantity": 4,
+          "price": 29
+        }
+      ]
     },
     "granny_zhu_of_the_border_road": {
       "name": "Granny Zhu of the Border Road",
@@ -26892,7 +27051,29 @@
       "budget": 650,
       "currency": "low_celestial_crystal",
       "markup_percent": 165,
-      "dwell_minutes": 420
+      "dwell_minutes": 420,
+      "wares": [
+        {
+          "item_id": "spirit_herb",
+          "quantity": 15,
+          "price": 7
+        },
+        {
+          "item_id": "stone_skin_talisman",
+          "quantity": 4,
+          "price": 30
+        },
+        {
+          "item_id": "beast_core",
+          "quantity": 5,
+          "price": 17
+        },
+        {
+          "item_id": "formation_flags",
+          "quantity": 3,
+          "price": 27
+        }
+      ]
     }
   }
 }

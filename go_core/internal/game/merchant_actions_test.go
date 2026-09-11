@@ -139,7 +139,7 @@ func TestMerchantsWalkTheirLoopOnTheTick(t *testing.T) {
 func TestAnUnsoldLotIsTakenByAMerchantAtItsStartingBid(t *testing.T) {
 	path := setupMerchantDB(t)
 	catalog := merchantCatalog(t)
-	batch4Exec(t, path, `INSERT INTO auctions(auction_id,house_id,seller_user_id,item_id,quantity,currency_id,starting_bid,current_bid,current_bidder_user_id,active,created_at,ends_at) VALUES(7,'golden_pavilion',42,'spirit_herb',2,'low_spirit_stone',30,0,NULL,1,0,0)`)
+	batch4Exec(t, path, `INSERT INTO auctions(auction_id,house_id,seller_user_id,item_id,quantity,currency_id,starting_bid,current_bid,current_bidder_user_id,active,created_at,ends_at) VALUES(7,'golden_pavilion',42,'bone_comb',2,'low_spirit_stone',30,0,NULL,1,0,0)`)
 	var merchant string
 	var bought bool
 	withMerchantConn(t, path, func(conn *storage.Conn) {
@@ -165,10 +165,10 @@ func TestAnUnsoldLotIsTakenByAMerchantAtItsStartingBid(t *testing.T) {
 	if got := escrowScalar(t, path, `SELECT budget FROM merchant_state WHERE merchant=?`, merchant); got != m.Budget-30 {
 		t.Fatalf("budget=%d want %d", got, m.Budget-30)
 	}
-	if got := escrowScalar(t, path, `SELECT quantity FROM merchant_stock WHERE merchant=? AND item_id='spirit_herb'`, merchant); got != 2 {
+	if got := escrowScalar(t, path, `SELECT quantity FROM merchant_stock WHERE merchant=? AND item_id='bone_comb'`, merchant); got != 2 {
 		t.Fatalf("stock quantity=%d want 2", got)
 	}
-	price := escrowScalar(t, path, `SELECT price FROM merchant_stock WHERE merchant=? AND item_id='spirit_herb'`, merchant)
+	price := escrowScalar(t, path, `SELECT price FROM merchant_stock WHERE merchant=? AND item_id='bone_comb'`, merchant)
 	if price < 15 {
 		t.Fatalf("resale price=%d is below the unit cost", price)
 	}
@@ -177,7 +177,7 @@ func TestAnUnsoldLotIsTakenByAMerchantAtItsStartingBid(t *testing.T) {
 	}
 	// An empty purse leaves the lot alone.
 	batch4Exec(t, path, `UPDATE merchant_state SET budget=0`)
-	batch4Exec(t, path, `INSERT INTO auctions(auction_id,house_id,seller_user_id,item_id,quantity,currency_id,starting_bid,current_bid,current_bidder_user_id,active,created_at,ends_at) VALUES(8,'golden_pavilion',42,'spirit_herb',1,'low_spirit_stone',30,0,NULL,1,0,0)`)
+	batch4Exec(t, path, `INSERT INTO auctions(auction_id,house_id,seller_user_id,item_id,quantity,currency_id,starting_bid,current_bid,current_bidder_user_id,active,created_at,ends_at) VALUES(8,'golden_pavilion',42,'bone_comb',1,'low_spirit_stone',30,0,NULL,1,0,0)`)
 	withMerchantConn(t, path, func(conn *storage.Conn) {
 		res, _ := conn.Execute(`SELECT * FROM auctions WHERE auction_id=8`, nil)
 		_, bought, err := MerchantBuysUnsoldLot(conn, catalog, firstRowMap(res), 2000)
@@ -324,4 +324,69 @@ func TestATravellerIsToldWhichMerchantsTheRoadHolds(t *testing.T) {
 	if len(encounters) != 1 || fmt.Sprint(encounters[0]["merchant"]) != "madam_wen_of_the_silk_road" || fmt.Sprint(encounters[0]["met"]) != "city" {
 		t.Fatalf("encounters=%v", encounters)
 	}
+}
+
+func TestAMerchantsOwnShopIsStockedAtSeedAndRestockedAtHome(t *testing.T) {
+	path := setupMerchantDB(t)
+	catalog := merchantCatalog(t)
+	hu := catalog.Merchants["old_hu_the_peddler"]
+	if len(hu.Wares) == 0 {
+		t.Fatal("Old Hu ships no wares")
+	}
+	first := hu.Wares[0]
+	withMerchantConn(t, path, func(conn *storage.Conn) {
+		if _, err := AdvanceMerchants(conn, catalog, 1000); err != nil {
+			t.Fatal(err)
+		}
+	})
+	if got := escrowScalar(t, path, `SELECT quantity FROM merchant_stock WHERE merchant='old_hu_the_peddler' AND item_id=?`, first.ItemID); got != first.Quantity {
+		t.Fatalf("seeded %s=%d want %d", first.ItemID, got, first.Quantity)
+	}
+	if got := escrowScalar(t, path, `SELECT price FROM merchant_stock WHERE merchant='old_hu_the_peddler' AND item_id=?`, first.ItemID); got != first.Price {
+		t.Fatalf("price=%d want the content price %d", got, first.Price)
+	}
+	// Sold down to one; away from home nothing refills; back home it does.
+	batch4Exec(t, path, `UPDATE merchant_stock SET quantity=1 WHERE merchant='old_hu_the_peddler' AND item_id=?`, first.ItemID)
+	away := hu.Route[(merchantRouteIndex(hu, hu.Home)+1)%int64(len(hu.Route))]
+	batch4Exec(t, path, `UPDATE merchant_state SET location=?,destination=?,depart_game_minute=2000,arrive_game_minute=2100 WHERE merchant='old_hu_the_peddler'`, hu.Home, away)
+	withMerchantConn(t, path, func(conn *storage.Conn) {
+		if _, err := AdvanceMerchants(conn, catalog, 2100); err != nil {
+			t.Fatal(err)
+		}
+	})
+	if got := escrowScalar(t, path, `SELECT quantity FROM merchant_stock WHERE merchant='old_hu_the_peddler' AND item_id=?`, first.ItemID); got != 1 {
+		t.Fatalf("arriving at %s restocked the shop: %d", away, got)
+	}
+	batch4Exec(t, path, `UPDATE merchant_state SET location=?,destination=?,depart_game_minute=3000,arrive_game_minute=3100 WHERE merchant='old_hu_the_peddler'`, away, hu.Home)
+	withMerchantConn(t, path, func(conn *storage.Conn) {
+		if _, err := AdvanceMerchants(conn, catalog, 3100); err != nil {
+			t.Fatal(err)
+		}
+	})
+	if got := escrowScalar(t, path, `SELECT quantity FROM merchant_stock WHERE merchant='old_hu_the_peddler' AND item_id=?`, first.ItemID); got != first.Quantity {
+		t.Fatalf("coming home should restock %s to %d, got %d", first.ItemID, first.Quantity, got)
+	}
+	// The status query tells the shop from the floor finds.
+	batch4Exec(t, path, `INSERT INTO merchant_stock(merchant,item_id,quantity,cost,price,acquired_game_minute) VALUES('old_hu_the_peddler','bone_comb',1,40,64,3000)`)
+	batch4Exec(t, path, `UPDATE characters SET location=? WHERE user_id=42`, hu.Home)
+	batch4Exec(t, path, `UPDATE merchant_state SET destination='' WHERE merchant='old_hu_the_peddler'`)
+	batch4SetCanonicalGameMinute(t, path, 3200)
+	status, err := ApplyWithWorld(path, batch4WorldPath(t), ActionRequest{APIVersion: authoritativeAPIVersion, ActionID: "merchant-wares-status", Operation: "merchant.status", ActorID: 42, Payload: json.RawMessage(`{}`)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, row := range batch4Result(t, status)["merchants"].([]map[string]any) {
+		if row["merchant"] != "old_hu_the_peddler" {
+			continue
+		}
+		stock := row["stock"].([]map[string]any)
+		if len(stock) != len(hu.Wares)+1 {
+			t.Fatalf("stock lines=%d want %d", len(stock), len(hu.Wares)+1)
+		}
+		if stock[0]["source"] != "wares" || stock[len(stock)-1]["source"] != "auction" || stock[len(stock)-1]["item_id"] != "bone_comb" {
+			t.Fatalf("shop should list first and the floor find last: %v", stock)
+		}
+		return
+	}
+	t.Fatal("Old Hu missing from status")
 }

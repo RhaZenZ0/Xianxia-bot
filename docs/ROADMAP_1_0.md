@@ -459,7 +459,7 @@ drift for seven versions as happened between v0.21.6 and v0.28.0.
 | v0.31 Narrator budget | v0.31.0 | shipped |
 | v0.32 Hardened II | v0.32.0 | shipped |
 | v0.33 Gameplay I | v0.33.0 | shipped |
-| v0.34 Playtest | v0.34.1 | shipped; the engine loops run, the checklist is on file, and the `#playtest` board collects the live pass; travelling merchants shipped beside it |
+| v0.34 Playtest | v0.34.2 | shipped; the engine loops run, the checklist is on file, and the `#playtest` board collects the live pass; travelling merchants shipped beside it |
 | v1.0.0-rc | | |
 | v1.0.0 | | |
 | Content track | | after rc |
