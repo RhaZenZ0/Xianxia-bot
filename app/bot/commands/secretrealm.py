@@ -45,9 +45,11 @@ async def secret_status(interaction: discord.Interaction) -> None:
         )
         await interaction.response.send_message(text, ephemeral=False)
         return
+    rotation = dict(result.get("rotation") or {})
+    rotation_line = _rotation_line(rotation)
     available = list(result.get("available") or [])
     if not available:
-        await interaction.response.send_message("No secret-realm entrance is currently open at your location.", ephemeral=False)
+        await interaction.response.send_message("No secret-realm entrance is currently open at your location." + rotation_line, ephemeral=False)
         return
     lines = ["🌀 **Open Secret Realms Here**"]
     for entry in available:
@@ -59,7 +61,22 @@ async def secret_status(interaction: discord.Interaction) -> None:
             f"\n**{realm.get('name', entry.get('realm_id', 'Secret Realm'))}** — minimum realm: "
             f"{WORLD.realm_name(int(realm.get('min_realm_index') or 0))} — closes in {human_duration(remaining)}{thread_ref}"
         )
-    await interaction.response.send_message("".join(lines), ephemeral=False)
+    await interaction.response.send_message("".join(lines) + rotation_line, ephemeral=False)
+
+
+def _rotation_line(rotation: dict) -> str:
+    """The rotation the tick keeps (v1.0.0-rc.2): which realm opens next and
+    where, so a player can be standing at the ruin when it does."""
+    next_id = str(rotation.get("next_realm_id") or "")
+    realm = dict(WORLD.secret_realms.get(next_id) or {}) if next_id else {}
+    if not realm:
+        return ""
+    last = str(rotation.get("last_realm_id") or "")
+    last_realm = dict(WORLD.secret_realms.get(last) or {}) if last else {}
+    line = f"\n\n🔄 **Next on the rotation:** {realm.get('name', next_id)} at **{realm.get('location', 'an unknown place')}**, on the world tick about game day {int(rotation.get('next_game_minute') or 0) // 1440 + 1}."
+    if last_realm:
+        line += f" Last opened: {last_realm.get('name', last)} at {last_realm.get('location', '?')}."
+    return line
 
 
 @registered_group_command(secret_group, name="enter", description="Enter an open secret realm by name")

@@ -6,6 +6,17 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.0** (rc.2) is the GM's view of v0.39 and the content it left thin. The realm rotation the
+tick keeps rides on `secret_realm.status`, shows on the dashboard's events page, in `/realm → Secret
+Realms → Status` and in the inn's rumours (an open realm anywhere in the world is public news; the
+next on the rotation is what the tellers bet on). The trades between cultivators are on the
+dashboard's economy page with one audited action, `admin.trade.void`, that closes an open offer -
+nothing moved, so nothing is refunded. Exploring a waystation, a hunting ground, a ruin or a shrine
+reads from a pool of that place's own (four new scene kinds, three lines a tier each). And the
+forty-three local auction floors each have a paragraph of their own - its river, crater, terrace or
+court, its broker by name, and where its protection ends - closing the last content item on the
+punch list. No schema change.
+
 **1.0.0** (rc.1) is the release candidate: the roadmap's rc bars a machine can meet. The migration
 drill bootstraps a database at every shipped schema, seeds a row in every table that will take one
 and opens it with the current release, holding every table, column and row (`test_migration_drill`);
@@ -90,10 +101,13 @@ mechanical authority paths.
 
 ## Release status — v1.0.0
 
-- Current release: v1.0.0 (rc.1): the release candidate - the migration drill across every shipped
-  schema, the stamps held to the README, the changelog and the Go version by tests, the changelog
-  trimmed, the commissions design marked shipped. Tagged `v1.0.0-rc.1` on the beta channel; the NAS
-  drills and two quiet weeks make it `v1.0.0`.
+- Current release: v1.0.0 (rc.2): the realm rotation visible on the dashboard, in `/realm` and in
+  the rumours; the trades on the dashboard with an audited void; narration of the road-side sites'
+  own; the forty-three local floors with prose of their own. Tagged `v1.0.0-rc.2` on the beta
+  channel; the NAS drills and two quiet weeks make it `v1.0.0`.
+- v1.0.0 (rc.1): the migration drill across every shipped schema, the stamps held to the README,
+  the changelog and the Go version by tests, the changelog trimmed, the commissions design marked
+  shipped.
 - v0.40.0: GUI II - one message is the whole GUI: a Menu button on every panel
   and a menu that opens hubs in place, next-step buttons under a result, long results paged in the
   panel, a Here line in every header, Reopen on an expired panel, a grouped travel picker, pickers

@@ -24,7 +24,19 @@ TIERS: tuple[str, ...] = ("Mortal World", "Spiritual World", "Immortal World", "
 SCENE_KINDS: tuple[str, ...] = (
     "exploration", "hunt_success", "hunt_failure", "action", "dialogue",
     "breakthrough_success", "breakthrough_failure",
+    # The road-side sites (v1.0.0-rc.2): exploring a waystation, a hunting
+    # ground, a ruin or a shrine reads as that place, not as open country.
+    "exploration_waystation", "exploration_hunting_ground", "exploration_ruin", "exploration_shrine",
 )
+
+
+def exploration_kind(world_data: dict[str, Any], location: str | None) -> str:
+    """The pool kind for exploring `location`: the site's own kind when it is
+    a road-side site with lines of its own, else plain exploration."""
+    definition = dict((world_data.get("locations") or {}).get(str(location or "")) or {})
+    site = str(definition.get("road_site") or "")
+    kind = f"exploration_{site}" if site else "exploration"
+    return kind if kind in SCENE_KINDS else "exploration"
 
 
 class _Blank(dict):

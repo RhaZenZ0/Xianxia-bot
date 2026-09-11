@@ -73,6 +73,8 @@ func ApplyWithWorld(databasePath, worldPath string, req ActionRequest) (ActionRe
 		result, err = adminClearBattle(conn, req.ActorID, req.Payload)
 	case "admin.automation.set":
 		result, err = adminAutomationSet(conn, req.ActorID, req.Payload)
+	case "admin.trade.void":
+		result, err = adminTradeVoid(conn, req.ActorID, req.Payload)
 	case "admin.narration.set_chain":
 		result, err = adminNarrationSetChain(conn, req.ActorID, req.Payload)
 	case "admin.simulation.interval":
@@ -2727,4 +2729,52 @@ func adminNarrationSetChain(conn *storage.Conn, adminUserID int64, raw json.RawM
 		return nil, err
 	}
 	return map[string]any{"slots": stored}, nil
+}
+
+// adminTradeVoid (v1.0.0-rc.2) closes an open trade offer from the
+// dashboard. Nothing has moved - an offer moves nothing until its accept -
+// so voiding it is a status change and an audit row, never a refund.
+func adminTradeVoid(conn *storage.Conn, adminUserID int64, raw json.RawMessage) (map[string]any, error) {
+	var p map[string]any
+	if err := json.Unmarshal(raw, &p); err != nil {
+		return nil, err
+	}
+	offerID := storage.ParseInt(p["offer_id"])
+	if offerID <= 0 {
+		return nil, errors.New("offer_id is required")
+	}
+	if !tableExistsTx(conn, "trade_offers") {
+		return nil, errors.New("trade offers are not available on this database")
+	}
+	if err := begin(conn); err != nil {
+		return nil, err
+	}
+	defer func() {
+		if conn.InTransaction() {
+			rollback(conn)
+		}
+	}()
+	res, err := conn.Execute(`SELECT offer_id,from_user_id,to_user_id,status,location FROM trade_offers WHERE offer_id=?`, []any{offerID})
+	if err != nil {
+		return nil, err
+	}
+	row := firstRowMap(res)
+	if row == nil {
+		return nil, errors.New("no such trade offer")
+	}
+	before := fmt.Sprint(row["status"])
+	if before != "open" {
+		return nil, fmt.Errorf("that offer is already %s", before)
+	}
+	now := float64(time.Now().UnixNano()) / 1e9
+	if _, err := conn.Execute(`UPDATE trade_offers SET status='voided',resolved_at=?,updated_at=? WHERE offer_id=?`, []any{now, now, offerID}); err != nil {
+		return nil, err
+	}
+	if err := auditAdmin(conn, adminUserID, "admin.trade.void", fmt.Sprint(offerID), map[string]any{"status": before}, map[string]any{"status": "voided"}, fmt.Sprint(p["reason"])); err != nil {
+		return nil, err
+	}
+	if err := conn.Commit(); err != nil {
+		return nil, err
+	}
+	return map[string]any{"offer_id": offerID, "status": "voided", "from_user_id": storage.ParseInt(row["from_user_id"]), "to_user_id": storage.ParseInt(row["to_user_id"]), "location": fmt.Sprint(row["location"])}, nil
 }

@@ -311,7 +311,7 @@ joined by roads with travel time, danger and encounters, and a place on every ro
   **Inn** (who is in town, which merchants are at the corner table, and the inn's common-room
   thread). Every trade moves the city's prosperity, and prosperity shows on the shelves and at the gate.
 - **Auction houses.** Every city has one, entered through its warded door; a capital's is grand,
-  a smaller city's a local floor. Each grand house has a live Discord channel and a world's local
+  a smaller city's a local floor with a paragraph of its own. Each grand house has a live Discord channel and a world's local
   floors share one, where lots are posted, bid on and struck as it happens.
 - **Travelling merchants.** Eight, two a world, each a named NPC walking a fixed loop of cities and
   sitting at the inn when in town. They keep a shop of their own, buy what an auction floor could not

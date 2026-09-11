@@ -198,7 +198,8 @@ button under an exploration or hunt result, an @mention, or the GM's `ai_routine
 automation flag). `narrate_exploration` and `narrate_hunt_result` are procedural by default and
 take `upgrade=True` for the explicit path; every `_generate` call names its purpose and the router
 counts purposes for the AI Routing page. The procedural floor is content: `narration_pool` in
-`content/world.json` (seven scene kinds by four world tiers), chosen deterministically by
+`content/world.json` (eleven scene kinds by four world tiers - seven scenes and the four road-site
+explorations since v1.0.0-rc.2), chosen deterministically by
 `app/rules/narration_pool.py`. One per-player bucket (`TYPED_PLAY_BURST` / `TYPED_PLAY_PER_MINUTE`)
 meters every door - typed lines, `serialized_user_action` (slash and hub), Narrate-it - and reports
 per door. `tests/python/contracts/test_narrator_budget.py` holds all of it.
