@@ -48,6 +48,8 @@ var authoritativeMutations = map[string]bool{
 	"cultivation.body_train":          true,
 	"cultivation.breakthrough":        true,
 	"cultivation.body_breakthrough":   true,
+	"cultivation.stance":              true,
+	"cultivation.insight":             true,
 	"lifecycle.true_death":            true,
 	"lifecycle.reincarnate":           true,
 	"combat.start":                    true,
@@ -174,6 +176,7 @@ var authoritativeQueries = map[string]bool{
 	"exploration.travel_status": true,
 	"merchant.status":           true,
 	"trade.status":              true,
+	"cultivation.status":        true,
 	"shop.here":                 true,
 	"shop.browse":               true,
 	// v0.30.0: the world-status reads that app/simulation/world.py ran as raw
@@ -424,6 +427,7 @@ func applyAuthoritative(databasePath, worldPath string, req ActionRequest) (Acti
 			mutation, err = applyLateMigrationAction(conn, catalog, req.ActorID, req.Operation, req.Payload)
 		case "aptitude.temper", "aptitude.awaken", "aptitude.evolve", "aptitude.harmonize",
 			"cultivation.train", "cultivation.body_train", "cultivation.breakthrough", "cultivation.body_breakthrough",
+			"cultivation.stance", "cultivation.insight",
 			"lifecycle.reincarnate", "combat.turn", "combat.technique", "combat.recovery_item",
 			"perfection.start", "perfection.quest", "perfection.trial", "perfection.abandon",
 			"perfection.body_start", "perfection.body_quest", "perfection.body_trial", "perfection.body_abandon", "law.comprehend",
@@ -456,6 +460,10 @@ func applyAuthoritative(databasePath, worldPath string, req ActionRequest) (Acti
 				mutation, err = cultivationBreakthrough(conn, catalog, req.ActorID, req.Payload, false)
 			case "cultivation.body_breakthrough":
 				mutation, err = cultivationBreakthrough(conn, catalog, req.ActorID, req.Payload, true)
+			case "cultivation.stance":
+				mutation, err = cultivationStanceAction(conn, req.ActorID, req.Payload)
+			case "cultivation.insight":
+				mutation, err = cultivationInsightAction(conn, catalog, req.ActorID, req.Payload)
 			case "lifecycle.reincarnate":
 				mutation, err = reincarnateAction(conn, catalog, req.ActorID, req.Payload)
 			case "combat.turn":
@@ -650,6 +658,20 @@ func applyAuthoritativeQuery(databasePath, worldPath string, req ActionRequest) 
 			return ActionResponse{}, loadErr
 		}
 		result, qerr := merchantStatusQuery(conn, catalog, req.ActorID)
+		if qerr != nil {
+			return ActionResponse{}, qerr
+		}
+		v, _ := eventledger.CurrentActorVersion(conn, req.ActorID)
+		return ActionResponse{APIVersion: authoritativeAPIVersion, Operation: req.Operation, StateVersion: v, Result: result}, nil
+	case "cultivation.status":
+		if strings.TrimSpace(worldPath) == "" {
+			return ActionResponse{}, errors.New("world catalog path is required")
+		}
+		catalog, loadErr := worlddata.Load(worldPath)
+		if loadErr != nil {
+			return ActionResponse{}, loadErr
+		}
+		result, qerr := cultivationStatusQuery(conn, catalog, req.ActorID)
 		if qerr != nil {
 			return ActionResponse{}, qerr
 		}

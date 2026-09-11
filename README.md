@@ -241,9 +241,12 @@ for a browser, mean for an attacker.
 
 ### Hubs and panels
 
-`/menu` opens one panel that lists every hub; `/me` opens the player dashboard. Each hub — character,
+`/menu` opens one panel of every hub, four rows of four - You, World, Doing, Home - under a header
+that says where you stand, your realm and stage with the essence, and what is waiting (a trade
+offer at the inn), with Begin when there is no character yet and Back to the hub you left
+(v1.0.0-rc.3); `/me` opens the player dashboard. Each hub — character,
 cultivation, world, travel, craft, realm, items, combat, economy, inner world, beast, abode, family,
-quest, sect, NPC — is a live panel with one visible, tappable row per action, guided inputs for
+quest, sect, NPCs — is a live panel with one visible, tappable row per action, guided inputs for
 every parameter (every id has a picker), owner locking and a refresh. One message is the whole GUI
 (v0.40.0): every panel's Menu button swaps it into the menu in place and the menu opens any hub in
 the same message. A plain result is shown inside the panel, in a result block above the actions,
@@ -272,7 +275,15 @@ who is actually present, and a picker when readings tie. `TYPED_PLAY_PREFIX` is 
 
 Realms and stages, breakthroughs and tribulations, spiritual roots, bloodlines and physiques, laws
 and techniques, aptitudes, seclusion with background cultivation, and a lifespan that ends in
-Samsara and a new incarnation. A sect is joined through an entrance trial before its examiner; every
+Samsara and a new incarnation. The cultivation hub opens on a sheet the engine computes
+(v1.0.0-rc.3): the essence bar, the stance and when the next session is ready, the odds of the
+next breakthrough and what moves them, today's multipliers, the body path and the Insight XP.
+Meditation has a stance the engine keeps and applies to every session - Circulate for the full
+gain, Refine for a fifth less and two Insight XP banked a session, Force for a third more and a
+fifteen-in-a-hundred qi deviation that is a real condition to treat. A breakthrough shows its odds
+before the roll. Stage 9 into a new realm is a gate: it opens to an insight banked from Insight XP
+(**/cultivation → Insight**; five at the mortal gate, five more a realm) or to a completed Realm
+Perfection, and the insight is spent on the crossing. A sect is joined through an entrance trial before its examiner; every
 public sect bestows its own entry manual on passing, chosen inside the trial transaction, and the
 sect residence grows facility by facility with contribution points. A manual is an item, studied
 through the engine, which enforces its realm requirement; the whole 160-manual catalogue is content.

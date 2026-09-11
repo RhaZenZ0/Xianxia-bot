@@ -512,7 +512,30 @@ async def run(url: str, token: str, db_path: str) -> Report:
         report.add("PASS" if ids & {"immortal_gold_ore", "immortal_gold_sabre", "dawnlotus_herb", "dawnlotus_vitality_pill", "golden_edge_talisman", "immortal_marrow_pill", "immortal_gold_plate"} else "FAIL",
                    "the Immortal World's own goods are on the shelf", ", ".join(sorted(ids))[:120])
 
-    # ---- 13. backups -------------------------------------------------------
+    # ---- 13. the cultivation sheet, the stance, the realm gate (v1.0.0-rc.3)
+    sheet = await step(report, "cultivation.status", engine.action("cultivation.status", PLAYER, {}))
+    if sheet is not None:
+        odds = dict(sheet.get("odds") or {})
+        report.add("PASS" if {"stance", "cost", "insight_xp", "insight_cost", "realm_gate"} <= set(sheet) and 0 <= int(odds.get("probability", -1)) <= 100 else "FAIL",
+                   "the sheet carries the stance, the cost, the insight and the odds", f"stance={sheet.get('stance')} odds={odds.get('probability')}% tn={odds.get('tn')}")
+    await step(report, "an unknown stance is refused", act("cultivation.stance", PLAYER, {"stance": "meditate"}), expect_error="unknown stance")
+    await step(report, "cultivation.stance refine", act("cultivation.stance", PLAYER, {"stance": "refine"}))
+    trained = await step(report, "cultivation.train under Refine", act("cultivation.train", PLAYER, {"cooldown_seconds": 1}))
+    if trained is not None:
+        report.add("PASS" if trained.get("stance") == "refine" and int(trained.get("insight_xp_gain") or 0) == 2 else "FAIL",
+                   "Refine banks Insight XP", f"stance={trained.get('stance')} +{trained.get('insight_xp_gain')} XP, gain {trained.get('gain')}")
+    sheet = dict(await engine.action("cultivation.status", PLAYER, {}) or {})
+    xp, cost = int(sheet.get("insight_xp") or 0), int(sheet.get("insight_cost") or 0)
+    if xp >= cost:
+        banked = await step(report, "cultivation.insight banks the gate insight", act("cultivation.insight", PLAYER, {}))
+        if banked is not None and not (banked.get("banked") and int(banked.get("insight_xp") or -1) == xp - cost):
+            report.add("FAIL", "cultivation.insight banks the gate insight", f"{banked}")
+        await step(report, "a second insight is refused", act("cultivation.insight", PLAYER, {}), expect_error="already banked")
+    else:
+        await step(report, "cultivation.insight is refused short of XP", act("cultivation.insight", PLAYER, {}), expect_error="Insight XP")
+    await step(report, "cultivation.stance back to circulate", act("cultivation.stance", PLAYER, {"stance": "circulate"}))
+
+    # ---- 14. backups -------------------------------------------------------
     backup = await step(report, "create a backup", transport.create_backup())
     listed = await step(report, "list backups", transport.list_backups())
     if backup and listed is not None and not any(row.get("name") == backup.get("name") for row in listed):

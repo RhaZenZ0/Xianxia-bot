@@ -6,6 +6,21 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.0** (rc.3) is a better cultivation system and menu. The main menu is four rows of four -
+You, World, Doing, Home - under a header of live facts (where you stand, your realm and stage with
+the essence, the trade offers waiting), with Begin when there is no character and Back to the hub
+you left; NPCs and Inner World are labelled as such. The cultivation hub opens on a sheet the engine
+computes in one query (`cultivation.status`): the essence bar, the stance and when the next session
+is ready, the odds of the next breakthrough with what moves them, today's multipliers, the body
+path and the Insight XP. Meditation has a stance, kept by the engine and applied to every session:
+Circulate (the full gain), Refine (a fifth slower, banks two Insight XP a session and deepens
+stage-9 refinement) or Force (a third faster, and fifteen times in a hundred a qi deviation - a
+real condition, treated like any other). A breakthrough shows its odds before and after the roll,
+from the one modifier the roll uses. And stage 9 into a new realm is a gate: it needs an insight
+banked from Insight XP (five at the mortal gate, five more a realm, `/cultivation → Insight`) or a
+completed Realm Perfection, and the insight is spent on the crossing. The stance and the banked
+insight live in `world_state` under the player's id; no schema change.
+
 **1.0.0** (rc.2) is the GM's view of v0.39 and the content it left thin. The realm rotation the
 tick keeps rides on `secret_realm.status`, shows on the dashboard's events page, in `/realm → Secret
 Realms → Status` and in the inn's rumours (an open realm anywhere in the world is public news; the
@@ -101,10 +116,13 @@ mechanical authority paths.
 
 ## Release status — v1.0.0
 
-- Current release: v1.0.0 (rc.2): the realm rotation visible on the dashboard, in `/realm` and in
-  the rumours; the trades on the dashboard with an audited void; narration of the road-side sites'
-  own; the forty-three local floors with prose of their own. Tagged `v1.0.0-rc.2` on the beta
-  channel; the NAS drills and two quiet weeks make it `v1.0.0`.
+- Current release: v1.0.0 (rc.3): the menu as four rows of four under live facts; the cultivation
+  sheet; meditation stances; the odds of a breakthrough shown; the realm gate with its banked
+  insight. Tagged `v1.0.0-rc.3` on the beta channel; the NAS drills and two quiet weeks make it
+  `v1.0.0`.
+- v1.0.0 (rc.2): the realm rotation visible on the dashboard, in `/realm` and in the rumours; the
+  trades on the dashboard with an audited void; narration of the road-side sites' own; the
+  forty-three local floors with prose of their own.
 - v1.0.0 (rc.1): the migration drill across every shipped schema, the stamps held to the README,
   the changelog and the Go version by tests, the changelog trimmed, the commissions design marked
   shipped.

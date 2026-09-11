@@ -287,11 +287,32 @@ _HUB_OPTION_PROVIDERS: dict[tuple[str, str], Any] = {}
 # panel's Menu button can swap itself into the menu in place, and the menu
 # can swap itself into a hub. One message is the whole GUI.
 _MENU_BUILDER: Any = None
+# The menu's header facts (v1.0.0-rc.3) - the Here line, the stage, what is
+# waiting - are looked up before the menu is built, by a coroutine surface.py
+# registers here, so the Menu button can show them the way /menu does.
+_MENU_FACTS: Any = None
 
 
 def register_menu_builder(builder: Any) -> None:
     global _MENU_BUILDER
     _MENU_BUILDER = builder
+
+
+def register_menu_facts(facts: Any) -> None:
+    global _MENU_FACTS
+    _MENU_FACTS = facts
+
+
+async def menu_facts(interaction: discord.Interaction) -> str:
+    """The facts line for a menu, or nothing when the lookup is unavailable
+    or fails - the menu itself must never fail on its header."""
+    if not callable(_MENU_FACTS):
+        return ""
+    try:
+        return str(await _MENU_FACTS(interaction) or "")
+    except Exception:
+        log.exception("Menu facts unavailable")
+        return ""
 
 
 def _hint_action(hub_name: str, steps: Sequence[str]) -> "HubAction | None":
@@ -1866,7 +1887,8 @@ class HubLayoutMenuButton(discord.ui.Button):
             return
         member = interaction.user
         is_admin = isinstance(member, discord.Member) and bool(member.guild_permissions.administrator)
-        menu = _MENU_BUILDER(owner_id=self.hub_view.owner_id, is_admin=is_admin, owner_name=self.hub_view.owner_name)
+        facts = await menu_facts(interaction)
+        menu = _MENU_BUILDER(owner_id=self.hub_view.owner_id, is_admin=is_admin, owner_name=self.hub_view.owner_name, facts=facts)
         await interaction.response.edit_message(view=menu)
         menu.message = getattr(interaction, "message", None)
         self.hub_view.stop()
