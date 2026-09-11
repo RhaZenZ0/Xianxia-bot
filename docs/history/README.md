@@ -11,5 +11,7 @@ repository root is the changelog, and the top-level `docs/` files are the living
   stages and the consolidated validation record.
 - `V019_RELEASE_NOTES.md` … `V025_RELEASE_NOTES.md`, `V023_1_REVIEW_FIXES.md`, `V019_24_RELEASE.txt` — per-release
   notes from the point-release era, superseded by the entries in `VERSIONS.md`.
+- `CHANGELOG_0_18_TO_0_40.md` — the per-release changelog entries as written, v0.18 to v0.40.0, moved here
+  at v1.0.0-rc.1 when `VERSIONS.md` was trimmed to a paragraph per minor.
 - `MAIN_SPLIT_PLAN.md` — the plan by which the 13,000-line `main.py` became `app/bot/`; the module docstrings
   still cite their phase of it.

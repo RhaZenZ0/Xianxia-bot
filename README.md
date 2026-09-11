@@ -1,4 +1,4 @@
-# Xianxia RP Discord Bot v0.40.0
+# Xianxia RP Discord Bot v1.0.0
 
 [![CI](https://github.com/RhaZenZ0/Xianxia-bot/actions/workflows/ci.yml/badge.svg)](https://github.com/RhaZenZ0/Xianxia-bot/actions/workflows/ci.yml)
 
@@ -447,7 +447,7 @@ release; it never installs anything. On the NAS:
 - If narration goes flat after an image rebuild, check **/admin → Server → Ai Status** for a TLS
   banner first. If SQLite reports contention, verify only the engine opens the database.
 
-Keep the whole `data/` directory persistent across rebuilds. The current schema is **38**; every
+Keep the whole `data/` directory persistent across rebuilds. The current schema is **39**; every
 historical migration is kept so an old database upgrades in place.
 
 ## Development

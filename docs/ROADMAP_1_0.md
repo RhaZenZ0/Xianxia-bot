@@ -59,9 +59,9 @@ route-selection releases were driven by what that deployment showed. The
 code runs on the NAS. What has *not* happened is the written, hub-by-hub
 playtest, which is still the last gate before rc.
 
-Document drift worth naming because rc will have to fix it: `README.md`
-still announces v0.21.0 in its title and "Current release" line;
-`DEVELOPMENT.md` says Go 1.23 while `go_core/Dockerfile` builds on 1.26.
+Document drift once worth naming here - the README announcing v0.21.0 for
+eleven minors, a `DEVELOPMENT.md` saying Go 1.23 while the engine image was
+1.26 - is held by `test_release_version` since rc.1.
 
 ## The release channel
 
@@ -315,19 +315,24 @@ with the release it was run against.
 
 Release candidates go to the **beta channel** only.
 
-- Migration drill: a database from every shipped schema (v1 through 32)
-  migrates to current with no data loss. `test_startup_health` covers v1 and
-  an unversioned database; extend to the set.
-- Backup → restore drill on the NAS, documented.
+- ~~Migration drill: a database from every shipped schema (v1 through 32)
+  migrates to current with no data loss.~~ **Done at rc.1**:
+  `tests/python/contracts/test_migration_drill.py` bootstraps a database at
+  every schema from 1 to 38, seeds a row in every table that takes one, opens
+  it with the current release and holds every table, column and row.
+- Backup → restore drill on the NAS, documented. *(operator)*
 - Clean install from the README on a machine that has never seen the
-  project, timed, with the gaps fixed.
-- Documentation consolidated: README title and "Current release" line
-  match `app/version.py` and a test holds them there; `DEVELOPMENT.md`
-  names the Go version `go.mod` and the Dockerfile agree on; `VERSIONS.md`
-  trimmed to one paragraph per minor with the per-release notes files kept
-  as history; `docs/COMMISSIONS_DESIGN.md` marked shipped.
-- `gofmt` clean; `make check` green from a fresh clone.
-- Two weeks on the NAS at rc without a P1.
+  project, timed, with the gaps fixed. *(operator)*
+- ~~Documentation consolidated~~ **Done at rc.1**: `test_release_version`
+  holds the README title, the changelog's release status line and the README's
+  schema number to the stamps, and the Go version across `go.mod`, the README
+  and the engine image (`DEVELOPMENT.md` no longer exists; the README's
+  Development section is it); `VERSIONS.md` is one paragraph per minor with
+  the full entries in `docs/history/CHANGELOG_0_18_TO_0_40.md`;
+  `docs/COMMISSIONS_DESIGN.md` is marked shipped.
+- ~~`gofmt` clean; `make check` green from a fresh clone.~~ Held by CI on
+  every push since v0.29.1.
+- Two weeks on the NAS at rc without a P1. *(operator)*
 
 `v1.0.0` is the rc that survived, re-tagged.
 
@@ -460,6 +465,6 @@ drift for seven versions as happened between v0.21.6 and v0.28.0.
 | v0.32 Hardened II | v0.32.0 | shipped |
 | v0.33 Gameplay I | v0.33.0 | shipped |
 | v0.34 Playtest | v0.34.2 | shipped; the engine loops run, the checklist is on file, and the `#playtest` board collects the live pass; travelling merchants shipped beside it |
-| v1.0.0-rc | | |
+| v1.0.0-rc | v1.0.0-rc.1 | the machine bars met: migration drill, docs held by tests; the NAS drills and the quiet fortnight are the operator's |
 | v1.0.0 | | |
 | Content track | v0.39.0 | started early: shops (v0.35.0), gates and districts (v0.36.0), merchants that bid (v0.37.0), city life (v0.38.0) - boards, envoys, rumours, inns, prosperity; the roads, sects and goods for every world, eight realms on rotation, typed play with two arguments and trade at the inn (v0.39.0) |
