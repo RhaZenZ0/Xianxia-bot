@@ -1009,6 +1009,26 @@ Gate: `tests/python/contracts/test_security_defaults.py` and `TestNewRefusesAnEn
 No schema change (still 32), no game-rule change, AI remains narration-only.
 
 
+**0.38.1** is a GUI point release: **results in the panel.** No schema change.
+
+Since the Components V2 layout (v0.19.10) every hub action answered beside the panel with a new
+message, because a V2 message cannot carry content or embeds and so could not be written over the
+way the classic card was. A V2 message can carry text displays, though. A plain-text result short
+enough for the panel's text budget (a thousand characters; the header, the page and eight action
+rows use the rest of Discord's four thousand) is now shown *inside* the panel, in a result block
+above the actions, and the panel is edited in place: pressed from the panel, the panel is its own
+response and is edited through it; pressed through an input step (a picker the hub opened) or a
+modal, the panel is edited directly and the step message or the "thinking" placeholder is deleted,
+so the conversation ends with one message either way. Refresh clears the block, and the live status
+is refreshed with every result.
+
+Where that is not possible the result is delivered beside the panel exactly as before, and the
+panel stays live underneath: an embed (the character sheet, an auction card), a result that brings
+its own buttons (Narrate it, a scene or an event panel), a file, an ephemeral reply, and text longer
+than the budget or split across messages. Only an action's first output can go in the panel; later
+outputs of the same action go beside it. `tests/python/unit/test_hub_layout_rollout.py` drives the
+delivery with stubs for each case.
+
 **0.38.0** is a feature release: **city life.** No schema change.
 
 Six things a city does now that it did not before, all under `/world → City`.
@@ -1493,9 +1513,12 @@ directory to one file, requires each check to appear before the release job and 
 and requires the release job to wait on all three.
 
 
-## Release status — v0.38.0
+## Release status — v0.38.1
 
-- Current release: v0.38.0: city life - a quest pavilion in every capital and a notice board at every
+- Current release: v0.38.1: results in the panel - a plain, short hub result edits the panel in
+  place instead of spawning a message; embeds, results with buttons, files and long text still land
+  beside it.
+- v0.38.0: city life - a quest pavilion in every capital and a notice board at every
   gate, a sect envoys' hall, rumours through the viewpoint gate, an inn in every city with a common
   room, and prosperity that trade moves and the shelves show.
 - v0.37.0 (schema 38): merchants bid - on the tick, at the next minimum, within a

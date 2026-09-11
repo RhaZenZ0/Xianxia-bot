@@ -77,6 +77,11 @@ LAYOUT_HUB_NAMES: set[str] = {
 # (/sect: 25 actions across three subgroups) at 36 and keeps headroom in case
 # Discord ever counts a nested component differently.  Longer pages chunk.
 _LAYOUT_ACTION_LIMIT = 8
+# A result shown inside the panel (v0.38.1) is one more TextDisplay and one
+# Separator - 38 of 40 with eight action rows - and Discord also caps the
+# text of a Components V2 message at 4,000 characters across its displays:
+# header (900) + page (600) + eight rows (180 each) leaves a thousand.
+_LAYOUT_RESULT_LIMIT = 1000
 
 _DANGER_ACTION_WORDS = frozenset({
     "abandon", "clear", "close", "delete", "destroy", "disband", "kill",
@@ -659,12 +664,70 @@ def _layout_targets_panel(source: discord.Interaction, hub_view: Any) -> bool:
     return int(getattr(message, "id", 0)) == int(getattr(panel, "id", -1))
 
 
+def _panel_can_hold(content: Any, kwargs: Mapping[str, Any]) -> bool:
+    """Whether a result can live inside the panel (v0.38.1).
+
+    A Components V2 message carries text displays and nothing else, so a
+    result goes into the panel only when it is plain text short enough for
+    the panel's text budget. Everything else is delivered beside the panel,
+    as before: an embed (the character sheet, an auction card), a result
+    that brings its own buttons (Narrate it, a scene or event panel), a
+    file, and text longer than the budget or split into several messages.
+    """
+    if content is not None and not isinstance(content, str):
+        return False
+    if any(key in kwargs for key in ("embed", "embeds", "view", "file", "files", "attachments")):
+        return False
+    text = content if content is not None else "✅ Done."
+    return len(text) <= _LAYOUT_RESULT_LIMIT
+
+
+async def _show_result_in_panel(source: discord.Interaction, hub_view: Any, text: str) -> Any:
+    """Write a result into the panel's result block and edit the panel.
+
+    When the interaction came from the panel itself the panel is its own
+    response and is edited through it. When it came from an input step (a
+    picker the hub opened) or a modal (whose acknowledgement is a "thinking"
+    placeholder), the panel is edited directly and that step message or
+    placeholder is deleted, so the conversation ends with one message: the
+    panel, showing the result above its actions.
+    """
+    hub_view.last_result = str(text)
+    await hub_view.refresh_status(source)
+    hub_view.rebuild()
+    panel = getattr(hub_view, "message", None)
+    source_message = getattr(source, "message", None)
+    if source_message is not None and panel is not None and int(getattr(source_message, "id", 0)) == int(getattr(panel, "id", -1)):
+        if not source.response.is_done():
+            return await source.response.edit_message(view=hub_view)
+        return await source.edit_original_response(view=hub_view)
+    if panel is None:
+        return None
+    edited = await panel.edit(view=hub_view)
+    if source.response.is_done():
+        try:
+            await source.delete_original_response()
+        except (discord.NotFound, discord.HTTPException):
+            pass
+    return edited
+
+
 async def _layout_result_send(
-    source: discord.Interaction, content: Any, kwargs: Mapping[str, Any]
+    source: discord.Interaction, content: Any, kwargs: Mapping[str, Any], hub_view: Any = None
 ) -> Any:
-    """Deliver hub action output beside a Components V2 panel instead of over it."""
+    """Deliver hub action output: inside the panel where it fits (v0.38.1),
+    beside the panel where it cannot."""
     if _response_is_ephemeral(kwargs):
         return await _send_ephemeral_followup(source, content, kwargs)
+
+    if hub_view is not None and _panel_can_hold(content, kwargs):
+        try:
+            shown = await _show_result_in_panel(source, hub_view, content if content is not None else "✅ Done.")
+        except (discord.NotFound, discord.HTTPException):
+            log.exception("Could not show the result in the hub panel; sending it beside the panel")
+            shown = None
+        if shown is not None:
+            return shown
 
     if not source.response.is_done():
         await source.response.defer()
@@ -698,8 +761,9 @@ class _HubFollowupProxy:
 
         result: Any = None
         if _layout_targets_panel(self.owner.source, self.owner.hub_view):
+            in_panel = None if self.owner.output_written or len(chunks) > 1 else self.owner.hub_view
             self.owner.output_written = True
-            result = await _layout_result_send(self.owner.source, first, kwargs)
+            result = await _layout_result_send(self.owner.source, first, kwargs, in_panel)
         elif not self.owner.output_written:
             self.owner.output_written = True
             edit_kwargs = dict(kwargs)
@@ -743,9 +807,10 @@ class _HubResponseProxy:
                 await self.owner.source.followup.send(chunk, ephemeral=True)
             return result
 
+        in_panel = None if self.owner.output_written or len(chunks) > 1 else self.owner.hub_view
         self.owner.output_written = True
         if _layout_targets_panel(self.owner.source, self.owner.hub_view):
-            result = await _layout_result_send(self.owner.source, first, kwargs)
+            result = await _layout_result_send(self.owner.source, first, kwargs, in_panel)
             for chunk in chunks[1:]:
                 await self.owner.source.followup.send(chunk, ephemeral=False)
             return result
@@ -785,10 +850,12 @@ class _HubResponseProxy:
         return await self.owner.source.response.defer(**kwargs)
 
     async def edit_message(self, **kwargs: Any) -> Any:
+        in_panel = None if self.owner.output_written else self.owner.hub_view
         self.owner.output_written = True
         if _layout_targets_panel(self.owner.source, self.owner.hub_view):
+            edit_kwargs = {key: value for key, value in kwargs.items() if key != "content"}
             return await _layout_result_send(
-                self.owner.source, kwargs.get("content"), kwargs
+                self.owner.source, kwargs.get("content"), edit_kwargs, in_panel
             )
         edit_kwargs = _safe_edit_kwargs(kwargs, fallback_view=self.owner.hub_view)
         source_message = getattr(self.owner.source, "message", None)
@@ -892,7 +959,7 @@ async def _invoke_action(
         text = "❌ That action could not be completed. The game state was rechecked and no additional hub-side rule was applied."
         try:
             if _layout_targets_panel(interaction, hub_view):
-                await _layout_result_send(interaction, text, {})
+                await _layout_result_send(interaction, text, {}, hub_view)
             elif not interaction.response.is_done():
                 await interaction.response.edit_message(content=text, embed=None, view=hub_view)
             else:
@@ -1618,6 +1685,8 @@ class HubLayoutRefreshButton(discord.ui.Button):
 
     async def callback(self, interaction: discord.Interaction) -> None:
         await self.hub_view.refresh_status(interaction)
+        # Refresh is also how a player clears the last result off the card.
+        self.hub_view.last_result = ""
         self.hub_view.rebuild()
         await interaction.response.edit_message(view=self.hub_view)
 
@@ -1631,10 +1700,14 @@ class LayoutHubView(_LayoutHubBase):
     renders as its own Section - emoji, label, description and its own button -
     and the only surviving dropdown jumps between systems.
 
-    A Components V2 message cannot carry ``content`` or ``embeds``, so unlike the
-    classic panel this one is never overwritten with action output; results are
-    routed to followup messages by ``_layout_targets_panel`` and the card stays
-    on screen, live and reusable, underneath them.
+    A Components V2 message cannot carry ``content`` or ``embeds``, so the
+    classic panel's trick - writing the action's output over the card - is
+    impossible here. Since v0.38.1 a plain-text result short enough for the
+    panel's budget is shown *inside* the card instead, in a result block above
+    the actions (``last_result``), and the card is edited in place; a result
+    that is an embed, brings its own buttons, or is too long is delivered
+    beside the card by ``_layout_result_send``, which stays on screen, live
+    and reusable, underneath it either way. Refresh clears the block.
     """
 
     is_layout_hub = True
@@ -1656,6 +1729,7 @@ class LayoutHubView(_LayoutHubBase):
         self.page_key = definition.pages[0].key if definition.pages else "empty"
         self.action_offset = 0
         self.expired = False
+        self.last_result = ""
         self.message: discord.Message | None = None
         self.rebuild()
 
@@ -1728,6 +1802,9 @@ class LayoutHubView(_LayoutHubBase):
             accent_colour=_HUB_COLOURS.get(self.definition.name, 0x5865F2)
         )
         container.add_item(discord.ui.TextDisplay(self._header_text()))
+        if self.last_result and not self.expired:
+            container.add_item(discord.ui.Separator())
+            container.add_item(discord.ui.TextDisplay(f"### 📜 Result\n{self.last_result}"[:_LAYOUT_RESULT_LIMIT + 16]))
 
         page = self.page
         if self.expired:
