@@ -142,6 +142,15 @@ func (r *Runner) advancedMaintenance(conn *storage.Conn, gm int64, automation ma
 			return Run{}, false, err
 		}
 	}
+	// Secret realms (v0.39.0): the rotation opens the next one in turn, so
+	// every world always has a realm coming whether or not anyone is
+	// standing at its entrance.
+	if !hasBoolKey(automation, "secret_realms") || automation["secret_realms"] {
+		counts["secret_realms"], err = game.RotateSecretRealms(conn, r.World, gm)
+		if err != nil {
+			return Run{}, false, err
+		}
+	}
 	counts["hunters_spawned"], err = r.spawnHunters(conn, gm)
 	if err != nil {
 		return Run{}, false, err
@@ -201,7 +210,7 @@ func (r *Runner) advancedMaintenance(conn *storage.Conn, gm int64, automation ma
 	if !changed {
 		return Run{}, false, nil
 	}
-	summary := fmt.Sprintf("auctions=%d merchants=%d merchant_bids=%d hunters_spawned=%d hunters_updated=%d wars=%d occupations=%d caravans=%d seclusions=%d commissions_expired=%d moderations_expired=%d era_changed=%t", counts["auctions"], counts["merchants"], counts["merchant_bids"], counts["hunters_spawned"], counts["hunters_updated"], counts["wars"], counts["occupations"], counts["caravans"], counts["seclusions"], counts["commissions_expired"], counts["moderations_expired"], eraChanged)
+	summary := fmt.Sprintf("auctions=%d merchants=%d merchant_bids=%d secret_realms=%d hunters_spawned=%d hunters_updated=%d wars=%d occupations=%d caravans=%d seclusions=%d commissions_expired=%d moderations_expired=%d era_changed=%t", counts["auctions"], counts["merchants"], counts["merchant_bids"], counts["secret_realms"], counts["hunters_spawned"], counts["hunters_updated"], counts["wars"], counts["occupations"], counts["caravans"], counts["seclusions"], counts["commissions_expired"], counts["moderations_expired"], eraChanged)
 	return Run{System: "advanced_world", DueSteps: 1, AppliedSteps: 1, Summary: summary}, true, nil
 }
 

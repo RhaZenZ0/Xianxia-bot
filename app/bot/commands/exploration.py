@@ -366,12 +366,25 @@ async def explore(interaction: discord.Interaction) -> None:
             f"\n\n🏪 **You find {discovered_shop.get('name')}** — a tier {int(discovered_shop.get('tier') or 1)} {str(discovered_shop.get('kind') or 'shop').replace('_', ' ')} kept by {discovered_shop.get('keeper')}.\n"
             f"{discovered_shop.get('description') or ''}\nEnter it with **/travel**, then **/economy → City Shops → Browse**."
         )
+    site_kind = str(outcome.get("site_kind") or "")
+    if site_kind == "ruin" and dict(outcome.get("items") or {}):
+        discovery_text += "\n🪨 The ruin gives up twice what open ground would."
+    elif site_kind == "shrine" and int(outcome.get("insight_xp") or 0):
+        discovery_text += f"\n🔔 The bell and the stillness: +{int(outcome.get('insight_xp') or 0)} insight."
     discovered_location = str(outcome.get("discovered_location") or "")
-    if discovered_location:
+    discovered_site = outcome.get("discovered_site")
+    if isinstance(discovered_site, dict):
+        leg = list(discovered_site.get("leg") or [])
+        discovery_text += (
+            f"\n\n🛤️ **You find {discovered_site.get('name')}** — {ROAD_SITE_LABEL.get(str(discovered_site.get('kind')), 'a place')} on the {' – '.join(leg)} road.\n"
+            f"{discovered_site.get('description') or ''}\nReach it with **/travel** from either end of the road."
+        )
+    elif discovered_location:
         discovery_text = (
             f"\n\n🧭 **New route discovered — {discovered_location}**\n"
             f"{WORLD.locations.get(discovered_location, {}).get('description', 'A newly charted route opens before you.')}"
         )
+    if discovered_location:
         discovered_sects = _sect_recruitment_at_location(discovered_location)
         if discovered_sects:
             try:
@@ -539,6 +552,8 @@ async def hunt(interaction: discord.Interaction) -> None:
         log.exception("Could not persist hunt RAG memory")
 
     text = f"**Hunt: {beast.get('name','Spirit Beast')}**\n{roll_line(roll)}\n\n{narration}"
+    if str(outcome.get("site_kind") or "") == "hunting_ground":
+        text += f"\n🏹 A hunting ground: **+{int(outcome.get('site_bonus') or 0)}** to the roll, and the spoils half again."
     if success:
         loot = {str(k): int(v) for k, v in dict(beast.get("loot") or {}).items()}
         text += (
@@ -984,6 +999,15 @@ async def city_look(interaction: discord.Interaction) -> None:
     here = str(c.get("location") or "")
     city = _city_of(here)
     parts = sorted(name for name, data in WORLD.locations.items() if data.get("district") and str(data.get("outside_location")) == city)
+    here_data = WORLD.locations.get(here) or {}
+    if here_data.get("road_site"):
+        leg = [str(x) for x in list(here_data.get("road_leg") or [])]
+        people = sorted(name for name, npc in WORLD.npcs.items() if str(npc.get("location")) == here)
+        lines = [f"🛤️ **{here}** — {ROAD_SITE_LABEL.get(str(here_data.get('road_site')), 'a place')} on the {' – '.join(leg)} road.", str(here_data.get("description") or "")]
+        lines.append(f"**Here:** {', '.join(people[:12]) if people else 'nobody of note at the moment'}.")
+        lines.append(_road_site_line(str(here_data.get("road_site")), here, leg).strip())
+        await interaction.response.send_message("\n".join(lines), ephemeral=False)
+        return
     if not parts and city == here and not WORLD.locations.get(city, {}).get("gates"):
         await interaction.response.send_message(f"🏙️ **{here}** has no walls and no districts - it is all one place.", ephemeral=False)
         return
@@ -1182,6 +1206,7 @@ async def city_inn(interaction: discord.Interaction) -> None:
     lines.append(f"**In town:** {', '.join(present) if present else 'no other cultivators tonight'}.")
     lines.append(f"**At the corner table:** {', '.join(merchants) if merchants else 'no merchant in town - see /economy → Merchants for who is on the road'}.")
     lines.append("**By the door:** the caravan master's notice - guards wanted for the next road out; see **/economy → Caravans**.")
+    lines.append("**At the long table:** trades are struck here, cultivator to cultivator - **/economy → Trade → Offer** names who gets what, and they accept or decline.")
     thread = await _inn_thread(interaction, city, inn)
     if thread is not None:
         lines.append(f"**Common room:** {thread.mention} - whoever is in {city} talks here.")
@@ -1220,6 +1245,25 @@ async def _inn_thread(interaction: discord.Interaction, city: str, inn: str) -> 
 
 
 travel_group = app_commands.Group(name="travel", description="Travel to another known location")
+
+
+ROAD_SITE_LABEL = {"waystation": "a waystation", "hunting_ground": "a hunting ground", "ruin": "a ruin", "shrine": "a wayside shrine"}
+
+
+def _road_site_line(kind: str, site: str, leg: list) -> str:
+    """What a road-side site (v0.39.0) offers, told on arrival."""
+    if not kind:
+        return ""
+    back = " – ".join(str(x) for x in leg) if leg else "either city"
+    if kind == "waystation":
+        what = f"a walled yard on the {back} road. The stall under the eaves sells what the road takes out of you: **/economy → City Shops → Browse**. Merchants walking this road stop here: **/economy → Merchants → Status**."
+    elif kind == "hunting_ground":
+        what = f"the best hunting on the {back} road, and the least safe: **/world → Hunt** here rolls easier and the spoils are half again."
+    elif kind == "ruin":
+        what = f"old stones by the {back} road. **/world → Explore** turns up twice what it would elsewhere, and this is where the secret realms of this road open."
+    else:
+        what = f"a stone and a bell on the {back} road. Nobody hunts within sound of it; **/world → Explore** here steadies the mind."
+    return f"\n🛤️ **{site}** is {ROAD_SITE_LABEL.get(kind, 'a place')}: {what} The road leads back to **{leg[0] if leg else '…'}** or on to **{leg[1] if len(leg) > 1 else '…'}** with **/travel**."
 
 
 def _discord_arrival_display(result: dict) -> str:
@@ -1295,6 +1339,13 @@ async def travel(interaction: discord.Interaction, destination: str) -> None:
     if shop_key:
         shop=dict(WORLD.shops.get(shop_key) or {})
         shop_line=f"\n🏪 You step inside; **{shop.get('keeper')}** looks up from the counter. Browse with **/economy → City Shops → Browse**; the door opens back onto {shop.get('city')} with **/travel**."
+    site_line=_road_site_line(str(result.get("site_kind") or ""),str(result.get("destination") or destination),list(result.get("site_leg") or []))
+    sites_found=""
+    for row in list(result.get("road_sites_found") or []):
+        if not isinstance(row,dict):continue
+        leg=list(row.get("leg") or [])
+        sites_found+=(f"\n🛤️ On the way you find **{row.get('name')}** — {ROAD_SITE_LABEL.get(str(row.get('kind')),'a place')} on the {' – '.join(leg)} road. "
+                      "It is on your map now: reach it with **/travel** from either end.")
     merchants=""
     for row in list(result.get("merchant_encounters") or []):
         if not isinstance(row,dict):continue
@@ -1310,7 +1361,7 @@ async def travel(interaction: discord.Interaction, destination: str) -> None:
         row=next((r for r in rows if str(r.get("world_name"))==world_name),None)
         if row: meeting=f"\n💬 Public meeting channel: <#{int(row['channel_id'])}>."
     await interaction.followup.send(
-        f"🗺️ **{c['name']} travels to {result.get('destination') or destination}.**\n{desc}{gate_line}{envoy_line}{shop_line}{road}{merchants}{safe}{meeting}"
+        f"🗺️ **{c['name']} travels to {result.get('destination') or destination}.**\n{desc}{gate_line}{envoy_line}{shop_line}{road}{merchants}{safe}{meeting}{site_line}{sites_found}"
     )
     for location in sorted(undiscovered_image_locations):
         if travel_first_discovers_location(

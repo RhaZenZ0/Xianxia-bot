@@ -541,6 +541,140 @@ async def shop_sell_item_autocomplete(interaction:discord.Interaction,current:st
     return choices[:25]
 
 
+trade_group=app_commands.Group(name="trade",description="Trade directly with another cultivator at the inn - offer, accept, decline")
+
+
+def _trade_side(rows:list[dict[str,Any]],stones:int)->str:
+    parts=[f"{row.get('name')} ×{int(row.get('quantity') or 0)}" for row in rows if isinstance(row,dict)]
+    if stones:parts.append(f"{stones} spirit stones")
+    return ", ".join(parts) if parts else "nothing"
+
+
+def _trade_line(offer:dict[str,Any])->str:
+    return (f"**#{int(offer.get('offer_id') or 0)}** {offer.get('from_name')} → {offer.get('to_name')}: gives {_trade_side(list(offer.get('give_items') or []),int(offer.get('give_stones') or 0))}; "
+            f"wants {_trade_side(list(offer.get('want_items') or []),int(offer.get('want_stones') or 0))}")
+
+
+@registered_group_command(trade_group, name="offer",description="Offer another cultivator at this inn a trade: what you give, what you want")
+@serialized_user_action
+async def trade_offer(interaction:discord.Interaction,player:discord.Member,give_item:str="",give_quantity:app_commands.Range[int,1,100]=1,give_stones:app_commands.Range[int,0,100000]=0,want_item:str="",want_quantity:app_commands.Range[int,1,100]=1,want_stones:app_commands.Range[int,0,100000]=0)->None:
+    await interaction.response.defer(ephemeral=False)
+    if not await require_character(interaction): return
+    wt=await current_world_time()
+    payload={"to_user_id":int(player.id),"give_items":({give_item:int(give_quantity)} if give_item else {}),"give_stones":int(give_stones),
+             "want_items":({want_item:int(want_quantity)} if want_item else {}),"want_stones":int(want_stones),"game_minute":wt.total_minutes}
+    try:
+        envelope=await ENGINE.authoritative_action("trade.offer",interaction.user.id,payload,action_id=f"discord:{interaction.id}:trade.offer")
+        result=dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
+    await interaction.followup.send(
+        f"🤝 {player.mention} — **{result.get('from_name')}** offers you a trade at **{result.get('location')}**:\n{_trade_line(result)}\n"
+        f"Accept with **/economy → Trade → Accept** (offer #{int(result.get('offer_id') or 0)}), or decline. The offer stands for two hours of game time and moves nothing until you accept.",
+        ephemeral=False,
+    )
+
+
+@trade_offer.autocomplete("give_item")
+async def trade_offer_give_item_autocomplete(interaction:discord.Interaction,current:str)->list[app_commands.Choice[str]]:
+    return await carried_item_autocomplete(interaction,current)
+
+
+@trade_offer.autocomplete("want_item")
+async def trade_offer_want_item_autocomplete(interaction:discord.Interaction,current:str)->list[app_commands.Choice[str]]:
+    needle=current.lower().strip()
+    choices=[]
+    for item_id,item in WORLD.items.items():
+        if item.get("market_excluded") or item.get("auction_interest") or item.get("type")=="manual":continue
+        name=str(item.get("name") or item_id)
+        if needle and needle not in name.lower() and needle not in item_id.lower():continue
+        choices.append(app_commands.Choice(name=name[:100],value=item_id))
+    return choices[:25]
+
+
+async def _trade_status(user_id:int)->dict[str,Any]:
+    return dict(await ENGINE.action("trade.status",user_id,{}) or {})
+
+
+@registered_group_command(trade_group, name="status",description="The trade offers you have made and been made, at this inn")
+async def trade_status(interaction:discord.Interaction)->None:
+    if not await require_character(interaction): return
+    try:
+        status=await _trade_status(interaction.user.id)
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
+    lines=["🤝 **Trades**"]
+    if not bool(status.get("at_inn")):
+        lines.append("Trades are struck at an inn's long table - go to the city's inn (**/world → City → Inn**) and find your counterpart there.")
+    made=list(status.get("offers_made") or []); received=list(status.get("offers_received") or [])
+    lines.append("**Offered to you:** "+("\n".join("• "+_trade_line(o) for o in received) if received else "nothing open"))
+    lines.append("**You have offered:** "+("\n".join("• "+_trade_line(o) for o in made) if made else "nothing open"))
+    lines.append("**Accept** or **Decline** by offer number; the one who offered can withdraw with Decline too.")
+    await reply_long(interaction,"\n".join(lines))
+
+
+async def _trade_offer_autocomplete(interaction:discord.Interaction,current:str,*,received_only:bool)->list[app_commands.Choice[int]]:
+    try:
+        status=await _trade_status(interaction.user.id)
+    except Exception:
+        return []
+    rows=list(status.get("offers_received") or [])+([] if received_only else list(status.get("offers_made") or []))
+    needle=current.lower().strip()
+    choices=[]
+    for offer in rows:
+        label=_trade_line(offer).replace("**","")
+        if needle and needle not in label.lower():continue
+        choices.append(app_commands.Choice(name=label[:100],value=int(offer.get("offer_id") or 0)))
+    return choices[:25]
+
+
+@registered_group_command(trade_group, name="accept",description="Accept a trade offered to you - both hands are checked, then the goods change hands")
+@serialized_user_action
+async def trade_accept(interaction:discord.Interaction,offer:int)->None:
+    await interaction.response.defer(ephemeral=False)
+    if not await require_character(interaction): return
+    wt=await current_world_time()
+    try:
+        envelope=await ENGINE.authoritative_action("trade.accept",interaction.user.id,{"offer_id":int(offer),"game_minute":wt.total_minutes},action_id=f"discord:{interaction.id}:trade.accept")
+        result=dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
+    if bool(result.get("lapsed")):
+        await interaction.followup.send(f"⌛ Offer #{int(offer)} lapsed before it was accepted - {result.get('from_name')} would have to offer again.",ephemeral=False); return
+    await interaction.followup.send(
+        f"🤝 **Struck.** <@{int(result.get('from_user_id') or 0)}> and **{result.get('to_name')}** trade at **{result.get('location')}**: "
+        f"{result.get('from_name')} hands over {_trade_side(list(result.get('give_items') or []),int(result.get('give_stones') or 0))} "
+        f"for {_trade_side(list(result.get('want_items') or []),int(result.get('want_stones') or 0))}.",
+        ephemeral=False,
+    )
+
+
+@trade_accept.autocomplete("offer")
+async def trade_accept_offer_autocomplete(interaction:discord.Interaction,current:str)->list[app_commands.Choice[int]]:
+    return await _trade_offer_autocomplete(interaction,current,received_only=True)
+
+
+@registered_group_command(trade_group, name="decline",description="Decline a trade offered to you, or withdraw one you made")
+@serialized_user_action
+async def trade_decline(interaction:discord.Interaction,offer:int)->None:
+    await interaction.response.defer(ephemeral=False)
+    if not await require_character(interaction): return
+    wt=await current_world_time()
+    try:
+        envelope=await ENGINE.authoritative_action("trade.decline",interaction.user.id,{"offer_id":int(offer),"game_minute":wt.total_minutes},action_id=f"discord:{interaction.id}:trade.decline")
+        result=dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
+    verb="withdrawn" if str(result.get("status"))=="withdrawn" else "declined"
+    other=int(result.get("from_user_id") or 0) if verb=="declined" else int(result.get("to_user_id") or 0)
+    await interaction.followup.send(f"🤝 Offer #{int(offer)} {verb}. <@{other}> — {_trade_line(result)}.",ephemeral=False)
+
+
+@trade_decline.autocomplete("offer")
+async def trade_decline_offer_autocomplete(interaction:discord.Interaction,current:str)->list[app_commands.Choice[int]]:
+    return await _trade_offer_autocomplete(interaction,current,received_only=False)
+
+
 civilization_group=app_commands.Group(name="civilization",description="Inspect the living population, security and activity of world regions")
 
 

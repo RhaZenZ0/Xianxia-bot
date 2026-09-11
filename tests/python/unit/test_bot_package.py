@@ -774,13 +774,14 @@ SURFACE = {
         },
     },
     "commands/economy.py": {
-        "groups": ('storage_group', 'auction_group', 'merchant_group', 'shop_group', 'civilization_group', 'market_group', 'blackmarket_group'),
+        "groups": ('storage_group', 'auction_group', 'merchant_group', 'shop_group', 'trade_group', 'civilization_group', 'market_group', 'blackmarket_group'),
         "roots": ('wallet', 'use'),
         "leaves": {
             "storage_group": ('status', 'deposit', 'withdraw'),
             "auction_group": ('enter', 'leave', 'browse', 'sell', 'bid'),
             "merchant_group": ('status', 'buy'),
             "shop_group": ('here', 'browse', 'buy', 'sell'),
+            "trade_group": ('offer', 'status', 'accept', 'decline'),
             "civilization_group": ('status', 'npcs'),
             "blackmarket_group": ('rumors', 'status', 'buy', 'sell'),
             "market_group": ('prices', 'buy', 'sell'),

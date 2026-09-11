@@ -70,6 +70,15 @@ func TestExploreDiscoveryStaysOnTheRoadFrontierNotAnywhereInTheWorld(t *testing.
 	if loc == distantCity {
 		t.Fatalf("explore surfaced %q, which is not on the road frontier of anything known yet", distantCity)
 	}
+	// A road-side site (v0.39.0) on a road out of a known city is on the
+	// same first ring: its leg touches the capital.
+	catalog := districtCatalog(t)
+	if a, b, ok := roadSiteEndpoints(catalog, loc); ok {
+		if a != "Azure Crown Imperial City" && b != "Azure Crown Imperial City" {
+			t.Fatalf("discovered the road-side site %q on the %s-%s road, which touches nothing known", loc, a, b)
+		}
+		return
+	}
 	if !firstRingFrontier[loc] {
 		t.Fatalf("discovered %q, which is outside the expected first-ring road frontier %v", loc, firstRingFrontier)
 	}

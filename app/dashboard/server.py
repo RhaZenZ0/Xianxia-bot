@@ -1738,6 +1738,7 @@ class AdminDashboardController:
                 "black_markets": True,
                 "autonomous_world_events": True,
                 "merchants": True,
+                "secret_realms": True,
             }
             row = await self.store._fetchone(db, "SELECT value_json FROM world_state WHERE key='automation_settings'")
             if row:

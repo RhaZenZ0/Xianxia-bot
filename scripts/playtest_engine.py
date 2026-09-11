@@ -418,7 +418,86 @@ async def run(url: str, token: str, db_path: str) -> Report:
     if inn:
         await step(report, "walk to the inn", act("exploration.travel", PLAYER, {"destination": inn, "mode": "known"}))
 
-    # ---- 12. backups -------------------------------------------------------
+    # ---- 12. the roads, the higher worlds, the trade (v0.39.0) --------------
+    # A site on every road: walking the Greenriver-Riverguard road finds the
+    # shrine on it, the shrine is half a leg from either end and leads back
+    # to them; the hunting ground's edge; the waystation's stall. A trade at
+    # the inn, confirmed on both sides. A realm opens on the rotation. The
+    # higher worlds have their own sects and goods.
+    sites = {n: l for n, l in locations.items() if l.get("road_site")}
+    report.add("PASS" if len(sites) >= 50 else "FAIL", "a site on every road", f"{len(sites)} sites")
+    shrine = next((n for n, l in sites.items() if l["road_site"] == "shrine" and set(l["road_leg"]) == {"Greenriver Town", "Riverguard City"}), "")
+    await step(report, "teleport to Greenriver Town", gm("admin.player.teleport", {"user_id": PLAYER, "location": "Greenriver Town", "reason": "playtest"}))
+    walked = await step(report, "exploration.travel Greenriver -> Riverguard finds the shrine", act("exploration.travel", PLAYER, {"destination": "Riverguard City", "mode": "known"}))
+    found_sites = [str(r.get("name")) for r in list((walked or {}).get("road_sites_found") or [])]
+    report.add("PASS" if shrine and shrine in found_sites else "FAIL", "the shrine on the road is found by walking it", ", ".join(found_sites) or "nothing found")
+    await step(report, "advance time to arrive", gm("admin.world.advance_time", {"minutes": int((walked or {}).get("travel_minutes") or 0) + 5, "reason": "playtest"}))
+    if shrine:
+        hop = await step(report, "exploration.travel to the shrine (half a leg)", act("exploration.travel", PLAYER, {"destination": shrine, "mode": "known"}))
+        if hop is not None:
+            report.add("PASS" if str(hop.get("site_kind")) == "shrine" and str(hop.get("arrived_at")) == shrine else "FAIL", "arrival at the shrine", f"{hop.get('arrived_at')} ({hop.get('site_kind')})")
+            await step(report, "advance time to arrive", gm("admin.world.advance_time", {"minutes": int(hop.get("travel_minutes") or 0) + 5, "reason": "playtest"}))
+        await step(report, "the shrine refuses the hunt", act("exploration.hunt", PLAYER, {"cooldown_seconds": 0}), expect_error="shrine")
+        await step(report, "from the shrine the road leads only to its ends", act("exploration.travel", PLAYER, {"destination": "Azure Crown Imperial City", "mode": "known"}), expect_error="leads back to")
+        back = await step(report, "exploration.travel shrine -> Greenriver Town", act("exploration.travel", PLAYER, {"destination": "Greenriver Town", "mode": "known"}))
+        await step(report, "advance time to arrive", gm("admin.world.advance_time", {"minutes": int((back or {}).get("travel_minutes") or 0) + 5, "reason": "playtest"}))
+    ground = next((n for n, l in sites.items() if l["road_site"] == "hunting_ground" and l["world"] == "Mortal World"), "")
+    if ground:
+        await step(report, "teleport to a hunting ground", gm("admin.player.teleport", {"user_id": PLAYER, "location": ground, "reason": "playtest"}))
+        await step(report, "reset cooldowns", gm("admin.player.reset_cooldowns", {"user_id": PLAYER, "reason": "playtest"}))
+        hunt = await step(report, "exploration.hunt on the hunting ground", act("exploration.hunt", PLAYER, {"cooldown_seconds": 0}))
+        if hunt is not None:
+            report.add("PASS" if int(hunt.get("site_bonus") or 0) > 0 else "FAIL", "the hunting ground's edge", f"site_bonus={hunt.get('site_bonus')}")
+    waystation = next((n for n, l in sites.items() if l["road_site"] == "waystation" and l["world"] == "Mortal World"), "")
+    if waystation:
+        await step(report, "teleport to a waystation", gm("admin.player.teleport", {"user_id": PLAYER, "location": waystation, "reason": "playtest"}))
+        stall = await step(report, "shop.browse at the waystation stall", engine.action("shop.browse", PLAYER, {}))
+        report.add("PASS" if stall and str(stall.get("kind")) == "waystation" and list(stall.get("stock") or []) else "FAIL", "the stall has a shelf", f"kind={(stall or {}).get('kind')}")
+    # The trade: both at the capital's inn.
+    if inn:
+        for uid in (PLAYER, BUYER):
+            await step(report, f"teleport {uid} to the inn", gm("admin.player.teleport", {"user_id": uid, "location": inn, "reason": "playtest"}))
+        await step(report, "the seller carries a herb", gm("admin.player.adjust_item", {"user_id": PLAYER, "item_id": "spirit_herb", "quantity": 2, "reason": "playtest"}))
+        await step(report, "the buyer carries a pill", gm("admin.player.adjust_item", {"user_id": BUYER, "item_id": "recovery_pill", "quantity": 1, "reason": "playtest"}))
+        offer = await step(report, "trade.offer (a herb for a pill)", act("trade.offer", PLAYER, {"to_user_id": BUYER, "give_items": {"spirit_herb": 1}, "want_items": {"recovery_pill": 1}}))
+        offer_id = int((offer or {}).get("offer_id") or 0)
+        if offer_id:
+            status = await step(report, "trade.status for the buyer", engine.action("trade.status", BUYER, {}))
+            report.add("PASS" if status and any(int(o.get("offer_id") or 0) == offer_id for o in list(status.get("offers_received") or [])) else "FAIL", "the buyer sees the offer", f"#{offer_id}")
+            await step(report, "the offerer cannot accept their own offer", act("trade.accept", PLAYER, {"offer_id": offer_id}), expect_error="not made to you")
+            struck = await step(report, "trade.accept", act("trade.accept", BUYER, {"offer_id": offer_id}))
+            report.add("PASS" if struck and struck.get("accepted") else "FAIL", "the trade is struck", f"status={(struck or {}).get('status')}")
+            inv = dict(await db.get_inventory(BUYER) or {})
+            report.add("PASS" if int(inv.get("spirit_herb", 0)) >= 1 else "FAIL", "the herb changed hands", f"buyer carries {inv.get('spirit_herb', 0)}")
+            await step(report, "a struck offer cannot be struck twice", act("trade.accept", BUYER, {"offer_id": offer_id}), expect_error="accepted")
+    # The rotation opens a realm on the tick.
+    await step(report, "the rotation opens the first realm", engine.run_due_simulation(await clock(), {"maintenance_cleanup": True, "secret_realms": True}))
+    open_realms = await step(report, "active world events", db.get_active_world_events())
+    if open_realms is not None:
+        names = [str(r.get("title")) for r in open_realms if str(r.get("event_type")) == "secret_realm"]
+        report.add("PASS" if names else "FAIL", "a secret realm is open somewhere", ", ".join(names) or "none")
+    realms = dict(world.get("secret_realms") or {})
+    report.add("PASS" if len(realms) >= 8 else "FAIL", "eight realms on the rotation", f"{len(realms)} realms")
+    # The higher worlds: sects and goods.
+    sects_by_world: dict[str, list[str]] = {}
+    for sect_name, sect in dict(world.get("sects") or {}).items():
+        rec = dict(sect.get("recruitment") or {})
+        where = dict(locations.get(str(rec.get("location") or "")) or {})
+        if where:
+            sects_by_world.setdefault(str(where.get("world")), []).append(sect_name)
+    report.add("PASS" if all(len(sects_by_world.get(w, [])) >= 2 for w in ("Spiritual World", "Immortal World", "Celestial World")) else "FAIL",
+               "two sects in every higher world", "; ".join(f"{w}: {len(v)}" for w, v in sorted(sects_by_world.items())))
+    recipes = dict(world.get("recipes") or {})
+    report.add("PASS" if len(recipes) >= 27 else "FAIL", "recipes for the higher worlds", f"{len(recipes)} recipes")
+    higher = next((n for n, l in locations.items() if l.get("shop") and l["world"] == "Immortal World" and not l.get("road_site")), "")
+    if higher:
+        await step(report, "teleport to an Immortal World shop", gm("admin.player.teleport", {"user_id": PLAYER, "location": higher, "reason": "playtest"}))
+        shelf = await step(report, "shop.browse in the Immortal World", engine.action("shop.browse", PLAYER, {}))
+        ids = {str(l.get("item_id")) for l in list((shelf or {}).get("stock") or [])}
+        report.add("PASS" if ids & {"immortal_gold_ore", "immortal_gold_sabre", "dawnlotus_herb", "dawnlotus_vitality_pill", "golden_edge_talisman", "immortal_marrow_pill", "immortal_gold_plate"} else "FAIL",
+                   "the Immortal World's own goods are on the shelf", ", ".join(sorted(ids))[:120])
+
+    # ---- 13. backups -------------------------------------------------------
     backup = await step(report, "create a backup", transport.create_backup())
     listed = await step(report, "list backups", transport.list_backups())
     if backup and listed is not None and not any(row.get("name") == backup.get("name") for row in listed):

@@ -30,7 +30,7 @@ def _body(source: str, name: str) -> str:
 class TheEngineOwnsTheWalk(unittest.TestCase):
     def test_arrival_is_at_the_facing_gate_and_the_parts_are_known(self):
         exploration = (GO / "game" / "exploration_actions.go").read_text(encoding="utf-8")
-        for needle in ("func cityOf(", "func cityPartsOf(", "func gateFacing(", 'gateFacing(catalog, p.Destination, route[len(route)-2])', '"arrived_at":', '"left_by_gate":', '"city_parts":', "canonicalRoadRoute(catalog, originCity, p.Destination, c.RealmIndex)"):
+        for needle in ("func cityOf(", "func cityPartsOf(", "func gateFacing(", 'gateFacing(catalog, p.Destination, roadFacingNeighbour(catalog, p.Destination, route[len(route)-2]))', '"arrived_at":', '"left_by_gate":', '"city_parts":', "canonicalRoadRoute(catalog, originCity, p.Destination, c.RealmIndex)"):
             self.assertIn(needle, exploration, needle)
         # Shops, halls and merchants are reached from any part of the city.
         self.assertIn("cityShopKeys(catalog, cityOf(catalog, c.Location))", (GO / "game" / "shop_actions.go").read_text(encoding="utf-8"))

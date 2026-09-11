@@ -217,7 +217,13 @@ class CityShopContentTests(unittest.TestCase):
             with self.subTest(shop=key):
                 interior = locations[shop["location"]]
                 self.assertEqual(interior.get("shop"), key)
-                self.assertEqual(interior.get("outside_location"), shop["city"])
+                if shop["kind"] == "waystation":
+                    # A waystation's stall (v0.39.0) is the waystation itself:
+                    # no door, no city, the road either side.
+                    self.assertEqual(shop["location"], shop["city"])
+                    self.assertEqual(interior.get("road_site"), "waystation")
+                else:
+                    self.assertEqual(interior.get("outside_location"), shop["city"])
                 self.assertTrue(interior.get("safe_zone"), "a shop is a protected interior")
                 self.assertEqual(interior["world"], shop["world"])
                 # v0.36.0: a capital's shops are a tier better and dearer.
@@ -358,3 +364,57 @@ class CityLifeContentTests(unittest.TestCase):
                 want = 4 if locations[city].get("realm_hub") else (1 if city == "Greenriver Town" else 2)
                 self.assertGreaterEqual(len(by_city.get(city, [])), want, f"{city} board is thin")
                 self.assertEqual(len({c["quest_key"] for c in by_city.get(city, [])}), len(by_city.get(city, [])))
+
+
+class RoadSideSiteContentTests(unittest.TestCase):
+    """v0.39.0: a place on every road between two cities."""
+
+    KINDS = ("waystation", "hunting_ground", "ruin", "shrine")
+
+    def _sites(self):
+        return {name: loc for name, loc in WORLD["locations"].items() if loc.get("road_site")}
+
+    def test_every_road_carries_exactly_one_site_of_a_known_kind(self):
+        locations = WORLD["locations"]
+        edges = {tuple(sorted((name, road))) for name, loc in locations.items() if not loc.get("road_site") for road in loc.get("roads", [])}
+        by_leg = {}
+        for name, loc in self._sites().items():
+            with self.subTest(site=name):
+                self.assertIn(loc["road_site"], self.KINDS)
+                leg = tuple(sorted(str(x) for x in loc.get("road_leg") or []))
+                self.assertEqual(len(leg), 2, "a site lies on one road between two cities")
+                self.assertIn(leg, edges, f"{name} lies on no road")
+                self.assertEqual({locations[leg[0]]["world"], locations[leg[1]]["world"]}, {loc["world"]})
+                self.assertEqual(int(loc.get("min_realm_index") or 0), max(int(locations[x].get("min_realm_index") or 0) for x in leg))
+                self.assertFalse(loc.get("roads"), "a site is reached by its leg, not by roads of its own")
+                self.assertFalse(loc.get("outside_location") or loc.get("district") or loc.get("auction_house"))
+                by_leg.setdefault(leg, []).append(name)
+        for edge in edges:
+            with self.subTest(road=edge):
+                self.assertEqual(len(by_leg.get(edge, [])), 1, f"the {edge[0]}-{edge[1]} road should carry one site")
+
+    def test_each_world_has_every_kind_and_the_safe_ones_are_safe(self):
+        by_world = {}
+        for name, loc in self._sites().items():
+            by_world.setdefault(loc["world"], set()).add(loc["road_site"])
+            with self.subTest(site=name):
+                self.assertEqual(bool(loc.get("safe_zone")), loc["road_site"] in ("waystation", "shrine"))
+        for world, kinds in by_world.items():
+            with self.subTest(world=world):
+                self.assertEqual(kinds, set(self.KINDS))
+
+    def test_a_waystation_keeps_a_stall_and_the_others_do_not(self):
+        shops, npcs = WORLD["shops"], WORLD["npcs"]
+        for name, loc in self._sites().items():
+            with self.subTest(site=name):
+                if loc["road_site"] != "waystation":
+                    self.assertFalse(loc.get("shop"))
+                    continue
+                shop = shops[loc["shop"]]
+                self.assertEqual(shop["kind"], "waystation")
+                self.assertEqual(shop["location"], name)
+                self.assertEqual(shop["city"], name)
+                self.assertEqual(npcs[shop["keeper"]]["location"], name)
+                self.assertGreaterEqual(len(shop["sells"]), 3)
+                self.assertGreaterEqual(len(shop["buys"]), 2)
+

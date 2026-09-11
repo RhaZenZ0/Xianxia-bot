@@ -1009,6 +1009,42 @@ Gate: `tests/python/contracts/test_security_defaults.py` and `TestNewRefusesAnEn
 No schema change (still 32), no game-rule change, AI remains narration-only.
 
 
+**0.39.0** is a feature release: **the roads, the higher worlds, the trade.** Schema **39**.
+
+Six things the content track had left thin, built together. *The roads:* a place on every one of
+the fifty-three roads between two cities - sixteen waystations, thirteen hunting grounds, twelve
+ruins and twelve shrines, each with a named keeper, hunter, scavenger or hermit. A waystation or a
+shrine stands on the road and is found by whoever walks the leg; a hunting ground or a ruin lies
+off it and is found one time in two, or by exploring from either city. A site is travelled to as
+half the leg from either end, the road leads on from it to either end and nowhere else, and a city
+reached from a site is entered by the gate facing that road. A waystation keeps a stall (the shop
+machinery, tier by world, road prices) and stands on the merchants' road: at one the player is on
+the leg, and meets whoever walks it. A hunting ground gives the hunt +2 and half again the spoils;
+a shrine refuses the hunt and steadies the mind (+3 insight on explore); a ruin gives up twice what
+open ground would, and is where the new realms open. *Sects in every world:* two per higher world -
+the Jade Meridian Sect and Thousand Beast Valley in the Spiritual World, the Heavenblade Immortal
+Sect and the Ashen Lotus Pavilion in the Immortal, the Celestial Mandate Academy and the Void
+Serpent Cult in the Celestial - each with a gate, an examiner, a trial and an entry manual of its
+own (tier 0, as every entry manual is; the gate's realm floor is what keeps a mortal from it), and
+the envoys' hall of each capital lists them. *Goods for the higher worlds:* an ore, a herb, a
+weapon, an armour, two pills and a talisman per world, with fifteen recipes; the shops of a world
+stock its own goods from its tier up, the higher worlds' merchants carry them, and the arms sit in
+the engine's equipment tables beside the mortal ones. *Secret realms on rotation:* five more realms,
+each at a ruin by a road - the Salt King's Barrow, the Broken Pagoda Sutra Hall, the Toppled Stele
+Sword Field, the Weeping Wall Sanctum, the Hollow Throne Vault - each with an inheritance and a
+relic; and the world tick now opens the eight realms in turn, one every three game days, at its own
+entrance for its own hours, so a realm at a ruin nobody stands at still opens. The opening is a
+public history row, so the rumours carry it; `secret_realms` is the automation switch. *Typed play
+with two arguments:* a verb-table root may declare several arguments, each with its own source -
+a known place, a carried item, an NPC present, a player present - and `$ I give the pill to Li
+Feng` is a trade offer to Li Feng; `$ I sell the sword to the smith` sells it. *Trade at the inn:*
+`trade.offer`, `trade.accept`, `trade.decline` and `trade.status` - one cultivator offers another
+at the same inn what they give and what they want; nothing moves until the other accepts, the
+accept checks both hands again, a lapsed offer closes as a result rather than an error, and a new
+offer to the same person replaces the old. Schema 39 adds `trade_offers`. Under **/economy →
+Trade**. `scripts/playtest_engine.py` walks the road to the shrine and back, hunts the ground,
+browses the stall, strikes a trade, opens a realm on the tick and browses an Immortal World shelf.
+
 **0.38.1** is a GUI point release: **results in the panel.** No schema change.
 
 Since the Components V2 layout (v0.19.10) every hub action answered beside the panel with a new
@@ -1513,9 +1549,13 @@ directory to one file, requires each check to appear before the release job and 
 and requires the release job to wait on all three.
 
 
-## Release status — v0.38.1
+## Release status — v0.39.0
 
-- Current release: v0.38.1: results in the panel - a plain, short hub result edits the panel in
+- Current release: v0.39.0 (schema 39): the roads, the higher worlds, the trade - a place on every
+  road (waystations with stalls, hunting grounds, ruins, shrines), two sects and a tier of goods in
+  every higher world, eight secret realms opened in turn by the tick, typed play with two arguments,
+  and trade between cultivators at the inn.
+- v0.38.1: results in the panel - a plain, short hub result edits the panel in
   place instead of spawning a message; embeds, results with buttons, files and long text still land
   beside it.
 - v0.38.0: city life - a quest pavilion in every capital and a notice board at every
@@ -1729,6 +1769,7 @@ and requires the release job to wait on all three.
 - **Schema 27** added the v0.19.29 mute/freeze moderation columns on `characters`
   (`is_muted`, `is_frozen`, `moderation_reason`).
 - **Schema 28** added the Quest Forge definition table (`quest_definitions`).
+- **Schema 39** added the trade offers between cultivators (`trade_offers`) (v0.39.0).
 - **Schema 38** added the merchant holding a lot's high bid (`auctions.merchant_bidder`) (v0.37.0).
 - **Schema 37** added the city shops' shelves (`shop_state`, `shop_stock`) (v0.35.0).
 - **Schema 36** added the playtest board (`playtest_channel_id`, `playtest_items`) and the travelling

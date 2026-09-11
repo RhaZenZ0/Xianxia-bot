@@ -83,6 +83,14 @@ async def _known_locations(user_id: int, character: dict[str, Any]) -> set[str]:
         for name, data in WORLD.locations.items():
             if data.get("district") and str(data.get("outside_location")) == city:
                 known.add(name)
+        # At a road-side site (v0.39.0) the road runs both ways: both ends
+        # of its leg are known, and every other site on that leg.
+        leg = [str(x) for x in list(current_data.get("road_leg") or [])] if current_data.get("road_site") else []
+        if len(leg) == 2:
+            known.update(leg)
+            for name, data in WORLD.locations.items():
+                if data.get("road_site") and sorted(str(x) for x in data.get("road_leg") or []) == sorted(leg):
+                    known.add(name)
         for neighbor in current_data.get("roads", []):
             neighbor_name = str(neighbor)
             neighbor_data = WORLD.locations.get(neighbor_name) or {}

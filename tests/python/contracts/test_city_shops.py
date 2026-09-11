@@ -72,7 +72,7 @@ class TheSlashSurface(unittest.TestCase):
     def test_the_economy_hub_has_the_page(self):
         self.assertIn('_hub_page("shop", "City Shops"', SURFACE)
         self.assertIn('"shop": shop_group,', SURFACE)
-        self.assertIn('"merchant", "shop", "blackmarket",', SURFACE)
+        self.assertIn('"merchant", "shop", "trade", "blackmarket",', SURFACE)
 
 
 class FindingAndEntering(unittest.TestCase):

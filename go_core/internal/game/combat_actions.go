@@ -97,7 +97,7 @@ func combatCompanionBonus(conn *storage.Conn, userID int64) (int64, error) {
 // Keep bugslayer_sword's tuple here in sync with both that map and
 // app/advanced_runtime.py's EQUIPMENT_DEFINITIONS - see
 // tests/python/contracts/test_equipment_stat_parity.py.
-var equipDefs = map[string][4]int64{"spirit_iron_sword": {4, 0, 1, 0}, "spirit_iron_armor": {0, 5, 1, -1}, "cloud_stepping_boots": {0, 1, 0, 4}, "lesser_stygian_seal": {1, 1, 4, 0}, "bone_comb": {0, 0, 5, 1}, "cracked_nether_mirror": {0, 2, 3, 0}, bugslayerSwordItemID: {5, 1, 1, 1}}
+var equipDefs = map[string][4]int64{"spirit_iron_sword": {4, 0, 1, 0}, "spirit_iron_armor": {0, 5, 1, -1}, "cloud_stepping_boots": {0, 1, 0, 4}, "lesser_stygian_seal": {1, 1, 4, 0}, "bone_comb": {0, 0, 5, 1}, "cracked_nether_mirror": {0, 2, 3, 0}, bugslayerSwordItemID: {5, 1, 1, 1}, "spirit_crystal_sword": {6, 0, 2, 0}, "spirit_crystal_mail": {0, 8, 2, -1}, "immortal_gold_sabre": {9, 1, 3, 0}, "immortal_gold_plate": {1, 12, 3, -1}, "starsteel_glaive": {13, 1, 4, 1}, "starsteel_aegis": {1, 17, 4, 0}}
 
 func combatEquipment(conn *storage.Conn, userID int64) (attack, defense, spirit, agility int64, err error) {
 	r, e := conn.Execute(`SELECT item_id,durability,max_durability,quality FROM equipment_instances WHERE user_id=? AND equipped=1 AND durability>0`, []any{userID})
