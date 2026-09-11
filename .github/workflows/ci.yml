@@ -13,7 +13,7 @@ name: CI
 # manifest, builds xianxia_rp_v<version>.zip exactly as the hand-packaged
 # releases were built, writes its SHA-256 sidecar, and attaches both to a
 # GitHub Release. update.sh --fetch and the bot's update-check worker read
-# nothing else. (Release channel: v0.20.4, docs/V020_RELEASE_NOTES.md.)
+# nothing else. (Release channel: v0.20.4, docs/history/V020_RELEASE_NOTES.md.)
 
 on:
   push:

@@ -138,7 +138,7 @@ v0.17 starts from v0.16 so it retains the newer Go mechanics, then restores the 
 - Clan branch names remain unique rather than repeating `Distant Branch`.
 - Conservative NPC bootstrap ages avoid the current lifespan/death-model mismatch.
 - Bootstrap HTTP body is capped at 1 MiB.
-- Current docs are versioned as v0.17; v0.15/v0.16 release audits live under `docs/migration_history/`.
+- Current docs are versioned as v0.17; v0.15/v0.16 release audits live under `docs/history/`.
 
 ## Test-file delta notes
 

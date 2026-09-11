@@ -1,6 +1,6 @@
 """The #bugs forum channel: guidelines post, tag sync, open reports.
 
-Phase 6 of the main.py split (v0.19.41, docs/MAIN_SPLIT_PLAN.md). Reads
+Phase 6 of the main.py split (v0.19.41, docs/history/MAIN_SPLIT_PLAN.md). Reads
 runtime and discord; never main.py, never the other admin modules.
 Definition order is the order these had in main.py.
 """

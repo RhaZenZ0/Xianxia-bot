@@ -2,7 +2,7 @@
 registers with Discord, the hub page tables, the /admin panel root, the
 application-command error handler, and the event-handler bindings.
 
-Split phase 10 (v0.20.0, docs/MAIN_SPLIT_PLAN.md). Cut verbatim from
+Split phase 10 (v0.20.0, docs/history/MAIN_SPLIT_PLAN.md). Cut verbatim from
 main.py, which is now the composition root and nothing else. This module
 imports every command module whose groups or status handlers it wires;
 the modules that define only root commands (commands/sense.py) and the

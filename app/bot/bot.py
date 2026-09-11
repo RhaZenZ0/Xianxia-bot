@@ -1,6 +1,6 @@
 """The bot class and the single bot instance.
 
-Phase 8 of the main.py split (v0.19.43, docs/MAIN_SPLIT_PLAN.md). XianxiaBot
+Phase 8 of the main.py split (v0.19.43, docs/history/MAIN_SPLIT_PLAN.md). XianxiaBot
 owns startup phases, the health and event-expiry workers, and on_message; the
 instance is created here and main.py (the composition root) registers the
 command surface on it. Nothing here imports main.py.

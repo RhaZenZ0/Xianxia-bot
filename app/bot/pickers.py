@@ -1,6 +1,6 @@
 """Shared option providers that need the live services.
 
-Phase 7 of the main.py split (v0.19.42, docs/MAIN_SPLIT_PLAN.md). Autocomplete
+Phase 7 of the main.py split (v0.19.42, docs/history/MAIN_SPLIT_PLAN.md). Autocomplete
 callbacks are named as bare decorator arguments, so anything two modules both
 decorate with must be importable from below both of them - never behind a
 deferred import. carried_item_autocomplete already lives in runtime.py for

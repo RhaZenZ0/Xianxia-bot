@@ -1,7 +1,7 @@
 # Xianxia RP v0.19 — Cultivation Depth & Consistency Pass
 
 The v0.19 line ends at **v0.19.48**; v0.20.0 (the `main.py` split completed) and later are in
-`docs/V020_RELEASE_NOTES.md`. This file covers the whole v0.19 line: v0.19 itself, the v0.19.5
+`docs/history/V020_RELEASE_NOTES.md`. This file covers the whole v0.19 line: v0.19 itself, the v0.19.5
 GUI release (the Components V2 hub layout), v0.19.6, which fixes the findings of an
 external audit, v0.19.25, a production-review pass covering the late-Discord-ack
 architecture, persistent event-scene timeouts, `/explore`'s road-discovery logic, and
@@ -215,7 +215,7 @@ Fixed two dangling doc references the deletions created.
 
 A later pass in this same release archived the three remaining V017-era docs
 (`V017_COMPARISON_AND_MERGE.md`, `V017_RELEASE_NOTES.md`,
-`V017_REMAINING_AUTHORITY_GAPS.md`) into `docs/migration_history/` alongside
+`V017_REMAINING_AUTHORITY_GAPS.md`) into `docs/history/` alongside
 the existing V015/V016 archive — confirmed unreferenced elsewhere first —
 and fixed `README.md`, which had drifted to a mix of "v0.18" section
 headings and schema **21**/**22** references despite the code being on
@@ -1179,7 +1179,7 @@ unreachable once cleared.
 
 Measured on this tree before regenerating: 42 wrong hashes, 14 entries pointing at files
 that no longer existed, 22 packaged files listed nowhere. The 14 "missing" turned out to be
-benign — documentation that had moved into `docs/` and `docs/migration_history/`, which is
+benign — documentation that had moved into `docs/` and `docs/history/`, which is
 also where 14 of the 22 "unlisted" came from — but a manifest in that state is worse than
 no manifest, because it looks like an integrity guarantee and is not one. `update.sh` never
 verified it in any case.
@@ -3640,7 +3640,7 @@ line.
 ## v0.19.33 — main.py split, phase 1: the tests move first
 
 No code under `app/` changes in this release. It is the scaffolding phase of
-`docs/MAIN_SPLIT_PLAN.md` (shipped with this release): everything that has to be
+`docs/history/MAIN_SPLIT_PLAN.md` (shipped with this release): everything that has to be
 true of the test suite *before* any more code leaves `app/bot/main.py`, done as
 its own release so the later phases are pure cut-and-paste moves.
 
@@ -3723,7 +3723,7 @@ the widened checks were mutation-tested as described above.
 
 ## v0.19.34 — main.py split, phase 2: `services.py` and `formatting.py`
 
-The first phase of `docs/MAIN_SPLIT_PLAN.md` that moves code. Two new modules
+The first phase of `docs/history/MAIN_SPLIT_PLAN.md` that moves code. Two new modules
 below `main.py`, 89 lines out of it, and the shape of every later phase
 established: measure the block's footprint, cut it verbatim in definition
 order, import the names back, add the module to `MODULES`, guard the move.
@@ -3793,7 +3793,7 @@ versus 572 (+7, `Phase2SplitTests`), identical failure set (the nine
 ## v0.19.35 — main.py split, phase 3: `locations.py`
 
 The plan's highest-leverage single move. The scope-accurate dependency scan
-behind `docs/MAIN_SPLIT_PLAN.md` found the 18 player-command sub-domains still
+behind `docs/history/MAIN_SPLIT_PLAN.md` found the 18 player-command sub-domains still
 in `main.py` have only 19 edges between them, and 15 of those point at the
 same six location helpers buried in the travel section. With those below
 `main.py`, the sub-domains can be cut out one at a time without cross-imports.
@@ -4042,7 +4042,7 @@ versus 603 (+4), identical failure set.
 
 ## v0.19.39 — main.py split, phase 4: the rest of the plumbing
 
-The last infrastructure phase of `docs/MAIN_SPLIT_PLAN.md`. 644 lines out of
+The last infrastructure phase of `docs/history/MAIN_SPLIT_PLAN.md`. 644 lines out of
 `main.py` into four modules, and the last call-time `from ..main import`
 anywhere in the package deleted. From here on, a command module that needs
 `main.py` is a bug, not a workaround — and a test says so.

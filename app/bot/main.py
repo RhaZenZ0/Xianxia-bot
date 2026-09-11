@@ -1,7 +1,7 @@
 """Composition root for the Discord bot.
 
 Everything the bot is made of lives in the modules below (see
-docs/MAIN_SPLIT_PLAN.md for the map). This file configures logging, wires
+docs/history/MAIN_SPLIT_PLAN.md for the map). This file configures logging, wires
 the command surface and the event-handler bindings onto the bot instance,
 and provides `run()`. The four names app/bot/__init__.py re-exports -
 XianxiaBot, bot, register_command_surface, run - are imported here for

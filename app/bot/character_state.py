@@ -1,6 +1,6 @@
 """Per-character derived state: effect modifiers, pill toxicity, NPC memory.
 
-Phase 4 of the main.py split (v0.19.39, docs/MAIN_SPLIT_PLAN.md).
+Phase 4 of the main.py split (v0.19.39, docs/history/MAIN_SPLIT_PLAN.md).
 current_effect_modifiers is read by eight command blocks, which is why it
 lives here rather than with any one of them. Reads runtime, services and
 app.*; never main.py. Definition order is the order these had in main.py.

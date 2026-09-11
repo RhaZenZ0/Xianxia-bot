@@ -1,6 +1,6 @@
 """Where things are: known/visible locations, world gating, NPC whereabouts.
 
-Phase 3 of the main.py split (v0.19.35, docs/MAIN_SPLIT_PLAN.md). The scope-
+Phase 3 of the main.py split (v0.19.35, docs/history/MAIN_SPLIT_PLAN.md). The scope-
 accurate dependency scan behind the plan found that 15 of the 19 edges between
 the player-command sub-domains still in main.py all pointed at these helpers -
 they were buried in the travel section but read by perception, market, scene,

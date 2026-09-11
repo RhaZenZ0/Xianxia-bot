@@ -1,7 +1,7 @@
 """The /begin character-creation flow: the name/concept modal, the
 birth-family browser and the cultivation-style and birth-sex pickers.
 
-Phase 8 of the main.py split (v0.19.43, docs/MAIN_SPLIT_PLAN.md). This is the
+Phase 8 of the main.py split (v0.19.43, docs/history/MAIN_SPLIT_PLAN.md). This is the
 one flow allowed to reply ephemerally (see the allowlist in
 tests/python/unit/test_command_cleanup.py - keyed by these class names, which
 the move keeps). Definition order is the order these had in main.py.

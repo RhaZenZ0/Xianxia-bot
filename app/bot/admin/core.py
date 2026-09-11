@@ -1,7 +1,7 @@
 """The admin core: the permission gate, the two audit trails, and the
 /admin command groups every admin module registers into.
 
-Phase 5 of the main.py split (v0.19.40, docs/MAIN_SPLIT_PLAN.md).
+Phase 5 of the main.py split (v0.19.40, docs/history/MAIN_SPLIT_PLAN.md).
 require_admin has 44 call sites and audit_admin 27, all in the /admin
 handlers that phases 6-7 move into this package - 85 of the edges between
 those handlers and the rest of main.py were just these names. Reads

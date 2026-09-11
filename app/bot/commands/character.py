@@ -1,6 +1,6 @@
 """The character: /begin, sheet, dashboards, quests, inventory, identity roots (lifespan, karma, soul, afterlife, reincarnate, dao heart, reputation, grudges, provenance, era, effects), /fate and /bond.
 
-Split phase 9b (v0.19.45, docs/MAIN_SPLIT_PLAN.md). Cut verbatim from
+Split phase 9b (v0.19.45, docs/history/MAIN_SPLIT_PLAN.md). Cut verbatim from
 main.py in definition order; reads only modules below main.py.
 """
 from __future__ import annotations

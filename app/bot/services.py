@@ -1,6 +1,6 @@
 """Service singletons shared by every command module.
 
-Phase 2 of the main.py split (v0.19.34, docs/MAIN_SPLIT_PLAN.md). These objects
+Phase 2 of the main.py split (v0.19.34, docs/history/MAIN_SPLIT_PLAN.md). These objects
 were constructed at the top of main.py and read from nearly every command block
 - SIM by nine of them, GUILD by fifteen - which is why the modules already split
 out (family, sect) had to reach back into main.py with call-time imports. Now

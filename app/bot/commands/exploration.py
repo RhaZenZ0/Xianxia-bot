@@ -1,6 +1,6 @@
 """Exploration: explore, hunt, craft, /alchemy, /realmhub and /travel.
 
-Split phase 9c (v0.19.46, docs/MAIN_SPLIT_PLAN.md). Cut verbatim from
+Split phase 9c (v0.19.46, docs/history/MAIN_SPLIT_PLAN.md). Cut verbatim from
 main.py in definition order (one contiguous block); reads only modules
 below main.py. `_run_crafting` stays here because `craft` and
 `/alchemy refine` are its only two callers and both live in this file.

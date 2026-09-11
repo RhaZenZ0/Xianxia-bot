@@ -183,7 +183,7 @@ v0.21.6 and v0.28.0.
   `roll_unexpected_event`, `craft_quality`, `tribulation_tns`,
   `condition_effect`, `boss_phase`, `stable_percent`, `manor_qi_multiplier`,
   `manor_defense_power_bonus` — all confirmed at zero callers on 2026-09-09.
-- `docs/migration_history/V018_AUTHORITY_CLEANUP_ROADMAP.md` joined the V015/V016 lists
+- `docs/history/V018_AUTHORITY_CLEANUP_ROADMAP.md` joined the V015/V016 lists
   there (v0.30.0).
 
 **Gate:** `test_authority_boundary.py` asserts (a) no INSERT/UPDATE/DELETE

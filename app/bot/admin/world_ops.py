@@ -1,7 +1,7 @@
 """/admin player karma and grants, /admin sect, /admin world advancetime,
 /admin server maintenance.
 
-Phase 7 of the main.py split (v0.19.42, docs/MAIN_SPLIT_PLAN.md). Everything
+Phase 7 of the main.py split (v0.19.42, docs/history/MAIN_SPLIT_PLAN.md). Everything
 here reads core, runtime, services, pickers and app.*; never main.py. The
 three /admin world commands that open or close event scenes (events,
 spawnrealm, closeevent) are NOT here: they read spawn_event_thread and the bot

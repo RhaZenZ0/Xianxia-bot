@@ -1,7 +1,7 @@
 # Xianxia RP Discord Bot — v0.21 release notes
 
 Shipping as **v0.21.6**. The v0.20 line (v0.20.0 through v0.20.9) is in
-`docs/V020_RELEASE_NOTES.md`. The release is stamped 0.21.6 in `app/version.py`,
+`docs/history/V020_RELEASE_NOTES.md`. The release is stamped 0.21.6 in `app/version.py`,
 `VERSION`, the `Dockerfile` and `docker-compose.yml`, and carries schema 28,
 unchanged since v0.20.6.
 

@@ -3,7 +3,7 @@
 app/bot/main.py cannot be imported in the build sandbox (no discord.py), and
 it is the file every Discord command routes through, so nothing here can be
 validated by running it. These checks stand in for that. They grew one class
-per phase of the main.py split (v0.19.33-v0.20.0, docs/MAIN_SPLIT_PLAN.md);
+per phase of the main.py split (v0.19.33-v0.20.0, docs/history/MAIN_SPLIT_PLAN.md);
 v0.20.3 folded the eleven phase classes into the invariants they were each a
 special case of. Every failure mode below has cost a failed deploy at least
 once, and each docstring says which.

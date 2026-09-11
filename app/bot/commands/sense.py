@@ -1,7 +1,7 @@
 """Perception and world information: sense, conceal, check, world,
 worldevents, time, rulers, worldrules.
 
-Split phase 9e (v0.19.48, docs/MAIN_SPLIT_PLAN.md). Cut verbatim from
+Split phase 9e (v0.19.48, docs/history/MAIN_SPLIT_PLAN.md). Cut verbatim from
 main.py in definition order; reads only modules below main.py.
 """
 from __future__ import annotations

@@ -2,8 +2,8 @@
 
 This is the release-by-release changelog for the Xianxia RP Discord Bot, split out of `README.md`
 so the README can stay focused on architecture, setup, and current operational documentation. See
-`README.md` for that; see `docs/V021_RELEASE_NOTES.md`, `docs/V020_RELEASE_NOTES.md`, `docs/V019_RELEASE_NOTES.md`, `docs/V018_RELEASE_NOTES.md` and
-`docs/V018_BUILD_HISTORY.md` for full per-release detail beyond the summaries below.
+`README.md` for that; see `docs/history/V021_RELEASE_NOTES.md`, `docs/history/V020_RELEASE_NOTES.md`, `docs/history/V019_RELEASE_NOTES.md`, `docs/history/V018_RELEASE_NOTES.md` and
+`docs/history/V018_BUILD_HISTORY.md` for full per-release detail beyond the summaries below.
 
 ## Changelog
 
@@ -150,7 +150,7 @@ branch, which would have broken every layout-hub panel's ability to route its
 own output beside the panel instead of over it. Both are guarded by new
 regression tests (`HubFailurePublicSurfaceTests` in
 `tests/python/unit/test_hub_layout_rollout.py`) so a future patch touching
-this code gets caught the same way. See `docs/V019_RELEASE_NOTES.md` for the
+this code gets caught the same way. See `docs/history/V019_RELEASE_NOTES.md` for the
 full before/after and the reasoning behind each accepted and rejected change.
 
 **0.19.32** adds the Bugslayer Sword - a one-of-a-kind, indestructible GM reward
@@ -169,7 +169,7 @@ carried in with split stage 4 (`main.py` read `boss_status`/`hunter_status`/
 connected) and repairs the source-scanning tests that split had broken. No schema
 change.
 
-**0.19.33** is phase 1 of the `main.py` split (`docs/MAIN_SPLIT_PLAN.md`): test scaffolding
+**0.19.33** is phase 1 of the `main.py` split (`docs/history/MAIN_SPLIT_PLAN.md`): test scaffolding
 only, no change under `app/`. Nineteen test files read `app/bot/main.py` by path and would
 silently stop guarding code as it moved out (as `EquipmentOptionTests` did in stage 4); they
 now read the whole `app/bot` package or locate a definition by name through new helpers in
@@ -277,7 +277,7 @@ change, no schema change.
 `app/bot/surface.py` and `main.py` becomes a 35-line composition root (11,650 lines at v0.19.32). The
 sweep drops the imports `main.py` no longer read and the dead `_tribulation_currency` helper, and adds a
 guard that every module under `app/bot/` is loaded at startup. The minor-version bump marks the end of the
-decomposition; no behaviour change, no schema change. See `docs/V020_RELEASE_NOTES.md`.
+decomposition; no behaviour change, no schema change. See `docs/history/V020_RELEASE_NOTES.md`.
 
 **0.20.1** groups the 43 flat modules under `app/` into `app/rules/` (gameplay rules and content helpers),
 `app/ops/` (plumbing), `app/ai/` (routing, narration, retrieval, chat monitor) and `app/dashboard/`
@@ -285,7 +285,7 @@ decomposition; no behaviour change, no schema change. See `docs/V020_RELEASE_NOT
 tiers. Two container entrypoints change (`app.database.bootstrap`, `app.ops.healthcheck`); `app.bot` and
 `app.dashboard` do not. No behaviour change, no schema change.
 
-**0.20.2** archives the stale `RELEASE.txt` (it described v0.19.24) to `docs/migration_history/` and keeps
+**0.20.2** archives the stale `RELEASE.txt` (it described v0.19.24) to `docs/history/` and keeps
 the four deployment scripts at the root on purpose: the installed `update.sh` requires `startup.sh`/`stop.sh`
 there and replaces itself only there. No behaviour change, no schema change.
 
@@ -350,7 +350,7 @@ else is speech, recorded and free. Ambiguity becomes a picker, never a guess.
 Every line that can reach the engine or the narrator spends a token from a new
 per-player bucket (`TYPED_PLAY_BURST` / `TYPED_PLAY_PER_MINUTE`). Typed play adds
 no handler, no engine action and no database write, so the v0.21 authority gate
-is unchanged. No schema change. See `docs/V021_RELEASE_NOTES.md` and
+is unchanged. No schema change. See `docs/history/V021_RELEASE_NOTES.md` and
 `docs/COMMISSIONS_DESIGN.md`.
 
 **0.21.2** adds **Teardown** to the dashboard's Discord tab: delete every thread the bot
@@ -414,7 +414,7 @@ abandon confirmation that states its cost, and a GM Commissions dashboard tab (a
 discard, both audited). Schema **29** adds the giver/tier/variant/deadline columns to
 `quest_definitions`, the commission columns to `character_quests`, and the cooldown and outcome
 counters to `npc_relationships`. Seeded invention - the design's second producer - is deliberately
-not built yet. See `docs/V022_RELEASE_NOTES.md` and `docs/COMMISSIONS_DESIGN.md`.
+not built yet. See `docs/history/V022_RELEASE_NOTES.md` and `docs/COMMISSIONS_DESIGN.md`.
 
 **0.22.1** finishes the giver roster. Eleven givers instead of three: the two old men who sleep and
 posture in Greenriver, and a quest board for every public sect. A commission may now keep its terms
@@ -607,8 +607,8 @@ two files that drive `httpx.MockTransport` skip with a reason instead of errorin
 
 No application change; no schema change.
 
-See `docs/V025_RELEASE_NOTES.md` for v0.25.0, `docs/V024_RELEASE_NOTES.md` for v0.24.0, `docs/V021_RELEASE_NOTES.md` for v0.21.x, `docs/V020_RELEASE_NOTES.md` for v0.20.0, `docs/V019_RELEASE_NOTES.md` for the full detail on every v0.19.x release above, `docs/V018_RELEASE_NOTES.md` and
-`docs/V018_BUILD_HISTORY.md` (consolidated validation/audit record) for the prior staged-authority migration.
+See `docs/history/V025_RELEASE_NOTES.md` for v0.25.0, `docs/history/V024_RELEASE_NOTES.md` for v0.24.0, `docs/history/V021_RELEASE_NOTES.md` for v0.21.x, `docs/history/V020_RELEASE_NOTES.md` for v0.20.0, `docs/history/V019_RELEASE_NOTES.md` for the full detail on every v0.19.x release above, `docs/history/V018_RELEASE_NOTES.md` and
+`docs/history/V018_BUILD_HISTORY.md` (consolidated validation/audit record) for the prior staged-authority migration.
 
 **0.25.0** remakes the dashboard, from the design canvas approved before the release. No endpoint
 changed, no query changed, and no data was added or removed except one small block on
@@ -640,7 +640,7 @@ behind than its own interval (a 4,320-minute system 500 minutes behind is early,
 frozen player only when no reason was recorded.
 
 The palette, the serif headings, the drawer, the authority split and the coverage gate are all
-unchanged. See `docs/V025_RELEASE_NOTES.md`.
+unchanged. See `docs/history/V025_RELEASE_NOTES.md`.
 
 
 **0.25.1** changes the typed-play prefix default from `>` to `$`.
@@ -1479,7 +1479,7 @@ remaining-authority list rather than quietly allowlisted.
 did everything only they or their tests reached: eighty-one functions and `World` methods in all
 (the Python `roll_2d10`, `random_hunt`, `breakthrough_tn`, the secret-realm tables, the samsara and
 aptitude generators, the sense checks, the manor maths). Tests count as callers of nothing.
-`docs/V018_AUTHORITY_CLEANUP_ROADMAP.md` joins the V015/V016 lists under `docs/migration_history/`.
+`docs/history/V018_AUTHORITY_CLEANUP_ROADMAP.md` joins the V015/V016 lists under `docs/history/`.
 
 Gate: `test_authority_boundary.py` - every DB-layer writer is in `PRESENTATION_WRITES` with its
 tables and nothing else may write; `database`, `simulation` and `ops` import no rules and the
@@ -1748,10 +1748,10 @@ and requires the release job to wait on all three.
   on `character_quests`; and the refusal cooldown, per-outcome counters and last outcome on
   `npc_relationships`.
 
-See `docs/V018_RELEASE_NOTES.md` and `docs/V019_RELEASE_NOTES.md` for the per-release detail.
+See `docs/history/V018_RELEASE_NOTES.md` and `docs/history/V019_RELEASE_NOTES.md` for the per-release detail.
 
 ## Release notes
 
-See `docs/V019_RELEASE_NOTES.md` for the current release's cultivation-depth audit, dashboard coverage gaps, and
-combat authority-migration fixes. See `docs/V018_RELEASE_NOTES.md` for the complete staged-authority, road/caravan,
+See `docs/history/V019_RELEASE_NOTES.md` for the current release's cultivation-depth audit, dashboard coverage gaps, and
+combat authority-migration fixes. See `docs/history/V018_RELEASE_NOTES.md` for the complete staged-authority, road/caravan,
 setup, cleanup, migration, security, and upgrade summary that v0.19 builds on.
