@@ -642,6 +642,50 @@ func canonicalRoadNeighbors(catalog worlddata.Catalog, current string, realmInde
 	return neighbors
 }
 
+// cityOf resolves a location to the city it belongs to (v0.36.0): a gate,
+// a district, a shop or an auction hall answers its city; anywhere else
+// answers itself.
+func cityOf(catalog worlddata.Catalog, location string) string {
+	if loc, ok := catalog.Locations[location]; ok && loc.OutsideLocation != "" && (loc.District != "" || loc.Shop != "" || loc.AuctionHouse != "") {
+		return loc.OutsideLocation
+	}
+	return location
+}
+
+// cityPartsOf lists a city's gates and districts, by name, in a fixed order.
+func cityPartsOf(catalog worlddata.Catalog, city string) []string {
+	parts := []string{}
+	for name, loc := range catalog.Locations {
+		if loc.District != "" && loc.OutsideLocation == city {
+			parts = append(parts, name)
+		}
+	}
+	sort.Strings(parts)
+	return parts
+}
+
+// gateFacing is the gate of city that faces neighbour - the one a road
+// from neighbour arrives at and the one a road to neighbour leaves by.
+func gateFacing(catalog worlddata.Catalog, city, neighbour string) (string, string, bool) {
+	loc, ok := catalog.Locations[city]
+	if !ok {
+		return "", "", false
+	}
+	for direction, faces := range loc.Gates {
+		for _, name := range faces {
+			if name != neighbour {
+				continue
+			}
+			for gateName, gate := range catalog.Locations {
+				if gate.Gate == direction && gate.OutsideLocation == city {
+					return gateName, direction, true
+				}
+			}
+		}
+	}
+	return "", "", false
+}
+
 func knownLocationsTx(conn *storage.Conn, catalog worlddata.Catalog, userID int64, c mechanicsCharacter) (map[string]bool, error) {
 	known := map[string]bool{}
 	rows, err := conn.Execute(`SELECT location FROM character_location_discoveries WHERE user_id=?`, []any{userID})
@@ -657,6 +701,19 @@ func knownLocationsTx(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 		known[c.Location] = true
 		for _, neighbor := range canonicalRoadNeighbors(catalog, c.Location, c.RealmIndex) {
 			known[neighbor] = true
+		}
+		// Inside a shop, an auction hall, a gate or a district (v0.35.0,
+		// v0.36.0) the city is known, its roads, and every gate and
+		// district of it - a city's parts are in plain sight from any of them.
+		city := cityOf(catalog, c.Location)
+		if city != c.Location {
+			known[city] = true
+			for _, neighbor := range canonicalRoadNeighbors(catalog, city, c.RealmIndex) {
+				known[neighbor] = true
+			}
+		}
+		for _, part := range cityPartsOf(catalog, city) {
+			known[part] = true
 		}
 	}
 	for name, loc := range catalog.Locations {
@@ -1146,6 +1203,16 @@ func explorationExploreAction(conn *storage.Conn, catalog worlddata.Catalog, use
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
+	// Walking a city finds its shops (v0.35.0), independently of the road
+	// beyond the gate.
+	foundShop, err := discoverCityShopTx(conn, catalog, userID, c, p.GameMinute, now)
+	if err != nil {
+		return authoritativeMutation{}, err
+	}
+	var discoveredShop any
+	if foundShop != "" {
+		discoveredShop = shopDiscoveryView(catalog, foundShop)
+	}
 	enabled, err := unexpectedEventsEnabledTx(conn, p.UnexpectedEventsEnabled)
 	if err != nil {
 		return authoritativeMutation{}, err
@@ -1168,7 +1235,7 @@ func explorationExploreAction(conn *storage.Conn, catalog worlddata.Catalog, use
 	if surpriseOut != nil {
 		kind = "event_started"
 	}
-	result := map[string]any{"kind": kind, "location": c.Location, "encounter": encounter, "cultivation_awarded": awarded, "spirit_stones": reward.SpiritStones, "items": reward.Items, "shared_claims": shared, "discovered_location": discovered, "surprise": surpriseOut, "event": surpriseOut}
+	result := map[string]any{"kind": kind, "location": c.Location, "encounter": encounter, "cultivation_awarded": awarded, "spirit_stones": reward.SpiritStones, "items": reward.Items, "shared_claims": shared, "discovered_location": discovered, "discovered_shop": discoveredShop, "surprise": surpriseOut, "event": surpriseOut}
 	return authoritativeMutation{Result: result, Event: eventledger.Event{Domain: "exploration", EventType: "exploration_resolved", EntityType: "character", EntityID: fmt.Sprint(userID), GameMinute: p.GameMinute, Payload: result}}, nil
 }
 
@@ -1225,6 +1292,22 @@ func explorationTravelAction(conn *storage.Conn, catalog worlddata.Catalog, user
 			return authoritativeMutation{}, fmt.Errorf("warded auction exit leads first to %s", outside)
 		}
 	}
+	// A shop (v0.35.0) is entered from anywhere in its city - the street, a
+	// gate, a district, another shop - and its door opens back onto the
+	// street. A gate or district (v0.36.0) is walked to from anywhere in
+	// its city except through a shop door. An auction hall keeps its own
+	// warded door, above.
+	cur := catalog.Locations[c.Location]
+	originCity := cityOf(catalog, c.Location)
+	if dest.Shop != "" {
+		if originCity != dest.OutsideLocation {
+			return authoritativeMutation{}, fmt.Errorf("%s is in %s; travel there first", p.Destination, dest.OutsideLocation)
+		}
+	} else if cur.Shop != "" && p.Destination != cur.OutsideLocation {
+		return authoritativeMutation{}, fmt.Errorf("the shop door opens onto %s", cur.OutsideLocation)
+	} else if dest.District != "" && originCity != dest.OutsideLocation {
+		return authoritativeMutation{}, fmt.Errorf("%s is in %s; travel there first", p.Destination, dest.OutsideLocation)
+	}
 	if c.RealmIndex < dest.MinRealmIndex {
 		return authoritativeMutation{}, errors.New("destination lies beyond the character's current cultivation")
 	}
@@ -1260,7 +1343,7 @@ func explorationTravelAction(conn *storage.Conn, catalog worlddata.Catalog, user
 	roadConnection := false
 
 	if mode != "hub" {
-		if plan, found := canonicalRoadRoute(catalog, c.Location, p.Destination, c.RealmIndex); found {
+		if plan, found := canonicalRoadRoute(catalog, originCity, p.Destination, c.RealmIndex); found {
 			roadConnection = true
 			route = plan.Nodes
 			travelCost = plan.Cost
@@ -1295,7 +1378,20 @@ func explorationTravelAction(conn *storage.Conn, catalog worlddata.Catalog, user
 		}
 	}
 
-	if _, err = conn.Execute(`UPDATE characters SET location=?,updated_at=? WHERE user_id=?`, []any{p.Destination, now, userID}); err != nil {
+	// Arrival by road is at the gate facing the road you came by (v0.36.0);
+	// departure by road is by the gate facing the first leg. A city with no
+	// gates, or a direct journey, lands on the destination itself.
+	arrivedAt := p.Destination
+	arrivalGate, leftBy := "", ""
+	if roadConnection && len(route) >= 2 {
+		if gate, direction, ok := gateFacing(catalog, p.Destination, route[len(route)-2]); ok {
+			arrivedAt, arrivalGate = gate, direction
+		}
+		if _, direction, ok := gateFacing(catalog, originCity, route[1]); ok {
+			leftBy = direction
+		}
+	}
+	if _, err = conn.Execute(`UPDATE characters SET location=?,updated_at=? WHERE user_id=?`, []any{arrivedAt, now, userID}); err != nil {
 		return authoritativeMutation{}, err
 	}
 
@@ -1322,7 +1418,7 @@ func explorationTravelAction(conn *storage.Conn, catalog worlddata.Catalog, user
 		if err := setRoadTransitTx(
 			conn,
 			userID,
-			c.Location,
+			originCity,
 			p.Destination,
 			route,
 			travelCost,
@@ -1358,6 +1454,10 @@ func explorationTravelAction(conn *storage.Conn, catalog worlddata.Catalog, user
 		"road_encounter":                roadEncounterOut,
 		"road_encounters":               roadEncounters,
 		"traveling":                     roadConnection && travelMinutes > 0,
+		"arrived_at":                    arrivedAt,
+		"arrival_gate":                  arrivalGate,
+		"left_by_gate":                  leftBy,
+		"city_parts":                    cityPartsOf(catalog, p.Destination),
 	}
 	// Merchants on the way (v0.34.1): whoever walks a leg of this route or
 	// waits in a city it passes is named, so the traveller knows to stop.

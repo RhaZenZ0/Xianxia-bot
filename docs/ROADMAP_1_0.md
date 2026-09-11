@@ -183,7 +183,7 @@ v0.21.6 and v0.28.0.
   `roll_unexpected_event`, `craft_quality`, `tribulation_tns`,
   `condition_effect`, `boss_phase`, `stable_percent`, `manor_qi_multiplier`,
   `manor_defense_power_bonus` — all confirmed at zero callers on 2026-09-09.
-- `docs/migration_history/V018_AUTHORITY_CLEANUP_ROADMAP.md` joined the V015/V016 lists
+- `docs/history/V018_AUTHORITY_CLEANUP_ROADMAP.md` joined the V015/V016 lists
   there (v0.30.0).
 
 **Gate:** `test_authority_boundary.py` asserts (a) no INSERT/UPDATE/DELETE
@@ -459,7 +459,7 @@ drift for seven versions as happened between v0.21.6 and v0.28.0.
 | v0.31 Narrator budget | v0.31.0 | shipped |
 | v0.32 Hardened II | v0.32.0 | shipped |
 | v0.33 Gameplay I | v0.33.0 | shipped |
-| v0.34 Playtest | v0.34.1 | shipped; the engine loops run, the checklist is on file, and the `#playtest` board collects the live pass; travelling merchants shipped beside it |
+| v0.34 Playtest | v0.34.2 | shipped; the engine loops run, the checklist is on file, and the `#playtest` board collects the live pass; travelling merchants shipped beside it |
 | v1.0.0-rc | | |
 | v1.0.0 | | |
-| Content track | | after rc |
+| Content track | v0.38.0 | started early: shops (v0.35.0), gates and districts (v0.36.0), merchants that bid (v0.37.0), city life (v0.38.0) - boards, envoys, rumours, inns, prosperity |

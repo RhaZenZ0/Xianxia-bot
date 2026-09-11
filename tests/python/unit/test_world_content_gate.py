@@ -67,7 +67,7 @@ class AuctionHouseContentTests(unittest.TestCase):
         houses = WORLD["auction_houses"]
         by_entrance = {str(h.get("entrance_location")): h for h in houses.values()}
         for name, loc in WORLD["locations"].items():
-            if loc.get("auction_house") or loc.get("private"):
+            if loc.get("auction_house") or loc.get("private") or loc.get("district") or loc.get("shop"):
                 continue
             if "City" in name or "Town" in name or loc.get("realm_hub"):
                 with self.subTest(city=name):
@@ -153,6 +153,23 @@ class TravellingMerchantContentTests(unittest.TestCase):
                 self.assertIn(key, faces, "no NPC fronts this merchant")
                 self.assertEqual(WORLD["npcs"][faces[key]]["location"], m["home"])
 
+    def test_every_merchant_keeps_a_shop_of_ordinary_tradeable_goods(self):
+        # v0.34.2: the shop is content - real items, market-tradeable, not
+        # auction-grade, each with a quantity and a price in the merchant's currency.
+        items = WORLD["items"]
+        for key, m in WORLD["merchants"].items():
+            with self.subTest(merchant=key):
+                wares = m.get("wares") or []
+                self.assertGreaterEqual(len(wares), 3, "a shop needs a few lines")
+                self.assertEqual(len({w["item_id"] for w in wares}), len(wares), "one line per item")
+                for ware in wares:
+                    item = items[ware["item_id"]]
+                    self.assertFalse(item.get("market_excluded"), ware["item_id"])
+                    self.assertFalse(item.get("auction_interest"), f"{ware['item_id']} is auction-grade, not shop stock")
+                    self.assertNotEqual(item.get("category"), "manual", ware["item_id"])
+                    self.assertGreater(int(ware["quantity"]), 0)
+                    self.assertGreater(int(ware["price"]), 0)
+
     def test_every_world_with_an_auction_house_has_a_merchant_on_its_floors(self):
         houses = WORLD["auction_houses"]
         locations = WORLD["locations"]
@@ -172,3 +189,172 @@ class TravellingMerchantContentTests(unittest.TestCase):
             city = house["entrance_location"]
             with self.subTest(grand_house=house_id):
                 self.assertIn(city, route_stops[locations[city]["world"]], f"no merchant passes {city}")
+
+
+class CityShopContentTests(unittest.TestCase):
+    """v0.35.0: every city has shops; a shop is an interior location with a
+    keeper, a shelf of real tradeable goods and a board of what it buys,
+    and the cities differ - in kind, in tier by world, in stock."""
+
+    def test_every_city_has_shops_and_capitals_have_four(self):
+        shops = WORLD["shops"]
+        cities = {h["entrance_location"] for h in WORLD["auction_houses"].values()}
+        by_city = {}
+        for key, shop in shops.items():
+            by_city.setdefault(shop["city"], []).append(key)
+        for city in cities:
+            with self.subTest(city=city):
+                self.assertIn(city, by_city, f"{city} has no shops")
+                want = 4 if WORLD["locations"][city].get("realm_hub") else 2
+                self.assertGreaterEqual(len(by_city[city]), want)
+                kinds = [shops[k]["kind"] for k in by_city[city]]
+                self.assertEqual(len(set(kinds)), len(kinds), "two shops of one kind in one city")
+
+    def test_every_shop_is_a_kept_interior_with_a_real_shelf(self):
+        items, locations, npcs = WORLD["items"], WORLD["locations"], WORLD["npcs"]
+        tier_of = {"Mortal World": 1, "Spiritual World": 2, "Immortal World": 3, "Celestial World": 4}
+        for key, shop in WORLD["shops"].items():
+            with self.subTest(shop=key):
+                interior = locations[shop["location"]]
+                self.assertEqual(interior.get("shop"), key)
+                self.assertEqual(interior.get("outside_location"), shop["city"])
+                self.assertTrue(interior.get("safe_zone"), "a shop is a protected interior")
+                self.assertEqual(interior["world"], shop["world"])
+                # v0.36.0: a capital's shops are a tier better and dearer.
+                capital = bool(WORLD["locations"][shop["city"]].get("realm_hub"))
+                self.assertEqual(shop["tier"], tier_of[shop["world"]] + (1 if capital else 0))
+                self.assertEqual(npcs[shop["keeper"]]["location"], shop["location"])
+                self.assertEqual(npcs[shop["keeper"]].get("shop"), key)
+                self.assertGreaterEqual(len(shop["sells"]), 2)
+                self.assertEqual(len({line["item_id"] for line in shop["sells"]}), len(shop["sells"]))
+                for line in shop["sells"]:
+                    item = items[line["item_id"]]
+                    self.assertFalse(item.get("market_excluded"), line["item_id"])
+                    self.assertFalse(item.get("auction_interest"), f"{line['item_id']} is auction-grade, not shelf stock")
+                    self.assertGreater(int(line["quantity"]), 0)
+                    self.assertGreater(int(line["price"]), 0)
+                self.assertGreaterEqual(len(shop["buys"]), 2)
+                for item_id, price in shop["buys"].items():
+                    self.assertIn(item_id, items)
+                    self.assertGreater(int(price), 0)
+                self.assertIn(shop["currency"], WORLD["currencies"])
+                self.assertEqual(WORLD["currencies"][shop["currency"]]["world"], shop["world"])
+                self.assertGreater(int(shop["restock_minutes"]), 0)
+
+    def test_a_smithy_makes_its_own_blades(self):
+        # "the products they make": a made-here line is the keeper's craft,
+        # and every weaponsmith and apothecary has at least one.
+        for key, shop in WORLD["shops"].items():
+            if shop["kind"] not in ("weaponsmith", "apothecary", "talisman", "array"):
+                continue
+            with self.subTest(shop=key):
+                self.assertTrue(any(line.get("made_here") for line in shop["sells"]), f"{key} makes nothing")
+
+
+class CityDistrictContentTests(unittest.TestCase):
+    """v0.36.0: every walled city has a gate per compass side that has a
+    road, both ends of a road agree on the compass, the capitals have four
+    compass districts and the other cities one, and every part has people."""
+
+    OPPOSITE = {"North": "South", "South": "North", "East": "West", "West": "East"}
+
+    def test_every_road_has_a_gate_on_each_end_and_the_compass_agrees(self):
+        locations = WORLD["locations"]
+        cities = {h["entrance_location"] for h in WORLD["auction_houses"].values()}
+        for city in sorted(cities):
+            loc = locations[city]
+            roads = sorted(loc.get("roads") or [])
+            gates = loc.get("gates") or {}
+            with self.subTest(city=city):
+                if not roads:
+                    self.assertEqual(gates, {}, f"{city} has gates but no roads")
+                    continue
+                faced = sorted(n for names in gates.values() for n in names)
+                self.assertEqual(faced, roads, "every road neighbour is faced by exactly one gate")
+                for direction, names in gates.items():
+                    gate_name = f"{city} {direction} Gate"
+                    self.assertIn(gate_name, locations, f"{city} lacks its {direction} gate location")
+                    gate = locations[gate_name]
+                    self.assertEqual(gate.get("district"), "gate")
+                    self.assertEqual(gate.get("gate"), direction)
+                    self.assertEqual(gate.get("outside_location"), city)
+                    self.assertTrue(gate.get("safe_zone"), "a gate is guarded")
+                    for neighbour in names:
+                        back = locations[neighbour].get("gates") or {}
+                        self.assertIn(city, back.get(self.OPPOSITE[direction], []), f"{neighbour} should face {city} by its {self.OPPOSITE[direction]} gate")
+
+    def test_capitals_have_four_compass_districts_and_cities_one(self):
+        locations = WORLD["locations"]
+        cities = {h["entrance_location"] for h in WORLD["auction_houses"].values()}
+        for city in sorted(cities):
+            districts = [n for n, l in locations.items() if l.get("district") not in (None, "", "gate", "inn") and l.get("outside_location") == city]
+            with self.subTest(city=city):
+                if locations[city].get("realm_hub"):
+                    self.assertEqual(len(districts), 4, districts)
+                    self.assertEqual({n.split()[-2] for n in districts}, {"North", "East", "South", "West"})
+                elif city == "Greenriver Town":
+                    self.assertEqual(districts, [], "a town is one place")
+                else:
+                    self.assertEqual(len(districts), 1, districts)
+
+    def test_every_district_has_its_own_people(self):
+        homes = {}
+        for name, npc in WORLD["npcs"].items():
+            homes.setdefault(npc["location"], []).append(name)
+        for name, loc in WORLD["locations"].items():
+            if not loc.get("district"):
+                continue
+            with self.subTest(district=name):
+                want = 1 if loc["district"] in ("gate", "inn") else 2
+                self.assertGreaterEqual(len(homes.get(name, [])), want, f"{name} is empty")
+                for npc in homes.get(name, []):
+                    self.assertEqual(WORLD["npcs"][npc].get("district"), name)
+
+
+class CityLifeContentTests(unittest.TestCase):
+    """v0.38.0: every city has an inn with a keeper, and a board of
+    commissions given by people who live in the city's parts - the
+    capitals' quest pavilion, every other city's gate notice."""
+
+    def test_every_city_has_an_inn_with_a_keeper(self):
+        locations, npcs = WORLD["locations"], WORLD["npcs"]
+        cities = {h["entrance_location"] for h in WORLD["auction_houses"].values()}
+        homes = {}
+        for name, npc in npcs.items():
+            homes.setdefault(npc["location"], []).append(name)
+        for city in sorted(cities):
+            inns = [n for n, l in locations.items() if l.get("district") == "inn" and l.get("outside_location") == city]
+            with self.subTest(city=city):
+                self.assertEqual(len(inns), 1, inns)
+                self.assertTrue(locations[inns[0]].get("safe_zone"))
+                self.assertTrue(any(n.startswith(("Landlord", "Landlady")) for n in homes.get(inns[0], [])), f"{inns[0]} has no keeper")
+
+    def test_every_city_has_a_board_and_the_capitals_a_pavilion(self):
+        locations, npcs = WORLD["locations"], WORLD["npcs"]
+        givers = WORLD["commission_givers"]
+        cities = {h["entrance_location"] for h in WORLD["auction_houses"].values()}
+
+        def city_of(location):
+            loc = locations.get(location) or {}
+            return str(loc.get("outside_location")) if loc.get("district") or loc.get("shop") or loc.get("auction_house") else location
+
+        by_city = {}
+        for c in WORLD["commissions"]:
+            if not str(c["quest_key"]).startswith("commission_city_"):
+                continue
+            giver = c["giver_npc"]
+            self.assertIn(giver, npcs, giver)
+            self.assertIn(giver, givers, f"{giver} gives a commission but is not a giver")
+            self.assertEqual(givers[giver]["location"], npcs[giver]["location"])
+            by_city.setdefault(city_of(npcs[giver]["location"]), []).append(c)
+            for objective in c["objectives"]:
+                self.assertIn(objective["type"], ("explore", "talk", "scene_action"))
+                if objective["type"] == "explore":
+                    self.assertIn(objective["target"], locations)
+                if objective["type"] == "talk":
+                    self.assertIn(objective["target"], npcs)
+        for city in sorted(cities):
+            with self.subTest(city=city):
+                want = 4 if locations[city].get("realm_hub") else (1 if city == "Greenriver Town" else 2)
+                self.assertGreaterEqual(len(by_city.get(city, [])), want, f"{city} board is thin")
+                self.assertEqual(len({c["quest_key"] for c in by_city.get(city, [])}), len(by_city.get(city, [])))

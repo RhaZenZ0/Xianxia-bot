@@ -173,6 +173,11 @@ class World:
         return self.data.get("merchants", {})
 
     @property
+    def shops(self) -> dict[str, dict[str, Any]]:
+        """City shops (v0.35.0), keyed by shop key."""
+        return self.data.get("shops", {})
+
+    @property
     def law_system(self) -> dict[str, Any]:
         return self.data.get("law_system", {})
 

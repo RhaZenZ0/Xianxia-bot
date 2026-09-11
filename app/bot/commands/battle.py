@@ -1,6 +1,6 @@
 """Combat: /battle, its panel views and the bounty command.
 
-Split phase 9d (v0.19.47, docs/MAIN_SPLIT_PLAN.md). Cut verbatim from
+Split phase 9d (v0.19.47, docs/history/MAIN_SPLIT_PLAN.md). Cut verbatim from
 main.py in definition order. `_execute_battle_law_technique` lives here
 rather than in law.py because `BattleView` calls it and `/law technique`
 already imports `_battle_panel` from here - keeping it on this side is what

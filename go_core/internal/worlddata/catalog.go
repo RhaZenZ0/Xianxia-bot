@@ -240,10 +240,20 @@ type LocationDefinition struct {
 	RealmHub        bool     `json:"realm_hub"`
 	AuctionHouse    string   `json:"auction_house"`
 	OutsideLocation string   `json:"outside_location"`
-	Climate         string   `json:"climate"`
-	Terrain         string   `json:"terrain"`
-	SettlementType  string   `json:"settlement_type"`
-	Roads           []string `json:"roads"`
+	// Shop (v0.35.0) names the city shop this location is the inside of;
+	// OutsideLocation is the city its door opens onto.
+	Shop string `json:"shop"`
+	// District (v0.36.0) marks a part of a city - a gate, a quarter, the
+	// forge terraces - with OutsideLocation naming the city. Gate is the
+	// compass direction of a gate district. Gates, on the city itself, maps
+	// each compass direction to the road neighbours that side faces.
+	District       string              `json:"district"`
+	Gate           string              `json:"gate"`
+	Gates          map[string][]string `json:"gates"`
+	Climate        string              `json:"climate"`
+	Terrain        string              `json:"terrain"`
+	SettlementType string              `json:"settlement_type"`
+	Roads          []string            `json:"roads"`
 }
 
 type UnexpectedEvent struct {
@@ -397,6 +407,36 @@ type Catalog struct {
 	// at a markup. They are met in a city while they dwell there, or on the
 	// road while a player is in transit over the same leg.
 	Merchants map[string]Merchant `json:"merchants"`
+	// Shops (v0.35.0): the fixed shops of every city - a smithy, an
+	// apothecary, a talisman hall - each an interior location found by
+	// exploring the city and entered by travelling to it.
+	Shops map[string]Shop `json:"shops"`
+}
+
+// Shop is one city shop. Sells is what it stocks (MadeHere lines are the
+// keeper's own craft), Buys is what it pays for and how much, both in the
+// shop's currency; the stock refills to the content quantities every
+// RestockMinutes.
+type Shop struct {
+	Name           string           `json:"name"`
+	Kind           string           `json:"kind"`
+	City           string           `json:"city"`
+	World          string           `json:"world"`
+	Tier           int64            `json:"tier"`
+	Location       string           `json:"location"`
+	Keeper         string           `json:"keeper"`
+	Currency       string           `json:"currency"`
+	RestockMinutes int64            `json:"restock_minutes"`
+	Description    string           `json:"description"`
+	Sells          []ShopLine       `json:"sells"`
+	Buys           map[string]int64 `json:"buys"`
+}
+
+type ShopLine struct {
+	ItemID   string `json:"item_id"`
+	Quantity int64  `json:"quantity"`
+	Price    int64  `json:"price"`
+	MadeHere bool   `json:"made_here"`
 }
 
 // Merchant is one travelling trader. Home is the city the trader starts in
@@ -411,6 +451,16 @@ type Merchant struct {
 	Currency      string   `json:"currency"`
 	MarkupPercent int64    `json:"markup_percent"`
 	DwellMinutes  int64    `json:"dwell_minutes"`
+	// Wares (v0.34.2) is the merchant's own shop: the goods it always
+	// carries, at the prices content sets, restocked every time it comes
+	// home. Auction leftovers sit beside them in the same pack.
+	Wares []MerchantWare `json:"wares"`
+}
+
+type MerchantWare struct {
+	ItemID   string `json:"item_id"`
+	Quantity int64  `json:"quantity"`
+	Price    int64  `json:"price"`
 }
 
 func Load(path string) (Catalog, error) {

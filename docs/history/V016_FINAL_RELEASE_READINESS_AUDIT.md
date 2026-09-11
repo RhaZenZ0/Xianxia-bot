@@ -10,7 +10,7 @@ The remaining live Python `Database` mutators are an explicitly documented futur
 
 ## Blockers from the v0.15 audit
 
-1. **Release identity was v0.14 / partial:** **CLOSED.** `VERSION`, `app/version.py`, Docker image label, Compose labels, health metadata, release tests, README, environment example, and user-facing version strings are now 0.16. `PARTIAL_BUILD.txt` has been removed from the release package; the v0.15 review documents remain under `docs/migration_history/`.
+1. **Release identity was v0.14 / partial:** **CLOSED.** `VERSION`, `app/version.py`, Docker image label, Compose labels, health metadata, release tests, README, environment example, and user-facing version strings are now 0.16. `PARTIAL_BUILD.txt` has been removed from the release package; the v0.15 review documents remain under `docs/history/`.
 2. **Four production-reachable Python gameplay RNG paths:** **CLOSED.** NPC mood and clan bootstrap now execute in Go; forage outcome/profile RNG now executes in Go; child-root inheritance now executes in Go.
 3. **Remaining Python `Database` mutators:** **RECLASSIFIED AS DOCUMENTED FUTURE MIGRATION.** The retained set is live/non-duplicated and is reviewed in `V016_REMAINING_DATABASE_MUTATORS.md`; zero statically unreachable write-like methods from the audited set remain.
 

@@ -152,7 +152,7 @@ class AppLayoutTests(unittest.TestCase):
         self.assertIn('for required in VERSION startup.sh stop.sh docker-compose.yml go_core app content;', update)
         # The stale release marker (it described v0.19.24) is history now.
         self.assertFalse((PROJECT_ROOT / "RELEASE.txt").exists())
-        self.assertTrue((PROJECT_ROOT / "docs" / "migration_history" / "V019_24_RELEASE.txt").is_file())
+        self.assertTrue((PROJECT_ROOT / "docs" / "history" / "V019_24_RELEASE.txt").is_file())
 
     def test_nothing_in_the_repository_names_an_old_path(self):
         # Sources, tests, scripts and the container files. Docs are history.

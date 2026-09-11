@@ -1,6 +1,6 @@
 """The /aptitude hub: spiritual roots, ancestral bloodlines and physiques.
 
-Split phase 9a (v0.19.44, docs/MAIN_SPLIT_PLAN.md). Cut verbatim from
+Split phase 9a (v0.19.44, docs/history/MAIN_SPLIT_PLAN.md). Cut verbatim from
 main.py in definition order; reads only modules below main.py.
 """
 from __future__ import annotations

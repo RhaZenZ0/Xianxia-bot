@@ -3,7 +3,7 @@
 app/bot/main.py cannot be imported in the build sandbox (no discord.py), and
 it is the file every Discord command routes through, so nothing here can be
 validated by running it. These checks stand in for that. They grew one class
-per phase of the main.py split (v0.19.33-v0.20.0, docs/MAIN_SPLIT_PLAN.md);
+per phase of the main.py split (v0.19.33-v0.20.0, docs/history/MAIN_SPLIT_PLAN.md);
 v0.20.3 folded the eleven phase classes into the invariants they were each a
 special case of. Every failure mode below has cost a failed deploy at least
 once, and each docstring says which.
@@ -774,12 +774,13 @@ SURFACE = {
         },
     },
     "commands/economy.py": {
-        "groups": ('storage_group', 'auction_group', 'merchant_group', 'civilization_group', 'market_group', 'blackmarket_group'),
+        "groups": ('storage_group', 'auction_group', 'merchant_group', 'shop_group', 'civilization_group', 'market_group', 'blackmarket_group'),
         "roots": ('wallet', 'use'),
         "leaves": {
             "storage_group": ('status', 'deposit', 'withdraw'),
             "auction_group": ('enter', 'leave', 'browse', 'sell', 'bid'),
             "merchant_group": ('status', 'buy'),
+            "shop_group": ('here', 'browse', 'buy', 'sell'),
             "civilization_group": ('status', 'npcs'),
             "blackmarket_group": ('rumors', 'status', 'buy', 'sell'),
             "market_group": ('prices', 'buy', 'sell'),
@@ -793,10 +794,11 @@ SURFACE = {
         },
     },
     "commands/exploration.py": {
-        "groups": ('alchemy_group', 'realmhub_group', 'travel_group'),
+        "groups": ('alchemy_group', 'realmhub_group', 'city_group', 'travel_group'),
         "roots": ('explore', 'hunt', 'craft'),
         "leaves": {
             "alchemy_group": ('status', 'refine', 'forage', 'purge'),
+            "city_group": ('look', 'board', 'accept', 'envoys', 'rumours', 'inn'),
             "realmhub_group": ('status', 'go'),
             "travel_group": ('go', 'status'),
         },

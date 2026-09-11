@@ -26,7 +26,7 @@ from .remote import GoDatabaseTransport
 log = logging.getLogger("xianxia.database")
 
 
-SCHEMA_VERSION = 36
+SCHEMA_VERSION = 38
 # A readiness probe must validate more than the schema-version marker.  If the
 # SQLite file is removed or replaced while the bot is running, SQLite will
 # happily create a new empty file at the same path.  Checking these tables lets
@@ -1548,6 +1548,37 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
                 PRIMARY KEY(merchant, item_id)
             )""",
             "ALTER TABLE auctions ADD COLUMN merchant_buyer TEXT NOT NULL DEFAULT ''",
+        ),
+    ),
+    (
+        37,
+        "city_shops",
+        (
+            # v0.35.0: the city shops' shelves - what each shop holds right
+            # now and when it last refilled. The shops themselves are content.
+            """CREATE TABLE IF NOT EXISTS shop_state (
+                shop TEXT PRIMARY KEY,
+                last_restock_game_minute INTEGER NOT NULL DEFAULT 0,
+                updated_at REAL NOT NULL
+            )""",
+            """CREATE TABLE IF NOT EXISTS shop_stock (
+                shop TEXT NOT NULL,
+                item_id TEXT NOT NULL,
+                quantity INTEGER NOT NULL DEFAULT 0,
+                price INTEGER NOT NULL DEFAULT 0,
+                made_here INTEGER NOT NULL DEFAULT 0,
+                updated_at REAL NOT NULL,
+                PRIMARY KEY(shop, item_id)
+            )""",
+        ),
+    ),
+    (
+        38,
+        "merchant_bids",
+        (
+            # v0.37.0: a merchant can hold the high bid on a lot. Its purse
+            # is the escrow; the column says which merchant holds it.
+            "ALTER TABLE auctions ADD COLUMN merchant_bidder TEXT NOT NULL DEFAULT ''",
         ),
     ),
 )
@@ -5114,6 +5145,19 @@ class Database:
         async with self._connect() as db:
             await db.execute("DELETE FROM auction_lot_messages WHERE auction_id=?", (int(auction_id),))
             await db.commit()
+
+    async def list_active_bounties(self, *, limit: int = 12) -> list[dict[str, Any]]:
+        """The wanted list a capital's quest pavilion posts (v0.38.0): every
+        active bounty with the name and whereabouts of the one it is on."""
+        async with self._connect() as db:
+            db.row_factory = aiosqlite.Row
+            cur = await db.execute(
+                """SELECT b.bounty_id,b.jurisdiction,b.amount,b.reason,b.created_game_minute,c.name AS target_name,c.location AS target_location
+                   FROM bounties b JOIN characters c ON c.user_id=b.user_id
+                   WHERE b.status='active' ORDER BY b.amount DESC,b.bounty_id DESC LIMIT ?""",
+                (max(1, min(50, int(limit))),),
+            )
+            return [dict(row) for row in await cur.fetchall()]
 
     async def get_realm_hub_channels(self, guild_id: int) -> list[dict[str, Any]]:
         async with self._connect() as db:

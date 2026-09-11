@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Drive the roadmap's playtest loops through the Go engine (v0.34.0).
+"""Drive the roadmap's playtest loops through the Go engine (v0.34.0; the city,
+its shops and the merchants since v0.36.1).
 
 The v0.34 playtest is a written pass over the live server. This is the half a
 machine can run without Discord: every loop the roadmap names, driven through
@@ -278,7 +279,146 @@ async def run(url: str, token: str, db_path: str) -> Report:
     await step(report, "a local floor refuses a seventh lot",
                (lambda: _local_floor(act, gm))(), expect_error="at most 6 lots")
 
-    # ---- 9. backups --------------------------------------------------------
+    # ---- 9. the city: the gate, the districts, the shops, the merchants ----
+    # v0.35.0-v0.36.0: a road journey ends at the gate facing the road, the
+    # city's parts are a walk apart, walking the city finds its shops, a shop
+    # buys and sells, and a merchant takes an unsold lot and resells it.
+    await step(report, "grant the player road stones", gm("admin.player.grant_currency", {"user_id": PLAYER, "currency_id": "low_spirit_stone", "amount": 300, "reason": "playtest"}))
+    await step(report, "teleport the player to Riverguard City", gm("admin.player.teleport", {"user_id": PLAYER, "location": "Riverguard City", "reason": "playtest"}))
+    capital = "Azure Crown Imperial City"
+    journey = await step(report, "exploration.travel by road to the capital", act("exploration.travel", PLAYER, {"destination": capital, "mode": "known"}))
+    if journey is not None:
+        gate = str(journey.get("arrived_at") or "")
+        report.add("PASS" if journey.get("road_connection") and gate.endswith("Gate") and journey.get("arrival_gate") else "FAIL",
+                   "the road ends at the gate facing it", f"arrived_at={gate} gate={journey.get('arrival_gate')} left_by={journey.get('left_by_gate')}")
+        await step(report, "advance time past arrival", gm("admin.world.advance_time", {"minutes": int(journey.get("travel_minutes") or 0) + 30, "reason": "playtest"}))
+    status = await step(report, "exploration.travel_status after arrival", engine.action("exploration.travel_status", PLAYER, {}))
+    if status is not None and status.get("traveling"):
+        report.add("FAIL", "exploration.travel_status after arrival", f"still traveling: {status}")
+    parts = [part for part in list((journey or {}).get("city_parts") or []) if not part.endswith("Gate")]
+    district = parts[0] if parts else capital
+    await step(report, f"walk to {district}", act("exploration.travel", PLAYER, {"destination": district, "mode": "known"}))
+    here = await step(report, "shop.here from a district", engine.action("shop.here", PLAYER, {}))
+    if here is not None and not (here.get("is_city") and int(here.get("total") or 0) >= 4):
+        report.add("FAIL", "shop.here from a district", f"{here}")
+    found = None
+    for _ in range(12):
+        walked = await act("exploration.explore", PLAYER, {"cooldown_seconds": 0, "unexpected_event_chance_percent": 0, "event_key": aid("exploration:event")})
+        if isinstance(walked.get("discovered_shop"), dict):
+            found = dict(walked["discovered_shop"])
+            break
+    report.add("PASS" if found else "FAIL", "walking the city finds a shop", f"{found.get('name') if found else 'none in twelve walks'}")
+    if found:
+        await step(report, "walk into the shop", act("exploration.travel", PLAYER, {"destination": str(found.get("location")), "mode": "known"}))
+        shelf = await step(report, "shop.browse", engine.action("shop.browse", PLAYER, {}))
+        stock = list((shelf or {}).get("stock") or [])
+        buys = list((shelf or {}).get("buys") or [])
+        if stock:
+            line = dict(stock[0])
+            bought = await step(report, f"shop.buy {line.get('item_id')}", act("shop.buy", PLAYER, {"item_id": str(line.get("item_id")), "quantity": 1}))
+            if bought is not None and int(bought.get("total") or 0) != int(line.get("price") or -1):
+                report.add("FAIL", "shop.buy charges the shelf price", f"total={bought.get('total')} shelf={line.get('price')}")
+        else:
+            report.add("FAIL", "shop.browse", "an empty shelf on first sight")
+        if buys:
+            want = dict(buys[0])
+            await step(report, "grant the item the keeper wants", gm("admin.player.adjust_item", {"user_id": PLAYER, "item_id": str(want.get("item_id")), "quantity": 2, "reason": "playtest"}))
+            await step(report, f"shop.sell {want.get('item_id')}", act("shop.sell", PLAYER, {"item_id": str(want.get("item_id")), "quantity": 1}))
+        await step(report, "the shop door opens onto the street only", act("exploration.travel", PLAYER, {"destination": district, "mode": "known"}), expect_error="door opens onto")
+        await step(report, "step back onto the street", act("exploration.travel", PLAYER, {"destination": capital, "mode": "known"}))
+    merchants = await step(report, "merchant.status", engine.action("merchant.status", PLAYER, {}))
+    rows = list((merchants or {}).get("merchants") or [])
+    report.add("PASS" if len(rows) >= 8 else "FAIL", "eight merchants walk the roads", f"{len(rows)} listed")
+    # The lot is something no merchant stocks as a ware, so it lands in the
+    # pack as a floor find rather than merging into the shop's own line.
+    find_item = "bone_comb"
+    await step(report, "grant the seller a curio for the floor", gm("admin.player.adjust_item", {"user_id": PLAYER, "item_id": find_item, "quantity": 1, "reason": "playtest"}))
+    await step(report, "auction.enter at the capital", act("auction.enter", PLAYER, {}))
+    unsold = await step(report, "auction.sell with no bidder", act("auction.sell", PLAYER, {"item_id": find_item, "quantity": 1, "currency_id": "low_spirit_stone", "starting_bid": 10, "anonymous": False, "ends_at": time.time() + 2}))
+    unsold_id = int((unsold or {}).get("auction_id") or 0)
+    if unsold_id:
+        await asyncio.sleep(3)
+        await step(report, "the tick settles the unsold lot", engine.run_due_simulation(await clock(), {"auction_settlement": True, "merchants": True}))
+        settled = await db.get_auction(unsold_id)
+        buyer = str((settled or {}).get("merchant_buyer") or "")
+        report.add("PASS" if buyer else "FAIL", "a merchant takes the unsold lot", f"merchant_buyer={buyer!r}")
+        if buyer:
+            merchants = dict(await engine.action("merchant.status", PLAYER, {}) or {})
+            row = next((dict(r) for r in list(merchants.get("merchants") or []) if str(r.get("merchant")) == buyer), {})
+            find = [dict(l) for l in list(row.get("stock") or []) if str(l.get("item_id")) == find_item]
+            report.add("PASS" if find and str(find[0].get("source")) == "auction" else "FAIL", "the lot is in the merchant's pack as a floor find", f"{find}")
+            await step(report, "auction.leave", act("auction.leave", PLAYER, {}))
+            if row and not bool(row.get("on_the_road")):
+                await step(report, f"teleport to {row.get('location')}", gm("admin.player.teleport", {"user_id": PLAYER, "location": str(row.get("location")), "reason": "playtest"}))
+                await step(report, "merchant.buy the floor find", act("merchant.buy", PLAYER, {"merchant": buyer, "item_id": find_item, "quantity": 1}))
+            else:
+                report.add("PASS", "merchant.buy the floor find", f"skipped: {buyer} is {row.get('whereabouts')}")
+
+    # ---- 10. a merchant bids (v0.37.0) --------------------------------------
+    # A valued lot with an hour to run: the tick's merchant bids the starting
+    # bid from its purse; a player outbids it and the purse is refunded.
+    await step(report, "grant the seller a sword for the floor", gm("admin.player.adjust_item", {"user_id": PLAYER, "item_id": "spirit_iron_sword", "quantity": 1, "reason": "playtest"}))
+    await step(report, "teleport the seller to the capital", gm("admin.player.teleport", {"user_id": PLAYER, "location": capital, "reason": "playtest"}))
+    await step(report, "auction.enter at the capital (again)", act("auction.enter", PLAYER, {}))
+    valued = await step(report, "auction.sell a sword with an hour to run", act("auction.sell", PLAYER, {"item_id": "spirit_iron_sword", "quantity": 1, "currency_id": "low_spirit_stone", "starting_bid": 3, "anonymous": False, "ends_at": time.time() + 3600}))
+    valued_id = int((valued or {}).get("auction_id") or 0)
+    if valued_id:
+        before = {str(r.get("merchant")): int(r.get("budget") or 0) for r in list((await engine.action("merchant.status", PLAYER, {}) or {}).get("merchants") or [])}
+        await step(report, "the tick lets the merchants bid", engine.run_due_simulation(await clock(), {"auction_settlement": True, "merchants": True}))
+        lot_row = await db.get_auction(valued_id) or {}
+        holder = str(lot_row.get("merchant_bidder") or "")
+        report.add("PASS" if holder and int(lot_row.get("current_bid") or 0) >= 3 and not lot_row.get("current_bidder_user_id") else "FAIL",
+                   "a merchant bids the starting bid from its purse", f"merchant_bidder={holder!r} current_bid={lot_row.get('current_bid')}")
+        if holder:
+            after = {str(r.get("merchant")): int(r.get("budget") or 0) for r in list((await engine.action("merchant.status", PLAYER, {}) or {}).get("merchants") or [])}
+            report.add("PASS" if after.get(holder, 0) == before.get(holder, 0) - int(lot_row.get("current_bid") or 0) else "FAIL",
+                       "the purse is the escrow", f"{before.get(holder)} -> {after.get(holder)}")
+            await step(report, "teleport the buyer to the capital", gm("admin.player.teleport", {"user_id": BUYER, "location": capital, "reason": "playtest"}))
+            await step(report, "auction.enter (buyer, capital)", act("auction.enter", BUYER, {}))
+            await step(report, "the buyer outbids the merchant", act("auction.bid", BUYER, {"auction_id": valued_id, "amount": int(lot_row.get("current_bid") or 0) + 5}))
+            lot_row = await db.get_auction(valued_id) or {}
+            refunded = {str(r.get("merchant")): int(r.get("budget") or 0) for r in list((await engine.action("merchant.status", PLAYER, {}) or {}).get("merchants") or [])}
+            report.add("PASS" if not str(lot_row.get("merchant_bidder") or "") and refunded.get(holder, 0) == before.get(holder, 0) else "FAIL",
+                       "outbid, the merchant is refunded and cleared", f"merchant_bidder={lot_row.get('merchant_bidder')!r} budget {after.get(holder)} -> {refunded.get(holder)}")
+
+    # ---- 11. city life (v0.38.0) ---------------------------------------------
+    # The capital's board offers work from its own people; a shop trade moves
+    # the city's prosperity; the envoys' hall is content the bot reads.
+    givers = dict(world.get("commission_givers") or {})
+    locations = dict(world.get("locations") or {})
+
+    def city_of(place: str) -> str:
+        loc = dict(locations.get(place) or {})
+        return str(loc.get("outside_location")) if loc.get("district") or loc.get("shop") or loc.get("auction_house") else place
+
+    board = [c for c in list(world.get("commissions") or []) if city_of(str(givers.get(str(c.get("giver_npc")), {}).get("location") or "")) == capital]
+    report.add("PASS" if len(board) >= 4 else "FAIL", "the capital's pavilion has work from its own people", f"{len(board)} commissions")
+    if board:
+        await step(report, "teleport the buyer to the capital's street", gm("admin.player.teleport", {"user_id": BUYER, "location": capital, "reason": "playtest"}))
+        job = dict(board[0])
+        await step(report, f"commission.accept from the pavilion ({job.get('title')})", act("commission.accept", BUYER, {"quest_key": str(job.get("quest_key")), "variant_index": 0}))
+        rows = {r["quest_key"]: r for r in await db.list_character_quests(BUYER)}
+        report.add("PASS" if str((rows.get(str(job.get("quest_key"))) or {}).get("status")) == "active" else "FAIL", "the pavilion commission is held", f"status={(rows.get(str(job.get('quest_key'))) or {}).get('status')}")
+    before_city = dict(await engine.action("civilization.status", PLAYER, {"location": capital}) or {})
+    if found:
+        # The seller is still on the auction floor from the bidding section;
+        # the warded door leads to the street, and the shop is a walk from there.
+        await step(report, "auction.leave onto the street", act("auction.leave", PLAYER, {}))
+        await step(report, "walk back into the shop", act("exploration.travel", PLAYER, {"destination": str(found.get("location")), "mode": "known"}))
+        shelf = dict(await step(report, "shop.browse (again)", engine.action("shop.browse", PLAYER, {})) or {})
+        line = dict((list(shelf.get("stock") or []) or [{}])[0])
+        if line.get("item_id"):
+            await step(report, "a second shop trade", act("shop.buy", PLAYER, {"item_id": str(line.get("item_id")), "quantity": 1}))
+        after_city = dict(await engine.action("civilization.status", PLAYER, {"location": capital}) or {})
+        before_p, after_p = int(before_city.get("prosperity") or 0), int(after_city.get("prosperity") or 0)
+        report.add("PASS" if after_p > before_p or after_p >= 95 else "FAIL", "trade moves the city's prosperity", f"{before_p} -> {after_p}")
+        await step(report, "back onto the street", act("exploration.travel", PLAYER, {"destination": capital, "mode": "known"}))
+    inn = next((n for n, l in locations.items() if l.get("district") == "inn" and l.get("outside_location") == capital), "")
+    report.add("PASS" if inn else "FAIL", "the capital keeps an inn", inn or "none")
+    if inn:
+        await step(report, "walk to the inn", act("exploration.travel", PLAYER, {"destination": inn, "mode": "known"}))
+
+    # ---- 12. backups -------------------------------------------------------
     backup = await step(report, "create a backup", transport.create_backup())
     listed = await step(report, "list backups", transport.list_backups())
     if backup and listed is not None and not any(row.get("name") == backup.get("name") for row in listed):

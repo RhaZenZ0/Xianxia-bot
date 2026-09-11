@@ -1,6 +1,6 @@
 """Where things are: known/visible locations, world gating, NPC whereabouts.
 
-Phase 3 of the main.py split (v0.19.35, docs/MAIN_SPLIT_PLAN.md). The scope-
+Phase 3 of the main.py split (v0.19.35, docs/history/MAIN_SPLIT_PLAN.md). The scope-
 accurate dependency scan behind the plan found that 15 of the 19 edges between
 the player-command sub-domains still in main.py all pointed at these helpers -
 they were buried in the travel section but read by perception, market, scene,
@@ -73,6 +73,16 @@ async def _known_locations(user_id: int, character: dict[str, Any]) -> set[str]:
     if current and not current.startswith(("abode:", "personal_world:")):
         known.add(current)
         current_data = WORLD.locations.get(current) or {}
+        # Inside a city's gate, district, shop or hall (v0.36.0) the city
+        # itself is known, its roads, and every gate and district of it.
+        city = current
+        if current_data.get("outside_location") and (current_data.get("district") or current_data.get("shop") or current_data.get("auction_house")):
+            city = str(current_data["outside_location"])
+            known.add(city)
+            current_data = WORLD.locations.get(city) or {}
+        for name, data in WORLD.locations.items():
+            if data.get("district") and str(data.get("outside_location")) == city:
+                known.add(name)
         for neighbor in current_data.get("roads", []):
             neighbor_name = str(neighbor)
             neighbor_data = WORLD.locations.get(neighbor_name) or {}

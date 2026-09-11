@@ -1,7 +1,7 @@
 """Persistent player threads: expeditions, birth-family households, sect
 abodes, private abodes, and finding the private scene a thread belongs to.
 
-Phase 4 of the main.py split (v0.19.39, docs/MAIN_SPLIT_PLAN.md). These are
+Phase 4 of the main.py split (v0.19.39, docs/history/MAIN_SPLIT_PLAN.md). These are
 the helpers family.py and sect.py had to reach back into main.py for with
 call-time imports; with this module below them those hooks are gone. Reads
 runtime, channels, formatting, app.sect_recruitment and discord; never

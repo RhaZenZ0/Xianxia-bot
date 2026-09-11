@@ -1,6 +1,6 @@
 """Player property: /abode, /array, /innerworld and spatialkey.
 
-Split phase 9b (v0.19.45, docs/MAIN_SPLIT_PLAN.md). Cut verbatim from
+Split phase 9b (v0.19.45, docs/history/MAIN_SPLIT_PLAN.md). Cut verbatim from
 main.py in definition order; reads only modules below main.py.
 """
 from __future__ import annotations

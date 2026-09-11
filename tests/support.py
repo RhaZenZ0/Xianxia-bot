@@ -694,7 +694,7 @@ def load_module_by_path(name: str, relative_path: str):
 # ---------------------------------------------------------------------------
 # Source-scanning helpers for the app/bot package
 # ---------------------------------------------------------------------------
-# main.py is being decomposed one block at a time (see docs/MAIN_SPLIT_PLAN.md).
+# main.py is being decomposed one block at a time (see docs/history/MAIN_SPLIT_PLAN.md).
 # A test that reads app/bot/main.py by path and slices it does not fail when the
 # code it guards moves to another module - it silently stops guarding it, which
 # is what happened to test_engine_result_keys' EquipmentOptionTests in split

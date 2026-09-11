@@ -3,7 +3,7 @@ permission and configuration reports, realm access roles, the dashboard's
 Discord bridge, the chat monitor, and the wipe-and-rebuild of managed
 channel messages.
 
-Phase 6 of the main.py split (v0.19.41, docs/MAIN_SPLIT_PLAN.md). Imports
+Phase 6 of the main.py split (v0.19.41, docs/history/MAIN_SPLIT_PLAN.md). Imports
 channel_messages and bugs_forum (never the reverse), core, channels,
 services, runtime; never main.py. The two dashboard entry points used to be
 annotated with main.py's XianxiaBot class; they take the same object and

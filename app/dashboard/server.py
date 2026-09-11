@@ -1430,7 +1430,7 @@ class ReadOnlyDashboardStore:
             )
             auctions = await self._fetchall_if_table(
                 db, "auctions",
-                """SELECT a.*,seller.name AS seller_name,bidder.name AS bidder_name,
+                """SELECT a.*,seller.name AS seller_name,COALESCE(bidder.name,NULLIF(a.merchant_bidder,'')) AS bidder_name,
                           (SELECT COUNT(*) FROM auction_bids b WHERE b.auction_id=a.auction_id) AS bid_count
                    FROM auctions a JOIN characters seller ON seller.user_id=a.seller_user_id
                    LEFT JOIN characters bidder ON bidder.user_id=a.current_bidder_user_id

@@ -2,8 +2,8 @@
 
 This is the release-by-release changelog for the Xianxia RP Discord Bot, split out of `README.md`
 so the README can stay focused on architecture, setup, and current operational documentation. See
-`README.md` for that; see `docs/V021_RELEASE_NOTES.md`, `docs/V020_RELEASE_NOTES.md`, `docs/V019_RELEASE_NOTES.md`, `docs/V018_RELEASE_NOTES.md` and
-`docs/V018_BUILD_HISTORY.md` for full per-release detail beyond the summaries below.
+`README.md` for that; see `docs/history/V021_RELEASE_NOTES.md`, `docs/history/V020_RELEASE_NOTES.md`, `docs/history/V019_RELEASE_NOTES.md`, `docs/history/V018_RELEASE_NOTES.md` and
+`docs/history/V018_BUILD_HISTORY.md` for full per-release detail beyond the summaries below.
 
 ## Changelog
 
@@ -150,7 +150,7 @@ branch, which would have broken every layout-hub panel's ability to route its
 own output beside the panel instead of over it. Both are guarded by new
 regression tests (`HubFailurePublicSurfaceTests` in
 `tests/python/unit/test_hub_layout_rollout.py`) so a future patch touching
-this code gets caught the same way. See `docs/V019_RELEASE_NOTES.md` for the
+this code gets caught the same way. See `docs/history/V019_RELEASE_NOTES.md` for the
 full before/after and the reasoning behind each accepted and rejected change.
 
 **0.19.32** adds the Bugslayer Sword - a one-of-a-kind, indestructible GM reward
@@ -169,7 +169,7 @@ carried in with split stage 4 (`main.py` read `boss_status`/`hunter_status`/
 connected) and repairs the source-scanning tests that split had broken. No schema
 change.
 
-**0.19.33** is phase 1 of the `main.py` split (`docs/MAIN_SPLIT_PLAN.md`): test scaffolding
+**0.19.33** is phase 1 of the `main.py` split (`docs/history/MAIN_SPLIT_PLAN.md`): test scaffolding
 only, no change under `app/`. Nineteen test files read `app/bot/main.py` by path and would
 silently stop guarding code as it moved out (as `EquipmentOptionTests` did in stage 4); they
 now read the whole `app/bot` package or locate a definition by name through new helpers in
@@ -277,7 +277,7 @@ change, no schema change.
 `app/bot/surface.py` and `main.py` becomes a 35-line composition root (11,650 lines at v0.19.32). The
 sweep drops the imports `main.py` no longer read and the dead `_tribulation_currency` helper, and adds a
 guard that every module under `app/bot/` is loaded at startup. The minor-version bump marks the end of the
-decomposition; no behaviour change, no schema change. See `docs/V020_RELEASE_NOTES.md`.
+decomposition; no behaviour change, no schema change. See `docs/history/V020_RELEASE_NOTES.md`.
 
 **0.20.1** groups the 43 flat modules under `app/` into `app/rules/` (gameplay rules and content helpers),
 `app/ops/` (plumbing), `app/ai/` (routing, narration, retrieval, chat monitor) and `app/dashboard/`
@@ -285,7 +285,7 @@ decomposition; no behaviour change, no schema change. See `docs/V020_RELEASE_NOT
 tiers. Two container entrypoints change (`app.database.bootstrap`, `app.ops.healthcheck`); `app.bot` and
 `app.dashboard` do not. No behaviour change, no schema change.
 
-**0.20.2** archives the stale `RELEASE.txt` (it described v0.19.24) to `docs/migration_history/` and keeps
+**0.20.2** archives the stale `RELEASE.txt` (it described v0.19.24) to `docs/history/` and keeps
 the four deployment scripts at the root on purpose: the installed `update.sh` requires `startup.sh`/`stop.sh`
 there and replaces itself only there. No behaviour change, no schema change.
 
@@ -350,7 +350,7 @@ else is speech, recorded and free. Ambiguity becomes a picker, never a guess.
 Every line that can reach the engine or the narrator spends a token from a new
 per-player bucket (`TYPED_PLAY_BURST` / `TYPED_PLAY_PER_MINUTE`). Typed play adds
 no handler, no engine action and no database write, so the v0.21 authority gate
-is unchanged. No schema change. See `docs/V021_RELEASE_NOTES.md` and
+is unchanged. No schema change. See `docs/history/V021_RELEASE_NOTES.md` and
 `docs/COMMISSIONS_DESIGN.md`.
 
 **0.21.2** adds **Teardown** to the dashboard's Discord tab: delete every thread the bot
@@ -414,7 +414,7 @@ abandon confirmation that states its cost, and a GM Commissions dashboard tab (a
 discard, both audited). Schema **29** adds the giver/tier/variant/deadline columns to
 `quest_definitions`, the commission columns to `character_quests`, and the cooldown and outcome
 counters to `npc_relationships`. Seeded invention - the design's second producer - is deliberately
-not built yet. See `docs/V022_RELEASE_NOTES.md` and `docs/COMMISSIONS_DESIGN.md`.
+not built yet. See `docs/history/V022_RELEASE_NOTES.md` and `docs/COMMISSIONS_DESIGN.md`.
 
 **0.22.1** finishes the giver roster. Eleven givers instead of three: the two old men who sleep and
 posture in Greenriver, and a quest board for every public sect. A commission may now keep its terms
@@ -607,8 +607,8 @@ two files that drive `httpx.MockTransport` skip with a reason instead of errorin
 
 No application change; no schema change.
 
-See `docs/V025_RELEASE_NOTES.md` for v0.25.0, `docs/V024_RELEASE_NOTES.md` for v0.24.0, `docs/V021_RELEASE_NOTES.md` for v0.21.x, `docs/V020_RELEASE_NOTES.md` for v0.20.0, `docs/V019_RELEASE_NOTES.md` for the full detail on every v0.19.x release above, `docs/V018_RELEASE_NOTES.md` and
-`docs/V018_BUILD_HISTORY.md` (consolidated validation/audit record) for the prior staged-authority migration.
+See `docs/history/V025_RELEASE_NOTES.md` for v0.25.0, `docs/history/V024_RELEASE_NOTES.md` for v0.24.0, `docs/history/V021_RELEASE_NOTES.md` for v0.21.x, `docs/history/V020_RELEASE_NOTES.md` for v0.20.0, `docs/history/V019_RELEASE_NOTES.md` for the full detail on every v0.19.x release above, `docs/history/V018_RELEASE_NOTES.md` and
+`docs/history/V018_BUILD_HISTORY.md` (consolidated validation/audit record) for the prior staged-authority migration.
 
 **0.25.0** remakes the dashboard, from the design canvas approved before the release. No endpoint
 changed, no query changed, and no data was added or removed except one small block on
@@ -640,7 +640,7 @@ behind than its own interval (a 4,320-minute system 500 minutes behind is early,
 frozen player only when no reason was recorded.
 
 The palette, the serif headings, the drawer, the authority split and the coverage gate are all
-unchanged. See `docs/V025_RELEASE_NOTES.md`.
+unchanged. See `docs/history/V025_RELEASE_NOTES.md`.
 
 
 **0.25.1** changes the typed-play prefix default from `>` to `$`.
@@ -1009,6 +1009,172 @@ Gate: `tests/python/contracts/test_security_defaults.py` and `TestNewRefusesAnEn
 No schema change (still 32), no game-rule change, AI remains narration-only.
 
 
+**0.38.1** is a GUI point release: **results in the panel.** No schema change.
+
+Since the Components V2 layout (v0.19.10) every hub action answered beside the panel with a new
+message, because a V2 message cannot carry content or embeds and so could not be written over the
+way the classic card was. A V2 message can carry text displays, though. A plain-text result short
+enough for the panel's text budget (a thousand characters; the header, the page and eight action
+rows use the rest of Discord's four thousand) is now shown *inside* the panel, in a result block
+above the actions, and the panel is edited in place: pressed from the panel, the panel is its own
+response and is edited through it; pressed through an input step (a picker the hub opened) or a
+modal, the panel is edited directly and the step message or the "thinking" placeholder is deleted,
+so the conversation ends with one message either way. Refresh clears the block, and the live status
+is refreshed with every result.
+
+Where that is not possible the result is delivered beside the panel exactly as before, and the
+panel stays live underneath: an embed (the character sheet, an auction card), a result that brings
+its own buttons (Narrate it, a scene or an event panel), a file, an ephemeral reply, and text longer
+than the budget or split across messages. Only an action's first output can go in the panel; later
+outputs of the same action go beside it. `tests/python/unit/test_hub_layout_rollout.py` drives the
+delivery with stubs for each case.
+
+**0.38.0** is a feature release: **city life.** No schema change.
+
+Six things a city does now that it did not before, all under `/world → City`.
+
+*A quest pavilion in every capital, a notice board at every gate.* A hundred and three commissions,
+given by the people who live in the cities' parts: in a capital the noble steward, the abbot and the
+clerk each have work, and every walled city's gate captain posts a notice - walk the wall twice and
+report - and its district's first citizen a standing request. `Board` lists the city's own
+commissions with who gives them and what they pay, marked held, done or open; in a capital it also
+posts the wanted list, every active bounty in the realm with who it is on and where they were last
+seen. `Accept` takes one, and only while you are in that city; the giver is found in their own
+district for the report. Every objective is one the engine already progresses - explore a named
+place, talk to a named person, take a scene action - so the board rides on `commission.accept` and
+`quest.progress` as they are.
+
+*A sect envoys' hall.* In each capital's temple quarter, `Envoys` names every sect with a public
+gate in that world - the trial, the examiner, the place - and records each as a discovered
+recruitment route (`sect.discover`, kind `envoys_hall`), so a new player learns where the trials are
+without exploring at random. Arriving in the temple quarter says the hall is there.
+
+*Rumours.* `Rumours` retells what has happened in the city and its parts - the structured world
+history, through the same viewpoint gate the narrator uses, so a hidden or faction-only event never
+reaches an ear it should not - as the lower town's innkeeper or beggar king tells it in a capital,
+the gate captain elsewhere.
+
+*An inn in every city.* Forty-eight inns with a landlord or landlady apiece, the corner table where
+a merchant sits when one is in town (the merchant NPC now stands at the inn, not the square), and
+the board by the door where the caravan master posts for guards. `Inn` names who is in town - every
+cultivator in the city and its parts - and which merchants are at the table, and opens the inn's
+common room: one public thread per inn in the world's realm-hub channel, so whoever is in the city
+has somewhere to talk.
+
+*A city that grows.* Every trade moves the city's prosperity a point - a sale at a shop shelf or a
+merchant's pack, a lot struck on the floor - capped where the simulation caps it, and the
+civilization tick still drifts it back. Prosperity shows: a thriving city's shops refill a line
+fuller, a struggling one's a line thinner (never empty), the gate queue in the explore reply is long
+or quiet, and `Look` says whether the city is thriving, getting by or struggling. Go owns the
+prosperity and the shelf (`nudgeCityProsperityTx`, `prosperityShelfBonus`); Python reads it.
+
+`scripts/playtest_engine.py` takes a commission from the capital's pavilion, trades at a shop and
+watches prosperity move, and walks to the inn.
+
+**0.37.0** is a feature release: **merchants bid.** Schema **38**.
+
+A merchant was the floor's last bidder only: it took what nobody wanted at the starting bid. It is a
+bidder now. On every simulation tick each open lot with at least five real minutes to run gets at
+most one merchant bid - from the merchant standing in the city, or the first whose loop passes it -
+at the next minimum, as long as that is within the merchant's valuation and purse. The valuation is
+the market base value of the goods (their sect value on the world's ladder), or sixty percent of the
+merchant's own shelf price for something it stocks as a ware: a merchant buys to resell and never
+pays what it would ask, so a player who wants the lot more than the market does still wins it. The
+purse pays at bidding time, like a player's escrow (`auctions.merchant_bidder` says who holds the
+lot); a player who outbids the merchant sees the purse refunded and the merchant cleared, a rival
+merchant refunds the purse the same way, and a merchant still holding the high bid when the lot
+closes wins it - the seller is paid the hammer price, the purse does not pay twice, and the goods go
+into the pack as a floor find. The five-minute floor means a merchant never snipes: there is always
+time to answer. The live card and `/economy → Auction House → Browse` name a merchant high bidder as
+such, the card is refreshed after each tick a merchant holds a lot, and the dashboard's auction
+table shows the merchant where it shows a bidder. `scripts/playtest_engine.py` drives a lot through
+the merchant's bid, the escrow and the refund - a hundred steps, none failed.
+
+**0.36.1** is a point release: **Greenriver Town joins the roads, and the engine playtest covers the
+city.** No schema change.
+
+*Greenriver Town has roads.* The starting town was the one settlement outside the road graph: it
+could be reached only by direct travel, had no gates, and a fresh character's first road out was
+the capital's. It now has roads to Azure Crown Imperial City (by its East Gate) and Riverguard City
+(by its North Gate), so the first journey is a real one - out by the gate, along the road, in by the
+gate facing it - and Old Hu's loop from Greenriver walks a road rather than a fixed four hours.
+
+*The engine playtest walks the city.* `scripts/playtest_engine.py --launch` gained a tenth section
+(ninety-six steps in all): a road journey from Riverguard to the capital that must end
+at the gate facing the road, the walk to a district, `shop.here` from there, walking the city until
+a shop is found, entering it, browsing, buying at the shelf price, selling what the keeper wants,
+the door refusing to open anywhere but the street, the eight merchants on `merchant.status`, an
+unsold lot at the capital's house taken by a merchant on the tick, the lot in that merchant's pack
+as a floor find, and buying it back from him in his city. The run passed clean on the first full
+pass of the new systems; the one failure it produced was the script's own (a lot of spirit herb
+merges into Old Hu's wares line by design) and the lot is a curio now.
+
+**0.36.0** is a feature release: **gates and districts.** No schema change.
+
+*It matters which way you arrived.* Every walled city has a gate on each compass side that has a
+road - the road graph of each world is laid out deterministically and both ends of a road agree on
+the compass, so a road that leaves Riverguard City by its East Gate arrives at Azure Crown's West
+Gate. A road journey now ends at the gate facing the road you came by, not in the centre, and the
+travel reply says which gate you left by and what lies inside the walls. A direct journey, or a town
+with no walls, lands where it always did.
+
+*Bigger cities have districts.* Each capital has four compass districts behind its gates - the noble
+quarter to the north, the temple quarter east, the lower town south, ministry row west - and every
+other city has one district drawn from its terrain: forge terraces, herb gardens, blade yards, a
+garrison ward, mist docks, a frost market, a ruin quarter, caravan yards, river landings, ore
+terraces. A hundred and fifty-six gates and districts in all, each a location with four encounters
+and sense hints, and each with its own people - a gate captain at every gate, two named NPCs in
+every district, two hundred and fifteen in all - so a city is lively where you stand and only the
+people of that part are in the scene. `/world → City → Look` shows the gates, what each faces, the
+districts, where you are and who is here.
+
+*A walk apart.* Inside the walls the gates, the districts, the centre and the shops are all a step
+from each other: any part is walked to from any other, none needs discovering, and the picker offers
+them the moment you are in the city. Leaving by road works from any part and goes by the gate facing
+the first leg. A shop, an auction hall or a dwelling merchant is reached from any part of the city;
+a shop door still opens onto the street. The Quest Forge sets quests in the city, not in its parts.
+
+*The capitals charge more.* A capital's shops are a tier better than their world - tier two in the
+Mortal capital, tier five in the Celestial - and a quarter dearer, buying and selling.
+
+**0.35.0** is a feature release: **the city shops.** Schema **37**.
+
+A city was one place: you arrived, you explored, you left. Every city now has its shops - a
+hundred and four across the forty-eight cities, four in each capital and two everywhere else -
+and they differ by city. The kind follows the city's character (Emberforge's smithy, Jadewood's
+apothecary, Moonfen's talisman hall, Ashenwall's array workshop, Four-Roads' provisions,
+Riverguard's beast hall), the tier follows the world (mortal-grade in the Mortal World up to
+celestial-grade in the Celestial), and the shelf follows both: a tier-one smithy sells spirit-iron
+swords of its own making and the ore; a tier-three one adds lamellar and beast cores. Every shop is
+an interior location with a keeper NPC of its own - a want, a fear, a secret - four encounters and
+sense hints, generated from the city's terrain and climate and held to the content gate like any
+other place.
+
+*Finding and entering.* A shop is found by walking the city: each `/world → Explore` in a city
+has a fair chance of turning up one of its shops the player has not found, recorded as a location
+discovery of kind `shop`, so `/travel` offers it and enters it - instantly, from the city's street
+or from another shop of the same city - and the door opens back onto the street and nowhere else.
+`/economy → City Shops → Here` says how many of the city's shops you have found and which kinds
+remain. Inside, `Browse` shows the shelf (the keeper's own craft first, marked *made here*) and the
+board of what the keeper buys; `Buy` and `Sell` trade against them, and what a shop also sells goes
+straight back onto its shelf. The shelf refills to the content quantities on the shop's own clock
+(twelve game hours), written by the next trade after it is due. Go owns all of it
+(`shop_actions.go`); Python never writes `shop_state` or `shop_stock`. The Quest Forge leaves
+shopfronts and keepers off its capped lists, and NPC life and world events do not wander into them.
+
+**0.34.2** is a feature point release: **the merchant's own shop.** No schema change.
+
+A merchant carried only what the auction floors could not sell, so a pack was empty until a lot
+went unsold. Each merchant now keeps a shop of its own beside the floor finds: three to five lines
+of ordinary tradeable goods in content (`wares` - Old Hu's herbs and pills, Madam Wen's talismans
+and ink, Brother Lan's spirit iron and beast cores, Elder Fang's array disks), each with a quantity
+and a price in the merchant's currency, stocked when the merchant is first seeded and restocked to
+the content quantity every time it comes home. Every stock line now says which it is (`source`:
+`wares` or `auction`); the status lists the shop first with 🛒 and the floor finds after with 🏮,
+the buy reply says "from the shop" or "from the floor finds", and the item picker tags each line.
+A floor find of an item the shop also sells takes the shop's price. Gate: the wares rule in
+`test_world_content_gate.py` and the Go `TestAMerchantsOwnShopIsStockedAtSeedAndRestockedAtHome`.
+
 **0.34.1** is a feature point release: **the playtest board and the travelling merchants.** Schema **36**.
 
 *The playtest board.* A `#playtest` base channel beside `#bugs`, created by Setup/Repair like the
@@ -1313,7 +1479,7 @@ remaining-authority list rather than quietly allowlisted.
 did everything only they or their tests reached: eighty-one functions and `World` methods in all
 (the Python `roll_2d10`, `random_hunt`, `breakthrough_tn`, the secret-realm tables, the samsara and
 aptitude generators, the sense checks, the manor maths). Tests count as callers of nothing.
-`docs/V018_AUTHORITY_CLEANUP_ROADMAP.md` joins the V015/V016 lists under `docs/migration_history/`.
+`docs/history/V018_AUTHORITY_CLEANUP_ROADMAP.md` joins the V015/V016 lists under `docs/history/`.
 
 Gate: `test_authority_boundary.py` - every DB-layer writer is in `PRESENTATION_WRITES` with its
 tables and nothing else may write; `database`, `simulation` and `ops` import no rules and the
@@ -1347,9 +1513,29 @@ directory to one file, requires each check to appear before the release job and 
 and requires the release job to wait on all three.
 
 
-## Release status — v0.34.1
+## Release status — v0.38.1
 
-- Current release: v0.34.1 (schema 36): the `#playtest` board - one message per hub page,
+- Current release: v0.38.1: results in the panel - a plain, short hub result edits the panel in
+  place instead of spawning a message; embeds, results with buttons, files and long text still land
+  beside it.
+- v0.38.0: city life - a quest pavilion in every capital and a notice board at every
+  gate, a sect envoys' hall, rumours through the viewpoint gate, an inn in every city with a common
+  room, and prosperity that trade moves and the shelves show.
+- v0.37.0 (schema 38): merchants bid - on the tick, at the next minimum, within a
+  valuation the market sets and a purse that pays as escrow; outbid, they are refunded; holding the
+  high bid at the close, they win.
+- v0.36.1: Greenriver Town joins the roads (gates east to the capital and north to
+  Riverguard), and the engine playtest walks the city - the gate, a district, a shop found, bought
+  from and sold to, and a merchant taking an unsold lot and reselling it - ninety-six steps clean.
+- v0.36.0: gates and districts - a road journey ends at the gate facing the road
+  you came by, the capitals have four compass districts and every city one, each with its own
+  people, and the capitals' shops are a tier better and dearer.
+- v0.35.0 (schema 37): the city shops - a hundred and four across the forty-eight
+  cities, differing by city in kind, tier and shelf, found by exploring the city, entered by
+  travelling to them, with a keeper to buy from and sell to inside.
+- v0.34.2: the merchant's own shop - three to five lines of ordinary goods per
+  merchant in content, restocked every time it comes home, listed beside the floor finds.
+- v0.34.1 (schema 36): the `#playtest` board - one message per hub page,
   testers react ✅ ❌ 💡 and the GM reads the tally - and the travelling merchants, who buy what an
   auction floor could not sell, walk fixed loops of cities and resell it to whoever meets them in a
   city or on the road.
@@ -1543,6 +1729,8 @@ and requires the release job to wait on all three.
 - **Schema 27** added the v0.19.29 mute/freeze moderation columns on `characters`
   (`is_muted`, `is_frozen`, `moderation_reason`).
 - **Schema 28** added the Quest Forge definition table (`quest_definitions`).
+- **Schema 38** added the merchant holding a lot's high bid (`auctions.merchant_bidder`) (v0.37.0).
+- **Schema 37** added the city shops' shelves (`shop_state`, `shop_stock`) (v0.35.0).
 - **Schema 36** added the playtest board (`playtest_channel_id`, `playtest_items`) and the travelling
   merchants (`merchant_state`, `merchant_stock`, `auctions.merchant_buyer`) (v0.34.1).
 - **Schema 35** added the live-auction channel per house (`auction_house_channels`) and the card per
@@ -1560,10 +1748,10 @@ and requires the release job to wait on all three.
   on `character_quests`; and the refusal cooldown, per-outcome counters and last outcome on
   `npc_relationships`.
 
-See `docs/V018_RELEASE_NOTES.md` and `docs/V019_RELEASE_NOTES.md` for the per-release detail.
+See `docs/history/V018_RELEASE_NOTES.md` and `docs/history/V019_RELEASE_NOTES.md` for the per-release detail.
 
 ## Release notes
 
-See `docs/V019_RELEASE_NOTES.md` for the current release's cultivation-depth audit, dashboard coverage gaps, and
-combat authority-migration fixes. See `docs/V018_RELEASE_NOTES.md` for the complete staged-authority, road/caravan,
+See `docs/history/V019_RELEASE_NOTES.md` for the current release's cultivation-depth audit, dashboard coverage gaps, and
+combat authority-migration fixes. See `docs/history/V018_RELEASE_NOTES.md` for the complete staged-authority, road/caravan,
 setup, cleanup, migration, security, and upgrade summary that v0.19 builds on.

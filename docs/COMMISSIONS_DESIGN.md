@@ -11,7 +11,7 @@ claim about it may not.
 > the GM tab — with one deliberate exception: **seeded invention is not
 > built**. Its columns exist and its visibility rule is enforced and tested,
 > but nothing writes a personal commission yet. See
-> `docs/V022_RELEASE_NOTES.md`. Sections below describing invention are
+> `docs/history/V022_RELEASE_NOTES.md`. Sections below describing invention are
 > therefore still design, not code; everything else describes what is in the
 > tree.
 

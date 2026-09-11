@@ -11,6 +11,12 @@ database. Its findings are the first two entries.
 
 ## Findings
 
+- **fixed (v0.36.1)** — *Greenriver Town had no roads.* The starting town sat outside the road
+  graph, so it had no gates (v0.36.0), could only be reached by direct travel, and a fresh
+  character's first road journey was the capital's rather than their own town's. It now has roads
+  to Azure Crown Imperial City and Riverguard City, with the gates to match. Found by asking why
+  the gate test skipped it; the engine playtest's city section (v0.36.1) now starts a road journey
+  from a real gate.
 - **fixed (v0.34.0)** — *A commission's last objective could never be turned in.* `quest.progress`
   wrote the row `completed` and then asked `resolveCommissionTx` for an `active` row, which failed
   with "no active commission by that name" and rolled the whole progress back. Every commission

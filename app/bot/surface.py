@@ -2,7 +2,7 @@
 registers with Discord, the hub page tables, the /admin panel root, the
 application-command error handler, and the event-handler bindings.
 
-Split phase 10 (v0.20.0, docs/MAIN_SPLIT_PLAN.md). Cut verbatim from
+Split phase 10 (v0.20.0, docs/history/MAIN_SPLIT_PLAN.md). Cut verbatim from
 main.py, which is now the composition root and nothing else. This module
 imports every command module whose groups or status handlers it wires;
 the modules that define only root commands (commands/sense.py) and the
@@ -49,10 +49,11 @@ from .commands.economy import (
     civilization_status_command,
     market_group,
     merchant_group,
+    shop_group,
     storage_group,
 )
 from .commands.equipment import equipment_group
-from .commands.exploration import alchemy_group, realmhub_group, travel_group
+from .commands.exploration import alchemy_group, city_group, realmhub_group, travel_group
 from .commands.family import family_group
 from .commands.formation import formation_group, formation_status
 from .commands.law import condition_group, crime_group, law_group, manual_group, profession_group
@@ -110,8 +111,10 @@ _GROUP_ACTION_ROOTS = {
     "civilization": civilization_group,
     "market": market_group,
     "merchant": merchant_group,
+    "shop": shop_group,
     "blackmarket": blackmarket_group,
     "realmhub": realmhub_group,
+    "city": city_group,
     "fate": fate_group,
     "bond": bond_group,
     "travel": travel_group,
@@ -120,10 +123,10 @@ _GROUP_ACTION_ROOTS = {
 _MIGRATED_ROOTS = {
     "abode", "afterlife", "alchemy", "aptitude", "array", "artifact", "auction", "battle", "beast",
     "body", "bodyperfect", "bond", "boss", "bounty", "breakthrough", "caravan",
-    "civilization", "conceal", "condition", "craft", "crime", "cultivate",
+    "city", "civilization", "conceal", "condition", "craft", "crime", "cultivate",
     "daoheart", "duel", "effects", "equipment", "era", "explore", "family",
     "formation", "gender", "grudges", "hunt", "hunter", "inheritances", "fate",
-    "innerworld", "inventory", "karma", "law", "lifespan", "manual", "market", "merchant", "blackmarket",
+    "innerworld", "inventory", "karma", "law", "lifespan", "manual", "market", "merchant", "shop", "blackmarket",
     "npcinfo", "party", "perfect", "profession", "provenance", "reincarnate",
     "reputation", "rulers", "scene", "seclusion", "secretrealm", "sect", "sense",
     "sheet", "soul", "spatialkey", "specialeffects", "storage", "talk", "territory",
@@ -227,6 +230,7 @@ _HUB_DEFINITIONS = (
         description="Your location, local actions, current events, civilization and world laws.",
         pages=(
             _hub_page("world", "Current Location", "Show the current world and known locations."),
+            _hub_page("city", "City", "The city you are in: its gates and districts, the commission board, the sect envoys' hall, the rumours and the inn."),
             _hub_page("explore", "Explore", "Explore the current location for events and discoveries."),
             _hub_page("hunt", "Hunt", "Hunt a spirit beast at the current location."),
             _hub_page("worldevents", "Events", "Active phenomena, consequences and realm openings."),
@@ -264,9 +268,10 @@ _HUB_DEFINITIONS = (
     HubDefinition(
         name="economy",
         title="💰 Economy Hub",
-        description="Wallet, local markets, black markets, protected auctions, travelling merchants and trade caravans.",
+        description="Wallet, city shops, local markets, black markets, protected auctions, travelling merchants and trade caravans.",
         pages=(
             _hub_page("wallet", "Wallet", "View cultivation currencies."),
+            _hub_page("shop", "City Shops", "The smithy, apothecary and talisman hall of each city: find them by exploring, enter them by travelling, buy and sell inside."),
             _hub_page("market", "Local Market", "Buy and sell in the dynamic local economy."),
             _hub_page("blackmarket", "Black Market", "Locate rotating underworld posts and trade forbidden goods."),
             _hub_page("auction", "Auction House", "Browse, list and bid in protected auctions."),

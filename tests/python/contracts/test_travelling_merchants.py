@@ -73,6 +73,18 @@ class TheSlashSurface(unittest.TestCase):
         self.assertIn('ENGINE.action("merchant.status"', _body(ECONOMY, "_merchant_status"))
         self.assertIn("/economy → Merchants → Buy", status)
 
+    def test_the_shop_and_the_floor_finds_are_told_apart(self):
+        # v0.34.2: the engine marks every stock line "wares" or "auction";
+        # the status, the buy reply and the picker all say which.
+        go = (GO / "game" / "merchant_actions.go").read_text(encoding="utf-8")
+        self.assertIn("func restockMerchantWaresTx(", go)
+        self.assertIn("if state.Location == m.Home {", go)
+        self.assertIn('source = "wares"', go)
+        lines = _body(ECONOMY, "_merchant_stock_lines")
+        self.assertIn('"🛒" if str(line.get("source"))=="wares" else "🏮"', lines)
+        self.assertIn('" from the shop" if str(result.get("source"))=="wares"', _body(ECONOMY, "merchant_buy"))
+        self.assertIn('"shop" if str(line.get("source"))=="wares" else "floor find"', _body(ECONOMY, "merchant_buy_item_autocomplete"))
+
     def test_the_item_picker_follows_the_chosen_merchant(self):
         picker = _body(ECONOMY, "merchant_buy_item_autocomplete")
         self.assertIn('getattr(interaction.namespace,"merchant","")', picker)
@@ -80,7 +92,7 @@ class TheSlashSurface(unittest.TestCase):
     def test_the_economy_hub_has_the_page(self):
         self.assertIn('_hub_page("merchant", "Merchants"', SURFACE)
         self.assertIn('"merchant": merchant_group,', SURFACE)
-        self.assertIn('"merchant", "blackmarket",', SURFACE)
+        self.assertIn('"merchant", "shop", "blackmarket",', SURFACE)
 
 
 class TheRoadAndTheFloor(unittest.TestCase):
@@ -106,3 +118,31 @@ class TheAutomationSwitch(unittest.TestCase):
         self.assertIn('value="merchants"', INSPECT)
         actions = (GO / "game" / "actions.go").read_text(encoding="utf-8")
         self.assertIn('"merchants":               true,', actions)
+
+
+class MerchantsBid(unittest.TestCase):
+    """v0.37.0: a merchant bids on the tick, its purse the escrow; a player
+    who outbids it sees the purse refunded; a merchant holding the high bid
+    at the close wins the lot."""
+
+    def test_the_engine_bids_refunds_and_settles(self):
+        go = (GO / "game" / "merchant_actions.go").read_text(encoding="utf-8")
+        for needle in ("func MerchantsBid(", "func MerchantWinsLot(", "func refundMerchantBidderTx(", "func merchantValuation(", "merchantBidMinimumSecondsLeft"):
+            self.assertIn(needle, go, needle)
+        economy = (GO / "game" / "economy_actions.go").read_text(encoding="utf-8")
+        self.assertIn("refundMerchantBidderTx(conn, catalog, a, p.GameMinute, now)", economy)
+        tick = (GO / "simulation" / "advanced_maintenance.go").read_text(encoding="utf-8")
+        self.assertIn("game.MerchantsBid(conn, r.World, gm)", tick)
+        self.assertIn("game.MerchantWinsLot(conn, r.World, a, gm)", tick)
+        migration = CORE.split('"merchant_bids"')[1].split("),")[0]
+        self.assertIn("ALTER TABLE auctions ADD COLUMN merchant_bidder", migration)
+
+    def test_the_card_and_the_board_name_a_merchant_high_bidder(self):
+        embed = _body(FEED, "lot_embed")
+        self.assertIn('lot.get("merchant_bidder")', embed)
+        self.assertIn("(travelling merchant)", embed)
+        settle = _body(FEED, "settle_lots")
+        self.assertIn('str(lot.get("merchant_bidder") or "")', settle)
+        self.assertIn('_edit_card(guild, record, lot, state="open")', settle)
+        self.assertIn("merchant_bidder", _body(ECONOMY, "auction_browse"))
+        self.assertIn("NULLIF(a.merchant_bidder,'')", DASHBOARD)

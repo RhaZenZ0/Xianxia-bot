@@ -1,17 +1,39 @@
-# Xianxia RP Discord Bot v0.21.0
+# Xianxia RP Discord Bot v0.38.1
 
 [![CI](https://github.com/RhaZenZ0/Xianxia-bot/actions/workflows/ci.yml/badge.svg)](https://github.com/RhaZenZ0/Xianxia-bot/actions/workflows/ci.yml)
 
-A persistent Xianxia role-playing Discord bot designed for CPU-only QNAP/NAS deployment. Python owns
-Discord, RAG, dashboard, and presentation orchestration; Go owns canonical gameplay rules, current
-game time, simulation mutations, and SQLite WAL state.
+A persistent Xianxia role-playing game that lives in a Discord server and runs on a CPU-only
+QNAP/NAS. Forty-eight cities across four worlds, each with gates, districts, shops and an inn; sects
+with entrance trials and manuals; travelling merchants and live auction floors; NPCs with lives,
+injuries, marriages and deaths that go on whether players are there or not. A Go engine owns every
+rule and the database. Python owns Discord, the GM dashboard and the narrator. The AI only ever
+describes what the engine has already decided, and the game keeps running when the AI is down.
 
+- `VERSIONS.md` — the changelog, release by release, with the schema history.
+- `docs/CONFIGURATION.md` — every `.env` key explained; `.env.example` is the keys and defaults only.
+- `docs/ROADMAP_1_0.md` — what is left before 1.0 and the test that gates each milestone.
+- `docs/KNOWN_LIMITATIONS.md` — the punch list, every entry fixed or deferred with a reason.
+- `docs/playtest/` — the live-server checklist for the current release.
+- `docs/COMMISSIONS_DESIGN.md` — the design of commissions and typed play.
+- `docs/history/` — the record of how the tree got here; nothing in it describes the current release.
 
-See `VERSIONS.md` for the full release-by-release changelog, and
-`docs/V021_RELEASE_NOTES.md`, `docs/V020_RELEASE_NOTES.md`, `docs/V019_RELEASE_NOTES.md`, `docs/V018_RELEASE_NOTES.md` and `docs/V018_BUILD_HISTORY.md`
-(consolidated validation/audit record) for full per-release and staged-authority migration detail.
+---
 
-## Release architecture
+## Contents
+
+1. [Architecture](#architecture)
+2. [Quick start on QNAP](#quick-start-on-qnap)
+3. [Running without Docker](#running-without-docker)
+4. [The narrator](#the-narrator)
+5. [Playing](#playing)
+6. [The world](#the-world)
+7. [Running the game as GM](#running-the-game-as-gm)
+8. [Operations](#operations)
+9. [Development](#development)
+
+---
+
+## Architecture
 
 ```text
 PLAYER
@@ -19,7 +41,7 @@ PLAYER
   v
 Discord / Python interaction layer
   |
-  +-- guided /action UI + deterministic checks
+  +-- hubs, guided /action UI, typed play
   +-- RAG / NPC memory / canonical context
   |
   +------------------------+
@@ -27,20 +49,9 @@ Discord / Python interaction layer
   v                        v
 Go game engine         AI narrator (read only)
 AUTHORITATIVE              |
-  |                  +-----+-----+
-  |                  |           |
-  |               ROUTINE      EPIC
-  |                  |           |
-  |           Gemma 4 31B   Nemotron 3 Super
-  |               :free         :free
-  |                  |           |
-  |           Gemma 4 26B   Gemma 4 31B
-  |             A4B :free      :free
-  |                  +-----+-----+
-  |                        |
-  |                  openrouter/free
-  |                        |
-  |                procedural fallback
+  |                  routine / epic chains
+  |                  -> openrouter/free
+  |                  -> procedural fallback
   |                        |
   +------------+-----------+
                v
@@ -49,259 +60,48 @@ AUTHORITATIVE              |
 Go -> SQLite WAL + batched transactions
 ```
 
-Ownership rules:
+Three services, one database:
 
-- **Go owns canonical mechanics and production SQLite access.**
-- **Python owns Discord commands/views, RAG/context assembly, permissions and presentation.**
-- **AI is narration-only.** `/action` selects intent through the UI; deterministic mechanics fix the result before narration.
-- **Gameplay survives AI outages.** When all OpenRouter routes fail or quota is exhausted, procedural narration is returned and canonical play continues.
-
-## Narration routes
-
-### Direct Google AI Studio route (optional, v0.26.0)
-
-Set `GOOGLE_AI_STUDIO_API_KEY` (or `GEMINI_API_KEY`) and one more hop appears at
-the **front of both chains**:
-
-```text
-aistudio/gemini-3.8-flash       (your own AI Studio key, called directly)
-        | fail / timeout / empty / scratchpad
-        v
-   ... the OpenRouter chain below, unchanged ...
-```
-
-This is the only route that does not go through OpenRouter, and that is the
-whole point: it is not charged against OpenRouter's ~50-request daily free
-budget, so it is the most effective single change against procedural fallbacks.
-Set the key and nothing else changes; leave it empty and the router is exactly
-what v0.25.x shipped.
-
-It is narration only, and it is not trusted more than any other route — the
-reply goes through the same scratchpad, prompt-leak and length guards, and a
-rejected reply falls through to the OpenRouter chain. The SDK (`google-genai`)
-is imported lazily: if it is missing or incompatible the route is left out of
-the chain, `/admin → Server → Ai Status` says why, and narration carries on.
-
-### Routine (OpenRouter)
-
-```text
-google/gemma-4-31b-it:free      (Google AI Studio only - add your own AI Studio key on OpenRouter)
-        | fail / timeout / 429
-        v
-openrouter/free
-        | fail / account quota exhausted
-        v
-procedural narration
-```
-
-Used for `/talk`, guided `/action` outcomes, exploration, hunts, ordinary events and normal NPC/sect scenes.
-
-Every narration request tells OpenRouter to switch model reasoning off
-(`OPENROUTER_DISABLE_REASONING=true`): the two production failures of the free
-chain were a model spending the whole budget thinking and returning nothing, and
-a model returning its thinking as the narration. A model that is reasoning-native
-ignores the switch, so a route that keeps answering with its scratchpad is dropped
-from the defaults rather than kept and filtered: MiniMax M3 was the routine
-fallback until v0.25.3 and went this way, as Nemotron 3 Super did before it. `/admin server ai_status` shows,
-per route, which upstream served it, whether it went through your own provider
-key or OpenRouter's shared pool, and how long a repeatedly failing route is
-backing off.
-
-### Epic (OpenRouter)
-
-```text
-google/gemma-4-31b-it:free
-        | fail / timeout / 429
-        v
-openrouter/free
-        | fail / account quota exhausted
-        v
-procedural narration
-```
-
-Used for major breakthroughs, sect trials, major event scenes and other explicitly epic narration. The LLM does not decide world simulation, combat, advancement, rewards, karma, NPC deaths or faction state.
-
-`OPENROUTER_REQUIRE_FREE=true` rejects paid model IDs. `openrouter/free` is explicitly allowed even though its ID does not end in `:free`. The local request limiter is fail-fast: it does not queue Discord users behind repeated retries.
-
-## HTTP request limits
-
-Both the health listener and the GM dashboard parse HTTP by hand, and both read
-the request head **before any authentication runs**. A per-line timeout on its
-own is not a limit: a client sending one header just under it holds the
-connection open indefinitely, and a client sending them quickly grows the header
-dictionary without bound.
-
-Every request head is therefore bounded (`app/ops/http_limits.py`), on both servers,
-with the same env knobs:
-
-| Setting | Default | Rejected with |
-| --- | --- | --- |
-| `HTTP_MAX_REQUEST_LINE_BYTES` | 8192 | 414 URI Too Long |
-| `HTTP_MAX_HEADER_LINES` | 100 | 431 Request Header Fields Too Large |
-| `HTTP_MAX_HEADER_BYTES` | 16384 | 431 |
-| `HTTP_HEADER_DEADLINE_SECONDS` | 10 | 408 Request Timeout |
-| `HTTP_HEADER_LINE_TIMEOUT_SECONDS` | 5 | 408 |
-| `HTTP_MAX_CONNECTIONS` | 64 | 503 |
-
-The deadline is **absolute**: each read gets whichever is smaller, the per-line
-timeout or the time remaining for the whole head. Defaults are generous for a
-browser (Chrome sends roughly 15 headers, 1–2 KiB) and mean for an attacker.
-
-> The GM dashboard publishes to `${DASHBOARD_BIND_ADDRESS}:8090`. The shipped
-> `.env.example` sets that to `0.0.0.0` so the dashboard is reachable from a PC
-> on the LAN, which is what a headless NAS needs; everything above then
-> matters a great deal more. Unset, compose falls back to loopback. Set the
-> NAS's LAN address to narrow it to one interface.
-
-## Free-tier budget
-
-OpenRouter free models (`:free`) allow **20 requests per minute and 50 requests
-per day** while the account has under $10 of lifetime credits — **1000/day at $10
-or more**. Every failed route walks to the next one and each walk spends a daily
-slot, so the allowance drains faster than the narration count suggests.
-
-```env
-OPENROUTER_MAX_REQUESTS_PER_MINUTE=20
-OPENROUTER_MAX_REQUESTS_PER_DAY=50      # raise to 1000 once credits are added
-```
-
-Once the daily budget is spent the router stops locally rather than making
-requests it knows will be refused, and `/admin → Server → Ai Status` says so.
-The counter is in memory and resets on restart, so it is a cost saver rather
-than an authority — upstream remains the source of truth.
-
-If narration keeps falling back to procedural prose, the two highest-leverage
-actions are outside this codebase: add $10 of credits, or add your own provider
-key at [openrouter.ai/settings/integrations](https://openrouter.ai/settings/integrations)
-so the free models draw on your own provider quota instead of the shared pool.
-
-For the Gemma primary that means a Google AI Studio key, which is two steps and
-neither of them is in this repo. Copy the key from
-[aistudio.google.com/api-keys](https://aistudio.google.com/api-keys) — AI Studio
-creates a project and a key for a new account by itself, so it is usually already
-sitting there — then paste it into OpenRouter's **Google AI Studio** integration
-(not Vertex) and save. Google's free tier is enough; the key does not need Cloud
-Billing, and the bot never calls Google directly, so no Gemini SDK is involved.
-On that key, set "shared capacity fallback" to *never use shared capacity for
-models this key applies to*, so a failure of your key shows up in `ai_status` as
-Google's own error rather than the shared pool's 429.
-
-## Administrator AI monitor
-
-Two GM-only actions under `/admin → Server`. Neither is a typable slash command.
-
-| Action | What it does |
+| Service | Owns |
 | --- | --- |
-| `ai_status` | Narrator health from counters only: AI-served vs procedural fallbacks, per-route attempts/successes/failures, which routes are cooling down and why, and how often the local rate ceiling refused a request. No prompts, no player text, no API key. |
-| `chat_digest` | Reads a channel (optionally its threads) over a window and reports what players did, where they got stuck, possible bugs, mood, and what needs attention. Options: `channel`, `hours`, `include_threads`. |
+| `xianxia-engine` (Go) | every game and admin action, the canonical clock, native batched world simulation, the only connection to `data/xianxia.sqlite3`, backups, health |
+| `xianxia-bot` (Python) | slash commands, hubs and panels, RAG and NPC context, permissions, presentation, the narrator chains |
+| `xianxia-dashboard` (Python, optional) | the authenticated GM control plane and Discord server setup |
 
-The digest runs on the **same free route chain as narration** — it never uses a
-paid model and never uses OpenRouter's paid `openrouter:fusion` server tool, so
-it cannot start spending money. The transcript is chunked and analysed
-map-reduce style to fit free-model context windows, and overflow keeps the
-newest parts. Every AI failure degrades rather than raises: if all routes fail
-you still get the deterministic counts.
+The rules that keep it that way:
 
-**`chat_digest` needs the Message Content intent.** Two steps, both required:
+- **Go owns canonical mechanics and production SQLite access.** Python never opens the production
+  database; it talks to the engine over HTTP.
+- **AI is narration-only.** Intent is chosen through a guided UI, deterministic mechanics resolve the
+  result, and the model describes it afterwards. It cannot write rewards, deaths, relationships,
+  travel or history.
+- **Gameplay survives AI outages.** When every route fails or the day's free budget is spent,
+  procedural narration steps in and play continues.
+- **RAG never creates truth.** Retrieval is deterministic and SQLite-first, permission-filtered before
+  scoring, and hidden or faction-only knowledge never reaches a viewpoint that should not have it.
+- **Every GM mutation is audited** in `admin_audit_log`, from Discord and from the dashboard alike.
 
-1. `MESSAGE_CONTENT_INTENT=true` in `.env` (this is now the default).
-2. *Message Content Intent* enabled in the [Discord Developer Portal](https://discord.com/developers/applications) under **Bot → Privileged Gateway Intents**. Under 100 servers this needs no verification.
+## Quick start on QNAP
 
-Without step 2 Discord returns empty text for every message the bot was not
-mentioned in, and the digest tells you so rather than reporting an empty channel.
-Turning the intent on also activates the existing `on_message` path: RP messages
-start being written to `scene_history`, and the bot replies to @-mentions from
-users without a character. `AUTO_NARRATE` stays `false`, so it does not begin
-listening for typed play on its own (see below).
-
-> The bot's own `scene_history` table cannot answer this question — it keeps only
-> the newest 60 rows per channel as narrator context, and deletes the rest on
-> every insert. The digest reads Discord's message history instead.
-
-## Typed play (v0.21.1)
-
-With `AUTO_NARRATE=true`, the bot listens in realm hub channels, private scene
-threads and `RP_CHANNEL_IDS`. Before v0.21.1 every line there was one narration
-call that decided nothing: "I explore the ravine" produced a paragraph and no
-exploration. Now a line is one of three things:
-
-| You type | What happens | Narrator calls |
-| --- | --- | --- |
-| `> I explore the ravine` | The **prefix** marks an action. A deterministic router turns it into the same handler the hub button runs — `/explore`, `/hunt`, `/cultivate`, `/breakthrough`, a scene action (observe, investigate, influence, stealth, physical, qi, resolve, aid) or `/talk` — and the engine resolves it. | whatever that action already spends (routine actions: none) |
-| `Qiao, what is the caravan carrying?` | An un-prefixed line that **addresses an NPC who is present** (name in the first two words, or a question naming them), or @mentions the bot, is dialogue: `/talk` for the former, free narration for the latter. | one |
-| anything else | **Speech.** Recorded as history so the narrator sees it as context later. No reply, no call. This is most lines in a roleplay channel. | none |
-
-The router is three deterministic stages and never calls a model: a verb table
-(`content/typed_play.json` — aliases per action, grow it from what players type),
-entity resolution against who is actually present (naming an absent NPC is a
-refusal, never a guess), and a picker when two readings tie or nothing matches
-(the top candidates, **Narrate it**, and **Just say it in character**). Typed
-play defines no handler of its own and makes no engine call or database write;
-`tests/python/contracts/test_typed_play_surface.py` reads the source to hold
-that, and `tests/python/unit/test_typed_play_router.py` pins what each kind of
-line becomes.
-
-Every typed line that can reach the engine or the narrator first spends a token
-from a **per-player bucket** (`TYPED_PLAY_BURST` immediately, refilling at
-`TYPED_PLAY_PER_MINUTE`) — the v0.23 "per-user command budget" pulled forward,
-because before it one player pasting paragraphs could drain the shared 50/day
-allowance for everyone. Speech is free. A refused line is answered with the wait,
-not queued.
-
-```env
-TYPED_PLAY_PREFIX=$        # exactly one character; not a letter, digit or space
-TYPED_PLAY_BURST=4
-TYPED_PLAY_PER_MINUTE=6
-TYPED_PLAY_HINT=true       # once a day, tell a player how when their speech looked like an action
-```
-
-Design: `docs/COMMISSIONS_DESIGN.md` ("Typed play").
-
-## Current database configuration
-
-Every Go SQLite connection applies:
-
-```text
-journal_mode=WAL
-foreign_keys=ON
-busy_timeout=10000
-synchronous=NORMAL
-cache_size=-32768
-wal_autocheckpoint=1000
-```
-
-The current schema is **27**. Historical migrations remain in the repository and upgrades run in place.
-
-## Requirements
-
-Recommended QNAP/NAS deployment:
-
-- QNAP Container Station / Docker
-- Docker Compose V2 (`docker compose`)
-- Discord bot token and guild ID
-- OpenRouter API key
-- persistent `./data` directory
-- **no GPU required**
-
-For development without Docker:
-
-- Python 3.11+
-- Go 1.23+
-- SQLite development/runtime library for the Go CGO binding
-
-## QNAP quick start
+Requirements: QNAP Container Station or Docker with Compose V2, a Discord bot token and guild id,
+an OpenRouter API key, and a persistent `./data` directory. No GPU.
 
 ### 1. Configure `.env`
 
-The release includes both `.env` and `.env.example`. Fill in at least:
+Copy `.env.example` to `.env` and fill the five required values:
 
 ```env
 DISCORD_TOKEN=<discord bot token>
 GUILD_ID=<discord server id>
 OPENROUTER_API_KEY=<OpenRouter API key>
+ENGINE_AUTH_TOKEN=<random secret shared by bot, dashboard and engine>
+DASHBOARD_TOKEN=<random secret, at least 20 characters>
 ```
 
-The default cloud-only narrator configuration is:
+Generate a secret with `python3 -c "import secrets; print(secrets.token_urlsafe(32))"`. Everything
+else has a working default; `docs/CONFIGURATION.md` explains each key in the order the file lists them.
+
+The default narrator configuration is:
 
 ```env
 NARRATOR_PROVIDER=openrouter
@@ -313,750 +113,340 @@ OPENROUTER_DYNAMIC_FREE_FALLBACK=openrouter/free
 OPENROUTER_DISABLE_REASONING=true
 OPENROUTER_REQUIRE_FREE=true
 OPENROUTER_MAX_REQUESTS_PER_MINUTE=20
+OPENROUTER_MAX_REQUESTS_PER_DAY=50
 OPENROUTER_TIMEOUT_SECONDS=30
 OPENROUTER_EPIC_TIMEOUT_SECONDS=60
 ```
 
-> **Dependency note (v0.19.16).** `openai` is pinned at `3.7.0`. openai 3.x uses
-> HTTPX2, which verifies TLS against the **operating system** trust store rather
-> than certifi — the Dockerfile installs `ca-certificates`, asserts the bundle is
-> present and sets `SSL_CERT_FILE`. `httpx` stays pinned in `requirements.txt` in
-> its own right because openai 3.x no longer installs it and the Go engine
-> transport imports it directly. If narration ever goes flat after an image
-> rebuild, check `/admin → Server → ai_status` for a TLS banner first.
-
-The administrator chat monitor is configured with:
-
-```env
-MESSAGE_CONTENT_INTENT=true
-MONITOR_MAX_MESSAGES=400
-MONITOR_LOOKBACK_HOURS=24
-MONITOR_CHUNK_CHARS=6000
-MONITOR_MAX_CHUNKS=6
-```
-
-The ceilings exist because the monitor shares the narrator's
-`OPENROUTER_MAX_REQUESTS_PER_MINUTE` limiter — an unbounded transcript would
-starve narration for a whole minute.
-
-### 2. Start on QNAP
+### 2. Start, watch, stop
 
 ```bash
 chmod +x startup.sh stop.sh
-sudo ./startup.sh
-```
-
-`startup.sh` validates Docker/Compose, checks required secrets, creates `./data`, builds the Go engine + Python bot, and starts the GM dashboard when `DASHBOARD_ENABLED=true`.
-
-Useful logs:
-
-```bash
+sudo ./startup.sh                                         # validates Docker, checks secrets, builds, starts
 docker compose logs -f --tail=150 xianxia-engine
 docker compose logs -f --tail=150 xianxia-bot
 docker compose --profile dashboard logs -f --tail=150 xianxia-dashboard
+sudo ./stop.sh                                            # removes containers, keeps .env and ./data
 ```
 
-### 3. Stop on QNAP
+`startup.sh` starts the dashboard when `DASHBOARD_ENABLED=true`.
+
+### 3. Set up the Discord server
+
+Open the GM dashboard at `http://<NAS LAN address>:8090`, go to **Discord Setup** and run
+**Full Setup**. It creates or repairs the base channels, the realm-capital channels gated behind
+presence roles, the live-auction channels, `#bugs`, `#playtest` and the `#xianxia-info` guide, and it
+is idempotent. See [Discord server setup](#discord-server-setup).
+
+### Reset the world
 
 ```bash
-sudo ./stop.sh
-```
-
-The stop script removes running containers/networks but preserves `.env` and `./data`.
-
-### Reset the database
-
-```bash
-chmod +x reset_database.sh
 ./reset_database.sh
 ```
 
-Wipes every character, NPC, family, sect, war, event and world-history entry and starts a
-brand-new game. Discord channels/threads are left alone - run **Server Setup → Repair**
-afterward if you want the bot to reconcile stale bindings. It always takes a safety backup
-first (through the same engine backup API described below when the stack is running, or a
-plain file copy when it is already stopped) and requires typing `RESET` to confirm unless
-you pass `--yes`. See `./reset_database.sh --help` for `--no-backup` and `--no-restart`.
+Wipes every character, NPC, family, sect, war, event and history entry and starts a new game.
+It takes a safety backup first, asks you to type `RESET`, leaves Discord channels alone (run
+**Repair** afterwards), and restarts the stack. `--help` lists `--yes`, `--no-backup`, `--no-restart`.
 
-## Services
+## Running without Docker
 
-### `xianxia-engine`
-
-Authoritative Go service providing game/admin actions, native batched world simulation, Go-owned SQLite sessions, backups/maintenance, and health endpoints.
-
-### `xianxia-bot`
-
-Python Discord application providing slash commands, guided UI, RAG/NPC context, and read-only OpenRouter narration.
-
-### `xianxia-dashboard`
-
-Optional authenticated GM control plane. `startup.sh` starts it when:
-
-```env
-DASHBOARD_ENABLED=true
-```
-
-## Player interface and Discord GUI
-
-The bot uses interactive panels rather than requiring players to memorize every command.
-
-### Player dashboard
-
-`/me` opens the player dashboard with current character state and guided actions, and `/menu` (v0.33.1)
-opens one panel that lists every hub - Admin included, for an administrator - and opens the one you
-pick exactly as its own slash command would. System panels provide:
-
-- clear active-page hierarchy
-- Vitality and Qi bars with percentages and exact values
-- quick actions and complete action lists
-- selectors and guided inputs
-- in-place refresh
-- owner locking and timeout protection
-
-### Battle interface
-
-Battles use an interactive in-place panel with:
-
-- color-coded Vitality bars
-- realm/stage matchup context
-- location and suppression state
-- Attack, Defend, Flee and Refresh
-- law-technique and recovery-item selectors
-- click serialization/owner locking
-- Spare/Kill decision controls after victory
-
-### Event-specific GUI
-
-Persistent world events can open playable event threads. Event panels support category-aware actions and connect directly to canonical systems.
-
-Typical controls include:
-
-- **Investigate** — opens the Scene Action system focused on the environment.
-- **Scene Action** — opens the complete action/target interface.
-- **Battle** — opens canonical battle status when combat exists.
-- **Participants** — shows persistent participation and public NPC life state.
-- **Consequences** — shows mechanical event consequences and recent contribution.
-- **Talk** — speaks to mechanically present persistent NPCs.
-- **Refresh** — refreshes event state and remaining time.
-
-Event controls do not bypass travel, permissions, cooldowns, rolls, hidden information or combat rules. Dangerous events may spawn event-specific hostile manifestations without silently killing persistent NPCs. Event closure writes an idempotent structured world-history aftermath entry.
-
-## GM Admin Console
-
-Version 0.10 upgrades the former observational dashboard into a real administrative control plane.
-
-### Configure dashboard access
-
-Generate a strong private token:
+Python 3.12+, Go 1.23+ and the SQLite development library (`libsqlite3-dev` on Debian/Ubuntu) for
+the Go CGO binding.
 
 ```bash
-python -c "import secrets; print(secrets.token_urlsafe(32))"
-```
-
-Set:
-
-```env
-DASHBOARD_USERNAME=admin
-DASHBOARD_TOKEN=<long random secret>
-DASHBOARD_BIND_ADDRESS=0.0.0.0
-DASHBOARD_PORT=8090
-DASHBOARD_ADMIN_WRITES=true
-```
-
-Open, from a PC on the same LAN:
-
-```text
-http://<NAS LAN address>:8090
-```
-
-For LAN use, bind to the QNAP/server's exact LAN address where possible. Do **not** port-forward the GM dashboard directly to the public internet.
-
-Since v0.29.0 the dashboard has two more locks. After five wrong passwords
-from one source address in five minutes, that address is answered `429` for
-fifteen minutes before its credentials are read
-(`DASHBOARD_LOGIN_MAX_FAILURES`, `DASHBOARD_LOGIN_WINDOW_SECONDS`,
-`DASHBOARD_LOGIN_LOCKOUT_SECONDS`). And a browser `POST` whose `Origin` does
-not match the `Host` it was sent to is refused with `403 origin_mismatch`, so
-another tab cannot post admin actions with your session.
-
-**Outside Docker** the process binds `127.0.0.1` when `DASHBOARD_HOST` is
-unset, as does the bot's health/control listener when `HEALTH_HOST` is; the
-shipped `.env.example` sets both to `0.0.0.0` so a bare-metal run behaves
-like the Docker one. Whichever way it is reached from another machine, a TLS
-reverse proxy in front is the right door - Basic Auth is plaintext without it. The proxy must pass the
-original `Host` through, or you must list the public origin in
-`DASHBOARD_ALLOWED_ORIGINS`; note that behind a proxy every visitor shares
-the proxy's address and therefore its login lock. A minimal nginx site:
-
-```nginx
-server {
-    listen 443 ssl;
-    server_name gm.example.lan;
-    ssl_certificate     /etc/ssl/gm.example.lan.crt;
-    ssl_certificate_key /etc/ssl/gm.example.lan.key;
-    location / {
-        proxy_pass http://127.0.0.1:8090;
-        proxy_set_header Host $host;
-    }
-}
-```
-
-### Security model
-
-- HTTP Basic authentication protects UI/API routes except `/livez`.
-- Dashboard traffic binds to localhost by default.
-- Production dashboard reads use query-only sessions owned by the Go engine; the dashboard does not open SQLite directly.
-- State-changing requests require authenticated JSON `POST` plus the dashboard-specific `X-Xianxia-Admin: 1` header.
-- Browser CSP disables external scripts/forms and cross-origin API access is not enabled.
-- Every game-state mutation is executed by the authoritative Go engine.
-- GM state changes are written to `admin_audit_log`.
-- `DASHBOARD_ADMIN_WRITES=false` turns the Admin Console back into read-only mode.
-
-### Observability views
-
-The dashboard contains:
-
-1. **Overview** — canonical clock, totals, active era, simulation lag and recent history.
-2. **Timeline** — searchable Structured World-History RAG timeline including GM-visible visibility levels.
-3. **NPCs** — autonomous state, injury, family, goals, social graph, disciples, descendants and GM-only catalog details.
-4. **Families** — birth families, branches, retainers, player-founded families, marriages and descendants.
-5. **Sect Politics** — resources, cohesion, influence, internal factions, inter-sect relations and political events.
-6. **Conflicts** — wars, battles, feuds, grudges, bounties/hunters and boss encounters.
-7. **World Events** — active phenomena, civilization regions/incidents and eras.
-8. **Player Activity** — player state, persistent world actions and scene activity.
-9. **Cultivation** — spiritual-root grade/purity/elements/refinement, bloodlines, physiques, Dao/law progress, tribulations, realm perfection and seclusion.
-10. **Crafting & Assets** — profession progress, alchemy/toxicity/batches, spirit beasts, artifact bonds, player/sect properties, personal worlds, formations and equipment.
-11. **Exploration** — exploration events/participants, secret-realm runs, location discoveries, wild-beast encounters, caravans and expedition threads.
-12. **Economy** — dynamic markets, economy events, auctions, black markets/stock and crime records.
-13. **Samsara Dynasties** — reincarnation state, soul legacy, dynasty history, ancestral leads, investigation quests, claims and persistent dynasty conflicts.
-14. **RAG Memory** — memories, salience, recall counts and metadata.
-15. **Autonomous Decisions** — NPC goals/mood/activity plus simulation-generated historical outcomes.
-16. **Admin Console** — authoritative world/player/simulation/database controls.
-
-`/api/capabilities` publishes the dashboard API/schema coverage contract. The regression suite compares browser API references, navigation loaders and the backend endpoint registry, and performs authenticated HTTP smoke tests for the newer-system endpoints so frontend/backend drift fails CI instead of appearing as a broken dashboard tab.
-
-### Real admin actions
-
-The Admin Console currently supports:
-
-- advance or rewind canonical world time
-- force one native Go simulation system for 1–120 steps
-- change native simulation intervals
-- enable/disable persisted automation systems
-- teleport a player to a canonical location
-- grant cultivation currency
-- adjust canonical karma
-- revive a character, restore Vitality/Qi, cancel pending Samsara and abandon active battles
-- force-clear a player's active battle state
-- create safe SQLite backups (retention, a size cap and optional sealing with an operator key since v0.32.0 — `docs/CONFIGURATION.md`, "Backups")
-- run `PRAGMA optimize`
-- run `VACUUM`
-- inspect recent admin audit records
-
-Dangerous actions use explicit browser confirmation where appropriate.
-
-## Authoritative Go engine
-
-The original Go shadow/parity experiment is gone. Go is now a production service rather than a duplicate calculation path.
-
-### Native heavy simulation
-
-The world tick is deliberately coarse-grained. Python submits a world/simulation operation; Go processes large sets internally and commits them in transactions.
-
-Current native batch systems include:
-
-- `npc_civilization`
-- `npc_life`
-- `dynamic_economy`
-- `black_markets`
-- `sect_politics`
-- `clan_dynamics`
-
-This avoids the slow pattern of Python calling Go/SQLite once per NPC.
-
-### Authoritative game actions
-
-Migrated Go action handlers include scene transitions, NPC relationship updates, quest progression, combat damage, cultivation rewards and the GM admin mutations listed above.
-
-Python can continue using the repository API while remaining game-engine/database agnostic because the production database connection is hosted by Go.
-
-## Autonomous NPC life simulation
-
-NPCs have persistent mechanical lives rather than being only narrator characters.
-
-### Simulation clocks
-
-- `npc_civilization` normally advances daily.
-- `npc_life` normally advances every seven world-days.
-- economy, black-market, sect and clan systems have their own persisted intervals.
-- simulation anchors survive restarts and support bounded catch-up.
-
-### NPC state
-
-Persistent systems track:
-
-- cultivation and breakthroughs
-- travel and current activity
-- career progression and social rank
-- health and injuries
-- affinity, trust and grudges
-- friendships, rivalries and blood feuds
-- marriage and descendants
-- master/disciple lineage
-- faction membership and defection
-- aging, lifespan and death
-- autonomous goals, mood and focus
-
-Sect career progression can move through Outer Disciple, Inner Disciple, Core Disciple, Deacon, Elder, Hall Master and Grand Elder.
-
-### Injuries and death
-
-NPC conflicts can create persistent flesh wounds, fractures, meridian damage, internal injuries or foundation wounds. Injuries recover with world time. Severe clashes can mechanically kill an NPC, update family/social/discipleship state and write canonical history.
-
-### Marriage and descendants
-
-Compatible mature NPCs can marry mechanically. Descendants record both parents, birth game-minute, gender style, spiritual root and cultivation state. Surviving descendants can mature into actively simulated NPCs and continue the lineage.
-
-### Narrator boundary
-
-The narrator can describe mechanical life state but cannot create it. AI text cannot independently marry NPCs, kill them, promote them, create children, change faction membership or heal injuries.
-
-## NPC memory and autonomous mind
-
-Persistent NPC/player memory and mind-state systems give dialogue continuity without transferring authority to the LLM.
-
-The database stores relevant encounters, relationship facts and autonomous mind state. Narrator/director context may use those facts, but mechanical state always wins.
-
-## Memory / RAG v1
-
-The RAG architecture is deterministic and SQLite-first. It does not need an embedding model or vector database.
-
-### Core rule
-
-RAG retrieves **known canonical information**. It never creates game truth.
-
-The retrieval chain is conceptually:
-
-```text
-live structured SQL
-  -> permission-filtered SQLite FTS5 candidates
-  -> deterministic scoring
-  -> small scene-specific context packet
-  -> narrator
-```
-
-### Schema history
-
-The RAG-relevant schema versions are 14-17 (see `VERSIONS.md` for the full schema history across
-every version, 14 through the current schema 27).
-
-### Safe canon indexing
-
-The RAG corpus can include safe public/current information such as current-location descriptions and known manuals/techniques. It deliberately excludes:
-
-- NPC secrets and hidden-master identities
-- unrevealed schedules/encounter seeds
-- undiscovered locations
-- unknown manuals/techniques
-- raw database dumps
-- GM-only state
-
-Unknown manuals do not become visible simply because player text matches their name. Current-location documents are restricted to the player's physical location.
-
-### Query safety
-
-Raw player text is never passed directly to SQLite `MATCH`. Text is tokenized/sanitized and the application builds bounded FTS5 queries, preventing player RP from becoming FTS operators.
-
-### Scene retrieval profiles
-
-Narrator context is budgeted by scene type. Routine dialogue/battle scenes receive compact memory/canon/history retrieval while exploration and epic/world-event scenes receive a larger budget. The authority contract is kept even when context must be truncated.
-
-Short permission-scoped caches reduce repeated FTS work. Live structured state is not replaced by cached RAG.
-
-No additional AI request is required for RAG.
-
-## Manuals and inheritances
-
-A manual is an item (`<manual_id>_manual`) that has to be in your inventory; **/cultivation →
-Manuals & Techniques → Study** then learns it through the engine's `manual.study`, which enforces the
-manual's realm requirement. Since v0.21.3 the whole 148-manual catalog is in `content/world.json`
-(`scripts/materialize_world_catalog.py`; a test fails if the file drifts), so the Go engine and Python
-read the same content. How players get one:
-
-- **Joining a sect.** Passing an entrance trial bestows the sect's own entry manual - every public
-  sect has an authored tier-0 one (v0.21.4), studyable the day you join - chosen and written by the
-  engine inside the trial transaction. A disciple who already holds it gets the next manual by the
-  sect's alignment (a righteous sect never gives a forbidden art), their own path and the lowest
-  tier, never a duplicate. Recorded in `item_provenance` as `sect_entry`.
-- **Hidden-sect initiation** (`/sect shadow`): one demonic manual matching your path and realm.
-- **The black market**: the forbidden, contraband and demonic stock.
-
-Manual items are `market_excluded`: town markets never list them, and Quest Forge's `rewardable_items`
-excludes them too (a deliberate follow-up decision for commissions, see `docs/COMMISSIONS_DESIGN.md`).
-
-## Structured world history
-
-`world_history_events` stores events that actually happened mechanically. History answers **what happened**; current structured state answers **what is true now**.
-
-Typical historical event types include:
-
-- true deaths and Samsara
-- NPC deaths
-- major battles and mercy outcomes
-- territory wars and control changes
-- family leadership/succession changes
-- clan feuds and alliances
-- Dao partnerships
-- discoveries
-- secret-realm openings
-- server-wide phenomena
-- ancient inheritances
-- ascensions
-- NPC breakthroughs, travel, marriage, descendants, discipleship, promotions and faction changes
-
-### Knowledge boundaries
-
-History rows use visibility levels:
-
-- `public`
-- `participant`
-- `faction`
-- `hidden`
-
-A focused NPC does not inherit the player's participant-only knowledge. Hidden history is never supplied to narrator RAG.
-
-### Retrieval
-
-History retrieval merges structured context and FTS5 matches, checks viewpoint permissions, removes duplicate history IDs and ranks by relevance, significance, slow recency decay, location/faction relationship and actor/target mentions.
-
-Current structured state always overrides old historical state.
-
-## Economy, sects, clans and world consequences
-
-The simulation maintains dynamic regional markets, black-market rotations, sect politics and clan dynamics. Player actions can write persistent world actions/history, and autonomous changes continue while players are absent or in seclusion.
-
-Every city has a protected auction house (v0.33.1), entered with **/economy → Auction House → Enter**; protection ends at the doors. A capital's house is grand and takes twenty-five lots at once for up to a day; a smaller city's is a local floor of six lots, none longer than six hours. Each grand house has a live Discord channel of its own and the local floors of a world share one, where lots are posted, bid on and struck as it happens.
-
-Travelling merchants (v0.34.1) are the floor's last bidder: a lot that ends with no bid is taken at its starting bid by a merchant whose loop passes that city, the seller is paid, and the item travels in the merchant's pack at a markup. Eight merchants, two a world and each a named NPC, walk fixed loops of cities on the simulation tick; **/economy → Merchants** shows where each one is and what it carries, and **Buy** works in the same city or on the same stretch of road - the one trade a traveller can make mid-journey. The travel reply names who is on the road ahead.
-
-The design goal is that progression and world simulation never pause each other.
-
-## Administration in Discord
-
-Discord Administrator commands remain available alongside the web dashboard. They cover areas such as:
-
-- server/channel setup and diagnostics
-- world-event management
-- player inspection, teleport, revive, battle recovery, currency and karma
-- sect/master/rank management
-- family/NPC inspection
-- simulation automation, intervals and forced runs
-- backups, maintenance and audit logs
-
-The web Admin Console is an additional local control surface, not a replacement for Discord permissions.
-
-### Quest Forge
-
-`/admin world questforge <story>` turns a few sentences of story into a quest. The narrator's
-free model chain drafts it in the game's own quest shape - objectives from the small vocabulary
-the engine tracks (`explore <location>`, `talk <NPC>`, `scene_action <kind>`, `sect_discovery`,
-`sect_trial`) and rewards inside your budget - and every location, NPC, scene action and item it
-names is checked against `content/world.json` before you see it. You get the draft with
-**Approve** / **Discard** buttons; only an approved quest appears in players' `/quests`.
-If the model is down or keeps producing something invalid, a procedural draft built from the
-same story is offered instead, marked as such. `/admin world quests` lists drafts (with the
-same buttons) and approved quests, and retires an approved one by key; the dashboard's
-Exploration view shows them too.
-
-With `QUEST_FORGE_AUTO=true` the bot also drafts one quest per notable world-history event
-(`QUEST_FORGE_MIN_SIGNIFICANCE`, default 80) every `QUEST_FORGE_INTERVAL_HOURS` and posts
-"Quest drafts ready" to the log channel - drafts only, never auto-approved. Rewards are capped
-by `QUEST_REWARD_MAX_XP` / `_STONES` / `_ITEMS` and granted by the Go engine when the quest
-completes; the player is told what they earned.
-
-## Backups and maintenance
-
-Backups are created by the Go engine using the SQLite backup API and stored under the data backup directory.
-
-From Discord or the Admin Console you can:
-
-- create/list backups
-- inspect engine/database health
-- optimize SQLite
-- VACUUM SQLite when appropriate
-
-Do not copy a live WAL database file by hand as your primary backup strategy.
-
-To wipe the world and start over, use `./reset_database.sh` (see above) rather than
-deleting `data/xianxia.sqlite3` by hand - it takes a safety backup first and restarts
-the stack so a fresh schema is created automatically.
-
-## Updates and the release channel
-
-Releases are GitHub Releases on `RhaZenZ0/Xianxia-bot`, built by CI from a tag
-(the `release` job in `.github/workflows/ci.yml`, after the checks pass): `v0.21.0` is a **stable** release,
-`v0.21.0-beta.1` a **beta** (pre-release). Each carries
-`xianxia_rp_v<version>.zip` and its `.sha256`.
-
-Two things read that channel:
-
-- **The bot** checks it once after startup and then every `UPDATE_CHECK_HOURS`
-  (default 24) and posts "Update available" to the bot log channel once per
-  newer release. `UPDATE_CHANNEL=stable|beta` picks the channel;
-  `UPDATE_CHECK_ENABLED=false` turns the check off. The bot never downloads or
-  installs anything.
-- **`update.sh` on the NAS**, which stays offline unless you ask:
-
-```bash
-./update.sh                     # offline: look in ./updates for a ZIP you placed there
-./update.sh --check             # ask the channel whether something newer exists
-./update.sh --fetch             # download the newest ZIP into ./updates, verify its SHA-256
-./update.sh --upgrade           # fetch, then install (backup, stop, swap, start, rollback on failure)
-./update.sh --fetch --channel beta   # this run only; .env's UPDATE_CHANNEL otherwise
-```
-
-A download whose SHA-256 does not match the release's sidecar, or whose
-archive `VERSION` does not match the tag, is discarded. Installing a fetched
-ZIP is exactly the same transactional path as installing a hand-placed one,
-release manifest check included.
-
-The roadmap to v1.0.0 — what each milestone ships and the test that gates it —
-is `docs/ROADMAP_1_0.md`.
-
-## Data ownership and migrations
-
-Canonical persistent data lives in:
-
-```text
-data/xianxia.sqlite3
-```
-
-Keep the entire `data/` directory persistent across container rebuilds.
-
-Although development currently allows architectural/database changes, the migration history remains preserved so existing test/development databases can still upgrade through the known schema chain.
-
-## Configuration highlights
-
-`.env.example` carries the complete set of keys and their defaults, and only
-those; `docs/CONFIGURATION.md` explains every one of them, section by section.
-Important groups include:
-
-- Discord token/guild/channel behavior
-- OpenRouter routine/epic free fallback chains, rate limiting and timeouts
-- context/RAG budgets and cache TTLs
-- game-engine URL/timeouts
-- dashboard bind/auth/admin-write settings
-- operational logging/health settings
-
-Never commit `.env`, Discord tokens or dashboard secrets.
-
-## Run without Docker
-
-Start the Go engine first:
-
-```bash
-cd go_core
-go run ./cmd/xianxia-core
-```
-
-Configure Python to point at it, then initialize and start the bot:
-
-```bash
+cd go_core && go run ./cmd/xianxia-core        # the engine, on 127.0.0.1:8081 by default
+# in another shell:
 export GAME_ENGINE_URL=http://127.0.0.1:8081
 python -m app.database.bootstrap
 python -m app.bot
+python -m app.dashboard                        # optional
 ```
 
-Optional dashboard:
+Outside Docker the dashboard binds `127.0.0.1` when `DASHBOARD_HOST` is unset, as does the bot's
+health listener when `HEALTH_HOST` is; the shipped `.env.example` sets both to `0.0.0.0` so a
+bare-metal run behaves like the Docker one.
 
-```bash
-python -m app.dashboard
-```
+## The narrator
 
-You still need either an OpenRouter API key or an intentionally configured alternative narrator provider for generated roleplay text.
+### Routes
 
-## Health and troubleshooting
-
-### Engine
-
-- `GET /livez` — process liveness
-- `GET /readyz` — database/service readiness
-- `GET /v1/db/status` — SQLite pragmas and engine request count
-
-### Bot
-
-The Python service exposes its configured health/metrics behavior and records startup/catalog readiness.
-
-### Dashboard
-
-- `GET /livez` is unauthenticated for container health checks.
-- UI/API routes require Basic authentication.
-- The **Discord Setup** page talks only to the private Python-bot control endpoint inside the Docker network. It never sends Discord mutations through Go.
-- The bot control endpoint requires `BOT_CONTROL_TOKEN`; when that value is blank both bot and dashboard reuse `DASHBOARD_TOKEN`.
-
-If the dashboard rejects startup, verify `DASHBOARD_TOKEN` is at least 20 characters and not a placeholder. If Admin Console controls are disabled, verify `DASHBOARD_ADMIN_WRITES=true` and `GAME_ENGINE_URL` is reachable.
-
-### Discord Server Setup from the GM Dashboard
-
-Open **Discord Setup** in the GM dashboard after the bot has joined the configured `GUILD_ID`. The page can:
-
-- inspect the connected Xianxia RP guild and bot identity
-- diagnose required Discord permissions and realm-role hierarchy problems
-- run an idempotent **Full Setup** that creates/reuses/repairs the canonical Xianxia RP base channels, realm-capital channels and,
-  since v0.33.1, the live-auction channels beside the capitals - one per grand house, one shared by a world's local
-  floors - where a lot is posted the moment it is listed, its card follows every bid, and it is struck when the
-  simulation tick settles it
-- run **Repair Server** without deleting unrelated Discord channels or resetting game/world data
-- keep a **#playtest** board (v0.34.1): `/admin → Server → Playtest → Post` puts one message per hub page in the
-  channel, pre-reacted ✅ ❌ 💡; testers react (works / fails / change wanted) and reply with what they saw, and
-  `Report` tallies the reactions with names and links the flagged pages for the GM to read
-- gate every realm-capital hub behind its **presence role** `Xianxia • <capital name>` (v0.21.6:
-  `@everyone` denied, the presence role granted view/send/history/threads/reactions/files/slash commands,
-  the bot allowed; applied on every Setup/Repair). The bot puts the role on when a character's
-  location is that capital and takes it off when it is not, so a capital is visible only while you
-  are in the city. The Realm Capitals table shows a hub as **VISIBLE TO ALL** until it is gated.
-- synchronize guild slash commands
-- synchronize existing cultivators' generated realm-access roles
-- rebuild the persistent `#xianxia-info` guide
-- send a test message to the configured world-events channel
-- bind existing text channels manually for world events, event scenes, player homes, logs, onboarding, info and expeditions
-- **Fresh Start** (type nothing, confirm `CLEAR`): delete and recreate the message-safe channels
-- **Teardown** (v0.21.2, type `DELETE`): delete every thread, bound channel, `#bugs` and the two Xianxia
-  categories when empty, and forget their ids — nothing is recreated (run Full Setup after) and the
-  database is untouched; `RP_CHANNEL_IDS`, the realm roles and any channel Setup did not bind are left alone
-- **Reset World** (confirm `RESET`): delete every tracked thread and post the world-reset announcement
-
-Discord provisioning is intentionally owned by the Python `discord.py` process. The dashboard calls a private authenticated bot-control endpoint, and every state-changing dashboard Discord operation writes an `admin_audit_log` entry through the normal Go-owned database boundary.
-
-Recommended first install:
-
-1. Create or choose the Discord server.
-2. Invite the Xianxia RP bot with the required permissions.
-3. Set `GUILD_ID` and start the stack.
-4. Open **GM Dashboard -> Discord Setup**.
-5. Run **Full Setup**.
-6. Resolve any permission warnings shown by the dashboard, then run **Repair Server** if needed.
-
-If SQLite reports contention, verify only the Go service is opening the production database and inspect `journal_mode`, `busy_timeout` and current engine sessions rather than adding direct Python SQLite writers.
-
-## Development and testing
-
-### Python regression suite
-
-The Python suite is organized by ownership under `tests/python/`:
-
-- `unit/` — fast Python-only presentation, content, narrator and helper behavior
-- `integration/` — repository/orchestration features that still genuinely live in Python
-- `contracts/` — Python↔Go HTTP/RPC, startup, deployment and release boundaries
-
-Run everything:
-
-```bash
-pytest -q
-```
-
-Dashboard implementation is part of the standard release gate. To run that contract directly:
-
-```bash
-python scripts/check_dashboard_implementation.py
-```
-
-This check fails on frontend/backend API drift, missing dashboard loaders/views/routes, or a schema version that has not been explicitly reviewed for dashboard coverage.
-
-Or target one ownership layer:
-
-```bash
-pytest -q -m unit
-pytest -q -m integration
-pytest -q -m contract
-```
-
-Do not duplicate authoritative Go formulas or SQLite semantics in pytest. When a mechanic moves to Go, move its rule/state-transition coverage to native Go tests and keep only the Python boundary assertion here.
-
-### Go tests
-
-```bash
-cd go_core
-go test ./...
-```
-
-Native Go tests cover authoritative game actions, SQLite WAL/transaction/backup behavior, simulation batching/backlog handling, engine contracts and GM mutations.
-
-### Compile production Python
-
-```bash
-python -m compileall -q app
-```
-
-### Build Go engine
-
-```bash
-cd go_core
-go build ./cmd/xianxia-core
-```
-
-### Validate world content
-
-```bash
-python -m json.tool content/world.json >/dev/null
-```
-
-## Repository layout
+Two chains, **routine** (talk, guided actions, exploration, hunts, ordinary scenes) and **epic**
+(breakthroughs, sect trials, major events). Each walks its primary model, then its fallback, then
+`openrouter/free`, then procedural narration:
 
 ```text
-app/
-  bot/                 Discord frontend: runtime, services, commands/, admin/, ui/, surface wiring
-  rules/               gameplay rules and content helpers (pure: alchemy, aptitudes, birthfamily,
-                       samsara, sect*, worldtime, game/World ...) - imports nothing above it
-  ai/                  ai_router (OpenRouter routing), narrator + narrator_context, rag, chat_monitor
-  ops/                 config, health/http_limits, game_engine (Go client), core_services,
-                       the healthcheck entrypoint
-  dashboard/           authenticated GM web control plane (server.py) + front-end contract
-  database/            Python repository API, Go remote DB transport, bootstrap entrypoint
-  simulation/          Python orchestration over engine queries (no SQL since v0.30.0)
-  version.py           the release stamp
-
-Layering (tests/python/unit/test_app_layout.py): {rules, ops} <- ai <- database <- simulation <- dashboard <- bot;
-rules and ops do not import each other.
-
-go_core/
-  cmd/xianxia-core/    Go service entry point
-  internal/game/       authoritative game/admin actions
-  internal/simulation/ native batched world simulation
-  internal/storage/    SQLite WAL ownership, sessions and backup support
-  internal/server/     HTTP control/data plane
-
-dashboard/             static GM dashboard UI
-content/world.json     canonical content catalog
-data/                   runtime SQLite/backups (not shipped as source state)
-tests/python/           Python-owned unit/integration/contract suite
-tests/support.py         shared dependency shims and test path helpers
+google/gemma-4-31b-it:free
+        | fail / timeout / 429
+        v
+openrouter/free
+        | fail / account quota exhausted
+        v
+procedural narration
 ```
 
-## Release status
+The five chain slots are chosen on the dashboard's **Narration Routes** panel from OpenRouter's live
+free catalogue, stored through the engine and audited, and applied to the running bot without a
+restart; `.env` is the baseline. `OPENROUTER_REQUIRE_FREE=true` rejects paid model ids, and every
+request switches model reasoning off (`OPENROUTER_DISABLE_REASONING=true`) because the two ways the
+free chain has failed in production are a model spending the budget thinking and returning nothing,
+and a model returning its thinking as the story.
 
-- Current release: v0.21.0. See `VERSIONS.md` for the full release-by-release history.
-- Go owns canonical gameplay time, migrated gameplay mechanics, lifespan/death authority, road travel,
-  caravan settlement, simulation mutation, and SQLite WAL.
-- Python owns Discord/RAG/dashboard/presentation orchestration and does not duplicate the removed
-  lifespan/mechanical authority paths.
-- Discord channel/category provisioning is admin-dashboard-owned: the web GM dashboard's Full Setup/Repair
-  action can create the missing base and realm-hub channels/categories itself (when the bot has Manage
-  Channels); the `/admin` Discord slash command's own setup action reuses the same helper but stays
-  validate-and-bind-only, so channel layout still can't drift out from under the dashboard via Discord itself.
-- Database schema is **27**.
+Every day (`ROUTE_AUDIT_HOURS`) the bot pings each route with the cheapest call the API takes and
+retires the ones that answer `401`, `403` or `404` until the next pass; `429`s and timeouts retire
+nothing. **Systems → AI Routing** on the dashboard shows the chains in their real order, what was
+served by AI versus fallen back, and each route's verdict.
 
-## Design rules for future work
+### Your own Google key (optional)
 
-1. **Do not reintroduce a Go shadow mode.** New migrated mechanics should execute once in Go.
-2. **Do not open production SQLite from Python.** Add a Go action, Go batch, or Go-hosted repository session.
-3. **Batch world work.** Do not make one HTTP/database operation per NPC when a native Go batch can process a complete simulation step.
-4. **Keep AI non-authoritative.** The guided `/action` UI and deterministic mechanics resolve intent/results before narration. AI only describes supplied canonical outcomes and never directly writes rewards, deaths, relationships, travel or history.
-5. **Keep viewpoint permissions deterministic.** RAG must not leak hidden/participant/faction information.
-6. **Audit GM mutations.** New Admin Console actions should write `admin_audit_log`.
-7. **Prefer native Go tests for Go-owned rules.** Pytest should test Python-owned behavior and integration boundaries rather than duplicate engine formulas.
+Set `GOOGLE_AI_STUDIO_API_KEY` and one more hop appears at the front of both chains, called
+directly rather than through OpenRouter, so it is not charged against OpenRouter's daily free budget.
+It is the most effective single change against procedural fallbacks. Get the key at
+[aistudio.google.com/api-keys](https://aistudio.google.com/api-keys); it is narration-only and goes
+through the same guards as every other route. You can also paste that key into OpenRouter's
+**Google AI Studio** integration at
+[openrouter.ai/settings/integrations](https://openrouter.ai/settings/integrations) so the free Gemma
+route draws on your own quota instead of the shared pool.
+
+### The budget
+
+OpenRouter's free models allow 20 requests a minute and **50 a day** while the account has under $10
+of lifetime credits, **1000 a day** at $10 or more. The dashboard's ten-dollar switch
+(`credits_topped_up`, `OPENROUTER_CREDITS_TOPPED_UP` as baseline) picks which allowance the router
+budgets against. Once the day's budget is spent the router stops locally rather than making requests
+it knows will be refused, and **/admin → Server → Ai Status** says so.
+
+Since v0.31.0 a live call is made for three reasons only: an NPC answering a player, an epic beat,
+or an explicit ask — the **Narrate it** button under an exploration or hunt result, an @mention, or
+the GM's `ai_routine_narration` automation flag. Everything else reads from a procedural pool in
+`content/world.json`, so a quiet day costs nothing.
+
+### Rate limits and the chat monitor
+
+One per-player bucket (`TYPED_PLAY_BURST`, `TYPED_PLAY_PER_MINUTE`) meters every door to the
+narrator, so one player cannot drain the shared allowance. The limiter is fail-fast: a refused line
+is answered with the wait, never queued.
+
+**/admin → Server** carries two GM-only AI actions: `ai_status` (narrator health from counters, no
+prompts, no player text) and `chat_digest` (reads a channel over a window and reports what players
+did, where they got stuck and what needs attention, on the same free chain, map-reduce style, capped
+by `MONITOR_*`). The digest needs the Message Content intent: `MESSAGE_CONTENT_INTENT=true` in `.env`
+and the intent enabled in the Discord Developer Portal.
+
+Both HTTP listeners bound every request head before authentication runs
+(`HTTP_MAX_REQUEST_LINE_BYTES`, `HTTP_MAX_HEADER_LINES`, `HTTP_MAX_HEADER_BYTES`,
+`HTTP_HEADER_DEADLINE_SECONDS`, `HTTP_HEADER_LINE_TIMEOUT_SECONDS`, `HTTP_MAX_CONNECTIONS`) — generous
+for a browser, mean for an attacker.
+
+## Playing
+
+### Hubs and panels
+
+`/menu` opens one panel that lists every hub; `/me` opens the player dashboard. Each hub — character,
+cultivation, world, travel, craft, realm, items, combat, economy, inner world, beast, abode, family,
+quest, sect, NPC — is a live panel with one visible, tappable row per action, guided inputs for
+every parameter (every id has a picker), owner locking and a refresh. A short plain result is
+shown inside the panel, in a result block above the actions, and Refresh clears it; an embed, a
+reply with its own buttons, a file or a long reply lands beside the panel, which stays live
+underneath. Battles and events have their own in-place panels.
+
+### Typed play
+
+With `AUTO_NARRATE=true` the bot listens in realm-hub channels, private scene threads and
+`RP_CHANNEL_IDS`. A line is one of three things:
+
+| You type | What happens |
+| --- | --- |
+| `$ I explore the ravine` | The prefix marks an action. A deterministic router turns it into the same handler the hub button runs and the engine resolves it; a root may take one argument from the line (`$ I travel to Greenriver Town`, `$ I drink a healing pill`). |
+| `Qiao, what is the caravan carrying?` | A line addressing an NPC who is present is dialogue: `/talk`. |
+| anything else | Speech, recorded as context. No reply, no call. |
+
+The router never calls a model: a verb table (`content/typed_play.json`), entity resolution against
+who is actually present, and a picker when readings tie. `TYPED_PLAY_PREFIX` is one character;
+`$` by default.
+
+### Cultivation, sects and manuals
+
+Realms and stages, breakthroughs and tribulations, spiritual roots, bloodlines and physiques, laws
+and techniques, aptitudes, seclusion with background cultivation, and a lifespan that ends in
+Samsara and a new incarnation. A sect is joined through an entrance trial before its examiner; every
+public sect bestows its own entry manual on passing, chosen inside the trial transaction, and the
+sect residence grows facility by facility with contribution points. A manual is an item, studied
+through the engine, which enforces its realm requirement; the whole 148-manual catalogue is content.
+
+### Quests and commissions
+
+Quests come from three places: the content's static quests, the **Quest Forge** (a GM turns a few
+sentences of story into a checked, approved quest), and **commissions** — work offered by a named
+NPC with terms, a deadline the engine enforces on its tick, and a cooldown for abandoning it. Since
+v0.38.0 every city posts its own: a quest pavilion in each capital, a notice board at each gate.
+Objectives are the small vocabulary the engine tracks — explore a place, talk to a person, take a
+scene action, discover or pass a sect trial — so progress is mechanical, never narrated.
+
+## The world
+
+Four worlds — Mortal, Spiritual, Immortal, Celestial — each with a realm capital and eleven cities,
+joined by roads with travel time, danger and encounters.
+
+### Cities
+
+- **Arriving.** Every walled city has a gate on each compass side that has a road, and both ends of
+  a road agree on the compass. A road journey ends at the gate facing the road you came by. The
+  capitals have four compass districts behind their gates (noble quarter, temple quarter, lower
+  town, ministry row); every other city has one drawn from its terrain. Every gate and district has
+  its own named people, and only the people of the part you stand in are in the scene. Inside the
+  walls everything is a walk apart with **/travel**.
+- **Shops.** A hundred and four, differing by city: the kind follows the city's character (a smithy
+  in Emberforge, an apothecary in Jadewood, a talisman hall in Moonfen, an array workshop in
+  Ashenwall), the tier follows the world, and a capital's shops are a tier better and a quarter
+  dearer. Found by walking the city with **/world → Explore**, entered with **/travel**, traded in
+  with **/economy → City Shops**; shelves refill on the shop's clock, fuller in a thriving city.
+- **City life**, under **/world → City**: **Look** (gates, districts, who is here, whether the city
+  is thriving), **Board** and **Accept** (the city's commissions and, in a capital, the wanted list),
+  **Envoys** (the sect envoys' hall in a capital's temple quarter puts every sect gate in the world
+  on your map), **Rumours** (the city's history, through the same viewpoint gate the narrator uses),
+  **Inn** (who is in town, which merchants are at the corner table, and the inn's common-room
+  thread). Every trade moves the city's prosperity, and prosperity shows on the shelves and at the gate.
+- **Auction houses.** Every city has one, entered through its warded door; a capital's is grand,
+  a smaller city's a local floor. Each grand house has a live Discord channel and a world's local
+  floors share one, where lots are posted, bid on and struck as it happens.
+- **Travelling merchants.** Eight, two a world, each a named NPC walking a fixed loop of cities and
+  sitting at the inn when in town. They keep a shop of their own, buy what an auction floor could not
+  sell, bid on the floors within the market's valuation with their purse as escrow, and resell it
+  all to whoever meets them — in a city, or on the same stretch of road mid-journey.
+
+### The economy
+
+Dynamic regional markets with supply, demand and a price index, rotating black markets, caravans
+you dispatch and settle, protected auctions with escrowed bids, currencies per world, and a
+storage system from pouch to spatial ring. Item provenance is kept, and manuals never reach a market.
+
+### NPCs with lives
+
+NPCs cultivate, travel, work, marry, raise descendants who mature into simulated NPCs, take masters
+and disciples, join and defect from factions, are injured, recover, age and die — on the engine's
+native batched tick (`npc_civilization` daily, `npc_life` weekly, economy, black markets, sect
+politics and clan dynamics on their own intervals), with bounded catch-up after downtime. Each has
+a personality, a want, a fear and a secret for the narrator, and a memory of you. The narrator can
+describe all of it and change none of it.
+
+### History and memory
+
+`world_history_events` records what mechanically happened — deaths, battles, succession, discoveries,
+openings, marriages, promotions — separately from what is true now, which always wins. Rows carry
+visibility levels (`public`, `participant`, `faction`, `hidden`); hidden rows never reach the
+narrator, and a focused NPC does not inherit the player's participant-only knowledge. RAG is
+deterministic SQLite FTS5 with no embeddings: live structured state, permission-filtered candidates,
+deterministic scoring, a small scene packet. Raw player text is tokenised before it touches `MATCH`.
+
+## Running the game as GM
+
+### From Discord
+
+`/admin` is a hub for administrators: server setup and diagnostics, the `#playtest` board, world
+events, player inspection, teleport, revive, currency, karma and cooldowns, moderation (mute, freeze
+and ban with an expiry the engine enforces, force-end-scene, all undoable from the audit log), sect
+and NPC management, simulation automation and forced runs, the Quest Forge, backups and audit logs.
+
+**The playtest board.** **/admin → Server → Playtest → Post** puts one message per hub page in
+`#playtest`, pre-reacted ✅ ❌ 💡; testers react and reply under the page, and **Report** tallies the
+reactions with names and links every flagged page.
+
+**Quest Forge.** `/admin world questforge <story>` drafts a quest in the game's own shape from a few
+sentences, checks every place, person and item it names against the content, and offers it with
+**Approve** / **Discard**. `QUEST_FORGE_AUTO=true` drafts one per notable world event, never
+auto-approved. Rewards are capped and granted by the engine on completion.
+
+### The GM dashboard
+
+Set `DASHBOARD_USERNAME`, `DASHBOARD_TOKEN` (at least 20 characters), `DASHBOARD_BIND_ADDRESS`,
+`DASHBOARD_PORT` and `DASHBOARD_ADMIN_WRITES=true`, then open `http://<NAS LAN address>:8090` from
+the LAN. Do not port-forward it to the internet; put a TLS reverse proxy in front if it must be
+reached from elsewhere, passing the original `Host` through or listing the public origin in
+`DASHBOARD_ALLOWED_ORIGINS`.
+
+Security: HTTP Basic auth on everything but `/livez`; five wrong passwords from one address lock it
+out for fifteen minutes; a `POST` whose `Origin` does not match its `Host` is refused; state changes
+need a JSON `POST` with the `X-Xianxia-Admin: 1` header; reads go through Go-owned query sessions,
+never SQLite directly; every mutation runs in the engine and lands in `admin_audit_log`;
+`DASHBOARD_ADMIN_WRITES=false` makes the console read-only.
+
+Views: Overview, Timeline, NPCs, Families, Sect Politics, Conflicts, World Events, Player Activity,
+Cultivation, Crafting & Assets, Exploration, Economy, Samsara Dynasties, RAG Memory, Autonomous
+Decisions, AI Routing, and the Admin Console (time, forced simulation, intervals, automation
+switches, teleport, currency, karma, revive and recovery, backups, `PRAGMA optimize`, `VACUUM`,
+the audit log) and Narration Routes. `/api/capabilities` is the frontend/backend coverage contract,
+and CI fails on drift.
+
+### Discord server setup
+
+**Discord Setup** on the dashboard talks to the bot's private control endpoint (it never sends
+Discord mutations through Go) and can inspect the guild, diagnose permissions and role hierarchy,
+run **Full Setup** or **Repair Server** without touching game data, gate every realm capital behind
+its presence role (a capital is visible only while your character is in it), synchronise slash
+commands and realm roles, rebuild `#xianxia-info`, bind existing channels, and run **Fresh Start**,
+**Teardown** or **Reset World** behind typed confirmations. Every state-changing operation writes an
+audit entry.
+
+## Operations
+
+### Backups
+
+Backups are made by the engine through the SQLite backup API, from Discord or the dashboard:
+retention, a size cap, optional sealing with an operator key and an off-box copy since v0.32.0
+(`docs/CONFIGURATION.md`, "Backups"). Never copy a live WAL database by hand as your backup.
+
+### Updates
+
+Releases are GitHub Releases built by CI from a tag; `vX.Y.Z` is stable, `vX.Y.Z-beta.N` a beta.
+The bot checks the channel every `UPDATE_CHECK_HOURS` and posts "Update available" once per newer
+release; it never installs anything. On the NAS:
+
+```bash
+./update.sh                     # offline: install a ZIP you placed in ./updates
+./update.sh --check             # is there something newer?
+./update.sh --fetch             # download the newest ZIP and verify its SHA-256
+./update.sh --upgrade           # fetch, then install: backup, stop, swap, start, roll back on failure
+```
+
+`RELEASE_MANIFEST.sha256` inside the tree proves an unpacked release is intact; `update.sh` checks it.
+
+### Health
+
+- Engine: `GET /livez`, `GET /readyz`, `GET /v1/db/status`.
+- Dashboard: `GET /livez` is unauthenticated for container health checks.
+- If narration goes flat after an image rebuild, check **/admin → Server → Ai Status** for a TLS
+  banner first. If SQLite reports contention, verify only the engine opens the database.
+
+Keep the whole `data/` directory persistent across rebuilds. The current schema is **38**; every
+historical migration is kept so an old database upgrades in place.
+
+## Development
+
+```bash
+python3 -m venv .venv && . .venv/bin/activate
+make install-dev
+make check              # lint + format-check + test-python + test-go, what CI runs
+```
+
+| Command | What it runs |
+| --- | --- |
+| `make test-python` | `pytest -q` — `unit/` (Python-only), `integration/` (still Python-owned orchestration), `contracts/` (the Python↔Go, startup, deployment and release boundaries) |
+| `make test-go` | `cd go_core && go test ./...` — every Go-owned rule and state transition |
+| `make lint` | `ruff check app scripts` and `go vet ./...` |
+| `python scripts/check_dashboard_implementation.py` | the dashboard drift and coverage gate |
+| `python scripts/playtest_engine.py --launch` | the engine half of the playtest: every roadmap loop driven through a scratch engine |
+| `python scripts/playtest_checklist.py` | regenerates `docs/playtest/v<version>.md` |
+| `python scripts/release_manifest.py --write` | regenerates `RELEASE_MANIFEST.sha256`; run it last before a release |
+
+Layout: `app/bot` (Discord), `app/rules` (pure content helpers), `app/ai` (router, narrator, RAG),
+`app/ops` (config, engine client, health), `app/dashboard`, `app/database` (repository API over the
+Go transport), `app/simulation`; `go_core/internal/{game,simulation,storage,server}`;
+`content/world.json` is the world. `CLAUDE.md` holds the working rules for the codebase:
+do not reintroduce a Go shadow mode, do not open production SQLite from Python, batch world work,
+keep AI non-authoritative, keep viewpoint permissions deterministic, audit GM mutations, and test
+Go-owned rules in Go.
 
 ## Version history
 
-See `VERSIONS.md` for the full v0.19.x (and v0.18) release-by-release changelog, schema history, and
-release-notes pointers.
+`VERSIONS.md` is the changelog, every release since 0.18 with its schema; `docs/history/` keeps the
+per-release notes and the migration record from before that.

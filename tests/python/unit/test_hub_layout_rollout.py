@@ -329,7 +329,7 @@ class HubFailurePublicSurfaceTests(unittest.TestCase):
     def test_invoke_action_failure_still_refreshes_the_public_hub_panel(self):
         body = _function_body(HUBS_SOURCE, "_invoke_action")
         self.assertIn("_layout_targets_panel(interaction, hub_view)", body)
-        self.assertIn("_layout_result_send(interaction, text, {})", body)
+        self.assertIn("_layout_result_send(interaction, text, {}, hub_view)", body)
         self.assertIn(
             "interaction.response.edit_message(content=text, embed=None, view=hub_view)",
             body,
@@ -365,3 +365,104 @@ class HubFailurePublicSurfaceTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ResultsInThePanelTests(unittest.TestCase):
+    """v0.38.1: a plain, short result is shown inside the panel by editing it;
+    an embed, a result with its own buttons, or a long one goes beside it."""
+
+    def _run(self, coro):
+        import asyncio
+
+        return asyncio.run(coro)
+
+    @staticmethod
+    def _hubs():
+        """Import the hub module under a test environment: its runtime reads
+        the settings at import, and the settings insist on the four keys."""
+        import importlib
+        import os
+        from unittest.mock import patch
+
+        env = {"DISCORD_TOKEN": "test-token", "GUILD_ID": "123456789012345678",
+               "ENGINE_AUTH_TOKEN": "test-engine-token-1234567890", "DATABASE_PATH": "data/test.sqlite3"}
+        with patch.dict(os.environ, env):
+            return importlib.import_module("app.bot.hubs")
+
+    def _fixtures(self, *, source_is_panel: bool, response_done: bool = True):
+        from types import SimpleNamespace
+
+        hubs = self._hubs()
+
+        calls: dict[str, list] = {"panel_edit": [], "edit_original": [], "followup": [], "delete_original": [], "response_edit": []}
+
+        async def panel_edit(**kwargs):
+            calls["panel_edit"].append(kwargs)
+            return "panel"
+
+        panel = SimpleNamespace(id=11, edit=panel_edit)
+
+        async def refresh_status(_interaction):
+            return None
+
+        hub_view = SimpleNamespace(message=panel, last_result="", refresh_status=refresh_status, rebuild=lambda: None, is_layout_hub=True)
+
+        async def edit_original(**kwargs):
+            calls["edit_original"].append(kwargs)
+            return "edited"
+
+        async def response_edit(**kwargs):
+            calls["response_edit"].append(kwargs)
+            return "edited"
+
+        async def followup_send(content=None, **kwargs):
+            calls["followup"].append((content, kwargs))
+            return "followup"
+
+        async def delete_original():
+            calls["delete_original"].append(True)
+
+        async def defer(**kwargs):
+            return None
+
+        source = SimpleNamespace(
+            message=SimpleNamespace(id=11 if source_is_panel else 22),
+            response=SimpleNamespace(is_done=lambda: response_done, edit_message=response_edit, defer=defer),
+            edit_original_response=edit_original,
+            delete_original_response=delete_original,
+            followup=SimpleNamespace(send=followup_send),
+        )
+        return hubs, source, hub_view, calls
+
+    def test_a_short_plain_result_edits_the_panel_in_place(self):
+        hubs, source, hub_view, calls = self._fixtures(source_is_panel=True)
+        result = self._run(hubs._layout_result_send(source, "You bought a pill.", {}, hub_view))
+        self.assertEqual(result, "edited")
+        self.assertEqual(hub_view.last_result, "You bought a pill.")
+        self.assertEqual(len(calls["edit_original"]), 1)
+        self.assertIs(calls["edit_original"][0]["view"], hub_view)
+        self.assertEqual(calls["followup"], [])
+
+    def test_an_input_step_result_edits_the_panel_and_removes_the_step(self):
+        hubs, source, hub_view, calls = self._fixtures(source_is_panel=False)
+        result = self._run(hubs._layout_result_send(source, "Done.", {}, hub_view))
+        self.assertEqual(result, "panel")
+        self.assertEqual(len(calls["panel_edit"]), 1)
+        self.assertEqual(calls["delete_original"], [True])
+        self.assertEqual(calls["followup"], [])
+
+    def test_an_embed_a_view_or_a_long_result_goes_beside_the_panel(self):
+        hubs, source, hub_view, calls = self._fixtures(source_is_panel=True)
+        self._run(hubs._layout_result_send(source, None, {"embed": object()}, hub_view))
+        self._run(hubs._layout_result_send(source, "Narrate it?", {"view": object()}, hub_view))
+        self._run(hubs._layout_result_send(source, "x" * (hubs._LAYOUT_RESULT_LIMIT + 1), {}, hub_view))
+        self.assertEqual(len(calls["followup"]), 3)
+        self.assertEqual(calls["edit_original"], [])
+        self.assertEqual(hub_view.last_result, "")
+
+    def test_the_panel_renders_the_result_block_and_refresh_clears_it(self):
+        self.assertIn('container.add_item(discord.ui.TextDisplay(f"### 📜 Result\\n{self.last_result}"', HUBS_SOURCE)
+        self.assertIn('self.hub_view.last_result = ""', HUBS_SOURCE)
+        self.assertIn("_LAYOUT_RESULT_LIMIT = 1000", HUBS_SOURCE)
+        # Only the first output of an action goes in the panel; the rest go beside it.
+        self.assertEqual(HUBS_SOURCE.count("in_panel = None if self.owner.output_written"), 3)

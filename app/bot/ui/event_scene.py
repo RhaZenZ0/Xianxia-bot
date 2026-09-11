@@ -1,7 +1,7 @@
 """The shared event-scene panel (EventSceneView and its selects/modals) and
 the two thread spawners that post it.
 
-Phase 8 of the main.py split (v0.19.43, docs/MAIN_SPLIT_PLAN.md). The panel
+Phase 8 of the main.py split (v0.19.43, docs/history/MAIN_SPLIT_PLAN.md). The panel
 launches commands that live in many modules; it has always reached them
 through the EVENT_HANDLERS registry rather than by import, and main.py fills
 that registry at import time. The three helpers it used to call directly

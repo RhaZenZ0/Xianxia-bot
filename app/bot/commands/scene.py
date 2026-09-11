@@ -1,6 +1,6 @@
 """Roleplay scenes: talk, action (with its panel views), npcinfo, /scene.
 
-Split phase 9e (v0.19.48, docs/MAIN_SPLIT_PLAN.md). Cut verbatim from
+Split phase 9e (v0.19.48, docs/history/MAIN_SPLIT_PLAN.md). Cut verbatim from
 main.py in definition order. `_scene_action_targets` and
 `scene_action_panel` are what `EventSceneView` (ui/event_scene.py) reaches
 through the `EVENT_HANDLERS` registry; the two bindings moved here with

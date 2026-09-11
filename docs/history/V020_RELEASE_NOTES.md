@@ -1,8 +1,8 @@
 # Xianxia RP Discord Bot — v0.20 release notes
 
-The v0.20 line closed at **v0.20.9**; the current release is in `docs/V021_RELEASE_NOTES.md`. The v0.19 line (v0.19 through v0.19.48) is in
-`docs/V019_RELEASE_NOTES.md`; the staged-authority migration before it in
-`docs/V018_RELEASE_NOTES.md`. v0.20.9 was stamped 0.20.9 in `app/version.py`,
+The v0.20 line closed at **v0.20.9**; the current release is in `docs/history/V021_RELEASE_NOTES.md`. The v0.19 line (v0.19 through v0.19.48) is in
+`docs/history/V019_RELEASE_NOTES.md`; the staged-authority migration before it in
+`docs/history/V018_RELEASE_NOTES.md`. v0.20.9 was stamped 0.20.9 in `app/version.py`,
 `VERSION`, the `Dockerfile` and `docker-compose.yml`, and carries schema 28
 (v0.20.6: `quest_definitions`; 27 since v0.19.29 before that).
 
@@ -10,7 +10,7 @@ Release date: 2026-09-05 (v0.20.0, v0.20.1, v0.20.2) / 2026-09-06 (v0.20.3, v0.2
 
 ## v0.20.0 — main.py split complete: phase 10, the final sweep
 
-v0.20.0 closes `docs/MAIN_SPLIT_PLAN.md`. Sixteen releases (v0.19.33 through
+v0.20.0 closes `docs/history/MAIN_SPLIT_PLAN.md`. Sixteen releases (v0.19.33 through
 v0.19.48) moved `app/bot/main.py` from 11,650 lines and 484 top-level
 definitions into thirty-two modules under `app/bot/`; this release moves the
 last of it and leaves `main.py` at 35 lines. No behaviour change, no schema
@@ -199,7 +199,7 @@ expects them. A guard in `test_app_layout.py` pins that, with the reason.
 
 What did move: `RELEASE.txt`, a 57 KB release marker that still described
 v0.19.24 and had not been updated since, is
-`docs/migration_history/V019_24_RELEASE.txt` now. `VERSIONS.md` and the
+`docs/history/V019_24_RELEASE.txt` now. `VERSIONS.md` and the
 per-line notes files are the release record; nothing read `RELEASE.txt`.
 
 No behaviour change, no schema change. Full suite against v0.20.1: 681

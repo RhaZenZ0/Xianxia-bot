@@ -1,6 +1,6 @@
 """Law, manuals, conditions, professions and crime.
 
-Split phase 9d (v0.19.47, docs/MAIN_SPLIT_PLAN.md). Cut verbatim from
+Split phase 9d (v0.19.47, docs/history/MAIN_SPLIT_PLAN.md). Cut verbatim from
 main.py in definition order (`worldrules`, which sat between the manual and
 condition blocks, stays with the sense domain). Reads battle.py for the
 panel and the technique executor; nothing reads back.
