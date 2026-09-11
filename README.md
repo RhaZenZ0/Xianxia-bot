@@ -1,4 +1,4 @@
-# Xianxia RP Discord Bot v0.39.0
+# Xianxia RP Discord Bot v0.40.0
 
 [![CI](https://github.com/RhaZenZ0/Xianxia-bot/actions/workflows/ci.yml/badge.svg)](https://github.com/RhaZenZ0/Xianxia-bot/actions/workflows/ci.yml)
 
@@ -244,10 +244,14 @@ for a browser, mean for an attacker.
 `/menu` opens one panel that lists every hub; `/me` opens the player dashboard. Each hub — character,
 cultivation, world, travel, craft, realm, items, combat, economy, inner world, beast, abode, family,
 quest, sect, NPC — is a live panel with one visible, tappable row per action, guided inputs for
-every parameter (every id has a picker), owner locking and a refresh. A short plain result is
-shown inside the panel, in a result block above the actions, and Refresh clears it; an embed, a
-reply with its own buttons, a file or a long reply lands beside the panel, which stays live
-underneath. Battles and events have their own in-place panels.
+every parameter (every id has a picker), owner locking and a refresh. One message is the whole GUI
+(v0.40.0): every panel's Menu button swaps it into the menu in place and the menu opens any hub in
+the same message. A plain result is shown inside the panel, in a result block above the actions,
+paged when long, with the next steps it names as buttons under it; Refresh clears it. An embed, a
+reply with its own buttons or a file lands beside the panel, which stays live underneath. The
+header carries a Here line saying what the place you stand in is and who is about; a chain of
+pickers is one message that changes; a red button asks once before it runs; a panel that goes quiet
+for fifteen minutes keeps a Reopen button. Battles and events have their own in-place panels.
 
 ### Typed play
 

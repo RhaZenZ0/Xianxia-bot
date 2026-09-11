@@ -455,13 +455,13 @@ class ResultsInThePanelTests(unittest.TestCase):
         hubs, source, hub_view, calls = self._fixtures(source_is_panel=True)
         self._run(hubs._layout_result_send(source, None, {"embed": object()}, hub_view))
         self._run(hubs._layout_result_send(source, "Narrate it?", {"view": object()}, hub_view))
-        self._run(hubs._layout_result_send(source, "x" * (hubs._LAYOUT_RESULT_LIMIT + 1), {}, hub_view))
+        self._run(hubs._layout_result_send(source, "x" * (hubs._LAYOUT_RESULT_LIMIT * hubs._LAYOUT_RESULT_PAGES + 1), {}, hub_view))
         self.assertEqual(len(calls["followup"]), 3)
         self.assertEqual(calls["edit_original"], [])
         self.assertEqual(hub_view.last_result, "")
 
     def test_the_panel_renders_the_result_block_and_refresh_clears_it(self):
-        self.assertIn('container.add_item(discord.ui.TextDisplay(f"### 📜 Result\\n{self.last_result}"', HUBS_SOURCE)
+        self.assertIn('container.add_item(discord.ui.TextDisplay(f"### 📜 Result\\n{self._result_text()}"', HUBS_SOURCE)
         self.assertIn('self.hub_view.last_result = ""', HUBS_SOURCE)
         self.assertIn("_LAYOUT_RESULT_LIMIT = 1000", HUBS_SOURCE)
         # Only the first output of an action goes in the panel; the rest go beside it.

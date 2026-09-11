@@ -82,6 +82,19 @@ _LAYOUT_ACTION_LIMIT = 8
 # text of a Components V2 message at 4,000 characters across its displays:
 # header (900) + page (600) + eight rows (180 each) leaves a thousand.
 _LAYOUT_RESULT_LIMIT = 1000
+# A longer plain result pages inside the panel (v0.40.0): up to this many
+# pages of the budget above, stepped with Prev/Next result buttons, instead
+# of landing beside the panel as two or three messages.
+_LAYOUT_RESULT_PAGES = 5
+# Next-step buttons under a result (v0.40.0): the hub paths a reply already
+# prints as hints (`**/world → City → Look**`) become at most this many
+# buttons, so the suggested follow-up is a tap rather than a page change.
+_LAYOUT_RESULT_ACTION_LIMIT = 3
+_HINT_PATH_RE = re.compile(r"\*\*/([a-z]+)((?:\s*→\s*[^*→]+)*)\*\*")
+# Discord's cap on components per message, nested ones included; rebuild()
+# sizes the action list against it once the result block and its buttons
+# have taken their share.
+_LAYOUT_COMPONENT_CAP = 40
 
 _DANGER_ACTION_WORDS = frozenset({
     "abandon", "clear", "close", "delete", "destroy", "disband", "kill",
@@ -268,6 +281,80 @@ def register_hubs(*definitions: HubDefinition) -> None:
 
 
 _HUB_OPTION_PROVIDERS: dict[tuple[str, str], Any] = {}
+
+# The main menu as a panel (v0.40.0). surface.py builds it - it owns the hub
+# definitions and the admin gate - and registers the builder here so every
+# panel's Menu button can swap itself into the menu in place, and the menu
+# can swap itself into a hub. One message is the whole GUI.
+_MENU_BUILDER: Any = None
+
+
+def register_menu_builder(builder: Any) -> None:
+    global _MENU_BUILDER
+    _MENU_BUILDER = builder
+
+
+def _hint_action(hub_name: str, steps: Sequence[str]) -> "HubAction | None":
+    """The action a printed hint path names: `/world → City → Look` is the
+    hub world, its page labelled City, its action labelled Look; a bare
+    `/travel` is the first action of the hub's first page."""
+    definition = next((d for d in REGISTERED_HUBS if d.name == hub_name), None)
+    if definition is None or not definition.pages:
+        return None
+    labels = [str(step).strip().casefold() for step in steps if str(step).strip()]
+    page = definition.pages[0]
+    if labels:
+        found = next((p for p in definition.pages if p.label.casefold() == labels[0] or p.key.casefold() == labels[0]), None)
+        if found is None:
+            return None
+        page = found
+        labels = labels[1:]
+    actions = _leaf_actions(page)
+    if not actions:
+        return None
+    if not labels:
+        # A bare `/travel` means the thing you do there, not its status
+        # line: the first primary-band action, else the first there is.
+        return next((a for a in actions if _action_rank(getattr(a.command, "name", "")) in (1, 2)), actions[0])
+    return next((a for a in actions if a.label.casefold() == labels[-1] or str(getattr(a.command, "name", "")).casefold() == labels[-1]), None)
+
+
+def suggested_actions(text: str) -> list["HubAction"]:
+    """The next-step buttons a result earns (v0.40.0): every hub path the
+    text prints as a hint, in order, deduplicated, at most three."""
+    out: list[HubAction] = []
+    seen: set[str] = set()
+    for match in _HINT_PATH_RE.finditer(str(text or "")):
+        steps = [part for part in re.split(r"\s*→\s*", match.group(2) or "") if part.strip()]
+        action = _hint_action(match.group(1), steps)
+        if action is None or action.path in seen:
+            continue
+        seen.add(action.path)
+        out.append(action)
+        if len(out) >= _LAYOUT_RESULT_ACTION_LIMIT:
+            break
+    return out
+
+
+def _result_pages(text: str, limit: int = _LAYOUT_RESULT_LIMIT) -> list[str]:
+    """Split a result into pages that fit the panel's text budget, breaking
+    on a paragraph, then a line, then a space, then hard."""
+    remaining = str(text or "").strip()
+    pages: list[str] = []
+    while remaining:
+        if len(remaining) <= limit:
+            pages.append(remaining)
+            break
+        cut = -1
+        for separator in ("\n\n", "\n", " "):
+            cut = remaining.rfind(separator, limit // 3, limit)
+            if cut != -1:
+                break
+        if cut == -1:
+            cut = limit
+        pages.append(remaining[:cut].rstrip())
+        remaining = remaining[cut:].lstrip()
+    return pages or [""]
 
 # What to say when a live provider returns nothing.
 #
@@ -679,7 +766,7 @@ def _panel_can_hold(content: Any, kwargs: Mapping[str, Any]) -> bool:
     if any(key in kwargs for key in ("embed", "embeds", "view", "file", "files", "attachments")):
         return False
     text = content if content is not None else "✅ Done."
-    return len(text) <= _LAYOUT_RESULT_LIMIT
+    return len(text) <= _LAYOUT_RESULT_LIMIT * _LAYOUT_RESULT_PAGES
 
 
 async def _show_result_in_panel(source: discord.Interaction, hub_view: Any, text: str) -> Any:
@@ -693,6 +780,10 @@ async def _show_result_in_panel(source: discord.Interaction, hub_view: Any, text
     panel, showing the result above its actions.
     """
     hub_view.last_result = str(text)
+    # Paged, with the follow-ups the text names as buttons (v0.40.0).
+    hub_view.result_pages = _result_pages(hub_view.last_result)
+    hub_view.result_page = 0
+    hub_view.result_actions = suggested_actions(hub_view.last_result)
     await hub_view.refresh_status(source)
     hub_view.rebuild()
     panel = getattr(hub_view, "message", None)
@@ -761,6 +852,11 @@ class _HubFollowupProxy:
 
         result: Any = None
         if _layout_targets_panel(self.owner.source, self.owner.hub_view):
+            # A plain result that fits the panel's pages goes in whole
+            # (v0.40.0); only what cannot is chunked beside the panel.
+            if not self.owner.output_written and len(chunks) > 1 and _panel_can_hold(content, kwargs):
+                self.owner.output_written = True
+                return await _layout_result_send(self.owner.source, content, kwargs, self.owner.hub_view)
             in_panel = None if self.owner.output_written or len(chunks) > 1 else self.owner.hub_view
             self.owner.output_written = True
             result = await _layout_result_send(self.owner.source, first, kwargs, in_panel)
@@ -807,6 +903,9 @@ class _HubResponseProxy:
                 await self.owner.source.followup.send(chunk, ephemeral=True)
             return result
 
+        if _layout_targets_panel(self.owner.source, self.owner.hub_view) and not self.owner.output_written and len(chunks) > 1 and _panel_can_hold(content, kwargs):
+            self.owner.output_written = True
+            return await _layout_result_send(self.owner.source, content, kwargs, self.owner.hub_view)
         in_panel = None if self.owner.output_written or len(chunks) > 1 else self.owner.hub_view
         self.owner.output_written = True
         if _layout_targets_panel(self.owner.source, self.owner.hub_view):
@@ -1380,6 +1479,39 @@ class HubDynamicView(discord.ui.View):
         return await self.hub_view.interaction_check(interaction)
 
 
+def _is_own_step_message(interaction: discord.Interaction, hub_view: Any) -> bool:
+    """True when the interaction came from an ephemeral step message the hub
+    opened (a picker, a confirm) rather than from the panel itself."""
+    message = getattr(interaction, "message", None)
+    if message is None:
+        return False
+    panel = getattr(hub_view, "message", None)
+    if panel is not None and int(getattr(message, "id", 0)) == int(getattr(panel, "id", -1)):
+        return False
+    flags = getattr(message, "flags", None)
+    return bool(getattr(flags, "ephemeral", False))
+
+
+async def _step_reply(interaction: discord.Interaction, hub_view: Any, content: str, view: Any = None) -> None:
+    """Show an input step. From the panel it is a new ephemeral message; from
+    a previous step (a picker, a confirm) it replaces that message, so a
+    chain of pickers is one message that changes rather than a stack
+    (v0.40.0)."""
+    if _is_own_step_message(interaction, hub_view) and not interaction.response.is_done():
+        try:
+            await interaction.response.edit_message(content=content, view=view)
+            return
+        except (discord.NotFound, discord.HTTPException):
+            pass
+    if interaction.response.is_done():
+        await interaction.followup.send(content, view=view, ephemeral=True) if view is not None else await interaction.followup.send(content, ephemeral=True)
+        return
+    if view is not None:
+        await interaction.response.send_message(content, view=view, ephemeral=True)
+    else:
+        await interaction.response.send_message(content, ephemeral=True)
+
+
 async def _present_input_step(
     interaction: discord.Interaction,
     hub_view: "CommandHubView",
@@ -1397,49 +1529,29 @@ async def _present_input_step(
     tail = remaining_inputs[1:]
 
     if spec.choices and len(spec.choices) <= 25:
-        await interaction.response.send_message(
-            f"**{action.label}** — select {spec.label.lower()}.",
-            view=HubChoiceView(hub_view, action, spec, tail, values),
-            ephemeral=True,
-        )
+        await _step_reply(interaction, hub_view, f"**{action.label}** — select {spec.label.lower()}.", HubChoiceView(hub_view, action, spec, tail, values))
         return
     if _is_bool_input(spec):
-        await interaction.response.send_message(
-            f"**{action.label}** — choose {spec.label.lower()}.",
-            view=HubBoolView(hub_view, action, spec, tail, values),
-            ephemeral=True,
-        )
+        await _step_reply(interaction, hub_view, f"**{action.label}** — choose {spec.label.lower()}.", HubBoolView(hub_view, action, spec, tail, values))
         return
     if _is_member_input(spec):
-        await interaction.response.send_message(
-            f"**{action.label}** — select {spec.label.lower()}.",
-            view=HubMemberView(hub_view, action, spec, tail, values),
-            ephemeral=True,
-        )
+        await _step_reply(interaction, hub_view, f"**{action.label}** — select {spec.label.lower()}.", HubMemberView(hub_view, action, spec, tail, values))
         return
     if _is_channel_input(spec):
-        await interaction.response.send_message(
-            f"**{action.label}** — select {spec.label.lower()}.",
-            view=HubChannelView(hub_view, action, spec, tail, values),
-            ephemeral=True,
-        )
+        await _step_reply(interaction, hub_view, f"**{action.label}** — select {spec.label.lower()}.", HubChannelView(hub_view, action, spec, tail, values))
         return
 
     provider = _autocomplete_provider(action, spec)
     if provider is not None:
         options = await _live_options(interaction, action, spec)
         if options:
-            await interaction.response.send_message(
-                f"**{action.label}** — choose {spec.label.lower()} from the current live options.",
-                view=HubDynamicView(hub_view, action, spec, options, tail, values),
-                ephemeral=True,
-            )
+            await _step_reply(interaction, hub_view, f"**{action.label}** — choose {spec.label.lower()} from the current live options.", HubDynamicView(hub_view, action, spec, options, tail, values))
         else:
             hint = _hub_option_hint(action, spec)
             message = f"ℹ️ **{action.label}** — nothing to choose from right now."
             if hint:
                 message += f"\n{hint}"
-            await interaction.response.send_message(message, ephemeral=True)
+            await _step_reply(interaction, hub_view, message)
         return
 
     # Collect a compact run of genuinely free-form values in one modal, stopping
@@ -1511,12 +1623,58 @@ class HubActionSelect(discord.ui.Select):
         await _start_hub_action(interaction, self.hub_view, action)
 
 
+def _is_danger_action(action: HubAction) -> bool:
+    return _action_button_style(action, 1) is discord.ButtonStyle.danger
+
+
+class HubConfirmButton(discord.ui.Button):
+    def __init__(self, hub_view: Any, action: HubAction, *, confirm: bool) -> None:
+        self.hub_view = hub_view
+        self.action = action
+        self.confirm = confirm
+        if confirm:
+            super().__init__(label=f"Yes, {action.label}"[:40], style=discord.ButtonStyle.danger, emoji=_mapped_action_emoji(action))
+        else:
+            super().__init__(label="Cancel", style=discord.ButtonStyle.secondary)
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        if not self.confirm:
+            await interaction.response.edit_message(content=f"**{self.action.label}** — cancelled.", view=None)
+            return
+        await _start_hub_action(interaction, self.hub_view, self.action, confirmed=True)
+
+
+class HubConfirmView(discord.ui.View):
+    """A second tap before a destructive action (v0.40.0): leave, abandon,
+    sever, disband, withdraw. A red button on a phone is one mis-tap from
+    running; this is the step between."""
+
+    def __init__(self, hub_view: Any, action: HubAction) -> None:
+        super().__init__(timeout=120)
+        self.hub_view = hub_view
+        self.add_item(HubConfirmButton(hub_view, action, confirm=True))
+        self.add_item(HubConfirmButton(hub_view, action, confirm=False))
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        return await self.hub_view.interaction_check(interaction)
+
+
 async def _start_hub_action(
     interaction: discord.Interaction,
     hub_view: "CommandHubView",
     action: HubAction,
+    *,
+    confirmed: bool = False,
 ) -> None:
-    """Open guided inputs or immediately run one canonical hub action."""
+    """Open guided inputs or immediately run one canonical hub action. A
+    destructive action asks once first (v0.40.0)."""
+    if _is_danger_action(action) and not confirmed:
+        await _step_reply(
+            interaction, hub_view,
+            f"⚠️ **{action.label}** — {action.description or 'this cannot be undone'}\nAre you sure?",
+            HubConfirmView(hub_view, action),
+        )
+        return
     inputs = _inputs_for(action)
     if not inputs:
         await _invoke_action(interaction, hub_view, action, {})
@@ -1664,15 +1822,16 @@ class HubLayoutActionPageButton(discord.ui.Button):
     async def callback(self, interaction: discord.Interaction) -> None:
         page = self.hub_view.page
         total = len(_leaf_actions(page)) if page is not None else 0
-        if total <= _LAYOUT_ACTION_LIMIT:
+        step_size = max(1, int(getattr(self.hub_view, "row_limit", _LAYOUT_ACTION_LIMIT)))
+        if total <= step_size:
             await interaction.response.defer()
             return
-        step = _LAYOUT_ACTION_LIMIT * self.direction
+        step = step_size * self.direction
         offset = self.hub_view.action_offset + step
         if offset >= total:
             offset = 0
         elif offset < 0:
-            offset = ((total - 1) // _LAYOUT_ACTION_LIMIT) * _LAYOUT_ACTION_LIMIT
+            offset = ((total - 1) // step_size) * step_size
         self.hub_view.action_offset = offset
         self.hub_view.rebuild()
         await interaction.response.edit_message(view=self.hub_view)
@@ -1687,8 +1846,100 @@ class HubLayoutRefreshButton(discord.ui.Button):
         await self.hub_view.refresh_status(interaction)
         # Refresh is also how a player clears the last result off the card.
         self.hub_view.last_result = ""
+        self.hub_view.result_pages = []
+        self.hub_view.result_page = 0
+        self.hub_view.result_actions = []
         self.hub_view.rebuild()
         await interaction.response.edit_message(view=self.hub_view)
+
+
+class HubLayoutMenuButton(discord.ui.Button):
+    """Swap the panel into the main menu in place (v0.40.0)."""
+
+    def __init__(self, hub_view: "LayoutHubView") -> None:
+        self.hub_view = hub_view
+        super().__init__(label="Menu", style=discord.ButtonStyle.secondary, emoji="🧭")
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        if not callable(_MENU_BUILDER):
+            await interaction.response.send_message("Open the menu with **/menu**.", ephemeral=True)
+            return
+        member = interaction.user
+        is_admin = isinstance(member, discord.Member) and bool(member.guild_permissions.administrator)
+        menu = _MENU_BUILDER(owner_id=self.hub_view.owner_id, is_admin=is_admin, owner_name=self.hub_view.owner_name)
+        await interaction.response.edit_message(view=menu)
+        menu.message = getattr(interaction, "message", None)
+        self.hub_view.stop()
+
+
+class HubResultPageButton(discord.ui.Button):
+    """Step through the pages of a long result shown in the panel (v0.40.0)."""
+
+    def __init__(self, hub_view: "LayoutHubView", *, direction: int) -> None:
+        self.hub_view = hub_view
+        self.direction = -1 if direction < 0 else 1
+        super().__init__(label="Prev" if self.direction < 0 else "Next", style=discord.ButtonStyle.secondary, emoji="◀️" if self.direction < 0 else "▶️")
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        pages = list(getattr(self.hub_view, "result_pages", None) or [])
+        if len(pages) > 1:
+            self.hub_view.result_page = (int(self.hub_view.result_page) + self.direction) % len(pages)
+        self.hub_view.rebuild()
+        await interaction.response.edit_message(view=self.hub_view)
+
+
+class HubResultActionButton(discord.ui.Button):
+    """A next step the result named, as a button under it (v0.40.0)."""
+
+    def __init__(self, hub_view: "LayoutHubView", action: HubAction, *, index: int) -> None:
+        self.hub_view = hub_view
+        self.action = action
+        style = discord.ButtonStyle.danger if _is_danger_action(action) else (discord.ButtonStyle.primary if index == 0 else discord.ButtonStyle.secondary)
+        super().__init__(label=action.label[:20], style=style, emoji=_mapped_action_emoji(action))
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        await _start_hub_action(interaction, self.hub_view, self.action)
+
+
+class HubReopenButton(discord.ui.Button):
+    def __init__(self, expired: "ExpiredPanelView") -> None:
+        self.expired_view = expired
+        super().__init__(label="Reopen", style=discord.ButtonStyle.primary, emoji="🔄")
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        await open_hub_in_place(interaction, self.expired_view.definition, self.expired_view.status_provider)
+        self.expired_view.stop()
+
+
+class ExpiredPanelView(_LayoutHubBase):
+    """What a panel becomes after fifteen quiet minutes (v0.40.0): its title
+    and one Reopen button that rebuilds it in place, instead of a dead card
+    telling the player to run the command again."""
+
+    is_layout_hub = False
+
+    def __init__(self, hub_view: "LayoutHubView") -> None:
+        super().__init__(timeout=None)
+        self.owner_id = hub_view.owner_id
+        self.owner_name = hub_view.owner_name
+        self.definition = hub_view.definition
+        self.status_provider = hub_view.status_provider
+        self.message: discord.Message | None = hub_view.message
+        container = discord.ui.Container(accent_colour=_HUB_COLOURS.get(self.definition.name, 0x5865F2))
+        icon = _hub_icon(self.definition.name)
+        title = self.definition.title if self.definition.title.startswith(icon) else f"{icon} {self.definition.title}"
+        container.add_item(discord.ui.TextDisplay(f"## {title}\n-# Xianxia RP  ·  {self.owner_name}\n-# This panel went quiet for fifteen minutes. Reopen it here; any tap keeps a panel alive another fifteen."))
+        row = discord.ui.ActionRow()
+        row.add_item(HubReopenButton(self))
+        container.add_item(row)
+        self.add_item(container)
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.owner_id:
+            if not interaction.response.is_done():
+                await interaction.response.send_message("This panel belongs to another player.", ephemeral=True)
+            return False
+        return True
 
 
 class LayoutHubView(_LayoutHubBase):
@@ -1730,8 +1981,37 @@ class LayoutHubView(_LayoutHubBase):
         self.action_offset = 0
         self.expired = False
         self.last_result = ""
+        self.result_pages: list[str] = []
+        self.result_page = 0
+        self.result_actions: list[HubAction] = []
         self.message: discord.Message | None = None
         self.rebuild()
+
+    def _result_text(self) -> str:
+        """The page of the result on show, with its page count when paged."""
+        pages = list(self.result_pages or []) or _result_pages(self.last_result)
+        index = max(0, min(int(self.result_page), len(pages) - 1))
+        text = pages[index]
+        if len(pages) > 1:
+            text = f"-# page {index + 1}/{len(pages)}\n{text}"
+        return text[:_LAYOUT_RESULT_LIMIT + 24]
+
+    def _result_row(self) -> "discord.ui.ActionRow | None":
+        """The buttons under a result: Prev/Next when paged, then the next
+        steps the result named. At most five, Discord's row."""
+        pages = list(self.result_pages or [])
+        buttons: list[discord.ui.Button] = []
+        if len(pages) > 1:
+            buttons.append(HubResultPageButton(self, direction=-1))
+            buttons.append(HubResultPageButton(self, direction=1))
+        for index, action in enumerate(list(self.result_actions or [])[: 5 - len(buttons)]):
+            buttons.append(HubResultActionButton(self, action, index=index))
+        if not buttons:
+            return None
+        row = discord.ui.ActionRow()
+        for button in buttons:
+            row.add_item(button)
+        return row
 
     @property
     def page(self) -> HubPage | None:
@@ -1802,9 +2082,24 @@ class LayoutHubView(_LayoutHubBase):
             accent_colour=_HUB_COLOURS.get(self.definition.name, 0x5865F2)
         )
         container.add_item(discord.ui.TextDisplay(self._header_text()))
+        result_row = None
+        # Components in the fixed chrome, counted against Discord's cap so
+        # the action list shrinks to make room for the result and its
+        # buttons rather than the message failing to send: the container,
+        # the header, three separators, the page text, the control row and
+        # its five buttons at most; a result adds a separator and a text, and
+        # its row adds one plus its buttons.
+        fixed = 1 + 1 + 3 + 1 + 1 + 5
         if self.last_result and not self.expired:
             container.add_item(discord.ui.Separator())
-            container.add_item(discord.ui.TextDisplay(f"### 📜 Result\n{self.last_result}"[:_LAYOUT_RESULT_LIMIT + 16]))
+            container.add_item(discord.ui.TextDisplay(f"### 📜 Result\n{self._result_text()}"[:_LAYOUT_RESULT_LIMIT + 48]))
+            fixed += 2
+            result_row = self._result_row()
+            if result_row is not None:
+                container.add_item(result_row)
+                fixed += 1 + len(list(result_row.children))
+        row_limit = max(1, min(_LAYOUT_ACTION_LIMIT, (_LAYOUT_COMPONENT_CAP - fixed) // 3))
+        self.row_limit = row_limit
 
         page = self.page
         if self.expired:
@@ -1828,7 +2123,7 @@ class LayoutHubView(_LayoutHubBase):
         total = len(actions)
         if self.action_offset >= total:
             self.action_offset = 0
-        visible = actions[self.action_offset : self.action_offset + _LAYOUT_ACTION_LIMIT]
+        visible = actions[self.action_offset : self.action_offset + row_limit]
 
         container.add_item(discord.ui.Separator())
         container.add_item(discord.ui.TextDisplay(self._page_text(page, total, len(visible))))
@@ -1850,10 +2145,13 @@ class LayoutHubView(_LayoutHubBase):
         if multi_page:
             controls.add_item(HubLayoutSystemStepButton(self, direction=-1))
         controls.add_item(HubLayoutRefreshButton(self))
+        controls.add_item(HubLayoutMenuButton(self))
         if multi_page:
             controls.add_item(HubLayoutSystemStepButton(self, direction=1))
-        if total > _LAYOUT_ACTION_LIMIT:
-            controls.add_item(HubLayoutActionPageButton(self, direction=-1))
+        # One "More actions" that wraps: a row holds five buttons, and with
+        # Menu on it (v0.40.0) there is no room for a "Fewer" that the wrap
+        # makes redundant anyway.
+        if total > row_limit:
             controls.add_item(HubLayoutActionPageButton(self, direction=1))
         container.add_item(controls)
 
@@ -1893,6 +2191,12 @@ class LayoutHubView(_LayoutHubBase):
 
     async def on_timeout(self) -> None:
         self.expired = True
+        if self.message is not None:
+            try:
+                await self.message.edit(view=ExpiredPanelView(self))
+                return
+            except (discord.HTTPException, Exception):
+                log.exception("Could not offer Reopen on the expired panel for %s", self.definition.name)
         self.rebuild()
         if self.message is not None:
             try:
@@ -2070,6 +2374,34 @@ async def _send_classic_hub(
             embed=view.build_embed(), view=view, ephemeral=False
         )
     return view
+
+
+async def open_hub_in_place(
+    interaction: discord.Interaction,
+    definition: HubDefinition,
+    status_provider: Any | None = None,
+) -> Any:
+    """Turn the message the interaction came from into this hub's panel
+    (v0.40.0): the menu opening a hub, a hub's Menu button, an expired
+    panel's Reopen. Falls back to a new message where the layout is not
+    available or the edit is refused."""
+    if _use_layout_hub(definition) and not interaction.response.is_done():
+        try:
+            view = LayoutHubView(
+                interaction.user.id,
+                definition,
+                owner_name=getattr(interaction.user, "display_name", str(interaction.user)),
+                status_provider=status_provider,
+            )
+            await view.refresh_status(interaction)
+            view.rebuild()
+            await interaction.response.edit_message(view=view)
+            view.message = getattr(interaction, "message", None)
+            return view
+        except Exception:
+            log.exception("Could not open %s in place; sending a new panel", definition.name)
+    await send_hub(interaction, definition, status_provider=status_provider)
+    return None
 
 
 async def send_hub(

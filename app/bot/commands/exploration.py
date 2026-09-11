@@ -30,7 +30,8 @@ from ..discovery import (
     travel_first_discovers_location,
 )
 from ..formatting import human_duration, roll_line
-from ..locations import location_autocomplete
+from ..hubs import HubDynamicOption, register_hub_option_provider
+from ..locations import _known_locations, destination_groups, location_autocomplete
 from ..registry import registered_group_command, registered_root_command
 from ..runtime import (
     DB,
@@ -1368,6 +1369,27 @@ async def travel(interaction: discord.Interaction, destination: str) -> None:
             result, location, previously_discovered=False
         ):
             await send_location_discovery_image(interaction, location)
+
+
+async def travel_destination_hub_options(interaction: discord.Interaction, current: str) -> list[HubDynamicOption]:
+    """The travel picker with its places grouped and labelled (v0.40.0):
+    this city's parts and shops, road-side sites, cities by road hops, the
+    capitals - the same known places the slash autocomplete offers."""
+    c = await DB.get_character(interaction.user.id)
+    if not c:
+        return []
+    known = await _known_locations(interaction.user.id, c)
+    needle = str(current or "").casefold().strip()
+    rows = destination_groups(str(c.get("location") or ""), known, int(c.get("realm_index", 0)))
+    out = []
+    for name, emoji, description, _order in rows:
+        if needle and needle not in name.casefold():
+            continue
+        out.append(HubDynamicOption(label=name[:100], value=name[:100], description=description[:100], emoji=emoji))
+    return out[:25]
+
+
+register_hub_option_provider(travel, "destination", travel_destination_hub_options)
 
 
 @registered_group_command(travel_group, name="status", description="Show your destination and a live countdown while you are traveling")

@@ -1009,6 +1009,28 @@ Gate: `tests/python/contracts/test_security_defaults.py` and `TestNewRefusesAnEn
 No schema change (still 32), no game-rule change, AI remains narration-only.
 
 
+**0.40.0** is a GUI release: **GUI II - one message is the whole GUI.** No schema change.
+
+Six things about the panels, built together. *Menu in place:* every panel's control row carries a
+Menu button that swaps the panel into the main menu in the same message, and the menu opens any hub
+in that same message; `/menu` itself is now a panel of the same kind, so the conversation ends with
+one live card instead of a trail of them. *Next-step buttons:* the hub paths a reply already prints
+as hints (`**/world → City → Look**`) become up to three buttons under the result block - after a
+journey, Look, Explore and Browse are taps; a bare `/travel` means Go, not Status. *Long results in
+the panel:* plain text up to five pages of the panel's budget pages inside the panel with Prev/Next
+result buttons instead of landing beside it as two or three messages. *The Here line:* every player
+hub's header says what the place you stand in is - a capital with its gates and districts, a shop
+and its keeper, a road-side site and its road, a sect gate - and who is about. *Reopen:* a panel
+that goes quiet for fifteen minutes becomes its title and one Reopen button that rebuilds it in
+place; any tap keeps a panel alive another fifteen. *Pickers and confirms:* the travel picker
+groups its places - this city's parts and shops, road-side sites, cities by road hops, the capitals
+- with a line each; a chain of pickers is one message that changes rather than a stack; and a
+red button (leave, abandon, sever, disband, withdraw) asks once before it runs. The action list
+sizes itself against Discord's forty-component cap once the result and its buttons have taken
+their share, so the busiest page stays sendable; the "Fewer" button is gone (More wraps) to make
+room for Menu. `tests/python/unit/test_gui_ii.py` renders every page of every hub with a paged
+result and three buttons and holds the count under the cap.
+
 **0.39.0** is a feature release: **the roads, the higher worlds, the trade.** Schema **39**.
 
 Six things the content track had left thin, built together. *The roads:* a place on every one of
@@ -1549,9 +1571,13 @@ directory to one file, requires each check to appear before the release job and 
 and requires the release job to wait on all three.
 
 
-## Release status — v0.39.0
+## Release status — v0.40.0
 
-- Current release: v0.39.0 (schema 39): the roads, the higher worlds, the trade - a place on every
+- Current release: v0.40.0: GUI II - one message is the whole GUI: a Menu button on every panel
+  and a menu that opens hubs in place, next-step buttons under a result, long results paged in the
+  panel, a Here line in every header, Reopen on an expired panel, a grouped travel picker, pickers
+  that replace each other, and a confirm before a red button.
+- v0.39.0 (schema 39): the roads, the higher worlds, the trade - a place on every
   road (waystations with stalls, hunting grounds, ruins, shrines), two sects and a tier of goods in
   every higher world, eight secret realms opened in turn by the tick, typed play with two arguments,
   and trade between cultivators at the inn.
