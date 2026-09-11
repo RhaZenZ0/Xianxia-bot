@@ -94,7 +94,7 @@ DASHBOARD_SYSTEM_TABLES = {
     ),
     "economy": (
         "economy_markets", "economy_events", "auctions", "auction_bids", "black_market_posts",
-        "black_market_stock", "crime_records",
+        "black_market_stock", "crime_records", "trade_offers",
     ),
     "dynasties": (
         "reincarnation_state", "soul_legacy", "samsara_dynasty_history", "samsara_ancestral_leads",

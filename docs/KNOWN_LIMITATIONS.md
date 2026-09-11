@@ -42,10 +42,10 @@ database. Its findings are the first two entries.
   A muted or frozen player is blocked from the ~150 authoritative ops; raw `/v1/db` writes the
   bot makes on their behalf and the simulation runner are not intercepted. Stated in
   `moderation.go`; a stronger guarantee would need every presentation write to carry the actor.
-- **deferred (content)** — *The forty-three local auction floors share archetype prose.* Twelve
-  archetypes, four worlds; a riverside hall reads like a riverside hall in every world, with the
-  world's stones and wardens swapped in. Hand-written floors are content work for the content
-  track after rc.
+- **fixed (v1.0.0-rc.2)** — *The forty-three local auction floors share archetype prose.* Was:
+  twelve archetypes, four worlds; a riverside hall read like a riverside hall in every world. Each
+  floor now has a paragraph of its own - its river, crater, terrace or court, its broker by name, and
+  where its protection ends - and the content gate holds the forty-three apart.
 - **fixed (v0.39.0)** — *Typed play fills one argument, not two.* Was: `$ I give the pill to Qiao`
   routed to talk or use. A root may now declare several arguments, each with its own source (a
   known place, a carried item, an NPC present, a player present); `$ I give the pill to Li Feng`

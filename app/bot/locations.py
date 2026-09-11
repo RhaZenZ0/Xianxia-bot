@@ -152,3 +152,115 @@ async def local_npc_autocomplete(
     return [app_commands.Choice(name=name[:100], value=name[:100]) for name in names[:25]]
 
 
+# --- the Here line and the travel picker (v0.40.0) ---------------------------
+
+ROAD_SITE_WORDS = {"waystation": "a waystation", "hunting_ground": "a hunting ground", "ruin": "a ruin", "shrine": "a wayside shrine"}
+
+
+def _city_of_location(name: str) -> str:
+    data = WORLD.locations.get(name) or {}
+    if data.get("outside_location") and (data.get("district") or data.get("shop") or data.get("auction_house")):
+        return str(data["outside_location"])
+    return name
+
+
+def here_summary(location: str, limit: int = 180) -> str:
+    """One line on what the place you stand in is and offers, for the panel
+    header (v0.40.0). Pure: reads the catalogue only. Private places
+    (abodes, personal worlds, households) answer nothing - their own hubs
+    describe them."""
+    name = str(location or "")
+    data = WORLD.locations.get(name)
+    if not data:
+        return ""
+    people = sorted(n for n, npc in WORLD.npcs.items() if str(npc.get("location")) == name)
+    city = _city_of_location(name)
+    if data.get("road_site"):
+        leg = [str(x) for x in list(data.get("road_leg") or [])]
+        what = f"{ROAD_SITE_WORDS.get(str(data['road_site']), 'a place')} on the {' – '.join(leg)} road"
+    elif data.get("shop"):
+        shop = WORLD.shops.get(str(data["shop"])) or {}
+        what = f"inside {shop.get('name') or name}, kept by {shop.get('keeper') or 'the keeper'}, in {city}"
+    elif data.get("auction_house"):
+        what = f"the auction floor of {city}"
+    elif data.get("gate"):
+        faces = ", ".join(str(x) for x in (WORLD.locations.get(city, {}).get("gates") or {}).get(str(data["gate"]), []))
+        what = f"the {data['gate']} Gate of {city}" + (f", facing {faces}" if faces else "")
+    elif data.get("district"):
+        what = f"the {str(data['district']).replace('_', ' ')} of {city}" if data["district"] != "inn" else f"the inn of {city}"
+    elif any(str((sect.get("recruitment") or {}).get("location")) == name for sect in WORLD.sects.values()):
+        sect_name = next(s for s, sect in WORLD.sects.items() if str((sect.get("recruitment") or {}).get("location")) == name)
+        what = f"the gate of the {sect_name} · trials before its examiner"
+    else:
+        parts = sorted(n for n, d in WORLD.locations.items() if d.get("district") and str(d.get("outside_location")) == name)
+        gates = [p for p in parts if WORLD.locations[p].get("gate")]
+        districts = [p for p in parts if not WORLD.locations[p].get("gate")]
+        roads = [str(r) for r in list(data.get("roads") or [])]
+        if parts:
+            what = f"a {'capital' if data.get('realm_hub') else str(data.get('settlement_type') or 'city')} · {len(gates)} gate{'s' if len(gates) != 1 else ''}, {len(districts)} district{'s' if len(districts) != 1 else ''}"
+        elif roads:
+            what = f"{str(data.get('terrain') or 'open country')} · roads to {', '.join(roads[:3])}"
+        else:
+            what = str(data.get("terrain") or "open country")
+    if people:
+        shown = ", ".join(people[:3]) + (f" +{len(people) - 3}" if len(people) > 3 else "")
+        what += f" · {shown}"
+    return what[:limit]
+
+
+def destination_groups(current: str, known: set[str] | list[str], realm_index: int) -> list[tuple[str, str, str, int]]:
+    """The travel picker's rows (v0.40.0): (name, group, description, order).
+
+    Groups: the parts of the city you stand in; road-side sites on the
+    road you stand on or beside; the cities along the roads, by hops from
+    here; the realm capitals. Hops are counted over the catalogue's roads
+    for the label only - the engine plans the journey and its time.
+    """
+    current = str(current or "")
+    city = _city_of_location(current)
+    here = WORLD.locations.get(current) or {}
+    origin = city
+    site_leg = [str(x) for x in list(here.get("road_leg") or [])] if here.get("road_site") else []
+    hops: dict[str, int] = {}
+    starts = site_leg or [origin]
+    frontier = [(s, 1 if site_leg else 0) for s in starts]
+    for s, d in frontier:
+        hops[s] = d
+    while frontier:
+        node, dist = frontier.pop(0)
+        for road in list((WORLD.locations.get(node) or {}).get("roads") or []):
+            road = str(road)
+            if road not in hops:
+                hops[road] = dist + 1
+                frontier.append((road, dist + 1))
+    rows: list[tuple[str, str, str, int]] = []
+    for name in sorted(str(n) for n in known):
+        if name == current:
+            continue
+        data = WORLD.locations.get(name)
+        if not data or int(data.get("min_realm_index", 0)) > int(realm_index) or data.get("auction_house"):
+            continue
+        if site_leg and name in site_leg:
+            rows.append((name, "🛣️", "half a leg from here · the road's end", 5))
+        elif data.get("district") and str(data.get("outside_location")) == city:
+            kind = "inn" if data.get("district") == "inn" else ("gate" if data.get("gate") else "district")
+            rows.append((name, "🏙️", f"in this city · {kind}", 0))
+        elif data.get("shop") and str(data.get("outside_location")) == city:
+            shop = WORLD.shops.get(str(data["shop"])) or {}
+            rows.append((name, "🏪", f"in this city · {str(shop.get('kind') or 'shop').replace('_', ' ')}", 1))
+        elif data.get("road_site"):
+            leg = [str(x) for x in list(data.get("road_leg") or [])]
+            near = min((hops.get(x, 99) for x in leg), default=99)
+            where = "half a leg from here" if origin in leg or set(leg) == set(site_leg) else f"on the {' – '.join(leg)} road"
+            rows.append((name, "🛤️", f"{ROAD_SITE_WORDS.get(str(data['road_site']), 'a place')} · {where}", 10 + near))
+        elif data.get("realm_hub"):
+            n = hops.get(name)
+            rows.append((name, "🌀", f"realm capital · {n} road hop{'s' if n != 1 else ''}" if n is not None else "realm capital", 20 + (n or 50)))
+        elif name in hops:
+            n = hops[name]
+            rows.append((name, "🛣️", f"{n} road hop{'s' if n != 1 else ''} from here", 20 + n))
+        else:
+            rows.append((name, "📍", str(data.get("world") or "known place"), 90))
+    rows.sort(key=lambda r: (r[3], r[0]))
+    return rows
+

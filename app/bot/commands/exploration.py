@@ -30,7 +30,8 @@ from ..discovery import (
     travel_first_discovers_location,
 )
 from ..formatting import human_duration, roll_line
-from ..locations import location_autocomplete
+from ..hubs import HubDynamicOption, register_hub_option_provider
+from ..locations import _known_locations, destination_groups, location_autocomplete
 from ..registry import registered_group_command, registered_root_command
 from ..runtime import (
     DB,
@@ -1175,6 +1176,23 @@ async def city_rumours(interaction: discord.Interaction) -> None:
         lines.append("Nothing worth repeating has happened here lately. Make something happen.")
     for e in events:
         lines.append(f"• **{e.get('title')}** — {str(e.get('summary') or '')[:200]}")
+    # The realms (v1.0.0-rc.2): an opening is public news across the world
+    # it happened in, and the rotation's next turn is what the tellers bet on.
+    world = str(WORLD.locations.get(city, {}).get("world") or "")
+    for row in await DB.get_active_world_events():
+        if str(row.get("event_type")) != "secret_realm":
+            continue
+        where = str(row.get("location") or "")
+        if str(WORLD.locations.get(where, {}).get("world") or "") != world:
+            continue
+        lines.append(f"• 🌀 **{row.get('title')}** stands open at **{where}** — the road there is the road to a realm.")
+    try:
+        rotation = dict((await ENGINE.action("secret_realm.status", interaction.user.id, {}) or {}).get("rotation") or {})
+    except GameEngineError:
+        rotation = {}
+    next_realm = dict(WORLD.secret_realms.get(str(rotation.get("next_realm_id") or "")) or {})
+    if next_realm and str(WORLD.locations.get(str(next_realm.get("location") or ""), {}).get("world") or "") == world:
+        lines.append(f"• 🔄 The tellers say **{next_realm.get('name')}** at **{next_realm.get('location')}** is next to open, on the world tick.")
     await reply_long(interaction, "\n".join(lines))
 
 
@@ -1368,6 +1386,27 @@ async def travel(interaction: discord.Interaction, destination: str) -> None:
             result, location, previously_discovered=False
         ):
             await send_location_discovery_image(interaction, location)
+
+
+async def travel_destination_hub_options(interaction: discord.Interaction, current: str) -> list[HubDynamicOption]:
+    """The travel picker with its places grouped and labelled (v0.40.0):
+    this city's parts and shops, road-side sites, cities by road hops, the
+    capitals - the same known places the slash autocomplete offers."""
+    c = await DB.get_character(interaction.user.id)
+    if not c:
+        return []
+    known = await _known_locations(interaction.user.id, c)
+    needle = str(current or "").casefold().strip()
+    rows = destination_groups(str(c.get("location") or ""), known, int(c.get("realm_index", 0)))
+    out = []
+    for name, emoji, description, _order in rows:
+        if needle and needle not in name.casefold():
+            continue
+        out.append(HubDynamicOption(label=name[:100], value=name[:100], description=description[:100], emoji=emoji))
+    return out[:25]
+
+
+register_hub_option_provider(travel, "destination", travel_destination_hub_options)
 
 
 @registered_group_command(travel_group, name="status", description="Show your destination and a live countdown while you are traveling")

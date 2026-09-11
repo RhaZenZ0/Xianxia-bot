@@ -1,4 +1,4 @@
-# Xianxia RP Discord Bot v0.39.0
+# Xianxia RP Discord Bot v1.0.0
 
 [![CI](https://github.com/RhaZenZ0/Xianxia-bot/actions/workflows/ci.yml/badge.svg)](https://github.com/RhaZenZ0/Xianxia-bot/actions/workflows/ci.yml)
 
@@ -244,10 +244,14 @@ for a browser, mean for an attacker.
 `/menu` opens one panel that lists every hub; `/me` opens the player dashboard. Each hub — character,
 cultivation, world, travel, craft, realm, items, combat, economy, inner world, beast, abode, family,
 quest, sect, NPC — is a live panel with one visible, tappable row per action, guided inputs for
-every parameter (every id has a picker), owner locking and a refresh. A short plain result is
-shown inside the panel, in a result block above the actions, and Refresh clears it; an embed, a
-reply with its own buttons, a file or a long reply lands beside the panel, which stays live
-underneath. Battles and events have their own in-place panels.
+every parameter (every id has a picker), owner locking and a refresh. One message is the whole GUI
+(v0.40.0): every panel's Menu button swaps it into the menu in place and the menu opens any hub in
+the same message. A plain result is shown inside the panel, in a result block above the actions,
+paged when long, with the next steps it names as buttons under it; Refresh clears it. An embed, a
+reply with its own buttons or a file lands beside the panel, which stays live underneath. The
+header carries a Here line saying what the place you stand in is and who is about; a chain of
+pickers is one message that changes; a red button asks once before it runs; a panel that goes quiet
+for fifteen minutes keeps a Reopen button. Battles and events have their own in-place panels.
 
 ### Typed play
 
@@ -307,7 +311,7 @@ joined by roads with travel time, danger and encounters, and a place on every ro
   **Inn** (who is in town, which merchants are at the corner table, and the inn's common-room
   thread). Every trade moves the city's prosperity, and prosperity shows on the shelves and at the gate.
 - **Auction houses.** Every city has one, entered through its warded door; a capital's is grand,
-  a smaller city's a local floor. Each grand house has a live Discord channel and a world's local
+  a smaller city's a local floor with a paragraph of its own. Each grand house has a live Discord channel and a world's local
   floors share one, where lots are posted, bid on and struck as it happens.
 - **Travelling merchants.** Eight, two a world, each a named NPC walking a fixed loop of cities and
   sitting at the inn when in town. They keep a shop of their own, buy what an auction floor could not
@@ -443,7 +447,7 @@ release; it never installs anything. On the NAS:
 - If narration goes flat after an image rebuild, check **/admin → Server → Ai Status** for a TLS
   banner first. If SQLite reports contention, verify only the engine opens the database.
 
-Keep the whole `data/` directory persistent across rebuilds. The current schema is **38**; every
+Keep the whole `data/` directory persistent across rebuilds. The current schema is **39**; every
 historical migration is kept so an old database upgrades in place.
 
 ## Development

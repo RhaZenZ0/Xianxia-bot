@@ -428,9 +428,14 @@ async def run(url: str, token: str, db_path: str) -> Report:
     report.add("PASS" if len(sites) >= 50 else "FAIL", "a site on every road", f"{len(sites)} sites")
     shrine = next((n for n, l in sites.items() if l["road_site"] == "shrine" and set(l["road_leg"]) == {"Greenriver Town", "Riverguard City"}), "")
     await step(report, "teleport to Greenriver Town", gm("admin.player.teleport", {"user_id": PLAYER, "location": "Greenriver Town", "reason": "playtest"}))
+    # Exploring Greenriver earlier in the run may already have turned the
+    # shrine up (a road-side site is on the explore frontier too, one roll in
+    # two); walking the road finds it only if it is still unknown.
+    known_before = bool(await db.has_discovered_location(PLAYER, shrine)) if shrine else False
     walked = await step(report, "exploration.travel Greenriver -> Riverguard finds the shrine", act("exploration.travel", PLAYER, {"destination": "Riverguard City", "mode": "known"}))
     found_sites = [str(r.get("name")) for r in list((walked or {}).get("road_sites_found") or [])]
-    report.add("PASS" if shrine and shrine in found_sites else "FAIL", "the shrine on the road is found by walking it", ", ".join(found_sites) or "nothing found")
+    report.add("PASS" if shrine and (shrine in found_sites or known_before) else "FAIL", "the shrine on the road is found by walking it",
+               ", ".join(found_sites) or ("found earlier by exploring" if known_before else "nothing found"))
     await step(report, "advance time to arrive", gm("admin.world.advance_time", {"minutes": int((walked or {}).get("travel_minutes") or 0) + 5, "reason": "playtest"}))
     if shrine:
         hop = await step(report, "exploration.travel to the shrine (half a leg)", act("exploration.travel", PLAYER, {"destination": shrine, "mode": "known"}))
@@ -470,6 +475,13 @@ async def run(url: str, token: str, db_path: str) -> Report:
             inv = dict(await db.get_inventory(BUYER) or {})
             report.add("PASS" if int(inv.get("spirit_herb", 0)) >= 1 else "FAIL", "the herb changed hands", f"buyer carries {inv.get('spirit_herb', 0)}")
             await step(report, "a struck offer cannot be struck twice", act("trade.accept", BUYER, {"offer_id": offer_id}), expect_error="accepted")
+    # rc.2: a fresh offer can be voided from the dashboard's action, audited.
+    if inn:
+        voidable = await step(report, "trade.offer (to be voided)", act("trade.offer", PLAYER, {"to_user_id": BUYER, "give_stones": 1}))
+        if voidable and int(voidable.get("offer_id") or 0):
+            voided = await step(report, "admin.trade.void", gm("admin.trade.void", {"offer_id": int(voidable["offer_id"]), "reason": "playtest"}))
+            report.add("PASS" if voided and str(voided.get("status")) == "voided" else "FAIL", "the offer is voided", f"status={(voided or {}).get('status')}")
+            await step(report, "a voided offer cannot be accepted", act("trade.accept", BUYER, {"offer_id": int(voidable["offer_id"])}), expect_error="voided")
     # The rotation opens a realm on the tick.
     await step(report, "the rotation opens the first realm", engine.run_due_simulation(await clock(), {"maintenance_cleanup": True, "secret_realms": True}))
     open_realms = await step(report, "active world events", db.get_active_world_events())
@@ -478,6 +490,9 @@ async def run(url: str, token: str, db_path: str) -> Report:
         report.add("PASS" if names else "FAIL", "a secret realm is open somewhere", ", ".join(names) or "none")
     realms = dict(world.get("secret_realms") or {})
     report.add("PASS" if len(realms) >= 8 else "FAIL", "eight realms on the rotation", f"{len(realms)} realms")
+    status = await step(report, "secret_realm.status carries the rotation", engine.action("secret_realm.status", PLAYER, {}))
+    rotation = dict((status or {}).get("rotation") or {})
+    report.add("PASS" if rotation.get("next_realm_id") in realms else "FAIL", "the next realm is named", f"next={rotation.get('next_realm_id')} last={rotation.get('last_realm_id')}")
     # The higher worlds: sects and goods.
     sects_by_world: dict[str, list[str]] = {}
     for sect_name, sect in dict(world.get("sects") or {}).items():

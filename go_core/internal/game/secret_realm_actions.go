@@ -79,6 +79,15 @@ func secretRealmStatusQuery(conn *storage.Conn, catalog worlddata.Catalog, userI
 		available = append(available, map[string]any{"event_key": fmt.Sprint(row[0]), "title": fmt.Sprint(row[1]), "realm_id": rid, "realm": realm, "ends_at": float64Value(row[3]), "thread_id": row[4]})
 	}
 	out["available"] = available
+	// The rotation (v1.0.0-rc.2): which realm opened last and which is
+	// next, so a player can be standing at the ruin when it does.
+	gm, gmErr := canonicalWorldGameMinute(conn)
+	if gmErr != nil {
+		gm = 0
+	}
+	if rotation, rotErr := SecretRealmRotationView(conn, catalog, gm); rotErr == nil {
+		out["rotation"] = rotation
+	}
 	return out, nil
 }
 

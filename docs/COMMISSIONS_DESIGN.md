@@ -1,4 +1,4 @@
-# Commissions and typed play — design
+# Commissions and typed play — design (shipped)
 
 Written at v0.21.0 (2026-09-06), against the tree as it is. Intended path:
 `docs/COMMISSIONS_DESIGN.md`, beside `docs/ROADMAP_1_0.md`. Every path and
@@ -13,7 +13,10 @@ claim about it may not.
 > but nothing writes a personal commission yet. See
 > `docs/history/V022_RELEASE_NOTES.md`. Sections below describing invention are
 > therefore still design, not code; everything else describes what is in the
-> tree.
+> tree. **Marked shipped at v1.0.0-rc.1:** commissions have been in production
+> since v0.22.0 and a board in every city and sect since v0.38.0/v0.39.0;
+> seeded invention stays deferred past 1.0 (`docs/KNOWN_LIMITATIONS.md`). Typed
+> play took a second argument in v0.39.0.
 
 ## What a commission is
 

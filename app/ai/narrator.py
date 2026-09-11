@@ -7,7 +7,7 @@ import time
 from typing import Any
 
 from .ai_router import AITaskRouter, NarrationTier
-from ..rules.narration_pool import narration_tier, procedural_narration
+from ..rules.narration_pool import exploration_kind, narration_tier, procedural_narration
 from ..rules.game import World
 from ..rules.sect import TERMINOLOGY_PROMPT
 from ..rules.npc_memory import format_memories
@@ -570,7 +570,7 @@ class Narrator:
         result, or the GM's ai_routine_narration flag.
         """
         fallback = self._pool(
-            "exploration", character, (str(character.get("location")), encounter),
+            exploration_kind(self._world_data, character.get("location")), character, (str(character.get("location")), encounter),
             f"{encounter}\n\nNothing else commits itself to motion yet. The encounter remains unresolved, "
             "with its next turn depending on the cultivator's response.",
             encounter=encounter, location=str(character.get("location") or "this place"),

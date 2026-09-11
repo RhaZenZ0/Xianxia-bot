@@ -63,7 +63,18 @@ from .commands.secretrealm import secret_group, secret_status
 from .commands.sect import sect_group
 from .commands import sense as _commands_sense  # noqa: F401  (registers its root commands on import)
 from .commands.territory import caravan_group, party_group, party_status, territory_group, war_group, war_status
-from .hubs import HubDefinition, HubPage, HubStatusField, _hub_icon, register_hubs, send_hub
+from .hubs import (
+    LAYOUT_COMPONENTS_AVAILABLE,
+    HubDefinition,
+    HubPage,
+    HubStatusField,
+    _hub_icon,
+    open_hub_in_place,
+    register_hubs,
+    register_menu_builder,
+    send_hub,
+)
+from .locations import here_summary
 from .registry import ACTIONS, EVENT_HANDLERS, registered_root_command
 from .runtime import DB, WORLD, character_location_display, log
 from .services import GUILD, SIM
@@ -380,7 +391,15 @@ async def _player_hub_status(interaction: discord.Interaction) -> list[HubStatus
             f"**{(await character_location_display(character))[:180]}**",
             inline=False,
         ),
+        *_here_field(character),
     ]
+
+
+def _here_field(character: dict) -> list[HubStatusField]:
+    """The Here line (v0.40.0): what the place is and offers, and who is
+    about - the context a player checked with City → Look before every action."""
+    summary = here_summary(str(character.get("location") or ""))
+    return [HubStatusField("🧭 Here", summary, inline=False)] if summary else []
 
 
 async def _economy_hub_status(interaction: discord.Interaction) -> list[HubStatusField]:
@@ -402,6 +421,7 @@ async def _economy_hub_status(interaction: discord.Interaction) -> list[HubStatu
     return [
         HubStatusField("🪙 Spirit Stones", f"**{int(character.get('spirit_stones', 0) or 0):,}**"),
         HubStatusField("📍 Location", f"**{(await character_location_display(character))[:180]}**", inline=False),
+        *_here_field(character),
         HubStatusField("💹 Local Market", market_signal, inline=False),
     ]
 
@@ -456,15 +476,36 @@ _ADMIN_HUB_DEFINITION = HubDefinition(
 )
 
 
-class MenuView(discord.ui.View):
+_MenuBase = discord.ui.LayoutView if LAYOUT_COMPONENTS_AVAILABLE else discord.ui.View
+
+
+class MenuView(_MenuBase):
     """The one door (v0.33.1): a select listing every hub, Admin included for
     an administrator. Picking one opens that hub exactly as its own slash
-    command does; the sixteen hub commands remain beside it."""
+    command does; the sixteen hub commands remain beside it.
 
-    def __init__(self, *, owner_id: int, is_admin: bool) -> None:
-        super().__init__(timeout=300)
+    Since v0.40.0 the menu is a panel of the same kind as the hubs, so a hub
+    swaps into it in place (its Menu button) and it swaps into a hub in
+    place (the select): one message is the whole GUI. Where the layout is
+    not available it is the classic select under a line of text."""
+
+    is_layout_hub = False
+
+    def __init__(self, *, owner_id: int, is_admin: bool, owner_name: str = "Cultivator") -> None:
+        super().__init__(timeout=900)
         self.owner_id = int(owner_id)
-        self.add_item(MenuSelect(is_admin=is_admin))
+        self.owner_name = str(owner_name)[:80]
+        self.message: discord.Message | None = None
+        select = MenuSelect(is_admin=is_admin)
+        if LAYOUT_COMPONENTS_AVAILABLE:
+            container = discord.ui.Container(accent_colour=0x5865F2)
+            container.add_item(discord.ui.TextDisplay(f"## 🧭 Xianxia RP — Main Menu\n-# {self.owner_name}\nPick a hub below. It opens here, in this message; every hub's Menu button brings you back."))
+            row = discord.ui.ActionRow()
+            row.add_item(select)
+            container.add_item(row)
+            self.add_item(container)
+        else:
+            self.add_item(select)
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if int(interaction.user.id) != self.owner_id:
@@ -493,11 +534,20 @@ class MenuSelect(discord.ui.Select):
 
     async def callback(self, interaction: discord.Interaction) -> None:
         choice = str(self.values[0])
+        in_place = LAYOUT_COMPONENTS_AVAILABLE and getattr(self.view, "is_layout_hub", None) is False and getattr(interaction, "message", None) is not None
         if choice == "admin":
+            if in_place:
+                if not await require_admin(interaction):
+                    return
+                await open_hub_in_place(interaction, _ADMIN_HUB_DEFINITION, _admin_hub_status)
+                return
             await admin_panel.callback(interaction)
             return
         definition = _HUB_BY_NAME[choice]
         provider = _economy_hub_status if definition.name == "economy" else _player_hub_status
+        if in_place:
+            await open_hub_in_place(interaction, definition, provider)
+            return
         await send_hub(interaction, definition, status_provider=provider)
 
 
@@ -509,10 +559,19 @@ class MenuSelect(discord.ui.Select):
 async def menu(interaction: discord.Interaction) -> None:
     member = interaction.user
     is_admin = isinstance(member, discord.Member) and member.guild_permissions.administrator
-    lines = ["🧭 **Xianxia RP — Main Menu**", "Pick a hub below. Each opens the same panel as its own slash command."]
-    await interaction.response.send_message(
-        "\n".join(lines), view=MenuView(owner_id=member.id, is_admin=bool(is_admin)), ephemeral=False,
-    )
+    view = MenuView(owner_id=member.id, is_admin=bool(is_admin), owner_name=getattr(member, "display_name", str(member)))
+    if LAYOUT_COMPONENTS_AVAILABLE:
+        await interaction.response.send_message(view=view, ephemeral=False)
+    else:
+        lines = ["🧭 **Xianxia RP — Main Menu**", "Pick a hub below. Each opens the same panel as its own slash command."]
+        await interaction.response.send_message("\n".join(lines), view=view, ephemeral=False)
+    try:
+        view.message = await interaction.original_response()
+    except discord.HTTPException:
+        view.message = None
+
+
+register_menu_builder(lambda owner_id, is_admin, owner_name: MenuView(owner_id=owner_id, is_admin=is_admin, owner_name=owner_name))
 
 
 register_hubs(*_HUB_DEFINITIONS, _ADMIN_HUB_DEFINITION)

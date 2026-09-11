@@ -141,6 +141,14 @@ class CommandCleanupTests(unittest.TestCase):
             # on every mis-click - a real privacy leak this release fixes.
             "LayoutHubView",
             "CommandHubView",
+            # v0.40.0: _step_reply is the one door every input step goes
+            # through (a picker, a confirm) - a step the acting player is in
+            # the middle of, as _present_input_step above. The Menu button's
+            # "open the menu with /menu" fallback and the expired panel's
+            # owner check are the same plumbing as the interaction_checks.
+            "_step_reply",
+            "HubLayoutMenuButton",
+            "ExpiredPanelView",
         }
         violations = []
 
