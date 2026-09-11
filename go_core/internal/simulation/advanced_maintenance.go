@@ -135,6 +135,12 @@ func (r *Runner) advancedMaintenance(conn *storage.Conn, gm int64, automation ma
 		if err != nil {
 			return Run{}, false, err
 		}
+		// ...and bid on the open lots (v0.37.0), after settlement so a lot
+		// struck this tick is not bid on.
+		counts["merchant_bids"], err = game.MerchantsBid(conn, r.World, gm)
+		if err != nil {
+			return Run{}, false, err
+		}
 	}
 	counts["hunters_spawned"], err = r.spawnHunters(conn, gm)
 	if err != nil {
@@ -195,7 +201,7 @@ func (r *Runner) advancedMaintenance(conn *storage.Conn, gm int64, automation ma
 	if !changed {
 		return Run{}, false, nil
 	}
-	summary := fmt.Sprintf("auctions=%d merchants=%d hunters_spawned=%d hunters_updated=%d wars=%d occupations=%d caravans=%d seclusions=%d commissions_expired=%d moderations_expired=%d era_changed=%t", counts["auctions"], counts["merchants"], counts["hunters_spawned"], counts["hunters_updated"], counts["wars"], counts["occupations"], counts["caravans"], counts["seclusions"], counts["commissions_expired"], counts["moderations_expired"], eraChanged)
+	summary := fmt.Sprintf("auctions=%d merchants=%d merchant_bids=%d hunters_spawned=%d hunters_updated=%d wars=%d occupations=%d caravans=%d seclusions=%d commissions_expired=%d moderations_expired=%d era_changed=%t", counts["auctions"], counts["merchants"], counts["merchant_bids"], counts["hunters_spawned"], counts["hunters_updated"], counts["wars"], counts["occupations"], counts["caravans"], counts["seclusions"], counts["commissions_expired"], counts["moderations_expired"], eraChanged)
 	return Run{System: "advanced_world", DueSteps: 1, AppliedSteps: 1, Summary: summary}, true, nil
 }
 
@@ -232,12 +238,19 @@ func (r *Runner) finalizeAuctions(conn *storage.Conn, gm int64) (int64, error) {
 				}
 			}
 		} else {
-			// No bidder: a travelling merchant whose loop passes this city
-			// may take the lot at its starting bid (v0.34.1); otherwise it
-			// goes back to the seller.
-			_, bought, err := game.MerchantBuysUnsoldLot(conn, r.World, a, gm)
+			// No player bidder: the merchant holding the high bid wins it
+			// (v0.37.0); failing that, a merchant whose loop passes this
+			// city may take the lot at its starting bid (v0.34.1); otherwise
+			// it goes back to the seller.
+			_, bought, err := game.MerchantWinsLot(conn, r.World, a, gm)
 			if err != nil {
 				return 0, err
+			}
+			if !bought {
+				_, bought, err = game.MerchantBuysUnsoldLot(conn, r.World, a, gm)
+				if err != nil {
+					return 0, err
+				}
 			}
 			if !bought {
 				if _, err = conn.Execute(`INSERT INTO inventory(user_id,item_id,quantity) VALUES(?,?,?) ON CONFLICT(user_id,item_id) DO UPDATE SET quantity=inventory.quantity+excluded.quantity`, []any{i64(a["seller_user_id"]), fmt.Sprint(a["item_id"]), i64(a["quantity"])}); err != nil {

@@ -40,6 +40,8 @@ func setupMerchantDB(t *testing.T) string {
 	defer conn.Close()
 	if err := conn.ExecScript(merchantTestTables + `
 ALTER TABLE auctions ADD COLUMN merchant_buyer TEXT NOT NULL DEFAULT '';
+ALTER TABLE auctions ADD COLUMN merchant_bidder TEXT NOT NULL DEFAULT '';
+CREATE TABLE IF NOT EXISTS auction_bids(bid_id INTEGER PRIMARY KEY AUTOINCREMENT, auction_id INTEGER NOT NULL, bidder_user_id INTEGER NOT NULL, amount INTEGER NOT NULL, created_at REAL NOT NULL DEFAULT 0);
 INSERT INTO npc_civilization_state VALUES('Old Hu the Peddler','Greenriver Town','Greenriver Town','Mortal World',0);
 `); err != nil {
 		t.Fatal(err)
@@ -389,4 +391,101 @@ func TestAMerchantsOwnShopIsStockedAtSeedAndRestockedAtHome(t *testing.T) {
 		return
 	}
 	t.Fatal("Old Hu missing from status")
+}
+
+// Merchants bid (v0.37.0): on the tick a merchant bids the next minimum on
+// a lot it values, its purse paying as escrow; a player who outbids it gets
+// the purse refunded to it, and a merchant left holding the high bid at the
+// close wins the lot.
+func TestAMerchantBidsOnALotItValuesAndIsRefundedWhenOutbid(t *testing.T) {
+	path := setupMerchantDB(t)
+	world := batch4WorldPath(t)
+	catalog := merchantCatalog(t)
+	batch4SetCanonicalGameMinute(t, path, 2000)
+	// A spirit-iron sword (sect value 8) on the Golden Pavilion floor, an
+	// hour to run, starting at 3.
+	batch4Exec(t, path, `INSERT INTO auctions(auction_id,house_id,seller_user_id,item_id,quantity,currency_id,starting_bid,current_bid,current_bidder_user_id,active,created_at,ends_at) VALUES(9,'golden_pavilion',43,'spirit_iron_sword',1,'low_spirit_stone',3,0,NULL,1,0,?)`, nowSeconds()+3600)
+	var placed int64
+	withMerchantConn(t, path, func(conn *storage.Conn) {
+		var err error
+		placed, err = MerchantsBid(conn, catalog, 2000)
+		if err != nil {
+			t.Fatal(err)
+		}
+	})
+	if placed != 1 {
+		t.Fatalf("bids placed=%d want 1", placed)
+	}
+	bidder := fmt.Sprint(actionScalar(t, path, `SELECT merchant_bidder FROM auctions WHERE auction_id=9`))
+	if bidder == "" || bidder == "<nil>" {
+		t.Fatal("no merchant bid")
+	}
+	if got := escrowScalar(t, path, `SELECT current_bid FROM auctions WHERE auction_id=9`); got != 3 {
+		t.Fatalf("current_bid=%d want the starting bid 3", got)
+	}
+	budget := catalog.Merchants[bidder].Budget
+	if got := escrowScalar(t, path, `SELECT budget FROM merchant_state WHERE merchant=?`, bidder); got != budget-3 {
+		t.Fatalf("budget=%d want %d (escrowed)", got, budget-3)
+	}
+	// The same tick does not bid twice; the next tick raises no further while
+	// the merchant already holds the lot (a rival could, at the next minimum).
+	withMerchantConn(t, path, func(conn *storage.Conn) {
+		placed, _ = MerchantsBid(conn, catalog, 2001)
+	})
+	if got := fmt.Sprint(actionScalar(t, path, `SELECT merchant_bidder FROM auctions WHERE auction_id=9`)); got == bidder && placed > 0 {
+		t.Fatalf("the holder bid against itself: placed=%d", placed)
+	}
+	// A player outbids: the merchant's purse is refunded and it is cleared.
+	current := escrowScalar(t, path, `SELECT current_bid FROM auctions WHERE auction_id=9`)
+	holder := fmt.Sprint(actionScalar(t, path, `SELECT merchant_bidder FROM auctions WHERE auction_id=9`))
+	holderBudget := escrowScalar(t, path, `SELECT budget FROM merchant_state WHERE merchant=?`, holder)
+	batch4Exec(t, path, `UPDATE characters SET location='Golden Pavilion Auction House' WHERE user_id=42`)
+	batch4Exec(t, path, `INSERT INTO currency_wallets(user_id,currency_id,balance) VALUES(42,'low_spirit_stone',100)`)
+	raw, _ := json.Marshal(map[string]any{"auction_id": 9, "amount": current + 10})
+	if _, err := ApplyWithWorld(path, world, ActionRequest{APIVersion: authoritativeAPIVersion, ActionID: "outbid-merchant", Operation: "auction.bid", ActorID: 42, Payload: raw}); err != nil {
+		t.Fatal(err)
+	}
+	if got := fmt.Sprint(actionScalar(t, path, `SELECT merchant_bidder FROM auctions WHERE auction_id=9`)); got != "" {
+		t.Fatalf("merchant_bidder after a player outbid=%q", got)
+	}
+	if got := escrowScalar(t, path, `SELECT budget FROM merchant_state WHERE merchant=?`, holder); got != holderBudget+current {
+		t.Fatalf("holder budget=%d want %d refunded", got, holderBudget+current)
+	}
+	// A merchant never pays above its valuation: at 8 (the sword's value)
+	// the next minimum is 9, so no bid is placed.
+	withMerchantConn(t, path, func(conn *storage.Conn) {
+		placed, _ = MerchantsBid(conn, catalog, 2002)
+	})
+	if placed != 0 {
+		t.Fatalf("a merchant bid above its valuation: %d", placed)
+	}
+}
+
+func TestAMerchantHoldingTheHighBidWinsTheLot(t *testing.T) {
+	path := setupMerchantDB(t)
+	catalog := merchantCatalog(t)
+	batch4Exec(t, path, `INSERT INTO merchant_state(merchant,location,destination,dwell_until_game_minute,budget,route_index) VALUES('old_hu_the_peddler','Greenriver Town','',9000,390,0)`)
+	batch4Exec(t, path, `INSERT INTO auctions(auction_id,house_id,seller_user_id,item_id,quantity,currency_id,starting_bid,current_bid,current_bidder_user_id,merchant_bidder,active,created_at,ends_at) VALUES(10,'golden_pavilion',43,'bone_comb',1,'low_spirit_stone',5,10,NULL,'old_hu_the_peddler',1,0,0)`)
+	withMerchantConn(t, path, func(conn *storage.Conn) {
+		res, _ := conn.Execute(`SELECT * FROM auctions WHERE auction_id=10`, nil)
+		key, won, err := MerchantWinsLot(conn, catalog, firstRowMap(res), 3000)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !won || key != "old_hu_the_peddler" {
+			t.Fatalf("won=%v key=%q", won, key)
+		}
+	})
+	if got := escrowScalar(t, path, `SELECT balance FROM currency_wallets WHERE user_id=43 AND currency_id='low_spirit_stone'`); got != 10 {
+		t.Fatalf("seller paid %d want the hammer price 10", got)
+	}
+	if got := escrowScalar(t, path, `SELECT budget FROM merchant_state WHERE merchant='old_hu_the_peddler'`); got != 390 {
+		t.Fatalf("budget=%d: the purse paid at bidding time and must not pay twice", got)
+	}
+	if got := escrowScalar(t, path, `SELECT quantity FROM merchant_stock WHERE merchant='old_hu_the_peddler' AND item_id='bone_comb'`); got != 1 {
+		t.Fatalf("pack=%d want 1", got)
+	}
+	if got := fmt.Sprint(actionScalar(t, path, `SELECT merchant_buyer||'|'||merchant_bidder FROM auctions WHERE auction_id=10`)); got != "old_hu_the_peddler|" {
+		t.Fatalf("lot record=%q", got)
+	}
 }

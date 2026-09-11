@@ -39,6 +39,11 @@ async def lot_embed(house_id: str, lot: dict[str, Any], *, state: str = "open") 
     bidder_id = lot.get("current_bidder_user_id")
     anonymous = bool(lot.get("anonymous"))
     bidder = "Anonymous" if anonymous and bidder_id else await _name(bidder_id)
+    if not bidder_id and str(lot.get("merchant_bidder") or ""):
+        # v0.37.0: a travelling merchant holds the high bid; its purse is
+        # the escrow, and a player who outbids it sees it refunded.
+        holder = dict(WORLD.merchants.get(str(lot.get("merchant_bidder"))) or {})
+        bidder = f"{holder.get('name') or lot.get('merchant_bidder')} (travelling merchant)"
     merchant_key = str(lot.get("merchant_buyer") or "")
     if merchant_key:
         # v0.34.1: no bidder reached the reserve, but a travelling merchant
@@ -138,6 +143,10 @@ async def settle_lots(guild: discord.Guild | None) -> int:
             await DB.forget_auction_lot_message(int(record["auction_id"]))
             continue
         if int(lot.get("active") or 0):
+            if str(lot.get("merchant_bidder") or ""):
+                # A merchant bid on the tick, not through a command, so the
+                # card learns of it here.
+                await _edit_card(guild, record, lot, state="open")
             continue
         struck = (lot.get("current_bidder_user_id") or lot.get("merchant_buyer")) and int(lot.get("current_bid") or 0) > 0
         state = "sold" if struck else "unsold"

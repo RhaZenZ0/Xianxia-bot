@@ -244,6 +244,8 @@ async def auction_browse(interaction:discord.Interaction)->None:
         bidder="Anonymous" if lot.get('anonymous') and lot.get('current_bidder_user_id') else "None"
         if lot.get('current_bidder_user_id') and not lot.get('anonymous'):
             bidder_c=await DB.get_character(int(lot['current_bidder_user_id'])); bidder=bidder_c['name'] if bidder_c else 'Unknown'
+        elif not lot.get('current_bidder_user_id') and str(lot.get('merchant_bidder') or ''):
+            bidder=f"{(WORLD.merchants.get(str(lot['merchant_bidder'])) or {}).get('name') or lot['merchant_bidder']} (travelling merchant)"
         lines.append(
             f"\n`#{lot['auction_id']}` **{item_name} x{lot['quantity']}**\n"
             f"Current: **{bid or 'No bids'} {WORLD.currency_name(str(lot['currency_id']))}** • next minimum **{minimum}**\n"

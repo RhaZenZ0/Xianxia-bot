@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 
@@ -276,6 +277,78 @@ func merchantResalePrice(catalog worlddata.Catalog, m worlddata.Merchant, itemID
 	return max64(1, price)
 }
 
+// merchantLotCity is the city whose floor a lot is on.
+func merchantLotCity(catalog worlddata.Catalog, auction map[string]any) (string, bool) {
+	house, found := catalog.AuctionHouses[fmt.Sprint(auction["house_id"])]
+	if !found {
+		return "", false
+	}
+	if house.EntranceLocation != "" {
+		return house.EntranceLocation, true
+	}
+	return house.Location, true
+}
+
+// pickMerchantForLot is the merchant a floor deals with: the one standing in
+// the city first, otherwise the first (by key) whose loop passes through,
+// dealing through an agent. It must trade in the lot's currency, have the
+// purse for the price, and not be excluded.
+func pickMerchantForLot(conn *storage.Conn, catalog worlddata.Catalog, city, currency string, price int64, exclude string, gm int64, now float64) (string, merchantState, error) {
+	for pass := 0; pass < 2; pass++ {
+		for _, key := range merchantKeys(catalog) {
+			m := catalog.Merchants[key]
+			if key == exclude || m.Currency != currency || !merchantRouteHas(m, city) {
+				continue
+			}
+			state, err := ensureMerchantState(conn, catalog, key, gm, now)
+			if err != nil {
+				return "", merchantState{}, err
+			}
+			if state.Budget < price {
+				continue
+			}
+			if pass == 0 && (state.Location != city || state.Destination != "") {
+				continue
+			}
+			return key, state, nil
+		}
+	}
+	return "", merchantState{}, nil
+}
+
+// merchantTakesLotTx settles a lot into a merchant's pack: the seller is
+// paid the price, the purse pays it unless it already did at bidding time,
+// the goods go into the pack at the resale price, and the lot records who
+// took it.
+func merchantTakesLotTx(conn *storage.Conn, catalog worlddata.Catalog, key string, state merchantState, auction map[string]any, price int64, alreadyPaid bool, gm int64, now float64) error {
+	m := catalog.Merchants[key]
+	currency := strings.TrimSpace(fmt.Sprint(auction["currency_id"]))
+	quantity := max64(1, i64(auction["quantity"]))
+	itemID := fmt.Sprint(auction["item_id"])
+	if _, err := walletDeltaTx(conn, i64(auction["seller_user_id"]), currency, price, now); err != nil {
+		return err
+	}
+	if !alreadyPaid {
+		state.Budget -= price
+		if err := writeMerchantState(conn, state, now); err != nil {
+			return err
+		}
+	}
+	unitCost := (price + quantity - 1) / quantity
+	resale := merchantResalePrice(catalog, m, itemID, unitCost)
+	if ware, ok := merchantWare(m, itemID); ok {
+		// The shop's own line keeps the shop's price.
+		resale = max64(1, ware.Price)
+	}
+	if _, err := conn.Execute(`INSERT INTO merchant_stock(merchant,item_id,quantity,cost,price,acquired_game_minute,updated_at) VALUES(?,?,?,?,?,?,?)
+		ON CONFLICT(merchant,item_id) DO UPDATE SET quantity=merchant_stock.quantity+excluded.quantity,cost=excluded.cost,price=excluded.price,acquired_game_minute=excluded.acquired_game_minute,updated_at=excluded.updated_at`,
+		[]any{key, itemID, quantity, unitCost, resale, gm, now}); err != nil {
+		return err
+	}
+	_, err := conn.Execute(`UPDATE auctions SET merchant_buyer=?,merchant_bidder='',current_bid=? WHERE auction_id=?`, []any{key, price, i64(auction["auction_id"])})
+	return err
+}
+
 // MerchantBuysUnsoldLot is the auction floor's last bidder. When a lot ends
 // with no bid, a merchant whose loop passes the house's city and whose purse
 // covers the starting bid takes it at that price: the seller is paid, the
@@ -287,69 +360,174 @@ func MerchantBuysUnsoldLot(conn *storage.Conn, catalog worlddata.Catalog, auctio
 	if err != nil || !ok {
 		return "", false, err
 	}
-	house, found := catalog.AuctionHouses[fmt.Sprint(auction["house_id"])]
+	city, found := merchantLotCity(catalog, auction)
 	if !found {
 		return "", false, nil
 	}
-	city := house.EntranceLocation
-	if city == "" {
-		city = house.Location
-	}
-	currency := strings.TrimSpace(fmt.Sprint(auction["currency_id"]))
-	price := max64(1, i64(auction["starting_bid"]))
-	quantity := max64(1, i64(auction["quantity"]))
-	itemID := fmt.Sprint(auction["item_id"])
 	now := nowSeconds()
-	// The merchant standing in the city takes it first; otherwise the first
-	// (by key) whose loop passes through, buying through an agent.
-	var chosen string
-	var chosenState merchantState
-	for pass := 0; pass < 2 && chosen == ""; pass++ {
-		for _, key := range merchantKeys(catalog) {
-			m := catalog.Merchants[key]
-			if m.Currency != currency || !merchantRouteHas(m, city) {
-				continue
-			}
-			state, err := ensureMerchantState(conn, catalog, key, gm, now)
-			if err != nil {
-				return "", false, err
-			}
-			if state.Budget < price {
-				continue
-			}
-			if pass == 0 && (state.Location != city || state.Destination != "") {
-				continue
-			}
-			chosen, chosenState = key, state
-			break
-		}
+	price := max64(1, i64(auction["starting_bid"]))
+	key, state, err := pickMerchantForLot(conn, catalog, city, strings.TrimSpace(fmt.Sprint(auction["currency_id"])), price, "", gm, now)
+	if err != nil || key == "" {
+		return "", false, err
 	}
-	if chosen == "" {
+	if err := merchantTakesLotTx(conn, catalog, key, state, auction, price, false, gm, now); err != nil {
+		return "", false, err
+	}
+	return key, true, nil
+}
+
+// MerchantWinsLot settles a lot whose high bidder is a merchant (v0.37.0):
+// its purse paid at bidding time, so the seller is paid and the goods go
+// into the pack. It returns the merchant key and true when that happened.
+func MerchantWinsLot(conn *storage.Conn, catalog worlddata.Catalog, auction map[string]any, gm int64) (string, bool, error) {
+	key := strings.TrimSpace(fmt.Sprint(auction["merchant_bidder"]))
+	if key == "" || key == "<nil>" || i64(auction["current_bidder_user_id"]) > 0 {
 		return "", false, nil
 	}
-	m := catalog.Merchants[chosen]
-	if _, err := walletDeltaTx(conn, i64(auction["seller_user_id"]), currency, price, now); err != nil {
+	ok, err := merchantTablesExist(conn)
+	if err != nil || !ok {
 		return "", false, err
 	}
-	chosenState.Budget -= price
-	if err := writeMerchantState(conn, chosenState, now); err != nil {
+	if _, found := catalog.Merchants[key]; !found {
+		return "", false, nil
+	}
+	now := nowSeconds()
+	state, err := ensureMerchantState(conn, catalog, key, gm, now)
+	if err != nil {
 		return "", false, err
 	}
-	unitCost := (price + quantity - 1) / quantity
-	resale := merchantResalePrice(catalog, m, itemID, unitCost)
+	if err := merchantTakesLotTx(conn, catalog, key, state, auction, max64(1, i64(auction["current_bid"])), true, gm, now); err != nil {
+		return "", false, err
+	}
+	return key, true, nil
+}
+
+// merchantWorldFactor is what a world's market does to a base value - the
+// same ladder the dynamic economy seeds its markets with.
+func merchantWorldFactor(world string) float64 {
+	switch world {
+	case "Spiritual World":
+		return 1.2
+	case "Immortal World":
+		return 1.5
+	case "Celestial World":
+		return 2.0
+	default:
+		return 1.0
+	}
+}
+
+// merchantValuation is the most a merchant will pay for a lot: the market
+// base value of the goods (their sect value on the world's ladder), or
+// sixty percent of its own shelf price for something it stocks as a ware -
+// a merchant buys to resell, so it never pays what it would ask.
+func merchantValuation(catalog worlddata.Catalog, m worlddata.Merchant, itemID string, quantity int64) int64 {
+	quantity = max64(1, quantity)
 	if ware, ok := merchantWare(m, itemID); ok {
-		// The shop's own line keeps the shop's price.
-		resale = max64(1, ware.Price)
+		return max64(1, ware.Price*60/100) * quantity
 	}
-	if _, err := conn.Execute(`INSERT INTO merchant_stock(merchant,item_id,quantity,cost,price,acquired_game_minute,updated_at) VALUES(?,?,?,?,?,?,?)
-		ON CONFLICT(merchant,item_id) DO UPDATE SET quantity=merchant_stock.quantity+excluded.quantity,cost=excluded.cost,price=excluded.price,acquired_game_minute=excluded.acquired_game_minute,updated_at=excluded.updated_at`,
-		[]any{chosen, itemID, quantity, unitCost, resale, gm, now}); err != nil {
-		return "", false, err
+	base := catalog.Items[itemID].SectValue
+	if base < 1 {
+		base = 5
 	}
-	if _, err := conn.Execute(`UPDATE auctions SET merchant_buyer=?,current_bid=? WHERE auction_id=?`, []any{chosen, price, i64(auction["auction_id"])}); err != nil {
-		return "", false, err
+	return max64(1, int64(math.Ceil(float64(base)*merchantWorldFactor(m.World)))) * quantity
+}
+
+// merchantBidMinimumSecondsLeft keeps a merchant from sniping: it bids only
+// on a lot with this much real time still to run, so a player can answer.
+const merchantBidMinimumSecondsLeft = 300.0
+
+// MerchantsBid is the merchants on the floors (v0.37.0): on every tick, each
+// open lot with time left gets at most one merchant bid - from the merchant
+// standing in the city, or one whose loop passes it - at the next minimum,
+// as long as that is within the merchant's valuation and purse. The purse
+// pays at bidding time, like a player's escrow, and is refunded when outbid;
+// a player the merchant outbids has their escrow refunded the same way.
+// It returns how many bids were placed. The caller owns the transaction.
+func MerchantsBid(conn *storage.Conn, catalog worlddata.Catalog, gm int64) (int64, error) {
+	ok, err := merchantTablesExist(conn)
+	if err != nil || !ok || len(catalog.Merchants) == 0 {
+		return 0, err
 	}
-	return chosen, true, nil
+	now := nowSeconds()
+	res, err := conn.Execute(`SELECT * FROM auctions WHERE active=1 AND ends_at>? ORDER BY ends_at,auction_id`, []any{now + merchantBidMinimumSecondsLeft})
+	if err != nil {
+		return 0, err
+	}
+	placed := int64(0)
+	for _, a := range rowsToMaps(res) {
+		city, found := merchantLotCity(catalog, a)
+		if !found {
+			continue
+		}
+		currency := strings.TrimSpace(fmt.Sprint(a["currency_id"]))
+		current := i64(a["current_bid"])
+		amount := max64(i64(a["starting_bid"]), current+max64(1, current/10))
+		standing := strings.TrimSpace(fmt.Sprint(a["merchant_bidder"]))
+		if standing == "<nil>" {
+			standing = ""
+		}
+		key, state, err := pickMerchantForLot(conn, catalog, city, currency, amount, standing, gm, now)
+		if err != nil {
+			return placed, err
+		}
+		if key == "" {
+			continue
+		}
+		if amount > merchantValuation(catalog, catalog.Merchants[key], fmt.Sprint(a["item_id"]), i64(a["quantity"])) {
+			continue
+		}
+		// Refund whoever held the lot: a player's escrow or a rival's purse.
+		if old := i64(a["current_bidder_user_id"]); old > 0 {
+			if _, err := walletDeltaTx(conn, old, currency, current, now); err != nil {
+				return placed, err
+			}
+		} else if standing != "" {
+			rival, err := ensureMerchantState(conn, catalog, standing, gm, now)
+			if err != nil {
+				return placed, err
+			}
+			rival.Budget += current
+			if err := writeMerchantState(conn, rival, now); err != nil {
+				return placed, err
+			}
+		}
+		state.Budget -= amount
+		if err := writeMerchantState(conn, state, now); err != nil {
+			return placed, err
+		}
+		if _, err := conn.Execute(`UPDATE auctions SET current_bid=?,current_bidder_user_id=NULL,merchant_bidder=? WHERE auction_id=?`, []any{amount, key, i64(a["auction_id"])}); err != nil {
+			return placed, err
+		}
+		placed++
+	}
+	return placed, nil
+}
+
+// refundMerchantBidderTx gives a merchant its purse back when a player
+// outbids it, and clears it from the lot.
+func refundMerchantBidderTx(conn *storage.Conn, catalog worlddata.Catalog, auction map[string]any, gm int64, now float64) error {
+	key := strings.TrimSpace(fmt.Sprint(auction["merchant_bidder"]))
+	if key == "" || key == "<nil>" {
+		return nil
+	}
+	if _, found := catalog.Merchants[key]; !found {
+		return nil
+	}
+	ok, err := merchantTablesExist(conn)
+	if err != nil || !ok {
+		return err
+	}
+	state, err := ensureMerchantState(conn, catalog, key, gm, now)
+	if err != nil {
+		return err
+	}
+	state.Budget += i64(auction["current_bid"])
+	if err := writeMerchantState(conn, state, now); err != nil {
+		return err
+	}
+	_, err = conn.Execute(`UPDATE auctions SET merchant_bidder='' WHERE auction_id=?`, []any{i64(auction["auction_id"])})
+	return err
 }
 
 // actorWhereabouts is where a player is for the purpose of meeting a

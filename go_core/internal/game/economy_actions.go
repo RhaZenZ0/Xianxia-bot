@@ -319,6 +319,9 @@ func auctionBidAction(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 		if _, err = walletDeltaTx(conn, old, fmt.Sprint(a["currency_id"]), i64(a["current_bid"]), now); err != nil {
 			return authoritativeMutation{}, err
 		}
+	} else if err := refundMerchantBidderTx(conn, catalog, a, p.GameMinute, now); err != nil {
+		// A merchant held the lot (v0.37.0): its purse gets the bid back.
+		return authoritativeMutation{}, err
 	}
 	bal, err := walletDeltaTx(conn, userID, fmt.Sprint(a["currency_id"]), -p.Amount, now)
 	if err != nil {

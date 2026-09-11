@@ -354,7 +354,34 @@ async def run(url: str, token: str, db_path: str) -> Report:
             else:
                 report.add("PASS", "merchant.buy the floor find", f"skipped: {buyer} is {row.get('whereabouts')}")
 
-    # ---- 10. backups -------------------------------------------------------
+    # ---- 10. a merchant bids (v0.37.0) --------------------------------------
+    # A valued lot with an hour to run: the tick's merchant bids the starting
+    # bid from its purse; a player outbids it and the purse is refunded.
+    await step(report, "grant the seller a sword for the floor", gm("admin.player.adjust_item", {"user_id": PLAYER, "item_id": "spirit_iron_sword", "quantity": 1, "reason": "playtest"}))
+    await step(report, "teleport the seller to the capital", gm("admin.player.teleport", {"user_id": PLAYER, "location": capital, "reason": "playtest"}))
+    await step(report, "auction.enter at the capital (again)", act("auction.enter", PLAYER, {}))
+    valued = await step(report, "auction.sell a sword with an hour to run", act("auction.sell", PLAYER, {"item_id": "spirit_iron_sword", "quantity": 1, "currency_id": "low_spirit_stone", "starting_bid": 3, "anonymous": False, "ends_at": time.time() + 3600}))
+    valued_id = int((valued or {}).get("auction_id") or 0)
+    if valued_id:
+        before = {str(r.get("merchant")): int(r.get("budget") or 0) for r in list((await engine.action("merchant.status", PLAYER, {}) or {}).get("merchants") or [])}
+        await step(report, "the tick lets the merchants bid", engine.run_due_simulation(await clock(), {"auction_settlement": True, "merchants": True}))
+        lot_row = await db.get_auction(valued_id) or {}
+        holder = str(lot_row.get("merchant_bidder") or "")
+        report.add("PASS" if holder and int(lot_row.get("current_bid") or 0) >= 3 and not lot_row.get("current_bidder_user_id") else "FAIL",
+                   "a merchant bids the starting bid from its purse", f"merchant_bidder={holder!r} current_bid={lot_row.get('current_bid')}")
+        if holder:
+            after = {str(r.get("merchant")): int(r.get("budget") or 0) for r in list((await engine.action("merchant.status", PLAYER, {}) or {}).get("merchants") or [])}
+            report.add("PASS" if after.get(holder, 0) == before.get(holder, 0) - int(lot_row.get("current_bid") or 0) else "FAIL",
+                       "the purse is the escrow", f"{before.get(holder)} -> {after.get(holder)}")
+            await step(report, "teleport the buyer to the capital", gm("admin.player.teleport", {"user_id": BUYER, "location": capital, "reason": "playtest"}))
+            await step(report, "auction.enter (buyer, capital)", act("auction.enter", BUYER, {}))
+            await step(report, "the buyer outbids the merchant", act("auction.bid", BUYER, {"auction_id": valued_id, "amount": int(lot_row.get("current_bid") or 0) + 5}))
+            lot_row = await db.get_auction(valued_id) or {}
+            refunded = {str(r.get("merchant")): int(r.get("budget") or 0) for r in list((await engine.action("merchant.status", PLAYER, {}) or {}).get("merchants") or [])}
+            report.add("PASS" if not str(lot_row.get("merchant_bidder") or "") and refunded.get(holder, 0) == before.get(holder, 0) else "FAIL",
+                       "outbid, the merchant is refunded and cleared", f"merchant_bidder={lot_row.get('merchant_bidder')!r} budget {after.get(holder)} -> {refunded.get(holder)}")
+
+    # ---- 11. backups -------------------------------------------------------
     backup = await step(report, "create a backup", transport.create_backup())
     listed = await step(report, "list backups", transport.list_backups())
     if backup and listed is not None and not any(row.get("name") == backup.get("name") for row in listed):

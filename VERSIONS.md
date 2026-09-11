@@ -1009,6 +1009,25 @@ Gate: `tests/python/contracts/test_security_defaults.py` and `TestNewRefusesAnEn
 No schema change (still 32), no game-rule change, AI remains narration-only.
 
 
+**0.37.0** is a feature release: **merchants bid.** Schema **38**.
+
+A merchant was the floor's last bidder only: it took what nobody wanted at the starting bid. It is a
+bidder now. On every simulation tick each open lot with at least five real minutes to run gets at
+most one merchant bid - from the merchant standing in the city, or the first whose loop passes it -
+at the next minimum, as long as that is within the merchant's valuation and purse. The valuation is
+the market base value of the goods (their sect value on the world's ladder), or sixty percent of the
+merchant's own shelf price for something it stocks as a ware: a merchant buys to resell and never
+pays what it would ask, so a player who wants the lot more than the market does still wins it. The
+purse pays at bidding time, like a player's escrow (`auctions.merchant_bidder` says who holds the
+lot); a player who outbids the merchant sees the purse refunded and the merchant cleared, a rival
+merchant refunds the purse the same way, and a merchant still holding the high bid when the lot
+closes wins it - the seller is paid the hammer price, the purse does not pay twice, and the goods go
+into the pack as a floor find. The five-minute floor means a merchant never snipes: there is always
+time to answer. The live card and `/economy → Auction House → Browse` name a merchant high bidder as
+such, the card is refreshed after each tick a merchant holds a lot, and the dashboard's auction
+table shows the merchant where it shows a bidder. `scripts/playtest_engine.py` drives a lot through
+the merchant's bid, the escrow and the refund - a hundred steps, none failed.
+
 **0.36.1** is a point release: **Greenriver Town joins the roads, and the engine playtest covers the
 city.** No schema change.
 
@@ -1432,9 +1451,12 @@ directory to one file, requires each check to appear before the release job and 
 and requires the release job to wait on all three.
 
 
-## Release status — v0.36.1
+## Release status — v0.37.0
 
-- Current release: v0.36.1: Greenriver Town joins the roads (gates east to the capital and north to
+- Current release: v0.37.0 (schema 38): merchants bid - on the tick, at the next minimum, within a
+  valuation the market sets and a purse that pays as escrow; outbid, they are refunded; holding the
+  high bid at the close, they win.
+- v0.36.1: Greenriver Town joins the roads (gates east to the capital and north to
   Riverguard), and the engine playtest walks the city - the gate, a district, a shop found, bought
   from and sold to, and a merchant taking an unsold lot and reselling it - ninety-six steps clean.
 - v0.36.0: gates and districts - a road journey ends at the gate facing the road
@@ -1639,6 +1661,7 @@ and requires the release job to wait on all three.
 - **Schema 27** added the v0.19.29 mute/freeze moderation columns on `characters`
   (`is_muted`, `is_frozen`, `moderation_reason`).
 - **Schema 28** added the Quest Forge definition table (`quest_definitions`).
+- **Schema 38** added the merchant holding a lot's high bid (`auctions.merchant_bidder`) (v0.37.0).
 - **Schema 37** added the city shops' shelves (`shop_state`, `shop_stock`) (v0.35.0).
 - **Schema 36** added the playtest board (`playtest_channel_id`, `playtest_items`) and the travelling
   merchants (`merchant_state`, `merchant_stock`, `auctions.merchant_buyer`) (v0.34.1).
