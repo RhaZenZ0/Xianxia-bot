@@ -212,3 +212,52 @@ func TestBuyingSellingAndRestockingAtAShop(t *testing.T) {
 		t.Fatalf("after refill and one buy=%d want %d", got, pill.Quantity-1)
 	}
 }
+
+// City life (v0.38.0): trade moves a city's prosperity, and prosperity
+// shows on the shelves.
+func TestTradeNudgesProsperityAndProsperityFillsTheShelf(t *testing.T) {
+	path := setupShopDB(t)
+	world := batch4WorldPath(t)
+	catalog := shopCatalog(t)
+	key := "greenriver_apothecary"
+	shop := catalog.Shops[key]
+	batch4Exec(t, path, `ALTER TABLE civilization_regions ADD COLUMN prosperity INTEGER NOT NULL DEFAULT 50`)
+	batch4Exec(t, path, `INSERT INTO civilization_regions(location,world_name,spirit_resources,prosperity) VALUES('Greenriver Town','Mortal World',50,69)`)
+	batch4SetCanonicalGameMinute(t, path, 1000)
+	batch4Exec(t, path, `UPDATE characters SET location=? WHERE user_id=42`, shop.Location)
+	batch4Exec(t, path, `INSERT INTO currency_wallets(user_id,currency_id,balance) VALUES(42,?,200)`, shop.Currency)
+	var pill worlddata.ShopLine
+	for _, line := range shop.Sells {
+		if line.ItemID == "recovery_pill" {
+			pill = line
+		}
+	}
+	// At 69 the shelf is the content quantity; one buy lifts the city to 70.
+	batch4Apply(t, path, world, "shop.buy", 61, map[string]any{"item_id": "recovery_pill", "quantity": 1})
+	if got := escrowScalar(t, path, `SELECT prosperity FROM civilization_regions WHERE location='Greenriver Town'`); got != 70 {
+		t.Fatalf("prosperity after a buy=%d want 70", got)
+	}
+	if got := escrowScalar(t, path, `SELECT quantity FROM shop_stock WHERE shop=? AND item_id='recovery_pill'`, key); got != pill.Quantity-1 {
+		t.Fatalf("shelf=%d want %d", got, pill.Quantity-1)
+	}
+	// The next refill, in a thriving city, is one fuller.
+	batch4Exec(t, path, `UPDATE shop_state SET last_restock_game_minute=0 WHERE shop=?`, key)
+	batch4Apply(t, path, world, "shop.buy", 62, map[string]any{"item_id": "recovery_pill", "quantity": 1})
+	if got := escrowScalar(t, path, `SELECT quantity FROM shop_stock WHERE shop=? AND item_id='recovery_pill'`, key); got != pill.Quantity+1-1 {
+		t.Fatalf("thriving shelf after refill and one buy=%d want %d", got, pill.Quantity)
+	}
+	// A struggling city's shelf is one thinner, never empty.
+	batch4Exec(t, path, `UPDATE civilization_regions SET prosperity=20 WHERE location='Greenriver Town'`)
+	batch4Exec(t, path, `UPDATE shop_state SET last_restock_game_minute=0 WHERE shop=?`, key)
+	batch4Exec(t, path, `UPDATE shop_stock SET quantity=0 WHERE shop=?`, key)
+	batch4Apply(t, path, world, "shop.buy", 63, map[string]any{"item_id": "recovery_pill", "quantity": 1})
+	if got := escrowScalar(t, path, `SELECT quantity FROM shop_stock WHERE shop=? AND item_id='recovery_pill'`, key); got != pill.Quantity-1-1 {
+		t.Fatalf("struggling shelf after refill and one buy=%d want %d", got, pill.Quantity-2)
+	}
+	// The cap holds: prosperity never passes 95.
+	batch4Exec(t, path, `UPDATE civilization_regions SET prosperity=95 WHERE location='Greenriver Town'`)
+	batch4Apply(t, path, world, "shop.buy", 64, map[string]any{"item_id": "recovery_pill", "quantity": 1})
+	if got := escrowScalar(t, path, `SELECT prosperity FROM civilization_regions WHERE location='Greenriver Town'`); got != 95 {
+		t.Fatalf("prosperity passed the cap: %d", got)
+	}
+}

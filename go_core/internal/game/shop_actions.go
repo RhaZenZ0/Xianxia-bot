@@ -80,6 +80,11 @@ func ensureShopStockTx(conn *storage.Conn, catalog worlddata.Catalog, key string
 			return nil
 		}
 	}
+	prosperity, err := cityProsperityTx(conn, shop.City)
+	if err != nil {
+		return err
+	}
+	bonus := prosperityShelfBonus(prosperity)
 	for _, line := range shop.Sells {
 		if strings.TrimSpace(line.ItemID) == "" || line.Quantity <= 0 {
 			continue
@@ -88,14 +93,81 @@ func ensureShopStockTx(conn *storage.Conn, catalog worlddata.Catalog, key string
 		if line.MadeHere {
 			made = 1
 		}
+		quantity := max64(1, line.Quantity+bonus)
 		if _, err := conn.Execute(`INSERT INTO shop_stock(shop,item_id,quantity,price,made_here,updated_at) VALUES(?,?,?,?,?,?)
 			ON CONFLICT(shop,item_id) DO UPDATE SET quantity=MAX(shop_stock.quantity,excluded.quantity),price=excluded.price,made_here=excluded.made_here,updated_at=excluded.updated_at`,
-			[]any{key, line.ItemID, line.Quantity, max64(1, line.Price), made, now}); err != nil {
+			[]any{key, line.ItemID, quantity, max64(1, line.Price), made, now}); err != nil {
 			return err
 		}
 	}
 	_, err = conn.Execute(`INSERT INTO shop_state(shop,last_restock_game_minute,updated_at) VALUES(?,?,?) ON CONFLICT(shop) DO UPDATE SET last_restock_game_minute=excluded.last_restock_game_minute,updated_at=excluded.updated_at`, []any{key, gm, now})
 	return err
+}
+
+// cityProsperityTx reads a city's prosperity (0-100) from the civilization
+// simulation, or 50 when the region is not simulated yet.
+func cityProsperityTx(conn *storage.Conn, city string) (int64, error) {
+	probe, err := conn.Execute(`SELECT 1 AS ok FROM sqlite_master WHERE type='table' AND name='civilization_regions'`, nil)
+	if err != nil {
+		return 50, err
+	}
+	if firstRowMap(probe) == nil {
+		return 50, nil
+	}
+	cols, err := conn.Execute(`SELECT COUNT(*) AS n FROM pragma_table_info('civilization_regions') WHERE name='prosperity'`, nil)
+	if err != nil {
+		return 50, err
+	}
+	if row := firstRowMap(cols); row == nil || i64(row["n"]) == 0 {
+		return 50, nil
+	}
+	res, err := conn.Execute(`SELECT prosperity FROM civilization_regions WHERE location=?`, []any{city})
+	if err != nil {
+		return 50, err
+	}
+	row := firstRowMap(res)
+	if row == nil || row["prosperity"] == nil {
+		return 50, nil
+	}
+	return i64(row["prosperity"]), nil
+}
+
+// nudgeCityProsperityTx is what trade does to a city (v0.38.0): every sale
+// on a shelf, at a merchant's pack or on the auction floor moves the city's
+// prosperity a point, capped where the simulation caps it. A city players
+// keep trading in visibly wakes up; one they abandon drifts back on the
+// civilization tick.
+func nudgeCityProsperityTx(conn *storage.Conn, catalog worlddata.Catalog, location string, delta int64) error {
+	city := cityOf(catalog, location)
+	probe, err := conn.Execute(`SELECT 1 AS ok FROM sqlite_master WHERE type='table' AND name='civilization_regions'`, nil)
+	if err != nil {
+		return err
+	}
+	if firstRowMap(probe) == nil {
+		return nil
+	}
+	cols, err := conn.Execute(`SELECT COUNT(*) AS n FROM pragma_table_info('civilization_regions') WHERE name='prosperity'`, nil)
+	if err != nil {
+		return err
+	}
+	if row := firstRowMap(cols); row == nil || i64(row["n"]) == 0 {
+		return nil
+	}
+	_, err = conn.Execute(`UPDATE civilization_regions SET prosperity=MAX(10,MIN(95,prosperity+?)) WHERE location=?`, []any{delta, city})
+	return err
+}
+
+// prosperityShelfBonus is how a city's fortunes show on its shelves: a
+// thriving city's shops refill a little fuller, a struggling one's a little
+// thinner, never below one.
+func prosperityShelfBonus(prosperity int64) int64 {
+	switch {
+	case prosperity >= 70:
+		return 1
+	case prosperity <= 30:
+		return -1
+	}
+	return 0
 }
 
 func shopStockRows(conn *storage.Conn, catalog worlddata.Catalog, key string) ([]map[string]any, error) {
@@ -290,6 +362,9 @@ func shopBuyAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, 
 	if _, err := conn.Execute(`UPDATE shop_stock SET quantity=quantity-?,updated_at=? WHERE shop=? AND item_id=?`, []any{p.Quantity, now, key, p.ItemID}); err != nil {
 		return authoritativeMutation{}, err
 	}
+	if err := nudgeCityProsperityTx(conn, catalog, shop.City, 1); err != nil {
+		return authoritativeMutation{}, err
+	}
 	out := map[string]any{
 		"shop":        key,
 		"shop_name":   shop.Name,
@@ -345,6 +420,9 @@ func shopSellAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64,
 			restocked = true
 			break
 		}
+	}
+	if err := nudgeCityProsperityTx(conn, catalog, shop.City, 1); err != nil {
+		return authoritativeMutation{}, err
 	}
 	out := map[string]any{
 		"shop":         key,

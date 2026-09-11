@@ -221,6 +221,9 @@ func (r *Runner) finalizeAuctions(conn *storage.Conn, gm int64) (int64, error) {
 			if err = walletDeltaSim(conn, i64(a["seller_user_id"]), fmt.Sprint(a["currency_id"]), i64(a["current_bid"])); err != nil {
 				return 0, err
 			}
+			if err = game.AuctionStruckProsperityTx(conn, r.World, a); err != nil {
+				return 0, err
+			}
 			item := r.Catalog.Items[fmt.Sprint(a["item_id"])]
 			level := strings.ToLower(strings.TrimSpace(item.AuctionInterest))
 			if level == "special" || level == "legendary" {

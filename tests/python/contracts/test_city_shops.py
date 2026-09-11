@@ -84,7 +84,7 @@ class FindingAndEntering(unittest.TestCase):
     def test_the_travel_reply_says_you_stepped_inside(self):
         self.assertIn('.get("shop") or "")', EXPLORATION)
         self.assertIn("looks up from the counter", EXPLORATION)
-        self.assertIn("{desc}{gate_line}{shop_line}{road}", EXPLORATION)
+        self.assertIn("{desc}{gate_line}{envoy_line}{shop_line}{road}", EXPLORATION)
 
     def test_the_forge_leaves_shopfronts_off_its_lists(self):
         self.assertIn('loc.get("auction_house") or loc.get("shop") or loc.get("district")', FORGE)

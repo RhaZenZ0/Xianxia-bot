@@ -189,8 +189,24 @@ func relocateMerchantNPC(conn *storage.Conn, catalog worlddata.Catalog, key stri
 	if firstRowMap(probe) == nil {
 		return nil
 	}
+	// In a city with an inn (v0.38.0) the merchant sits at the inn's corner
+	// table, so that is where the NPC is found.
+	if inn := cityInn(catalog, where); inn != "" {
+		where = inn
+	}
 	_, err = conn.Execute(`UPDATE npc_civilization_state SET current_location=?,updated_at=? WHERE npc_name=?`, []any{where, now, merchantNPCName(catalog, key)})
 	return err
+}
+
+// cityInn is the inn of a city, or "" when it has none (or the place is not
+// a city at all).
+func cityInn(catalog worlddata.Catalog, city string) string {
+	for name, loc := range catalog.Locations {
+		if loc.District == "inn" && loc.OutsideLocation == city {
+			return name
+		}
+	}
+	return ""
 }
 
 // AdvanceMerchants moves every catalog merchant one step along its loop when
@@ -345,8 +361,22 @@ func merchantTakesLotTx(conn *storage.Conn, catalog worlddata.Catalog, key strin
 		[]any{key, itemID, quantity, unitCost, resale, gm, now}); err != nil {
 		return err
 	}
-	_, err := conn.Execute(`UPDATE auctions SET merchant_buyer=?,merchant_bidder='',current_bid=? WHERE auction_id=?`, []any{key, price, i64(auction["auction_id"])})
-	return err
+	if _, err := conn.Execute(`UPDATE auctions SET merchant_buyer=?,merchant_bidder='',current_bid=? WHERE auction_id=?`, []any{key, price, i64(auction["auction_id"])}); err != nil {
+		return err
+	}
+	if city, ok := merchantLotCity(catalog, auction); ok {
+		return nudgeCityProsperityTx(conn, catalog, city, 1)
+	}
+	return nil
+}
+
+// AuctionStruckProsperityTx is the floor's share of a city's fortunes: a lot
+// struck to a player bidder moves the house's city a point (v0.38.0).
+func AuctionStruckProsperityTx(conn *storage.Conn, catalog worlddata.Catalog, auction map[string]any) error {
+	if city, ok := merchantLotCity(catalog, auction); ok {
+		return nudgeCityProsperityTx(conn, catalog, city, 1)
+	}
+	return nil
 }
 
 // MerchantBuysUnsoldLot is the auction floor's last bidder. When a lot ends
@@ -644,6 +674,7 @@ func merchantView(catalog worlddata.Catalog, key string, s merchantState, stock 
 	if s.Destination != "" {
 		out["arrives_in_minutes"] = max64(0, s.Arrive-gm)
 	} else {
+		out["inn"] = cityInn(catalog, s.Location)
 		out["departs_in_minutes"] = max64(0, s.DwellUntil-gm)
 		if len(m.Route) > 1 {
 			out["next_stop"] = m.Route[(s.RouteIndex+1)%int64(len(m.Route))]
@@ -767,6 +798,11 @@ func merchantBuyAction(conn *storage.Conn, catalog worlddata.Catalog, userID int
 	state.Budget += total
 	if err := writeMerchantState(conn, state, now); err != nil {
 		return authoritativeMutation{}, err
+	}
+	if state.Destination == "" {
+		if err := nudgeCityProsperityTx(conn, catalog, state.Location, 1); err != nil {
+			return authoritativeMutation{}, err
+		}
 	}
 	name := catalog.Items[p.ItemID].Name
 	if name == "" {

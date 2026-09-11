@@ -5146,6 +5146,19 @@ class Database:
             await db.execute("DELETE FROM auction_lot_messages WHERE auction_id=?", (int(auction_id),))
             await db.commit()
 
+    async def list_active_bounties(self, *, limit: int = 12) -> list[dict[str, Any]]:
+        """The wanted list a capital's quest pavilion posts (v0.38.0): every
+        active bounty with the name and whereabouts of the one it is on."""
+        async with self._connect() as db:
+            db.row_factory = aiosqlite.Row
+            cur = await db.execute(
+                """SELECT b.bounty_id,b.jurisdiction,b.amount,b.reason,b.created_game_minute,c.name AS target_name,c.location AS target_location
+                   FROM bounties b JOIN characters c ON c.user_id=b.user_id
+                   WHERE b.status='active' ORDER BY b.amount DESC,b.bounty_id DESC LIMIT ?""",
+                (max(1, min(50, int(limit))),),
+            )
+            return [dict(row) for row in await cur.fetchall()]
+
     async def get_realm_hub_channels(self, guild_id: int) -> list[dict[str, Any]]:
         async with self._connect() as db:
             db.row_factory = aiosqlite.Row

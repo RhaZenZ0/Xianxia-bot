@@ -21,6 +21,7 @@ from ...ops.game_engine import GameEngineError
 from ...rules.progression_systems import profession_rank, profession_xp_needed
 from ...rules.realm_hubs import REALM_HUBS, realm_hub, realm_hub_by_location
 from ...rules.sect_manor import manor_craft_bonus
+from ...rules.sect_recruitment import recruitment_definition
 from ..channels import send_long_to_thread
 from ..character_state import announce_quest_progress
 from ..discovery import (
@@ -53,6 +54,7 @@ from ..services import (
     NARRATOR_CONTEXT,
     NARRATOR_QUEUE,
     QUESTS,
+    SIM,
 )
 from ..threads import ensure_expedition_thread
 from ..ui.event_scene import spawn_event_thread
@@ -350,6 +352,14 @@ async def explore(interaction: discord.Interaction) -> None:
             surprise_text += f"\n💬 **Live event thread:** {event_thread.mention}"
 
     discovery_text = ""
+    here_data = WORLD.locations.get(str(c.get("location") or "")) or {}
+    if here_data.get("gate"):
+        try:
+            mood = int(dict(await SIM.civilization_status(str(here_data.get("outside_location") or "")) or {}).get("prosperity") or 50)
+        except Exception:
+            mood = 50
+        discovery_text += ("\n🚪 The gate queue is long today and the carts are full - the city is thriving." if mood >= 70 else
+                           ("\n🚪 The gate is quiet and the guards bored - the city is struggling." if mood <= 30 else "\n🚪 The usual traffic through the gate; the city is getting by."))
     discovered_shop = outcome.get("discovered_shop")
     if isinstance(discovered_shop, dict):
         discovery_text += (
@@ -938,6 +948,34 @@ def _city_of(location: str) -> str:
     return location
 
 
+def _city_parts(city: str) -> list[str]:
+    return sorted(name for name, data in WORLD.locations.items() if data.get("district") and str(data.get("outside_location")) == city)
+
+
+def _city_inn(city: str) -> str:
+    return next((name for name in _city_parts(city) if WORLD.locations[name].get("district") == "inn"), "")
+
+
+def _city_board(city: str) -> list[dict[str, Any]]:
+    """The commissions whose givers live in this city or its parts."""
+    givers = WORLD.data.get("commission_givers", {}) or {}
+    rows = []
+    for c in WORLD.data.get("commissions", []) or []:
+        giver = str(c.get("giver_npc") or "")
+        where = str((givers.get(giver) or {}).get("location") or (WORLD.npcs.get(giver) or {}).get("location") or "")
+        if where and _city_of(where) == city:
+            rows.append(dict(c))
+    return sorted(rows, key=lambda c: (int(c.get("tier") or 1), str(c.get("title"))))
+
+
+def _prosperity_line(data: dict[str, Any]) -> str:
+    if not data or not data.get("found", True):
+        return ""
+    prosperity = int(data.get("prosperity") or 0)
+    mood = "thriving" if prosperity >= 70 else ("struggling" if prosperity <= 30 else "getting by")
+    return f"The city is **{mood}** — prosperity {prosperity}/100, security {int(data.get('security') or 0)}/100."
+
+
 @registered_group_command(city_group, name="look", description="See the gates and districts of this city, where you stand, and who is here")
 async def city_look(interaction: discord.Interaction) -> None:
     c = await require_character(interaction)
@@ -962,9 +1000,223 @@ async def city_look(interaction: discord.Interaction) -> None:
         lines.append(f"**Here:** {', '.join(people[:12])}" + (" …" if len(people) > 12 else ""))
     else:
         lines.append("**Here:** nobody of note at the moment.")
+    try:
+        mood = _prosperity_line(dict(await SIM.civilization_status(city) or {}))
+    except Exception:
+        mood = ""
+    if mood:
+        lines.append(mood)
     lines.append(f"{WORLD.locations.get(here, {}).get('description', '')}")
-    lines.append("Walk to any gate or district with **/travel**; walk the streets with **/world → Explore** to find the shops.")
+    lines.append("Walk to any gate or district with **/travel**; walk the streets with **/world → Explore** to find the shops. **/world → City → Board** for work, **Inn** for company, **Rumours** for news.")
     await interaction.response.send_message("\n".join(lines), ephemeral=False)
+
+
+@registered_group_command(city_group, name="board", description="The city's commission board: a quest pavilion in a capital, the gate notice elsewhere")
+async def city_board(interaction: discord.Interaction) -> None:
+    c = await require_character(interaction)
+    if not c:
+        return
+    city = _city_of(str(c.get("location") or ""))
+    board = _city_board(city)
+    if not board:
+        await interaction.response.send_message(f"🪧 No board in {city} - find one in a city.", ephemeral=False)
+        return
+    capital = bool(WORLD.locations.get(city, {}).get("realm_hub"))
+    held = {str(r.get("quest_key")): str(r.get("status")) for r in await DB.list_character_quests(interaction.user.id)}
+    title = f"🏯 **The Quest Pavilion of {city}**" if capital else f"🪧 **The notice board of {city}**"
+    lines = [title]
+    for q in board[:20]:
+        key = str(q.get("quest_key"))
+        state = held.get(key)
+        mark = {"active": "📌 held", "completed": "✅ done", "failed": "❌ failed", "abandoned": "↩️ abandoned"}.get(state or "", "open")
+        reward = dict(q.get("rewards") or {})
+        lines.append(f"• **{q.get('title')}** (tier {int(q.get('tier') or 1)}) — from {q.get('giver_npc')}; {int(reward.get('spirit_stones') or 0)} stones, {int(reward.get('insight_xp') or 0)} insight — {mark}")
+    if capital:
+        wanted = await DB.list_active_bounties(limit=8)
+        if wanted:
+            lines.append("")
+            lines.append("**Wanted** — bounties posted across the realm:")
+            for b in wanted:
+                lines.append(f"• {b.get('target_name')} — {int(b.get('amount') or 0)} stones, {b.get('jurisdiction')}: {str(b.get('reason') or '')[:80]}")
+    lines.append("")
+    lines.append("Take one with **/world → City → Accept** while you are in the city; the giver is found in their own district.")
+    await reply_long(interaction, "\n".join(lines))
+
+
+@registered_group_command(city_group, name="accept", description="Take a commission from this city's board")
+@serialized_user_action
+async def city_accept(interaction: discord.Interaction, quest: str, terms: app_commands.Range[int, 0, 2] = 0) -> None:
+    await interaction.response.defer(ephemeral=False)
+    c = await require_character(interaction)
+    if not c:
+        return
+    city = _city_of(str(c.get("location") or ""))
+    board = {str(q.get("quest_key")): q for q in _city_board(city)}
+    if quest not in board:
+        await interaction.followup.send(f"❌ That is not on {city}'s board. Read it with **/world → City → Board**.", ephemeral=False)
+        return
+    try:
+        envelope = await ENGINE.authoritative_action("commission.accept", interaction.user.id, {"quest_key": quest, "variant_index": int(terms)}, action_id=f"discord:{interaction.id}:commission.accept")
+        result = dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
+        return
+    q = board[quest]
+    await interaction.followup.send(
+        f"📜 **{q.get('title')}** taken from {q.get('giver_npc')}'s board. {q.get('description')}\n"
+        f"Deadline in **{human_duration(int(result.get('deadline_game_minutes') or q.get('deadline_game_minutes') or 0))}**. Progress shows under **/character → Quests**.",
+        ephemeral=False,
+    )
+
+
+@city_accept.autocomplete("quest")
+async def city_accept_quest_autocomplete(interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
+    c = await DB.get_character(interaction.user.id)
+    if not c:
+        return []
+    city = _city_of(str(c.get("location") or ""))
+    held = {str(r.get("quest_key")) for r in await DB.list_character_quests(interaction.user.id)}
+    needle = current.casefold().strip()
+    choices = []
+    for q in _city_board(city):
+        key = str(q.get("quest_key"))
+        if key in held:
+            continue
+        title = str(q.get("title"))
+        if needle and needle not in title.casefold():
+            continue
+        choices.append(app_commands.Choice(name=f"{title} — {q.get('giver_npc')}"[:100], value=key))
+    return choices[:25]
+
+
+@registered_group_command(city_group, name="envoys", description="The sect envoys' hall of a capital: every sect's gate in this world, and the way there")
+async def city_envoys(interaction: discord.Interaction) -> None:
+    c = await require_character(interaction)
+    if not c:
+        return
+    here = str(c.get("location") or "")
+    city = _city_of(here)
+    data = WORLD.locations.get(here) or {}
+    if not WORLD.locations.get(city, {}).get("realm_hub"):
+        await interaction.response.send_message("The sect envoys keep their halls in the realm capitals, in the temple quarter.", ephemeral=False)
+        return
+    hall = next((name for name in _city_parts(city) if WORLD.locations[name].get("district") == "temple"), "")
+    if data.get("district") != "temple":
+        await interaction.response.send_message(f"The envoys' hall is in **{hall or 'the temple quarter'}** - walk there with **/travel**.", ephemeral=False)
+        return
+    world = str(WORLD.locations.get(city, {}).get("world") or "")
+    sects = []
+    for sect_name in WORLD.sects:
+        rec = recruitment_definition(WORLD.sects, sect_name)
+        if rec and str(WORLD.locations.get(str(rec.get("location")), {}).get("world") or "") == world and rec.get("public_route", True):
+            sects.append((sect_name, rec))
+    if not sects:
+        await interaction.response.send_message("No sect keeps an envoy here.", ephemeral=False)
+        return
+    wt = await current_world_time()
+    try:
+        await ENGINE.action("sect.discover", interaction.user.id, {"sects": [name for name, _ in sects], "discovery_kind": "envoys_hall", "source_key": hall, "game_minute": wt.total_minutes})
+    except GameEngineError:
+        log.exception("Sect discovery could not be recorded at the envoys' hall")
+    lines = [f"🏯 **The Sect Envoys' Hall — {hall}**", "Each envoy names their gate and the trial that opens it:"]
+    for name, rec in sects:
+        lines.append(f"• **{name}** — the {rec.get('trial_name')} at **{rec.get('location')}**, before {rec.get('examiner')}.")
+    lines.append("Their routes are on your map now. Open **Sect → Recruitment** to learn about a gate, and **/travel** to reach it.")
+    await reply_long(interaction, "\n".join(lines))
+
+
+@registered_group_command(city_group, name="rumours", description="What the city has heard lately, told by the people who hear everything first")
+async def city_rumours(interaction: discord.Interaction) -> None:
+    c = await require_character(interaction)
+    if not c:
+        return
+    city = _city_of(str(c.get("location") or ""))
+    parts = _city_parts(city)
+    if not parts and not WORLD.locations.get(city, {}).get("gates"):
+        await interaction.response.send_message("Rumours are traded in cities - at the gate, or in the lower town.", ephemeral=False)
+        return
+    teller = ""
+    lower = next((name for name in parts if WORLD.locations[name].get("district") == "lower"), "")
+    if lower:
+        teller = next((n for n, npc in WORLD.npcs.items() if str(npc.get("location")) == lower and n.startswith(("Innkeeper", "Beggar King"))), "")
+    if not teller:
+        gate = next((name for name in parts if WORLD.locations[name].get("gate")), "")
+        teller = next((n for n, npc in WORLD.npcs.items() if str(npc.get("location")) == gate and n.startswith("Gate Captain")), "") if gate else ""
+    events = []
+    for place in [city, *parts]:
+        events.extend(await DB.get_structured_world_history(location=place, user_id=interaction.user.id, min_significance=20, limit=6))
+    events = sorted(events, key=lambda e: int(e.get("game_minute") or 0), reverse=True)[:8]
+    lines = [f"🗣️ **Rumours in {city}**" + (f" — as {teller} tells them" if teller else "")]
+    if not events:
+        lines.append("Nothing worth repeating has happened here lately. Make something happen.")
+    for e in events:
+        lines.append(f"• **{e.get('title')}** — {str(e.get('summary') or '')[:200]}")
+    await reply_long(interaction, "\n".join(lines))
+
+
+@registered_group_command(city_group, name="inn", description="The city's inn: who is in town, the merchants at the corner table, and the common room thread")
+async def city_inn(interaction: discord.Interaction) -> None:
+    c = await require_character(interaction)
+    if not c:
+        return
+    here = str(c.get("location") or "")
+    city = _city_of(here)
+    inn = _city_inn(city)
+    if not inn:
+        await interaction.response.send_message("There is no inn here - every city keeps one.", ephemeral=False)
+        return
+    await interaction.response.defer(ephemeral=False)
+    present = []
+    for place in [city, *_city_parts(city)]:
+        for row in await DB.get_characters_at_location(place, exclude_user_id=interaction.user.id):
+            present.append(f"{row.get('name')} ({place})")
+    merchants = []
+    try:
+        for row in list((await ENGINE.action("merchant.status", interaction.user.id, {}) or {}).get("merchants") or []):
+            if not bool(row.get("on_the_road")) and str(row.get("location")) == city:
+                merchants.append(str(row.get("name")))
+    except GameEngineError:
+        pass
+    keeper = next((n for n, npc in WORLD.npcs.items() if str(npc.get("location")) == inn), "the landlord")
+    lines = [f"🍶 **{inn}** — {keeper} keeps the long table.", str(WORLD.locations.get(inn, {}).get("description") or "")]
+    lines.append(f"**In town:** {', '.join(present) if present else 'no other cultivators tonight'}.")
+    lines.append(f"**At the corner table:** {', '.join(merchants) if merchants else 'no merchant in town - see /economy → Merchants for who is on the road'}.")
+    lines.append("**By the door:** the caravan master's notice - guards wanted for the next road out; see **/economy → Caravans**.")
+    thread = await _inn_thread(interaction, city, inn)
+    if thread is not None:
+        lines.append(f"**Common room:** {thread.mention} - whoever is in {city} talks here.")
+    await interaction.followup.send("\n".join(lines), ephemeral=False)
+
+
+async def _inn_thread(interaction: discord.Interaction, city: str, inn: str) -> discord.Thread | None:
+    """One public thread per city inn, in the world's realm-hub channel."""
+    guild = interaction.guild
+    if guild is None:
+        return None
+    world = str(WORLD.locations.get(city, {}).get("world") or "")
+    rows = await DB.get_realm_hub_channels(guild.id)
+    row = next((r for r in rows if str(r.get("world_name")) == world), None)
+    if not row:
+        return None
+    channel = guild.get_channel(int(row["channel_id"]))
+    if not isinstance(channel, discord.TextChannel):
+        return None
+    name = f"🍶 {inn}"[:100]
+    for thread in channel.threads:
+        if thread.name == name:
+            try:
+                await thread.add_user(interaction.user)
+            except (discord.Forbidden, discord.HTTPException):
+                pass
+            return thread
+    try:
+        thread = await channel.create_thread(name=name, type=discord.ChannelType.public_thread, reason=f"The common room of {inn}")
+        await thread.send(f"🍶 **{inn}** — the common room of {city}. Whoever is in the city passes through here; speak freely, the landlord hears everything anyway.")
+        await thread.add_user(interaction.user)
+        return thread
+    except (discord.Forbidden, discord.HTTPException):
+        log.exception("Could not open the inn thread for %s", inn)
+        return None
 
 
 travel_group = app_commands.Group(name="travel", description="Travel to another known location")
@@ -1025,6 +1277,10 @@ async def travel(interaction: discord.Interaction, destination: str) -> None:
             damage=int(encounter.get("vitality_damage") or 0)
             if delay or damage:
                 road+=f" (**+{delay} min**, **-{damage} Vitality**)"
+    envoy_line=""
+    dest_data=WORLD.locations.get(str(result.get("destination") or destination)) or {}
+    if dest_data.get("district")=="temple" and WORLD.locations.get(str(dest_data.get("outside_location") or ""),{}).get("realm_hub"):
+        envoy_line="\n🏯 The sect envoys keep their hall here - **/world → City → Envoys** names every gate in this world and puts it on your map."
     gate_line=""
     arrived_at=str(result.get("arrived_at") or "")
     if arrived_at and arrived_at!=str(result.get("destination") or destination):
@@ -1054,7 +1310,7 @@ async def travel(interaction: discord.Interaction, destination: str) -> None:
         row=next((r for r in rows if str(r.get("world_name"))==world_name),None)
         if row: meeting=f"\n💬 Public meeting channel: <#{int(row['channel_id'])}>."
     await interaction.followup.send(
-        f"🗺️ **{c['name']} travels to {result.get('destination') or destination}.**\n{desc}{gate_line}{shop_line}{road}{merchants}{safe}{meeting}"
+        f"🗺️ **{c['name']} travels to {result.get('destination') or destination}.**\n{desc}{gate_line}{envoy_line}{shop_line}{road}{merchants}{safe}{meeting}"
     )
     for location in sorted(undiscovered_image_locations):
         if travel_first_discovers_location(

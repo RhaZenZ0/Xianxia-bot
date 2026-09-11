@@ -133,8 +133,13 @@ func TestMerchantsWalkTheirLoopOnTheTick(t *testing.T) {
 	if got := fmt.Sprint(actionScalar(t, path, `SELECT location||'|'||destination FROM merchant_state WHERE merchant='old_hu_the_peddler'`)); got != next+"|" {
 		t.Fatalf("after arrival=%q want %q", got, next+"|")
 	}
-	if got := fmt.Sprint(actionScalar(t, path, `SELECT current_location FROM npc_civilization_state WHERE npc_name='Old Hu the Peddler'`)); got != next {
-		t.Fatalf("npc location=%q want %q", got, next)
+	// In a city with an inn (v0.38.0) the merchant is found at its corner table.
+	wantNPC := next
+	if inn := cityInn(catalog, next); inn != "" {
+		wantNPC = inn
+	}
+	if got := fmt.Sprint(actionScalar(t, path, `SELECT current_location FROM npc_civilization_state WHERE npc_name='Old Hu the Peddler'`)); got != wantNPC {
+		t.Fatalf("npc location=%q want %q", got, wantNPC)
 	}
 }
 

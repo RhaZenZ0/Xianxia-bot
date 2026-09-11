@@ -47,7 +47,7 @@ class TheSurface(unittest.TestCase):
         self.assertIn('arrived_at=str(result.get("arrived_at") or "")', EXPLORATION)
         self.assertIn("You arrive at the **{arrived_at}**", EXPLORATION)
         self.assertIn("You leave by the **{result.get('left_by_gate')} Gate**", EXPLORATION)
-        self.assertIn("{desc}{gate_line}{shop_line}", EXPLORATION)
+        self.assertIn("{desc}{gate_line}{envoy_line}{shop_line}", EXPLORATION)
 
     def test_city_look_is_under_the_world_hub(self):
         self.assertIn('city_group = app_commands.Group(name="city"', EXPLORATION)

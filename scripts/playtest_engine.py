@@ -381,7 +381,44 @@ async def run(url: str, token: str, db_path: str) -> Report:
             report.add("PASS" if not str(lot_row.get("merchant_bidder") or "") and refunded.get(holder, 0) == before.get(holder, 0) else "FAIL",
                        "outbid, the merchant is refunded and cleared", f"merchant_bidder={lot_row.get('merchant_bidder')!r} budget {after.get(holder)} -> {refunded.get(holder)}")
 
-    # ---- 11. backups -------------------------------------------------------
+    # ---- 11. city life (v0.38.0) ---------------------------------------------
+    # The capital's board offers work from its own people; a shop trade moves
+    # the city's prosperity; the envoys' hall is content the bot reads.
+    givers = dict(world.get("commission_givers") or {})
+    locations = dict(world.get("locations") or {})
+
+    def city_of(place: str) -> str:
+        loc = dict(locations.get(place) or {})
+        return str(loc.get("outside_location")) if loc.get("district") or loc.get("shop") or loc.get("auction_house") else place
+
+    board = [c for c in list(world.get("commissions") or []) if city_of(str(givers.get(str(c.get("giver_npc")), {}).get("location") or "")) == capital]
+    report.add("PASS" if len(board) >= 4 else "FAIL", "the capital's pavilion has work from its own people", f"{len(board)} commissions")
+    if board:
+        await step(report, "teleport the buyer to the capital's street", gm("admin.player.teleport", {"user_id": BUYER, "location": capital, "reason": "playtest"}))
+        job = dict(board[0])
+        await step(report, f"commission.accept from the pavilion ({job.get('title')})", act("commission.accept", BUYER, {"quest_key": str(job.get("quest_key")), "variant_index": 0}))
+        rows = {r["quest_key"]: r for r in await db.list_character_quests(BUYER)}
+        report.add("PASS" if str((rows.get(str(job.get("quest_key"))) or {}).get("status")) == "active" else "FAIL", "the pavilion commission is held", f"status={(rows.get(str(job.get('quest_key'))) or {}).get('status')}")
+    before_city = dict(await engine.action("civilization.status", PLAYER, {"location": capital}) or {})
+    if found:
+        # The seller is still on the auction floor from the bidding section;
+        # the warded door leads to the street, and the shop is a walk from there.
+        await step(report, "auction.leave onto the street", act("auction.leave", PLAYER, {}))
+        await step(report, "walk back into the shop", act("exploration.travel", PLAYER, {"destination": str(found.get("location")), "mode": "known"}))
+        shelf = dict(await step(report, "shop.browse (again)", engine.action("shop.browse", PLAYER, {})) or {})
+        line = dict((list(shelf.get("stock") or []) or [{}])[0])
+        if line.get("item_id"):
+            await step(report, "a second shop trade", act("shop.buy", PLAYER, {"item_id": str(line.get("item_id")), "quantity": 1}))
+        after_city = dict(await engine.action("civilization.status", PLAYER, {"location": capital}) or {})
+        before_p, after_p = int(before_city.get("prosperity") or 0), int(after_city.get("prosperity") or 0)
+        report.add("PASS" if after_p > before_p or after_p >= 95 else "FAIL", "trade moves the city's prosperity", f"{before_p} -> {after_p}")
+        await step(report, "back onto the street", act("exploration.travel", PLAYER, {"destination": capital, "mode": "known"}))
+    inn = next((n for n, l in locations.items() if l.get("district") == "inn" and l.get("outside_location") == capital), "")
+    report.add("PASS" if inn else "FAIL", "the capital keeps an inn", inn or "none")
+    if inn:
+        await step(report, "walk to the inn", act("exploration.travel", PLAYER, {"destination": inn, "mode": "known"}))
+
+    # ---- 12. backups -------------------------------------------------------
     backup = await step(report, "create a backup", transport.create_backup())
     listed = await step(report, "list backups", transport.list_backups())
     if backup and listed is not None and not any(row.get("name") == backup.get("name") for row in listed):

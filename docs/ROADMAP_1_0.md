@@ -462,4 +462,4 @@ drift for seven versions as happened between v0.21.6 and v0.28.0.
 | v0.34 Playtest | v0.34.2 | shipped; the engine loops run, the checklist is on file, and the `#playtest` board collects the live pass; travelling merchants shipped beside it |
 | v1.0.0-rc | | |
 | v1.0.0 | | |
-| Content track | v0.36.0 | started early: the city shops (v0.35.0) and the gates and districts (v0.36.0) - arrival by the facing gate, 156 city parts with 215 people |
+| Content track | v0.38.0 | started early: shops (v0.35.0), gates and districts (v0.36.0), merchants that bid (v0.37.0), city life (v0.38.0) - boards, envoys, rumours, inns, prosperity |

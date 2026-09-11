@@ -230,7 +230,7 @@ _HUB_DEFINITIONS = (
         description="Your location, local actions, current events, civilization and world laws.",
         pages=(
             _hub_page("world", "Current Location", "Show the current world and known locations."),
-            _hub_page("city", "City", "The gates and districts of the city you are in, and who is about where you stand."),
+            _hub_page("city", "City", "The city you are in: its gates and districts, the commission board, the sect envoys' hall, the rumours and the inn."),
             _hub_page("explore", "Explore", "Explore the current location for events and discoveries."),
             _hub_page("hunt", "Hunt", "Hunt a spirit beast at the current location."),
             _hub_page("worldevents", "Events", "Active phenomena, consequences and realm openings."),

@@ -798,7 +798,7 @@ SURFACE = {
         "roots": ('explore', 'hunt', 'craft'),
         "leaves": {
             "alchemy_group": ('status', 'refine', 'forage', 'purge'),
-            "city_group": ('look',),
+            "city_group": ('look', 'board', 'accept', 'envoys', 'rumours', 'inn'),
             "realmhub_group": ('status', 'go'),
             "travel_group": ('go', 'status'),
         },

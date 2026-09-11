@@ -1009,6 +1009,48 @@ Gate: `tests/python/contracts/test_security_defaults.py` and `TestNewRefusesAnEn
 No schema change (still 32), no game-rule change, AI remains narration-only.
 
 
+**0.38.0** is a feature release: **city life.** No schema change.
+
+Six things a city does now that it did not before, all under `/world → City`.
+
+*A quest pavilion in every capital, a notice board at every gate.* A hundred and three commissions,
+given by the people who live in the cities' parts: in a capital the noble steward, the abbot and the
+clerk each have work, and every walled city's gate captain posts a notice - walk the wall twice and
+report - and its district's first citizen a standing request. `Board` lists the city's own
+commissions with who gives them and what they pay, marked held, done or open; in a capital it also
+posts the wanted list, every active bounty in the realm with who it is on and where they were last
+seen. `Accept` takes one, and only while you are in that city; the giver is found in their own
+district for the report. Every objective is one the engine already progresses - explore a named
+place, talk to a named person, take a scene action - so the board rides on `commission.accept` and
+`quest.progress` as they are.
+
+*A sect envoys' hall.* In each capital's temple quarter, `Envoys` names every sect with a public
+gate in that world - the trial, the examiner, the place - and records each as a discovered
+recruitment route (`sect.discover`, kind `envoys_hall`), so a new player learns where the trials are
+without exploring at random. Arriving in the temple quarter says the hall is there.
+
+*Rumours.* `Rumours` retells what has happened in the city and its parts - the structured world
+history, through the same viewpoint gate the narrator uses, so a hidden or faction-only event never
+reaches an ear it should not - as the lower town's innkeeper or beggar king tells it in a capital,
+the gate captain elsewhere.
+
+*An inn in every city.* Forty-eight inns with a landlord or landlady apiece, the corner table where
+a merchant sits when one is in town (the merchant NPC now stands at the inn, not the square), and
+the board by the door where the caravan master posts for guards. `Inn` names who is in town - every
+cultivator in the city and its parts - and which merchants are at the table, and opens the inn's
+common room: one public thread per inn in the world's realm-hub channel, so whoever is in the city
+has somewhere to talk.
+
+*A city that grows.* Every trade moves the city's prosperity a point - a sale at a shop shelf or a
+merchant's pack, a lot struck on the floor - capped where the simulation caps it, and the
+civilization tick still drifts it back. Prosperity shows: a thriving city's shops refill a line
+fuller, a struggling one's a line thinner (never empty), the gate queue in the explore reply is long
+or quiet, and `Look` says whether the city is thriving, getting by or struggling. Go owns the
+prosperity and the shelf (`nudgeCityProsperityTx`, `prosperityShelfBonus`); Python reads it.
+
+`scripts/playtest_engine.py` takes a commission from the capital's pavilion, trades at a shop and
+watches prosperity move, and walks to the inn.
+
 **0.37.0** is a feature release: **merchants bid.** Schema **38**.
 
 A merchant was the floor's last bidder only: it took what nobody wanted at the starting bid. It is a
@@ -1451,9 +1493,12 @@ directory to one file, requires each check to appear before the release job and 
 and requires the release job to wait on all three.
 
 
-## Release status — v0.37.0
+## Release status — v0.38.0
 
-- Current release: v0.37.0 (schema 38): merchants bid - on the tick, at the next minimum, within a
+- Current release: v0.38.0: city life - a quest pavilion in every capital and a notice board at every
+  gate, a sect envoys' hall, rumours through the viewpoint gate, an inn in every city with a common
+  room, and prosperity that trade moves and the shelves show.
+- v0.37.0 (schema 38): merchants bid - on the tick, at the next minimum, within a
   valuation the market sets and a purse that pays as escrow; outbid, they are refunded; holding the
   high bid at the close, they win.
 - v0.36.1: Greenriver Town joins the roads (gates east to the capital and north to
