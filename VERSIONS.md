@@ -1009,6 +1009,25 @@ Gate: `tests/python/contracts/test_security_defaults.py` and `TestNewRefusesAnEn
 No schema change (still 32), no game-rule change, AI remains narration-only.
 
 
+**0.36.1** is a point release: **Greenriver Town joins the roads, and the engine playtest covers the
+city.** No schema change.
+
+*Greenriver Town has roads.* The starting town was the one settlement outside the road graph: it
+could be reached only by direct travel, had no gates, and a fresh character's first road out was
+the capital's. It now has roads to Azure Crown Imperial City (by its East Gate) and Riverguard City
+(by its North Gate), so the first journey is a real one - out by the gate, along the road, in by the
+gate facing it - and Old Hu's loop from Greenriver walks a road rather than a fixed four hours.
+
+*The engine playtest walks the city.* `scripts/playtest_engine.py --launch` gained a tenth section
+(ninety-six steps in all): a road journey from Riverguard to the capital that must end
+at the gate facing the road, the walk to a district, `shop.here` from there, walking the city until
+a shop is found, entering it, browsing, buying at the shelf price, selling what the keeper wants,
+the door refusing to open anywhere but the street, the eight merchants on `merchant.status`, an
+unsold lot at the capital's house taken by a merchant on the tick, the lot in that merchant's pack
+as a floor find, and buying it back from him in his city. The run passed clean on the first full
+pass of the new systems; the one failure it produced was the script's own (a lot of spirit herb
+merges into Old Hu's wares line by design) and the lot is a curio now.
+
 **0.36.0** is a feature release: **gates and districts.** No schema change.
 
 *It matters which way you arrived.* Every walled city has a gate on each compass side that has a
@@ -1413,9 +1432,12 @@ directory to one file, requires each check to appear before the release job and 
 and requires the release job to wait on all three.
 
 
-## Release status — v0.36.0
+## Release status — v0.36.1
 
-- Current release: v0.36.0: gates and districts - a road journey ends at the gate facing the road
+- Current release: v0.36.1: Greenriver Town joins the roads (gates east to the capital and north to
+  Riverguard), and the engine playtest walks the city - the gate, a district, a shop found, bought
+  from and sold to, and a merchant taking an unsold lot and reselling it - ninety-six steps clean.
+- v0.36.0: gates and districts - a road journey ends at the gate facing the road
   you came by, the capitals have four compass districts and every city one, each with its own
   people, and the capitals' shops are a tier better and dearer.
 - v0.35.0 (schema 37): the city shops - a hundred and four across the forty-eight
