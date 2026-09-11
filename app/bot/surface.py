@@ -51,6 +51,7 @@ from .commands.economy import (
     merchant_group,
     shop_group,
     storage_group,
+    trade_group,
 )
 from .commands.equipment import equipment_group
 from .commands.exploration import alchemy_group, city_group, realmhub_group, travel_group
@@ -112,6 +113,7 @@ _GROUP_ACTION_ROOTS = {
     "market": market_group,
     "merchant": merchant_group,
     "shop": shop_group,
+    "trade": trade_group,
     "blackmarket": blackmarket_group,
     "realmhub": realmhub_group,
     "city": city_group,
@@ -126,7 +128,7 @@ _MIGRATED_ROOTS = {
     "city", "civilization", "conceal", "condition", "craft", "crime", "cultivate",
     "daoheart", "duel", "effects", "equipment", "era", "explore", "family",
     "formation", "gender", "grudges", "hunt", "hunter", "inheritances", "fate",
-    "innerworld", "inventory", "karma", "law", "lifespan", "manual", "market", "merchant", "shop", "blackmarket",
+    "innerworld", "inventory", "karma", "law", "lifespan", "manual", "market", "merchant", "shop", "trade", "blackmarket",
     "npcinfo", "party", "perfect", "profession", "provenance", "reincarnate",
     "reputation", "rulers", "scene", "seclusion", "secretrealm", "sect", "sense",
     "sheet", "soul", "spatialkey", "specialeffects", "storage", "talk", "territory",
@@ -276,6 +278,7 @@ _HUB_DEFINITIONS = (
             _hub_page("blackmarket", "Black Market", "Locate rotating underworld posts and trade forbidden goods."),
             _hub_page("auction", "Auction House", "Browse, list and bid in protected auctions."),
             _hub_page("merchant", "Merchants", "Find the travelling merchants and buy what the auction floors could not sell."),
+            _hub_page("trade", "Trade", "Trade directly with another cultivator at the inn: offer what you give and what you want, and they accept or decline."),
             _hub_page("caravan", "Caravans", "Dispatch and inspect persistent trade caravans."),
         ),
     ),

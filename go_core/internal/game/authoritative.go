@@ -98,6 +98,9 @@ var authoritativeMutations = map[string]bool{
 	"merchant.buy":                    true,
 	"shop.buy":                        true,
 	"shop.sell":                       true,
+	"trade.offer":                     true,
+	"trade.accept":                    true,
+	"trade.decline":                   true,
 	"auction.bid":                     true,
 	"black_market.trade":              true,
 	"market.trade":                    true,
@@ -170,6 +173,7 @@ var authoritativeQueries = map[string]bool{
 	"exploration.event.status":  true,
 	"exploration.travel_status": true,
 	"merchant.status":           true,
+	"trade.status":              true,
 	"shop.here":                 true,
 	"shop.browse":               true,
 	// v0.30.0: the world-status reads that app/simulation/world.py ran as raw
@@ -409,7 +413,7 @@ func applyAuthoritative(databasePath, worldPath string, req ActionRequest) (Acti
 			mutation, err = dynastyClaimAction(conn, req.ActorID, req.Payload)
 		case "family.dynasty.conflict":
 			mutation, err = dynastyConflictAction(conn, req.ActorID, req.Payload)
-		case "auction.enter", "auction.leave", "auction.sell", "auction.bid", "black_market.trade", "market.trade", "bounty_hunter.act", "equipment.bind", "equipment.equip", "equipment.unequip", "equipment.repair", "party.create", "party.join", "party.leave", "formation.create", "formation.assign", "formation.activate", "formation.stance", "boss.start", "boss.act", "boss.claim", "territory.claim", "war.act", "caravan.dispatch", "caravan.settle", "sect.recruitment.recommendation", "sect.recruitment.trial", "sect.contribute", "sect.redeem", "discipleship.request", "discipleship.resolve", "discipleship.leave", "sect.manor.establish", "sect.manor.upgrade", "family.simulate", "family.support", "family.add_child", "seclusion.start", "seclusion.settle", "dao.propose", "dao.respond", "dao.sever", "dao.dual_cultivate", "storage.deposit", "storage.withdraw", "storage.upgrade", "abode.establish", "abode.enter", "abode.visit", "abode.leave", "abode.invite", "abode.revoke", "abode.upgrade", "abode.focus", "array.use", "array.deploy", "spatial_key.use", "personal_world.create", "personal_world.set_rule", "personal_world.enter", "personal_world.leave", "item.use", "sect.abode.upgrade", "merchant.buy", "shop.buy", "shop.sell":
+		case "auction.enter", "auction.leave", "auction.sell", "auction.bid", "black_market.trade", "market.trade", "bounty_hunter.act", "equipment.bind", "equipment.equip", "equipment.unequip", "equipment.repair", "party.create", "party.join", "party.leave", "formation.create", "formation.assign", "formation.activate", "formation.stance", "boss.start", "boss.act", "boss.claim", "territory.claim", "war.act", "caravan.dispatch", "caravan.settle", "sect.recruitment.recommendation", "sect.recruitment.trial", "sect.contribute", "sect.redeem", "discipleship.request", "discipleship.resolve", "discipleship.leave", "sect.manor.establish", "sect.manor.upgrade", "family.simulate", "family.support", "family.add_child", "seclusion.start", "seclusion.settle", "dao.propose", "dao.respond", "dao.sever", "dao.dual_cultivate", "storage.deposit", "storage.withdraw", "storage.upgrade", "abode.establish", "abode.enter", "abode.visit", "abode.leave", "abode.invite", "abode.revoke", "abode.upgrade", "abode.focus", "array.use", "array.deploy", "spatial_key.use", "personal_world.create", "personal_world.set_rule", "personal_world.enter", "personal_world.leave", "item.use", "sect.abode.upgrade", "merchant.buy", "shop.buy", "shop.sell", "trade.offer", "trade.accept", "trade.decline":
 			if strings.TrimSpace(worldPath) == "" {
 				return ActionResponse{}, errors.New("world catalog path is required")
 			}
@@ -646,6 +650,20 @@ func applyAuthoritativeQuery(databasePath, worldPath string, req ActionRequest) 
 			return ActionResponse{}, loadErr
 		}
 		result, qerr := merchantStatusQuery(conn, catalog, req.ActorID)
+		if qerr != nil {
+			return ActionResponse{}, qerr
+		}
+		v, _ := eventledger.CurrentActorVersion(conn, req.ActorID)
+		return ActionResponse{APIVersion: authoritativeAPIVersion, Operation: req.Operation, StateVersion: v, Result: result}, nil
+	case "trade.status":
+		if strings.TrimSpace(worldPath) == "" {
+			return ActionResponse{}, errors.New("world catalog path is required")
+		}
+		catalog, loadErr := worlddata.Load(worldPath)
+		if loadErr != nil {
+			return ActionResponse{}, loadErr
+		}
+		result, qerr := tradeStatusQuery(conn, catalog, req.ActorID)
 		if qerr != nil {
 			return ActionResponse{}, qerr
 		}

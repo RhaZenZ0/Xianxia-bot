@@ -200,20 +200,24 @@ class VerbTableContentTests(unittest.TestCase):
                     self.assertIn(action.command, commands)
 
     def test_root_commands_take_exactly_the_declared_parameters(self):
-        """A typed line carries the one argument the table declares, or none;
-        a root that needs more would fail at call time (v0.33.0)."""
+        """A typed line carries the arguments the table declares, or none; a
+        root that needs more would fail at call time (v0.33.0; two since
+        v0.39.0). Every required handler parameter must be declared and every
+        declared one must exist on the handler - an optional handler
+        parameter may go undeclared, the handler's default stands in."""
         commands = self._registered_commands()
         for action in TABLE.actions:
             if action.kind != "root":
                 continue
             node = commands[action.command]
             args = node.args
+            names = [a.arg for a in args.args][1:]
             required = [a.arg for a in args.args[: len(args.args) - len(args.defaults)]][1:]
+            declared = [a.parameter for a in action.arguments if not a.optional]
             with self.subTest(action=action.key):
-                if action.parameter:
-                    self.assertEqual(required, [action.parameter], f"{action.command} must take exactly {action.parameter}")
-                else:
-                    self.assertEqual(required, [], f"{action.command} takes required parameters beyond the interaction")
+                for parameter in [a.parameter for a in action.arguments]:
+                    self.assertIn(parameter, names, f"{action.command} has no parameter {parameter}")
+                self.assertTrue(set(required) <= set(declared), f"{action.command} requires {required}; the table declares {declared}")
 
     def test_every_argument_source_is_one_the_bot_supplies(self):
         bot = (PROJECT_ROOT / "app" / "bot" / "bot.py").read_text(encoding="utf-8")
@@ -324,3 +328,41 @@ class ArgumentRootTests(unittest.TestCase):
             router.VerbTable.from_data({"actions": [{"key": "x", "kind": "root", "command": "use", "argument": {"parameter": "item", "source": "planet"}}]})
         with self.assertRaises(ValueError):
             router.VerbTable.from_data({"actions": [{"key": "x", "kind": "scene", "scene_action": "observe", "argument": {"parameter": "item", "source": "item"}}]})
+
+
+class TwoArgumentRootTests(unittest.TestCase):
+    """v0.39.0: a root with two arguments - an item and a player who is here."""
+
+    def test_give_resolves_the_item_and_the_player(self):
+        route = _route_with("I give the healing pill to Li Feng")
+        self.assertEqual(route.kind, "dispatch", route)
+        single = route.single
+        self.assertEqual(single.payload["command"], "trade offer")
+        self.assertEqual(single.payload["arguments"]["give_item"], "healing_pill")
+        self.assertEqual(single.payload["sources"], {"give_item": "item", "player": "player"})
+        self.assertEqual(single.payload["arguments"]["player"], next(t for t in PRESENT if t.startswith("Player ")).split(":", 1)[0].removeprefix("Player ").strip())
+        self.assertEqual(single.label, "Offer → Healing Pill → Li Feng")
+
+    def test_give_to_an_npc_is_not_a_trade(self):
+        # Qiao is an NPC: the player argument stays unresolved, and the
+        # picker says what the line lacks rather than guessing a cultivator.
+        route = _route_with("I give the healing pill to Qiao")
+        self.assertEqual(route.kind, "picker")
+        self.assertEqual(route.candidates, ())
+        self.assertIn("a cultivator who is here", route.message)
+
+    def test_give_needs_both(self):
+        route = _route_with("I hand over a pill to Li Feng")
+        self.assertEqual(route.kind, "picker")
+        self.assertIn("something you carry", route.message)
+
+    def test_sell_takes_the_item(self):
+        self.assertEqual(_ids(_route_with("I sell the healing pill to the smith")), ["root:shop sell:healing_pill"])
+
+    def test_the_table_accepts_a_list_and_rejects_a_repeated_parameter(self):
+        table = router.VerbTable.from_data({"actions": [{"key": "x", "kind": "root", "command": "use", "aliases": ["x"], "arguments": [{"parameter": "item", "source": "item"}, {"parameter": "to", "source": "player", "optional": True}]}]})
+        self.assertEqual([a.parameter for a in table.actions[0].arguments], ["item", "to"])
+        self.assertTrue(table.actions[0].arguments[1].optional)
+        with self.assertRaises(ValueError):
+            router.VerbTable.from_data({"actions": [{"key": "x", "kind": "root", "command": "use", "arguments": [{"parameter": "item", "source": "item"}, {"parameter": "item", "source": "player"}]}]})
+

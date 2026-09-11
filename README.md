@@ -1,4 +1,4 @@
-# Xianxia RP Discord Bot v0.38.1
+# Xianxia RP Discord Bot v0.39.0
 
 [![CI](https://github.com/RhaZenZ0/Xianxia-bot/actions/workflows/ci.yml/badge.svg)](https://github.com/RhaZenZ0/Xianxia-bot/actions/workflows/ci.yml)
 
@@ -256,7 +256,7 @@ With `AUTO_NARRATE=true` the bot listens in realm-hub channels, private scene th
 
 | You type | What happens |
 | --- | --- |
-| `$ I explore the ravine` | The prefix marks an action. A deterministic router turns it into the same handler the hub button runs and the engine resolves it; a root may take one argument from the line (`$ I travel to Greenriver Town`, `$ I drink a healing pill`). |
+| `$ I explore the ravine` | The prefix marks an action. A deterministic router turns it into the same handler the hub button runs and the engine resolves it; a root may take its arguments from the line (`$ I travel to Greenriver Town`, `$ I drink a healing pill`, `$ I give the pill to Li Feng` - a trade offer to a player who is here, `$ I sell the sword to the smith`). |
 | `Qiao, what is the caravan carrying?` | A line addressing an NPC who is present is dialogue: `/talk`. |
 | anything else | Speech, recorded as context. No reply, no call. |
 
@@ -271,7 +271,7 @@ and techniques, aptitudes, seclusion with background cultivation, and a lifespan
 Samsara and a new incarnation. A sect is joined through an entrance trial before its examiner; every
 public sect bestows its own entry manual on passing, chosen inside the trial transaction, and the
 sect residence grows facility by facility with contribution points. A manual is an item, studied
-through the engine, which enforces its realm requirement; the whole 148-manual catalogue is content.
+through the engine, which enforces its realm requirement; the whole 160-manual catalogue is content.
 
 ### Quests and commissions
 
@@ -285,7 +285,7 @@ scene action, discover or pass a sect trial — so progress is mechanical, never
 ## The world
 
 Four worlds — Mortal, Spiritual, Immortal, Celestial — each with a realm capital and eleven cities,
-joined by roads with travel time, danger and encounters.
+joined by roads with travel time, danger and encounters, and a place on every road.
 
 ### Cities
 
@@ -312,7 +312,33 @@ joined by roads with travel time, danger and encounters.
 - **Travelling merchants.** Eight, two a world, each a named NPC walking a fixed loop of cities and
   sitting at the inn when in town. They keep a shop of their own, buy what an auction floor could not
   sell, bid on the floors within the market's valuation with their purse as escrow, and resell it
-  all to whoever meets them — in a city, or on the same stretch of road mid-journey.
+  all to whoever meets them — in a city, on the same stretch of road mid-journey, or at a waystation.
+- **Trade at the inn.** Two cultivators at the same inn trade directly under **/economy → Trade**:
+  one offers what they give and what they want, the other accepts or declines. Nothing moves until
+  the accept, and the accept checks both hands again.
+
+### The roads
+
+Fifty-three roads join the cities, and every one of them has a place on it (v0.39.0): a
+**waystation** with a stall and a walled yard, a **hunting ground**, a **ruin** or a wayside
+**shrine**, each with someone who lives there. A waystation or a shrine stands on the road itself
+and is found by whoever walks the leg; a hunting ground or a ruin lies off it and is found one
+time in two, or by exploring from either city. A site is reached with **/travel** as half the leg
+from either end, and from it the road leads on to either end and nowhere else. A waystation sells
+what the road takes out of you and stands on the merchants' road; a hunting ground makes the hunt
+easier and the spoils richer; a shrine forbids the hunt and steadies the mind; a ruin gives up
+twice what open ground would, and is where the secret realms open.
+
+### Sects, goods and realms in every world
+
+Each higher world has two sects of its own — a gate, an examiner, a trial, an entry manual — and the
+envoys' hall of its capital names them: the Jade Meridian Sect and Thousand Beast Valley
+(Spiritual), the Heavenblade Immortal Sect and the Ashen Lotus Pavilion (Immortal), the Celestial
+Mandate Academy and the Void Serpent Cult (Celestial). Each world has its own ore, herb, weapon,
+armour, pills and talisman, with recipes; a world's shops stock its own goods and its merchants
+carry them. Eight secret realms, five of them at ruins by the roads, open in turn on the world tick
+— one every three game days, at its own entrance, for its own hours — as well as when a player at
+the entrance stumbles on the opening; each holds an inheritance and a relic.
 
 ### The economy
 

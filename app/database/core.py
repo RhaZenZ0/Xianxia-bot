@@ -26,7 +26,7 @@ from .remote import GoDatabaseTransport
 log = logging.getLogger("xianxia.database")
 
 
-SCHEMA_VERSION = 38
+SCHEMA_VERSION = 39
 # A readiness probe must validate more than the schema-version marker.  If the
 # SQLite file is removed or replaced while the bot is running, SQLite will
 # happily create a new empty file at the same path.  Checking these tables lets
@@ -1579,6 +1579,32 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
             # v0.37.0: a merchant can hold the high bid on a lot. Its purse
             # is the escrow; the column says which merchant holds it.
             "ALTER TABLE auctions ADD COLUMN merchant_bidder TEXT NOT NULL DEFAULT ''",
+        ),
+    ),
+    (
+        39,
+        "trade_offers",
+        (
+            # v0.39.0: player-to-player trade at the inn. An offer names what
+            # one side gives and wants; it moves nothing until the other
+            # side accepts, and the accept checks both hands again.
+            """CREATE TABLE IF NOT EXISTS trade_offers (
+                offer_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                from_user_id INTEGER NOT NULL,
+                to_user_id INTEGER NOT NULL,
+                location TEXT NOT NULL,
+                give_json TEXT NOT NULL DEFAULT '{}',
+                give_stones INTEGER NOT NULL DEFAULT 0,
+                want_json TEXT NOT NULL DEFAULT '{}',
+                want_stones INTEGER NOT NULL DEFAULT 0,
+                status TEXT NOT NULL DEFAULT 'open',
+                created_game_minute INTEGER NOT NULL DEFAULT 0,
+                expires_game_minute INTEGER NOT NULL DEFAULT 0,
+                resolved_at REAL,
+                created_at REAL NOT NULL,
+                updated_at REAL NOT NULL
+            )""",
+            "CREATE INDEX IF NOT EXISTS idx_trade_offers_open ON trade_offers(status, to_user_id, from_user_id)",
         ),
     ),
 )

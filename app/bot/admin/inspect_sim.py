@@ -49,6 +49,7 @@ ADMIN_AUTOMATION_CHOICES = [
     app_commands.Choice(name="Martial clan dynamics", value="clan_dynamics"),
     app_commands.Choice(name="Background cultivation / seclusion", value="background_seclusion"),
     app_commands.Choice(name="Travelling merchants", value="merchants"),
+    app_commands.Choice(name="Secret realms on rotation", value="secret_realms"),
     app_commands.Choice(name="AI narrates explore and hunt by default", value="ai_routine_narration"),
 ]
 

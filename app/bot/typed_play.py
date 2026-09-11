@@ -147,6 +147,19 @@ class MessageInteraction:
 # Dispatch: the one door to the handlers
 # --------------------------------------------------------------------------
 
+async def _guild_member(interaction: Any, user_id: str) -> Any:
+    guild = getattr(interaction, "guild", None)
+    if guild is None or not user_id.isdigit():
+        return None
+    member = guild.get_member(int(user_id))
+    if member is None:
+        try:
+            member = await guild.fetch_member(int(user_id))
+        except (discord.HTTPException, AttributeError):
+            return None
+    return member
+
+
 async def dispatch(interaction: Any, candidate: Candidate) -> None:
     """Run one candidate through the handler that already owns it.
 
@@ -162,6 +175,17 @@ async def dispatch(interaction: Any, candidate: Candidate) -> None:
         if isinstance(interaction, MessageInteraction):
             interaction.command = command
         arguments = {str(k): v for k, v in dict(candidate.payload.get("arguments") or {}).items()}
+        # A player argument (v0.39.0) is resolved by id against the guild:
+        # the handler takes the member the slash command would have been
+        # given. Nobody by that id here is a refusal, not a guess.
+        for parameter, source in dict(candidate.payload.get("sources") or {}).items():
+            if source != "player":
+                continue
+            member = await _guild_member(interaction, str(arguments.get(parameter) or ""))
+            if member is None:
+                await interaction.response.send_message("They are not here any more.")
+                return
+            arguments[parameter] = member
         await handler(interaction, **arguments)
         return
     if candidate.kind == "talk":

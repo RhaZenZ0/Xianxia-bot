@@ -26,6 +26,13 @@ func equipmentDefinitionsGo() map[string]equipmentDefinitionGo {
 		"lesser_stygian_seal":   {"accessory", 90, 1, 1, 4, 0, false},
 		"bone_comb":             {"accessory", 80, 0, 0, 5, 1, false},
 		"cracked_nether_mirror": {"accessory", 75, 0, 2, 3, 0, false},
+		// The higher worlds' arms and armour (v0.39.0), forged there and sold there.
+		"spirit_crystal_sword": {"weapon", 200, 6, 0, 2, 0, false},
+		"spirit_crystal_mail":  {"armor", 240, 0, 8, 2, -1, false},
+		"immortal_gold_sabre":  {"weapon", 320, 9, 1, 3, 0, false},
+		"immortal_gold_plate":  {"armor", 380, 1, 12, 3, -1, false},
+		"starsteel_glaive":     {"weapon", 480, 13, 1, 4, 1, false},
+		"starsteel_aegis":      {"armor", 560, 1, 17, 4, 0, false},
 		// A one-of-a-kind GM reward (granted via /admin player grant, never
 		// crafted or bought) - Indestructible=true is what actually protects
 		// it from durability decay; see indestructibleEquipmentIDsGo below.

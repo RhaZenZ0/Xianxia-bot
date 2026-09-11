@@ -576,6 +576,11 @@ func actorWhereabouts(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 	// A merchant dwelling in a city is met from any of its gates and
 	// districts (v0.36.0), not only its centre.
 	location = cityOf(catalog, fmt.Sprint(row["location"]))
+	// At a road-side site (v0.39.0) the player is on the road between its
+	// two ends, and meets whoever walks it.
+	if a, b, ok := roadSiteEndpoints(catalog, location); ok {
+		return "", a, b, nil
+	}
 	tr, err := conn.Execute(`SELECT value_json FROM world_state WHERE key=?`, []any{roadTransitStateKey(userID)})
 	if err != nil {
 		return "", "", "", err

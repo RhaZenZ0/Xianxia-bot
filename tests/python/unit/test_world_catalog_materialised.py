@@ -39,10 +39,10 @@ class MaterialisedCatalogTests(unittest.TestCase):
     def test_the_documented_scale_is_on_disk(self):
         data = json.loads(WORLD.read_text(encoding="utf-8"))
         system = data["technique_system"]
-        self.assertEqual(len(system["manuals"]), 154)  # 148 generated + one authored entry manual per public sect
-        self.assertEqual(len(system["techniques"]), 546)
+        self.assertEqual(len(system["manuals"]), 160)  # 148 generated + one authored entry manual per public sect (twelve since v0.39.0)
+        self.assertEqual(len(system["techniques"]), 564)
         demonic = [m for m in system["manuals"].values() if str(m.get("alignment", "")).casefold() == "demonic"]
-        self.assertEqual(len(demonic), 44)
+        self.assertEqual(len(demonic), 46)
 
     def test_every_manual_has_an_item_and_none_is_market_stock(self):
         data = json.loads(WORLD.read_text(encoding="utf-8"))
@@ -85,7 +85,7 @@ class MaterialisedCatalogTests(unittest.TestCase):
         sect = data["sects"]["Heaven-Devouring Demon Sect"]
         self.assertTrue(sect.get("hidden"))
         public = [name for name, s in data["sects"].items() if not s.get("hidden")]
-        self.assertEqual(len(public), 6)
+        self.assertEqual(len(public), 12)  # two per higher world since v0.39.0
 
 
 if __name__ == "__main__":

@@ -163,8 +163,8 @@ CREATE TABLE world_history_events(
 	if got := storage.ParseInt(simScalar(t, path, `SELECT COUNT(*) FROM sect_relations WHERE sect_a='Heaven-Devouring Demon Sect' OR sect_b='Heaven-Devouring Demon Sect'`)); got != 0 {
 		t.Fatalf("hidden sect has public relations: %d", got)
 	}
-	if got := storage.ParseInt(simScalar(t, path, `SELECT COUNT(*) FROM sect_politics_state`)); got != 6 {
-		t.Fatalf("expected the six public sects, got %d", got)
+	if got := storage.ParseInt(simScalar(t, path, `SELECT COUNT(*) FROM sect_politics_state`)); got != 12 {
+		t.Fatalf("expected the twelve public sects (v0.39.0: two per higher world), got %d", got)
 	}
 	if got := storage.ParseInt(simScalar(t, path, `SELECT COUNT(*) FROM economy_markets WHERE item_id LIKE '%_manual'`)); got != 0 {
 		t.Fatalf("manuals are stocked on town markets: %d rows", got)

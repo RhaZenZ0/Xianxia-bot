@@ -49,7 +49,21 @@ _TITLE_TOKENS = frozenset({
 _WORD_RE = re.compile(r"[a-z0-9']+")
 
 
-ARGUMENT_SOURCES = ("location", "item")
+ARGUMENT_SOURCES = ("location", "item", "npc", "player")
+
+
+@dataclass(frozen=True)
+class VerbArgument:
+    """One argument a root takes from the line (v0.33.0; several since v0.39.0).
+
+    ``source`` is what the line is searched for to fill it: a known location,
+    a carried item, an NPC who is present, or a player who is present. A
+    required argument left unresolved keeps the action off the picker; an
+    optional one is simply not passed.
+    """
+    parameter: str
+    source: str
+    optional: bool = False
 
 
 @dataclass(frozen=True)
@@ -60,12 +74,18 @@ class VerbAction:
     aliases: tuple[str, ...]
     command: str = ""        # kind == root; a root name or a group leaf ("travel go")
     scene_action: str = ""   # kind == scene
-    # A root that takes one argument (v0.33.0): the handler parameter it fills
-    # and what the line is searched for to fill it - a known location or a
-    # carried item. Unresolved, the action is not offered; the router never
-    # guesses a destination.
-    parameter: str = ""
-    source: str = ""
+    # The arguments a root takes from the line, in the order the label shows
+    # them. Unresolved, the action is not offered; the router never guesses.
+    arguments: tuple[VerbArgument, ...] = ()
+
+    @property
+    def parameter(self) -> str:
+        """The first argument's parameter (the v0.33.0 single-argument view)."""
+        return self.arguments[0].parameter if self.arguments else ""
+
+    @property
+    def source(self) -> str:
+        return self.arguments[0].source if self.arguments else ""
 
 
 @dataclass(frozen=True)
@@ -138,16 +158,25 @@ class VerbTable:
                 raise ValueError(f"typed_play.json: root action {key!r} needs a command")
             if kind == "scene" and not str(raw.get("scene_action") or "").strip():
                 raise ValueError(f"typed_play.json: scene action {key!r} needs a scene_action")
-            argument = dict(raw.get("argument") or {})
-            parameter = str(argument.get("parameter") or "").strip()
-            source = str(argument.get("source") or "").strip()
-            if argument and (kind != "root" or not parameter or source not in ARGUMENT_SOURCES):
-                raise ValueError(f"typed_play.json: action {key!r} argument needs a parameter and a source of {'/'.join(ARGUMENT_SOURCES)}, on a root")
+            # One "argument" (v0.33.0) or a list of "arguments" (v0.39.0).
+            raw_arguments = list(raw.get("arguments") or [])
+            if raw.get("argument"):
+                raw_arguments.insert(0, raw.get("argument"))
+            arguments: list[VerbArgument] = []
+            for argument in raw_arguments:
+                argument = dict(argument or {})
+                parameter = str(argument.get("parameter") or "").strip()
+                source = str(argument.get("source") or "").strip()
+                if kind != "root" or not parameter or source not in ARGUMENT_SOURCES:
+                    raise ValueError(f"typed_play.json: action {key!r} argument needs a parameter and a source of {'/'.join(ARGUMENT_SOURCES)}, on a root")
+                if any(a.parameter == parameter for a in arguments):
+                    raise ValueError(f"typed_play.json: action {key!r} names the parameter {parameter!r} twice")
+                arguments.append(VerbArgument(parameter=parameter, source=source, optional=bool(argument.get("optional"))))
             actions.append(VerbAction(
                 key=key, kind=kind, label=str(raw.get("label") or key),
                 aliases=tuple(str(a) for a in (raw.get("aliases") or []) if str(a).strip()),
                 command=str(raw.get("command") or ""), scene_action=str(raw.get("scene_action") or ""),
-                parameter=parameter, source=source,
+                arguments=tuple(arguments),
             ))
         return cls(actions, [str(p) for p in (data.get("leading_phrases") or [])])
 
@@ -367,14 +396,20 @@ def route_line(
 
     ``locations`` are the places this player knows and ``items`` the
     (id, name) pairs they carry: what a root with an argument is resolved
-    against (v0.33.0).
+    against (v0.33.0). An ``npc`` argument resolves against the NPCs present
+    and a ``player`` argument against the players present, by id (v0.39.0) -
+    both come from ``present``, so a root with two arguments (``$ I give the
+    pill to Li Feng``) needs nothing the scene panel does not already know.
     """
     text = text.strip()[:MAX_LINE_CHARS]
-    sources = {
+    present_list = list(present)
+    sources: dict[str, list[tuple[str, str]]] = {
         "location": [(name, name) for name in locations],
         "item": list(items),
+        "npc": [(name, name) for name in present_list if not _player_target_name(name)],
+        "player": [(name.split(":", 1)[0].removeprefix("Player ").strip(), _player_target_name(name)) for name in present_list if _player_target_name(name)],
     }
-    unresolved: list[VerbAction] = []
+    unresolved: list[VerbArgument] = []
     entities = resolve_entities(text, present)
     npc = next((e for e in entities if not _player_target_name(e)), None)
     player_target = next((e for e in entities if _player_target_name(e)), None)
@@ -389,14 +424,26 @@ def route_line(
     candidates: list[Candidate] = []
     for action, score in ranked:
         if action.kind == "root":
-            if action.parameter:
-                found = resolve_argument(text, sources.get(action.source, ()))
-                if found is None:
-                    unresolved.append(action)
+            if action.arguments:
+                values: dict[str, str] = {}
+                argument_sources: dict[str, str] = {}
+                displays: list[str] = []
+                missing = None
+                for argument in action.arguments:
+                    found = resolve_argument(text, sources.get(argument.source, ()))
+                    if found is None:
+                        if argument.optional:
+                            continue
+                        missing = argument
+                        break
+                    values[argument.parameter], display = found
+                    argument_sources[argument.parameter] = argument.source
+                    displays.append(display)
+                if missing is not None:
+                    unresolved.append(missing)
                     continue
-                value, display = found
-                candidates.append(Candidate("root", f"{action.label} → {display}",
-                                            {"command": action.command, "arguments": {action.parameter: value}}, score))
+                candidates.append(Candidate("root", " → ".join([action.label, *displays]),
+                                            {"command": action.command, "arguments": values, "sources": argument_sources}, score))
                 continue
             candidates.append(Candidate("root", action.label, {"command": action.command}, score))
         elif action.kind == "scene":
@@ -416,8 +463,8 @@ def route_line(
 
     if not candidates:
         if unresolved:
-            wants = {"location": "a place you know", "item": "something you carry"}
-            asks = sorted({f"{a.label.lower()} needs {wants.get(a.source, 'a name')}" for a in unresolved})
+            wants = {"location": "a place you know", "item": "something you carry", "npc": "someone who is here", "player": "a cultivator who is here"}
+            asks = sorted({f"{a.parameter.replace('_', ' ')} needs {wants.get(a.source, 'a name')}" for a in unresolved})
             return Route("picker", (), message="; ".join(asks).capitalize() + ".", text=text)
         return Route("picker", (), text=text)
 

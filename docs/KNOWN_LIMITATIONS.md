@@ -46,6 +46,8 @@ database. Its findings are the first two entries.
   archetypes, four worlds; a riverside hall reads like a riverside hall in every world, with the
   world's stones and wardens swapped in. Hand-written floors are content work for the content
   track after rc.
-- **deferred (scope)** — *Typed play fills one argument, not two.* `$ I give the pill to Qiao`
-  routes to talk or use, not to a two-argument command; the roadmap asked for one argument and a
-  second is a picker question, not a router one.
+- **fixed (v0.39.0)** — *Typed play fills one argument, not two.* Was: `$ I give the pill to Qiao`
+  routed to talk or use. A root may now declare several arguments, each with its own source (a
+  known place, a carried item, an NPC present, a player present); `$ I give the pill to Li Feng`
+  is a trade offer to Li Feng, and a line that names an NPC instead says what it lacks rather than
+  guessing a cultivator.

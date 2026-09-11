@@ -254,6 +254,12 @@ type LocationDefinition struct {
 	Terrain        string              `json:"terrain"`
 	SettlementType string              `json:"settlement_type"`
 	Roads          []string            `json:"roads"`
+	// RoadSite (v0.39.0) marks a place by the side of a road - a
+	// "waystation", a "hunting_ground", a "ruin" or a "shrine" - and RoadLeg
+	// names the two cities whose road it lies on. A site is reached from
+	// either end of its leg and the road leads on from it to either.
+	RoadSite string   `json:"road_site"`
+	RoadLeg  []string `json:"road_leg"`
 }
 
 type UnexpectedEvent struct {

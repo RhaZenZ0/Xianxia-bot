@@ -31,6 +31,31 @@ EQUIPMENT_DEFINITIONS: dict[str, dict[str, Any]] = {
         "name": "Cracked Nether Mirror", "slot": "accessory", "max_durability": 75,
         "attack": 0, "defense": 2, "spirit": 3, "agility": 0,
     },
+    # The higher worlds' arms and armour (v0.39.0), forged there and sold there.
+    "spirit_crystal_sword": {
+        "name": "Spirit-Crystal Sword", "slot": "weapon", "max_durability": 200,
+        "attack": 6, "defense": 0, "spirit": 2, "agility": 0,
+    },
+    "spirit_crystal_mail": {
+        "name": "Spirit-Crystal Mail", "slot": "armor", "max_durability": 240,
+        "attack": 0, "defense": 8, "spirit": 2, "agility": -1,
+    },
+    "immortal_gold_sabre": {
+        "name": "Immortal-Gold Sabre", "slot": "weapon", "max_durability": 320,
+        "attack": 9, "defense": 1, "spirit": 3, "agility": 0,
+    },
+    "immortal_gold_plate": {
+        "name": "Immortal-Gold Plate", "slot": "armor", "max_durability": 380,
+        "attack": 1, "defense": 12, "spirit": 3, "agility": -1,
+    },
+    "starsteel_glaive": {
+        "name": "Starsteel Glaive", "slot": "weapon", "max_durability": 480,
+        "attack": 13, "defense": 1, "spirit": 4, "agility": 1,
+    },
+    "starsteel_aegis": {
+        "name": "Starsteel Aegis", "slot": "armor", "max_durability": 560,
+        "attack": 1, "defense": 17, "spirit": 4, "agility": 0,
+    },
     # A one-of-a-kind GM reward granted via /admin player grant, never crafted
     # or bought (content/world.json marks it market_excluded). "indestructible"
     # and "unique" are read by app/bot/main.py's grant/equipment-status code;

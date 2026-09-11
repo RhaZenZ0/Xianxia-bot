@@ -715,6 +715,14 @@ func knownLocationsTx(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 		for _, part := range cityPartsOf(catalog, city) {
 			known[part] = true
 		}
+		// At a road-side site (v0.39.0) the road runs both ways: both ends
+		// of the leg are known, and so is every other site on it.
+		if a, b, ok := roadSiteEndpoints(catalog, c.Location); ok {
+			known[a], known[b] = true, true
+			for _, site := range roadSitesOnLeg(catalog, a, b) {
+				known[site] = true
+			}
+		}
 	}
 	for name, loc := range catalog.Locations {
 		if loc.RealmHub && c.RealmIndex >= worldMinRealm(catalog, loc.World) {
@@ -768,6 +776,9 @@ func discoverNextLocationTx(conn *storage.Conn, catalog worlddata.Catalog, userI
 		}
 		candidates = append(candidates, name)
 	}
+	// The sites on the roads out of a known city (v0.39.0) are found the
+	// same way as the next city along.
+	candidates = append(candidates, roadSiteCandidates(catalog, known, world, c.RealmIndex)...)
 	if len(candidates) == 0 {
 		return "", nil
 	}
@@ -1190,6 +1201,16 @@ func explorationExploreAction(conn *storage.Conn, catalog worlddata.Catalog, use
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
+	// A road-side site (v0.39.0) colours what exploring turns up: a ruin
+	// yields twice the things left behind, a shrine steadies the mind.
+	switch loc.RoadSite {
+	case "ruin":
+		for id := range reward.Items {
+			reward.Items[id] *= 2
+		}
+	case "shrine":
+		reward.InsightXP += 3
+	}
 	awarded, err := applyCanonicalRewardTx(conn, catalog, userID, c, reward, "explore_discovery", now)
 	if err != nil {
 		return authoritativeMutation{}, err
@@ -1235,7 +1256,11 @@ func explorationExploreAction(conn *storage.Conn, catalog worlddata.Catalog, use
 	if surpriseOut != nil {
 		kind = "event_started"
 	}
-	result := map[string]any{"kind": kind, "location": c.Location, "encounter": encounter, "cultivation_awarded": awarded, "spirit_stones": reward.SpiritStones, "items": reward.Items, "shared_claims": shared, "discovered_location": discovered, "discovered_shop": discoveredShop, "surprise": surpriseOut, "event": surpriseOut}
+	var discoveredSite any
+	if discovered != "" && catalog.Locations[discovered].RoadSite != "" {
+		discoveredSite = roadSiteView(catalog, discovered)
+	}
+	result := map[string]any{"kind": kind, "location": c.Location, "encounter": encounter, "cultivation_awarded": awarded, "spirit_stones": reward.SpiritStones, "items": reward.Items, "insight_xp": reward.InsightXP, "shared_claims": shared, "discovered_location": discovered, "discovered_site": discoveredSite, "discovered_shop": discoveredShop, "site_kind": loc.RoadSite, "surprise": surpriseOut, "event": surpriseOut}
 	return authoritativeMutation{Result: result, Event: eventledger.Event{Domain: "exploration", EventType: "exploration_resolved", EntityType: "character", EntityID: fmt.Sprint(userID), GameMinute: p.GameMinute, Payload: result}}, nil
 }
 
@@ -1299,11 +1324,13 @@ func explorationTravelAction(conn *storage.Conn, catalog worlddata.Catalog, user
 	// warded door, above.
 	cur := catalog.Locations[c.Location]
 	originCity := cityOf(catalog, c.Location)
-	if dest.Shop != "" {
+	// A waystation's stall (v0.39.0) is the waystation itself: no door,
+	// so the shop rules below do not apply to a road-side site.
+	if dest.Shop != "" && dest.RoadSite == "" {
 		if originCity != dest.OutsideLocation {
 			return authoritativeMutation{}, fmt.Errorf("%s is in %s; travel there first", p.Destination, dest.OutsideLocation)
 		}
-	} else if cur.Shop != "" && p.Destination != cur.OutsideLocation {
+	} else if cur.Shop != "" && cur.RoadSite == "" && p.Destination != cur.OutsideLocation {
 		return authoritativeMutation{}, fmt.Errorf("the shop door opens onto %s", cur.OutsideLocation)
 	} else if dest.District != "" && originCity != dest.OutsideLocation {
 		return authoritativeMutation{}, fmt.Errorf("%s is in %s; travel there first", p.Destination, dest.OutsideLocation)
@@ -1342,8 +1369,28 @@ func explorationTravelAction(conn *storage.Conn, catalog worlddata.Catalog, user
 	encounterChance := int64(0)
 	roadConnection := false
 
+	// A road-side site (v0.39.0) is half a leg from either end of its road
+	// and from the other sites on it; from a site the road leads nowhere
+	// else. A site is never a hub.
+	siteHop := dest.RoadSite != "" || cur.RoadSite != ""
+	if siteHop && mode == "hub" {
+		return authoritativeMutation{}, errors.New("a road-side site is reached by its road, not by the realm gate")
+	}
 	if mode != "hub" {
-		if plan, found := canonicalRoadRoute(catalog, originCity, p.Destination, c.RealmIndex); found {
+		plan, found := roadRoutePlan{}, false
+		if siteHop {
+			plan, found = roadSiteHop(catalog, originCity, p.Destination, c.RealmIndex)
+			if !found {
+				if cur.RoadSite != "" {
+					a, b, _ := roadSiteEndpoints(catalog, c.Location)
+					return authoritativeMutation{}, fmt.Errorf("the road from %s leads back to %s or on to %s", c.Location, a, b)
+				}
+				return authoritativeMutation{}, fmt.Errorf("%s lies on the road between %s and %s; travel to either first", p.Destination, dest.RoadLeg[0], dest.RoadLeg[1])
+			}
+		} else {
+			plan, found = canonicalRoadRoute(catalog, originCity, p.Destination, c.RealmIndex)
+		}
+		if found {
 			roadConnection = true
 			route = plan.Nodes
 			travelCost = plan.Cost
@@ -1384,10 +1431,10 @@ func explorationTravelAction(conn *storage.Conn, catalog worlddata.Catalog, user
 	arrivedAt := p.Destination
 	arrivalGate, leftBy := "", ""
 	if roadConnection && len(route) >= 2 {
-		if gate, direction, ok := gateFacing(catalog, p.Destination, route[len(route)-2]); ok {
+		if gate, direction, ok := gateFacing(catalog, p.Destination, roadFacingNeighbour(catalog, p.Destination, route[len(route)-2])); ok {
 			arrivedAt, arrivalGate = gate, direction
 		}
-		if _, direction, ok := gateFacing(catalog, originCity, route[1]); ok {
+		if _, direction, ok := gateFacing(catalog, originCity, roadFacingNeighbour(catalog, originCity, route[1])); ok {
 			leftBy = direction
 		}
 	}
@@ -1434,6 +1481,15 @@ func explorationTravelAction(conn *storage.Conn, catalog worlddata.Catalog, user
 	if len(roadEncounters) > 0 {
 		roadEncounterOut = roadEncounters[0]
 	}
+	// The sites by the road (v0.39.0): whoever walks a leg finds what
+	// stands on it, and one time in two what lies off it.
+	sitesFound := []map[string]any{}
+	if roadConnection {
+		sitesFound, err = discoverRoadSitesTx(conn, catalog, userID, route, p.GameMinute, now)
+		if err != nil {
+			return authoritativeMutation{}, err
+		}
+	}
 	result := map[string]any{
 		"from":                          c.Location,
 		"destination":                   p.Destination,
@@ -1458,11 +1514,25 @@ func explorationTravelAction(conn *storage.Conn, catalog worlddata.Catalog, user
 		"arrival_gate":                  arrivalGate,
 		"left_by_gate":                  leftBy,
 		"city_parts":                    cityPartsOf(catalog, p.Destination),
+		"road_sites_found":              sitesFound,
+		"site_kind":                     dest.RoadSite,
+		"site_leg":                      append([]string{}, dest.RoadLeg...),
 	}
 	// Merchants on the way (v0.34.1): whoever walks a leg of this route or
 	// waits in a city it passes is named, so the traveller knows to stop.
+	// A hop to a site is on the leg the site lies on (v0.39.0).
 	if roadConnection {
-		encounters, err := merchantEncountersOnRoute(conn, catalog, route, p.GameMinute)
+		merchantRoute := route
+		if siteHop {
+			site := p.Destination
+			if dest.RoadSite == "" {
+				site = c.Location
+			}
+			if a, b, ok := roadSiteEndpoints(catalog, site); ok {
+				merchantRoute = []string{a, b}
+			}
+		}
+		encounters, err := merchantEncountersOnRoute(conn, catalog, merchantRoute, p.GameMinute)
 		if err != nil {
 			return authoritativeMutation{}, err
 		}
@@ -1577,9 +1647,24 @@ func explorationHuntAction(conn *storage.Conn, catalog worlddata.Catalog, userID
 	if remaining > 0 {
 		return authoritativeMutation{}, fmt.Errorf("cooldown active: %d seconds", remaining)
 	}
+	// A shrine (v0.39.0) is no hunting ground; a hunting ground is the
+	// best one there is - the beasts are there to be found, so the roll is
+	// easier and the spoils richer.
+	siteKind := catalog.Locations[c.Location].RoadSite
+	if siteKind == "shrine" {
+		return authoritativeMutation{}, errors.New("no beast is hunted on a shrine's ground")
+	}
+	siteBonus := int64(0)
+	if siteKind == "hunting_ground" {
+		siteBonus = huntingGroundRollBonus
+	}
 	beast, err := randomHuntBeast(c.RealmIndex)
 	if err != nil {
 		return authoritativeMutation{}, err
+	}
+	if siteBonus > 0 {
+		beast.Stones += beast.Stones / 2
+		beast.Cultivation += beast.Cultivation / 2
 	}
 	agility, err := canonicalAttribute(conn, catalog, userID, p.GameMinute, "agility")
 	if err != nil {
@@ -1593,7 +1678,7 @@ func explorationHuntAction(conn *storage.Conn, catalog worlddata.Catalog, userID
 	if c.RealmIndex == c.BodyRealmIndex && c.Phase == c.BodyPhase {
 		dual = 1
 	}
-	roll, err := rollCheck(agility+body+1+dual, beast.TN)
+	roll, err := rollCheck(agility+body+1+dual+siteBonus, beast.TN)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -1654,6 +1739,6 @@ func explorationHuntAction(conn *storage.Conn, catalog worlddata.Catalog, userID
 		}
 	}
 	beastOut := map[string]any{"name": beast.Name, "tn": beast.TN, "taming_tn": beast.TamingTN, "rank": beast.Rank, "element": beast.Element, "temperament": beast.Temperament, "bloodline": beast.Bloodline, "intelligence": beast.Intelligence, "loot": beast.Loot, "stones": beast.Stones, "cultivation": beast.Cultivation}
-	result := map[string]any{"beast": beastOut, "roll": roll, "success": roll["success"], "cultivation_awarded": awarded, "bonded_beast": bonded, "wild_encounter": wild}
+	result := map[string]any{"beast": beastOut, "roll": roll, "success": roll["success"], "cultivation_awarded": awarded, "bonded_beast": bonded, "wild_encounter": wild, "site_kind": siteKind, "site_bonus": siteBonus}
 	return authoritativeMutation{Result: result, Event: eventledger.Event{Domain: "exploration", EventType: "hunt_resolved", EntityType: "character", EntityID: fmt.Sprint(userID), GameMinute: p.GameMinute, Payload: result}}, nil
 }

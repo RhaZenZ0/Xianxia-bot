@@ -24,6 +24,12 @@ func applyLateMigrationAction(conn *storage.Conn, catalog worlddata.Catalog, use
 		return shopBuyAction(conn, catalog, userID, raw)
 	case "shop.sell":
 		return shopSellAction(conn, catalog, userID, raw)
+	case "trade.offer":
+		return tradeOfferAction(conn, catalog, userID, raw)
+	case "trade.accept":
+		return tradeAcceptAction(conn, catalog, userID, raw)
+	case "trade.decline":
+		return tradeDeclineAction(conn, catalog, userID, raw)
 	case "black_market.trade":
 		return blackMarketTradeAction(conn, catalog, userID, raw)
 	case "market.trade":
