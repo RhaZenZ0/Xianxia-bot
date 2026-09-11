@@ -139,10 +139,9 @@ func shopHereQuery(conn *storage.Conn, catalog worlddata.Catalog, userID int64) 
 	if err != nil {
 		return nil, err
 	}
-	city := c.Location
+	city := cityOf(catalog, c.Location)
 	inside := ""
 	if key, _, ok := shopAt(catalog, c.Location); ok {
-		city = catalog.Locations[c.Location].OutsideLocation
 		inside = key
 	}
 	keys := cityShopKeys(catalog, city)
@@ -367,7 +366,7 @@ func shopSellAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64,
 // is recorded as a location discovery so /travel can enter it. It returns
 // the shop key found, or "".
 func discoverCityShopTx(conn *storage.Conn, catalog worlddata.Catalog, userID int64, c mechanicsCharacter, gameMinute int64, now float64) (string, error) {
-	keys := cityShopKeys(catalog, c.Location)
+	keys := cityShopKeys(catalog, cityOf(catalog, c.Location))
 	if len(keys) == 0 {
 		return "", nil
 	}

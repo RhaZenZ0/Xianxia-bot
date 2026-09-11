@@ -356,7 +356,7 @@ func MerchantBuysUnsoldLot(conn *storage.Conn, catalog worlddata.Catalog, auctio
 // merchant: their city when standing still, or the road leg they are on.
 // An arrived transit whose record has not been cleared yet counts as the
 // destination, which is what every other action would clear it to.
-func actorWhereabouts(conn *storage.Conn, userID int64, gm int64) (location string, from string, to string, err error) {
+func actorWhereabouts(conn *storage.Conn, catalog worlddata.Catalog, userID int64, gm int64) (location string, from string, to string, err error) {
 	res, err := conn.Execute(`SELECT location FROM characters WHERE user_id=?`, []any{userID})
 	if err != nil {
 		return "", "", "", err
@@ -365,7 +365,9 @@ func actorWhereabouts(conn *storage.Conn, userID int64, gm int64) (location stri
 	if row == nil {
 		return "", "", "", errors.New("character not found")
 	}
-	location = fmt.Sprint(row["location"])
+	// A merchant dwelling in a city is met from any of its gates and
+	// districts (v0.36.0), not only its centre.
+	location = cityOf(catalog, fmt.Sprint(row["location"]))
 	tr, err := conn.Execute(`SELECT value_json FROM world_state WHERE key=?`, []any{roadTransitStateKey(userID)})
 	if err != nil {
 		return "", "", "", err
@@ -487,7 +489,7 @@ func merchantStatusQuery(conn *storage.Conn, catalog worlddata.Catalog, userID i
 	if !ok {
 		return result, nil
 	}
-	location, from, to, err := actorWhereabouts(conn, userID, gm)
+	location, from, to, err := actorWhereabouts(conn, catalog, userID, gm)
 	if err != nil {
 		return nil, err
 	}
@@ -551,7 +553,7 @@ func merchantBuyAction(conn *storage.Conn, catalog worlddata.Catalog, userID int
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
-	location, from, to, err := actorWhereabouts(conn, userID, p.GameMinute)
+	location, from, to, err := actorWhereabouts(conn, catalog, userID, p.GameMinute)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}

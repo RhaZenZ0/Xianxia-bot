@@ -242,11 +242,18 @@ type LocationDefinition struct {
 	OutsideLocation string   `json:"outside_location"`
 	// Shop (v0.35.0) names the city shop this location is the inside of;
 	// OutsideLocation is the city its door opens onto.
-	Shop           string   `json:"shop"`
-	Climate        string   `json:"climate"`
-	Terrain        string   `json:"terrain"`
-	SettlementType string   `json:"settlement_type"`
-	Roads          []string `json:"roads"`
+	Shop string `json:"shop"`
+	// District (v0.36.0) marks a part of a city - a gate, a quarter, the
+	// forge terraces - with OutsideLocation naming the city. Gate is the
+	// compass direction of a gate district. Gates, on the city itself, maps
+	// each compass direction to the road neighbours that side faces.
+	District       string              `json:"district"`
+	Gate           string              `json:"gate"`
+	Gates          map[string][]string `json:"gates"`
+	Climate        string              `json:"climate"`
+	Terrain        string              `json:"terrain"`
+	SettlementType string              `json:"settlement_type"`
+	Roads          []string            `json:"roads"`
 }
 
 type UnexpectedEvent struct {

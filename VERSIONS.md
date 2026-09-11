@@ -1009,6 +1009,34 @@ Gate: `tests/python/contracts/test_security_defaults.py` and `TestNewRefusesAnEn
 No schema change (still 32), no game-rule change, AI remains narration-only.
 
 
+**0.36.0** is a feature release: **gates and districts.** No schema change.
+
+*It matters which way you arrived.* Every walled city has a gate on each compass side that has a
+road - the road graph of each world is laid out deterministically and both ends of a road agree on
+the compass, so a road that leaves Riverguard City by its East Gate arrives at Azure Crown's West
+Gate. A road journey now ends at the gate facing the road you came by, not in the centre, and the
+travel reply says which gate you left by and what lies inside the walls. A direct journey, or a town
+with no walls, lands where it always did.
+
+*Bigger cities have districts.* Each capital has four compass districts behind its gates - the noble
+quarter to the north, the temple quarter east, the lower town south, ministry row west - and every
+other city has one district drawn from its terrain: forge terraces, herb gardens, blade yards, a
+garrison ward, mist docks, a frost market, a ruin quarter, caravan yards, river landings, ore
+terraces. A hundred and fifty-six gates and districts in all, each a location with four encounters
+and sense hints, and each with its own people - a gate captain at every gate, two named NPCs in
+every district, two hundred and fifteen in all - so a city is lively where you stand and only the
+people of that part are in the scene. `/world → City → Look` shows the gates, what each faces, the
+districts, where you are and who is here.
+
+*A walk apart.* Inside the walls the gates, the districts, the centre and the shops are all a step
+from each other: any part is walked to from any other, none needs discovering, and the picker offers
+them the moment you are in the city. Leaving by road works from any part and goes by the gate facing
+the first leg. A shop, an auction hall or a dwelling merchant is reached from any part of the city;
+a shop door still opens onto the street. The Quest Forge sets quests in the city, not in its parts.
+
+*The capitals charge more.* A capital's shops are a tier better than their world - tier two in the
+Mortal capital, tier five in the Celestial - and a quarter dearer, buying and selling.
+
 **0.35.0** is a feature release: **the city shops.** Schema **37**.
 
 A city was one place: you arrived, you explored, you left. Every city now has its shops - a
@@ -1385,9 +1413,12 @@ directory to one file, requires each check to appear before the release job and 
 and requires the release job to wait on all three.
 
 
-## Release status — v0.35.0
+## Release status — v0.36.0
 
-- Current release: v0.35.0 (schema 37): the city shops - a hundred and four across the forty-eight
+- Current release: v0.36.0: gates and districts - a road journey ends at the gate facing the road
+  you came by, the capitals have four compass districts and every city one, each with its own
+  people, and the capitals' shops are a tier better and dearer.
+- v0.35.0 (schema 37): the city shops - a hundred and four across the forty-eight
   cities, differing by city in kind, tier and shelf, found by exploring the city, entered by
   travelling to them, with a keeper to buy from and sell to inside.
 - v0.34.2: the merchant's own shop - three to five lines of ordinary goods per

@@ -53,7 +53,7 @@ from .commands.economy import (
     storage_group,
 )
 from .commands.equipment import equipment_group
-from .commands.exploration import alchemy_group, realmhub_group, travel_group
+from .commands.exploration import alchemy_group, city_group, realmhub_group, travel_group
 from .commands.family import family_group
 from .commands.formation import formation_group, formation_status
 from .commands.law import condition_group, crime_group, law_group, manual_group, profession_group
@@ -114,6 +114,7 @@ _GROUP_ACTION_ROOTS = {
     "shop": shop_group,
     "blackmarket": blackmarket_group,
     "realmhub": realmhub_group,
+    "city": city_group,
     "fate": fate_group,
     "bond": bond_group,
     "travel": travel_group,
@@ -122,7 +123,7 @@ _GROUP_ACTION_ROOTS = {
 _MIGRATED_ROOTS = {
     "abode", "afterlife", "alchemy", "aptitude", "array", "artifact", "auction", "battle", "beast",
     "body", "bodyperfect", "bond", "boss", "bounty", "breakthrough", "caravan",
-    "civilization", "conceal", "condition", "craft", "crime", "cultivate",
+    "city", "civilization", "conceal", "condition", "craft", "crime", "cultivate",
     "daoheart", "duel", "effects", "equipment", "era", "explore", "family",
     "formation", "gender", "grudges", "hunt", "hunter", "inheritances", "fate",
     "innerworld", "inventory", "karma", "law", "lifespan", "manual", "market", "merchant", "shop", "blackmarket",
@@ -229,6 +230,7 @@ _HUB_DEFINITIONS = (
         description="Your location, local actions, current events, civilization and world laws.",
         pages=(
             _hub_page("world", "Current Location", "Show the current world and known locations."),
+            _hub_page("city", "City", "The gates and districts of the city you are in, and who is about where you stand."),
             _hub_page("explore", "Explore", "Explore the current location for events and discoveries."),
             _hub_page("hunt", "Hunt", "Hunt a spirit beast at the current location."),
             _hub_page("worldevents", "Events", "Active phenomena, consequences and realm openings."),

@@ -88,15 +88,21 @@ func auctionEnterAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 		house, ok = catalog.AuctionHouses[p.HouseID]
 		key = p.HouseID
 	}
+	// The hall's door is on the street, reached from anywhere in the city
+	// (v0.36.0: a gate or district too) except from inside a shop.
+	here := cityOf(catalog, fmt.Sprint(c["location"]))
+	if catalog.Locations[fmt.Sprint(c["location"])].Shop != "" {
+		here = ""
+	}
 	if !ok {
 		for k, h := range catalog.AuctionHouses {
-			if h.EntranceLocation == fmt.Sprint(c["location"]) {
+			if h.EntranceLocation == here {
 				key, house, ok = k, h, true
 				break
 			}
 		}
 	}
-	if !ok || house.EntranceLocation != fmt.Sprint(c["location"]) {
+	if !ok || house.EntranceLocation != here {
 		return authoritativeMutation{}, errors.New("no recognized auction-house entrance at current location")
 	}
 	now := nowSeconds()

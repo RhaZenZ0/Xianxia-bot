@@ -928,6 +928,45 @@ async def realmhub_go(interaction:discord.Interaction,world:str)->None:
 
 
 
+city_group = app_commands.Group(name="city", description="The city around you: its gates, districts and who is about")
+
+
+def _city_of(location: str) -> str:
+    data = WORLD.locations.get(location) or {}
+    if data.get("outside_location") and (data.get("district") or data.get("shop") or data.get("auction_house")):
+        return str(data["outside_location"])
+    return location
+
+
+@registered_group_command(city_group, name="look", description="See the gates and districts of this city, where you stand, and who is here")
+async def city_look(interaction: discord.Interaction) -> None:
+    c = await require_character(interaction)
+    if not c:
+        return
+    here = str(c.get("location") or "")
+    city = _city_of(here)
+    parts = sorted(name for name, data in WORLD.locations.items() if data.get("district") and str(data.get("outside_location")) == city)
+    if not parts and city == here and not WORLD.locations.get(city, {}).get("gates"):
+        await interaction.response.send_message(f"🏙️ **{here}** has no walls and no districts - it is all one place.", ephemeral=False)
+        return
+    lines = [f"🏙️ **{city}** — you are at **{here}**." if here != city else f"🏙️ **{city}** — you are in the centre."]
+    gates = [p for p in parts if WORLD.locations[p].get("gate")]
+    districts = [p for p in parts if not WORLD.locations[p].get("gate")]
+    if gates:
+        faces = WORLD.locations.get(city, {}).get("gates") or {}
+        lines.append("**Gates:** " + "; ".join(f"{g} → {', '.join(faces.get(str(WORLD.locations[g].get('gate')), []))}" for g in gates))
+    if districts:
+        lines.append("**Districts:** " + ", ".join(districts))
+    people = sorted(name for name, npc in WORLD.npcs.items() if str(npc.get("location")) == here)
+    if people:
+        lines.append(f"**Here:** {', '.join(people[:12])}" + (" …" if len(people) > 12 else ""))
+    else:
+        lines.append("**Here:** nobody of note at the moment.")
+    lines.append(f"{WORLD.locations.get(here, {}).get('description', '')}")
+    lines.append("Walk to any gate or district with **/travel**; walk the streets with **/world → Explore** to find the shops.")
+    await interaction.response.send_message("\n".join(lines), ephemeral=False)
+
+
 travel_group = app_commands.Group(name="travel", description="Travel to another known location")
 
 
@@ -986,6 +1025,15 @@ async def travel(interaction: discord.Interaction, destination: str) -> None:
             damage=int(encounter.get("vitality_damage") or 0)
             if delay or damage:
                 road+=f" (**+{delay} min**, **-{damage} Vitality**)"
+    gate_line=""
+    arrived_at=str(result.get("arrived_at") or "")
+    if arrived_at and arrived_at!=str(result.get("destination") or destination):
+        parts=[p for p in list(result.get("city_parts") or []) if p!=arrived_at]
+        inside=", ".join(f"**{p}**" for p in parts) if parts else "the streets"
+        gate_line=(f"\n🏯 You arrive at the **{arrived_at}** — the road behind you, the city ahead. Inside the walls: {inside}. "
+                   "Step in with **/travel**; **/world → City → Look** shows who is about.")
+    if result.get("left_by_gate"):
+        gate_line=f"\n🚪 You leave by the **{result.get('left_by_gate')} Gate**."+gate_line
     shop_line=""
     shop_key=str((WORLD.locations.get(str(result.get("destination") or destination)) or {}).get("shop") or "")
     if shop_key:
@@ -1006,7 +1054,7 @@ async def travel(interaction: discord.Interaction, destination: str) -> None:
         row=next((r for r in rows if str(r.get("world_name"))==world_name),None)
         if row: meeting=f"\n💬 Public meeting channel: <#{int(row['channel_id'])}>."
     await interaction.followup.send(
-        f"🗺️ **{c['name']} travels to {result.get('destination') or destination}.**\n{desc}{shop_line}{road}{merchants}{safe}{meeting}"
+        f"🗺️ **{c['name']} travels to {result.get('destination') or destination}.**\n{desc}{gate_line}{shop_line}{road}{merchants}{safe}{meeting}"
     )
     for location in sorted(undiscovered_image_locations):
         if travel_first_discovers_location(

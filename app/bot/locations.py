@@ -73,6 +73,16 @@ async def _known_locations(user_id: int, character: dict[str, Any]) -> set[str]:
     if current and not current.startswith(("abode:", "personal_world:")):
         known.add(current)
         current_data = WORLD.locations.get(current) or {}
+        # Inside a city's gate, district, shop or hall (v0.36.0) the city
+        # itself is known, its roads, and every gate and district of it.
+        city = current
+        if current_data.get("outside_location") and (current_data.get("district") or current_data.get("shop") or current_data.get("auction_house")):
+            city = str(current_data["outside_location"])
+            known.add(city)
+            current_data = WORLD.locations.get(city) or {}
+        for name, data in WORLD.locations.items():
+            if data.get("district") and str(data.get("outside_location")) == city:
+                known.add(name)
         for neighbor in current_data.get("roads", []):
             neighbor_name = str(neighbor)
             neighbor_data = WORLD.locations.get(neighbor_name) or {}

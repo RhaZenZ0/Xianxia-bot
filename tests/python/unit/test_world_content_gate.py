@@ -67,7 +67,7 @@ class AuctionHouseContentTests(unittest.TestCase):
         houses = WORLD["auction_houses"]
         by_entrance = {str(h.get("entrance_location")): h for h in houses.values()}
         for name, loc in WORLD["locations"].items():
-            if loc.get("auction_house") or loc.get("private"):
+            if loc.get("auction_house") or loc.get("private") or loc.get("district") or loc.get("shop"):
                 continue
             if "City" in name or "Town" in name or loc.get("realm_hub"):
                 with self.subTest(city=name):
@@ -220,7 +220,9 @@ class CityShopContentTests(unittest.TestCase):
                 self.assertEqual(interior.get("outside_location"), shop["city"])
                 self.assertTrue(interior.get("safe_zone"), "a shop is a protected interior")
                 self.assertEqual(interior["world"], shop["world"])
-                self.assertEqual(shop["tier"], tier_of[shop["world"]])
+                # v0.36.0: a capital's shops are a tier better and dearer.
+                capital = bool(WORLD["locations"][shop["city"]].get("realm_hub"))
+                self.assertEqual(shop["tier"], tier_of[shop["world"]] + (1 if capital else 0))
                 self.assertEqual(npcs[shop["keeper"]]["location"], shop["location"])
                 self.assertEqual(npcs[shop["keeper"]].get("shop"), key)
                 self.assertGreaterEqual(len(shop["sells"]), 2)
@@ -247,3 +249,63 @@ class CityShopContentTests(unittest.TestCase):
                 continue
             with self.subTest(shop=key):
                 self.assertTrue(any(line.get("made_here") for line in shop["sells"]), f"{key} makes nothing")
+
+
+class CityDistrictContentTests(unittest.TestCase):
+    """v0.36.0: every walled city has a gate per compass side that has a
+    road, both ends of a road agree on the compass, the capitals have four
+    compass districts and the other cities one, and every part has people."""
+
+    OPPOSITE = {"North": "South", "South": "North", "East": "West", "West": "East"}
+
+    def test_every_road_has_a_gate_on_each_end_and_the_compass_agrees(self):
+        locations = WORLD["locations"]
+        cities = {h["entrance_location"] for h in WORLD["auction_houses"].values()}
+        for city in sorted(cities):
+            loc = locations[city]
+            roads = sorted(loc.get("roads") or [])
+            gates = loc.get("gates") or {}
+            with self.subTest(city=city):
+                if not roads:
+                    self.assertEqual(gates, {}, f"{city} has gates but no roads")
+                    continue
+                faced = sorted(n for names in gates.values() for n in names)
+                self.assertEqual(faced, roads, "every road neighbour is faced by exactly one gate")
+                for direction, names in gates.items():
+                    gate_name = f"{city} {direction} Gate"
+                    self.assertIn(gate_name, locations, f"{city} lacks its {direction} gate location")
+                    gate = locations[gate_name]
+                    self.assertEqual(gate.get("district"), "gate")
+                    self.assertEqual(gate.get("gate"), direction)
+                    self.assertEqual(gate.get("outside_location"), city)
+                    self.assertTrue(gate.get("safe_zone"), "a gate is guarded")
+                    for neighbour in names:
+                        back = locations[neighbour].get("gates") or {}
+                        self.assertIn(city, back.get(self.OPPOSITE[direction], []), f"{neighbour} should face {city} by its {self.OPPOSITE[direction]} gate")
+
+    def test_capitals_have_four_compass_districts_and_cities_one(self):
+        locations = WORLD["locations"]
+        cities = {h["entrance_location"] for h in WORLD["auction_houses"].values()}
+        for city in sorted(cities):
+            districts = [n for n, l in locations.items() if l.get("district") and l.get("district") != "gate" and l.get("outside_location") == city]
+            with self.subTest(city=city):
+                if locations[city].get("realm_hub"):
+                    self.assertEqual(len(districts), 4, districts)
+                    self.assertEqual({n.split()[-2] for n in districts}, {"North", "East", "South", "West"})
+                elif city == "Greenriver Town":
+                    self.assertEqual(districts, [], "a town is one place")
+                else:
+                    self.assertEqual(len(districts), 1, districts)
+
+    def test_every_district_has_its_own_people(self):
+        homes = {}
+        for name, npc in WORLD["npcs"].items():
+            homes.setdefault(npc["location"], []).append(name)
+        for name, loc in WORLD["locations"].items():
+            if not loc.get("district"):
+                continue
+            with self.subTest(district=name):
+                want = 1 if loc["district"] == "gate" else 2
+                self.assertGreaterEqual(len(homes.get(name, [])), want, f"{name} is empty")
+                for npc in homes.get(name, []):
+                    self.assertEqual(WORLD["npcs"][npc].get("district"), name)
