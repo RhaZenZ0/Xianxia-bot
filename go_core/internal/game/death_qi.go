@@ -406,7 +406,7 @@ func ghostStatusQuery(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 	tm := cultivationTimeModifiers(gameMinute, c.SpiritualRoot)
 	form := ghostFormAt(catalog, body.GhostForm)
 	next := map[string]any(nil)
-	if int(body.GhostForm)+1 < len(catalog.DeathQi.GhostForms) {
+	if body.GhostForm+1 < int64(len(catalog.DeathQi.GhostForms)) {
 		step := catalog.DeathQi.GhostForms[body.GhostForm+1]
 		next = map[string]any{
 			"name": step.Name, "corruption": step.Corruption, "min_realm_index": step.MinRealmIndex,
