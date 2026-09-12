@@ -28,15 +28,53 @@ def _body(source: str, name: str) -> str:
     return ast.get_source_segment(source, node)
 
 
+def _code(source: str, name: str) -> str:
+    """`_body` without the docstring - what the function *does*.
+
+    A docstring that explains what a function no longer does names the very
+    things a "this must not appear" assertion is looking for, and would fail
+    the test for saying so.
+    """
+    tree = ast.parse(source)
+    node = next(n for n in ast.walk(tree) if isinstance(n, (ast.AsyncFunctionDef, ast.FunctionDef, ast.ClassDef)) and n.name == name)
+    statements = node.body
+    if statements and isinstance(statements[0], ast.Expr) and isinstance(statements[0].value, ast.Constant) and isinstance(statements[0].value.value, str):
+        statements = statements[1:]
+    return "\n".join(ast.get_source_segment(source, statement) for statement in statements)
+
+
 class TheRotationIsVisible(unittest.TestCase):
     def test_the_engine_puts_it_on_the_status_query(self):
         status = (GO / "secret_realm_actions.go").read_text(encoding="utf-8")
         self.assertIn('out["rotation"] = rotation', status)
         self.assertIn("SecretRealmRotationView(conn, catalog, gm)", status)
 
-    def test_the_dashboard_events_page_and_the_discord_replies_show_it(self):
-        self.assertIn('"secret_realm_rotation": rotation', _body(SERVER, "events"))
-        self.assertIn("SELECT value_json FROM world_state WHERE key='secret_realm_rotation'", _body(SERVER, "_secret_realm_rotation"))
+    def test_the_engine_answers_the_rotation_as_a_query_of_its_own(self):
+        """v1.0.0: `secret_realm.rotation`, so a caller that is not a
+        cultivator can ask the world for its schedule."""
+        authoritative = (GO / "authoritative.go").read_text(encoding="utf-8")
+        self.assertIn('"secret_realm.rotation":     true,', authoritative)
+        self.assertIn('case "secret_realm.rotation":', authoritative)
+        rotation = (GO / "secret_realm_rotation.go").read_text(encoding="utf-8")
+        for field in ("last_realm_name", "last_location", "next_realm_name", "next_location", "order"):
+            self.assertIn(field, rotation, f"the view must carry {field} so no caller has to look it up")
+
+    def test_the_dashboard_asks_rather_than_working_it_out(self):
+        """The rotation is the engine's rule, and the dashboard keeps no copy.
+
+        It used to read world_state, parse the whole content pack on every
+        request to turn ids into names, and repeat the interval, the catalogue
+        ordering and the "which is next" arithmetic in Python. The copies had
+        already drifted: on a world that had never rotated the engine answered
+        "the next tick" and the dashboard "the first interval after minute
+        zero". This is what stops a second copy growing back.
+        """
+        self.assertIn('"secret_realm_rotation": await self._secret_realm_rotation()', _body(SERVER, "events"))
+        code = _code(SERVER, "_secret_realm_rotation")
+        self.assertIn('self._engine.action("secret_realm.rotation", 0, {})', code)
+        for copied in ("world_state", "world.json", "sorted(", "24 * 60", "% len("):
+            self.assertNotIn(copied, code,
+                             f"the dashboard is working the rotation out again ({copied!r})")
         self.assertIn("Secret Realm Rotation", APP_JS)
         realm = (BOT / "commands" / "secretrealm.py").read_text(encoding="utf-8")
         self.assertIn('result.get("rotation")', realm)

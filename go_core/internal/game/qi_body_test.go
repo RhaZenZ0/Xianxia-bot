@@ -113,8 +113,31 @@ func TestAContentQiNumberIsTheSameShareOfEveryPool(t *testing.T) {
 		t.Fatalf("impure qi must cost more")
 	}
 	// A pill restores by share too, but purity does not enter it.
-	if scaledQiRestore(8, capacity, reference) != scaledQiRestore(8, capacity, reference) || scaledQiRestore(0, capacity, reference) != 0 {
-		t.Fatal("a restore is a plain share of the pool")
+	//
+	// Asserted through qiState, because that is what carries the body.
+	// scaledQiRestore takes no qiBody, so the line that used to stand here
+	// compared it with itself and could not fail - it read as a test of the
+	// sentence above and tested nothing. What is worth pinning is that the
+	// same pill gives a torn cultivator exactly what it gives a clean one,
+	// while the same skill costs them more.
+	cleanState := qiState{Body: clean, Capacity: capacity, Reference: reference}
+	tornState := qiState{Body: torn, Capacity: capacity, Reference: reference}
+	if cleanState.Cost(8) >= tornState.Cost(8) {
+		t.Fatalf("a torn channel must cost more: %d vs %d", cleanState.Cost(8), tornState.Cost(8))
+	}
+	if cleanState.Restore(8) != tornState.Restore(8) {
+		t.Fatalf("purity entered a restore: %d clean vs %d torn", cleanState.Restore(8), tornState.Restore(8))
+	}
+	// And it is a share of the pool rather than a flat number: a dantian twice
+	// the size takes twice as much from the same pill, give or take the one
+	// unit that rounding a doubled share can move.
+	wide := qiState{Body: clean, Capacity: capacity * 2, Reference: reference}
+	if drift := wide.Restore(8) - cleanState.Restore(8)*2; drift > 1 || drift < -1 {
+		t.Fatalf("a restore is not a share of the pool: %d of %d, but %d of %d",
+			cleanState.Restore(8), capacity, wide.Restore(8), capacity*2)
+	}
+	if cleanState.Restore(0) != 0 {
+		t.Fatal("a pill worth nothing must restore nothing")
 	}
 }
 
