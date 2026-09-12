@@ -117,7 +117,7 @@ func rollFamilyRoot(f BirthFamily, roots []string) (string, error) {
 		weights[f.BloodlineAffinity] += 10
 	}
 	if w, ok := weights["Mortal Root"]; ok {
-		tier := clampInt(int(f.Tier), 1, 5)
+		tier := clampInt(narrowToInt(f.Tier), 1, 5)
 		weights["Mortal Root"] = maxInt(5, w-(tier-1)*2)
 	}
 	total := 0
@@ -288,7 +288,7 @@ func generateBloodline(f BirthFamily, defs map[string]worlddata.BloodlineDefinit
 	if err != nil {
 		return nil, err
 	}
-	purity := clampInt(clampInt(int(f.BloodlinePurity), 1, 100)-12+n, 5, 100)
+	purity := clampInt(clampInt(narrowToInt(f.BloodlinePurity), 1, 100)-12+n, 5, 100)
 	aff := def.Affinity
 	if aff == "" {
 		aff = f.BloodlineAffinity
@@ -303,7 +303,7 @@ func ordinaryPhysique() PhysiqueState {
 	return PhysiqueState{PhysiqueID: "ordinary_mortal_body", Name: "Ordinary Mortal Body", State: "ordinary", Stability: 100}
 }
 func generatePhysique(path string, roots []string, f BirthFamily, defs map[string]worlddata.PhysiqueDefinition, talentEcho int) (PhysiqueState, error) {
-	chance := clampInt(18+int(f.Tier)*4+talentEcho/5, 18, 60)
+	chance := clampInt(18+narrowToInt(f.Tier)*4+talentEcho/5, 18, 60)
 	r, err := gamerng.Intn(100)
 	if err != nil {
 		return PhysiqueState{}, err
@@ -354,7 +354,7 @@ func generatePhysique(path string, roots []string, f BirthFamily, defs map[strin
 	return PhysiqueState{PhysiqueID: chosen.id, Name: name, State: "dormant", Stability: 82 + sr}, nil
 }
 func generateAptitudes(baseRoot, path string, f BirthFamily, c worlddata.Catalog, talentEcho int) (AptitudeBundle, error) {
-	root, err := generateRootProfile(baseRoot, path, c.SpiritualRootSystem, int(f.Tier), talentEcho)
+	root, err := generateRootProfile(baseRoot, path, c.SpiritualRootSystem, narrowToInt(f.Tier), talentEcho)
 	if err != nil {
 		return AptitudeBundle{}, err
 	}

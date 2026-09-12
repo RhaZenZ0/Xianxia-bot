@@ -90,7 +90,13 @@ _LAYOUT_RESULT_PAGES = 5
 # prints as hints (`**/world → City → Look**`) become at most this many
 # buttons, so the suggested follow-up is a tap rather than a page change.
 _LAYOUT_RESULT_ACTION_LIMIT = 3
-_HINT_PATH_RE = re.compile(r"\*\*/([a-z]+)((?:\s*→\s*[^*→]+)*)\*\*")
+# The `\s*` after the arrow is deliberately absent: `[^*→]` matches
+# whitespace too, so `\s*[^*→]+` could split a run of spaces N ways and
+# made the pattern quadratic on input that never completes a match. Each
+# repetition is anchored by a literal arrow, which neither `\s` nor the
+# class can match, so this form is unambiguous - and it captures exactly
+# the same text, since the split below trims each step anyway.
+_HINT_PATH_RE = re.compile(r"\*\*/([a-z]+)((?:\s*→[^*→]+)*)\*\*")
 # Discord's cap on components per message, nested ones included; rebuild()
 # sizes the action list against it once the result block and its buttons
 # have taken their share.

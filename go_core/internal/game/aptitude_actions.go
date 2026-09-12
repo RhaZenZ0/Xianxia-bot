@@ -101,7 +101,7 @@ func loadAptitudes(conn *storage.Conn, userID int64) (AptitudeBundle, error) {
 	r := rr.Rows[0]
 	elements := []string{}
 	_ = json.Unmarshal([]byte(fmt.Sprint(r[2])), &elements)
-	bundle.Root = SpiritualRootState{Grade: fmt.Sprint(r[0]), Purity: int(storage.ParseInt(r[1])), Elements: elements, Mutation: fmt.Sprint(r[3]), Stability: int(storage.ParseInt(r[4])), RefinementProgress: int(storage.ParseInt(r[5])), Compatibility: int(storage.ParseInt(r[6]))}
+	bundle.Root = SpiritualRootState{Grade: fmt.Sprint(r[0]), Purity: intFromDB(r[1]), Elements: elements, Mutation: fmt.Sprint(r[3]), Stability: intFromDB(r[4]), RefinementProgress: intFromDB(r[5]), Compatibility: intFromDB(r[6])}
 	br, err := conn.Execute(`SELECT bloodline_id,name,affinity,purity,state,evolution_stage,progress,rejection,mutation,primary_lineage,unlocked_techniques_json FROM character_bloodlines WHERE user_id=? ORDER BY primary_lineage DESC,id LIMIT 1`, []any{userID})
 	if err != nil {
 		return bundle, err
@@ -110,7 +110,7 @@ func loadAptitudes(conn *storage.Conn, userID int64) (AptitudeBundle, error) {
 		r = br.Rows[0]
 		tech := []string{}
 		_ = json.Unmarshal([]byte(fmt.Sprint(r[10])), &tech)
-		bundle.Bloodline = &BloodlineState{BloodlineID: fmt.Sprint(r[0]), Name: fmt.Sprint(r[1]), Affinity: fmt.Sprint(r[2]), Purity: int(storage.ParseInt(r[3])), State: fmt.Sprint(r[4]), EvolutionStage: int(storage.ParseInt(r[5])), Progress: int(storage.ParseInt(r[6])), Rejection: int(storage.ParseInt(r[7])), Mutation: fmt.Sprint(r[8]), PrimaryLineage: int(storage.ParseInt(r[9])), UnlockedTechniques: tech}
+		bundle.Bloodline = &BloodlineState{BloodlineID: fmt.Sprint(r[0]), Name: fmt.Sprint(r[1]), Affinity: fmt.Sprint(r[2]), Purity: intFromDB(r[3]), State: fmt.Sprint(r[4]), EvolutionStage: intFromDB(r[5]), Progress: intFromDB(r[6]), Rejection: intFromDB(r[7]), Mutation: fmt.Sprint(r[8]), PrimaryLineage: intFromDB(r[9]), UnlockedTechniques: tech}
 	}
 	pr, err := conn.Execute(`SELECT physique_id,name,state,evolution_stage,progress,stability,instability FROM character_physiques WHERE user_id=?`, []any{userID})
 	if err != nil {
@@ -118,7 +118,7 @@ func loadAptitudes(conn *storage.Conn, userID int64) (AptitudeBundle, error) {
 	}
 	if len(pr.Rows) > 0 {
 		r = pr.Rows[0]
-		bundle.Physique = PhysiqueState{PhysiqueID: fmt.Sprint(r[0]), Name: fmt.Sprint(r[1]), State: fmt.Sprint(r[2]), EvolutionStage: int(storage.ParseInt(r[3])), Progress: int(storage.ParseInt(r[4])), Stability: int(storage.ParseInt(r[5])), Instability: int(storage.ParseInt(r[6]))}
+		bundle.Physique = PhysiqueState{PhysiqueID: fmt.Sprint(r[0]), Name: fmt.Sprint(r[1]), State: fmt.Sprint(r[2]), EvolutionStage: intFromDB(r[3]), Progress: intFromDB(r[4]), Stability: intFromDB(r[5]), Instability: intFromDB(r[6])}
 	} else {
 		bundle.Physique = ordinaryPhysique()
 	}
@@ -139,7 +139,7 @@ func loadEffectModifiers(conn *storage.Conn, userID, gameMinute int64, bundle Ap
 			Modifiers []worlddata.Modifier `json:"modifiers"`
 		}
 		if json.Unmarshal([]byte(fmt.Sprint(row[0])), &payload) == nil {
-			stacks := int(storage.ParseInt(row[1]))
+			stacks := intFromDB(row[1])
 			for _, m := range payload.Modifiers {
 				mods.apply(m, stacks)
 			}

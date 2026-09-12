@@ -259,7 +259,7 @@ func lineageInvestigateAction(conn *storage.Conn, userID int64, raw json.RawMess
 
 	evidence := []string{}
 	_ = json.Unmarshal([]byte(fmt.Sprint(r[10])), &evidence)
-	revealCount := int(level)
+	revealCount := narrowToInt(level)
 	if revealCount > len(evidence) {
 		revealCount = len(evidence)
 	}
