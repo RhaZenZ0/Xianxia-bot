@@ -510,7 +510,7 @@ historical migration is kept so an old database upgrades in place.
 ```bash
 python3 -m venv .venv && . .venv/bin/activate
 make install-dev
-make check              # lint + format-check + test-python + test-go, what CI runs
+make check              # lint + format-check + test-python + test-go, the python and go jobs
 ```
 
 | Command | What it runs |
@@ -526,8 +526,9 @@ make check              # lint + format-check + test-python + test-go, what CI r
 ### What CI runs
 
 One workflow (`.github/workflows/ci.yml`) on every push to `main` and every pull request, in three
-jobs. `python` runs `ruff` and the whole pytest suite; `go` runs `go vet` and `go test -race`; and
-`containers`, which waits for both, builds the two images and then **starts** them:
+jobs. `make check` covers the first two locally; the third has no local equivalent. `python` runs
+`ruff` and the whole pytest suite; `go` runs `go vet` and `go test -race`; and `containers`, which
+waits for both, builds the two images and then **starts** them:
 
 | Step | What it proves |
 | --- | --- |
@@ -546,6 +547,14 @@ the job output rather than a bare timeout.
 A `v*` tag runs the same three jobs and then, only once all three are green, the `release` job builds
 `xianxia_rp_v<version>.zip` and attaches it to a GitHub Release. No image is ever pushed to a
 registry: the NAS builds its own from the zip through `./startup.sh`.
+
+A fourth check appears on pull requests without living in this repository: **CodeQL**, enabled
+through GitHub's default code-scanning setup rather than a workflow file, which is why there is no
+`codeql.yml` to find. It scans the Python and Go sources and reports to the Security tab. Take its
+findings as bug reports rather than style notes — it has caught real ones here, an integer
+conversion that silently truncated on 32-bit and a regular expression with quadratic backtracking
+on player input — but it cannot see intent, so a finding that is genuinely a false positive is
+dismissed in the Security tab with a reason, not worked around in the code.
 
 Layout: `app/bot` (Discord), `app/rules` (pure content helpers), `app/ai` (router, narrator, RAG),
 `app/ops` (config, engine client, health), `app/dashboard`, `app/database` (repository API over the
