@@ -59,6 +59,41 @@ jobs:
       - run: docker build -f Dockerfile -t xianxia-bot:ci .
       - run: docker build -f go_core/Dockerfile -t xianxia-engine:ci .
 
+      # A build proves the image assembles, not that it starts. Both images
+      # have a startup path CI never exercised: the bot's three services and
+      # their imports, and the engine's entrypoint, which fixes up the data
+      # directory's ownership as root and drops to uid 10001 through gosu
+      # before the binary ever runs. A missing runtime dependency or a
+      # mistake in that fixup would pass a green build and only surface on
+      # the NAS. These two steps run what the images actually run.
+      - name: The bot image imports every service it starts
+        run: |
+          docker run --rm \
+            -e DISCORD_TOKEN=ci -e GUILD_ID=1 \
+            -e ENGINE_AUTH_TOKEN=ci-smoke-token-0000000000 \
+            -e DATABASE_PATH=/app/data/ci.sqlite3 \
+            xianxia-bot:ci \
+            python -c "import app.bot, app.dashboard, app.ops.healthcheck"
+
+      - name: The engine image starts, opens SQLite and serves
+        run: |
+          # ENGINE_ADDR is 127.0.0.1:8081 by default, which a published port
+          # cannot reach; bind the container's own interface instead.
+          docker run -d --name engine-smoke \
+            -e ENGINE_ADDR=0.0.0.0:8081 \
+            -e ENGINE_AUTH_TOKEN=ci-smoke-token-0000000000 \
+            -e DATABASE_PATH=/data/ci.sqlite3 \
+            -p 8081:8081 xianxia-engine:ci
+          ok=
+          for _ in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8081/livez; then ok=1; break; fi
+            sleep 1
+          done
+          echo "--- engine log ---"
+          docker logs engine-smoke
+          docker rm -f engine-smoke >/dev/null
+          test "${ok:-}" = 1
+
   release:
     # Only a v* tag reaches this job, and only after every check above passed
     # on that same commit: the release is built from a tree CI has just proven.
