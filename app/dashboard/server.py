@@ -992,17 +992,28 @@ class ReadOnlyDashboardStore:
                 """SELECT s.*,c.name AS player_name,c.location FROM seclusion_sessions s JOIN characters c ON c.user_id=s.user_id
                    ORDER BY (s.status='active') DESC,s.updated_at DESC LIMIT 150""",
             )
+            qi_bodies = await self._fetchall_if_table(
+                db, "character_qi_body",
+                """SELECT q.*,c.name AS player_name,c.discord_name,c.realm_index,c.phase,c.qi,c.qi_max
+                   FROM character_qi_body q JOIN characters c ON c.user_id=q.user_id
+                   ORDER BY q.meridians_damaged DESC,c.realm_index DESC,q.meridians_open DESC,c.name LIMIT 300""",
+            )
             summary = {
                 "roots": len(roots),
                 "mutated_roots": sum(1 for r in roots if str(r.get("mutation") or "").strip()),
                 "active_seclusion": sum(1 for r in seclusion if str(r.get("status")) == "active"),
                 "uncleared_tribulations": sum(1 for r in tribulations if not int(r.get("cleared") or 0)),
                 "bloodlines": len(bloodlines),
+                "ruptured_qi_bodies": sum(
+                    1 for r in qi_bodies
+                    if int(r.get("meridians_damaged") or 0) or str(r.get("dantian_state") or "intact") != "intact"
+                ),
             }
             return {
                 "summary": summary, "roots": roots, "bloodlines": bloodlines, "physiques": physiques,
                 "dao": dao, "laws": laws, "tribulations": tribulations, "tribulation_attempts": attempts,
                 "realm_perfection": perfection, "body_realm_perfection": body_perfection, "seclusion": seclusion,
+                "qi_bodies": qi_bodies,
             }
 
     async def crafting(self) -> dict[str, Any]:

@@ -302,11 +302,18 @@ func manualTechniqueAction(conn *storage.Conn, catalog worlddata.Catalog, userID
 	if ch == nil {
 		return authoritativeMutation{}, errors.New("character not found")
 	}
-	if i64(ch["qi"]) < t.QiCost || i64(ch["vitality"])-t.VitalityCost < 1 {
-		return authoritativeMutation{}, errors.New("insufficient Qi or Vitality")
-	}
+	// The qi body (v1.0.0-rc.7): the content's qi cost is a base, scaled into
+	// this cultivator's own pool and by the purity of what they hold.
 	now := float64(time.Now().UnixNano()) / 1e9
-	_, e = conn.Execute(`UPDATE characters SET qi=qi-?,vitality=vitality-?,updated_at=? WHERE user_id=?`, []any{t.QiCost, t.VitalityCost, now, userID})
+	state, e := settleQi(conn, catalog, userID, p.GameMinute, now)
+	if e != nil {
+		return authoritativeMutation{}, e
+	}
+	qiCost := state.Cost(t.QiCost)
+	if state.Qi < qiCost || i64(ch["vitality"])-t.VitalityCost < 1 {
+		return authoritativeMutation{}, fmt.Errorf("insufficient Qi or Vitality: %d qi required, %d held", qiCost, state.Qi)
+	}
+	_, e = conn.Execute(`UPDATE characters SET qi=qi-?,vitality=vitality-?,updated_at=? WHERE user_id=?`, []any{qiCost, t.VitalityCost, now, userID})
 	if e != nil {
 		return authoritativeMutation{}, e
 	}
@@ -383,7 +390,7 @@ func manualTechniqueAction(conn *storage.Conn, catalog worlddata.Catalog, userID
 			}
 		}
 	}
-	result := map[string]any{"technique_id": p.TechniqueID, "name": t.Name, "qi_cost": t.QiCost, "vitality_cost": t.VitalityCost, "damage": damage, "heal": heal, "suppress_turns": suppress, "npc_hp": nhp, "battle_id": i64(battle["battle_id"]), "forbidden": forbidden, "karma_score": karma, "karma_cost": t.KarmaCost, "exposure": exposure, "witnessed": witnessed, "crime": crime, "impacts": impacts}
+	result := map[string]any{"technique_id": p.TechniqueID, "name": t.Name, "qi_cost": qiCost, "qi_cost_base": t.QiCost, "vitality_cost": t.VitalityCost, "damage": damage, "heal": heal, "suppress_turns": suppress, "npc_hp": nhp, "battle_id": i64(battle["battle_id"]), "forbidden": forbidden, "karma_score": karma, "karma_cost": t.KarmaCost, "exposure": exposure, "witnessed": witnessed, "crime": crime, "impacts": impacts}
 	return authoritativeMutation{Result: result, Event: eventledger.Event{Domain: "manuals", EventType: "manual.technique", EntityType: "technique", EntityID: p.TechniqueID, GameMinute: p.GameMinute, Payload: result}}, nil
 }
 

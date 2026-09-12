@@ -939,3 +939,179 @@ async def tribulation_attempt(interaction: discord.Interaction, path: app_comman
     await reply_long(interaction, "\n".join(lines), ephemeral=False)
 
 
+
+
+# ---------------- The qi body (v1.0.0-rc.7) ----------------
+# The channels qi runs through and the three dantian they feed. The engine
+# owns every number here; these commands choose and report.
+meridian_group = app_commands.Group(name="meridian", description="The channels qi runs through: open them, mend them")
+dantian_group = app_commands.Group(name="dantian", description="The three dantian: what you hold, how clean it is, how far you feel")
+
+
+def _dantian_state_word(state: str) -> str:
+    return {"intact": "intact", "cracked": "**cracked**", "shattered": "**shattered**"}.get(str(state), str(state))
+
+
+async def _qi_body(user_id: int) -> dict[str, Any]:
+    return dict(await ENGINE.action("qi.status", user_id, {}) or {})
+
+
+def _qi_body_lines(name: str, status: dict[str, Any]) -> list[str]:
+    open_count, damaged = int(status.get("meridians_open", 0)), int(status.get("meridians_damaged", 0))
+    ceiling = int(status.get("meridian_ceiling", 108))
+    purity, ceiling_purity = int(status.get("purity", 0)), int(status.get("purity_ceiling", 0))
+    lines = [
+        f"🧬 **{name} — the qi body**",
+        f"🫀 **Lower dantian:** **{int(status.get('qi', 0)):,} / {int(status.get('qi_max', 0)):,}** qi"
+        f" • recovering **{float(status.get('regen_per_game_minute', 0)):.1f}** a game minute"
+        f" • the vessel is {_dantian_state_word(status.get('dantian_state', 'intact'))}",
+        f"⚗️ **Middle dantian:** purity **{purity}%** of a possible **{ceiling_purity}%**"
+        f" • every technique costs **x{float(status.get('skill_cost_mult', 1)):.2f}**",
+    ]
+    if status.get("upper_open"):
+        lines.append(f"👁️ **Upper dantian:** open • spiritual sense reaches **{int(status.get('sense_reach', 0)):,}**")
+    else:
+        lines.append("👁️ **Upper dantian:** sealed until the Nascent Soul realm.")
+    lines.append(
+        f"🩸 **Meridians:** **{open_count}/{ceiling}** open"
+        + (f", **{damaged} ruptured**" if damaged else "")
+        + f" • the next costs **{int(status.get('meridian_open_cost', 0))} Insight XP** (you hold **{int(status.get('insight_xp', 0))}**)"
+    )
+    if str(status.get("manual_name") or ""):
+        lines.append(
+            f"📖 **{status.get('manual_name')}** ({status.get('manual_grade')}) widens the dantian by "
+            f"**x{float(status.get('manual_capacity_mult', 1)):.2f}**."
+        )
+    lines.append(f"☯️ A breakthrough attempt burns **{int(status.get('breakthrough_qi_cost', 0)):,}** qi.")
+    return lines
+
+
+@registered_group_command(dantian_group, name="status", description="Inspect your qi body: the three dantian and your meridians")
+async def dantian_status(interaction: discord.Interaction) -> None:
+    await interaction.response.defer(ephemeral=False)
+    c = await require_character(interaction)
+    if not c:
+        return
+    try:
+        status = await _qi_body(interaction.user.id)
+    except GameEngineError as exc:
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
+        return
+    await reply_long(interaction, "\n".join(_qi_body_lines(str(c["name"]), status)), ephemeral=False)
+
+
+@registered_group_command(dantian_group, name="refine", description="Refine what you hold: cleaner qi makes every technique cheaper")
+@serialized_user_action
+async def dantian_refine(interaction: discord.Interaction) -> None:
+    """The middle dantian's work: a session spent cleaning rather than
+    gathering. Purity sets what every technique costs."""
+    await interaction.response.defer(ephemeral=False)
+    c = await require_character(interaction)
+    if not c:
+        return
+    try:
+        envelope = await ENGINE.authoritative_action(
+            "qi.refine", interaction.user.id, {"cooldown_seconds": 30 * 60},
+            action_id=f"discord:{interaction.id}:qi.refine",
+        )
+    except GameEngineError as exc:
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
+        return
+    result = dict(envelope.get("result") or {})
+    await interaction.followup.send(
+        f"⚗️ **{c['name']} circulates what they hold through the middle dantian.**\n"
+        f"Purity **+{int(result.get('purity_gain', 0))}** → **{int(result.get('purity', 0))}%** "
+        f"of a possible **{int(result.get('purity_ceiling', 0))}%**.\n"
+        f"Every technique now costs **x{float(result.get('skill_cost_mult', 1)):.2f}**. "
+        f"The refining spent **{int(result.get('qi_spent', 0)):,}** qi; **{int(result.get('qi', 0)):,} / {int(result.get('qi_max', 0)):,}** remains.",
+        ephemeral=False,
+    )
+
+
+@registered_group_command(meridian_group, name="status", description="See which of your channels are open, and which are ruptured")
+async def meridian_status(interaction: discord.Interaction) -> None:
+    await interaction.response.defer(ephemeral=False)
+    c = await require_character(interaction)
+    if not c:
+        return
+    try:
+        status = await _qi_body(interaction.user.id)
+    except GameEngineError as exc:
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
+        return
+    open_count, ceiling = int(status.get("meridians_open", 0)), int(status.get("meridian_ceiling", 108))
+    damaged = int(status.get("meridians_damaged", 0))
+    filled = max(0, min(20, round(open_count * 20 / max(1, ceiling))))
+    lines = [
+        f"🩸 **{c['name']} — the meridians**",
+        f"`{'▰' * filled}{'▱' * (20 - filled)}` **{open_count}/{ceiling}** open"
+        + (f" • **{damaged} ruptured**" if damaged else ""),
+        f"Each open channel widens the dantian by **2%** and quickens its recovery by **1%**.",
+        f"The next costs **{int(status.get('meridian_open_cost', 0))} Insight XP** and a quarter of your qi — "
+        "**/cultivation → Qi Body → Meridian Open**.",
+    ]
+    if damaged:
+        lines.append("A ruptured channel halves your recovery and doubles what techniques cost. Mend it with **/cultivation → Qi Body → Meridian Heal**.")
+    await reply_long(interaction, "\n".join(lines), ephemeral=False)
+
+
+@registered_group_command(meridian_group, name="open", description="Force the next channel open: Insight XP, qi, and a roll that can go wrong")
+@serialized_user_action
+async def meridian_open(interaction: discord.Interaction) -> None:
+    await interaction.response.defer(ephemeral=False)
+    c = await require_character(interaction)
+    if not c:
+        return
+    try:
+        envelope = await ENGINE.authoritative_action(
+            "meridian.open", interaction.user.id, {},
+            action_id=f"discord:{interaction.id}:meridian.open",
+        )
+    except GameEngineError as exc:
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
+        return
+    result = dict(envelope.get("result") or {})
+    roll = SimpleNamespace(**dict(result.get("roll") or {}))
+    lines = [f"🩸 **{c['name']} drives qi against the next channel.**", roll_line(roll)]
+    if result.get("success"):
+        lines.append(f"✨ It opens. **{int(result.get('meridians_open', 0))}/{int(result.get('meridian_ceiling', 108))}** channels now carry your qi.")
+    else:
+        lines.append("⚠️ The channel holds, and the qi turns back on you.")
+        deviation = dict(result.get("deviation") or {})
+        if deviation:
+            lines.append(
+                f"⚠️ **{deviation.get('name') or 'Qi Deviation'}** (severity {int(deviation.get('severity', 1))}/5). "
+                "Treat it under **/character → Treatment**."
+            )
+    lines.append(
+        f"Spent **{int(result.get('insight_spent', 0))} Insight XP** and **{int(result.get('qi_spent', 0)):,}** qi; "
+        f"**{int(result.get('qi', 0)):,} / {int(result.get('qi_max', 0)):,}** remains."
+    )
+    await reply_long(interaction, "\n".join(lines), ephemeral=False)
+
+
+@registered_group_command(meridian_group, name="heal", description="Mend a ruptured channel, or a cracked dantian, with spirit stones and quiet")
+@serialized_user_action
+async def meridian_heal(interaction: discord.Interaction) -> None:
+    await interaction.response.defer(ephemeral=False)
+    c = await require_character(interaction)
+    if not c:
+        return
+    try:
+        envelope = await ENGINE.authoritative_action(
+            "meridian.heal", interaction.user.id, {},
+            action_id=f"discord:{interaction.id}:meridian.heal",
+        )
+    except GameEngineError as exc:
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
+        return
+    result = dict(envelope.get("result") or {})
+    mended = "channel" if str(result.get("mended")) == "meridian" else "dantian"
+    await interaction.followup.send(
+        f"🩹 **{c['name']} mends a ruptured {mended}.**\n"
+        f"Spent **{int(result.get('stones_spent', 0)):,}** spirit stones. "
+        f"**{int(result.get('meridians_damaged', 0))}** ruptures remain; the vessel is "
+        f"{_dantian_state_word(result.get('dantian_state', 'intact'))}.\n"
+        f"Qi: **{int(result.get('qi', 0)):,} / {int(result.get('qi_max', 0)):,}**.",
+        ephemeral=False,
+    )

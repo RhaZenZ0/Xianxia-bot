@@ -51,6 +51,9 @@ var authoritativeMutations = map[string]bool{
 	"cultivation.stance":              true,
 	"cultivation.insight":             true,
 	"cultivation.manual":              true,
+	"meridian.open":                   true,
+	"meridian.heal":                   true,
+	"qi.refine":                       true,
 	"lifecycle.true_death":            true,
 	"lifecycle.reincarnate":           true,
 	"combat.start":                    true,
@@ -178,6 +181,7 @@ var authoritativeQueries = map[string]bool{
 	"merchant.status":           true,
 	"trade.status":              true,
 	"cultivation.status":        true,
+	"qi.status":                 true,
 	"shop.here":                 true,
 	"shop.browse":               true,
 	// v0.30.0: the world-status reads that app/simulation/world.py ran as raw
@@ -383,8 +387,6 @@ func applyAuthoritative(databasePath, worldPath string, req ActionRequest) (Acti
 			} else {
 				mutation, err = resolveSceneAction(conn, catalog, req.ActorID, req.Payload)
 			}
-		case "alchemy.purge":
-			mutation, err = alchemyPurgeAction(conn, req.ActorID, req.Payload)
 		case "character.set_gender":
 			mutation, err = setGenderAction(conn, req.ActorID, req.Payload)
 		case "sect.abode.enter":
@@ -429,6 +431,7 @@ func applyAuthoritative(databasePath, worldPath string, req ActionRequest) (Acti
 		case "aptitude.temper", "aptitude.awaken", "aptitude.evolve", "aptitude.harmonize",
 			"cultivation.train", "cultivation.body_train", "cultivation.breakthrough", "cultivation.body_breakthrough",
 			"cultivation.stance", "cultivation.insight", "cultivation.manual",
+			"meridian.open", "meridian.heal", "qi.refine", "alchemy.purge",
 			"lifecycle.reincarnate", "combat.turn", "combat.technique", "combat.recovery_item",
 			"perfection.start", "perfection.quest", "perfection.trial", "perfection.abandon",
 			"perfection.body_start", "perfection.body_quest", "perfection.body_trial", "perfection.body_abandon", "law.comprehend",
@@ -467,6 +470,14 @@ func applyAuthoritative(databasePath, worldPath string, req ActionRequest) (Acti
 				mutation, err = cultivationInsightAction(conn, catalog, req.ActorID, req.Payload)
 			case "cultivation.manual":
 				mutation, err = cultivationManualAction(conn, catalog, req.ActorID, req.Payload)
+			case "meridian.open":
+				mutation, err = meridianOpenAction(conn, catalog, req.ActorID, req.Payload)
+			case "meridian.heal":
+				mutation, err = meridianHealAction(conn, catalog, req.ActorID, req.Payload)
+			case "qi.refine":
+				mutation, err = refineQiAction(conn, catalog, req.ActorID, req.Payload)
+			case "alchemy.purge":
+				mutation, err = alchemyPurgeAction(conn, catalog, req.ActorID, req.Payload)
 			case "lifecycle.reincarnate":
 				mutation, err = reincarnateAction(conn, catalog, req.ActorID, req.Payload)
 			case "combat.turn":
@@ -661,6 +672,20 @@ func applyAuthoritativeQuery(databasePath, worldPath string, req ActionRequest) 
 			return ActionResponse{}, loadErr
 		}
 		result, qerr := merchantStatusQuery(conn, catalog, req.ActorID)
+		if qerr != nil {
+			return ActionResponse{}, qerr
+		}
+		v, _ := eventledger.CurrentActorVersion(conn, req.ActorID)
+		return ActionResponse{APIVersion: authoritativeAPIVersion, Operation: req.Operation, StateVersion: v, Result: result}, nil
+	case "qi.status":
+		if strings.TrimSpace(worldPath) == "" {
+			return ActionResponse{}, errors.New("world catalog path is required")
+		}
+		catalog, loadErr := worlddata.Load(worldPath)
+		if loadErr != nil {
+			return ActionResponse{}, loadErr
+		}
+		result, qerr := qiBodyStatusQuery(conn, catalog, req.ActorID)
 		if qerr != nil {
 			return ActionResponse{}, qerr
 		}

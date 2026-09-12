@@ -29,6 +29,26 @@ def _relative_time(seconds: object) -> str:
     return f"ready <t:{int(time.time()) + remaining}:R>"
 
 
+def _qi_body_value(status: dict) -> str:
+    """The qi body on the sheet (v1.0.0-rc.7): what the lower dantian holds and
+    how fast it fills, how clean the middle dantian keeps it and what that
+    costs, and how many channels carry it."""
+    capacity = max(1, int(status.get("qi_max", 1) or 1))
+    qi = max(0, int(status.get("qi", 0) or 0))
+    filled = max(0, min(10, round(qi * 10 / capacity)))
+    line = f"`{'▰' * filled}{'▱' * (10 - filled)}` **{qi:,} / {capacity:,}** qi"
+    if float(status.get("qi_regen", 0) or 0):
+        line += f" • +{float(status.get('qi_regen', 0)):.1f}/game minute"
+    line += f"\n⚗️ purity **{int(status.get('purity', 0))}%** of **{int(status.get('purity_ceiling', 0))}%** — techniques **x{float(status.get('skill_cost_mult', 1)):.2f}**"
+    damaged = int(status.get("meridians_damaged", 0) or 0)
+    line += f"\n🩸 **{int(status.get('meridians_open', 0))}/{int(status.get('meridian_ceiling', 108))}** meridians"
+    if damaged:
+        line += f" • **{damaged} ruptured**"
+    if str(status.get("dantian_state") or "intact") != "intact":
+        line += f" • the vessel is **{status.get('dantian_state')}**"
+    return line
+
+
 async def cultivation_status_fields(interaction: discord.Interaction, *, fallback: Any) -> list[HubStatusField]:
     """The cultivation sheet (v1.0.0-rc.3), the hub's first page: realm and
     stage with the essence bar, the stance and when the next session is
@@ -63,6 +83,9 @@ async def cultivation_status_fields(interaction: discord.Interaction, *, fallbac
         odds_line += f"\n-# {movers}"
     if status.get("reroll_available"):
         odds_line += f"\n🎯 A moment to seize: one more roll for **{int(status.get('reroll_cost', 0))} Insight XP**"
+    odds_line += f"\n-# 💡 **{int(status.get('insight_xp', 0)):,}** Insight XP"
+    if int(status.get("breakthrough_qi_cost", 0)):
+        odds_line += f" • burns **{int(status.get('breakthrough_qi_cost', 0)):,}** qi"
     if status.get("ceiling"):
         odds_line = "At the ceiling of this path."
     elif status.get("realm_gate"):
@@ -111,10 +134,7 @@ async def cultivation_status_fields(interaction: discord.Interaction, *, fallbac
         HubStatusField("🎲 Breakthrough", odds_line, inline=False),
         HubStatusField("🌤️ Today", today),
         HubStatusField("💪 Body", body_line),
-        HubStatusField(
-            "💡 Insight XP",
-            f"**{int(status.get('insight_xp', 0)):,}**" + (" • banked 🔑" if status.get("insight_banked") else f" • +{int(status.get('insight_xp_per_refine', 2))}/Refine session"),
-        ),
+        HubStatusField("🫀 Qi Body", _qi_body_value(status), inline=False),
     ]
 
 

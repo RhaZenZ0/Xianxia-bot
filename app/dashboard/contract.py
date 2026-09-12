@@ -9,7 +9,7 @@ from typing import Iterable
 # run before the bot/dashboard dependencies are installed.  Keep the browser/API,
 # schema-review, and newer-system coverage contract in one place.
 DASHBOARD_API_VERSION = 2
-DASHBOARD_REVIEWED_SCHEMA_VERSION = 39
+DASHBOARD_REVIEWED_SCHEMA_VERSION = 40
 
 DASHBOARD_GET_API_PATHS = frozenset({
     "/api/overview", "/api/capabilities", "/api/timeline", "/api/npcs", "/api/npc",
@@ -67,6 +67,8 @@ DASHBOARD_SYSTEM_TABLES = {
         "character_spiritual_roots", "character_bloodlines", "character_physiques", "dao_progress",
         "law_progress", "tribulation_state", "tribulation_attempts", "realm_perfection",
         "body_realm_perfection", "seclusion_sessions",
+        # v1.0.0-rc.7 (schema 40): the qi body - purity, the meridians, the dantian.
+        "character_qi_body",
     ),
     "crafting": (
         "profession_progress", "alchemy_state", "alchemy_batches", "spirit_beasts", "artifact_bonds",

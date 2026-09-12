@@ -38,7 +38,9 @@ func alchemyPurgeApply(t *testing.T, path string, actor int64, actionID string) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	out, err := ApplyWithWorld(path, "", ActionRequest{
+	// The purge reads the catalogue since v1.0.0-rc.7: its qi cost is scaled
+	// into the cultivator's own pool.
+	out, err := ApplyWithWorld(path, batch4WorldPath(t), ActionRequest{
 		APIVersion: authoritativeAPIVersion,
 		ActionID:   actionID,
 		Operation:  "alchemy.purge",
@@ -84,15 +86,24 @@ func TestAPurgeSpendsQiReducesToxicityAndSetsTheCooldownTogether(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// min(12, max(4, 64/8)) = 8
-	if got := storage.ParseInt(result["qi_cost"]); got != 8 {
-		t.Fatalf("qi_cost=%d, want 8", got)
+	// min(12, max(4, 64/8)) = 8 of the old fourteen-point pool, scaled into
+	// the cultivator's own dantian and priced by their purity (v1.0.0-rc.7).
+	capacity := storage.ParseInt(result["qi_max"])
+	wantCost := scaledQiCost(8, capacity, referenceQiPool(100), qiBody{Purity: purityStart, MeridiansOpen: meridianStartOpen, DantianState: "intact"})
+	if got := storage.ParseInt(result["qi_cost"]); got != wantCost {
+		t.Fatalf("qi_cost=%d, want %d (8 base against a pool of %d)", got, wantCost, capacity)
 	}
+	_ = qiBefore
 	if got := storage.ParseInt(result["purged"]); got != 64 {
 		t.Fatalf("purged=%d, want the whole 64", got)
 	}
-	if got := alchemyScalar(t, path, `SELECT qi FROM characters WHERE user_id=42`); got != qiBefore-8 {
-		t.Fatalf("qi=%d, want %d", got, qiBefore-8)
+	// The fixture starts with a full pool, so what is left is the settled
+	// capacity less the charge, and the row agrees with the receipt.
+	if got := alchemyScalar(t, path, `SELECT qi FROM characters WHERE user_id=42`); got != storage.ParseInt(result["qi"]) {
+		t.Fatalf("qi=%d, want the %v the receipt reports", got, result["qi"])
+	}
+	if got, want := storage.ParseInt(result["qi"]), capacity-wantCost; got != want {
+		t.Fatalf("qi=%d, want %d", got, want)
 	}
 	if got := alchemyScalar(t, path, `SELECT pill_toxicity FROM alchemy_state WHERE user_id=42`); got != 0 {
 		t.Fatalf("pill_toxicity=%d, want 0", got)

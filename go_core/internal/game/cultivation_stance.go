@@ -417,6 +417,10 @@ func cultivationStatusQuery(conn *storage.Conn, catalog worlddata.Catalog, userI
 	if err != nil {
 		return nil, err
 	}
+	qi, err := settleQi(conn, catalog, userID, gameMinute, now)
+	if err != nil {
+		return nil, err
+	}
 	rerollAvailable, err := rerollState(conn, userID, c.RealmIndex, c.Phase)
 	if err != nil {
 		return nil, err
@@ -440,7 +444,12 @@ func cultivationStatusQuery(conn *storage.Conn, catalog worlddata.Catalog, userI
 		"pace": stagePace(cost, c.RealmIndex), "sessions_per_stage": sessionsForStage(c.RealmIndex),
 		"world_mult":  worldQiMultiplier(catalog, realmWorld(catalog.Realms, c.RealmIndex)),
 		"manual_name": manualName, "manual_grade": manualGrade, "manual_mult": manualMult, "manual_chosen": manualChosen,
-		"deviation_severity": deviation, "attribute_quality": round4(attributeQuality(mods.value(c.Attributes["will"], "will"))),
+		"qi": qi.Qi, "qi_max": qi.Capacity, "qi_regen": qi.Regen, "purity": qi.Body.Purity,
+		"purity_ceiling": purityCeilingFor(c.RealmIndex, manualGrade), "skill_cost_mult": qi.Body.skillCostMultiplier(),
+		"meridians_open": qi.Body.MeridiansOpen, "meridians_damaged": qi.Body.MeridiansDamaged,
+		"meridian_ceiling": int64(meridianCeiling), "dantian_state": qi.Body.DantianState,
+		"breakthrough_qi_cost": maxI64(1, qi.Capacity/breakthroughQiShare),
+		"deviation_severity":   deviation, "attribute_quality": round4(attributeQuality(mods.value(c.Attributes["will"], "will"))),
 		"reroll_available": rerollAvailable, "reroll_cost": insightRerollCost(c.RealmIndex), "law_insight_cost": lawInsightSpendCost,
 	}
 	if c.BodyRealmIndex >= 0 && c.BodyRealmIndex < int64(len(catalog.BodyRealms)) {

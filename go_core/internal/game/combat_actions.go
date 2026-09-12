@@ -870,7 +870,13 @@ func combatRecoveryItemAction(conn *storage.Conn, catalog worlddata.Catalog, use
 		return authoritativeMutation{}, e
 	}
 	now := float64(time.Now().UnixNano()) / 1e9
-	_, e = conn.Execute(`UPDATE characters SET qi=MIN(qi_max,qi+?),vitality=MIN(vitality_max,vitality+?),updated_at=? WHERE user_id=?`, []any{item.Use.Instant.QiRestore, item.Use.Instant.VitalityRestore, now, userID})
+	qiRestore := maxI64(0, item.Use.Instant.QiRestore)
+	if qiRestore > 0 {
+		if state, err := settleQi(conn, catalog, userID, p.GameMinute, now); err == nil {
+			qiRestore = state.Restore(qiRestore)
+		}
+	}
+	_, e = conn.Execute(`UPDATE characters SET qi=MIN(qi_max,qi+?),vitality=MIN(vitality_max,vitality+?),updated_at=? WHERE user_id=?`, []any{qiRestore, item.Use.Instant.VitalityRestore, now, userID})
 	if e != nil {
 		return authoritativeMutation{}, e
 	}

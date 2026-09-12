@@ -358,6 +358,25 @@ func cultivationTrain(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 		if err != nil {
 			return authoritativeMutation{}, err
 		}
+		// The qi body (v1.0.0-rc.7): forcing dirties what you hold, and a
+		// deviation deep enough ruptures a channel.
+		if stance.Key == stanceForce {
+			if err = losePurity(conn, userID, 1, now); err != nil {
+				return authoritativeMutation{}, err
+			}
+		}
+		if deviation != nil {
+			if err = losePurity(conn, userID, 3, now); err != nil {
+				return authoritativeMutation{}, err
+			}
+			if i64(deviation["severity"]) >= 3 {
+				damaged, err := damageMeridian(conn, userID, now)
+				if err != nil {
+					return authoritativeMutation{}, err
+				}
+				deviation["meridians_damaged"] = damaged
+			}
+		}
 	}
 	cool := p.CooldownSeconds
 	if cool <= 0 {
@@ -597,6 +616,20 @@ func cultivationBreakthrough(conn *storage.Conn, catalog worlddata.Catalog, user
 	}
 	innate := int64(math.Round(mods.Add["breakthrough_bonus"]))
 	modifier := breakthroughModifier(c, mods, body, perfectBonus, resonance, innate)
+	// The qi body (v1.0.0-rc.7): an attempt is fuelled from the dantian, win
+	// or lose, so a dry cultivator prepares before they try.
+	now := float64(time.Now().UnixNano()) / 1e9
+	qiState, err := settleQi(conn, catalog, userID, p.GameMinute, now)
+	if err != nil {
+		return authoritativeMutation{}, err
+	}
+	qiCost := maxI64(1, qiState.Capacity/breakthroughQiShare)
+	if qiState.Qi < qiCost {
+		return authoritativeMutation{}, fmt.Errorf("a breakthrough burns %d qi and the dantian holds %d; rest or meditate until it is full", qiCost, qiState.Qi)
+	}
+	if _, err = spendQi(conn, userID, qiCost, qiState, now); err != nil {
+		return authoritativeMutation{}, err
+	}
 	tn := breakthroughTN(realms, realm, phase)
 	probability := breakthroughOdds(modifier, tn)
 	roll, err := roll2d10(modifier, tn)
@@ -605,7 +638,6 @@ func cultivationBreakthrough(conn *storage.Conn, catalog worlddata.Catalog, user
 	}
 	success := boolResult(roll)
 	failureLoss := maxI64(5, cost/10)
-	now := float64(time.Now().UnixNano()) / 1e9
 	if reroll {
 		if _, err = conn.Execute(`UPDATE characters SET insight_xp=insight_xp-?,updated_at=? WHERE user_id=?`, []any{rerollCost, now, userID}); err != nil {
 			return authoritativeMutation{}, err
@@ -631,6 +663,10 @@ func cultivationBreakthrough(conn *storage.Conn, catalog worlddata.Catalog, user
 		}
 		if err == nil && newRealm != realm {
 			attributeGains, err = growAttributesOnRealmCrossing(conn, catalog, userID, c, body, now)
+		}
+		// Every stage crossed widens the qi body by one channel.
+		if err == nil {
+			_, err = openMeridianOnStage(conn, userID, now)
 		}
 	} else {
 		col := "cultivation"
@@ -662,7 +698,7 @@ func cultivationBreakthrough(conn *storage.Conn, catalog worlddata.Catalog, user
 		}
 		insightSpent = true
 	}
-	result := map[string]any{"mode": map[bool]string{true: "body", false: "qi"}[body], "roll": roll, "success": success, "tn": tn, "modifier": modifier, "probability": probability, "realm_gate": newRealm != realm, "gate_via_insight": viaInsight, "insight_spent": insightSpent, "reroll": reroll, "reroll_cost": rerollCost, "reroll_available": rerollAvailable, "insight_xp": xpLeft, "cost": cost, "failure_loss": failureLoss, "from_realm": realmName(realms, realm), "from_stage": phase, "to_realm": realmName(realms, newRealm), "to_stage": newPhase, "from_world": oldWorld, "to_world": newWorld, "perfect_bonus": perfectBonus, "resonance_bonus": resonance, "innate_breakthrough_bonus": innate, "vitality_gain": vitalityGain, "ascended": oldWorld != newWorld, "attribute_gains": attributeGains, "world_mult": worldQiMultiplier(catalog, newWorld)}
+	result := map[string]any{"mode": map[bool]string{true: "body", false: "qi"}[body], "roll": roll, "success": success, "tn": tn, "modifier": modifier, "probability": probability, "realm_gate": newRealm != realm, "gate_via_insight": viaInsight, "insight_spent": insightSpent, "qi_spent": qiCost, "reroll": reroll, "reroll_cost": rerollCost, "reroll_available": rerollAvailable, "insight_xp": xpLeft, "cost": cost, "failure_loss": failureLoss, "from_realm": realmName(realms, realm), "from_stage": phase, "to_realm": realmName(realms, newRealm), "to_stage": newPhase, "from_world": oldWorld, "to_world": newWorld, "perfect_bonus": perfectBonus, "resonance_bonus": resonance, "innate_breakthrough_bonus": innate, "vitality_gain": vitalityGain, "ascended": oldWorld != newWorld, "attribute_gains": attributeGains, "world_mult": worldQiMultiplier(catalog, newWorld)}
 	if success {
 		legacy, err := awakenSoulMemoryGo(conn, userID, map[bool]int64{true: 4, false: 5}[body], now)
 		if err != nil {

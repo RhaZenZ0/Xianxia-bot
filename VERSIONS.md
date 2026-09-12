@@ -6,6 +6,25 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.0** (rc.7) gives a cultivator a body for the qi to live in. `character_qi_body` (schema 40)
+holds what the sheet never had: the purity of the qi in the dantian, the meridians opened out of the
+hundred and eight a cultivator can hold, the ones ruptured, and the state of the vessel itself. Qi
+is no longer a small pool that barely moved - capacity is half the current realm's phase costs,
+scaled by the stage within it, by the meridians open, by the state of the dantian and by the grade of
+the method practised, so a Qi Condensation cultivator holds hundreds and a Nascent Soul one holds
+tens of thousands. It refills over four game hours rather than by a flat trickle, and every cost in
+the game - a forbidden art, a purging pill, a technique in a duel - is now a share of the pool rather
+than a flat number, so the old prices still bite at every realm instead of becoming free at the
+second. Purity is the price of haste: the Force stance costs a point, a qi deviation costs three, and
+a severe one ruptures a meridian; impure qi makes every technique cost more (`2 - purity/100`, doubled
+while a meridian is torn). Each stage crossed opens another meridian, the middle dantian's spiritual
+sense reaches further as it does, and the upper dantian opens at Nascent Soul. A breakthrough now
+spends a quarter of the pool before the roll, so a cultivator who arrives at the gate drained waits.
+`/dantian refine` trades game time for purity up to the ceiling the realm allows, `/meridian open`
+spends qi to force one open early, and `/meridian heal` mends a rupture; all three sit on the new
+**Qi Body** page of the cultivation hub, and the sheet carries the pool, the regeneration, the purity
+against its ceiling and the meridians on one line.
+
 **1.0.0** (rc.6) gives a cultivator two things to raise besides the number on their sheet, and tilts
 the climb. The `formation` facility of a player's own property is a spirit-gathering array now, not
 just a workshop for inscribing formations: six percent a level, nine levels, and it multiplies what
@@ -160,10 +179,13 @@ mechanical authority paths.
 
 ## Release status — v1.0.0
 
-- Current release: v1.0.0 (rc.6): the spirit-gathering array a player raises at home; the manual they
-  practise speeding every session by its grade and mastery; a climb that tightens with each realm and
-  eases when a world is crossed. Tagged `v1.0.0-rc.6` on the beta channel; the NAS drills and two
-  quiet weeks make it `v1.0.0`.
+- Current release: v1.0.0 (rc.7, schema 40): the qi body - purity, the hundred and eight meridians,
+  the three dantian, a pool that scales with the realm and refills over game hours, and every qi cost
+  in the game rescaled as a share of it. Tagged `v1.0.0-rc.7` on the beta channel; the NAS drills and
+  two quiet weeks make it `v1.0.0`.
+- v1.0.0 (rc.6): the spirit-gathering array a player raises at home; the manual they practise speeding
+  every session by its grade and mastery; a climb that tightens with each realm and eases when a
+  world is crossed.
 - v1.0.0 (rc.5): a session is a share of the stage it fills; crossing a realm raises the cultivator;
   the higher worlds are thick with qi; four balance fixes.
 - v1.0.0 (rc.4): the ground a cultivator sits on priced and named; Insight XP spent on a seized
@@ -398,6 +420,8 @@ mechanical authority paths.
 - **Schema 27** added the v0.19.29 mute/freeze moderation columns on `characters`
   (`is_muted`, `is_frozen`, `moderation_reason`).
 - **Schema 28** added the Quest Forge definition table (`quest_definitions`).
+- **Schema 40** added the cultivator's qi body - purity, meridians and the dantian's state
+  (`character_qi_body`) (v1.0.0-rc.7).
 - **Schema 39** added the trade offers between cultivators (`trade_offers`) (v0.39.0).
 - **Schema 38** added the merchant holding a lot's high bid (`auctions.merchant_bidder`) (v0.37.0).
 - **Schema 37** added the city shops' shelves (`shop_state`, `shop_stock`) (v0.35.0).

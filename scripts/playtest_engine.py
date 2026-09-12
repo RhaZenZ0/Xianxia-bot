@@ -519,6 +519,9 @@ async def run(url: str, token: str, db_path: str) -> Report:
         report.add("PASS" if {"stance", "cost", "insight_xp", "insight_cost", "realm_gate"} <= set(sheet) and 0 <= int(odds.get("probability", -1)) <= 100 else "FAIL",
                    "the sheet carries the stance, the cost, the insight and the odds", f"stance={sheet.get('stance')} odds={odds.get('probability')}% tn={odds.get('tn')}")
     await step(report, "an unknown stance is refused", act("cultivation.stance", PLAYER, {"stance": "meditate"}), expect_error="unknown stance")
+    # A stage with room in it: since v1.0.0-rc.5 a session at a full stage
+    # banks nothing, which would make the Refine check below read as a failure.
+    await step(report, "stand at a stage with room in it", gm("admin.player.set_realm", {"user_id": PLAYER, "realm_index": 0, "phase": 2, "reason": "playtest"}))
     await step(report, "cultivation.stance refine", act("cultivation.stance", PLAYER, {"stance": "refine"}))
     trained = await step(report, "cultivation.train under Refine", act("cultivation.train", PLAYER, {"cooldown_seconds": 1}))
     if trained is not None:
@@ -628,7 +631,36 @@ async def run(url: str, token: str, db_path: str) -> Report:
                    "the session is worked by the method", f"x{with_method.get('manual_mult')} ({with_method.get('manual_name')})")
     await step(report, "an unlearned method is refused", act("cultivation.manual", PLAYER, {"manual_id": "advanced_demonic_019_sword_cultivator"}), expect_error="not been learned")
 
-    # ---- 17. backups -------------------------------------------------------
+    # ---- 17. the qi body (v1.0.0-rc.7) --------------------------------------
+    body = await step(report, "qi.status", engine.action("qi.status", PLAYER, {}))
+    if body is not None:
+        wanted = {"qi", "qi_max", "regen_per_game_minute", "purity", "purity_ceiling",
+                  "skill_cost_mult", "meridians_open", "meridians_damaged", "meridian_ceiling",
+                  "dantian_state", "upper_open", "breakthrough_qi_cost"}
+        report.add("PASS" if wanted <= set(body) else "FAIL", "the qi body carries the three dantian and the channels",
+                   f"{body.get('qi')}/{body.get('qi_max')} qi, purity {body.get('purity')}/{body.get('purity_ceiling')}%, "
+                   f"{body.get('meridians_open')}/{body.get('meridian_ceiling')} channels, vessel {body.get('dantian_state')}")
+        report.add("PASS" if int(body.get("qi_max") or 0) >= 120 and float(body.get("regen_per_game_minute") or 0) > 0 else "FAIL",
+                   "the dantian is the realm's, not the old flat pool", f"{body.get('qi_max')} qi, +{body.get('regen_per_game_minute')}/game minute")
+    await clear_cooldowns()
+    refined = await step(report, "qi.refine cleans what is held", act("qi.refine", PLAYER, {"cooldown_seconds": 1}))
+    if refined is not None:
+        report.add("PASS" if int(refined.get("purity_gain") or 0) > 0 and int(refined.get("qi_spent") or 0) > 0 else "FAIL",
+                   "refining trades qi for purity", f"+{refined.get('purity_gain')}% to {refined.get('purity')}% for {refined.get('qi_spent')} qi")
+    await step(report, "refining again at once is refused", act("qi.refine", PLAYER, {}), expect_error="cooldown")
+    await step(report, "nothing ruptured mends nothing", act("meridian.heal", PLAYER, {}), expect_error="ruptured")
+    await clear_cooldowns()
+    before_channels = dict(await engine.action("qi.status", PLAYER, {}) or {})
+    opening = await act("meridian.open", PLAYER, {})
+    if isinstance(opening, dict) and opening.get("meridian_ceiling"):
+        report.add("PASS" if int(opening.get("meridian_ceiling") or 0) == 108 and int(opening.get("insight_spent") or 0) > 0 else "FAIL",
+                   "meridian.open spends Insight XP and qi", f"{opening.get('insight_spent')} XP + {opening.get('qi_spent')} qi, "
+                   f"{'opened' if opening.get('success') else 'failed'} at {opening.get('meridians_open')}/108")
+    else:
+        report.add("PASS", "meridian.open spends Insight XP and qi",
+                   f"refused by design at {before_channels.get('meridians_open')} channels: {opening}")
+
+    # ---- 18. backups -------------------------------------------------------
     backup = await step(report, "create a backup", transport.create_backup())
     listed = await step(report, "list backups", transport.list_backups())
     if backup and listed is not None and not any(row.get("name") == backup.get("name") for row in listed):

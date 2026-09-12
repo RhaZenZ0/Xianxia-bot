@@ -297,7 +297,16 @@ the next one climbable; the cultivate cooldown sets the calendar. Crossing a rea
 attributes, one point of will and one of your path's own. Two things you raise yourself multiply
 every session: the spirit-gathering array in your own property, six percent a level through
 **/abode → Upgrade**, and the manual you practise, by its grade from Mortal to Dao and by your
-mastery of it, chosen with **/cultivation → Arts → Practise**. A sect is joined through an entrance trial before its examiner; every
+mastery of it, chosen with **/cultivation → Arts → Practise**. Qi itself now has a body to live in
+(v1.0.0-rc.7): a lower dantian whose size is the realm you stand in, the channels you have opened
+and the method you practise - hundreds of qi at Qi Condensation, tens of thousands at Nascent Soul -
+refilling over four game hours; a middle dantian whose purity prices every technique you use, raised
+by **/cultivation → Qi Body → Refine** and spent by forcing the gathering; a hundred and eight
+meridians, one more opened at every stage crossed and the rest forced open with Insight XP and a
+roll; and an upper dantian that opens at Nascent Soul and gives you a spiritual sense. Every qi cost
+in the game is read as a share of that pool, so a technique that bit at the first realm still bites
+at the fifth, a severe qi deviation ruptures a channel (mended with spirit stones and a day's quiet),
+and a breakthrough spends a quarter of the dantian before the roll. A sect is joined through an entrance trial before its examiner; every
 public sect bestows its own entry manual on passing, chosen inside the trial transaction, and the
 sect residence grows facility by facility with contribution points. A manual is an item, studied
 through the engine, which enforces its realm requirement; the whole 160-manual catalogue is content.
@@ -472,7 +481,7 @@ release; it never installs anything. On the NAS:
 - If narration goes flat after an image rebuild, check **/admin → Server → Ai Status** for a TLS
   banner first. If SQLite reports contention, verify only the engine opens the database.
 
-Keep the whole `data/` directory persistent across rebuilds. The current schema is **39**; every
+Keep the whole `data/` directory persistent across rebuilds. The current schema is **40**; every
 historical migration is kept so an old database upgrades in place.
 
 ## Development
