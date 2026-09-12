@@ -75,6 +75,9 @@ async def cultivate(interaction: discord.Interaction) -> None:
         extra += f"\n⚡ Active Qi Storm added **+{int(result['storm_bonus'])}** before the stage cap."
     if int(result.get("perfection_gain", 0)):
         extra += f"\n★ Realm refinement deepens by **+{int(result['perfection_gain'])}%**."
+    if float(result.get("manual_mult", 1)) != 1.0:
+        chosen = "you practise" if result.get("manual_chosen") else "the best method you have learned"
+        extra += f"\n📖 **{result.get('manual_name')}** ({result.get('manual_grade')} grade, {chosen}): **x{float(result['manual_mult']):.2f}**."
     if str(result.get("place_name") or ""):
         extra += f"\n🪨 **{result.get('place_name')}** — {result.get('place_quality') or 'ordinary'} ground: **x{float(result.get('place_mult', 1)):.2f}** cultivation efficiency."
     stance = str(result.get("stance") or "circulate")

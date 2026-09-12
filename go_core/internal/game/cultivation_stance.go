@@ -413,6 +413,10 @@ func cultivationStatusQuery(conn *storage.Conn, catalog worlddata.Catalog, userI
 	if err != nil {
 		return nil, err
 	}
+	manualName, manualGrade, manualMult, manualChosen, err := manualCultivationMultiplier(conn, catalog, userID)
+	if err != nil {
+		return nil, err
+	}
 	rerollAvailable, err := rerollState(conn, userID, c.RealmIndex, c.Phase)
 	if err != nil {
 		return nil, err
@@ -433,8 +437,9 @@ func cultivationStatusQuery(conn *storage.Conn, catalog worlddata.Catalog, userI
 		"manor_name": manorName, "manor_mult": manorMult, "storm_bonus": storm,
 		"insight_xp_per_refine": refineInsightXPPerSession, "force_deviation_percent": forceDeviationChancePercent,
 		"place_name": placeName, "place_mult": placeMult, "place_quality": placeQuality(placeMult),
-		"pace": stagePace(cost), "sessions_per_stage": int64(cultivationSessionsPerStage),
-		"world_mult":         worldQiMultiplier(catalog, realmWorld(catalog.Realms, c.RealmIndex)),
+		"pace": stagePace(cost, c.RealmIndex), "sessions_per_stage": sessionsForStage(c.RealmIndex),
+		"world_mult":  worldQiMultiplier(catalog, realmWorld(catalog.Realms, c.RealmIndex)),
+		"manual_name": manualName, "manual_grade": manualGrade, "manual_mult": manualMult, "manual_chosen": manualChosen,
 		"deviation_severity": deviation, "attribute_quality": round4(attributeQuality(mods.value(c.Attributes["will"], "will"))),
 		"reroll_available": rerollAvailable, "reroll_cost": insightRerollCost(c.RealmIndex), "law_insight_cost": lawInsightSpendCost,
 	}

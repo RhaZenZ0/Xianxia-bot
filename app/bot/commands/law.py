@@ -150,6 +150,21 @@ async def manual_autocomplete(interaction:discord.Interaction,current:str)->list
     return out[:25]
 
 
+async def learned_manual_autocomplete(interaction:discord.Interaction,current:str)->list[app_commands.Choice[str]]:
+    """The methods you have actually opened, best grade first - the ones you
+    can practise (v1.0.0-rc.6)."""
+    needle=current.casefold().strip(); learned={str(r['manual_id']) for r in await DB.get_manuals(interaction.user.id)}
+    order={g:i for i,g in enumerate(("Dao","Immortal","Heaven","Spirit","Earth","Mortal"))}
+    rows=[]
+    for mid in learned:
+        m=WORLD.manual_definition(mid) or {}
+        name=str(m.get('name',mid)); grade=str(m.get('grade','Unknown'))
+        if needle and needle not in name.casefold() and needle not in mid.casefold(): continue
+        rows.append((order.get(grade,99),name,app_commands.Choice(name=f"{name} • {grade}"[:100],value=mid[:100])))
+    rows.sort(key=lambda r:(r[0],r[1]))
+    return [r[2] for r in rows[:25]]
+
+
 async def learned_technique_autocomplete(interaction:discord.Interaction,current:str)->list[app_commands.Choice[str]]:
     needle=current.casefold().strip(); rows={str(r['manual_id']):r for r in await DB.get_manuals(interaction.user.id)}; out=[]
     for tid,t in WORLD.techniques.items():
@@ -211,6 +226,37 @@ async def manual_study(interaction:discord.Interaction,manual:str)->None:
         t=WORLD.technique_definition(str(tid)) or {}
         if int(state.get('mastery',0))>=int(t.get('min_mastery',0)): unlocked.append(str(t.get('name',tid)))
     await interaction.response.send_message(f"📖 **{m['name']}**\n{m.get('description','')}\nMastery: **{_mastery_name(int(state.get('mastery',0)))}** • Practice {state.get('practice',0)}\nUnlocked: **{', '.join(unlocked) if unlocked else 'none yet'}**{karma_note}",ephemeral=False)
+
+
+@registered_group_command(manual_group, name="practise",description="Choose the manual you cultivate by; its grade speeds every session")
+@app_commands.autocomplete(manual=learned_manual_autocomplete)
+@serialized_user_action
+async def manual_practise(interaction:discord.Interaction,manual:str)->None:
+    """The art you practise (v1.0.0-rc.6). The engine keeps the choice and
+    applies its grade and your mastery to every gathering session."""
+    await interaction.response.defer(ephemeral=False)
+    c=await require_character(interaction)
+    if not c:return
+    try:
+        envelope=await ENGINE.authoritative_action(
+            "cultivation.manual",interaction.user.id,
+            {"manual_id":manual},
+            action_id=f"discord:{interaction.id}:cultivation.manual",
+        )
+    except GameEngineError as exc:
+        message=str(exc)
+        if "has not been learned" in message:
+            message+=" Study it first with **/cultivation → Arts → Study**."
+        await interaction.followup.send(f"❌ {message}",ephemeral=False);return
+    result=dict(envelope.get("result") or {})
+    previous=str(result.get("previous_manual") or "")
+    note=f"\nYou set aside **{previous}**." if previous and result.get("changed") else ""
+    await interaction.followup.send(
+        f"📖 **{c['name']} circulates the {result.get('manual_name') or manual}.**\n"
+        f"Grade **{result.get('manual_grade') or 'Unknown'}** • mastery **{_mastery_name(int(result.get('mastery',0)))}** — "
+        f"every session gathers **x{float(result.get('manual_mult',1)):.2f}**.{note}",
+        ephemeral=False,
+    )
 
 
 @registered_group_command(manual_group, name="technique",description="Use a learned manual technique in your active battle")

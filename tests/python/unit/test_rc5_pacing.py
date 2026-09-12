@@ -44,9 +44,10 @@ def _surface():
 
 class TheStageSetsThePace(unittest.TestCase):
     def test_a_session_is_a_share_of_the_stage_and_the_engine_says_which(self):
-        self.assertIn("func stagePace(cost int64) int64", GO_PACE)
-        self.assertIn("cultivationSessionsPerStage = 12", GO_PACE)
-        self.assertIn("pace := stagePace(cost)", GO_ACTIONS)
+        self.assertIn("func stagePace(cost, realmIndex int64) int64", GO_PACE)
+        self.assertIn("cultivationSessionsPerStage = 8", GO_PACE)
+        self.assertIn("func sessionsForStage(realmIndex int64) int64", GO_PACE)
+        self.assertIn("pace := stagePace(cost, realm)", GO_ACTIONS)
         self.assertIn("base := maxI64(1, int64(math.Round(float64(pace)*quality*variance)))", GO_ACTIONS)
         # The old flat session is gone.
         self.assertNotIn("base := int64(8+rv) + mods.value(c.Attributes[attr], attr)", GO_ACTIONS)
@@ -55,19 +56,24 @@ class TheStageSetsThePace(unittest.TestCase):
         realms = WORLD["realms"]
         density = WORLD["world_qi_density"]
 
-        def sessions(realm: dict, will: int) -> int:
+        def sessions(index: int, will: int) -> int:
+            realm = realms[index]
             quality = 1 + will / 20
             total = 0
             for cost in realm["phase_costs"]:
-                pace = max(8, cost // 12)
+                pace = max(8, cost // (8 + index * 5 // 4))
                 gain = max(1, round(pace * quality * density[realm["world"]]))
                 total += -(-cost // gain)
             return total
 
         # Will grows by one a realm, which is what a crossing now grants.
-        counts = [sessions(realms[index], 3 + index) for index in range(8)]
+        counts = [sessions(index, 3 + index) for index in range(len(realms))]
         self.assertLess(max(counts), 130, counts)
-        self.assertGreater(min(counts), 60, counts)
+        self.assertGreater(min(counts), 40, counts)
+        # The climb tightens inside the mortal world (v1.0.0-rc.6) and the
+        # next world's qi is the relief.
+        self.assertGreater(counts[7], counts[0], counts[:8])
+        self.assertLess(counts[8], counts[7], counts[7:9])
 
     def test_seclusion_is_paced_by_the_same_stage(self):
         self.assertIn("pace, worldMult := characterStagePace(catalog, character, mode)", GO_SECLUSION)

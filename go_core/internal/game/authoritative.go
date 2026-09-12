@@ -50,6 +50,7 @@ var authoritativeMutations = map[string]bool{
 	"cultivation.body_breakthrough":   true,
 	"cultivation.stance":              true,
 	"cultivation.insight":             true,
+	"cultivation.manual":              true,
 	"lifecycle.true_death":            true,
 	"lifecycle.reincarnate":           true,
 	"combat.start":                    true,
@@ -427,7 +428,7 @@ func applyAuthoritative(databasePath, worldPath string, req ActionRequest) (Acti
 			mutation, err = applyLateMigrationAction(conn, catalog, req.ActorID, req.Operation, req.Payload)
 		case "aptitude.temper", "aptitude.awaken", "aptitude.evolve", "aptitude.harmonize",
 			"cultivation.train", "cultivation.body_train", "cultivation.breakthrough", "cultivation.body_breakthrough",
-			"cultivation.stance", "cultivation.insight",
+			"cultivation.stance", "cultivation.insight", "cultivation.manual",
 			"lifecycle.reincarnate", "combat.turn", "combat.technique", "combat.recovery_item",
 			"perfection.start", "perfection.quest", "perfection.trial", "perfection.abandon",
 			"perfection.body_start", "perfection.body_quest", "perfection.body_trial", "perfection.body_abandon", "law.comprehend",
@@ -464,6 +465,8 @@ func applyAuthoritative(databasePath, worldPath string, req ActionRequest) (Acti
 				mutation, err = cultivationStanceAction(conn, req.ActorID, req.Payload)
 			case "cultivation.insight":
 				mutation, err = cultivationInsightAction(conn, catalog, req.ActorID, req.Payload)
+			case "cultivation.manual":
+				mutation, err = cultivationManualAction(conn, catalog, req.ActorID, req.Payload)
 			case "lifecycle.reincarnate":
 				mutation, err = reincarnateAction(conn, catalog, req.ActorID, req.Payload)
 			case "combat.turn":

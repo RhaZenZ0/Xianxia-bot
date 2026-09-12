@@ -31,9 +31,9 @@ func seclusionEnvironmentGo(conn *storage.Conn, catalog worlddata.Catalog, userI
 	env := map[string]any{
 		"site": "", "abode_name": "", "abode_property_type": "", "abode_level": int64(0),
 		"safe_zone": false, "manor_name": "", "manor_level": int64(0), "manor_mult": 1.0,
-		"array_name": "", "array_mult": 1.0, "base_mult": 1.0,
+		"array_name": "", "array_mult": 1.0, "base_mult": 1.0, "abode_array_mult": 1.0,
 	}
-	r, e := conn.Execute(`SELECT name,property_type,cultivation_level FROM cave_abodes WHERE location_key=?`, []any{location})
+	r, e := conn.Execute(`SELECT name,property_type,cultivation_level,formation_level FROM cave_abodes WHERE location_key=?`, []any{location})
 	if e != nil {
 		return nil, 0, e
 	}
@@ -44,7 +44,7 @@ func seclusionEnvironmentGo(conn *storage.Conn, catalog worlddata.Catalog, userI
 	residenceBase := location
 	var sectAbode map[string]any
 	if abode == nil && strings.HasPrefix(location, "sect_abode:") {
-		r, e = conn.Execute(`SELECT name,base_location,cultivation_level FROM sect_abodes WHERE location_key=? AND user_id=?`, []any{location, userID})
+		r, e = conn.Execute(`SELECT name,base_location,cultivation_level,formation_level FROM sect_abodes WHERE location_key=? AND user_id=?`, []any{location, userID})
 		if e != nil {
 			return nil, 0, e
 		}
@@ -87,8 +87,18 @@ func seclusionEnvironmentGo(conn *storage.Conn, catalog worlddata.Catalog, userI
 		base = 1.0
 		env["site"] = "safe_zone"
 	}
+	// The property's own spirit-gathering array (v1.0.0-rc.6), raised through
+	// the `formation` facility - the same array active meditation reads.
+	abodeArray := 1.0
+	switch {
+	case abode != nil:
+		abodeArray = abodeArrayMultiplier(abode)
+	case sectAbode != nil:
+		abodeArray = abodeArrayMultiplier(sectAbode)
+	}
+	env["abode_array_mult"] = abodeArray
 	env["base_mult"] = base
-	mult := base
+	mult := base * abodeArray
 	if manor != nil {
 		level := clamp(i64(manor["qi_array_level"]), 0, manorFacilityMaxGo)
 		manorMult := 1.0 + 0.08*float64(level)

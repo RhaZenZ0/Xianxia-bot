@@ -6,6 +6,20 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.0** (rc.6) gives a cultivator two things to raise besides the number on their sheet, and tilts
+the climb. The `formation` facility of a player's own property is a spirit-gathering array now, not
+just a workshop for inscribing formations: six percent a level, nine levels, and it multiplies what
+every session gathers at home and in closed-door seclusion alike. The manual a cultivator practises
+multiplies the gathering too, by its grade - Mortal, Earth, Spirit, Heaven, Immortal, Dao - deepened
+three percent for each level of mastery, so a perfected Dao method is worth half again what a mortal
+pamphlet is. `/cultivation → Arts → Practise` chooses it from the methods actually learned, and a
+cultivator who never chose gathers by the best method they hold, so every existing character
+benefits from the manual already on their shelf. And the pacing tilts: a stage takes eight sessions
+at Body Tempering and five quarters of a session more with each realm above it, so the early game is
+quick and the ladder steepens, while the qi of a new world (softened to 1.5, 2.0 and 2.5) is the
+relief that makes the next ladder climbable. No schema change - both the array column and the
+manuals table already existed.
+
 **1.0.0** (rc.5) fixes the curve the cultivation system sat on. A session used to be worth a flat
 `8 + d7 + attribute`, about fourteen essence, at every realm - while a realm cost about three fifths
 more than the last and a cultivator's attributes were written exactly once, at creation, and never
@@ -146,10 +160,12 @@ mechanical authority paths.
 
 ## Release status — v1.0.0
 
-- Current release: v1.0.0 (rc.5): a session is a share of the stage it fills, so every realm takes
-  about the same work; crossing a realm raises the cultivator; the higher worlds are thick with qi;
-  four balance fixes. Tagged `v1.0.0-rc.5` on the beta channel; the NAS drills and two quiet weeks
-  make it `v1.0.0`.
+- Current release: v1.0.0 (rc.6): the spirit-gathering array a player raises at home; the manual they
+  practise speeding every session by its grade and mastery; a climb that tightens with each realm and
+  eases when a world is crossed. Tagged `v1.0.0-rc.6` on the beta channel; the NAS drills and two
+  quiet weeks make it `v1.0.0`.
+- v1.0.0 (rc.5): a session is a share of the stage it fills; crossing a realm raises the cultivator;
+  the higher worlds are thick with qi; four balance fixes.
 - v1.0.0 (rc.4): the ground a cultivator sits on priced and named; Insight XP spent on a seized
   moment and on Laws; the cultivation hub as four pages; every roll printing its chance.
 - v1.0.0 (rc.3): the menu as four rows of four under live facts; the cultivation sheet; meditation

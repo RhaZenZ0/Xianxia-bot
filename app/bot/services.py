@@ -128,7 +128,7 @@ PLAYER_PROPERTY_FACILITY_LABELS = {
     "cultivation": "Cultivation Chamber",
     "alchemy": "Alchemy Furnace",
     "forge": "Forge Workshop",
-    "formation": "Formation Core",
+    "formation": "Spirit-Gathering Array",
     "defense": "Defensive Formation",
     "storage": "Storage",
     "herb_garden": "Spirit Herb Garden",

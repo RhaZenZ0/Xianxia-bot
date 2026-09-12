@@ -30,7 +30,9 @@ CREATE TABLE IF NOT EXISTS sect_manors(sect_name TEXT PRIMARY KEY,name TEXT NOT 
 CREATE TABLE IF NOT EXISTS sect_lineage(master_user_id INTEGER NOT NULL,disciple_user_id INTEGER NOT NULL,attention INTEGER NOT NULL DEFAULT 0);
 ALTER TABLE cave_abodes ADD COLUMN name TEXT NOT NULL DEFAULT '';
 ALTER TABLE cave_abodes ADD COLUMN cultivation_level INTEGER NOT NULL DEFAULT 0;
-CREATE TABLE IF NOT EXISTS sect_abodes(user_id INTEGER NOT NULL,location_key TEXT NOT NULL,name TEXT NOT NULL DEFAULT '',base_location TEXT NOT NULL DEFAULT '',cultivation_level INTEGER NOT NULL DEFAULT 0);
+CREATE TABLE IF NOT EXISTS sect_abodes(user_id INTEGER NOT NULL,location_key TEXT NOT NULL,name TEXT NOT NULL DEFAULT '',base_location TEXT NOT NULL DEFAULT '',cultivation_level INTEGER NOT NULL DEFAULT 0,formation_level INTEGER NOT NULL DEFAULT 0);
+ALTER TABLE cave_abodes ADD COLUMN formation_level INTEGER NOT NULL DEFAULT 0;
+CREATE TABLE IF NOT EXISTS character_manuals(user_id INTEGER NOT NULL,manual_id TEXT NOT NULL,mastery INTEGER NOT NULL DEFAULT 0,practice INTEGER NOT NULL DEFAULT 0,learned_at REAL NOT NULL DEFAULT 0,updated_at REAL NOT NULL DEFAULT 0,PRIMARY KEY(user_id,manual_id));
 `); err != nil {
 		t.Fatal(err)
 	}

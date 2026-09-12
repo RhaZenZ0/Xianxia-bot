@@ -23,8 +23,15 @@ import (
 // of rounding away to nothing.
 
 const (
-	// One stage is about this many sessions before any multiplier.
-	cultivationSessionsPerStage = 12
+	// A stage takes about this many sessions at the first realm, before any
+	// multiplier, and a quarter-session more with each realm above it
+	// (v1.0.0-rc.6). A flat twelve made every realm identical work; the climb
+	// should tighten as a cultivator rises, and the qi of a new world should
+	// be the relief that makes the next ladder climbable.
+	cultivationSessionsPerStage = 8
+	// Added to the sessions a stage takes, per realm: five quarters.
+	cultivationSessionsPerRealmNumerator   = 5
+	cultivationSessionsPerRealmDenominator = 4
 	// A day of closed-door cultivation is worth this many sessions, before the
 	// environment multiplier - less than sitting down for them by hand.
 	seclusionSessionsPerDay = 1.2
@@ -34,9 +41,17 @@ const (
 	cultivationAttributeShare = 20.0
 )
 
+// sessionsForStage is how many sessions a stage of this realm is meant to
+// take before the cultivator's own multipliers: eight at Body Tempering,
+// rising by five quarters a realm.
+func sessionsForStage(realmIndex int64) int64 {
+	realm := maxI64(0, realmIndex)
+	return cultivationSessionsPerStage + realm*cultivationSessionsPerRealmNumerator/cultivationSessionsPerRealmDenominator
+}
+
 // stagePace is what one session of this stage is worth before multipliers.
-func stagePace(cost int64) int64 {
-	return maxI64(cultivationPaceFloor, cost/cultivationSessionsPerStage)
+func stagePace(cost, realmIndex int64) int64 {
+	return maxI64(cultivationPaceFloor, cost/sessionsForStage(realmIndex))
 }
 
 // worldQiMultiplier is the qi density of a world (v1.0.0-rc.5): the higher
@@ -94,7 +109,7 @@ func characterStagePace(catalog worlddata.Catalog, character map[string]any, mod
 	if err != nil {
 		return cultivationPaceFloor, 1
 	}
-	return stagePace(cost), worldQiMultiplier(catalog, realmWorld(realms, index))
+	return stagePace(cost, index), worldQiMultiplier(catalog, realmWorld(realms, index))
 }
 
 // pathPrimaryAttribute is the attribute a path is built on - its highest

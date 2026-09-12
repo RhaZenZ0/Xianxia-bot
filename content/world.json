@@ -532,9 +532,9 @@
   ],
   "world_qi_density": {
     "Mortal World": 1.0,
-    "Spiritual World": 1.6,
-    "Immortal World": 2.6,
-    "Celestial World": 4.0
+    "Spiritual World": 1.5,
+    "Immortal World": 2.0,
+    "Celestial World": 2.5
   },
   "paths": {
     "Sword Cultivator": {

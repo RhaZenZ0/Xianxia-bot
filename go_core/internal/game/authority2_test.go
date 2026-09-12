@@ -24,6 +24,7 @@ func setupAuthority2DB(t *testing.T) string {
 ALTER TABLE cave_abodes ADD COLUMN name TEXT NOT NULL DEFAULT '';
 ALTER TABLE cave_abodes ADD COLUMN property_type TEXT NOT NULL DEFAULT 'cave_abode';
 ALTER TABLE cave_abodes ADD COLUMN cultivation_level INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE cave_abodes ADD COLUMN formation_level INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE birth_families ADD COLUMN family_name TEXT NOT NULL DEFAULT '';
 ALTER TABLE birth_families ADD COLUMN location TEXT NOT NULL DEFAULT '';
 ALTER TABLE birth_families ADD COLUMN line_status TEXT NOT NULL DEFAULT 'active';

@@ -614,7 +614,21 @@ async def run(url: str, token: str, db_path: str) -> Report:
     elif crossed is not None:
         report.add("PASS", "crossing a realm raises the cultivator", "the roll failed; attributes unchanged by design")
 
-    # ---- 16. backups -------------------------------------------------------
+    # ---- 16. the array and the method (v1.0.0-rc.6) -------------------------
+    manuals = [dict(r) for r in await db.get_manuals(PLAYER)]
+    if manuals:
+        best = max(manuals, key=lambda r: str(r.get("manual_id")))
+        practised = await step(report, "cultivation.manual chooses the method", act("cultivation.manual", PLAYER, {"manual_id": str(best.get("manual_id"))}))
+        if practised:
+            report.add("PASS" if float(practised.get("manual_mult") or 0) > 1.0 and practised.get("manual_grade") else "FAIL",
+                       "the method's grade speeds the gathering", f"{practised.get('manual_name')} ({practised.get('manual_grade')}) x{practised.get('manual_mult')}")
+        await clear_cooldowns()
+        with_method = dict(await act("cultivation.train", PLAYER, {"cooldown_seconds": 1}) or {})
+        report.add("PASS" if float(with_method.get("manual_mult") or 0) > 1.0 else "FAIL",
+                   "the session is worked by the method", f"x{with_method.get('manual_mult')} ({with_method.get('manual_name')})")
+    await step(report, "an unlearned method is refused", act("cultivation.manual", PLAYER, {"manual_id": "advanced_demonic_019_sword_cultivator"}), expect_error="not been learned")
+
+    # ---- 17. backups -------------------------------------------------------
     backup = await step(report, "create a backup", transport.create_backup())
     listed = await step(report, "list backups", transport.list_backups())
     if backup and listed is not None and not any(row.get("name") == backup.get("name") for row in listed):

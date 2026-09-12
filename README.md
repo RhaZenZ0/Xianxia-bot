@@ -291,10 +291,13 @@ array all gather faster, and the Here line, the result and the sheet name the gr
 Insight XP buys more than the gate: a seized moment is one more roll after a failed breakthrough at
 the same stage, once a stage, and `spend_insight` puts it into a Law comprehension. Every 2d10 roll
 prints the chance it had beside what fell. A session is a share of the stage it fills rather than a
-flat number (v1.0.0-rc.5), so a realm takes about the same hundred sessions at Divine Transformation
-as at Body Tempering and the cultivate cooldown sets the calendar; crossing a realm raises your
-attributes, one point of will and one of your path's own; and the worlds above the mortal one are
-thick with qi, which is what ascending is for. A sect is joined through an entrance trial before its examiner; every
+flat number (v1.0.0-rc.5), and a stage takes a little more work at each realm (v1.0.0-rc.6), so the
+early game is quick, the ladder steepens, and the thick qi of a new world is the relief that makes
+the next one climbable; the cultivate cooldown sets the calendar. Crossing a realm raises your
+attributes, one point of will and one of your path's own. Two things you raise yourself multiply
+every session: the spirit-gathering array in your own property, six percent a level through
+**/abode → Upgrade**, and the manual you practise, by its grade from Mortal to Dao and by your
+mastery of it, chosen with **/cultivation → Arts → Practise**. A sect is joined through an entrance trial before its examiner; every
 public sect bestows its own entry manual on passing, chosen inside the trial transaction, and the
 sect residence grows facility by facility with contribution points. A manual is an item, studied
 through the engine, which enforces its realm requirement; the whole 160-manual catalogue is content.

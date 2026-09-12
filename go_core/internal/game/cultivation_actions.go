@@ -248,7 +248,7 @@ func cultivationTrain(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
-	pace := stagePace(cost)
+	pace := stagePace(cost, realm)
 
 	bundle, err := loadAptitudes(conn, userID)
 	if err != nil {
@@ -292,7 +292,13 @@ func cultivationTrain(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 	// thick above it.
 	worldName := realmWorld(realms, realm)
 	worldMult := worldQiMultiplier(catalog, worldName)
-	attempted := int64(math.Round(float64(base+resonance) * timeMult * effectMult * soulMult * eraMult * stance.GainMult * worldMult))
+	// The method being practised (v1.0.0-rc.6): its grade, deepened by
+	// mastery.
+	manualName, manualGrade, manualMult, manualChosen, err := manualCultivationMultiplier(conn, catalog, userID)
+	if err != nil {
+		return authoritativeMutation{}, err
+	}
+	attempted := int64(math.Round(float64(base+resonance) * timeMult * effectMult * soulMult * eraMult * stance.GainMult * worldMult * manualMult))
 
 	// The ground, and what the sect built on it. The manor array and a qi
 	// storm are qi-path weather; the ground itself counts for both paths.
@@ -361,7 +367,7 @@ func cultivationTrain(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 		return authoritativeMutation{}, err
 	}
 	total := current + gain
-	payload := map[string]any{"mode": map[bool]string{true: "body", false: "qi"}[body], "gain": gain, "attempted_gain": attempted, "total": total, "cost": cost, "base_gain": base, "pace": pace, "sessions_per_stage": int64(cultivationSessionsPerStage), "attribute": attr, "attribute_value": attrValue, "attribute_quality": round4(quality), "resonance_bonus": resonance, "period": tm.Period, "season": tm.Season, "time_mult": timeMult, "root_resonance": tm.RootResonance, "effect_mult": effectMult, "soul_mult": soulMult, "era_name": eraName, "era_mult": eraMult, "world_name": worldName, "world_mult": worldMult, "manor_name": manorName, "manor_mult": manorMult, "storm_bonus": storm, "perfection_gain": pg, "ready": total >= cost, "stance": stance.Key, "stance_label": stance.Label, "stance_mult": stance.GainMult, "insight_xp_gain": insightGain, "deviation": deviation, "place_name": placeName, "place_mult": placeMult, "place_quality": placeQuality(placeMult), "stage_full": room == 0}
+	payload := map[string]any{"mode": map[bool]string{true: "body", false: "qi"}[body], "gain": gain, "attempted_gain": attempted, "total": total, "cost": cost, "base_gain": base, "pace": pace, "sessions_per_stage": sessionsForStage(realm), "attribute": attr, "attribute_value": attrValue, "attribute_quality": round4(quality), "resonance_bonus": resonance, "period": tm.Period, "season": tm.Season, "time_mult": timeMult, "root_resonance": tm.RootResonance, "effect_mult": effectMult, "soul_mult": soulMult, "era_name": eraName, "era_mult": eraMult, "world_name": worldName, "world_mult": worldMult, "manor_name": manorName, "manor_mult": manorMult, "storm_bonus": storm, "perfection_gain": pg, "ready": total >= cost, "stance": stance.Key, "stance_label": stance.Label, "stance_mult": stance.GainMult, "insight_xp_gain": insightGain, "deviation": deviation, "place_name": placeName, "place_mult": placeMult, "place_quality": placeQuality(placeMult), "stage_full": room == 0, "manual_name": manualName, "manual_grade": manualGrade, "manual_mult": manualMult, "manual_chosen": manualChosen}
 	legacy, _ := json.Marshal(payload)
 	_, _ = conn.Execute(`INSERT INTO event_log(user_id,event_type,payload_json,created_at) VALUES(?,?,?,?)`, []any{userID, eventType, string(legacy), now})
 	return authoritativeMutation{Result: payload, Event: eventledger.Event{Domain: "cultivation", EventType: eventType, EntityType: "character", EntityID: fmt.Sprint(userID), GameMinute: p.GameMinute, Payload: payload}}, nil

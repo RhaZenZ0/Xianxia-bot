@@ -19,6 +19,10 @@ const (
 	placeTempleMult   = 1.10
 	placeSectGateMult = 1.10
 	placeMultCeiling  = 1.75
+	// The spirit-gathering array a player raises in their own property
+	// (v1.0.0-rc.6): the `formation` facility, six percent a level, nine
+	// levels, so a finished array is worth half again.
+	abodeArrayPerLevel = 0.06
 )
 
 // placeCultivationMultiplier is the ground's name and its multiplier, or
@@ -46,21 +50,24 @@ func placeCultivationMultiplier(conn *storage.Conn, catalog worlddata.Catalog, u
 		}
 	}
 	if name == "" {
-		r, err := conn.Execute(`SELECT name,cultivation_level FROM cave_abodes WHERE location_key=?`, []any{location})
+		r, err := conn.Execute(`SELECT name,cultivation_level,formation_level FROM cave_abodes WHERE location_key=?`, []any{location})
 		if err != nil {
 			return "", 1, err
 		}
-		if abode := firstRowMap(r); abode != nil {
-			level := max64(0, i64(abode["cultivation_level"]))
-			name, mult = fmt.Sprint(abode["name"]), math.Min(1.45, 1.05+0.05*float64(level))
-		} else {
-			r, err = conn.Execute(`SELECT name,cultivation_level FROM sect_abodes WHERE location_key=? AND user_id=?`, []any{location, userID})
+		home := firstRowMap(r)
+		if home == nil {
+			r, err = conn.Execute(`SELECT name,cultivation_level,formation_level FROM sect_abodes WHERE location_key=? AND user_id=?`, []any{location, userID})
 			if err != nil {
 				return "", 1, err
 			}
-			if residence := firstRowMap(r); residence != nil {
-				level := max64(0, i64(residence["cultivation_level"]))
-				name, mult = fmt.Sprint(residence["name"]), math.Min(1.45, 1.05+0.05*float64(level))
+			home = firstRowMap(r)
+		}
+		if home != nil {
+			level := max64(0, i64(home["cultivation_level"]))
+			name, mult = fmt.Sprint(home["name"]), math.Min(1.45, 1.05+0.05*float64(level))
+			if array := abodeArrayMultiplier(home); array > 1 {
+				mult *= array
+				name += " and its gathering array"
 			}
 		}
 	}
@@ -78,6 +85,20 @@ func placeCultivationMultiplier(conn *storage.Conn, catalog worlddata.Catalog, u
 	}
 	mult = math.Min(placeMultCeiling, math.Max(0.5, mult))
 	return name, round4(mult), nil
+}
+
+// abodeArrayMultiplier is what the spirit-gathering array a player raised in
+// their own home or sect residence is worth (v1.0.0-rc.6): the `formation`
+// facility, which until now only let them inscribe formations.
+func abodeArrayMultiplier(home map[string]any) float64 {
+	if home == nil {
+		return 1
+	}
+	level := clampI64(i64(home["formation_level"]), 0, 9)
+	if level <= 0 {
+		return 1
+	}
+	return round4(1 + abodeArrayPerLevel*float64(level))
 }
 
 // placeQuality is the word the Here line and the sheet use for the ground.

@@ -17,6 +17,19 @@ func trainOnce(t *testing.T, path, world string, seq int) map[string]any {
 	return batch4Result(t, batch4Apply(t, path, world, "cultivation.train", seq, map[string]any{"cooldown_seconds": 1, "game_minute": 600}))
 }
 
+func TestTheClimbTightensWithEachRealmAndEasesOnAscension(t *testing.T) {
+	// Eight sessions a stage at the first realm, rising five quarters a
+	// realm: the early game is quick and the ladder gets steeper.
+	if sessionsForStage(0) != 8 || sessionsForStage(4) != 13 || sessionsForStage(8) != 18 {
+		t.Fatalf("sessions a stage: %d %d %d", sessionsForStage(0), sessionsForStage(4), sessionsForStage(8))
+	}
+	for realm := int64(1); realm < 32; realm++ {
+		if sessionsForStage(realm) < sessionsForStage(realm-1) {
+			t.Fatalf("the ladder must never slacken: realm %d", realm)
+		}
+	}
+}
+
 func TestASessionIsAShareOfTheStageSoEveryRealmTakesAboutTheSameWork(t *testing.T) {
 	path := setupCultivationDB(t)
 	world := batch4WorldPath(t)
@@ -35,14 +48,16 @@ func TestASessionIsAShareOfTheStageSoEveryRealmTakesAboutTheSameWork(t *testing.
 		result := trainOnce(t, path, world, int(100+realm))
 		gain := storage.ParseInt(result["gain"])
 		sessions := float64(cost) / float64(gain)
-		// The floor under a session makes the very first stages quicker than
-		// the target on purpose; everywhere above it the target holds.
-		floor := stagePace(cost) == cultivationPaceFloor
-		if sessions > 14 || (!floor && sessions < 6) {
-			t.Fatalf("realm %d: cost %d, gain %d -> %.1f sessions a stage", realm, cost, gain, sessions)
+		// The target rises with the realm (v1.0.0-rc.6); a cultivator's own
+		// multipliers pull the real number under it, and the floor under a
+		// session makes the very first stages quicker still.
+		target := float64(sessionsForStage(realm))
+		floor := stagePace(cost, realm) == cultivationPaceFloor
+		if sessions > target+2 || (!floor && sessions < target/2) {
+			t.Fatalf("realm %d: cost %d, gain %d -> %.1f sessions a stage, target %.0f", realm, cost, gain, sessions, target)
 		}
-		if storage.ParseInt(result["pace"]) != stagePace(cost) {
-			t.Fatalf("realm %d pace=%v want %d", realm, result["pace"], stagePace(cost))
+		if storage.ParseInt(result["pace"]) != stagePace(cost, realm) {
+			t.Fatalf("realm %d pace=%v want %d", realm, result["pace"], stagePace(cost, realm))
 		}
 	}
 }
@@ -182,7 +197,7 @@ func TestSeclusionIsPacedLikeTheStageItFills(t *testing.T) {
 	}
 	// It stays slower than sitting down for the sessions by hand.
 	cost, _ := phaseCost(catalog.Realms, 6, 9)
-	if float64(high) > float64(stagePace(cost))*2 {
-		t.Fatalf("seclusion pays %d a day against a pace of %d", high, stagePace(cost))
+	if float64(high) > float64(stagePace(cost, 6))*2 {
+		t.Fatalf("seclusion pays %d a day against a pace of %d", high, stagePace(cost, 6))
 	}
 }
