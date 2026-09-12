@@ -26,7 +26,7 @@ from .remote import GoDatabaseTransport
 log = logging.getLogger("xianxia.database")
 
 
-SCHEMA_VERSION = 39
+SCHEMA_VERSION = 41
 # A readiness probe must validate more than the schema-version marker.  If the
 # SQLite file is removed or replaced while the bot is running, SQLite will
 # happily create a new empty file at the same path.  Checking these tables lets
@@ -1605,6 +1605,45 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
                 updated_at REAL NOT NULL
             )""",
             "CREATE INDEX IF NOT EXISTS idx_trade_offers_open ON trade_offers(status, to_user_id, from_user_id)",
+        ),
+    ),
+    (
+        40,
+        "qi_body",
+        (
+            # v1.0.0-rc.7: the cultivator's qi body. The meridians are the
+            # channels qi runs through - one opens with each stage, a hundred
+            # and eight is the ceiling - and they widen the three dantian: the
+            # lower one stores qi (capacity), the middle one refines it
+            # (purity, which sets what a technique costs), the upper one is
+            # spiritual sense. Qi regenerates per game minute and is settled
+            # when it is read or spent, so nothing has to tick in the
+            # background.
+            """CREATE TABLE IF NOT EXISTS character_qi_body (
+                user_id INTEGER PRIMARY KEY,
+                purity INTEGER NOT NULL DEFAULT 50,
+                meridians_open INTEGER NOT NULL DEFAULT 12,
+                meridians_damaged INTEGER NOT NULL DEFAULT 0,
+                dantian_state TEXT NOT NULL DEFAULT 'intact',
+                settled_game_minute INTEGER NOT NULL DEFAULT 0,
+                created_at REAL NOT NULL DEFAULT 0,
+                updated_at REAL NOT NULL DEFAULT 0,
+                FOREIGN KEY (user_id) REFERENCES characters(user_id) ON DELETE CASCADE
+            )""",
+        ),
+    ),
+    (
+        41,
+        "death_qi",
+        (
+            # v1.0.0-rc.8: the ghost road. A cultivator born to one of the two
+            # ghost households gathers death qi instead of spirit qi: the same
+            # dantian, filled from what a place keeps after something died in
+            # it. `corruption` is the residue that never entirely washes out,
+            # and `ghost_form` is what it has made of the body so far.
+            "ALTER TABLE character_qi_body ADD COLUMN qi_type TEXT NOT NULL DEFAULT 'spirit'",
+            "ALTER TABLE character_qi_body ADD COLUMN corruption INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE character_qi_body ADD COLUMN ghost_form INTEGER NOT NULL DEFAULT 0",
         ),
     ),
 )

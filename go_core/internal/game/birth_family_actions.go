@@ -78,6 +78,9 @@ var starterBirthFamilySurnames = map[string]string{
 	"fallen_martial_clan":        "Luo",
 	"noble_martial_clan":         "Qin",
 	"alchemy_family":             "Bai",
+	// v1.0.0-rc.8: the two households a ghost cultivator can be born into.
+	"nether_market_house": "Ye",
+	"tomb_watch_clan":     "Xie",
 }
 var birthFamilyArchetypes = []birthFamilyArchetype{
 	{"martial_household", "martial", "Martial Household", 42, 48, 62, 2, 0, "Riverguard City", "Weapons, body-training knowledge, guards and combat-minded relatives.", "Feuds, injuries and expectations to defend the family name."},
@@ -90,7 +93,10 @@ var birthFamilyArchetypes = []birthFamilyArchetype{
 	{"border_garrison_family", "martial", "Border Garrison Martial Family", 40, 62, 52, 3, 0, "Frostwatch City", "Battlefield experience, armor and weapon access, scouts and strong defensive discipline.", "Beast attacks, border wars, casualties and long periods away from home."},
 	{"fallen_martial_clan", "martial", "Fallen Martial Clan", 26, 36, 36, 2, -4, "Ashenwall City", "Old manuals, ruined training grounds, forgotten enemies and a chance to recover a lost martial inheritance.", "Debt, broken alliances, old grudges and internal pressure to restore the clan's former glory."},
 	{"noble_martial_clan", "martial", "Noble Martial Clan", 82, 76, 46, 4, 0, "Azure Crown Imperial City", "Strong resources, martial tutors, political protection, retainers and access to better cultivation contacts.", "Succession disputes, family politics, powerful enemies and heavy expectations placed on talented descendants."},
-	{"alchemy_family", "martial", "Alchemy Family", 61, 45, 67, 3, 2, "Jadewood Medicine City", "Medicinal herb gardens, furnace access, pill lore and relatives experienced in identifying and refining spirit medicines.", "Rare-herb debts, furnace accidents, pill poisoning and rival alchemists seeking the family's recipes."},
+	{"alchemy_family", "martial", "Alchemy Family", 61, 45, 67, 3, 2, "Jadewood Medicine City", "Medicinal herb gardens, furnace access, pill lore and relatives experienced in identifying and refining spirit medicines.", "Rare-herb debts, furnace accidents, pill poisoning and rival alchemists seeking the family's recipes."}, // v1.0.0-rc.8: born to death qi. Only these two households raise a
+	// child who can walk the ghost path; nobody else may take it.
+	{"nether_market_house", "ghost", "Nether-Market Household", 55, 30, 44, 2, -5, "Moonfen City", "Funeral rites, spirit money, corpse-brokerage, incense that carries and buyers no ledger names.", "Watched by the magistrate, hated by orthodox sects and owed favours by things that do not stay buried."},
+	{"tomb_watch_clan", "ghost", "Tomb-Watch Clan", 31, 39, 58, 2, -2, "Ashenwall City", "A necropolis to keep, grave-lore passed down, wards against what wakes and death qi thick enough to breathe.", "Grave-robbers, restless occupants, a duty that cannot be set down and neighbours who cross the road."},
 }
 
 type birthFamilyHomelandProfile struct {
@@ -165,6 +171,18 @@ var birthFamilyHomelands = map[string]birthFamilyHomelandProfile{
 		"Spiritual World": "Hundred Herb Spirit City",
 		"Immortal World":  "Jade Cauldron Immortal City",
 		"Celestial World": "Divine Herb Celestial City",
+	}},
+	"nether_market_house": {Theme: "fog-bound night markets of the yin wetlands", Climate: "cold-damp", Locations: map[string]string{
+		"Mortal World":    "Moonfen City",
+		"Spiritual World": "Moonfrost Spirit City",
+		"Immortal World":  "Lunar Veil Immortal City",
+		"Celestial World": "Lunar Shadow Celestial City",
+	}},
+	"tomb_watch_clan": {Theme: "necropolis terraces above an old battlefield", Climate: "cool-dry", Locations: map[string]string{
+		"Mortal World":    "Ashenwall City",
+		"Spiritual World": "Broken Halo Spirit City",
+		"Immortal World":  "Fallen Star Immortal City",
+		"Celestial World": "Ruined Constellation City",
 	}},
 }
 

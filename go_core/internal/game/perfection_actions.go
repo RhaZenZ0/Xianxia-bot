@@ -49,7 +49,7 @@ func perfectionConfig(c perfectionChar, body bool, catalog worlddata.Catalog) (t
 	if body {
 		realms = catalog.BodyRealms
 	}
-	if realm < 0 || int(realm) >= len(realms) {
+	if realm < 0 || realm >= int64(len(realms)) {
 		err = errors.New("realm index out of range")
 		return
 	}
@@ -60,11 +60,11 @@ func perfectionPhaseCost(catalog worlddata.Catalog, body bool, realm, phase int6
 	if body {
 		realms = catalog.BodyRealms
 	}
-	if realm < 0 || int(realm) >= len(realms) {
+	if realm < 0 || realm >= int64(len(realms)) {
 		return 0, errors.New("realm index out of range")
 	}
 	costs := realms[realm].PhaseCosts
-	if phase < 1 || int(phase) > len(costs) {
+	if phase < 1 || phase > int64(len(costs)) {
 		return 0, errors.New("phase out of range")
 	}
 	return costs[phase-1], nil
@@ -181,7 +181,7 @@ func perfectionQuestAction(conn *storage.Conn, catalog worlddata.Catalog, userID
 		return authoritativeMutation{}, errors.New("perfection path is not active")
 	}
 	qi := st["quest_index"].(int64)
-	if qi < 0 || int(qi) >= len(sys.Quests) {
+	if qi < 0 || qi >= int64(len(sys.Quests)) {
 		return authoritativeMutation{}, errors.New("all perfection quests are complete")
 	}
 	q := sys.Quests[qi]
@@ -224,7 +224,7 @@ func perfectionQuestAction(conn *storage.Conn, catalog worlddata.Catalog, userID
 		return authoritativeMutation{}, err
 	}
 	reward := int64(0)
-	if int(qi) < len(sys.QuestProgress) {
+	if qi < int64(len(sys.QuestProgress)) {
 		reward = sys.QuestProgress[qi]
 	}
 	if rolled["success"].(bool) {

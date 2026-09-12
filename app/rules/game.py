@@ -276,6 +276,7 @@ class World:
             "soul": "Soul Cultivator",
             "beast": "Beast Binder",
             "formation": "Formation Adept",
+            "ghost": "Ghost Cultivator",
         }
         return aliases.get(value)
 

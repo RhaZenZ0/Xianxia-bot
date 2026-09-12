@@ -601,7 +601,7 @@ func bossActActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64
 		return authoritativeMutation{}, errors.New("boss template unavailable")
 	}
 	phaseIdx := i64(enc["phase_index"])
-	if phaseIdx < 0 || int(phaseIdx) >= len(t.Phases) {
+	if phaseIdx < 0 || phaseIdx >= int64(len(t.Phases)) {
 		phaseIdx = 0
 	}
 	phase := t.Phases[phaseIdx]

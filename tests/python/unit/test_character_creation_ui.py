@@ -3,7 +3,7 @@ from pathlib import Path
 
 from tests.support import bot_class_source, bot_package_source
 
-from app.rules.creation_ui import CULTIVATION_STYLE_PROFILES, cultivation_style_profile, family_root_tendencies, family_status_summary, location_theme, origin_vignette, recommended_cultivation_styles
+from app.rules.creation_ui import CULTIVATION_STYLE_PROFILES, cultivation_style_profile, family_root_tendencies, family_status_summary, location_theme, origin_vignette, recommended_cultivation_styles, selectable_cultivation_styles, style_is_open_to
 
 
 class CharacterCreationUITests(unittest.TestCase):
@@ -13,12 +13,29 @@ class CharacterCreationUITests(unittest.TestCase):
             {
                 "Sword Cultivator", "Qi Refiner", "Body Refiner",
                 "Soul Cultivator", "Beast Binder", "Formation Adept",
+                # v1.0.0-rc.8: the birth-gated seventh.
+                "Ghost Cultivator",
             },
         )
         for profile in CULTIVATION_STYLE_PROFILES.values():
             self.assertTrue(profile["emoji"])
             self.assertTrue(profile["summary"])
             self.assertTrue(profile["focus"])
+
+    def test_the_ghost_road_is_offered_only_to_those_born_to_it(self):
+        """v1.0.0-rc.8: the picker never shows a path the engine would refuse."""
+        paths = ("Sword Cultivator", "Qi Refiner", "Body Refiner", "Soul Cultivator",
+                 "Beast Binder", "Formation Adept", "Ghost Cultivator")
+        ordinary = {"id": "alchemy_family", "location": "Jadewood Medicine City", "tier": 3}
+        ghost = {"id": "tomb_watch_clan", "location": "Ashenwall City", "tier": 2}
+        self.assertNotIn("Ghost Cultivator", selectable_cultivation_styles(paths, ordinary))
+        self.assertIn("Ghost Cultivator", selectable_cultivation_styles(paths, ghost))
+        # And it leads for a household born to it.
+        self.assertEqual(selectable_cultivation_styles(paths, ghost)[0], "Ghost Cultivator")
+        # Every other path is still offered to everyone.
+        self.assertEqual(set(selectable_cultivation_styles(paths, ordinary)), set(paths) - {"Ghost Cultivator"})
+        self.assertFalse(style_is_open_to("Ghost Cultivator", ordinary))
+        self.assertTrue(style_is_open_to("Qi Refiner", ghost))
 
     def test_alchemy_family_recommends_paths_and_root_tendencies(self):
         family = {"id": "alchemy_family", "location": "Greenriver Town", "tier": 3}

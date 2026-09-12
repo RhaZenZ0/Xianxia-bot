@@ -17,6 +17,7 @@ from ...rules.progression_systems import ascension_gate
 from ...simulation import MINUTES_PER_DAY
 from ..character_state import current_effect_modifiers
 from ..formatting import roll_line
+from ..status_cards import _ELEMENT_MARKS
 from ..registry import registered_group_command, registered_root_command
 from ..runtime import (
     _explain_engine_error,
@@ -78,6 +79,16 @@ async def cultivate(interaction: discord.Interaction) -> None:
     if float(result.get("manual_mult", 1)) != 1.0:
         chosen = "you practise" if result.get("manual_chosen") else "the best method you have learned"
         extra += f"\n📖 **{result.get('manual_name')}** ({result.get('manual_grade')} grade, {chosen}): **x{float(result['manual_mult']):.2f}**."
+    # v1.0.0-rc.9: the kind of qi the method draws, said only when the root
+    # makes something of it - an indifferent element is not worth a line.
+    element_relation = str(result.get("element_relation") or "neutral")
+    if str(result.get("element") or "") and element_relation != "neutral":
+        extra += (f"\n{_ELEMENT_MARKS.get(str(result.get('element')), '☯️')} **{result.get('element')} qi** is "
+                  f"**{result.get('element_label') or element_relation}** with your root: "
+                  f"**x{float(result.get('element_mult', 1)):.2f}**."
+                  + (f" {result.get('element_note')}" if str(result.get("element_note") or "") else ""))
+    if result.get("element_clash"):
+        extra += "\n⚠️ The qi turned going in — a method your root cannot stomach is its own danger."
     if str(result.get("place_name") or ""):
         extra += f"\n🪨 **{result.get('place_name')}** — {result.get('place_quality') or 'ordinary'} ground: **x{float(result.get('place_mult', 1)):.2f}** cultivation efficiency."
     stance = str(result.get("stance") or "circulate")
@@ -939,3 +950,297 @@ async def tribulation_attempt(interaction: discord.Interaction, path: app_comman
     await reply_long(interaction, "\n".join(lines), ephemeral=False)
 
 
+
+
+# ---------------- The qi body (v1.0.0-rc.7) ----------------
+# The channels qi runs through and the three dantian they feed. The engine
+# owns every number here; these commands choose and report.
+meridian_group = app_commands.Group(name="meridian", description="The channels qi runs through: open them, mend them")
+dantian_group = app_commands.Group(name="dantian", description="The three dantian: what you hold, how clean it is, how far you feel")
+
+
+def _dantian_state_word(state: str) -> str:
+    return {"intact": "intact", "cracked": "**cracked**", "shattered": "**shattered**"}.get(str(state), str(state))
+
+
+async def _qi_body(user_id: int) -> dict[str, Any]:
+    return dict(await ENGINE.action("qi.status", user_id, {}) or {})
+
+
+def _qi_body_lines(name: str, status: dict[str, Any]) -> list[str]:
+    open_count, damaged = int(status.get("meridians_open", 0)), int(status.get("meridians_damaged", 0))
+    ceiling = int(status.get("meridian_ceiling", 108))
+    purity, ceiling_purity = int(status.get("purity", 0)), int(status.get("purity_ceiling", 0))
+    lines = [
+        f"🧬 **{name} — the qi body**",
+        f"🫀 **Lower dantian:** **{int(status.get('qi', 0)):,} / {int(status.get('qi_max', 0)):,}** qi"
+        f" • recovering **{float(status.get('regen_per_game_minute', 0)):.1f}** a game minute"
+        f" • the vessel is {_dantian_state_word(status.get('dantian_state', 'intact'))}",
+        f"⚗️ **Middle dantian:** purity **{purity}%** of a possible **{ceiling_purity}%**"
+        f" • every technique costs **x{float(status.get('skill_cost_mult', 1)):.2f}**",
+    ]
+    if status.get("upper_open"):
+        lines.append(f"👁️ **Upper dantian:** open • spiritual sense reaches **{int(status.get('sense_reach', 0)):,}**")
+    else:
+        lines.append("👁️ **Upper dantian:** sealed until the Nascent Soul realm.")
+    lines.append(
+        f"🩸 **Meridians:** **{open_count}/{ceiling}** open"
+        + (f", **{damaged} ruptured**" if damaged else "")
+        + f" • the next costs **{int(status.get('meridian_open_cost', 0))} Insight XP** (you hold **{int(status.get('insight_xp', 0))}**)"
+    )
+    if str(status.get("manual_name") or ""):
+        lines.append(
+            f"📖 **{status.get('manual_name')}** ({status.get('manual_grade')}) widens the dantian by "
+            f"**x{float(status.get('manual_capacity_mult', 1)):.2f}**."
+        )
+    lines.append(f"☯️ A breakthrough attempt burns **{int(status.get('breakthrough_qi_cost', 0)):,}** qi.")
+    return lines
+
+
+@registered_group_command(dantian_group, name="status", description="Inspect your qi body: the three dantian and your meridians")
+async def dantian_status(interaction: discord.Interaction) -> None:
+    await interaction.response.defer(ephemeral=False)
+    c = await require_character(interaction)
+    if not c:
+        return
+    try:
+        status = await _qi_body(interaction.user.id)
+    except GameEngineError as exc:
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
+        return
+    await reply_long(interaction, "\n".join(_qi_body_lines(str(c["name"]), status)), ephemeral=False)
+
+
+@registered_group_command(dantian_group, name="refine", description="Refine what you hold: cleaner qi makes every technique cheaper")
+@serialized_user_action
+async def dantian_refine(interaction: discord.Interaction) -> None:
+    """The middle dantian's work: a session spent cleaning rather than
+    gathering. Purity sets what every technique costs."""
+    await interaction.response.defer(ephemeral=False)
+    c = await require_character(interaction)
+    if not c:
+        return
+    try:
+        envelope = await ENGINE.authoritative_action(
+            "qi.refine", interaction.user.id, {"cooldown_seconds": 30 * 60},
+            action_id=f"discord:{interaction.id}:qi.refine",
+        )
+    except GameEngineError as exc:
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
+        return
+    result = dict(envelope.get("result") or {})
+    await interaction.followup.send(
+        f"⚗️ **{c['name']} circulates what they hold through the middle dantian.**\n"
+        f"Purity **+{int(result.get('purity_gain', 0))}** → **{int(result.get('purity', 0))}%** "
+        f"of a possible **{int(result.get('purity_ceiling', 0))}%**.\n"
+        f"Every technique now costs **x{float(result.get('skill_cost_mult', 1)):.2f}**. "
+        f"The refining spent **{int(result.get('qi_spent', 0)):,}** qi; **{int(result.get('qi', 0)):,} / {int(result.get('qi_max', 0)):,}** remains.",
+        ephemeral=False,
+    )
+
+
+@registered_group_command(meridian_group, name="status", description="See which of your channels are open, and which are ruptured")
+async def meridian_status(interaction: discord.Interaction) -> None:
+    await interaction.response.defer(ephemeral=False)
+    c = await require_character(interaction)
+    if not c:
+        return
+    try:
+        status = await _qi_body(interaction.user.id)
+    except GameEngineError as exc:
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
+        return
+    open_count, ceiling = int(status.get("meridians_open", 0)), int(status.get("meridian_ceiling", 108))
+    damaged = int(status.get("meridians_damaged", 0))
+    filled = max(0, min(20, round(open_count * 20 / max(1, ceiling))))
+    lines = [
+        f"🩸 **{c['name']} — the meridians**",
+        f"`{'▰' * filled}{'▱' * (20 - filled)}` **{open_count}/{ceiling}** open"
+        + (f" • **{damaged} ruptured**" if damaged else ""),
+        f"Each open channel widens the dantian by **2%** and quickens its recovery by **1%**.",
+        f"The next costs **{int(status.get('meridian_open_cost', 0))} Insight XP** and a quarter of your qi — "
+        "**/cultivation → Qi Body → Meridian Open**.",
+    ]
+    if damaged:
+        lines.append("A ruptured channel halves your recovery and doubles what techniques cost. Mend it with **/cultivation → Qi Body → Meridian Heal**.")
+    await reply_long(interaction, "\n".join(lines), ephemeral=False)
+
+
+@registered_group_command(meridian_group, name="open", description="Force the next channel open: Insight XP, qi, and a roll that can go wrong")
+@serialized_user_action
+async def meridian_open(interaction: discord.Interaction) -> None:
+    await interaction.response.defer(ephemeral=False)
+    c = await require_character(interaction)
+    if not c:
+        return
+    try:
+        envelope = await ENGINE.authoritative_action(
+            "meridian.open", interaction.user.id, {},
+            action_id=f"discord:{interaction.id}:meridian.open",
+        )
+    except GameEngineError as exc:
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
+        return
+    result = dict(envelope.get("result") or {})
+    roll = SimpleNamespace(**dict(result.get("roll") or {}))
+    lines = [f"🩸 **{c['name']} drives qi against the next channel.**", roll_line(roll)]
+    if result.get("success"):
+        lines.append(f"✨ It opens. **{int(result.get('meridians_open', 0))}/{int(result.get('meridian_ceiling', 108))}** channels now carry your qi.")
+    else:
+        lines.append("⚠️ The channel holds, and the qi turns back on you.")
+        deviation = dict(result.get("deviation") or {})
+        if deviation:
+            lines.append(
+                f"⚠️ **{deviation.get('name') or 'Qi Deviation'}** (severity {int(deviation.get('severity', 1))}/5). "
+                "Treat it under **/character → Treatment**."
+            )
+    lines.append(
+        f"Spent **{int(result.get('insight_spent', 0))} Insight XP** and **{int(result.get('qi_spent', 0)):,}** qi; "
+        f"**{int(result.get('qi', 0)):,} / {int(result.get('qi_max', 0)):,}** remains."
+    )
+    await reply_long(interaction, "\n".join(lines), ephemeral=False)
+
+
+@registered_group_command(meridian_group, name="heal", description="Mend a ruptured channel, or a cracked dantian, with spirit stones and quiet")
+@serialized_user_action
+async def meridian_heal(interaction: discord.Interaction) -> None:
+    await interaction.response.defer(ephemeral=False)
+    c = await require_character(interaction)
+    if not c:
+        return
+    try:
+        envelope = await ENGINE.authoritative_action(
+            "meridian.heal", interaction.user.id, {},
+            action_id=f"discord:{interaction.id}:meridian.heal",
+        )
+    except GameEngineError as exc:
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
+        return
+    result = dict(envelope.get("result") or {})
+    mended = "channel" if str(result.get("mended")) == "meridian" else "dantian"
+    await interaction.followup.send(
+        f"🩹 **{c['name']} mends a ruptured {mended}.**\n"
+        f"Spent **{int(result.get('stones_spent', 0)):,}** spirit stones. "
+        f"**{int(result.get('meridians_damaged', 0))}** ruptures remain; the vessel is "
+        f"{_dantian_state_word(result.get('dantian_state', 'intact'))}.\n"
+        f"Qi: **{int(result.get('qi', 0)):,} / {int(result.get('qi_max', 0)):,}**.",
+        ephemeral=False,
+    )
+
+
+# ---------------- The ghost road (v1.0.0-rc.8) ----------------
+# Death qi: the same three dantian, filled from what a place keeps after
+# something died in it. Only a cultivator born to one of the two ghost
+# households walks it; the engine refuses every one of these to anyone else.
+ghost_group = app_commands.Group(name="ghost", description="The ghost road: death qi, the residue it leaves, and the rites that lift it")
+
+
+def _ghost_lines(name: str, status: dict[str, Any]) -> list[str]:
+    corruption, cap = int(status.get("corruption", 0)), int(status.get("corruption_cap", 100))
+    filled = max(0, min(10, round(corruption * 10 / max(1, cap))))
+    lines = [
+        f"👻 **{name} — the ghost road**",
+        f"🕯️ **{status.get('ghost_form_name')}** • `{'▰' * filled}{'▱' * (10 - filled)}` corruption **{corruption}/{cap}**",
+    ]
+    if str(status.get("ghost_form_note") or ""):
+        lines.append(f"*{status.get('ghost_form_note')}*")
+    lines.append(
+        f"🫀 The form widens the dantian by **x{float(status.get('capacity_mult', 1)):.2f}**"
+        f" and costs **{int(round(float(status.get('daylight_penalty', 0)) * 100))}%** of what you gather under the sun."
+    )
+    nxt = dict(status.get("next_form") or {})
+    if nxt:
+        lines.append(
+            f"⬆️ Next: **{nxt.get('name')}** at **{int(nxt.get('corruption', 0))}** corruption"
+            f" and realm **{int(nxt.get('min_realm_index', 0))}** — *{nxt.get('note')}*"
+        )
+    else:
+        lines.append("⬆️ There is nothing further down this road.")
+    ground = str(status.get("ground_name") or "open ground")
+    lines.append(
+        f"📍 Here: {ground} **x{float(status.get('ground_mult', 1)):.2f}** • **{status.get('period')}** **x{float(status.get('hour_mult', 1)):.2f}**"
+    )
+    penalty = int(status.get("purity_ceiling_penalty", 0))
+    if penalty:
+        lines.append(f"⚗️ The residue has taken **{penalty}%** off how clean your qi can ever be.")
+    if corruption >= int(status.get("rupture_threshold", 60) or 60):
+        lines.append("🩸 Past this depth every session can tear a channel.")
+    todo = []
+    if status.get("can_harvest_here"):
+        todo.append("**/cultivation → Ghost → Harvest**")
+    if status.get("can_appease_here"):
+        todo.append("**/cultivation → Ghost → Appease**")
+    lines.append("➡️ " + (" • ".join(todo) if todo else "Neither the harvest nor the rites belong on this ground."))
+    return lines
+
+
+@registered_group_command(ghost_group, name="status", description="The ghost road: what you have become and what this ground is worth")
+async def ghost_status(interaction: discord.Interaction) -> None:
+    await interaction.response.defer(ephemeral=False)
+    c = await require_character(interaction)
+    if not c:
+        return
+    try:
+        status = dict(await ENGINE.action("ghost.status", interaction.user.id, {}) or {})
+    except GameEngineError as exc:
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
+        return
+    if not status.get("walking_the_road"):
+        await interaction.followup.send(
+            f"🕯️ **{c['name']}** holds spirit qi, not death qi. The **{status.get('ghost_path')}** road belongs to "
+            "those born into a ghost household — it is chosen at birth, and never after.",
+            ephemeral=False,
+        )
+        return
+    await reply_long(interaction, "\n".join(_ghost_lines(str(c["name"]), status)), ephemeral=False)
+
+
+@registered_group_command(ghost_group, name="harvest", description="Take the death qi this place is holding — fast, and it stains")
+async def ghost_harvest(interaction: discord.Interaction) -> None:
+    await interaction.response.defer(ephemeral=False)
+    c = await require_character(interaction)
+    if not c:
+        return
+    try:
+        envelope = await ENGINE.authoritative_action(
+            "ghost.harvest", interaction.user.id, {},
+            action_id=f"discord:{interaction.id}:ghost.harvest",
+        )
+    except GameEngineError as exc:
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
+        return
+    result = dict(envelope.get("result") or {})
+    risen = str(result.get("form_risen") or "")
+    await interaction.followup.send(
+        f"👻 **{c['name']} draws on {result.get('ground_name') or 'the ground'}.**\n"
+        f"The residue comes up cold and fast: **+{int(result.get('qi_gained', 0)):,}** qi "
+        f"(**{int(result.get('qi', 0)):,} / {int(result.get('qi_max', 0)):,}**) at **x{float(result.get('ground_mult', 1)):.2f}**.\n"
+        f"🕯️ Corruption **+{int(result.get('corruption_gain', 0))}** → **{int(result.get('corruption', 0))}**"
+        f" • karma **{int(result.get('karma_delta', 0))}**."
+        + (f"\n⬆️ Something in you settles differently. You are **{risen}** now." if risen else ""),
+        ephemeral=False,
+    )
+
+
+@registered_group_command(ghost_group, name="appease", description="Burn incense where the living keep their dead, and shed some of what clings")
+async def ghost_appease(interaction: discord.Interaction) -> None:
+    await interaction.response.defer(ephemeral=False)
+    c = await require_character(interaction)
+    if not c:
+        return
+    try:
+        envelope = await ENGINE.authoritative_action(
+            "ghost.appease", interaction.user.id, {},
+            action_id=f"discord:{interaction.id}:ghost.appease",
+        )
+    except GameEngineError as exc:
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
+        return
+    result = dict(envelope.get("result") or {})
+    await interaction.followup.send(
+        f"🕯️ **{c['name']} burns incense at {result.get('ground_name') or 'the shrine'}.**\n"
+        f"Some of it lifts: corruption **-{int(result.get('corruption_shed', 0))}** → **{int(result.get('corruption', 0))}** "
+        f"for **{int(result.get('stones_spent', 0)):,}** spirit stones • karma **+{int(result.get('karma_delta', 0))}**.\n"
+        f"What your body has become does not lift with it: you are still **{result.get('ghost_form_name')}**.",
+        ephemeral=False,
+    )

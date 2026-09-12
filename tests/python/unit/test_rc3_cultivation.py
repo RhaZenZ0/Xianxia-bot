@@ -142,7 +142,7 @@ class TheCultivationSheet(unittest.TestCase):
              patch.object(cards.ENGINE, "action", AsyncMock(return_value=status)) as action:
             fields = asyncio.run(surface._cultivation_hub_status(interaction))
         action.assert_awaited_once_with("cultivation.status", 7, {})
-        self.assertEqual([f.name for f in fields], ["☯️ Realm", "🧭 Stance", "🎲 Breakthrough", "🌤️ Today", "💪 Body", "💡 Insight XP"])
+        self.assertEqual([f.name for f in fields], ["☯️ Realm", "🧭 Stance", "🎲 Breakthrough", "🌤️ Today", "💪 Body", "🫀 Qi Body"])
         text = "\n".join(f"{f.name}\n{f.value}" for f in fields)
         self.assertLess(len(text), 900)
         self.assertIn("Stage **9**/9", text)

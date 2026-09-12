@@ -35,6 +35,7 @@ sys.path.insert(0, str(ROOT))
 
 PLAYER = 900001
 BUYER = 900002
+GHOST = 900003
 GM = 1
 
 
@@ -519,6 +520,9 @@ async def run(url: str, token: str, db_path: str) -> Report:
         report.add("PASS" if {"stance", "cost", "insight_xp", "insight_cost", "realm_gate"} <= set(sheet) and 0 <= int(odds.get("probability", -1)) <= 100 else "FAIL",
                    "the sheet carries the stance, the cost, the insight and the odds", f"stance={sheet.get('stance')} odds={odds.get('probability')}% tn={odds.get('tn')}")
     await step(report, "an unknown stance is refused", act("cultivation.stance", PLAYER, {"stance": "meditate"}), expect_error="unknown stance")
+    # A stage with room in it: since v1.0.0-rc.5 a session at a full stage
+    # banks nothing, which would make the Refine check below read as a failure.
+    await step(report, "stand at a stage with room in it", gm("admin.player.set_realm", {"user_id": PLAYER, "realm_index": 0, "phase": 2, "reason": "playtest"}))
     await step(report, "cultivation.stance refine", act("cultivation.stance", PLAYER, {"stance": "refine"}))
     trained = await step(report, "cultivation.train under Refine", act("cultivation.train", PLAYER, {"cooldown_seconds": 1}))
     if trained is not None:
@@ -628,7 +632,112 @@ async def run(url: str, token: str, db_path: str) -> Report:
                    "the session is worked by the method", f"x{with_method.get('manual_mult')} ({with_method.get('manual_name')})")
     await step(report, "an unlearned method is refused", act("cultivation.manual", PLAYER, {"manual_id": "advanced_demonic_019_sword_cultivator"}), expect_error="not been learned")
 
-    # ---- 17. backups -------------------------------------------------------
+    # ---- 16b. elemental qi (v1.0.0-rc.9) ------------------------------------
+    elements = {str(m.get("element")) for m in dict(world.get("technique_system", {}).get("manuals") or {}).values()}
+    report.add("PASS" if len(elements) >= 10 and "" not in elements else "FAIL",
+               "every method draws one of the twelve kinds of qi", ", ".join(sorted(elements)))
+    sheet = dict(await engine.action("cultivation.status", PLAYER, {}) or {})
+    if sheet:
+        report.add("PASS" if sheet.get("element_relation") and float(sheet.get("element_mult") or 0) > 0 else "FAIL",
+                   "the sheet says what the root makes of the method's qi",
+                   f"{sheet.get('element')} qi, {sheet.get('element_label')}, x{sheet.get('element_mult')}")
+    if manuals:
+        practised = dict(await act("cultivation.manual", PLAYER, {"manual_id": str(best.get("manual_id"))}) or {})
+        report.add("PASS" if practised.get("element") and practised.get("element_relation") else "FAIL",
+                   "choosing a method names the qi it draws",
+                   f"{practised.get('manual_name')} draws {practised.get('element')} — {practised.get('element_label')}")
+        await clear_cooldowns()
+        worked = dict(await act("cultivation.train", PLAYER, {"cooldown_seconds": 1}) or {})
+        report.add("PASS" if float(worked.get("element_mult") or 0) > 0 and worked.get("element") else "FAIL",
+                   "the session is worked by what the root can absorb",
+                   f"{worked.get('element')} x{worked.get('element_mult')} ({worked.get('element_label')})")
+        body = dict(await act("cultivation.body_train", PLAYER, {"cooldown_seconds": 1}) or {})
+        report.add("PASS" if float(body.get("element_mult") or 0) == 1.0 else "FAIL",
+                   "the body path answers to no element", f"x{body.get('element_mult')}")
+
+    # ---- 17. the qi body (v1.0.0-rc.7) --------------------------------------
+    body = await step(report, "qi.status", engine.action("qi.status", PLAYER, {}))
+    if body is not None:
+        wanted = {"qi", "qi_max", "regen_per_game_minute", "purity", "purity_ceiling",
+                  "skill_cost_mult", "meridians_open", "meridians_damaged", "meridian_ceiling",
+                  "dantian_state", "upper_open", "breakthrough_qi_cost"}
+        report.add("PASS" if wanted <= set(body) else "FAIL", "the qi body carries the three dantian and the channels",
+                   f"{body.get('qi')}/{body.get('qi_max')} qi, purity {body.get('purity')}/{body.get('purity_ceiling')}%, "
+                   f"{body.get('meridians_open')}/{body.get('meridian_ceiling')} channels, vessel {body.get('dantian_state')}")
+        report.add("PASS" if int(body.get("qi_max") or 0) >= 120 and float(body.get("regen_per_game_minute") or 0) > 0 else "FAIL",
+                   "the dantian is the realm's, not the old flat pool", f"{body.get('qi_max')} qi, +{body.get('regen_per_game_minute')}/game minute")
+    await clear_cooldowns()
+    refined = await step(report, "qi.refine cleans what is held", act("qi.refine", PLAYER, {"cooldown_seconds": 1}))
+    if refined is not None:
+        report.add("PASS" if int(refined.get("purity_gain") or 0) > 0 and int(refined.get("qi_spent") or 0) > 0 else "FAIL",
+                   "refining trades qi for purity", f"+{refined.get('purity_gain')}% to {refined.get('purity')}% for {refined.get('qi_spent')} qi")
+    await step(report, "refining again at once is refused", act("qi.refine", PLAYER, {}), expect_error="cooldown")
+    await step(report, "nothing ruptured mends nothing", act("meridian.heal", PLAYER, {}), expect_error="ruptured")
+    await clear_cooldowns()
+    before_channels = dict(await engine.action("qi.status", PLAYER, {}) or {})
+    opening = await act("meridian.open", PLAYER, {})
+    if isinstance(opening, dict) and opening.get("meridian_ceiling"):
+        report.add("PASS" if int(opening.get("meridian_ceiling") or 0) == 108 and int(opening.get("insight_spent") or 0) > 0 else "FAIL",
+                   "meridian.open spends Insight XP and qi", f"{opening.get('insight_spent')} XP + {opening.get('qi_spent')} qi, "
+                   f"{'opened' if opening.get('success') else 'failed'} at {opening.get('meridians_open')}/108")
+    else:
+        report.add("PASS", "meridian.open spends Insight XP and qi",
+                   f"refused by design at {before_channels.get('meridians_open')} channels: {opening}")
+
+    # ---- 18. the ghost road (v1.0.0-rc.8) -----------------------------------
+    road = await step(report, "ghost.status for a living cultivator", engine.action("ghost.status", PLAYER, {}))
+    if road is not None:
+        report.add("PASS" if road.get("walking_the_road") is False and road.get("qi_type") == "spirit" else "FAIL",
+                   "a living cultivator is not on the ghost road",
+                   f"path={road.get('path')} qi={road.get('qi_type')} form={road.get('ghost_form_name')}")
+    await step(report, "the living cannot harvest death qi", act("ghost.harvest", PLAYER, {}), expect_error="born to a ghost household")
+    await step(report, "the living cannot burn the rites", act("ghost.appease", PLAYER, {}), expect_error="born to a ghost household")
+
+    offers = await step(report, "family options carry the ghost households", act("character.family_options", GHOST, {"world_name": "Mortal World"}))
+    families = list((offers or {}).get("families") or [])
+    by_id = {str(f.get("id")): f for f in families}
+    report.add("PASS" if len(families) == 13 and {"nether_market_house", "tomb_watch_clan"} <= set(by_id) else "FAIL",
+               "thirteen households, two of them ghost-born", f"{len(families)} offered")
+    ordinary = by_id.get("martial_household") or (families[0] if families else {})
+    if ordinary:
+        await step(report, "a martial household cannot raise a ghost cultivator",
+                   act("character.create", GHOST, {"discord_name": "Playtest Ghost", "name": "Playtest Wrongborn",
+                                                   "concept": "a playtest cultivator", "gender": "male", "path": "Ghost Cultivator",
+                                                   "family_choice_id": str(ordinary.get("choice_id") or ""), "age_at_creation_years": 18}),
+                   expect_error="born among the dead")
+    tomb = by_id.get("tomb_watch_clan")
+    if tomb:
+        born = await step(report, "the tomb-watch clan can", act("character.create", GHOST, {
+            "discord_name": "Playtest Ghost", "name": "Xie Graveborn", "concept": "keep the barrows", "gender": "female",
+            "path": "Ghost Cultivator", "family_choice_id": str(tomb.get("choice_id") or ""), "age_at_creation_years": 18}))
+        if born is not None and not born.get("created"):
+            report.add("FAIL", "the tomb-watch clan can", f"created=false: {born.get('reason')}")
+    ruin = next((n for n, l in locations.items() if l.get("road_site") == "ruin" and l.get("world") == "Mortal World"), "")
+    shrine = next((n for n, l in locations.items() if l.get("road_site") == "shrine" and l.get("world") == "Mortal World"), "")
+    if ruin:
+        await step(report, "teleport the ghost-born to a ruin", gm("admin.player.teleport", {"user_id": GHOST, "location": ruin, "reason": "playtest"}))
+        sheet = dict(await engine.action("ghost.status", GHOST, {}) or {})
+        report.add("PASS" if sheet.get("walking_the_road") and float(sheet.get("ground_mult") or 0) > 1 else "FAIL",
+                   "a ruin is rich ground for death qi",
+                   f"{sheet.get('ground_name')} x{sheet.get('ground_mult')} at {sheet.get('period')} x{sheet.get('hour_mult')}")
+        # A newborn cultivator's dantian is full, and a full one has nowhere to
+        # put a harvest; refining is the cheapest way to make room for it.
+        await step(report, "make room in the ghost-born's dantian", act("qi.refine", GHOST, {"cooldown_seconds": 1}))
+        taken = await step(report, "ghost.harvest takes what the place held", act("ghost.harvest", GHOST, {}))
+        if taken is not None:
+            report.add("PASS" if int(taken.get("qi_gained") or 0) > 0 and int(taken.get("corruption_gain") or 0) > 0 else "FAIL",
+                       "a harvest is qi bought with corruption",
+                       f"+{taken.get('qi_gained')} qi, corruption {taken.get('corruption')}, karma {taken.get('karma_delta')}")
+    if shrine:
+        await step(report, "grant the ghost-born stones for the rites", gm("admin.player.grant_currency", {"user_id": GHOST, "currency_id": "low_spirit_stone", "amount": 500, "reason": "playtest"}))
+        await step(report, "teleport the ghost-born to a shrine", gm("admin.player.teleport", {"user_id": GHOST, "location": shrine, "reason": "playtest"}))
+        shed = await step(report, "ghost.appease lifts some of the residue", act("ghost.appease", GHOST, {}))
+        if shed is not None:
+            report.add("PASS" if int(shed.get("corruption_shed") or 0) > 0 else "FAIL",
+                       "incense lifts some of what clings",
+                       f"-{shed.get('corruption_shed')} to {shed.get('corruption')} for {shed.get('stones_spent')} stones")
+
+    # ---- 19. backups -------------------------------------------------------
     backup = await step(report, "create a backup", transport.create_backup())
     listed = await step(report, "list backups", transport.list_backups())
     if backup and listed is not None and not any(row.get("name") == backup.get("name") for row in listed):

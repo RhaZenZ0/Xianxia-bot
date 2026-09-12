@@ -114,17 +114,19 @@ func practisedManual(conn *storage.Conn, catalog worlddata.Catalog, userID int64
 
 // manualCultivationMultiplier is what the practised method is worth to a
 // session: its grade, deepened by mastery. No method is 1.0 and no penalty.
-func manualCultivationMultiplier(conn *storage.Conn, catalog worlddata.Catalog, userID int64) (name string, grade string, mult float64, chosen bool, err error) {
+// The element (v1.0.0-rc.9) comes back with it: the kind of qi the method
+// draws is what a spiritual root is measured against.
+func manualCultivationMultiplier(conn *storage.Conn, catalog worlddata.Catalog, userID int64) (name string, grade string, element string, mult float64, chosen bool, err error) {
 	id, mastery, chosen, err := practisedManual(conn, catalog, userID)
 	if err != nil || id == "" {
-		return "", "", 1, false, err
+		return "", "", "", 1, false, err
 	}
 	definition, ok := catalog.TechniqueSystem.Manuals[id]
 	if !ok {
-		return "", "", 1, false, nil
+		return "", "", "", 1, false, nil
 	}
 	mult = manualGradeMultiplier(definition.Grade) * (1 + masteryGatheringShare*float64(clampI64(mastery, 0, 4)))
-	return definition.Name, definition.Grade, round4(mult), chosen, nil
+	return definition.Name, definition.Grade, strings.TrimSpace(definition.Element), round4(mult), chosen, nil
 }
 
 type cultivationManualPayload struct {
@@ -159,7 +161,7 @@ func cultivationManualAction(conn *storage.Conn, catalog worlddata.Catalog, user
 	if !held {
 		return authoritativeMutation{}, fmt.Errorf("%s has not been learned; study it first", definition.Name)
 	}
-	previousName, _, previousMult, _, err := manualCultivationMultiplier(conn, catalog, userID)
+	previousName, _, _, previousMult, _, err := manualCultivationMultiplier(conn, catalog, userID)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -168,10 +170,20 @@ func cultivationManualAction(conn *storage.Conn, catalog worlddata.Catalog, user
 		return authoritativeMutation{}, err
 	}
 	mult := round4(manualGradeMultiplier(definition.Grade) * (1 + masteryGatheringShare*float64(clampI64(mastery, 0, 4))))
+	bundle, err := loadAptitudes(conn, userID)
+	if err != nil {
+		return authoritativeMutation{}, err
+	}
+	absorption := absorptionFor(catalog, bundle.Root, definition.Element)
 	result := map[string]any{
 		"manual_id": p.ManualID, "manual_name": definition.Name, "manual_grade": definition.Grade,
 		"manual_mult": mult, "mastery": mastery, "alignment": definition.Alignment, "path": definition.Path,
 		"previous_manual": previousName, "previous_mult": previousMult, "changed": previousName != definition.Name,
+		// v1.0.0-rc.9: the kind of qi it draws, and what this root makes of it.
+		// Spelled out rather than merged in, so the Python/Go result-key
+		// contract can see every key this action returns.
+		"element": absorption.Element, "element_relation": absorption.Relation,
+		"element_label": absorption.Label, "element_note": absorption.Note, "element_mult": absorption.Mult,
 	}
 	return authoritativeMutation{Result: result, Event: eventledger.Event{Domain: "cultivation", EventType: "manual_practised", EntityType: "character", EntityID: fmt.Sprint(userID), GameMinute: p.GameMinute, Payload: result}}, nil
 }

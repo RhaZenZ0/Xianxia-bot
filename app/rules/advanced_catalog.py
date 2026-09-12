@@ -18,6 +18,67 @@ ORTHODOX_SUFFIXES = ("Canon", "Scripture", "Manual", "Record", "Codex", "Sutra",
 DEMONIC_SUFFIXES = ("Forbidden Scripture", "Demon Codex", "Blood Record", "Ghost Sutra", "Black Manual")
 TECHNIQUE_VERBS = ("Strike", "Step", "Guard", "Seal", "Wave", "Edge", "Palm", "Thread", "Domain", "Breath")
 
+# v1.0.0-rc.9: every manual draws one kind of qi, and which kind decides how
+# well a given spiritual root can absorb it. The element is read off the
+# method's own name first - a Vermilion Crane canon is a fire method however it
+# was generated - and otherwise falls to a stable spread over the five phases
+# by the manual id, so the catalogue is reproducible and the content and this
+# generator can never drift apart.
+MANUAL_ELEMENTS = ("Fire", "Water", "Wood", "Metal", "Earth", "Lightning", "Wind", "Ice", "Yin", "Yang", "Void", "Chaos")
+FIVE_PHASES = ("Wood", "Fire", "Earth", "Metal", "Water")
+# The generated catalogue is built from fixed prefixes, so the element follows
+# the prefix: it fits the name, and because the generator cycles the prefixes
+# every element ends up with methods a cultivator of that root can seek out.
+_PREFIX_ELEMENTS: dict[str, str] = {
+    "Azure Cloud": "Wind", "Golden Meridian": "Metal", "Vermilion Crane": "Fire",
+    "Jade River": "Water", "Nine Echo": "Void", "White Lotus": "Wood",
+    "Starfall": "Chaos", "Thunder Peak": "Lightning", "Moonshadow": "Yin",
+    "Heavenly Reed": "Wood", "Iron Mountain": "Metal", "Clear Sky": "Wind",
+    "Void Lantern": "Void", "Dragon Gate": "Earth", "Phoenix Feather": "Fire",
+    "Radiant Sun": "Yang", "Frost Moon": "Ice", "Endless Tide": "Water",
+    "Blood Moon": "Yin", "Soul Furnace": "Fire", "White Bone": "Metal",
+    "Abyss Maw": "Void", "Corpse Lantern": "Yin", "Black Venom": "Water",
+    "Heart Demon": "Chaos", "Nether Sacrifice": "Void", "Ghost Banner": "Wind",
+    "Scarlet Hunger": "Fire", "Ashen Veil": "Earth", "Devouring Heaven": "Chaos",
+}
+# The authored manuals name no prefix from that table, so they are read by the
+# words they do use.
+_ELEMENT_KEYWORDS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("Chaos", ("chaos",)),
+    ("Void", ("void", "abyss", "nether", "hollow")),
+    ("Yin", ("yin", "shadow", "ghost", "corpse", "blood", "demon", "bone", "soul", "spectral", "sacrifice")),
+    ("Yang", ("yang", "solar", "radiant", "sun")),
+    ("Lightning", ("thunder", "lightning", "storm")),
+    ("Ice", ("frost", "glacier", "winter", "snow")),
+    ("Wind", ("wind", "gale", "cloud", "sky", "feather")),
+    ("Fire", ("flame", "fire", "ember", "vermilion", "furnace", "crimson", "blaze", "scarlet", "phoenix")),
+    ("Water", ("tide", "river", "sea", "rain", "wave", "mist", "moon", "water", "lotus", "venom", "poison")),
+    ("Wood", ("verdant", "reed", "herb", "vine", "forest", "wood", "spring")),
+    ("Metal", ("iron", "golden", "gold", "blade", "sword", "sabre", "steel", "edge", "spear", "needle")),
+    ("Earth", ("earth", "stone", "mountain", "soil", "sand", "dust", "tortoise", "jade")),
+)
+
+
+def manual_element(manual_id: str, name: str = "", description: str = "") -> str:
+    """The element a cultivation manual draws, from its own name.
+
+    Deterministic and total: a manual that names no element at all is spread
+    over the five phases by a stable sum of its id, so the same catalogue
+    always produces the same elements.
+    """
+    label = str(name or manual_id)
+    for prefix, element in _PREFIX_ELEMENTS.items():
+        if label.startswith(prefix):
+            return element
+    # The name only: the generated catalogue shares two boilerplate
+    # descriptions, so reading them would drown the five phases in whichever
+    # element those two paragraphs happen to mention.
+    haystack = label.casefold()
+    for element, words in _ELEMENT_KEYWORDS:
+        if any(word in haystack for word in words):
+            return element
+    return FIVE_PHASES[sum(manual_id.encode("utf-8")) % len(FIVE_PHASES)]
+
 
 def _slug(text: str) -> str:
     return "_".join("".join(ch.lower() if ch.isalnum() else " " for ch in text).split())
@@ -98,6 +159,8 @@ def _add_manual(
         "alignment": alignment,
         "path": path,
         "grade": grade,
+        # v1.0.0-rc.9: the kind of qi this method draws.
+        "element": manual_element(manual_id, name),
         "min_realm_index": min_realm_index,
         "description": (
             "A forbidden inheritance whose shortcuts accumulate exposure, karma debt and backlash."

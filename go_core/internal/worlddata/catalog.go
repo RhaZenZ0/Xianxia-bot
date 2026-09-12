@@ -335,11 +335,14 @@ type NPCDefinition struct {
 }
 
 type ManualDefinition struct {
-	Name          string   `json:"name"`
-	ItemID        string   `json:"item_id"`
-	Alignment     string   `json:"alignment"`
-	Path          string   `json:"path"`
-	Grade         string   `json:"grade"`
+	Name      string `json:"name"`
+	ItemID    string `json:"item_id"`
+	Alignment string `json:"alignment"`
+	Path      string `json:"path"`
+	Grade     string `json:"grade"`
+	// Element (v1.0.0-rc.9) is the kind of qi this method draws, which decides
+	// how well a given spiritual root can absorb what it gathers.
+	Element       string   `json:"element"`
 	Sect          string   `json:"sect"` // the sect whose entry inheritance this is (v0.21.4); "" for the rest
 	MinRealmIndex int64    `json:"min_realm_index"`
 	Description   string   `json:"description"`
@@ -387,6 +390,67 @@ type SectDefinition struct {
 	RighteousEnemy   int64             `json:"righteous_enemy"`
 }
 
+// DeathQiSystem (v1.0.0-rc.8) is the ghost road: the one cultivation path a
+// character must be born to, the ground and hours it reads the other way
+// round, what the residue costs, and what it makes of the body.
+type DeathQiGround struct {
+	RoadSites   map[string]float64 `json:"road_sites"`
+	Districts   map[string]float64 `json:"districts"`
+	Default     float64            `json:"default"`
+	CityPenalty float64            `json:"city_penalty"`
+}
+
+type DeathQiCorruption struct {
+	PerSession                 int `json:"per_session"`
+	PerHarvest                 int `json:"per_harvest"`
+	AppeaseRelief              int `json:"appease_relief"`
+	AppeaseStoneCost           int `json:"appease_stone_cost"`
+	RuptureThreshold           int `json:"rupture_threshold"`
+	RuptureChancePercent       int `json:"rupture_chance_percent"`
+	PurityCeilingPenaltyPerTen int `json:"purity_ceiling_penalty_per_ten"`
+}
+
+type GhostForm struct {
+	Name            string  `json:"name"`
+	Corruption      int64   `json:"corruption"`
+	MinRealmIndex   int64   `json:"min_realm_index"`
+	CapacityMult    float64 `json:"capacity_mult"`
+	DaylightPenalty float64 `json:"daylight_penalty"`
+	Note            string  `json:"note"`
+}
+
+type DeathQiSystem struct {
+	Path        string             `json:"path"`
+	Families    []string           `json:"families"`
+	Description string             `json:"description"`
+	Ground      DeathQiGround      `json:"ground"`
+	Hours       map[string]float64 `json:"hours"`
+	Corruption  DeathQiCorruption  `json:"corruption"`
+	GhostForms  []GhostForm        `json:"ghost_forms"`
+}
+
+// ElementalQiSystem (v1.0.0-rc.9) is the five-phase cycle and what it is worth
+// to a cultivator's absorption: which element each method draws, which phase
+// every root element stands with, and what each relation between the two does
+// to a gathering session.
+type ElementRelation struct {
+	Mult                      float64 `json:"mult"`
+	Label                     string  `json:"label"`
+	Note                      string  `json:"note"`
+	DeviationSurchargePercent int     `json:"deviation_surcharge_percent"`
+}
+
+type ElementalQiSystem struct {
+	Description       string                     `json:"description"`
+	Phases            []string                   `json:"phases"`
+	Generates         map[string]string          `json:"generates"`
+	Overcomes         map[string]string          `json:"overcomes"`
+	PhaseOf           map[string]string          `json:"phase_of"`
+	Relations         map[string]ElementRelation `json:"relations"`
+	GradeBonusPerRank float64                    `json:"grade_bonus_per_rank"`
+	PurityBonusAtFull float64                    `json:"purity_bonus_at_full"`
+}
+
 type Catalog struct {
 	StartingLocation string `json:"starting_location"`
 	// WorldQiDensity (v1.0.0-rc.5) is how thick the qi is in each world, by
@@ -429,6 +493,11 @@ type Catalog struct {
 	// apothecary, a talisman hall - each an interior location found by
 	// exploring the city and entered by travelling to it.
 	Shops map[string]Shop `json:"shops"`
+	// DeathQi (v1.0.0-rc.8): the ghost road and everything it reads.
+	DeathQi DeathQiSystem `json:"death_qi_system"`
+	// ElementalQi (v1.0.0-rc.9): the five phases and what they are worth to
+	// absorption.
+	ElementalQi ElementalQiSystem `json:"elemental_qi_system"`
 }
 
 // Shop is one city shop. Sells is what it stocks (MadeHere lines are the
@@ -503,7 +572,7 @@ func (c Catalog) NormalizePath(raw string) (string, bool) {
 			return name, true
 		}
 	}
-	aliases := map[string]string{"sword": "Sword Cultivator", "qi": "Qi Refiner", "body": "Body Refiner", "soul": "Soul Cultivator", "beast": "Beast Binder", "formation": "Formation Adept"}
+	aliases := map[string]string{"sword": "Sword Cultivator", "qi": "Qi Refiner", "body": "Body Refiner", "soul": "Soul Cultivator", "beast": "Beast Binder", "formation": "Formation Adept", "ghost": "Ghost Cultivator"}
 	v, ok := aliases[needle]
 	return v, ok
 }

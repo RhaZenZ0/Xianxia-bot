@@ -14,6 +14,8 @@ var familyRootAffinities = map[string][]string{
 	"hidden_weapon_family": {"Yin", "Water", "Ice"}, "border_garrison_family": {"Earth", "Wind", "Metal"},
 	"fallen_martial_clan": {"Metal", "Yin", "Earth"}, "noble_martial_clan": {"Metal", "Yang", "Lightning"},
 	"alchemy_family": {"Wood", "Fire", "Water"},
+	// v1.0.0-rc.8: the two ghost-born households.
+	"nether_market_house": {"Yin", "Void", "Water"}, "tomb_watch_clan": {"Yin", "Earth", "Ice"},
 }
 var locationRootAffinities = map[string][]string{
 	"Greenriver Town":               {"Water", "Wood"},

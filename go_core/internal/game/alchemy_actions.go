@@ -8,6 +8,7 @@ import (
 
 	"xianxia/core/internal/eventledger"
 	"xianxia/core/internal/storage"
+	"xianxia/core/internal/worlddata"
 )
 
 // Alchemy purge (v0.23.0, the v0.21 Authority I backlog).
@@ -47,7 +48,7 @@ func alchemyPurgeAmount(toxicity, will, spirit int64) int64 {
 	return minI64(toxicity, 8+will/2+spirit/3)
 }
 
-func alchemyPurgeAction(conn *storage.Conn, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
+func alchemyPurgeAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	var p alchemyPurgePayload
 	if err := json.Unmarshal(raw, &p); err != nil {
 		return authoritativeMutation{}, err
@@ -83,8 +84,13 @@ func alchemyPurgeAction(conn *storage.Conn, userID int64, raw json.RawMessage) (
 		return authoritativeMutation{}, errors.New("no pill toxicity to purge")
 	}
 
-	qiCost := alchemyPurgeQiCost(toxicity)
-	qi := storage.ParseInt(character["qi"])
+	// Scaled into the cultivator's own pool (v1.0.0-rc.7).
+	state, err := settleQi(conn, catalog, userID, p.GameMinute, nowSeconds())
+	if err != nil {
+		return authoritativeMutation{}, err
+	}
+	qiCost := state.Cost(alchemyPurgeQiCost(toxicity))
+	qi := state.Qi
 	if qi < qiCost {
 		return authoritativeMutation{}, fmt.Errorf("insufficient qi: %d required, %d available", qiCost, qi)
 	}
@@ -121,7 +127,7 @@ func alchemyPurgeAction(conn *storage.Conn, userID int64, raw json.RawMessage) (
 	result := map[string]any{
 		"qi_cost":        qiCost,
 		"qi":             maxI64(0, qi-qiCost),
-		"qi_max":         storage.ParseInt(character["qi_max"]),
+		"qi_max":         state.Capacity,
 		"purged":         purged,
 		"pill_toxicity":  settled,
 		"before":         toxicity,

@@ -135,10 +135,10 @@ func currentWorld(c mechanicsCharacter, catalog worlddata.Catalog) string {
 	if idx < 0 {
 		idx = 0
 	}
-	if int(idx) >= len(catalog.Realms) {
+	if idx >= int64(len(catalog.Realms)) {
 		idx = int64(len(catalog.Realms) - 1)
 	}
-	if idx >= 0 && int(idx) < len(catalog.Realms) {
+	if idx >= 0 && idx < int64(len(catalog.Realms)) {
 		return catalog.Realms[idx].World
 	}
 	return "Mortal World"

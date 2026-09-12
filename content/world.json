@@ -590,6 +590,15 @@
       "will": 2,
       "presence": 2,
       "skill": "Formations"
+    },
+    "Ghost Cultivator": {
+      "body": 1,
+      "agility": 2,
+      "spirit": 3,
+      "insight": 2,
+      "will": 3,
+      "presence": 1,
+      "skill": "Ghost Arts"
     }
   },
   "roots": [
@@ -729,6 +738,12 @@
         "Wood",
         "Void",
         "Chaos"
+      ],
+      "Ghost Cultivator": [
+        "Yin",
+        "Void",
+        "Ice",
+        "Water"
       ]
     },
     "mutations": {
@@ -29668,6 +29683,7 @@
         "alignment": "Demonic",
         "path": "Blood",
         "grade": "Earth",
+        "element": "Yin",
         "min_realm_index": 1,
         "description": "Refines blood essence into violent crimson qi. Fast, potent, and corrosive to the Dao Heart.",
         "techniques": [
@@ -29681,6 +29697,7 @@
         "alignment": "Demonic",
         "path": "Soul",
         "grade": "Earth",
+        "element": "Yin",
         "min_realm_index": 2,
         "description": "A forbidden soul path that tears loose fragments of spiritual consciousness.",
         "techniques": [
@@ -29694,6 +29711,7 @@
         "alignment": "Demonic",
         "path": "Body",
         "grade": "Spirit",
+        "element": "Metal",
         "min_realm_index": 1,
         "description": "Tempers bones with corpse-yin and death qi until the body resembles an undead treasure.",
         "techniques": [
@@ -29707,6 +29725,7 @@
         "alignment": "Unorthodox",
         "path": "Poison",
         "grade": "Earth",
+        "element": "Water",
         "min_realm_index": 1,
         "description": "Turns poisons into cultivation resources and the body into a mobile poison furnace.",
         "techniques": [
@@ -29720,6 +29739,7 @@
         "alignment": "Demonic",
         "path": "Illusion",
         "grade": "Heaven",
+        "element": "Yin",
         "min_realm_index": 3,
         "description": "Invades fear, regret and obsession to cultivate power from another being’s inner demons.",
         "techniques": [
@@ -29733,6 +29753,7 @@
         "alignment": "Demonic",
         "path": "Sacrifice",
         "grade": "Heaven",
+        "element": "Void",
         "min_realm_index": 4,
         "description": "Burns vitality, lifespan and karmic fortune for terrifying temporary strength.",
         "techniques": [
@@ -29746,6 +29767,7 @@
         "alignment": "Demonic",
         "path": "Sword Cultivator",
         "grade": "Earth",
+        "element": "Yin",
         "min_realm_index": 0,
         "description": "A forbidden inheritance whose shortcuts accumulate exposure, karma debt and backlash.",
         "techniques": [
@@ -29763,6 +29785,7 @@
         "alignment": "Demonic",
         "path": "Qi Refiner",
         "grade": "Earth",
+        "element": "Fire",
         "min_realm_index": 1,
         "description": "A forbidden inheritance whose shortcuts accumulate exposure, karma debt and backlash.",
         "techniques": [
@@ -29780,6 +29803,7 @@
         "alignment": "Demonic",
         "path": "Body Refiner",
         "grade": "Earth",
+        "element": "Metal",
         "min_realm_index": 2,
         "description": "A forbidden inheritance whose shortcuts accumulate exposure, karma debt and backlash.",
         "techniques": [
@@ -29796,6 +29820,7 @@
         "alignment": "Demonic",
         "path": "Soul Cultivator",
         "grade": "Earth",
+        "element": "Void",
         "min_realm_index": 3,
         "description": "A forbidden inheritance whose shortcuts accumulate exposure, karma debt and backlash.",
         "techniques": [
@@ -29812,6 +29837,7 @@
         "alignment": "Demonic",
         "path": "Beast Binder",
         "grade": "Earth",
+        "element": "Yin",
         "min_realm_index": 4,
         "description": "A forbidden inheritance whose shortcuts accumulate exposure, karma debt and backlash.",
         "techniques": [
@@ -29828,6 +29854,7 @@
         "alignment": "Demonic",
         "path": "Formation Adept",
         "grade": "Earth",
+        "element": "Water",
         "min_realm_index": 5,
         "description": "A forbidden inheritance whose shortcuts accumulate exposure, karma debt and backlash.",
         "techniques": [
@@ -29844,6 +29871,7 @@
         "alignment": "Demonic",
         "path": "Sword Cultivator",
         "grade": "Heaven",
+        "element": "Chaos",
         "min_realm_index": 14,
         "description": "A forbidden inheritance whose shortcuts accumulate exposure, karma debt and backlash.",
         "techniques": [
@@ -29860,6 +29888,7 @@
         "alignment": "Demonic",
         "path": "Qi Refiner",
         "grade": "Heaven",
+        "element": "Void",
         "min_realm_index": 15,
         "description": "A forbidden inheritance whose shortcuts accumulate exposure, karma debt and backlash.",
         "techniques": [
@@ -29876,6 +29905,7 @@
         "alignment": "Demonic",
         "path": "Body Refiner",
         "grade": "Heaven",
+        "element": "Wind",
         "min_realm_index": 8,
         "description": "A forbidden inheritance whose shortcuts accumulate exposure, karma debt and backlash.",
         "techniques": [
@@ -29892,6 +29922,7 @@
         "alignment": "Demonic",
         "path": "Soul Cultivator",
         "grade": "Heaven",
+        "element": "Fire",
         "min_realm_index": 9,
         "description": "A forbidden inheritance whose shortcuts accumulate exposure, karma debt and backlash.",
         "techniques": [
@@ -29908,6 +29939,7 @@
         "alignment": "Demonic",
         "path": "Beast Binder",
         "grade": "Heaven",
+        "element": "Earth",
         "min_realm_index": 10,
         "description": "A forbidden inheritance whose shortcuts accumulate exposure, karma debt and backlash.",
         "techniques": [
@@ -29924,6 +29956,7 @@
         "alignment": "Demonic",
         "path": "Formation Adept",
         "grade": "Heaven",
+        "element": "Chaos",
         "min_realm_index": 11,
         "description": "A forbidden inheritance whose shortcuts accumulate exposure, karma debt and backlash.",
         "techniques": [
@@ -29940,6 +29973,7 @@
         "alignment": "Demonic",
         "path": "Sword Cultivator",
         "grade": "Immortal",
+        "element": "Yin",
         "min_realm_index": 20,
         "description": "A forbidden inheritance whose shortcuts accumulate exposure, karma debt and backlash.",
         "techniques": [
@@ -29956,6 +29990,7 @@
         "alignment": "Demonic",
         "path": "Qi Refiner",
         "grade": "Immortal",
+        "element": "Fire",
         "min_realm_index": 21,
         "description": "A forbidden inheritance whose shortcuts accumulate exposure, karma debt and backlash.",
         "techniques": [
@@ -29972,6 +30007,7 @@
         "alignment": "Demonic",
         "path": "Body Refiner",
         "grade": "Immortal",
+        "element": "Metal",
         "min_realm_index": 22,
         "description": "A forbidden inheritance whose shortcuts accumulate exposure, karma debt and backlash.",
         "techniques": [
@@ -29988,6 +30024,7 @@
         "alignment": "Demonic",
         "path": "Soul Cultivator",
         "grade": "Immortal",
+        "element": "Void",
         "min_realm_index": 23,
         "description": "A forbidden inheritance whose shortcuts accumulate exposure, karma debt and backlash.",
         "techniques": [
@@ -30004,6 +30041,7 @@
         "alignment": "Demonic",
         "path": "Beast Binder",
         "grade": "Immortal",
+        "element": "Yin",
         "min_realm_index": 16,
         "description": "A forbidden inheritance whose shortcuts accumulate exposure, karma debt and backlash.",
         "techniques": [
@@ -30020,6 +30058,7 @@
         "alignment": "Demonic",
         "path": "Formation Adept",
         "grade": "Immortal",
+        "element": "Water",
         "min_realm_index": 17,
         "description": "A forbidden inheritance whose shortcuts accumulate exposure, karma debt and backlash.",
         "techniques": [
@@ -30036,6 +30075,7 @@
         "alignment": "Demonic",
         "path": "Sword Cultivator",
         "grade": "Dao",
+        "element": "Chaos",
         "min_realm_index": 26,
         "description": "A forbidden inheritance whose shortcuts accumulate exposure, karma debt and backlash.",
         "techniques": [
@@ -30052,6 +30092,7 @@
         "alignment": "Demonic",
         "path": "Qi Refiner",
         "grade": "Dao",
+        "element": "Void",
         "min_realm_index": 27,
         "description": "A forbidden inheritance whose shortcuts accumulate exposure, karma debt and backlash.",
         "techniques": [
@@ -30068,6 +30109,7 @@
         "alignment": "Demonic",
         "path": "Body Refiner",
         "grade": "Dao",
+        "element": "Wind",
         "min_realm_index": 28,
         "description": "A forbidden inheritance whose shortcuts accumulate exposure, karma debt and backlash.",
         "techniques": [
@@ -30084,6 +30126,7 @@
         "alignment": "Demonic",
         "path": "Soul Cultivator",
         "grade": "Dao",
+        "element": "Fire",
         "min_realm_index": 29,
         "description": "A forbidden inheritance whose shortcuts accumulate exposure, karma debt and backlash.",
         "techniques": [
@@ -30100,6 +30143,7 @@
         "alignment": "Demonic",
         "path": "Beast Binder",
         "grade": "Dao",
+        "element": "Earth",
         "min_realm_index": 30,
         "description": "A forbidden inheritance whose shortcuts accumulate exposure, karma debt and backlash.",
         "techniques": [
@@ -30116,6 +30160,7 @@
         "alignment": "Demonic",
         "path": "Formation Adept",
         "grade": "Dao",
+        "element": "Chaos",
         "min_realm_index": 31,
         "description": "A forbidden inheritance whose shortcuts accumulate exposure, karma debt and backlash.",
         "techniques": [
@@ -30132,6 +30177,7 @@
         "alignment": "Demonic",
         "path": "Sword Cultivator",
         "grade": "Earth",
+        "element": "Yin",
         "min_realm_index": 0,
         "description": "A forbidden inheritance whose shortcuts accumulate exposure, karma debt and backlash.",
         "techniques": [
@@ -30148,6 +30194,7 @@
         "alignment": "Demonic",
         "path": "Qi Refiner",
         "grade": "Earth",
+        "element": "Fire",
         "min_realm_index": 1,
         "description": "A forbidden inheritance whose shortcuts accumulate exposure, karma debt and backlash.",
         "techniques": [
@@ -30164,6 +30211,7 @@
         "alignment": "Demonic",
         "path": "Body Refiner",
         "grade": "Earth",
+        "element": "Metal",
         "min_realm_index": 2,
         "description": "A forbidden inheritance whose shortcuts accumulate exposure, karma debt and backlash.",
         "techniques": [
@@ -30180,6 +30228,7 @@
         "alignment": "Demonic",
         "path": "Soul Cultivator",
         "grade": "Earth",
+        "element": "Void",
         "min_realm_index": 3,
         "description": "A forbidden inheritance whose shortcuts accumulate exposure, karma debt and backlash.",
         "techniques": [
@@ -30196,6 +30245,7 @@
         "alignment": "Demonic",
         "path": "Beast Binder",
         "grade": "Earth",
+        "element": "Yin",
         "min_realm_index": 4,
         "description": "A forbidden inheritance whose shortcuts accumulate exposure, karma debt and backlash.",
         "techniques": [
@@ -30212,6 +30262,7 @@
         "alignment": "Demonic",
         "path": "Formation Adept",
         "grade": "Earth",
+        "element": "Water",
         "min_realm_index": 5,
         "description": "A forbidden inheritance whose shortcuts accumulate exposure, karma debt and backlash.",
         "techniques": [
@@ -30228,6 +30279,7 @@
         "alignment": "Demonic",
         "path": "Sword Cultivator",
         "grade": "Heaven",
+        "element": "Chaos",
         "min_realm_index": 14,
         "description": "A forbidden inheritance whose shortcuts accumulate exposure, karma debt and backlash.",
         "techniques": [
@@ -30244,6 +30296,7 @@
         "alignment": "Demonic",
         "path": "Qi Refiner",
         "grade": "Heaven",
+        "element": "Void",
         "min_realm_index": 15,
         "description": "A forbidden inheritance whose shortcuts accumulate exposure, karma debt and backlash.",
         "techniques": [
@@ -30260,6 +30313,7 @@
         "alignment": "Demonic",
         "path": "Body Refiner",
         "grade": "Heaven",
+        "element": "Wind",
         "min_realm_index": 8,
         "description": "A forbidden inheritance whose shortcuts accumulate exposure, karma debt and backlash.",
         "techniques": [
@@ -30276,6 +30330,7 @@
         "alignment": "Demonic",
         "path": "Soul Cultivator",
         "grade": "Heaven",
+        "element": "Fire",
         "min_realm_index": 9,
         "description": "A forbidden inheritance whose shortcuts accumulate exposure, karma debt and backlash.",
         "techniques": [
@@ -30292,6 +30347,7 @@
         "alignment": "Demonic",
         "path": "Beast Binder",
         "grade": "Heaven",
+        "element": "Earth",
         "min_realm_index": 10,
         "description": "A forbidden inheritance whose shortcuts accumulate exposure, karma debt and backlash.",
         "techniques": [
@@ -30308,6 +30364,7 @@
         "alignment": "Demonic",
         "path": "Formation Adept",
         "grade": "Heaven",
+        "element": "Chaos",
         "min_realm_index": 11,
         "description": "A forbidden inheritance whose shortcuts accumulate exposure, karma debt and backlash.",
         "techniques": [
@@ -30324,6 +30381,7 @@
         "alignment": "Demonic",
         "path": "Sword Cultivator",
         "grade": "Immortal",
+        "element": "Yin",
         "min_realm_index": 20,
         "description": "A forbidden inheritance whose shortcuts accumulate exposure, karma debt and backlash.",
         "techniques": [
@@ -30340,6 +30398,7 @@
         "alignment": "Neutral",
         "path": "Sword Cultivator",
         "grade": "Spirit",
+        "element": "Wind",
         "min_realm_index": 0,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -30356,6 +30415,7 @@
         "alignment": "Orthodox",
         "path": "Qi Refiner",
         "grade": "Spirit",
+        "element": "Metal",
         "min_realm_index": 1,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -30372,6 +30432,7 @@
         "alignment": "Orthodox",
         "path": "Body Refiner",
         "grade": "Spirit",
+        "element": "Fire",
         "min_realm_index": 2,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -30388,6 +30449,7 @@
         "alignment": "Orthodox",
         "path": "Soul Cultivator",
         "grade": "Spirit",
+        "element": "Water",
         "min_realm_index": 3,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -30404,6 +30466,7 @@
         "alignment": "Neutral",
         "path": "Beast Binder",
         "grade": "Spirit",
+        "element": "Void",
         "min_realm_index": 4,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -30420,6 +30483,7 @@
         "alignment": "Orthodox",
         "path": "Formation Adept",
         "grade": "Spirit",
+        "element": "Wood",
         "min_realm_index": 5,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -30436,6 +30500,7 @@
         "alignment": "Orthodox",
         "path": "Sword Cultivator",
         "grade": "Spirit",
+        "element": "Chaos",
         "min_realm_index": 6,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -30452,6 +30517,7 @@
         "alignment": "Orthodox",
         "path": "Qi Refiner",
         "grade": "Spirit",
+        "element": "Lightning",
         "min_realm_index": 7,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -30468,6 +30534,7 @@
         "alignment": "Neutral",
         "path": "Body Refiner",
         "grade": "Spirit",
+        "element": "Yin",
         "min_realm_index": 0,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -30484,6 +30551,7 @@
         "alignment": "Orthodox",
         "path": "Soul Cultivator",
         "grade": "Spirit",
+        "element": "Wood",
         "min_realm_index": 1,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -30500,6 +30568,7 @@
         "alignment": "Orthodox",
         "path": "Beast Binder",
         "grade": "Spirit",
+        "element": "Metal",
         "min_realm_index": 2,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -30516,6 +30585,7 @@
         "alignment": "Orthodox",
         "path": "Formation Adept",
         "grade": "Spirit",
+        "element": "Wind",
         "min_realm_index": 3,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -30532,6 +30602,7 @@
         "alignment": "Neutral",
         "path": "Sword Cultivator",
         "grade": "Spirit",
+        "element": "Void",
         "min_realm_index": 4,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -30548,6 +30619,7 @@
         "alignment": "Orthodox",
         "path": "Qi Refiner",
         "grade": "Spirit",
+        "element": "Earth",
         "min_realm_index": 5,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -30564,6 +30636,7 @@
         "alignment": "Orthodox",
         "path": "Body Refiner",
         "grade": "Spirit",
+        "element": "Fire",
         "min_realm_index": 6,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -30580,6 +30653,7 @@
         "alignment": "Orthodox",
         "path": "Soul Cultivator",
         "grade": "Spirit",
+        "element": "Yang",
         "min_realm_index": 7,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -30596,6 +30670,7 @@
         "alignment": "Neutral",
         "path": "Beast Binder",
         "grade": "Spirit",
+        "element": "Ice",
         "min_realm_index": 0,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -30612,6 +30687,7 @@
         "alignment": "Orthodox",
         "path": "Formation Adept",
         "grade": "Spirit",
+        "element": "Water",
         "min_realm_index": 1,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -30628,6 +30704,7 @@
         "alignment": "Orthodox",
         "path": "Sword Cultivator",
         "grade": "Spirit",
+        "element": "Wind",
         "min_realm_index": 2,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -30644,6 +30721,7 @@
         "alignment": "Orthodox",
         "path": "Qi Refiner",
         "grade": "Spirit",
+        "element": "Metal",
         "min_realm_index": 3,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -30660,6 +30738,7 @@
         "alignment": "Neutral",
         "path": "Body Refiner",
         "grade": "Spirit",
+        "element": "Fire",
         "min_realm_index": 4,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -30676,6 +30755,7 @@
         "alignment": "Orthodox",
         "path": "Soul Cultivator",
         "grade": "Spirit",
+        "element": "Water",
         "min_realm_index": 5,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -30692,6 +30772,7 @@
         "alignment": "Orthodox",
         "path": "Beast Binder",
         "grade": "Spirit",
+        "element": "Void",
         "min_realm_index": 6,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -30708,6 +30789,7 @@
         "alignment": "Orthodox",
         "path": "Formation Adept",
         "grade": "Spirit",
+        "element": "Wood",
         "min_realm_index": 7,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -30724,6 +30806,7 @@
         "alignment": "Neutral",
         "path": "Sword Cultivator",
         "grade": "Spirit",
+        "element": "Chaos",
         "min_realm_index": 0,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -30740,6 +30823,7 @@
         "alignment": "Orthodox",
         "path": "Qi Refiner",
         "grade": "Spirit",
+        "element": "Lightning",
         "min_realm_index": 1,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -30756,6 +30840,7 @@
         "alignment": "Orthodox",
         "path": "Body Refiner",
         "grade": "Spirit",
+        "element": "Yin",
         "min_realm_index": 2,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -30772,6 +30857,7 @@
         "alignment": "Orthodox",
         "path": "Soul Cultivator",
         "grade": "Spirit",
+        "element": "Wood",
         "min_realm_index": 3,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -30788,6 +30874,7 @@
         "alignment": "Neutral",
         "path": "Beast Binder",
         "grade": "Spirit",
+        "element": "Metal",
         "min_realm_index": 4,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -30804,6 +30891,7 @@
         "alignment": "Orthodox",
         "path": "Formation Adept",
         "grade": "Spirit",
+        "element": "Wind",
         "min_realm_index": 5,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -30820,6 +30908,7 @@
         "alignment": "Orthodox",
         "path": "Sword Cultivator",
         "grade": "Earth",
+        "element": "Void",
         "min_realm_index": 14,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -30836,6 +30925,7 @@
         "alignment": "Orthodox",
         "path": "Qi Refiner",
         "grade": "Earth",
+        "element": "Earth",
         "min_realm_index": 15,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -30852,6 +30942,7 @@
         "alignment": "Neutral",
         "path": "Body Refiner",
         "grade": "Earth",
+        "element": "Fire",
         "min_realm_index": 8,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -30868,6 +30959,7 @@
         "alignment": "Orthodox",
         "path": "Soul Cultivator",
         "grade": "Earth",
+        "element": "Yang",
         "min_realm_index": 9,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -30884,6 +30976,7 @@
         "alignment": "Orthodox",
         "path": "Beast Binder",
         "grade": "Earth",
+        "element": "Ice",
         "min_realm_index": 10,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -30900,6 +30993,7 @@
         "alignment": "Orthodox",
         "path": "Formation Adept",
         "grade": "Earth",
+        "element": "Water",
         "min_realm_index": 11,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -30916,6 +31010,7 @@
         "alignment": "Neutral",
         "path": "Sword Cultivator",
         "grade": "Earth",
+        "element": "Wind",
         "min_realm_index": 12,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -30932,6 +31027,7 @@
         "alignment": "Orthodox",
         "path": "Qi Refiner",
         "grade": "Earth",
+        "element": "Metal",
         "min_realm_index": 13,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -30948,6 +31044,7 @@
         "alignment": "Orthodox",
         "path": "Body Refiner",
         "grade": "Earth",
+        "element": "Fire",
         "min_realm_index": 14,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -30964,6 +31061,7 @@
         "alignment": "Orthodox",
         "path": "Soul Cultivator",
         "grade": "Earth",
+        "element": "Water",
         "min_realm_index": 15,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -30980,6 +31078,7 @@
         "alignment": "Neutral",
         "path": "Beast Binder",
         "grade": "Earth",
+        "element": "Void",
         "min_realm_index": 8,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -30996,6 +31095,7 @@
         "alignment": "Orthodox",
         "path": "Formation Adept",
         "grade": "Earth",
+        "element": "Wood",
         "min_realm_index": 9,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -31012,6 +31112,7 @@
         "alignment": "Orthodox",
         "path": "Sword Cultivator",
         "grade": "Earth",
+        "element": "Chaos",
         "min_realm_index": 10,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -31028,6 +31129,7 @@
         "alignment": "Orthodox",
         "path": "Qi Refiner",
         "grade": "Earth",
+        "element": "Lightning",
         "min_realm_index": 11,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -31044,6 +31146,7 @@
         "alignment": "Neutral",
         "path": "Body Refiner",
         "grade": "Earth",
+        "element": "Yin",
         "min_realm_index": 12,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -31060,6 +31163,7 @@
         "alignment": "Orthodox",
         "path": "Soul Cultivator",
         "grade": "Earth",
+        "element": "Wood",
         "min_realm_index": 13,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -31076,6 +31180,7 @@
         "alignment": "Orthodox",
         "path": "Beast Binder",
         "grade": "Earth",
+        "element": "Metal",
         "min_realm_index": 14,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -31092,6 +31197,7 @@
         "alignment": "Orthodox",
         "path": "Formation Adept",
         "grade": "Earth",
+        "element": "Wind",
         "min_realm_index": 15,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -31108,6 +31214,7 @@
         "alignment": "Neutral",
         "path": "Sword Cultivator",
         "grade": "Earth",
+        "element": "Void",
         "min_realm_index": 8,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -31124,6 +31231,7 @@
         "alignment": "Orthodox",
         "path": "Qi Refiner",
         "grade": "Earth",
+        "element": "Earth",
         "min_realm_index": 9,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -31140,6 +31248,7 @@
         "alignment": "Orthodox",
         "path": "Body Refiner",
         "grade": "Earth",
+        "element": "Fire",
         "min_realm_index": 10,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -31156,6 +31265,7 @@
         "alignment": "Orthodox",
         "path": "Soul Cultivator",
         "grade": "Earth",
+        "element": "Yang",
         "min_realm_index": 11,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -31171,6 +31281,7 @@
         "alignment": "Neutral",
         "path": "Beast Binder",
         "grade": "Earth",
+        "element": "Ice",
         "min_realm_index": 12,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -31186,6 +31297,7 @@
         "alignment": "Orthodox",
         "path": "Formation Adept",
         "grade": "Earth",
+        "element": "Water",
         "min_realm_index": 13,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -31201,6 +31313,7 @@
         "alignment": "Orthodox",
         "path": "Sword Cultivator",
         "grade": "Earth",
+        "element": "Wind",
         "min_realm_index": 14,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -31216,6 +31329,7 @@
         "alignment": "Orthodox",
         "path": "Qi Refiner",
         "grade": "Earth",
+        "element": "Metal",
         "min_realm_index": 15,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -31231,6 +31345,7 @@
         "alignment": "Neutral",
         "path": "Body Refiner",
         "grade": "Earth",
+        "element": "Fire",
         "min_realm_index": 8,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -31246,6 +31361,7 @@
         "alignment": "Orthodox",
         "path": "Soul Cultivator",
         "grade": "Earth",
+        "element": "Water",
         "min_realm_index": 9,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -31261,6 +31377,7 @@
         "alignment": "Orthodox",
         "path": "Beast Binder",
         "grade": "Earth",
+        "element": "Void",
         "min_realm_index": 10,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -31276,6 +31393,7 @@
         "alignment": "Orthodox",
         "path": "Formation Adept",
         "grade": "Earth",
+        "element": "Wood",
         "min_realm_index": 11,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -31291,6 +31409,7 @@
         "alignment": "Neutral",
         "path": "Sword Cultivator",
         "grade": "Heaven",
+        "element": "Chaos",
         "min_realm_index": 20,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -31306,6 +31425,7 @@
         "alignment": "Orthodox",
         "path": "Qi Refiner",
         "grade": "Heaven",
+        "element": "Lightning",
         "min_realm_index": 21,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -31321,6 +31441,7 @@
         "alignment": "Orthodox",
         "path": "Body Refiner",
         "grade": "Heaven",
+        "element": "Yin",
         "min_realm_index": 22,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -31336,6 +31457,7 @@
         "alignment": "Orthodox",
         "path": "Soul Cultivator",
         "grade": "Heaven",
+        "element": "Wood",
         "min_realm_index": 23,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -31351,6 +31473,7 @@
         "alignment": "Neutral",
         "path": "Beast Binder",
         "grade": "Heaven",
+        "element": "Metal",
         "min_realm_index": 16,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -31366,6 +31489,7 @@
         "alignment": "Orthodox",
         "path": "Formation Adept",
         "grade": "Heaven",
+        "element": "Wind",
         "min_realm_index": 17,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -31381,6 +31505,7 @@
         "alignment": "Orthodox",
         "path": "Sword Cultivator",
         "grade": "Heaven",
+        "element": "Void",
         "min_realm_index": 18,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -31396,6 +31521,7 @@
         "alignment": "Orthodox",
         "path": "Qi Refiner",
         "grade": "Heaven",
+        "element": "Earth",
         "min_realm_index": 19,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -31411,6 +31537,7 @@
         "alignment": "Neutral",
         "path": "Body Refiner",
         "grade": "Heaven",
+        "element": "Fire",
         "min_realm_index": 20,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -31426,6 +31553,7 @@
         "alignment": "Orthodox",
         "path": "Soul Cultivator",
         "grade": "Heaven",
+        "element": "Yang",
         "min_realm_index": 21,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -31441,6 +31569,7 @@
         "alignment": "Orthodox",
         "path": "Beast Binder",
         "grade": "Heaven",
+        "element": "Ice",
         "min_realm_index": 22,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -31456,6 +31585,7 @@
         "alignment": "Orthodox",
         "path": "Formation Adept",
         "grade": "Heaven",
+        "element": "Water",
         "min_realm_index": 23,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -31471,6 +31601,7 @@
         "alignment": "Neutral",
         "path": "Sword Cultivator",
         "grade": "Heaven",
+        "element": "Wind",
         "min_realm_index": 16,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -31486,6 +31617,7 @@
         "alignment": "Orthodox",
         "path": "Qi Refiner",
         "grade": "Heaven",
+        "element": "Metal",
         "min_realm_index": 17,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -31501,6 +31633,7 @@
         "alignment": "Orthodox",
         "path": "Body Refiner",
         "grade": "Heaven",
+        "element": "Fire",
         "min_realm_index": 18,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -31516,6 +31649,7 @@
         "alignment": "Orthodox",
         "path": "Soul Cultivator",
         "grade": "Heaven",
+        "element": "Water",
         "min_realm_index": 19,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -31531,6 +31665,7 @@
         "alignment": "Neutral",
         "path": "Beast Binder",
         "grade": "Heaven",
+        "element": "Void",
         "min_realm_index": 20,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -31546,6 +31681,7 @@
         "alignment": "Orthodox",
         "path": "Formation Adept",
         "grade": "Heaven",
+        "element": "Wood",
         "min_realm_index": 21,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -31561,6 +31697,7 @@
         "alignment": "Orthodox",
         "path": "Sword Cultivator",
         "grade": "Heaven",
+        "element": "Chaos",
         "min_realm_index": 22,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -31576,6 +31713,7 @@
         "alignment": "Orthodox",
         "path": "Qi Refiner",
         "grade": "Heaven",
+        "element": "Lightning",
         "min_realm_index": 23,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -31591,6 +31729,7 @@
         "alignment": "Neutral",
         "path": "Body Refiner",
         "grade": "Heaven",
+        "element": "Yin",
         "min_realm_index": 16,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -31606,6 +31745,7 @@
         "alignment": "Orthodox",
         "path": "Soul Cultivator",
         "grade": "Heaven",
+        "element": "Wood",
         "min_realm_index": 17,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -31621,6 +31761,7 @@
         "alignment": "Orthodox",
         "path": "Beast Binder",
         "grade": "Heaven",
+        "element": "Metal",
         "min_realm_index": 18,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -31636,6 +31777,7 @@
         "alignment": "Orthodox",
         "path": "Formation Adept",
         "grade": "Heaven",
+        "element": "Wind",
         "min_realm_index": 19,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -31651,6 +31793,7 @@
         "alignment": "Neutral",
         "path": "Sword Cultivator",
         "grade": "Heaven",
+        "element": "Void",
         "min_realm_index": 20,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -31666,6 +31809,7 @@
         "alignment": "Orthodox",
         "path": "Qi Refiner",
         "grade": "Heaven",
+        "element": "Earth",
         "min_realm_index": 21,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -31681,6 +31825,7 @@
         "alignment": "Orthodox",
         "path": "Body Refiner",
         "grade": "Heaven",
+        "element": "Fire",
         "min_realm_index": 22,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -31696,6 +31841,7 @@
         "alignment": "Orthodox",
         "path": "Soul Cultivator",
         "grade": "Heaven",
+        "element": "Yang",
         "min_realm_index": 23,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -31711,6 +31857,7 @@
         "alignment": "Neutral",
         "path": "Beast Binder",
         "grade": "Heaven",
+        "element": "Ice",
         "min_realm_index": 16,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -31726,6 +31873,7 @@
         "alignment": "Orthodox",
         "path": "Formation Adept",
         "grade": "Heaven",
+        "element": "Water",
         "min_realm_index": 17,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -31741,6 +31889,7 @@
         "alignment": "Orthodox",
         "path": "Sword Cultivator",
         "grade": "Immortal",
+        "element": "Wind",
         "min_realm_index": 26,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -31756,6 +31905,7 @@
         "alignment": "Orthodox",
         "path": "Qi Refiner",
         "grade": "Immortal",
+        "element": "Metal",
         "min_realm_index": 27,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -31771,6 +31921,7 @@
         "alignment": "Neutral",
         "path": "Body Refiner",
         "grade": "Immortal",
+        "element": "Fire",
         "min_realm_index": 28,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -31786,6 +31937,7 @@
         "alignment": "Orthodox",
         "path": "Soul Cultivator",
         "grade": "Immortal",
+        "element": "Water",
         "min_realm_index": 29,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -31801,6 +31953,7 @@
         "alignment": "Orthodox",
         "path": "Beast Binder",
         "grade": "Immortal",
+        "element": "Void",
         "min_realm_index": 30,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -31816,6 +31969,7 @@
         "alignment": "Orthodox",
         "path": "Formation Adept",
         "grade": "Immortal",
+        "element": "Wood",
         "min_realm_index": 31,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -31831,6 +31985,7 @@
         "alignment": "Neutral",
         "path": "Sword Cultivator",
         "grade": "Immortal",
+        "element": "Chaos",
         "min_realm_index": 24,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -31846,6 +32001,7 @@
         "alignment": "Orthodox",
         "path": "Qi Refiner",
         "grade": "Immortal",
+        "element": "Lightning",
         "min_realm_index": 25,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -31861,6 +32017,7 @@
         "alignment": "Orthodox",
         "path": "Body Refiner",
         "grade": "Immortal",
+        "element": "Yin",
         "min_realm_index": 26,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -31876,6 +32033,7 @@
         "alignment": "Orthodox",
         "path": "Soul Cultivator",
         "grade": "Immortal",
+        "element": "Wood",
         "min_realm_index": 27,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -31891,6 +32049,7 @@
         "alignment": "Neutral",
         "path": "Beast Binder",
         "grade": "Immortal",
+        "element": "Metal",
         "min_realm_index": 28,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -31906,6 +32065,7 @@
         "alignment": "Orthodox",
         "path": "Formation Adept",
         "grade": "Immortal",
+        "element": "Wind",
         "min_realm_index": 29,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -31921,6 +32081,7 @@
         "alignment": "Orthodox",
         "path": "Sword Cultivator",
         "grade": "Immortal",
+        "element": "Void",
         "min_realm_index": 30,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -31936,6 +32097,7 @@
         "alignment": "Orthodox",
         "path": "Qi Refiner",
         "grade": "Immortal",
+        "element": "Earth",
         "min_realm_index": 31,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -31951,6 +32113,7 @@
         "alignment": "Neutral",
         "path": "Body Refiner",
         "grade": "Immortal",
+        "element": "Fire",
         "min_realm_index": 24,
         "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
         "techniques": [
@@ -31966,6 +32129,7 @@
         "alignment": "Orthodox",
         "path": "Any",
         "grade": "Mortal",
+        "element": "Wind",
         "min_realm_index": 0,
         "sect": "Azure Cloud Sect",
         "description": "The Azure Cloud Sect's first teaching: a steady stance, a clean draw, and qi that settles before it moves. Every outer disciple learns it before anything else.",
@@ -31981,6 +32145,7 @@
         "alignment": "Orthodox",
         "path": "Any",
         "grade": "Mortal",
+        "element": "Fire",
         "min_realm_index": 0,
         "sect": "Crimson Furnace Sect",
         "description": "Breath and fire in one rhythm. The Crimson Furnace Sect teaches its newest disciples to hold an ember in the meridians without being burned by it.",
@@ -31996,6 +32161,7 @@
         "alignment": "Orthodox",
         "path": "Any",
         "grade": "Mortal",
+        "element": "Ice",
         "min_realm_index": 0,
         "sect": "Frozen Moon Palace",
         "description": "Stillness before technique. The Frozen Moon Palace's entry sutra teaches qi to slow, cool and hold a shape - the ground every formation is later built on.",
@@ -32011,6 +32177,7 @@
         "alignment": "Neutral",
         "path": "Any",
         "grade": "Mortal",
+        "element": "Water",
         "min_realm_index": 0,
         "sect": "Black Serpent Clan",
         "description": "Strike low, strike once, leave. The Black Serpent Clan's primer teaches its new blood to move unseen and to make the first bite count.",
@@ -32026,6 +32193,7 @@
         "alignment": "Demonic",
         "path": "Any",
         "grade": "Mortal",
+        "element": "Yin",
         "min_realm_index": 0,
         "sect": "Blood River Sect",
         "description": "The first lesson of the Blood River Sect: blood is qi that has not yet been spent. A forbidden foundation that grows stronger the more it costs.",
@@ -32041,6 +32209,7 @@
         "alignment": "Demonic",
         "path": "Any",
         "grade": "Mortal",
+        "element": "Yin",
         "min_realm_index": 0,
         "sect": "Corpse Lantern Pavilion",
         "description": "Light a lantern with what should have gone dark. The Corpse Lantern Pavilion's initiation teaches a new disciple to bind the first pale flame.",
@@ -32056,6 +32225,7 @@
         "alignment": "Orthodox",
         "path": "Any",
         "grade": "Spirit",
+        "element": "Earth",
         "min_realm_index": 0,
         "sect": "Jade Meridian Sect",
         "description": "A green jade slip cut from the gate cliff itself. Every outer disciple learns the sect's first array from it.",
@@ -32071,6 +32241,7 @@
         "alignment": "Neutral",
         "path": "Any",
         "grade": "Spirit",
+        "element": "Earth",
         "min_realm_index": 0,
         "sect": "Thousand Beast Valley",
         "description": "A slip of tanned hide stamped with a paw. The valley's first teaching: how to be followed.",
@@ -32086,6 +32257,7 @@
         "alignment": "Orthodox",
         "path": "Any",
         "grade": "Immortal",
+        "element": "Metal",
         "min_realm_index": 0,
         "sect": "Heavenblade Immortal Sect",
         "description": "An immortal-gold slip that hums when drawn from its sheath. The terrace's first teaching.",
@@ -32101,6 +32273,7 @@
         "alignment": "Demonic",
         "path": "Any",
         "grade": "Immortal",
+        "element": "Yin",
         "min_realm_index": 0,
         "sect": "Ashen Lotus Pavilion",
         "description": "A grey slip that is warm and should not be. The pavilion's first teaching: what survives the fire.",
@@ -32116,6 +32289,7 @@
         "alignment": "Orthodox",
         "path": "Any",
         "grade": "Heaven",
+        "element": "Water",
         "min_realm_index": 0,
         "sect": "Celestial Mandate Academy",
         "description": "A slip of starlight caught in crystal. The Academy's first lecture, to be re-read at every realm.",
@@ -32131,6 +32305,7 @@
         "alignment": "Demonic",
         "path": "Any",
         "grade": "Heaven",
+        "element": "Void",
         "min_realm_index": 0,
         "sect": "Void Serpent Cult",
         "description": "A slip of black scale that is cold to hold. The cult's first teaching: what the body can swallow.",
@@ -59496,5 +59671,156 @@
         "spirit_iron": 1
       }
     }
+  },
+  "death_qi_system": {
+    "path": "Ghost Cultivator",
+    "families": [
+      "nether_market_house",
+      "tomb_watch_clan"
+    ],
+    "description": "Death qi is what a place keeps after something has died in it. A ghost cultivator gathers that instead of spirit qi: richer where the living are gone, thin where they are many, and it leaves a residue in the body that never entirely washes out.",
+    "ground": {
+      "road_sites": {
+        "ruin": 1.45,
+        "hunting_ground": 1.15,
+        "waystation": 0.95,
+        "shrine": 0.65
+      },
+      "districts": {
+        "temple": 0.7,
+        "market": 0.9
+      },
+      "default": 1.0,
+      "city_penalty": 0.85
+    },
+    "hours": {
+      "Night": 1.35,
+      "Evening": 1.12,
+      "Dawn": 0.92,
+      "Morning": 0.8,
+      "Afternoon": 0.72
+    },
+    "corruption": {
+      "per_session": 1,
+      "per_harvest": 6,
+      "appease_relief": 9,
+      "appease_stone_cost": 25,
+      "rupture_threshold": 60,
+      "rupture_chance_percent": 15,
+      "purity_ceiling_penalty_per_ten": 3
+    },
+    "ghost_forms": [
+      {
+        "name": "Living Flesh",
+        "corruption": 0,
+        "min_realm_index": 0,
+        "capacity_mult": 1.0,
+        "daylight_penalty": 0.0,
+        "note": "Nothing of the grave shows on you yet."
+      },
+      {
+        "name": "Yin-Touched",
+        "corruption": 20,
+        "min_realm_index": 0,
+        "capacity_mult": 1.12,
+        "daylight_penalty": 0.05,
+        "note": "Your breath fogs in warm rooms and dogs will not settle near you."
+      },
+      {
+        "name": "Corpse-Hardened",
+        "corruption": 40,
+        "min_realm_index": 1,
+        "capacity_mult": 1.28,
+        "daylight_penalty": 0.1,
+        "note": "Cold and poison find little purchase; the living find you harder to look at."
+      },
+      {
+        "name": "Ghost-Bodied",
+        "corruption": 60,
+        "min_realm_index": 2,
+        "capacity_mult": 1.5,
+        "daylight_penalty": 0.18,
+        "note": "The upper dantian opens early — a ghost senses before it sees."
+      },
+      {
+        "name": "Netherborn",
+        "corruption": 80,
+        "min_realm_index": 4,
+        "capacity_mult": 1.8,
+        "daylight_penalty": 0.28,
+        "note": "Orthodox gates close to you; the dead do not."
+      },
+      {
+        "name": "Revenant Sovereign",
+        "corruption": 95,
+        "min_realm_index": 6,
+        "capacity_mult": 2.2,
+        "daylight_penalty": 0.4,
+        "note": "What walks in your skin is no longer answerable to the living world."
+      }
+    ]
+  },
+  "elemental_qi_system": {
+    "description": "Qi is not one substance. Every cultivation method draws one kind of it, and a cultivator's spiritual root decides how much of that kind their body can actually take in. The five phases generate and overcome one another in the old cycle; the elements outside the cycle - Void and Chaos - answer to nothing and are absorbed no better and no worse by anyone.",
+    "phases": [
+      "Wood",
+      "Fire",
+      "Earth",
+      "Metal",
+      "Water"
+    ],
+    "generates": {
+      "Wood": "Fire",
+      "Fire": "Earth",
+      "Earth": "Metal",
+      "Metal": "Water",
+      "Water": "Wood"
+    },
+    "overcomes": {
+      "Wood": "Earth",
+      "Earth": "Water",
+      "Water": "Fire",
+      "Fire": "Metal",
+      "Metal": "Wood"
+    },
+    "phase_of": {
+      "Lightning": "Fire",
+      "Wind": "Wood",
+      "Ice": "Water",
+      "Yin": "Water",
+      "Yang": "Fire",
+      "Void": "",
+      "Chaos": ""
+    },
+    "relations": {
+      "resonant": {
+        "mult": 1.25,
+        "label": "resonant",
+        "note": "The method draws exactly what your root already is; nothing is wasted."
+      },
+      "generative": {
+        "mult": 1.12,
+        "label": "generative",
+        "note": "Your root and the method's qi feed one another along the cycle."
+      },
+      "neutral": {
+        "mult": 1.0,
+        "label": "indifferent",
+        "note": "Neither helps the other; the qi goes in at the plain rate."
+      },
+      "drained": {
+        "mult": 0.88,
+        "label": "draining",
+        "note": "Your root overcomes this qi: it submits, and yields less for it."
+      },
+      "clashing": {
+        "mult": 0.75,
+        "label": "clashing",
+        "deviation_surcharge_percent": 8,
+        "note": "This qi overcomes your root. It fights you going in, and it can turn."
+      }
+    },
+    "grade_bonus_per_rank": 0.02,
+    "purity_bonus_at_full": 0.1
   }
 }

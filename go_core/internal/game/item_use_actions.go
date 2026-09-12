@@ -189,6 +189,13 @@ func itemUseActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64
 
 	// 2. restore - clamped to the maxima; an active battle's HP bar follows.
 	qiRestore, vitRestore := maxI64(0, item.Use.Instant.QiRestore), maxI64(0, item.Use.Instant.VitalityRestore)
+	// The qi body (v1.0.0-rc.7): a pill's qi is a base, scaled into the pool
+	// the drinker actually has, so it is worth the same share it always was.
+	if qiRestore > 0 {
+		if state, e := settleQi(conn, catalog, userID, p.GameMinute, now); e == nil {
+			qiRestore = state.Restore(qiRestore)
+		}
+	}
 	if qiRestore > 0 || vitRestore > 0 {
 		if _, e = conn.Execute(`UPDATE characters SET qi=MIN(qi_max,qi+?),vitality=MIN(vitality_max,vitality+?),updated_at=? WHERE user_id=?`, []any{qiRestore, vitRestore, now, userID}); e != nil {
 			return authoritativeMutation{}, e

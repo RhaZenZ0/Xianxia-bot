@@ -297,7 +297,34 @@ the next one climbable; the cultivate cooldown sets the calendar. Crossing a rea
 attributes, one point of will and one of your path's own. Two things you raise yourself multiply
 every session: the spirit-gathering array in your own property, six percent a level through
 **/abode → Upgrade**, and the manual you practise, by its grade from Mortal to Dao and by your
-mastery of it, chosen with **/cultivation → Arts → Practise**. A sect is joined through an entrance trial before its examiner; every
+mastery of it, chosen with **/cultivation → Arts → Practise**. Qi itself now has a body to live in
+(v1.0.0-rc.7): a lower dantian whose size is the realm you stand in, the channels you have opened
+and the method you practise - hundreds of qi at Qi Condensation, tens of thousands at Nascent Soul -
+refilling over four game hours; a middle dantian whose purity prices every technique you use, raised
+by **/cultivation → Qi Body → Refine** and spent by forcing the gathering; a hundred and eight
+meridians, one more opened at every stage crossed and the rest forced open with Insight XP and a
+roll; and an upper dantian that opens at Nascent Soul and gives you a spiritual sense. Every qi cost
+in the game is read as a share of that pool, so a technique that bit at the first realm still bites
+at the fifth, a severe qi deviation ruptures a channel (mended with spirit stones and a day's quiet),
+and a breakthrough spends a quarter of the dantian before the roll. One road has to be born into
+(v1.0.0-rc.8): a child of the **Nether-Market Household** or the **Tomb-Watch Clan**, and of nobody
+else, may take the **Ghost Cultivator** path, which fills the same three dantian with death qi. A
+ghost cultivator reads the world the other way round - a road-side ruin is rich ground where a
+wayside shrine is hostile, a living city is thin, night is their noon and the afternoon sun costs
+them - and has two rites of their own under **/cultivation → Ghost**: a harvest that takes what a
+place has been holding, and incense burned where the living keep their dead, the one thing that
+lifts what the road leaves behind. What it leaves is corruption: it eats the middle dantian's purity
+ceiling, tears channels once it is deep, and remakes the body up a ladder of six ghost forms from
+Living Flesh to Revenant Sovereign - each widening the dantian, each deepening what daylight costs,
+and none of them ever given back. Qi is not one substance either (v1.0.0-rc.9): every method in the
+catalogue draws one of twelve kinds, and your spiritual root decides how much of that kind actually
+goes in. The five phases do the deciding - a **resonant** root gathers a quarter more, a
+**generative** one an eighth more, a **draining** one a little less, and a **clashing** one a quarter
+less with an eight-in-a-hundred chance each session that the qi turns going in. Void and Chaos stand
+outside the cycle and answer to nobody; a root of several elements is answered by the kindest of them;
+and a better, purer root absorbs more of whatever it touches. The sheet, the session and
+**/cultivation → Arts → Practise** all name the kind a method draws and what your root makes of it.
+A sect is joined through an entrance trial before its examiner; every
 public sect bestows its own entry manual on passing, chosen inside the trial transaction, and the
 sect residence grows facility by facility with contribution points. A manual is an item, studied
 through the engine, which enforces its realm requirement; the whole 160-manual catalogue is content.
@@ -472,7 +499,7 @@ release; it never installs anything. On the NAS:
 - If narration goes flat after an image rebuild, check **/admin → Server → Ai Status** for a TLS
   banner first. If SQLite reports contention, verify only the engine opens the database.
 
-Keep the whole `data/` directory persistent across rebuilds. The current schema is **39**; every
+Keep the whole `data/` directory persistent across rebuilds. The current schema is **41**; every
 historical migration is kept so an old database upgrades in place.
 
 ## Development
