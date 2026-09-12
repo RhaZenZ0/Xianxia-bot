@@ -520,6 +520,30 @@ make check              # lint + format-check + test-python + test-go, what CI r
 | `python scripts/playtest_checklist.py` | regenerates `docs/playtest/v<version>.md` |
 | `python scripts/release_manifest.py --write` | regenerates `RELEASE_MANIFEST.sha256`; run it last before a release |
 
+### What CI runs
+
+One workflow (`.github/workflows/ci.yml`) on every push to `main` and every pull request, in three
+jobs. `python` runs `ruff` and the whole pytest suite; `go` runs `go vet` and `go test -race`; and
+`containers`, which waits for both, builds the two images and then **starts** them:
+
+| Step | What it proves |
+| --- | --- |
+| `docker build -f Dockerfile` | the bot image assembles |
+| `docker build -f go_core/Dockerfile` | the engine image assembles |
+| `docker run … python -c "import app.bot, app.dashboard, app.ops.healthcheck"` | the bot image's three services import inside the image — every runtime dependency is installed in the final layer, not just at build time |
+| `docker run -d …` then `curl /livez` | the engine's entrypoint fixes up the data directory as root, drops to uid 10001 through `gosu`, opens SQLite and serves HTTP |
+
+The last two matter because a build alone proves an image assembles, not that it starts: a missing
+runtime dependency, or a mistake in the ownership fixup `go_core/docker-entrypoint.sh` performs
+before dropping privileges, would pass a green build and surface only on the NAS. The engine step
+binds `ENGINE_ADDR=0.0.0.0:8081` — the default `127.0.0.1:8081` is not reachable through a published
+port — and prints the container's log before tearing it down, so a failure to start is readable in
+the job output rather than a bare timeout.
+
+A `v*` tag runs the same three jobs and then, only once all three are green, the `release` job builds
+`xianxia_rp_v<version>.zip` and attaches it to a GitHub Release. No image is ever pushed to a
+registry: the NAS builds its own from the zip through `./startup.sh`.
+
 Layout: `app/bot` (Discord), `app/rules` (pure content helpers), `app/ai` (router, narrator, RAG),
 `app/ops` (config, engine client, health), `app/dashboard`, `app/database` (repository API over the
 Go transport), `app/simulation`; `go_core/internal/{game,simulation,storage,server}`;
