@@ -29,6 +29,15 @@ def _relative_time(seconds: object) -> str:
     return f"ready <t:{int(time.time()) + remaining}:R>"
 
 
+# The mark each kind of qi is written with, so a glance at the sheet says which
+# one the method draws (v1.0.0-rc.9).
+_ELEMENT_MARKS = {
+    "Fire": "🔥", "Water": "💧", "Wood": "🌿", "Metal": "⚙️", "Earth": "🪨",
+    "Lightning": "⚡", "Wind": "🌬️", "Ice": "❄️", "Yin": "🌑", "Yang": "☀️",
+    "Void": "🕳️", "Chaos": "🌀",
+}
+
+
 def _qi_body_value(status: dict) -> str:
     """The qi body on the sheet (v1.0.0-rc.7): what the lower dantian holds and
     how fast it fills, how clean the middle dantian keeps it and what that
@@ -107,6 +116,10 @@ async def cultivation_status_fields(interaction: discord.Interaction, *, fallbac
         today += f"\n🌏 world qi **x{float(status.get('world_mult', 1)):.2f}**"
     if str(status.get("manual_name") or ""):
         today += f"\n📖 {status.get('manual_name')} ({status.get('manual_grade')}) **x{float(status.get('manual_mult', 1)):.2f}**"
+        # v1.0.0-rc.9: what kind of qi it draws, and what this root makes of it.
+        if str(status.get("element") or ""):
+            today += (f" • {_ELEMENT_MARKS.get(str(status.get('element')), '☯️')} **{status.get('element')}**"
+                      f" {status.get('element_label') or 'indifferent'} **x{float(status.get('element_mult', 1)):.2f}**")
     extras = []
     if float(status.get("effect_mult", 1)) != 1.0:
         extras.append(f"effects x{float(status.get('effect_mult', 1)):.2f}")

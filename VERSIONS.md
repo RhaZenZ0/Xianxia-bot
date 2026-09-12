@@ -6,6 +6,25 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.0** (rc.9) makes qi more than one substance. Every method in the 160-manual catalogue now draws
+one kind of it - Fire, Water, Wood, Metal, Earth, and the seven beyond the five phases - and a
+cultivator's spiritual root decides how much of that kind actually goes in. The old cycle does the
+deciding: a root that stands with the method's phase is **resonant** and gathers a quarter more, a
+root the cycle feeds or is fed by is **generative** and gathers an eighth more, a root that overcomes
+the method's qi finds it **draining** and loses a little, and a root the method's qi overcomes is
+**clashing** - a quarter less, and an eight-in-a-hundred chance each session that the qi turns going
+in and leaves a qi deviation, whatever stance was held. Void and Chaos stand with no phase: they help
+and hinder nobody. The root itself counts on top of the relation, two percent a grade and a tenth at
+full purity, so a Heaven-grade root absorbs more of whatever it touches. A cultivator with several
+root elements is answered by the kindest of them, which is what a multi-element root is for. The
+elements are content, assigned by each method's own name - a Vermilion Crane canon is a fire method,
+a Frost Moon sutra an ice one - with the same rule in the catalogue generator, so regenerating the
+catalogue reproduces them exactly rather than reshuffling every manual. Every element has at least a
+dozen methods, so a root of any kind has something to go and find. The cultivation sheet names the
+kind beside the method and what the root makes of it, the session says so when it matters, and
+`/cultivation → Arts → Practise` and the manual list both name what a method draws. The body path
+tempers flesh and answers to no element. No schema change.
+
 **1.0.0** (rc.8) opens a road that has to be born into. Two households join the eleven — the
 Nether-Market Household of the fog-bound yin wetlands and the Tomb-Watch Clan of the necropolis above
 the old battlefield — and a child of either, and of nobody else, may take a seventh cultivation path:
@@ -200,10 +219,13 @@ mechanical authority paths.
 
 ## Release status — v1.0.0
 
-- Current release: v1.0.0 (rc.8, schema 41): the ghost road - two households born to death qi, a
-  seventh path only they can take, a ruin for a shrine and night for noon, and a corruption that
-  remakes the body up a ladder of ghost forms. Tagged `v1.0.0-rc.8` on the beta channel; the NAS
-  drills and two quiet weeks make it `v1.0.0`.
+- Current release: v1.0.0 (rc.9): elemental qi - every method draws one of twelve kinds, the five
+  phases decide how much of it a given spiritual root can absorb, and a clashing element can turn
+  going in. Tagged `v1.0.0-rc.9` on the beta channel; the NAS drills and two quiet weeks make it
+  `v1.0.0`.
+- v1.0.0 (rc.8, schema 41): the ghost road - two households born to death qi, a seventh path only
+  they can take, a ruin for a shrine and night for noon, and a corruption that remakes the body up a
+  ladder of ghost forms.
 - v1.0.0 (rc.7, schema 40): the qi body - purity, the hundred and eight meridians, the three dantian,
   a pool that scales with the realm and refills over game hours, and every qi cost in the game
   rescaled as a share of it.

@@ -316,7 +316,15 @@ place has been holding, and incense burned where the living keep their dead, the
 lifts what the road leaves behind. What it leaves is corruption: it eats the middle dantian's purity
 ceiling, tears channels once it is deep, and remakes the body up a ladder of six ghost forms from
 Living Flesh to Revenant Sovereign - each widening the dantian, each deepening what daylight costs,
-and none of them ever given back. A sect is joined through an entrance trial before its examiner; every
+and none of them ever given back. Qi is not one substance either (v1.0.0-rc.9): every method in the
+catalogue draws one of twelve kinds, and your spiritual root decides how much of that kind actually
+goes in. The five phases do the deciding - a **resonant** root gathers a quarter more, a
+**generative** one an eighth more, a **draining** one a little less, and a **clashing** one a quarter
+less with an eight-in-a-hundred chance each session that the qi turns going in. Void and Chaos stand
+outside the cycle and answer to nobody; a root of several elements is answered by the kindest of them;
+and a better, purer root absorbs more of whatever it touches. The sheet, the session and
+**/cultivation → Arts → Practise** all name the kind a method draws and what your root makes of it.
+A sect is joined through an entrance trial before its examiner; every
 public sect bestows its own entry manual on passing, chosen inside the trial transaction, and the
 sect residence grows facility by facility with contribution points. A manual is an item, studied
 through the engine, which enforces its realm requirement; the whole 160-manual catalogue is content.

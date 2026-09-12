@@ -274,7 +274,7 @@ func settleQi(conn *storage.Conn, catalog worlddata.Catalog, userID int64, gameM
 		return qiState{}, errors.New("create a cultivation character first")
 	}
 	attributes := decodeJSONMap(row["attributes_json"])
-	manualName, manualGrade, _, _, err := manualCultivationMultiplier(conn, catalog, userID)
+	manualName, manualGrade, _, _, _, err := manualCultivationMultiplier(conn, catalog, userID)
 	if err != nil {
 		return qiState{}, err
 	}

@@ -632,6 +632,29 @@ async def run(url: str, token: str, db_path: str) -> Report:
                    "the session is worked by the method", f"x{with_method.get('manual_mult')} ({with_method.get('manual_name')})")
     await step(report, "an unlearned method is refused", act("cultivation.manual", PLAYER, {"manual_id": "advanced_demonic_019_sword_cultivator"}), expect_error="not been learned")
 
+    # ---- 16b. elemental qi (v1.0.0-rc.9) ------------------------------------
+    elements = {str(m.get("element")) for m in dict(world.get("technique_system", {}).get("manuals") or {}).values()}
+    report.add("PASS" if len(elements) >= 10 and "" not in elements else "FAIL",
+               "every method draws one of the twelve kinds of qi", ", ".join(sorted(elements)))
+    sheet = dict(await engine.action("cultivation.status", PLAYER, {}) or {})
+    if sheet:
+        report.add("PASS" if sheet.get("element_relation") and float(sheet.get("element_mult") or 0) > 0 else "FAIL",
+                   "the sheet says what the root makes of the method's qi",
+                   f"{sheet.get('element')} qi, {sheet.get('element_label')}, x{sheet.get('element_mult')}")
+    if manuals:
+        practised = dict(await act("cultivation.manual", PLAYER, {"manual_id": str(best.get("manual_id"))}) or {})
+        report.add("PASS" if practised.get("element") and practised.get("element_relation") else "FAIL",
+                   "choosing a method names the qi it draws",
+                   f"{practised.get('manual_name')} draws {practised.get('element')} — {practised.get('element_label')}")
+        await clear_cooldowns()
+        worked = dict(await act("cultivation.train", PLAYER, {"cooldown_seconds": 1}) or {})
+        report.add("PASS" if float(worked.get("element_mult") or 0) > 0 and worked.get("element") else "FAIL",
+                   "the session is worked by what the root can absorb",
+                   f"{worked.get('element')} x{worked.get('element_mult')} ({worked.get('element_label')})")
+        body = dict(await act("cultivation.body_train", PLAYER, {"cooldown_seconds": 1}) or {})
+        report.add("PASS" if float(body.get("element_mult") or 0) == 1.0 else "FAIL",
+                   "the body path answers to no element", f"x{body.get('element_mult')}")
+
     # ---- 17. the qi body (v1.0.0-rc.7) --------------------------------------
     body = await step(report, "qi.status", engine.action("qi.status", PLAYER, {}))
     if body is not None:

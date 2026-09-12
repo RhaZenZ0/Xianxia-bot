@@ -311,11 +311,18 @@ func cultivationTrain(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 	worldMult := worldQiMultiplier(catalog, worldName)
 	// The method being practised (v1.0.0-rc.6): its grade, deepened by
 	// mastery.
-	manualName, manualGrade, manualMult, manualChosen, err := manualCultivationMultiplier(conn, catalog, userID)
+	manualName, manualGrade, manualElement, manualMult, manualChosen, err := manualCultivationMultiplier(conn, catalog, userID)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
-	attempted := int64(math.Round(float64(base+resonance) * timeMult * effectMult * soulMult * eraMult * stance.GainMult * worldMult * manualMult))
+	// What the root can actually absorb of what the method draws (v1.0.0-rc.9).
+	// The body path tempers flesh and answers to no element.
+	absorption := absorptionFor(catalog, bundle.Root, manualElement)
+	elementMult := absorption.Mult
+	if body {
+		elementMult = 1
+	}
+	attempted := int64(math.Round(float64(base+resonance) * timeMult * effectMult * soulMult * eraMult * stance.GainMult * worldMult * manualMult * elementMult))
 
 	// The ground, and what the sect built on it. The manor array and a qi
 	// storm are qi-path weather; the ground itself counts for both paths.
@@ -376,6 +383,7 @@ func cultivationTrain(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 	// stage was an endless Insight XP farm under Refine before v1.0.0-rc.5.
 	insightGain, deviation := int64(0), map[string]any(nil)
 	corruptionGain, formRisen, ghostRupture := int64(0), "", false
+	elementClash := false
 	if gain > 0 && deathQi {
 		// Every session on the road leaves a little more of it in you, and
 		// past the content's threshold the residue tears a channel.
@@ -404,6 +412,24 @@ func cultivationTrain(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 				return authoritativeMutation{}, err
 			}
 		}
+		// Qi the root cannot stomach can turn on its own, whatever the stance
+		// (v1.0.0-rc.9): a clashing element carries its own surcharge.
+		if deviation == nil && !body && absorption.Surcharge > 0 {
+			roll, rerr := gamerng.Intn(100)
+			if rerr != nil {
+				return authoritativeMutation{}, rerr
+			}
+			if roll < absorption.Surcharge {
+				held, herr := currentConditionSeverity(conn, userID, "qi_deviation")
+				if herr != nil {
+					return authoritativeMutation{}, herr
+				}
+				if deviation, err = applyCombatCondition(conn, userID, "qi_deviation", minI64(5, held+1), "cultivation", "element_clash", p.GameMinute); err != nil {
+					return authoritativeMutation{}, err
+				}
+				elementClash = true
+			}
+		}
 		if deviation != nil {
 			if err = losePurity(conn, userID, 3, now); err != nil {
 				return authoritativeMutation{}, err
@@ -425,7 +451,7 @@ func cultivationTrain(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 		return authoritativeMutation{}, err
 	}
 	total := current + gain
-	payload := map[string]any{"mode": map[bool]string{true: "body", false: "qi"}[body], "gain": gain, "attempted_gain": attempted, "total": total, "cost": cost, "base_gain": base, "pace": pace, "sessions_per_stage": sessionsForStage(realm), "attribute": attr, "attribute_value": attrValue, "attribute_quality": round4(quality), "resonance_bonus": resonance, "period": tm.Period, "season": tm.Season, "time_mult": timeMult, "root_resonance": tm.RootResonance, "effect_mult": effectMult, "soul_mult": soulMult, "era_name": eraName, "era_mult": eraMult, "world_name": worldName, "world_mult": worldMult, "manor_name": manorName, "manor_mult": manorMult, "storm_bonus": storm, "perfection_gain": pg, "ready": total >= cost, "stance": stance.Key, "stance_label": stance.Label, "stance_mult": stance.GainMult, "insight_xp_gain": insightGain, "deviation": deviation, "place_name": placeName, "place_mult": placeMult, "place_quality": placeQuality(placeMult), "stage_full": room == 0, "manual_name": manualName, "manual_grade": manualGrade, "manual_mult": manualMult, "manual_chosen": manualChosen, "qi_type": firstNonempty(ghostBody.QiType, spiritQiType), "corruption": ghostBody.Corruption, "corruption_gain": corruptionGain, "ghost_form_name": ghostFormAt(catalog, ghostBody.GhostForm).Name, "form_risen": formRisen, "ghost_rupture": ghostRupture}
+	payload := map[string]any{"mode": map[bool]string{true: "body", false: "qi"}[body], "gain": gain, "attempted_gain": attempted, "total": total, "cost": cost, "base_gain": base, "pace": pace, "sessions_per_stage": sessionsForStage(realm), "attribute": attr, "attribute_value": attrValue, "attribute_quality": round4(quality), "resonance_bonus": resonance, "period": tm.Period, "season": tm.Season, "time_mult": timeMult, "root_resonance": tm.RootResonance, "effect_mult": effectMult, "soul_mult": soulMult, "era_name": eraName, "era_mult": eraMult, "world_name": worldName, "world_mult": worldMult, "manor_name": manorName, "manor_mult": manorMult, "storm_bonus": storm, "perfection_gain": pg, "ready": total >= cost, "stance": stance.Key, "stance_label": stance.Label, "stance_mult": stance.GainMult, "insight_xp_gain": insightGain, "deviation": deviation, "place_name": placeName, "place_mult": placeMult, "place_quality": placeQuality(placeMult), "stage_full": room == 0, "manual_name": manualName, "manual_grade": manualGrade, "manual_mult": manualMult, "manual_chosen": manualChosen, "qi_type": firstNonempty(ghostBody.QiType, spiritQiType), "corruption": ghostBody.Corruption, "corruption_gain": corruptionGain, "ghost_form_name": ghostFormAt(catalog, ghostBody.GhostForm).Name, "form_risen": formRisen, "ghost_rupture": ghostRupture, "element": absorption.Element, "element_relation": absorption.Relation, "element_label": absorption.Label, "element_note": absorption.Note, "element_mult": elementMult, "element_clash": elementClash}
 	legacy, _ := json.Marshal(payload)
 	_, _ = conn.Execute(`INSERT INTO event_log(user_id,event_type,payload_json,created_at) VALUES(?,?,?,?)`, []any{userID, eventType, string(legacy), now})
 	return authoritativeMutation{Result: payload, Event: eventledger.Event{Domain: "cultivation", EventType: eventType, EntityType: "character", EntityID: fmt.Sprint(userID), GameMinute: p.GameMinute, Payload: payload}}, nil

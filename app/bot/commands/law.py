@@ -18,6 +18,7 @@ from ...rules.progression_systems import condition_definition, profession_rank, 
 from ..character_state import current_effect_modifiers
 from ..formatting import roll_line
 from ..registry import registered_group_command
+from ..status_cards import _ELEMENT_MARKS
 from ..runtime import _explain_engine_error, DB, ENGINE, WORLD, current_world_time, reply_long, require_character, respond, serialized_user_action
 from .battle import _battle_panel, _execute_battle_law_technique
 
@@ -189,7 +190,9 @@ async def manual_list(interaction:discord.Interaction)->None:
         for tid in m.get('techniques',[]):
             t=WORLD.technique_definition(str(tid)) or {}
             if int(row.get('mastery',0))>=int(t.get('min_mastery',0)): unlocked.append(str(t.get('name',tid)))
-        lines.append(f"\n**{m.get('name',row['manual_id'])}** • {m.get('alignment','Unknown')} • {m.get('grade','Unknown')}\nMastery: **{_mastery_name(int(row.get('mastery',0)))}** • Practice {row.get('practice',0)}\nTechniques: {', '.join(unlocked) if unlocked else 'None unlocked'}")
+        element=str(m.get('element') or '')
+        mark=f" • {_ELEMENT_MARKS.get(element,'☯️')} {element} qi" if element else ""
+        lines.append(f"\n**{m.get('name',row['manual_id'])}** • {m.get('alignment','Unknown')} • {m.get('grade','Unknown')}{mark}\nMastery: **{_mastery_name(int(row.get('mastery',0)))}** • Practice {row.get('practice',0)}\nTechniques: {', '.join(unlocked) if unlocked else 'None unlocked'}")
     await reply_long(interaction,"\n".join(lines),ephemeral=False)
 
 
@@ -251,10 +254,18 @@ async def manual_practise(interaction:discord.Interaction,manual:str)->None:
     result=dict(envelope.get("result") or {})
     previous=str(result.get("previous_manual") or "")
     note=f"\nYou set aside **{previous}**." if previous and result.get("changed") else ""
+    element=str(result.get('element') or '')
+    # v1.0.0-rc.9: the method draws one kind of qi, and the root decides how
+    # much of it actually goes in.
+    affinity=""
+    if element:
+        affinity=(f"\n{_ELEMENT_MARKS.get(element,'☯️')} It draws **{element} qi**, which your root finds "
+                  f"**{result.get('element_label') or 'indifferent'}**: **x{float(result.get('element_mult',1)):.2f}**."
+                  + (f" {result.get('element_note')}" if str(result.get('element_note') or '') else ""))
     await interaction.followup.send(
         f"📖 **{c['name']} circulates the {result.get('manual_name') or manual}.**\n"
         f"Grade **{result.get('manual_grade') or 'Unknown'}** • mastery **{_mastery_name(int(result.get('mastery',0)))}** — "
-        f"every session gathers **x{float(result.get('manual_mult',1)):.2f}**.{note}",
+        f"every session gathers **x{float(result.get('manual_mult',1)):.2f}**.{affinity}{note}",
         ephemeral=False,
     )
 

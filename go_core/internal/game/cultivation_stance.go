@@ -413,10 +413,11 @@ func cultivationStatusQuery(conn *storage.Conn, catalog worlddata.Catalog, userI
 	if err != nil {
 		return nil, err
 	}
-	manualName, manualGrade, manualMult, manualChosen, err := manualCultivationMultiplier(conn, catalog, userID)
+	manualName, manualGrade, manualElement, manualMult, manualChosen, err := manualCultivationMultiplier(conn, catalog, userID)
 	if err != nil {
 		return nil, err
 	}
+	absorption := absorptionFor(catalog, bundle.Root, manualElement)
 	qi, err := settleQi(conn, catalog, userID, gameMinute, now)
 	if err != nil {
 		return nil, err
@@ -444,6 +445,10 @@ func cultivationStatusQuery(conn *storage.Conn, catalog worlddata.Catalog, userI
 		"pace": stagePace(cost, c.RealmIndex), "sessions_per_stage": sessionsForStage(c.RealmIndex),
 		"world_mult":  worldQiMultiplier(catalog, realmWorld(catalog.Realms, c.RealmIndex)),
 		"manual_name": manualName, "manual_grade": manualGrade, "manual_mult": manualMult, "manual_chosen": manualChosen,
+		// v1.0.0-rc.9: the kind of qi the method draws, and what this
+		// cultivator's root makes of it.
+		"element": absorption.Element, "element_relation": absorption.Relation,
+		"element_label": absorption.Label, "element_note": absorption.Note, "element_mult": absorption.Mult,
 		"qi": qi.Qi, "qi_max": qi.Capacity, "qi_regen": qi.Regen, "purity": qi.Body.Purity,
 		"purity_ceiling": purityCeilingFor(catalog, c.RealmIndex, manualGrade, qi.Body), "skill_cost_mult": qi.Body.skillCostMultiplier(),
 		"meridians_open": qi.Body.MeridiansOpen, "meridians_damaged": qi.Body.MeridiansDamaged,

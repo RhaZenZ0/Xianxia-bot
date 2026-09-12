@@ -17,6 +17,7 @@ from ...rules.progression_systems import ascension_gate
 from ...simulation import MINUTES_PER_DAY
 from ..character_state import current_effect_modifiers
 from ..formatting import roll_line
+from ..status_cards import _ELEMENT_MARKS
 from ..registry import registered_group_command, registered_root_command
 from ..runtime import (
     _explain_engine_error,
@@ -78,6 +79,16 @@ async def cultivate(interaction: discord.Interaction) -> None:
     if float(result.get("manual_mult", 1)) != 1.0:
         chosen = "you practise" if result.get("manual_chosen") else "the best method you have learned"
         extra += f"\n📖 **{result.get('manual_name')}** ({result.get('manual_grade')} grade, {chosen}): **x{float(result['manual_mult']):.2f}**."
+    # v1.0.0-rc.9: the kind of qi the method draws, said only when the root
+    # makes something of it - an indifferent element is not worth a line.
+    element_relation = str(result.get("element_relation") or "neutral")
+    if str(result.get("element") or "") and element_relation != "neutral":
+        extra += (f"\n{_ELEMENT_MARKS.get(str(result.get('element')), '☯️')} **{result.get('element')} qi** is "
+                  f"**{result.get('element_label') or element_relation}** with your root: "
+                  f"**x{float(result.get('element_mult', 1)):.2f}**."
+                  + (f" {result.get('element_note')}" if str(result.get("element_note") or "") else ""))
+    if result.get("element_clash"):
+        extra += "\n⚠️ The qi turned going in — a method your root cannot stomach is its own danger."
     if str(result.get("place_name") or ""):
         extra += f"\n🪨 **{result.get('place_name')}** — {result.get('place_quality') or 'ordinary'} ground: **x{float(result.get('place_mult', 1)):.2f}** cultivation efficiency."
     stance = str(result.get("stance") or "circulate")
