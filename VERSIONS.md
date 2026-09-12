@@ -6,6 +6,21 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.0** (rc.10) makes the beta channel walkable. `VERSION` holds the numbers and never the
+`-rc.N` suffix - that is deliberate, so the updater compares plain numbers - but it means an installed
+tree cannot tell one candidate of a version from another: every 1.0.0 rc says `1.0.0`. The updater
+compared those numbers, found `1.0.0` was not newer than `1.0.0`, and answered "already the newest on
+the beta channel" for every rc after the first. The channel could be read and never walked; rc.7, rc.8
+and rc.9 could only reach a NAS by hand. The release job now stamps the tag it built into `RELEASE_TAG`
+beside `VERSION`, and both readers of the channel - `update.sh` and the bot's update-check worker -
+order releases by semver precedence, so `1.0.0-rc.6` < `1.0.0-rc.9` < `1.0.0` and a finished release is
+never pulled back to one of its own candidates. The shell comparator is BusyBox awk, because a QNAP has
+nothing else, and it is driven against the Python one from the same table of cases so the two cannot
+drift. A tree with no `RELEASE_TAG` reads as the plain release, which is the one-time cost of the
+change: `docs/CONFIGURATION.md` says how to stamp an installed rc by hand, once. The tag is believed
+only when its numbers agree with `VERSION`, and an absent, empty or malformed one is ignored rather
+than fatal. No schema change.
+
 **1.0.0** (rc.9) makes qi more than one substance. Every method in the 160-manual catalogue now draws
 one kind of it - Fire, Water, Wood, Metal, Earth, and the seven beyond the five phases - and a
 cultivator's spiritual root decides how much of that kind actually goes in. The old cycle does the

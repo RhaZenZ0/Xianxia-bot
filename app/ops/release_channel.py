@@ -7,9 +7,19 @@ the tag. Two
 channels:
 
   stable - full releases (tag `vX.Y.Z`);
-  beta   - pre-releases too (tag `vX.Y.Z-beta.N`, `-rc.N`; VERSION inside
-           the archive is still `X.Y.Z`, so the on-disk updater compares
-           plain numbers).
+  beta   - pre-releases too (tag `vX.Y.Z-beta.N`, `-rc.N`).
+
+`VERSION` inside the archive is the numeric release and never carries the
+suffix, so it cannot tell one rc from another: every 1.0.0 rc says `1.0.0`.
+Until v1.0.0-rc.10 that meant the updater compared `1.0.0` against `1.0.0`
+and answered "already the newest" for every rc after the first - the beta
+channel could be read but never walked. The release job now stamps the tag
+it built into `RELEASE_TAG` beside `VERSION`, and ordering is semver
+precedence (§11), so `1.0.0-rc.6 < 1.0.0-rc.9 < 1.0.0`. An installed tree
+with no `RELEASE_TAG` is a release built before that and reads as the plain
+release, which outranks every prerelease of the same number - the one-time
+cost of the transition, and `docs/CONFIGURATION.md` says how to stamp it by
+hand.
 
 This module is pure: it parses the API's JSON and decides. Two consumers
 share it - the bot's update-check worker (announces in the log channel) and
@@ -43,6 +53,35 @@ def is_prerelease_tag(tag: str) -> bool:
     return bool(match and match.group(4))
 
 
+def _identifier_key(identifier: str) -> tuple[int, int, str]:
+    """One dot-separated prerelease identifier, as a comparable triple.
+
+    Semver §11: numeric identifiers compare numerically and rank below
+    alphanumeric ones. The shape is uniform so tuples never compare an int
+    against a str.
+    """
+    if identifier.isdigit():
+        return (0, int(identifier), "")
+    return (1, 0, identifier)
+
+
+def precedence(text: str) -> tuple:
+    """A sort key ordering `1.0.0-rc.6 < 1.0.0-rc.9 < 1.0.0`.
+
+    The fourth element carries `(1,)` for a release and `(0,)` for a
+    prerelease, which is what makes a release outrank a prerelease of the
+    same numbers without comparing ragged tuples of mixed type.
+    """
+    match = TAG_PATTERN.match(str(text).strip())
+    if not match:
+        raise ValueError(f"not a release version: {text!r}")
+    core = (int(match.group(1)), int(match.group(2)), int(match.group(3)))
+    suffix = match.group(4)
+    if not suffix:
+        return (*core, (1,))
+    return (*core, (0,), tuple(_identifier_key(part) for part in suffix.split(".")))
+
+
 @dataclass(frozen=True)
 class Release:
     tag: str
@@ -55,7 +94,21 @@ class Release:
 
     @property
     def version_text(self) -> str:
+        """The version as it should be shown and remembered: the tag, less its `v`.
+
+        This is what tells one rc from another, so the worker's
+        "announced this already" check keys on it.
+        """
+        return self.tag.lstrip("vV").strip() or ".".join(str(part) for part in self.version)
+
+    @property
+    def numeric_version_text(self) -> str:
+        """The `X.Y.Z` the archive asset is named after, suffix dropped."""
         return ".".join(str(part) for part in self.version)
+
+    @property
+    def precedence(self) -> tuple:
+        return precedence(self.tag)
 
     @property
     def channel(self) -> str:
@@ -104,7 +157,7 @@ def parse_releases(payload: str | bytes | list[dict[str, Any]]) -> list[Release]
             page_url=str(entry.get("html_url") or ""),
             notes=str(entry.get("body") or ""),
         ))
-    releases.sort(key=lambda r: (r.version, not r.prerelease), reverse=True)
+    releases.sort(key=lambda r: r.precedence, reverse=True)
     return releases
 
 
@@ -112,14 +165,18 @@ def newest_for_channel(releases: Iterable[Release], channel: str) -> Release | N
     if channel not in CHANNELS:
         raise ValueError(f"unknown channel {channel!r}; expected one of {CHANNELS}")
     candidates = [r for r in releases if channel == "beta" or not r.prerelease]
-    return max(candidates, key=lambda r: (r.version, not r.prerelease), default=None)
+    return max(candidates, key=lambda r: r.precedence, default=None)
 
 
 def newer_than_installed(release: Release | None, installed: str) -> Release | None:
-    """The release if it is strictly newer than the installed version, else None."""
+    """The release if it is strictly newer than the installed version, else None.
+
+    `installed` may carry a prerelease suffix (`1.0.0-rc.6`), which is how an
+    rc knows a later rc of the same number is an upgrade.
+    """
     if release is None:
         return None
-    return release if release.version > parse_version(installed) else None
+    return release if release.precedence > precedence(installed) else None
 
 
 def announcement(release: Release, installed: str, channel: str) -> str:

@@ -375,8 +375,39 @@ downloaded or installed by the bot; that stays with `./update.sh` on the NAS:
 ```
 
 `UPDATE_CHANNEL=stable` sees full releases only; `beta` also sees pre-releases
-(tags like `v0.21.0-beta.1`). `update.sh` reads the same three variables.
-`UPDATE_CHECK_ENABLED=false` turns the check off.
+(tags like `v0.21.0-beta.1`, `v1.0.0-rc.9`). `update.sh` reads the same three
+variables. `UPDATE_CHECK_ENABLED=false` turns the check off.
+
+### Walking the beta channel (v1.0.0-rc.10)
+
+`VERSION` carries the numbers and never the `-rc.N` suffix, so it cannot tell
+one rc of a version from another — every 1.0.0 candidate says `1.0.0`. Until
+rc.10 the updater compared those numbers alone, decided `1.0.0` was not newer
+than `1.0.0`, and answered *"Installed 1.0.0 is already the newest on the beta
+channel"* for every rc after the first: the channel could be read but never
+walked, and each rc had to be installed by hand with `--force`.
+
+The release job now writes the tag it built into **`RELEASE_TAG`** at the tree
+root, and both the updater and the bot's check order releases by semver
+precedence — `1.0.0-rc.6` < `1.0.0-rc.9` < `1.0.0`. A finished release still
+outranks every candidate of its own numbers, so 1.0.0 will not be pulled back
+to one of its rcs.
+
+**Crossing over once.** A tree installed from a release older than rc.10 has no
+`RELEASE_TAG`, so it reads as the plain release and outranks the very rcs it
+should be accepting. Stamp it once, with the tag actually installed:
+
+```bash
+echo v1.0.0-rc.6 > RELEASE_TAG    # whatever ./update.sh reports installing
+./update.sh --check --channel beta
+```
+
+`RELEASE_TAG` is believed only when its numbers agree with `VERSION`, so a file
+left behind by an older tree cannot talk the updater past a real release; an
+absent, empty or malformed one is ignored rather than fatal. It is deliberately
+not listed in `RELEASE_MANIFEST.sha256` — the manifest proves the tree CI
+verified, and the tag is stamped after that check — which is safe because
+`sha256sum -c` verifies the files the manifest lists and ignores any other.
 
 ## Daily route check (v0.27.0)
 
