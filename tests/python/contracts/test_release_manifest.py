@@ -87,8 +87,14 @@ class ReleaseManifestTests(unittest.TestCase):
             f"GNU-only checksum flag(s) {gnu_only} in the manifest check; BusyBox "
             f"rejects these and the updater reports a false integrity failure.",
         )
-        self.assertIn("sha256sum -c RELEASE_MANIFEST.sha256", block)
-        self.assertIn("shasum -a 256 -c RELEASE_MANIFEST.sha256", block)
+        # The manifest is named by a variable rather than inline since the
+        # post-install check began leaving update.sh out of its copy, so this
+        # pins the two things that actually matter: the portable "-c <file>"
+        # form, and that the file is the release manifest rather than some
+        # other list a future edit might point the checker at.
+        self.assertIn('sha256sum -c "$_manifest"', block)
+        self.assertIn('shasum -a 256 -c "$_manifest"', block)
+        self.assertIn("_manifest=RELEASE_MANIFEST.sha256", block)
 
     def test_manifest_failure_output_reads_the_stream_the_tools_actually_use(self):
         """sha256sum prints FAILED lines on stdout, so stderr alone shows nothing useful."""

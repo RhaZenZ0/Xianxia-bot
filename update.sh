@@ -443,12 +443,40 @@ for required in VERSION startup.sh stop.sh docker-compose.yml go_core app conten
 # and this one only got fixed in the place it was noticed.
 #
 # $1 = directory to verify, $2 = where to write the per-file log,
-# $3 = what to say if it fails.
+# $3 = what to say if it fails, $4 = one manifest path to leave out (optional).
+#
+# $4 exists for exactly one file. The post-install check runs while the tree
+# still carries the PREVIOUS release's update.sh: both install loops skip it on
+# purpose, and the new one waits at .update.sh.next until the commit point, so
+# that an install which fails can still roll back with the updater it started
+# with. Checking the installed tree against the NEW manifest therefore failed
+# on that one line for every release that changed update.sh - a real mismatch,
+# but the deferral's, not the tree's, and it aborted the upgrade into a
+# rollback after the files were already in place. Nothing is given up by
+# leaving it out here: verify_release_manifest has already checked that same
+# new update.sh, byte for byte, inside $NEW_ROOT, and .update.sh.next is a
+# cp -a of it.
 verify_manifest_tree() {
-    _dir=$1; _log=$2; _context=$3
+    _dir=$1; _log=$2; _context=$3; _skip=${4:-}
     if [ ! -f "$_dir/RELEASE_MANIFEST.sha256" ]; then
         echo "WARNING: No RELEASE_MANIFEST.sha256 in $_dir; skipping integrity check." >&2
         return 0
+    fi
+    # A skipped path is dropped from a scratch copy of the manifest rather than
+    # from the tree, so the checker still walks every other line. The name is
+    # matched against the manifest's own "<hash>  <path>" ending, with the
+    # regex metacharacters in it quoted - an unescaped "update.sh" would also
+    # match a line ending "updateXsh".
+    _manifest=RELEASE_MANIFEST.sha256
+    _scratch=
+    if [ -n "$_skip" ]; then
+        _scratch="$_log.filtered"
+        _skip_re=$(printf '%s' "$_skip" | sed 's|[.[\*^$]|\\&|g')
+        grep -v "  $_skip_re\$" "$_dir/RELEASE_MANIFEST.sha256" > "$_scratch" || {
+            echo "WARNING: Could not filter $_skip out of the manifest; checking it whole." >&2
+            rm -f "$_scratch"; _scratch=
+        }
+        [ -z "$_scratch" ] || _manifest=$_scratch
     fi
     # Only "-c" is portable. --quiet and --strict are GNU coreutils extensions
     # and BusyBox (which is what a QNAP NAS actually provides) rejects them with
@@ -456,11 +484,12 @@ verify_manifest_tree() {
     # like a failed integrity check. Per-file "OK" output goes to the log file
     # instead of the terminal, which is all --quiet was buying.
     if command -v sha256sum >/dev/null 2>&1; then
-        set -- sha256sum -c RELEASE_MANIFEST.sha256
+        set -- sha256sum -c "$_manifest"
     elif command -v shasum >/dev/null 2>&1; then
-        set -- shasum -a 256 -c RELEASE_MANIFEST.sha256
+        set -- shasum -a 256 -c "$_manifest"
     else
         echo "WARNING: Neither sha256sum nor shasum is available; skipping integrity check." >&2
+        [ -z "$_scratch" ] || rm -f "$_scratch"
         return 0
     fi
     # The manifest deliberately omits .env, data/, caches and itself, so a plain
@@ -468,8 +497,10 @@ verify_manifest_tree() {
     # captured together because these tools print FAILED lines on stdout, not
     # stderr - reporting only stderr would hide which files mismatched.
     if ( cd "$_dir" && "$@" ) >"$_log" 2>&1; then
+        [ -z "$_scratch" ] || rm -f "$_scratch"
         return 0
     fi
+    [ -z "$_scratch" ] || rm -f "$_scratch"
     echo "ERROR: $_context" >&2
     grep -v ': OK$' "$_log" 2>/dev/null | head -n 20 >&2 || true
     return 1
@@ -662,7 +693,7 @@ INSTALLED_VERSION=$(clean_version "$(cat "$PROJECT_DIR/VERSION")")
 # ... and the whole tree, not just VERSION: every file the release manifest
 # names must be in place, byte for byte, before anything is started.
 verify_manifest_tree "$PROJECT_DIR" "${STAGING_DIR:-$PARENT_DIR}/post-install-manifest.log" \
-    "Post-install tree does not match RELEASE_MANIFEST.sha256." || exit 1
+    "Post-install tree does not match RELEASE_MANIFEST.sha256." "update.sh" || exit 1
 
 echo "Starting Xianxia RP $TARGET_VERSION..."
 "$PROJECT_DIR/startup.sh"
