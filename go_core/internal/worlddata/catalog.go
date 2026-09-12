@@ -388,7 +388,11 @@ type SectDefinition struct {
 }
 
 type Catalog struct {
-	StartingLocation    string                         `json:"starting_location"`
+	StartingLocation string `json:"starting_location"`
+	// WorldQiDensity (v1.0.0-rc.5) is how thick the qi is in each world, by
+	// world name: what a cultivation session is multiplied by there. An
+	// unlisted world is 1.0.
+	WorldQiDensity      map[string]float64             `json:"world_qi_density"`
 	Realms              []Realm                        `json:"realms"`
 	BodyRealms          []Realm                        `json:"body_realms"`
 	Paths               map[string]Path                `json:"paths"`

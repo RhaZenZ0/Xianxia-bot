@@ -26,6 +26,9 @@ const (
 func placeCultivationMultiplier(conn *storage.Conn, catalog worlddata.Catalog, userID int64, location string, gameMinute int64) (string, float64, error) {
 	name := ""
 	mult := 1.0
+	if conn == nil {
+		return name, mult, nil
+	}
 	if def, ok := catalog.Locations[location]; ok {
 		switch {
 		case def.RoadSite == "shrine":
@@ -61,19 +64,16 @@ func placeCultivationMultiplier(conn *storage.Conn, catalog worlddata.Catalog, u
 			}
 		}
 	}
-	r, err := conn.Execute(`SELECT name,effect_json FROM deployed_location_arrays WHERE location=? AND starts_game_minute<=? AND ends_game_minute>? ORDER BY starts_game_minute DESC LIMIT 1`, []any{location, gameMinute, gameMinute})
+	arrayName, arrayMult, err := deployedArrayMultiplier(conn, location, gameMinute)
 	if err != nil {
 		return "", 1, err
 	}
-	if array := firstRowMap(r); array != nil {
-		arrayMult := multiplicativeEffectJSONStat(fmt.Sprint(array["effect_json"]), "cultivation_gain")
-		if arrayMult != 1 {
-			mult *= arrayMult
-			if name == "" {
-				name = fmt.Sprint(array["name"])
-			} else {
-				name += " under " + fmt.Sprint(array["name"])
-			}
+	if arrayMult != 1 {
+		mult *= arrayMult
+		if name == "" {
+			name = arrayName
+		} else {
+			name += " under " + arrayName
 		}
 	}
 	mult = math.Min(placeMultCeiling, math.Max(0.5, mult))

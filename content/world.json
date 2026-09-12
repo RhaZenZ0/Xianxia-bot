@@ -530,6 +530,12 @@
       "base_tn": 32
     }
   ],
+  "world_qi_density": {
+    "Mortal World": 1.0,
+    "Spiritual World": 1.6,
+    "Immortal World": 2.6,
+    "Celestial World": 4.0
+  },
   "paths": {
     "Sword Cultivator": {
       "body": 2,

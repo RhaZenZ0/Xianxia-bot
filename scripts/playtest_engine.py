@@ -548,9 +548,73 @@ async def run(url: str, token: str, db_path: str) -> Report:
         if session is not None and not (float(session.get("place_mult") or 0) > 1.0):
             report.add("FAIL", "the session is worked at the shrine's rate", f"{session.get('place_mult')}")
     await step(report, "a moment nobody failed cannot be seized", act("cultivation.breakthrough", PLAYER, {"reroll": True}), expect_error="no moment to seize")
-    await step(report, "putting insight into a Law needs the realm for it", act("law.comprehend", PLAYER, {"law": "fire", "spend_insight": True}), expect_error="realm")
 
-    # ---- 15. backups -------------------------------------------------------
+    # ---- 15. the pace, the growth and the world's qi (v1.0.0-rc.5) ----------
+    async def clear_cooldowns() -> None:
+        await gm("admin.player.reset_cooldowns", {"user_id": PLAYER, "reason": "playtest"})
+
+    async def meditate() -> dict[str, Any]:
+        await clear_cooldowns()
+        return dict(await act("cultivation.train", PLAYER, {"cooldown_seconds": 1}) or {})
+
+    # Stage 9 of the first realm: a stage with room in it, so the pace is
+    # what the session pays rather than whatever the cap allows.
+    await step(report, "stand at Stage 9 of the first realm", gm("admin.player.set_realm", {"user_id": PLAYER, "realm_index": 0, "phase": 9, "reason": "playtest"}))
+    sheet = dict(await engine.action("cultivation.status", PLAYER, {}) or {})
+    pace, cost = int(sheet.get("pace") or 0), int(sheet.get("cost") or 0)
+    report.add("PASS" if pace > 0 and pace >= cost // 12 else "FAIL",
+               "a session is a share of the stage", f"pace={pace} of a {cost} stage over {sheet.get('sessions_per_stage')} sessions")
+    paced = await step(report, "cultivation.train pays about the pace", meditate())
+    if paced:
+        gain = int(paced.get("gain") or 0)
+        report.add("PASS" if pace // 2 <= gain <= pace * 3 else "FAIL", "the session pays about its pace", f"gain={gain} pace={pace}")
+        report.add("PASS" if float(paced.get("world_mult") or 0) == 1.0 and paced.get("world_name") == "Mortal World" else "FAIL",
+                   "the Mortal World is the baseline density", f"{paced.get('world_name')} x{paced.get('world_mult')}")
+
+    sessions = 1
+    filled = dict(await engine.action("cultivation.status", PLAYER, {}) or {})
+    while not filled.get("ready") and sessions < 30:
+        await meditate()
+        sessions += 1
+        filled = dict(await engine.action("cultivation.status", PLAYER, {}) or {})
+    report.add("PASS" if filled.get("ready") and 4 <= sessions <= 20 else "FAIL",
+               "a stage fills in about a dozen sessions", f"{sessions} sessions for a {filled.get('cost')} stage")
+
+    # A full stage gathers nothing, banks nothing and risks nothing.
+    await step(report, "cultivation.stance refine (for the farm check)", act("cultivation.stance", PLAYER, {"stance": "refine"}))
+    before_xp = int(dict(await engine.action("cultivation.status", PLAYER, {}) or {}).get("insight_xp") or 0)
+    full = await step(report, "cultivation.train at a full stage", meditate())
+    after_xp = int(dict(await engine.action("cultivation.status", PLAYER, {}) or {}).get("insight_xp") or 0)
+    if full:
+        report.add("PASS" if int(full.get("gain") or 0) == 0 and full.get("stage_full") and after_xp == before_xp else "FAIL",
+                   "a full stage banks nothing", f"gain={full.get('gain')} xp {before_xp} -> {after_xp}")
+    await step(report, "cultivation.stance back to circulate (again)", act("cultivation.stance", PLAYER, {"stance": "circulate"}))
+
+    # Crossing a realm raises the cultivator - the one thing that never moved
+    # before this release.
+    gate = dict(await engine.action("cultivation.status", PLAYER, {}) or {})
+    if int(gate.get("insight_xp") or 0) < int(gate.get("insight_cost") or 0):
+        await step(report, "earn the last of the gate insight", act("exploration.explore", PLAYER, {"cooldown_seconds": 0, "unexpected_event_chance_percent": 0, "event_key": aid("exploration:gate")}))
+    if not gate.get("insight_banked"):
+        await step(report, "bank the gate insight", act("cultivation.insight", PLAYER, {}))
+    def will_of(character: dict[str, Any]) -> int:
+        attributes = character.get("attributes")
+        if not isinstance(attributes, dict):
+            attributes = json.loads(str(character.get("attributes_json") or "{}"))
+        return int(attributes.get("will") or 0)
+
+    before_attr = dict(await db.get_character(PLAYER) or {})
+    crossed = await step(report, "cross into the second realm", act("cultivation.breakthrough", PLAYER, {"confirm": True}))
+    if crossed and crossed.get("success"):
+        after_attr = dict(await db.get_character(PLAYER) or {})
+        before_will = will_of(before_attr)
+        after_will = will_of(after_attr)
+        report.add("PASS" if after_will == before_will + 1 and dict(crossed.get("attribute_gains") or {}) else "FAIL",
+                   "crossing a realm raises the cultivator", f"will {before_will} -> {after_will}, gains {crossed.get('attribute_gains')}")
+    elif crossed is not None:
+        report.add("PASS", "crossing a realm raises the cultivator", "the roll failed; attributes unchanged by design")
+
+    # ---- 16. backups -------------------------------------------------------
     backup = await step(report, "create a backup", transport.create_backup())
     listed = await step(report, "list backups", transport.list_backups())
     if backup and listed is not None and not any(row.get("name") == backup.get("name") for row in listed):

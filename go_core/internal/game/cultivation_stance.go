@@ -44,7 +44,7 @@ type cultivationStanceDefinition struct {
 var cultivationStances = []cultivationStanceDefinition{
 	{Key: stanceCirculate, Label: "Circulate", GainMult: 1.0, Description: "The orthodox circulation: the full gain, nothing risked, nothing banked."},
 	{Key: stanceRefine, Label: "Refine", GainMult: 0.8, Description: "Slower by a fifth, but every session banks Insight XP toward the realm gate, and stage-9 refinement deepens faster."},
-	{Key: stanceForce, Label: "Force", GainMult: 1.3, Description: "A third faster, and fifteen times in a hundred the qi runs wild and leaves a deviation to treat."},
+	{Key: stanceForce, Label: "Force", GainMult: 1.3, Description: "A third faster, and fifteen times in a hundred the qi runs wild; each untreated deviation is worse than the last."},
 }
 
 func stanceDefinition(key string) (cultivationStanceDefinition, bool) {
@@ -409,6 +409,10 @@ func cultivationStatusQuery(conn *storage.Conn, catalog worlddata.Catalog, userI
 	if err != nil {
 		return nil, err
 	}
+	deviation, err := currentConditionSeverity(conn, userID, "qi_deviation")
+	if err != nil {
+		return nil, err
+	}
 	rerollAvailable, err := rerollState(conn, userID, c.RealmIndex, c.Phase)
 	if err != nil {
 		return nil, err
@@ -429,6 +433,9 @@ func cultivationStatusQuery(conn *storage.Conn, catalog worlddata.Catalog, userI
 		"manor_name": manorName, "manor_mult": manorMult, "storm_bonus": storm,
 		"insight_xp_per_refine": refineInsightXPPerSession, "force_deviation_percent": forceDeviationChancePercent,
 		"place_name": placeName, "place_mult": placeMult, "place_quality": placeQuality(placeMult),
+		"pace": stagePace(cost), "sessions_per_stage": int64(cultivationSessionsPerStage),
+		"world_mult":         worldQiMultiplier(catalog, realmWorld(catalog.Realms, c.RealmIndex)),
+		"deviation_severity": deviation, "attribute_quality": round4(attributeQuality(mods.value(c.Attributes["will"], "will"))),
 		"reroll_available": rerollAvailable, "reroll_cost": insightRerollCost(c.RealmIndex), "law_insight_cost": lawInsightSpendCost,
 	}
 	if c.BodyRealmIndex >= 0 && c.BodyRealmIndex < int64(len(catalog.BodyRealms)) {
@@ -467,7 +474,15 @@ func applyStanceToTraining(conn *storage.Conn, userID int64, stance cultivationS
 			return 0, nil, err
 		}
 		if roll < forceDeviationChancePercent {
-			dev, err := applyCombatCondition(conn, userID, "qi_deviation", 1, "cultivation", "force_stance", gameMinute)
+			// The deviation deepens each time it is taken untreated
+			// (v1.0.0-rc.5). Held at severity 1 it was a rounding error and
+			// Force was strictly the best stance; at 5 it halves what a
+			// session gathers, so forcing is a sprint that has to be paid for.
+			held, err := currentConditionSeverity(conn, userID, "qi_deviation")
+			if err != nil {
+				return 0, nil, err
+			}
+			dev, err := applyCombatCondition(conn, userID, "qi_deviation", minI64(5, held+1), "cultivation", "force_stance", gameMinute)
 			if err != nil {
 				return 0, nil, err
 			}

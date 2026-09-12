@@ -228,6 +228,28 @@ func cultivationTrain(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 	} else if rem > 0 {
 		return authoritativeMutation{}, fmt.Errorf("cultivation cooldown remaining: %d", rem)
 	}
+
+	// Which path is being trained, and what the stage it is filling costs:
+	// since v1.0.0-rc.5 the cost is what sets the session's worth, so it is
+	// read before the gain rather than after it as a cap.
+	realms := catalog.Realms
+	realm, phase, current := c.RealmIndex, c.Phase, c.Cultivation
+	column, eventType, perfectionTable := "cultivation", "cultivate", "realm_perfection"
+	cap := catalog.Perfection.TrainingCap
+	attr := "will"
+	if body {
+		realms = catalog.BodyRealms
+		realm, phase, current = c.BodyRealmIndex, c.BodyPhase, c.BodyCultivation
+		column, eventType, perfectionTable = "body_cultivation", "body_cultivate", "body_realm_perfection"
+		cap = catalog.BodyPerfection.TrainingCap
+		attr = "body"
+	}
+	cost, err := phaseCost(realms, realm, phase)
+	if err != nil {
+		return authoritativeMutation{}, err
+	}
+	pace := stagePace(cost)
+
 	bundle, err := loadAptitudes(conn, userID)
 	if err != nil {
 		return authoritativeMutation{}, err
@@ -236,15 +258,16 @@ func cultivationTrain(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
-	attr := "will"
-	if body {
-		attr = "body"
-	}
 	rv, err := gamerng.Intn(7)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
-	base := int64(8+rv) + mods.value(c.Attributes[attr], attr)
+	// The pace, worked by the cultivator: their attribute is the quality of
+	// the work and the d7 is the day's variance, +/- a tenth.
+	attrValue := mods.value(c.Attributes[attr], attr)
+	quality := attributeQuality(attrValue)
+	variance := 0.9 + float64(rv)/30.0
+	base := maxI64(1, int64(math.Round(float64(pace)*quality*variance)))
 	resonance := dualTrainingBonus(c, base)
 	tm := cultivationTimeModifiers(p.GameMinute, c.SpiritualRoot)
 	timeMult := tm.QiMult
@@ -265,50 +288,40 @@ func cultivationTrain(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
-	attempted := int64(math.Round(float64(base+resonance) * timeMult * effectMult * soulMult * eraMult * stance.GainMult))
+	// The world's own qi density (v1.0.0-rc.5): thin in the Mortal World,
+	// thick above it.
+	worldName := realmWorld(realms, realm)
+	worldMult := worldQiMultiplier(catalog, worldName)
+	attempted := int64(math.Round(float64(base+resonance) * timeMult * effectMult * soulMult * eraMult * stance.GainMult * worldMult))
+
+	// The ground, and what the sect built on it. The manor array and a qi
+	// storm are qi-path weather; the ground itself counts for both paths.
+	placeName, placeMult, err := placeCultivationMultiplier(conn, catalog, userID, c.Location, p.GameMinute)
+	if err != nil {
+		return authoritativeMutation{}, err
+	}
+	attempted = int64(math.Round(float64(attempted) * placeMult))
 	manorName := ""
 	manorMult := 1.0
-	placeName := ""
-	placeMult := 1.0
 	storm := int64(0)
 	if !body {
 		manorName, manorMult, err = manorCultivationMultiplier(conn, userID, c.Location)
 		if err != nil {
 			return authoritativeMutation{}, err
 		}
-		placeName, placeMult, err = placeCultivationMultiplier(conn, catalog, userID, c.Location, p.GameMinute)
-		if err != nil {
-			return authoritativeMutation{}, err
-		}
-		attempted = int64(math.Round(float64(attempted) * manorMult * placeMult))
+		attempted = int64(math.Round(float64(attempted) * manorMult))
 		storm, err = qiStormBonus(conn, c.Location, now)
 		if err != nil {
 			return authoritativeMutation{}, err
 		}
-		attempted += storm
+		if storm > 0 {
+			// A storm was a flat +4, which is a gift at Body Tempering and
+			// nothing at Nascent Soul. It is a share of the session now.
+			storm = maxI64(storm, pace/4)
+			attempted += storm
+		}
 	}
-	realms := catalog.Realms
-	realm := c.RealmIndex
-	phase := c.Phase
-	current := c.Cultivation
-	column := "cultivation"
-	eventType := "cultivate"
-	perfectionTable := "realm_perfection"
-	cap := catalog.Perfection.TrainingCap
-	if body {
-		realms = catalog.BodyRealms
-		realm = c.BodyRealmIndex
-		phase = c.BodyPhase
-		current = c.BodyCultivation
-		column = "body_cultivation"
-		eventType = "body_cultivate"
-		perfectionTable = "body_realm_perfection"
-		cap = catalog.BodyPerfection.TrainingCap
-	}
-	cost, err := phaseCost(realms, realm, phase)
-	if err != nil {
-		return authoritativeMutation{}, err
-	}
+
 	room := cost - current
 	if room < 0 {
 		room = 0
@@ -331,9 +344,14 @@ func cultivationTrain(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
-	insightGain, deviation, err := applyStanceToTraining(conn, userID, stance, p.GameMinute, now)
-	if err != nil {
-		return authoritativeMutation{}, err
+	// A session that gathered nothing banks nothing and risks nothing: a full
+	// stage was an endless Insight XP farm under Refine before v1.0.0-rc.5.
+	insightGain, deviation := int64(0), map[string]any(nil)
+	if gain > 0 {
+		insightGain, deviation, err = applyStanceToTraining(conn, userID, stance, p.GameMinute, now)
+		if err != nil {
+			return authoritativeMutation{}, err
+		}
 	}
 	cool := p.CooldownSeconds
 	if cool <= 0 {
@@ -343,7 +361,7 @@ func cultivationTrain(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 		return authoritativeMutation{}, err
 	}
 	total := current + gain
-	payload := map[string]any{"mode": map[bool]string{true: "body", false: "qi"}[body], "gain": gain, "attempted_gain": attempted, "total": total, "cost": cost, "base_gain": base, "resonance_bonus": resonance, "period": tm.Period, "season": tm.Season, "time_mult": timeMult, "root_resonance": tm.RootResonance, "effect_mult": effectMult, "soul_mult": soulMult, "era_name": eraName, "era_mult": eraMult, "manor_name": manorName, "manor_mult": manorMult, "storm_bonus": storm, "perfection_gain": pg, "ready": total >= cost, "stance": stance.Key, "stance_label": stance.Label, "stance_mult": stance.GainMult, "insight_xp_gain": insightGain, "deviation": deviation, "place_name": placeName, "place_mult": placeMult, "place_quality": placeQuality(placeMult)}
+	payload := map[string]any{"mode": map[bool]string{true: "body", false: "qi"}[body], "gain": gain, "attempted_gain": attempted, "total": total, "cost": cost, "base_gain": base, "pace": pace, "sessions_per_stage": int64(cultivationSessionsPerStage), "attribute": attr, "attribute_value": attrValue, "attribute_quality": round4(quality), "resonance_bonus": resonance, "period": tm.Period, "season": tm.Season, "time_mult": timeMult, "root_resonance": tm.RootResonance, "effect_mult": effectMult, "soul_mult": soulMult, "era_name": eraName, "era_mult": eraMult, "world_name": worldName, "world_mult": worldMult, "manor_name": manorName, "manor_mult": manorMult, "storm_bonus": storm, "perfection_gain": pg, "ready": total >= cost, "stance": stance.Key, "stance_label": stance.Label, "stance_mult": stance.GainMult, "insight_xp_gain": insightGain, "deviation": deviation, "place_name": placeName, "place_mult": placeMult, "place_quality": placeQuality(placeMult), "stage_full": room == 0}
 	legacy, _ := json.Marshal(payload)
 	_, _ = conn.Execute(`INSERT INTO event_log(user_id,event_type,payload_json,created_at) VALUES(?,?,?,?)`, []any{userID, eventType, string(legacy), now})
 	return authoritativeMutation{Result: payload, Event: eventledger.Event{Domain: "cultivation", EventType: eventType, EntityType: "character", EntityID: fmt.Sprint(userID), GameMinute: p.GameMinute, Payload: payload}}, nil
@@ -591,6 +609,7 @@ func cultivationBreakthrough(conn *storage.Conn, catalog worlddata.Catalog, user
 		}
 	}
 	vitalityGain := int64(0)
+	attributeGains := map[string]any(nil)
 	if success {
 		if body {
 			vitalityGain = 2
@@ -603,6 +622,9 @@ func cultivationBreakthrough(conn *storage.Conn, catalog worlddata.Catalog, user
 		}
 		if err == nil && !body {
 			_, err = conn.Execute(`DELETE FROM world_state WHERE key IN (?,?)`, []any{cultivationLastFailKey(userID), cultivationRerollKey(userID)})
+		}
+		if err == nil && newRealm != realm {
+			attributeGains, err = growAttributesOnRealmCrossing(conn, catalog, userID, c, body, now)
 		}
 	} else {
 		col := "cultivation"
@@ -634,7 +656,7 @@ func cultivationBreakthrough(conn *storage.Conn, catalog worlddata.Catalog, user
 		}
 		insightSpent = true
 	}
-	result := map[string]any{"mode": map[bool]string{true: "body", false: "qi"}[body], "roll": roll, "success": success, "tn": tn, "modifier": modifier, "probability": probability, "realm_gate": newRealm != realm, "gate_via_insight": viaInsight, "insight_spent": insightSpent, "reroll": reroll, "reroll_cost": rerollCost, "reroll_available": rerollAvailable, "insight_xp": xpLeft, "cost": cost, "failure_loss": failureLoss, "from_realm": realmName(realms, realm), "from_stage": phase, "to_realm": realmName(realms, newRealm), "to_stage": newPhase, "from_world": oldWorld, "to_world": newWorld, "perfect_bonus": perfectBonus, "resonance_bonus": resonance, "innate_breakthrough_bonus": innate, "vitality_gain": vitalityGain, "ascended": oldWorld != newWorld}
+	result := map[string]any{"mode": map[bool]string{true: "body", false: "qi"}[body], "roll": roll, "success": success, "tn": tn, "modifier": modifier, "probability": probability, "realm_gate": newRealm != realm, "gate_via_insight": viaInsight, "insight_spent": insightSpent, "reroll": reroll, "reroll_cost": rerollCost, "reroll_available": rerollAvailable, "insight_xp": xpLeft, "cost": cost, "failure_loss": failureLoss, "from_realm": realmName(realms, realm), "from_stage": phase, "to_realm": realmName(realms, newRealm), "to_stage": newPhase, "from_world": oldWorld, "to_world": newWorld, "perfect_bonus": perfectBonus, "resonance_bonus": resonance, "innate_breakthrough_bonus": innate, "vitality_gain": vitalityGain, "ascended": oldWorld != newWorld, "attribute_gains": attributeGains, "world_mult": worldQiMultiplier(catalog, newWorld)}
 	if success {
 		legacy, err := awakenSoulMemoryGo(conn, userID, map[bool]int64{true: 4, false: 5}[body], now)
 		if err != nil {

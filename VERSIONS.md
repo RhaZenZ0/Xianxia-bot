@@ -6,6 +6,23 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.0** (rc.5) fixes the curve the cultivation system sat on. A session used to be worth a flat
+`8 + d7 + attribute`, about fourteen essence, at every realm - while a realm cost about three fifths
+more than the last and a cultivator's attributes were written exactly once, at creation, and never
+again. Body Tempering took 88 sessions and Divine Transformation 3,626: the game ended at the second
+realm. A session is now a share of the stage it fills (the stage's cost over twelve), worked by the
+cultivator's attribute and every multiplier already in the chain, so a realm takes about the same
+hundred sessions wherever it sits and the operator's cooldown sets the calendar. Closed-door
+seclusion is paced the same way. Crossing a realm now raises the cultivator: one point of will, or
+body on the body path, and one of their path's own attribute. The worlds above the mortal one are
+thick with qi - a new `world_qi_density` in the content, 1.6 in the Spiritual World, 2.6 in the
+Immortal, 4.0 in the Celestial - which is the reward for crossing into one, and the sheet and the
+session both name it. Four balance fixes ride along: an untreated qi deviation deepens each time it
+is taken (Force was strictly the best stance while it was pinned at severity 1), a session at a full
+stage banks no Insight XP and risks nothing (it was an endless farm), a deployed array is read once
+for both meditation and seclusion instead of by two copies of the same query, and the ground is
+priced for the body path too. No schema change.
+
 **1.0.0** (rc.4) finishes the cultivation system: the place, the spending and the pages. Where a
 cultivator sits is worth something the engine prices - a road-side shrine, a city's temple quarter,
 a sect gate, a residence chamber, a deployed array - and the Here line, the session's result and the
@@ -129,9 +146,12 @@ mechanical authority paths.
 
 ## Release status — v1.0.0
 
-- Current release: v1.0.0 (rc.4): the ground a cultivator sits on priced and named; Insight XP spent
-  on a seized moment and on Laws; the cultivation hub as four pages; every roll printing its chance.
-  Tagged `v1.0.0-rc.4` on the beta channel; the NAS drills and two quiet weeks make it `v1.0.0`.
+- Current release: v1.0.0 (rc.5): a session is a share of the stage it fills, so every realm takes
+  about the same work; crossing a realm raises the cultivator; the higher worlds are thick with qi;
+  four balance fixes. Tagged `v1.0.0-rc.5` on the beta channel; the NAS drills and two quiet weeks
+  make it `v1.0.0`.
+- v1.0.0 (rc.4): the ground a cultivator sits on priced and named; Insight XP spent on a seized
+  moment and on Laws; the cultivation hub as four pages; every roll printing its chance.
 - v1.0.0 (rc.3): the menu as four rows of four under live facts; the cultivation sheet; meditation
   stances; the odds of a breakthrough shown; the realm gate with its banked insight.
 - v1.0.0 (rc.2): the realm rotation visible on the dashboard, in `/realm` and in the rumours; the

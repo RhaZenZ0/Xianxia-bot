@@ -65,6 +65,8 @@ async def cultivate(interaction: discord.Interaction) -> None:
         extra += f"\n💊 Active effects modified cultivation efficiency to **x{float(result['effect_mult']):.2f}**."
     if float(result.get("soul_mult", 1)) > 1.0:
         extra += f"\n☸️ Soul Legacy talent echo: **x{float(result['soul_mult']):.2f}** cultivation efficiency."
+    if float(result.get("world_mult", 1)) != 1.0:
+        extra += f"\n🌏 The qi of the **{result.get('world_name') or 'world'}** is thick: **x{float(result['world_mult']):.2f}**."
     if float(result.get("era_mult", 1)) != 1.0:
         extra += f"\n🌌 **{result.get('era_name') or 'World Era'}** modifies cultivation to **x{float(result['era_mult']):.2f}**."
     if float(result.get("manor_mult", 1)) != 1.0:
@@ -83,6 +85,8 @@ async def cultivate(interaction: discord.Interaction) -> None:
     deviation = dict(result.get("deviation") or {})
     if deviation:
         extra += f"\n⚠️ The forced qi ran wild: **{deviation.get('name') or 'Qi Deviation'}** (severity {int(deviation.get('severity', 1))}). Treat it under **/character → Treatment**, or it drags every session down."
+    if result.get("stage_full") and not gain:
+        extra += "\n🪷 This stage is already full: the session gathered nothing, banked nothing and risked nothing. Break through before meditating again."
     ready = ""
     if result.get("ready"):
         ready = "\n✨ Stage 9 is full. Choose **/quest → Realm Perfection → Start** or **/quest → Main Progression → Breakthrough**." if int(c.get("phase", 1)) == 9 else "\n✨ You are ready to attempt **/quest → Main Progression → Breakthrough**."
@@ -349,6 +353,12 @@ async def breakthrough(interaction: discord.Interaction, confirm: bool = False, 
         mechanical += f"\n🌿 Innate aptitude modifier: **{int(result['innate_breakthrough_bonus']):+d}** to this breakthrough."
     if success:
         mechanical += f"\n✨ Advanced to **{next_realm}, Stage {next_phase}**."
+        gains = dict(result.get("attribute_gains") or {})
+        if gains:
+            grown = ", ".join(f"**+{int(v)} {k.replace('_', ' ')}**" for k, v in sorted(gains.items()))
+            mechanical += f"\n💪 Crossing into a new realm remade your foundation: {grown}. Every session from here gathers more."
+        if float(result.get("world_mult", 1)) != 1.0 and result.get("ascended"):
+            mechanical += f"\n🌏 The qi of **{result.get('to_world')}** is **x{float(result['world_mult']):.2f}** what you knew."
         master = dict(result.get("master_reward") or {})
         if master:
             mechanical += f"\n🎓 Your breakthrough feeds the master-disciple bond: **{master.get('master_name','Your master')}** receives **+{int(master.get('insight_xp',0))} Insight XP** and the lineage gains **+{int(master.get('attention',0))} Master Attention**."
@@ -427,6 +437,8 @@ async def body_cultivate(interaction: discord.Interaction) -> None:
     extra += f"\n🕰️ {result.get('period','World-time')} body-tempering flow: **x{float(result.get('time_mult',1)):.2f}** efficiency."
     if float(result.get("soul_mult", 1)) > 1.0:
         extra += f"\n☸️ Soul Legacy talent echo: **x{float(result['soul_mult']):.2f}** body-cultivation efficiency."
+    if float(result.get("world_mult", 1)) != 1.0:
+        extra += f"\n🌏 The qi of the **{result.get('world_name') or 'world'}** is thick: **x{float(result['world_mult']):.2f}**."
     if float(result.get("era_mult", 1)) != 1.0:
         extra += f"\n🌌 **{result.get('era_name') or 'World Era'}** modifies cultivation to **x{float(result['era_mult']):.2f}**."
     if int(result.get("perfection_gain", 0)):

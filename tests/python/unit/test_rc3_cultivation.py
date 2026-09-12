@@ -174,7 +174,8 @@ class TheStanceTheOddsAndTheGate(unittest.TestCase):
         self.assertIn("stance, err := loadCultivationStance(conn, userID)", GO_ACTIONS)
         self.assertIn("* stance.GainMult", GO_ACTIONS)
         self.assertIn("applyStanceToTraining(conn, userID, stance, p.GameMinute, now)", GO_ACTIONS)
-        self.assertIn('applyCombatCondition(conn, userID, "qi_deviation", 1, "cultivation", "force_stance", gameMinute)', GO_STANCE)
+        # Since v1.0.0-rc.5 the severity deepens with each untreated deviation.
+        self.assertIn('applyCombatCondition(conn, userID, "qi_deviation", minI64(5, held+1), "cultivation", "force_stance", gameMinute)', GO_STANCE)
 
     def test_the_odds_and_the_roll_share_one_modifier(self):
         self.assertEqual(GO_ACTIONS.count("breakthroughModifier(c, mods, body, perfectBonus, resonance, innate)"), 1)

@@ -51,6 +51,9 @@ async def cultivation_status_fields(interaction: discord.Interaction, *, fallbac
     realm_line = f"**{realm}** • Stage **{stage}**/9\n{_stage_bar(status.get('cultivation'), status.get('cost'))}"
     if status.get("ready"):
         realm_line += " ✨ full"
+    pace = int(status.get("pace", 0) or 0)
+    if pace:
+        realm_line += f"\n-# about **{int(status.get('sessions_per_stage', 12) or 12)}** sessions a stage at **{pace:,}** each"
     odds = dict(status.get("odds") or {})
     movers = " • ".join(
         f"{str(m.get('label'))} {int(m.get('value', 0)):+d}" for m in list(odds.get("movers") or [])[:4]
@@ -72,6 +75,8 @@ async def cultivation_status_fields(interaction: discord.Interaction, *, fallbac
         today += " 🌿"
     if str(status.get("place_name") or ""):
         today += f"\n🪨 {status.get('place_name')} — {status.get('place_quality') or 'ordinary'} ground **x{float(status.get('place_mult', 1)):.2f}**"
+    if float(status.get("world_mult", 1)) != 1.0:
+        today += f"\n🌏 world qi **x{float(status.get('world_mult', 1)):.2f}**"
     extras = []
     if float(status.get("effect_mult", 1)) != 1.0:
         extras.append(f"effects x{float(status.get('effect_mult', 1)):.2f}")
@@ -94,12 +99,13 @@ async def cultivation_status_fields(interaction: discord.Interaction, *, fallbac
         body_line += f" • {int(body_odds.get('probability', 0))}%"
     if status.get("dual_resonance"):
         body_line += " ☯"
+    stance_line = f"**{status.get('stance_label') or 'Circulate'}** x{float(status.get('stance_mult', 1)):.2f} • {_relative_time(status.get('cooldown_remaining'))}"
+    severity = int(status.get("deviation_severity", 0) or 0)
+    if severity:
+        stance_line += f"\n⚠️ Qi deviation **{severity}/5** — treat it under **/character → Treatment**"
     return [
         HubStatusField("☯️ Realm", realm_line),
-        HubStatusField(
-            "🧭 Stance",
-            f"**{status.get('stance_label') or 'Circulate'}** x{float(status.get('stance_mult', 1)):.2f} • {_relative_time(status.get('cooldown_remaining'))}",
-        ),
+        HubStatusField("🧭 Stance", stance_line),
         HubStatusField("🎲 Breakthrough", odds_line, inline=False),
         HubStatusField("🌤️ Today", today),
         HubStatusField("💪 Body", body_line),

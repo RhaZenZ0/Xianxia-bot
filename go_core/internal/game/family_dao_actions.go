@@ -480,7 +480,10 @@ func seclusionStartActionGo(conn *storage.Conn, catalog worlddata.Catalog, userI
 	if p.DurationGameMinutes <= 0 {
 		p.DurationGameMinutes = 1
 	}
-	r, e := conn.Execute(`SELECT life_status,location,realm_index,body_realm_index,attributes_json FROM characters WHERE user_id=?`, []any{userID})
+	// phase and body_phase are read because the projection is a share of the
+	// stage being filled since v1.0.0-rc.5; without them the start reported a
+	// stage-1 rate and the settle paid the real one.
+	r, e := conn.Execute(`SELECT life_status,location,realm_index,phase,body_realm_index,body_phase,attributes_json FROM characters WHERE user_id=?`, []any{userID})
 	if e != nil {
 		return authoritativeMutation{}, e
 	}
@@ -509,7 +512,7 @@ func seclusionStartActionGo(conn *storage.Conn, catalog worlddata.Catalog, userI
 	if e != nil {
 		return authoritativeMutation{}, e
 	}
-	projected := seclusionDailyGainGo(c, p.Mode, environmentMult, soulCultivationMultGo(conn, userID))
+	projected := seclusionDailyGainGo(catalog, c, p.Mode, environmentMult, soulCultivationMultGo(conn, userID))
 	end := p.GameMinute + p.DurationGameMinutes
 	now := nowSeconds()
 	_, e = conn.Execute(`INSERT INTO seclusion_sessions(user_id,mode,started_game_minute,ends_game_minute,last_settled_game_minute,start_location,environment_mult,accumulated_gain,status,ended_reason,created_at,updated_at) VALUES(?,?,?,?,?,?,?,0,'active','',?,?) ON CONFLICT(user_id) DO UPDATE SET mode=excluded.mode,started_game_minute=excluded.started_game_minute,ends_game_minute=excluded.ends_game_minute,last_settled_game_minute=excluded.last_settled_game_minute,start_location=excluded.start_location,environment_mult=excluded.environment_mult,accumulated_gain=0,status='active',ended_reason='',created_at=excluded.created_at,updated_at=excluded.updated_at`, []any{userID, p.Mode, p.GameMinute, end, p.GameMinute, p.Location, environmentMult, now, now})
@@ -549,7 +552,7 @@ func seclusionSettleActionGo(conn *storage.Conn, catalog worlddata.Catalog, user
 	days := max64(0, (target-last)/p.MinutesPerDay)
 	mode := fmt.Sprint(s["mode"])
 	env, _ := strconvFloat(s["environment_mult"])
-	daily := seclusionDailyGainGo(c, mode, env, soulCultivationMultGo(conn, userID))
+	daily := seclusionDailyGainGo(catalog, c, mode, env, soulCultivationMultGo(conn, userID))
 	attempted := daily * days
 	awarded := int64(0)
 	field := "cultivation"
