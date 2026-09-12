@@ -203,7 +203,7 @@ func loadEffectModifiers(conn *storage.Conn, userID, gameMinute int64, bundle Ap
 }
 
 func phaseCost(realms []worlddata.Realm, index, phase int64) (int64, error) {
-	if index < 0 || int(index) >= len(realms) {
+	if index < 0 || index >= int64(len(realms)) {
 		return 0, errors.New("realm index out of range")
 	}
 	costs := realms[index].PhaseCosts

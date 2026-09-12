@@ -220,7 +220,7 @@ func realmNameGo(catalog worlddata.Catalog, index int64) string {
 	if index < 0 {
 		index = 0
 	}
-	if int(index) >= len(catalog.Realms) {
+	if index >= int64(len(catalog.Realms)) {
 		index = int64(len(catalog.Realms) - 1)
 	}
 	if index < 0 {
@@ -232,7 +232,7 @@ func realmWorldGo(catalog worlddata.Catalog, index int64) string {
 	if index < 0 {
 		index = 0
 	}
-	if int(index) >= len(catalog.Realms) {
+	if index >= int64(len(catalog.Realms)) {
 		index = int64(len(catalog.Realms) - 1)
 	}
 	if index < 0 {

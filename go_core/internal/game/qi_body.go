@@ -167,7 +167,7 @@ func saveQiBody(conn *storage.Conn, userID int64, body qiBody, now float64) erro
 // in essence, shared across its nine stages, so capacity climbs the same
 // ladder the cultivation does.
 func realmQiBase(realms []worlddata.Realm, index, phase int64) int64 {
-	if index < 0 || int(index) >= len(realms) {
+	if index < 0 || index >= int64(len(realms)) {
 		return qiCapacityFloor
 	}
 	total := int64(0)

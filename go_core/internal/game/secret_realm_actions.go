@@ -50,7 +50,7 @@ func secretRealmStatusQuery(conn *storage.Conn, catalog worlddata.Catalog, userI
 			}
 			idx := storage.ParseInt(row[2])
 			var room any
-			if idx >= 0 && int(idx) < len(realm.Rooms) {
+			if idx >= 0 && idx < int64(len(realm.Rooms)) {
 				room = realm.Rooms[idx]
 			}
 			out["active"] = true
@@ -235,7 +235,7 @@ func secretRealmExploreAction(conn *storage.Conn, catalog worlddata.Catalog, use
 	}
 	idx := storage.ParseInt(row[2])
 	danger := storage.ParseInt(row[3])
-	if idx < 0 || int(idx) >= len(realm.Rooms) {
+	if idx < 0 || idx >= int64(len(realm.Rooms)) {
 		return authoritativeMutation{}, errors.New("secret realm run has already reached its end")
 	}
 	room := realm.Rooms[idx]
@@ -267,7 +267,7 @@ func secretRealmExploreAction(conn *storage.Conn, catalog worlddata.Catalog, use
 		if newDanger < 0 {
 			newDanger = 0
 		}
-		final := int(idx) == len(realm.Rooms)-1
+		final := idx == int64(len(realm.Rooms)-1)
 		result["cultivation_awarded"] = awarded
 		result["spirit_stones"] = room.SpiritStones
 		result["insight_xp"] = room.InsightXP

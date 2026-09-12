@@ -431,11 +431,11 @@ func phaseCapGo(catalog worlddata.Catalog, realm, phase int64, body bool) int64 
 	if body {
 		realms = catalog.BodyRealms
 	}
-	if realm < 0 || int(realm) >= len(realms) {
+	if realm < 0 || realm >= int64(len(realms)) {
 		return math.MaxInt64
 	}
 	costs := realms[realm].PhaseCosts
-	if phase <= 0 || int(phase) > len(costs) {
+	if phase <= 0 || phase > int64(len(costs)) {
 		return math.MaxInt64
 	}
 	return costs[phase-1]
