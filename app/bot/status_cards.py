@@ -36,7 +36,10 @@ def _qi_body_value(status: dict) -> str:
     capacity = max(1, int(status.get("qi_max", 1) or 1))
     qi = max(0, int(status.get("qi", 0) or 0))
     filled = max(0, min(10, round(qi * 10 / capacity)))
-    line = f"`{'▰' * filled}{'▱' * (10 - filled)}` **{qi:,} / {capacity:,}** qi"
+    # v1.0.0-rc.8: a ghost cultivator's dantian holds death qi, and the sheet
+    # names it rather than pretending the two are the same thing.
+    death = str(status.get("qi_type") or "spirit") == "death"
+    line = f"`{'▰' * filled}{'▱' * (10 - filled)}` **{qi:,} / {capacity:,}** {'death qi' if death else 'qi'}"
     if float(status.get("qi_regen", 0) or 0):
         line += f" • +{float(status.get('qi_regen', 0)):.1f}/game minute"
     line += f"\n⚗️ purity **{int(status.get('purity', 0))}%** of **{int(status.get('purity_ceiling', 0))}%** — techniques **x{float(status.get('skill_cost_mult', 1)):.2f}**"
@@ -46,6 +49,8 @@ def _qi_body_value(status: dict) -> str:
         line += f" • **{damaged} ruptured**"
     if str(status.get("dantian_state") or "intact") != "intact":
         line += f" • the vessel is **{status.get('dantian_state')}**"
+    if death:
+        line += f"\n👻 **{status.get('ghost_form_name') or 'Living Flesh'}** • corruption **{int(status.get('corruption', 0))}/100**"
     return line
 
 

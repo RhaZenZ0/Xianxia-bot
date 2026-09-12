@@ -43,7 +43,21 @@ CULTIVATION_STYLE_PROFILES: dict[str, dict[str, str]] = {
         "focus": "Insight • Spirit • formations",
         "suggested_root": "Earth",
     },
+    # v1.0.0-rc.8: only a child of the two ghost-born households is offered this.
+    "Ghost Cultivator": {
+        "emoji": "👻",
+        "summary": "Gather the death qi a place keeps, and pay for it in what it leaves behind.",
+        "focus": "Spirit • Will • ghost arts",
+        "suggested_root": "Yin",
+    },
 }
+
+
+# Paths nobody may take unless they were born to them. The engine enforces this
+# on character.create; this is the same gate on the picker, so the option never
+# appears to a family that cannot choose it.
+GHOST_BORN_FAMILIES: frozenset[str] = frozenset({"nether_market_house", "tomb_watch_clan"})
+BIRTH_GATED_STYLES: dict[str, frozenset[str]] = {"Ghost Cultivator": GHOST_BORN_FAMILIES}
 
 
 FAMILY_STYLE_PREFERENCES: dict[str, tuple[str, ...]] = {
@@ -58,6 +72,8 @@ FAMILY_STYLE_PREFERENCES: dict[str, tuple[str, ...]] = {
     "fallen_martial_clan": ("Qi Refiner", "Soul Cultivator", "Sword Cultivator"),
     "noble_martial_clan": ("Qi Refiner", "Sword Cultivator", "Formation Adept"),
     "alchemy_family": ("Qi Refiner", "Formation Adept", "Soul Cultivator"),
+    "nether_market_house": ("Ghost Cultivator", "Soul Cultivator", "Qi Refiner"),
+    "tomb_watch_clan": ("Ghost Cultivator", "Body Refiner", "Formation Adept"),
 }
 
 
@@ -73,6 +89,8 @@ FAMILY_EMOJIS: dict[str, str] = {
     "fallen_martial_clan": "🕯️",
     "noble_martial_clan": "🏯",
     "alchemy_family": "⚗️",
+    "nether_market_house": "🏮",
+    "tomb_watch_clan": "⚰️",
 }
 
 
@@ -151,6 +169,23 @@ def recommended_cultivation_styles(family: dict[str, Any] | None) -> tuple[str, 
     return tuple(path for path in preferred if path in CULTIVATION_STYLE_PROFILES)
 
 
+def style_is_open_to(path: str, family: dict[str, Any] | None) -> bool:
+    """Whether this family may choose this cultivation path at all."""
+    allowed = BIRTH_GATED_STYLES.get(str(path or ""))
+    return allowed is None or family_archetype_id(family) in allowed
+
+
+def selectable_cultivation_styles(paths: Any, family: dict[str, Any] | None) -> tuple[str, ...]:
+    """The paths offered to this family, recommendations first.
+
+    `paths` is the canonical path list (``WORLD.paths``); a birth-gated path is
+    dropped for every family that was not born to it.
+    """
+    preferred = [path for path in recommended_cultivation_styles(family) if style_is_open_to(path, family)]
+    rest = [path for path in paths if path not in preferred and style_is_open_to(path, family)]
+    return tuple(preferred + rest)
+
+
 RandBelow = Callable[[int], int]
 
 
@@ -168,6 +203,8 @@ FAMILY_ROOT_AFFINITIES: dict[str, tuple[str, ...]] = {
     "fallen_martial_clan": ("Metal", "Yin", "Earth"),
     "noble_martial_clan": ("Metal", "Yang", "Lightning"),
     "alchemy_family": ("Wood", "Fire", "Water"),
+    "nether_market_house": ("Yin", "Void", "Water"),
+    "tomb_watch_clan": ("Yin", "Earth", "Ice"),
 }
 
 LOCATION_ROOT_AFFINITIES: dict[str, tuple[str, ...]] = {

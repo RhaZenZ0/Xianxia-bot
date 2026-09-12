@@ -304,8 +304,24 @@ func TestFamilyHomelandsUseDistinctPublicStandardCities(t *testing.T) {
 			if location.SettlementType != "city" {
 				t.Fatalf("%s %s location %q settlement_type=%q", worldName, family.Archetype, family.Location, location.SettlementType)
 			}
+			// Every household that founded a city keeps it to itself. The
+			// two ghost households (v1.0.0-rc.8) founded nothing: they are
+			// outcasts living at the edge of a cousin's city - the
+			// nether-market house in the yin city, the tomb-watch clan in
+			// the city of ruins - so they are the one permitted sharing,
+			// and they must share with exactly those two.
 			if previous, exists := seen[family.Location]; exists {
-				t.Fatalf("%s families %s and %s share %q; every current family must have its own city", worldName, previous, family.Archetype, family.Location)
+				if !ghostBornFamily(catalog, family.Archetype) {
+					t.Fatalf("%s families %s and %s share %q; every founding family must have its own city", worldName, previous, family.Archetype, family.Location)
+				}
+				host := map[string]string{"nether_market_house": "hidden_weapon_family", "tomb_watch_clan": "fallen_martial_clan"}[family.Archetype]
+				if previous != host {
+					t.Fatalf("%s ghost household %s shares %q with %s, not with %s", worldName, family.Archetype, family.Location, previous, host)
+				}
+				continue
+			}
+			if ghostBornFamily(catalog, family.Archetype) {
+				t.Fatalf("%s ghost household %s founded its own city %q; it should live in a cousin's", worldName, family.Archetype, family.Location)
 			}
 			seen[family.Location] = family.Archetype
 		}
@@ -419,8 +435,11 @@ func TestFamilyCityRoadGraphIsBidirectionalConnectedAndWorldLocal(t *testing.T) 
 		for _, family := range options {
 			familyCities[family.Location] = true
 		}
-		if len(familyCities) != len(birthFamilyArchetypes) {
-			t.Fatalf("%s family city count=%d", worldName, len(familyCities))
+		// One city per founding household; the two ghost households
+		// (v1.0.0-rc.8) live in a cousin's and found none of their own.
+		wantCities := len(birthFamilyArchetypes) - len(catalog.DeathQi.Families)
+		if len(familyCities) != wantCities {
+			t.Fatalf("%s family city count=%d want %d", worldName, len(familyCities), wantCities)
 		}
 
 		for city := range familyCities {

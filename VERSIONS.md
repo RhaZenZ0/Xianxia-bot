@@ -6,6 +6,27 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.0** (rc.8) opens a road that has to be born into. Two households join the eleven — the
+Nether-Market Household of the fog-bound yin wetlands and the Tomb-Watch Clan of the necropolis above
+the old battlefield — and a child of either, and of nobody else, may take a seventh cultivation path:
+the **Ghost Cultivator**. The engine enforces that at creation and the picker never offers the option
+to anyone it would refuse. A ghost cultivator fills the same three dantian with death qi instead of
+spirit qi, and reads the world the other way round: a road-side ruin is rich ground where a wayside
+shrine is hostile, the streets of a living city are thin, and night is their noon while the afternoon
+sun costs them. `ghost.harvest` takes what a place has been holding — a third of the dantian at a
+stroke, priced by the ground — and `ghost.appease` burns incense at the one kind of place their
+gathering fails, which is the only thing that lifts what the road leaves behind. What it leaves is
+corruption (schema 41, three columns on `character_qi_body`): a point a session, six a harvest,
+eating three percent of the middle dantian's purity ceiling for every ten it reaches, and tearing a
+channel at a one-in-seven chance once it passes sixty. It also remakes the body, step by step, up a
+six-rung ladder of ghost forms from Living Flesh to Revenant Sovereign — each widening the dantian
+and deepening what daylight costs, each needing a realm to carry it, and none of them ever given
+back: incense lifts the residue, not what the residue has made of you. The cultivation hub gains a
+sixth **Ghost** page, the sheet names death qi and its corruption where it used to say qi, and the GM
+dashboard's Cultivation page shows which qi each body holds and how far gone it is. The ground, the
+hours, the corruption costs and the whole ghost-form ladder are content, in a new `death_qi_system`
+block.
+
 **1.0.0** (rc.7) gives a cultivator a body for the qi to live in. `character_qi_body` (schema 40)
 holds what the sheet never had: the purity of the qi in the dantian, the meridians opened out of the
 hundred and eight a cultivator can hold, the ones ruptured, and the state of the vessel itself. Qi
@@ -179,10 +200,13 @@ mechanical authority paths.
 
 ## Release status — v1.0.0
 
-- Current release: v1.0.0 (rc.7, schema 40): the qi body - purity, the hundred and eight meridians,
-  the three dantian, a pool that scales with the realm and refills over game hours, and every qi cost
-  in the game rescaled as a share of it. Tagged `v1.0.0-rc.7` on the beta channel; the NAS drills and
-  two quiet weeks make it `v1.0.0`.
+- Current release: v1.0.0 (rc.8, schema 41): the ghost road - two households born to death qi, a
+  seventh path only they can take, a ruin for a shrine and night for noon, and a corruption that
+  remakes the body up a ladder of ghost forms. Tagged `v1.0.0-rc.8` on the beta channel; the NAS
+  drills and two quiet weeks make it `v1.0.0`.
+- v1.0.0 (rc.7, schema 40): the qi body - purity, the hundred and eight meridians, the three dantian,
+  a pool that scales with the realm and refills over game hours, and every qi cost in the game
+  rescaled as a share of it.
 - v1.0.0 (rc.6): the spirit-gathering array a player raises at home; the manual they practise speeding
   every session by its grade and mastery; a climb that tightens with each realm and eases when a
   world is crossed.
@@ -420,6 +444,9 @@ mechanical authority paths.
 - **Schema 27** added the v0.19.29 mute/freeze moderation columns on `characters`
   (`is_muted`, `is_frozen`, `moderation_reason`).
 - **Schema 28** added the Quest Forge definition table (`quest_definitions`).
+- **Schema 41** added the ghost road to the qi body - which qi it holds, the residue death qi
+  leaves and the form the residue has made (`character_qi_body.qi_type`, `.corruption`,
+  `.ghost_form`) (v1.0.0-rc.8).
 - **Schema 40** added the cultivator's qi body - purity, meridians and the dantian's state
   (`character_qi_body`) (v1.0.0-rc.7).
 - **Schema 39** added the trade offers between cultivators (`trade_offers`) (v0.39.0).

@@ -1115,3 +1115,121 @@ async def meridian_heal(interaction: discord.Interaction) -> None:
         f"Qi: **{int(result.get('qi', 0)):,} / {int(result.get('qi_max', 0)):,}**.",
         ephemeral=False,
     )
+
+
+# ---------------- The ghost road (v1.0.0-rc.8) ----------------
+# Death qi: the same three dantian, filled from what a place keeps after
+# something died in it. Only a cultivator born to one of the two ghost
+# households walks it; the engine refuses every one of these to anyone else.
+ghost_group = app_commands.Group(name="ghost", description="The ghost road: death qi, the residue it leaves, and the rites that lift it")
+
+
+def _ghost_lines(name: str, status: dict[str, Any]) -> list[str]:
+    corruption, cap = int(status.get("corruption", 0)), int(status.get("corruption_cap", 100))
+    filled = max(0, min(10, round(corruption * 10 / max(1, cap))))
+    lines = [
+        f"👻 **{name} — the ghost road**",
+        f"🕯️ **{status.get('ghost_form_name')}** • `{'▰' * filled}{'▱' * (10 - filled)}` corruption **{corruption}/{cap}**",
+    ]
+    if str(status.get("ghost_form_note") or ""):
+        lines.append(f"*{status.get('ghost_form_note')}*")
+    lines.append(
+        f"🫀 The form widens the dantian by **x{float(status.get('capacity_mult', 1)):.2f}**"
+        f" and costs **{int(round(float(status.get('daylight_penalty', 0)) * 100))}%** of what you gather under the sun."
+    )
+    nxt = dict(status.get("next_form") or {})
+    if nxt:
+        lines.append(
+            f"⬆️ Next: **{nxt.get('name')}** at **{int(nxt.get('corruption', 0))}** corruption"
+            f" and realm **{int(nxt.get('min_realm_index', 0))}** — *{nxt.get('note')}*"
+        )
+    else:
+        lines.append("⬆️ There is nothing further down this road.")
+    ground = str(status.get("ground_name") or "open ground")
+    lines.append(
+        f"📍 Here: {ground} **x{float(status.get('ground_mult', 1)):.2f}** • **{status.get('period')}** **x{float(status.get('hour_mult', 1)):.2f}**"
+    )
+    penalty = int(status.get("purity_ceiling_penalty", 0))
+    if penalty:
+        lines.append(f"⚗️ The residue has taken **{penalty}%** off how clean your qi can ever be.")
+    if corruption >= int(status.get("rupture_threshold", 60) or 60):
+        lines.append("🩸 Past this depth every session can tear a channel.")
+    todo = []
+    if status.get("can_harvest_here"):
+        todo.append("**/cultivation → Ghost → Harvest**")
+    if status.get("can_appease_here"):
+        todo.append("**/cultivation → Ghost → Appease**")
+    lines.append("➡️ " + (" • ".join(todo) if todo else "Neither the harvest nor the rites belong on this ground."))
+    return lines
+
+
+@registered_group_command(ghost_group, name="status", description="The ghost road: what you have become and what this ground is worth")
+async def ghost_status(interaction: discord.Interaction) -> None:
+    await interaction.response.defer(ephemeral=False)
+    c = await require_character(interaction)
+    if not c:
+        return
+    try:
+        status = dict(await ENGINE.action("ghost.status", interaction.user.id, {}) or {})
+    except GameEngineError as exc:
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
+        return
+    if not status.get("walking_the_road"):
+        await interaction.followup.send(
+            f"🕯️ **{c['name']}** holds spirit qi, not death qi. The **{status.get('ghost_path')}** road belongs to "
+            "those born into a ghost household — it is chosen at birth, and never after.",
+            ephemeral=False,
+        )
+        return
+    await reply_long(interaction, "\n".join(_ghost_lines(str(c["name"]), status)), ephemeral=False)
+
+
+@registered_group_command(ghost_group, name="harvest", description="Take the death qi this place is holding — fast, and it stains")
+async def ghost_harvest(interaction: discord.Interaction) -> None:
+    await interaction.response.defer(ephemeral=False)
+    c = await require_character(interaction)
+    if not c:
+        return
+    try:
+        envelope = await ENGINE.authoritative_action(
+            "ghost.harvest", interaction.user.id, {},
+            action_id=f"discord:{interaction.id}:ghost.harvest",
+        )
+    except GameEngineError as exc:
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
+        return
+    result = dict(envelope.get("result") or {})
+    risen = str(result.get("form_risen") or "")
+    await interaction.followup.send(
+        f"👻 **{c['name']} draws on {result.get('ground_name') or 'the ground'}.**\n"
+        f"The residue comes up cold and fast: **+{int(result.get('qi_gained', 0)):,}** qi "
+        f"(**{int(result.get('qi', 0)):,} / {int(result.get('qi_max', 0)):,}**) at **x{float(result.get('ground_mult', 1)):.2f}**.\n"
+        f"🕯️ Corruption **+{int(result.get('corruption_gain', 0))}** → **{int(result.get('corruption', 0))}**"
+        f" • karma **{int(result.get('karma_delta', 0))}**."
+        + (f"\n⬆️ Something in you settles differently. You are **{risen}** now." if risen else ""),
+        ephemeral=False,
+    )
+
+
+@registered_group_command(ghost_group, name="appease", description="Burn incense where the living keep their dead, and shed some of what clings")
+async def ghost_appease(interaction: discord.Interaction) -> None:
+    await interaction.response.defer(ephemeral=False)
+    c = await require_character(interaction)
+    if not c:
+        return
+    try:
+        envelope = await ENGINE.authoritative_action(
+            "ghost.appease", interaction.user.id, {},
+            action_id=f"discord:{interaction.id}:ghost.appease",
+        )
+    except GameEngineError as exc:
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
+        return
+    result = dict(envelope.get("result") or {})
+    await interaction.followup.send(
+        f"🕯️ **{c['name']} burns incense at {result.get('ground_name') or 'the shrine'}.**\n"
+        f"Some of it lifts: corruption **-{int(result.get('corruption_shed', 0))}** → **{int(result.get('corruption', 0))}** "
+        f"for **{int(result.get('stones_spent', 0)):,}** spirit stones • karma **+{int(result.get('karma_delta', 0))}**.\n"
+        f"What your body has become does not lift with it: you are still **{result.get('ghost_form_name')}**.",
+        ephemeral=False,
+    )

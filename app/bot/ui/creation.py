@@ -21,6 +21,7 @@ from ...rules.creation_ui import (
     location_theme,
     origin_vignette,
     recommended_cultivation_styles,
+    selectable_cultivation_styles,
 )
 from ...ops.game_engine import GameEngineError
 from ..channels import _report_game_ui_error, post_server_log
@@ -362,7 +363,10 @@ class BirthFamilyNextButton(discord.ui.Button):
 class CultivationStyleSelect(discord.ui.Select):
     def __init__(self, family: dict[str, Any], selected_style: str | None):
         preferred = list(recommended_cultivation_styles(family))
-        ordered = preferred + [path for path in WORLD.paths if path not in preferred]
+        # v1.0.0-rc.8: a birth-gated path (the ghost road) is never offered to a
+        # family that was not born to it, and the engine refuses it besides.
+        ordered = list(selectable_cultivation_styles(WORLD.paths, family))
+        preferred = [path for path in preferred if path in ordered]
         options = []
         for path in ordered:
             profile = cultivation_style_profile(path)

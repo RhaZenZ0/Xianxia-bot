@@ -276,6 +276,23 @@ func cultivationTrain(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 		timeMult = tm.BodyMult
 		effectMult = mulOrOne(mods, "body_cultivation_gain")
 	}
+	// The ghost road (v1.0.0-rc.8): a cultivator who holds death qi reads the
+	// hours the other way round - night is their noon - and pays a daylight
+	// penalty that deepens with every ghost form. The body path is flesh, and
+	// tempers by the ordinary clock.
+	ghostBody, err := loadQiBody(conn, userID)
+	if err != nil {
+		return authoritativeMutation{}, err
+	}
+	ghostBody = normaliseQiType(catalog, ghostBody, c.Path)
+	deathQi := ghostBody.isDeathQi() && !body
+	if deathQi {
+		timeMult = deathQiHourMultiplier(catalog, tm.Period) * (1 - ghostDaylightPenalty(catalog, ghostBody, tm.Period))
+		if tm.RootResonance {
+			timeMult *= 1.10
+		}
+		timeMult = round4(math.Max(0.1, timeMult))
+	}
 	soulMult, err := soulCultivationMultiplier(conn, userID)
 	if err != nil {
 		return authoritativeMutation{}, err
@@ -305,6 +322,11 @@ func cultivationTrain(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 	placeName, placeMult, err := placeCultivationMultiplier(conn, catalog, userID, c.Location, p.GameMinute)
 	if err != nil {
 		return authoritativeMutation{}, err
+	}
+	if deathQi {
+		// A ruin is rich ground and a shrine is hostile: the living world's
+		// prices do not apply to what the dead leave behind.
+		placeName, placeMult = deathQiGroundMultiplier(catalog, c.Location)
 	}
 	attempted = int64(math.Round(float64(attempted) * placeMult))
 	manorName := ""
@@ -353,6 +375,23 @@ func cultivationTrain(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 	// A session that gathered nothing banks nothing and risks nothing: a full
 	// stage was an endless Insight XP farm under Refine before v1.0.0-rc.5.
 	insightGain, deviation := int64(0), map[string]any(nil)
+	corruptionGain, formRisen, ghostRupture := int64(0), "", false
+	if gain > 0 && deathQi {
+		// Every session on the road leaves a little more of it in you, and
+		// past the content's threshold the residue tears a channel.
+		corruptionGain = int64(catalog.DeathQi.Corruption.PerSession)
+		if corruptionGain <= 0 {
+			corruptionGain = 1
+		}
+		updated, risen, cerr := addCorruption(conn, catalog, userID, ghostBody, corruptionGain, realm, now)
+		if cerr != nil {
+			return authoritativeMutation{}, cerr
+		}
+		formRisen, ghostBody = risen, updated
+		if ghostRupture, err = corruptionRupture(conn, catalog, userID, ghostBody, now); err != nil {
+			return authoritativeMutation{}, err
+		}
+	}
 	if gain > 0 {
 		insightGain, deviation, err = applyStanceToTraining(conn, userID, stance, p.GameMinute, now)
 		if err != nil {
@@ -386,7 +425,7 @@ func cultivationTrain(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 		return authoritativeMutation{}, err
 	}
 	total := current + gain
-	payload := map[string]any{"mode": map[bool]string{true: "body", false: "qi"}[body], "gain": gain, "attempted_gain": attempted, "total": total, "cost": cost, "base_gain": base, "pace": pace, "sessions_per_stage": sessionsForStage(realm), "attribute": attr, "attribute_value": attrValue, "attribute_quality": round4(quality), "resonance_bonus": resonance, "period": tm.Period, "season": tm.Season, "time_mult": timeMult, "root_resonance": tm.RootResonance, "effect_mult": effectMult, "soul_mult": soulMult, "era_name": eraName, "era_mult": eraMult, "world_name": worldName, "world_mult": worldMult, "manor_name": manorName, "manor_mult": manorMult, "storm_bonus": storm, "perfection_gain": pg, "ready": total >= cost, "stance": stance.Key, "stance_label": stance.Label, "stance_mult": stance.GainMult, "insight_xp_gain": insightGain, "deviation": deviation, "place_name": placeName, "place_mult": placeMult, "place_quality": placeQuality(placeMult), "stage_full": room == 0, "manual_name": manualName, "manual_grade": manualGrade, "manual_mult": manualMult, "manual_chosen": manualChosen}
+	payload := map[string]any{"mode": map[bool]string{true: "body", false: "qi"}[body], "gain": gain, "attempted_gain": attempted, "total": total, "cost": cost, "base_gain": base, "pace": pace, "sessions_per_stage": sessionsForStage(realm), "attribute": attr, "attribute_value": attrValue, "attribute_quality": round4(quality), "resonance_bonus": resonance, "period": tm.Period, "season": tm.Season, "time_mult": timeMult, "root_resonance": tm.RootResonance, "effect_mult": effectMult, "soul_mult": soulMult, "era_name": eraName, "era_mult": eraMult, "world_name": worldName, "world_mult": worldMult, "manor_name": manorName, "manor_mult": manorMult, "storm_bonus": storm, "perfection_gain": pg, "ready": total >= cost, "stance": stance.Key, "stance_label": stance.Label, "stance_mult": stance.GainMult, "insight_xp_gain": insightGain, "deviation": deviation, "place_name": placeName, "place_mult": placeMult, "place_quality": placeQuality(placeMult), "stage_full": room == 0, "manual_name": manualName, "manual_grade": manualGrade, "manual_mult": manualMult, "manual_chosen": manualChosen, "qi_type": firstNonempty(ghostBody.QiType, spiritQiType), "corruption": ghostBody.Corruption, "corruption_gain": corruptionGain, "ghost_form_name": ghostFormAt(catalog, ghostBody.GhostForm).Name, "form_risen": formRisen, "ghost_rupture": ghostRupture}
 	legacy, _ := json.Marshal(payload)
 	_, _ = conn.Execute(`INSERT INTO event_log(user_id,event_type,payload_json,created_at) VALUES(?,?,?,?)`, []any{userID, eventType, string(legacy), now})
 	return authoritativeMutation{Result: payload, Event: eventledger.Event{Domain: "cultivation", EventType: eventType, EntityType: "character", EntityID: fmt.Sprint(userID), GameMinute: p.GameMinute, Payload: payload}}, nil

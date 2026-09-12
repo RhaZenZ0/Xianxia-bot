@@ -44,13 +44,14 @@ class FourPagesNamedAfterTheWork(unittest.TestCase):
     def test_the_hub_is_four_pages_and_every_action_is_still_on_one(self):
         surface, hubs, _, _, _ = _modules()
         hub = surface._HUB_BY_NAME["cultivation"]
-        # v1.0.0-rc.7 adds the Qi Body page between them.
-        self.assertEqual([page.label for page in hub.pages], ["Cultivate", "Body", "Qi Body", "Path", "Arts"])
+        # v1.0.0-rc.7 adds the Qi Body page and v1.0.0-rc.8 the Ghost road.
+        self.assertEqual([page.label for page in hub.pages], ["Cultivate", "Body", "Qi Body", "Ghost", "Path", "Arts"])
         paths = {action.path for page in hub.pages for action in hubs._leaf_actions(page)}
         for expected in ("/cultivate", "/stance", "/insight", "/breakthrough", "/seclusion end",
                          "/body cultivate", "/aptitude temper", "/law comprehend",
                          "/manual study", "/profession status", "/conceal",
-                         "/dantian refine", "/meridian open", "/meridian heal"):
+                         "/dantian refine", "/meridian open", "/meridian heal",
+                         "/ghost status", "/ghost harvest", "/ghost appease"):
             self.assertIn(expected, paths, expected)
 
     def test_a_page_that_gathers_several_roots_names_its_rows_in_full(self):

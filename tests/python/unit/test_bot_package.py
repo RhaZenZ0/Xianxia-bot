@@ -756,7 +756,7 @@ SURFACE = {
         },
     },
     "commands/cultivation.py": {
-        "groups": ('seclusion_group', 'body_group', 'bodyperfect_group', 'perfect_group', 'tribulation_group', 'meridian_group', 'dantian_group'),
+        "groups": ('seclusion_group', 'body_group', 'bodyperfect_group', 'perfect_group', 'tribulation_group', 'meridian_group', 'dantian_group', 'ghost_group'),
         "roots": ('cultivate', 'stance', 'insight', 'breakthrough'),
         "leaves": {
             "seclusion_group": ('start', 'status', 'end'),
@@ -766,6 +766,7 @@ SURFACE = {
             "tribulation_group": ('status', 'prepare', 'attempt'),
             "meridian_group": ('status', 'open', 'heal'),
             "dantian_group": ('status', 'refine'),
+            "ghost_group": ('status', 'harvest', 'appease'),
         },
     },
     "commands/duel.py": {

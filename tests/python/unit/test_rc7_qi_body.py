@@ -41,8 +41,9 @@ def _modules():
 class TheTableAndTheEngine(unittest.TestCase):
     def test_schema_forty_is_the_qi_body(self):
         from app.database import SCHEMA_VERSION
-        self.assertEqual(SCHEMA_VERSION, 40)
-        self.assertIn('"qi_body"', CORE_SOURCE)
+        # The qi body is migration 40; later releases move the current schema on.
+        self.assertGreaterEqual(SCHEMA_VERSION, 40)
+        self.assertIn('        40,\n        "qi_body",', CORE_SOURCE)
         self.assertIn("CREATE TABLE IF NOT EXISTS character_qi_body", CORE_SOURCE)
         for column in ("purity", "meridians_open", "meridians_damaged", "dantian_state", "settled_game_minute"):
             self.assertIn(column, CORE_SOURCE, column)

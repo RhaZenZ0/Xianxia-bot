@@ -306,7 +306,17 @@ meridians, one more opened at every stage crossed and the rest forced open with 
 roll; and an upper dantian that opens at Nascent Soul and gives you a spiritual sense. Every qi cost
 in the game is read as a share of that pool, so a technique that bit at the first realm still bites
 at the fifth, a severe qi deviation ruptures a channel (mended with spirit stones and a day's quiet),
-and a breakthrough spends a quarter of the dantian before the roll. A sect is joined through an entrance trial before its examiner; every
+and a breakthrough spends a quarter of the dantian before the roll. One road has to be born into
+(v1.0.0-rc.8): a child of the **Nether-Market Household** or the **Tomb-Watch Clan**, and of nobody
+else, may take the **Ghost Cultivator** path, which fills the same three dantian with death qi. A
+ghost cultivator reads the world the other way round - a road-side ruin is rich ground where a
+wayside shrine is hostile, a living city is thin, night is their noon and the afternoon sun costs
+them - and has two rites of their own under **/cultivation → Ghost**: a harvest that takes what a
+place has been holding, and incense burned where the living keep their dead, the one thing that
+lifts what the road leaves behind. What it leaves is corruption: it eats the middle dantian's purity
+ceiling, tears channels once it is deep, and remakes the body up a ladder of six ghost forms from
+Living Flesh to Revenant Sovereign - each widening the dantian, each deepening what daylight costs,
+and none of them ever given back. A sect is joined through an entrance trial before its examiner; every
 public sect bestows its own entry manual on passing, chosen inside the trial transaction, and the
 sect residence grows facility by facility with contribution points. A manual is an item, studied
 through the engine, which enforces its realm requirement; the whole 160-manual catalogue is content.
@@ -481,7 +491,7 @@ release; it never installs anything. On the NAS:
 - If narration goes flat after an image rebuild, check **/admin → Server → Ai Status** for a TLS
   banner first. If SQLite reports contention, verify only the engine opens the database.
 
-Keep the whole `data/` directory persistent across rebuilds. The current schema is **40**; every
+Keep the whole `data/` directory persistent across rebuilds. The current schema is **41**; every
 historical migration is kept so an old database upgrades in place.
 
 ## Development

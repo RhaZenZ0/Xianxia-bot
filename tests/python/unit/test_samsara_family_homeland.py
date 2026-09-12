@@ -5,10 +5,13 @@ from tests.support import PROJECT_ROOT
 from app.rules.birthfamily import FAMILY_HOMELANDS
 
 WORLDS = ("Mortal World", "Spiritual World", "Immortal World", "Celestial World")
-# Every city a birth family can call home, straight from the rules table
-# (11 archetypes x 4 worlds). test_family_homeland_playability.py used to
-# hand-copy the 44 names; merged here in v0.20.3.
+# Every city a birth family can call home, straight from the rules table.
+# test_family_homeland_playability.py used to hand-copy the 44 names; merged
+# here in v0.20.3. Eleven households founded a city each, in four worlds; the
+# two ghost households (v1.0.0-rc.8) founded none and live in a cousin's, so
+# thirteen archetypes still come to forty-four cities.
 HOMELAND_CITIES = {profile[world] for profile in FAMILY_HOMELANDS.values() for world in WORLDS}
+GHOST_HOUSEHOLDS = {"nether_market_house": "hidden_weapon_family", "tomb_watch_clan": "fallen_martial_clan"}
 
 
 EXPECTED_STARTERS = {
@@ -26,12 +29,20 @@ EXPECTED_STARTERS = {
 }
 
 
-def test_the_homeland_table_is_eleven_archetypes_by_four_worlds() -> None:
-    assert len(FAMILY_HOMELANDS) == 11
+def test_the_homeland_table_is_thirteen_archetypes_by_four_worlds() -> None:
+    assert len(FAMILY_HOMELANDS) == 13
     for archetype, profile in FAMILY_HOMELANDS.items():
         for world in WORLDS:
             assert profile[world], f"{archetype} has no {world} city"
-    assert len(HOMELAND_CITIES) == 44, "two archetypes share a city"
+    assert len(HOMELAND_CITIES) == 44, "a founding household shares its city"
+    # The one permitted sharing, and only with the named cousin.
+    for ghost, host in GHOST_HOUSEHOLDS.items():
+        for world in WORLDS:
+            assert FAMILY_HOMELANDS[ghost][world] == FAMILY_HOMELANDS[host][world], (ghost, world)
+    founding = [a for a in FAMILY_HOMELANDS if a not in GHOST_HOUSEHOLDS]
+    for world in WORLDS:
+        cities = [FAMILY_HOMELANDS[a][world] for a in founding]
+        assert len(set(cities)) == len(cities) == 11, (world, cities)
 
 
 def test_every_family_homeland_is_explorable() -> None:

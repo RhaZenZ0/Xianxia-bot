@@ -235,6 +235,7 @@ func TestForcingAMeridianOpenSpendsInsightAndQi(t *testing.T) {
 func TestRefiningCleansTheQiAndCheapensEveryTechnique(t *testing.T) {
 	path := setupCultivationDB(t)
 	world := batch4WorldPath(t)
+	catalog := qiBodyCatalog(t)
 	batch4Exec(t, path, `UPDATE characters SET realm_index=2,phase=4,qi=0,qi_max=0 WHERE user_id=42`)
 	batch4Exec(t, path, `UPDATE characters SET qi=28,qi_max=28 WHERE user_id=42`)
 
@@ -248,10 +249,10 @@ func TestRefiningCleansTheQiAndCheapensEveryTechnique(t *testing.T) {
 	}
 	// The ceiling is the realm and the method, and refining stops at it.
 	ceiling := storage.ParseInt(out["purity_ceiling"])
-	if ceiling != purityCeilingFor(2, "") {
+	if ceiling != purityCeilingFor(catalog, 2, "", qiBody{QiType: spiritQiType}) {
 		t.Fatalf("ceiling %d", ceiling)
 	}
-	if purityCeilingFor(2, "Dao") <= purityCeilingFor(2, "") {
+	if purityCeilingFor(catalog, 2, "Dao", qiBody{QiType: spiritQiType}) <= purityCeilingFor(catalog, 2, "", qiBody{QiType: spiritQiType}) {
 		t.Fatalf("a better method must raise the ceiling")
 	}
 	batch4Exec(t, path, `UPDATE character_qi_body SET purity=? WHERE user_id=42`, ceiling)

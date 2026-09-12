@@ -54,6 +54,8 @@ var authoritativeMutations = map[string]bool{
 	"meridian.open":                   true,
 	"meridian.heal":                   true,
 	"qi.refine":                       true,
+	"ghost.harvest":                   true,
+	"ghost.appease":                   true,
 	"lifecycle.true_death":            true,
 	"lifecycle.reincarnate":           true,
 	"combat.start":                    true,
@@ -182,6 +184,7 @@ var authoritativeQueries = map[string]bool{
 	"trade.status":              true,
 	"cultivation.status":        true,
 	"qi.status":                 true,
+	"ghost.status":              true,
 	"shop.here":                 true,
 	"shop.browse":               true,
 	// v0.30.0: the world-status reads that app/simulation/world.py ran as raw
@@ -431,7 +434,7 @@ func applyAuthoritative(databasePath, worldPath string, req ActionRequest) (Acti
 		case "aptitude.temper", "aptitude.awaken", "aptitude.evolve", "aptitude.harmonize",
 			"cultivation.train", "cultivation.body_train", "cultivation.breakthrough", "cultivation.body_breakthrough",
 			"cultivation.stance", "cultivation.insight", "cultivation.manual",
-			"meridian.open", "meridian.heal", "qi.refine", "alchemy.purge",
+			"meridian.open", "meridian.heal", "qi.refine", "ghost.harvest", "ghost.appease", "alchemy.purge",
 			"lifecycle.reincarnate", "combat.turn", "combat.technique", "combat.recovery_item",
 			"perfection.start", "perfection.quest", "perfection.trial", "perfection.abandon",
 			"perfection.body_start", "perfection.body_quest", "perfection.body_trial", "perfection.body_abandon", "law.comprehend",
@@ -476,6 +479,10 @@ func applyAuthoritative(databasePath, worldPath string, req ActionRequest) (Acti
 				mutation, err = meridianHealAction(conn, catalog, req.ActorID, req.Payload)
 			case "qi.refine":
 				mutation, err = refineQiAction(conn, catalog, req.ActorID, req.Payload)
+			case "ghost.harvest":
+				mutation, err = ghostHarvestAction(conn, catalog, req.ActorID, req.Payload)
+			case "ghost.appease":
+				mutation, err = ghostAppeaseAction(conn, catalog, req.ActorID, req.Payload)
 			case "alchemy.purge":
 				mutation, err = alchemyPurgeAction(conn, catalog, req.ActorID, req.Payload)
 			case "lifecycle.reincarnate":
@@ -672,6 +679,20 @@ func applyAuthoritativeQuery(databasePath, worldPath string, req ActionRequest) 
 			return ActionResponse{}, loadErr
 		}
 		result, qerr := merchantStatusQuery(conn, catalog, req.ActorID)
+		if qerr != nil {
+			return ActionResponse{}, qerr
+		}
+		v, _ := eventledger.CurrentActorVersion(conn, req.ActorID)
+		return ActionResponse{APIVersion: authoritativeAPIVersion, Operation: req.Operation, StateVersion: v, Result: result}, nil
+	case "ghost.status":
+		if strings.TrimSpace(worldPath) == "" {
+			return ActionResponse{}, errors.New("world catalog path is required")
+		}
+		catalog, loadErr := worlddata.Load(worldPath)
+		if loadErr != nil {
+			return ActionResponse{}, loadErr
+		}
+		result, qerr := ghostStatusQuery(conn, catalog, req.ActorID)
 		if qerr != nil {
 			return ActionResponse{}, qerr
 		}
@@ -879,6 +900,12 @@ func createCharacterAuthoritative(conn *storage.Conn, worldPath string, userID i
 	familyID := selectedChoice.FamilyID
 	if familyID <= 0 {
 		return authoritativeMutation{}, errors.New("canonical starter household is missing")
+	}
+	// v1.0.0-rc.8: the ghost road is walked only by those born to it. Two
+	// households raise such a child; every other family is refused the path
+	// here, whatever the client offered.
+	if isGhostPath(catalog, path) && !ghostBornFamily(catalog, firstNonempty(pFamily.ID, pFamily.Archetype)) {
+		return authoritativeMutation{}, fmt.Errorf("the %s path belongs to those born among the dead; the %s cannot raise one", path, pFamily.Name)
 	}
 	location := strings.TrimSpace(pFamily.Location)
 	if location == "" {

@@ -590,6 +590,15 @@
       "will": 2,
       "presence": 2,
       "skill": "Formations"
+    },
+    "Ghost Cultivator": {
+      "body": 1,
+      "agility": 2,
+      "spirit": 3,
+      "insight": 2,
+      "will": 3,
+      "presence": 1,
+      "skill": "Ghost Arts"
     }
   },
   "roots": [
@@ -729,6 +738,12 @@
         "Wood",
         "Void",
         "Chaos"
+      ],
+      "Ghost Cultivator": [
+        "Yin",
+        "Void",
+        "Ice",
+        "Water"
       ]
     },
     "mutations": {
@@ -59496,5 +59511,93 @@
         "spirit_iron": 1
       }
     }
+  },
+  "death_qi_system": {
+    "path": "Ghost Cultivator",
+    "families": [
+      "nether_market_house",
+      "tomb_watch_clan"
+    ],
+    "description": "Death qi is what a place keeps after something has died in it. A ghost cultivator gathers that instead of spirit qi: richer where the living are gone, thin where they are many, and it leaves a residue in the body that never entirely washes out.",
+    "ground": {
+      "road_sites": {
+        "ruin": 1.45,
+        "hunting_ground": 1.15,
+        "waystation": 0.95,
+        "shrine": 0.65
+      },
+      "districts": {
+        "temple": 0.7,
+        "market": 0.9
+      },
+      "default": 1.0,
+      "city_penalty": 0.85
+    },
+    "hours": {
+      "Night": 1.35,
+      "Evening": 1.12,
+      "Dawn": 0.92,
+      "Morning": 0.8,
+      "Afternoon": 0.72
+    },
+    "corruption": {
+      "per_session": 1,
+      "per_harvest": 6,
+      "appease_relief": 9,
+      "appease_stone_cost": 25,
+      "rupture_threshold": 60,
+      "rupture_chance_percent": 15,
+      "purity_ceiling_penalty_per_ten": 3
+    },
+    "ghost_forms": [
+      {
+        "name": "Living Flesh",
+        "corruption": 0,
+        "min_realm_index": 0,
+        "capacity_mult": 1.0,
+        "daylight_penalty": 0.0,
+        "note": "Nothing of the grave shows on you yet."
+      },
+      {
+        "name": "Yin-Touched",
+        "corruption": 20,
+        "min_realm_index": 0,
+        "capacity_mult": 1.12,
+        "daylight_penalty": 0.05,
+        "note": "Your breath fogs in warm rooms and dogs will not settle near you."
+      },
+      {
+        "name": "Corpse-Hardened",
+        "corruption": 40,
+        "min_realm_index": 1,
+        "capacity_mult": 1.28,
+        "daylight_penalty": 0.1,
+        "note": "Cold and poison find little purchase; the living find you harder to look at."
+      },
+      {
+        "name": "Ghost-Bodied",
+        "corruption": 60,
+        "min_realm_index": 2,
+        "capacity_mult": 1.5,
+        "daylight_penalty": 0.18,
+        "note": "The upper dantian opens early — a ghost senses before it sees."
+      },
+      {
+        "name": "Netherborn",
+        "corruption": 80,
+        "min_realm_index": 4,
+        "capacity_mult": 1.8,
+        "daylight_penalty": 0.28,
+        "note": "Orthodox gates close to you; the dead do not."
+      },
+      {
+        "name": "Revenant Sovereign",
+        "corruption": 95,
+        "min_realm_index": 6,
+        "capacity_mult": 2.2,
+        "daylight_penalty": 0.4,
+        "note": "What walks in your skin is no longer answerable to the living world."
+      }
+    ]
   }
 }

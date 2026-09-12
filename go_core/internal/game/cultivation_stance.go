@@ -445,7 +445,7 @@ func cultivationStatusQuery(conn *storage.Conn, catalog worlddata.Catalog, userI
 		"world_mult":  worldQiMultiplier(catalog, realmWorld(catalog.Realms, c.RealmIndex)),
 		"manual_name": manualName, "manual_grade": manualGrade, "manual_mult": manualMult, "manual_chosen": manualChosen,
 		"qi": qi.Qi, "qi_max": qi.Capacity, "qi_regen": qi.Regen, "purity": qi.Body.Purity,
-		"purity_ceiling": purityCeilingFor(c.RealmIndex, manualGrade), "skill_cost_mult": qi.Body.skillCostMultiplier(),
+		"purity_ceiling": purityCeilingFor(catalog, c.RealmIndex, manualGrade, qi.Body), "skill_cost_mult": qi.Body.skillCostMultiplier(),
 		"meridians_open": qi.Body.MeridiansOpen, "meridians_damaged": qi.Body.MeridiansDamaged,
 		"meridian_ceiling": int64(meridianCeiling), "dantian_state": qi.Body.DantianState,
 		"breakthrough_qi_cost": maxI64(1, qi.Capacity/breakthroughQiShare),

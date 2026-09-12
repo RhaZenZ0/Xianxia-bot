@@ -26,7 +26,7 @@ from .remote import GoDatabaseTransport
 log = logging.getLogger("xianxia.database")
 
 
-SCHEMA_VERSION = 40
+SCHEMA_VERSION = 41
 # A readiness probe must validate more than the schema-version marker.  If the
 # SQLite file is removed or replaced while the bot is running, SQLite will
 # happily create a new empty file at the same path.  Checking these tables lets
@@ -1630,6 +1630,20 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
                 updated_at REAL NOT NULL DEFAULT 0,
                 FOREIGN KEY (user_id) REFERENCES characters(user_id) ON DELETE CASCADE
             )""",
+        ),
+    ),
+    (
+        41,
+        "death_qi",
+        (
+            # v1.0.0-rc.8: the ghost road. A cultivator born to one of the two
+            # ghost households gathers death qi instead of spirit qi: the same
+            # dantian, filled from what a place keeps after something died in
+            # it. `corruption` is the residue that never entirely washes out,
+            # and `ghost_form` is what it has made of the body so far.
+            "ALTER TABLE character_qi_body ADD COLUMN qi_type TEXT NOT NULL DEFAULT 'spirit'",
+            "ALTER TABLE character_qi_body ADD COLUMN corruption INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE character_qi_body ADD COLUMN ghost_form INTEGER NOT NULL DEFAULT 0",
         ),
     ),
 )

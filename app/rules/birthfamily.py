@@ -19,6 +19,9 @@ STARTER_BIRTH_FAMILY_SURNAMES = {
     "fallen_martial_clan": "Luo",
     "noble_martial_clan": "Qin",
     "alchemy_family": "Bai",
+    # v1.0.0-rc.8: the two households a ghost cultivator can be born into.
+    "nether_market_house": "Ye",
+    "tomb_watch_clan": "Xie",
 }
 
 MALE_NAMES = ("Wei", "Jun", "Hao", "Tian", "Rui", "Feng", "Ming", "Bo", "Jian", "Kai")
@@ -121,6 +124,22 @@ FAMILY_ARCHETYPES: tuple[dict[str, Any], ...] = (
         "boon": "Medicinal herb gardens, furnace access, pill lore and relatives experienced in identifying and refining spirit medicines.",
         "risk": "Rare-herb debts, furnace accidents, pill poisoning and rival alchemists seeking the family's recipes.",
     },
+    # v1.0.0-rc.8: born to death qi. These two households, and only these two,
+    # raise a child who can walk the ghost path.
+    {
+        "id": "nether_market_house", "category": "ghost", "name": "Nether-Market Household",
+        "wealth": 55, "influence": 30, "stability": 44, "tier": 2, "alignment_bias": -5,
+        "location": "Moonfen City",
+        "boon": "Funeral rites, spirit money, corpse-brokerage, incense that carries and buyers no ledger names.",
+        "risk": "Watched by the magistrate, hated by orthodox sects and owed favours by things that do not stay buried.",
+    },
+    {
+        "id": "tomb_watch_clan", "category": "ghost", "name": "Tomb-Watch Clan",
+        "wealth": 31, "influence": 39, "stability": 58, "tier": 2, "alignment_bias": -2,
+        "location": "Ashenwall City",
+        "boon": "A necropolis to keep, grave-lore passed down, wards against what wakes and death qi thick enough to breathe.",
+        "risk": "Grave-robbers, restless occupants, a duty that cannot be set down and neighbours who cross the road.",
+    },
 )
 
 FAMILY_HOMELANDS: dict[str, dict[str, str]] = {
@@ -200,6 +219,20 @@ FAMILY_HOMELANDS: dict[str, dict[str, str]] = {
         "Spiritual World": "Hundred Herb Spirit City",
         "Immortal World": "Jade Cauldron Immortal City",
         "Celestial World": "Divine Herb Celestial City",
+    },
+    "nether_market_house": {
+        "theme": "fog-bound night markets of the yin wetlands", "climate": "cold-damp",
+        "Mortal World": "Moonfen City",
+        "Spiritual World": "Moonfrost Spirit City",
+        "Immortal World": "Lunar Veil Immortal City",
+        "Celestial World": "Lunar Shadow Celestial City",
+    },
+    "tomb_watch_clan": {
+        "theme": "necropolis terraces above an old battlefield", "climate": "cool-dry",
+        "Mortal World": "Ashenwall City",
+        "Spiritual World": "Broken Halo Spirit City",
+        "Immortal World": "Fallen Star Immortal City",
+        "Celestial World": "Ruined Constellation City",
     },
 }
 

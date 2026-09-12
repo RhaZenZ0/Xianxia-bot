@@ -42,6 +42,7 @@ from .commands.cultivation import (
     body_group,
     bodyperfect_group,
     dantian_group,
+    ghost_group,
     meridian_group,
     perfect_group,
     seclusion_group,
@@ -99,6 +100,7 @@ from .status_cards import cultivation_status_fields, menu_facts_line
 _GROUP_ACTION_ROOTS = {
     "seclusion": seclusion_group,
     "dantian": dantian_group,
+    "ghost": ghost_group,
     "meridian": meridian_group,
     "aptitude": aptitude_group,
     "perfect": perfect_group,
@@ -150,7 +152,7 @@ _MIGRATED_ROOTS = {
     "body", "bodyperfect", "bond", "boss", "bounty", "breakthrough", "caravan",
     "city", "civilization", "conceal", "condition", "craft", "crime", "cultivate",
     "dantian", "daoheart", "duel", "effects", "equipment", "era", "explore", "family",
-    "formation", "gender", "grudges", "hunt", "hunter", "inheritances", "fate",
+    "formation", "gender", "ghost", "grudges", "hunt", "hunter", "inheritances", "fate",
     "innerworld", "inventory", "karma", "law", "lifespan", "manual", "market", "merchant", "shop", "trade", "blackmarket",
     "meridian", "npcinfo", "party", "perfect", "profession", "provenance", "reincarnate",
     "reputation", "rulers", "scene", "seclusion", "secretrealm", "sect", "sense",
@@ -230,6 +232,10 @@ _HUB_DEFINITIONS = (
                       "stance", "insight", "breakthrough", "seclusion"),
             _hub_page("body", "Body", "The parallel body path: temper it, inspect it and break through its stages."),
             _hub_page("dantian", "Qi Body", "The three dantian and the channels that feed them: what you hold, how clean it is, how far you feel.", "meridian"),
+            # v1.0.0-rc.8: the ghost road. The page is shown to everyone - the
+            # commands say plainly who may walk it - because a road nobody can
+            # see is a road nobody learns exists.
+            _hub_page("ghost", "Ghost", "The ghost road: death qi from the ground the living have left, the residue it leaves, and the rites that lift it."),
             _hub_page("aptitude", "Path", "What you were born with and what you comprehend: roots, bloodlines, physiques, and the Laws.", "law"),
             _hub_page("manual", "Arts", "Manuals and techniques, profession mastery, and the concealment of your aura.", "profession", "conceal"),
         ),

@@ -104,7 +104,15 @@ type qiBody struct {
 	MeridiansDamaged  int64
 	DantianState      string
 	SettledGameMinute int64
+	// v1.0.0-rc.8, the ghost road: which qi this dantian holds, the residue
+	// death qi leaves behind, and what that residue has made of the body.
+	QiType     string
+	Corruption int64
+	GhostForm  int64
 }
+
+// isDeathQi is whether this dantian holds death qi rather than spirit qi.
+func (q qiBody) isDeathQi() bool { return q.QiType == deathQiType }
 
 // effectiveMeridians is what actually carries qi: the open channels less the
 // damaged ones.
@@ -126,7 +134,7 @@ func (q qiBody) skillCostMultiplier() float64 {
 // loadQiBody reads a cultivator's qi body, creating the ordinary one for a
 // character who predates the table.
 func loadQiBody(conn *storage.Conn, userID int64) (qiBody, error) {
-	res, err := conn.Execute(`SELECT purity,meridians_open,meridians_damaged,dantian_state,settled_game_minute FROM character_qi_body WHERE user_id=?`, []any{userID})
+	res, err := conn.Execute(`SELECT purity,meridians_open,meridians_damaged,dantian_state,settled_game_minute,qi_type,corruption,ghost_form FROM character_qi_body WHERE user_id=?`, []any{userID})
 	if err != nil {
 		return qiBody{}, err
 	}
@@ -137,17 +145,20 @@ func loadQiBody(conn *storage.Conn, userID int64) (qiBody, error) {
 			MeridiansDamaged:  maxI64(0, i64(row["meridians_damaged"])),
 			DantianState:      fmt.Sprint(row["dantian_state"]),
 			SettledGameMinute: i64(row["settled_game_minute"]),
+			QiType:            firstNonempty(fmt.Sprint(row["qi_type"]), spiritQiType),
+			Corruption:        clampI64(i64(row["corruption"]), 0, corruptionCap),
+			GhostForm:         maxI64(0, i64(row["ghost_form"])),
 		}, nil
 	}
-	return qiBody{Purity: purityStart, MeridiansOpen: meridianStartOpen, DantianState: "intact"}, nil
+	return qiBody{Purity: purityStart, MeridiansOpen: meridianStartOpen, DantianState: "intact", QiType: spiritQiType}, nil
 }
 
 func saveQiBody(conn *storage.Conn, userID int64, body qiBody, now float64) error {
 	_, err := conn.Execute(
-		`INSERT INTO character_qi_body(user_id,purity,meridians_open,meridians_damaged,dantian_state,settled_game_minute,created_at,updated_at)
-		 VALUES(?,?,?,?,?,?,?,?)
-		 ON CONFLICT(user_id) DO UPDATE SET purity=excluded.purity,meridians_open=excluded.meridians_open,meridians_damaged=excluded.meridians_damaged,dantian_state=excluded.dantian_state,settled_game_minute=excluded.settled_game_minute,updated_at=excluded.updated_at`,
-		[]any{userID, clampI64(body.Purity, 0, purityCap), clampI64(body.MeridiansOpen, 0, meridianCeiling), maxI64(0, body.MeridiansDamaged), firstNonempty(body.DantianState, "intact"), body.SettledGameMinute, now, now},
+		`INSERT INTO character_qi_body(user_id,purity,meridians_open,meridians_damaged,dantian_state,settled_game_minute,qi_type,corruption,ghost_form,created_at,updated_at)
+		 VALUES(?,?,?,?,?,?,?,?,?,?,?)
+		 ON CONFLICT(user_id) DO UPDATE SET purity=excluded.purity,meridians_open=excluded.meridians_open,meridians_damaged=excluded.meridians_damaged,dantian_state=excluded.dantian_state,settled_game_minute=excluded.settled_game_minute,qi_type=excluded.qi_type,corruption=excluded.corruption,ghost_form=excluded.ghost_form,updated_at=excluded.updated_at`,
+		[]any{userID, clampI64(body.Purity, 0, purityCap), clampI64(body.MeridiansOpen, 0, meridianCeiling), maxI64(0, body.MeridiansDamaged), firstNonempty(body.DantianState, "intact"), body.SettledGameMinute, firstNonempty(body.QiType, spiritQiType), clampI64(body.Corruption, 0, corruptionCap), maxI64(0, body.GhostForm), now, now},
 	)
 	return err
 }
@@ -254,7 +265,7 @@ func settleQi(conn *storage.Conn, catalog worlddata.Catalog, userID int64, gameM
 	if err != nil {
 		return qiState{}, err
 	}
-	res, err := conn.Execute(`SELECT realm_index,phase,qi,qi_max,attributes_json FROM characters WHERE user_id=?`, []any{userID})
+	res, err := conn.Execute(`SELECT realm_index,phase,qi,qi_max,attributes_json,path FROM characters WHERE user_id=?`, []any{userID})
 	if err != nil {
 		return qiState{}, err
 	}
@@ -268,7 +279,12 @@ func settleQi(conn *storage.Conn, catalog worlddata.Catalog, userID int64, gameM
 		return qiState{}, err
 	}
 	realm, phase := i64(row["realm_index"]), i64(row["phase"])
+	// v1.0.0-rc.8: which qi this dantian holds follows the path, so a ghost
+	// cultivator never has to be switched over by hand and a reincarnation
+	// out of the road switches back.
+	body = normaliseQiType(catalog, body, fmt.Sprint(row["path"]))
 	capacity := qiCapacityFor(catalog.Realms, realm, phase, i64(attributes["spirit"]), body, manualGrade)
+	capacity = maxI64(1, int64(math.Round(float64(capacity)*ghostFormCapacityMultiplier(catalog, body))))
 	regen := qiRegenPerGameMinute(capacity, body, manualGrade)
 
 	qi := i64(row["qi"])
@@ -498,10 +514,13 @@ func meridianHealAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 
 // purityCeilingFor is as clean as this cultivator's qi can get: the realm they
 // stand in and the method they practise set it.
-func purityCeilingFor(realm int64, manualGrade string) int64 {
+func purityCeilingFor(catalog worlddata.Catalog, realm int64, manualGrade string, body qiBody) int64 {
 	ceiling := 55 + maxI64(0, realm)*2
 	ceiling += int64(math.Round((manualCapacityMultiplier(manualGrade) - 1) * 40))
-	return clampI64(ceiling, purityStart, purityCap)
+	// v1.0.0-rc.8: death qi leaves a residue, and a dantian holding a residue
+	// cannot be kept as clean as one that never held it.
+	ceiling -= corruptionPurityPenalty(catalog, body)
+	return clampI64(ceiling, purityFloor, purityCap)
 }
 
 // refineQiAction is the middle dantian's work: a session spent cleaning what
@@ -528,7 +547,7 @@ func refineQiAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64,
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
-	ceiling := purityCeilingFor(c.RealmIndex, state.ManualGrade)
+	ceiling := purityCeilingFor(catalog, c.RealmIndex, state.ManualGrade, state.Body)
 	if state.Body.Purity >= ceiling {
 		return authoritativeMutation{}, fmt.Errorf("your qi is already as clean as %s and this realm allow (%d%%); a better method raises the ceiling", firstNonempty(state.ManualName, "your method"), ceiling)
 	}
@@ -620,7 +639,7 @@ func qiBodyStatusQuery(conn *storage.Conn, catalog worlddata.Catalog, userID int
 	}
 	return map[string]any{
 		"qi": state.Qi, "qi_max": state.Capacity, "regen_per_game_minute": state.Regen,
-		"purity": state.Body.Purity, "purity_ceiling": purityCeilingFor(c.RealmIndex, state.ManualGrade),
+		"purity": state.Body.Purity, "purity_ceiling": purityCeilingFor(catalog, c.RealmIndex, state.ManualGrade, state.Body),
 		"skill_cost_mult": state.Body.skillCostMultiplier(),
 		"meridians_open":  state.Body.MeridiansOpen, "meridians_damaged": state.Body.MeridiansDamaged,
 		"meridian_ceiling": int64(meridianCeiling), "meridian_open_cost": meridianOpenCost(state.Body.MeridiansOpen),
@@ -630,6 +649,10 @@ func qiBodyStatusQuery(conn *storage.Conn, catalog worlddata.Catalog, userID int
 		"manual_capacity_mult": manualCapacityMultiplier(state.ManualGrade),
 		"insight_xp":           xp,
 		"breakthrough_qi_cost": maxI64(1, state.Capacity/breakthroughQiShare),
+		"qi_type":              firstNonempty(state.Body.QiType, spiritQiType),
+		"corruption":           state.Body.Corruption,
+		"ghost_form":           state.Body.GhostForm,
+		"ghost_form_name":      ghostFormAt(catalog, state.Body.GhostForm).Name,
 	}, nil
 }
 
