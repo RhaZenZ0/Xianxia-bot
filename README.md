@@ -3,7 +3,10 @@
 *A cultivation RPG played entirely through Discord commands: deterministic rules in Go, an AI that
 narrates but never decides, self-hosted on your own hardware.*
 
-[![CI](https://github.com/RhaZenZ0/Xianxia-bot/actions/workflows/ci.yml/badge.svg)](https://github.com/RhaZenZ0/Xianxia-bot/actions/workflows/ci.yml)
+[![CI](https://github.com/RhaZenZ0/Xianxia-bot/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/RhaZenZ0/Xianxia-bot/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/RhaZenZ0/Xianxia-bot?include_prereleases&label=release)](https://github.com/RhaZenZ0/Xianxia-bot/releases)
+[![Go 1.23+](https://img.shields.io/badge/go-1.23%2B-00ADD8)](go_core/go.mod)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-3776AB)](requirements.txt)
 
 A persistent Xianxia role-playing game that lives in a Discord server and runs on a CPU-only
 QNAP/NAS. Forty-eight cities across four worlds, each with gates, districts, shops and an inn; sects
