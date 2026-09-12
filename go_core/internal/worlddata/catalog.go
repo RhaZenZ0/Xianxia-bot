@@ -367,9 +367,17 @@ type TechniqueSystemDefinition struct {
 	Techniques map[string]ManualTechniqueDefinition `json:"techniques"`
 }
 
+type SectRecruitment struct {
+	Location string `json:"location"`
+	Examiner string `json:"examiner"`
+}
+
 type SectDefinition struct {
 	Alignment string `json:"alignment"`
 	Hidden    bool   `json:"hidden"` // the Heaven-Devouring Demon Sect: no public trial, no entry manual
+	// Recruitment (v1.0.0-rc.4) names the sect gate - where the trial is
+	// held - so the engine knows a gate when a cultivator meditates at one.
+	Recruitment SectRecruitment `json:"recruitment"`
 	// Karma gates and cell names for a hidden sect (v0.23.0). Only the
 	// Heaven-Devouring Demon Sect carries these today; a public sect leaves
 	// them zero and Branches empty.
@@ -380,7 +388,11 @@ type SectDefinition struct {
 }
 
 type Catalog struct {
-	StartingLocation    string                         `json:"starting_location"`
+	StartingLocation string `json:"starting_location"`
+	// WorldQiDensity (v1.0.0-rc.5) is how thick the qi is in each world, by
+	// world name: what a cultivation session is multiplied by there. An
+	// unlisted world is 1.0.
+	WorldQiDensity      map[string]float64             `json:"world_qi_density"`
 	Realms              []Realm                        `json:"realms"`
 	BodyRealms          []Realm                        `json:"body_realms"`
 	Paths               map[string]Path                `json:"paths"`

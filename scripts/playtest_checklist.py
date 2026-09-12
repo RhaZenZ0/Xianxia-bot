@@ -109,13 +109,46 @@ def _acked(node: ast.AsyncFunctionDef) -> str:
     return "yes" if any(marker in text for marker in ("response.defer(", "is_done()", "response.send_message(", "respond(", "edit_message(")) else "via helper"
 
 
+def _call_end(text: str, start: int) -> int:
+    """Index of the parenthesis that closes a call opened just before `start`,
+    ignoring parentheses inside string literals."""
+    depth, index, quote = 1, start, ""
+    while index < len(text):
+        char = text[index]
+        if quote:
+            if char == "\\":
+                index += 2
+                continue
+            if char == quote:
+                quote = ""
+        elif char in "\"'":
+            quote = char
+        elif char == "(":
+            depth += 1
+        elif char == ")":
+            depth -= 1
+            if depth == 0:
+                return index
+        index += 1
+    return len(text)
+
+
 def _hubs(sources: dict[Path, str]):
     surface = sources[BOT / "surface.py"]
     hubs = []
     for block in re.finditer(r"HubDefinition\(\s*name=\"([a-z]+)\",\s*title=\"([^\"]+)\"(.*?)\n\s*\)\s*,?\n", surface, re.S):
         name, title, body = block.group(1), block.group(2), block.group(3)
-        pages = re.findall(r"_hub_page\(\s*\"([a-z_]+)\",\s*\"([^\"]+)\"", body)
-        pages += [(m.group(1), m.group(2)) for m in re.finditer(r"HubPage\(key=\"([a-z_]+)\", label=\"([^\"]+)\"", body)]
+        pages = []
+        # A page is `_hub_page(key, label, description, *extra roots)`: the
+        # extras (v1.0.0-rc.4) are further roots gathered onto the same page,
+        # and their actions belong on the page's rows here too. The call is
+        # read by scanning to its own closing parenthesis - a regex that
+        # ended on a newline silently dropped the last page of every hub.
+        for start in (m.end() for m in re.finditer(r"_hub_page\(", body)):
+            quoted = re.findall(r"\"([^\"]*)\"", body[start:_call_end(body, start)])
+            if len(quoted) >= 2:
+                pages.append((quoted[0], quoted[1], tuple(quoted[3:])))
+        pages += [(m.group(1), m.group(2), ()) for m in re.finditer(r"HubPage\(key=\"([a-z_]+)\", label=\"([^\"]+)\"", body)]
         hubs.append((name, title, pages))
     return hubs
 
@@ -157,11 +190,14 @@ def build() -> str:
     total = 0
     for hub, title, pages in _hubs(sources):
         lines += [f"## /{hub} — {title}", ""]
-        for key, label in pages:
-            kind, target = page_roots.get(key, ("root", key))
-            rows = by_group.get(target, []) if kind == "group" else ([roots[target]] if target in roots else [])
-            if not rows and key in roots:
-                rows = [roots[key]]
+        for key, label, extras in pages:
+            rows = []
+            for page_key in (key, *extras):
+                kind, target = page_roots.get(page_key, ("root", page_key))
+                found = by_group.get(target, []) if kind == "group" else ([roots[target]] if target in roots else [])
+                if not found and page_key in roots:
+                    found = [roots[page_key]]
+                rows += found
             lines += [f"### {label} (`{key}`)", "", "| Action | Params | Acked | Live: reachable | error text | narration |", "|---|---|---|---|---|---|"]
             for qualified, name, node, path, all_text in sorted(rows, key=lambda r: r[0]):
                 params = ", ".join(_parameters(node, all_text)) or "—"

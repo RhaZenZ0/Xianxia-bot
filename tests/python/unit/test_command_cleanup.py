@@ -48,7 +48,7 @@ class CommandCleanupTests(unittest.TestCase):
         self.assertIn("_MIGRATED_ROOTS", source)
         migrated_source = bot_module_defining("_MIGRATED_ROOTS").read_text(encoding="utf-8")
         migrated_node = next(node for node in ast.parse(migrated_source).body if isinstance(node, ast.Assign) and any(isinstance(target, ast.Name) and target.id == "_MIGRATED_ROOTS" for target in node.targets))
-        self.assertEqual(len(ast.literal_eval(migrated_node.value)), 78)
+        self.assertEqual(len(ast.literal_eval(migrated_node.value)), 80)
         self.assertNotIn("tree.remove_command", source)
         self.assertIn('"alchemy": alchemy_group', source)
         self.assertIn('_hub_page("alchemy", "Alchemy"', source)

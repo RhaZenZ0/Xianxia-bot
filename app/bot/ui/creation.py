@@ -162,7 +162,7 @@ class CharacterModal(discord.ui.Modal):
             name="Next steps",
             value=(
                 "You begin **inside your birth household**. Look around first:\n"
-                "**/character → Overview** • **/family → View** • **/cultivation → Meditation**\n\n"
+                "**/character → Overview** • **/family → View** • **/cultivation → Cultivate**\n\n"
                 "Exploring and hunting need the open world, so they stay closed until you step outside "
                 "with **/family → Leave**. After that:\n"
                 "**/world → Explore** • **/npc → Talk** • **/action**"

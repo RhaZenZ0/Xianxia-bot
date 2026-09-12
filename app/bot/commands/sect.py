@@ -445,7 +445,7 @@ async def sect_recruitment_trial(interaction: discord.Interaction, sect_name: st
         tier=int(granted.get('min_realm_index',0) or 0)
         when="study it now" if tier<=int(c.get('realm_index',0)) else f"study it once you reach **{WORLD.realm_name(tier)}**"
         text+=(f"\n📕 **{sect_name}** bestows its entry inheritance: **{granted.get('name','a manual')}** is in your inventory — "
-               f"{when} with **/cultivation → Manuals & Techniques → Study**.")
+               f"{when} with **/cultivation → Arts → Study**.")
     await interaction.response.send_message(text,ephemeral=False)
     # The "A Road Toward a Sect" quest's sect_trial objective was never
     # reported anywhere, so the quest could not complete (found while building
@@ -773,7 +773,7 @@ async def sect_shadow(interaction: discord.Interaction, action: app_commands.Cho
     initiation=dict(envelope.get("result") or {})
     hidden=initiation.get("membership") or {}
     text=f"🌑 You accept the **Heaven-Devouring Demon Sect** initiation in **{initiation.get('branch',branch)}**. Hidden rank: **{hidden.get('rank_name','Shadow Initiate')}**. This affiliation is stored separately from your public sect lineage."
-    if initiation.get("manual_name"): text+=f"\n📕 Initiation inheritance: **{initiation['manual_name']}** was placed in your inventory; study it with **/cultivation → Manuals & Techniques → Study**."
+    if initiation.get("manual_name"): text+=f"\n📕 Initiation inheritance: **{initiation['manual_name']}** was placed in your inventory; study it with **/cultivation → Arts → Study**."
     await respond(interaction, text,ephemeral=False)
 
 

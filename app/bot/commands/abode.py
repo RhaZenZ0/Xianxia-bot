@@ -173,7 +173,7 @@ async def abode_guests(interaction:discord.Interaction)->None:
     await interaction.response.send_message("\n".join(lines),ephemeral=False)
 
 
-@registered_group_command(abode_group, name="upgrade",description="Build a facility your home lacks, or raise one it has")
+@registered_group_command(abode_group, name="upgrade",description="Build a facility your home lacks, or raise one it has (the array speeds cultivation)")
 @app_commands.choices(facility=ABODE_FACILITIES)
 @serialized_user_action
 async def abode_upgrade(interaction:discord.Interaction,facility:app_commands.Choice[str])->None:

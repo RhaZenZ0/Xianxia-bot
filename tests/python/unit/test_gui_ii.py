@@ -112,7 +112,8 @@ class OneMessageIsTheGUI(unittest.TestCase):
         self.assertTrue(callable(hubs._MENU_BUILDER))
         menu = hubs._MENU_BUILDER(owner_id=1, is_admin=True, owner_name="T")
         self.assertIsInstance(menu, surface.MenuView)
-        self.assertLessEqual(sum(_count(c) for c in menu.children), 6)
+        # Four rows of four and an admin row (v1.0.0-rc.3), inside the budget.
+        self.assertLessEqual(sum(_count(c) for c in menu.children), hubs._LAYOUT_COMPONENT_CAP)
         self.assertIn("await open_hub_in_place(interaction, definition, provider)", SURFACE_SOURCE)
         self.assertIn("await open_hub_in_place(interaction, _ADMIN_HUB_DEFINITION, _admin_hub_status)", SURFACE_SOURCE)
         self.assertIn("register_menu_builder(", SURFACE_SOURCE)

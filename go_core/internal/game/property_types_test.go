@@ -28,12 +28,12 @@ func setupPropertyTypesDB(t *testing.T) string {
 	}
 	defer conn.Close()
 	// setupBatch4AuthorityDB and setupAuthority2DB between them give
-	// cave_abodes its key, name, type, cultivation and herb-garden columns;
+	// cave_abodes its key, name, type, cultivation, formation (the
+	// gathering array, v1.0.0-rc.6) and herb-garden columns;
 	// founding writes every facility column.
 	if err := conn.ExecScript(`
 ALTER TABLE cave_abodes ADD COLUMN alchemy_level INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE cave_abodes ADD COLUMN forge_level INTEGER NOT NULL DEFAULT 0;
-ALTER TABLE cave_abodes ADD COLUMN formation_level INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE cave_abodes ADD COLUMN defense_level INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE cave_abodes ADD COLUMN storage_level INTEGER NOT NULL DEFAULT 1;
 ALTER TABLE cave_abodes ADD COLUMN beast_pen_level INTEGER NOT NULL DEFAULT 0;

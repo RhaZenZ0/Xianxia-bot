@@ -195,7 +195,14 @@ model contexts are unnecessary.
 The cooldowns (`CULTIVATE_COOLDOWN_MINUTES`, `EXPLORE_COOLDOWN_MINUTES`,
 `HUNT_COOLDOWN_MINUTES`, `PERFECT_QUEST_COOLDOWN_MINUTES`,
 `PERFECT_TRIAL_COOLDOWN_MINUTES`, `SECRET_REALM_COOLDOWN_MINUTES`) are real
-minutes between uses of the corresponding action. `UNEXPECTED_EVENT_CHANCE_PERCENT`
+minutes between uses of the corresponding action. `CULTIVATE_COOLDOWN_MINUTES`
+is the one that sets the pace of the whole game since v1.0.0-rc.5: a session is
+a share of the stage it fills (a twelfth of it), so a stage takes about a dozen
+sessions and a realm about a hundred at every realm, and this knob turns that
+into a calendar. At the default of 180 minutes a realm is roughly ten real days
+of active cultivation, less with closed-door seclusion running beside it and
+less again in the higher worlds, whose qi density is content
+(`world_qi_density` in `content/world.json`). `UNEXPECTED_EVENT_CHANCE_PERCENT`
 is the chance an explore rolls an unexpected event. `WORLD_TIME_SCALE` is how
 many game minutes pass per real minute. `REINCARNATION_BASE_SAMSARA_YEARS` and
 `REINCARNATION_MAX_WAIT_SECONDS` shape how long a dead character waits in

@@ -47,9 +47,15 @@ def human_duration(seconds: int) -> str:
     return f"{sec}s"
 
 def roll_line(result) -> str:
+    """One 2d10 check as a line. Since v1.0.0-rc.4 it ends with the chance
+    the roll had, which the engine puts in every roll map (`rollOdds`): the
+    dice are the same dice, but the player can see whether a failure was
+    unlucky or hopeless."""
     sign = "+" if result.modifier >= 0 else ""
+    odds = getattr(result, "probability", None)
+    chance = f" · **{int(odds)}%** chance" if odds is not None else ""
     return (
         f"2d10 ({result.die1}+{result.die2}) {sign}{result.modifier} = "
-        f"**{result.total}** vs TN **{result.tn}** — **{result.degree}**"
+        f"**{result.total}** vs TN **{result.tn}** — **{result.degree}**{chance}"
     )
 

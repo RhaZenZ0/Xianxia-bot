@@ -6,6 +6,65 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.0** (rc.6) gives a cultivator two things to raise besides the number on their sheet, and tilts
+the climb. The `formation` facility of a player's own property is a spirit-gathering array now, not
+just a workshop for inscribing formations: six percent a level, nine levels, and it multiplies what
+every session gathers at home and in closed-door seclusion alike. The manual a cultivator practises
+multiplies the gathering too, by its grade - Mortal, Earth, Spirit, Heaven, Immortal, Dao - deepened
+three percent for each level of mastery, so a perfected Dao method is worth half again what a mortal
+pamphlet is. `/cultivation → Arts → Practise` chooses it from the methods actually learned, and a
+cultivator who never chose gathers by the best method they hold, so every existing character
+benefits from the manual already on their shelf. And the pacing tilts: a stage takes eight sessions
+at Body Tempering and five quarters of a session more with each realm above it, so the early game is
+quick and the ladder steepens, while the qi of a new world (softened to 1.5, 2.0 and 2.5) is the
+relief that makes the next ladder climbable. No schema change - both the array column and the
+manuals table already existed.
+
+**1.0.0** (rc.5) fixes the curve the cultivation system sat on. A session used to be worth a flat
+`8 + d7 + attribute`, about fourteen essence, at every realm - while a realm cost about three fifths
+more than the last and a cultivator's attributes were written exactly once, at creation, and never
+again. Body Tempering took 88 sessions and Divine Transformation 3,626: the game ended at the second
+realm. A session is now a share of the stage it fills (the stage's cost over twelve), worked by the
+cultivator's attribute and every multiplier already in the chain, so a realm takes about the same
+hundred sessions wherever it sits and the operator's cooldown sets the calendar. Closed-door
+seclusion is paced the same way. Crossing a realm now raises the cultivator: one point of will, or
+body on the body path, and one of their path's own attribute. The worlds above the mortal one are
+thick with qi - a new `world_qi_density` in the content, 1.6 in the Spiritual World, 2.6 in the
+Immortal, 4.0 in the Celestial - which is the reward for crossing into one, and the sheet and the
+session both name it. Four balance fixes ride along: an untreated qi deviation deepens each time it
+is taken (Force was strictly the best stance while it was pinned at severity 1), a session at a full
+stage banks no Insight XP and risks nothing (it was an endless farm), a deployed array is read once
+for both meditation and seclusion instead of by two copies of the same query, and the ground is
+priced for the body path too. No schema change.
+
+**1.0.0** (rc.4) finishes the cultivation system: the place, the spending and the pages. Where a
+cultivator sits is worth something the engine prices - a road-side shrine, a city's temple quarter,
+a sect gate, a residence chamber, a deployed array - and the Here line, the session's result and the
+sheet all name the ground and its rate. Insight XP, which accrued almost everywhere and was spent
+almost nowhere, now buys two things besides the realm gate: a seized moment, one more roll after a
+failed breakthrough at the same stage, once a stage, without asking for the stage's essence again;
+and a bonus on a Law comprehension (`/law comprehend` with `spend_insight`). The cultivation hub's
+ten pages named after commands become four named after the work - Cultivate, Body, Path, Arts - with
+every action still one tap in; a hub page may now gather several roots, and a gathered page names
+its rows in full (`Law Status` beside `Aptitude Status`). And every 2d10 roll in the game prints the
+chance it had beside what fell, so a failure reads as unlucky or hopeless rather than arbitrary. No
+schema change.
+
+**1.0.0** (rc.3) is a better cultivation system and menu. The main menu is four rows of four -
+You, World, Doing, Home - under a header of live facts (where you stand, your realm and stage with
+the essence, the trade offers waiting), with Begin when there is no character and Back to the hub
+you left; NPCs and Inner World are labelled as such. The cultivation hub opens on a sheet the engine
+computes in one query (`cultivation.status`): the essence bar, the stance and when the next session
+is ready, the odds of the next breakthrough with what moves them, today's multipliers, the body
+path and the Insight XP. Meditation has a stance, kept by the engine and applied to every session:
+Circulate (the full gain), Refine (a fifth slower, banks two Insight XP a session and deepens
+stage-9 refinement) or Force (a third faster, and fifteen times in a hundred a qi deviation - a
+real condition, treated like any other). A breakthrough shows its odds before and after the roll,
+from the one modifier the roll uses. And stage 9 into a new realm is a gate: it needs an insight
+banked from Insight XP (five at the mortal gate, five more a realm, `/cultivation → Insight`) or a
+completed Realm Perfection, and the insight is spent on the crossing. The stance and the banked
+insight live in `world_state` under the player's id; no schema change.
+
 **1.0.0** (rc.2) is the GM's view of v0.39 and the content it left thin. The realm rotation the
 tick keeps rides on `secret_realm.status`, shows on the dashboard's events page, in `/realm → Secret
 Realms → Status` and in the inn's rumours (an open realm anywhere in the world is public news; the
@@ -101,10 +160,19 @@ mechanical authority paths.
 
 ## Release status — v1.0.0
 
-- Current release: v1.0.0 (rc.2): the realm rotation visible on the dashboard, in `/realm` and in
-  the rumours; the trades on the dashboard with an audited void; narration of the road-side sites'
-  own; the forty-three local floors with prose of their own. Tagged `v1.0.0-rc.2` on the beta
-  channel; the NAS drills and two quiet weeks make it `v1.0.0`.
+- Current release: v1.0.0 (rc.6): the spirit-gathering array a player raises at home; the manual they
+  practise speeding every session by its grade and mastery; a climb that tightens with each realm and
+  eases when a world is crossed. Tagged `v1.0.0-rc.6` on the beta channel; the NAS drills and two
+  quiet weeks make it `v1.0.0`.
+- v1.0.0 (rc.5): a session is a share of the stage it fills; crossing a realm raises the cultivator;
+  the higher worlds are thick with qi; four balance fixes.
+- v1.0.0 (rc.4): the ground a cultivator sits on priced and named; Insight XP spent on a seized
+  moment and on Laws; the cultivation hub as four pages; every roll printing its chance.
+- v1.0.0 (rc.3): the menu as four rows of four under live facts; the cultivation sheet; meditation
+  stances; the odds of a breakthrough shown; the realm gate with its banked insight.
+- v1.0.0 (rc.2): the realm rotation visible on the dashboard, in `/realm` and in the rumours; the
+  trades on the dashboard with an audited void; narration of the road-side sites' own; the
+  forty-three local floors with prose of their own.
 - v1.0.0 (rc.1): the migration drill across every shipped schema, the stamps held to the README,
   the changelog and the Go version by tests, the changelog trimmed, the commissions design marked
   shipped.

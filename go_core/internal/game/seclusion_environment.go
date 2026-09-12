@@ -31,9 +31,9 @@ func seclusionEnvironmentGo(conn *storage.Conn, catalog worlddata.Catalog, userI
 	env := map[string]any{
 		"site": "", "abode_name": "", "abode_property_type": "", "abode_level": int64(0),
 		"safe_zone": false, "manor_name": "", "manor_level": int64(0), "manor_mult": 1.0,
-		"array_name": "", "array_mult": 1.0, "base_mult": 1.0,
+		"array_name": "", "array_mult": 1.0, "base_mult": 1.0, "abode_array_mult": 1.0,
 	}
-	r, e := conn.Execute(`SELECT name,property_type,cultivation_level FROM cave_abodes WHERE location_key=?`, []any{location})
+	r, e := conn.Execute(`SELECT name,property_type,cultivation_level,formation_level FROM cave_abodes WHERE location_key=?`, []any{location})
 	if e != nil {
 		return nil, 0, e
 	}
@@ -44,7 +44,7 @@ func seclusionEnvironmentGo(conn *storage.Conn, catalog worlddata.Catalog, userI
 	residenceBase := location
 	var sectAbode map[string]any
 	if abode == nil && strings.HasPrefix(location, "sect_abode:") {
-		r, e = conn.Execute(`SELECT name,base_location,cultivation_level FROM sect_abodes WHERE location_key=? AND user_id=?`, []any{location, userID})
+		r, e = conn.Execute(`SELECT name,base_location,cultivation_level,formation_level FROM sect_abodes WHERE location_key=? AND user_id=?`, []any{location, userID})
 		if e != nil {
 			return nil, 0, e
 		}
@@ -87,8 +87,18 @@ func seclusionEnvironmentGo(conn *storage.Conn, catalog worlddata.Catalog, userI
 		base = 1.0
 		env["site"] = "safe_zone"
 	}
+	// The property's own spirit-gathering array (v1.0.0-rc.6), raised through
+	// the `formation` facility - the same array active meditation reads.
+	abodeArray := 1.0
+	switch {
+	case abode != nil:
+		abodeArray = abodeArrayMultiplier(abode)
+	case sectAbode != nil:
+		abodeArray = abodeArrayMultiplier(sectAbode)
+	}
+	env["abode_array_mult"] = abodeArray
 	env["base_mult"] = base
-	mult := base
+	mult := base * abodeArray
 	if manor != nil {
 		level := clamp(i64(manor["qi_array_level"]), 0, manorFacilityMaxGo)
 		manorMult := 1.0 + 0.08*float64(level)
@@ -101,14 +111,13 @@ func seclusionEnvironmentGo(conn *storage.Conn, catalog worlddata.Catalog, userI
 		}
 	}
 	if mode == "qi" {
-		r, e = conn.Execute(`SELECT name,effect_json FROM deployed_location_arrays WHERE location=? AND starts_game_minute<=? AND ends_game_minute>? ORDER BY starts_game_minute DESC LIMIT 1`, []any{location, gameMinute, gameMinute})
+		arrayName, arrayMult, e := deployedArrayMultiplier(conn, location, gameMinute)
 		if e != nil {
 			return nil, 0, e
 		}
-		if array := firstRowMap(r); array != nil {
-			arrayMult := multiplicativeEffectJSONStat(fmt.Sprint(array["effect_json"]), "cultivation_gain")
+		if arrayName != "" {
 			mult *= arrayMult
-			env["array_name"] = fmt.Sprint(array["name"])
+			env["array_name"] = arrayName
 			env["array_mult"] = arrayMult
 		}
 	}
@@ -147,14 +156,19 @@ func multiplicativeEffectJSONStat(raw, stat string) float64 {
 // seclusion.settle pays it per completed day and seclusion.start reports it
 // as the projection. Slower than active cultivation on purpose - it runs
 // while the player is offline and asks nothing of them.
-func seclusionDailyGainGo(character map[string]any, mode string, environmentMult, soulMult float64) int64 {
+//
+// Since v1.0.0-rc.5 it is a share of the stage being filled, like a hand-sat
+// session, rather than a flat number off the character sheet: the old rate
+// paid about ten essence a day at every realm, which was a day's work at Body
+// Tempering and a rounding error at Nascent Soul.
+func seclusionDailyGainGo(catalog worlddata.Catalog, character map[string]any, mode string, environmentMult, soulMult float64) int64 {
+	pace, worldMult := characterStagePace(catalog, character, mode)
 	attrs := decodeJSONMap(character["attributes_json"])
-	base := int64(0)
+	attribute := i64(attrs["will"])
 	if mode == "body" {
-		base = 7 + i64(attrs["body"]) + i64(attrs["will"])/3 + i64(character["body_realm_index"])/2
-	} else {
-		base = 8 + i64(attrs["will"]) + i64(attrs["insight"])/2 + i64(character["realm_index"])/2
+		attribute = i64(attrs["body"])
 	}
 	env := math.Max(seclusionMultFloor, math.Min(seclusionMultCeiling, environmentMult))
-	return max64(1, int64(math.Round(float64(base)*seclusionDailyShare*env*soulMult)))
+	daily := float64(pace) * seclusionSessionsPerDay * attributeQuality(attribute) * env * soulMult * worldMult
+	return max64(1, int64(math.Round(daily*seclusionDailyShare/0.6)))
 }

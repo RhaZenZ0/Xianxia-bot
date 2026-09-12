@@ -65,6 +65,8 @@ async def cultivate(interaction: discord.Interaction) -> None:
         extra += f"\n💊 Active effects modified cultivation efficiency to **x{float(result['effect_mult']):.2f}**."
     if float(result.get("soul_mult", 1)) > 1.0:
         extra += f"\n☸️ Soul Legacy talent echo: **x{float(result['soul_mult']):.2f}** cultivation efficiency."
+    if float(result.get("world_mult", 1)) != 1.0:
+        extra += f"\n🌏 The qi of the **{result.get('world_name') or 'world'}** is thick: **x{float(result['world_mult']):.2f}**."
     if float(result.get("era_mult", 1)) != 1.0:
         extra += f"\n🌌 **{result.get('era_name') or 'World Era'}** modifies cultivation to **x{float(result['era_mult']):.2f}**."
     if float(result.get("manor_mult", 1)) != 1.0:
@@ -73,11 +75,95 @@ async def cultivate(interaction: discord.Interaction) -> None:
         extra += f"\n⚡ Active Qi Storm added **+{int(result['storm_bonus'])}** before the stage cap."
     if int(result.get("perfection_gain", 0)):
         extra += f"\n★ Realm refinement deepens by **+{int(result['perfection_gain'])}%**."
+    if float(result.get("manual_mult", 1)) != 1.0:
+        chosen = "you practise" if result.get("manual_chosen") else "the best method you have learned"
+        extra += f"\n📖 **{result.get('manual_name')}** ({result.get('manual_grade')} grade, {chosen}): **x{float(result['manual_mult']):.2f}**."
+    if str(result.get("place_name") or ""):
+        extra += f"\n🪨 **{result.get('place_name')}** — {result.get('place_quality') or 'ordinary'} ground: **x{float(result.get('place_mult', 1)):.2f}** cultivation efficiency."
+    stance = str(result.get("stance") or "circulate")
+    if stance != "circulate":
+        extra += f"\n🧭 **{result.get('stance_label') or stance.title()}** stance: **x{float(result.get('stance_mult', 1)):.2f}** gain."
+    if int(result.get("insight_xp_gain", 0)):
+        extra += f"\n💡 Refining banks **+{int(result['insight_xp_gain'])} Insight XP** toward the realm gate."
+    deviation = dict(result.get("deviation") or {})
+    if deviation:
+        extra += f"\n⚠️ The forced qi ran wild: **{deviation.get('name') or 'Qi Deviation'}** (severity {int(deviation.get('severity', 1))}). Treat it under **/character → Treatment**, or it drags every session down."
+    if result.get("stage_full") and not gain:
+        extra += "\n🪷 This stage is already full: the session gathered nothing, banked nothing and risked nothing. Break through before meditating again."
     ready = ""
     if result.get("ready"):
         ready = "\n✨ Stage 9 is full. Choose **/quest → Realm Perfection → Start** or **/quest → Main Progression → Breakthrough**." if int(c.get("phase", 1)) == 9 else "\n✨ You are ready to attempt **/quest → Main Progression → Breakthrough**."
     await interaction.followup.send(
         f"🧘 **{c['name']} cultivates.**\nYou circulate qi through your meridians and gain **+{gain} cultivation essence**.\nProgress: **{total}/{cost}**{extra}{ready}"
+    )
+
+
+STANCE_CHOICES = [
+    app_commands.Choice(name="Circulate — the full gain, nothing risked", value="circulate"),
+    app_commands.Choice(name="Refine — a fifth slower, banks Insight XP", value="refine"),
+    app_commands.Choice(name="Force — a third faster, risks qi deviation", value="force"),
+]
+
+
+@registered_root_command(name="stance", description="Choose the meditation stance every cultivation session uses", guild=GUILD)
+@app_commands.choices(stance=STANCE_CHOICES)
+@serialized_user_action
+async def stance_command(interaction: discord.Interaction, stance: app_commands.Choice[str]) -> None:
+    """A better cultivation system (v1.0.0-rc.3): the stance is engine state
+    - Go stores it and applies it to every session - so this only chooses."""
+    await interaction.response.defer(ephemeral=False)
+    c = await require_character(interaction)
+    if not c:
+        return
+    try:
+        envelope = await ENGINE.authoritative_action(
+            "cultivation.stance", interaction.user.id, {"stance": stance.value},
+            action_id=f"discord:{interaction.id}:cultivation.stance",
+        )
+    except GameEngineError as exc:
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
+        return
+    result = dict(envelope.get("result") or {})
+    label = str(result.get("label") or stance.name.split("—")[0].strip())
+    changed = bool(result.get("changed"))
+    lines = [
+        f"🧭 **{c['name']} settles into the {label} stance.**" if changed else f"🧭 **{c['name']} keeps the {label} stance.**",
+        f"{result.get('description') or ''}".strip(),
+        f"Every session under it gains **x{float(result.get('gain_mult', 1)):.2f}**. Meditate with **/cultivation → Cultivate**.",
+    ]
+    await interaction.followup.send("\n".join(line for line in lines if line), ephemeral=False)
+
+
+@registered_root_command(name="insight", description="Spend Insight XP to bank the insight that opens the next realm gate", guild=GUILD)
+@serialized_user_action
+async def insight(interaction: discord.Interaction) -> None:
+    """The realm gate (v1.0.0-rc.3): stage 9 into a new realm needs an insight
+    banked here, or a completed Realm Perfection. Insight XP comes from
+    exploration, quests, battles, a disciple's breakthrough and the Refine
+    stance; the engine prices the gate and keeps the bank."""
+    await interaction.response.defer(ephemeral=False)
+    c = await require_character(interaction)
+    if not c:
+        return
+    try:
+        envelope = await ENGINE.authoritative_action(
+            "cultivation.insight", interaction.user.id, {},
+            action_id=f"discord:{interaction.id}:cultivation.insight",
+        )
+    except GameEngineError as exc:
+        message = str(exc)
+        if "already banked" in message:
+            message = "An insight is already banked. It is spent when you cross the realm gate at **/quest → Main Progression → Breakthrough**."
+        elif "costs" in message and "Insight XP" in message:
+            message += " Insight XP comes from exploring, quests, battles and the Refine stance (**/cultivation → Cultivate → Stance**)."
+        await interaction.followup.send(f"❌ {message}", ephemeral=False)
+        return
+    result = dict(envelope.get("result") or {})
+    await interaction.followup.send(
+        f"💡 **{c['name']} banks an insight into {result.get('next_realm') or 'the next realm'}.**\n"
+        f"Spent **{int(result.get('cost', 0))} Insight XP** (**{int(result.get('insight_xp', 0))}** left). "
+        f"The realm gate out of **{result.get('realm') or 'this realm'}** is open: fill Stage 9 and attempt **/quest → Main Progression → Breakthrough**.",
+        ephemeral=False,
     )
 
 
@@ -143,7 +229,7 @@ async def seclusion_start(
         f"Environment efficiency: **x{env_mult:.2f}**\n"
         f"Projected background gain: about **{daily} essence per completed world-day**.\n\n"
         "Progress is settled automatically while the bot is online and catches up after restarts. "
-        "Seclusion never auto-breaks through a stage. Any state-changing command will remain locked until you use **/cultivation → Seclusion → End** or the planned seclusion completes."
+        "Seclusion never auto-breaks through a stage. Any state-changing command will remain locked until you use **/cultivation → Cultivate → End** or the planned seclusion completes."
     )
 
 
@@ -173,7 +259,7 @@ async def seclusion_status(interaction: discord.Interaction) -> None:
         f"Remaining: **{remaining / MINUTES_PER_DAY:.1f} world-days**\n"
         f"Cultivation awarded: **{int(state.get('accumulated_gain',0))}**\n"
         f"Environment: **x{float(state.get('environment_mult',1.0)):.2f}**\n"
-        + ("Use **/cultivation → Seclusion → End** to emerge early." if str(state.get("status")) == "active" else f"Ended: **{state.get('ended_reason') or 'completed'}**"),
+        + ("Use **/cultivation → Cultivate → End** to emerge early." if str(state.get("status")) == "active" else f"Ended: **{state.get('ended_reason') or 'completed'}**"),
         ephemeral=False,
     )
 
@@ -208,7 +294,10 @@ async def seclusion_end(interaction: discord.Interaction) -> None:
 
 @registered_root_command(name="breakthrough", description="Attempt to advance your cultivation stage", guild=GUILD)
 @serialized_user_action
-async def breakthrough(interaction: discord.Interaction, confirm: bool = False) -> None:
+async def breakthrough(interaction: discord.Interaction, confirm: bool = False, reroll: bool = False) -> None:
+    """`reroll` (v1.0.0-rc.4) seizes the moment after a failed attempt at this
+    stage: one more roll, bought with Insight XP, once a stage. The engine
+    holds whether there is a moment to seize and what it costs."""
     await interaction.response.defer(ephemeral=False)
     c = await require_character(interaction)
     if not c:
@@ -218,13 +307,19 @@ async def breakthrough(interaction: discord.Interaction, confirm: bool = False) 
         envelope = await ENGINE.authoritative_action(
             "cultivation.breakthrough",
             interaction.user.id,
-            {"confirm": bool(confirm)},
+            {"confirm": bool(confirm), "reroll": bool(reroll)},
             action_id=f"discord:{interaction.id}:cultivation.breakthrough",
         )
     except GameEngineError as exc:
         message = str(exc)
         if "perfection choice requires explicit confirmation" in message:
             message = "⚠️ **Stage 9 choice**\nYou can pursue **/quest → Realm Perfection → Start** for a stronger long-term foundation, or explicitly confirm this breakthrough to skip it."
+        elif "no moment to seize" in message or "seized once already" in message:
+            message = "⚠️ **No moment to seize**\nA seized moment is one more roll after a failed attempt at this same stage, and only one. Fill the stage and attempt it again."
+        elif "seizing the moment costs" in message:
+            message += " Insight XP comes from exploring, quests, battles and the Refine stance (**/cultivation → Cultivate → Stance**)."
+        elif "realm gate" in message:
+            message = f"⚠️ **The realm gate is closed**\n{message}\nBank the insight under **/cultivation → Cultivate → Insight**, or complete **/quest → Realm Perfection**. The sheet at **/cultivation** shows your Insight XP and the odds."
         await interaction.followup.send(f"❌ {message}" if not message.startswith("⚠️") else message, ephemeral=False)
         return
     result = dict(envelope.get("result") or {})
@@ -247,6 +342,12 @@ async def breakthrough(interaction: discord.Interaction, confirm: bool = False) 
     except Exception:
         log.exception("Could not persist breakthrough RAG memory")
     mechanical = roll_line(roll)
+    if result.get("reroll"):
+        mechanical += f"\n🎯 You seized the moment: **{int(result.get('reroll_cost', 0))} Insight XP** spent for this second roll, and the stage's essence was not asked for again."
+    if result.get("insight_spent"):
+        mechanical += "\n🔑 Your banked insight opened the realm gate and is spent."
+    elif result.get("realm_gate") and result.get("gate_via_insight"):
+        mechanical += "\n🔑 Your banked insight held the gate open; it is kept for the next attempt."
     if int(result.get("perfect_bonus", 0)):
         mechanical += "\n★ Perfect-foundation legacy bonus: **+2** to this breakthrough."
     if int(result.get("resonance_bonus", 0)):
@@ -255,6 +356,12 @@ async def breakthrough(interaction: discord.Interaction, confirm: bool = False) 
         mechanical += f"\n🌿 Innate aptitude modifier: **{int(result['innate_breakthrough_bonus']):+d}** to this breakthrough."
     if success:
         mechanical += f"\n✨ Advanced to **{next_realm}, Stage {next_phase}**."
+        gains = dict(result.get("attribute_gains") or {})
+        if gains:
+            grown = ", ".join(f"**+{int(v)} {k.replace('_', ' ')}**" for k, v in sorted(gains.items()))
+            mechanical += f"\n💪 Crossing into a new realm remade your foundation: {grown}. Every session from here gathers more."
+        if float(result.get("world_mult", 1)) != 1.0 and result.get("ascended"):
+            mechanical += f"\n🌏 The qi of **{result.get('to_world')}** is **x{float(result['world_mult']):.2f}** what you knew."
         master = dict(result.get("master_reward") or {})
         if master:
             mechanical += f"\n🎓 Your breakthrough feeds the master-disciple bond: **{master.get('master_name','Your master')}** receives **+{int(master.get('insight_xp',0))} Insight XP** and the lineage gains **+{int(master.get('attention',0))} Master Attention**."
@@ -263,6 +370,12 @@ async def breakthrough(interaction: discord.Interaction, confirm: bool = False) 
             mechanical += f"\n🕯️ Past-life memory awakened: **{int(legacy.get('awakened_memory',0))}% / {int(legacy.get('memory_seed',0))}%**."
     else:
         mechanical += f"\n⚠️ Breakthrough failed; **{int(result.get('failure_loss',0))} cultivation essence** was lost."
+        if result.get("reroll_available"):
+            mechanical += (
+                f"\n🎯 The moment has not passed: **/cultivation → Cultivate → Breakthrough** with **reroll** rolls again "
+                f"for **{int(result.get('reroll_cost', 0))} Insight XP** (you hold **{int(result.get('insight_xp', 0))}**), once at this stage, "
+                "and the essence is not asked for again."
+            )
     await reply_long(interaction, f"{mechanical}\n\n{narration}")
 
 
@@ -297,7 +410,7 @@ async def body_sheet(interaction: discord.Interaction) -> None:
                 f"Quests {p['completed_quests']}/{WORLD.body_perfection_quest_count()}"
             )
         else:
-            lines.append("Stage 9 choice: **/quest → Body Perfection → Start** or **/cultivation → Body Cultivation → Breakthrough**.")
+            lines.append("Stage 9 choice: **/quest → Body Perfection → Start** or **/cultivation → Body → Breakthrough**.")
     await interaction.response.send_message("\n".join(lines), ephemeral=False)
 
 
@@ -327,12 +440,14 @@ async def body_cultivate(interaction: discord.Interaction) -> None:
     extra += f"\n🕰️ {result.get('period','World-time')} body-tempering flow: **x{float(result.get('time_mult',1)):.2f}** efficiency."
     if float(result.get("soul_mult", 1)) > 1.0:
         extra += f"\n☸️ Soul Legacy talent echo: **x{float(result['soul_mult']):.2f}** body-cultivation efficiency."
+    if float(result.get("world_mult", 1)) != 1.0:
+        extra += f"\n🌏 The qi of the **{result.get('world_name') or 'world'}** is thick: **x{float(result['world_mult']):.2f}**."
     if float(result.get("era_mult", 1)) != 1.0:
         extra += f"\n🌌 **{result.get('era_name') or 'World Era'}** modifies cultivation to **x{float(result['era_mult']):.2f}**."
     if int(result.get("perfection_gain", 0)):
         extra += f"\n★ Body refinement deepens by **+{int(result['perfection_gain'])}%**."
     if result.get("ready"):
-        extra += "\n✨ Body Stage 9 is full. Choose **/quest → Body Perfection → Start** or **/cultivation → Body Cultivation → Breakthrough**." if int(c.get("body_phase", 1)) == 9 else "\n✨ Your body is ready for **/cultivation → Body Cultivation → Breakthrough**."
+        extra += "\n✨ Body Stage 9 is full. Choose **/quest → Body Perfection → Start** or **/cultivation → Body → Breakthrough**." if int(c.get("body_phase", 1)) == 9 else "\n✨ Your body is ready for **/cultivation → Body → Breakthrough**."
     await interaction.followup.send(f"💪 **{c['name']} tempers the body.**\nYou refine flesh, blood, bone, and meridians for **+{gain} body essence**.\nProgress: **{total}/{cost}**{extra}")
 
 
@@ -534,7 +649,7 @@ async def bodyperfect_trial(interaction: discord.Interaction) -> None:
     else:
         lines.append(
             f"\n⚠️ The final body tempering fails. **{int(result.get('training_loss',0))}% recoverable Body Perfection training** is lost; "
-            "your body realm remains stable. Restore it with **/cultivation → Body Cultivation → Cultivate** before trying again."
+            "your body realm remains stable. Restore it with **/cultivation → Body → Cultivate** before trying again."
         )
     await reply_long(interaction, "\n".join(lines))
 
@@ -693,7 +808,7 @@ async def perfect_trial(interaction: discord.Interaction) -> None:
     else:
         lines.append(
             f"\n⚠️ The final compression fails. **{int(result.get('training_loss',0))}% recoverable Perfection training** is lost, but your realm remains stable. "
-            "Restore it with **/cultivation → Meditation** before trying again."
+            "Restore it with **/cultivation → Cultivate** before trying again."
         )
     await reply_long(interaction, "\n".join(lines))
 

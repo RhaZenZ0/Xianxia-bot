@@ -354,7 +354,7 @@ TIERS = (
     ("runtime.py", "hubs.py"),
     ("services.py", "typed_play.py"),
     ("formatting.py", "locations.py", "pickers.py"),
-    ("discovery.py", "character_state.py", "channels.py"),
+    ("discovery.py", "character_state.py", "channels.py", "status_cards.py"),
     ("threads.py", "auction_feed.py"),
     ("admin/core.py",),
     ("admin/channel_messages.py", "admin/bugs_forum.py", "ui/event_scene.py", "ui/creation.py", "ui/commissions.py"),
@@ -757,7 +757,7 @@ SURFACE = {
     },
     "commands/cultivation.py": {
         "groups": ('seclusion_group', 'body_group', 'bodyperfect_group', 'perfect_group', 'tribulation_group'),
-        "roots": ('cultivate', 'breakthrough'),
+        "roots": ('cultivate', 'stance', 'insight', 'breakthrough'),
         "leaves": {
             "seclusion_group": ('start', 'status', 'end'),
             "body_group": ('sheet', 'cultivate', 'breakthrough'),
@@ -823,7 +823,7 @@ SURFACE = {
         "roots": (),
         "leaves": {
             "law_group": ('status', 'comprehend', 'technique'),
-            "manual_group": ('list', 'study', 'technique'),
+            "manual_group": ('list', 'study', 'practise', 'technique'),
             "condition_group": ('status', 'treat'),
             "profession_group": ('status',),
             "crime_group": ('status', 'atone'),

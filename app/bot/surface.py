@@ -37,7 +37,7 @@ from .commands.artifact import artifact_group
 from .commands.battle import battle_group, battle_status
 from .commands.beast import beast_group
 from .commands.boss import boss_group, boss_status, hunter_group, hunter_status
-from .commands.character import bond_group, fate_group
+from .commands.character import begin as begin_command, bond_group, fate_group
 from .commands.cultivation import body_group, bodyperfect_group, perfect_group, seclusion_group, tribulation_group
 from .commands.duel import duel_group
 from .commands.economy import (
@@ -72,12 +72,14 @@ from .hubs import (
     open_hub_in_place,
     register_hubs,
     register_menu_builder,
+    register_menu_facts,
     send_hub,
 )
 from .locations import here_summary
 from .registry import ACTIONS, EVENT_HANDLERS, registered_root_command
 from .runtime import DB, WORLD, character_location_display, log
 from .services import GUILD, SIM
+from .status_cards import cultivation_status_fields, menu_facts_line
 
 
 # ---------------------------------------------------------------------------
@@ -142,7 +144,7 @@ _MIGRATED_ROOTS = {
     "innerworld", "inventory", "karma", "law", "lifespan", "manual", "market", "merchant", "shop", "trade", "blackmarket",
     "npcinfo", "party", "perfect", "profession", "provenance", "reincarnate",
     "reputation", "rulers", "scene", "seclusion", "secretrealm", "sect", "sense",
-    "sheet", "soul", "spatialkey", "specialeffects", "storage", "talk", "territory",
+    "sheet", "soul", "spatialkey", "specialeffects", "stance", "insight", "storage", "talk", "territory",
     "time", "travel", "realmhub", "tribulation", "use", "wallet", "war", "world",
     "worldevents", "worldrules",
 }
@@ -157,8 +159,15 @@ _missing_action_roots = sorted(_MIGRATED_ROOTS - set(_ROOT_ACTIONS))
 if _missing_action_roots:
     raise RuntimeError(f"Command registry lost action roots: {_missing_action_roots}")
 
-def _hub_page(root: str, label: str, description: str) -> HubPage:
-    return HubPage(key=root, label=label, description=description, command=_ROOT_ACTIONS[root])
+def _hub_page(root: str, label: str, description: str, *extra_roots: str) -> HubPage:
+    """One page of a hub. Extra roots (v1.0.0-rc.4) are gathered onto the same
+    page, so a page can be a thing you are doing rather than one command's
+    name; the page keeps the first root's key, which hint paths, the playtest
+    checklist and the emoji map resolve against."""
+    return HubPage(
+        key=root, label=label, description=description, command=_ROOT_ACTIONS[root],
+        extras=tuple(_ROOT_ACTIONS[name] for name in extra_roots),
+    )
 
 
 _HUB_DEFINITIONS = (
@@ -202,16 +211,16 @@ _HUB_DEFINITIONS = (
     HubDefinition(
         name="cultivation",
         title="🧘 Cultivation Hub",
-        description="Meditation, seclusion, body cultivation, aptitudes, Laws, manuals and concealment.",
+        description="The cultivation sheet, and four pages for what you are doing: meditate, temper the body, walk the path, practise the arts.",
         pages=(
-            _hub_page("cultivate", "Meditation", "Gather cultivation essence."),
-            _hub_page("seclusion", "Seclusion", "Start, inspect or end closed-door cultivation."),
-            _hub_page("body", "Body Cultivation", "Parallel body-cultivation progression."),
-            _hub_page("aptitude", "Aptitudes", "Roots, bloodlines, physiques and aptitude progression."),
-            _hub_page("law", "Laws", "Comprehend and wield Laws."),
-            _hub_page("manual", "Manuals & Techniques", "Study manuals and use learned techniques."),
-            _hub_page("conceal", "Concealment", "Toggle cultivation-aura concealment."),
-            _hub_page("profession", "Profession", "Cultivation-profession mastery status."),
+            # Four pages, grouped by what you are doing (v1.0.0-rc.4). Ten
+            # pages named after commands became four named after the work:
+            # every action is still here, one tap further in at most.
+            _hub_page("cultivate", "Cultivate", "Meditate under your stance, choose the stance, bank a realm-gate insight, break through, or close the doors for a seclusion.",
+                      "stance", "insight", "breakthrough", "seclusion"),
+            _hub_page("body", "Body", "The parallel body path: temper it, inspect it and break through its stages."),
+            _hub_page("aptitude", "Path", "What you were born with and what you comprehend: roots, bloodlines, physiques, and the Laws.", "law"),
+            _hub_page("manual", "Arts", "Manuals and techniques, profession mastery, and the concealment of your aura.", "profession", "conceal"),
         ),
     ),
     HubDefinition(
@@ -426,6 +435,24 @@ async def _economy_hub_status(interaction: discord.Interaction) -> list[HubStatu
     ]
 
 
+async def _cultivation_hub_status(interaction: discord.Interaction) -> list[HubStatusField]:
+    """The cultivation sheet (v1.0.0-rc.3), the hub's first page - computed
+    by status_cards from one engine query, the player card when the engine
+    is away."""
+    return await cultivation_status_fields(interaction, fallback=_player_hub_status)
+
+
+def _status_provider_for(definition: HubDefinition):
+    """The status card a hub carries: the economy hub the wallet and market,
+    the cultivation hub its sheet (v1.0.0-rc.3), every other hub the
+    player card."""
+    if definition.name == "economy":
+        return _economy_hub_status
+    if definition.name == "cultivation":
+        return _cultivation_hub_status
+    return _player_hub_status
+
+
 async def _admin_hub_status(interaction: discord.Interaction) -> list[HubStatusField]:
     guild = interaction.guild
     return [
@@ -440,6 +467,9 @@ def _build_hub_command(definition: HubDefinition) -> app_commands.Command:
     async def hub_command(interaction: discord.Interaction) -> None:
         if definition.name == "economy":
             await send_hub(interaction, definition, status_provider=_economy_hub_status)
+            return
+        if definition.name == "cultivation":
+            await send_hub(interaction, definition, status_provider=_cultivation_hub_status)
             return
         await send_hub(interaction, definition, status_provider=_player_hub_status)
 
@@ -478,34 +508,125 @@ _ADMIN_HUB_DEFINITION = HubDefinition(
 
 _MenuBase = discord.ui.LayoutView if LAYOUT_COMPONENTS_AVAILABLE else discord.ui.View
 
+# The menu's shape (v1.0.0-rc.3): four rows of four, grouped by what a player
+# is doing, instead of one sixteen-entry select. The hub names stay the hub
+# names; two get the label they should always have had.
+_HUB_LABELS = {"npc": "NPCs", "innerworld": "Inner World", "quest": "Quests"}
+_MENU_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
+    ("You", "who you are and what you carry", ("character", "cultivation", "items", "quest")),
+    ("World", "where you are and what is happening", ("world", "travel", "realm", "npc")),
+    ("Doing", "fighting, making, trading, taming", ("combat", "craft", "economy", "beast")),
+    ("Home", "the places that are yours", ("sect", "family", "abode", "innerworld")),
+)
+# The hub each player opened last, in process: the menu offers it back
+# first. Lost at restart, which costs one tap.
+_LAST_HUB: dict[int, str] = {}
+
+
+def _hub_label(name: str) -> str:
+    if name in _HUB_LABELS:
+        return _HUB_LABELS[name]
+    definition = _HUB_BY_NAME.get(name)
+    if definition is not None and "—" in definition.title:
+        return definition.title.split("—")[-1].strip().replace(" Hub", "")[:80]
+    if definition is not None:
+        return definition.title.split(" ", 1)[-1].replace(" Hub", "").strip()[:80]
+    return name.title()
+
+
+async def _open_hub_from_menu(interaction: discord.Interaction, name: str) -> None:
+    """Open a hub from the menu, in place where the layout allows it; the
+    admin panel behind its gate. Remembers the choice for Back."""
+    in_place = LAYOUT_COMPONENTS_AVAILABLE and getattr(interaction, "message", None) is not None
+    if name == "admin":
+        if in_place:
+            if not await require_admin(interaction):
+                return
+            _LAST_HUB[int(interaction.user.id)] = name
+            await open_hub_in_place(interaction, _ADMIN_HUB_DEFINITION, _admin_hub_status)
+            return
+        await admin_panel.callback(interaction)
+        return
+    definition = _HUB_BY_NAME[name]
+    provider = _status_provider_for(definition)
+    _LAST_HUB[int(interaction.user.id)] = name
+    if in_place:
+        await open_hub_in_place(interaction, definition, provider)
+        return
+    await send_hub(interaction, definition, status_provider=provider)
+
+
+async def _menu_facts(interaction: discord.Interaction) -> str:
+    return await menu_facts_line(interaction)
+
+
+class MenuHubButton(discord.ui.Button):
+    """One hub, one button (v1.0.0-rc.3)."""
+
+    def __init__(self, name: str, *, style: discord.ButtonStyle = discord.ButtonStyle.secondary) -> None:
+        self.hub_name = str(name)
+        super().__init__(label=_hub_label(self.hub_name)[:20], style=style, emoji=_hub_icon(self.hub_name))
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        await _open_hub_from_menu(interaction, self.hub_name)
+
+
+class MenuBeginButton(discord.ui.Button):
+    """Begin, when there is no character to open a hub for."""
+
+    def __init__(self) -> None:
+        super().__init__(label="Begin", style=discord.ButtonStyle.success, emoji="🌱")
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        await begin_command.callback(interaction)
+
 
 class MenuView(_MenuBase):
-    """The one door (v0.33.1): a select listing every hub, Admin included for
-    an administrator. Picking one opens that hub exactly as its own slash
-    command does; the sixteen hub commands remain beside it.
-
-    Since v0.40.0 the menu is a panel of the same kind as the hubs, so a hub
-    swaps into it in place (its Menu button) and it swaps into a hub in
-    place (the select): one message is the whole GUI. Where the layout is
-    not available it is the classic select under a line of text."""
+    """The one door (v0.33.1), a panel of the hubs' own kind (v0.40.0), and
+    since v1.0.0-rc.3 four rows of four - You, World, Doing, Home - under a
+    header that says where you are, what stage you hold and what is waiting,
+    with Back to the hub you left and Begin when there is no character yet.
+    Admin gets a fifth row. Where the layout is not available it is the
+    classic select under a line of text."""
 
     is_layout_hub = False
 
-    def __init__(self, *, owner_id: int, is_admin: bool, owner_name: str = "Cultivator") -> None:
+    def __init__(self, *, owner_id: int, is_admin: bool, owner_name: str = "Cultivator", facts: str = "") -> None:
         super().__init__(timeout=900)
         self.owner_id = int(owner_id)
         self.owner_name = str(owner_name)[:80]
+        self.facts = str(facts or "")[:700]
         self.message: discord.Message | None = None
-        select = MenuSelect(is_admin=is_admin)
-        if LAYOUT_COMPONENTS_AVAILABLE:
-            container = discord.ui.Container(accent_colour=0x5865F2)
-            container.add_item(discord.ui.TextDisplay(f"## 🧭 Xianxia RP — Main Menu\n-# {self.owner_name}\nPick a hub below. It opens here, in this message; every hub's Menu button brings you back."))
+        if not LAYOUT_COMPONENTS_AVAILABLE:
+            self.add_item(MenuSelect(is_admin=is_admin))
+            return
+        container = discord.ui.Container(accent_colour=0x5865F2)
+        header = f"## 🧭 Xianxia RP — Main Menu\n-# {self.owner_name}"
+        if self.facts:
+            header += f"\n{self.facts}"
+        container.add_item(discord.ui.TextDisplay(header[:1900]))
+        no_character = self.facts.startswith("🌱")
+        last = _LAST_HUB.get(self.owner_id)
+        for title, blurb, names in _MENU_GROUPS:
+            container.add_item(discord.ui.TextDisplay(f"**{title}**\n-# {blurb}"))
             row = discord.ui.ActionRow()
-            row.add_item(select)
+            for name in names:
+                style = discord.ButtonStyle.primary if name == last else discord.ButtonStyle.secondary
+                row.add_item(MenuHubButton(name, style=style))
             container.add_item(row)
-            self.add_item(container)
-        else:
-            self.add_item(select)
+        footer = discord.ui.ActionRow()
+        if no_character:
+            footer.add_item(MenuBeginButton())
+        elif last and last != "admin":
+            back = MenuHubButton(last, style=discord.ButtonStyle.primary)
+            back.label = f"Back to {_hub_label(last)}"[:40]
+            back.emoji = "↩️"
+            footer.add_item(back)
+        if is_admin:
+            footer.add_item(MenuHubButton("admin", style=discord.ButtonStyle.danger))
+        if footer.children:
+            container.add_item(footer)
+        self.add_item(container)
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if int(interaction.user.id) != self.owner_id:
@@ -515,10 +636,12 @@ class MenuView(_MenuBase):
 
 
 class MenuSelect(discord.ui.Select):
+    """The classic menu: one select, for a discord.py without the layout."""
+
     def __init__(self, *, is_admin: bool) -> None:
         options = [
             discord.SelectOption(
-                label=definition.title.split("—")[-1].strip()[:100] if "—" in definition.title else definition.name.title(),
+                label=_hub_label(definition.name)[:100],
                 value=definition.name,
                 description=definition.description[:100],
                 emoji=_hub_icon(definition.name),
@@ -544,7 +667,8 @@ class MenuSelect(discord.ui.Select):
             await admin_panel.callback(interaction)
             return
         definition = _HUB_BY_NAME[choice]
-        provider = _economy_hub_status if definition.name == "economy" else _player_hub_status
+        provider = _status_provider_for(definition)
+        _LAST_HUB[int(interaction.user.id)] = choice
         if in_place:
             await open_hub_in_place(interaction, definition, provider)
             return
@@ -559,7 +683,13 @@ class MenuSelect(discord.ui.Select):
 async def menu(interaction: discord.Interaction) -> None:
     member = interaction.user
     is_admin = isinstance(member, discord.Member) and member.guild_permissions.administrator
-    view = MenuView(owner_id=member.id, is_admin=bool(is_admin), owner_name=getattr(member, "display_name", str(member)))
+    facts = ""
+    if LAYOUT_COMPONENTS_AVAILABLE:
+        try:
+            facts = await _menu_facts(interaction)
+        except Exception:
+            log.exception("Menu facts unavailable")
+    view = MenuView(owner_id=member.id, is_admin=bool(is_admin), owner_name=getattr(member, "display_name", str(member)), facts=facts)
     if LAYOUT_COMPONENTS_AVAILABLE:
         await interaction.response.send_message(view=view, ephemeral=False)
     else:
@@ -571,7 +701,8 @@ async def menu(interaction: discord.Interaction) -> None:
         view.message = None
 
 
-register_menu_builder(lambda owner_id, is_admin, owner_name: MenuView(owner_id=owner_id, is_admin=is_admin, owner_name=owner_name))
+register_menu_builder(lambda owner_id, is_admin, owner_name, facts="": MenuView(owner_id=owner_id, is_admin=is_admin, owner_name=owner_name, facts=facts))
+register_menu_facts(_menu_facts)
 
 
 register_hubs(*_HUB_DEFINITIONS, _ADMIN_HUB_DEFINITION)
