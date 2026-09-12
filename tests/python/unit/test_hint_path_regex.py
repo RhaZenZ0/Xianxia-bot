@@ -41,21 +41,25 @@ class TheHintPatternIsUnambiguous(unittest.TestCase):
             with self.subTest(text=text):
                 self.assertEqual([(m.group(1), m.group(2)) for m in pattern.finditer(text)], expected)
 
-    def test_no_repetition_can_split_a_run_of_spaces_two_ways(self):
-        """The structural property, not the timing: every repetition of the
-        step group must be anchored by a literal arrow, which neither `\\s`
-        nor the class can match."""
+    def test_the_step_list_is_one_flat_class_with_nothing_to_backtrack_over(self):
+        """The structural property rather than the timing: no repeated group
+        at all, so there is no pair of quantifiers to split text between."""
         source = _pattern().pattern
-        self.assertIn("→", source)
-        self.assertNotIn(r"→\s*[^*→]+", source, "the arrow's trailing \\s* reintroduces the ambiguity")
+        self.assertNotIn("(?:", source, "a repeated group is what made this backtrack")
+        self.assertIn("[^*]*", source, "the step list is one class that cannot cross the closing **")
 
-    def test_text_that_never_completes_a_match_returns_promptly(self):
+    def test_neither_attack_shape_takes_any_time(self):
         pattern = _pattern()
-        evil = "**/world → " + " " * 4000
-        started = time.perf_counter()
-        self.assertIsNone(pattern.search(evil))
-        # The old pattern took ~29s on 3000 spaces and grows quadratically.
-        self.assertLess(time.perf_counter() - started, 1.0)
+        for name, evil in (
+            # Splitting spaces between adjacent repetitions: exponential.
+            ("arrow repetitions", "**/a" + "\u2192" + ") \u2192" * 26),
+            # Splitting one run of spaces N ways: quadratic.
+            ("run of spaces", "**/world \u2192 " + " " * 4000),
+        ):
+            with self.subTest(attack=name):
+                started = time.perf_counter()
+                self.assertIsNone(pattern.search(evil))
+                self.assertLess(time.perf_counter() - started, 1.0)
 
 
 if __name__ == "__main__":

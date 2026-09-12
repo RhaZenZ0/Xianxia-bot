@@ -90,13 +90,18 @@ _LAYOUT_RESULT_PAGES = 5
 # prints as hints (`**/world → City → Look**`) become at most this many
 # buttons, so the suggested follow-up is a tap rather than a page change.
 _LAYOUT_RESULT_ACTION_LIMIT = 3
-# The `\s*` after the arrow is deliberately absent: `[^*→]` matches
-# whitespace too, so `\s*[^*→]+` could split a run of spaces N ways and
-# made the pattern quadratic on input that never completes a match. Each
-# repetition is anchored by a literal arrow, which neither `\s` nor the
-# class can match, so this form is unambiguous - and it captures exactly
-# the same text, since the split below trims each step anyway.
-_HINT_PATH_RE = re.compile(r"\*\*/([a-z]+)((?:\s*→[^*→]+)*)\*\*")
+# One flat character class, and deliberately no repeated group. The step
+# list used to be `(?:\s*→\s*[^*→]+)*`, which is ambiguous twice over:
+# `[^*→]` matches whitespace, so the spaces around an arrow could be
+# claimed by the `\s*` on either side or by the class itself. On text
+# that never closes the `**`, splitting N such spaces N ways is
+# quadratic, and splitting them between adjacent repetitions is
+# exponential: 16.9s on twenty-six repetitions of ") →", and the text
+# scanned here is whatever a reply happens to contain. `[^*]*` cannot
+# cross the closing `**`, captures exactly the same text, and has
+# nothing to backtrack over. A group that is not a real hub path is
+# dropped by _hint_action below, as it always was.
+_HINT_PATH_RE = re.compile(r"\*\*/([a-z]+)([^*]*)\*\*")
 # Discord's cap on components per message, nested ones included; rebuild()
 # sizes the action list against it once the result block and its buttons
 # have taken their share.
