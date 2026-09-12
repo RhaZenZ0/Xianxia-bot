@@ -22,7 +22,7 @@ from ..ops.http_limits import HeaderLimits
 from ..ops.release_channel import announcement, api_url, newer_than_installed, newest_for_channel, parse_releases
 from ..ai.narrator import canonical_location_reply, is_current_location_question
 from ..rules.npc_memory import classify_memory, exchange_memory_summary, public_mood_hint
-from ..version import RELEASE_VERSION
+from ..version import INSTALLED_VERSION, RELEASE_VERSION
 from .admin.channel_messages import XianxiaInfoView
 from .admin.server_setup import dashboard_discord_control
 from .admin.quest_control import dashboard_quest_control, owns as quest_control_owns
@@ -315,15 +315,15 @@ class XianxiaBot(commands.Bot):
             self.health_state.set_check("release_channel", False, channel=channel, error=f"{type(exc).__name__}: {exc}"[:200])
             return None
         newest = newest_for_channel(releases, channel)
-        available = newer_than_installed(newest, RELEASE_VERSION)
+        available = newer_than_installed(newest, INSTALLED_VERSION)
         self.health_state.set_check(
-            "release_channel", True, channel=channel, installed=RELEASE_VERSION,
+            "release_channel", True, channel=channel, installed=INSTALLED_VERSION,
             newest=newest.version_text if newest else None,
             update_available=bool(available),
         )
         if available is None:
             return None
-        text = announcement(available, RELEASE_VERSION, channel)
+        text = announcement(available, INSTALLED_VERSION, channel)
         if self.announced_release != available.version_text:
             self.announced_release = available.version_text
             await post_server_log(self.get_guild(SETTINGS.guild_id), "Update available", text)

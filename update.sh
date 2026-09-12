@@ -90,16 +90,74 @@ esac
 need_cmd() { command -v "$1" >/dev/null 2>&1 || { echo "ERROR: Required command '$1' was not found." >&2; exit 1; }; }
 for cmd in unzip awk find mktemp cp rm mkdir mv sed tr head basename dirname; do need_cmd "$cmd"; done
 
-clean_version() { printf '%s' "$1" | tr -d '[:space:]' | sed 's/^v//'; }
+clean_version() { printf '%s' "$1" | tr -d '[:space:]' | sed 's/^[vV]//'; }
+# A version is X.Y.Z (two to four numeric parts) with an optional prerelease
+# suffix: 1.0.0, 1.0.0-rc.9, 0.21.0-beta.1.
 valid_version() {
-    awk -v v="$1" 'BEGIN { n=split(v,a,"."); if(n<2 || n>4) exit 1; for(i=1;i<=n;i++) if(a[i] !~ /^[0-9]+$/) exit 1; exit 0 }'
+    awk -v v="$1" 'BEGIN {
+        core = v; pre = "";
+        if (index(v, "-")) { pre = substr(v, index(v, "-") + 1); sub(/-.*$/, "", core) }
+        n = split(core, a, ".");
+        if (n < 2 || n > 4) exit 1;
+        for (i = 1; i <= n; i++) if (a[i] !~ /^[0-9]+$/) exit 1;
+        if (index(v, "-")) {
+            if (pre == "") exit 1;
+            if (pre !~ /^[0-9A-Za-z.-]+$/) exit 1;
+            if (pre ~ /^\./ || pre ~ /\.$/ || pre ~ /\.\./) exit 1;
+        }
+        exit 0
+    }'
 }
+# Semver precedence (semver.org §11), because every rc of a version shares its
+# numbers: 1.0.0-rc.6 < 1.0.0-rc.9 < 1.0.0. Comparing the numbers alone - which
+# is all this did until v1.0.0-rc.10 - made every rc equal to every other, so
+# --fetch answered "already the newest" and the beta channel could be read but
+# never walked. Mirrored in app/ops/release_channel.py:precedence(); the two are
+# held together by tests/python/unit/test_release_channel.py.
 version_gt() {
-    awk -v a="$1" -v b="$2" 'BEGIN { na=split(a,A,"."); nb=split(b,B,"."); n=(na>nb?na:nb); for(i=1;i<=n;i++){x=(i<=na?A[i]+0:0);y=(i<=nb?B[i]+0:0);if(x>y)exit 0;if(x<y)exit 1} exit 1 }'
+    awk -v a="$1" -v b="$2" '
+    function vcore(v) { sub(/-.*$/, "", v); return v }
+    function vpre(v)  { return index(v, "-") ? substr(v, index(v, "-") + 1) : "" }
+    function corecmp(x, y,   A, B, na, nb, n, i, p, q) {
+        na = split(vcore(x), A, "."); nb = split(vcore(y), B, ".");
+        n = (na > nb ? na : nb);
+        for (i = 1; i <= n; i++) {
+            p = (i <= na ? A[i] + 0 : 0); q = (i <= nb ? B[i] + 0 : 0);
+            if (p > q) return 1;
+            if (p < q) return -1;
+        }
+        return 0
+    }
+    # A release outranks any prerelease of the same numbers; among prereleases,
+    # identifiers compare left to right, numeric ones numerically and below
+    # alphanumeric ones, and a longer run of identifiers wins a shared prefix.
+    function precmp(pa, pb,   A, B, na, nb, n, i, x, y, xn, yn) {
+        if (pa == "" && pb == "") return 0;
+        if (pa == "") return 1;
+        if (pb == "") return -1;
+        na = split(pa, A, "."); nb = split(pb, B, ".");
+        n = (na < nb ? na : nb);
+        for (i = 1; i <= n; i++) {
+            x = A[i]; y = B[i];
+            xn = (x ~ /^[0-9]+$/); yn = (y ~ /^[0-9]+$/);
+            if (xn && yn) { if (x + 0 != y + 0) return (x + 0 > y + 0) ? 1 : -1 }
+            else if (xn != yn) { return xn ? -1 : 1 }
+            else if (x != y) { return (x > y) ? 1 : -1 }
+        }
+        if (na == nb) return 0;
+        return (na > nb) ? 1 : -1
+    }
+    function vcmp(x, y,   r) { r = corecmp(x, y); if (r) return r; return precmp(vpre(x), vpre(y)) }
+    BEGIN { exit (vcmp(a, b) > 0) ? 0 : 1 }'
 }
+# RELEASE_TAG first: it is the only thing in the tree that names the rc, and the
+# release job stamps it. VERSION is the fallback for an archive built before
+# v1.0.0-rc.10 and for a hand-made one.
 archive_version() {
     archive=$1
-    value=$(unzip -p "$archive" 'VERSION' 2>/dev/null | head -n 1 || true)
+    value=$(unzip -p "$archive" 'RELEASE_TAG' 2>/dev/null | head -n 1 || true)
+    [ -n "$value" ] || value=$(unzip -p "$archive" '*/RELEASE_TAG' 2>/dev/null | head -n 1 || true)
+    [ -n "$value" ] || value=$(unzip -p "$archive" 'VERSION' 2>/dev/null | head -n 1 || true)
     [ -n "$value" ] || value=$(unzip -p "$archive" '*/VERSION' 2>/dev/null | head -n 1 || true)
     clean_version "$value"
 }
@@ -121,6 +179,16 @@ trap cleanup EXIT INT TERM HUP
 [ -f "$VERSION_FILE" ] || { echo "ERROR: VERSION file not found at: $VERSION_FILE" >&2; exit 1; }
 CURRENT_VERSION=$(clean_version "$(cat "$VERSION_FILE")")
 valid_version "$CURRENT_VERSION" || { echo "ERROR: Invalid installed VERSION: $CURRENT_VERSION" >&2; exit 1; }
+# RELEASE_TAG, when the release job stamped one, is the more precise answer:
+# VERSION says 1.0.0 for every 1.0.0 rc. It is only believed when its numbers
+# agree with VERSION, so a file left behind by a hand-unpacked older tree
+# cannot talk the updater into skipping a real release.
+if [ -f "$PROJECT_DIR/RELEASE_TAG" ]; then
+    INSTALLED_TAG=$(clean_version "$(head -n 1 "$PROJECT_DIR/RELEASE_TAG" 2>/dev/null || true)")
+    if [ -n "$INSTALLED_TAG" ] && valid_version "$INSTALLED_TAG" && [ "${INSTALLED_TAG%%-*}" = "$CURRENT_VERSION" ]; then
+        CURRENT_VERSION=$INSTALLED_TAG
+    fi
+fi
 
 # Normalize persistent directories before deletion logic so custom locations are preserved.
 mkdir -p "$UPDATES_DIR" "$BACKUP_DIR"
@@ -210,7 +278,8 @@ resolve_release() {
     tr -d '\n' < "$listing" | sed 's/},[[:space:]]*{"url":"[^"]*","assets_url".*$//' > "$first"
     RELEASE_TAG=$(json_field "$first" tag_name)
     RELEASE_PAGE=$(json_field "$first" html_url)
-    RELEASE_VERSION=$(printf '%s' "$RELEASE_TAG" | sed 's/^v//; s/-.*$//')
+    # The suffix is kept: it is the only thing that tells one rc from another.
+    RELEASE_VERSION=$(printf '%s' "$RELEASE_TAG" | sed 's/^[vV]//')
     RELEASE_ARCHIVE_URL=$(tr -d '\n' < "$first" | grep -o '"browser_download_url":[[:space:]]*"[^"]*xianxia_rp_v[0-9.]*\.zip"' | head -n 1 | sed 's/.*"\(http[^"]*\)"/\1/')
     RELEASE_SHA_URL=$(tr -d '\n' < "$first" | grep -o '"browser_download_url":[[:space:]]*"[^"]*xianxia_rp_v[0-9.]*\.zip\.sha256"' | head -n 1 | sed 's/.*"\(http[^"]*\)"/\1/')
     rm -f "$listing" "$first"
@@ -225,6 +294,8 @@ fetch_release() {
         echo "Installed $CURRENT_VERSION is already the newest on the $UPDATE_CHANNEL channel ($RELEASE_VERSION)."
         return 3
     fi
+    # Named for the full tag so two rcs of one version do not overwrite each
+    # other in ./updates; the release asset itself keeps its numeric name.
     target="$UPDATES_DIR/xianxia_rp_v$RELEASE_VERSION.zip"
     partial="$target.part"
     echo "Downloading $RELEASE_TAG from $UPDATE_REPOSITORY ($UPDATE_CHANNEL) ..."
@@ -247,7 +318,13 @@ fetch_release() {
         return 1
     fi
     inner=$(archive_version "$partial")
-    [ "$inner" = "$RELEASE_VERSION" ] || { rm -f "$partial"; echo "ERROR: Archive VERSION ($inner) does not match release tag ($RELEASE_TAG)." >&2; return 1; }
+    # A stamped archive answers with the full tag; one built before
+    # v1.0.0-rc.10 has only VERSION and answers with the numbers alone.
+    if [ "$inner" != "$RELEASE_VERSION" ] && [ "$inner" != "${RELEASE_VERSION%%-*}" ]; then
+        rm -f "$partial"
+        echo "ERROR: Archive version ($inner) does not match release tag ($RELEASE_TAG)." >&2
+        return 1
+    fi
     mv -f "$partial" "$target"
     echo "Fetched: $target"
     FETCHED_ARCHIVE=$target

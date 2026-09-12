@@ -25,6 +25,7 @@ from app.ops.release_channel import (
     newest_for_channel,
     parse_releases,
     parse_version,
+    precedence,
 )
 
 UPDATE_SH = (PROJECT_ROOT / "update.sh").read_text(encoding="utf-8")
@@ -166,8 +167,10 @@ class BotWorkerTests(unittest.TestCase):
         body = BOT[BOT.index("async def check_for_release"):BOT.index("async def update_check_worker")]
         self.assertIn("parse_releases(response.text)", body)
         self.assertIn("newest_for_channel(releases, channel)", body)
-        self.assertIn("newer_than_installed(newest, RELEASE_VERSION)", body)
-        self.assertIn("announcement(available, RELEASE_VERSION, channel)", body)
+        # INSTALLED_VERSION, not RELEASE_VERSION: the comparison has to know
+        # which rc is installed, and VERSION alone never does.
+        self.assertIn("newer_than_installed(newest, INSTALLED_VERSION)", body)
+        self.assertIn("announcement(available, INSTALLED_VERSION, channel)", body)
         self.assertIn("if self.announced_release != available.version_text:", body)
         self.assertIn('await post_server_log(self.get_guild(SETTINGS.guild_id), "Update available", text)', body)
         # An unreachable channel is a health check, never an exception out of the worker.
@@ -220,7 +223,9 @@ class UpdaterTests(unittest.TestCase):
         body = UPDATE_SH[UPDATE_SH.index("fetch_release() {"):UPDATE_SH.index('if [ "$MODE" = remote_check ]')]
         self.assertIn("SHA-256 mismatch", body)
         self.assertIn('refusing an unverifiable archive', body)
-        self.assertIn('[ "$inner" = "$RELEASE_VERSION" ]', body)
+        # Either the full tag (a stamped archive) or the bare numbers (one built
+        # before v1.0.0-rc.10), and nothing else.
+        self.assertIn('if [ "$inner" != "$RELEASE_VERSION" ] && [ "$inner" != "${RELEASE_VERSION%%-*}" ]; then', body)
         # The .part file is what gets verified; only a verified file is renamed into ./updates.
         self.assertLess(body.index('sha256_of "$partial"'), body.index('mv -f "$partial" "$target"'))
         self.assertIn('"$UPDATES_DIR/xianxia_rp_v$RELEASE_VERSION.zip"', body)
@@ -288,3 +293,148 @@ class WorkflowTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PrereleasePrecedenceTests(unittest.TestCase):
+    """Every rc of a version shares its numbers (VERSION never carries the
+    suffix), so comparing numbers alone made `1.0.0-rc.6` and `1.0.0-rc.9`
+    equal and the beta channel unwalkable: `--fetch` answered "already the
+    newest" for every rc after the first. Ordering is semver precedence now.
+    """
+
+    def test_a_later_rc_of_the_same_version_is_newer(self):
+        self.assertGreater(precedence("1.0.0-rc.9"), precedence("1.0.0-rc.6"))
+        self.assertLess(precedence("1.0.0-rc.6"), precedence("1.0.0-rc.9"))
+        self.assertEqual(precedence("1.0.0-rc.9"), precedence("v1.0.0-rc.9"))
+
+    def test_a_release_outranks_every_prerelease_of_its_own_numbers(self):
+        self.assertGreater(precedence("1.0.0"), precedence("1.0.0-rc.9"))
+        self.assertGreater(precedence("1.0.0"), precedence("1.0.0-beta.1"))
+        self.assertGreater(precedence("1.0.1-rc.1"), precedence("1.0.0"))
+
+    def test_identifiers_compare_by_semver_not_as_text(self):
+        # rc.10 after rc.9 is where a string compare would go wrong.
+        self.assertGreater(precedence("1.0.0-rc.10"), precedence("1.0.0-rc.9"))
+        # Numeric identifiers rank below alphanumeric ones.
+        self.assertGreater(precedence("1.0.0-rc"), precedence("1.0.0-1"))
+        self.assertGreater(precedence("1.0.0-rc.1"), precedence("1.0.0-beta.1"))
+        # A longer run of identifiers wins a shared prefix.
+        self.assertGreater(precedence("1.0.0-rc.1.1"), precedence("1.0.0-rc.1"))
+
+    def test_the_numbers_still_dominate_the_suffix(self):
+        self.assertGreater(precedence("1.0.0-rc.1"), precedence("0.40.0"))
+        self.assertGreater(precedence("0.20.10"), precedence("0.20.9"))
+
+    def test_junk_is_refused(self):
+        for bad in ("", "1.0", "one.0.0", "1.0.0-"):
+            with self.assertRaises(ValueError, msg=bad):
+                precedence(bad)
+
+    def test_newer_than_installed_walks_the_rc_ladder(self):
+        releases = parse_releases([
+            _entry("v1.0.0-rc.9", "1.0.0", prerelease=True),
+            _entry("v1.0.0-rc.6", "1.0.0", prerelease=True),
+        ])
+        newest = newest_for_channel(releases, "beta")
+        self.assertEqual(newest.tag, "v1.0.0-rc.9")
+        self.assertIsNotNone(newer_than_installed(newest, "1.0.0-rc.6"))
+        self.assertIsNone(newer_than_installed(newest, "1.0.0-rc.9"))
+        # A finished 1.0.0 is not downgraded to one of its own candidates.
+        self.assertIsNone(newer_than_installed(newest, "1.0.0"))
+
+    def test_the_version_text_keeps_the_suffix_so_announcements_differ(self):
+        # The worker announces once per version_text; if every rc said "1.0.0"
+        # only the first would ever be announced.
+        releases = parse_releases([_entry("v1.0.0-rc.9", "1.0.0", prerelease=True)])
+        self.assertEqual(releases[0].version_text, "1.0.0-rc.9")
+        self.assertEqual(releases[0].numeric_version_text, "1.0.0")
+
+
+class InstalledVersionTests(unittest.TestCase):
+    """app/version.py reads the tag the release job stamped, when there is one."""
+
+    def test_a_dev_checkout_without_the_stamp_is_the_plain_release(self):
+        from app.version import INSTALLED_VERSION, RELEASE_VERSION
+        self.assertEqual(INSTALLED_VERSION, RELEASE_VERSION)
+
+    def test_the_stamp_is_read_and_a_disagreeing_one_is_ignored(self):
+        from app import version as version_module
+        read = version_module._installed_version
+        plain = version_module.RELEASE_VERSION
+        with patch.object(version_module, "__file__", version_module.__file__):
+            pass  # the reader resolves its own path; drive it through a temp tree instead
+        import tempfile
+        from pathlib import Path
+        for stamp, expected in (
+            (f"v{plain}-rc.9", f"{plain}-rc.9"),
+            (plain, plain),
+            ("v0.29.0", plain),          # names another version: not believed
+            ("not-a-version", plain),
+            ("", plain),
+        ):
+            with tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                (root / "app").mkdir()
+                fake = root / "app" / "version.py"
+                fake.write_text("", encoding="utf-8")
+                (root / "RELEASE_TAG").write_text(stamp, encoding="utf-8")
+                with patch.object(version_module, "__file__", str(fake)):
+                    self.assertEqual(read(), expected, stamp)
+
+
+class UpdaterPrereleaseTests(unittest.TestCase):
+    """update.sh re-implements the same ordering in shell, so the two are
+    driven against the same table here - the updater must work on a QNAP with
+    nothing but BusyBox awk, which is why it cannot simply import the module.
+    """
+
+    CASES = (
+        ("1.0.0-rc.9", "1.0.0-rc.6", True),
+        ("1.0.0-rc.6", "1.0.0-rc.9", False),
+        ("1.0.0-rc.9", "1.0.0-rc.9", False),
+        ("1.0.0", "1.0.0-rc.9", True),
+        ("1.0.0-rc.9", "1.0.0", False),
+        ("1.0.0-rc.10", "1.0.0-rc.9", True),
+        ("1.0.0-rc.1", "1.0.0-beta.1", True),
+        ("1.0.0-rc.1.1", "1.0.0-rc.1", True),
+        ("1.0.1-rc.1", "1.0.0", True),
+        ("0.20.10", "0.20.9", True),
+        ("1.0.0-rc.1", "0.40.0", True),
+    )
+
+    def _shell_version_gt(self, a, b):
+        script = re.search(r"^version_gt\(\) \{.*?^\}", UPDATE_SH, re.S | re.M)
+        self.assertIsNotNone(script, "version_gt not found in update.sh")
+        body = f'{script.group(0)}\nif version_gt "$1" "$2"; then exit 0; else exit 1; fi\n'
+        return subprocess.run(["sh", "-c", body, "sh", a, b]).returncode == 0
+
+    def test_the_shell_and_the_module_agree(self):
+        for a, b, expected in self.CASES:
+            with self.subTest(a=a, b=b):
+                self.assertEqual(self._shell_version_gt(a, b), expected)
+                self.assertEqual(precedence(a) > precedence(b), expected)
+
+    def test_the_shell_accepts_a_prerelease_as_a_valid_version(self):
+        script = re.search(r"^valid_version\(\) \{.*?^\}", UPDATE_SH, re.S | re.M)
+        self.assertIsNotNone(script)
+        body = f'{script.group(0)}\nif valid_version "$1"; then exit 0; else exit 1; fi\n'
+        def ok(v):
+            return subprocess.run(["sh", "-c", body, "sh", v]).returncode == 0
+        for good in ("1.0.0", "1.0.0-rc.9", "0.21.0-beta.1", "1.0.0.1"):
+            self.assertTrue(ok(good), good)
+        for bad in ("", "1", "one.0.0", "1.0.0-", "1.0.0-rc..9", "1.0.0-rc.9."):
+            self.assertFalse(ok(bad), bad)
+
+    def test_the_installed_tag_is_read_and_sanity_checked(self):
+        # RELEASE_TAG is only believed when its numbers agree with VERSION.
+        self.assertIn('if [ -f "$PROJECT_DIR/RELEASE_TAG" ]; then', UPDATE_SH)
+        self.assertIn('[ "${INSTALLED_TAG%%-*}" = "$CURRENT_VERSION" ]', UPDATE_SH)
+        # The archive is asked for its tag before its VERSION.
+        archive = re.search(r"^archive_version\(\) \{.*?^\}", UPDATE_SH, re.S | re.M).group(0)
+        self.assertLess(archive.index("RELEASE_TAG"), archive.index("VERSION"))
+
+    def test_the_release_job_stamps_the_tag_into_the_archive(self):
+        build = WORKFLOW[WORKFLOW.index("Build the archive"):WORKFLOW.index("Release notes from VERSIONS.md")]
+        self.assertIn("""printf '%s\\n' "${GITHUB_REF_NAME}" > RELEASE_TAG""", build)
+        # Stamped before the zip is built, so the archive carries it.
+        self.assertLess(build.index("RELEASE_TAG"), build.index("zip -qr"))

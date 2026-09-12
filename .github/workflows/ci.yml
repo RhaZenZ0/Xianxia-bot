@@ -131,6 +131,14 @@ jobs:
       - name: Build the archive
         run: |
           asset="${{ steps.version.outputs.asset }}"
+          # VERSION carries the numbers and never the -rc.N suffix, so on its
+          # own an installed tree cannot tell one rc of a version from another
+          # and the updater reads every 1.0.0 rc as the same release. Stamp the
+          # tag beside it. Written after the manifest check on purpose: the
+          # manifest proves the tree CI verified, and this file is not part of
+          # that tree - `sha256sum -c` checks the files the manifest lists and
+          # ignores any other, so both checks stay honest.
+          printf '%s\n' "${GITHUB_REF_NAME}" > RELEASE_TAG
           zip -qr "/tmp/$asset" . -x '*/__pycache__/*' '*.pyc' '.env' 'data/*' '.git/*' '.pytest_cache/*' '.ruff_cache/*' '.claude/*'
           (cd /tmp && sha256sum "$asset" > "$asset.sha256")
           unzip -p "/tmp/$asset" VERSION
