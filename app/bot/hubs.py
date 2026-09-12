@@ -214,6 +214,12 @@ class HubPage:
     label: str
     description: str
     command: Any
+    # Extras (v1.0.0-rc.4): further roots or groups this page gathers, so a
+    # page can be a thing you are doing ("Cultivate": meditate, stance,
+    # insight, breakthrough, seclusion) rather than one command's name. The
+    # page's key stays its first command's, which is what every hint path,
+    # the checklist and the emoji map already resolve against.
+    extras: tuple[Any, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -458,14 +464,20 @@ def _action_rank(name: str) -> int:
 
 
 def _leaf_actions(page: HubPage) -> list[HubAction]:
-    command = page.command
-    if command is None:
+    commands = [c for c in (page.command, *tuple(getattr(page, "extras", ()) or ())) if c is not None]
+    if not commands:
         return []
-    if isinstance(command, app_commands.Group):
-        leaves = [item for item in command.walk_commands() if isinstance(item, app_commands.Command)]
-    else:
-        leaves = [command]
+    leaves: list[Any] = []
+    for command in commands:
+        if isinstance(command, app_commands.Group):
+            leaves += [item for item in command.walk_commands() if isinstance(item, app_commands.Command)]
+        else:
+            leaves.append(command)
     actions: list[HubAction] = []
+    # A page that gathers several commands (v1.0.0-rc.4) labels its leaves by
+    # their whole path: one page holds both `aptitude status` and `law
+    # status`, and two rows reading "Status" would name nothing.
+    qualify = len(commands) > 1
     for item in leaves:
         qualified = str(getattr(item, "qualified_name", getattr(item, "name", "action")))
         path = f"/{qualified}"
@@ -474,7 +486,7 @@ def _leaf_actions(page: HubPage) -> list[HubAction]:
                 command=item,
                 handler=ACTIONS.handler_for(item),
                 path=path,
-                label=str(getattr(item, "name", "Action")).replace("_", " ").title()[:100],
+                label=(qualified if qualify else str(getattr(item, "name", "Action"))).replace("_", " ").title()[:100],
                 description=str(getattr(item, "description", "Run this action"))[:100],
             )
         )

@@ -164,6 +164,22 @@ def _city_of_location(name: str) -> str:
     return name
 
 
+# The ground's qi (v1.0.0-rc.4). The engine is authoritative for what a
+# session actually gathers (placeCultivationMultiplier); this names the same
+# three catalogue facts so the Here line can say a place is worth sitting in.
+_QI_GROUND_WORDS = {"shrine": "rich qi", "temple": "good qi"}
+
+
+def _qi_ground(name: str, data: dict) -> str:
+    if str(data.get("road_site") or "") == "shrine":
+        return _QI_GROUND_WORDS["shrine"]
+    if str(data.get("district") or "") == "temple":
+        return _QI_GROUND_WORDS["temple"]
+    if any(str((sect.get("recruitment") or {}).get("location")) == name for sect in WORLD.sects.values()):
+        return "good qi"
+    return ""
+
+
 def here_summary(location: str, limit: int = 180) -> str:
     """One line on what the place you stand in is and offers, for the panel
     header (v0.40.0). Pure: reads the catalogue only. Private places
@@ -202,6 +218,9 @@ def here_summary(location: str, limit: int = 180) -> str:
             what = f"{str(data.get('terrain') or 'open country')} · roads to {', '.join(roads[:3])}"
         else:
             what = str(data.get("terrain") or "open country")
+    qi = _qi_ground(name, data)
+    if qi:
+        what += f" · {qi}"
     if people:
         shown = ", ".join(people[:3]) + (f" +{len(people) - 3}" if len(people) > 3 else "")
         what += f" · {shown}"

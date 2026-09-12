@@ -196,7 +196,7 @@ func rollCheck(modifier, tn int64) (map[string]any, error) {
 	case margin >= -7:
 		degree = "Hard Failure"
 	}
-	return map[string]any{"die1": d1, "die2": d2, "modifier": modifier, "tn": tn, "total": total, "margin": margin, "success": total >= tn, "degree": degree}, nil
+	return map[string]any{"die1": d1, "die2": d2, "modifier": modifier, "tn": tn, "total": total, "margin": margin, "success": total >= tn, "degree": degree, "probability": rollOdds(modifier, tn)}, nil
 }
 
 type canonicalCheckPayloadV2 struct {

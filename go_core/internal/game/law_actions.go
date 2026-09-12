@@ -15,7 +15,15 @@ import (
 type lawComprehendPayload struct {
 	Law        string `json:"law"`
 	GameMinute int64  `json:"game_minute"`
+	// SpendInsight (v1.0.0-rc.4): put Insight XP into this comprehension -
+	// lawInsightSpendCost XP for lawInsightSpendBonus on the check.
+	SpendInsight bool `json:"spend_insight"`
 }
+
+const (
+	lawInsightSpendCost  = int64(4)
+	lawInsightSpendBonus = int64(3)
+)
 
 func containsString(xs []string, v string) bool {
 	for _, x := range xs {
@@ -117,7 +125,22 @@ func lawComprehendAction(conn *storage.Conn, catalog worlddata.Catalog, userID i
 	if def.Supreme {
 		tn += 5
 	}
-	roll, err := rollCheck(insight+spirit+affinity+legacyBonus, tn)
+	insightBonus := int64(0)
+	insightSpent := int64(0)
+	if p.SpendInsight {
+		xp, err := readInsightXP(conn, userID)
+		if err != nil {
+			return authoritativeMutation{}, err
+		}
+		if xp < lawInsightSpendCost {
+			return authoritativeMutation{}, fmt.Errorf("putting insight into a Law costs %d Insight XP; you have %d", lawInsightSpendCost, xp)
+		}
+		if _, err := conn.Execute(`UPDATE characters SET insight_xp=insight_xp-?,updated_at=? WHERE user_id=?`, []any{lawInsightSpendCost, now, userID}); err != nil {
+			return authoritativeMutation{}, err
+		}
+		insightBonus, insightSpent = lawInsightSpendBonus, lawInsightSpendCost
+	}
+	roll, err := rollCheck(insight+spirit+affinity+legacyBonus+insightBonus, tn)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -160,6 +183,6 @@ func lawComprehendAction(conn *storage.Conn, catalog worlddata.Catalog, userID i
 		return authoritativeMutation{}, err
 	}
 	stage := lawStage(catalog, comp)
-	result := map[string]any{"law": p.Law, "name": def.Name, "dao": dao, "roll": roll, "gain": gain, "comprehension": comp, "insights": insights, "dao_gain": daoGain, "stage_index": stage.Index, "stage_name": stage.Name, "affinity_bonus": affinity, "legacy_bonus": legacyBonus, "memory_awakened": awakened}
+	result := map[string]any{"law": p.Law, "name": def.Name, "dao": dao, "roll": roll, "gain": gain, "comprehension": comp, "insights": insights, "dao_gain": daoGain, "stage_index": stage.Index, "stage_name": stage.Name, "affinity_bonus": affinity, "legacy_bonus": legacyBonus, "memory_awakened": awakened, "insight_bonus": insightBonus, "insight_spent": insightSpent}
 	return authoritativeMutation{Result: result, Event: eventledger.Event{Domain: "law", EventType: "law_comprehended", EntityType: "character", EntityID: fmt.Sprint(userID), GameMinute: p.GameMinute, Payload: result}}, nil
 }

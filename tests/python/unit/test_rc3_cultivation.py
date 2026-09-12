@@ -115,7 +115,11 @@ class TheCultivationSheet(unittest.TestCase):
         surface, _ = _modules()
         hub = surface._HUB_BY_NAME["cultivation"]
         keys = [page.key for page in hub.pages]
-        self.assertEqual(keys[:3], ["cultivate", "stance", "insight"])
+        # Since v1.0.0-rc.4 the pages are four, and the stance and the
+        # insight are actions gathered onto the first of them.
+        self.assertEqual(keys[0], "cultivate")
+        gathered = {c.name for c in (hub.pages[0].command, *hub.pages[0].extras)}
+        self.assertLessEqual({"stance", "insight"}, gathered)
         self.assertIs(surface._status_provider_for(hub), surface._cultivation_hub_status)
         self.assertIs(surface._status_provider_for(surface._HUB_BY_NAME["economy"]), surface._economy_hub_status)
         self.assertIs(surface._status_provider_for(surface._HUB_BY_NAME["world"]), surface._player_hub_status)
@@ -177,7 +181,8 @@ class TheStanceTheOddsAndTheGate(unittest.TestCase):
         self.assertEqual(GO_STANCE.count("breakthroughModifier(c, mods, body, perfectBonus, resonance, innate)"), 1)
         self.assertNotIn('mods.value(c.Attributes["will"], "will") + 2 + perfectBonus', GO_ACTIONS)
         self.assertIn("probability := breakthroughOdds(modifier, tn)", GO_ACTIONS)
-        self.assertIn("The odds before the roll", CULTIVATION_SOURCE)
+        formatting = (BOT / "formatting.py").read_text(encoding="utf-8")
+        self.assertIn('chance = f" · **{int(odds)}%** chance" if odds is not None else ""', formatting)
 
     def test_the_realm_gate_is_engine_law_with_a_way_through(self):
         self.assertIn("realmGateOpen(conn, userID, realm)", GO_ACTIONS)
@@ -186,8 +191,8 @@ class TheStanceTheOddsAndTheGate(unittest.TestCase):
         self.assertIn('"cultivation.status"', GO_AUTHORITATIVE)
         self.assertIn("DELETE FROM world_state WHERE key=?`, []any{cultivationInsightKey(userID)}", GO_ACTIONS)
         self.assertIn('@registered_root_command(name="insight"', CULTIVATION_SOURCE)
-        self.assertIn("**/cultivation → Insight**", CULTIVATION_SOURCE)
-        self.assertIn("**/cultivation → Stance**", CULTIVATION_SOURCE)
+        self.assertIn("**/cultivation → Cultivate → Insight**", CULTIVATION_SOURCE)
+        self.assertIn("**/cultivation → Cultivate → Stance**", CULTIVATION_SOURCE)
 
 
 if __name__ == "__main__":

@@ -28,6 +28,9 @@ CREATE TABLE IF NOT EXISTS world_eras(era_id INTEGER PRIMARY KEY AUTOINCREMENT,n
 CREATE TABLE IF NOT EXISTS sect_membership(user_id INTEGER PRIMARY KEY,sect_name TEXT NOT NULL,contribution_points INTEGER NOT NULL DEFAULT 0,influence INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE IF NOT EXISTS sect_manors(sect_name TEXT PRIMARY KEY,name TEXT NOT NULL,base_location TEXT NOT NULL,qi_array_level INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE IF NOT EXISTS sect_lineage(master_user_id INTEGER NOT NULL,disciple_user_id INTEGER NOT NULL,attention INTEGER NOT NULL DEFAULT 0);
+ALTER TABLE cave_abodes ADD COLUMN name TEXT NOT NULL DEFAULT '';
+ALTER TABLE cave_abodes ADD COLUMN cultivation_level INTEGER NOT NULL DEFAULT 0;
+CREATE TABLE IF NOT EXISTS sect_abodes(user_id INTEGER NOT NULL,location_key TEXT NOT NULL,name TEXT NOT NULL DEFAULT '',base_location TEXT NOT NULL DEFAULT '',cultivation_level INTEGER NOT NULL DEFAULT 0);
 `); err != nil {
 		t.Fatal(err)
 	}

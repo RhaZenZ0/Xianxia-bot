@@ -37,7 +37,7 @@ async def law_status(interaction:discord.Interaction)->None:
     c=await require_character(interaction)
     if not c:return
     rows=await DB.get_law_progress(interaction.user.id); daos=await DB.get_dao_progress(interaction.user.id)
-    if not rows: await interaction.response.send_message("You have not begun comprehending a Law. Use **/cultivation → Laws → Comprehend** when your realm is sufficient.",ephemeral=False); return
+    if not rows: await interaction.response.send_message("You have not begun comprehending a Law. Use **/cultivation → Path → Comprehend** when your realm is sufficient.",ephemeral=False); return
     lines=[f"⚖️ **Law Comprehension — {c['name']}**"]
     for row in rows[:12]:
         d=WORLD.law_definition(str(row['law_id'])) or {}; stage=WORLD.law_stage(int(row['comprehension']))
@@ -50,7 +50,9 @@ async def law_status(interaction:discord.Interaction)->None:
 @registered_group_command(law_group, name="comprehend",description="Meditate on a Law and increase genuine comprehension")
 @app_commands.autocomplete(law=law_autocomplete)
 @serialized_user_action
-async def law_comprehend(interaction:discord.Interaction,law:str)->None:
+async def law_comprehend(interaction:discord.Interaction,law:str,spend_insight:bool=False)->None:
+    """`spend_insight` (v1.0.0-rc.4) puts Insight XP into the comprehension:
+    the engine charges it and adds its bonus to the check."""
     c=await require_character(interaction)
     if not c:return
     definition=WORLD.law_definition(law)
@@ -62,14 +64,19 @@ async def law_comprehend(interaction:discord.Interaction,law:str)->None:
     try:
         envelope=await ENGINE.authoritative_action(
             "law.comprehend",interaction.user.id,
-            {"law":law},
+            {"law":law,"spend_insight":bool(spend_insight)},
             action_id=f"discord:{interaction.id}:law.comprehend:{law}",
         )
     except GameEngineError as exc:
-        await interaction.response.send_message(f"Law comprehension could not resolve: {exc}",ephemeral=False);return
+        message=str(exc)
+        if "Insight XP" in message:
+            message+=" Insight XP comes from exploring, quests, battles and the Refine stance (**/cultivation → Cultivate → Stance**)."
+        await interaction.response.send_message(f"Law comprehension could not resolve: {message}",ephemeral=False);return
     result=dict(envelope.get("result") or {})
     roll=SimpleNamespace(**dict(result.get("roll") or {}))
     legacy_note=f"\n☸️ Soul Legacy Law Echo: **+{int(result.get('legacy_bonus',0))}** to the comprehension check." if int(result.get('legacy_bonus',0)) else ""
+    if int(result.get('insight_spent',0)):
+        legacy_note+=f"\n💡 You put **{int(result['insight_spent'])} Insight XP** into it: **+{int(result.get('insight_bonus',0))}** to the check."
     await interaction.response.send_message(
         f"⚖️ **{result.get('name',definition['name'])}**\n{roll_line(roll)}{legacy_note}\n"
         f"Comprehension **+{int(result.get('gain',0))}%** → **{int(result.get('comprehension',0))}%**\n"
@@ -159,7 +166,7 @@ async def manual_list(interaction:discord.Interaction)->None:
     if not c:return
     rows=await DB.get_manuals(interaction.user.id)
     if not rows:
-        await interaction.response.send_message("You have not learned a cultivation manual yet. Acquire a manual item, then use **/cultivation → Manuals & Techniques → Study**.",ephemeral=False);return
+        await interaction.response.send_message("You have not learned a cultivation manual yet. Acquire a manual item, then use **/cultivation → Arts → Study**.",ephemeral=False);return
     lines=[f"📚 **Cultivation Manuals — {c['name']}**"]
     for row in rows:
         m=WORLD.manual_definition(str(row['manual_id'])) or {}

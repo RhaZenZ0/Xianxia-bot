@@ -26,7 +26,7 @@ class SectEntryManualBoundaryTests(unittest.TestCase):
     def test_the_reply_tells_the_player_when_they_can_study_it(self):
         source = bot_function_source("sect_recruitment_trial")
         self.assertIn("min_realm_index", source)
-        self.assertIn("Manuals & Techniques", source)
+        self.assertIn("/cultivation → Arts → Study", source)
 
     def test_the_engine_grants_inside_the_trial_transaction(self):
         start = GO.index("func sectTrialActionGo(")

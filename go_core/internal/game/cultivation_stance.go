@@ -57,6 +57,44 @@ func stanceDefinition(key string) (cultivationStanceDefinition, bool) {
 }
 
 func cultivationStanceKey(userID int64) string { return fmt.Sprintf("cultivation_stance:%d", userID) }
+
+// The moment seized (v1.0.0-rc.4): a failed breakthrough leaves the stage's
+// essence full in memory for one more roll, bought with Insight XP, once a
+// stage. The last failure and the reroll spent live under the player's id.
+func cultivationLastFailKey(userID int64) string {
+	return fmt.Sprintf("cultivation_last_fail:%d", userID)
+}
+func cultivationRerollKey(userID int64) string { return fmt.Sprintf("cultivation_reroll:%d", userID) }
+
+// insightRerollCost is the Insight XP a seized moment costs: three at the
+// mortal realms, two more a realm, forty at most.
+func insightRerollCost(realmIndex int64) int64 {
+	return minI64(40, 3+2*maxI64(0, realmIndex))
+}
+
+// rerollState says whether the moment can be seized at this stage: the last
+// breakthrough here failed and no reroll was spent here yet.
+func rerollState(conn *storage.Conn, userID, realm, phase int64) (available bool, err error) {
+	fail, err := readWorldStateMap(conn, cultivationLastFailKey(userID))
+	if err != nil {
+		return false, err
+	}
+	if fail == nil || storage.ParseInt(fail["realm_index"]) != realm || storage.ParseInt(fail["stage"]) != phase {
+		return false, nil
+	}
+	used, err := readWorldStateMap(conn, cultivationRerollKey(userID))
+	if err != nil {
+		return false, err
+	}
+	if used != nil && storage.ParseInt(used["realm_index"]) == realm && storage.ParseInt(used["stage"]) == phase {
+		return false, nil
+	}
+	return true, nil
+}
+
+// rollOdds is the chance in a hundred of any 2d10 check - every roll map
+// carries it, so a result can say what the odds were beside what fell.
+func rollOdds(modifier, tn int64) int64 { return breakthroughOdds(modifier, tn) }
 func cultivationInsightKey(userID int64) string {
 	return fmt.Sprintf("cultivation_insight:%d", userID)
 }
@@ -367,6 +405,14 @@ func cultivationStatusQuery(conn *storage.Conn, catalog worlddata.Catalog, userI
 	if err != nil {
 		return nil, err
 	}
+	placeName, placeMult, err := placeCultivationMultiplier(conn, catalog, userID, c.Location, gameMinute)
+	if err != nil {
+		return nil, err
+	}
+	rerollAvailable, err := rerollState(conn, userID, c.RealmIndex, c.Phase)
+	if err != nil {
+		return nil, err
+	}
 	odds := cultivationOddsResult(c, catalog, mods, false, perfect)
 	result := map[string]any{
 		"realm_index": c.RealmIndex, "realm": realmName(catalog.Realms, c.RealmIndex), "stage": c.Phase, "world": realmWorld(catalog.Realms, c.RealmIndex),
@@ -382,6 +428,8 @@ func cultivationStatusQuery(conn *storage.Conn, catalog worlddata.Catalog, userI
 		"effect_mult": mulOrOne(mods, "cultivation_gain"), "soul_mult": soulMult, "era_name": eraName, "era_mult": eraMult,
 		"manor_name": manorName, "manor_mult": manorMult, "storm_bonus": storm,
 		"insight_xp_per_refine": refineInsightXPPerSession, "force_deviation_percent": forceDeviationChancePercent,
+		"place_name": placeName, "place_mult": placeMult, "place_quality": placeQuality(placeMult),
+		"reroll_available": rerollAvailable, "reroll_cost": insightRerollCost(c.RealmIndex), "law_insight_cost": lawInsightSpendCost,
 	}
 	if c.BodyRealmIndex >= 0 && c.BodyRealmIndex < int64(len(catalog.BodyRealms)) {
 		bodyCost, err := phaseCost(catalog.BodyRealms, c.BodyRealmIndex, c.BodyPhase)

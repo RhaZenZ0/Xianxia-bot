@@ -6,6 +6,19 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.0** (rc.4) finishes the cultivation system: the place, the spending and the pages. Where a
+cultivator sits is worth something the engine prices - a road-side shrine, a city's temple quarter,
+a sect gate, a residence chamber, a deployed array - and the Here line, the session's result and the
+sheet all name the ground and its rate. Insight XP, which accrued almost everywhere and was spent
+almost nowhere, now buys two things besides the realm gate: a seized moment, one more roll after a
+failed breakthrough at the same stage, once a stage, without asking for the stage's essence again;
+and a bonus on a Law comprehension (`/law comprehend` with `spend_insight`). The cultivation hub's
+ten pages named after commands become four named after the work - Cultivate, Body, Path, Arts - with
+every action still one tap in; a hub page may now gather several roots, and a gathered page names
+its rows in full (`Law Status` beside `Aptitude Status`). And every 2d10 roll in the game prints the
+chance it had beside what fell, so a failure reads as unlucky or hopeless rather than arbitrary. No
+schema change.
+
 **1.0.0** (rc.3) is a better cultivation system and menu. The main menu is four rows of four -
 You, World, Doing, Home - under a header of live facts (where you stand, your realm and stage with
 the essence, the trade offers waiting), with Begin when there is no character and Back to the hub
@@ -116,10 +129,11 @@ mechanical authority paths.
 
 ## Release status — v1.0.0
 
-- Current release: v1.0.0 (rc.3): the menu as four rows of four under live facts; the cultivation
-  sheet; meditation stances; the odds of a breakthrough shown; the realm gate with its banked
-  insight. Tagged `v1.0.0-rc.3` on the beta channel; the NAS drills and two quiet weeks make it
-  `v1.0.0`.
+- Current release: v1.0.0 (rc.4): the ground a cultivator sits on priced and named; Insight XP spent
+  on a seized moment and on Laws; the cultivation hub as four pages; every roll printing its chance.
+  Tagged `v1.0.0-rc.4` on the beta channel; the NAS drills and two quiet weeks make it `v1.0.0`.
+- v1.0.0 (rc.3): the menu as four rows of four under live facts; the cultivation sheet; meditation
+  stances; the odds of a breakthrough shown; the realm gate with its banked insight.
 - v1.0.0 (rc.2): the realm rotation visible on the dashboard, in `/realm` and in the rumours; the
   trades on the dashboard with an audited void; narration of the road-side sites' own; the
   forty-three local floors with prose of their own.

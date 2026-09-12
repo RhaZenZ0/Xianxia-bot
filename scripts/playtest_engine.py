@@ -535,7 +535,22 @@ async def run(url: str, token: str, db_path: str) -> Report:
         await step(report, "cultivation.insight is refused short of XP", act("cultivation.insight", PLAYER, {}), expect_error="Insight XP")
     await step(report, "cultivation.stance back to circulate", act("cultivation.stance", PLAYER, {"stance": "circulate"}))
 
-    # ---- 14. backups -------------------------------------------------------
+    # ---- 14. the ground, and Insight XP spent (v1.0.0-rc.4) -----------------
+    shrine = next((n for n, l in locations.items() if l.get("road_site") == "shrine"), "")
+    report.add("PASS" if shrine else "FAIL", "the roads keep a shrine", shrine or "none")
+    if shrine:
+        await step(report, "teleport to the shrine", gm("admin.player.teleport", {"user_id": PLAYER, "location": shrine, "reason": "playtest"}))
+        at_shrine = dict(await engine.action("cultivation.status", PLAYER, {}) or {})
+        report.add("PASS" if float(at_shrine.get("place_mult") or 0) > 1.0 and at_shrine.get("place_name") else "FAIL",
+                   "the shrine is richer ground than open country", f"{at_shrine.get('place_name')} x{at_shrine.get('place_mult')} ({at_shrine.get('place_quality')})")
+        await step(report, "clear the meditation cooldown", gm("admin.player.reset_cooldowns", {"user_id": PLAYER, "reason": "playtest"}))
+        session = await step(report, "cultivation.train at the shrine", act("cultivation.train", PLAYER, {"cooldown_seconds": 1}))
+        if session is not None and not (float(session.get("place_mult") or 0) > 1.0):
+            report.add("FAIL", "the session is worked at the shrine's rate", f"{session.get('place_mult')}")
+    await step(report, "a moment nobody failed cannot be seized", act("cultivation.breakthrough", PLAYER, {"reroll": True}), expect_error="no moment to seize")
+    await step(report, "putting insight into a Law needs the realm for it", act("law.comprehend", PLAYER, {"law": "fire", "spend_insight": True}), expect_error="realm")
+
+    # ---- 15. backups -------------------------------------------------------
     backup = await step(report, "create a backup", transport.create_backup())
     listed = await step(report, "list backups", transport.list_backups())
     if backup and listed is not None and not any(row.get("name") == backup.get("name") for row in listed):

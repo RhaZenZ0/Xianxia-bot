@@ -289,7 +289,7 @@ def serialized_user_action(func):
                     await interaction.response.send_message(
                         f"🔒 You are in **closed-door seclusion** ({str(seclusion['mode']).upper()}). "
                         f"About **{remaining / MINUTES_PER_DAY:.1f} world-days** remain. "
-                        "Use **/cultivation → Seclusion → End** to leave early before taking other actions.",
+                        "Use **/cultivation → Cultivate → End** to leave early before taking other actions.",
                         ephemeral=False,
                     )
                     return None

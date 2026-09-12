@@ -302,7 +302,7 @@ async def sheet(interaction: discord.Interaction) -> None:
                 f"Quests {body_perfection['completed_quests']}/{WORLD.body_perfection_quest_count()} • use **/quest → Body Perfection → Info**"
             )
         else:
-            body_perfect_text = "Body Stage 9 choice unlocked: **/quest → Body Perfection → Start** or **/cultivation → Body Cultivation → Breakthrough**."
+            body_perfect_text = "Body Stage 9 choice unlocked: **/quest → Body Perfection → Start** or **/cultivation → Body → Breakthrough**."
         embed.add_field(name="Body Perfection", value=body_perfect_text, inline=False)
 
     embed.add_field(

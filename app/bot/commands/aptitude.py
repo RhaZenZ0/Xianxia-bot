@@ -193,7 +193,7 @@ async def aptitude_awaken(interaction: discord.Interaction, target: app_commands
         + (
             f"The {target.name.lower()} awakens successfully. State: **{state.title()}**."
             if bool(getattr(roll, "success", False))
-            else "Awakening failed. The persistent backlash has been recorded; use **/cultivation → Aptitudes → harmonize** before rejection or instability becomes severe."
+            else "Awakening failed. The persistent backlash has been recorded; use **/cultivation → Path → Harmonize** before rejection or instability becomes severe."
         )
     )
 

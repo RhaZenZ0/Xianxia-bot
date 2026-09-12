@@ -159,8 +159,15 @@ _missing_action_roots = sorted(_MIGRATED_ROOTS - set(_ROOT_ACTIONS))
 if _missing_action_roots:
     raise RuntimeError(f"Command registry lost action roots: {_missing_action_roots}")
 
-def _hub_page(root: str, label: str, description: str) -> HubPage:
-    return HubPage(key=root, label=label, description=description, command=_ROOT_ACTIONS[root])
+def _hub_page(root: str, label: str, description: str, *extra_roots: str) -> HubPage:
+    """One page of a hub. Extra roots (v1.0.0-rc.4) are gathered onto the same
+    page, so a page can be a thing you are doing rather than one command's
+    name; the page keeps the first root's key, which hint paths, the playtest
+    checklist and the emoji map resolve against."""
+    return HubPage(
+        key=root, label=label, description=description, command=_ROOT_ACTIONS[root],
+        extras=tuple(_ROOT_ACTIONS[name] for name in extra_roots),
+    )
 
 
 _HUB_DEFINITIONS = (
@@ -204,18 +211,16 @@ _HUB_DEFINITIONS = (
     HubDefinition(
         name="cultivation",
         title="🧘 Cultivation Hub",
-        description="The cultivation sheet: meditation and its stance, the realm-gate insight, seclusion, body cultivation, aptitudes, Laws, manuals and concealment.",
+        description="The cultivation sheet, and four pages for what you are doing: meditate, temper the body, walk the path, practise the arts.",
         pages=(
-            _hub_page("cultivate", "Meditation", "Gather cultivation essence under your stance."),
-            _hub_page("stance", "Stance", "Circulate, Refine or Force: how every session gathers, what it banks and what it risks."),
-            _hub_page("insight", "Insight", "Spend Insight XP to bank the insight that opens the next realm gate."),
-            _hub_page("seclusion", "Seclusion", "Start, inspect or end closed-door cultivation."),
-            _hub_page("body", "Body Cultivation", "Parallel body-cultivation progression."),
-            _hub_page("aptitude", "Aptitudes", "Roots, bloodlines, physiques and aptitude progression."),
-            _hub_page("law", "Laws", "Comprehend and wield Laws."),
-            _hub_page("manual", "Manuals & Techniques", "Study manuals and use learned techniques."),
-            _hub_page("conceal", "Concealment", "Toggle cultivation-aura concealment."),
-            _hub_page("profession", "Profession", "Cultivation-profession mastery status."),
+            # Four pages, grouped by what you are doing (v1.0.0-rc.4). Ten
+            # pages named after commands became four named after the work:
+            # every action is still here, one tap further in at most.
+            _hub_page("cultivate", "Cultivate", "Meditate under your stance, choose the stance, bank a realm-gate insight, break through, or close the doors for a seclusion.",
+                      "stance", "insight", "breakthrough", "seclusion"),
+            _hub_page("body", "Body", "The parallel body path: temper it, inspect it and break through its stages."),
+            _hub_page("aptitude", "Path", "What you were born with and what you comprehend: roots, bloodlines, physiques, and the Laws.", "law"),
+            _hub_page("manual", "Arts", "Manuals and techniques, profession mastery, and the concealment of your aura.", "profession", "conceal"),
         ),
     ),
     HubDefinition(

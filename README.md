@@ -246,7 +246,9 @@ that says where you stand, your realm and stage with the essence, and what is wa
 offer at the inn), with Begin when there is no character yet and Back to the hub you left
 (v1.0.0-rc.3); `/me` opens the player dashboard. Each hub — character,
 cultivation, world, travel, craft, realm, items, combat, economy, inner world, beast, abode, family,
-quest, sect, NPCs — is a live panel with one visible, tappable row per action, guided inputs for
+quest, sect, NPCs — is a live panel with one visible, tappable row per action. A hub's pages are
+named after the work rather than the commands: the cultivation hub is Cultivate, Body, Path and
+Arts (v1.0.0-rc.4), and a page that gathers several commands names its rows in full, guided inputs for
 every parameter (every id has a picker), owner locking and a refresh. One message is the whole GUI
 (v0.40.0): every panel's Menu button swaps it into the menu in place and the menu opens any hub in
 the same message. A plain result is shown inside the panel, in a result block above the actions,
@@ -282,8 +284,13 @@ Meditation has a stance the engine keeps and applies to every session - Circulat
 gain, Refine for a fifth less and two Insight XP banked a session, Force for a third more and a
 fifteen-in-a-hundred qi deviation that is a real condition to treat. A breakthrough shows its odds
 before the roll. Stage 9 into a new realm is a gate: it opens to an insight banked from Insight XP
-(**/cultivation → Insight**; five at the mortal gate, five more a realm) or to a completed Realm
-Perfection, and the insight is spent on the crossing. A sect is joined through an entrance trial before its examiner; every
+(**/cultivation → Cultivate → Insight**; five at the mortal gate, five more a realm) or to a completed Realm
+Perfection, and the insight is spent on the crossing. Where you sit is worth something too
+(v1.0.0-rc.4): a road-side shrine, a temple quarter, a sect gate, your own chamber or a deployed
+array all gather faster, and the Here line, the result and the sheet name the ground and its rate.
+Insight XP buys more than the gate: a seized moment is one more roll after a failed breakthrough at
+the same stage, once a stage, and `spend_insight` puts it into a Law comprehension. Every 2d10 roll
+prints the chance it had beside what fell. A sect is joined through an entrance trial before its examiner; every
 public sect bestows its own entry manual on passing, chosen inside the trial transaction, and the
 sect residence grows facility by facility with contribution points. A manual is an item, studied
 through the engine, which enforces its realm requirement; the whole 160-manual catalogue is content.

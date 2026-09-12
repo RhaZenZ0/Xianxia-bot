@@ -367,9 +367,17 @@ type TechniqueSystemDefinition struct {
 	Techniques map[string]ManualTechniqueDefinition `json:"techniques"`
 }
 
+type SectRecruitment struct {
+	Location string `json:"location"`
+	Examiner string `json:"examiner"`
+}
+
 type SectDefinition struct {
 	Alignment string `json:"alignment"`
 	Hidden    bool   `json:"hidden"` // the Heaven-Devouring Demon Sect: no public trial, no entry manual
+	// Recruitment (v1.0.0-rc.4) names the sect gate - where the trial is
+	// held - so the engine knows a gate when a cultivator meditates at one.
+	Recruitment SectRecruitment `json:"recruitment"`
 	// Karma gates and cell names for a hidden sect (v0.23.0). Only the
 	// Heaven-Devouring Demon Sect carries these today; a public sect leaves
 	// them zero and Branches empty.

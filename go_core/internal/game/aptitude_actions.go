@@ -273,7 +273,7 @@ func roll2d10(modifier, tn int64) (map[string]any, error) {
 	case margin >= -7:
 		degree = "Hard Failure"
 	}
-	return map[string]any{"die1": a, "die2": b, "modifier": modifier, "tn": tn, "total": total, "margin": margin, "success": total >= tn, "degree": degree}, nil
+	return map[string]any{"die1": a, "die2": b, "modifier": modifier, "tn": tn, "total": total, "margin": margin, "success": total >= tn, "degree": degree, "probability": rollOdds(modifier, tn)}, nil
 }
 func boolResult(r map[string]any) bool    { v, _ := r["success"].(bool); return v }
 func resultMargin(r map[string]any) int64 { return storage.ParseInt(r["margin"]) }

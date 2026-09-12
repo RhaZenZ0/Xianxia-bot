@@ -17,6 +17,9 @@ type cultivationActionPayload struct {
 	GameMinute      int64 `json:"game_minute"`
 	CooldownSeconds int64 `json:"cooldown_seconds"`
 	Confirm         bool  `json:"confirm"`
+	// Reroll (v1.0.0-rc.4): seize the moment after a failed breakthrough at
+	// this stage - one more roll for Insight XP, once a stage, qi path only.
+	Reroll bool `json:"reroll"`
 }
 
 type timeCultivationModifiers struct {
@@ -265,13 +268,19 @@ func cultivationTrain(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 	attempted := int64(math.Round(float64(base+resonance) * timeMult * effectMult * soulMult * eraMult * stance.GainMult))
 	manorName := ""
 	manorMult := 1.0
+	placeName := ""
+	placeMult := 1.0
 	storm := int64(0)
 	if !body {
 		manorName, manorMult, err = manorCultivationMultiplier(conn, userID, c.Location)
 		if err != nil {
 			return authoritativeMutation{}, err
 		}
-		attempted = int64(math.Round(float64(attempted) * manorMult))
+		placeName, placeMult, err = placeCultivationMultiplier(conn, catalog, userID, c.Location, p.GameMinute)
+		if err != nil {
+			return authoritativeMutation{}, err
+		}
+		attempted = int64(math.Round(float64(attempted) * manorMult * placeMult))
 		storm, err = qiStormBonus(conn, c.Location, now)
 		if err != nil {
 			return authoritativeMutation{}, err
@@ -334,7 +343,7 @@ func cultivationTrain(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 		return authoritativeMutation{}, err
 	}
 	total := current + gain
-	payload := map[string]any{"mode": map[bool]string{true: "body", false: "qi"}[body], "gain": gain, "attempted_gain": attempted, "total": total, "cost": cost, "base_gain": base, "resonance_bonus": resonance, "period": tm.Period, "season": tm.Season, "time_mult": timeMult, "root_resonance": tm.RootResonance, "effect_mult": effectMult, "soul_mult": soulMult, "era_name": eraName, "era_mult": eraMult, "manor_name": manorName, "manor_mult": manorMult, "storm_bonus": storm, "perfection_gain": pg, "ready": total >= cost, "stance": stance.Key, "stance_label": stance.Label, "stance_mult": stance.GainMult, "insight_xp_gain": insightGain, "deviation": deviation}
+	payload := map[string]any{"mode": map[bool]string{true: "body", false: "qi"}[body], "gain": gain, "attempted_gain": attempted, "total": total, "cost": cost, "base_gain": base, "resonance_bonus": resonance, "period": tm.Period, "season": tm.Season, "time_mult": timeMult, "root_resonance": tm.RootResonance, "effect_mult": effectMult, "soul_mult": soulMult, "era_name": eraName, "era_mult": eraMult, "manor_name": manorName, "manor_mult": manorMult, "storm_bonus": storm, "perfection_gain": pg, "ready": total >= cost, "stance": stance.Key, "stance_label": stance.Label, "stance_mult": stance.GainMult, "insight_xp_gain": insightGain, "deviation": deviation, "place_name": placeName, "place_mult": placeMult, "place_quality": placeQuality(placeMult)}
 	legacy, _ := json.Marshal(payload)
 	_, _ = conn.Execute(`INSERT INTO event_log(user_id,event_type,payload_json,created_at) VALUES(?,?,?,?)`, []any{userID, eventType, string(legacy), now})
 	return authoritativeMutation{Result: payload, Event: eventledger.Event{Domain: "cultivation", EventType: eventType, EntityType: "character", EntityID: fmt.Sprint(userID), GameMinute: p.GameMinute, Payload: payload}}, nil
@@ -501,7 +510,24 @@ func cultivationBreakthrough(conn *storage.Conn, catalog worlddata.Catalog, user
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
-	if current < cost {
+	reroll := p.Reroll && !body
+	rerollCost := insightRerollCost(realm)
+	if reroll {
+		available, err := rerollState(conn, userID, realm, phase)
+		if err != nil {
+			return authoritativeMutation{}, err
+		}
+		if !available {
+			return authoritativeMutation{}, errors.New("there is no moment to seize: the last breakthrough at this stage did not fail, or it was seized once already")
+		}
+		xp, err := readInsightXP(conn, userID)
+		if err != nil {
+			return authoritativeMutation{}, err
+		}
+		if xp < rerollCost {
+			return authoritativeMutation{}, fmt.Errorf("seizing the moment costs %d Insight XP; you have %d", rerollCost, xp)
+		}
+	} else if current < cost {
 		return authoritativeMutation{}, fmt.Errorf("need %d cultivation essence but have %d", cost, current)
 	}
 	if err = checkPerfectionChoice(conn, perfectionTable, userID, realm, phase, p.Confirm); err != nil {
@@ -556,6 +582,14 @@ func cultivationBreakthrough(conn *storage.Conn, catalog worlddata.Catalog, user
 	success := boolResult(roll)
 	failureLoss := maxI64(5, cost/10)
 	now := float64(time.Now().UnixNano()) / 1e9
+	if reroll {
+		if _, err = conn.Execute(`UPDATE characters SET insight_xp=insight_xp-?,updated_at=? WHERE user_id=?`, []any{rerollCost, now, userID}); err != nil {
+			return authoritativeMutation{}, err
+		}
+		if err = writeWorldStateMap(conn, cultivationRerollKey(userID), map[string]any{"realm_index": realm, "stage": phase, "game_minute": p.GameMinute}, now); err != nil {
+			return authoritativeMutation{}, err
+		}
+	}
 	vitalityGain := int64(0)
 	if success {
 		if body {
@@ -565,7 +599,10 @@ func cultivationBreakthrough(conn *storage.Conn, catalog worlddata.Catalog, user
 			}
 			_, err = conn.Execute(`UPDATE characters SET body_realm_index=?,body_phase=?,body_cultivation=body_cultivation-?,vitality_max=vitality_max+?,vitality=vitality_max+?,updated_at=? WHERE user_id=?`, []any{newRealm, newPhase, cost, vitalityGain, vitalityGain, now, userID})
 		} else {
-			_, err = conn.Execute(`UPDATE characters SET realm_index=?,phase=?,cultivation=cultivation-?,updated_at=? WHERE user_id=?`, []any{newRealm, newPhase, cost, now, userID})
+			_, err = conn.Execute(`UPDATE characters SET realm_index=?,phase=?,cultivation=MAX(0,cultivation-?),updated_at=? WHERE user_id=?`, []any{newRealm, newPhase, cost, now, userID})
+		}
+		if err == nil && !body {
+			_, err = conn.Execute(`DELETE FROM world_state WHERE key IN (?,?)`, []any{cultivationLastFailKey(userID), cultivationRerollKey(userID)})
 		}
 	} else {
 		col := "cultivation"
@@ -573,7 +610,20 @@ func cultivationBreakthrough(conn *storage.Conn, catalog worlddata.Catalog, user
 			col = "body_cultivation"
 		}
 		_, err = conn.Execute(fmt.Sprintf(`UPDATE characters SET %s=MAX(0,%s-?),updated_at=? WHERE user_id=?`, col, col), []any{failureLoss, now, userID})
+		if err == nil && !body {
+			err = writeWorldStateMap(conn, cultivationLastFailKey(userID), map[string]any{"realm_index": realm, "stage": phase, "game_minute": p.GameMinute}, now)
+		}
 	}
+	if err != nil {
+		return authoritativeMutation{}, err
+	}
+	rerollAvailable := false
+	if !success && !body {
+		if rerollAvailable, err = rerollState(conn, userID, realm, phase); err != nil {
+			return authoritativeMutation{}, err
+		}
+	}
+	xpLeft, err := readInsightXP(conn, userID)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -584,7 +634,7 @@ func cultivationBreakthrough(conn *storage.Conn, catalog worlddata.Catalog, user
 		}
 		insightSpent = true
 	}
-	result := map[string]any{"mode": map[bool]string{true: "body", false: "qi"}[body], "roll": roll, "success": success, "tn": tn, "modifier": modifier, "probability": probability, "realm_gate": newRealm != realm, "gate_via_insight": viaInsight, "insight_spent": insightSpent, "cost": cost, "failure_loss": failureLoss, "from_realm": realmName(realms, realm), "from_stage": phase, "to_realm": realmName(realms, newRealm), "to_stage": newPhase, "from_world": oldWorld, "to_world": newWorld, "perfect_bonus": perfectBonus, "resonance_bonus": resonance, "innate_breakthrough_bonus": innate, "vitality_gain": vitalityGain, "ascended": oldWorld != newWorld}
+	result := map[string]any{"mode": map[bool]string{true: "body", false: "qi"}[body], "roll": roll, "success": success, "tn": tn, "modifier": modifier, "probability": probability, "realm_gate": newRealm != realm, "gate_via_insight": viaInsight, "insight_spent": insightSpent, "reroll": reroll, "reroll_cost": rerollCost, "reroll_available": rerollAvailable, "insight_xp": xpLeft, "cost": cost, "failure_loss": failureLoss, "from_realm": realmName(realms, realm), "from_stage": phase, "to_realm": realmName(realms, newRealm), "to_stage": newPhase, "from_world": oldWorld, "to_world": newWorld, "perfect_bonus": perfectBonus, "resonance_bonus": resonance, "innate_breakthrough_bonus": innate, "vitality_gain": vitalityGain, "ascended": oldWorld != newWorld}
 	if success {
 		legacy, err := awakenSoulMemoryGo(conn, userID, map[bool]int64{true: 4, false: 5}[body], now)
 		if err != nil {

@@ -58,6 +58,8 @@ async def cultivation_status_fields(interaction: discord.Interaction, *, fallbac
     odds_line = f"**{int(odds.get('probability', 0))}%** (2d10 {int(odds.get('modifier', 0)):+d} vs TN {int(odds.get('tn', 0))})"
     if movers:
         odds_line += f"\n-# {movers}"
+    if status.get("reroll_available"):
+        odds_line += f"\n🎯 A moment to seize: one more roll for **{int(status.get('reroll_cost', 0))} Insight XP**"
     if status.get("ceiling"):
         odds_line = "At the ceiling of this path."
     elif status.get("realm_gate"):
@@ -68,6 +70,8 @@ async def cultivation_status_fields(interaction: discord.Interaction, *, fallbac
     today = f"{status.get('period') or 'Day'} **x{float(status.get('time_mult', 1)):.2f}** • {status.get('season') or ''}"
     if status.get("root_resonance"):
         today += " 🌿"
+    if str(status.get("place_name") or ""):
+        today += f"\n🪨 {status.get('place_name')} — {status.get('place_quality') or 'ordinary'} ground **x{float(status.get('place_mult', 1)):.2f}**"
     extras = []
     if float(status.get("effect_mult", 1)) != 1.0:
         extras.append(f"effects x{float(status.get('effect_mult', 1)):.2f}")
