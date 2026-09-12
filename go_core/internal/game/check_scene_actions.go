@@ -113,7 +113,7 @@ func canonicalAttribute(conn *storage.Conn, catalog worlddata.Catalog, userID, g
 	}
 	if len(br.Rows) > 0 {
 		id, state := fmt.Sprint(br.Rows[0][0]), fmt.Sprint(br.Rows[0][1])
-		stage, rejection := int(storage.ParseInt(br.Rows[0][2])), int(storage.ParseInt(br.Rows[0][3]))
+		stage, rejection := intFromDB(br.Rows[0][2]), intFromDB(br.Rows[0][3])
 		if def, ok := catalog.Bloodlines[id]; ok {
 			if (state == "awakened" || state == "evolved" || state == "mutated") && len(def.Evolutions) > 0 {
 				if stage < 1 {
@@ -141,7 +141,7 @@ func canonicalAttribute(conn *storage.Conn, catalog worlddata.Catalog, userID, g
 	}
 	if len(pr.Rows) > 0 {
 		id, state := fmt.Sprint(pr.Rows[0][0]), fmt.Sprint(pr.Rows[0][1])
-		stage, instability := int(storage.ParseInt(pr.Rows[0][2])), int(storage.ParseInt(pr.Rows[0][3]))
+		stage, instability := intFromDB(pr.Rows[0][2]), intFromDB(pr.Rows[0][3])
 		if id != "ordinary_mortal_body" && (state == "awakened" || state == "evolved") {
 			if def, ok := catalog.Physiques[id]; ok {
 				if len(def.Evolutions) > 0 {

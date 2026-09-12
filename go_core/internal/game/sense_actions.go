@@ -88,7 +88,7 @@ func senseExtraModifier(conn *storage.Conn, catalog worlddata.Catalog, userID, g
 	}
 	if len(br.Rows) > 0 {
 		id, state := fmt.Sprint(br.Rows[0][0]), fmt.Sprint(br.Rows[0][1])
-		stage := int(storage.ParseInt(br.Rows[0][2]))
+		stage := intFromDB(br.Rows[0][2])
 		if def, ok := catalog.Bloodlines[id]; ok && (state == "awakened" || state == "evolved" || state == "mutated") && len(def.Evolutions) > 0 {
 			if stage < 1 {
 				stage = 1
@@ -112,7 +112,7 @@ func senseExtraModifier(conn *storage.Conn, catalog worlddata.Catalog, userID, g
 	}
 	if len(pr.Rows) > 0 {
 		id, state := fmt.Sprint(pr.Rows[0][0]), fmt.Sprint(pr.Rows[0][1])
-		stage := int(storage.ParseInt(pr.Rows[0][2]))
+		stage := intFromDB(pr.Rows[0][2])
 		if id != "ordinary_mortal_body" && (state == "awakened" || state == "evolved") {
 			if def, ok := catalog.Physiques[id]; ok {
 				if len(def.Evolutions) > 0 {

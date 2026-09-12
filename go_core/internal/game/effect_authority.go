@@ -438,7 +438,7 @@ func canonicalAdditiveEffectBonus(
 	if len(res.Rows) > 0 {
 		id := fmt.Sprint(res.Rows[0][0])
 		state := strings.TrimSpace(fmt.Sprint(res.Rows[0][1]))
-		stage := int(storage.ParseInt(res.Rows[0][2]))
+		stage := intFromDB(res.Rows[0][2])
 		if definition, ok := catalog.Bloodlines[id]; ok &&
 			(state == "awakened" || state == "evolved" || state == "mutated") &&
 			len(definition.Evolutions) > 0 {
@@ -462,7 +462,7 @@ func canonicalAdditiveEffectBonus(
 	if len(res.Rows) > 0 {
 		id := fmt.Sprint(res.Rows[0][0])
 		state := strings.TrimSpace(fmt.Sprint(res.Rows[0][1]))
-		stage := int(storage.ParseInt(res.Rows[0][2]))
+		stage := intFromDB(res.Rows[0][2])
 		if id != "ordinary_mortal_body" && (state == "awakened" || state == "evolved") {
 			if definition, ok := catalog.Physiques[id]; ok {
 				if len(definition.Evolutions) > 0 {

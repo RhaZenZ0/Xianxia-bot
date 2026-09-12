@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
@@ -187,6 +188,25 @@ func clamp(v, lo, hi int64) int64 {
 	return v
 }
 func i64(v any) int64 { return storage.ParseInt(v) }
+
+// intFromDB narrows a number read out of SQLite to the `int` the aptitude,
+// bloodline and physique structs store. Every one of them is a small game
+// value - a purity, a stage, a progress - but the column it came from is a
+// 64-bit integer, and narrowing one blindly truncates on a 32-bit build. A
+// bounds check that a truncated value sails through is worse than no bounds
+// check at all, so the value is clamped into range before it is converted.
+func intFromDB(v any) int { return narrowToInt(storage.ParseInt(v)) }
+
+// narrowToInt is the one place in this package an int64 becomes an int.
+func narrowToInt(v int64) int {
+	if v > math.MaxInt {
+		return math.MaxInt
+	}
+	if v < math.MinInt {
+		return math.MinInt
+	}
+	return int(v)
+}
 
 type relationshipPayload struct {
 	NPCName   string `json:"npc_name"`
