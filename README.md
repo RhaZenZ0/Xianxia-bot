@@ -498,6 +498,22 @@ release; it never installs anything. On the NAS:
 
 `RELEASE_MANIFEST.sha256` inside the tree proves an unpacked release is intact; `update.sh` checks it.
 
+An upgrade never touches your `.env` — that is where the tokens are. So when a release adds a key,
+`update.sh` stops before it changes anything and says the `.env` is incomplete. Rebuild it on the
+new template instead of diffing the two by hand:
+
+```bash
+./migrate_env.sh --dry-run      # what would change: new keys, retired keys, nothing written
+./migrate_env.sh                # rebuild .env on the new .env.example, keeping every value you set
+```
+
+The new `.env.example` supplies the shape — its keys, order, comments and sections — and your old
+`.env` supplies the values. New keys arrive at the release default; a key the release no longer
+ships is kept at the end of the file rather than dropped. The previous file stays beside it as
+`.env.bak.<timestamp>`, which holds the same tokens and is ignored by git, left out of release
+archives and the manifest, and preserved across the next upgrade. No value is ever printed, so the
+report is safe to paste into an issue.
+
 ### Health
 
 - Engine: `GET /livez`, `GET /readyz`, `GET /v1/db/status`.

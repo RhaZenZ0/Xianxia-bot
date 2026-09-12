@@ -525,7 +525,19 @@ if grep -q -- '--check-env' "$NEW_ROOT/startup.sh" 2>/dev/null; then
     echo "Checking .env against the requirements of $TARGET_VERSION..."
     if ! (cd "$NEW_ROOT" && sh ./startup.sh --check-env "$PROJECT_DIR/.env"); then
         echo "ERROR: The installed .env does not satisfy Xianxia RP $TARGET_VERSION (see above)." >&2
-        echo "       Edit $PROJECT_DIR/.env - compare it with the new .env.example in the package - and run the install again." >&2
+        # The usual cause is a key this release added, and the answer is almost
+        # never to retype the tokens: migrate_env.sh rebuilds .env on the new
+        # release's .env.example and carries every value already set across.
+        # It is named here because this message is where an operator is
+        # standing when they need it.
+        if [ -f "$NEW_ROOT/migrate_env.sh" ]; then
+            echo "       Most likely this release added a key. To rebuild .env on the new template," >&2
+            echo "       keeping the values you already set (a backup is written beside it):" >&2
+            echo "         sh $NEW_ROOT/migrate_env.sh --env $PROJECT_DIR/.env --template $NEW_ROOT/.env.example" >&2
+            echo "       Run it with --dry-run first to see what it would change." >&2
+        else
+            echo "       Edit $PROJECT_DIR/.env - compare it with the new .env.example in the package - and run the install again." >&2
+        fi
         echo "       Nothing was stopped or changed." >&2
         exit 1
     fi
@@ -536,7 +548,7 @@ INSTALL_TREE=$(mktemp -d "$PARENT_DIR/.xianxia-release-$TARGET_VERSION.XXXXXX")
 for item in "$NEW_ROOT"/* "$NEW_ROOT"/.[!.]* "$NEW_ROOT"/..?*; do
     [ -e "$item" ] || continue
     name=$(basename "$item")
-    case "$name" in .env|data|updates|update_backups) continue ;; esac
+    case "$name" in .env|.env.bak.*|data|updates|update_backups) continue ;; esac
     cp -a "$item" "$INSTALL_TREE/"
 done
 [ -f "$INSTALL_TREE/update.sh" ] && chmod +x "$INSTALL_TREE/update.sh" || true
@@ -560,7 +572,7 @@ echo "Creating code snapshot: $SNAPSHOT"
 for old_item in "$PROJECT_DIR"/* "$PROJECT_DIR"/.[!.]* "$PROJECT_DIR"/..?*; do
     [ -e "$old_item" ] || continue
     name=$(basename "$old_item")
-    case "$name" in .env|data|updates|update_backups) continue ;; esac
+    case "$name" in .env|.env.bak.*|data|updates|update_backups) continue ;; esac
     # Preserve custom update/backup trees even when they live under an unusual top-level directory.
     case "$UPDATES_DIR/" in "$old_item"/*) continue ;; esac
     case "$BACKUP_DIR/" in "$old_item"/*) continue ;; esac
@@ -614,7 +626,7 @@ restore_code() {
     for old_item in "$PROJECT_DIR"/* "$PROJECT_DIR"/.[!.]* "$PROJECT_DIR"/..?*; do
         [ -e "$old_item" ] || continue
         name=$(basename "$old_item")
-        case "$name" in .env|data|updates|update_backups) continue ;; esac
+        case "$name" in .env|.env.bak.*|data|updates|update_backups) continue ;; esac
         case "$UPDATES_DIR/" in "$old_item"/*) continue ;; esac
         case "$BACKUP_DIR/" in "$old_item"/*) continue ;; esac
         rm -rf "$old_item"
@@ -669,7 +681,7 @@ echo "Installing Xianxia RP $TARGET_VERSION..."
 for old_item in "$PROJECT_DIR"/* "$PROJECT_DIR"/.[!.]* "$PROJECT_DIR"/..?*; do
     [ -e "$old_item" ] || continue
     name=$(basename "$old_item")
-    case "$name" in .env|data|updates|update_backups|update.sh) continue ;; esac
+    case "$name" in .env|.env.bak.*|data|updates|update_backups|update.sh) continue ;; esac
     case "$UPDATES_DIR/" in "$old_item"/*) continue ;; esac
     case "$BACKUP_DIR/" in "$old_item"/*) continue ;; esac
     # A delete or copy that fails (a tree owned by another NAS account is the
@@ -682,7 +694,7 @@ done
 for item in "$INSTALL_TREE"/* "$INSTALL_TREE"/.[!.]* "$INSTALL_TREE"/..?*; do
     [ -e "$item" ] || continue
     name=$(basename "$item")
-    case "$name" in .env|data|updates|update_backups|update.sh) continue ;; esac
+    case "$name" in .env|.env.bak.*|data|updates|update_backups|update.sh) continue ;; esac
     cp -a "$item" "$PROJECT_DIR/" || { echo "ERROR: Could not copy $name into $PROJECT_DIR." >&2; exit 1; }
 done
 if [ -f "$INSTALL_TREE/update.sh" ]; then NEXT_UPDATER="$PROJECT_DIR/.update.sh.next"; cp -a "$INSTALL_TREE/update.sh" "$NEXT_UPDATER"; chmod +x "$NEXT_UPDATER"; fi

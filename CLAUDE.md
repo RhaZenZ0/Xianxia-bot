@@ -77,6 +77,10 @@ python -m app.dashboard   # optional
 ```
 
 Docker/QNAP: `./startup.sh` / `./stop.sh`. Reset the world (takes a safety backup first): `./reset_database.sh`.
+Rebuild `.env` on a new release's `.env.example`, keeping the values already set (an upgrade
+never edits `.env`, so a release that adds a key leaves the two to drift): `./migrate_env.sh`
+— `--dry-run` first. The backup it writes, `.env.bak.<timestamp>`, holds the same tokens and is
+excluded from git, the release archive, the manifest and the updater's delete loops.
 
 ## Architecture
 

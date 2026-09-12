@@ -5,6 +5,8 @@ __pycache__/
 .coverage
 htmlcov/
 .env
+# migrate_env.sh keeps the previous file beside it; it holds the same tokens.
+.env.bak.*
 *.zip
 data/
 .venv/
