@@ -126,6 +126,24 @@ class NarratorContextBuilder:
     def cache_stats(self) -> dict[str, dict[str, int]]:
         return self.rag.cache_stats()
 
+    async def _public_npc(self, name: str) -> dict:
+        """The public profile of an NPC: the world catalogue first, then the
+        cast of a running world event. Event NPCs are deliberately not in the
+        permanent catalogue, so without this a militia captain summoned by a
+        beast tide would reach the narrator as an anonymous local cultivator.
+        Nothing hidden is added - role, manner and stated want are what any
+        bystander in the scene would already know."""
+        public = (getattr(self.world, "npcs", {}) or {}).get(name, {}) or {}
+        if public:
+            return public
+        getter = getattr(self.db, "get_event_npc_definition", None)
+        if getter is None:
+            return {}
+        try:
+            return await getter(name) or {}
+        except Exception:
+            return {}
+
     async def build(
         self,
         character: dict[str, Any],
@@ -412,7 +430,7 @@ class NarratorContextBuilder:
             focus_row = None
             if effective_focus_npc:
                 focus_row = next((row for row in region_npcs if str(row.get("npc_name") or "").casefold() == effective_focus_npc.casefold()), None)
-                public = (getattr(self.world, "npcs", {}) or {}).get(effective_focus_npc, {}) or {}
+                public = await self._public_npc(effective_focus_npc)
                 role = public.get("role") or (focus_row or {}).get("profession") or "local cultivator"
                 activity = (focus_row or {}).get("activity") or "present in the scene"
                 faction = (focus_row or {}).get("faction") or public.get("faction") or public.get("sect_affiliation") or ""
@@ -434,7 +452,7 @@ class NarratorContextBuilder:
                 note = (state.get("npc_director_notes") or {}).get(effective_focus_npc) or {}
                 if note:
                     mind = dict(note.get("mind") or {})
-                    public = (getattr(self.world, "npcs", {}) or {}).get(effective_focus_npc, {}) or {}
+                    public = await self._public_npc(effective_focus_npc)
                     continuity: list[str] = []
                     if public.get("personality"):
                         continuity.append("personality " + _clip(public.get("personality"), 130))
@@ -457,7 +475,7 @@ class NarratorContextBuilder:
                     name = str(row.get("npc_name") or "").strip()
                     if not name:
                         continue
-                    public = (getattr(self.world, "npcs", {}) or {}).get(name, {}) or {}
+                    public = await self._public_npc(name)
                     role = public.get("role") or row.get("profession") or "local cultivator"
                     relationship = relationship_map.get(name)
                     rel = ""

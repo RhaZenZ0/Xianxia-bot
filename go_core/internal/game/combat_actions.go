@@ -900,7 +900,7 @@ func combatRecoveryItemAction(conn *storage.Conn, catalog worlddata.Catalog, use
 	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "combat", EventType: "recovery_item", EntityType: "battle", EntityID: fmt.Sprint(p.BattleID), GameMinute: p.GameMinute, Payload: out}}, nil
 }
 
-func combatFinalizeAction(conn *storage.Conn, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
+func combatFinalizeAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	var p combatFinalizePayload
 	if e := json.Unmarshal(raw, &p); e != nil {
 		return authoritativeMutation{}, e
@@ -975,13 +975,59 @@ func combatFinalizeAction(conn *storage.Conn, userID int64, raw json.RawMessage)
 		}
 		out["impacts"] = aftermath.Impacts
 	} else {
+		// An event battle now names a real member of the event's beast roster
+		// rather than an anonymous "hostile manifestation", and the source
+		// carries which one, so the kill takes that beast off the site and
+		// pays what the roster attached to it.
 		eventKey := strings.TrimPrefix(b.Source, "event:")
+		nodeKey := ""
+		if i := strings.Index(eventKey, "|node:"); i >= 0 {
+			nodeKey, eventKey = eventKey[i+len("|node:"):], eventKey[:i]
+		}
 		out["event_key"] = eventKey
-		state, recErr := recordWorldEventActionTx(conn, eventKey, userID, "battle_victory", "defend", b.NPCName, "combat", 0, 0, true, 4, 0, 2, 0, true, "Defeated an event-specific hostile manifestation during "+eventKey+".", p.GameMinute, now)
+		detail := "Defeated an event-specific hostile manifestation during " + eventKey + "."
+		contribution := int64(4)
+		if nodeKey != "" {
+			node, nodeErr := loadWorldEventNodeTx(conn, eventKey, nodeKey)
+			if nodeErr == nil {
+				took, remaining, depErr := depleteWorldEventNodeTx(conn, eventKey, nodeKey, now)
+				if depErr != nil {
+					return authoritativeMutation{}, depErr
+				}
+				out["node_key"] = nodeKey
+				out["node_name"] = node.Name
+				out["node_remaining"] = remaining
+				if took {
+					contribution += node.Contribution
+					detail = "Killed " + node.Name + " during " + eventKey + "."
+					reward := canonicalReward{Cultivation: node.Cultivation, SpiritStones: node.SpiritStones, Items: map[string]int64{}}
+					if node.ItemID != "" && node.ItemQty > 0 {
+						reward.Items[node.ItemID] = node.ItemQty
+					}
+					if reward.Cultivation != 0 || reward.SpiritStones != 0 || len(reward.Items) > 0 {
+						c, loadErr := loadMechanicsCharacter(conn, userID)
+						if loadErr != nil {
+							return authoritativeMutation{}, loadErr
+						}
+						awarded, rewardErr := applyCanonicalRewardTx(conn, catalog, userID, c, reward, "world_event_site_beast", now)
+						if rewardErr != nil {
+							return authoritativeMutation{}, rewardErr
+						}
+						out["node_cultivation"] = awarded
+						out["node_spirit_stones"] = reward.SpiritStones
+						out["node_items"] = reward.Items
+					}
+				}
+			}
+		}
+		state, recErr := recordWorldEventActionTx(conn, eventKey, userID, "battle_victory", "defend", b.NPCName, "combat", 0, 0, true, contribution, 0, 2, 0, true, detail, p.GameMinute, now)
 		if recErr != nil {
 			return authoritativeMutation{}, recErr
 		}
 		out["event_participation"] = state
+		if progress, progErr := worldEventSiteProgressTx(conn, eventKey); progErr == nil && len(progress) > 0 {
+			out["site"] = progress
+		}
 	}
 	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "combat", EventType: "battle_finalized", EntityType: "battle", EntityID: fmt.Sprint(b.BattleID), GameMinute: p.GameMinute, Payload: out}}, nil
 }

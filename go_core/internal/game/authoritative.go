@@ -100,6 +100,7 @@ var authoritativeMutations = map[string]bool{
 	"manual.technique":                true,
 	"crime.atone":                     true,
 	"world_event.act":                 true,
+	"world_event.engage":              true,
 	"auction.enter":                   true,
 	"auction.leave":                   true,
 	"auction.sell":                    true,
@@ -407,8 +408,6 @@ func applyAuthoritative(databasePath, worldPath string, req ActionRequest) (Acti
 			mutation, err = trueDeathAction(conn, req.ActorID, req.Payload)
 		case "combat.start":
 			mutation, err = combatStartAction(conn, req.ActorID, req.Payload)
-		case "combat.finalize":
-			mutation, err = combatFinalizeAction(conn, req.ActorID, req.Payload)
 		case "character.family_options":
 			mutation, err = birthFamilyOptionsAction(conn, req.ActorID, req.Payload)
 		case "character.create":
@@ -438,14 +437,14 @@ func applyAuthoritative(databasePath, worldPath string, req ActionRequest) (Acti
 			"cultivation.train", "cultivation.body_train", "cultivation.breakthrough", "cultivation.body_breakthrough",
 			"cultivation.stance", "cultivation.insight", "cultivation.manual",
 			"meridian.open", "meridian.heal", "qi.refine", "ghost.harvest", "ghost.appease", "alchemy.purge",
-			"lifecycle.reincarnate", "combat.turn", "combat.technique", "combat.recovery_item",
+			"lifecycle.reincarnate", "combat.turn", "combat.technique", "combat.recovery_item", "combat.finalize",
 			"perfection.start", "perfection.quest", "perfection.trial", "perfection.abandon",
 			"perfection.body_start", "perfection.body_quest", "perfection.body_trial", "perfection.body_abandon", "law.comprehend",
 			"law.technique", "sect.shadow", "condition.treat", "sense.inspect", "sense.conceal", "tribulation.prepare", "tribulation.attempt",
 			"exploration.explore", "exploration.event.act", "exploration.event.leave", "exploration.travel", "exploration.hunt",
 			"secret_realm.enter", "secret_realm.explore", "secret_realm.leave", "craft.resolve", "forage.resolve",
 			"beast.tame", "beast.feed", "beast.train", "beast.evolve", "beast.active", "artifact.bond", "artifact.awaken",
-			"pvp.challenge", "pvp.respond", "pvp.act", "manual.study", "manual.technique", "crime.atone", "world_event.act":
+			"pvp.challenge", "pvp.respond", "pvp.act", "manual.study", "manual.technique", "crime.atone", "world_event.act", "world_event.engage":
 			if strings.TrimSpace(worldPath) == "" {
 				return ActionResponse{}, errors.New("world catalog path is required")
 			}
@@ -574,8 +573,12 @@ func applyAuthoritative(databasePath, worldPath string, req ActionRequest) (Acti
 				mutation, err = manualTechniqueAction(conn, catalog, req.ActorID, req.Payload)
 			case "crime.atone":
 				mutation, err = crimeAtoneAction(conn, catalog, req.ActorID, req.Payload)
+			case "combat.finalize":
+				mutation, err = combatFinalizeAction(conn, catalog, req.ActorID, req.Payload)
 			case "world_event.act":
 				mutation, err = worldEventActAction(conn, catalog, req.ActorID, req.Payload)
+			case "world_event.engage":
+				mutation, err = worldEventEngageAction(conn, catalog, req.ActorID, req.Payload)
 			default:
 				err = fmt.Errorf("unsupported authoritative operation: %s", req.Operation)
 			}

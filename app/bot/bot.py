@@ -509,6 +509,10 @@ class XianxiaBot(commands.Bot):
                             if not guild: continue
                             impacts=[str(x) for x in list(event.get("impacts") or [])]
                             consequence=str(event.get("consequence_text") or "").strip()
+                            # How much is actually in the scene, so the call to
+                            # arms says what is waiting rather than only that
+                            # something happened.
+                            site_nodes=int(event.get("site_nodes") or 0)
                             await spawn_system_event_thread(
                                 guild,title=str(event.get("title") or "World Event"),event_type="random_event",
                                 event_key=str(event.get("event_key") or ""),expires_at=float(event.get("expires_at") or time.time()+7200),
@@ -516,6 +520,7 @@ class XianxiaBot(commands.Bot):
                                     f"⚡ **AUTONOMOUS WORLD EVENT — {event.get('title','World Event')}**\n📍 **{event.get('location','Unknown')}**\n{event.get('description','')}"
                                     + (f"\n\n**Persistent consequence:** {consequence}" if consequence else "")
                                     + (f"\n**Systems changed:** {'; '.join(impacts)}" if impacts else "")
+                                    + (f"\n**On site:** {site_nodes} things to fight, harvest or handle." if site_nodes else "")
                                 ),
                             )
                     if automation.get("maintenance_cleanup", True) and int(time.time()) % 3600 < 30:
