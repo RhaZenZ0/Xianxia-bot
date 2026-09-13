@@ -59822,5 +59822,1154 @@
     },
     "grade_bonus_per_rank": 0.02,
     "purity_bonus_at_full": 0.1
+  },
+  "event_sites": {
+    "tier_materials": {
+      "Mortal World": {
+        "herb": "spirit_herb",
+        "ore": "spirit_iron",
+        "core": "beast_core"
+      },
+      "Spiritual World": {
+        "herb": "moonveil_herb",
+        "ore": "spirit_crystal_ore",
+        "core": "beast_core"
+      },
+      "Immortal World": {
+        "herb": "dawnlotus_herb",
+        "ore": "immortal_gold_ore",
+        "core": "beast_core"
+      },
+      "Celestial World": {
+        "herb": "heavenpetal_herb",
+        "ore": "starsteel_ore",
+        "core": "beast_core"
+      }
+    },
+    "tier_rank": {
+      "Mortal World": 1,
+      "Spiritual World": 3,
+      "Immortal World": 5,
+      "Celestial World": 7
+    },
+    "default": {
+      "objective": "Find out what is actually happening here, and act on it.",
+      "nodes": [
+        {
+          "key": "investigate_site",
+          "type": "task",
+          "name": "Investigate the Disturbance",
+          "descriptor": "Somebody has to establish what this is before anybody can fix it.",
+          "count": [
+            2,
+            4
+          ],
+          "rank_bonus": 0,
+          "tn": 12,
+          "attribute": "insight",
+          "item": "",
+          "item_qty": 0,
+          "cultivation": 4,
+          "spirit_stones": 0,
+          "contribution": 2
+        },
+        {
+          "key": "disturbed_herb",
+          "type": "herb",
+          "name": "Disturbed Spirit-Herb",
+          "descriptor": "Knocked loose by whatever this is; still good in a satchel.",
+          "count": [
+            1,
+            4
+          ],
+          "rank_bonus": 0,
+          "tn": 12,
+          "attribute": "insight",
+          "item": "@herb",
+          "item_qty": 1,
+          "cultivation": 3,
+          "spirit_stones": 0,
+          "contribution": 1
+        },
+        {
+          "key": "agitated_beast",
+          "type": "beast",
+          "name": "Agitated Spirit Beast",
+          "descriptor": "It is not hunting. It is frightened, which is worse.",
+          "count": [
+            1,
+            3
+          ],
+          "rank_bonus": 0,
+          "tn": 13,
+          "attribute": "body",
+          "item": "@core",
+          "item_qty": 1,
+          "cultivation": 5,
+          "spirit_stones": 3,
+          "contribution": 2
+        }
+      ],
+      "npcs": [
+        {
+          "key": "witness",
+          "title": "Local Witness",
+          "role": "Saw it start and has been telling people since",
+          "personality": "Eager to be useful, embroiders slightly, corrects himself when pressed.",
+          "speech": "Runs on, doubles back, apologises for running on.",
+          "want": "Be taken seriously by someone who can act.",
+          "fear": "That nobody does anything.",
+          "descriptor": "A local who has clearly told this story eleven times and will tell it again."
+        },
+        {
+          "key": "passer",
+          "title": "Passing Cultivator",
+          "role": "Stopped because stopping was the right thing to do",
+          "personality": "Unbothered, competent, on the way somewhere else. Helps and does not linger.",
+          "speech": "Dry, economical, mildly amused.",
+          "want": "See this settled well enough to keep travelling.",
+          "fear": "Being drawn into something with no end.",
+          "descriptor": "A cultivator with a travel pack still on, assessing the situation from the road."
+        }
+      ]
+    },
+    "categories": {
+      "Beast Tide": {
+        "objective": "Break the tide before it reaches the walls.",
+        "nodes": [
+          {
+            "key": "charger",
+            "type": "beast",
+            "name": "Ironhorn Charger",
+            "descriptor": "Boars the size of carts, driven mad by whatever is behind them.",
+            "count": [
+              3,
+              7
+            ],
+            "rank_bonus": 0,
+            "tn": 13,
+            "attribute": "body",
+            "item": "@core",
+            "item_qty": 1,
+            "cultivation": 6,
+            "spirit_stones": 4,
+            "contribution": 2
+          },
+          {
+            "key": "packlord",
+            "type": "beast",
+            "name": "Ridge-Wolf Pack Leader",
+            "descriptor": "It does not charge with the rest. It waits, and it counts you.",
+            "count": [
+              1,
+              3
+            ],
+            "rank_bonus": 2,
+            "tn": 15,
+            "attribute": "body",
+            "item": "@core",
+            "item_qty": 2,
+            "cultivation": 10,
+            "spirit_stones": 8,
+            "contribution": 3
+          },
+          {
+            "key": "trampled_bed",
+            "type": "herb",
+            "name": "Trampled Spirit-Herb Bed",
+            "descriptor": "A season's growth flattened in a night; what survives is worth pulling now.",
+            "count": [
+              2,
+              5
+            ],
+            "rank_bonus": 0,
+            "tn": 11,
+            "attribute": "insight",
+            "item": "@herb",
+            "item_qty": 2,
+            "cultivation": 3,
+            "spirit_stones": 0,
+            "contribution": 1
+          },
+          {
+            "key": "wall_line",
+            "type": "task",
+            "name": "Hold the Wall Line",
+            "descriptor": "Stand in the gap while the militia rebuilds the barricade behind you.",
+            "count": [
+              2,
+              4
+            ],
+            "rank_bonus": 0,
+            "tn": 13,
+            "attribute": "body",
+            "item": "",
+            "item_qty": 0,
+            "cultivation": 4,
+            "spirit_stones": 6,
+            "contribution": 3
+          }
+        ],
+        "npcs": [
+          {
+            "key": "captain",
+            "title": "Militia Captain",
+            "role": "Holds the wall line while the tide comes in",
+            "personality": "Blunt, tired, counts heads before he counts glory. Treats cultivators as artillery he did not requisition.",
+            "speech": "Short sentences. Orders phrased as facts.",
+            "want": "Get every farmer behind the second gate before dark.",
+            "fear": "That the wall holds and the fields do not.",
+            "descriptor": "A militia captain with a voice gone hoarse, directing traffic through a gap in the barricade."
+          },
+          {
+            "key": "tamer",
+            "title": "Beast-Tamer",
+            "role": "Reads the tide and says what is driving it",
+            "personality": "Watchful, unhurried, more sympathetic to the beasts than to the town. Answers the question you should have asked.",
+            "speech": "Quiet, precise, fond of the exact species name.",
+            "want": "Learn what put the whole valley to flight.",
+            "fear": "That the thing behind the tide is still coming.",
+            "descriptor": "A beast-tamer crouched over churned mud, reading the tracks the way other people read a letter."
+          },
+          {
+            "key": "scout",
+            "title": "Wounded Scout",
+            "role": "Came back from the treeline; most did not",
+            "personality": "Rattled and trying not to show it. Gives more away than intended.",
+            "speech": "Fast, fragmentary, backtracks to correct herself.",
+            "want": "Be believed about what she saw at the ridge.",
+            "fear": "Being sent back out.",
+            "descriptor": "A scout with a field dressing on one arm, refusing to sit down."
+          }
+        ]
+      },
+      "Demon Invasion": {
+        "objective": "Break the invasion's spine before the array finishes.",
+        "nodes": [
+          {
+            "key": "soldier",
+            "type": "beast",
+            "name": "Blood-Rite Demon Soldier",
+            "descriptor": "Armour grown rather than forged, and it bleeds smoke.",
+            "count": [
+              4,
+              8
+            ],
+            "rank_bonus": 0,
+            "tn": 14,
+            "attribute": "body",
+            "item": "@core",
+            "item_qty": 1,
+            "cultivation": 8,
+            "spirit_stones": 6,
+            "contribution": 2
+          },
+          {
+            "key": "ritualist",
+            "type": "beast",
+            "name": "Demon Ritualist",
+            "descriptor": "It is not fighting you. It is finishing something.",
+            "count": [
+              1,
+              3
+            ],
+            "rank_bonus": 3,
+            "tn": 16,
+            "attribute": "spirit",
+            "item": "@core",
+            "item_qty": 2,
+            "cultivation": 12,
+            "spirit_stones": 10,
+            "contribution": 4
+          },
+          {
+            "key": "tainted_vein",
+            "type": "ore",
+            "name": "Corrupted Qi Vein",
+            "descriptor": "The ore is still good under the rot, if you cut fast.",
+            "count": [
+              2,
+              4
+            ],
+            "rank_bonus": 0,
+            "tn": 13,
+            "attribute": "insight",
+            "item": "@ore",
+            "item_qty": 1,
+            "cultivation": 4,
+            "spirit_stones": 0,
+            "contribution": 2
+          },
+          {
+            "key": "break_array",
+            "type": "task",
+            "name": "Break the Summoning Array",
+            "descriptor": "Every anchor stone you shatter is a demon that never arrives.",
+            "count": [
+              1,
+              3
+            ],
+            "rank_bonus": 0,
+            "tn": 15,
+            "attribute": "spirit",
+            "item": "",
+            "item_qty": 0,
+            "cultivation": 10,
+            "spirit_stones": 8,
+            "contribution": 4
+          }
+        ],
+        "npcs": [
+          {
+            "key": "commander",
+            "title": "Frontline Commander",
+            "role": "Runs the defence and spends what he has to",
+            "personality": "Cold arithmetic worn as calm. Has already decided what he is willing to lose.",
+            "speech": "Clipped, declarative, never repeats an order.",
+            "want": "Break the array before the second wave lands.",
+            "fear": "That the arithmetic was wrong.",
+            "descriptor": "A commander at a folding map table, moving markers that stand for people."
+          },
+          {
+            "key": "exorcist",
+            "title": "Sect Exorcist",
+            "role": "Knows what the ritual is for and how to unmake it",
+            "personality": "Severe, scholarly, faintly contemptuous of improvisation. Softens for anyone who asks a good question.",
+            "speech": "Formal, technical, uses the proper names for things.",
+            "want": "Unmake the summoning without leaving a seed of it behind.",
+            "fear": "That the rite is older than the sect's records.",
+            "descriptor": "An exorcist chalking counter-sigils, correcting one stroke three times."
+          },
+          {
+            "key": "survivor",
+            "title": "Surviving Villager",
+            "role": "Was here before the demons and intends to be here after",
+            "personality": "Stubborn, practical, grieving efficiently because there is no time for the other kind.",
+            "speech": "Plain, unhurried, occasionally very sharp.",
+            "want": "Find out which of the missing are dead.",
+            "fear": "That the answer is all of them.",
+            "descriptor": "A villager handing out water to soldiers, having lost the house behind her."
+          }
+        ]
+      },
+      "Demon Incident": {
+        "objective": "Cleanse the ground before the rite takes root.",
+        "nodes": [
+          {
+            "key": "possessed",
+            "type": "beast",
+            "name": "Possessed Villager",
+            "descriptor": "Someone's neighbour, wearing someone else's intent.",
+            "count": [
+              2,
+              5
+            ],
+            "rank_bonus": 0,
+            "tn": 12,
+            "attribute": "heart",
+            "item": "",
+            "item_qty": 0,
+            "cultivation": 5,
+            "spirit_stones": 3,
+            "contribution": 2
+          },
+          {
+            "key": "puppet",
+            "type": "beast",
+            "name": "Corpse-Puppet",
+            "descriptor": "Strung on death qi, and the strings go somewhere.",
+            "count": [
+              2,
+              4
+            ],
+            "rank_bonus": 0,
+            "tn": 13,
+            "attribute": "body",
+            "item": "@core",
+            "item_qty": 1,
+            "cultivation": 6,
+            "spirit_stones": 4,
+            "contribution": 2
+          },
+          {
+            "key": "ghost_lotus",
+            "type": "herb",
+            "name": "Blood-Fed Ghost Lotus",
+            "descriptor": "It grew fast on what was spilled here. Alchemists will not ask.",
+            "count": [
+              1,
+              4
+            ],
+            "rank_bonus": 0,
+            "tn": 14,
+            "attribute": "insight",
+            "item": "@herb",
+            "item_qty": 1,
+            "cultivation": 5,
+            "spirit_stones": 0,
+            "contribution": 2
+          },
+          {
+            "key": "cleanse",
+            "type": "task",
+            "name": "Cleanse the Ritual Ground",
+            "descriptor": "Scour the sigils out of the earth so nothing regrows in them.",
+            "count": [
+              1,
+              3
+            ],
+            "rank_bonus": 0,
+            "tn": 14,
+            "attribute": "spirit",
+            "item": "",
+            "item_qty": 0,
+            "cultivation": 8,
+            "spirit_stones": 6,
+            "contribution": 4
+          }
+        ],
+        "npcs": [
+          {
+            "key": "headman",
+            "title": "Village Headman",
+            "role": "Answerable for the village and knows he failed it",
+            "personality": "Defensive, then frank once cornered. Wants this handled quietly and knows it will not be.",
+            "speech": "Long explanations that circle the point before landing on it.",
+            "want": "Keep the sect from burning the whole village to be sure.",
+            "fear": "That the rite had local help.",
+            "descriptor": "A headman standing between you and the shrine door, not quite blocking it."
+          },
+          {
+            "key": "exorcist",
+            "title": "Wandering Exorcist",
+            "role": "Arrived a day too late and is furious about it",
+            "personality": "Brisk, unsentimental, kinder than her manner suggests. Has done this many times.",
+            "speech": "Impatient, direct, explains only what you need to act.",
+            "want": "Cleanse the ground before the rite roots deeper.",
+            "fear": "That someone here wants it to root.",
+            "descriptor": "An exorcist boiling something bitter over a travel brazier, watching the treeline."
+          }
+        ]
+      },
+      "Heavenly Treasure": {
+        "objective": "Reach the descent site and take what can be carried.",
+        "nodes": [
+          {
+            "key": "bloom",
+            "type": "herb",
+            "name": "Heaven-Blessed Bloom",
+            "descriptor": "It opened when the sky did, and it will close by dusk.",
+            "count": [
+              2,
+              6
+            ],
+            "rank_bonus": 0,
+            "tn": 13,
+            "attribute": "insight",
+            "item": "@herb",
+            "item_qty": 2,
+            "cultivation": 6,
+            "spirit_stones": 0,
+            "contribution": 2
+          },
+          {
+            "key": "fragment",
+            "type": "ore",
+            "name": "Descended Treasure Fragment",
+            "descriptor": "Still warm. Still humming. Still, somehow, falling.",
+            "count": [
+              1,
+              4
+            ],
+            "rank_bonus": 0,
+            "tn": 15,
+            "attribute": "insight",
+            "item": "@ore",
+            "item_qty": 2,
+            "cultivation": 8,
+            "spirit_stones": 10,
+            "contribution": 3
+          },
+          {
+            "key": "guardian",
+            "type": "beast",
+            "name": "Treasure-Guardian Beast",
+            "descriptor": "It was here before the treasure. It intends to be here after.",
+            "count": [
+              1,
+              3
+            ],
+            "rank_bonus": 2,
+            "tn": 15,
+            "attribute": "body",
+            "item": "@core",
+            "item_qty": 2,
+            "cultivation": 10,
+            "spirit_stones": 8,
+            "contribution": 3
+          },
+          {
+            "key": "chart",
+            "type": "task",
+            "name": "Chart the Descent Site",
+            "descriptor": "Map where it fell before a sect does it for you.",
+            "count": [
+              2,
+              4
+            ],
+            "rank_bonus": 0,
+            "tn": 12,
+            "attribute": "insight",
+            "item": "",
+            "item_qty": 0,
+            "cultivation": 4,
+            "spirit_stones": 0,
+            "contribution": 2
+          }
+        ],
+        "npcs": [
+          {
+            "key": "appraiser",
+            "title": "Treasure Appraiser",
+            "role": "Names what fell and what it is worth",
+            "personality": "Delighted, mercenary, entirely honest about being mercenary. Excellent company.",
+            "speech": "Rapid, enthusiastic, drops into trade jargon and back out again.",
+            "want": "Get a clean look at the fragment before a sect seals the site.",
+            "fear": "That it is already claimed.",
+            "descriptor": "An appraiser with a jeweller's loupe and no protective gear whatsoever."
+          },
+          {
+            "key": "prospector",
+            "title": "Rival Prospector",
+            "role": "Wants the same site you do",
+            "personality": "Guarded, competitive, capable of a fair deal if the alternative is worse.",
+            "speech": "Careful, feels out what you know before offering anything.",
+            "want": "Leave with more than he arrived with.",
+            "fear": "Being the one who dies to the guardian.",
+            "descriptor": "A prospector working the far side of the crater, pretending not to watch you."
+          }
+        ]
+      },
+      "Heavenly Phenomenon": {
+        "objective": "Work the storm for what it gives before it turns.",
+        "nodes": [
+          {
+            "key": "quickened",
+            "type": "herb",
+            "name": "Storm-Quickened Herb",
+            "descriptor": "A decade of growth forced into an afternoon.",
+            "count": [
+              3,
+              6
+            ],
+            "rank_bonus": 0,
+            "tn": 12,
+            "attribute": "insight",
+            "item": "@herb",
+            "item_qty": 2,
+            "cultivation": 5,
+            "spirit_stones": 0,
+            "contribution": 2
+          },
+          {
+            "key": "charged",
+            "type": "ore",
+            "name": "Qi-Charged Crystal",
+            "descriptor": "It rings when the currents turn. Cut it while it rings.",
+            "count": [
+              2,
+              5
+            ],
+            "rank_bonus": 0,
+            "tn": 13,
+            "attribute": "insight",
+            "item": "@ore",
+            "item_qty": 1,
+            "cultivation": 5,
+            "spirit_stones": 4,
+            "contribution": 2
+          },
+          {
+            "key": "maddened",
+            "type": "beast",
+            "name": "Qi-Maddened Beast",
+            "descriptor": "The storm got into it, and it cannot put the storm down.",
+            "count": [
+              1,
+              4
+            ],
+            "rank_bonus": 0,
+            "tn": 13,
+            "attribute": "body",
+            "item": "@core",
+            "item_qty": 1,
+            "cultivation": 6,
+            "spirit_stones": 3,
+            "contribution": 2
+          },
+          {
+            "key": "anchor",
+            "type": "task",
+            "name": "Anchor the Wild Currents",
+            "descriptor": "Sink anchors so the settlement is not cultivating in a knife drawer.",
+            "count": [
+              2,
+              4
+            ],
+            "rank_bonus": 0,
+            "tn": 14,
+            "attribute": "spirit",
+            "item": "",
+            "item_qty": 0,
+            "cultivation": 8,
+            "spirit_stones": 0,
+            "contribution": 3
+          }
+        ],
+        "npcs": [
+          {
+            "key": "formation_master",
+            "title": "Formation Master",
+            "role": "Anchors the wild currents before they take the settlement apart",
+            "personality": "Absorbed in the work, briefly irritated at interruption, then generous once engaged.",
+            "speech": "Thinks aloud in half-finished sentences, finishes them eventually.",
+            "want": "Sink enough anchors before the storm peaks.",
+            "fear": "That the storm is a symptom of something under the ground.",
+            "descriptor": "A formation master driving anchor stakes in a widening spiral, hair standing on end."
+          },
+          {
+            "key": "alchemist",
+            "title": "Wandering Alchemist",
+            "role": "Here for the herbs the storm forced into bloom",
+            "personality": "Cheerful, opportunistic, genuinely knowledgeable. Will trade knowledge for hands.",
+            "speech": "Warm and chatty, hides real advice inside small talk.",
+            "want": "Harvest the quickened herbs at their peak, which is now.",
+            "fear": "Missing the window.",
+            "descriptor": "An alchemist moving fast between beds with a satchel already overfull."
+          }
+        ]
+      },
+      "Tribulation": {
+        "objective": "Survive the descending heavens and gather what they leave.",
+        "nodes": [
+          {
+            "key": "shield",
+            "type": "task",
+            "name": "Shield the Tribulation Ground",
+            "descriptor": "Hold a ward over the ones who cannot hold their own.",
+            "count": [
+              2,
+              4
+            ],
+            "rank_bonus": 0,
+            "tn": 14,
+            "attribute": "spirit",
+            "item": "",
+            "item_qty": 0,
+            "cultivation": 9,
+            "spirit_stones": 0,
+            "contribution": 3
+          },
+          {
+            "key": "struck_metal",
+            "type": "ore",
+            "name": "Lightning-Struck Metal",
+            "descriptor": "Tempered by a stroke no forge can reproduce.",
+            "count": [
+              1,
+              4
+            ],
+            "rank_bonus": 0,
+            "tn": 14,
+            "attribute": "insight",
+            "item": "@ore",
+            "item_qty": 1,
+            "cultivation": 6,
+            "spirit_stones": 6,
+            "contribution": 2
+          },
+          {
+            "key": "thunder_root",
+            "type": "herb",
+            "name": "Thunder-Tempered Root",
+            "descriptor": "It took the bolt and kept growing. That is the whole value.",
+            "count": [
+              1,
+              4
+            ],
+            "rank_bonus": 0,
+            "tn": 13,
+            "attribute": "insight",
+            "item": "@herb",
+            "item_qty": 1,
+            "cultivation": 5,
+            "spirit_stones": 0,
+            "contribution": 2
+          },
+          {
+            "key": "drawn_beast",
+            "type": "beast",
+            "name": "Tribulation-Drawn Beast",
+            "descriptor": "Something came to watch the lightning, and stayed to feed.",
+            "count": [
+              1,
+              3
+            ],
+            "rank_bonus": 0,
+            "tn": 14,
+            "attribute": "body",
+            "item": "@core",
+            "item_qty": 1,
+            "cultivation": 7,
+            "spirit_stones": 4,
+            "contribution": 2
+          }
+        ],
+        "npcs": [
+          {
+            "key": "watcher",
+            "title": "Tribulation Watcher",
+            "role": "Records what the heavens do and to whom",
+            "personality": "Detached, precise, faintly ghoulish about it. Answers honestly if asked plainly.",
+            "speech": "Measured, uses numbers where others would use adjectives.",
+            "want": "Record a complete tribulation from first stroke to last.",
+            "fear": "Being close enough to be included in it.",
+            "descriptor": "A watcher at a safe distance with a wax tablet, counting under her breath."
+          },
+          {
+            "key": "ascendant",
+            "title": "The One Being Struck",
+            "role": "Is in the middle of it and cannot stop",
+            "personality": "Barely present. Speaks between strokes. Frightened and entirely committed.",
+            "speech": "Fragments, between breaths.",
+            "want": "Survive the ninth stroke.",
+            "fear": "That the ward fails on the eighth.",
+            "descriptor": "A cultivator kneeling in a scorched circle, steam coming off both shoulders."
+          }
+        ]
+      },
+      "Spatial Rift": {
+        "objective": "Close the rifts before the geography stops agreeing with itself.",
+        "nodes": [
+          {
+            "key": "stabilize_mouth",
+            "type": "task",
+            "name": "Stabilize a Rift Mouth",
+            "descriptor": "Pin the edges until the tear forgets it was open.",
+            "count": [
+              2,
+              4
+            ],
+            "rank_bonus": 0,
+            "tn": 15,
+            "attribute": "spirit",
+            "item": "",
+            "item_qty": 0,
+            "cultivation": 10,
+            "spirit_stones": 0,
+            "contribution": 4
+          },
+          {
+            "key": "void_ore",
+            "type": "ore",
+            "name": "Void-Touched Ore",
+            "descriptor": "Cold in a way that has nothing to do with temperature.",
+            "count": [
+              1,
+              4
+            ],
+            "rank_bonus": 0,
+            "tn": 14,
+            "attribute": "insight",
+            "item": "@ore",
+            "item_qty": 1,
+            "cultivation": 6,
+            "spirit_stones": 8,
+            "contribution": 2
+          },
+          {
+            "key": "aberration",
+            "type": "beast",
+            "name": "Rift-Spawned Aberration",
+            "descriptor": "It has too many of some things and none of others.",
+            "count": [
+              1,
+              4
+            ],
+            "rank_bonus": 1,
+            "tn": 15,
+            "attribute": "body",
+            "item": "@core",
+            "item_qty": 1,
+            "cultivation": 8,
+            "spirit_stones": 5,
+            "contribution": 3
+          },
+          {
+            "key": "displaced",
+            "type": "relic",
+            "name": "Displaced Relic",
+            "descriptor": "It fell out of somewhere that is not here, and it is not finished falling.",
+            "count": [
+              1,
+              2
+            ],
+            "rank_bonus": 0,
+            "tn": 16,
+            "attribute": "insight",
+            "item": "@ore",
+            "item_qty": 2,
+            "cultivation": 8,
+            "spirit_stones": 14,
+            "contribution": 3
+          }
+        ],
+        "npcs": [
+          {
+            "key": "surveyor",
+            "title": "Void Surveyor",
+            "role": "Maps the tears and says which are closing on their own",
+            "personality": "Methodical, quietly alarmed, refuses to speculate beyond the data.",
+            "speech": "Careful qualifications on every statement.",
+            "want": "Stabilize the mouths in the right order.",
+            "fear": "That the order does not matter because they are one tear.",
+            "descriptor": "A surveyor pacing a rift edge with a plumb line that will not hang straight."
+          },
+          {
+            "key": "stranded",
+            "title": "Stranded Traveller",
+            "role": "Fell out of the rift and is not from here",
+            "personality": "Disoriented, courteous, asking questions whose answers should be obvious.",
+            "speech": "Formal in an idiom half a century out of date.",
+            "want": "Find out where - and when - he is.",
+            "fear": "That there is no way back.",
+            "descriptor": "A traveller in unfamiliar cut and colour, examining a milestone with great attention."
+          }
+        ]
+      },
+      "Sect Recruitment": {
+        "objective": "Be seen, and be seen to be worth taking.",
+        "nodes": [
+          {
+            "key": "trial",
+            "type": "task",
+            "name": "Pass the Recruitment Trial",
+            "descriptor": "The elders are not watching the winners. They are watching how you lose.",
+            "count": [
+              1,
+              3
+            ],
+            "rank_bonus": 0,
+            "tn": 14,
+            "attribute": "body",
+            "item": "",
+            "item_qty": 0,
+            "cultivation": 10,
+            "spirit_stones": 8,
+            "contribution": 3
+          },
+          {
+            "key": "impress",
+            "type": "task",
+            "name": "Impress the Visiting Elder",
+            "descriptor": "One conversation, correctly held, outruns a year of drilling.",
+            "count": [
+              1,
+              3
+            ],
+            "rank_bonus": 0,
+            "tn": 14,
+            "attribute": "heart",
+            "item": "",
+            "item_qty": 0,
+            "cultivation": 8,
+            "spirit_stones": 6,
+            "contribution": 3
+          },
+          {
+            "key": "gift_herb",
+            "type": "herb",
+            "name": "Gift-Grade Spirit Herb",
+            "descriptor": "A gift is a sentence you do not have to say out loud.",
+            "count": [
+              1,
+              3
+            ],
+            "rank_bonus": 0,
+            "tn": 12,
+            "attribute": "insight",
+            "item": "@herb",
+            "item_qty": 1,
+            "cultivation": 3,
+            "spirit_stones": 0,
+            "contribution": 1
+          },
+          {
+            "key": "trial_beast",
+            "type": "beast",
+            "name": "Trial Beast",
+            "descriptor": "Caged for the trial, and entirely unaware of that.",
+            "count": [
+              1,
+              3
+            ],
+            "rank_bonus": 0,
+            "tn": 13,
+            "attribute": "body",
+            "item": "@core",
+            "item_qty": 1,
+            "cultivation": 6,
+            "spirit_stones": 4,
+            "contribution": 2
+          }
+        ],
+        "npcs": [
+          {
+            "key": "elder",
+            "title": "Visiting Elder",
+            "role": "Decides who is taken and who is thanked for coming",
+            "personality": "Composed, watchful, unreadable on purpose. Notices exactly what you think he missed.",
+            "speech": "Few words, each one placed.",
+            "want": "Find the one worth the sect's investment.",
+            "fear": "Taking the wrong one again.",
+            "descriptor": "An elder seated slightly apart, watching the trial ground rather than the candidates."
+          },
+          {
+            "key": "disciple",
+            "title": "Recruiting Disciple",
+            "role": "Handles the queue and knows how the elder actually scores it",
+            "personality": "Friendly, indiscreet, enjoying the small authority. A genuine ally if treated well.",
+            "speech": "Chatty, drops useful things without meaning to.",
+            "want": "Get through the list before the elder loses patience.",
+            "fear": "Being blamed for the elder losing patience.",
+            "descriptor": "A disciple with a roster, calling names and losing his place."
+          }
+        ]
+      },
+      "Tournament": {
+        "objective": "Take the stage and leave with more than you brought.",
+        "nodes": [
+          {
+            "key": "bout",
+            "type": "task",
+            "name": "Win a Bout on the Stage",
+            "descriptor": "The crowd is a resource. Spend it.",
+            "count": [
+              2,
+              5
+            ],
+            "rank_bonus": 0,
+            "tn": 14,
+            "attribute": "body",
+            "item": "",
+            "item_qty": 0,
+            "cultivation": 8,
+            "spirit_stones": 8,
+            "contribution": 3
+          },
+          {
+            "key": "read_rival",
+            "type": "task",
+            "name": "Read a Rival's Technique",
+            "descriptor": "You will meet this again somewhere with no referee.",
+            "count": [
+              2,
+              4
+            ],
+            "rank_bonus": 0,
+            "tn": 13,
+            "attribute": "insight",
+            "item": "",
+            "item_qty": 0,
+            "cultivation": 6,
+            "spirit_stones": 0,
+            "contribution": 2
+          },
+          {
+            "key": "prize_herb",
+            "type": "herb",
+            "name": "Victor's Herb Prize",
+            "descriptor": "Handed over on a lacquer tray, as though it were nothing.",
+            "count": [
+              1,
+              3
+            ],
+            "rank_bonus": 0,
+            "tn": 12,
+            "attribute": "insight",
+            "item": "@herb",
+            "item_qty": 1,
+            "cultivation": 3,
+            "spirit_stones": 4,
+            "contribution": 1
+          },
+          {
+            "key": "arena_beast",
+            "type": "beast",
+            "name": "Arena Beast",
+            "descriptor": "It has done this before and it has never once been asked.",
+            "count": [
+              1,
+              3
+            ],
+            "rank_bonus": 0,
+            "tn": 14,
+            "attribute": "body",
+            "item": "@core",
+            "item_qty": 1,
+            "cultivation": 7,
+            "spirit_stones": 6,
+            "contribution": 2
+          }
+        ],
+        "npcs": [
+          {
+            "key": "steward",
+            "title": "Tournament Steward",
+            "role": "Runs the bouts and enforces the rules that exist",
+            "personality": "Harried, fair, fond of the ritual of the thing. Will bend a schedule, never a rule.",
+            "speech": "Official register, slipping into ordinary speech when tired.",
+            "want": "Finish the card before the light goes.",
+            "fear": "A death on the stage during his watch.",
+            "descriptor": "A steward with a bout list, shouting over a crowd that is not listening."
+          },
+          {
+            "key": "champion",
+            "title": "Reigning Champion",
+            "role": "Has held the stage and expects to keep it",
+            "personality": "Gracious in a way that costs nothing. Sharpens considerably when actually tested.",
+            "speech": "Easy, generous, a hard edge underneath.",
+            "want": "Be beaten by someone worth losing to, eventually.",
+            "fear": "That it happens today.",
+            "descriptor": "The champion signing a spectator's fan, watching your approach in the reflection."
+          }
+        ]
+      },
+      "Auction House": {
+        "objective": "Restore order to the floor, and profit from the disorder.",
+        "nodes": [
+          {
+            "key": "secure_floor",
+            "type": "task",
+            "name": "Secure the Floor",
+            "descriptor": "Wealthy people panicking in an enclosed space is its own hazard.",
+            "count": [
+              2,
+              4
+            ],
+            "rank_bonus": 0,
+            "tn": 13,
+            "attribute": "body",
+            "item": "",
+            "item_qty": 0,
+            "cultivation": 4,
+            "spirit_stones": 10,
+            "contribution": 3
+          },
+          {
+            "key": "forged_lot",
+            "type": "task",
+            "name": "Trace the Forged Lot",
+            "descriptor": "The forgery is good. The paperwork behind it is not.",
+            "count": [
+              1,
+              3
+            ],
+            "rank_bonus": 0,
+            "tn": 14,
+            "attribute": "insight",
+            "item": "",
+            "item_qty": 0,
+            "cultivation": 5,
+            "spirit_stones": 12,
+            "contribution": 3
+          },
+          {
+            "key": "spilled",
+            "type": "ore",
+            "name": "Spilled Consignment Ore",
+            "descriptor": "It is on the floor, and the floor is not anybody's.",
+            "count": [
+              1,
+              4
+            ],
+            "rank_bonus": 0,
+            "tn": 12,
+            "attribute": "insight",
+            "item": "@ore",
+            "item_qty": 1,
+            "cultivation": 0,
+            "spirit_stones": 6,
+            "contribution": 1
+          },
+          {
+            "key": "guard_beast",
+            "type": "beast",
+            "name": "Guard-Beast Loose in the Hall",
+            "descriptor": "Someone opened the wrong crate during the stampede.",
+            "count": [
+              1,
+              2
+            ],
+            "rank_bonus": 0,
+            "tn": 14,
+            "attribute": "body",
+            "item": "@core",
+            "item_qty": 1,
+            "cultivation": 6,
+            "spirit_stones": 6,
+            "contribution": 2
+          }
+        ],
+        "npcs": [
+          {
+            "key": "auctioneer",
+            "title": "Pavilion Auctioneer",
+            "role": "Owns the floor and the disaster on it",
+            "personality": "Immaculate, furious, entirely controlled. Treats the chaos as an accounting problem.",
+            "speech": "Polished trade formality that thins under pressure.",
+            "want": "Restore the floor and the pavilion's name, in that order.",
+            "fear": "That the forged lot came from inside the house.",
+            "descriptor": "An auctioneer standing on the block itself for the height, directing staff."
+          },
+          {
+            "key": "guard",
+            "title": "Pavilion Guard Captain",
+            "role": "Was responsible for the doors and knows it",
+            "personality": "Grim, capable, taking it personally. Straight with anyone who helps.",
+            "speech": "Terse, operational, no excuses offered.",
+            "want": "Find who opened the crate.",
+            "fear": "That it was one of his own.",
+            "descriptor": "A guard captain checking the cellar door hinges, jaw set."
+          }
+        ]
+      }
+    },
+    "name_pool": [
+      "Hou Jin",
+      "Bai Shen",
+      "Lu Wenqing",
+      "Shen Yi",
+      "Tang Muyan",
+      "Wei Zhao",
+      "Fang Rulan",
+      "Qiao Bing",
+      "Yan Suzhen",
+      "Deng Hai",
+      "Mo Qingyu",
+      "Xue Ran",
+      "Gu Zhilan",
+      "Pei Song",
+      "Cui Yanran",
+      "Zhong Fu",
+      "Liang Xiaoyu",
+      "Ren Kang",
+      "Su Weilan",
+      "He Danqing",
+      "Jiang Bo",
+      "Ouyang Zhi",
+      "Ning Cailing",
+      "Duan Shu"
+    ]
   }
 }

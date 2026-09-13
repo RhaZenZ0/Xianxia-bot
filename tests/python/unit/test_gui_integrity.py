@@ -183,7 +183,7 @@ class GUIIntegrityTests(unittest.TestCase):
         # construction. Same intent: the event button pre-selects its action.
         self.assertIn("action_key=default_action", source)
         self.assertIn("Travel to **{self.location}** before acting in this event", source)
-        self.assertIn("embed=event_view.embed()", source)
+        self.assertIn("embed=await event_view.render()", source)
         self.assertIn("view=event_view", source)
 
     def test_hub_resources_render_as_visual_bars(self):
