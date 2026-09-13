@@ -807,10 +807,13 @@ SURFACE = {
         },
     },
     "commands/family.py": {
-        "groups": ('family_group',),
+        "groups": ('family_group', 'house_group'),
         "roots": (),
         "leaves": {
             "family_group": ('view', 'enter', 'leave', 'clan', 'support', 'history', 'ancestry', 'investigate', 'legacy', 'quest', 'claim', 'conflict', 'child', 'descendants'),
+            # v1.0.0-rc.15: the house players found themselves, as distinct
+            # from the birth family above.
+            "house_group": ('status', 'found', 'invite', 'respond', 'leave', 'child'),
         },
     },
     "commands/formation.py": {
@@ -933,7 +936,8 @@ class CommandSurfaceTests(unittest.TestCase):
                             self.assertIn(kw.value.id, SURFACE[module]["groups"], f"{module}: parent {kw.value.id}")
         self.assertEqual(nested, {"admin_server_group", "admin_world_group", "admin_player_group", "admin_sect_group",
                                   "admin_family_group", "admin_npc_group", "admin_sim_group",
-                                  "sect_manor_group", "sect_disciple_group", "sect_recruitment_group"})
+                                  "sect_manor_group", "sect_disciple_group", "sect_recruitment_group",
+                                  "house_group"})
         for module, expected in SURFACE.items():
             for group in expected["groups"]:
                 if group in nested or group == "admin_group":

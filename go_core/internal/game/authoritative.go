@@ -143,6 +143,11 @@ var authoritativeMutations = map[string]bool{
 	"family.simulate":                 true,
 	"family.support":                  true,
 	"family.add_child":                true,
+	"player_family.found":             true,
+	"player_family.invite":            true,
+	"player_family.respond":           true,
+	"player_family.leave":             true,
+	"player_family.child":             true,
 	"seclusion.start":                 true,
 	"seclusion.settle":                true,
 	"dao.propose":                     true,
@@ -177,6 +182,7 @@ var authoritativeQueries = map[string]bool{
 	"effects.current":          true,
 	"lifecycle.samsara_status": true,
 	"sense.status":             true,
+	"player_family.status":     true,
 	"secret_realm.status":      true,
 	// v1.0.0: the rotation on its own, for the GM dashboard, which is not an
 	// actor and wants the whole schedule rather than one cultivator's view.
@@ -441,7 +447,9 @@ func applyAuthoritative(databasePath, worldPath string, req ActionRequest) (Acti
 			"exploration.explore", "exploration.event.act", "exploration.event.leave", "exploration.travel", "exploration.hunt",
 			"secret_realm.enter", "secret_realm.explore", "secret_realm.leave", "craft.resolve", "forage.resolve",
 			"beast.tame", "beast.feed", "beast.train", "beast.evolve", "beast.active", "artifact.bond", "artifact.awaken",
-			"pvp.challenge", "pvp.respond", "pvp.act", "manual.study", "manual.technique", "crime.atone", "world_event.act", "world_event.engage":
+			"pvp.challenge", "pvp.respond", "pvp.act", "manual.study", "manual.technique", "crime.atone", "world_event.act", "world_event.engage",
+			"player_family.found", "player_family.invite", "player_family.respond",
+			"player_family.leave", "player_family.child":
 			if strings.TrimSpace(worldPath) == "" {
 				return ActionResponse{}, errors.New("world catalog path is required")
 			}
@@ -518,6 +526,16 @@ func applyAuthoritative(databasePath, worldPath string, req ActionRequest) (Acti
 				mutation, err = conditionTreatAction(conn, catalog, req.ActorID, req.Payload)
 			case "sense.inspect":
 				mutation, err = senseInspectAction(conn, catalog, req.ActorID, req.Payload)
+			case "player_family.found":
+				mutation, err = playerFamilyFoundAction(conn, req.ActorID, req.Payload)
+			case "player_family.invite":
+				mutation, err = playerFamilyInviteAction(conn, req.ActorID, req.Payload)
+			case "player_family.respond":
+				mutation, err = playerFamilyRespondAction(conn, req.ActorID, req.Payload)
+			case "player_family.leave":
+				mutation, err = playerFamilyLeaveAction(conn, req.ActorID, req.Payload)
+			case "player_family.child":
+				mutation, err = playerFamilyChildAction(conn, catalog, req.ActorID, req.Payload)
 			case "sense.conceal":
 				mutation, err = senseConcealAction(conn, catalog, req.ActorID, req.Payload)
 			case "tribulation.prepare":
@@ -772,6 +790,13 @@ func applyAuthoritativeQuery(databasePath, worldPath string, req ActionRequest) 
 			return ActionResponse{}, loadErr
 		}
 		result, qerr := secretRealmStatusQuery(conn, catalog, req.ActorID)
+		if qerr != nil {
+			return ActionResponse{}, qerr
+		}
+		v, _ := eventledger.CurrentActorVersion(conn, req.ActorID)
+		return ActionResponse{APIVersion: authoritativeAPIVersion, Operation: req.Operation, StateVersion: v, Result: result}, nil
+	case "player_family.status":
+		result, qerr := playerFamilyStatus(conn, req.ActorID)
 		if qerr != nil {
 			return ActionResponse{}, qerr
 		}

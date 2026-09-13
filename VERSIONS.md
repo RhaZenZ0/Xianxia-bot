@@ -28,6 +28,25 @@ composes all four ways the map joins up - roads, a city's own districts, the sit
 either end of a site's leg - and 429 stranded places became 17. A test holds the real content to it,
 because a fixture of two towns on a road passes that bug happily.
 
+Players can found a house. `player_families`, `player_family_members`, `player_family_invites` and
+`family_children` have carried one since the schema was written - with foreign keys, a cascade, a
+unique seniority index and a GM dashboard panel joining founders to members to children - and nothing
+ever wrote a single row into any of them. The panel could only ever be empty, and character deletion
+carefully cleaned up rows that could not exist. The design was finished; only the doors were missing.
+
+`/family house` is the doors: found one and take its first seat, invite another cultivator at a
+seniority, accept or decline the offer waiting for you, leave, and record a child born into the line.
+The house is distinct from the birth family beside it - that is the NPC household a character is born
+into, this is a line they start - which is why it is its own page rather than more actions on the old
+one. Nothing here invents state, and the schema had already decided most of the rules: a name is
+UNIQUE so two houses cannot share one, a member is UNIQUE so nobody belongs to two, an invitee is
+UNIQUE so nobody holds two offers, and (house, seniority) is UNIQUE so two people cannot hold the
+same seat. Each of those is now a refusal a player can read rather than a constraint error, and the
+seat is checked when the invitation is written rather than when it is answered, which is the worst
+possible moment to discover it. A child's spiritual root and talent are the world's to roll, not the
+parent's to choose; the last member out dissolves the house; and a founder who leaves hands it to the
+most senior who stays rather than leaving `founder_user_id` pointing at somebody gone.
+
 `/gender` is gone. A cultivator's sex is chosen at creation - `/begin` will not make a character
 without it - so a second setter afterwards was a door onto a room the player had already furnished,
 and the one thing it could do was undo a choice the creation screen had already taken. The engine
