@@ -410,6 +410,25 @@ class PatronGiftContentTests(unittest.TestCase):
                     self.assertTrue(item, f"{ref} is not written for {world}")
                     self.assertIn(item, WORLD["items"], f"{ref} in {world} is not a real item")
 
+    def test_an_untiered_material_is_one_the_tier_table_really_does_not_tier(self):
+        # The list exists so a material that is the same item in every world
+        # can be scaled by number instead. An entry that *does* tier would be
+        # paid twice over.
+        gift = WORLD["patron_gift"]
+        tiers = WORLD["event_sites"]["tier_materials"]
+        for ref in gift.get("untiered", []):
+            with self.subTest(ref=ref):
+                self.assertIn(ref, self.MATERIAL_REFS)
+                items = {materials.get(ref[1:]) for materials in tiers.values()}
+                self.assertEqual(len(items), 1, f"{ref} names {items} - it tiers, so it must not be listed as untiered")
+        # And the other way: a ref that is the same everywhere must be listed,
+        # or a Celestial cultivator is quietly given a Mortal World gift.
+        for ref in self.MATERIAL_REFS:
+            with self.subTest(ref=ref):
+                items = {materials.get(ref[1:]) for materials in tiers.values()}
+                if len(items) == 1:
+                    self.assertIn(ref, gift.get("untiered", []), f"{ref} is the same item in every world but is not listed as untiered")
+
     def test_the_default_is_a_material_every_world_carries(self):
         # A path or profession nobody wrote still has to pay something, so the
         # default cannot be a literal item that only one world trades in.

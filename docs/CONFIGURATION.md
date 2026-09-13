@@ -59,9 +59,10 @@ un-prefixed line of theirs looks like an action.
 DISBOARD, whichever you list on — and `VOTE_SITE_NAME` is what players see it
 called. Set the URL and `/vote` appears as a working command: it prints the
 link, and once per twelve hours (the cadence every listing site uses) a player
-can claim a patron's gift — ten of the local world's low-grade currency plus
-five for every realm they have climbed inside that world, and one tier-material
-their craft or their path uses. Leave `VOTE_SITE_URL` empty and `/vote` says so
+can claim a patron's gift — fifteen of the local world's low-grade currency
+plus five for every realm they have climbed inside that world, and a
+tier-material their craft or their path uses (a beast core, which is the same
+item in every world, arrives in greater number instead of a richer name). Leave `VOTE_SITE_URL` empty and `/vote` says so
 and grants nothing.
 
 From Friday through Sunday the gift doubles. That window is measured in

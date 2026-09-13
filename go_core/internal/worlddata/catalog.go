@@ -336,6 +336,24 @@ type PatronGift struct {
 	ByProfession map[string]string `json:"by_profession"`
 	ByPath       map[string]string `json:"by_path"`
 	Default      string            `json:"default"`
+	// Refs the tier table does not actually tier. "@herb" and "@ore" name a
+	// different, richer item in each world; "@core" is beast_core in all four
+	// deliberately - it is the one material every world's recipes and shops
+	// still trade in, so it cannot be split per tier without rewriting them.
+	// A gift of an untiered material is made worth the same by arriving in
+	// greater number instead. See Untiered.
+	UntieredRefs []string `json:"untiered"`
+}
+
+// Untiered reports whether a material ref keeps the same item in every world,
+// and so has to be scaled by quantity rather than by identity.
+func (p PatronGift) Untiered(ref string) bool {
+	for _, candidate := range p.UntieredRefs {
+		if candidate == ref {
+			return true
+		}
+	}
+	return false
 }
 
 // Material returns the material ref for a cultivator. A profession they have

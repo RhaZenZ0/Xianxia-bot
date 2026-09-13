@@ -33,10 +33,12 @@ const (
 	// The gift is the cultivator's, not a flat number. A flat 15 was wrong at
 	// both ends: shop lines run 3-59 in the Mortal World's low-grade stone and
 	// 6-468 in the Celestial World's, so one number is a windfall to a beginner
-	// and an insult to an ancestor. Ten, and five more for every realm climbed
-	// inside the current world, keeps it a few cheap wares at every tier -
-	// still far under what playing pays (a commission 30-150, a boss 120-420).
-	supportVoteBaseReward  int64 = 10
+	// and an insult to an ancestor. Fifteen, and five more for every realm
+	// climbed inside the current world, keeps it a few cheap wares at every
+	// tier - still far under what playing pays (a commission 30-150, a boss
+	// 120-420) - and never less than the flat fifteen it replaces, so nobody's
+	// gift shrank the day this shipped.
+	supportVoteBaseReward  int64 = 15
 	supportVoteRewardStep  int64 = 5
 	supportVoteMaxDepth    int64 = 7
 	supportVoteWeekendMult int64 = 2
@@ -172,6 +174,20 @@ func practisedProfessions(conn *storage.Conn, userID int64) ([]string, error) {
 	return out, nil
 }
 
+// worldTierIndex is which of the four worlds this is, 0 for the Mortal World
+// through 3 for the Celestial. Taken from the same floor the depth term uses,
+// so the size of a gift and the world it is paid in never disagree.
+func worldTierIndex(catalog worlddata.Catalog, world string) int64 {
+	index := worldMinRealm(catalog, world) / 8
+	if index < 0 {
+		index = 0
+	}
+	if index > 3 {
+		index = 3
+	}
+	return index
+}
+
 func supportVoteGift(conn *storage.Conn, catalog worlddata.Catalog, c mechanicsCharacter, userID int64, at time.Time) (supportGift, error) {
 	world := currentWorld(c, catalog)
 	depth := c.RealmIndex - worldMinRealm(catalog, world)
@@ -200,17 +216,24 @@ func supportVoteGift(conn *storage.Conn, catalog worlddata.Catalog, c mechanicsC
 		return supportGift{}, err
 	}
 	ref := catalog.PatronGift.Material(professions, c.Path)
-	// "@herb" and "@ore" double in value every world (spirit_herb 2 ->
-	// heavenpetal_herb 20); "@core" is beast_core in all four deliberately -
-	// it is the one material every tier still trades in, so a Beast Binder's
-	// gift stays useful without the catalogue carrying four of them.
 	itemID := catalog.EventSites.Material(world, ref)
 	// The same guard SpawnWorldEventNodes uses: a tier material this world
 	// does not name, or one the item catalogue does not carry, would be a
 	// phantom in the bag. Drop the item and keep the stones.
 	if _, ok := catalog.Items[itemID]; itemID != "" && ok {
 		gift.ItemID = itemID
-		gift.ItemQty = multiplier
+		// "@herb" and "@ore" name a richer item every world (spirit_herb 2 ->
+		// heavenpetal_herb 20), so one of them is already tier-appropriate.
+		// "@core" is beast_core in all four - the one material every world's
+		// recipes and shops still trade in, which is why it cannot be split
+		// per tier without rewriting them - so it is made worth the same by
+		// arriving in greater number: one in the Mortal World, four in the
+		// Celestial, which is the herb's own 2-to-20 ladder in another shape.
+		quantity := int64(1)
+		if catalog.PatronGift.Untiered(ref) {
+			quantity = worldTierIndex(catalog, world) + 1
+		}
+		gift.ItemQty = quantity * multiplier
 	}
 	return gift, nil
 }

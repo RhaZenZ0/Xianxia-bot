@@ -59841,7 +59841,10 @@
       "Formation Adept": "@ore",
       "Ghost Cultivator": "@core"
     },
-    "default": "@herb"
+    "default": "@herb",
+    "untiered": [
+      "@core"
+    ]
   },
   "event_sites": {
     "tier_materials": {

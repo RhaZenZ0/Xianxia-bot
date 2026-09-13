@@ -286,13 +286,22 @@ who is actually present, and a picker when readings tie. `TYPED_PLAY_PREFIX` is 
 that list and the list ranks on votes. Under the link is one button, once every twelve hours — the
 cadence every listing site resets a vote on.
 
-The gift is the cultivator's own. Ten of the local world's low-grade currency, and five more for
-every realm climbed inside that world, so it runs ten to forty-five and stays a few cheap wares at
-every tier rather than a windfall in the Mortal World and an insult in the Celestial. With it comes
-one material the character actually uses — a herb for an alchemist, ore for a smith or a sword
-cultivator, a beast core for a tamer — chosen by the craft they practise before the road they walk,
-and resolved against the tier of the world they stand in. The mapping is content (`patron_gift` in
-`content/world.json`), so a new path needs no engine change.
+The gift is the cultivator's own. Fifteen of the local world's low-grade currency, and five more for
+every realm climbed inside that world, so it runs fifteen to fifty and stays a few cheap wares at
+every tier rather than a windfall in the Mortal World and an insult in the Celestial — and never
+less than the flat fifteen it replaced. With it comes one material the character actually uses — a
+herb for an alchemist, ore for a smith or a sword cultivator, a beast core for a tamer — chosen by
+the craft they practise before the road they walk, and resolved against the tier of the world they
+stand in. The mapping is content (`patron_gift` in `content/world.json`), so a new path needs no
+engine change.
+
+Two of those three materials tier by name: a herb runs from a spirit herb to a heavenpetal, an ore
+from spirit iron to starsteel. A beast core does not — it is the same item in all four worlds
+because nineteen recipes and nineteen shops across every tier still trade in it, and splitting it
+would hand a Celestial tamer something nothing accepts. So it tiers by number instead: one core in
+the Mortal World, four in the Celestial, which is the herb's own ladder in another shape. Which
+materials work that way is content too (`untiered`), and the content gate checks the list against
+the tier table in both directions.
 
 From Friday through Sunday, the operator's local time, the whole gift doubles. The window is the
 engine's (`support.weekend`, measured in a named zone so it follows daylight saving rather than

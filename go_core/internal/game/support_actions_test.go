@@ -113,7 +113,20 @@ func supportScalar(t *testing.T, path, sql string, args ...any) int64 {
 // expectedGift is the ladder as the design states it, recomputed here rather
 // than read off the constants, so a change to the formula has to be made
 // twice - once in the engine and once as a deliberate edit here.
-func expectedGift(depth, multiplier int64) int64 { return (10 + depth*5) * multiplier }
+func expectedGift(depth, multiplier int64) int64 { return (15 + depth*5) * multiplier }
+
+// The gift never shrank when it stopped being flat: fifteen was what everyone
+// used to get, and fifteen is the floor of the ladder that replaced it.
+func TestTheLadderNeverPaysLessThanTheFlatGiftItReplaced(t *testing.T) {
+	for depth := int64(0); depth <= supportVoteMaxDepth; depth++ {
+		if got := expectedGift(depth, 1); got < 15 {
+			t.Fatalf("depth %d pays %d, less than the flat 15 it replaced", depth, got)
+		}
+	}
+	if got := expectedGift(supportVoteMaxDepth, 1); got != 50 {
+		t.Fatalf("the deepest cultivator is given %d, want 50", got)
+	}
+}
 
 func TestASupportVoteClaimPaysTheLocalCurrencyAndSetsTheTwelveHourWait(t *testing.T) {
 	path := setupSupportVoteDB(t)
@@ -220,6 +233,56 @@ func TestTheGiftArrivesAsTheMaterialTheCultivatorsPathUses(t *testing.T) {
 	quantity := supportScalar(t, path, `SELECT quantity FROM inventory WHERE user_id=42 AND item_id='spirit_iron'`)
 	if quantity != i64(result["item_quantity"]) || quantity < 1 {
 		t.Fatalf("inventory holds %d spirit iron, the receipt says %d", quantity, i64(result["item_quantity"]))
+	}
+}
+
+// "@core" is beast_core in every world - the one material all four worlds'
+// recipes and shops still trade in - so it cannot tier by identity the way a
+// herb does. It tiers by number instead, and this is the test that says the
+// two ladders end up worth about the same.
+func TestAnUntieredMaterialArrivesInGreaterNumberHigherUp(t *testing.T) {
+	path := setupSupportVoteDB(t)
+	// A Beast Binder is given "@core"; the fixture stands in the Mortal World.
+	batch4Exec(t, path, `UPDATE characters SET path='Beast Binder' WHERE user_id=42`)
+	mortal, err := supportVoteClaim(t, path, "vote-mortal", "Top.gg")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := mortal["item_id"]; got != "beast_core" {
+		t.Fatalf("item_id = %v for a Beast Binder, want beast_core", got)
+	}
+	if got, want := i64(mortal["item_quantity"]), i64(mortal["multiplier"]); got != want {
+		t.Fatalf("a Mortal World core came as %d, want %d", got, want)
+	}
+
+	// The same cultivator standing in the Celestial World is given four.
+	batch4Exec(t, path, `UPDATE characters SET location='Celestial Mandate Palace',realm_index=24 WHERE user_id=42`)
+	batch4Exec(t, path, `UPDATE cooldowns SET available_at=0 WHERE user_id=42 AND action='support_vote'`)
+	celestial, err := supportVoteClaim(t, path, "vote-celestial", "Top.gg")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := celestial["world"]; got != "Celestial World" {
+		t.Fatalf("world = %v, want Celestial World", got)
+	}
+	if got := celestial["item_id"]; got != "beast_core" {
+		t.Fatalf("item_id = %v in the Celestial World, want the same beast_core every shop there trades", got)
+	}
+	if got, want := i64(celestial["item_quantity"]), 4*i64(celestial["multiplier"]); got != want {
+		t.Fatalf("a Celestial core came as %d, want %d", got, want)
+	}
+	// A tiered material is unaffected: one is already the right one.
+	batch4Exec(t, path, `UPDATE characters SET path='Sword Cultivator' WHERE user_id=42`)
+	batch4Exec(t, path, `UPDATE cooldowns SET available_at=0 WHERE user_id=42 AND action='support_vote'`)
+	ore, err := supportVoteClaim(t, path, "vote-ore", "Top.gg")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := ore["item_id"]; got != "starsteel_ore" {
+		t.Fatalf("item_id = %v for a Celestial swordsman, want starsteel_ore", got)
+	}
+	if got, want := i64(ore["item_quantity"]), i64(ore["multiplier"]); got != want {
+		t.Fatalf("a tiered material came as %d, want %d - identity carries its value, not number", got, want)
 	}
 }
 
