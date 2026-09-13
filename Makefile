@@ -1,7 +1,7 @@
 PYTHON ?= python3
 GO ?= go
 
-.PHONY: install-dev tools lock test test-python test-go lint format-check check docker-build
+.PHONY: install-dev tools lock test test-python test-go lint audit format-check check docker-build
 
 install-dev:
 	$(PYTHON) -m pip install -r requirements-dev.txt
@@ -11,9 +11,12 @@ install-dev:
 # asked for - the same reason the Dockerfile pins its base image by digest and
 # requirements.lock carries hashes. CI installs this exact version.
 STATICCHECK_VERSION ?= 2026.2.1
+# govulncheck is the Go half of `make audit`. Pinned for the same reason.
+GOVULNCHECK_VERSION ?= v1.8.0
 
 tools:
 	$(GO) install honnef.co/go/tools/cmd/staticcheck@$(STATICCHECK_VERSION)
+	$(GO) install golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION)
 
 # requirements.lock is what the Dockerfile installs (under --require-hashes).
 # Regenerate it after any change to requirements.txt; needs uv.
@@ -45,6 +48,22 @@ lint:
 	  echo "(that is: $(GO) install honnef.co/go/tools/cmd/staticcheck@$(STATICCHECK_VERSION))"; \
 	  exit 1; }
 	cd go_core && CGO_ENABLED=1 staticcheck ./...
+
+# The security scan that needs the network, which is why it is not in `lint`
+# and not in `check`: both of those stay runnable offline, and a lint step that
+# fails because a machine is off the internet teaches nobody anything. CI runs
+# this on every push and pull request.
+#
+# go_core has no external dependencies at all - SQLite is bound through direct
+# cgo - so what govulncheck actually reports here is standard-library
+# advisories against the Go version in go.mod, and the fix for one is a Go
+# bump. That is a small surface, and it is the surface nothing else watches.
+audit:
+	@command -v govulncheck >/dev/null 2>&1 || { \
+	  echo 'govulncheck is not on PATH. Install the pinned version with:'; \
+	  echo '    make tools'; \
+	  exit 1; }
+	cd go_core && CGO_ENABLED=1 govulncheck ./...
 
 format-check:
 	@test -z "$$(gofmt -l go_core)" || (echo 'Go files need gofmt:'; gofmt -l go_core; exit 1)

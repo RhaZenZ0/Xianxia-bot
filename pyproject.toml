@@ -4,4 +4,32 @@ line-length = 120
 extend-exclude = [".venv", "venv", "data"]
 
 [tool.ruff.lint]
-select = ["E9"]
+# E9 is the syntax/runtime-error tier. S is flake8-bandit: the Python half of
+# the security gate, run by `make lint` and CI through the ruff call that was
+# already there.
+#
+# The seven rules below are off, each because its findings here are what the
+# design says they should be rather than defects. They were read one by one
+# before being silenced; nothing is ignored merely for being noisy, and the
+# rules that remain are all clean today, so they act as a ratchet on new code:
+# eval/exec, pickle, weak hashes, unverified TLS contexts, shell=True,
+# yaml.load and the rest stay impossible to introduce quietly.
+#
+#   S608 hardcoded-sql-expression - 18 sites. Every one interpolates a table or
+#        column name from a literal set or a checked allowlist (see
+#        _catalog_get, which rejects an unknown table before building the SQL);
+#        no player or GM string reaches a query except as a bound parameter.
+#   S110 try-except-pass - 10 sites, all best-effort cleanup and teardown where
+#        there is genuinely nothing to do with the exception.
+#   S310 urlopen scheme audit - 6 sites. Each URL is either built by this repo
+#        against its own health endpoint or is an operator-set value from .env
+#        (ALERT_WEBHOOK_URL); none comes from a player.
+#   S105 hardcoded-password-string - 2 sites, both matched on the *name*:
+#        PROBE_400_TOKEN_BUDGET is a classification constant and
+#        secret_for_prompt is a game secret, not a credential.
+#   S104 hardcoded-bind-all-interfaces - the health listener's 0.0.0.0, which
+#        is a stated choice: the port is `expose`-only and never published.
+#   S603/S607 subprocess - scripts/playtest_engine.py launching the engine it
+#        is written to drive, with arguments it constructs itself.
+select = ["E9", "S"]
+ignore = ["S608", "S110", "S310", "S105", "S104", "S603", "S607"]

@@ -62,6 +62,19 @@ jobs:
           go install "honnef.co/go/tools/cmd/staticcheck@$version"
       - run: cd go_core && CGO_ENABLED=1 staticcheck ./...
 
+      # `make audit`, which is kept out of `make lint` and `make check` because
+      # it needs the network and those two stay runnable offline. go_core has
+      # no external dependencies - SQLite is direct cgo - so this reports
+      # standard-library advisories against the Go version in go.mod, which is
+      # a small surface and the one nothing else watches.
+      - name: Install govulncheck at the pinned version
+        run: |
+          version="$(sed -n 's/^GOVULNCHECK_VERSION ?= //p' Makefile)"
+          test -n "$version" || { echo 'Makefile no longer pins GOVULNCHECK_VERSION' >&2; exit 1; }
+          echo "govulncheck $version"
+          go install "golang.org/x/vuln/cmd/govulncheck@$version"
+      - run: cd go_core && CGO_ENABLED=1 govulncheck ./...
+
       - run: cd go_core && CGO_ENABLED=1 go test -race ./...
 
   containers:
