@@ -6,6 +6,28 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.0** (rc.14) fixes the reading `/sense` gives most often, and closes the class of fault it
+belongs to. Sensing another cultivator called `WORLD.approximate_realm(...)`, and there is no such
+method on `World`: the function lives in `app/rules/sense.py` and takes its two realm lookups as
+arguments, so the call was wrong in both its name and its signature and raised `AttributeError`. It
+was not a corner. The engine answers `reveal = "approx"` whenever detection succeeds and precision
+lands on "success" or "strong", which is the ordinary middle outcome of sensing somebody - the three
+branches beside it read `realm_world`, `realm_name` and `body_realm_name`, all real methods, which is
+exactly why the fourth read as one. The function had been written for that call and never wired to
+it, so it had never run once.
+
+Nothing was looking, and that is the half worth keeping. `F821`, selected in rc.13 after the `/craft`
+crash, finds a name nothing defines - not an attribute nothing defines - and no suite can walk every
+branch of every command. So the check that found this is now a test: every `DB.`, `WORLD.`,
+`SETTINGS.` and `ENGINE.` read in `app/` is resolved against the real class, its dataclass
+annotations and whatever `__init__` assigns to self. That is 1,176 of the 1,287 singleton reads in
+the tree; the rest hang off `app.bot.services`, which cannot be imported without a Discord token, and
+join when that changes. Clean today, so it ratchets like the pyflakes rules rather than starting a
+backlog. `OPENROUTER_EPIC_MODEL` and `OPENROUTER_EPIC_FALLBACK_MODEL` were also the only two of
+`.env.example`'s ninety-two keys explained nowhere in `docs/CONFIGURATION.md` - the Epic chain was
+described in prose that never named the variables setting it - and the contract already holding that
+file to keys-and-separators now holds the other half of the rule too. No schema change.
+
 **1.0.0** (rc.13) makes the hub surface navigable and the beta channel installable. rc.10 stamped
 `RELEASE_TAG` so the channel could be ordered; the two checks that compare a package against what it
 claims to be kept reading plain `VERSION`, so every stamped release failed "Extracted VERSION
@@ -31,7 +53,21 @@ of `/sect recruitment`, `/sect discipleship`, `/sect manor`, and the whole `/adm
 was a heading with nothing under it while the gate passed on the heading alone. Both reads are ast
 now and a contract holds the file to the live surface: a command reachable from a hub and missing
 from the checklist fails the build. `/admin` is off the board deliberately rather than by accident.
-No schema change.
+
+Two faults were caught in the same tree before it was cut. Removing `/alchemy refine` took the
+profession gate with it and the local `profession` went along with the gate, leaving three uses of
+the name in `_run_crafting` - so the first craft to come back with a quality label raised
+`NameError`, in a core loop. Ruff was selecting only `E9` and `S`; pyflakes was off, so `F821`, the
+rule whose whole job is that, was never asked. It is selected now along with the neighbours that find
+a bug rather than untidiness (`F811`, `F822`, `F823`, `F632`, `F901` and the format-string ones), all
+clean, so they ratchet; `F401`/`F841` stay out, being a backlog that cannot crash anything. And of
+the 154 hub paths a reply prints in bold to earn a tappable button, 30 resolved to nothing and the
+button was simply never drawn - no error, nothing in a log. 24 were one cause: the resolver required
+`hub → page → action` and gave up when the first step named an action directly, as `**/family →
+Leave**` does. It falls through to the hub's actions now, only where it previously returned None, so
+a path that does name a page resolves exactly as before; the other six named an admin label that does
+not exist or were written as literal command paths. 154 of 154, held by a test with a floor on the
+count. No schema change.
 
 **1.0.0** (rc.10) makes the beta channel walkable. `VERSION` holds the numbers and never the
 `-rc.N` suffix - that is deliberate, so the updater compares plain numbers - but it means an installed
@@ -261,9 +297,13 @@ mechanical authority paths.
 
 ## Release status — v1.0.0
 
-- Current release: v1.0.0 (rc.13): the hub surface regrouped around what a player is doing, and the
-  updater fix that makes a stamped release installable at all. Tagged `v1.0.0-rc.13` on the beta
-  channel; the NAS drills and two quiet weeks make it `v1.0.0`.
+- Current release: v1.0.0 (rc.14): `/sense` no longer raises on the reading it gives most often, and
+  every attribute the command surface reads off `DB`, `WORLD`, `SETTINGS` and `ENGINE` is held to
+  exist by a test. Tagged `v1.0.0-rc.14` on the beta channel; the NAS drills and two quiet weeks make
+  it `v1.0.0`.
+- v1.0.0 (rc.13): the hub surface regrouped around what a player is doing, the updater fix that makes
+  a stamped release installable at all, and - cut into the same tree before it shipped - the `/craft`
+  `NameError` and the thirty printed hub paths that drew no button.
 - v1.0.0 (rc.10-rc.12): the beta channel ordered by semver precedence. rc.11 and rc.12 shipped but
   could not be installed - see rc.13 - so a NAS on rc.9 or earlier upgrades straight to rc.13, and
   one already carrying rc.12's `update.sh` needs the fixed script dropped in by hand first.
