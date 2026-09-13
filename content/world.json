@@ -2404,7 +2404,8 @@
           "Jadeflow Spirit City"
         ]
       },
-      "terrain": "imperial jade terrace"
+      "terrain": "imperial jade terrace",
+      "settlement_type": "city"
     },
     "Nine-Heavens Immortal Court": {
       "description": "The central court of an Immortal World domain, suspended above immortal clouds and guarded by law formations.",
@@ -2436,7 +2437,8 @@
           "Ninefold Noble Immortal City"
         ]
       },
-      "terrain": "highland cloud court"
+      "terrain": "highland cloud court",
+      "settlement_type": "city"
     },
     "Celestial Mandate Palace": {
       "description": "A palace-city at the heart of the Celestial World, where sovereign decrees can redirect the fate of entire star regions.",
@@ -2468,7 +2470,8 @@
           "Mandate Crown Celestial City"
         ]
       },
-      "terrain": "imperial starlit plain"
+      "terrain": "imperial starlit plain",
+      "settlement_type": "city"
     },
     "Spirit Jade Rebirth Enclave": {
       "description": "A protected lower district in the Spiritual World where mortal-born descendants, reincarnated souls and weak juniors can survive beneath stabilizing formations.",
@@ -29647,24 +29650,56 @@
       "name": "Ascendant Jade Gate",
       "from": "Azure Crown Imperial City",
       "to": "Spirit Jade Capital",
-      "currency": "low_spirit_crystal",
-      "cost": 1,
+      "currency": "low_spirit_stone",
+      "cost": 200,
       "min_realm_index": 8
     },
     "spirit_immortal": {
       "name": "Immortal Cloud Crossing",
       "from": "Spirit Jade Capital",
       "to": "Nine-Heavens Immortal Court",
-      "currency": "low_immortal_stone",
-      "cost": 1,
+      "currency": "low_spirit_crystal",
+      "cost": 200,
       "min_realm_index": 16
     },
     "immortal_celestial": {
       "name": "Celestial Mandate Gate",
       "from": "Nine-Heavens Immortal Court",
       "to": "Celestial Mandate Palace",
+      "currency": "low_immortal_stone",
+      "cost": 200,
+      "min_realm_index": 24
+    },
+    "imperial_greenriver": {
+      "name": "Greenriver–Imperial Transit Array (Return)",
+      "from": "Azure Crown Imperial City",
+      "to": "Greenriver Town",
+      "currency": "low_spirit_stone",
+      "cost": 10,
+      "min_realm_index": 1
+    },
+    "spirit_imperial": {
+      "name": "Ascendant Jade Gate (Return)",
+      "from": "Spirit Jade Capital",
+      "to": "Azure Crown Imperial City",
+      "currency": "low_spirit_crystal",
+      "cost": 200,
+      "min_realm_index": 8
+    },
+    "immortal_spirit": {
+      "name": "Immortal Cloud Crossing (Return)",
+      "from": "Nine-Heavens Immortal Court",
+      "to": "Spirit Jade Capital",
+      "currency": "low_immortal_stone",
+      "cost": 200,
+      "min_realm_index": 16
+    },
+    "celestial_immortal": {
+      "name": "Celestial Mandate Gate (Return)",
+      "from": "Celestial Mandate Palace",
+      "to": "Nine-Heavens Immortal Court",
       "currency": "low_celestial_crystal",
-      "cost": 1,
+      "cost": 200,
       "min_realm_index": 24
     }
   },

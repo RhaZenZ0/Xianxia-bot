@@ -504,8 +504,12 @@ async def inventory(interaction: discord.Interaction) -> None:
     else:
         lines = []
         for item_id, qty in inv.items():
-            item = WORLD.items.get(item_id, {"name": item_id, "description": ""})
-            lines.append(f"**{item['name']}** x{qty} — {item['description']}")
+            # The fallback only covers an id missing from the catalogue; an
+            # entry present but short a field must not take the listing down
+            # with it, so every read has its own default.
+            item = WORLD.items.get(item_id) or {}
+            name = str(item.get("name") or item_id)
+            lines.append(f"**{name}** x{qty} — {item.get('description') or ''}")
         text = "\n".join(lines)
     await interaction.response.send_message(
         f"**{c['name']}'s Carried Inventory**\nLow Spirit Stones: **{c['spirit_stones']}**\n\n{text}",

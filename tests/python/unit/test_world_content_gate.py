@@ -102,6 +102,37 @@ class AuctionHouseContentTests(unittest.TestCase):
                     self.assertGreaterEqual(int(house["max_active_lots"]), 20)
 
 
+class WorldCrossingContentTests(unittest.TestCase):
+    """v1.0.0-rc.15: the gates between the worlds are payable and run both ways."""
+
+    def test_every_array_charges_the_world_it_departs_from(self):
+        # Three of the four crossings charged the DESTINATION world's tier-1
+        # currency, which no reward path grants and no exchange converts - so
+        # they could only be paid by someone who had already arrived. Dead
+        # content, wired end to end.
+        tier_one = {c["world"]: key for key, c in WORLD["currencies"].items() if int(c.get("tier") or 0) == 1}
+        for key, array in WORLD["teleport_arrays"].items():
+            with self.subTest(array=key):
+                origin = WORLD["locations"][array["from"]]
+                self.assertEqual(array["currency"], tier_one[origin["world"]], "an array must be payable where it stands")
+                self.assertGreater(int(array["cost"]), 0)
+                self.assertIn(array["to"], WORLD["locations"])
+
+    def test_no_array_is_a_one_way_trap(self):
+        pairs = {(a["from"], a["to"]) for a in WORLD["teleport_arrays"].values()}
+        for origin, destination in sorted(pairs):
+            with self.subTest(leg=f"{origin} -> {destination}"):
+                self.assertIn((destination, origin), pairs, "no way back")
+
+    def test_a_capital_is_a_city(self):
+        # death_qi.go applies a city's gathering penalty only where
+        # settlement_type is set, so a capital without one is quietly exempt.
+        for name, loc in WORLD["locations"].items():
+            if loc.get("realm_hub"):
+                with self.subTest(capital=name):
+                    self.assertEqual(loc.get("settlement_type"), "city")
+
+
 class NpcContentTests(unittest.TestCase):
     def test_every_npc_has_the_narrator_fields(self):
         for name, npc in WORLD["npcs"].items():
@@ -166,7 +197,7 @@ class TravellingMerchantContentTests(unittest.TestCase):
                     item = items[ware["item_id"]]
                     self.assertFalse(item.get("market_excluded"), ware["item_id"])
                     self.assertFalse(item.get("auction_interest"), f"{ware['item_id']} is auction-grade, not shop stock")
-                    self.assertNotEqual(item.get("category"), "manual", ware["item_id"])
+                    self.assertNotEqual(item.get("type"), "manual", ware["item_id"])
                     self.assertGreater(int(ware["quantity"]), 0)
                     self.assertGreater(int(ware["price"]), 0)
 

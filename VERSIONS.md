@@ -190,6 +190,37 @@ minutes, the same for a jade terrace as for a volcanic pass. All 102 travel endp
 carry terrain now; the remaining 375 locations are districts, gates, shops and auction floors inside
 them, which no road ever ends at.
 
+And the hardest journey in the genre had three doors, two of them shut. Ascension - 飞升, the
+tribulation-gated jump to the next plane - had every piece built: the three waves of lightning, heart
+and void, the gate on the breakthrough that refuses an uncleared tribulation, the `world_history_events`
+row at significance 98 reading "ascended to the Spiritual World". And then the cultivator was still
+standing in Greenriver Town, with a free `/realmhub go` as the only way to actually be in the world
+they had just crossed into. The heavens took nobody anywhere. They do now: the crossing sets you down
+in the new world's capital, puts it on your map, and says so. An ordinary breakthrough inside a world
+still moves nobody, and an uncleared tribulation still refuses.
+
+The teleportation arrays were dead content wired end to end. Three of the four charged the
+*destination* world's tier-1 currency - which no reward path grants, which no exchange converts, and
+which can only be earned by selling in the world you are trying to reach. The chain was circular: the
+Ascendant Jade Gate wanted spirit crystals from someone who had never been to the Spiritual World.
+They charge the world you are standing in now, the way the tribulation's own preparation does, and a
+crossing costs what a crossing should. Each of the four also got its return leg, because a one-way
+gate is a trap. The `/array` picker no longer offers a gate your realm cannot withstand, and the
+arrival message names where you came down instead of "your destination" - it had been reading two
+keys the engine never returned.
+
+One more thing the crossing exposed: the world-crossing tribulation is gated on either ladder - a
+body cultivator clears the Mortal Body Ascension exactly as a qi cultivator clears theirs - but every
+location check in both languages read `realm_index` alone. A body cultivator could therefore ascend
+into a world and be locked out of it, arriving in a capital that admits realm 8 with a qi ladder
+still at zero. Whichever ladder carried them is the one that answers now, in the engine and in the
+pickers alike.
+
+And a capital is a city. `death_qi.go` gives a city its gathering penalty only where `settlement_type`
+is set, and the three higher-world capitals had none - so a death-qi cultivator gathering in Spirit
+Jade Capital, Nine-Heavens Immortal Court or Celestial Mandate Palace quietly escaped a penalty every
+mortal-world city pays. A content gate holds every realm hub to being a city.
+
 **1.0.0** (rc.14) repairs a broken call in `/sense` and closes the class of fault it belongs to.
 Sensing another cultivator called `WORLD.approximate_realm(...)`, and there is no such method on
 `World`: the function lives in `app/rules/sense.py` and takes its two realm lookups as arguments, so

@@ -144,6 +144,23 @@ func currentWorld(c mechanicsCharacter, catalog worlddata.Catalog) string {
 	return "Mortal World"
 }
 
+// realmHubOf is the capital of a world - the one place in it that is always
+// known and always reachable. Map iteration is unordered, so a world with two
+// capitals would otherwise answer differently on different runs; the lowest
+// name wins, which is arbitrary but stable.
+func realmHubOf(catalog worlddata.Catalog, world string) string {
+	hub := ""
+	for name, loc := range catalog.Locations {
+		if loc.World != world || !loc.RealmHub {
+			continue
+		}
+		if hub == "" || name < hub {
+			hub = name
+		}
+	}
+	return hub
+}
+
 func worldMinRealm(catalog worlddata.Catalog, world string) int64 {
 	var best int64 = 1 << 62
 	for _, loc := range catalog.Locations {
@@ -806,7 +823,7 @@ func knownLocationsTx(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 	}
 	if c.Location != "" && !strings.HasPrefix(c.Location, "abode:") && !strings.HasPrefix(c.Location, "personal_world:") {
 		known[c.Location] = true
-		for _, neighbor := range canonicalRoadNeighbors(catalog, c.Location, c.RealmIndex) {
+		for _, neighbor := range canonicalRoadNeighbors(catalog, c.Location, c.accessRealmIndex()) {
 			known[neighbor] = true
 		}
 		// Inside a shop, an auction hall, a gate or a district (v0.35.0,
@@ -815,7 +832,7 @@ func knownLocationsTx(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 		city := cityOf(catalog, c.Location)
 		if city != c.Location {
 			known[city] = true
-			for _, neighbor := range canonicalRoadNeighbors(catalog, city, c.RealmIndex) {
+			for _, neighbor := range canonicalRoadNeighbors(catalog, city, c.accessRealmIndex()) {
 				known[neighbor] = true
 			}
 		}
@@ -832,7 +849,7 @@ func knownLocationsTx(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 		}
 	}
 	for name, loc := range catalog.Locations {
-		if loc.RealmHub && c.RealmIndex >= worldMinRealm(catalog, loc.World) {
+		if loc.RealmHub && c.accessRealmIndex() >= worldMinRealm(catalog, loc.World) {
 			known[name] = true
 		}
 	}
@@ -874,18 +891,18 @@ func discoverNextLocationTx(conn *storage.Conn, catalog worlddata.Catalog, userI
 	// per knownLocationsTx), so this never stalls exploration - it just
 	// makes discovery follow the road network outward ring by ring instead
 	// of jumping anywhere at once.
-	frontier := roadFrontierTx(catalog, known, c.RealmIndex)
+	frontier := roadFrontierTx(catalog, known, c.accessRealmIndex())
 	candidates := []string{}
 	for name := range frontier {
 		loc, ok := catalog.Locations[name]
-		if !ok || known[name] || loc.World != world || loc.MinRealmIndex > c.RealmIndex || loc.Private || strings.HasPrefix(name, "abode:") || strings.HasPrefix(name, "personal_world:") {
+		if !ok || known[name] || loc.World != world || loc.MinRealmIndex > c.accessRealmIndex() || loc.Private || strings.HasPrefix(name, "abode:") || strings.HasPrefix(name, "personal_world:") {
 			continue
 		}
 		candidates = append(candidates, name)
 	}
 	// The sites on the roads out of a known city (v0.39.0) are found the
 	// same way as the next city along.
-	candidates = append(candidates, roadSiteCandidates(catalog, known, world, c.RealmIndex)...)
+	candidates = append(candidates, roadSiteCandidates(catalog, known, world, c.accessRealmIndex())...)
 	if len(candidates) == 0 {
 		return "", nil
 	}
@@ -1447,7 +1464,7 @@ func explorationTravelAction(conn *storage.Conn, catalog worlddata.Catalog, user
 	} else if dest.District != "" && originCity != dest.OutsideLocation {
 		return authoritativeMutation{}, fmt.Errorf("%s is in %s; travel there first", p.Destination, dest.OutsideLocation)
 	}
-	if c.RealmIndex < dest.MinRealmIndex {
+	if c.accessRealmIndex() < dest.MinRealmIndex {
 		return authoritativeMutation{}, errors.New("destination lies beyond the character's current cultivation")
 	}
 
@@ -1459,7 +1476,7 @@ func explorationTravelAction(conn *storage.Conn, catalog worlddata.Catalog, user
 		if !dest.RealmHub {
 			return authoritativeMutation{}, errors.New("destination is not a realm capital")
 		}
-		if c.RealmIndex < worldMinRealm(catalog, dest.World) {
+		if c.accessRealmIndex() < worldMinRealm(catalog, dest.World) {
 			return authoritativeMutation{}, errors.New("realm capital is not yet unlocked")
 		}
 	} else {
@@ -1483,7 +1500,7 @@ func explorationTravelAction(conn *storage.Conn, catalog worlddata.Catalog, user
 	// How they crossed it, and what carried them if anything did. Read off
 	// the plan rather than recomputed, so the words can never disagree with
 	// the minutes they were charged.
-	travelModeName, travelMount := travelModeFor(c.RealmIndex).Name, ""
+	travelModeName, travelMount := travelModeFor(c.accessRealmIndex()).Name, ""
 
 	// A road-side site (v0.39.0) is half a leg from either end of its road
 	// and from the other sites on it; from a site the road leads nowhere
@@ -1495,7 +1512,7 @@ func explorationTravelAction(conn *storage.Conn, catalog worlddata.Catalog, user
 	if mode != "hub" {
 		plan, found := roadRoutePlan{}, false
 		if siteHop {
-			plan, found = roadSiteHop(catalog, originCity, p.Destination, c.RealmIndex)
+			plan, found = roadSiteHop(catalog, originCity, p.Destination, c.accessRealmIndex())
 			if !found {
 				if cur.RoadSite != "" {
 					a, b, _ := roadSiteEndpoints(catalog, c.Location)
@@ -1509,13 +1526,13 @@ func explorationTravelAction(conn *storage.Conn, catalog worlddata.Catalog, user
 			if ferr != nil {
 				return authoritativeMutation{}, ferr
 			}
-			riding := c.RealmIndex
+			riding := c.accessRealmIndex()
 			if flight > riding {
 				riding = flight
 			} else {
 				mount = ""
 			}
-			plan, found = canonicalRoadRouteRiding(catalog, originCity, p.Destination, c.RealmIndex, riding, mount)
+			plan, found = canonicalRoadRouteRiding(catalog, originCity, p.Destination, c.accessRealmIndex(), riding, mount)
 		}
 		if found {
 			roadConnection = true

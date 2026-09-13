@@ -31,7 +31,7 @@ from ..discovery import (
 )
 from ..formatting import human_duration, roll_line
 from ..hubs import HubDynamicOption, register_hub_option_provider
-from ..locations import _known_locations, destination_groups, location_autocomplete
+from ..locations import _known_locations, access_realm_index, destination_groups, location_autocomplete
 from ..registry import registered_group_command, registered_root_command
 from ..runtime import (
     DB,
@@ -1393,7 +1393,7 @@ async def travel_destination_hub_options(interaction: discord.Interaction, curre
         return []
     known = await _known_locations(interaction.user.id, c)
     needle = str(current or "").casefold().strip()
-    rows = destination_groups(str(c.get("location") or ""), known, int(c.get("realm_index", 0)))
+    rows = destination_groups(str(c.get("location") or ""), known, access_realm_index(c))
     out = []
     for name, emoji, description, _order in rows:
         if needle and needle not in name.casefold():
