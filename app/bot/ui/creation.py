@@ -231,7 +231,7 @@ class CharacterModal(discord.ui.Modal):
         else:
             await interaction.followup.send(
                 "⚠️ Your cultivator was created, but Discord did not create the private starting thread. "
-                "Ask an administrator to run **/admin → Server → Setup Server** and confirm the bot has "
+                "Ask an administrator to run **/admin → Server → Setup** and confirm the bot has "
                 "**Create Private Threads**, **Send Messages in Threads**, and **Manage Threads**.",
                 ephemeral=True,
             )

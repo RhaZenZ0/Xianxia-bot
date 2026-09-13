@@ -552,7 +552,7 @@ async def admin_closeevent(interaction: discord.Interaction, event_key: str) -> 
     record = await DB.get_event_thread_by_key(event_key.strip())
     if not record:
         await interaction.response.send_message(
-            "No active event thread was found for that key. Use **/admin world events** first.", ephemeral=False
+            "No active event thread was found for that key. Use **/admin → World → Events** first.", ephemeral=False
         )
         return
     await interaction.response.defer(ephemeral=False)
@@ -721,7 +721,7 @@ async def admin_quests(interaction: discord.Interaction, retire: str = "") -> No
     drafts = await DB.list_quest_definitions("draft")
     approved = await DB.list_quest_definitions("approved")
     if not drafts and not approved:
-        await interaction.response.send_message("No forged quests yet. Draft one with **/admin world questforge**.", ephemeral=False)
+        await interaction.response.send_message("No forged quests yet. Draft one with **/admin → World → Questforge**.", ephemeral=False)
         return
     lines = []
     if approved:

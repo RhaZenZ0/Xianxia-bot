@@ -84,7 +84,7 @@ async def abode_thread_command(interaction:discord.Interaction)->None:
     if thread:
         await interaction.response.send_message(f"{player_property_emoji(a)} Private property scene: {thread.mention}",ephemeral=False)
     else:
-        await interaction.response.send_message("Could not create a private property thread. Run **/admin → Server → Setup Server** and grant Create Private Threads / Send in Threads.",ephemeral=False)
+        await interaction.response.send_message("Could not create a private property thread. Run **/admin → Server → Setup** and grant Create Private Threads / Send in Threads.",ephemeral=False)
 
 
 @registered_group_command(abode_group, name="enter",description="Enter your player-owned property from its physical entrance location")

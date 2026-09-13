@@ -1,31 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Any, Iterable
-
-
-@dataclass(frozen=True)
-class EffectModifier:
-    stat: str
-    operation: str
-    value: float
-
-
-@dataclass(frozen=True)
-class EffectView:
-    effect_key: str
-    name: str
-    source_type: str
-    source_id: str
-    modifiers: tuple[EffectModifier, ...]
-    tags: tuple[str, ...]
-    stacks: int = 1
-    starts_game_minute: int = 0
-    ends_game_minute: int | None = None
-
-    @property
-    def permanent(self) -> bool:
-        return self.ends_game_minute is None
 
 
 def normalize_effect_payload(payload: dict[str, Any]) -> dict[str, Any]:

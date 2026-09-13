@@ -351,7 +351,21 @@ def _hint_action(hub_name: str, steps: Sequence[str]) -> "HubAction | None":
     if labels:
         found = next((p for p in definition.pages if p.label.casefold() == labels[0] or p.key.casefold() == labels[0]), None)
         if found is None:
-            return None
+            # The step names an action, not a page: `**/family → Leave**` rather
+            # than `**/family → Family → Leave**`. Thirty printed paths were
+            # written that way and every one of them returned None here, so the
+            # next-step button a reply had earned simply did not appear - no
+            # error, nothing in a log, just a missing button. Look for the
+            # action across the hub's pages, in page order, and only when the
+            # first step named no page at all; a path that does name a page is
+            # resolved exactly as before.
+            direct = next(
+                (action for candidate in definition.pages for action in _leaf_actions(candidate)
+                 if action.label.casefold() == labels[0]
+                 or str(getattr(action.command, "name", "")).casefold() == labels[0]),
+                None,
+            )
+            return direct
         page = found
         labels = labels[1:]
     actions = _leaf_actions(page)

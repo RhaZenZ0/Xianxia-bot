@@ -9,37 +9,6 @@ from typing import Any, Protocol
 from .advanced_catalog import augment_advanced_catalog
 
 
-@dataclass(frozen=True)
-class RollResult:
-    die1: int
-    die2: int
-    modifier: int
-    total: int
-    tn: int
-
-    @property
-    def success(self) -> bool:
-        return self.total >= self.tn
-
-    @property
-    def margin(self) -> int:
-        return self.total - self.tn
-
-    @property
-    def degree(self) -> str:
-        if self.success:
-            if self.margin >= 10:
-                return "Overwhelming Success"
-            if self.margin >= 5:
-                return "Strong Success"
-            return "Success"
-        if self.margin >= -3:
-            return "Soft Failure"
-        if self.margin >= -7:
-            return "Hard Failure"
-        return "Severe Failure"
-
-
 class D10Source(Protocol):
     """Injected randomness boundary used by parity and replay tests."""
 
