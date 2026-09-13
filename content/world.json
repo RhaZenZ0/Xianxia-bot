@@ -12142,7 +12142,14 @@
         "Afternoon": "Golden Pavilion Auction House",
         "Evening": "Greenriver Town",
         "Night": "Greenriver Town"
-      }
+      },
+      "circuit": [
+        "Greenriver Town",
+        "Riverguard City",
+        "Azure Crown Imperial City",
+        "Jadewood Medicine City"
+      ],
+      "circuit_months": 2
     },
     "Old Lin the Janitor": {
       "role": "Quiet janitor who sweeps unused courtyards near an old sect outpost",
@@ -13321,7 +13328,7 @@
       "speech": "Low and even, the cadence of someone reading aloud; asks what year you think it is before anything else.",
       "want": "Every soul that arrives entered in the ledger under the name it will live by, and every stabilising tile whole before the pressure outside rises again.",
       "fear": "That the enclave is genuinely smaller each time the old woman says so, and that one day a tile cracks while she is on the road with the list of names.",
-      "secret": "She has read the enclave's oldest ledger, the one that records the Jade line's true heir dying in infancy, and keeps that page under a tile only she replaces; she has told no one, including the Sovereign.",
+      "secret": "She has read the enclave's oldest ledger, the one that records the Jade line's true heir dying in infancy, and keeps that page under a tile only she replaces; she has told no one, including the Sovereign. She is Soul Transformation Stage 2 and wears a warden's authority far above her cultivation; the enclave's ledgers are genuinely hers, and that is the part nobody doubts.",
       "location": "Spirit Jade Rebirth Enclave",
       "schedule": {
         "Dawn": "Spirit Jade Rebirth Enclave",
@@ -13329,6 +13336,20 @@
         "Afternoon": "Spirit Jade Capital",
         "Evening": "Spirit Jade Rebirth Enclave",
         "Night": "Spirit Jade Rebirth Enclave"
+      },
+      "hidden_master": {
+        "kind": "fake",
+        "true_name": "Wen Shuang",
+        "true_title": "None",
+        "true_realm_index": 9,
+        "true_stage": 2,
+        "concealment": 11,
+        "deception": 34,
+        "projected_realm_index": 15,
+        "projected_stage": 5,
+        "public_threat": "A warden nobody wishes to test",
+        "sense_false_reading": "A cold, immense pressure that sits oddly still around the ledgers",
+        "fraud_item": "Enclave Warden's Pressure Seal"
       }
     },
     "Terrace Matron Gu Yanli": {
@@ -13887,7 +13908,24 @@
         "Night": "Moonfen Mistwater Auction Pavilion"
       },
       "personality": "Quiet, patient, unsettling to strangers and unexpectedly kind to the frightened.",
-      "secret": "She keeps one dredged relic that was never listed, and speaks to it after the last lantern is out."
+      "secret": "She keeps one dredged relic that was never listed, and speaks to it after the last lantern is out. She is Zhou Suqin, the Mistwater Arbiter, a True Immortal who keeps the pavilion floor because every lie in the world eventually comes to auction.",
+      "hidden_master": {
+        "kind": "real",
+        "true_name": "Zhou Suqin",
+        "true_title": "Mistwater Arbiter",
+        "true_realm_index": 16,
+        "true_stage": 3,
+        "concealment": 60,
+        "deception": 14,
+        "public_threat": "The pavilion's quiet keeper",
+        "sense_false_reading": "A mortal woman counting lots, and nothing beneath it",
+        "mentor_tags": [
+          "Soul Cultivator",
+          "judgement",
+          "patience",
+          "worldly knowledge"
+        ]
+      }
     },
     "Pavilion Keeper Zhu Shaoyu": {
       "role": "Moonfrost Mistwater Auction Pavilion pavilion keeper",
@@ -14230,7 +14268,29 @@
         "Night": "Greenriver Town"
       },
       "personality": "Cheerful, nosy, unhurried and impossible to insult; remembers what every town needs.",
-      "secret": "Half his 'auction finds' are bought unsold at the Pavilion for the reserve; the stories are the markup."
+      "secret": "Half his 'auction finds' are bought unsold at the Pavilion for the reserve; the stories are the markup. He is Foundation Establishment Stage 1 and has let four towns believe he is a retired expert slumming it, because a senior's cart is not robbed and a senior's prices are not argued with.",
+      "circuit": [
+        "Greenriver Town",
+        "Riverguard City",
+        "Jadewood Medicine City",
+        "Azure Crown Imperial City"
+      ],
+      "circuit_months": 2,
+      "circuit_offset": 1,
+      "hidden_master": {
+        "kind": "fake",
+        "true_name": "Hu San",
+        "true_title": "None",
+        "true_realm_index": 2,
+        "true_stage": 1,
+        "concealment": 8,
+        "deception": 29,
+        "projected_realm_index": 6,
+        "projected_stage": 4,
+        "public_threat": "A peddler who used to be somebody, they say",
+        "sense_false_reading": "A settled, weighty aura that the mule plainly does not respect",
+        "fraud_item": "Cracked Aura-Weight Pendant"
+      }
     },
     "Madam Wen of the Silk Road": {
       "role": "caravan mistress and travelling merchant",
@@ -21638,7 +21698,7 @@
       "speech": "Talks over the shoulder while doing three other things.",
       "want": "Keep the yard full and the road between Adamant Body Immortal City and Heavenblade Immortal City open in both directions.",
       "fear": "A bandit season that closes the road and empties the yard.",
-      "secret": "Sells the merchants word of who passed and when.",
+      "secret": "Sells the merchants word of who passed and when. He is Fang Shan, the Halfmoon Sovereign, an Immortal Sovereign who keeps a waystation on the road he once closed with his own hands.",
       "schedule": {
         "Dawn": "Halfmoon Waystation",
         "Morning": "Halfmoon Waystation",
@@ -21646,7 +21706,24 @@
         "Evening": "Halfmoon Waystation",
         "Night": "Halfmoon Waystation"
       },
-      "shop": "halfmoon_waystation"
+      "shop": "halfmoon_waystation",
+      "hidden_master": {
+        "kind": "real",
+        "true_name": "Fang Shan",
+        "true_title": "Halfmoon Sovereign",
+        "true_realm_index": 23,
+        "true_stage": 5,
+        "concealment": 66,
+        "deception": 9,
+        "public_threat": "A waystation keeper, growing old",
+        "sense_false_reading": "Nothing - a still room, a lamp, an empty chair",
+        "mentor_tags": [
+          "Sword Cultivator",
+          "restraint",
+          "regret",
+          "dao insight"
+        ]
+      }
     },
     "Hunter Guo Jun": {
       "role": "wilderness hunter on the Adamant Body Immortal City-Solar Furnace Immortal City road",
@@ -21730,13 +21807,30 @@
       "speech": "Softly, with long pauses that are not for effect.",
       "want": "Keep the bell rung at noon until someone comes to take it over.",
       "fear": "Dying before the next keeper comes.",
-      "secret": "Was a sect deacon once, and left after a killing nobody has connected to the shrine.",
+      "secret": "Was a sect deacon once, and left after a killing nobody has connected to the shrine. He is Lu Kun, the Quiet Pine Sage, a Dao Comprehension cultivator who stepped down from the Spiritual World and has swept the same shrine for ninety years.",
       "schedule": {
         "Dawn": "Wayside Shrine of the Quiet Pine",
         "Morning": "Wayside Shrine of the Quiet Pine",
         "Afternoon": "Wayside Shrine of the Quiet Pine",
         "Evening": "Wayside Shrine of the Quiet Pine",
         "Night": "Wayside Shrine of the Quiet Pine"
+      },
+      "hidden_master": {
+        "kind": "real",
+        "true_name": "Lu Kun",
+        "true_title": "Quiet Pine Sage",
+        "true_realm_index": 13,
+        "true_stage": 4,
+        "concealment": 52,
+        "deception": 12,
+        "public_threat": "A shrine hermit, apparently unremarkable",
+        "sense_false_reading": "Nothing at all - the stillness of the pine, and of the man under it",
+        "mentor_tags": [
+          "Qi Refiner",
+          "stillness",
+          "dao insight",
+          "patience"
+        ]
       }
     },
     "Keeper Mo Rong": {
@@ -21804,7 +21898,7 @@
       "speech": "Talks over the shoulder while doing three other things.",
       "want": "Keep the yard full and the road between Celestial Mandate Palace and Celestial River City open in both directions.",
       "fear": "A bandit season that closes the road and empties the yard.",
-      "secret": "Sells the merchants word of who passed and when.",
+      "secret": "Sells the merchants word of who passed and when. He is Celestial Stage 1 and every inch of the rest is a Celestial-grade forgery he cannot afford to have examined twice.",
       "schedule": {
         "Dawn": "Broken Axle Waystation",
         "Morning": "Broken Axle Waystation",
@@ -21812,7 +21906,21 @@
         "Evening": "Broken Axle Waystation",
         "Night": "Broken Axle Waystation"
       },
-      "shop": "broken_axle_waystation"
+      "shop": "broken_axle_waystation",
+      "hidden_master": {
+        "kind": "fake",
+        "true_name": "Qin Jie",
+        "true_title": "None",
+        "true_realm_index": 24,
+        "true_stage": 1,
+        "concealment": 13,
+        "deception": 38,
+        "projected_realm_index": 28,
+        "projected_stage": 4,
+        "public_threat": "A Celestial Emperor keeping a waystation, or so the road says",
+        "sense_false_reading": "An overwhelming imperial pressure, a half-beat out of time with his breathing",
+        "fraud_item": "Counterfeit Emperor's Aura Array"
+      }
     },
     "Hunter Ruan Pan": {
       "role": "wilderness hunter on the Celestial Mandate Palace-Mandate Crown Celestial City road",
@@ -21859,13 +21967,30 @@
       "speech": "Softly, with long pauses that are not for effect.",
       "want": "Keep the bell rung at noon until someone comes to take it over.",
       "fear": "Dying before the next keeper comes.",
-      "secret": "Was a sect deacon once, and left after a killing nobody has connected to the shrine.",
+      "secret": "Was a sect deacon once, and left after a killing nobody has connected to the shrine. He is Tang Bao, the Kneeling Stone Saint, a Dao Saint who knelt once and has not explained to anyone, in eight thousand years, what for.",
       "schedule": {
         "Dawn": "Shrine of the Kneeling Stone",
         "Morning": "Shrine of the Kneeling Stone",
         "Afternoon": "Shrine of the Kneeling Stone",
         "Evening": "Shrine of the Kneeling Stone",
         "Night": "Shrine of the Kneeling Stone"
+      },
+      "hidden_master": {
+        "kind": "real",
+        "true_name": "Tang Bao",
+        "true_title": "Kneeling Stone Saint",
+        "true_realm_index": 30,
+        "true_stage": 3,
+        "concealment": 74,
+        "deception": 6,
+        "public_threat": "A beggar kneeling at a roadside stone",
+        "sense_false_reading": "Less than a mortal. The sense finds the stone, and not the man beside it",
+        "mentor_tags": [
+          "Perfect Realm",
+          "humility",
+          "penance",
+          "dao insight"
+        ]
       }
     },
     "Hunter Wei Hao": {
@@ -21931,13 +22056,30 @@
       "speech": "Softly, with long pauses that are not for effect.",
       "want": "Keep the bell rung at noon until someone comes to take it over.",
       "fear": "Dying before the next keeper comes.",
-      "secret": "Was a sect deacon once, and left after a killing nobody has connected to the shrine.",
+      "secret": "Was a sect deacon once, and left after a killing nobody has connected to the shrine. He is Zhou Shan, the Bellkeeper of the Long Road, a Star Immortal who rings the shrine bell for travellers and has not named himself in four hundred years.",
       "schedule": {
         "Dawn": "Shrine of the Traveller's Bell",
         "Morning": "Shrine of the Traveller's Bell",
         "Afternoon": "Shrine of the Traveller's Bell",
         "Evening": "Shrine of the Traveller's Bell",
         "Night": "Shrine of the Traveller's Bell"
+      },
+      "hidden_master": {
+        "kind": "real",
+        "true_name": "Zhou Shan",
+        "true_title": "Bellkeeper of the Long Road",
+        "true_realm_index": 19,
+        "true_stage": 6,
+        "concealment": 58,
+        "deception": 10,
+        "public_threat": "An old man who rings a bell",
+        "sense_false_reading": "The faint warmth of a mortal who has sat too long in one place",
+        "mentor_tags": [
+          "Formation Adept",
+          "endurance",
+          "roads",
+          "dao insight"
+        ]
       }
     },
     "Keeper Cao Jun": {
@@ -22633,6 +22775,333 @@
         "Afternoon": "Thousand Beast Valley Mouth",
         "Evening": "Thousand Beast Valley Mouth",
         "Night": "Thousand Beast Valley Mouth"
+      }
+    },
+    "The Barefoot Pilgrim": {
+      "role": "barefoot pilgrim walking the Spiritual World's shrine road, never staying a season",
+      "location": "Shrine of the River Mother",
+      "realm": "No detectable cultivation",
+      "stage": 1,
+      "personality": "Unhurried, courteous to everyone, entirely uninterested in being believed.",
+      "speech": "Short answers, and one question back that is harder than it sounds.",
+      "want": "Walk every shrine on the road once more before the road changes.",
+      "fear": "Being recognised, and having to stop walking.",
+      "secret": "She is Ruan Qingci, the Barefoot Transcendent, a Transcendence Realm cultivator who put down a sect of nine thousand and has not sat on a chair since.",
+      "schedule": {},
+      "circuit": [
+        "Shrine of the River Mother",
+        "Cold Spring Waystation",
+        "Shrine of the Hundred Cairns",
+        "Willow Ford Waystation",
+        "Shrine of the Traveller's Bell"
+      ],
+      "circuit_months": 2,
+      "hidden_master": {
+        "kind": "real",
+        "true_name": "Ruan Qingci",
+        "true_title": "Barefoot Transcendent",
+        "true_realm_index": 15,
+        "true_stage": 8,
+        "concealment": 57,
+        "deception": 11,
+        "public_threat": "A pilgrim with no shoes",
+        "sense_false_reading": "Road dust, tired feet, and nothing underneath either",
+        "mentor_tags": [
+          "Qi Refiner",
+          "detachment",
+          "roads",
+          "dao insight"
+        ]
+      }
+    },
+    "Elder Brother Pang": {
+      "role": "travelling seller of 'ancestral' cultivation manuals, working the spirit cities in turn",
+      "location": "Jadeflow Spirit City",
+      "realm": "Suppressed aura",
+      "stage": 1,
+      "personality": "Warm, generous with tea, and never in the same city when a buyer comes back.",
+      "speech": "Confidential murmurs, a great many titles, and prices that fall dramatically at the door.",
+      "want": "Sell the last of the Nirvana manuals before anyone reads one properly.",
+      "fear": "A customer who is genuinely Nirvana.",
+      "secret": "He is Nirvana Stage 1 and the aura is a rented array-plate; two of the nine manuals he sells are real, which is exactly why the other seven move.",
+      "schedule": {},
+      "circuit": [
+        "Jadeflow Spirit City",
+        "Galevein Spirit City",
+        "Moonfrost Spirit City",
+        "Stoneheart Spirit City",
+        "Northwind Spirit City"
+      ],
+      "circuit_months": 2,
+      "circuit_offset": 2,
+      "hidden_master": {
+        "kind": "fake",
+        "true_name": "Pang Er",
+        "true_title": "None",
+        "true_realm_index": 11,
+        "true_stage": 1,
+        "concealment": 12,
+        "deception": 36,
+        "projected_realm_index": 15,
+        "projected_stage": 2,
+        "public_threat": "A senior of some transcendent lineage, he implies",
+        "sense_false_reading": "A vast, patient pressure that flickers when he laughs",
+        "fraud_item": "Rented Ninefold Aura Plate"
+      }
+    },
+    "The Ferryman of the Yellow Gourd": {
+      "role": "ferryman who poles travellers across wherever the road meets water",
+      "location": "Yellow Gourd Waystation",
+      "realm": "No detectable cultivation",
+      "stage": 1,
+      "personality": "Talks about the weather and the water and nothing else, however hard you push.",
+      "speech": "Flat, friendly, and completely without curiosity about who you are.",
+      "want": "Carry everyone who asks, and refuse the ones who do not.",
+      "fear": "The one passenger he did not carry.",
+      "secret": "He is Dao Integration and has been ferrying the same four crossings for six hundred years; the sects that looked for him gave up four centuries ago.",
+      "schedule": {},
+      "circuit": [
+        "Yellow Gourd Waystation",
+        "Old Ferry Waystation",
+        "Willow Ford Waystation"
+      ],
+      "circuit_months": 3,
+      "hidden_master": {
+        "kind": "real",
+        "true_name": "Unnamed",
+        "true_title": "The Ferryman",
+        "true_realm_index": 14,
+        "true_stage": 5,
+        "concealment": 55,
+        "deception": 9,
+        "public_threat": "A ferryman",
+        "sense_false_reading": "Water, wet rope, and a mortal who has done this a long time",
+        "mentor_tags": [
+          "Soul Cultivator",
+          "patience",
+          "crossings",
+          "silence"
+        ]
+      }
+    },
+    "The Lamp-Carrier": {
+      "role": "old woman carrying an unlit lamp between the Immortal World's shrines",
+      "location": "Shrine of the Cold Lamp",
+      "realm": "No detectable cultivation",
+      "stage": 1,
+      "personality": "Kind, absent, and very hard to end a conversation with.",
+      "speech": "Wanders into long stories that turn out, afterwards, to have been about you.",
+      "want": "Find the shrine where the lamp is supposed to be lit.",
+      "fear": "Lighting it at the wrong one.",
+      "secret": "She is Meng Zhaoxi, the Cold Lamp Sovereign, a Void Immortal who burned a city and has been looking for the right place to answer for it since.",
+      "schedule": {},
+      "circuit": [
+        "Shrine of the Cold Lamp",
+        "Dust Road Waystation",
+        "Shrine of the Last Step",
+        "Iron Kettle Waystation",
+        "Shrine of the Lost Sandal",
+        "Crow's Rest Waystation"
+      ],
+      "circuit_months": 2,
+      "hidden_master": {
+        "kind": "real",
+        "true_name": "Meng Zhaoxi",
+        "true_title": "Cold Lamp Sovereign",
+        "true_realm_index": 21,
+        "true_stage": 4,
+        "concealment": 63,
+        "deception": 15,
+        "public_threat": "A confused old woman with a lamp",
+        "sense_false_reading": "Nothing, and a faint smell of smoke that is not coming from the lamp",
+        "mentor_tags": [
+          "Formation Adept",
+          "penance",
+          "memory",
+          "dao insight"
+        ]
+      }
+    },
+    "Master Yun of the Nine Seals": {
+      "role": "self-styled immortal appraiser who tours the immortal cities authenticating relics",
+      "location": "Skyroad Immortal City",
+      "realm": "Suppressed aura",
+      "stage": 1,
+      "personality": "Imperious, impatient, and genuinely knowledgeable about everything except his own realm.",
+      "speech": "Clipped verdicts, heavy sighs, and a fee named before the relic is unwrapped.",
+      "want": "Reach a city where nobody has heard the Nine Seals story yet.",
+      "fear": "An appraisal witnessed by someone who can actually read auras.",
+      "secret": "He is Earth Immortal Stage 2 wearing a Sky Immortal's borrowed seal-array; his appraisals are honest, which is the only reason the fraud has survived this long.",
+      "schedule": {},
+      "circuit": [
+        "Skyroad Immortal City",
+        "Immortal River City",
+        "Golden Spear Immortal City",
+        "Lunar Veil Immortal City",
+        "Adamant Body Immortal City"
+      ],
+      "circuit_months": 2,
+      "circuit_offset": 1,
+      "hidden_master": {
+        "kind": "fake",
+        "true_name": "Yun Feiyan",
+        "true_title": "None",
+        "true_realm_index": 17,
+        "true_stage": 2,
+        "concealment": 14,
+        "deception": 39,
+        "projected_realm_index": 21,
+        "projected_stage": 6,
+        "public_threat": "A Void Immortal appraiser, by his own account",
+        "sense_false_reading": "Nine layered pressures, each a fraction out of step with the next",
+        "fraud_item": "Borrowed Nine-Seal Array"
+      }
+    },
+    "The Sandal-Mender": {
+      "role": "mender of shoes who sets up at whichever waystation the road is busiest",
+      "location": "Shrine of the Lost Sandal",
+      "realm": "No detectable cultivation",
+      "stage": 1,
+      "personality": "Cheerful, fast, and charges mortals less than he charges cultivators.",
+      "speech": "Chatter while he works, and a flat refusal to discuss cultivation at all.",
+      "want": "Mend enough shoes that the road stops eating travellers.",
+      "fear": "Being thanked properly.",
+      "secret": "He is Chaos Immortal and mends shoes because the last thing he did at his full strength killed everyone he was trying to save.",
+      "schedule": {},
+      "circuit": [
+        "Shrine of the Lost Sandal",
+        "Halfmoon Waystation",
+        "Ashen Lotus Shrine Gate",
+        "Crow's Rest Waystation"
+      ],
+      "circuit_months": 3,
+      "circuit_offset": 1,
+      "hidden_master": {
+        "kind": "real",
+        "true_name": "Bo Shen",
+        "true_title": "The Sandal-Mender",
+        "true_realm_index": 22,
+        "true_stage": 1,
+        "concealment": 61,
+        "deception": 7,
+        "public_threat": "A cobbler at a shrine gate",
+        "sense_false_reading": "Leather, awl, and a man who has knelt too long",
+        "mentor_tags": [
+          "Body Refiner",
+          "humility",
+          "roads",
+          "atonement"
+        ]
+      }
+    },
+    "The Milestone Beggar": {
+      "role": "beggar who sits at a different milestone each season and asks for nothing",
+      "location": "Ninth Milestone Waystation",
+      "realm": "No detectable cultivation",
+      "stage": 1,
+      "personality": "Silent unless spoken to twice, and then unnervingly direct.",
+      "speech": "One sentence at a time, each of which takes a week to stop thinking about.",
+      "want": "Count the milestones to the end of the road.",
+      "fear": "Reaching it.",
+      "secret": "He is Xu Wangqing, the Ninth Milestone Ancestor, a Celestial Ancestor who has refused the last ascension nine times and counts the refusals in stones.",
+      "schedule": {},
+      "circuit": [
+        "Ninth Milestone Waystation",
+        "Shrine of the Mended Bowl",
+        "Two Bridges Waystation",
+        "Red Kite Waystation",
+        "Shrine of the Unnamed Sword"
+      ],
+      "circuit_months": 2,
+      "hidden_master": {
+        "kind": "real",
+        "true_name": "Xu Wangqing",
+        "true_title": "Ninth Milestone Ancestor",
+        "true_realm_index": 29,
+        "true_stage": 2,
+        "concealment": 71,
+        "deception": 13,
+        "public_threat": "A beggar at a milestone",
+        "sense_false_reading": "Absolutely nothing, in a way that becomes uncomfortable the longer you hold it",
+        "mentor_tags": [
+          "Perfect Realm",
+          "refusal",
+          "dao insight",
+          "endurance"
+        ]
+      }
+    },
+    "The Veiled Duchess": {
+      "role": "veiled noblewoman touring the celestial cities with a retinue of four",
+      "location": "Starroad Celestial City",
+      "realm": "Suppressed aura",
+      "stage": 1,
+      "personality": "Gracious, glacial, and never seen to eat, drink, or remove the veil.",
+      "speech": "Through an attendant, always, which is itself the trick.",
+      "want": "Be received in one more court before the letters catch up with her.",
+      "fear": "A Celestial Lord who knew the real Duchess.",
+      "secret": "She is Celestial Duke Stage 3 and the retinue are hired; the veil hides an ordinary face and a very good pressure-array sewn into the hem.",
+      "schedule": {},
+      "circuit": [
+        "Starroad Celestial City",
+        "Worldstone Celestial City",
+        "Mandate Spear City",
+        "Lunar Shadow Celestial City",
+        "Firmament Blade City",
+        "Solar Crucible Celestial City"
+      ],
+      "circuit_months": 2,
+      "circuit_offset": 3,
+      "hidden_master": {
+        "kind": "fake",
+        "true_name": "Shu Lianyi",
+        "true_title": "None",
+        "true_realm_index": 25,
+        "true_stage": 3,
+        "concealment": 16,
+        "deception": 41,
+        "projected_realm_index": 28,
+        "projected_stage": 7,
+        "public_threat": "A Celestial Emperor's kinswoman, the retinue says",
+        "sense_false_reading": "An immense, still authority that sits a handspan to the left of where she stands",
+        "fraud_item": "Hemmed Pressure-Array Veil"
+      }
+    },
+    "The Bowl-Mender": {
+      "role": "itinerant who mends broken bowls with gold and will not explain why",
+      "location": "Shrine of the Mended Bowl",
+      "realm": "No detectable cultivation",
+      "stage": 1,
+      "personality": "Absorbed in the work, indifferent to rank, and impossible to hurry.",
+      "speech": "Almost nothing, and then a question about what you broke.",
+      "want": "Mend one bowl that stays mended.",
+      "fear": "That none of them do.",
+      "secret": "She is Dao Saint, and every bowl she has mended in two thousand years is a piece of a single formation nobody has noticed is being assembled across the Celestial World.",
+      "schedule": {},
+      "circuit": [
+        "Shrine of the Mended Bowl",
+        "Broken Axle Waystation",
+        "Shrine of the Unnamed Sword",
+        "Ninth Milestone Waystation"
+      ],
+      "circuit_months": 3,
+      "circuit_offset": 2,
+      "hidden_master": {
+        "kind": "real",
+        "true_name": "Ji Wanluo",
+        "true_title": "Goldseam Saint",
+        "true_realm_index": 30,
+        "true_stage": 1,
+        "concealment": 73,
+        "deception": 18,
+        "public_threat": "A tinker with a pot of gold lacquer",
+        "sense_false_reading": "A mortal woman, and something in the bowls that does not read at all",
+        "mentor_tags": [
+          "Formation Adept",
+          "patience",
+          "repair",
+          "dao insight"
+        ]
       }
     }
   },

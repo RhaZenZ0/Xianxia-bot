@@ -176,6 +176,12 @@ func senseStatsGo(conn *storage.Conn, catalog worlddata.Catalog, userID, gameMin
 	power += ep
 	precision += epr
 	rng += erng
+	// The price of hiding: a folded aura does not reach as far.
+	if c.ConcealmentActive {
+		power = power * concealedSenseNumerator / concealedSenseDenominator
+		precision = precision * concealedSenseNumerator / concealedSenseDenominator
+		rng = rng * concealedSenseNumerator / concealedSenseDenominator
+	}
 	if power < 1 {
 		power = 1
 	}
@@ -187,8 +193,27 @@ func senseStatsGo(conn *storage.Conn, catalog worlddata.Catalog, userID, gameMin
 	}
 	return c, power, precision, rng, nil
 }
+
+// Folding your aura away costs you the reach of it: while concealed, a
+// cultivator senses at three quarters of their power and precision.
+//
+// Concealment had no cost at all, which made it not a decision - a free toggle
+// nobody had a reason to ever turn off. It now trades one thing for the other,
+// which is the shape the fiction already has: you cannot be both the quiet one
+// in the corner and the one sweeping the room. The one place it was already a
+// real choice stays untouched - a forbidden technique used unconcealed is
+// witnessed every time, concealed only sometimes, and that remains the reason
+// a cultivator with something to hide pays this price gladly.
+const concealedSenseNumerator, concealedSenseDenominator = 3, 4
+
+// Concealment rose 7 a realm (will and spirit one each, plus realm*5) against
+// a sense power that rose 10, so it fell three behind every realm and stopped
+// meaning anything between peers: from realm 4 a concealed cultivator read as
+// `exact` 100% of the time. At realm*8 the two rise together, so hiding keeps
+// the worth it had at the bottom of the ladder all the way up it, and a master
+// stays hidden from a junior the way the fiction says they do.
 func concealmentPowerGo(c senseCharacter) int64 {
-	base := c.Will + c.Spirit + c.Realm*5 + c.Phase/2 + c.ConcealmentBonus
+	base := c.Will + c.Spirit + c.Realm*8 + c.Phase/2 + c.ConcealmentBonus
 	if !c.ConcealmentActive {
 		return maxI64(2, base/3)
 	}
@@ -223,18 +248,24 @@ func senseTier(m int64) string {
 // of outcomes and `realm` at 0.015%, both only for a minimum-stat realm-0
 // character; everything else was `exact`.
 //
-// At 5 the detail roll degrades at a rate detection can outlive, so the ladder
-// the readings describe is actually walked: a peer still reads exact, someone
-// one to three realms above reads approximate, and past that the realm alone.
-// 5 rather than 6 or 7 because those collapse the top of the ladder - a peer
-// stops reading exact and most of the band turns into "world".
+// At 6 the detail roll degrades at a rate detection can outlive, so the ladder
+// the readings describe is actually walked. Against a concealed cultivator,
+// with concealment now rising 10 a realm alongside sense power, that lands on
+// the shape the fiction has: someone well below you reads exact, one realm
+// below reads exact or approximate, a peer reads approximate, and anyone above
+// you cannot be read at all - only the world they belong to, if that.
+//
+// 6 and not 5: 5 was tuned against concealment rising 7 a realm, and raising
+// it to 10 moved the detection curve out from under that number - at 5 the
+// graded readings fell back to 0.2% of outcomes, which is where they started.
+// 7 and 8 were tried and turn most of the band into "world".
 //
 // The area sweep keeps 2. It reads a place, not a cultivator, and its target
 // number scales with the *sensor's* own realm, so the same slope there would
 // only cancel the sensor's growth and freeze the sweep at one detail level.
 // Two is what makes a sweep qualitative early and precise later.
 const (
-	precisionPerTargetRealm = 5
+	precisionPerTargetRealm = 6
 	precisionPerAreaRealm   = 2
 )
 
@@ -378,6 +409,65 @@ func senseGroundReading(conn *storage.Conn, catalog worlddata.Catalog, userID in
 	return out, nil
 }
 
+// How far the sense has to carry to leave the place you are standing in. A
+// cultivator reaches the next town along the road at 25km, which is where the
+// range curve lands around Soul Formation.
+const senseNeighbourRangeMeters = 25000
+
+// Whether a sense can reach the place a target is standing in at all.
+//
+// It could reach anywhere. `/sense @someone` worked across the whole world -
+// from the Mortal World to the Celestial, with no check of any kind - while
+// range_m was computed with the most elaborate formula in this file, carried
+// bonuses and effect modifiers, and was then only ever printed. Sensing an NPC
+// already required standing with them; sensing a player required nothing.
+//
+// Now the place you are is always within reach, the places joined to it by
+// road or gate are within reach once the range curve has grown enough to cross
+// one, and everywhere else is not. Adjacency is the world's own, so the reach
+// of a spiritual sense follows the map a player already walks.
+func senseReaches(catalog worlddata.Catalog, sensorLocation, targetLocation string, rangeMeters int64) bool {
+	if sensorLocation == "" || targetLocation == "" {
+		return false
+	}
+	if sensorLocation == targetLocation {
+		return true
+	}
+	if rangeMeters < senseNeighbourRangeMeters {
+		return false
+	}
+	loc, ok := catalog.Locations[sensorLocation]
+	if !ok {
+		return false
+	}
+	for _, road := range loc.Roads {
+		if road == targetLocation {
+			return true
+		}
+	}
+	for _, behind := range loc.Gates {
+		for _, name := range behind {
+			if name == targetLocation {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// Whether the cultivator being read feels it happen.
+//
+// The engine already told the sensor "the target immediately feels your
+// probing sense" on one branch, and nothing anywhere backed the sentence: a
+// probe was silent, free and unlimited, so there was no counter-play to any of
+// it. A probe is felt when the one being read is at least as perceptive as the
+// one reading them - they notice a sense brush against their own - or when the
+// reading went all the way to `exact`, because at that depth it is not a brush
+// but a hand laid on the dantian.
+func senseTargetNotices(sensorPower, targetPower int64, reveal string) bool {
+	return targetPower >= sensorPower || reveal == "exact"
+}
+
 func senseInspectAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	var p sensePayload
 	if err := json.Unmarshal(raw, &p); err != nil {
@@ -403,6 +493,13 @@ func senseInspectAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 		target, err := loadSenseCharacter(conn, p.TargetUserID)
 		if err != nil {
 			return authoritativeMutation{}, err
+		}
+		if !senseReaches(catalog, sensor.Location, target.Location, rng) {
+			// Deliberately says nothing about where they are: a sense that
+			// could not find them has not learned their whereabouts either.
+			result["reveal"] = "out_of_range"
+			result["reading"] = "You cast your sense outward and find nothing of them within its reach."
+			break
 		}
 		tn := 10 + concealmentPowerGo(target)
 		roll, err := rollCheck(power, tn)
@@ -431,6 +528,11 @@ func senseInspectAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 		result["target_realm_index"] = target.Realm
 		result["target_phase"] = target.Phase
 		result["target_concealed"] = target.ConcealmentActive
+		_, targetPower, _, _, err := senseStatsGo(conn, catalog, p.TargetUserID, gameMinute)
+		if err != nil {
+			return authoritativeMutation{}, err
+		}
+		result["target_noticed"] = senseTargetNotices(power, targetPower, reveal)
 	case "npc":
 		npc, ok := catalog.NPCs[p.NPCName]
 		if !ok {

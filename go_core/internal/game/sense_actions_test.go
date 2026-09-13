@@ -170,8 +170,12 @@ func TestPrecisionSlopeMakesTheMiddleReadingsReachable(t *testing.T) {
 			spirit, will, insight, phase := 3+realm, 2+realm, int64(3), int64(5)
 			power := 4 + spirit*3 + will + realm*6 + phase - 1
 			precision := 3 + insight*3 + spirit + realm*4 + (phase-1)/2
-			tSpirit, tWill := 3+target, 2+target
-			detTN := 10 + maxI64(3, tWill+tSpirit+target*5+phase/2+8)
+			// The real concealment rule, not a copy of it: the two slopes
+			// are tuned against each other, so this must move when it does.
+			detTN := 10 + concealmentPowerGo(senseCharacter{
+				Realm: target, Phase: phase, Spirit: 3 + target, Will: 2 + target,
+				ConcealmentActive: true,
+			})
 			for d1 := int64(1); d1 <= 10; d1++ {
 				for d2 := int64(1); d2 <= 10; d2++ {
 					det := senseTier(d1 + d2 + power - detTN)
@@ -196,6 +200,148 @@ func TestPrecisionSlopeMakesTheMiddleReadingsReachable(t *testing.T) {
 	for _, reading := range []string{"exact", "approx", "realm", "world"} {
 		if !seen[reading] {
 			t.Errorf("the reading %q is unreachable - the ladder is not being walked", reading)
+		}
+	}
+}
+
+// Hiding has to cost something or it is not a decision: it was a free toggle
+// with no reason to ever be off. A folded aura does not reach as far.
+func TestConcealmentCostsTheSensorTheirOwnReach(t *testing.T) {
+	conn, catalog := senseGroundConn(t)
+	if _, err := conn.Execute(
+		`INSERT INTO characters(user_id,name,gender,path,spiritual_root,location,attributes_json,
+		 realm_index,phase,cultivation,body_realm_index,body_phase,body_cultivation,life_status,
+		 karma_score,qi,qi_max,vitality,vitality_max)
+		 VALUES(?,?,'male','Qi Refiner','Single',?,?,?,?,0,0,1,0,'alive',0,10,10,10,10)`,
+		[]any{4242, "Hidden", "Greenriver Town", `{"spirit":9,"insight":3,"will":8}`, 6, 5}); err != nil {
+		t.Fatal(err)
+	}
+	_, openPower, openPrecision, openRange, err := senseStatsGo(conn, catalog, 4242, 600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := conn.Execute(`UPDATE characters SET concealment_active=1 WHERE user_id=?`, []any{4242}); err != nil {
+		t.Fatal(err)
+	}
+	_, hidPower, hidPrecision, hidRange, err := senseStatsGo(conn, catalog, 4242, 600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		what            string
+		open, concealed int64
+	}{
+		{"power", openPower, hidPower},
+		{"precision", openPrecision, hidPrecision},
+		{"range", openRange, hidRange},
+	} {
+		if tc.concealed >= tc.open {
+			t.Errorf("%s: concealed %d is not below open %d - hiding is still free",
+				tc.what, tc.concealed, tc.open)
+		}
+		if want := tc.open * concealedSenseNumerator / concealedSenseDenominator; tc.concealed != want {
+			t.Errorf("%s: concealed %d, want %d", tc.what, tc.concealed, want)
+		}
+	}
+}
+
+// Concealment rose slower than the power that pierces it, so it stopped
+// meaning anything between peers: from realm 4 a concealed cultivator was read
+// exactly every single time. Hiding has to keep its worth up the whole ladder.
+func TestConcealmentHoldsItsWorthUpTheLadder(t *testing.T) {
+	for _, realm := range []int64{0, 4, 8, 16, 31} {
+		target := senseCharacter{Realm: realm, Phase: 5, Spirit: 3 + realm, Will: 2 + realm, ConcealmentActive: true}
+		sensor := senseCharacter{Realm: realm, Phase: 5, Spirit: 3 + realm, Will: 2 + realm}
+		power := 4 + sensor.Spirit*3 + sensor.Will + realm*6 + sensor.Phase - 1
+		tn := 10 + concealmentPowerGo(target)
+		stopped := 0
+		for d1 := int64(1); d1 <= 10; d1++ {
+			for d2 := int64(1); d2 <= 10; d2++ {
+				switch senseTier(d1 + d2 + power - tn) {
+				case "failure", "critical_failure", "partial":
+					stopped++
+				}
+			}
+		}
+		if stopped < 10 {
+			t.Errorf("realm %d: concealment stopped or blurred only %d%% of probes - "+
+				"hiding has stopped mattering at this realm", realm, stopped)
+		}
+	}
+}
+
+// A sense reached across the whole world: /sense on a player checked nothing,
+// while sensing an NPC already required standing with them, and range_m was
+// computed in detail and then only printed.
+func TestSenseReachFollowsTheMapAndTheRange(t *testing.T) {
+	catalog, err := worlddata.Load(batch4WorldPath(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	here := "Greenriver Town"
+	loc, ok := catalog.Locations[here]
+	if !ok || len(loc.Roads) == 0 {
+		t.Skip("the fixture world has no road out of " + here)
+	}
+	neighbour := loc.Roads[0]
+
+	if !senseReaches(catalog, here, here, 1) {
+		t.Error("the place you are standing in is always within reach")
+	}
+	if senseReaches(catalog, here, neighbour, senseNeighbourRangeMeters-1) {
+		t.Error("a short sense reached the next place along the road")
+	}
+	if !senseReaches(catalog, here, neighbour, senseNeighbourRangeMeters) {
+		t.Error("a long sense could not reach the next place along the road")
+	}
+	far := ""
+	for name := range catalog.Locations {
+		if name == here || name == neighbour {
+			continue
+		}
+		joined := false
+		for _, road := range loc.Roads {
+			if road == name {
+				joined = true
+			}
+		}
+		for _, behind := range loc.Gates {
+			for _, n := range behind {
+				if n == name {
+					joined = true
+				}
+			}
+		}
+		if !joined {
+			far = name
+			break
+		}
+	}
+	if far == "" {
+		t.Skip("the fixture world is fully connected to " + here)
+	}
+	if senseReaches(catalog, here, far, 1<<40) {
+		t.Errorf("an unbounded sense reached %q, which no road leaves here for", far)
+	}
+}
+
+// The engine told the sensor "the target immediately feels your probing sense"
+// and nothing anywhere backed it: a probe was silent, so there was no
+// counter-play to it at all.
+func TestSenseTargetNoticesAProbeItCanFeel(t *testing.T) {
+	for _, tc := range []struct {
+		name                     string
+		sensorPower, targetPower int64
+		reveal                   string
+		want                     bool
+	}{
+		{"read by someone far sharper, only partly", 200, 20, "world", false},
+		{"read to the dantian", 200, 20, "exact", true},
+		{"the one being read is just as perceptive", 100, 100, "world", true},
+		{"the one being read is sharper", 60, 100, "none", true},
+	} {
+		if got := senseTargetNotices(tc.sensorPower, tc.targetPower, tc.reveal); got != tc.want {
+			t.Errorf("%s: noticed = %v, want %v", tc.name, got, tc.want)
 		}
 	}
 }

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from typing import Any
+
+from .worldtime import MINUTES_PER_MONTH
 
 
 RealmName = Callable[[int, str | None], str]
@@ -27,6 +29,36 @@ def approximate_realm(
     if precision_tier == "success":
         return name
     return f"a cultivator of the {realm_world(int(realm_index))}"
+
+
+DEFAULT_CIRCUIT_MONTHS = 2
+
+
+def circuit_stop(
+    circuit: Sequence[str],
+    game_minute: int,
+    *,
+    months: int = DEFAULT_CIRCUIT_MONTHS,
+    offset: int = 0,
+) -> str | None:
+    """Where a wandering hidden master is standing at `game_minute`.
+
+    A recluse who never moves is a landmark, not a rumour. These walk: each
+    stop on the circuit holds them for a couple of world-months, and then they
+    are somewhere else and the town has only a story about the old beggar who
+    used to sit by the gate. `offset` staggers them so two masters sharing a
+    road are not always in the same town on the same month.
+
+    It is a pure function of the canonical clock rather than anything stored,
+    so it needs no simulation tick and no state - ask at any minute and get the
+    same answer, which is also what makes it testable.
+    """
+    stops = [str(stop) for stop in circuit if str(stop).strip()]
+    if not stops:
+        return None
+    span = max(1, int(months)) * MINUTES_PER_MONTH
+    elapsed = max(0, int(game_minute)) // span
+    return stops[(elapsed + int(offset)) % len(stops)]
 
 
 def ground_reading_line(ground: Mapping[str, Any] | None) -> str:

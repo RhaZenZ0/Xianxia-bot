@@ -6,26 +6,70 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
-**1.0.0** (rc.15) makes a spiritual sense worth casting. It could not answer the one question the
-genre uses it for - is the qi here good enough to sit in - although the engine has known the answer
-since rc.4: `placeCultivationMultiplier` prices a road-side shrine, a temple quarter, a sect gate, a
-cave abode and its gathering array and a deployed array, and `placeQuality` is the word the Here line
-and the cultivation sheet already print for it. `/sense area` read none of it and returned scenery
-instead. It now reads that same number, so what a sweep reports and what a session actually pays
-cannot disagree, and the detail is what the sweep earned: a weak one gets the word for the ground, a
-better one what is gathering it, an overwhelming one the multiplier and the world's own qi density as
-numbers. Qualitative early, precise later, which is the progression the sense was always described as
-having.
+**1.0.0** (rc.15) makes a spiritual sense worth casting, and worth hiding from. It could not answer
+the one question the genre uses it for - is the qi here good enough to sit in - although the engine
+has known the answer since rc.4: `placeCultivationMultiplier` prices a road-side shrine, a temple
+quarter, a sect gate, a cave abode and its gathering array and a deployed array, and `placeQuality`
+is the word the Here line and the cultivation sheet already print for it. `/sense area` read none of
+it and returned scenery instead. It reads that same number now, so what a sweep reports and what a
+session actually pays cannot disagree, and the detail is what the sweep earned: a weak one gets the
+word for the ground, a better one what is gathering it, an overwhelming one the multiplier and the
+world's own qi density as numbers. Qualitative early and precise later, which is the progression a
+spiritual sense was always described as having.
+
+Concealment cost nothing and did nothing. It was a free toggle with no reason ever to be off, and it
+rose 7 a realm against a sense power that rose 10, so it fell behind every realm and stopped
+mattering entirely: from Nascent Soul a concealed cultivator was read exactly, every single time. It
+rises 10 a realm now, so hiding keeps the worth it had at the bottom of the ladder all the way up it,
+and it has a price - a folded aura does not reach, so while concealed your own sense runs at three
+quarters of its power, precision and range. Hide or look; not both. The one place concealment was
+already a real decision is untouched and is now the reason to pay it: a forbidden technique used
+openly is witnessed every time, and concealed only sometimes.
 
 Two of the five readings `/sense` can give were unreachable. Resolving *what* a cultivator is got 2
 harder a realm while detecting them at all got 7, so precision was never the binding constraint: by
 the time a target was far enough above you to make the detail roll marginal, detection had already
 failed and the answer was "none" or "world". Swept over the realm ladder and some 2,900 attribute
 builds, `approx` was 0.3% of outcomes and `realm` 0.015%, both only for a minimum-stat realm-0
-character - the ladder was written and never walked. The slope is 5, so a peer still reads exact,
-someone one to three realms above reads approximate, and past that the realm alone; 6 and 7 were
-tried and collapse the top of it. The area sweep keeps 2, because it reads a place and its target
-number scales with the sensor's own realm, where the same slope would only cancel that growth.
+character - a ladder written and never walked. The slope is 6, chosen against the concealment above
+rather than the old one, and it reads the way the fiction does: someone well below you exactly, one
+realm below exactly or approximately, a peer approximately, and anyone above you not at all - only
+the world they belong to, if that. The area sweep keeps 2, because it reads a place and its target
+number already scales with the sensor's own realm, where the same slope would only cancel that
+growth.
+
+A sense also reached the entire world. `/sense` on a player checked nothing - not distance, not
+location - while sensing an NPC already required standing with them, and `range_m` was computed with
+the most elaborate formula in the file, took bonuses and effect modifiers, and was then only ever
+printed. It is a rule now: the place you are standing in is always within reach, the places a road or
+gate joins it to once your range passes 25km, and nowhere else. A sense that cannot find someone does
+not learn where they are either.
+
+And a probe was silent. The engine told the sensor "the target immediately feels your probing sense"
+while nothing anywhere told the target, so there was no counter-play to being read at all. A
+cultivator feels a sense settle over them when they are at least as perceptive as the one reading
+them, or when the reading went all the way to the dantian, and the reply names who did it - the way a
+trade offer names who sent it.
+
+The hidden masters they might be reading went from three to twenty. All the interesting machinery
+here - the collapsing false aura, the seamless void too perfect to be natural, the glimpse of
+something vastly beyond your realm - served three NPCs out of five hundred and sixty-five, all of
+them in one town in the Mortal World. There are twenty now, spread evenly over all four worlds,
+thirteen genuine and seven frauds: a shrine hermit who is a Dao Comprehension sage, an innkeeper
+letting a rumour do her haggling, a Dao Saint kneeling at a roadside stone, a waystation keeper whose
+Celestial Emperor pressure is a forgery half a beat out of time with his breathing. The eight added
+to existing NPCs keep the lore they already had - the hidden truth is written under it, not over it.
+
+Half of them walk. A recluse who never moves is a landmark rather than a rumour, so ten of the twenty
+hold a stop for two or three world-months and are then somewhere else: the barefoot pilgrim crossing
+the Spiritual World's shrine road, the lamp-carrier going shrine to shrine in the Immortal World
+looking for the one she is supposed to light, the beggar counting Celestial milestones, and the
+frauds especially - a manual-seller and a relic appraiser working their cities in rotation, which is
+precisely how a fraud survives. `circuit_stop` is a pure function of the canonical clock, so nobody
+ticks and nothing is stored: ask at any minute and the road answers the same. A `circuit_offset`
+staggers two who share a road, and a contract holds every stop to being a real place, because a
+circuit naming somewhere that does not exist would strand a master where no player can stand and
+nothing would say so.
 
 And every timed lookup the sense made asked for minute zero. An authoritative payload may not carry
 `game_minute`, so the field the action read was always unset - which means no active effect and no

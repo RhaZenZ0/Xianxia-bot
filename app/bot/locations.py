@@ -26,6 +26,7 @@ import discord
 from discord import app_commands
 
 from ..rules.realm_hubs import REALM_HUBS
+from ..rules.sense import circuit_stop
 from .runtime import DB, WORLD, current_world_time, log
 from .services import SIM
 
@@ -35,6 +36,22 @@ async def current_npc_location(npc_name: str, period: str | None = None) -> str 
     Daily world.json schedules still shape an NPC's routine while they remain in
     their home region, but there is no legacy no-simulation fallback anymore.
     """
+    # A hidden master who walks the road is wherever their circuit puts them
+    # this month, and that answer outranks both the daily schedule and the
+    # civilization simulation: these are recluses crossing the world on their
+    # own business, not townsfolk on a routine. It is a pure function of the
+    # canonical clock, so nothing has to tick to move them.
+    walking = WORLD.npcs.get(npc_name, {}).get("circuit")
+    if walking:
+        wt = await current_world_time()
+        stop = circuit_stop(
+            walking, int(getattr(wt, "total_minutes", 0)),
+            months=int(WORLD.npcs[npc_name].get("circuit_months", 2) or 2),
+            offset=int(WORLD.npcs[npc_name].get("circuit_offset", 0) or 0),
+        )
+        if stop:
+            return stop
+
     sim_state = await SIM.npc_status(npc_name)
     if period is None:
         period = (await current_world_time()).period
