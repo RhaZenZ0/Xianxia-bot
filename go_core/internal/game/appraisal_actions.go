@@ -4,10 +4,12 @@ package game
 //
 // "Appraisal" has been one of the eight professions since the progression
 // system was written (`app/rules/progression_systems.py`) and nothing in
-// either language has ever granted a point of it, named a recipe for it, or
-// rolled a check against it. `item_provenance.authenticity` has likewise been
-// a column every writer sets to 100 and no rule has ever read - a number
-// printed by `/provenance` and consulted by nothing.
+// either language had ever granted a point of it, named a recipe for it, or
+// rolled a check against it. `item_provenance.authenticity` was likewise a
+// column every writer set to 100 and no rule ever read - a number printed by
+// `/provenance` and consulted by nothing. A broker's goods now enter at a
+// rolled authenticity (`authenticity.go`), a keeper pays a forgery's price for
+// a forgery, and a reading is how a holder finds out which they are carrying.
 //
 // Both are load-bearing now, because the world's own people have started
 // putting things under the hammer that they cannot read themselves. A blind
@@ -159,7 +161,11 @@ func appraisalAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64
 		if err != nil {
 			return authoritativeMutation{}, fmt.Errorf("the appraisal costs %d and you cannot cover it", fee)
 		}
-		if err = recordAppraisalTx(conn, userID, itemID, "steward", 100, gameMinute, now); err != nil {
+		authenticity, held, aerr := itemAuthenticityTx(conn, userID, itemID)
+		if aerr != nil {
+			return authoritativeMutation{}, aerr
+		}
+		if err = recordAppraisalTx(conn, userID, itemID, "steward", authenticity, gameMinute, now); err != nil {
 			return authoritativeMutation{}, err
 		}
 		out["reading"] = "certified"
@@ -169,7 +175,13 @@ func appraisalAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64
 		out["currency"] = currency
 		out["balance"] = balance
 		out["grade"] = item.AuctionInterest
-		out["authenticity"] = int64(100)
+		out["authenticity"] = authenticity
+		if held {
+			// The half of a reading nobody could get before: not only what
+			// the thing is, but whether it is what it claims to be.
+			out["authenticity_note"] = authenticityNote(authenticity)
+			out["forgery"] = authenticity < authenticityForgery
+		}
 		return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "economy", EventType: "appraisal.read", EntityType: "character", EntityID: fmt.Sprint(userID), GameMinute: gameMinute, Payload: out}}, nil
 	}
 
@@ -202,12 +214,20 @@ func appraisalAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64
 	out["profession"] = progress
 	switch {
 	case success:
-		if err = recordAppraisalTx(conn, userID, itemID, "insight", 100, gameMinute, now); err != nil {
+		authenticity, held, aerr := itemAuthenticityTx(conn, userID, itemID)
+		if aerr != nil {
+			return authoritativeMutation{}, aerr
+		}
+		if err = recordAppraisalTx(conn, userID, itemID, "insight", authenticity, gameMinute, now); err != nil {
 			return authoritativeMutation{}, err
 		}
 		out["reading"] = "read"
 		out["grade"] = item.AuctionInterest
-		out["authenticity"] = int64(100)
+		out["authenticity"] = authenticity
+		if held {
+			out["authenticity_note"] = authenticityNote(authenticity)
+			out["forgery"] = authenticity < authenticityForgery
+		}
 	case margin >= -7:
 		// Nothing learned, and you know that you learned nothing.
 		out["reading"] = "inconclusive"

@@ -319,6 +319,56 @@ in the game derives from those two numbers. A legendary sword tablet would have 
 for eight stones. They are priced against the goods that already had considered numbers now, and a
 content gate holds every auction-grade item to being worth more than ordinary stock.
 
+And then a sweep for the same four faults everywhere else, which found five more and one of its own.
+
+**A crash, shipped the day before.** The smuggling path wrote `black_market_stock(world_name,
+location, item_id, quantity, price, ...)`. That table has no `location` and no `price`, and its
+`currency_id` and `unit_price` are NOT NULL - so every contraband find raised a bare SQL error,
+which aborted the consignment tick and, because the runner wraps a system in `BEGIN IMMEDIATE`,
+rolled back every legal lot in the same pass. Two of the nineteen findable items are contraband, so
+roughly one find in nine took it down. It passed CI because the test fixture beside it had invented
+a matching schema of its own. The insert names the real columns now, the fixture is the production
+one, and a contract test compares the two column lists directly - the fixture is what actually
+failed here, so the fixture is what is now held to the table.
+
+**Sects go to war on their own.** `territory_wars` had exactly one writer, `territory.claim`, and it
+always made the acting player's sect the attacker. Thirteen sects, a full siege resolver with scores,
+morale, occupations and an era war-pressure modifier - and the map could only ever be contested by
+somebody at a keyboard. A sect with standing and means and a weakly-held rival border now moves on
+it, rarely, never onto ground already contested and never at a wall it cannot breach. It opens the
+same operation row a player's war does, taken from the engine's own statement rather than written
+afresh, because a siege with no operation row is a war the tick cannot fight.
+
+**Inscription was Appraisal all over again.** Eight professions, and the eighth had no recipe, no
+call that granted it and no check that rolled it - the exact shape "Appraisal" was in before this
+release. Six of the eight recipes filed under Formation were talismans; only the two array disks
+were formation work. The talismans belong to the inscribers now, and because a talisman bench and an
+array table are the same room here - the sect manor's own description says its grand defensive array
+doubles as an inscription workshop - inscription shares the formation workshop, manor hall and effect
+bonus. Splitting them without that would have quietly stripped every talisman recipe of its bonuses,
+which is the fault this sweep was looking for, committed in the act of fixing another one.
+
+**And `item_provenance.authenticity` finally means something.** Five writers, every one of them
+passing the literal 100, and no rule anywhere reading it: the column recorded precisely that nothing
+in the world was ever fake. Some of what the underworld sells is fake. A broker's goods now enter at
+a rolled authenticity, a keeper pays a forgery what a forgery is worth - so passing one off at full
+price depends on the buyer not having had it read - and an appraisal is where a holder finds out
+which they are carrying. The worst provenance is the one that counts: if one of the three seals in
+your bag is a copy you cannot know which, and neither can the keeper pricing them. Nothing here
+touches what an item *does*; authenticity is information and money, not power.
+
+The placeholders got the rest of it. 43 of the 48 auction houses were byte-identical - local, six
+lots, 360 minutes - which mattered more than it looks, because the consignment tick reads the lot cap
+to decide whether the world's finders can put anything on a floor at all. A floor's size is the trade
+that passes through it now: roads met, world, and how many shops the city keeps, giving nine distinct
+floors instead of two. And the repricing from earlier in this release was half a job - 37 items still
+had no `base_price` and a dozen still carried the exact placeholder 8, so a Spirit-Iron Sword, a
+Recovery Pill and a set of Formation Flags were worth the same through the `max(8, sect_value*8)`
+fallback that five separate valuation sites use. Every item has a decided price now, anchored on
+what the shops already charge, and content gates hold all of it: every item priced, a sword dearer
+than a pill, the floors not one floor copied, and every declared crafting profession making
+something.
+
 **1.0.0** (rc.14) repairs a broken call in `/sense` and closes the class of fault it belongs to.
 Sensing another cultivator called `WORLD.approximate_realm(...)`, and there is no such method on
 `World`: the function lives in `app/rules/sense.py` and takes its two realm lookups as arguments, so

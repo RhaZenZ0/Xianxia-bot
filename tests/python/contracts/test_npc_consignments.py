@@ -136,3 +136,75 @@ class TheTreasuresArePricedLikeTreasures(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ForgeriesAndTheDeadColumn(unittest.TestCase):
+    """v1.0.0-rc.15: `item_provenance.authenticity` stops being a constant.
+
+    Every one of its five writers passed the literal 100 and no rule read it,
+    so the column recorded precisely that nothing in the world was ever fake.
+    """
+
+    def test_the_broker_rolls_authenticity_instead_of_asserting_it(self):
+        economy = (GO / "game" / "economy_actions.go").read_text(encoding="utf-8")
+        self.assertIn("authenticity, aerr := rollUnderworldAuthenticity()", economy)
+        self.assertNotIn('"underworld broker", fmt.Sprint(stock["legal_status"]), 100,', economy)
+
+    def test_a_keeper_prices_by_authenticity(self):
+        shop = (GO / "game" / "shop_actions.go").read_text(encoding="utf-8")
+        self.assertIn("itemAuthenticityTx(conn, userID, p.ItemID)", shop)
+        self.assertIn("unit = authenticityPrice(unit, authenticity)", shop)
+
+    def test_the_reading_is_what_reveals_it(self):
+        appraisal = (GO / "game" / "appraisal_actions.go").read_text(encoding="utf-8")
+        self.assertIn("itemAuthenticityTx(conn, userID, itemID)", appraisal)
+        self.assertIn('out["forgery"] = authenticity < authenticityForgery', appraisal)
+        # ...and the record keeps what was found rather than a hardcoded 100.
+        self.assertNotIn('recordAppraisalTx(conn, userID, itemID, "steward", 100,', appraisal)
+        self.assertNotIn('recordAppraisalTx(conn, userID, itemID, "insight", 100,', appraisal)
+
+
+class TheBlackMarketInsertMatchesTheTable(unittest.TestCase):
+    """The smuggle path wrote columns `black_market_stock` does not have.
+
+    It passed because the test fixture beside it had invented a schema of its
+    own - so the check asserts the fixture against production, which is the
+    thing that actually failed here.
+    """
+
+    def test_the_smuggle_write_names_the_real_columns(self):
+        finds = (GO / "simulation" / "npc_finds.go").read_text(encoding="utf-8")
+        self.assertIn("INSERT INTO black_market_stock(world_name,item_id,currency_id,unit_price,quantity,legal_status,updated_at)", finds)
+        for gone in ("black_market_stock(world_name,location", "price=excluded.price"):
+            self.assertNotIn(gone, finds, gone)
+
+    def test_the_fixture_matches_the_production_schema(self):
+        import re
+
+        core = (PROJECT_ROOT / "app" / "database" / "core.py").read_text(encoding="utf-8")
+        fixture = (GO / "simulation" / "npc_finds_test.go").read_text(encoding="utf-8")
+
+        def columns(sql: str, table: str) -> set[str]:
+            body = sql.split(f"{table}(", 1)[1] if f"{table}(" in sql else sql.split(f"{table} (", 1)[1]
+            depth, out = 1, []
+            for ch in body:
+                if ch == "(":
+                    depth += 1
+                elif ch == ")":
+                    depth -= 1
+                    if depth == 0:
+                        break
+                out.append(ch)
+            text = "".join(out)
+            names = set()
+            for part in text.split(","):
+                word = part.strip().split()[0] if part.strip() else ""
+                if word and re.fullmatch(r"[a-z_]+", word) and word not in {"primary", "foreign"}:
+                    names.add(word)
+            return names
+
+        self.assertEqual(
+            columns(core, "black_market_stock"),
+            columns(fixture, "black_market_stock"),
+            "the fixture's black_market_stock differs from production's",
+        )

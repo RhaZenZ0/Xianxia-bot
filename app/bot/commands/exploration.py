@@ -657,7 +657,7 @@ async def _run_crafting(interaction: discord.Interaction, recipe: str) -> None:
     )
 
 
-@registered_root_command(name="craft", description="Practice alchemy, forging, or formation inscription from a known recipe", guild=GUILD)
+@registered_root_command(name="craft", description="Practice alchemy, forging, formation or talisman inscription from a known recipe", guild=GUILD)
 @app_commands.autocomplete(recipe=recipe_autocomplete)
 @serialized_user_action
 async def craft(interaction: discord.Interaction, recipe: str) -> None:

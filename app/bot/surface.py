@@ -339,10 +339,10 @@ _HUB_DEFINITIONS = (
     HubDefinition(
         name="craft",
         title="🛠 Craft Hub",
-        description="Craft alchemy, forging and inscription recipes; deploy shared location arrays through Items → Use Item.",
+        description="Craft alchemy, forging, formation and talisman-inscription recipes; deploy shared location arrays through Items → Use Item.",
         pages=(
             _hub_page("alchemy", "Alchemy", "Refine pills, forage simulated herb resources, track toxicity and purge medicinal residue."),
-            _hub_page("craft", "General Crafting", "Practice alchemy, forging or Formation inscription from known recipes."),
+            _hub_page("craft", "General Crafting", "Practice alchemy, forging, formation or talisman inscription from known recipes."),
             _hub_page("profession", "Profession", "View crafting and support-profession mastery."),
         ),
     ),

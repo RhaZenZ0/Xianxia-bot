@@ -23152,17 +23152,20 @@
     "spirit_herb": {
       "name": "Spirit Herb",
       "description": "A common medicinal herb used in basic alchemy.",
-      "sect_value": 2
+      "sect_value": 2,
+      "base_price": 5
     },
     "beast_core": {
       "name": "Low Beast Core",
       "description": "A crystallized knot of spiritual energy from a low-rank beast.",
-      "sect_value": 5
+      "sect_value": 5,
+      "base_price": 13
     },
     "spirit_iron": {
       "name": "Spirit Iron",
       "description": "Iron ore with a faint spiritual resonance, suitable for beginner forging.",
-      "sect_value": 3
+      "sect_value": 3,
+      "base_price": 8
     },
     "recovery_pill": {
       "name": "Recovery Pill",
@@ -23173,12 +23176,13 @@
           "vitality_restore": 8
         },
         "consume": true
-      }
+      },
+      "base_price": 18
     },
     "qi_pill": {
       "name": "Qi Nourishing Pill",
       "description": "A basic cultivation pill that can improve meditation gains.",
-      "sect_value": 8,
+      "sect_value": 9,
       "use": {
         "effect_key": "qi_nourishment",
         "name": "Qi Nourishment",
@@ -23198,23 +23202,27 @@
             "cultivation"
           ]
         }
-      }
+      },
+      "base_price": 18
     },
     "spirit_iron_sword": {
       "name": "Spirit-Iron Sword",
       "description": "A low-grade sword capable of carrying qi.",
-      "sect_value": 8
+      "sect_value": 16,
+      "base_price": 18
     },
     "bugslayer_sword": {
       "name": "Bugslayer Sword",
       "description": "A one-of-a-kind, indestructible reward blade granted for uncovering flaws hidden in the Heavenly Dao. Passive — Heavenly Flawfinder: a strong normal attack exposes a weakness, dealing bonus damage and disrupting the counter.",
       "sect_value": 40,
-      "market_excluded": true
+      "market_excluded": true,
+      "base_price": 80
     },
     "formation_flags": {
       "name": "Formation Flags",
       "description": "A reusable set of simple formation anchors.",
-      "sect_value": 8
+      "sect_value": 10,
+      "base_price": 19
     },
     "ice_spirit_blazing_grass": {
       "name": "Ice Spirit Blazing Grass",
@@ -23237,12 +23245,13 @@
     "fire_spirit_root_herb": {
       "name": "Fire Spirit Root",
       "description": "A medicinal root rich in fire-affinity energy; prized by fire cultivators.",
-      "sect_value": 8
+      "sect_value": 12,
+      "base_price": 24
     },
     "heart_calming_pill": {
       "name": "Heart Calming Pill",
       "description": "Settles the mind, aids insight and suppresses heart-demon disturbances.",
-      "sect_value": 8,
+      "sect_value": 11,
       "use": {
         "effect_key": "heart_calm",
         "name": "Heart-Calming State",
@@ -23272,23 +23281,25 @@
             "mental"
           ]
         }
-      }
+      },
+      "base_price": 21
     },
     "qi_replenishment_pill": {
       "name": "Qi Replenishment Pill",
       "description": "Rapidly restores expended qi during dangerous adventures.",
-      "sect_value": 8,
+      "sect_value": 11,
       "use": {
         "instant": {
           "qi_restore": 12
         },
         "consume": true
-      }
+      },
+      "base_price": 21
     },
     "purging_phoenix_pill": {
       "name": "Purging Phoenix Pill",
       "description": "Incinerates poison with phoenix-like medicinal flame; dangerous without cooling medicine.",
-      "sect_value": 8,
+      "sect_value": 14,
       "use": {
         "effect_key": "phoenix_purge",
         "name": "Purging Phoenix Flame",
@@ -23315,7 +23326,8 @@
             "risky"
           ]
         }
-      }
+      },
+      "base_price": 26
     },
     "lesser_stygian_seal": {
       "name": "Lesser Stygian Seal",
@@ -23389,7 +23401,8 @@
         "grade": "Mortal",
         "slot_capacity": 24,
         "living_space": false
-      }
+      },
+      "base_price": 72
     },
     "spatial_ring": {
       "name": "Earth-Grade Spatial Ring",
@@ -23400,7 +23413,8 @@
         "grade": "Earth",
         "slot_capacity": 80,
         "living_space": false
-      }
+      },
+      "base_price": 240
     },
     "living_world_ring": {
       "name": "Living World Ring",
@@ -23425,7 +23439,8 @@
         "secret_realm_id": "sword_grave_nine_echoes",
         "open_hours": 2,
         "consumed": true
-      }
+      },
+      "base_price": 544
     },
     "verdant_grotto_key": {
       "name": "Verdant Grotto Key",
@@ -23435,7 +23450,8 @@
         "secret_realm_id": "verdant_immortal_grotto",
         "open_hours": 2,
         "consumed": true
-      }
+      },
+      "base_price": 448
     },
     "stygian_tomb_token": {
       "name": "Stygian Lantern Token",
@@ -23445,7 +23461,8 @@
         "secret_realm_id": "stygian_lantern_tomb",
         "open_hours": 2,
         "consumed": true
-      }
+      },
+      "base_price": 672
     },
     "longevity_pill": {
       "name": "Longevity Pill",
@@ -23454,7 +23471,8 @@
       "use": {
         "lifespan_years": 10,
         "consume": true
-      }
+      },
+      "base_price": 469
     },
     "jade_life_herb": {
       "name": "Jade Life Herb",
@@ -23547,7 +23565,8 @@
     "spirit_iron_armor": {
       "name": "Spirit-Iron Lamellar",
       "description": "Layered spirit-iron plates etched with simple qi-dispersing channels.",
-      "sect_value": 10
+      "sect_value": 10,
+      "base_price": 26
     },
     "talisman_paper": {
       "name": "Spirit Talisman Paper",
@@ -23570,7 +23589,7 @@
     "swift_wind_talisman": {
       "name": "Swift-Wind Talisman",
       "description": "A movement talisman that lightens the body and sharpens footwork for a short time.",
-      "sect_value": 8,
+      "sect_value": 9,
       "base_price": 18,
       "use": {
         "effect_key": "swift_wind_talisman",
@@ -25155,22 +25174,26 @@
     "spirit_crystal_ore": {
       "name": "Spirit-Crystal Ore",
       "description": "Ore veined with spirit crystal; the smiths of the Spiritual World will not work anything less.",
-      "sect_value": 6
+      "sect_value": 6,
+      "base_price": 18
     },
     "moonveil_herb": {
       "name": "Moonveil Herb",
       "description": "A pale herb that opens only under moonlight and holds a night of qi in each leaf.",
-      "sect_value": 5
+      "sect_value": 5,
+      "base_price": 14
     },
     "spirit_crystal_sword": {
       "name": "Spirit-Crystal Sword",
       "description": "A blade of spirit crystal folded over iron; it carries qi the way a river carries light.",
-      "sect_value": 30
+      "sect_value": 30,
+      "base_price": 75
     },
     "spirit_crystal_mail": {
       "name": "Spirit-Crystal Mail",
       "description": "Interlocking crystal scales over silk; light, and it drinks a blow before the body feels it.",
-      "sect_value": 36
+      "sect_value": 36,
+      "base_price": 91
     },
     "moonveil_recovery_pill": {
       "name": "Moonveil Recovery Pill",
@@ -25181,7 +25204,8 @@
           "vitality_restore": 20
         },
         "consume": true
-      }
+      },
+      "base_price": 61
     },
     "spirit_condensation_pill": {
       "name": "Spirit Condensation Pill",
@@ -25206,7 +25230,8 @@
             "cultivation"
           ]
         }
-      }
+      },
+      "base_price": 70
     },
     "crystal_ward_talisman": {
       "name": "Crystal-Ward Talisman",
@@ -25242,22 +25267,26 @@
     "immortal_gold_ore": {
       "name": "Immortal-Gold Ore",
       "description": "Gold that does not tarnish and does not bend; forged, it holds an edge for a century.",
-      "sect_value": 12
+      "sect_value": 12,
+      "base_price": 43
     },
     "dawnlotus_herb": {
       "name": "Dawn Lotus",
       "description": "A lotus that blooms at first light and holds the sunrise in its petals.",
-      "sect_value": 10
+      "sect_value": 10,
+      "base_price": 37
     },
     "immortal_gold_sabre": {
       "name": "Immortal-Gold Sabre",
       "description": "A heavy sabre of immortal gold; its edge answers the wielder's qi with its own.",
-      "sect_value": 60
+      "sect_value": 60,
+      "base_price": 187
     },
     "immortal_gold_plate": {
       "name": "Immortal-Gold Plate",
       "description": "Plates of immortal gold over spirit-crystal mail; a wall that walks.",
-      "sect_value": 72
+      "sect_value": 72,
+      "base_price": 226
     },
     "dawnlotus_vitality_pill": {
       "name": "Dawn Lotus Vitality Pill",
@@ -25268,7 +25297,8 @@
           "vitality_restore": 45
         },
         "consume": true
-      }
+      },
+      "base_price": 150
     },
     "immortal_marrow_pill": {
       "name": "Immortal Marrow Pill",
@@ -25293,7 +25323,8 @@
             "cultivation"
           ]
         }
-      }
+      },
+      "base_price": 176
     },
     "golden_edge_talisman": {
       "name": "Golden-Edge Talisman",
@@ -25329,22 +25360,26 @@
     "starsteel_ore": {
       "name": "Starsteel Ore",
       "description": "Ore fallen from beyond the sky; cold to the touch, and it rings when the stars are out.",
-      "sect_value": 24
+      "sect_value": 24,
+      "base_price": 109
     },
     "heavenpetal_herb": {
       "name": "Heaven-Petal Bloom",
       "description": "A flower that grows only where the celestial mandate has touched the ground.",
-      "sect_value": 20
+      "sect_value": 20,
+      "base_price": 91
     },
     "starsteel_glaive": {
       "name": "Starsteel Glaive",
       "description": "A glaive of starsteel; it cuts the air a heartbeat before the arm moves.",
-      "sect_value": 120
+      "sect_value": 120,
+      "base_price": 469
     },
     "starsteel_aegis": {
       "name": "Starsteel Aegis",
       "description": "A starsteel cuirass worked with celestial script; the mandate itself turns the blow.",
-      "sect_value": 144
+      "sect_value": 144,
+      "base_price": 562
     },
     "heavenpetal_elixir": {
       "name": "Heaven-Petal Elixir",
@@ -25355,7 +25390,8 @@
           "vitality_restore": 90
         },
         "consume": true
-      }
+      },
+      "base_price": 374
     },
     "starlight_dao_pill": {
       "name": "Starlight Dao Pill",
@@ -25380,7 +25416,8 @@
             "cultivation"
           ]
         }
-      }
+      },
+      "base_price": 437
     },
     "starfall_talisman": {
       "name": "Starfall Talisman",
@@ -25595,7 +25632,7 @@
     "cloudstep_sandals": {
       "name": "Cloudstep Sandals",
       "description": "Straw over hammered iron soles, each one weighted to the exact stride of the wearer. A body cultivator does not ride: they step off the mountain and the next step lands where they meant it to.",
-      "sect_value": 8,
+      "sect_value": 14,
       "base_price": 130,
       "type": "flight",
       "flight": 3,
@@ -25605,7 +25642,7 @@
     "garrison_signal_kite": {
       "name": "Garrison Signal Kite",
       "description": "A scout's kite off the frozen wall, oiled against the ice and cut wide enough to take a rider's weight in a headwind. The garrison's colours are still on the spar.",
-      "sect_value": 8,
+      "sect_value": 13,
       "base_price": 125,
       "type": "flight",
       "flight": 3,
@@ -25625,7 +25662,7 @@
     "ironbanner_pennant": {
       "name": "Ironbanner Pennant",
       "description": "The company pennant, stiffened along the hoist so it will take a rider standing. A spear guard is taught to go where the banner goes; this is that instruction made literal.",
-      "sect_value": 8,
+      "sect_value": 13,
       "base_price": 125,
       "type": "flight",
       "flight": 3,
@@ -25783,7 +25820,7 @@
       }
     },
     "Swift-Wind Talisman": {
-      "profession": "Formation",
+      "profession": "Inscription",
       "tn": 12,
       "cost": {
         "talisman_paper": 1,
@@ -25794,7 +25831,7 @@
       }
     },
     "Stone-Skin Talisman": {
-      "profession": "Formation",
+      "profession": "Inscription",
       "tn": 13,
       "cost": {
         "talisman_paper": 1,
@@ -25806,7 +25843,7 @@
       }
     },
     "Spirit-Focus Talisman": {
-      "profession": "Formation",
+      "profession": "Inscription",
       "tn": 14,
       "cost": {
         "talisman_paper": 1,
@@ -25887,7 +25924,7 @@
       }
     },
     "Crystal-Ward Talisman": {
-      "profession": "Formation",
+      "profession": "Inscription",
       "tn": 17,
       "cost": {
         "talisman_paper": 2,
@@ -25944,7 +25981,7 @@
       }
     },
     "Golden-Edge Talisman": {
-      "profession": "Formation",
+      "profession": "Inscription",
       "tn": 21,
       "cost": {
         "talisman_paper": 2,
@@ -26001,7 +26038,7 @@
       }
     },
     "Starfall Talisman": {
-      "profession": "Formation",
+      "profession": "Inscription",
       "tn": 25,
       "cost": {
         "talisman_paper": 2,
@@ -28955,7 +28992,7 @@
       "entrance_location": "Jadeflow Spirit City",
       "size": "local",
       "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_lot_minutes": 390,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_spirit_crystal",
@@ -28967,7 +29004,7 @@
       "location": "Immortal River Riverside Auction Hall",
       "entrance_location": "Immortal River City",
       "size": "local",
-      "max_active_lots": 6,
+      "max_active_lots": 7,
       "max_lot_minutes": 360,
       "protected_interior": true,
       "door_rule": true,
@@ -28980,8 +29017,8 @@
       "location": "Celestial River Riverside Auction Hall",
       "entrance_location": "Celestial River City",
       "size": "local",
-      "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_active_lots": 8,
+      "max_lot_minutes": 330,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_celestial_crystal",
@@ -28993,8 +29030,8 @@
       "location": "Four-Roads Caravan Crossroads Auction Yard",
       "entrance_location": "Four-Roads Caravan City",
       "size": "local",
-      "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_active_lots": 4,
+      "max_lot_minutes": 480,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_spirit_stone",
@@ -29006,8 +29043,8 @@
       "location": "Galevein Crossroads Auction Yard",
       "entrance_location": "Galevein Spirit City",
       "size": "local",
-      "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_active_lots": 5,
+      "max_lot_minutes": 450,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_spirit_crystal",
@@ -29020,7 +29057,7 @@
       "entrance_location": "Skyroad Immortal City",
       "size": "local",
       "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_lot_minutes": 420,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_immortal_stone",
@@ -29032,8 +29069,8 @@
       "location": "Starroad Crossroads Auction Yard",
       "entrance_location": "Starroad Celestial City",
       "size": "local",
-      "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_active_lots": 7,
+      "max_lot_minutes": 390,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_celestial_crystal",
@@ -29045,8 +29082,8 @@
       "location": "Emberforge Furnace Auction Gallery",
       "entrance_location": "Emberforge City",
       "size": "local",
-      "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_active_lots": 4,
+      "max_lot_minutes": 480,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_spirit_stone",
@@ -29058,8 +29095,8 @@
       "location": "Vermilion Furnace Furnace Auction Gallery",
       "entrance_location": "Vermilion Furnace City",
       "size": "local",
-      "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_active_lots": 5,
+      "max_lot_minutes": 450,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_spirit_crystal",
@@ -29072,7 +29109,7 @@
       "entrance_location": "Solar Furnace Immortal City",
       "size": "local",
       "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_lot_minutes": 420,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_immortal_stone",
@@ -29084,8 +29121,8 @@
       "location": "Solar Crucible Furnace Auction Gallery",
       "entrance_location": "Solar Crucible Celestial City",
       "size": "local",
-      "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_active_lots": 7,
+      "max_lot_minutes": 390,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_celestial_crystal",
@@ -29097,8 +29134,8 @@
       "location": "Stoneback Mountain Highland Auction Lodge",
       "entrance_location": "Stoneback Mountain City",
       "size": "local",
-      "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_active_lots": 4,
+      "max_lot_minutes": 480,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_spirit_stone",
@@ -29110,8 +29147,8 @@
       "location": "Stoneheart Highland Auction Lodge",
       "entrance_location": "Stoneheart Spirit City",
       "size": "local",
-      "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_active_lots": 5,
+      "max_lot_minutes": 450,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_spirit_crystal",
@@ -29124,7 +29161,7 @@
       "entrance_location": "Adamant Body Immortal City",
       "size": "local",
       "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_lot_minutes": 420,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_immortal_stone",
@@ -29136,8 +29173,8 @@
       "location": "Worldstone Highland Auction Lodge",
       "entrance_location": "Worldstone Celestial City",
       "size": "local",
-      "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_active_lots": 7,
+      "max_lot_minutes": 390,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_celestial_crystal",
@@ -29149,8 +29186,8 @@
       "location": "Cloudblade Sword Peak Auction Terrace",
       "entrance_location": "Cloudblade City",
       "size": "local",
-      "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_active_lots": 4,
+      "max_lot_minutes": 480,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_spirit_stone",
@@ -29162,8 +29199,8 @@
       "location": "Cloudedge Sword Peak Auction Terrace",
       "entrance_location": "Cloudedge Spirit City",
       "size": "local",
-      "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_active_lots": 5,
+      "max_lot_minutes": 450,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_spirit_crystal",
@@ -29176,7 +29213,7 @@
       "entrance_location": "Heavenblade Immortal City",
       "size": "local",
       "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_lot_minutes": 420,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_immortal_stone",
@@ -29188,8 +29225,8 @@
       "location": "Firmament Blade Sword Peak Auction Terrace",
       "entrance_location": "Firmament Blade City",
       "size": "local",
-      "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_active_lots": 7,
+      "max_lot_minutes": 390,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_celestial_crystal",
@@ -29201,8 +29238,8 @@
       "location": "Ironbanner Bannered Auction Ground",
       "entrance_location": "Ironbanner City",
       "size": "local",
-      "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_active_lots": 4,
+      "max_lot_minutes": 480,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_spirit_stone",
@@ -29214,8 +29251,8 @@
       "location": "Spearwall Bannered Auction Ground",
       "entrance_location": "Spearwall Spirit City",
       "size": "local",
-      "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_active_lots": 5,
+      "max_lot_minutes": 450,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_spirit_crystal",
@@ -29228,7 +29265,7 @@
       "entrance_location": "Golden Spear Immortal City",
       "size": "local",
       "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_lot_minutes": 420,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_immortal_stone",
@@ -29240,8 +29277,8 @@
       "location": "Mandate Spear Bannered Auction Ground",
       "entrance_location": "Mandate Spear City",
       "size": "local",
-      "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_active_lots": 7,
+      "max_lot_minutes": 390,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_celestial_crystal",
@@ -29253,8 +29290,8 @@
       "location": "Moonfen Mistwater Auction Pavilion",
       "entrance_location": "Moonfen City",
       "size": "local",
-      "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_active_lots": 4,
+      "max_lot_minutes": 480,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_spirit_stone",
@@ -29266,8 +29303,8 @@
       "location": "Moonfrost Mistwater Auction Pavilion",
       "entrance_location": "Moonfrost Spirit City",
       "size": "local",
-      "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_active_lots": 5,
+      "max_lot_minutes": 450,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_spirit_crystal",
@@ -29280,7 +29317,7 @@
       "entrance_location": "Lunar Veil Immortal City",
       "size": "local",
       "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_lot_minutes": 420,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_immortal_stone",
@@ -29292,8 +29329,8 @@
       "location": "Lunar Shadow Mistwater Auction Pavilion",
       "entrance_location": "Lunar Shadow Celestial City",
       "size": "local",
-      "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_active_lots": 7,
+      "max_lot_minutes": 390,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_celestial_crystal",
@@ -29305,8 +29342,8 @@
       "location": "Frostwatch Frontier Auction Hall",
       "entrance_location": "Frostwatch City",
       "size": "local",
-      "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_active_lots": 4,
+      "max_lot_minutes": 480,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_spirit_stone",
@@ -29318,8 +29355,8 @@
       "location": "Northwind Frontier Auction Hall",
       "entrance_location": "Northwind Spirit City",
       "size": "local",
-      "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_active_lots": 5,
+      "max_lot_minutes": 450,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_spirit_crystal",
@@ -29332,7 +29369,7 @@
       "entrance_location": "Polar Gate Immortal City",
       "size": "local",
       "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_lot_minutes": 420,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_immortal_stone",
@@ -29344,8 +29381,8 @@
       "location": "Froststar Frontier Auction Hall",
       "entrance_location": "Froststar Border City",
       "size": "local",
-      "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_active_lots": 7,
+      "max_lot_minutes": 390,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_celestial_crystal",
@@ -29357,8 +29394,8 @@
       "location": "Ashenwall Relic Auction Court",
       "entrance_location": "Ashenwall City",
       "size": "local",
-      "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_active_lots": 4,
+      "max_lot_minutes": 480,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_spirit_stone",
@@ -29370,8 +29407,8 @@
       "location": "Broken Halo Relic Auction Court",
       "entrance_location": "Broken Halo Spirit City",
       "size": "local",
-      "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_active_lots": 5,
+      "max_lot_minutes": 450,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_spirit_crystal",
@@ -29384,7 +29421,7 @@
       "entrance_location": "Fallen Star Immortal City",
       "size": "local",
       "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_lot_minutes": 420,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_immortal_stone",
@@ -29396,8 +29433,8 @@
       "location": "Ruined Constellation Relic Auction Court",
       "entrance_location": "Ruined Constellation City",
       "size": "local",
-      "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_active_lots": 7,
+      "max_lot_minutes": 390,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_celestial_crystal",
@@ -29409,8 +29446,8 @@
       "location": "Jadewood Medicine Garden Auction Hall",
       "entrance_location": "Jadewood Medicine City",
       "size": "local",
-      "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_active_lots": 4,
+      "max_lot_minutes": 480,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_spirit_stone",
@@ -29422,8 +29459,8 @@
       "location": "Hundred Herb Garden Auction Hall",
       "entrance_location": "Hundred Herb Spirit City",
       "size": "local",
-      "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_active_lots": 5,
+      "max_lot_minutes": 450,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_spirit_crystal",
@@ -29436,7 +29473,7 @@
       "entrance_location": "Jade Cauldron Immortal City",
       "size": "local",
       "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_lot_minutes": 420,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_immortal_stone",
@@ -29448,8 +29485,8 @@
       "location": "Divine Herb Garden Auction Hall",
       "entrance_location": "Divine Herb Celestial City",
       "size": "local",
-      "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_active_lots": 7,
+      "max_lot_minutes": 390,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_celestial_crystal",
@@ -29462,7 +29499,7 @@
       "entrance_location": "Jade Crown Spirit City",
       "size": "local",
       "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_lot_minutes": 390,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_spirit_crystal",
@@ -29474,7 +29511,7 @@
       "location": "Ninefold Noble Noble Auction Court",
       "entrance_location": "Ninefold Noble Immortal City",
       "size": "local",
-      "max_active_lots": 6,
+      "max_active_lots": 7,
       "max_lot_minutes": 360,
       "protected_interior": true,
       "door_rule": true,
@@ -29487,8 +29524,8 @@
       "location": "Mandate Crown Noble Auction Court",
       "entrance_location": "Mandate Crown Celestial City",
       "size": "local",
-      "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_active_lots": 8,
+      "max_lot_minutes": 330,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_celestial_crystal",

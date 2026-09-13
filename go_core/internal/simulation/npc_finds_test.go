@@ -32,13 +32,19 @@ CREATE TABLE auctions(
     appraised INTEGER NOT NULL DEFAULT 1, grade_band TEXT NOT NULL DEFAULT '',
     merchant_buyer TEXT NOT NULL DEFAULT '', merchant_bidder TEXT NOT NULL DEFAULT '',
     created_at REAL NOT NULL, ends_at REAL NOT NULL);
+-- Production shapes, copied from app/database/core.py:279-300. An earlier
+-- version of this fixture invented location/price columns on the stock table
+-- and left out the NOT NULL currency_id/unit_price, which made a broken
+-- INSERT pass its own test.
 CREATE TABLE black_market_posts(
-    world_name TEXT PRIMARY KEY, location TEXT NOT NULL, heat INTEGER NOT NULL DEFAULT 30,
-    active INTEGER NOT NULL DEFAULT 1, updated_at REAL NOT NULL DEFAULT 0);
+    world_name TEXT PRIMARY KEY, location TEXT NOT NULL, heat INTEGER NOT NULL DEFAULT 0,
+    opens_game_minute INTEGER NOT NULL DEFAULT 0, closes_game_minute INTEGER NOT NULL DEFAULT 0,
+    active INTEGER NOT NULL DEFAULT 1, created_at REAL NOT NULL DEFAULT 0, updated_at REAL NOT NULL DEFAULT 0);
 CREATE TABLE black_market_stock(
-    world_name TEXT NOT NULL, location TEXT NOT NULL, item_id TEXT NOT NULL, quantity INTEGER NOT NULL DEFAULT 0,
-    price INTEGER NOT NULL DEFAULT 0, legal_status TEXT NOT NULL DEFAULT 'restricted',
-    updated_at REAL NOT NULL DEFAULT 0, PRIMARY KEY(world_name,item_id));
+    world_name TEXT NOT NULL, item_id TEXT NOT NULL, currency_id TEXT NOT NULL,
+    unit_price INTEGER NOT NULL, quantity INTEGER NOT NULL DEFAULT 0,
+    legal_status TEXT NOT NULL DEFAULT 'forbidden', updated_at REAL NOT NULL,
+    PRIMARY KEY(world_name,item_id));
 CREATE TABLE world_history_events(
     history_id INTEGER PRIMARY KEY AUTOINCREMENT, source_key TEXT NOT NULL UNIQUE, event_type TEXT NOT NULL,
     title TEXT NOT NULL, summary TEXT NOT NULL, significance INTEGER NOT NULL, visibility TEXT NOT NULL,
@@ -185,7 +191,7 @@ func TestContrabandGoesToTheNightMarketInstead(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conn.Execute(`INSERT INTO black_market_posts(world_name,location,heat,active,updated_at) VALUES('Mortal World','Greenriver Alley',40,1,0)`, nil); err != nil {
+	if _, err := conn.Execute(`INSERT INTO black_market_posts(world_name,location,heat,opens_game_minute,closes_game_minute,active,created_at,updated_at) VALUES('Mortal World','Greenriver Alley',40,0,9999999,1,0,0)`, nil); err != nil {
 		t.Fatal(err)
 	}
 	if err := conn.Commit(); err != nil {
@@ -201,6 +207,14 @@ func TestContrabandGoesToTheNightMarketInstead(t *testing.T) {
 	}
 	if n := i64(simScalar(t, path, `SELECT COUNT(*) FROM black_market_stock WHERE item_id='ghost_sutra'`)); n == 0 {
 		t.Fatal("contraband reached neither the floor nor the night market")
+	}
+	// The row has to be one the buy path can actually read: economy_actions.go
+	// takes `currency_id` and `unit_price` off it.
+	if c := fmt.Sprint(simScalar(t, path, `SELECT currency_id FROM black_market_stock WHERE item_id='ghost_sutra'`)); c != "low_spirit_stone" {
+		t.Fatalf("currency_id=%q", c)
+	}
+	if u := i64(simScalar(t, path, `SELECT unit_price FROM black_market_stock WHERE item_id='ghost_sutra'`)); u <= 0 {
+		t.Fatalf("unit_price=%d", u)
 	}
 }
 

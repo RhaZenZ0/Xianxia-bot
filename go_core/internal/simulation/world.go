@@ -605,7 +605,11 @@ func (r *Runner) sects(conn *storage.Conn, steps, gm int64) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("batch-advanced politics for %d sects; %d swore in, %d walked out", count, joined, left), nil
+	declared, err := r.npcSectWars(conn, steps, gm)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("batch-advanced politics for %d sects; %d swore in, %d walked out, %d wars declared", count, joined, left, declared), nil
 }
 
 func (r *Runner) clans(conn *storage.Conn, steps, gm int64) (string, error) {

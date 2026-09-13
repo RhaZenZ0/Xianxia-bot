@@ -146,6 +146,62 @@ class WorldCrossingContentTests(unittest.TestCase):
                     self.assertEqual(loc.get("settlement_type"), "city")
 
 
+class PricedLikeSomethingTests(unittest.TestCase):
+    """v1.0.0-rc.15: every item is worth a decided number.
+
+    Five separate valuation sites fall back to `max(8, sect_value*8)` when an
+    item has no `base_price`, so an unpriced item is not merely undecided -
+    it is priced by an accident. 37 items had no price at all and a dozen
+    shared the exact placeholder 8, which made a Spirit-Iron Sword, a Recovery
+    Pill and a set of Formation Flags worth the same.
+    """
+
+    def test_every_item_has_a_price_of_its_own(self):
+        for key, item in WORLD["items"].items():
+            with self.subTest(item=key):
+                self.assertGreater(int(item.get("base_price") or 0), 0, f"{key} is priced by a fallback")
+                self.assertGreater(int(item.get("sect_value") or 0), 0)
+
+    def test_a_sword_is_not_a_pill(self):
+        items = WORLD["items"]
+        self.assertGreater(int(items["spirit_iron_sword"]["sect_value"]), int(items["recovery_pill"]["sect_value"]))
+
+    def test_the_auction_floors_are_not_one_floor_copied(self):
+        # 43 of the 48 were byte-identical, and the consignment tick reads the
+        # lot cap to decide whether the world's finders can list anything.
+        shapes = {
+            (h.get("size"), int(h["max_active_lots"]), int(h["max_lot_minutes"]))
+            for h in WORLD["auction_houses"].values()
+        }
+        self.assertGreaterEqual(len(shapes), 5, "every floor is the same floor")
+        for key, house in WORLD["auction_houses"].items():
+            with self.subTest(house=key):
+                if house.get("size") == "local":
+                    self.assertLess(int(house["max_active_lots"]), 10)
+                    self.assertLessEqual(int(house["max_lot_minutes"]), 720)
+
+
+class ProfessionsAreAllLiveTests(unittest.TestCase):
+    """Every declared profession makes something.
+
+    "Appraisal" sat in the list for releases with nothing granting it, and
+    "Inscription" sat beside it in exactly the same state - eight professions,
+    six of them real.
+    """
+
+    def test_every_crafting_profession_has_recipes(self):
+        professions = {str(r.get("profession")) for r in WORLD["recipes"].values()}
+        for craft in ("Alchemy", "Forging", "Formation", "Inscription"):
+            with self.subTest(profession=craft):
+                self.assertIn(craft, professions, f"{craft} is declared and makes nothing")
+
+    def test_the_talismans_belong_to_the_inscribers(self):
+        for key, recipe in WORLD["recipes"].items():
+            if "Talisman" in key:
+                with self.subTest(recipe=key):
+                    self.assertEqual(recipe.get("profession"), "Inscription")
+
+
 class BirthFamilySendoffTests(unittest.TestCase):
     """v1.0.0-rc.15: a household that can afford to does not send a child out
     to walk. Thirteen archetypes, thirteen heirlooms, no two the same."""

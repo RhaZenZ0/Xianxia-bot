@@ -25,7 +25,7 @@ func craftEffectStat(profession string) string {
 		return "alchemy_bonus"
 	case "forging":
 		return "forging_bonus"
-	case "formation":
+	case "formation", "inscription":
 		return "formation_bonus"
 	default:
 		return ""
@@ -38,7 +38,12 @@ func craftAbodeFacilityColumn(profession string) string {
 		return "alchemy_level"
 	case "forging":
 		return "forge_level"
-	case "formation":
+	case "formation", "inscription":
+		// A talisman bench and an array table are the same room here - the
+		// sect manor's own description says the grand defensive array doubles
+		// as an inscription workshop (app/rules/sect_manor.py:64). Splitting
+		// the talismans out of Formation without this would have quietly
+		// stripped every one of them of its workshop and manor bonus.
 		return "formation_level"
 	default:
 		return ""
@@ -51,7 +56,7 @@ func craftManorFacilityColumn(profession string) string {
 		return "alchemy_hall_level"
 	case "forging":
 		return "forge_pavilion_level"
-	case "formation":
+	case "formation", "inscription":
 		return "defense_array_level"
 	default:
 		return ""
@@ -320,7 +325,7 @@ func craftResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 	profession := strings.TrimSpace(recipe.Profession)
 	base := attrs["insight"] + attrs["will"]
 	switch strings.ToLower(profession) {
-	case "alchemy", "formation":
+	case "alchemy", "formation", "inscription":
 		base = attrs["insight"] + attrs["spirit"]
 	case "forging":
 		base = attrs["insight"] + attrs["body"]

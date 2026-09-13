@@ -229,24 +229,40 @@ func (r *Runner) smuggleToNightMarket(conn *storage.Conn, world, itemID string, 
 	if !simTableExists(conn, "black_market_stock") {
 		return false, nil
 	}
-	postRes, err := conn.Execute(`SELECT location,heat FROM black_market_posts WHERE world_name=? AND active=1`, []any{world})
+	postRes, err := conn.Execute(`SELECT heat FROM black_market_posts WHERE world_name=? AND active=1`, []any{world})
 	if err != nil || len(postRes.Rows) == 0 {
 		return false, err
 	}
-	location, heat := fmt.Sprint(postRes.Rows[0][0]), i64(postRes.Rows[0][1])
+	heat := i64(postRes.Rows[0][0])
 	base := item.BasePrice
 	if base <= 0 {
 		base = max64(8, item.SectValue*8)
 	}
 	price := base + base*heat/100
+	if price < 1 {
+		price = 1
+	}
 	legal := strings.ToLower(strings.TrimSpace(item.LegalStatus))
 	if legal == "" {
 		legal = "restricted"
 	}
-	_, err = conn.Execute(`INSERT INTO black_market_stock(world_name,location,item_id,quantity,price,legal_status,updated_at)
-        VALUES(?,?,?,1,?,?,?) ON CONFLICT(world_name,item_id) DO UPDATE SET quantity=black_market_stock.quantity+1,price=excluded.price,updated_at=excluded.updated_at`,
-		[]any{world, location, itemID, price, legal, nowFloat()})
+	// The columns are the ones the table actually has. The first version of
+	// this wrote `location` and `price`, which `black_market_stock` does not
+	// carry, and omitted `currency_id`/`unit_price`, which are NOT NULL - so
+	// every smuggled find raised a bare SQL error that aborted the whole
+	// consignment tick, legal lots included. It passed because the test
+	// fixture below had invented a matching-but-wrong schema of its own; the
+	// fixture is now the production one.
+	_, err = conn.Execute(`INSERT INTO black_market_stock(world_name,item_id,currency_id,unit_price,quantity,legal_status,updated_at)
+        VALUES(?,?,?,?,1,?,?) ON CONFLICT(world_name,item_id) DO UPDATE SET quantity=black_market_stock.quantity+1,unit_price=excluded.unit_price,updated_at=excluded.updated_at`,
+		[]any{world, itemID, blackMarketCurrency(world), price, legal, nowFloat()})
 	return err == nil, err
+}
+
+// blackMarketCurrency is the world's own tier-1 coin, the same one the
+// rotation stocks a post in (`worldCurrency`, bootstrap.go:91).
+func blackMarketCurrency(world string) string {
+	return worldCurrency(world)
 }
 
 // houseNear is the auction floor of the city the finder is in or standing
