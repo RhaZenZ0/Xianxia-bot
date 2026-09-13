@@ -5,7 +5,7 @@ narrates but never decides, self-hosted on your own hardware.*
 
 [![CI](https://github.com/RhaZenZ0/Xianxia-bot/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/RhaZenZ0/Xianxia-bot/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/RhaZenZ0/Xianxia-bot?include_prereleases&label=release)](https://github.com/RhaZenZ0/Xianxia-bot/releases)
-[![Go 1.23+](https://img.shields.io/badge/go-1.23%2B-00ADD8)](go_core/go.mod)
+[![Go 1.25+](https://img.shields.io/badge/go-1.25%2B-00ADD8)](go_core/go.mod)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-3776AB)](requirements.txt)
 
 A persistent Xianxia role-playing game that lives in a Discord server and runs on a CPU-only
@@ -156,7 +156,7 @@ It takes a safety backup first, asks you to type `RESET`, leaves Discord channel
 
 ## Running without Docker
 
-Python 3.12+, Go 1.23+ and the SQLite development library (`libsqlite3-dev` on Debian/Ubuntu) for
+Python 3.12+, Go 1.25+ and the SQLite development library (`libsqlite3-dev` on Debian/Ubuntu) for
 the Go CGO binding.
 
 ```bash
@@ -561,7 +561,10 @@ jobs. `make check` covers the first two locally; the third has no local equivale
 
 Two security scans sit beside them. `govulncheck` is the Go half: `go_core` has no external
 dependencies — SQLite is direct cgo — so what it reports is standard-library advisories against the
-Go version in `go.mod`, and the fix for one is a Go bump. It needs the network, so it is `make
+Go version in `go.mod`, and the fix for one is a Go bump. Its first run was one: the `go` directive
+said `1.23.0`, CI installs the toolchain that directive names, and Go 1.23.0 carried 26 advisories
+this code reaches. The directive is `1.25.13` now — the oldest release that clears all of them —
+which is why the floor is where it is. It needs the network, so it is `make
 audit` rather than part of `make lint`; `make check` stays runnable offline. The Python half needs
 nothing and rides the `ruff` call that was already there: `flake8-bandit` rules, with seven off for
 reasons written out in `pyproject.toml` and every other rule clean — so `eval`, `exec`, `pickle`,
