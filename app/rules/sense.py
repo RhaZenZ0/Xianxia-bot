@@ -77,15 +77,29 @@ def ground_reading_line(ground: Mapping[str, Any] | None) -> str:
     detail = str(ground.get("detail", "vague"))
     if detail == "vague":
         return f"The qi of this ground feels **{quality}**, though you cannot tell what shapes it."
+    land = _land_reading(ground)
     if detail == "named":
-        return f"The qi of this ground is **{quality}**" + (f", gathered by **{where}**." if where else ".")
+        return f"The qi of this ground is **{quality}**" + (f", gathered by **{where}**." if where else ".") + land
     multiplier = float(ground.get("multiplier", 1.0) or 1.0)
     world_qi = float(ground.get("world_qi", 1.0) or 1.0)
     return (
         f"The qi of this ground is **{quality}** — cultivation here runs at **×{multiplier:g}**"
         + (f", gathered by **{where}**" if where else "")
         + f", in a world whose qi runs at **×{world_qi:g}**."
+        + land
     )
+
+
+def _land_reading(ground: Mapping[str, Any]) -> str:
+    """The land a sweep reads under the qi: its terrain and its weather.
+
+    Both are content the world has always carried - `terrain` priced every
+    road journey, and `climate` was read by nothing whatsoever in either
+    language until it was given to the narrator and to this sweep.
+    """
+    parts = [str(ground.get("terrain") or "").strip(), str(ground.get("climate") or "").strip()]
+    said = ", ".join(p for p in parts if p)
+    return f" The land itself reads as **{said}**." if said else ""
 
 
 def hidden_npc_names(

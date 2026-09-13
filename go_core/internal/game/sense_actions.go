@@ -398,6 +398,18 @@ func senseGroundReading(conn *storage.Conn, catalog worlddata.Catalog, userID in
 	}
 	out["detail"] = "named"
 	out["ground"] = name
+	// A sweep that can name what gathers the qi can also read the land it
+	// gathers over. `terrain` and `climate` are written into the content and
+	// were read by the road planner and by nothing at all respectively; this
+	// is the second reader `climate` never had.
+	if loc, ok := catalog.Locations[sensor.Location]; ok {
+		if loc.Terrain != "" {
+			out["terrain"] = loc.Terrain
+		}
+		if loc.Climate != "" {
+			out["climate"] = loc.Climate
+		}
+	}
 	if tier == "overwhelming" {
 		out["detail"] = "exact"
 		out["multiplier"] = mult

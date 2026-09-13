@@ -221,6 +221,24 @@ is set, and the three higher-world capitals had none - so a death-qi cultivator 
 Jade Capital, Nine-Heavens Immortal Court or Celestial Mandate Palace quietly escaped a penalty every
 mortal-world city pays. A content gate holds every realm hub to being a city.
 
+Two more things the world had written down and nobody could reach. `climate` was parsed into
+`LocationDefinition.Climate` and read by **nothing at all**, in either language - ninety-eight
+locations' worth of weather that existed only as a key in a file. It reaches the narrator now, beside
+the description and the protection, and a sense sweep that can name what gathers the qi also reads
+the land it gathers over. The twenty places that had neither terrain nor climate have both, and a
+content gate holds every travel endpoint to both; an interior has no weather, so the 375 districts,
+shops and auction floors are correctly left alone.
+
+And the three spatial keys opened nothing. Each carried a `secret_realm_id` the engine looks up
+exactly - `sword_grave`, `verdant_grotto`, `stygian_tomb` - against a catalogue holding
+`sword_grave_nine_echoes`, `verdant_immortal_grotto` and `stygian_lantern_tomb`, so `spatial_key.use`
+could only ever answer "the token's coordinates no longer correspond to a known realm". Nobody had
+found out, because nothing sold them either: a working action, a working item, and no way to hold
+one. They name their realms correctly, the Mortal World's array workshops keep them (an array master
+trading in spatial coordinates is exactly who would), and a key spent away from its own entrance is
+now refused rather than silently wasted - `secret_realm.enter` only ever steps through at the
+realm's own mouth.
+
 **1.0.0** (rc.14) repairs a broken call in `/sense` and closes the class of fault it belongs to.
 Sensing another cultivator called `WORLD.approximate_realm(...)`, and there is no such method on
 `World`: the function lives in `app/rules/sense.py` and takes its two realm lookups as arguments, so

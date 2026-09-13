@@ -37,6 +37,19 @@ class LocationContentTests(unittest.TestCase):
                 for text in encounters:
                     self.assertGreater(len(text.strip()), 20)
 
+    def test_every_travel_endpoint_has_ground_and_weather(self):
+        # `terrain` prices every road journey (the fallback branch is a flat
+        # 75 minutes for a jade terrace and a volcanic pass alike) and both it
+        # and `climate` now reach the narrator and the `/sense area` sweep.
+        # An interior has no weather, so only the places a road can end at
+        # are held to this.
+        for name, loc in WORLD["locations"].items():
+            if loc.get("district") or loc.get("shop") or loc.get("auction_house"):
+                continue
+            with self.subTest(location=name):
+                self.assertTrue(str(loc.get("terrain") or "").strip(), f"{name} has no terrain")
+                self.assertTrue(str(loc.get("climate") or "").strip(), f"{name} has no climate")
+
     def test_every_location_has_at_least_one_npc(self):
         # A location the narrator can be asked about needs someone to voice
         # it. The three samsara arrival grounds were the last without one.
@@ -131,6 +144,36 @@ class WorldCrossingContentTests(unittest.TestCase):
             if loc.get("realm_hub"):
                 with self.subTest(capital=name):
                     self.assertEqual(loc.get("settlement_type"), "city")
+
+
+class TreasureContentTests(unittest.TestCase):
+    """v1.0.0-rc.15: a treasure the engine can read is a treasure somebody can
+    hold. Both halves had been missing for the spatial keys - they named
+    secret realms that do not exist, and nothing sold them."""
+
+    def test_every_spatial_key_names_a_real_secret_realm(self):
+        keys = {k: v for k, v in WORLD["items"].items() if v.get("spatial_key")}
+        self.assertGreaterEqual(len(keys), 3)
+        for key, item in keys.items():
+            with self.subTest(item=key):
+                rid = str(item["spatial_key"].get("secret_realm_id") or "")
+                self.assertIn(rid, WORLD["secret_realms"], f"{key} opens nothing")
+                self.assertGreater(int(item["spatial_key"].get("open_hours") or 0), 0)
+
+    def test_every_spatial_key_is_sold_in_the_world_its_realm_is_in(self):
+        for key, item in WORLD["items"].items():
+            if not item.get("spatial_key"):
+                continue
+            realm = WORLD["secret_realms"][str(item["spatial_key"]["secret_realm_id"])]
+            world = WORLD["locations"][realm["location"]]["world"]
+            shelves = [
+                shop for shop in WORLD["shops"].values()
+                if any(line["item_id"] == key for line in shop["sells"])
+            ]
+            with self.subTest(item=key):
+                self.assertTrue(shelves, f"{key} is sold nowhere")
+                self.assertTrue(any(shop["world"] == world for shop in shelves),
+                                f"{key} is only sold outside {world}")
 
 
 class NpcContentTests(unittest.TestCase):

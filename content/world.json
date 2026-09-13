@@ -2292,7 +2292,8 @@
       "world": "Mortal World",
       "min_realm_index": 0,
       "safe_zone": false,
-      "terrain": "mountain forest"
+      "terrain": "mountain forest",
+      "climate": "cool-highland"
     },
     "Moonfen Marsh": {
       "description": "A dangerous wetland rich in medicinal plants, poisonous insects, ghost-lotus flowers and hidden alchemist camps.",
@@ -2310,7 +2311,8 @@
       "world": "Mortal World",
       "min_realm_index": 0,
       "safe_zone": false,
-      "terrain": "wetland marsh"
+      "terrain": "wetland marsh",
+      "climate": "cold-damp"
     },
     "Golden Pavilion Auction House": {
       "description": "A many-tiered auction pavilion protected by ancient formations and discreet hidden experts. Violence inside is forbidden; the protection ends at the front doors.",
@@ -2405,7 +2407,8 @@
         ]
       },
       "terrain": "imperial jade terrace",
-      "settlement_type": "city"
+      "settlement_type": "city",
+      "climate": "temperate"
     },
     "Nine-Heavens Immortal Court": {
       "description": "The central court of an Immortal World domain, suspended above immortal clouds and guarded by law formations.",
@@ -2438,7 +2441,8 @@
         ]
       },
       "terrain": "highland cloud court",
-      "settlement_type": "city"
+      "settlement_type": "city",
+      "climate": "cool-highland"
     },
     "Celestial Mandate Palace": {
       "description": "A palace-city at the heart of the Celestial World, where sovereign decrees can redirect the fate of entire star regions.",
@@ -2471,7 +2475,8 @@
         ]
       },
       "terrain": "imperial starlit plain",
-      "settlement_type": "city"
+      "settlement_type": "city",
+      "climate": "cool-dry"
     },
     "Spirit Jade Rebirth Enclave": {
       "description": "A protected lower district in the Spiritual World where mortal-born descendants, reincarnated souls and weak juniors can survive beneath stabilizing formations.",
@@ -2488,7 +2493,8 @@
         "A caravan from the capital delivers spirit rice and takes away a list of names.",
         "An old woman insists she has been reborn here twice and that the enclave is smaller each time."
       ],
-      "terrain": "sheltered jade valley"
+      "terrain": "sheltered jade valley",
+      "climate": "warm-humid"
     },
     "Nine-Heavens Rebirth Terrace": {
       "description": "A sheltered Immortal World terrace maintained for newborn clan members and reincarnated souls whose bodies have not yet rebuilt immortal cultivation.",
@@ -2505,7 +2511,8 @@
         "A visiting elder inspects the reincarnated with the eyes of someone looking for one face in particular.",
         "A servant is caught copying names off the rebirth ledger and is escorted away without a word."
       ],
-      "terrain": "highland terrace"
+      "terrain": "highland terrace",
+      "climate": "cool-windy"
     },
     "Celestial Cradle Province": {
       "description": "A rare Celestial World province protected by sovereign law formations, allowing reincarnated souls to begin again in mortal-strength bodies without being crushed by the realm itself.",
@@ -2522,7 +2529,8 @@
         "A mortal-strength body sits in meditation for the first time and the surrounding grass bends toward it.",
         "A sealed message from the Immortal World arrives addressed to a child born this morning."
       ],
-      "terrain": "warded plain"
+      "terrain": "warded plain",
+      "climate": "dry-temperate"
     },
     "Azure Cloud Mountain Gate": {
       "description": "A white-stone stairway climbs through cloud-wrapped pines to the public mountain gate of the Azure Cloud Sect. Sword marks left by generations of applicants cover the testing plaza.",
@@ -2542,7 +2550,8 @@
         "The gate's protective formation runs the full height of the stair and stops exactly at the last step.",
         "Higher up the mountain, disciplined qi moves in ordered lines, out of reach of sense."
       ],
-      "terrain": "mountain stair"
+      "terrain": "mountain stair",
+      "climate": "cool-windy"
     },
     "Crimson Furnace Valley": {
       "description": "Red cliffs surround a furnace valley veined with fire-aspected qi. Herb terraces, pill halls and bronze examination furnaces mark the Crimson Furnace Sect recruitment grounds.",
@@ -2562,7 +2571,8 @@
         "The herb terraces carry a green, medicinal spiritual scent that masks weaker signatures.",
         "Heat-shimmer around the pill halls makes every life-sign there hard to count."
       ],
-      "terrain": "volcanic valley"
+      "terrain": "volcanic valley",
+      "climate": "hot"
     },
     "Frozen Moon Terrace": {
       "description": "A high terrace above a cold mirror-lake where frost formations glow beneath moonstone tiles. Frozen Moon Palace tests patience, control and formation sense here.",
@@ -2582,7 +2592,8 @@
         "Moonstone tiles hold a faint stored light that answers to patience rather than pressure.",
         "Whatever watches from the palace above keeps its presence perfectly level."
       ],
-      "terrain": "frozen highland"
+      "terrain": "frozen highland",
+      "climate": "cold"
     },
     "Black Serpent Ravine": {
       "description": "A humid ravine of black bamboo, beast pens and poison gardens. The Black Serpent Clan judges recruits by fieldcraft, nerve and their respect for dangerous creatures.",
@@ -2602,7 +2613,8 @@
         "Poison-aspected qi seeps from the gardens and dulls the edge of spiritual sense.",
         "The clan's own cultivators are hard to place; they keep their presence low the way their beasts do."
       ],
-      "terrain": "humid ravine"
+      "terrain": "humid ravine",
+      "climate": "warm-humid"
     },
     "Blood River Gorge": {
       "description": "A hidden gorge where iron-red water cuts through dark stone. Blood River banners appear only to those who have been shown the correct trail or survived long enough to be noticed.",
@@ -2623,7 +2635,8 @@
         "Hostile attention rests on the gorge from at least two vantage points on the cliffs.",
         "Something old has been fed here, and the stone remembers it."
       ],
-      "terrain": "river gorge"
+      "terrain": "river gorge",
+      "climate": "warm-humid"
     },
     "Corpse Lantern Necropolis": {
       "description": "A concealed funerary complex lit by blue soul-lanterns. Names of the dead are carved into black tablets while quiet archivists test whether visitors can face death without losing themselves.",
@@ -2644,7 +2657,8 @@
         "The black tablets each hold a faint residual presence, as if the names were listening.",
         "No living heat reads from the archivists; their signatures are thin and steady as lamp flames."
       ],
-      "terrain": "mist necropolis"
+      "terrain": "mist necropolis",
+      "climate": "cold-damp"
     },
     "Riverguard City": {
       "description": "A public temperate cultivation city shaped by temperate river martial district. Its family districts are part of the normal world: travelers can discover, visit, trade, and interact here. The city functions as a complete family starting region with local trade, cultivation resources, household politics, work, and recurring problems.",
@@ -8821,7 +8835,8 @@
         "The arrays in the cliff move qi in patterns too regular to be natural.",
         "Ordered, patient qi; the sect above is a place of long practice."
       ],
-      "terrain": "jade cliff"
+      "terrain": "jade cliff",
+      "climate": "cool-dry"
     },
     "Thousand Beast Valley Mouth": {
       "description": "The mouth of a wide valley in the Spiritual World, closed by a fence of bone and a gate that a beast, not a man, opens. Cages, kennels and roosts climb the slopes beyond it.",
@@ -8838,7 +8853,8 @@
         "Beast qi in a hundred flavours crowds the valley beyond the gate.",
         "Something old and very large sleeps under the far ridge and the valley arranges itself around it."
       ],
-      "terrain": "forest valley"
+      "terrain": "forest valley",
+      "climate": "warm-humid"
     },
     "Heavenblade Sword Terrace": {
       "description": "A terrace of immortal gold cut into the mountain above the Immortal Court, where a single sword stands point-down in the stone and has for ten thousand years. Applicants are asked to draw it and are judged by how they fail.",
@@ -8855,7 +8871,8 @@
         "Sword intent cuts the air above the terrace in a line that has not moved in ten thousand years.",
         "The mountain above is disciplined qi in rows; a sword sect at practice."
       ],
-      "terrain": "mountain peak"
+      "terrain": "mountain peak",
+      "climate": "cool-windy"
     },
     "Ashen Lotus Shrine Gate": {
       "description": "A shrine gate of grey stone in a burnt lotus field below the Immortal Court, where the ash never settles. The pavilion recruits openly here, which the Court tolerates because it cannot stop it.",
@@ -8872,7 +8889,8 @@
         "Soul qi rises off the ash field in slow spirals; something below it is patient.",
         "Cold fire and colder intent; the shrine is a door, not a wall."
       ],
-      "terrain": "dry ash field"
+      "terrain": "dry ash field",
+      "climate": "dry-temperate"
     },
     "Mandate Academy Star Steps": {
       "description": "Nine hundred steps of starlight rise from the Palace grounds to the Academy's first hall. Each step asks a question; applicants who reach the top have answered them.",
@@ -8889,7 +8907,8 @@
         "Celestial law presses on the steps in graded weights; each landing is heavier.",
         "The Academy above is ordered qi arranged by argument rather than rank."
       ],
-      "terrain": "mountain stair"
+      "terrain": "mountain stair",
+      "climate": "cool-highland"
     },
     "Void Serpent Pit": {
       "description": "A pit in the Celestial World whose bottom nobody has seen, ringed by serpent-carved stones. The cult recruits at the rim, and the Palace lets it, because the pit was here before the Palace.",
@@ -8906,7 +8925,8 @@
         "Serpent qi coils up out of the pit in slow waves; the rim is the only still ground.",
         "Something vast turns over far below and the whole rim breathes with it."
       ],
-      "terrain": "broken peak"
+      "terrain": "broken peak",
+      "climate": "cold"
     },
     "Adamant Body Forge": {
       "description": "Adamant Body's smithy: a stone-cold forge hall where Smith Guo Tie hammers spirit iron into blades and lamellar at the anvil, and sells the ore beside them. Tier 3 work - immortal-grade goods few can afford. The forge sits off Adamant Body Immortal City's main street and closes only when the coals do.",
@@ -23392,7 +23412,7 @@
       "description": "A sword-marked spatial token that can force open the entrance to the Sword Grave of Nine Echoes for a short time.",
       "sect_value": 900,
       "spatial_key": {
-        "secret_realm_id": "sword_grave",
+        "secret_realm_id": "sword_grave_nine_echoes",
         "open_hours": 2,
         "consumed": true
       }
@@ -23402,7 +23422,7 @@
       "description": "A jade key carrying the spatial coordinates of the Verdant Immortal Grotto.",
       "sect_value": 700,
       "spatial_key": {
-        "secret_realm_id": "verdant_grotto",
+        "secret_realm_id": "verdant_immortal_grotto",
         "open_hours": 2,
         "consumed": true
       }
@@ -23412,7 +23432,7 @@
       "description": "A cold black token that resonates with the sealed Stygian Lantern Tomb.",
       "sect_value": 1200,
       "spatial_key": {
-        "secret_realm_id": "stygian_tomb",
+        "secret_realm_id": "stygian_lantern_tomb",
         "open_hours": 2,
         "consumed": true
       }
@@ -52775,12 +52795,33 @@
           "quantity": 1,
           "price": 26,
           "made_here": true
+        },
+        {
+          "item_id": "verdant_grotto_key",
+          "quantity": 1,
+          "price": 280,
+          "made_here": false
+        },
+        {
+          "item_id": "nine_echo_spatial_token",
+          "quantity": 1,
+          "price": 340,
+          "made_here": false
+        },
+        {
+          "item_id": "stygian_tomb_token",
+          "quantity": 1,
+          "price": 420,
+          "made_here": false
         }
       ],
       "buys": {
         "array_disk_blank": 3,
         "formation_flags": 4,
-        "minor_warding_array_disk": 10
+        "minor_warding_array_disk": 10,
+        "verdant_grotto_key": 98,
+        "nine_echo_spatial_token": 118,
+        "stygian_tomb_token": 147
       }
     },
     "ashenwall_provisions": {
@@ -59636,12 +59677,33 @@
           "quantity": 1,
           "price": 26,
           "made_here": true
+        },
+        {
+          "item_id": "verdant_grotto_key",
+          "quantity": 1,
+          "price": 280,
+          "made_here": false
+        },
+        {
+          "item_id": "nine_echo_spatial_token",
+          "quantity": 1,
+          "price": 340,
+          "made_here": false
+        },
+        {
+          "item_id": "stygian_tomb_token",
+          "quantity": 1,
+          "price": 420,
+          "made_here": false
         }
       ],
       "buys": {
         "array_disk_blank": 3,
         "formation_flags": 4,
-        "minor_warding_array_disk": 10
+        "minor_warding_array_disk": 10,
+        "verdant_grotto_key": 98,
+        "nine_echo_spatial_token": 118,
+        "stygian_tomb_token": 147
       }
     },
     "stoneheart_forge": {
