@@ -162,6 +162,32 @@ archive_version() {
     clean_version "$value"
 }
 
+# tree_version is archive_version for a tree that is already extracted, with
+# the same precedence - so the two sides of the version checks below cannot
+# disagree about what one package says its version is.
+#
+# They did. archive_version prefers RELEASE_TAG, so TARGET_VERSION read
+# "1.0.0-rc.12" out of the stamp; both checks read the plain VERSION file and
+# got "1.0.0"; and every release carrying a RELEASE_TAG - which is every
+# release since rc.10 stamped one - stopped at "Extracted VERSION mismatch."
+# The commit that made the beta channel readable made it uninstallable in the
+# same stroke.
+#
+# The stamp is believed only when its numbers agree with VERSION, the rule
+# CURRENT_VERSION already applies; a package whose two stamps disagree falls
+# back to VERSION and is then correctly refused by the comparison.
+tree_version() {
+    _dir=$1
+    _value=$(clean_version "$(head -n 1 "$_dir/VERSION" 2>/dev/null || true)")
+    if [ -f "$_dir/RELEASE_TAG" ]; then
+        _stamped=$(clean_version "$(head -n 1 "$_dir/RELEASE_TAG" 2>/dev/null || true)")
+        if [ -n "$_stamped" ] && valid_version "$_stamped" && [ "${_stamped%%-*}" = "$_value" ]; then
+            _value=$_stamped
+        fi
+    fi
+    printf '%s' "$_value"
+}
+
 cleanup() {
     status=$?
     trap - EXIT INT TERM HUP
@@ -423,7 +449,7 @@ if [ -f "$STAGING_DIR/VERSION" ]; then NEW_ROOT=$STAGING_DIR; else
     done
 fi
 [ -n "$NEW_ROOT" ] && [ -f "$NEW_ROOT/VERSION" ] || { echo "ERROR: Could not locate project root inside ZIP." >&2; exit 1; }
-EXTRACTED_VERSION=$(clean_version "$(cat "$NEW_ROOT/VERSION")")
+EXTRACTED_VERSION=$(tree_version "$NEW_ROOT")
 [ "$EXTRACTED_VERSION" = "$TARGET_VERSION" ] || { echo "ERROR: Extracted VERSION mismatch." >&2; exit 1; }
 for required in VERSION startup.sh stop.sh docker-compose.yml go_core app content; do [ -e "$NEW_ROOT/$required" ] || { echo "ERROR: Package missing $required" >&2; exit 1; }; done
 
@@ -700,7 +726,7 @@ done
 if [ -f "$INSTALL_TREE/update.sh" ]; then NEXT_UPDATER="$PROJECT_DIR/.update.sh.next"; cp -a "$INSTALL_TREE/update.sh" "$NEXT_UPDATER"; chmod +x "$NEXT_UPDATER"; fi
 chmod +x "$PROJECT_DIR/startup.sh" "$PROJECT_DIR/stop.sh" 2>/dev/null || true
 
-INSTALLED_VERSION=$(clean_version "$(cat "$PROJECT_DIR/VERSION")")
+INSTALLED_VERSION=$(tree_version "$PROJECT_DIR")
 [ "$INSTALLED_VERSION" = "$TARGET_VERSION" ] || { echo "ERROR: Post-install VERSION check failed." >&2; exit 1; }
 # ... and the whole tree, not just VERSION: every file the release manifest
 # names must be in place, byte for byte, before anything is started.

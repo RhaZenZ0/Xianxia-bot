@@ -674,7 +674,7 @@ async def sect_abode(interaction: discord.Interaction, action: app_commands.Choi
             f"Facilities: {facilities}\n"
             + (f"Not yet built: {', '.join(unbuilt)}\n" if unbuilt else "")
             + f"Contribution points: **{int(membership.get('contribution_points', 0) or 0)}** - a facility is built or raised with "
-            "**/sect → Sect → Abode** and **Build or raise a facility**; the sect caps each level by your rank and stage.\n"
+            "**/sect → Holdings → Abode** and **Build or raise a facility**; the sect caps each level by your rank and stage.\n"
             + (f"Private scene: {thread.mention}" if thread else "⚠️ Private scene thread is unavailable; repair the base channels."),
             ephemeral=False,
         )

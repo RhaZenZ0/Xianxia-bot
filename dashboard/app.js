@@ -75,7 +75,7 @@ const VIEWS={
   rag:{t:'RAG Memory',g:'Systems',b:'What the narrator can retrieve, and at what visibility. Nothing here creates game truth.'},
   decisions:{t:'Autonomous Decisions',g:'Systems',b:'What the simulation decided on its own, and which of those decisions reached permanent history.'},
   threads:{t:'Discord Threads',g:'Systems',b:'Household, expedition and private scene threads bound to guild channels.'},
-  ai_routing:{t:'AI Routing',g:'Systems',b:'Which narration route serves a scene, what each one last answered, and what the daily liveness check retired. Read-only — narration is descriptive, never authoritative.'},
+  ai_routing:{t:'Narrator Health',g:'Systems',b:'Whether narration is reaching a model, and when it is not, which of the three faults it is: a provider cap credits never raise, the account budget credits do raise, or a route answering with nothing. Read-only — narration is descriptive, never authoritative, and play continues without it.'},
   discord:{t:'Discord Setup',g:'Admin',b:'Provision and repair the server layout. Only discord.py touches guilds — no game mechanics happen here.'},
   narration:{t:'Narration Routes',g:'Admin',b:'Which free models narrate, in what order, and what the daily probe found out about each one. Narration is descriptive only — nothing here can change canonical state.'},
   admin:{t:'Admin Console',g:'Admin',b:'Actions that change the world. Every one is applied by the engine and written to admin_audit_log with your name on it.'},
@@ -345,15 +345,85 @@ async function loadDecisions(){const d=await api('/api/decisions?limit=250');app
    in SQLite - so this page reports and never commands. */
 async function loadAiRouting(){
  const d=await api('/api/ai_routing');
- if(!d.control_available){app.innerHTML=`<h2>AI Routing</h2><div class="card badbox"><b>The bot's router is unreachable.</b><div class="muted">${esc(d.message||'The dashboard cannot reach the Python bot.')}</div></div>`;return}
- const chains=d.chains||{}, tiers=d.tiers||{}, lim=d.limiter||{}, google=d.google_route||{}, audit=d.audit||{}, models=d.models||[];
+ if(!d.control_available){app.innerHTML=`<h2>Narrator Health</h2><div class="card badbox"><b>The bot's router is unreachable.</b><div class="muted">${esc(d.message||'The dashboard cannot reach the Python bot.')}</div></div>`;return}
+ const chains=d.chains||{}, tiers=d.tiers||{}, lim=d.limiter||{}, google=d.google_route||{}, audit=d.audit||{}, models=d.models||[], faults=d.faults||{};
  const used=Number(lim.used_today||0), cap=Number(lim.max_requests_per_day||0);
  const req=Object.values(tiers).reduce((a,t)=>a+Number(t.requests||0),0);
  const served=Object.values(tiers).reduce((a,t)=>a+Number(t.served||0),0);
  // The number the whole page exists to explain: how much play is running on
  // template prose because no route answered.
  const fellBack=req-served, pct=req?Math.round(fellBack/req*100):0;
+ const counts=faults.counts||{}, serving=Number(faults.serving||0), routes=Number(faults.routes||models.length);
  const ago=t=>{if(!t)return '—';const s=Math.max(0,Date.now()/1000-Number(t));if(s<90)return `${Math.round(s)}s ago`;if(s<5400)return `${Math.round(s/60)}m ago`;return `${Math.round(s/3600)}h ago`};
+ // The freshest success across the chain: the payload has no single "last
+ // narration" stamp, and the newest per-route one is the same fact.
+ const lastOk=models.reduce((a,r)=>Math.max(a,Number(r.last_success_at||0)),0);
+ const BYOK='<a href="https://openrouter.ai/settings/integrations" target="_blank" rel="noopener noreferrer">openrouter.ai/settings/integrations</a>';
+
+ // The verdict, and it is one of three - because the three have three
+ // different fixes, and showing every failure the same way is what sent an
+ // operator to buy credits for a ceiling credits do not raise.
+ const verdict=()=>{
+  if(faults.budget_spent) return {k:'budget',cls:'warn',label:'Budget spent',
+    line:`The daily free budget is spent (${n(used)}/${n(cap)}). Narration is procedural until the window rolls over — the bot has stopped calling out rather than making requests it already knows will be refused.`};
+  if(req&&!serving) return {k:'degraded',cls:'bad',label:'Degraded',
+    line:`No route is carrying traffic. <b>${pct}%</b> of narration fell back to procedural prose — ${n(fellBack)} of ${n(req)} requests. Nothing errored and no action failed; players got the flat deterministic writing instead of the model's.`};
+  if(pct>=50) return {k:'degraded',cls:'warn',label:'Mostly procedural',
+    line:`<b>${pct}%</b> of narration fell back to procedural prose — ${n(fellBack)} of ${n(req)} requests. This is the failure that is invisible without this panel: it costs writing quality and nothing else.`};
+  if(!req) return {k:'idle',cls:'',label:'Idle',line:'No narration has been requested yet this process. Counters start empty on every restart.'};
+  return {k:'serving',cls:'good',label:'Serving',
+    line:`${n(serving)} of ${n(routes)} routes carrying traffic.${lastOk?` Last narration ${ago(lastOk)}.`:''}`};
+ };
+ const v=verdict();
+
+ const FAULTS={
+  provider_cap:{title:'Provider cap',
+    body:`The model's own provider is rate-limiting OpenRouter's shared free pool. These are per-minute caps enforced upstream, not by OpenRouter.`,
+    fix:`<b>Adding OpenRouter credits will not raise these.</b> Add your own provider key at ${BYOK} so the model draws on your quota instead of the shared one.`},
+  empty_reply:{title:'Empty reply',
+    body:`The route answered with no usable text. This is not a rate limit: a reasoning model given a small token budget spends it all thinking.`,
+    fix:`Neither waiting nor paying fixes it — change the route on <b>Admin → Narration Routes</b>. A route that has never succeeded is not a fallback, it is a delay plus a spent daily slot.`},
+  retired:{title:'Retired by the daily probe',
+    body:`The route answered 401/403/404, so narration no longer spends a slot on it until the next pass.`,
+    fix:`Usually the slug is gone from the free catalogue. Pick a live one on <b>Admin → Narration Routes</b>.`},
+  error:{title:'Failing',
+    body:`The route is failing for something other than a rate limit or an empty answer.`,
+    fix:`Read the route's last error in the table below.`},
+ };
+ const faultCards=Object.entries(counts).filter(([k])=>FAULTS[k]).map(([k,c])=>{
+  const f=FAULTS[k];
+  return `<div class="card"><small>${esc(f.title)}</small><div class="metric warn">${n(c)} route${c===1?'':'s'}</div>
+   <div class="muted">${f.body}</div><div class="muted" style="margin-top:.5em">${f.fix}</div></div>`}).join('');
+
+ // The account budget is always shown beside the route faults, because it is
+ // the one ceiling here that credits actually do raise, and telling them apart
+ // is the point of the section.
+ const budgetCard=`<div class="card"><small>Account budget</small>
+   <div class="metric ${faults.budget_spent?'bad':''}">${n(used)} / ${n(cap)}</div>
+   <div class="muted">OpenRouter's own free-tier daily cap, separate from any provider cap above.
+   <b>This one is raised by credits</b> — $10 of lifetime credit takes it from 50 to 1000 a day.</div>
+   <div class="muted" style="margin-top:.5em">${d.credits_topped_up
+     ? 'Credits are marked as topped up on <b>Admin → Narration Routes</b>.'
+     : 'Currently under $10 of credit. The switch is on <b>Admin → Narration Routes</b>.'}</div></div>`;
+
+ const routeState=r=>{
+  if(r.probe_retired)return pill('retired','bad');
+  if(r.cooling_down)return pill(`cooling ${Math.round(Number(r.cooldown_remaining_seconds||0))}s`,'warn');
+  if(r.never_succeeded)return pill('never succeeded','warn');
+  if(r.successes)return pill('serving','good');
+  return pill('untried','');
+ };
+ const why=r=>{
+  const f=String(r.fault||'');
+  if(!f)return '<span class="muted">—</span>';
+  const label=(FAULTS[f]||{}).title||f;
+  const detail=f==='provider_cap'?`${n(r.rate_limited||0)} refusal${Number(r.rate_limited)===1?'':'s'}`
+    :f==='empty_reply'?`${n(r.empty_responses||0)} empty of ${n(r.attempts||0)}`
+    :r.last_status?`HTTP ${n(r.last_status)}`:'';
+  const skipped=Number(r.skipped_cooling||0);
+  return `${pill(label,f==='retired'?'bad':'warn')}<div class="muted">${esc(detail)}${skipped?` · skipped ${n(skipped)}× while cooling`:''}</div>`;
+ };
+
  const chainRow=(tier,list)=>`<div class="card"><small>${esc(tier)} chain</small><div>${(list||[]).map((m,i)=>{
    const row=models.find(x=>x.model===m)||{};
    const cls=row.probe_retired?'bad':row.never_succeeded?'warn':row.successes?'good':'';
@@ -366,15 +436,34 @@ async function loadAiRouting(){
   return ret.length
    ? `<div class="warnbox"><b>${n(ret.length)} of ${n((audit.checked||[]).length)} retired</b> until the next pass: ${ret.map(m=>pill(m,'bad')).join(' ')}<div class="muted">They answered 401/403/404, so narration no longer spends a slot on them.</div></div>`
    : `<div class="goodbox">All ${n((audit.checked||[]).length)} routes reachable, checked ${ago(audit.at)}.</div>`};
+
  // No hero: sectionize() already renders the view's title and blurb from the
  // registry above, and repeating them here just pushed the numbers down a screen.
- app.innerHTML=`<div class="tagline">${pill(d.enabled?'narration enabled':'narration disabled',d.enabled?'good':'bad')}${pill(d.require_free?'free routes only':'paid routes allowed',d.require_free?'good':'warn')}${d.tls_failures?pill(`${n(d.tls_failures)} TLS failures`,'bad'):''}</div>
+ app.innerHTML=`<div class="tagline">${pill(v.label,v.cls)}${pill(d.enabled?'narration enabled':'narration disabled',d.enabled?'good':'bad')}${pill(d.require_free?'free routes only':'paid routes allowed',d.require_free?'good':'warn')}${d.tls_failures?pill(`${n(d.tls_failures)} TLS failures`,'bad'):''}</div>
+ <div class="card ${v.cls==='bad'?'badbox':v.cls==='warn'?'warnbox':v.cls==='good'?'goodbox':''}"><b>${esc(v.label)}</b><div>${v.line}</div></div>
+ <div class="card goodbox"><b>Play is unaffected.</b> <span class="muted">Mechanics resolve before narration runs. A total outage returns procedural prose — flatter writing, never a failed action, never lost state. A high fallback rate is a writing-quality problem, not an outage.</span></div>
  <div class="cards">
-  <div class="card"><small>Narration requests</small><div class="metric">${n(req)}</div></div>
-  <div class="card"><small>Served by AI</small><div class="metric">${n(served)}</div></div>
-  <div class="card"><small>Procedural fallbacks</small><div class="metric ${fellBack?'bad':''}">${n(fellBack)}</div><small>${pct}% of requests</small></div>
-  <div class="card"><small>Daily free budget</small><div class="metric">${n(used)}/${n(cap)}</div><small>refused ${n(lim.rejected||0)} · ${d.credits_topped_up?'ten dollars on the account':'under ten dollars of credit'}</small></div>
+  <div class="card"><small>Narration served by AI</small><div class="metric">${req?100-pct:0}%</div><small>${n(served)} of ${n(req)} requests</small></div>
+  <div class="card"><small>Procedural fallbacks</small><div class="metric ${fellBack?'bad':''}">${n(fellBack)}</div><small>${fellBack?'chain exhausted':'players saw no flat prose'}</small></div>
+  <div class="card"><small>Daily free budget</small><div class="metric ${faults.budget_spent?'bad':''}">${n(used)}/${n(cap)}</div><small>refused ${n(lim.rejected||0)} · ${d.credits_topped_up?'ten dollars on the account':'under ten dollars of credit'}</small></div>
+  <div class="card"><small>Routes carrying traffic</small><div class="metric ${serving?'':'warn'}">${n(serving)} of ${n(routes)}</div><small>${Object.keys(counts).length?'others throttled or cooling':'all healthy'}</small></div>
  </div>
+ <h2>What to do about it</h2>
+ <p class="muted">These are different faults with different fixes, which is why they are not one number. A provider cap and the account budget look alike in a log and are not alike at all.</p>
+ <div class="cards">${faultCards}${budgetCard}</div>
+ <h2>Routes</h2>${table([
+   ['Route','model'],
+   ['State',routeState],
+   ['Tried','attempts'],['OK','successes'],
+   ['Why it failed',why],
+   ['Skipped',r=>n(Number(r.skipped_cooling||0)+Number(r.skipped_route_limit||0)+Number(r.skipped_probe_retired||0))],
+   ['Scratchpad',r=>r.scratchpad_rejected?pill(r.scratchpad_rejected,'warn'):'0'],
+   ['Probe',r=>r.probe_ok===null||r.probe_ok===undefined?'<span class="muted">not probed</span>':(r.probe_ok?pill('ok','good'):pill('failed','bad'))],
+   ['Served by','last_provider'],
+   ['Own key',r=>r.byok===null||r.byok===undefined?'—':(r.byok?pill('yes','good'):pill('shared pool','warn'))],
+   ['Last success',r=>ago(r.last_success_at)],
+   ['Last error',r=>r.last_error?`<span class="muted" title="${esc(r.last_error)}">${esc(String(r.last_error).slice(0,80))}</span>`:'—'],
+ ],models,{empty:'No route has been called yet.',why:'Counters start empty on every bot restart.'})}
  <h2>What the calls are for</h2>
  <p class="muted">Since v0.31.0 a live call is made for three reasons only: an NPC answering a player, an epic beat, or an explicit ask (the picker's <b>Narrate it</b>, the button under an exploration or hunt, an @mention). Everything else reads from the procedural pool by design.</p>
  <div class="cards">
@@ -393,20 +482,7 @@ async function loadAiRouting(){
    ? (google.available
      ? `<div class="goodbox">Route <b>on</b> (${esc(google.model||'')}) — your own key, its own quota, outside the OpenRouter daily budget. It is never retired by the daily check.</div>`
      : `<div class="badbox"><b>A key is set but the route is off.</b><div class="muted">${esc(google.last_error||'the google-genai SDK could not be loaded')}</div></div>`)
-   : `<div class="muted">No key configured. Narration runs on OpenRouter only; setting GOOGLE_AI_STUDIO_API_KEY adds a route that does not spend the daily budget.</div>`}
- <h2>Routes</h2>${table([
-   ['Route','model'],
-   ['State',r=>r.probe_retired?pill('retired','bad'):r.cooling_down?pill('cooling','warn'):r.never_succeeded?pill('never succeeded','warn'):r.successes?pill('serving','good'):pill('untried','')],
-   ['Attempts','attempts'],['OK','successes'],['Failed','failures'],
-   ['Skipped',r=>n(Number(r.skipped_cooling||0)+Number(r.skipped_route_limit||0)+Number(r.skipped_probe_retired||0))],
-   ['Scratchpad',r=>r.scratchpad_rejected?pill(r.scratchpad_rejected,'warn'):'0'],
-   ['Empty','empty_responses'],
-   ['Probe',r=>r.probe_ok===null||r.probe_ok===undefined?'<span class="muted">not probed</span>':(r.probe_ok?pill('ok','good'):pill('failed','bad'))],
-   ['Served by','last_provider'],
-   ['Own key',r=>r.byok===null||r.byok===undefined?'—':(r.byok?pill('yes','good'):pill('shared pool','warn'))],
-   ['Last success',r=>ago(r.last_success_at)],
-   ['Last error',r=>r.last_error?`<span class="muted" title="${esc(r.last_error)}">${esc(String(r.last_error).slice(0,80))}</span>`:'—'],
- ],models,{empty:'No route has been called yet.',why:'Counters start empty on every bot restart.'})}`;
+   : `<div class="muted">No key configured. Narration runs on OpenRouter only; setting GOOGLE_AI_STUDIO_API_KEY adds a route that does not spend the daily budget.</div>`}`;
 }
 
 async function loadDiscordSetup(){

@@ -166,7 +166,7 @@ class CharacterModal(discord.ui.Modal):
                 "**/character → Overview** • **/family → View** • **/cultivation → Cultivate**\n\n"
                 "Exploring and hunting need the open world, so they stay closed until you step outside "
                 "with **/family → Leave**. After that:\n"
-                "**/world → Explore** • **/npc → Talk** • **/action**"
+                "**/world → Act → Explore** • **/npc → People → Talk** • **/action**"
             ),
             inline=False,
         )
@@ -219,13 +219,13 @@ class CharacterModal(discord.ui.Modal):
                 "Every cultivator begins at home, indoors with their family — so exploring and hunting "
                 "won't work yet, and that's not a bug. Meet them with **/family → View**, then "
                 "**/family → Leave** when you want to step outside. The world opens up from there: "
-                "**/world → Explore**, **/npc → Talk**, or **/action**.",
+                "**/world → Act → Explore**, **/npc → People → Talk**, or **/action**.",
                 ephemeral=True,
             )
         elif private_thread is not None:
             await interaction.followup.send(
                 f"🧭 Your private expedition journal is ready: {private_thread.mention}\n"
-                "Everything you explore is written there. Continue with **/world → Explore** or **/action**.",
+                "Everything you explore is written there. Continue with **/world → Act → Explore** or **/action**.",
                 ephemeral=True,
             )
         else:

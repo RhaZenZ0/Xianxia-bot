@@ -25,7 +25,7 @@ class CommandCleanupTests(unittest.TestCase):
         self.assertEqual(
             set(hub_names),
             {
-                "character", "quest", "cultivation", "items", "npc", "world",
+                "character", "ascend", "cultivation", "items", "npc", "world",
                 "travel", "combat", "economy", "craft", "beast", "sect",
                 "family", "abode", "innerworld", "realm", "admin",
             },
@@ -48,7 +48,9 @@ class CommandCleanupTests(unittest.TestCase):
         self.assertIn("_MIGRATED_ROOTS", source)
         migrated_source = bot_module_defining("_MIGRATED_ROOTS").read_text(encoding="utf-8")
         migrated_node = next(node for node in ast.parse(migrated_source).body if isinstance(node, ast.Assign) and any(isinstance(target, ast.Name) and target.id == "_MIGRATED_ROOTS" for target in node.targets))
-        self.assertEqual(len(ast.literal_eval(migrated_node.value)), 83)
+        # 82 since v1.0.0-rc.13: `bodyperfect` merged into `perfect`, which
+        # now takes the path as an argument.
+        self.assertEqual(len(ast.literal_eval(migrated_node.value)), 82)
         self.assertNotIn("tree.remove_command", source)
         self.assertIn('"alchemy": alchemy_group', source)
         self.assertIn('_hub_page("alchemy", "Alchemy"', source)
@@ -57,8 +59,10 @@ class CommandCleanupTests(unittest.TestCase):
         source = bot_package_source()
         wiring = bot_module_defining("_MIGRATED_ROOTS").read_text(encoding="utf-8")
         self.assertIn('"explore"', wiring[wiring.index("_MIGRATED_ROOTS"):wiring.index("_ROOT_ACTIONS")])
-        self.assertIn('_hub_page("explore", "Explore"', source)
-        self.assertIn("**/world → Explore**", source)
+        # rc.13 renames the page: Explore and Hunt are both things you do with
+        # the place you are standing in, so they share one page keyed "explore".
+        self.assertIn('_hub_page("explore", "Act"', source)
+        self.assertIn("**/world → Act → Explore**", source)
         self.assertIn("**/action**", source)
         self.assertNotIn("**/explore**", source)
         self.assertNotIn("**/act**", source)

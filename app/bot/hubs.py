@@ -18,7 +18,7 @@ _RANGE_ANNOTATION = re.compile(r"Range\[(int|float)\s*,\s*(-?\d+(?:\.\d+)?)\s*,\
 
 
 _HUB_COLOURS = {
-    "character": 0x6C7A89, "quest": 0xA87D32, "cultivation": 0x5B8C5A,
+    "character": 0x6C7A89, "ascend": 0xA87D32, "cultivation": 0x5B8C5A,
     "items": 0x8A6D3B, "npc": 0x6D78A8, "world": 0x3F7F73,
     "travel": 0x557A95, "combat": 0x9A4A4A, "economy": 0xA5863B,
     "craft": 0x8B6F47, "beast": 0x6B875F, "sect": 0x815D73,
@@ -27,7 +27,7 @@ _HUB_COLOURS = {
 }
 
 _HUB_ICONS = {
-    "character": "🧑", "quest": "☯️", "cultivation": "🧘", "items": "🎒",
+    "character": "🧑", "ascend": "☯️", "cultivation": "🧘", "items": "🎒",
     "npc": "👥", "world": "🌍", "travel": "🗺️", "combat": "⚔️",
     "economy": "💰", "craft": "🛠️", "beast": "🐉", "sect": "🏯",
     "family": "🏠", "abode": "🏡", "innerworld": "🌌", "realm": "🌀",
@@ -65,7 +65,7 @@ LAYOUT_HUB_NAMES: set[str] = {
     # stage 2
     "innerworld", "beast", "abode", "family",
     # stage 3
-    "quest", "cultivation", "sect",
+    "ascend", "cultivation", "sect",
     # stage 4
     "admin",
 }
@@ -121,7 +121,7 @@ _PAGE_EMOJIS = {
     "bond": "🤝", "daoheart": "💠", "reputation": "🏷️", "grudges": "🔥", "crime": "⚖️",
     "bounty": "🎯", "inheritances": "📚", "effects": "✨", "specialeffects": "🌀",
     "condition": "🩹", "soul": "🕯️", "afterlife": "☸️", "reincarnate": "🌱",
-    "breakthrough": "⬆️", "perfect": "💎", "bodyperfect": "🥋", "tribulation": "⚡",
+    "breakthrough": "⬆️", "perfect": "💎", "tribulation": "⚡",
     "cultivate": "🧘", "seclusion": "🚪", "body": "🥋", "aptitude": "🧬", "law": "📖",
     "manual": "📚", "conceal": "🌫️", "profession": "🛠️", "inventory": "🎒", "storage": "📦",
     "use": "🧪", "equipment": "🛡️", "artifact": "🔮", "provenance": "🔎", "npcinfo": "👤",
@@ -231,6 +231,13 @@ class HubPage:
     # page's key stays its first command's, which is what every hint path,
     # the checklist and the emoji map already resolve against.
     extras: tuple[Any, ...] = ()
+    # Only these leaves (v1.0.0-rc.13), when set: the qualified names, or the
+    # prefixes, this page takes from its command. A group of twenty-five - and
+    # `/sect` was one - is not a page, it is four pages behind a Next button
+    # with nothing to say they are there. Entries are matched against the full
+    # qualified name ("sect status", "sect recruitment"), so a prefix claims a
+    # whole subgroup. `test_hub_pages.py` holds every leaf to exactly one page.
+    only: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -474,6 +481,17 @@ def _action_rank(name: str) -> int:
     return 2
 
 
+def _claimed_by(item: Any, only: tuple[str, ...]) -> bool:
+    """Whether one leaf belongs to a page that names the leaves it takes.
+
+    An entry matches the leaf itself ("sect status") or any leaf under it
+    ("sect recruitment" takes every recruitment command), so a page can claim a
+    subgroup without listing it out.
+    """
+    qualified = str(getattr(item, "qualified_name", getattr(item, "name", "")))
+    return any(qualified == pick or qualified.startswith(f"{pick} ") for pick in only)
+
+
 def _leaf_actions(page: HubPage) -> list[HubAction]:
     commands = [c for c in (page.command, *tuple(getattr(page, "extras", ()) or ())) if c is not None]
     if not commands:
@@ -484,6 +502,9 @@ def _leaf_actions(page: HubPage) -> list[HubAction]:
             leaves += [item for item in command.walk_commands() if isinstance(item, app_commands.Command)]
         else:
             leaves.append(command)
+    only = tuple(getattr(page, "only", ()) or ())
+    if only:
+        leaves = [item for item in leaves if _claimed_by(item, only)]
     actions: list[HubAction] = []
     # A page that gathers several commands (v1.0.0-rc.4) labels its leaves by
     # their whole path: one page holds both `aptitude status` and `law

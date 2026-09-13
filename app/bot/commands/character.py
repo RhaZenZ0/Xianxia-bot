@@ -288,10 +288,10 @@ async def sheet(interaction: discord.Interaction) -> None:
         elif perfection and perfection["active"]:
             perfect_text = (
                 f"Perfection **{perfection['progress']}%** • Training {perfection['training_progress']}/{WORLD.perfection_training_cap()}\n"
-                f"Quests {perfection['completed_quests']}/{WORLD.perfection_quest_count()} • use **/quest → Realm Perfection → Info**"
+                f"Quests {perfection['completed_quests']}/{WORLD.perfection_quest_count()} • use **/ascend → Perfection → Info**"
             )
         else:
-            perfect_text = "Stage 9 choice unlocked: **/quest → Realm Perfection → Start** or **/quest → Main Progression → Breakthrough** to skip perfection."
+            perfect_text = "Stage 9 choice unlocked: **/ascend → Perfection → Start** or **/ascend → Main Progression → Breakthrough** to skip perfection."
         embed.add_field(name="Realm Perfection", value=perfect_text, inline=False)
     if c.get("body_phase", 1) == 9:
         if body_perfection and body_perfection["completed"]:
@@ -299,10 +299,10 @@ async def sheet(interaction: discord.Interaction) -> None:
         elif body_perfection and body_perfection["active"]:
             body_perfect_text = (
                 f"Perfection **{body_perfection['progress']}%** • Training {body_perfection['training_progress']}/{WORLD.body_perfection_training_cap()}\n"
-                f"Quests {body_perfection['completed_quests']}/{WORLD.body_perfection_quest_count()} • use **/quest → Body Perfection → Info**"
+                f"Quests {body_perfection['completed_quests']}/{WORLD.body_perfection_quest_count()} • use **/ascend → Perfection → Info**"
             )
         else:
-            body_perfect_text = "Body Stage 9 choice unlocked: **/quest → Body Perfection → Start** or **/cultivation → Body → Breakthrough**."
+            body_perfect_text = "Body Stage 9 choice unlocked: **/ascend → Perfection → Start** or **/cultivation → Body → Breakthrough**."
         embed.add_field(name="Body Perfection", value=body_perfect_text, inline=False)
 
     embed.add_field(

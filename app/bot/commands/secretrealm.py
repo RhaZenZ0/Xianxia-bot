@@ -139,7 +139,7 @@ register_hub_option_hint(
     secret_enter,
     "realm",
     "No secret-realm entrance is open where you stand. They open as world events — "
-    "**/world → Events** lists the ones running, with their locations.",
+    "**/world → Almanac → Worldevents** lists the ones running, with their locations.",
 )
 
 

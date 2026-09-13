@@ -66,7 +66,8 @@ class TheMenuIsFourRowsOfFour(unittest.TestCase):
             self.assertEqual(len(names), 4)
         self.assertEqual(surface._hub_label("npc"), "NPCs")
         self.assertEqual(surface._hub_label("innerworld"), "Inner World")
-        self.assertEqual(surface._hub_label("quest"), "Quests")
+        # rc.13: the hub is /ascend, and says so - the quests are /quests.
+        self.assertEqual(surface._hub_label("ascend"), "Ascension")
         for name in grouped:
             self.assertLessEqual(len(surface._hub_label(name)), 20, name)
 

@@ -8,6 +8,7 @@ import time
 from collections import deque
 from dataclasses import dataclass
 from enum import StrEnum
+from collections.abc import Mapping, Sequence
 from typing import Any, Iterable
 
 from openai import AsyncOpenAI
@@ -658,6 +659,66 @@ def _dedupe_chain(models: Iterable[str]) -> tuple[str, ...]:
     return tuple(ordered)
 
 
+def _route_fault(row: Mapping[str, Any]) -> str:
+    """Which of the distinguishable faults a route is in, or "" for none.
+
+    The three are not degrees of one problem, they are different problems:
+
+    * ``provider_cap``  - the upstream rate-limited us (429). Enforced by the
+      model's provider on OpenRouter's shared free pool, so OpenRouter credits
+      do not raise it; a own-provider key does.
+    * ``empty_reply``   - the route answered, with no usable text. Not a limit
+      at all: a reasoning model spending a small token budget on its own
+      scratchpad answers this way, and neither waiting nor paying fixes it.
+    * ``retired``       - the daily probe got 401/403/404, so the route is out
+      until the next pass.
+
+    ``error`` is the honest remainder: it failed, for something else.
+    """
+    if row.get("probe_retired"):
+        return "retired"
+    attempts = int(row.get("attempts") or 0)
+    successes = int(row.get("successes") or 0)
+    empty = int(row.get("empty_responses") or 0)
+    limited = int(row.get("rate_limited") or 0)
+    if attempts and not successes and empty:
+        # It answers; it just never answers with prose. Said before the rate
+        # limit because a route can be both, and this is the one that no
+        # amount of waiting clears.
+        return "empty_reply"
+    if limited:
+        return "provider_cap"
+    if int(row.get("failures") or 0):
+        return "error"
+    return ""
+
+
+def _fault_summary(models: Sequence[Mapping[str, Any]], limiter: Mapping[str, Any]) -> dict[str, Any]:
+    """What the whole chain is doing, for a panel that must not read as an outage.
+
+    ``budget_spent`` is OpenRouter's own daily cap, which is the one fault
+    here that credits actually raise; it is deliberately separate from the
+    per-route counts, because conflating the two is what sends an operator to
+    buy credits for a limit credits do not touch.
+    """
+    counts: dict[str, int] = {}
+    for row in models:
+        fault = str(row.get("fault") or "")
+        if fault:
+            counts[fault] = counts.get(fault, 0) + 1
+    used = int(limiter.get("used_today") or 0)
+    cap = int(limiter.get("max_requests_per_day") or 0)
+    serving = [row for row in models if int(row.get("successes") or 0) and not row.get("cooling_down")]
+    return {
+        "counts": counts,
+        "routes": len(models),
+        "serving": len(serving),
+        "budget_spent": bool(cap and used >= cap),
+        "budget_used": used,
+        "budget_cap": cap,
+    }
+
+
 class AITaskRouter:
     """Read-only OpenRouter narrator router with cloud-only free fallbacks.
 
@@ -1024,6 +1085,15 @@ class AITaskRouter:
                 "skipped_probe_retired": 0,
                 "consecutive_failures": 0,
                 "cooldown_seconds": 0.0,
+                # v1.0.0-rc.13: which ceiling a failure hit, recorded where the
+                # status code is still in hand. The panel must tell a provider
+                # rate limit (Google throttling the shared free pool; credits
+                # do not raise it) from OpenRouter's own daily budget (credits
+                # do) from a route that answers with nothing at all - three
+                # faults with three different fixes, and re-deriving them later
+                # by matching on `last_error` text is how they get confused.
+                "rate_limited": 0,
+                "last_status": 0,
                 # Which upstream actually served the last success, and whether
                 # OpenRouter used the operator's own provider key (BYOK) for
                 # it - the two facts a GM needs when a route "never responds".
@@ -1066,6 +1136,9 @@ class AITaskRouter:
         row["cooldown_seconds"] = float(cooldown)
         row["last_error"] = f"{type(exc).__name__}: {exc}"[:300]
         row["last_error_at"] = time.time()
+        row["last_status"] = int(status or 0)
+        if status == 429:
+            row["rate_limited"] += 1
         tls = _looks_like_tls_failure(exc)
         row["last_error_looks_like_tls"] = tls
         if tls:
@@ -1368,6 +1441,9 @@ class AITaskRouter:
                     "never_succeeded": int(row["attempts"]) > 0 and int(row["successes"]) == 0,
                     "last_error_at": float(row["last_error_at"]),
                     "last_success_at": float(row["last_success_at"]),
+                    "rate_limited": int(row["rate_limited"]),
+                    "last_status": int(row["last_status"]),
+                    "fault": _route_fault(row),
                 }
             )
         return {
@@ -1394,6 +1470,7 @@ class AITaskRouter:
             "daily_cap_configured": self.daily_cap_configured,
             "limiter": self.limiter.snapshot(),
             "models": models,
+            "faults": _fault_summary(models, self.limiter.snapshot()),
         }
 
     async def generate(

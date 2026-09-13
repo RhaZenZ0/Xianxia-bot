@@ -37,7 +37,7 @@ async def beast_status(interaction: discord.Interaction) -> None:
     rows = await DB.get_spirit_beasts(interaction.user.id)
     if not rows:
         await interaction.response.send_message(
-            "🐾 You have no spirit-beast contract. Beast Binders can earn equality-contract opportunities from overwhelming **/world → Hunt** successes.",
+            "🐾 You have no spirit-beast contract. Beast Binders can earn equality-contract opportunities from overwhelming **/world → Act → Hunt** successes.",
             ephemeral=False,
         )
         return
@@ -63,7 +63,7 @@ async def beast_encounters(interaction: discord.Interaction) -> None:
     )
     if not rows:
         await interaction.response.send_message(
-            "🐾 No subdued wild beast is waiting here. Strong **/world → Hunt** victories can create taming opportunities.",
+            "🐾 No subdued wild beast is waiting here. Strong **/world → Act → Hunt** victories can create taming opportunities.",
             ephemeral=False,
         )
         return

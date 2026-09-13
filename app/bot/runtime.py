@@ -490,7 +490,7 @@ async def require_character(interaction: discord.Interaction, *, allow_deceased:
         await respond(
             interaction,
             f"🕯️ **{character['name']}** is dead. Their old family remains in world history, but the soul has entered Samsara. "
-            "Use **/character → Samsara** to view the soul-cycle and **/character → Reincarnate** when rebirth opens.",
+            "Use **/character → Samsara** to view the soul-cycle and **/character → Samsara → Reincarnate** when rebirth opens.",
             ephemeral=False,
         )
         return None

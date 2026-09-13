@@ -6,6 +6,33 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.0** (rc.13) makes the hub surface navigable and the beta channel installable. rc.10 stamped
+`RELEASE_TAG` so the channel could be ordered; the two checks that compare a package against what it
+claims to be kept reading plain `VERSION`, so every stamped release failed "Extracted VERSION
+mismatch" and rc.10, rc.11 and rc.12 could not be installed at all - the change that made the channel
+readable made it unwalkable in the same stroke. Both checks now read the stamp the same way the
+comparison does, believing it only when its numbers agree with `VERSION`.
+
+The surface itself was thirty-seven pages holding one action each and seven holding more than the
+eight rows a panel renders: `/character` spent eighteen pages on twenty-five actions while `/sect`
+put twenty-five on one, four screens deep in a Next button with nothing to say they were there.
+Pages are named after what a player is doing now - `/character` 18 to 6, `/world` 11 to 4, `/npc` 3
+to 1 - and `HubPage.only` lets one group be several pages, so `/sect` is four and `/admin -> Players`
+is three. Three reads of "what is wrong with me" became one Afflictions page; curses were named by
+two of the three, so a hurt player had to open all of them. `/perfect` and `/bodyperfect` were the
+same six verbs twelve times and are one group taking a path. `/alchemy refine` was `/craft` with a
+profession check `/craft` walked around, so it is gone and no recipe is unreachable. `/quest` held no
+quests - it is `/ascend`, and `/quests` is the other thing. 85 pages to 71, 297 actions to 288, no
+mechanic removed and the 23 registered slash commands unchanged.
+
+The playtest checklist was describing a different game. Its group reader was a single-line regex and
+a subgroup is declared over several lines with `parent=`, so every nested command was invisible - all
+of `/sect recruitment`, `/sect discipleship`, `/sect manor`, and the whole `/admin` section, which
+was a heading with nothing under it while the gate passed on the heading alone. Both reads are ast
+now and a contract holds the file to the live surface: a command reachable from a hub and missing
+from the checklist fails the build. `/admin` is off the board deliberately rather than by accident.
+No schema change.
+
 **1.0.0** (rc.10) makes the beta channel walkable. `VERSION` holds the numbers and never the
 `-rc.N` suffix - that is deliberate, so the updater compares plain numbers - but it means an installed
 tree cannot tell one candidate of a version from another: every 1.0.0 rc says `1.0.0`. The updater
@@ -234,10 +261,15 @@ mechanical authority paths.
 
 ## Release status — v1.0.0
 
-- Current release: v1.0.0 (rc.9): elemental qi - every method draws one of twelve kinds, the five
+- Current release: v1.0.0 (rc.13): the hub surface regrouped around what a player is doing, and the
+  updater fix that makes a stamped release installable at all. Tagged `v1.0.0-rc.13` on the beta
+  channel; the NAS drills and two quiet weeks make it `v1.0.0`.
+- v1.0.0 (rc.10-rc.12): the beta channel ordered by semver precedence. rc.11 and rc.12 shipped but
+  could not be installed - see rc.13 - so a NAS on rc.9 or earlier upgrades straight to rc.13, and
+  one already carrying rc.12's `update.sh` needs the fixed script dropped in by hand first.
+- v1.0.0 (rc.9): elemental qi - every method draws one of twelve kinds, the five
   phases decide how much of it a given spiritual root can absorb, and a clashing element can turn
-  going in. Tagged `v1.0.0-rc.9` on the beta channel; the NAS drills and two quiet weeks make it
-  `v1.0.0`.
+  going in.
 - v1.0.0 (rc.8, schema 41): the ghost road - two households born to death qi, a seventh path only
   they can take, a ruin for a shrine and night for noon, and a corruption that remakes the body up a
   ladder of ghost forms.

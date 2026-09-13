@@ -110,7 +110,7 @@ async def board_report(guild: discord.Guild) -> list[dict[str, Any]]:
 
 def format_report(rows: list[dict[str, Any]], guild_id: int) -> str:
     if not rows:
-        return "🧪 The playtest board has not been posted yet. Post it with **/admin → Server → Playtest**."
+        return "🧪 The playtest board has not been posted yet. Post it with **/admin → Operations → Playtest**."
     flagged = [r for r in rows if r["counts"]["❌"] or r["counts"]["💡"]]
     clean = [r for r in rows if r["counts"]["✅"] and not (r["counts"]["❌"] or r["counts"]["💡"])]
     silent = [r for r in rows if not any(r["counts"].values())]

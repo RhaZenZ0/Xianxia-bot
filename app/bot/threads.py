@@ -47,12 +47,12 @@ def _expedition_thread_intro(*, name: str, location_display: str, location: obje
         command, description = exit_route
         lines.append(
             f"Right now you're inside {description}, where exploring and hunting are unavailable. "
-            f"Step out with {command} first — then **/world → Explore** to search wherever you land, "
+            f"Step out with {command} first — then **/world → Act → Explore** to search wherever you land, "
             "or **/action** for a guided in-scene action."
         )
     else:
         lines.append(
-            f"Start with **/world → Explore** to search **{location_display}**, "
+            f"Start with **/world → Act → Explore** to search **{location_display}**, "
             "or **/action** for a guided in-scene action."
         )
     return "\n".join(lines)

@@ -37,11 +37,39 @@ def _sources() -> dict[Path, str]:
 
 
 def _groups(sources: dict[Path, str]) -> dict[str, str]:
-    """group variable -> Discord group name."""
-    out: dict[str, str] = {}
+    """group variable -> the group's full Discord path ("sect recruitment").
+
+    Read with ast, and following `parent=`: a subgroup is declared over several
+    lines, so the single-line regex this used to be matched none of them, and
+    every nested command - all of `/sect recruitment`, `/sect discipleship`
+    and `/sect manor` - was missing from the checklist entirely.
+    """
+    parents: dict[str, str] = {}
+    names: dict[str, str] = {}
     for text in sources.values():
-        for var, name in re.findall(r"^(\w+)\s*=\s*app_commands\.Group\(\s*name=\"([^\"]+)\"", text, re.M):
-            out[var] = name
+        for node in ast.walk(ast.parse(text)):
+            if not (isinstance(node, ast.Assign) and isinstance(node.value, ast.Call)):
+                continue
+            call = node.value
+            if not (isinstance(call.func, ast.Attribute) and call.func.attr == "Group"):
+                continue
+            target = next((t.id for t in node.targets if isinstance(t, ast.Name)), None)
+            if target is None:
+                continue
+            for keyword in call.keywords:
+                if keyword.arg == "name" and isinstance(keyword.value, ast.Constant):
+                    names[target] = str(keyword.value.value)
+                elif keyword.arg == "parent" and isinstance(keyword.value, ast.Name):
+                    parents[target] = keyword.value.id
+    out: dict[str, str] = {}
+    for var, name in names.items():
+        path, seen = [name], {var}
+        cursor = var
+        while cursor in parents and parents[cursor] not in seen:
+            cursor = parents[cursor]
+            seen.add(cursor)
+            path.insert(0, names.get(cursor, cursor))
+        out[var] = " ".join(path)
     return out
 
 
@@ -79,6 +107,12 @@ def _parameters(node: ast.AsyncFunctionDef, all_text: str) -> list[str]:
     out = []
     for arg in node.args.args[1:]:
         annotation = ast.unparse(arg.annotation) if arg.annotation else ""
+        # An optional parameter is its type: `hours: int | None` is a number
+        # input, not a free string. Before this it fell through every branch to
+        # TYPED, which is the label for "a typed id with no picker" and is what
+        # the release gate refuses.
+        annotation = re.sub(r"\s*\|\s*None\b", "", annotation)
+        annotation = re.sub(r"^Optional\[(.*)\]$", r"\1", annotation).strip()
         name = arg.arg
         if name in choices:
             how = "choices"
@@ -133,22 +167,66 @@ def _call_end(text: str, start: int) -> int:
     return len(text)
 
 
+def _literal(node) -> object | None:
+    try:
+        return ast.literal_eval(node)
+    except Exception:
+        return None
+
+
+def _page_from_call(call: ast.Call) -> tuple[str, str, tuple[str, ...], tuple[str, ...]] | None:
+    """(page key, label, extra roots, `only` selectors) for one page call.
+
+    Read with ast rather than by counting quoted strings: since v1.0.0-rc.13 a
+    page call can carry `only=` and `key=` keywords, and a positional read
+    counted every selector string in `only` as another root - which rendered
+    each of `/sect`'s four pages as all twenty-five actions.
+    """
+    name = getattr(call.func, "id", "")
+    keywords = {k.arg: k.value for k in call.keywords if k.arg}
+    only = tuple(_literal(keywords["only"]) or ()) if "only" in keywords else ()
+    if name == "_hub_page":
+        args = [_literal(a) for a in call.args]
+        if len(args) < 2 or not isinstance(args[0], str) or not isinstance(args[1], str):
+            return None
+        root, label = args[0], args[1]
+        extras = tuple(a for a in args[3:] if isinstance(a, str))
+        key = _literal(keywords["key"]) if "key" in keywords else None
+        return (str(key or root), label, (root, *extras) if key else (root, *extras), only)
+    if name == "HubPage":
+        key = _literal(keywords.get("key"))
+        label = _literal(keywords.get("label"))
+        if not isinstance(key, str) or not isinstance(label, str):
+            return None
+        roots = []
+        for field in ("command", "extras"):
+            value = keywords.get(field)
+            if value is None:
+                continue
+            if isinstance(value, ast.Name):
+                roots.append(value.id)
+            elif isinstance(value, ast.Tuple):
+                roots += [e.id for e in value.elts if isinstance(e, ast.Name)]
+        return (key, label, tuple(roots), only)
+    return None
+
+
 def _hubs(sources: dict[Path, str]):
-    surface = sources[BOT / "surface.py"]
+    tree = ast.parse(sources[BOT / "surface.py"])
     hubs = []
-    for block in re.finditer(r"HubDefinition\(\s*name=\"([a-z]+)\",\s*title=\"([^\"]+)\"(.*?)\n\s*\)\s*,?\n", surface, re.S):
-        name, title, body = block.group(1), block.group(2), block.group(3)
+    for node in ast.walk(tree):
+        if not (isinstance(node, ast.Call) and getattr(node.func, "id", "") == "HubDefinition"):
+            continue
+        keywords = {k.arg: k.value for k in node.keywords if k.arg}
+        name, title = _literal(keywords.get("name")), _literal(keywords.get("title"))
+        if not isinstance(name, str) or not isinstance(title, str):
+            continue
         pages = []
-        # A page is `_hub_page(key, label, description, *extra roots)`: the
-        # extras (v1.0.0-rc.4) are further roots gathered onto the same page,
-        # and their actions belong on the page's rows here too. The call is
-        # read by scanning to its own closing parenthesis - a regex that
-        # ended on a newline silently dropped the last page of every hub.
-        for start in (m.end() for m in re.finditer(r"_hub_page\(", body)):
-            quoted = re.findall(r"\"([^\"]*)\"", body[start:_call_end(body, start)])
-            if len(quoted) >= 2:
-                pages.append((quoted[0], quoted[1], tuple(quoted[3:])))
-        pages += [(m.group(1), m.group(2), ()) for m in re.finditer(r"HubPage\(key=\"([a-z_]+)\", label=\"([^\"]+)\"", body)]
+        for element in getattr(keywords.get("pages"), "elts", ()):
+            if isinstance(element, ast.Call):
+                page = _page_from_call(element)
+                if page:
+                    pages.append(page)
         hubs.append((name, title, pages))
     return hubs
 
@@ -160,9 +238,16 @@ def _page_roots(sources: dict[Path, str], groups: dict[str, str]) -> dict[str, t
     block = surface[surface.index("_GROUP_ACTION_ROOTS = {"):surface.index("_MIGRATED_ROOTS = {")]
     for key, var in re.findall(r"\"([a-z_]+)\":\s*(\w+),", block):
         out[key] = ("group", groups.get(var, var))
-    admin = surface[surface.index("_ADMIN_HUB_DEFINITION"):]
-    for key, var in re.findall(r"HubPage\(key=\"([a-z_]+)\",[^)]*?command=(\w+)\)", admin):
-        out[key] = ("group", groups.get(var, var))
+    # The admin panel names its groups by variable; a page may also gather a
+    # second group in `extras`, and both map to the same Discord group name.
+    for node in ast.walk(ast.parse(surface)):
+        if isinstance(node, ast.Call) and getattr(node.func, "id", "") == "HubPage":
+            for keyword in node.keywords:
+                if keyword.arg in ("command", "extras"):
+                    names = ([keyword.value.id] if isinstance(keyword.value, ast.Name)
+                             else [e.id for e in getattr(keyword.value, "elts", ()) if isinstance(e, ast.Name)])
+                    for var in names:
+                        out.setdefault(var, ("group", groups.get(var, var)))
     return out
 
 
@@ -190,14 +275,37 @@ def build() -> str:
     total = 0
     for hub, title, pages in _hubs(sources):
         lines += [f"## /{hub} — {title}", ""]
-        for key, label, extras in pages:
+        # The admin panel is not playtested from the board: it is GM-only, its
+        # every action writes to `admin_audit_log`, and fifty-three rows no
+        # tester can open is noise on a list whose whole job is to be walked.
+        # The GM half lives in the channel checklist instead. The heading stays
+        # so the hub is still visibly accounted for.
+        if hub == "admin":
+            lines += ["GM-only; not posted to the playtest board. The admin pass is the GM checklist.", ""]
+            continue
+        for key, label, page_roots_named, only in pages:
             rows = []
-            for page_key in (key, *extras):
+            for page_key in page_roots_named:
                 kind, target = page_roots.get(page_key, ("root", page_key))
-                found = by_group.get(target, []) if kind == "group" else ([roots[target]] if target in roots else [])
+                if kind == "group":
+                    # A group's page carries its own leaves and every nested
+                    # subgroup's: `/sect` owns `/sect recruitment trial`.
+                    found = [row for name, group_rows in by_group.items()
+                             if name == target or name.startswith(f"{target} ")
+                             for row in group_rows]
+                else:
+                    found = [roots[target]] if target in roots else []
                 if not found and page_key in roots:
                     found = [roots[page_key]]
                 rows += found
+            if only:
+                # `only` names the leaves this page takes - the qualified name
+                # ("sect status") or a prefix claiming a subgroup ("sect
+                # recruitment"). Without this a split page lists its whole
+                # group, and a tester ticks the same action once per page.
+                rows = [r for r in rows
+                        if any(r[0].lstrip("/") == pick or r[0].lstrip("/").startswith(f"{pick} ")
+                               for pick in only)]
             lines += [f"### {label} (`{key}`)", "", "| Action | Params | Acked | Live: reachable | error text | narration |", "|---|---|---|---|---|---|"]
             for qualified, name, node, path, all_text in sorted(rows, key=lambda r: r[0]):
                 params = ", ".join(_parameters(node, all_text)) or "—"
@@ -216,6 +324,27 @@ def build() -> str:
               "| a lot at a local floor appears in the world's shared channel | [ ] |",
               "| `/menu` opens every hub; Admin only for an administrator | [ ] |",
               "| `/admin player mute` for `30m` expires on its own; `/admin player inspect` shows it | [ ] |",
+              "",
+              "### The surface regrouping (v1.0.0-rc.13)", "",
+              "The pages moved. These are the ones a player reaches differently than they did "
+              "last release, so they are worth one pass each even where the mechanic is untouched.", "",
+              "| Loop | Live |", "|---|---|",
+              "| `/ascend` opens; `/quests` is the other thing and still opens | [ ] |",
+              "| `/ascend -> Perfection -> Start` asks Realm or Body, and the Body path still starts | [ ] |",
+              "| `/character -> Overview` shows sheet, lifespan, karma, Dao heart, standing, inheritances and soul in one read | [ ] |",
+              "| `/character -> Afflictions` shows a buff, a curse and a persistent injury together, and treats one | [ ] |",
+              "| `/character -> Consequences` shows an open crime, a bounty and a grudge | [ ] |",
+              "| `/world -> Almanac` answers era, calendar, rulers, laws and running events in one read | [ ] |",
+              "| `/sect` is four pages and every sect action is on exactly one of them | [ ] |",
+              "| a reply printing a hub path (`**/world -> Act -> Explore**`) still offers it as a button | [ ] |",
+              "| `/craft` makes an alchemy recipe (`/alchemy refine` is gone and nothing is unreachable) | [ ] |",
+              "",
+              "### Upgrading the deployment", "",
+              "| Loop | Live |", "|---|---|",
+              "| `sudo ./update.sh --fetch --channel beta` offers the newest rc, not \"already the newest\" | [ ] |",
+              "| it installs it: a release stamped with RELEASE_TAG passes both VERSION checks | [ ] |",
+              "| the post-install manifest check passes, skipping the deferred updater | [ ] |",
+              "| `./migrate_env.sh --dry-run` runs on the NAS with no missing command | [ ] |",
               "", f"_{total} actions across {len(_hubs(sources))} hubs._", ""]
     return "\n".join(lines)
 

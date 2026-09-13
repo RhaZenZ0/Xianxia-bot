@@ -54,6 +54,35 @@ class TheChecklistIsOnFile(unittest.TestCase):
         self.assertIn(f"v{VERSION}", text.splitlines()[0])
         self.assertNotIn(":TYPED", text, "a typed id parameter with no picker is on the checklist")
 
+    def test_every_action_the_hubs_can_reach_is_a_row_on_it(self):
+        """The checklist and the live surface name the same actions.
+
+        They did not. The generator read hub pages by counting quoted strings
+        and never followed `parent=`, so the whole of `/sect recruitment`,
+        `/sect discipleship` and `/sect manor` was absent, and a page that
+        names the leaves it takes (`only=`, v1.0.0-rc.13) listed its entire
+        group instead. A checklist that is missing a command is worse than no
+        checklist: it reads as coverage.
+        """
+        import os
+        import re
+        from unittest.mock import patch
+
+        env = {"DISCORD_TOKEN": "test-token", "GUILD_ID": "123456789012345678",
+               "ENGINE_AUTH_TOKEN": "test-engine-token-1234567890",
+               "DATABASE_PATH": "data/test.sqlite3"}
+        with patch.dict(os.environ, env):
+            import importlib
+            hubs = importlib.import_module("app.bot.hubs")
+        # Admin is deliberately off the board (GM-only, audited, and nothing a
+        # tester can open), so it is excluded here rather than silently absent
+        # the way it used to be.
+        live = {action.path for definition in hubs.REGISTERED_HUBS if definition.name != "admin"
+                for page in definition.pages for action in hubs._leaf_actions(page)}
+        text = CHECKLIST.read_text(encoding="utf-8")
+        rows = {m.group(1) for m in re.finditer(r"^\| `(/[^`]+)`", text, re.M)}
+        self.assertEqual(live - rows, set(), "these actions are reachable from a hub but not on the checklist")
+
     def test_it_covers_every_hub(self):
         from tests.support import declared_hub_names
 

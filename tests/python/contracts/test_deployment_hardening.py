@@ -602,3 +602,77 @@ class SecurityScanTests(unittest.TestCase):
                 rule, prose,
                 f"{rule} is silenced with no comment saying why",
             )
+
+
+class UpdaterVersionAgreementTests(unittest.TestCase):
+    """The two sides of the updater's version checks must read a package the
+    same way.
+
+    They did not. `archive_version` prefers `RELEASE_TAG`, so TARGET_VERSION
+    read `1.0.0-rc.12` out of the stamp, while both checks against it read the
+    plain `VERSION` file and got `1.0.0`. Every release carrying a stamp — that
+    is, every release since rc.10 added one — stopped at "Extracted VERSION
+    mismatch", so the commit that made the beta channel readable made it
+    uninstallable in the same stroke.
+
+    This drives the real helpers out of update.sh over built packages, because
+    the bug was not in either function: it was in the pair disagreeing.
+    """
+
+    UPDATE = (PROJECT_ROOT / "update.sh").read_text(encoding="utf-8")
+
+    def _driver(self, tmp):
+        import re
+        parts = ["set -eu", re.search(r"^clean_version\(\).*$", self.UPDATE, re.M).group(0)]
+        for name in ("valid_version", "archive_version", "tree_version"):
+            block = re.search(rf"^{name}\(\) \{{.*?^\}}", self.UPDATE, re.M | re.S)
+            self.assertIsNotNone(block, f"{name} is gone from update.sh")
+            parts.append(block.group(0))
+        parts.append('archive_version "$1"; printf "\\n"; tree_version "$2"')
+        path = tmp / "drive.sh"
+        path.write_text("\n".join(parts) + "\n", encoding="utf-8")
+        return path
+
+    def _package(self, tmp, name, version, tag=None):
+        import subprocess
+        tree = tmp / name
+        tree.mkdir()
+        (tree / "VERSION").write_text(version + "\n", encoding="utf-8")
+        if tag:
+            (tree / "RELEASE_TAG").write_text(tag + "\n", encoding="utf-8")
+        subprocess.run(["zip", "-qr", str(tmp / f"{name}.zip"), "."], cwd=tree, check=True)
+        return tmp / f"{name}.zip", tree
+
+    def _read(self, tmp, zip_path, tree):
+        import subprocess
+        out = subprocess.run(["sh", str(self._driver(tmp)), str(zip_path), str(tree)],
+                             capture_output=True, text=True, check=True)
+        target, extracted = out.stdout.strip().splitlines()
+        return target, extracted
+
+    def setUp(self):
+        import shutil, tempfile
+        from pathlib import Path
+        if not shutil.which("zip"):
+            self.skipTest("needs zip")
+        self.tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+
+    def test_a_stamped_release_reads_the_same_on_both_sides(self):
+        """The case that was broken: every rc since rc.10."""
+        zip_path, tree = self._package(self.tmp, "stamped", "1.0.0", "v1.0.0-rc.12")
+        target, extracted = self._read(self.tmp, zip_path, tree)
+        self.assertEqual(target, "1.0.0-rc.12")
+        self.assertEqual(extracted, target, "the package cannot be installed: the checks disagree")
+
+    def test_a_package_from_before_the_stamp_still_reads_as_its_version(self):
+        zip_path, tree = self._package(self.tmp, "plain", "1.0.0")
+        target, extracted = self._read(self.tmp, zip_path, tree)
+        self.assertEqual((target, extracted), ("1.0.0", "1.0.0"))
+
+    def test_stamps_that_disagree_are_refused_rather_than_believed(self):
+        """A RELEASE_TAG whose numbers do not match VERSION is not trusted, so
+        the comparison catches a malformed package instead of installing it."""
+        zip_path, tree = self._package(self.tmp, "corrupt", "1.0.0", "v0.9.9-rc.1")
+        target, extracted = self._read(self.tmp, zip_path, tree)
+        self.assertNotEqual(extracted, target)

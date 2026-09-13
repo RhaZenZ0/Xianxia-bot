@@ -574,7 +574,7 @@ OWNERS = {
     # Cross-domain helpers: each has callers in two command modules and sits
     # on the side the import edge points to.
     "commands/sect.py": ("_sect_recruitment_at_location",),   # read by exploration (explore road discovery)
-    "commands/exploration.py": ("_run_crafting",),            # craft and /alchemy refine
+    "commands/exploration.py": ("_run_crafting",),            # `craft`; `/alchemy refine` was the same call and is gone
     "commands/battle.py": ("_battle_panel", "_execute_battle_law_technique"),  # read by law and BattleView
     "commands/scene.py": ("_scene_action_targets", "scene_action_panel"),
     "surface.py": ("_GROUP_ACTION_ROOTS", "_MIGRATED_ROOTS", "_ROOT_ACTIONS", "_HUB_DEFINITIONS",
@@ -756,12 +756,11 @@ SURFACE = {
         },
     },
     "commands/cultivation.py": {
-        "groups": ('seclusion_group', 'body_group', 'bodyperfect_group', 'perfect_group', 'tribulation_group', 'meridian_group', 'dantian_group', 'ghost_group'),
+        "groups": ('seclusion_group', 'body_group', 'perfect_group', 'tribulation_group', 'meridian_group', 'dantian_group', 'ghost_group'),
         "roots": ('cultivate', 'stance', 'insight', 'breakthrough'),
         "leaves": {
             "seclusion_group": ('start', 'status', 'end'),
             "body_group": ('sheet', 'cultivate', 'breakthrough'),
-            "bodyperfect_group": ('start', 'info', 'quest', 'clues', 'trial', 'abandon'),
             "perfect_group": ('start', 'info', 'quest', 'clues', 'trial', 'abandon'),
             "tribulation_group": ('status', 'prepare', 'attempt'),
             "meridian_group": ('status', 'open', 'heal'),
@@ -801,7 +800,7 @@ SURFACE = {
         "groups": ('alchemy_group', 'realmhub_group', 'city_group', 'travel_group'),
         "roots": ('explore', 'hunt', 'craft'),
         "leaves": {
-            "alchemy_group": ('status', 'refine', 'forage', 'purge'),
+            "alchemy_group": ('status', 'forage', 'purge'),
             "city_group": ('look', 'board', 'accept', 'envoys', 'rumours', 'inn'),
             "realmhub_group": ('status', 'go'),
             "travel_group": ('go', 'status'),
@@ -944,7 +943,10 @@ class CommandSurfaceTests(unittest.TestCase):
                 self.assertRegex(wiring, rf"\b{group}\b", f"{group} ({module}) is not wired in surface.py")
         for group in ("admin_server_group", "admin_world_group", "admin_player_group", "admin_sect_group",
                       "admin_family_group", "admin_npc_group", "admin_sim_group"):
-            self.assertIn(f"command={group}", wiring, group)
+            # `command=` or `extras=`: since rc.13 one page can gather two
+            # groups (Hidden State takes family and npc), and a page that
+            # names a subset of one group appears several times over.
+            self.assertTrue(f"command={group}" in wiring or f"extras=({group},)" in wiring, group)
 
     def test_the_module_level_autocompletes_are_imported_where_they_decorate(self):
         # `@app_commands.autocomplete(npc=local_npc_autocomplete)` evaluates

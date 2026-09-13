@@ -42,7 +42,8 @@ class ThePythonBoundary(unittest.TestCase):
     def test_the_travel_reply_tells_what_the_site_offers_and_what_was_found(self):
         self.assertIn("{meeting}{site_line}{sites_found}", EXPLORATION)
         line = _body(EXPLORATION, "_road_site_line")
-        for hint in ("**/economy → City Shops → Browse**", "**/world → Hunt**", "**/world → Explore**", "The road leads back to"):
+        for hint in ("**/economy → City Shops → Browse**", "**/world → Act → Hunt**",
+                     "**/world → Act → Explore**", "The road leads back to"):
             self.assertIn(hint, line)
         travel = _body(EXPLORATION, "travel")
         self.assertIn('result.get("road_sites_found")', travel)

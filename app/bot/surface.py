@@ -40,7 +40,6 @@ from .commands.boss import boss_group, boss_status, hunter_group, hunter_status
 from .commands.character import begin as begin_command, bond_group, fate_group
 from .commands.cultivation import (
     body_group,
-    bodyperfect_group,
     dantian_group,
     ghost_group,
     meridian_group,
@@ -105,7 +104,6 @@ _GROUP_ACTION_ROOTS = {
     "aptitude": aptitude_group,
     "perfect": perfect_group,
     "body": body_group,
-    "bodyperfect": bodyperfect_group,
     "secretrealm": secret_group,
     "scene": scene_group,
     "storage": storage_group,
@@ -149,7 +147,7 @@ _GROUP_ACTION_ROOTS = {
 
 _MIGRATED_ROOTS = {
     "abode", "afterlife", "alchemy", "aptitude", "array", "artifact", "auction", "battle", "beast",
-    "body", "bodyperfect", "bond", "boss", "bounty", "breakthrough", "caravan",
+    "body", "bond", "boss", "bounty", "breakthrough", "caravan",
     "city", "civilization", "conceal", "condition", "craft", "crime", "cultivate",
     "dantian", "daoheart", "duel", "effects", "equipment", "era", "explore", "family",
     "formation", "gender", "ghost", "grudges", "hunt", "hunter", "inheritances", "fate",
@@ -171,14 +169,21 @@ _missing_action_roots = sorted(_MIGRATED_ROOTS - set(_ROOT_ACTIONS))
 if _missing_action_roots:
     raise RuntimeError(f"Command registry lost action roots: {_missing_action_roots}")
 
-def _hub_page(root: str, label: str, description: str, *extra_roots: str) -> HubPage:
+def _hub_page(root: str, label: str, description: str, *extra_roots: str,
+              only: tuple[str, ...] = (), key: str | None = None) -> HubPage:
     """One page of a hub. Extra roots (v1.0.0-rc.4) are gathered onto the same
     page, so a page can be a thing you are doing rather than one command's
     name; the page keeps the first root's key, which hint paths, the playtest
-    checklist and the emoji map resolve against."""
+    checklist and the emoji map resolve against.
+
+    `only` (v1.0.0-rc.13) names the leaves this page takes from that root, so
+    one large group can be several pages instead of one page four deep in Next
+    buttons. A page that takes a subset needs its own `key`, because a key is
+    what the page select and every hint path address a page by."""
     return HubPage(
-        key=root, label=label, description=description, command=_ROOT_ACTIONS[root],
+        key=key or root, label=label, description=description, command=_ROOT_ACTIONS[root],
         extras=tuple(_ROOT_ACTIONS[name] for name in extra_roots),
+        only=only,
     )
 
 
@@ -188,36 +193,42 @@ _HUB_DEFINITIONS = (
         title="🧑 Cultivator — Character Hub",
         description="Identity, public character state, consequences, relationships and Samsara.",
         pages=(
-            _hub_page("sheet", "Overview", "Your main character sheet and public cultivation overview."),
-            _hub_page("gender", "Sex", "Male/Female identity used for gendered titles and forms of address."),
-            _hub_page("lifespan", "Lifespan", "Age, lifespan and mortality state."),
-            _hub_page("karma", "Karma", "Metaphysical karma and its known consequences."),
-            _hub_page("fate", "Fate", "Spendable providence that can avert true death and grows through major fortunate deeds."),
+            # Six pages, not eighteen (v1.0.0-rc.13). Fourteen of the old
+            # eighteen held a single read - nobody opens "Karma" to see one
+            # number, they open the sheet - so the reads that describe who you
+            # are now arrive together, and the pages that remain are the ones
+            # a player actually navigates to.
+            _hub_page("sheet", "Overview", "Who you are now: the sheet, your age and longevity, karma, Dao heart, standing, inheritances, soul legacy and how the realms address you.",
+                      "lifespan", "karma", "daoheart", "reputation", "inheritances", "soul", "gender"),
+            # One page for "something is wrong with me". It was three - generic
+            # effects, special/Law/curse/domain effects, and persistent
+            # conditions - and curses were named by two of the three, so a
+            # player who felt wrong had to check all of them to find out why.
+            _hub_page("effects", "Afflictions", "Everything currently acting on you: buffs, debuffs, curses, Law, domain and control effects, persistent injuries and deviations - and their treatment.",
+                      "specialeffects", "condition"),
             _hub_page("bond", "Dao Partnership", "Consensual partnership, paired cultivation resonance and Samsara partner echoes."),
-            _hub_page("daoheart", "Dao Heart", "Dao-heart stability and sworn commitments."),
-            _hub_page("reputation", "Reputation", "Persistent faction and social reputation."),
-            _hub_page("grudges", "Grudges", "Personal, family and faction grudges."),
-            _hub_page("crime", "Crimes", "Jurisdictional crimes, evidence and atonement."),
-            _hub_page("bounty", "Bounties", "Active capture/death bounties."),
-            _hub_page("inheritances", "Inheritances", "Ancient inheritances you have obtained."),
-            _hub_page("effects", "Conditions & Effects", "Generic buffs, debuffs, curses and conditions."),
-            _hub_page("specialeffects", "Special Effects", "Law, domain, curse and control effects."),
-            _hub_page("condition", "Treatment", "Inspect and treat persistent injuries and deviations."),
-            _hub_page("soul", "Soul", "Soul state and legacy across incarnations."),
-            _hub_page("afterlife", "Samsara", "Afterlife state and reincarnation timing."),
-            _hub_page("reincarnate", "Reincarnate", "Begin the next incarnation when Samsara permits it."),
+            _hub_page("crime", "Consequences", "What the world holds against you: open crimes and atonement, active capture and death bounties, and standing grudges.",
+                      "bounty", "grudges"),
+            _hub_page("fate", "Fate", "Spendable providence that can avert true death and grows through major fortunate deeds."),
+            _hub_page("afterlife", "Samsara", "Afterlife state, reincarnation timing, and the next incarnation when the wheel permits it.",
+                      "reincarnate"),
         ),
     ),
+    # `/ascend`, not `/quest` (v1.0.0-rc.13). This hub holds no quests: it is
+    # breakthrough, the two Perfection paths and the tribulation gates. The
+    # quests are `/quests`, one character away, which is how long it took a
+    # player to pick the wrong one. Bounties moved to /character -> Consequences
+    # with the rest of what the world holds against you.
     HubDefinition(
-        name="quest",
-        title="☯ Quest Journal",
-        description="Progression objectives, Perfection paths and ascension gates.",
+        name="ascend",
+        title="☰ Ascension Path",
+        description="Breakthrough, the optional Perfection paths, and the heavenly tribulations that gate the next realm.",
         pages=(
             _hub_page("breakthrough", "Main Progression", "Normal realm breakthrough and Stage 9 progression."),
-            _hub_page("perfect", "Realm Perfection", "Optional Stage 9 Realm Perfection path."),
-            _hub_page("bodyperfect", "Body Perfection", "Optional Stage 9 Body Realm Perfection path."),
+            # One page, one group (v1.0.0-rc.13): `perfect` and `bodyperfect`
+            # were the same six verbs twice, and are now a `path` on each.
+            _hub_page("perfect", "Perfection", "The optional Stage 9 Perfection path, for the cultivation realm or the body: start it, work its quests, read its clues, attempt its final trial."),
             _hub_page("tribulation", "Tribulation / Ascension", "Prepare for and attempt heavenly tribulations."),
-            _hub_page("bounty", "Bounties", "Active bounty objectives and consequences."),
         ),
     ),
     HubDefinition(
@@ -236,8 +247,14 @@ _HUB_DEFINITIONS = (
             # commands say plainly who may walk it - because a road nobody can
             # see is a road nobody learns exists.
             _hub_page("ghost", "Ghost", "The ghost road: death qi from the ground the living have left, the residue it leaves, and the rites that lift it."),
-            _hub_page("aptitude", "Path", "What you were born with and what you comprehend: roots, bloodlines, physiques, and the Laws.", "law"),
-            _hub_page("manual", "Arts", "Manuals and techniques, profession mastery, and the concealment of your aura.", "profession", "conceal"),
+            # Path and Laws are two pages (v1.0.0-rc.13): together they were
+            # eleven actions on a page that shows eight, so three of them sat
+            # behind a Next button with nothing to say they were there.
+            _hub_page("aptitude", "Path", "What you were born with: spiritual roots, bloodlines and special physiques - inspect them, awaken, temper, harmonize and evolve."),
+            _hub_page("law", "Laws", "What you comprehend: Law and Dao comprehension, meditation on a Law, and the techniques it unlocks."),
+            # `profession` is the Craft hub's - it was listed in both, one
+            # handler appearing twice.
+            _hub_page("manual", "Arts", "Manuals and techniques, and the concealment of your aura.", "conceal"),
         ),
     ),
     HubDefinition(
@@ -258,9 +275,10 @@ _HUB_DEFINITIONS = (
         title="👥 NPC Hub",
         description="Public, location-aware NPC inspection and interaction.",
         pages=(
-            _hub_page("npcinfo", "Inspect", "View public information for a known NPC."),
-            _hub_page("talk", "Talk", "Speak with a persistent NPC."),
-            _hub_page("sense", "Sense", "Use Spiritual Sense on NPCs, players or the area."),
+            # One page (v1.0.0-rc.13): three pages of one action each, in a hub
+            # whose every page was one action. Eight fit on a page.
+            _hub_page("npcinfo", "People", "Inspect a known NPC, speak with one, or turn Spiritual Sense on a person, a cultivator or the area.",
+                      "talk", "sense"),
         ),
     ),
     HubDefinition(
@@ -268,17 +286,16 @@ _HUB_DEFINITIONS = (
         title="🌍 World Hub",
         description="Your location, local actions, current events, civilization and world laws.",
         pages=(
-            _hub_page("world", "Current Location", "Show the current world and known locations."),
+            # Four pages, not eleven (v1.0.0-rc.13). Six of the old eleven were
+            # a single read answering one question - what is true in the world
+            # right now - so they answer it together.
+            _hub_page("world", "Almanac", "What is true in the world right now: where you are and what you have discovered, the era and the calendar, its rulers, its laws, and the phenomena currently running.",
+                      "era", "time", "rulers", "worldrules", "worldevents"),
             _hub_page("city", "City", "The city you are in: its gates and districts, the commission board, the sect envoys' hall, the rumours and the inn."),
-            _hub_page("explore", "Explore", "Explore the current location for events and discoveries."),
-            _hub_page("hunt", "Hunt", "Hunt a spirit beast at the current location."),
-            _hub_page("worldevents", "Events", "Active phenomena, consequences and realm openings."),
-            _hub_page("civilization", "Civilization", "Population, security and named regional NPC activity."),
-            _hub_page("scene", "Scene", "Current roleplay scene and in-world time."),
-            _hub_page("era", "Era", "The active era and cycle transitions."),
-            _hub_page("time", "Time", "Canonical cultivation calendar."),
-            _hub_page("rulers", "Rulers", "Publicly recognized rulers."),
-            _hub_page("worldrules", "World Laws", "Rules governing NPCs, sects, families and forbidden arts."),
+            _hub_page("explore", "Act", "What you can do with this place: explore it for events and discoveries, or hunt the spirit beasts that range here.",
+                      "hunt"),
+            _hub_page("scene", "Here", "This spot: the running scene and its in-world time, and the region's population, security and named NPC activity.",
+                      "civilization"),
         ),
     ),
     HubDefinition(
@@ -340,7 +357,19 @@ _HUB_DEFINITIONS = (
         title="🏯 Sect Hub",
         description="Sect membership, player discipleship, shared manor, resources, politics, territory and war.",
         pages=(
-            _hub_page("sect", "Sect", "Membership, player discipleship, shared manor, treasury and martial family."),
+            # Twenty-five actions were one page (v1.0.0-rc.13). A page shows
+            # eight, so seventeen of them sat behind a Next button with nothing
+            # to say they were there. Four pages, each a thing you came to do.
+            _hub_page("sect", "Sect", "Your membership and where you stand in it: rank, roster, politics, the martial family and how it addresses you.",
+                      only=("sect status", "sect roster", "sect politics", "sect address",
+                            "sect form", "sect family", "sect shadow")),
+            _hub_page("sect", "Recruitment", "Getting in: which sects recruit, who will sponsor you, and the entrance examination.",
+                      key="sect_recruitment", only=("sect recruitment",)),
+            _hub_page("sect", "Discipleship", "Master and disciple: ask, accept, reject, and the bond you already hold.",
+                      key="sect_discipleship", only=("sect discipleship",)),
+            _hub_page("sect", "Holdings", "What the sect keeps and what you may draw from it: the shared manor, your residence, the treasury, contribution and redemption.",
+                      key="sect_holdings", only=("sect manor", "sect abode", "sect treasury",
+                                                 "sect contribute", "sect redeem")),
             _hub_page("territory", "Territory", "Persistent territory control and claims."),
             _hub_page("war", "War", "Sieges, defenses and territorial conflict actions."),
         ),
@@ -349,13 +378,28 @@ _HUB_DEFINITIONS = (
         name="family",
         title="🏠 Family Hub",
         description="Birth family, clan structure, descendants, support and family history.",
-        pages=(_hub_page("family", "Family", "View and manage your persistent birth-family branch."),),
+        pages=(
+            _hub_page("family", "Family", "The household you belong to now: enter and leave it, ask it for support, and see the clan, its branches and your descendants.",
+                      only=("family view", "family enter", "family leave", "family support",
+                            "family clan", "family descendants", "family child")),
+            _hub_page("family", "Legacy", "What the family was and what it leaves you: its history and ancestry, ancestral sites, investigations, inheritance claims and their conflicts.",
+                      key="family_legacy",
+                      only=("family history", "family ancestry", "family legacy",
+                            "family investigate", "family quest", "family claim", "family conflict")),
+        ),
     ),
     HubDefinition(
         name="abode",
         title="🏡 Abode Hub",
         description="Establish, enter, upgrade and manage access to your private player-owned location.",
-        pages=(_hub_page("abode", "Player Property", "Private property type, facilities, visitors and location-scene access."),),
+        pages=(
+            _hub_page("abode", "Property", "The home itself: found it, enter and leave it, build and raise its facilities, and use one.",
+                      only=("abode status", "abode establish", "abode enter", "abode leave",
+                            "abode upgrade", "abode focus")),
+            _hub_page("abode", "Access", "Who else may come in: invite, revoke, see your guests, visit another cultivator's home, and the private thread it uses.",
+                      key="abode_access",
+                      only=("abode visit", "abode invite", "abode guests", "abode revoke", "abode thread")),
+        ),
     ),
     HubDefinition(
         name="innerworld",
@@ -512,13 +556,38 @@ _ADMIN_HUB_DEFINITION = HubDefinition(
         "Choose a section, then choose an action. Actions use the explicitly registered canonical handlers and audit logging."
     ),
     pages=(
-        HubPage(key="server", label="Server", description="Channels, health, AI/narrator status, chat monitoring, maintenance, backups and audit logs.", command=admin_server_group),
+        # Three pages of twelve, fifteen and twelve became eight (rc.13): the
+        # admin panel shows eight rows like every other, and a GM looking for
+        # `unmute` was paging blind through a list called "Players".
+        HubPage(key="server", label="Server", description="Install and wire the server: setup, channel bindings, realm capitals and what the current configuration looks like.", command=admin_server_group,
+                only=("admin server setup", "admin server status", "admin server basechannels",
+                      "admin server bind_channels", "admin server realmhubs")),
+        HubPage(key="operations", label="Operations", description="Running it: backups, maintenance, telemetry, the audit log, narrator health and the playtest board.", command=admin_server_group,
+                only=("admin server backup", "admin server maintenance", "admin server observability",
+                      "admin server audit", "admin server ai_status", "admin server chat_digest",
+                      "admin server playtest")),
         HubPage(key="world", label="World", description="Events, secret realms and canonical world time.", command=admin_world_group),
-        HubPage(key="player", label="Players", description="Inspect, restore, reward or move cultivators.", command=admin_player_group),
+        HubPage(key="player", label="Players", description="Inspect a cultivator and put one right: revive, teleport, clear a stuck battle or scene.", command=admin_player_group,
+                only=("admin player inspect", "admin player revive", "admin player teleport",
+                      "admin player clearbattle", "admin player forceendscene")),
+        HubPage(key="grants", label="Grants", description="Give: items, currency, spatial storage, and karma adjustments.", command=admin_player_group,
+                only=("admin player grant", "admin player grantcurrency",
+                      "admin player grantstorage", "admin player karma")),
+        HubPage(key="moderation", label="Moderation", description="Withhold: ban, freeze and mute, each with its undo.", command=admin_player_group,
+                only=("admin player ban", "admin player unban", "admin player freeze",
+                      "admin player unfreeze", "admin player mute", "admin player unmute")),
         HubPage(key="sect", label="Sects", description="Membership, ranks and master/disciple administration.", command=admin_sect_group),
-        HubPage(key="family", label="Families", description="Inspect hidden birth-family state.", command=admin_family_group),
-        HubPage(key="npc", label="NPCs", description="Inspect hidden canonical NPC state.", command=admin_npc_group),
-        HubPage(key="simulation", label="Simulation", description="Automation, regions, markets, factions and world simulation.", command=admin_sim_group),
+        # Two pages of one action each, both "show me the hidden state of a
+        # thing" (rc.13).
+        HubPage(key="hidden", label="Hidden State", description="Inspect what players cannot see: a cultivator's NPC birth family, and a canonical NPC's GM-only state.",
+                command=admin_family_group, extras=(admin_npc_group,)),
+        HubPage(key="simulation", label="Simulation", description="Drive it: run a system, set an interval, and see what the automation switches are doing.", command=admin_sim_group,
+                only=("admin simulation status", "admin simulation run", "admin simulation interval",
+                      "admin simulation automation", "admin simulation toggle",
+                      "admin simulation actions")),
+        HubPage(key="siminspect", label="Simulation Inspect", description="Read it: the world summary, a region, a market, a named NPC, a sect faction, a clan.", command=admin_sim_group,
+                only=("admin simulation world", "admin simulation region", "admin simulation market",
+                      "admin simulation npc", "admin simulation sect", "admin simulation clan")),
     ),
 )
 
@@ -528,9 +597,9 @@ _MenuBase = discord.ui.LayoutView if LAYOUT_COMPONENTS_AVAILABLE else discord.ui
 # The menu's shape (v1.0.0-rc.3): four rows of four, grouped by what a player
 # is doing, instead of one sixteen-entry select. The hub names stay the hub
 # names; two get the label they should always have had.
-_HUB_LABELS = {"npc": "NPCs", "innerworld": "Inner World", "quest": "Quests"}
+_HUB_LABELS = {"npc": "NPCs", "innerworld": "Inner World", "ascend": "Ascension"}
 _MENU_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
-    ("You", "who you are and what you carry", ("character", "cultivation", "items", "quest")),
+    ("You", "who you are and what you carry", ("character", "cultivation", "items", "ascend")),
     ("World", "where you are and what is happening", ("world", "travel", "realm", "npc")),
     ("Doing", "fighting, making, trading, taming", ("combat", "craft", "economy", "beast")),
     ("Home", "the places that are yours", ("sect", "family", "abode", "innerworld")),

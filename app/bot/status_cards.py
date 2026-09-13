@@ -145,7 +145,7 @@ async def cultivation_status_fields(interaction: discord.Interaction, *, fallbac
     stance_line = f"**{status.get('stance_label') or 'Circulate'}** x{float(status.get('stance_mult', 1)):.2f} • {_relative_time(status.get('cooldown_remaining'))}"
     severity = int(status.get("deviation_severity", 0) or 0)
     if severity:
-        stance_line += f"\n⚠️ Qi deviation **{severity}/5** — treat it under **/character → Treatment**"
+        stance_line += f"\n⚠️ Qi deviation **{severity}/5** — treat it under **/character → Afflictions**"
     return [
         HubStatusField("☯️ Realm", realm_line),
         HubStatusField("🧭 Stance", stance_line),
