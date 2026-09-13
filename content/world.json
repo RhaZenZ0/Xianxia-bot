@@ -25554,6 +25554,136 @@
       "type": "flight",
       "flight": 9,
       "flight_name": "a folded step"
+    },
+    "cracked_ancestral_blade": {
+      "name": "Cracked Ancestral Blade",
+      "description": "The clan's flying sword, from before the clan fell. The crack runs a third of the way up the spine and the creditors would not take it. It still lifts a rider, slowly, and it still cuts.",
+      "sect_value": 10,
+      "base_price": 140,
+      "type": "flight",
+      "flight": 3,
+      "flight_name": "a cracked ancestral blade",
+      "market_excluded": true
+    },
+    "funeral_paper_crane": {
+      "name": "Funeral Paper Crane",
+      "description": "Folded from the heavy grey paper the tomb-watch burn for the dead, and inked with the ward that keeps an offering from being taken on the road. It carries the living just as well, which the family does not say aloud.",
+      "sect_value": 7,
+      "base_price": 110,
+      "type": "flight",
+      "flight": 3,
+      "flight_name": "a funeral paper crane",
+      "market_excluded": true
+    },
+    "cloudstep_sandals": {
+      "name": "Cloudstep Sandals",
+      "description": "Straw over hammered iron soles, each one weighted to the exact stride of the wearer. A body cultivator does not ride: they step off the mountain and the next step lands where they meant it to.",
+      "sect_value": 8,
+      "base_price": 130,
+      "type": "flight",
+      "flight": 3,
+      "flight_name": "a cloudstep stride",
+      "market_excluded": true
+    },
+    "garrison_signal_kite": {
+      "name": "Garrison Signal Kite",
+      "description": "A scout's kite off the frozen wall, oiled against the ice and cut wide enough to take a rider's weight in a headwind. The garrison's colours are still on the spar.",
+      "sect_value": 8,
+      "base_price": 125,
+      "type": "flight",
+      "flight": 3,
+      "flight_name": "a garrison signal kite",
+      "market_excluded": true
+    },
+    "riverreed_leaf": {
+      "name": "Riverreed Leaf",
+      "description": "One reed leaf off the Riverguard water, lacquered stiff and carrying a household charm at the stem. It rides low and quiet, the way the river district likes things.",
+      "sect_value": 7,
+      "base_price": 115,
+      "type": "flight",
+      "flight": 3,
+      "flight_name": "a riverreed leaf",
+      "market_excluded": true
+    },
+    "ironbanner_pennant": {
+      "name": "Ironbanner Pennant",
+      "description": "The company pennant, stiffened along the hoist so it will take a rider standing. A spear guard is taught to go where the banner goes; this is that instruction made literal.",
+      "sect_value": 8,
+      "base_price": 125,
+      "type": "flight",
+      "flight": 3,
+      "flight_name": "a company pennant",
+      "market_excluded": true
+    },
+    "hall_practice_sword": {
+      "name": "Hall Practice Sword",
+      "description": "The training blade every child of the hall learns the forms on, dull along the last hand's breadth so a beginner keeps their fingers. It flies badly and reliably, which is what a practice sword is for.",
+      "sect_value": 12,
+      "base_price": 160,
+      "type": "flight",
+      "flight": 3,
+      "flight_name": "a practice flying sword",
+      "market_excluded": true
+    },
+    "moonfen_shadow_fan": {
+      "name": "Moonfen Shadow Fan",
+      "description": "Ribs of black marsh-cane over silk dyed the colour of standing water. It rides the fog rather than the wind, and it is very hard to see against a grey sky, which was the point.",
+      "sect_value": 10,
+      "base_price": 145,
+      "type": "flight",
+      "flight": 3,
+      "flight_name": "a shadow fan",
+      "market_excluded": true
+    },
+    "forge_proof_sword": {
+      "name": "Forge-Proof Sword",
+      "description": "The blade an apprentice proves on the anvil before the family will call them a smith. Honest spirit iron, no ornament, and the maker's mark punched where their own master's would go.",
+      "sect_value": 12,
+      "base_price": 165,
+      "type": "flight",
+      "flight": 3,
+      "flight_name": "a proof blade",
+      "market_excluded": true
+    },
+    "nether_market_lantern": {
+      "name": "Nether-Market Lantern",
+      "description": "A paper lantern on a hooked pole, burning the cold blue the night markets trade under. It lifts its bearer as readily as it lights them, and buyers know from a long way off exactly whose house is coming.",
+      "sect_value": 11,
+      "base_price": 150,
+      "type": "flight",
+      "flight": 3,
+      "flight_name": "a night-market lantern",
+      "market_excluded": true
+    },
+    "escort_cargo_skiff": {
+      "name": "Escort Cargo Skiff",
+      "description": "A caravan flying boat cut down to one rider and a strapped load - the escort agency's own pattern, the one they put a child on the first time they send them down a road alone.",
+      "sect_value": 14,
+      "base_price": 190,
+      "type": "flight",
+      "flight": 3,
+      "flight_name": "a caravan skiff",
+      "market_excluded": true
+    },
+    "medicine_gathering_gourd": {
+      "name": "Medicine-Gathering Gourd",
+      "description": "A high-riding spirit gourd with the panniers still lashed to it, cut and cured by the family for reaching the cliff herbs nobody else can price. It goes where a ladder will not.",
+      "sect_value": 30,
+      "base_price": 700,
+      "type": "flight",
+      "flight": 5,
+      "flight_name": "a gathering gourd",
+      "market_excluded": true
+    },
+    "qin_ancestral_sword": {
+      "name": "Qin Ancestral Sword",
+      "description": "Azure steel with the clan seal inlaid at the ricasso, taken down off the ancestral rack and put into a young hand with the whole household watching. It is a real sword and a real mount, and everyone on the road will know which family it came from.",
+      "sect_value": 34,
+      "base_price": 820,
+      "type": "flight",
+      "flight": 5,
+      "flight_name": "the clan's azure sword",
+      "market_excluded": true
     }
   },
   "recipes": {
@@ -62171,5 +62301,59 @@
       "Ning Cailing",
       "Duan Shu"
     ]
+  },
+  "birth_family_sendoff": {
+    "fallen_martial_clan": {
+      "item": "cracked_ancestral_blade",
+      "line": "Your uncle takes it off the wall himself and does not meet your eye. Bring it back better than it goes out."
+    },
+    "tomb_watch_clan": {
+      "item": "funeral_paper_crane",
+      "line": "Folded at the graveside and handed over still warm. The dead can spare one, they tell you."
+    },
+    "body_tempering_family": {
+      "item": "cloudstep_sandals",
+      "line": "Weighted to your stride over a winter of measuring. Do not ride anything, your father says. Step."
+    },
+    "border_garrison_family": {
+      "item": "garrison_signal_kite",
+      "line": "Off the wall, colours and all, signed out of the quartermaster's book against your name."
+    },
+    "martial_household": {
+      "item": "riverreed_leaf",
+      "line": "Cut from the household's own reed bed the morning you leave, and lacquered while you pack."
+    },
+    "spear_guard_family": {
+      "item": "ironbanner_pennant",
+      "line": "The company stands to as it comes down off the pole. Go where the banner goes."
+    },
+    "sword_hall_family": {
+      "item": "hall_practice_sword",
+      "line": "The blade you learned the first form on. The hall keeps the good ones; you have earned the honest one."
+    },
+    "hidden_weapon_family": {
+      "item": "moonfen_shadow_fan",
+      "line": "Handed over without ceremony, in the dark, by someone who was not there a moment before."
+    },
+    "weaponsmith_martial_family": {
+      "item": "forge_proof_sword",
+      "line": "Your own proof blade, with your own mark on it. The family does not buy a child a sword."
+    },
+    "nether_market_house": {
+      "item": "nether_market_lantern",
+      "line": "Lit off the house lamp so the trade knows the flame. Owe nobody on the road, your mother says."
+    },
+    "escort_martial_family": {
+      "item": "escort_cargo_skiff",
+      "line": "Cut down to one rider in the yard while you watch. Every escort's first solo run leaves on this."
+    },
+    "alchemy_family": {
+      "item": "medicine_gathering_gourd",
+      "line": "Panniers lashed on and the cliff-herb map folded into the left one. Come back with something worth the trip."
+    },
+    "noble_martial_clan": {
+      "item": "qin_ancestral_sword",
+      "line": "Taken down off the ancestral rack in front of the whole household. The clan's name goes with it, and so do its enemies."
+    }
   }
 }

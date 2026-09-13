@@ -1006,6 +1006,11 @@ func createCharacterAuthoritative(conn *storage.Conn, worldPath string, userID i
 			return authoritativeMutation{}, err
 		}
 	}
+	// And what the household itself puts in their hands (v1.0.0-rc.15).
+	sendoff, err := grantBirthFamilySendoffTx(conn, catalog, userID, familyID, firstNonempty(pFamily.ID, pFamily.Archetype), p.GameMinute, now)
+	if err != nil {
+		return authoritativeMutation{}, err
+	}
 	if _, err = conn.Execute(`INSERT INTO currency_wallets(user_id,currency_id,balance) VALUES(?,?,?)`, []any{userID, "low_spirit_stone", 25}); err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -1061,6 +1066,9 @@ func createCharacterAuthoritative(conn *storage.Conn, worldPath string, userID i
 		return authoritativeMutation{}, err
 	}
 	result := map[string]any{"created": true, "user_id": userID, "name": p.Name, "origin": origin, "path": path, "gender": gender, "location": householdLocation, "physical_location": location, "spiritual_root": root, "natural_lifespan_years": natural, "attributes": attrs, "qi_max": qiMax, "vitality_max": vitMax, "aptitudes": aptitude, "family_id": familyID, "family": pFamily}
+	if sendoff != nil {
+		result["family_sendoff"] = sendoff
+	}
 	return authoritativeMutation{Result: result, Event: eventledger.Event{Domain: "character", EventType: "character_created", EntityType: "character", EntityID: fmt.Sprint(userID), GameMinute: p.GameMinute, Payload: result}}, nil
 }
 

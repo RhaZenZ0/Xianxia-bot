@@ -243,6 +243,27 @@ async def birth_family_clan(interaction:discord.Interaction)->None:
     await reply_long(interaction,text+"\n".join(details),ephemeral=False)
 
 
+def family_sendoff_line(result: dict) -> str:
+    """What the household put in your hands on the way out of the door.
+
+    Every one of the thirteen birth families sends a child out with a flying
+    artifact of its own - a tomb-watch clan folds a burnt offering, a
+    weapon-smith's child leaves on the blade they proved on the anvil - and no
+    two households give the same object. The engine decides whether there is
+    one to give (once per household, guarded on `item_provenance`); this only
+    says it.
+    """
+    sendoff = dict(result.get("family_sendoff") or {})
+    if not sendoff:
+        return ""
+    line = str(sendoff.get("line") or "").strip()
+    return (
+        f"\n🎁 The household sends you out with **{sendoff.get('name')}**"
+        + (f" — {line}" if line else ".")
+        + "\n✈️ It carries you: the road runs at a third of its walking hours while you have it."
+    )
+
+
 @registered_group_command(family_group, name="support",description="Ask your birth family for resources or emergency support")
 @serialized_user_action
 async def birth_family_support(interaction:discord.Interaction)->None:
@@ -254,7 +275,15 @@ async def birth_family_support(interaction:discord.Interaction)->None:
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
         await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
-    await interaction.followup.send(f"🏠 **{result.get('family_name','Your family')} supports you.**\nReceived: **{int(result.get('stones',0))} Low-Grade Spirit Stones**",ephemeral=False)
+    goods=""
+    for item_id,qty in sorted(dict(result.get("items") or {}).items()):
+        if int(qty)>0:
+            goods+=f", **{int(qty)}× {WORLD.item_name(str(item_id))}**"
+    await interaction.followup.send(
+        f"🏠 **{result.get('family_name','Your family')} supports you.**"
+        f"\nReceived: **{int(result.get('stones',0))} Low-Grade Spirit Stones**{goods}"
+        f"{family_sendoff_line(result)}",
+        ephemeral=False)
 
 @registered_group_command(family_group, name="history",description="View recent rises, setbacks and political changes in your family")
 async def birth_family_history(interaction:discord.Interaction)->None:

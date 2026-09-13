@@ -239,6 +239,34 @@ trading in spatial coordinates is exactly who would), and a key spent away from 
 now refused rather than silently wasted - `secret_realm.enter` only ever steps through at the
 realm's own mouth.
 
+And the household you were born into finally puts something in your hands. Thirteen birth families
+carry a hand-tuned wealth from 26 for a ruined clan to 82 for an imperial one, a written boon and a
+written risk each - and every one of them handed a new cultivator the same two spirit herbs and one
+spirit iron, so what a family was worth bought their child exactly nothing on the way out of the
+door. Each sends its own flying artifact now, and no two households give the same object, because
+which artifact a family owns *is* the family: a tomb-watch clan folds a burnt offering that will
+carry the living too, a weapon-smith's child leaves on the blade they proved on the anvil, a body
+cultivator is given weighted sandals and told not to ride anything, and a fallen clan has only the
+cracked ancestral sword nobody would buy. The roster is content, the same way the event sites and the
+narration pool are.
+
+Power tracks the purse already written beside each house: flight 3 below wealth 60, which carries a
+disciple until their own realm reaches Core Formation and then goes quiet, and flight 5 for the
+Alchemy Family and the Noble Martial Clan, which keeps carrying them to Ascension. The four heirloom
+swords are deliberately under the shop ladder - the cracked blade and the two training swords below
+the spirit-iron sword anyone can buy, the clan sword under the spirit-crystal one - because the gift
+is the flight, not the edge. And they are heirlooms rather than stock: no shop sells one, so the
+sixty-stone paper crane on the shelf is still the road for anyone whose family could not do better.
+
+There are two doors and one guard. A character made today leaves home carrying it. A character made
+before this comes home and asks - `/family support` hands it over the first time and never again -
+which is also where two households stopped being ignored: neither ghost house had a case in that
+switch at all, so the two families that trade in funeral goods and grave-lore handed over one
+ordinary recovery pill like everybody else. The guard is an `item_provenance` row rather than a new
+column, keyed on the *family* rather than the character, and that is what makes samsara work: a new
+life is a new household, so it earns that household's heirloom, while asking the same household twice
+earns nothing. Creation also writes provenance for what it grants now, which it never did.
+
 **1.0.0** (rc.14) repairs a broken call in `/sense` and closes the class of fault it belongs to.
 Sensing another cultivator called `WORLD.approximate_realm(...)`, and there is no such method on
 `World`: the function lives in `app/rules/sense.py` and takes its two realm lookups as arguments, so

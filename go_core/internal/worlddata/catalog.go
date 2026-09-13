@@ -389,6 +389,17 @@ type SecretRealm struct {
 	Rooms         []SecretRealmRoom `json:"rooms"`
 }
 
+// BirthFamilySendoff is what a household puts in a child's hands on the day
+// they leave it (v1.0.0-rc.15). Every archetype has one and no two share an
+// item: which flying artifact a family owns *is* the family - a tomb-watch
+// clan folds a burnt offering that will carry the living too, a weapon-smith's
+// child leaves on the blade they proved on the anvil, and a fallen clan has
+// only the cracked ancestral sword nobody would buy.
+type BirthFamilySendoff struct {
+	Item string `json:"item"`
+	Line string `json:"line"`
+}
+
 type Inheritance struct {
 	Name           string           `json:"name"`
 	Description    string           `json:"description"`
@@ -569,6 +580,7 @@ type Catalog struct {
 	EventSites          EventSites                     `json:"event_sites"`
 	SecretRealms        map[string]SecretRealm         `json:"secret_realms"`
 	Inheritances        map[string]Inheritance         `json:"inheritances"`
+	BirthFamilySendoff  map[string]BirthFamilySendoff  `json:"birth_family_sendoff"`
 	NPCs                map[string]NPCDefinition       `json:"npcs"`
 	TechniqueSystem     TechniqueSystemDefinition      `json:"technique_system"`
 	WorldRules          map[string]any                 `json:"world_rules"`

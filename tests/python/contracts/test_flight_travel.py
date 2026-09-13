@@ -107,19 +107,26 @@ class TheArtifactsAreRealGoods(unittest.TestCase):
                 self.assertGreaterEqual(int(item["flight"]), 3, "a flying artifact must at least fly")
                 self.assertTrue(str(item.get("flight_name") or "").strip(), "the reply has nothing to name")
 
-    def test_a_flying_artifact_can_actually_be_bought(self):
-        # An artifact no shop sells is scenery. Every one of them is on a
-        # shelf somewhere, and the cheapest is on a mortal-world shelf, so
-        # the disciple the rule is written for can reach it.
+    def test_every_flying_artifact_is_either_bought_or_inherited(self):
+        # An artifact nobody can obtain is scenery. There are exactly two ways
+        # to come by one: a shop sells it, or a birth family sends you out
+        # with it. An heirloom is deliberately unbuyable - market_excluded,
+        # on no shelf - so the rule is a disjunction, not a shelf check.
         stocked = {}
         for key, shop in WORLD["shops"].items():
             for line in shop["sells"]:
                 if line["item_id"] in FLIGHT:
                     stocked.setdefault(line["item_id"], []).append(shop)
+        inherited = {str(entry["item"]) for entry in WORLD["birth_family_sendoff"].values()}
         for key in FLIGHT:
             with self.subTest(item=key):
-                self.assertIn(key, stocked, f"{key} is sold nowhere")
-        entry = min(FLIGHT, key=lambda k: int(FLIGHT[k]["base_price"]))
+                self.assertTrue(key in stocked or key in inherited, f"{key} can be neither bought nor inherited")
+                if key in inherited:
+                    self.assertTrue(FLIGHT[key].get("market_excluded"), f"{key} is an heirloom and must not be stock")
+                    self.assertNotIn(key, stocked, f"{key} is an heirloom and is on a shelf")
+        # The cheapest *stocked* one still has to be reachable in the world
+        # players start in, so the walking hint is never a dead end.
+        entry = min(stocked, key=lambda k: int(FLIGHT[k]["base_price"]))
         self.assertTrue(
             any(shop["world"] == "Mortal World" for shop in stocked[entry]),
             "the first flying artifact must be reachable from the world players start in",

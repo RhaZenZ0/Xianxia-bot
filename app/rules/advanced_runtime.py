@@ -63,6 +63,27 @@ EQUIPMENT_DEFINITIONS: dict[str, dict[str, Any]] = {
         "name": "Azure Flying Sword", "slot": "weapon", "max_durability": 220,
         "attack": 7, "defense": 0, "spirit": 3, "agility": 3,
     },
+    # The birth family's send-off (v1.0.0-rc.15): a household that can afford
+    # to does not send a child out to walk. Deliberately under the shop ladder
+    # - the cracked heirloom and the two training blades below
+    # spirit_iron_sword, the clan sword under spirit_crystal_mail's tier -
+    # because the gift is the flight, not the edge.
+    "cracked_ancestral_blade": {
+        "name": "Cracked Ancestral Blade", "slot": "weapon", "max_durability": 90,
+        "attack": 2, "defense": 0, "spirit": 1, "agility": 1,
+    },
+    "hall_practice_sword": {
+        "name": "Hall Practice Sword", "slot": "weapon", "max_durability": 110,
+        "attack": 3, "defense": 0, "spirit": 1, "agility": 1,
+    },
+    "forge_proof_sword": {
+        "name": "Forge-Proof Sword", "slot": "weapon", "max_durability": 130,
+        "attack": 3, "defense": 1, "spirit": 1, "agility": 0,
+    },
+    "qin_ancestral_sword": {
+        "name": "Qin Ancestral Sword", "slot": "weapon", "max_durability": 240,
+        "attack": 5, "defense": 0, "spirit": 2, "agility": 2,
+    },
     # A one-of-a-kind GM reward granted via /admin player grant, never crafted
     # or bought (content/world.json marks it market_excluded). "indestructible"
     # and "unique" are read by app/bot/main.py's grant/equipment-status code;

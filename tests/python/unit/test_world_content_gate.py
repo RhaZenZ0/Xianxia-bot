@@ -146,6 +146,55 @@ class WorldCrossingContentTests(unittest.TestCase):
                     self.assertEqual(loc.get("settlement_type"), "city")
 
 
+class BirthFamilySendoffTests(unittest.TestCase):
+    """v1.0.0-rc.15: a household that can afford to does not send a child out
+    to walk. Thirteen archetypes, thirteen heirlooms, no two the same."""
+
+    SENDOFF = WORLD["birth_family_sendoff"]
+
+    def _archetypes(self):
+        import re
+
+        source = (PROJECT_ROOT / "go_core" / "internal" / "game" / "birth_family_actions.go").read_text(encoding="utf-8")
+        found = set(re.findall(r'\{"([a-z_]+)", "(?:martial|ghost)",', source))
+        self.assertEqual(len(found), 13, "the archetype table changed shape")
+        return found
+
+    def test_every_household_sends_its_child_out_with_something(self):
+        self.assertEqual(set(self.SENDOFF), self._archetypes(), "an archetype with no send-off")
+
+    def test_no_two_households_give_the_same_thing(self):
+        items = [str(entry["item"]) for entry in self.SENDOFF.values()]
+        self.assertEqual(len(set(items)), len(items), "two households hand out the same object")
+
+    def test_every_heirloom_is_a_real_described_flying_artifact(self):
+        for archetype, entry in self.SENDOFF.items():
+            with self.subTest(archetype=archetype):
+                item = WORLD["items"].get(str(entry["item"]))
+                self.assertIsNotNone(item, f"{archetype} sends out an item that does not exist")
+                self.assertEqual(item.get("type"), "flight")
+                self.assertGreaterEqual(int(item.get("flight") or 0), 3, "an heirloom that does not fly")
+                self.assertTrue(str(item.get("flight_name") or "").strip())
+                self.assertGreater(len(str(item.get("description") or "").strip()), 40)
+                self.assertGreater(int(item.get("base_price") or 0), 0)
+                self.assertTrue(item.get("market_excluded"), "an heirloom is inherited, not stocked")
+                self.assertGreater(len(str(entry.get("line") or "").strip()), 20, "no words for the handover")
+
+    def test_the_rich_houses_send_the_better_artifact(self):
+        # The gift tracks the Wealth already written beside each household:
+        # flight 5 above 60, flight 3 below it. A flight-3 heirloom goes quiet
+        # once the owner's own realm reaches Core Formation; a flight-5 one
+        # keeps carrying them to Ascension.
+        from app.rules.birthfamily import FAMILY_ARCHETYPES
+
+        wealth_of = {str(a["id"]): int(a["wealth"]) for a in FAMILY_ARCHETYPES}
+        for archetype, entry in self.SENDOFF.items():
+            wealth = wealth_of[archetype]
+            flight = int(WORLD["items"][str(entry["item"])]["flight"])
+            with self.subTest(archetype=archetype, wealth=wealth):
+                self.assertEqual(flight, 5 if wealth >= 60 else 3)
+
+
 class TreasureContentTests(unittest.TestCase):
     """v1.0.0-rc.15: a treasure the engine can read is a treasure somebody can
     hold. Both halves had been missing for the spatial keys - they named

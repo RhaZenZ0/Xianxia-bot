@@ -81,7 +81,7 @@ CREATE TABLE hidden_sect_membership(
 	branch_name TEXT NOT NULL DEFAULT '', standing INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'active',
 	joined_game_minute INTEGER NOT NULL DEFAULT 0, updated_at REAL NOT NULL
 );
-CREATE TABLE item_provenance(
+CREATE TABLE IF NOT EXISTS item_provenance(
 	provenance_id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, item_id TEXT NOT NULL,
 	quantity INTEGER NOT NULL DEFAULT 1, source_type TEXT NOT NULL DEFAULT 'unknown',
 	source_key TEXT NOT NULL DEFAULT '', ownership_mark TEXT NOT NULL DEFAULT '',

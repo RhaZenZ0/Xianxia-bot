@@ -38,6 +38,15 @@ func equipmentDefinitionsGo() map[string]equipmentDefinitionGo {
 		// (`flight`) and takes a weapon slot, which is exactly why the genre
 		// makes it the default: you do not choose between going and fighting.
 		"azure_flying_sword": {"weapon", 220, 7, 0, 3, 3, false},
+		// The birth family's send-off (v1.0.0-rc.15): a household that can
+		// afford to does not send a child out to walk. These are deliberately
+		// under the shop ladder - the cracked heirloom and the two training
+		// blades below spirit_iron_sword, the clan sword under
+		// spirit_crystal_sword - because the gift is the flight, not the edge.
+		"cracked_ancestral_blade": {"weapon", 90, 2, 0, 1, 1, false},
+		"hall_practice_sword":     {"weapon", 110, 3, 0, 1, 1, false},
+		"forge_proof_sword":       {"weapon", 130, 3, 1, 1, 0, false},
+		"qin_ancestral_sword":     {"weapon", 240, 5, 0, 2, 2, false},
 		// A one-of-a-kind GM reward (granted via /admin player grant, never
 		// crafted or bought) - Indestructible=true is what actually protects
 		// it from durability decay; see indestructibleEquipmentIDsGo below.
