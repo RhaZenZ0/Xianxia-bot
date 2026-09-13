@@ -2,6 +2,7 @@ package game
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -17,6 +18,13 @@ const worldEventNodesDDL = `CREATE TABLE world_event_nodes (
     attribute TEXT NOT NULL DEFAULT 'insight',item_id TEXT NOT NULL DEFAULT '',item_qty INTEGER NOT NULL DEFAULT 0,
     cultivation INTEGER NOT NULL DEFAULT 0,spirit_stones INTEGER NOT NULL DEFAULT 0,contribution INTEGER NOT NULL DEFAULT 1,
     created_at REAL NOT NULL,updated_at REAL NOT NULL,UNIQUE(event_key,node_key));`
+
+const worldEventNPCsDDL = `CREATE TABLE world_event_npcs (
+    event_key TEXT NOT NULL,npc_key TEXT NOT NULL,name TEXT NOT NULL,title TEXT NOT NULL DEFAULT '',
+    role TEXT NOT NULL DEFAULT '',personality TEXT NOT NULL DEFAULT '',speech TEXT NOT NULL DEFAULT '',
+    want TEXT NOT NULL DEFAULT '',fear TEXT NOT NULL DEFAULT '',descriptor TEXT NOT NULL DEFAULT '',
+    location TEXT NOT NULL DEFAULT '',created_at REAL NOT NULL,PRIMARY KEY(event_key,npc_key));
+CREATE UNIQUE INDEX idx_world_event_npcs_name ON world_event_npcs(name);`
 
 const worldEventParticipationDDL = `CREATE TABLE world_event_participation (
     event_key TEXT NOT NULL,user_id INTEGER NOT NULL,stance TEXT NOT NULL DEFAULT 'observing',
@@ -39,6 +47,7 @@ func setupEventSiteDB(t *testing.T, category string, severity int64) (string, st
 	path := setupBatch5AuthorityDB(t)
 	world := batch4WorldPath(t)
 	batch4Exec(t, path, worldEventNodesDDL)
+	batch4Exec(t, path, worldEventNPCsDDL)
 	batch4Exec(t, path, worldEventParticipationDDL)
 	batch4Exec(t, path, worldEventActionsDDL)
 	now := float64(time.Now().UnixNano()) / 1e9
@@ -145,9 +154,11 @@ func TestSpawnWorldEventNodesIsIdempotent(t *testing.T) {
 	if second := spawnTestSite(t, path, world, "Beast Tide", 5); second != 0 {
 		t.Fatalf("respawn created %d more nodes; expected 0", second)
 	}
-	got := storage.ParseInt(actionScalar(t, path, `SELECT COUNT(*) FROM world_event_nodes WHERE event_key='site-event'`))
+	// The return counts everything the site spawned - nodes and cast alike.
+	got := storage.ParseInt(actionScalar(t, path, `SELECT COUNT(*) FROM world_event_nodes WHERE event_key='site-event'`)) +
+		storage.ParseInt(actionScalar(t, path, `SELECT COUNT(*) FROM world_event_npcs WHERE event_key='site-event'`))
 	if got != first {
-		t.Fatalf("node count drifted from %d to %d on respawn", first, got)
+		t.Fatalf("site size drifted from %d to %d on respawn", first, got)
 	}
 }
 
@@ -246,5 +257,69 @@ func TestWorldEventSiteProgressTracksClearing(t *testing.T) {
 	}
 	if storage.ParseInt(done["percent"]) != 100 || done["resolved"] != true {
 		t.Fatalf("cleared site reports %v", done)
+	}
+}
+
+// The scene needs people in it, not only things to hit.
+func TestSpawnWorldEventCastFillsTheScene(t *testing.T) {
+	path, world := setupEventSiteDB(t, "Beast Tide", 7)
+	spawnTestSite(t, path, world, "Beast Tide", 7)
+	if got := storage.ParseInt(actionScalar(t, path, `SELECT COUNT(*) FROM world_event_npcs WHERE event_key='site-event'`)); got < 2 {
+		t.Fatalf("beast tide brought %d people; the scene needs a cast", got)
+	}
+	// Named, located, and carrying enough character to be worth talking to.
+	name := fmt.Sprint(actionScalar(t, path, `SELECT name FROM world_event_npcs WHERE event_key='site-event' AND npc_key='captain'`))
+	if !strings.HasPrefix(name, "Militia Captain ") || name == "Militia Captain " {
+		t.Fatalf("captain is named %q; expected a title plus a name from the pool", name)
+	}
+	if got := actionScalar(t, path, `SELECT location FROM world_event_npcs WHERE event_key='site-event' AND npc_key='captain'`); got != "Greenriver Town" {
+		t.Fatalf("captain is at %v, not at the event", got)
+	}
+	for _, column := range []string{"role", "personality", "speech", "want"} {
+		if got := fmt.Sprint(actionScalar(t, path, `SELECT `+column+` FROM world_event_npcs WHERE event_key='site-event' AND npc_key='captain'`)); strings.TrimSpace(got) == "" {
+			t.Fatalf("captain has no %s; the narrator would render an anonymous local", column)
+		}
+	}
+}
+
+// An unwritten category still gets people.
+func TestSpawnWorldEventCastFallsBackToTheDefault(t *testing.T) {
+	path, world := setupEventSiteDB(t, "Category Nobody Wrote", 4)
+	spawnTestSite(t, path, world, "Category Nobody Wrote", 4)
+	if got := storage.ParseInt(actionScalar(t, path, `SELECT COUNT(*) FROM world_event_npcs WHERE event_key='site-event'`)); got < 1 {
+		t.Fatalf("fallback cast=%d", got)
+	}
+}
+
+// Two live events must not both field the same captain - the name is how a
+// player addresses them, so it has to identify exactly one person.
+func TestWorldEventCastNamesDoNotCollideAcrossEvents(t *testing.T) {
+	path, world := setupEventSiteDB(t, "Beast Tide", 7)
+	spawnTestSite(t, path, world, "Beast Tide", 7)
+
+	catalog, err := worlddata.Load(world)
+	if err != nil {
+		t.Fatal(err)
+	}
+	conn, err := storage.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	now := float64(time.Now().UnixNano()) / 1e9
+	if _, err := conn.Execute(`INSERT INTO world_events(event_key,dedupe_key,event_type,title,location,payload_json,active,starts_at,ends_at)
+        VALUES('site-event-2','random:test2','random_event','Second Tide','Cloudspine Foothills','{"severity":7}',1,?,?)`, []any{now - 10, now + 7200}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := SpawnWorldEventNodes(conn, catalog, "site-event-2", "Beast Tide", "Cloudspine Foothills", 7, now); err != nil {
+		t.Fatal(err)
+	}
+	if err := conn.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	total := storage.ParseInt(actionScalar(t, path, `SELECT COUNT(*) FROM world_event_npcs`))
+	distinct := storage.ParseInt(actionScalar(t, path, `SELECT COUNT(DISTINCT name) FROM world_event_npcs`))
+	if total != distinct || total < 4 {
+		t.Fatalf("cast names collided: %d rows, %d distinct names", total, distinct)
 	}
 }

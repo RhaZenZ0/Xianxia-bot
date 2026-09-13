@@ -185,6 +185,7 @@ class EventSceneView(discord.ui.View):
     def embed(
         self, *, description: str = "", objective: str = "", site: list[dict[str, Any]] | None = None,
         progress: dict[str, Any] | None = None, participants: list[dict[str, Any]] | None = None,
+        cast: list[dict[str, Any]] | None = None,
     ) -> discord.Embed:
         """The scene panel.
 
@@ -237,6 +238,12 @@ class EventSceneView(discord.ui.View):
                 inline=False,
             )
 
+        roster=list(cast or [])
+        if roster:
+            lines=[f"• **{p.get('name')}** — {p.get('role') or p.get('title') or 'present'}" for p in roster[:6]]
+            lines.append("Use **Talk** to speak with any of them.")
+            embed.add_field(name="🧑 Who is here", value="\n".join(lines)[:1024], inline=False)
+
         people=list(participants or [])
         if people:
             net=sum(int(x.get("contribution") or 0) for x in people)
@@ -262,13 +269,14 @@ class EventSceneView(discord.ui.View):
             parts.append(f"{int(node['spirit_stones'])} spirit stones")
         return ("→ "+", ".join(parts)) if parts else ""
 
-    async def _site_state(self) -> tuple[str, str, list[dict[str, Any]], dict[str, Any], list[dict[str, Any]]]:
+    async def _site_state(self) -> tuple[str, str, list[dict[str, Any]], dict[str, Any], list[dict[str, Any]], list[dict[str, Any]]]:
         """Load everything the panel shows in one place: what the event is, the
         objective, the site roster, its progress and who is working it."""
         description=objective=""
-        site: list[dict[str, Any]]=[]; progress: dict[str, Any]={}; participants: list[dict[str, Any]]=[]
+        site: list[dict[str, Any]]=[]; progress: dict[str, Any]={}
+        participants: list[dict[str, Any]]=[]; cast: list[dict[str, Any]]=[]
         if not self.event_key:
-            return description, objective, site, progress, participants
+            return description, objective, site, progress, participants, cast
         try:
             record=await DB.get_world_event(self.event_key) or {}
             payload=dict(record.get("payload") or {})
@@ -284,18 +292,19 @@ class EventSceneView(discord.ui.View):
             site=await DB.list_world_event_nodes(self.event_key)
             progress=await DB.world_event_site_progress(self.event_key)
             participants=await DB.list_world_event_participants(self.event_key, limit=10)
+            cast=await DB.list_world_event_npcs(self.event_key)
         except Exception:
             log.exception("Could not load the event site for %s", self.event_key)
-        return description, objective, site, progress, participants
+        return description, objective, site, progress, participants, cast
 
     async def render(self) -> discord.Embed:
         """Build the panel against live state, refreshing the site select with
         whatever is still workable."""
-        description, objective, site, progress, participants = await self._site_state()
+        description, objective, site, progress, participants, cast = await self._site_state()
         self._refresh_site_select(site)
         return self.embed(
             description=description, objective=objective, site=site,
-            progress=progress, participants=participants,
+            progress=progress, participants=participants, cast=cast,
         )
 
     def _refresh_site_select(self, site: list[dict[str, Any]]) -> None:
@@ -404,6 +413,16 @@ class EventSceneView(discord.ui.View):
                 lines.append("✅ **The whole site is cleared.**")
         await interaction.response.send_message("\n".join(lines),ephemeral=False)
 
+    async def _event_cast(self) -> list[dict[str, Any]]:
+        """The people this event brought with it."""
+        if not self.event_key:
+            return []
+        try:
+            return await DB.list_world_event_npcs(self.event_key)
+        except Exception:
+            log.exception("Could not read the cast for %s", self.event_key)
+            return []
+
     async def _next_beast(self) -> dict[str, Any] | None:
         """The next living member of the event's beast roster, so an event
         battle is a named creature with its own loot rather than an anonymous
@@ -464,6 +483,13 @@ class EventSceneView(discord.ui.View):
             if rows:
                 lines.append("\n**Cultivators**")
                 for r in rows: lines.append(f"• **{r.get('character_name','Cultivator')}** — contribution {int(r.get('contribution',0)):+d} • {int(r.get('actions_taken',0))} actions")
+        cast=await self._event_cast()
+        if cast:
+            lines.append("\n**Here for this event**")
+            for person in cast:
+                descriptor=str(person.get("descriptor") or "").strip()
+                lines.append(f"• **{person.get('name')}** — {person.get('role') or person.get('title') or 'present'}"
+                             +(f"\n  _{descriptor}_" if descriptor else ""))
         regional=await SIM.civilization_status(str(c.get("location") or ""))
         npcs=list((regional or {}).get("npcs") or [])
         if npcs:
@@ -497,7 +523,11 @@ class EventSceneView(discord.ui.View):
     async def talk_to_npc(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         c=await self._character_here(interaction)
         if c is None:return
-        regional=await SIM.civilization_status(str(c.get("location") or "")); names=[str(x.get("npc_name") or "") for x in (regional or {}).get("npcs",[]) if x.get("npc_name")]
+        # The event's own cast comes first - they are the ones the scene is
+        # about - then whoever the region happens to have living here.
+        names=[str(x.get("name") or "") for x in await self._event_cast() if x.get("name")]
+        regional=await SIM.civilization_status(str(c.get("location") or ""))
+        names+=[str(x.get("npc_name") or "") for x in (regional or {}).get("npcs",[]) if x.get("npc_name") and str(x.get("npc_name")) not in names]
         if not names:
             await interaction.response.send_message("No named persistent NPC is mechanically present here right now.",ephemeral=False);return
         await interaction.response.send_message("💬 Choose someone present in this event scene.",view=EventNpcSelectView(names),ephemeral=False)

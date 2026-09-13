@@ -143,7 +143,7 @@ internal/server/        HTTP control/data plane
 ```
 
 Every Go SQLite connection uses `journal_mode=WAL`, `foreign_keys=ON`, `busy_timeout=10000`,
-`synchronous=NORMAL`. Current schema version is 42; historical migrations are kept so old databases
+`synchronous=NORMAL`. Current schema version is 43; historical migrations are kept so old databases
 can upgrade in place — see `VERSIONS.md` for the full schema/release history.
 
 ### RAG / memory (`app/ai/rag`)
@@ -190,6 +190,16 @@ node (attribute check vs the node's TN, and on success a guarded `remaining>0` d
 item, cultivation and spirit stones), and an event battle names a real beast from the roster, with the
 node key riding the combat `source` as `event:<key>|node:<node>` so the kill depletes it. Python only
 reads the site (`DB.list_world_event_nodes`, `DB.world_event_site_progress`) and draws it.
+
+An event also brings a **cast** (`world_event_npcs`, schema 43) - the militia captain to report to,
+the visiting elder to impress, the auctioneer whose floor it is - written per category beside the
+nodes and named at spawn from a shared pool, walked forward until the name is free so two live
+events never field the same officer. They are deliberately *not* added to the permanent NPC
+catalogue: an eight-hour captain must not be aged, married and buried by `npc_life`. Instead
+`DB.get_npc_definition` falls back to the cast of a *running* event, which is all `/talk` needs, and
+`NarratorContext._public_npc` does the same so a cast member reaches the narrator with their role,
+manner and stated want rather than as an anonymous local cultivator. Because both lookups filter on
+the event still being active, the rows need no cleanup - they simply stop answering when it closes.
 
 ### Narration routing
 

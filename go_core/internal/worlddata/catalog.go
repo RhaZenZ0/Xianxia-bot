@@ -305,10 +305,26 @@ type EventSiteNode struct {
 	Contribution int64   `json:"contribution"`
 }
 
+// EventSiteNPC is one of the people an event needs: someone to report to,
+// someone to ask, someone whose problem this is. Title is the role name and
+// the given name is drawn from the shared pool at spawn, so two concurrent
+// beast tides do not both field the same captain.
+type EventSiteNPC struct {
+	Key         string `json:"key"`
+	Title       string `json:"title"`
+	Role        string `json:"role"`
+	Personality string `json:"personality"`
+	Speech      string `json:"speech"`
+	Want        string `json:"want"`
+	Fear        string `json:"fear"`
+	Descriptor  string `json:"descriptor"`
+}
+
 // EventSiteTemplate is the roster one event category spawns.
 type EventSiteTemplate struct {
 	Objective string          `json:"objective"`
 	Nodes     []EventSiteNode `json:"nodes"`
+	NPCs      []EventSiteNPC  `json:"npcs"`
 }
 
 // EventSites turns an event category into the concrete roster players can act
@@ -316,6 +332,7 @@ type EventSiteTemplate struct {
 type EventSites struct {
 	TierMaterials map[string]map[string]string `json:"tier_materials"`
 	TierRank      map[string]int64             `json:"tier_rank"`
+	NamePool      []string                     `json:"name_pool"`
 	Default       EventSiteTemplate            `json:"default"`
 	Categories    map[string]EventSiteTemplate `json:"categories"`
 }
@@ -323,7 +340,7 @@ type EventSites struct {
 // Template returns the roster for a category, falling back to the default one
 // so an event category nobody wrote a site for is still not empty.
 func (e EventSites) Template(category string) EventSiteTemplate {
-	if tpl, ok := e.Categories[category]; ok && len(tpl.Nodes) > 0 {
+	if tpl, ok := e.Categories[category]; ok && (len(tpl.Nodes) > 0 || len(tpl.NPCs) > 0) {
 		return tpl
 	}
 	return e.Default

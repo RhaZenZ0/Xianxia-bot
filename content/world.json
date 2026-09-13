@@ -59909,6 +59909,28 @@
           "spirit_stones": 3,
           "contribution": 2
         }
+      ],
+      "npcs": [
+        {
+          "key": "witness",
+          "title": "Local Witness",
+          "role": "Saw it start and has been telling people since",
+          "personality": "Eager to be useful, embroiders slightly, corrects himself when pressed.",
+          "speech": "Runs on, doubles back, apologises for running on.",
+          "want": "Be taken seriously by someone who can act.",
+          "fear": "That nobody does anything.",
+          "descriptor": "A local who has clearly told this story eleven times and will tell it again."
+        },
+        {
+          "key": "passer",
+          "title": "Passing Cultivator",
+          "role": "Stopped because stopping was the right thing to do",
+          "personality": "Unbothered, competent, on the way somewhere else. Helps and does not linger.",
+          "speech": "Dry, economical, mildly amused.",
+          "want": "See this settled well enough to keep travelling.",
+          "fear": "Being drawn into something with no end.",
+          "descriptor": "A cultivator with a travel pack still on, assessing the situation from the road."
+        }
       ]
     },
     "categories": {
@@ -59987,6 +60009,38 @@
             "spirit_stones": 6,
             "contribution": 3
           }
+        ],
+        "npcs": [
+          {
+            "key": "captain",
+            "title": "Militia Captain",
+            "role": "Holds the wall line while the tide comes in",
+            "personality": "Blunt, tired, counts heads before he counts glory. Treats cultivators as artillery he did not requisition.",
+            "speech": "Short sentences. Orders phrased as facts.",
+            "want": "Get every farmer behind the second gate before dark.",
+            "fear": "That the wall holds and the fields do not.",
+            "descriptor": "A militia captain with a voice gone hoarse, directing traffic through a gap in the barricade."
+          },
+          {
+            "key": "tamer",
+            "title": "Beast-Tamer",
+            "role": "Reads the tide and says what is driving it",
+            "personality": "Watchful, unhurried, more sympathetic to the beasts than to the town. Answers the question you should have asked.",
+            "speech": "Quiet, precise, fond of the exact species name.",
+            "want": "Learn what put the whole valley to flight.",
+            "fear": "That the thing behind the tide is still coming.",
+            "descriptor": "A beast-tamer crouched over churned mud, reading the tracks the way other people read a letter."
+          },
+          {
+            "key": "scout",
+            "title": "Wounded Scout",
+            "role": "Came back from the treeline; most did not",
+            "personality": "Rattled and trying not to show it. Gives more away than intended.",
+            "speech": "Fast, fragmentary, backtracks to correct herself.",
+            "want": "Be believed about what she saw at the ridge.",
+            "fear": "Being sent back out.",
+            "descriptor": "A scout with a field dressing on one arm, refusing to sit down."
+          }
         ]
       },
       "Demon Invasion": {
@@ -60063,6 +60117,38 @@
             "cultivation": 10,
             "spirit_stones": 8,
             "contribution": 4
+          }
+        ],
+        "npcs": [
+          {
+            "key": "commander",
+            "title": "Frontline Commander",
+            "role": "Runs the defence and spends what he has to",
+            "personality": "Cold arithmetic worn as calm. Has already decided what he is willing to lose.",
+            "speech": "Clipped, declarative, never repeats an order.",
+            "want": "Break the array before the second wave lands.",
+            "fear": "That the arithmetic was wrong.",
+            "descriptor": "A commander at a folding map table, moving markers that stand for people."
+          },
+          {
+            "key": "exorcist",
+            "title": "Sect Exorcist",
+            "role": "Knows what the ritual is for and how to unmake it",
+            "personality": "Severe, scholarly, faintly contemptuous of improvisation. Softens for anyone who asks a good question.",
+            "speech": "Formal, technical, uses the proper names for things.",
+            "want": "Unmake the summoning without leaving a seed of it behind.",
+            "fear": "That the rite is older than the sect's records.",
+            "descriptor": "An exorcist chalking counter-sigils, correcting one stroke three times."
+          },
+          {
+            "key": "survivor",
+            "title": "Surviving Villager",
+            "role": "Was here before the demons and intends to be here after",
+            "personality": "Stubborn, practical, grieving efficiently because there is no time for the other kind.",
+            "speech": "Plain, unhurried, occasionally very sharp.",
+            "want": "Find out which of the missing are dead.",
+            "fear": "That the answer is all of them.",
+            "descriptor": "A villager handing out water to soldiers, having lost the house behind her."
           }
         ]
       },
@@ -60141,6 +60227,28 @@
             "spirit_stones": 6,
             "contribution": 4
           }
+        ],
+        "npcs": [
+          {
+            "key": "headman",
+            "title": "Village Headman",
+            "role": "Answerable for the village and knows he failed it",
+            "personality": "Defensive, then frank once cornered. Wants this handled quietly and knows it will not be.",
+            "speech": "Long explanations that circle the point before landing on it.",
+            "want": "Keep the sect from burning the whole village to be sure.",
+            "fear": "That the rite had local help.",
+            "descriptor": "A headman standing between you and the shrine door, not quite blocking it."
+          },
+          {
+            "key": "exorcist",
+            "title": "Wandering Exorcist",
+            "role": "Arrived a day too late and is furious about it",
+            "personality": "Brisk, unsentimental, kinder than her manner suggests. Has done this many times.",
+            "speech": "Impatient, direct, explains only what you need to act.",
+            "want": "Cleanse the ground before the rite roots deeper.",
+            "fear": "That someone here wants it to root.",
+            "descriptor": "An exorcist boiling something bitter over a travel brazier, watching the treeline."
+          }
         ]
       },
       "Heavenly Treasure": {
@@ -60217,6 +60325,28 @@
             "cultivation": 4,
             "spirit_stones": 0,
             "contribution": 2
+          }
+        ],
+        "npcs": [
+          {
+            "key": "appraiser",
+            "title": "Treasure Appraiser",
+            "role": "Names what fell and what it is worth",
+            "personality": "Delighted, mercenary, entirely honest about being mercenary. Excellent company.",
+            "speech": "Rapid, enthusiastic, drops into trade jargon and back out again.",
+            "want": "Get a clean look at the fragment before a sect seals the site.",
+            "fear": "That it is already claimed.",
+            "descriptor": "An appraiser with a jeweller's loupe and no protective gear whatsoever."
+          },
+          {
+            "key": "prospector",
+            "title": "Rival Prospector",
+            "role": "Wants the same site you do",
+            "personality": "Guarded, competitive, capable of a fair deal if the alternative is worse.",
+            "speech": "Careful, feels out what you know before offering anything.",
+            "want": "Leave with more than he arrived with.",
+            "fear": "Being the one who dies to the guardian.",
+            "descriptor": "A prospector working the far side of the crater, pretending not to watch you."
           }
         ]
       },
@@ -60295,6 +60425,28 @@
             "spirit_stones": 0,
             "contribution": 3
           }
+        ],
+        "npcs": [
+          {
+            "key": "formation_master",
+            "title": "Formation Master",
+            "role": "Anchors the wild currents before they take the settlement apart",
+            "personality": "Absorbed in the work, briefly irritated at interruption, then generous once engaged.",
+            "speech": "Thinks aloud in half-finished sentences, finishes them eventually.",
+            "want": "Sink enough anchors before the storm peaks.",
+            "fear": "That the storm is a symptom of something under the ground.",
+            "descriptor": "A formation master driving anchor stakes in a widening spiral, hair standing on end."
+          },
+          {
+            "key": "alchemist",
+            "title": "Wandering Alchemist",
+            "role": "Here for the herbs the storm forced into bloom",
+            "personality": "Cheerful, opportunistic, genuinely knowledgeable. Will trade knowledge for hands.",
+            "speech": "Warm and chatty, hides real advice inside small talk.",
+            "want": "Harvest the quickened herbs at their peak, which is now.",
+            "fear": "Missing the window.",
+            "descriptor": "An alchemist moving fast between beds with a satchel already overfull."
+          }
         ]
       },
       "Tribulation": {
@@ -60371,6 +60523,28 @@
             "cultivation": 7,
             "spirit_stones": 4,
             "contribution": 2
+          }
+        ],
+        "npcs": [
+          {
+            "key": "watcher",
+            "title": "Tribulation Watcher",
+            "role": "Records what the heavens do and to whom",
+            "personality": "Detached, precise, faintly ghoulish about it. Answers honestly if asked plainly.",
+            "speech": "Measured, uses numbers where others would use adjectives.",
+            "want": "Record a complete tribulation from first stroke to last.",
+            "fear": "Being close enough to be included in it.",
+            "descriptor": "A watcher at a safe distance with a wax tablet, counting under her breath."
+          },
+          {
+            "key": "ascendant",
+            "title": "The One Being Struck",
+            "role": "Is in the middle of it and cannot stop",
+            "personality": "Barely present. Speaks between strokes. Frightened and entirely committed.",
+            "speech": "Fragments, between breaths.",
+            "want": "Survive the ninth stroke.",
+            "fear": "That the ward fails on the eighth.",
+            "descriptor": "A cultivator kneeling in a scorched circle, steam coming off both shoulders."
           }
         ]
       },
@@ -60449,6 +60623,28 @@
             "spirit_stones": 14,
             "contribution": 3
           }
+        ],
+        "npcs": [
+          {
+            "key": "surveyor",
+            "title": "Void Surveyor",
+            "role": "Maps the tears and says which are closing on their own",
+            "personality": "Methodical, quietly alarmed, refuses to speculate beyond the data.",
+            "speech": "Careful qualifications on every statement.",
+            "want": "Stabilize the mouths in the right order.",
+            "fear": "That the order does not matter because they are one tear.",
+            "descriptor": "A surveyor pacing a rift edge with a plumb line that will not hang straight."
+          },
+          {
+            "key": "stranded",
+            "title": "Stranded Traveller",
+            "role": "Fell out of the rift and is not from here",
+            "personality": "Disoriented, courteous, asking questions whose answers should be obvious.",
+            "speech": "Formal in an idiom half a century out of date.",
+            "want": "Find out where - and when - he is.",
+            "fear": "That there is no way back.",
+            "descriptor": "A traveller in unfamiliar cut and colour, examining a milestone with great attention."
+          }
         ]
       },
       "Sect Recruitment": {
@@ -60525,6 +60721,28 @@
             "cultivation": 6,
             "spirit_stones": 4,
             "contribution": 2
+          }
+        ],
+        "npcs": [
+          {
+            "key": "elder",
+            "title": "Visiting Elder",
+            "role": "Decides who is taken and who is thanked for coming",
+            "personality": "Composed, watchful, unreadable on purpose. Notices exactly what you think he missed.",
+            "speech": "Few words, each one placed.",
+            "want": "Find the one worth the sect's investment.",
+            "fear": "Taking the wrong one again.",
+            "descriptor": "An elder seated slightly apart, watching the trial ground rather than the candidates."
+          },
+          {
+            "key": "disciple",
+            "title": "Recruiting Disciple",
+            "role": "Handles the queue and knows how the elder actually scores it",
+            "personality": "Friendly, indiscreet, enjoying the small authority. A genuine ally if treated well.",
+            "speech": "Chatty, drops useful things without meaning to.",
+            "want": "Get through the list before the elder loses patience.",
+            "fear": "Being blamed for the elder losing patience.",
+            "descriptor": "A disciple with a roster, calling names and losing his place."
           }
         ]
       },
@@ -60603,6 +60821,28 @@
             "spirit_stones": 6,
             "contribution": 2
           }
+        ],
+        "npcs": [
+          {
+            "key": "steward",
+            "title": "Tournament Steward",
+            "role": "Runs the bouts and enforces the rules that exist",
+            "personality": "Harried, fair, fond of the ritual of the thing. Will bend a schedule, never a rule.",
+            "speech": "Official register, slipping into ordinary speech when tired.",
+            "want": "Finish the card before the light goes.",
+            "fear": "A death on the stage during his watch.",
+            "descriptor": "A steward with a bout list, shouting over a crowd that is not listening."
+          },
+          {
+            "key": "champion",
+            "title": "Reigning Champion",
+            "role": "Has held the stage and expects to keep it",
+            "personality": "Gracious in a way that costs nothing. Sharpens considerably when actually tested.",
+            "speech": "Easy, generous, a hard edge underneath.",
+            "want": "Be beaten by someone worth losing to, eventually.",
+            "fear": "That it happens today.",
+            "descriptor": "The champion signing a spectator's fan, watching your approach in the reflection."
+          }
         ]
       },
       "Auction House": {
@@ -60680,8 +60920,56 @@
             "spirit_stones": 6,
             "contribution": 2
           }
+        ],
+        "npcs": [
+          {
+            "key": "auctioneer",
+            "title": "Pavilion Auctioneer",
+            "role": "Owns the floor and the disaster on it",
+            "personality": "Immaculate, furious, entirely controlled. Treats the chaos as an accounting problem.",
+            "speech": "Polished trade formality that thins under pressure.",
+            "want": "Restore the floor and the pavilion's name, in that order.",
+            "fear": "That the forged lot came from inside the house.",
+            "descriptor": "An auctioneer standing on the block itself for the height, directing staff."
+          },
+          {
+            "key": "guard",
+            "title": "Pavilion Guard Captain",
+            "role": "Was responsible for the doors and knows it",
+            "personality": "Grim, capable, taking it personally. Straight with anyone who helps.",
+            "speech": "Terse, operational, no excuses offered.",
+            "want": "Find who opened the crate.",
+            "fear": "That it was one of his own.",
+            "descriptor": "A guard captain checking the cellar door hinges, jaw set."
+          }
         ]
       }
-    }
+    },
+    "name_pool": [
+      "Hou Jin",
+      "Bai Shen",
+      "Lu Wenqing",
+      "Shen Yi",
+      "Tang Muyan",
+      "Wei Zhao",
+      "Fang Rulan",
+      "Qiao Bing",
+      "Yan Suzhen",
+      "Deng Hai",
+      "Mo Qingyu",
+      "Xue Ran",
+      "Gu Zhilan",
+      "Pei Song",
+      "Cui Yanran",
+      "Zhong Fu",
+      "Liang Xiaoyu",
+      "Ren Kang",
+      "Su Weilan",
+      "He Danqing",
+      "Jiang Bo",
+      "Ouyang Zhi",
+      "Ning Cailing",
+      "Duan Shu"
+    ]
   }
 }

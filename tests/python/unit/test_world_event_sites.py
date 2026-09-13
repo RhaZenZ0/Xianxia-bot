@@ -118,6 +118,45 @@ class EventSiteContentTests(unittest.TestCase):
             self.assertIn(wanted, types, f"no {wanted} node in any roster")
 
 
+class EventCastContentTests(unittest.TestCase):
+    """Reported after the site landed: "the needed npc are also missing".
+
+    The site gave an event beasts, herbs, ore and tasks, but nobody to report
+    to, ask, or blame - and the panel's own Talk button answered "No named
+    persistent NPC is mechanically present here right now" whenever the region
+    had wandered empty. Every category now brings its own cast.
+    """
+
+    def _templates(self):
+        return list((SITES.get("categories") or {}).values()) + [SITES.get("default") or {}]
+
+    def test_every_category_brings_people(self):
+        templates = dict(SITES.get("categories") or {})
+        templates["default"] = SITES.get("default") or {}
+        for name, template in templates.items():
+            with self.subTest(category=name):
+                cast = list(template.get("npcs") or [])
+                self.assertGreaterEqual(len(cast), 1, f"{name} brings nobody")
+                keys = [p.get("key") for p in cast]
+                self.assertEqual(len(keys), len(set(keys)), f"{name} has duplicate cast keys")
+
+    def test_every_cast_member_is_worth_talking_to(self):
+        """Role, manner and a stated want are what reach the narrator; without
+        them a cast member renders as an anonymous local cultivator."""
+        for template in self._templates():
+            for person in template.get("npcs") or []:
+                with self.subTest(npc=person.get("key")):
+                    for field in ("title", "role", "personality", "speech", "want", "descriptor"):
+                        self.assertTrue(str(person.get(field) or "").strip(), f"{person.get('key')} has no {field}")
+
+    def test_there_is_a_name_pool_big_enough_to_go_around(self):
+        pool = list(SITES.get("name_pool") or [])
+        self.assertGreaterEqual(len(pool), 12, "too few names to keep two live events apart")
+        self.assertEqual(len(pool), len(set(pool)), "duplicate names in the pool")
+        biggest = max(len(t.get("npcs") or []) for t in self._templates())
+        self.assertGreater(len(pool), biggest * 2, "the pool cannot name two concurrent events")
+
+
 class WorldHelperTests(unittest.TestCase):
     def test_the_objective_lookup_falls_back_rather_than_returning_nothing(self):
         from app.rules.game import World
@@ -165,6 +204,48 @@ class EventPanelTests(unittest.TestCase):
         # The node key rides the combat source so the kill takes that beast off
         # the site and pays what it carries.
         self.assertIn("|node:", self.view)
+
+
+class EventCastWiringTests(unittest.TestCase):
+    def test_the_engine_spawns_the_cast_with_the_site(self):
+        go = (PROJECT_ROOT / "go_core" / "internal" / "game" / "world_event_sites.go").read_text(encoding="utf-8")
+        self.assertIn("func spawnWorldEventCastTx(", go)
+        self.assertIn("spawnWorldEventCastTx(conn, catalog", go)
+        # The name has to identify exactly one person across live events.
+        self.assertIn("SELECT 1 FROM world_event_npcs WHERE name=?", go)
+
+    def test_a_cast_member_answers_the_ordinary_npc_lookup(self):
+        core = (PROJECT_ROOT / "app" / "database" / "core.py").read_text(encoding="utf-8")
+        self.assertIn("async def get_event_npc_definition(", core)
+        self.assertIn("return await self.get_event_npc_definition(name)", core)
+        # Only while the event is running - that is why the rows need no cleanup.
+        self.assertIn("e.active=1 AND e.ends_at>?", core)
+
+    def test_the_cast_is_not_added_to_the_permanent_npc_catalogue(self):
+        """An eight-hour militia captain must not be aged, married and buried
+        by the NPC life simulation."""
+        go = (PROJECT_ROOT / "go_core" / "internal" / "game" / "world_event_sites.go").read_text(encoding="utf-8")
+        self.assertNotIn("catalog_npcs", go)
+        self.assertNotIn("npc_civilization_state", go)
+
+    def test_the_narrator_gives_a_cast_member_their_character(self):
+        context = (PROJECT_ROOT / "app" / "ai" / "narrator_context.py").read_text(encoding="utf-8")
+        self.assertIn("async def _public_npc(", context)
+        self.assertIn("get_event_npc_definition", context)
+        self.assertNotIn('(getattr(self.world, "npcs", {}) or {}).get(effective_focus_npc, {}) or {}', context)
+
+    def test_the_slash_command_can_find_a_cast_member(self):
+        """The cast are not in the permanent catalogue, so the ordinary NPC
+        autocomplete would never turn them up."""
+        locations = (PROJECT_ROOT / "app" / "bot" / "locations.py").read_text(encoding="utf-8")
+        self.assertIn("list_active_event_npcs", locations)
+
+    def test_the_panel_offers_the_cast(self):
+        view = bot_class_source("EventSceneView")
+        self.assertIn("_event_cast", view)
+        self.assertIn("list_world_event_npcs", view)
+        self.assertIn("Here for this event", view)
+        self.assertIn("Who is here", view)
 
 
 class EngineWiringTests(unittest.TestCase):

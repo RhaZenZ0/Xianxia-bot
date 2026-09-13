@@ -26,7 +26,7 @@ import discord
 from discord import app_commands
 
 from ..rules.realm_hubs import REALM_HUBS
-from .runtime import DB, WORLD, current_world_time
+from .runtime import DB, WORLD, current_world_time, log
 from .services import SIM
 
 async def current_npc_location(npc_name: str, period: str | None = None) -> str | None:
@@ -143,7 +143,20 @@ async def local_npc_autocomplete(
     wt = await current_world_time()
     needle = current.casefold().strip()
     names: list[str] = []
+    # A running world event's cast stand here too, and they are not in the
+    # permanent catalogue, so search_catalog will never turn them up. They go
+    # first: they are the reason there is anyone to talk to at a beast tide.
+    if location:
+        try:
+            for person in await DB.list_active_event_npcs(location):
+                name = str(person.get("name") or "")
+                if name and (not needle or needle in name.casefold()):
+                    names.append(name)
+        except Exception:
+            log.exception("Could not read the event cast at %s", location)
     for name in await DB.search_catalog("npc", current, 25):
+        if name in names:
+            continue
         npc_location = await current_npc_location(name, wt.period)
         if location and npc_location and npc_location != location:
             continue

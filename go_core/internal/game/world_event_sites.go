@@ -100,7 +100,68 @@ func SpawnWorldEventNodes(conn *storage.Conn, catalog worlddata.Catalog, eventKe
 		}
 		spawned++
 	}
+	cast, err := spawnWorldEventCastTx(conn, catalog, eventKey, location, template, now)
+	if err != nil {
+		return 0, err
+	}
+	return spawned + cast, nil
+}
+
+// spawnWorldEventCastTx gives the event the people it needs. Names come from
+// the shared pool, offset by a hash of the event and the role so two concurrent
+// events of the same category field different officers, and walked forward
+// until one is free - the name index is unique across live events, so a cast
+// member is always an unambiguous person to address.
+func spawnWorldEventCastTx(conn *storage.Conn, catalog worlddata.Catalog, eventKey, location string, template worlddata.EventSiteTemplate, now float64) (int64, error) {
+	if !tableExistsTx(conn, "world_event_npcs") || len(template.NPCs) == 0 {
+		return 0, nil
+	}
+	pool := catalog.EventSites.NamePool
+	spawned := int64(0)
+	for _, person := range template.NPCs {
+		key := strings.TrimSpace(person.Key)
+		if key == "" {
+			continue
+		}
+		title := strings.TrimSpace(person.Title)
+		if title == "" {
+			title = "Bystander"
+		}
+		name := title
+		if len(pool) > 0 {
+			start := int(hashString(eventKey+":"+key) % uint64(len(pool)))
+			for i := 0; i < len(pool); i++ {
+				candidate := title + " " + pool[(start+i)%len(pool)]
+				taken, err := conn.Execute(`SELECT 1 FROM world_event_npcs WHERE name=? LIMIT 1`, []any{candidate})
+				if err != nil {
+					return 0, err
+				}
+				if len(taken.Rows) == 0 {
+					name = candidate
+					break
+				}
+			}
+		}
+		res, err := conn.Execute(`INSERT INTO world_event_npcs(
+            event_key,npc_key,name,title,role,personality,speech,want,fear,descriptor,location,created_at
+        ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(event_key,npc_key) DO NOTHING`,
+			[]any{eventKey, key, name, title, person.Role, person.Personality, person.Speech,
+				person.Want, person.Fear, person.Descriptor, location, now})
+		if err != nil {
+			return 0, err
+		}
+		spawned += res.RowsAffected
+	}
 	return spawned, nil
+}
+
+func hashString(s string) uint64 {
+	h := uint64(1469598103934665603)
+	for i := 0; i < len(s); i++ {
+		h ^= uint64(s[i])
+		h *= 1099511628211
+	}
+	return h
 }
 
 type worldEventSiteNode struct {
