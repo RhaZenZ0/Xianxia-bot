@@ -508,3 +508,46 @@ class UpdaterPostInstallManifestTests(unittest.TestCase):
         package = package[:package.index("|| return 1")]
         self.assertNotIn("update.sh", package,
                          "the package check must verify the new update.sh, not skip it")
+
+
+class GoLintGateTests(unittest.TestCase):
+    """`make lint` and CI must run the same Go gate, at the same version.
+
+    `go vet` finds none of the dead code staticcheck does. The v0.33.0 sweep
+    deleted the code only tests kept alive, and by v1.0.0 six more names had
+    accumulated with no caller at all - staticcheck found every one and vet
+    passed on all six. So it is a gate, and these hold the two halves of it
+    together: a pin only the Makefile spells, a CI step that reads that pin
+    instead of repeating it, and a `make lint` that fails rather than skips
+    when the tool is absent.
+    """
+
+    MAKEFILE = (PROJECT_ROOT / "Makefile").read_text(encoding="utf-8")
+    WORKFLOW = (PROJECT_ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+
+    def test_the_makefile_pins_a_version(self):
+        """An unpinned tool turns an upstream release into a red build nobody
+        asked for - the reason the base image is pinned by digest and
+        requirements.lock carries hashes."""
+        pin = re.search(r"^STATICCHECK_VERSION \?= (\S+)$", self.MAKEFILE, re.M)
+        self.assertIsNotNone(pin, "the Makefile must pin STATICCHECK_VERSION")
+        self.assertNotEqual(pin.group(1), "latest", "a floating pin is not a pin")
+        self.assertIn(f"staticcheck@$(STATICCHECK_VERSION)", self.MAKEFILE,
+                      "`make tools` must install the pinned version")
+
+    def test_make_lint_runs_it_and_refuses_to_skip_it(self):
+        block = self.MAKEFILE[self.MAKEFILE.index("\nlint:"):]
+        block = block[:block.index("\nformat-check:")]
+        self.assertIn("staticcheck ./...", block, "make lint must run staticcheck")
+        self.assertIn("exit 1", block,
+                      "make lint must fail when staticcheck is absent, not pass quietly")
+
+    def test_ci_runs_it_at_the_pin_it_reads_from_the_makefile(self):
+        self.assertIn("staticcheck ./...", self.WORKFLOW, "CI must run staticcheck")
+        self.assertIn("sed -n 's/^STATICCHECK_VERSION ?= //p' Makefile", self.WORKFLOW,
+                      "CI must read the pin from the Makefile rather than repeat it")
+        pin = re.search(r"^STATICCHECK_VERSION \?= (\S+)$", self.MAKEFILE, re.M).group(1)
+        self.assertNotIn(
+            f"staticcheck@{pin}", self.WORKFLOW,
+            "CI spells the version out; it and the Makefile will drift apart",
+        )

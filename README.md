@@ -536,7 +536,8 @@ make check              # lint + format-check + test-python + test-go, the pytho
 | --- | --- |
 | `make test-python` | `pytest -q` — `unit/` (Python-only), `integration/` (still Python-owned orchestration), `contracts/` (the Python↔Go, startup, deployment and release boundaries) |
 | `make test-go` | `cd go_core && go test ./...` — every Go-owned rule and state transition |
-| `make lint` | `ruff check app scripts` and `go vet ./...` |
+| `make lint` | `ruff check app scripts`, `go vet ./...` and `staticcheck ./...` — it fails rather than skips if staticcheck is absent; `make tools` installs the pinned version |
+| `make tools` | installs `staticcheck` at the version the Makefile pins (the only version CI runs) |
 | `python scripts/check_dashboard_implementation.py` | the dashboard drift and coverage gate |
 | `python scripts/playtest_engine.py --launch` | the engine half of the playtest: every roadmap loop driven through a scratch engine |
 | `python scripts/playtest_checklist.py` | regenerates `docs/playtest/v<version>.md` |
@@ -546,8 +547,8 @@ make check              # lint + format-check + test-python + test-go, the pytho
 
 One workflow (`.github/workflows/ci.yml`) on every push to `main` and every pull request, in three
 jobs. `make check` covers the first two locally; the third has no local equivalent. `python` runs
-`ruff` and the whole pytest suite; `go` runs `go vet` and `go test -race`; and `containers`, which
-waits for both, builds the two images and then **starts** them:
+`ruff` and the whole pytest suite; `go` runs `go vet`, `staticcheck` and `go test -race`; and
+`containers`, which waits for both, builds the two images and then **starts** them:
 
 | Step | What it proves |
 | --- | --- |
@@ -555,6 +556,11 @@ waits for both, builds the two images and then **starts** them:
 | `docker build -f go_core/Dockerfile` | the engine image assembles |
 | `docker run … python -c "import app.bot, app.dashboard, app.ops.healthcheck"` | the bot image's three services import inside the image — every runtime dependency is installed in the final layer, not just at build time |
 | `docker run -d …` then `curl /livez` | the engine's entrypoint fixes up the data directory as root, drops to uid 10001 through `gosu`, opens SQLite and serves HTTP |
+
+`staticcheck` is a gate rather than a suggestion: `go vet` finds none of the dead code it does — by
+v1.0.0 six names had accumulated with no caller at all, and vet passed on every one. CI installs the
+version `STATICCHECK_VERSION` pins in the Makefile, read out of the Makefile rather than repeated in
+the workflow, so the two cannot drift.
 
 The last two matter because a build alone proves an image assembles, not that it starts: a missing
 runtime dependency, or a mistake in the ownership fixup `go_core/docker-entrypoint.sh` performs

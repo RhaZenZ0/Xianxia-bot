@@ -49,6 +49,19 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install --yes libsqlite3-dev
       - run: test -z "$(gofmt -l go_core)"
       - run: cd go_core && CGO_ENABLED=1 go vet ./...
+
+      # staticcheck, at the version the Makefile pins - read from the Makefile
+      # rather than repeated here, so CI and `make lint` cannot drift apart.
+      # vet finds none of the dead code it does: six names with no caller at
+      # all had accumulated by v1.0.0 and vet passed on every one of them.
+      - name: Install staticcheck at the pinned version
+        run: |
+          version="$(sed -n 's/^STATICCHECK_VERSION ?= //p' Makefile)"
+          test -n "$version" || { echo 'Makefile no longer pins STATICCHECK_VERSION' >&2; exit 1; }
+          echo "staticcheck $version"
+          go install "honnef.co/go/tools/cmd/staticcheck@$version"
+      - run: cd go_core && CGO_ENABLED=1 staticcheck ./...
+
       - run: cd go_core && CGO_ENABLED=1 go test -race ./...
 
   containers:

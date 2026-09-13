@@ -505,7 +505,7 @@ func loadBirthFamilyByID(conn *storage.Conn, familyID int64) (BirthFamily, error
 	parts := strings.Split(starterKey, ":")
 	if len(parts) >= 3 {
 		f.RebirthWorld = strings.ReplaceAll(parts[1], "_", " ")
-		f.RebirthWorld = strings.Title(f.RebirthWorld)
+		f.RebirthWorld = titleWords(f.RebirthWorld)
 	}
 	if f.RebirthWorld == "" {
 		f.RebirthWorld = "Mortal World"
