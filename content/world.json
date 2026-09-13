@@ -2291,7 +2291,8 @@
       ],
       "world": "Mortal World",
       "min_realm_index": 0,
-      "safe_zone": false
+      "safe_zone": false,
+      "terrain": "mountain forest"
     },
     "Moonfen Marsh": {
       "description": "A dangerous wetland rich in medicinal plants, poisonous insects, ghost-lotus flowers and hidden alchemist camps.",
@@ -2308,7 +2309,8 @@
       ],
       "world": "Mortal World",
       "min_realm_index": 0,
-      "safe_zone": false
+      "safe_zone": false,
+      "terrain": "wetland marsh"
     },
     "Golden Pavilion Auction House": {
       "description": "A many-tiered auction pavilion protected by ancient formations and discreet hidden experts. Violence inside is forbidden; the protection ends at the front doors.",
@@ -2401,7 +2403,8 @@
         "East": [
           "Jadeflow Spirit City"
         ]
-      }
+      },
+      "terrain": "imperial jade terrace"
     },
     "Nine-Heavens Immortal Court": {
       "description": "The central court of an Immortal World domain, suspended above immortal clouds and guarded by law formations.",
@@ -2432,7 +2435,8 @@
         "West": [
           "Ninefold Noble Immortal City"
         ]
-      }
+      },
+      "terrain": "highland cloud court"
     },
     "Celestial Mandate Palace": {
       "description": "A palace-city at the heart of the Celestial World, where sovereign decrees can redirect the fate of entire star regions.",
@@ -2463,7 +2467,8 @@
         "East": [
           "Mandate Crown Celestial City"
         ]
-      }
+      },
+      "terrain": "imperial starlit plain"
     },
     "Spirit Jade Rebirth Enclave": {
       "description": "A protected lower district in the Spiritual World where mortal-born descendants, reincarnated souls and weak juniors can survive beneath stabilizing formations.",
@@ -2479,7 +2484,8 @@
         "Two mortal-born juniors trade rumours about which ancestor is paying for their protection.",
         "A caravan from the capital delivers spirit rice and takes away a list of names.",
         "An old woman insists she has been reborn here twice and that the enclave is smaller each time."
-      ]
+      ],
+      "terrain": "sheltered jade valley"
     },
     "Nine-Heavens Rebirth Terrace": {
       "description": "A sheltered Immortal World terrace maintained for newborn clan members and reincarnated souls whose bodies have not yet rebuilt immortal cultivation.",
@@ -2495,7 +2501,8 @@
         "A crack in a cradle formation lets a breath of raw immortal qi through; a junior collapses, then laughs.",
         "A visiting elder inspects the reincarnated with the eyes of someone looking for one face in particular.",
         "A servant is caught copying names off the rebirth ledger and is escorted away without a word."
-      ]
+      ],
+      "terrain": "highland terrace"
     },
     "Celestial Cradle Province": {
       "description": "A rare Celestial World province protected by sovereign law formations, allowing reincarnated souls to begin again in mortal-strength bodies without being crushed by the realm itself.",
@@ -2511,7 +2518,8 @@
         "Provincial clerks re-register a family under a new name at the empress's written instruction.",
         "A mortal-strength body sits in meditation for the first time and the surrounding grass bends toward it.",
         "A sealed message from the Immortal World arrives addressed to a child born this morning."
-      ]
+      ],
+      "terrain": "warded plain"
     },
     "Azure Cloud Mountain Gate": {
       "description": "A white-stone stairway climbs through cloud-wrapped pines to the public mountain gate of the Azure Cloud Sect. Sword marks left by generations of applicants cover the testing plaza.",
@@ -2530,7 +2538,8 @@
         "Sword intent clings to the testing plaza, layered by generations of applicants.",
         "The gate's protective formation runs the full height of the stair and stops exactly at the last step.",
         "Higher up the mountain, disciplined qi moves in ordered lines, out of reach of sense."
-      ]
+      ],
+      "terrain": "mountain stair"
     },
     "Crimson Furnace Valley": {
       "description": "Red cliffs surround a furnace valley veined with fire-aspected qi. Herb terraces, pill halls and bronze examination furnaces mark the Crimson Furnace Sect recruitment grounds.",
@@ -2549,7 +2558,8 @@
         "Fire-aspected qi rises from the valley floor in slow pulses, strongest near the bronze furnaces.",
         "The herb terraces carry a green, medicinal spiritual scent that masks weaker signatures.",
         "Heat-shimmer around the pill halls makes every life-sign there hard to count."
-      ]
+      ],
+      "terrain": "volcanic valley"
     },
     "Frozen Moon Terrace": {
       "description": "A high terrace above a cold mirror-lake where frost formations glow beneath moonstone tiles. Frozen Moon Palace tests patience, control and formation sense here.",
@@ -2568,7 +2578,8 @@
         "Cold, still qi lies over the mirror-lake like a second surface; ripples in it are formations, not water.",
         "Moonstone tiles hold a faint stored light that answers to patience rather than pressure.",
         "Whatever watches from the palace above keeps its presence perfectly level."
-      ]
+      ],
+      "terrain": "frozen highland"
     },
     "Black Serpent Ravine": {
       "description": "A humid ravine of black bamboo, beast pens and poison gardens. The Black Serpent Clan judges recruits by fieldcraft, nerve and their respect for dangerous creatures.",
@@ -2587,7 +2598,8 @@
         "Beast life-signs crowd the pens and the bamboo, some of them large and awake.",
         "Poison-aspected qi seeps from the gardens and dulls the edge of spiritual sense.",
         "The clan's own cultivators are hard to place; they keep their presence low the way their beasts do."
-      ]
+      ],
+      "terrain": "humid ravine"
     },
     "Blood River Gorge": {
       "description": "A hidden gorge where iron-red water cuts through dark stone. Blood River banners appear only to those who have been shown the correct trail or survived long enough to be noticed.",
@@ -2607,7 +2619,8 @@
         "The iron-red water carries a faint, hungry blood qi that tugs at the meridians.",
         "Hostile attention rests on the gorge from at least two vantage points on the cliffs.",
         "Something old has been fed here, and the stone remembers it."
-      ]
+      ],
+      "terrain": "river gorge"
     },
     "Corpse Lantern Necropolis": {
       "description": "A concealed funerary complex lit by blue soul-lanterns. Names of the dead are carved into black tablets while quiet archivists test whether visitors can face death without losing themselves.",
@@ -2627,7 +2640,8 @@
         "Soul-aspected qi hangs in the blue lantern-light, cold and patient.",
         "The black tablets each hold a faint residual presence, as if the names were listening.",
         "No living heat reads from the archivists; their signatures are thin and steady as lamp flames."
-      ]
+      ],
+      "terrain": "mist necropolis"
     },
     "Riverguard City": {
       "description": "A public temperate cultivation city shaped by temperate river martial district. Its family districts are part of the normal world: travelers can discover, visit, trade, and interact here. The city functions as a complete family starting region with local trade, cultivation resources, household politics, work, and recurring problems.",
@@ -8803,7 +8817,8 @@
       "sense_hints": [
         "The arrays in the cliff move qi in patterns too regular to be natural.",
         "Ordered, patient qi; the sect above is a place of long practice."
-      ]
+      ],
+      "terrain": "jade cliff"
     },
     "Thousand Beast Valley Mouth": {
       "description": "The mouth of a wide valley in the Spiritual World, closed by a fence of bone and a gate that a beast, not a man, opens. Cages, kennels and roosts climb the slopes beyond it.",
@@ -8819,7 +8834,8 @@
       "sense_hints": [
         "Beast qi in a hundred flavours crowds the valley beyond the gate.",
         "Something old and very large sleeps under the far ridge and the valley arranges itself around it."
-      ]
+      ],
+      "terrain": "forest valley"
     },
     "Heavenblade Sword Terrace": {
       "description": "A terrace of immortal gold cut into the mountain above the Immortal Court, where a single sword stands point-down in the stone and has for ten thousand years. Applicants are asked to draw it and are judged by how they fail.",
@@ -8835,7 +8851,8 @@
       "sense_hints": [
         "Sword intent cuts the air above the terrace in a line that has not moved in ten thousand years.",
         "The mountain above is disciplined qi in rows; a sword sect at practice."
-      ]
+      ],
+      "terrain": "mountain peak"
     },
     "Ashen Lotus Shrine Gate": {
       "description": "A shrine gate of grey stone in a burnt lotus field below the Immortal Court, where the ash never settles. The pavilion recruits openly here, which the Court tolerates because it cannot stop it.",
@@ -8851,7 +8868,8 @@
       "sense_hints": [
         "Soul qi rises off the ash field in slow spirals; something below it is patient.",
         "Cold fire and colder intent; the shrine is a door, not a wall."
-      ]
+      ],
+      "terrain": "dry ash field"
     },
     "Mandate Academy Star Steps": {
       "description": "Nine hundred steps of starlight rise from the Palace grounds to the Academy's first hall. Each step asks a question; applicants who reach the top have answered them.",
@@ -8867,7 +8885,8 @@
       "sense_hints": [
         "Celestial law presses on the steps in graded weights; each landing is heavier.",
         "The Academy above is ordered qi arranged by argument rather than rank."
-      ]
+      ],
+      "terrain": "mountain stair"
     },
     "Void Serpent Pit": {
       "description": "A pit in the Celestial World whose bottom nobody has seen, ringed by serpent-carved stones. The cult recruits at the rim, and the Palace lets it, because the pit was here before the Palace.",
@@ -8883,7 +8902,8 @@
       "sense_hints": [
         "Serpent qi coils up out of the pit in slow waves; the rim is the only still ground.",
         "Something vast turns over far below and the whole rim breathes with it."
-      ]
+      ],
+      "terrain": "broken peak"
     },
     "Adamant Body Forge": {
       "description": "Adamant Body's smithy: a stone-cold forge hall where Smith Guo Tie hammers spirit iron into blades and lamellar at the anvil, and sells the ore beside them. Tier 3 work - immortal-grade goods few can afford. The forge sits off Adamant Body Immortal City's main street and closes only when the coals do.",
@@ -25457,6 +25477,60 @@
       "auction_interest": "legendary",
       "door_event_chance": 60,
       "hunter_realm_bonus": 2
+    },
+    "paper_crane_charm": {
+      "name": "Paper Crane Charm",
+      "description": "A folded crane that unfolds into a bird large enough for one rider. Cheap, slow, and it will not survive rain.",
+      "sect_value": 6,
+      "base_price": 90,
+      "type": "flight",
+      "flight": 3,
+      "flight_name": "a paper crane"
+    },
+    "wind_gourd": {
+      "name": "Riding Gourd",
+      "description": "A hollow gourd that swells to seat a cultivator and drifts on the wind. Undignified, and every peddler on the road has one.",
+      "sect_value": 9,
+      "base_price": 180,
+      "type": "flight",
+      "flight": 3,
+      "flight_name": "a riding gourd"
+    },
+    "azure_flying_sword": {
+      "name": "Azure Flying Sword",
+      "description": "A blue-steel sword long enough to stand on. The default of every sect disciple who can afford one: it carries you, and it is still a sword when you arrive.",
+      "sect_value": 24,
+      "base_price": 620,
+      "type": "flight",
+      "flight": 5,
+      "flight_name": "a flying sword"
+    },
+    "cloudskiff_boat": {
+      "name": "Cloudskiff Flying Boat",
+      "description": "A lacquered skiff that rides the cloud layer, built to carry a party and their cargo rather than one cultivator in a hurry.",
+      "sect_value": 40,
+      "base_price": 1500,
+      "type": "flight",
+      "flight": 5,
+      "flight_name": "a flying boat"
+    },
+    "crane_saddle_token": {
+      "name": "Crane-Summons Token",
+      "description": "A jade token that calls a bonded immortal crane. Faster than any sword, and it decides for itself whether it likes you.",
+      "sect_value": 66,
+      "base_price": 4200,
+      "type": "flight",
+      "flight": 7,
+      "flight_name": "a summoned crane"
+    },
+    "void_stride_talisman": {
+      "name": "Void-Stride Talisman",
+      "description": "A talisman that folds the road between two points you have already walked. One use, and the walk had to come first.",
+      "sect_value": 120,
+      "base_price": 9000,
+      "type": "flight",
+      "flight": 9,
+      "flight_name": "a folded step"
     }
   },
   "recipes": {
@@ -52559,6 +52633,12 @@
           "quantity": 1,
           "price": 141,
           "made_here": true
+        },
+        {
+          "item_id": "azure_flying_sword",
+          "quantity": 1,
+          "price": 350,
+          "made_here": false
         }
       ],
       "buys": {
@@ -52569,7 +52649,8 @@
         "spirit_crystal_ore": 4,
         "immortal_gold_ore": 9,
         "spirit_crystal_sword": 22,
-        "immortal_gold_sabre": 45
+        "immortal_gold_sabre": 45,
+        "azure_flying_sword": 122
       }
     },
     "adamant_body_array_workshop": {
@@ -52752,6 +52833,12 @@
           "quantity": 1,
           "price": 59,
           "made_here": true
+        },
+        {
+          "item_id": "azure_flying_sword",
+          "quantity": 1,
+          "price": 260,
+          "made_here": false
         }
       ],
       "buys": {
@@ -52760,7 +52847,8 @@
         "spirit_iron_sword": 5,
         "spirit_iron_armor": 6,
         "spirit_crystal_ore": 3,
-        "spirit_crystal_sword": 18
+        "spirit_crystal_sword": 18,
+        "azure_flying_sword": 91
       }
     },
     "azure_crown_apothecary": {
@@ -52880,6 +52968,12 @@
           "quantity": 2,
           "price": 39,
           "made_here": true
+        },
+        {
+          "item_id": "paper_crane_charm",
+          "quantity": 2,
+          "price": 72,
+          "made_here": false
         }
       ],
       "buys": {
@@ -52887,7 +52981,8 @@
         "spirit_ink": 1,
         "swift_wind_talisman": 5,
         "stone_skin_talisman": 5,
-        "crystal_ward_talisman": 15
+        "crystal_ward_talisman": 15,
+        "paper_crane_charm": 25
       }
     },
     "azure_crown_provisions": {
@@ -52937,6 +53032,12 @@
           "quantity": 2,
           "price": 45,
           "made_here": false
+        },
+        {
+          "item_id": "wind_gourd",
+          "quantity": 1,
+          "price": 130,
+          "made_here": false
         }
       ],
       "buys": {
@@ -52944,7 +53045,8 @@
         "spirit_iron": 1,
         "beast_core": 3,
         "talisman_paper": 1,
-        "moonveil_herb": 3
+        "moonveil_herb": 3,
+        "wind_gourd": 45
       }
     },
     "broken_halo_array_workshop": {
@@ -53045,6 +53147,12 @@
           "quantity": 2,
           "price": 44,
           "made_here": false
+        },
+        {
+          "item_id": "wind_gourd",
+          "quantity": 1,
+          "price": 130,
+          "made_here": false
         }
       ],
       "buys": {
@@ -53052,7 +53160,8 @@
         "spirit_iron": 1,
         "beast_core": 3,
         "talisman_paper": 1,
-        "moonveil_herb": 3
+        "moonveil_herb": 3,
+        "wind_gourd": 45
       }
     },
     "celestial_mandate_forge": {
@@ -53144,6 +53253,12 @@
           "quantity": 1,
           "price": 468,
           "made_here": true
+        },
+        {
+          "item_id": "azure_flying_sword",
+          "quantity": 1,
+          "price": 540,
+          "made_here": false
         }
       ],
       "buys": {
@@ -53156,7 +53271,8 @@
         "starsteel_ore": 30,
         "spirit_crystal_sword": 37,
         "immortal_gold_sabre": 75,
-        "starsteel_glaive": 150
+        "starsteel_glaive": 150,
+        "azure_flying_sword": 189
       }
     },
     "celestial_mandate_apothecary": {
@@ -53338,6 +53454,18 @@
           "quantity": 2,
           "price": 312,
           "made_here": true
+        },
+        {
+          "item_id": "paper_crane_charm",
+          "quantity": 1,
+          "price": 150,
+          "made_here": false
+        },
+        {
+          "item_id": "void_stride_talisman",
+          "quantity": 1,
+          "price": 2200,
+          "made_here": false
         }
       ],
       "buys": {
@@ -53347,7 +53475,9 @@
         "stone_skin_talisman": 11,
         "crystal_ward_talisman": 30,
         "golden_edge_talisman": 60,
-        "starfall_talisman": 120
+        "starfall_talisman": 120,
+        "paper_crane_charm": 52,
+        "void_stride_talisman": 770
       }
     },
     "celestial_mandate_provisions": {
@@ -53427,6 +53557,12 @@
           "quantity": 1,
           "price": 360,
           "made_here": false
+        },
+        {
+          "item_id": "wind_gourd",
+          "quantity": 1,
+          "price": 270,
+          "made_here": false
         }
       ],
       "buys": {
@@ -53436,7 +53572,8 @@
         "talisman_paper": 2,
         "moonveil_herb": 6,
         "dawnlotus_herb": 12,
-        "heavenpetal_herb": 25
+        "heavenpetal_herb": 25,
+        "wind_gourd": 94
       }
     },
     "celestial_river_beast_hall": {
@@ -53492,6 +53629,12 @@
           "quantity": 2,
           "price": 72,
           "made_here": false
+        },
+        {
+          "item_id": "crane_saddle_token",
+          "quantity": 1,
+          "price": 1150,
+          "made_here": false
         }
       ],
       "buys": {
@@ -53500,7 +53643,8 @@
         "fire_spirit_root_herb": 8,
         "spirit_crystal_ore": 6,
         "immortal_gold_ore": 12,
-        "starsteel_ore": 24
+        "starsteel_ore": 24,
+        "crane_saddle_token": 402
       }
     },
     "celestial_river_apothecary": {
@@ -53689,13 +53833,20 @@
           "quantity": 3,
           "price": 12,
           "made_here": true
+        },
+        {
+          "item_id": "paper_crane_charm",
+          "quantity": 2,
+          "price": 60,
+          "made_here": false
         }
       ],
       "buys": {
         "talisman_paper": 1,
         "spirit_ink": 1,
         "swift_wind_talisman": 4,
-        "stone_skin_talisman": 4
+        "stone_skin_talisman": 4,
+        "paper_crane_charm": 21
       }
     },
     "cloudedge_forge": {
@@ -53745,6 +53896,12 @@
           "quantity": 1,
           "price": 57,
           "made_here": true
+        },
+        {
+          "item_id": "azure_flying_sword",
+          "quantity": 1,
+          "price": 260,
+          "made_here": false
         }
       ],
       "buys": {
@@ -53753,7 +53910,8 @@
         "spirit_iron_sword": 4,
         "spirit_iron_armor": 6,
         "spirit_crystal_ore": 3,
-        "spirit_crystal_sword": 18
+        "spirit_crystal_sword": 18,
+        "azure_flying_sword": 91
       }
     },
     "cloudedge_talisman_hall": {
@@ -53803,6 +53961,12 @@
           "quantity": 2,
           "price": 38,
           "made_here": true
+        },
+        {
+          "item_id": "paper_crane_charm",
+          "quantity": 2,
+          "price": 72,
+          "made_here": false
         }
       ],
       "buys": {
@@ -53810,7 +53974,8 @@
         "spirit_ink": 1,
         "swift_wind_talisman": 4,
         "stone_skin_talisman": 5,
-        "crystal_ward_talisman": 14
+        "crystal_ward_talisman": 14,
+        "paper_crane_charm": 25
       }
     },
     "divine_herb_apothecary": {
@@ -53992,6 +54157,18 @@
           "quantity": 2,
           "price": 250,
           "made_here": true
+        },
+        {
+          "item_id": "paper_crane_charm",
+          "quantity": 2,
+          "price": 120,
+          "made_here": false
+        },
+        {
+          "item_id": "void_stride_talisman",
+          "quantity": 1,
+          "price": 1800,
+          "made_here": false
         }
       ],
       "buys": {
@@ -54001,7 +54178,9 @@
         "stone_skin_talisman": 9,
         "crystal_ward_talisman": 24,
         "golden_edge_talisman": 48,
-        "starfall_talisman": 96
+        "starfall_talisman": 96,
+        "paper_crane_charm": 42,
+        "void_stride_talisman": 630
       }
     },
     "emberforge_smithy": {
@@ -54196,6 +54375,12 @@
           "quantity": 2,
           "price": 108,
           "made_here": false
+        },
+        {
+          "item_id": "wind_gourd",
+          "quantity": 1,
+          "price": 175,
+          "made_here": false
         }
       ],
       "buys": {
@@ -54204,7 +54389,8 @@
         "beast_core": 3,
         "talisman_paper": 1,
         "moonveil_herb": 3,
-        "dawnlotus_herb": 7
+        "dawnlotus_herb": 7,
+        "wind_gourd": 61
       }
     },
     "firmament_blade_forge": {
@@ -54296,6 +54482,12 @@
           "quantity": 1,
           "price": 375,
           "made_here": true
+        },
+        {
+          "item_id": "azure_flying_sword",
+          "quantity": 1,
+          "price": 440,
+          "made_here": false
         }
       ],
       "buys": {
@@ -54308,7 +54500,8 @@
         "starsteel_ore": 24,
         "spirit_crystal_sword": 30,
         "immortal_gold_sabre": 60,
-        "starsteel_glaive": 120
+        "starsteel_glaive": 120,
+        "azure_flying_sword": 154
       }
     },
     "firmament_blade_talisman_hall": {
@@ -54370,6 +54563,18 @@
           "quantity": 2,
           "price": 250,
           "made_here": true
+        },
+        {
+          "item_id": "paper_crane_charm",
+          "quantity": 2,
+          "price": 120,
+          "made_here": false
+        },
+        {
+          "item_id": "void_stride_talisman",
+          "quantity": 1,
+          "price": 1800,
+          "made_here": false
         }
       ],
       "buys": {
@@ -54379,7 +54584,9 @@
         "stone_skin_talisman": 9,
         "crystal_ward_talisman": 24,
         "golden_edge_talisman": 48,
-        "starfall_talisman": 96
+        "starfall_talisman": 96,
+        "paper_crane_charm": 42,
+        "void_stride_talisman": 630
       }
     },
     "four_roads_provisions": {
@@ -54527,6 +54734,12 @@
           "quantity": 1,
           "price": 288,
           "made_here": false
+        },
+        {
+          "item_id": "wind_gourd",
+          "quantity": 1,
+          "price": 220,
+          "made_here": false
         }
       ],
       "buys": {
@@ -54536,7 +54749,8 @@
         "talisman_paper": 2,
         "moonveil_herb": 5,
         "dawnlotus_herb": 10,
-        "heavenpetal_herb": 20
+        "heavenpetal_herb": 20,
+        "wind_gourd": 77
       }
     },
     "froststar_talisman_hall": {
@@ -54598,6 +54812,18 @@
           "quantity": 2,
           "price": 250,
           "made_here": true
+        },
+        {
+          "item_id": "paper_crane_charm",
+          "quantity": 2,
+          "price": 120,
+          "made_here": false
+        },
+        {
+          "item_id": "void_stride_talisman",
+          "quantity": 1,
+          "price": 1800,
+          "made_here": false
         }
       ],
       "buys": {
@@ -54607,7 +54833,9 @@
         "stone_skin_talisman": 9,
         "crystal_ward_talisman": 24,
         "golden_edge_talisman": 48,
-        "starfall_talisman": 96
+        "starfall_talisman": 96,
+        "paper_crane_charm": 42,
+        "void_stride_talisman": 630
       }
     },
     "frostwatch_provisions": {
@@ -54683,13 +54911,20 @@
           "quantity": 3,
           "price": 12,
           "made_here": true
+        },
+        {
+          "item_id": "paper_crane_charm",
+          "quantity": 2,
+          "price": 60,
+          "made_here": false
         }
       ],
       "buys": {
         "talisman_paper": 1,
         "spirit_ink": 1,
         "swift_wind_talisman": 4,
-        "stone_skin_talisman": 4
+        "stone_skin_talisman": 4,
+        "paper_crane_charm": 21
       }
     },
     "galevein_provisions": {
@@ -54739,6 +54974,12 @@
           "quantity": 2,
           "price": 44,
           "made_here": false
+        },
+        {
+          "item_id": "wind_gourd",
+          "quantity": 1,
+          "price": 130,
+          "made_here": false
         }
       ],
       "buys": {
@@ -54746,7 +54987,8 @@
         "spirit_iron": 1,
         "beast_core": 3,
         "talisman_paper": 1,
-        "moonveil_herb": 3
+        "moonveil_herb": 3,
+        "wind_gourd": 45
       }
     },
     "galevein_beast_hall": {
@@ -54870,6 +55112,12 @@
           "quantity": 1,
           "price": 141,
           "made_here": true
+        },
+        {
+          "item_id": "azure_flying_sword",
+          "quantity": 1,
+          "price": 350,
+          "made_here": false
         }
       ],
       "buys": {
@@ -54880,7 +55128,8 @@
         "spirit_crystal_ore": 4,
         "immortal_gold_ore": 9,
         "spirit_crystal_sword": 22,
-        "immortal_gold_sabre": 45
+        "immortal_gold_sabre": 45,
+        "azure_flying_sword": 122
       }
     },
     "golden_spear_provisions": {
@@ -54948,6 +55197,12 @@
           "quantity": 2,
           "price": 108,
           "made_here": false
+        },
+        {
+          "item_id": "wind_gourd",
+          "quantity": 1,
+          "price": 175,
+          "made_here": false
         }
       ],
       "buys": {
@@ -54956,7 +55211,8 @@
         "beast_core": 3,
         "talisman_paper": 1,
         "moonveil_herb": 3,
-        "dawnlotus_herb": 7
+        "dawnlotus_herb": 7,
+        "wind_gourd": 61
       }
     },
     "greenriver_apothecary": {
@@ -55106,6 +55362,12 @@
           "quantity": 1,
           "price": 141,
           "made_here": true
+        },
+        {
+          "item_id": "azure_flying_sword",
+          "quantity": 1,
+          "price": 350,
+          "made_here": false
         }
       ],
       "buys": {
@@ -55116,7 +55378,8 @@
         "spirit_crystal_ore": 4,
         "immortal_gold_ore": 9,
         "spirit_crystal_sword": 22,
-        "immortal_gold_sabre": 45
+        "immortal_gold_sabre": 45,
+        "azure_flying_sword": 122
       }
     },
     "heavenblade_talisman_hall": {
@@ -55172,6 +55435,12 @@
           "quantity": 2,
           "price": 94,
           "made_here": true
+        },
+        {
+          "item_id": "paper_crane_charm",
+          "quantity": 2,
+          "price": 96,
+          "made_here": false
         }
       ],
       "buys": {
@@ -55180,7 +55449,8 @@
         "swift_wind_talisman": 6,
         "stone_skin_talisman": 6,
         "crystal_ward_talisman": 18,
-        "golden_edge_talisman": 36
+        "golden_edge_talisman": 36,
+        "paper_crane_charm": 33
       }
     },
     "hundred_herb_apothecary": {
@@ -55300,6 +55570,12 @@
           "quantity": 2,
           "price": 38,
           "made_here": true
+        },
+        {
+          "item_id": "paper_crane_charm",
+          "quantity": 2,
+          "price": 72,
+          "made_here": false
         }
       ],
       "buys": {
@@ -55307,7 +55583,8 @@
         "spirit_ink": 1,
         "swift_wind_talisman": 4,
         "stone_skin_talisman": 5,
-        "crystal_ward_talisman": 14
+        "crystal_ward_talisman": 14,
+        "paper_crane_charm": 25
       }
     },
     "immortal_river_beast_hall": {
@@ -55357,6 +55634,12 @@
           "quantity": 2,
           "price": 27,
           "made_here": false
+        },
+        {
+          "item_id": "crane_saddle_token",
+          "quantity": 1,
+          "price": 900,
+          "made_here": false
         }
       ],
       "buys": {
@@ -55364,7 +55647,8 @@
         "spirit_herb": 1,
         "fire_spirit_root_herb": 6,
         "spirit_crystal_ore": 4,
-        "immortal_gold_ore": 9
+        "immortal_gold_ore": 9,
+        "crane_saddle_token": 315
       }
     },
     "immortal_river_apothecary": {
@@ -55679,6 +55963,12 @@
           "quantity": 2,
           "price": 94,
           "made_here": true
+        },
+        {
+          "item_id": "paper_crane_charm",
+          "quantity": 2,
+          "price": 96,
+          "made_here": false
         }
       ],
       "buys": {
@@ -55687,7 +55977,8 @@
         "swift_wind_talisman": 6,
         "stone_skin_talisman": 6,
         "crystal_ward_talisman": 18,
-        "golden_edge_talisman": 36
+        "golden_edge_talisman": 36,
+        "paper_crane_charm": 33
       }
     },
     "jade_crown_provisions": {
@@ -55737,6 +56028,12 @@
           "quantity": 2,
           "price": 44,
           "made_here": false
+        },
+        {
+          "item_id": "wind_gourd",
+          "quantity": 1,
+          "price": 130,
+          "made_here": false
         }
       ],
       "buys": {
@@ -55744,7 +56041,8 @@
         "spirit_iron": 1,
         "beast_core": 3,
         "talisman_paper": 1,
-        "moonveil_herb": 3
+        "moonveil_herb": 3,
+        "wind_gourd": 45
       }
     },
     "jade_crown_talisman_hall": {
@@ -55794,6 +56092,12 @@
           "quantity": 2,
           "price": 38,
           "made_here": true
+        },
+        {
+          "item_id": "paper_crane_charm",
+          "quantity": 2,
+          "price": 72,
+          "made_here": false
         }
       ],
       "buys": {
@@ -55801,7 +56105,8 @@
         "spirit_ink": 1,
         "swift_wind_talisman": 4,
         "stone_skin_talisman": 5,
-        "crystal_ward_talisman": 14
+        "crystal_ward_talisman": 14,
+        "paper_crane_charm": 25
       }
     },
     "jadeflow_beast_hall": {
@@ -55997,13 +56302,20 @@
           "quantity": 3,
           "price": 12,
           "made_here": true
+        },
+        {
+          "item_id": "paper_crane_charm",
+          "quantity": 2,
+          "price": 60,
+          "made_here": false
         }
       ],
       "buys": {
         "talisman_paper": 1,
         "spirit_ink": 1,
         "swift_wind_talisman": 4,
-        "stone_skin_talisman": 4
+        "stone_skin_talisman": 4,
+        "paper_crane_charm": 21
       }
     },
     "lunar_shadow_talisman_hall": {
@@ -56065,6 +56377,18 @@
           "quantity": 2,
           "price": 250,
           "made_here": true
+        },
+        {
+          "item_id": "paper_crane_charm",
+          "quantity": 2,
+          "price": 120,
+          "made_here": false
+        },
+        {
+          "item_id": "void_stride_talisman",
+          "quantity": 1,
+          "price": 1800,
+          "made_here": false
         }
       ],
       "buys": {
@@ -56074,7 +56398,9 @@
         "stone_skin_talisman": 9,
         "crystal_ward_talisman": 24,
         "golden_edge_talisman": 48,
-        "starfall_talisman": 96
+        "starfall_talisman": 96,
+        "paper_crane_charm": 42,
+        "void_stride_talisman": 630
       }
     },
     "lunar_shadow_apothecary": {
@@ -56250,6 +56576,12 @@
           "quantity": 2,
           "price": 94,
           "made_here": true
+        },
+        {
+          "item_id": "paper_crane_charm",
+          "quantity": 2,
+          "price": 96,
+          "made_here": false
         }
       ],
       "buys": {
@@ -56258,7 +56590,8 @@
         "swift_wind_talisman": 6,
         "stone_skin_talisman": 6,
         "crystal_ward_talisman": 18,
-        "golden_edge_talisman": 36
+        "golden_edge_talisman": 36,
+        "paper_crane_charm": 33
       }
     },
     "lunar_veil_apothecary": {
@@ -56433,6 +56766,12 @@
           "quantity": 1,
           "price": 288,
           "made_here": false
+        },
+        {
+          "item_id": "wind_gourd",
+          "quantity": 1,
+          "price": 220,
+          "made_here": false
         }
       ],
       "buys": {
@@ -56442,7 +56781,8 @@
         "talisman_paper": 2,
         "moonveil_herb": 5,
         "dawnlotus_herb": 10,
-        "heavenpetal_herb": 20
+        "heavenpetal_herb": 20,
+        "wind_gourd": 77
       }
     },
     "mandate_crown_talisman_hall": {
@@ -56504,6 +56844,18 @@
           "quantity": 2,
           "price": 250,
           "made_here": true
+        },
+        {
+          "item_id": "paper_crane_charm",
+          "quantity": 2,
+          "price": 120,
+          "made_here": false
+        },
+        {
+          "item_id": "void_stride_talisman",
+          "quantity": 1,
+          "price": 1800,
+          "made_here": false
         }
       ],
       "buys": {
@@ -56513,7 +56865,9 @@
         "stone_skin_talisman": 9,
         "crystal_ward_talisman": 24,
         "golden_edge_talisman": 48,
-        "starfall_talisman": 96
+        "starfall_talisman": 96,
+        "paper_crane_charm": 42,
+        "void_stride_talisman": 630
       }
     },
     "mandate_spear_forge": {
@@ -56605,6 +56959,12 @@
           "quantity": 1,
           "price": 375,
           "made_here": true
+        },
+        {
+          "item_id": "azure_flying_sword",
+          "quantity": 1,
+          "price": 440,
+          "made_here": false
         }
       ],
       "buys": {
@@ -56617,7 +56977,8 @@
         "starsteel_ore": 24,
         "spirit_crystal_sword": 30,
         "immortal_gold_sabre": 60,
-        "starsteel_glaive": 120
+        "starsteel_glaive": 120,
+        "azure_flying_sword": 154
       }
     },
     "mandate_spear_provisions": {
@@ -56697,6 +57058,12 @@
           "quantity": 1,
           "price": 288,
           "made_here": false
+        },
+        {
+          "item_id": "wind_gourd",
+          "quantity": 1,
+          "price": 220,
+          "made_here": false
         }
       ],
       "buys": {
@@ -56706,7 +57073,8 @@
         "talisman_paper": 2,
         "moonveil_herb": 5,
         "dawnlotus_herb": 10,
-        "heavenpetal_herb": 20
+        "heavenpetal_herb": 20,
+        "wind_gourd": 77
       }
     },
     "moonfen_talisman_hall": {
@@ -56744,13 +57112,20 @@
           "quantity": 3,
           "price": 12,
           "made_here": true
+        },
+        {
+          "item_id": "paper_crane_charm",
+          "quantity": 2,
+          "price": 60,
+          "made_here": false
         }
       ],
       "buys": {
         "talisman_paper": 1,
         "spirit_ink": 1,
         "swift_wind_talisman": 4,
-        "stone_skin_talisman": 4
+        "stone_skin_talisman": 4,
+        "paper_crane_charm": 21
       }
     },
     "moonfen_apothecary": {
@@ -56838,6 +57213,12 @@
           "quantity": 2,
           "price": 38,
           "made_here": true
+        },
+        {
+          "item_id": "paper_crane_charm",
+          "quantity": 2,
+          "price": 72,
+          "made_here": false
         }
       ],
       "buys": {
@@ -56845,7 +57226,8 @@
         "spirit_ink": 1,
         "swift_wind_talisman": 4,
         "stone_skin_talisman": 5,
-        "crystal_ward_talisman": 14
+        "crystal_ward_talisman": 14,
+        "paper_crane_charm": 25
       }
     },
     "moonfrost_apothecary": {
@@ -57007,6 +57389,12 @@
           "quantity": 1,
           "price": 351,
           "made_here": true
+        },
+        {
+          "item_id": "azure_flying_sword",
+          "quantity": 1,
+          "price": 440,
+          "made_here": false
         }
       ],
       "buys": {
@@ -57019,7 +57407,8 @@
         "starsteel_ore": 22,
         "spirit_crystal_sword": 28,
         "immortal_gold_sabre": 56,
-        "starsteel_glaive": 112
+        "starsteel_glaive": 112,
+        "azure_flying_sword": 154
       }
     },
     "nine_heavens_apothecary": {
@@ -57201,6 +57590,18 @@
           "quantity": 2,
           "price": 234,
           "made_here": true
+        },
+        {
+          "item_id": "paper_crane_charm",
+          "quantity": 2,
+          "price": 120,
+          "made_here": false
+        },
+        {
+          "item_id": "void_stride_talisman",
+          "quantity": 1,
+          "price": 1800,
+          "made_here": false
         }
       ],
       "buys": {
@@ -57210,7 +57611,9 @@
         "stone_skin_talisman": 8,
         "crystal_ward_talisman": 22,
         "golden_edge_talisman": 45,
-        "starfall_talisman": 90
+        "starfall_talisman": 90,
+        "paper_crane_charm": 42,
+        "void_stride_talisman": 630
       }
     },
     "nine_heavens_provisions": {
@@ -57290,6 +57693,12 @@
           "quantity": 1,
           "price": 270,
           "made_here": false
+        },
+        {
+          "item_id": "wind_gourd",
+          "quantity": 1,
+          "price": 220,
+          "made_here": false
         }
       ],
       "buys": {
@@ -57299,7 +57708,8 @@
         "talisman_paper": 1,
         "moonveil_herb": 4,
         "dawnlotus_herb": 9,
-        "heavenpetal_herb": 18
+        "heavenpetal_herb": 18,
+        "wind_gourd": 77
       }
     },
     "ninefold_noble_provisions": {
@@ -57367,6 +57777,12 @@
           "quantity": 2,
           "price": 108,
           "made_here": false
+        },
+        {
+          "item_id": "wind_gourd",
+          "quantity": 1,
+          "price": 175,
+          "made_here": false
         }
       ],
       "buys": {
@@ -57375,7 +57791,8 @@
         "beast_core": 3,
         "talisman_paper": 1,
         "moonveil_herb": 3,
-        "dawnlotus_herb": 7
+        "dawnlotus_herb": 7,
+        "wind_gourd": 61
       }
     },
     "ninefold_noble_talisman_hall": {
@@ -57431,6 +57848,12 @@
           "quantity": 2,
           "price": 94,
           "made_here": true
+        },
+        {
+          "item_id": "paper_crane_charm",
+          "quantity": 2,
+          "price": 96,
+          "made_here": false
         }
       ],
       "buys": {
@@ -57439,7 +57862,8 @@
         "swift_wind_talisman": 6,
         "stone_skin_talisman": 6,
         "crystal_ward_talisman": 18,
-        "golden_edge_talisman": 36
+        "golden_edge_talisman": 36,
+        "paper_crane_charm": 33
       }
     },
     "northwind_provisions": {
@@ -57489,6 +57913,12 @@
           "quantity": 2,
           "price": 44,
           "made_here": false
+        },
+        {
+          "item_id": "wind_gourd",
+          "quantity": 1,
+          "price": 130,
+          "made_here": false
         }
       ],
       "buys": {
@@ -57496,7 +57926,8 @@
         "spirit_iron": 1,
         "beast_core": 3,
         "talisman_paper": 1,
-        "moonveil_herb": 3
+        "moonveil_herb": 3,
+        "wind_gourd": 45
       }
     },
     "northwind_talisman_hall": {
@@ -57546,6 +57977,12 @@
           "quantity": 2,
           "price": 38,
           "made_here": true
+        },
+        {
+          "item_id": "paper_crane_charm",
+          "quantity": 2,
+          "price": 72,
+          "made_here": false
         }
       ],
       "buys": {
@@ -57553,7 +57990,8 @@
         "spirit_ink": 1,
         "swift_wind_talisman": 4,
         "stone_skin_talisman": 5,
-        "crystal_ward_talisman": 14
+        "crystal_ward_talisman": 14,
+        "paper_crane_charm": 25
       }
     },
     "polar_gate_provisions": {
@@ -57621,6 +58059,12 @@
           "quantity": 2,
           "price": 108,
           "made_here": false
+        },
+        {
+          "item_id": "wind_gourd",
+          "quantity": 1,
+          "price": 175,
+          "made_here": false
         }
       ],
       "buys": {
@@ -57629,7 +58073,8 @@
         "beast_core": 3,
         "talisman_paper": 1,
         "moonveil_herb": 3,
-        "dawnlotus_herb": 7
+        "dawnlotus_herb": 7,
+        "wind_gourd": 61
       }
     },
     "polar_gate_talisman_hall": {
@@ -57685,6 +58130,12 @@
           "quantity": 2,
           "price": 94,
           "made_here": true
+        },
+        {
+          "item_id": "paper_crane_charm",
+          "quantity": 2,
+          "price": 96,
+          "made_here": false
         }
       ],
       "buys": {
@@ -57693,7 +58144,8 @@
         "swift_wind_talisman": 6,
         "stone_skin_talisman": 6,
         "crystal_ward_talisman": 18,
-        "golden_edge_talisman": 36
+        "golden_edge_talisman": 36,
+        "paper_crane_charm": 33
       }
     },
     "riverguard_beast_hall": {
@@ -57906,6 +58358,12 @@
           "quantity": 1,
           "price": 288,
           "made_here": false
+        },
+        {
+          "item_id": "wind_gourd",
+          "quantity": 1,
+          "price": 220,
+          "made_here": false
         }
       ],
       "buys": {
@@ -57915,7 +58373,8 @@
         "talisman_paper": 2,
         "moonveil_herb": 5,
         "dawnlotus_herb": 10,
-        "heavenpetal_herb": 20
+        "heavenpetal_herb": 20,
+        "wind_gourd": 77
       }
     },
     "skyroad_provisions": {
@@ -57983,6 +58442,12 @@
           "quantity": 2,
           "price": 108,
           "made_here": false
+        },
+        {
+          "item_id": "wind_gourd",
+          "quantity": 1,
+          "price": 175,
+          "made_here": false
         }
       ],
       "buys": {
@@ -57991,7 +58456,8 @@
         "beast_core": 3,
         "talisman_paper": 1,
         "moonveil_herb": 3,
-        "dawnlotus_herb": 7
+        "dawnlotus_herb": 7,
+        "wind_gourd": 61
       }
     },
     "skyroad_beast_hall": {
@@ -58041,6 +58507,12 @@
           "quantity": 2,
           "price": 27,
           "made_here": false
+        },
+        {
+          "item_id": "crane_saddle_token",
+          "quantity": 1,
+          "price": 900,
+          "made_here": false
         }
       ],
       "buys": {
@@ -58048,7 +58520,8 @@
         "spirit_herb": 1,
         "fire_spirit_root_herb": 6,
         "spirit_crystal_ore": 4,
-        "immortal_gold_ore": 9
+        "immortal_gold_ore": 9,
+        "crane_saddle_token": 315
       }
     },
     "solar_crucible_smithy": {
@@ -58140,6 +58613,12 @@
           "quantity": 1,
           "price": 375,
           "made_here": true
+        },
+        {
+          "item_id": "azure_flying_sword",
+          "quantity": 1,
+          "price": 440,
+          "made_here": false
         }
       ],
       "buys": {
@@ -58152,7 +58631,8 @@
         "starsteel_ore": 24,
         "spirit_crystal_sword": 30,
         "immortal_gold_sabre": 60,
-        "starsteel_glaive": 120
+        "starsteel_glaive": 120,
+        "azure_flying_sword": 154
       }
     },
     "solar_crucible_provisions": {
@@ -58232,6 +58712,12 @@
           "quantity": 1,
           "price": 288,
           "made_here": false
+        },
+        {
+          "item_id": "wind_gourd",
+          "quantity": 1,
+          "price": 220,
+          "made_here": false
         }
       ],
       "buys": {
@@ -58241,7 +58727,8 @@
         "talisman_paper": 2,
         "moonveil_herb": 5,
         "dawnlotus_herb": 10,
-        "heavenpetal_herb": 20
+        "heavenpetal_herb": 20,
+        "wind_gourd": 77
       }
     },
     "solar_furnace_smithy": {
@@ -58315,6 +58802,12 @@
           "quantity": 1,
           "price": 141,
           "made_here": true
+        },
+        {
+          "item_id": "azure_flying_sword",
+          "quantity": 1,
+          "price": 350,
+          "made_here": false
         }
       ],
       "buys": {
@@ -58325,7 +58818,8 @@
         "spirit_crystal_ore": 4,
         "immortal_gold_ore": 9,
         "spirit_crystal_sword": 22,
-        "immortal_gold_sabre": 45
+        "immortal_gold_sabre": 45,
+        "azure_flying_sword": 122
       }
     },
     "solar_furnace_provisions": {
@@ -58393,6 +58887,12 @@
           "quantity": 2,
           "price": 108,
           "made_here": false
+        },
+        {
+          "item_id": "wind_gourd",
+          "quantity": 1,
+          "price": 175,
+          "made_here": false
         }
       ],
       "buys": {
@@ -58401,7 +58901,8 @@
         "beast_core": 3,
         "talisman_paper": 1,
         "moonveil_herb": 3,
-        "dawnlotus_herb": 7
+        "dawnlotus_herb": 7,
+        "wind_gourd": 61
       }
     },
     "spearwall_forge": {
@@ -58451,6 +58952,12 @@
           "quantity": 1,
           "price": 57,
           "made_here": true
+        },
+        {
+          "item_id": "azure_flying_sword",
+          "quantity": 1,
+          "price": 260,
+          "made_here": false
         }
       ],
       "buys": {
@@ -58459,7 +58966,8 @@
         "spirit_iron_sword": 4,
         "spirit_iron_armor": 6,
         "spirit_crystal_ore": 3,
-        "spirit_crystal_sword": 18
+        "spirit_crystal_sword": 18,
+        "azure_flying_sword": 91
       }
     },
     "spearwall_provisions": {
@@ -58509,6 +59017,12 @@
           "quantity": 2,
           "price": 44,
           "made_here": false
+        },
+        {
+          "item_id": "wind_gourd",
+          "quantity": 1,
+          "price": 130,
+          "made_here": false
         }
       ],
       "buys": {
@@ -58516,7 +59030,8 @@
         "spirit_iron": 1,
         "beast_core": 3,
         "talisman_paper": 1,
-        "moonveil_herb": 3
+        "moonveil_herb": 3,
+        "wind_gourd": 45
       }
     },
     "spirit_jade_forge": {
@@ -58590,6 +59105,12 @@
           "quantity": 1,
           "price": 141,
           "made_here": true
+        },
+        {
+          "item_id": "azure_flying_sword",
+          "quantity": 1,
+          "price": 350,
+          "made_here": false
         }
       ],
       "buys": {
@@ -58600,7 +59121,8 @@
         "spirit_crystal_ore": 4,
         "immortal_gold_ore": 9,
         "spirit_crystal_sword": 22,
-        "immortal_gold_sabre": 45
+        "immortal_gold_sabre": 45,
+        "azure_flying_sword": 122
       }
     },
     "spirit_jade_apothecary": {
@@ -58751,6 +59273,12 @@
           "quantity": 2,
           "price": 94,
           "made_here": true
+        },
+        {
+          "item_id": "paper_crane_charm",
+          "quantity": 2,
+          "price": 96,
+          "made_here": false
         }
       ],
       "buys": {
@@ -58759,7 +59287,8 @@
         "swift_wind_talisman": 6,
         "stone_skin_talisman": 6,
         "crystal_ward_talisman": 18,
-        "golden_edge_talisman": 36
+        "golden_edge_talisman": 36,
+        "paper_crane_charm": 33
       }
     },
     "spirit_jade_provisions": {
@@ -58827,6 +59356,12 @@
           "quantity": 2,
           "price": 108,
           "made_here": false
+        },
+        {
+          "item_id": "wind_gourd",
+          "quantity": 1,
+          "price": 175,
+          "made_here": false
         }
       ],
       "buys": {
@@ -58835,7 +59370,8 @@
         "beast_core": 3,
         "talisman_paper": 1,
         "moonveil_herb": 3,
-        "dawnlotus_herb": 7
+        "dawnlotus_herb": 7,
+        "wind_gourd": 61
       }
     },
     "starroad_provisions": {
@@ -58915,6 +59451,12 @@
           "quantity": 1,
           "price": 288,
           "made_here": false
+        },
+        {
+          "item_id": "wind_gourd",
+          "quantity": 1,
+          "price": 220,
+          "made_here": false
         }
       ],
       "buys": {
@@ -58924,7 +59466,8 @@
         "talisman_paper": 2,
         "moonveil_herb": 5,
         "dawnlotus_herb": 10,
-        "heavenpetal_herb": 20
+        "heavenpetal_herb": 20,
+        "wind_gourd": 77
       }
     },
     "starroad_beast_hall": {
@@ -58980,6 +59523,12 @@
           "quantity": 2,
           "price": 72,
           "made_here": false
+        },
+        {
+          "item_id": "crane_saddle_token",
+          "quantity": 1,
+          "price": 1150,
+          "made_here": false
         }
       ],
       "buys": {
@@ -58988,7 +59537,8 @@
         "fire_spirit_root_herb": 8,
         "spirit_crystal_ore": 6,
         "immortal_gold_ore": 12,
-        "starsteel_ore": 24
+        "starsteel_ore": 24,
+        "crane_saddle_token": 402
       }
     },
     "stoneback_forge": {
@@ -59106,6 +59656,12 @@
           "quantity": 1,
           "price": 57,
           "made_here": true
+        },
+        {
+          "item_id": "azure_flying_sword",
+          "quantity": 1,
+          "price": 260,
+          "made_here": false
         }
       ],
       "buys": {
@@ -59114,7 +59670,8 @@
         "spirit_iron_sword": 4,
         "spirit_iron_armor": 6,
         "spirit_crystal_ore": 3,
-        "spirit_crystal_sword": 18
+        "spirit_crystal_sword": 18,
+        "azure_flying_sword": 91
       }
     },
     "stoneheart_array_workshop": {
@@ -59215,6 +59772,12 @@
           "quantity": 1,
           "price": 57,
           "made_here": true
+        },
+        {
+          "item_id": "azure_flying_sword",
+          "quantity": 1,
+          "price": 260,
+          "made_here": false
         }
       ],
       "buys": {
@@ -59223,7 +59786,8 @@
         "spirit_iron_sword": 4,
         "spirit_iron_armor": 6,
         "spirit_crystal_ore": 3,
-        "spirit_crystal_sword": 18
+        "spirit_crystal_sword": 18,
+        "azure_flying_sword": 91
       }
     },
     "vermilion_furnace_provisions": {
@@ -59273,6 +59837,12 @@
           "quantity": 2,
           "price": 44,
           "made_here": false
+        },
+        {
+          "item_id": "wind_gourd",
+          "quantity": 1,
+          "price": 130,
+          "made_here": false
         }
       ],
       "buys": {
@@ -59280,7 +59850,8 @@
         "spirit_iron": 1,
         "beast_core": 3,
         "talisman_paper": 1,
-        "moonveil_herb": 3
+        "moonveil_herb": 3,
+        "wind_gourd": 45
       }
     },
     "worldstone_forge": {
@@ -59372,6 +59943,12 @@
           "quantity": 1,
           "price": 375,
           "made_here": true
+        },
+        {
+          "item_id": "azure_flying_sword",
+          "quantity": 1,
+          "price": 440,
+          "made_here": false
         }
       ],
       "buys": {
@@ -59384,7 +59961,8 @@
         "starsteel_ore": 24,
         "spirit_crystal_sword": 30,
         "immortal_gold_sabre": 60,
-        "starsteel_glaive": 120
+        "starsteel_glaive": 120,
+        "azure_flying_sword": 154
       }
     },
     "worldstone_array_workshop": {
@@ -59487,12 +60065,19 @@
           "quantity": 8,
           "price": 5,
           "made_here": false
+        },
+        {
+          "item_id": "cloudskiff_boat",
+          "quantity": 1,
+          "price": 520,
+          "made_here": false
         }
       ],
       "buys": {
         "beast_core": 3,
         "spirit_herb": 1,
-        "spirit_iron": 2
+        "spirit_iron": 2,
+        "cloudskiff_boat": 182
       }
     },
     "grey_mule_waystation": {
@@ -59659,12 +60244,19 @@
           "quantity": 9,
           "price": 7,
           "made_here": false
+        },
+        {
+          "item_id": "cloudskiff_boat",
+          "quantity": 1,
+          "price": 650,
+          "made_here": false
         }
       ],
       "buys": {
         "beast_core": 4,
         "spirit_herb": 1,
-        "spirit_iron": 2
+        "spirit_iron": 2,
+        "cloudskiff_boat": 227
       }
     },
     "red_kite_waystation": {
@@ -59702,12 +60294,19 @@
           "quantity": 9,
           "price": 7,
           "made_here": false
+        },
+        {
+          "item_id": "cloudskiff_boat",
+          "quantity": 1,
+          "price": 650,
+          "made_here": false
         }
       ],
       "buys": {
         "beast_core": 4,
         "spirit_herb": 1,
-        "spirit_iron": 2
+        "spirit_iron": 2,
+        "cloudskiff_boat": 227
       }
     },
     "salt_cart_waystation": {
@@ -59788,12 +60387,19 @@
           "quantity": 9,
           "price": 7,
           "made_here": false
+        },
+        {
+          "item_id": "cloudskiff_boat",
+          "quantity": 1,
+          "price": 650,
+          "made_here": false
         }
       ],
       "buys": {
         "beast_core": 4,
         "spirit_herb": 1,
-        "spirit_iron": 2
+        "spirit_iron": 2,
+        "cloudskiff_boat": 227
       }
     },
     "willow_ford_waystation": {
@@ -59874,12 +60480,19 @@
           "quantity": 8,
           "price": 5,
           "made_here": false
+        },
+        {
+          "item_id": "cloudskiff_boat",
+          "quantity": 1,
+          "price": 520,
+          "made_here": false
         }
       ],
       "buys": {
         "beast_core": 3,
         "spirit_herb": 1,
-        "spirit_iron": 2
+        "spirit_iron": 2,
+        "cloudskiff_boat": 182
       }
     },
     "dust_road_waystation": {
@@ -59917,12 +60530,19 @@
           "quantity": 8,
           "price": 5,
           "made_here": false
+        },
+        {
+          "item_id": "cloudskiff_boat",
+          "quantity": 1,
+          "price": 520,
+          "made_here": false
         }
       ],
       "buys": {
         "beast_core": 3,
         "spirit_herb": 1,
-        "spirit_iron": 2
+        "spirit_iron": 2,
+        "cloudskiff_boat": 182
       }
     },
     "blue_tile_waystation": {
@@ -60046,12 +60666,19 @@
           "quantity": 8,
           "price": 5,
           "made_here": false
+        },
+        {
+          "item_id": "cloudskiff_boat",
+          "quantity": 1,
+          "price": 520,
+          "made_here": false
         }
       ],
       "buys": {
         "beast_core": 3,
         "spirit_herb": 1,
-        "spirit_iron": 2
+        "spirit_iron": 2,
+        "cloudskiff_boat": 182
       }
     },
     "two_bridges_waystation": {
@@ -60089,12 +60716,19 @@
           "quantity": 9,
           "price": 7,
           "made_here": false
+        },
+        {
+          "item_id": "cloudskiff_boat",
+          "quantity": 1,
+          "price": 650,
+          "made_here": false
         }
       ],
       "buys": {
         "beast_core": 4,
         "spirit_herb": 1,
-        "spirit_iron": 2
+        "spirit_iron": 2,
+        "cloudskiff_boat": 227
       }
     },
     "yellow_gourd_waystation": {

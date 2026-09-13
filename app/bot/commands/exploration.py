@@ -1260,6 +1260,26 @@ def _road_site_line(kind: str, site: str, leg: list) -> str:
     return f"\n🛤️ **{site}** is {ROAD_SITE_LABEL.get(kind, 'a place')}: {what} The road leads back to **{leg[0] if leg else '…'}** or on to **{leg[1] if len(leg) > 1 else '…'}** with **/travel**."
 
 
+def _travel_mode_line(result: dict) -> str:
+    """How the journey was crossed, in the words of the genre.
+
+    The engine decides it (realm, or the best flying artifact in the bags)
+    and hands back ``travel_mode``/``travel_mount``; this only says it. The
+    walking line carries the pointer to a flying artifact deliberately - it
+    is shown to exactly the cultivators who cannot yet leave the ground,
+    and stops showing itself the moment they can.
+    """
+    mode = str(result.get("travel_mode") or "")
+    mount = str(result.get("travel_mount") or "")
+    if mode == "folding space":
+        return "\n🌌 You do not cross the distance so much as fold it; the road passes beneath you in moments."
+    if mode == "flying":
+        if mount:
+            return f"\n🗡️ You ride **{mount}** above the road — a third of the walking hours, and little on the ground can reach you."
+        return "\n☁️ You leave the ground and fly it — a third of the walking hours, and little on the ground can reach you."
+    return "\n🚶 You walk it. A flying artifact would cut the road to a third: **/economy → City Shops → Browse**."
+
+
 def _discord_arrival_display(result: dict) -> str:
     """Render a road journey's arrival as a live, self-updating Discord
     timestamp when the Go engine could resolve one, falling back to the raw
@@ -1303,7 +1323,7 @@ async def travel(interaction: discord.Interaction, destination: str) -> None:
         danger=int(result.get("road_danger") or 0)
         chance=int(result.get("road_encounter_chance_percent") or 0)
         arrival_display=_discord_arrival_display(result)
-        road=(
+        road=_travel_mode_line(result)+(
             f"\n⏱️ Arrival **{arrival_display}** • Danger **{danger}/45** • "
             f"Encounter risk **{chance}%**."
             "\n🚶 You remain in transit and cannot take authoritative actions until arrival."

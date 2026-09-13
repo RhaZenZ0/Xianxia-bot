@@ -19,6 +19,7 @@ func setupBatch5AuthorityDB(t *testing.T) string {
 	defer conn.Close()
 
 	if err := conn.ExecScript(`
+CREATE TABLE equipment_instances(equipment_id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,item_id TEXT NOT NULL,slot TEXT NOT NULL DEFAULT 'weapon',durability INTEGER NOT NULL DEFAULT 100,max_durability INTEGER NOT NULL DEFAULT 100,quality INTEGER NOT NULL DEFAULT 100,equipped INTEGER NOT NULL DEFAULT 0,bound_at REAL NOT NULL DEFAULT 0,updated_at REAL NOT NULL DEFAULT 0);
 ALTER TABLE characters ADD COLUMN spirit_stones INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE characters ADD COLUMN insight_xp INTEGER NOT NULL DEFAULT 0;
 CREATE TABLE character_location_discoveries(

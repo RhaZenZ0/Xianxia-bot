@@ -33,6 +33,11 @@ func equipmentDefinitionsGo() map[string]equipmentDefinitionGo {
 		"immortal_gold_plate":  {"armor", 380, 1, 12, 3, -1, false},
 		"starsteel_glaive":     {"weapon", 480, 13, 1, 4, 1, false},
 		"starsteel_aegis":      {"armor", 560, 1, 17, 4, 0, false},
+		// A flying sword is still a sword when you land (v1.0.0-rc.15). It is
+		// the one artifact in `content/world.json` that both carries a rider
+		// (`flight`) and takes a weapon slot, which is exactly why the genre
+		// makes it the default: you do not choose between going and fighting.
+		"azure_flying_sword": {"weapon", 220, 7, 0, 3, 3, false},
 		// A one-of-a-kind GM reward (granted via /admin player grant, never
 		// crafted or bought) - Indestructible=true is what actually protects
 		// it from durability decay; see indestructibleEquipmentIDsGo below.

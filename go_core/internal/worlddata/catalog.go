@@ -140,9 +140,15 @@ type Item struct {
 	DoorEventChance  int64          `json:"door_event_chance"`
 	HunterRealmBonus int64          `json:"hunter_realm_bonus"`
 	StorageUpgrade   map[string]any `json:"storage_upgrade"`
-	ArrayDeploy      string         `json:"array_deploy"`
-	SpatialKey       map[string]any `json:"spatial_key"`
-	MarketExcluded   bool           `json:"market_excluded"`
+	// Flight (v1.0.0-rc.15) is the realm a rider effectively travels at while
+	// carrying this, which is how a cultivator who cannot yet fly gets off the
+	// road: the artifact does the flying. FlightName is what the reply calls
+	// it - a flying sword, a paper crane, a folded step.
+	Flight         int64          `json:"flight"`
+	FlightName     string         `json:"flight_name"`
+	ArrayDeploy    string         `json:"array_deploy"`
+	SpatialKey     map[string]any `json:"spatial_key"`
+	MarketExcluded bool           `json:"market_excluded"`
 }
 
 // MarketTradeable is the one rule for whether an item belongs in ordinary

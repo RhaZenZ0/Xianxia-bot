@@ -56,6 +56,13 @@ EQUIPMENT_DEFINITIONS: dict[str, dict[str, Any]] = {
         "name": "Starsteel Aegis", "slot": "armor", "max_durability": 560,
         "attack": 1, "defense": 17, "spirit": 4, "agility": 0,
     },
+    # The flying sword (v1.0.0-rc.15) is the one artifact that both carries a
+    # rider and takes the weapon slot - which is why the genre makes it the
+    # default way to travel: it is still a sword when you arrive.
+    "azure_flying_sword": {
+        "name": "Azure Flying Sword", "slot": "weapon", "max_durability": 220,
+        "attack": 7, "defense": 0, "spirit": 3, "agility": 3,
+    },
     # A one-of-a-kind GM reward granted via /admin player grant, never crafted
     # or bought (content/world.json marks it market_excluded). "indestructible"
     # and "unique" are read by app/bot/main.py's grant/equipment-status code;

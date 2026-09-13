@@ -154,6 +154,42 @@ And every timed lookup the sense made asked for minute zero. An authoritative pa
 deployed location array has ever modified a sense reading, and every sense event was filed at the
 dawn of the world. It takes the clock from the engine now, like every other action. No schema change.
 
+And how a cultivator crosses ground is finally a question of realm. Every journey in the game was a
+walk: terrain set the minutes, realm shaved at most a third off them, and that was the whole ladder -
+so an Ascension Realm ancestor and a mortal porter crossed the same valley at nearly the same speed,
+and the flying sword this genre is built on existed only inside item descriptions. There are three
+ways to cross ground now, and the realm you cross it at decides which. Below Core Formation nobody
+leaves the ground unaided and the road is a road. From Core Formation a cultivator flies: a third of
+the hours and ten off the danger, because what walks the road cannot reach you. From Ascension Realm
+distance stops being crossed and starts being folded - an eighth of the hours, twenty-five off the
+danger, and a floor that scales with the mode so the fastest travel in the setting is not
+indistinguishable from the slowest on a short leg.
+
+Six flying artifacts let a disciple off the road before their own realm would: a paper crane charm
+and a wind gourd (Core Formation), an azure flying sword and a cloudskiff boat, a crane-summons token,
+and a void-stride talisman that folds space for whoever holds it. What is in the bags sets the realm
+you *travel* at, which is the entire point of one - it is how a Qi Refining disciple gets airborne at
+all. They are on real shelves, by shop kind and by tier: the crane in the talisman halls from the
+Mortal World up, the gourd with the provisioners, the sword at the smiths, the boat at the
+waystations, the crane token at the beast halls, the void talisman only in the Celestial World, each
+of them the dearest thing on its shelf and each bought back by the keeper who sold it. An artifact no
+shop sells is scenery, which is what the six were the day they were written.
+
+The flying sword is also a sword. It is the one artifact that both carries a rider and takes the
+weapon slot, in all three stat tables the parity contract holds to each other - which is the genre's
+own reason it is the default: you do not choose between going and fighting. That made a second rule
+necessary. `equipment.bind` takes an item *out* of the inventory to make it an equipment instance, so
+a mount read only off `inventory` would have stopped flying the moment its owner bound it, which is
+exactly backwards - binding it is what makes it theirs. The lookup reads both, and a sword broken to
+nothing carries nobody.
+
+Underneath it, the roads got their ground back. Twenty locations had no `terrain` at all, among them
+all three higher-world capitals, so every journey to or from Spirit Jade Capital, Nine-Heavens
+Immortal Court or Celestial Mandate Palace was priced by the fallback branch - a flat seventy-five
+minutes, the same for a jade terrace as for a volcanic pass. All 102 travel endpoints in the world
+carry terrain now; the remaining 375 locations are districts, gates, shops and auction floors inside
+them, which no road ever ends at.
+
 **1.0.0** (rc.14) repairs a broken call in `/sense` and closes the class of fault it belongs to.
 Sensing another cultivator called `WORLD.approximate_realm(...)`, and there is no such method on
 `World`: the function lives in `app/rules/sense.py` and takes its two realm lookups as arguments, so
