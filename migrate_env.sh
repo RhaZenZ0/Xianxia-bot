@@ -42,6 +42,16 @@ while [ $# -gt 0 ]; do
     shift
 done
 
+# Say which tool is missing, rather than failing at a line number in the
+# middle of the run - which is exactly how `comm` announced itself on a QNAP.
+# update.sh carries the same preflight for the same reason.
+for cmd in awk sed grep sort tr cat cp mv rm chmod mktemp date wc tail dirname; do
+    command -v "$cmd" >/dev/null 2>&1 || {
+        echo "ERROR: this script needs '$cmd' and it is not on PATH." >&2
+        exit 1
+    }
+done
+
 [ -f "$TEMPLATE" ] || { echo "ERROR: no template at $TEMPLATE." >&2; exit 1; }
 if [ ! -f "$ENV_FILE" ]; then
     echo "ERROR: no .env at $ENV_FILE." >&2
@@ -100,7 +110,12 @@ done < "$TEMPLATE"
 # Anything the operator has that this release no longer ships. Kept, and said
 # out loud - a key removed from .env.example is usually a key the code stopped
 # reading, but "usually" is not a reason to delete somebody's token.
-comm -23 "$WORK/env-keys" "$WORK/template-keys" > "$WORK/orphans"
+# The keys the operator has that the template does not. `comm` would say this
+# in one word and is not on a QNAP - BusyBox there ships without it, which is
+# what broke the first run of this script on the NAS. awk is in the set
+# update.sh already preflights, so it is the one to use.
+awk 'NR==FNR { seen[$0] = 1; next } !($0 in seen)' \
+    "$WORK/template-keys" "$WORK/env-keys" > "$WORK/orphans"
 if [ -s "$WORK/orphans" ]; then
     {
         printf '\n'
@@ -145,7 +160,10 @@ if [ "$DRY_RUN" -eq 1 ]; then
     exit 0
 fi
 
-if cmp -s "$WORK/new-env" "$ENV_FILE"; then
+# Compared as strings rather than with `cmp`, which BusyBox can also be built
+# without. Command substitution strips trailing newlines from both sides
+# equally, so two files that differ only there are correctly seen as equal.
+if [ "$(cat "$WORK/new-env")" = "$(cat "$ENV_FILE")" ]; then
     echo
     echo "$ENV_FILE already matches this release's template. Nothing written."
     exit 0
