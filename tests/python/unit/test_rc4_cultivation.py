@@ -44,22 +44,31 @@ class FourPagesNamedAfterTheWork(unittest.TestCase):
     def test_the_hub_is_four_pages_and_every_action_is_still_on_one(self):
         surface, hubs, _, _, _ = _modules()
         hub = surface._HUB_BY_NAME["cultivation"]
-        # v1.0.0-rc.7 adds the Qi Body page and v1.0.0-rc.8 the Ghost road.
-        self.assertEqual([page.label for page in hub.pages], ["Cultivate", "Body", "Qi Body", "Ghost", "Path", "Arts"])
+        # v1.0.0-rc.7 adds the Qi Body page, rc.8 the Ghost road, and rc.13
+        # splits Laws off Path - which was eleven actions on a page that shows
+        # eight. The count is not the claim; the claim is that a page is a
+        # thing you are doing, and that no page overflows.
+        self.assertEqual([page.label for page in hub.pages],
+                         ["Cultivate", "Body", "Qi Body", "Ghost", "Path", "Laws", "Arts"])
+        for page in hub.pages:
+            self.assertLessEqual(len(hubs._leaf_actions(page)), hubs._LAYOUT_ACTION_LIMIT, page.label)
         paths = {action.path for page in hub.pages for action in hubs._leaf_actions(page)}
         for expected in ("/cultivate", "/stance", "/insight", "/breakthrough", "/seclusion end",
                          "/body cultivate", "/aptitude temper", "/law comprehend",
-                         "/manual study", "/profession status", "/conceal",
+                         "/manual study", "/conceal",
                          "/dantian refine", "/meridian open", "/meridian heal",
                          "/ghost status", "/ghost harvest", "/ghost appease"):
             self.assertIn(expected, paths, expected)
+        # `/profession status` is the Craft hub's one home (rc.13): it used to
+        # be listed here as well, one handler appearing on two hubs.
+        self.assertNotIn("/profession status", paths)
 
     def test_a_page_that_gathers_several_roots_names_its_rows_in_full(self):
         surface, hubs, _, _, _ = _modules()
         pages = {page.label: page for page in surface._HUB_BY_NAME["cultivation"].pages}
-        labels = {action.label for action in hubs._leaf_actions(pages["Path"])}
-        self.assertIn("Law Status", labels)
-        self.assertIn("Aptitude Status", labels)
+        labels = {action.label for action in hubs._leaf_actions(pages["Cultivate"])}
+        self.assertIn("Seclusion Start", labels)
+        self.assertIn("Breakthrough", labels)
         # A page with one command keeps the short labels it always had.
         self.assertEqual({a.label for a in hubs._leaf_actions(pages["Body"])}, {"Sheet", "Cultivate", "Breakthrough"})
 
@@ -70,7 +79,7 @@ class FourPagesNamedAfterTheWork(unittest.TestCase):
             (["Cultivate", "Insight"], "/insight"),
             (["Cultivate", "Stance"], "/stance"),
             (["Body", "Breakthrough"], "/body breakthrough"),
-            (["Path", "Comprehend"], "/law comprehend"),
+            (["Laws", "Comprehend"], "/law comprehend"),
             (["Path", "Harmonize"], "/aptitude harmonize"),
             (["Arts", "Study"], "/manual study"),
         ):

@@ -439,7 +439,7 @@ async def shop_here(interaction:discord.Interaction)->None:
         else:
             lines.append(f"• {_shop_kind(str(row.get('kind')))} — not found yet (tier {int(row.get('tier') or 1)}).")
     if int(here.get("found") or 0)<int(here.get("total") or 0):
-        lines.append("Walk the city with **/world → Explore** to find the rest.")
+        lines.append("Walk the city with **/world → Act → Explore** to find the rest.")
     await interaction.response.send_message("\n".join(lines),ephemeral=False)
 
 

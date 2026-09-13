@@ -57,8 +57,10 @@ class CommandCleanupTests(unittest.TestCase):
         source = bot_package_source()
         wiring = bot_module_defining("_MIGRATED_ROOTS").read_text(encoding="utf-8")
         self.assertIn('"explore"', wiring[wiring.index("_MIGRATED_ROOTS"):wiring.index("_ROOT_ACTIONS")])
-        self.assertIn('_hub_page("explore", "Explore"', source)
-        self.assertIn("**/world → Explore**", source)
+        # rc.13 renames the page: Explore and Hunt are both things you do with
+        # the place you are standing in, so they share one page keyed "explore".
+        self.assertIn('_hub_page("explore", "Act"', source)
+        self.assertIn("**/world → Act → Explore**", source)
         self.assertIn("**/action**", source)
         self.assertNotIn("**/explore**", source)
         self.assertNotIn("**/act**", source)

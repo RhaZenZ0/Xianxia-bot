@@ -98,7 +98,7 @@ async def cultivate(interaction: discord.Interaction) -> None:
         extra += f"\n💡 Refining banks **+{int(result['insight_xp_gain'])} Insight XP** toward the realm gate."
     deviation = dict(result.get("deviation") or {})
     if deviation:
-        extra += f"\n⚠️ The forced qi ran wild: **{deviation.get('name') or 'Qi Deviation'}** (severity {int(deviation.get('severity', 1))}). Treat it under **/character → Treatment**, or it drags every session down."
+        extra += f"\n⚠️ The forced qi ran wild: **{deviation.get('name') or 'Qi Deviation'}** (severity {int(deviation.get('severity', 1))}). Treat it under **/character → Afflictions**, or it drags every session down."
     if result.get("stage_full") and not gain:
         extra += "\n🪷 This stage is already full: the session gathered nothing, banked nothing and risked nothing. Break through before meditating again."
     ready = ""
@@ -1092,7 +1092,7 @@ async def meridian_open(interaction: discord.Interaction) -> None:
         if deviation:
             lines.append(
                 f"⚠️ **{deviation.get('name') or 'Qi Deviation'}** (severity {int(deviation.get('severity', 1))}/5). "
-                "Treat it under **/character → Treatment**."
+                "Treat it under **/character → Afflictions**."
             )
     lines.append(
         f"Spent **{int(result.get('insight_spent', 0))} Insight XP** and **{int(result.get('qi_spent', 0)):,}** qi; "

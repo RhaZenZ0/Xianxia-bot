@@ -188,24 +188,25 @@ _HUB_DEFINITIONS = (
         title="🧑 Cultivator — Character Hub",
         description="Identity, public character state, consequences, relationships and Samsara.",
         pages=(
-            _hub_page("sheet", "Overview", "Your main character sheet and public cultivation overview."),
-            _hub_page("gender", "Sex", "Male/Female identity used for gendered titles and forms of address."),
-            _hub_page("lifespan", "Lifespan", "Age, lifespan and mortality state."),
-            _hub_page("karma", "Karma", "Metaphysical karma and its known consequences."),
-            _hub_page("fate", "Fate", "Spendable providence that can avert true death and grows through major fortunate deeds."),
+            # Six pages, not eighteen (v1.0.0-rc.13). Fourteen of the old
+            # eighteen held a single read - nobody opens "Karma" to see one
+            # number, they open the sheet - so the reads that describe who you
+            # are now arrive together, and the pages that remain are the ones
+            # a player actually navigates to.
+            _hub_page("sheet", "Overview", "Who you are now: the sheet, your age and longevity, karma, Dao heart, standing, inheritances, soul legacy and how the realms address you.",
+                      "lifespan", "karma", "daoheart", "reputation", "inheritances", "soul", "gender"),
+            # One page for "something is wrong with me". It was three - generic
+            # effects, special/Law/curse/domain effects, and persistent
+            # conditions - and curses were named by two of the three, so a
+            # player who felt wrong had to check all of them to find out why.
+            _hub_page("effects", "Afflictions", "Everything currently acting on you: buffs, debuffs, curses, Law, domain and control effects, persistent injuries and deviations - and their treatment.",
+                      "specialeffects", "condition"),
             _hub_page("bond", "Dao Partnership", "Consensual partnership, paired cultivation resonance and Samsara partner echoes."),
-            _hub_page("daoheart", "Dao Heart", "Dao-heart stability and sworn commitments."),
-            _hub_page("reputation", "Reputation", "Persistent faction and social reputation."),
-            _hub_page("grudges", "Grudges", "Personal, family and faction grudges."),
-            _hub_page("crime", "Crimes", "Jurisdictional crimes, evidence and atonement."),
-            _hub_page("bounty", "Bounties", "Active capture/death bounties."),
-            _hub_page("inheritances", "Inheritances", "Ancient inheritances you have obtained."),
-            _hub_page("effects", "Conditions & Effects", "Generic buffs, debuffs, curses and conditions."),
-            _hub_page("specialeffects", "Special Effects", "Law, domain, curse and control effects."),
-            _hub_page("condition", "Treatment", "Inspect and treat persistent injuries and deviations."),
-            _hub_page("soul", "Soul", "Soul state and legacy across incarnations."),
-            _hub_page("afterlife", "Samsara", "Afterlife state and reincarnation timing."),
-            _hub_page("reincarnate", "Reincarnate", "Begin the next incarnation when Samsara permits it."),
+            _hub_page("crime", "Consequences", "What the world holds against you: open crimes and atonement, active capture and death bounties, and standing grudges.",
+                      "bounty", "grudges"),
+            _hub_page("fate", "Fate", "Spendable providence that can avert true death and grows through major fortunate deeds."),
+            _hub_page("afterlife", "Samsara", "Afterlife state, reincarnation timing, and the next incarnation when the wheel permits it.",
+                      "reincarnate"),
         ),
     ),
     HubDefinition(
@@ -236,8 +237,14 @@ _HUB_DEFINITIONS = (
             # commands say plainly who may walk it - because a road nobody can
             # see is a road nobody learns exists.
             _hub_page("ghost", "Ghost", "The ghost road: death qi from the ground the living have left, the residue it leaves, and the rites that lift it."),
-            _hub_page("aptitude", "Path", "What you were born with and what you comprehend: roots, bloodlines, physiques, and the Laws.", "law"),
-            _hub_page("manual", "Arts", "Manuals and techniques, profession mastery, and the concealment of your aura.", "profession", "conceal"),
+            # Path and Laws are two pages (v1.0.0-rc.13): together they were
+            # eleven actions on a page that shows eight, so three of them sat
+            # behind a Next button with nothing to say they were there.
+            _hub_page("aptitude", "Path", "What you were born with: spiritual roots, bloodlines and special physiques - inspect them, awaken, temper, harmonize and evolve."),
+            _hub_page("law", "Laws", "What you comprehend: Law and Dao comprehension, meditation on a Law, and the techniques it unlocks."),
+            # `profession` is the Craft hub's - it was listed in both, one
+            # handler appearing twice.
+            _hub_page("manual", "Arts", "Manuals and techniques, and the concealment of your aura.", "conceal"),
         ),
     ),
     HubDefinition(
@@ -258,9 +265,10 @@ _HUB_DEFINITIONS = (
         title="👥 NPC Hub",
         description="Public, location-aware NPC inspection and interaction.",
         pages=(
-            _hub_page("npcinfo", "Inspect", "View public information for a known NPC."),
-            _hub_page("talk", "Talk", "Speak with a persistent NPC."),
-            _hub_page("sense", "Sense", "Use Spiritual Sense on NPCs, players or the area."),
+            # One page (v1.0.0-rc.13): three pages of one action each, in a hub
+            # whose every page was one action. Eight fit on a page.
+            _hub_page("npcinfo", "People", "Inspect a known NPC, speak with one, or turn Spiritual Sense on a person, a cultivator or the area.",
+                      "talk", "sense"),
         ),
     ),
     HubDefinition(
@@ -268,17 +276,16 @@ _HUB_DEFINITIONS = (
         title="🌍 World Hub",
         description="Your location, local actions, current events, civilization and world laws.",
         pages=(
-            _hub_page("world", "Current Location", "Show the current world and known locations."),
+            # Four pages, not eleven (v1.0.0-rc.13). Six of the old eleven were
+            # a single read answering one question - what is true in the world
+            # right now - so they answer it together.
+            _hub_page("world", "Almanac", "What is true in the world right now: where you are and what you have discovered, the era and the calendar, its rulers, its laws, and the phenomena currently running.",
+                      "era", "time", "rulers", "worldrules", "worldevents"),
             _hub_page("city", "City", "The city you are in: its gates and districts, the commission board, the sect envoys' hall, the rumours and the inn."),
-            _hub_page("explore", "Explore", "Explore the current location for events and discoveries."),
-            _hub_page("hunt", "Hunt", "Hunt a spirit beast at the current location."),
-            _hub_page("worldevents", "Events", "Active phenomena, consequences and realm openings."),
-            _hub_page("civilization", "Civilization", "Population, security and named regional NPC activity."),
-            _hub_page("scene", "Scene", "Current roleplay scene and in-world time."),
-            _hub_page("era", "Era", "The active era and cycle transitions."),
-            _hub_page("time", "Time", "Canonical cultivation calendar."),
-            _hub_page("rulers", "Rulers", "Publicly recognized rulers."),
-            _hub_page("worldrules", "World Laws", "Rules governing NPCs, sects, families and forbidden arts."),
+            _hub_page("explore", "Act", "What you can do with this place: explore it for events and discoveries, or hunt the spirit beasts that range here.",
+                      "hunt"),
+            _hub_page("scene", "Here", "This spot: the running scene and its in-world time, and the region's population, security and named NPC activity.",
+                      "civilization"),
         ),
     ),
     HubDefinition(

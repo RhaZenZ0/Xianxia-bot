@@ -38,7 +38,7 @@ async def law_status(interaction:discord.Interaction)->None:
     c=await require_character(interaction)
     if not c:return
     rows=await DB.get_law_progress(interaction.user.id); daos=await DB.get_dao_progress(interaction.user.id)
-    if not rows: await interaction.response.send_message("You have not begun comprehending a Law. Use **/cultivation → Path → Comprehend** when your realm is sufficient.",ephemeral=False); return
+    if not rows: await interaction.response.send_message("You have not begun comprehending a Law. Use **/cultivation → Laws → Comprehend** when your realm is sufficient.",ephemeral=False); return
     lines=[f"⚖️ **Law Comprehension — {c['name']}**"]
     for row in rows[:12]:
         d=WORLD.law_definition(str(row['law_id'])) or {}; stage=WORLD.law_stage(int(row['comprehension']))
