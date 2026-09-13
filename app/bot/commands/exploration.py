@@ -2,8 +2,8 @@
 
 Split phase 9c (v0.19.46, docs/history/MAIN_SPLIT_PLAN.md). Cut verbatim from
 main.py in definition order (one contiguous block); reads only modules
-below main.py. `_run_crafting` stays here because `craft` and
-`/alchemy refine` are its only two callers and both live in this file.
+below main.py. `_run_crafting` stays here because `craft` is its only caller
+and lives in this file.
 """
 from __future__ import annotations
 
@@ -594,21 +594,7 @@ async def recipe_autocomplete(
     return [app_commands.Choice(name=name[:100], value=name[:100]) for name in names]
 
 
-async def alchemy_recipe_autocomplete(
-    interaction: discord.Interaction, current: str
-) -> list[app_commands.Choice[str]]:
-    needle = current.casefold().strip()
-    names = [
-        name for name, recipe in WORLD.recipes.items()
-        if str(recipe.get("profession", "")).casefold() == "alchemy"
-        and (not needle or needle in name.casefold())
-    ]
-    return [app_commands.Choice(name=name[:100], value=name[:100]) for name in sorted(names)[:25]]
-
-
-async def _run_crafting(
-    interaction: discord.Interaction, recipe: str, *, required_profession: str | None = None,
-) -> None:
+async def _run_crafting(interaction: discord.Interaction, recipe: str) -> None:
     c = await require_character(interaction)
     if not c:
         return
@@ -619,13 +605,6 @@ async def _run_crafting(
             ephemeral=False,
         )
         return
-    profession = str(r["profession"])
-    if required_profession and profession.casefold() != str(required_profession).casefold():
-        await interaction.response.send_message(
-            f"**{recipe}** is a **{profession}** recipe, not {required_profession}.", ephemeral=False,
-        )
-        return
-
     try:
         envelope = await ENGINE.authoritative_action(
             "craft.resolve",
@@ -779,13 +758,6 @@ async def alchemy_status(interaction: discord.Interaction) -> None:
                 f"`#{batch['batch_id']}` **{batch['recipe_name']}** • {str(batch['quality']).title()} • margin {int(batch['margin']):+d} • {result_text}"
             )
     await reply_long(interaction, "\n".join(lines), ephemeral=False)
-
-
-@registered_group_command(alchemy_group, name="refine", description="Refine a pill recipe using the connected Alchemy crafting system")
-@app_commands.autocomplete(recipe=alchemy_recipe_autocomplete)
-@serialized_user_action
-async def alchemy_refine(interaction: discord.Interaction, recipe: str) -> None:
-    await _run_crafting(interaction, recipe, required_profession="Alchemy")
 
 
 @registered_group_command(alchemy_group, name="forage", description="Gather medicinal herbs using the current region's simulated spirit resources")

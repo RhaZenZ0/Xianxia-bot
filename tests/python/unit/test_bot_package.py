@@ -574,7 +574,7 @@ OWNERS = {
     # Cross-domain helpers: each has callers in two command modules and sits
     # on the side the import edge points to.
     "commands/sect.py": ("_sect_recruitment_at_location",),   # read by exploration (explore road discovery)
-    "commands/exploration.py": ("_run_crafting",),            # craft and /alchemy refine
+    "commands/exploration.py": ("_run_crafting",),            # `craft`; `/alchemy refine` was the same call and is gone
     "commands/battle.py": ("_battle_panel", "_execute_battle_law_technique"),  # read by law and BattleView
     "commands/scene.py": ("_scene_action_targets", "scene_action_panel"),
     "surface.py": ("_GROUP_ACTION_ROOTS", "_MIGRATED_ROOTS", "_ROOT_ACTIONS", "_HUB_DEFINITIONS",
@@ -800,7 +800,7 @@ SURFACE = {
         "groups": ('alchemy_group', 'realmhub_group', 'city_group', 'travel_group'),
         "roots": ('explore', 'hunt', 'craft'),
         "leaves": {
-            "alchemy_group": ('status', 'refine', 'forage', 'purge'),
+            "alchemy_group": ('status', 'forage', 'purge'),
             "city_group": ('look', 'board', 'accept', 'envoys', 'rumours', 'inn'),
             "realmhub_group": ('status', 'go'),
             "travel_group": ('go', 'status'),
