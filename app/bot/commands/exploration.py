@@ -490,7 +490,7 @@ async def explore(interaction: discord.Interaction) -> None:
                 await interaction.followup.send("The account above is the world's plain record.", view=narrate_view, ephemeral=False)
     else:
         await reply_long(
-            interaction, full_exploration + "\n\n⚠️ No private expedition thread is configured. Ask an admin to bind the existing channel in the admin dashboard, then run **/admin → Server → Base Channels → Validate / bind**.",
+            interaction, full_exploration + "\n\n⚠️ No private expedition thread is configured. Ask an admin to bind the existing channel in the admin dashboard, then run **/admin → Server → Basechannels**.",
             ephemeral=False,
         )
         if discovered_location:
@@ -605,6 +605,10 @@ async def _run_crafting(interaction: discord.Interaction, recipe: str) -> None:
             ephemeral=False,
         )
         return
+    # The recipe's profession is printed on every result line below and decides
+    # the alchemy-only batch wording. It was removed with the `required_profession`
+    # gate in the same edit, which left three uses of a name nothing defined.
+    profession = str(r["profession"])
     try:
         envelope = await ENGINE.authoritative_action(
             "craft.resolve",

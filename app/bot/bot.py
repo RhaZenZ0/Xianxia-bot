@@ -369,7 +369,7 @@ class XianxiaBot(commands.Bot):
             titles = "\n".join(f"• {row['title']} (`{row['quest_key']}`)" for row in created)
             await post_server_log(
                 self.get_guild(SETTINGS.guild_id), "Quest drafts ready",
-                f"The Forge drafted {len(created)} quest(s) from recent world history. Review with **/admin world quests**.\n{titles}",
+                f"The Forge drafted {len(created)} quest(s) from recent world history. Review with **/admin → World → Quests**.\n{titles}",
             )
         return created
 
