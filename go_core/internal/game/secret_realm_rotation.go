@@ -104,6 +104,16 @@ func RotateSecretRealms(conn *storage.Conn, catalog worlddata.Catalog, gm int64)
 
 // SecretRealmRotationView is what the dashboard and the rumours ask: which
 // realm opened last, which is next, and when.
+//
+// It carries the names and locations, and the order, because the one caller
+// that wanted them used to work them out for itself. The GM dashboard read
+// content/world.json on every request and reimplemented the interval, the
+// catalogue ordering and the "which is next" arithmetic in Python - a second
+// copy of a rule this engine owns, which had already drifted: on a world that
+// has never rotated, Go answers "the next tick" and the Python copy answered
+// "the first interval after minute zero". Adding the display fields here is
+// what lets that copy go. Every field is additive; secret_realm.status nests
+// the same map under "rotation".
 func SecretRealmRotationView(conn *storage.Conn, catalog worlddata.Catalog, gm int64) (map[string]any, error) {
 	ids := secretRealmIDs(catalog)
 	state, err := readSecretRealmRotationTx(conn)
@@ -117,5 +127,15 @@ func SecretRealmRotationView(conn *storage.Conn, catalog worlddata.Catalog, gm i
 	if state.LastGameMinute == 0 {
 		out["next_game_minute"] = gm
 	}
+	order := make([]map[string]any, 0, len(ids))
+	for _, id := range ids {
+		realm := catalog.SecretRealms[id]
+		order = append(order, map[string]any{"realm_id": id, "name": realm.Name, "location": realm.Location})
+	}
+	out["order"] = order
+	last := catalog.SecretRealms[state.LastRealmID]
+	out["last_realm_name"], out["last_location"] = last.Name, last.Location
+	next := catalog.SecretRealms[fmt.Sprint(out["next_realm_id"])]
+	out["next_realm_name"], out["next_location"] = next.Name, next.Location
 	return out, nil
 }

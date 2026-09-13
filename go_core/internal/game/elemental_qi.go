@@ -37,15 +37,6 @@ var elementRelationRank = map[string]int{
 	relationGenerative: 3, relationResonant: 4,
 }
 
-// manualElementOf is the kind of qi a method draws.
-func manualElementOf(catalog worlddata.Catalog, manualID string) string {
-	definition, ok := catalog.TechniqueSystem.Manuals[strings.TrimSpace(manualID)]
-	if !ok {
-		return ""
-	}
-	return strings.TrimSpace(definition.Element)
-}
-
 // elementPhase is the phase of the five an element stands with. A phase stands
 // with itself; Void and Chaos stand with none, and neither does anything the
 // content has not placed.

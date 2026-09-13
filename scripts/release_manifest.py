@@ -43,6 +43,12 @@ EXCLUDED_NAMES = frozenset({
 # Suffixes excluded anywhere in the tree.
 EXCLUDED_SUFFIXES = (".pyc", ".pyo", ".sqlite3", ".sqlite3-wal", ".sqlite3-shm", ".log")
 
+# Prefixes excluded anywhere in the tree. `.env.bak.<stamp>` is what
+# migrate_env.sh leaves behind, and it holds the same tokens .env does - it is
+# excluded by prefix rather than by name because the stamp makes every one of
+# them a different filename.
+EXCLUDED_PREFIXES = (".env.bak.",)
+
 
 def iter_release_files(root: Path):
     """Every file the manifest covers, in deterministic sorted order."""
@@ -53,6 +59,8 @@ def iter_release_files(root: Path):
         if any(part in EXCLUDED_DIRS for part in relative.parts[:-1]):
             continue
         if relative.name in EXCLUDED_NAMES or relative.name.endswith(EXCLUDED_SUFFIXES):
+            continue
+        if relative.name.startswith(EXCLUDED_PREFIXES):
             continue
         yield relative, path
 

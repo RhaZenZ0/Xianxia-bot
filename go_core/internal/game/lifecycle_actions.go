@@ -413,7 +413,6 @@ func absI64(v int64) int64 {
 	return v
 }
 
-var samsaraSurnames = []string{"Chen", "Lin", "Zhao", "Shen", "Wei", "Su", "Bai", "Gu", "Han", "Luo", "Xu", "Yan", "Jiang", "Qin", "Mu", "Tang", "Ye", "Feng", "Song", "Xie"}
 var samsaraMale = []string{"Wei", "Jun", "Hao", "Tian", "Rui", "Feng", "Ming", "Bo", "Jian", "Kai"}
 var samsaraFemale = []string{"Mei", "Lan", "Yue", "Xue", "Ling", "Hua", "Ning", "Qiao", "Yan", "Rin"}
 

@@ -411,3 +411,100 @@ class UpdaterManifestPortabilityTests(unittest.TestCase):
     def test_both_the_package_and_the_installed_tree_are_verified(self):
         self.assertIn('verify_manifest_tree "$NEW_ROOT"', self.UPDATE)
         self.assertIn('verify_manifest_tree "$PROJECT_DIR"', self.UPDATE)
+
+
+class UpdaterPostInstallManifestTests(unittest.TestCase):
+    """The post-install check runs before the updater is swapped in.
+
+    Both install loops skip `update.sh` on purpose, and the new one waits at
+    `.update.sh.next` until the commit point, so that an install which fails
+    can still roll back with the updater it started with. That left the
+    post-install check comparing the PREVIOUS release's `update.sh` against the
+    NEW manifest, which lists it (line 444 of a 444-line manifest) - so every
+    release that changed the updater aborted its own upgrade into a rollback,
+    after the files were already in place, reporting a tree that was otherwise
+    byte-perfect.
+
+    These run the real helper out of update.sh rather than reading it, because
+    the previous tests in this file assert the check's *shape* and this is a
+    bug in what it does.
+    """
+
+    UPDATE = (PROJECT_ROOT / "update.sh").read_text(encoding="utf-8")
+
+    @classmethod
+    def _extract_helper(cls) -> str:
+        lines = cls.UPDATE.splitlines()
+        start = next(i for i, line in enumerate(lines) if line.startswith("verify_manifest_tree() {"))
+        end = next(i for i in range(start + 1, len(lines)) if lines[i] == "}")
+        return "\n".join(lines[start:end + 1])
+
+    def _run(self, tree, skip):
+        """Run the real verify_manifest_tree over `tree`; return its exit status."""
+        import subprocess
+        runner = tree / "runner.sh"
+        runner.write_text(
+            "set -eu\n" + self._extract_helper()
+            + '\nverify_manifest_tree "$1" "$2" "post-install check failed" "$3"\n',
+            encoding="utf-8",
+        )
+        return subprocess.run(
+            ["sh", str(runner), str(tree / "install"), str(tree / "check.log"), skip],
+            capture_output=True, text=True,
+        ).returncode
+
+    def _tree(self):
+        """A tree in the state the post-install check actually sees: every file
+        matching the new manifest except update.sh, which is still the old one."""
+        import hashlib
+        import tempfile
+        from pathlib import Path
+        tree = Path(tempfile.mkdtemp())
+        self.addCleanup(__import__("shutil").rmtree, tree, True)
+        install = tree / "install"
+        install.mkdir()
+        (install / "app.py").write_text("the new release\n", encoding="utf-8")
+        # The manifest names the NEW updater...
+        new_updater = b"#!/bin/sh\n# the new updater\n"
+        digest = hashlib.sha256(new_updater).hexdigest()
+        app_digest = hashlib.sha256((install / "app.py").read_bytes()).hexdigest()
+        (install / "RELEASE_MANIFEST.sha256").write_text(
+            f"{app_digest}  app.py\n{digest}  update.sh\n", encoding="utf-8",
+        )
+        # ...but the tree still carries the OLD one, as it does at this point.
+        (install / "update.sh").write_bytes(b"#!/bin/sh\n# the previous updater\n")
+        return tree
+
+    @unittest.skipUnless(
+        __import__("shutil").which("sha256sum") or __import__("shutil").which("shasum"),
+        "needs a checksum tool",
+    )
+    def test_a_stale_updater_does_not_fail_the_post_install_check(self):
+        self.assertEqual(
+            self._run(self._tree(), "update.sh"), 0,
+            "the post-install check still fails on the updater it deliberately left behind",
+        )
+
+    @unittest.skipUnless(
+        __import__("shutil").which("sha256sum") or __import__("shutil").which("shasum"),
+        "needs a checksum tool",
+    )
+    def test_everything_else_is_still_checked(self):
+        """The skip is one line, not an off switch."""
+        tree = self._tree()
+        (tree / "install" / "app.py").write_text("tampered\n", encoding="utf-8")
+        self.assertEqual(
+            self._run(tree, "update.sh"), 1,
+            "skipping update.sh stopped the rest of the tree from being checked",
+        )
+
+    def test_the_post_install_call_is_the_only_one_that_skips_anything(self):
+        """The package check has no updater to defer, so it verifies the lot."""
+        self.assertIn(
+            '"Post-install tree does not match RELEASE_MANIFEST.sha256." "update.sh"',
+            self.UPDATE,
+        )
+        package = self.UPDATE[self.UPDATE.index('verify_manifest_tree "$NEW_ROOT"'):]
+        package = package[:package.index("|| return 1")]
+        self.assertNotIn("update.sh", package,
+                         "the package check must verify the new update.sh, not skip it")

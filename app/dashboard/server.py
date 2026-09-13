@@ -304,6 +304,11 @@ class ReadOnlyDashboardStore:
         self.path = Path(path)
         engine_url = os.getenv("GAME_ENGINE_URL", "").strip()
         self._go_transport = GoDatabaseTransport(engine_url) if engine_url else None
+        # Almost every read here is SQL through the query-only session above.
+        # A few answers are not rows at all but rules the engine owns - the
+        # secret-realm rotation is the first - and those are asked for as
+        # authoritative queries rather than recomputed on this side.
+        self._engine = GameEngineClient(engine_url) if engine_url else None
         self._quest_world: _QuestWorld | None = None
 
     def quest_world(self) -> _QuestWorld:
@@ -808,41 +813,30 @@ class ReadOnlyDashboardStore:
             civilization_events = await self._fetchall(db, "SELECT * FROM civilization_events ORDER BY game_minute DESC,event_id DESC LIMIT 100")
             era = await self._fetchall(db, "SELECT * FROM world_eras ORDER BY active DESC,started_game_minute DESC") if await self._table_exists(db, "world_eras") else []
             era_events = await self._fetchall(db, "SELECT * FROM world_era_events ORDER BY game_minute DESC,event_id DESC LIMIT 100") if await self._table_exists(db, "world_era_events") else []
-            rotation = await self._secret_realm_rotation(db)
-            return {"world_events": world_events, "regions": civilization, "civilization_events": civilization_events, "eras": era, "era_events": era_events, "secret_realm_rotation": rotation}
+        return {"world_events": world_events, "regions": civilization, "civilization_events": civilization_events, "eras": era, "era_events": era_events, "secret_realm_rotation": await self._secret_realm_rotation()}
 
-    async def _secret_realm_rotation(self, db) -> dict[str, Any]:
-        """The realm rotation (v1.0.0-rc.2): what the tick keeps in world_state
-        and what the catalogue says comes next. Reads only."""
-        row = await self._fetchone(db, "SELECT value_json FROM world_state WHERE key='secret_realm_rotation'")
-        state: dict[str, Any] = {}
-        if row:
-            try:
-                state = dict(json.loads(str(row.get("value_json") or "{}")))
-            except Exception:
-                state = {}
+    async def _secret_realm_rotation(self) -> dict[str, Any]:
+        """The realm rotation, as the engine reports it (v1.0.0).
+
+        This used to be a Python reimplementation: it read world_state, then
+        parsed the whole 2.3 MB content pack on every request to turn realm ids
+        into names, and repeated the engine's interval, its catalogue ordering
+        and its "which is next" arithmetic. Three copies of one rule, and they
+        had already parted company - on a world that had never rotated the
+        engine said "the next tick" and this said "the first interval after
+        minute zero". `secret_realm.rotation` is that rule, asked once.
+
+        The actor is 0: the schedule belongs to the world, not to a cultivator.
+        A dashboard with no engine configured is the local test path, and gets
+        an empty panel rather than a stale guess.
+        """
+        if self._engine is None:
+            return {}
         try:
-            realms = dict(json.loads((ROOT / "content" / "world.json").read_text(encoding="utf-8")).get("secret_realms") or {})
-        except Exception:
-            realms = {}
-        ids = sorted(realms)
-        index = int(state.get("index") or 0)
-        next_id = ids[index % len(ids)] if ids else ""
-        last_id = str(state.get("last_realm_id") or "")
-        interval = 3 * 24 * 60
-        return {
-            "realms": len(ids),
-            "interval_minutes": interval,
-            "last_realm_id": last_id,
-            "last_realm_name": str((realms.get(last_id) or {}).get("name") or ""),
-            "last_location": str((realms.get(last_id) or {}).get("location") or ""),
-            "last_game_minute": int(state.get("last_game_minute") or 0),
-            "next_realm_id": next_id,
-            "next_realm_name": str((realms.get(next_id) or {}).get("name") or ""),
-            "next_location": str((realms.get(next_id) or {}).get("location") or ""),
-            "next_game_minute": int(state.get("last_game_minute") or 0) + interval,
-            "order": [{"realm_id": rid, "name": str(realms[rid].get("name") or rid), "location": str(realms[rid].get("location") or "")} for rid in ids],
-        }
+            return dict(await self._engine.action("secret_realm.rotation", 0, {}) or {})
+        except (GameEngineError, OSError) as exc:
+            log.warning("Could not read the secret realm rotation from the engine: %s", exc)
+            return {}
 
     async def players(self, *, limit: int = 200) -> dict[str, Any]:
         limit = max(1, min(500, int(limit)))

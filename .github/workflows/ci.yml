@@ -139,7 +139,7 @@ jobs:
           # that tree - `sha256sum -c` checks the files the manifest lists and
           # ignores any other, so both checks stay honest.
           printf '%s\n' "${GITHUB_REF_NAME}" > RELEASE_TAG
-          zip -qr "/tmp/$asset" . -x '*/__pycache__/*' '*.pyc' '.env' 'data/*' '.git/*' '.pytest_cache/*' '.ruff_cache/*' '.claude/*'
+          zip -qr "/tmp/$asset" . -x '*/__pycache__/*' '*.pyc' '.env' '.env.bak.*' 'data/*' '.git/*' '.pytest_cache/*' '.ruff_cache/*' '.claude/*'
           (cd /tmp && sha256sum "$asset" > "$asset.sha256")
           unzip -p "/tmp/$asset" VERSION
           cat "/tmp/$asset.sha256"

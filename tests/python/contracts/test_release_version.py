@@ -41,8 +41,33 @@ class ReleaseVersionTests(unittest.TestCase):
         versions = (root / "VERSIONS.md").read_text(encoding="utf-8")
         self.assertIn(f"## Release status — v{__version__}", versions)
         self.assertIn(f"- Current release: v{__version__}", versions)
+
+    def test_the_schema_version_is_stated_consistently_everywhere(self):
+        """rc bar: every prose statement of the schema number is the number
+        app/database actually enforces.
+
+        The README was already held here; CLAUDE.md was not, and that is
+        exactly the one that drifted - it was bumped to 39 for v0.39.0 and
+        then v1.0.0-rc.7 and rc.8 added schemas 40 and 41 without touching
+        it, so the file an agent reads first described a database two
+        migrations behind the one it would open. VERSIONS.md is checked too,
+        so a new schema cannot land without its history line: that list is
+        what an operator upgrading an old database reads.
+        """
+        root = PROJECT_ROOT
         from app.database import SCHEMA_VERSION
-        self.assertIn(f"The current schema is **{SCHEMA_VERSION}**", (root / "README.md").read_text(encoding="utf-8"))
+        self.assertIn(
+            f"The current schema is **{SCHEMA_VERSION}**",
+            (root / "README.md").read_text(encoding="utf-8"),
+        )
+        self.assertIn(
+            f"Current schema version is {SCHEMA_VERSION};",
+            (root / "CLAUDE.md").read_text(encoding="utf-8"),
+        )
+        self.assertIn(
+            f"- **Schema {SCHEMA_VERSION}** ",
+            (root / "VERSIONS.md").read_text(encoding="utf-8"),
+        )
 
     def test_the_go_version_is_the_same_everywhere(self):
         """rc bar: the README's stated Go minimum is go.mod's go directive, and

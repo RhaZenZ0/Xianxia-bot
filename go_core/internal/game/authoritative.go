@@ -172,12 +172,15 @@ var authoritativeMutations = map[string]bool{
 	"commission.resolve":              true,
 }
 var authoritativeQueries = map[string]bool{
-	"character.lifespan":        true,
-	"npc.lifespan":              true,
-	"effects.current":           true,
-	"lifecycle.samsara_status":  true,
-	"sense.status":              true,
-	"secret_realm.status":       true,
+	"character.lifespan":       true,
+	"npc.lifespan":             true,
+	"effects.current":          true,
+	"lifecycle.samsara_status": true,
+	"sense.status":             true,
+	"secret_realm.status":      true,
+	// v1.0.0: the rotation on its own, for the GM dashboard, which is not an
+	// actor and wants the whole schedule rather than one cultivator's view.
+	"secret_realm.rotation":     true,
 	"exploration.event.status":  true,
 	"exploration.travel_status": true,
 	"merchant.status":           true,
@@ -645,6 +648,26 @@ func applyAuthoritativeQuery(databasePath, worldPath string, req ActionRequest) 
 		return ActionResponse{APIVersion: authoritativeAPIVersion, Operation: req.Operation, StateVersion: v, Result: result}, nil
 	case "exploration.travel_status":
 		result, qerr := travelStatusQuery(conn, req.ActorID)
+		if qerr != nil {
+			return ActionResponse{}, qerr
+		}
+		v, _ := eventledger.CurrentActorVersion(conn, req.ActorID)
+		return ActionResponse{APIVersion: authoritativeAPIVersion, Operation: req.Operation, StateVersion: v, Result: result}, nil
+	case "secret_realm.rotation":
+		// World-level: the schedule belongs to the world, not to the caller,
+		// so the actor is only what the state version is read against.
+		if strings.TrimSpace(worldPath) == "" {
+			return ActionResponse{}, errors.New("world catalog path is required")
+		}
+		catalog, loadErr := worlddata.Load(worldPath)
+		if loadErr != nil {
+			return ActionResponse{}, loadErr
+		}
+		gm, gmErr := canonicalWorldGameMinute(conn)
+		if gmErr != nil {
+			gm = 0
+		}
+		result, qerr := SecretRealmRotationView(conn, catalog, gm)
 		if qerr != nil {
 			return ActionResponse{}, qerr
 		}

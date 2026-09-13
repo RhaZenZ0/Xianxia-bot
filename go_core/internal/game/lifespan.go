@@ -13,7 +13,6 @@ import (
 )
 
 const minutesPerYear int64 = lifespanmodel.MinutesPerYear
-const immortalRealmIndex int64 = lifespanmodel.ImmortalRealmIndex
 
 const playerLifespanInactivityPauseAfter = 7 * 24 * time.Hour
 

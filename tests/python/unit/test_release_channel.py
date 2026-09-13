@@ -284,10 +284,19 @@ class WorkflowTests(unittest.TestCase):
         self.assertIn('sha256sum "$asset" > "$asset.sha256"', WORKFLOW)
         self.assertIn("/tmp/${{ steps.version.outputs.asset }}.sha256", WORKFLOW)
         self.assertIn("prerelease: ${{ steps.version.outputs.prerelease }}", WORKFLOW)
-        # The archive is built exactly as the hand-made releases were (same
-        # exclusions), and .github stays in: the manifest lists it and
-        # update.sh verifies the manifest against the extracted tree.
-        self.assertIn("-x '*/__pycache__/*' '*.pyc' '.env' 'data/*' '.git/*'", WORKFLOW)
+        # The archive is built as the hand-made releases were, and .github
+        # stays in: the manifest lists it and update.sh verifies the manifest
+        # against the extracted tree.
+        #
+        # Checked one exclusion at a time rather than as a single literal. The
+        # list has to be able to grow - `.env.bak.*`, the backup migrate_env.sh
+        # leaves beside .env, joined it and holds the same tokens - and pinning
+        # the whole string meant the test failed for the addition rather than
+        # for anything being dropped, which is what it is actually guarding.
+        zip_line = next(line for line in WORKFLOW.splitlines() if "zip -qr" in line)
+        for excluded in ("'*/__pycache__/*'", "'*.pyc'", "'.env'", "'.env.bak.*'",
+                         "'data/*'", "'.git/*'"):
+            self.assertIn(excluded, zip_line, f"{excluded} is no longer excluded from the archive")
         self.assertNotIn("'.github/*'", WORKFLOW)
 
 

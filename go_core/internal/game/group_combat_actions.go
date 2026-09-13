@@ -160,11 +160,6 @@ type partyJoinPayload struct {
 type formationCreatePayload struct {
 	Name string `json:"name"`
 }
-type formationAssignPayload struct {
-	FormationID  int64  `json:"formation_id"`
-	TargetUserID int64  `json:"target_user_id"`
-	Position     string `json:"position"`
-}
 type formationActivatePayload struct {
 	FormationID int64  `json:"formation_id"`
 	Stance      string `json:"stance"`
