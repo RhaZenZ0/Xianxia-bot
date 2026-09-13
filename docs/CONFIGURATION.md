@@ -135,6 +135,13 @@ scratchpad as the narration (it is reasoning-native and ignores the switch
 below); GLM 5.2 was dropped in v0.26.1 when its free variant left the
 catalogue.
 
+`OPENROUTER_EPIC_MODEL` and `OPENROUTER_EPIC_FALLBACK_MODEL` are this chain's
+two named slots, exactly as the routine pair above are the routine chain's:
+the first is the model an epic beat tries first, the second an optional named
+hop after it, empty by default so `openrouter/free` carries the tier. Both can
+also be set from the dashboard's Narration Routes panel, which lists
+OpenRouter's live free catalogue rather than a list kept in the repo.
+
 `OPENROUTER_DISABLE_REASONING` — Reasoning ("thinking") is switched off on
 every narration request. Both production failures of the free chain were
 reasoning: models spending the whole token budget thinking and returning

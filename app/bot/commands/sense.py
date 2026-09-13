@@ -13,7 +13,7 @@ import discord
 from discord import app_commands
 
 from ...ops.game_engine import GameEngineError
-from ...rules.sense import hidden_npc_names
+from ...rules.sense import approximate_realm, hidden_npc_names
 from ...rules.worldtime import cultivation_cycle_summary
 from ..character_state import current_effect_modifiers
 from ..formatting import human_duration, roll_line
@@ -139,9 +139,10 @@ async def sense_command(
         elif reveal == "approx":
             reading = (
                 "Main cultivation: **"
-                + WORLD.approximate_realm(
+                + approximate_realm(
                     int(sensed.get("target_realm_index", 0)), int(sensed.get("target_phase", 1)),
                     precision_tier=precision_tier, gender=tc.get("gender"),
+                    realm_name=WORLD.realm_name, realm_world=WORLD.realm_world,
                 )
                 + "**."
             )

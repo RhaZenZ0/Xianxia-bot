@@ -236,6 +236,24 @@ class BindDefaultTests(unittest.TestCase):
         self.assertIn("docs/CONFIGURATION.md", ENV_EXAMPLE)
         self.assertTrue((PROJECT_ROOT / "docs" / "CONFIGURATION.md").exists())
 
+    def test_every_key_the_operator_can_set_is_explained(self):
+        # The other half of the rule above. .env.example carries no prose, so
+        # the reference is the only place a key is explained - and a key that
+        # appears in neither is one an operator can set without ever finding
+        # out what it does. OPENROUTER_EPIC_MODEL and its fallback were in
+        # that state: both shipped in .env.example, neither was ever named
+        # here, and the Epic chain paragraph described the chain in prose
+        # without telling anyone which variables set it.
+        undocumented = [
+            key for key in re.findall(r"^([A-Z][A-Z0-9_]*)=", ENV_EXAMPLE, re.M)
+            if key not in CONFIGURATION
+        ]
+        self.assertEqual(
+            undocumented, [],
+            "in .env.example but explained nowhere in docs/CONFIGURATION.md: "
+            + ", ".join(undocumented),
+        )
+
 
 class SupplyChainTests(unittest.TestCase):
     PINNED = ("discord.py", "openai", "aiosqlite", "python-dotenv", "httpx")
