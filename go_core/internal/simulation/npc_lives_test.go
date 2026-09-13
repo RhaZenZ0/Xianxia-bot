@@ -147,17 +147,11 @@ func TestMarriedNPCsHaveChildren(t *testing.T) {
 func TestAChildIsNeverGivenATakenName(t *testing.T) {
 	path := livesDB(t)
 	r := livesRunner()
-	// Every name the pool can build for this family is already taken.
-	for _, given := range r.World.EventSites.NamePool {
-		parts := given
-		if len(given) > 0 {
-			parts = given[len(given)-len(given):]
-		}
-		_ = parts
-	}
+	// Every name the pool could build for this family is already carried by
+	// somebody, so there is nothing left to call the child.
 	r.World.NPCs = map[string]worlddata.NPCDefinition{}
 	for _, entry := range r.World.EventSites.NamePool {
-		given := entry[len("Hou "):]
+		given := entry
 		if idx := indexOfSpace(entry); idx >= 0 {
 			given = entry[idx+1:]
 		}

@@ -28,6 +28,13 @@ composes all four ways the map joins up - roads, a city's own districts, the sit
 either end of a site's leg - and 429 stranded places became 17. A test holds the real content to it,
 because a fixture of two towns on a road passes that bug happily.
 
+`/gender` is gone. A cultivator's sex is chosen at creation - `/begin` will not make a character
+without it - so a second setter afterwards was a door onto a room the player had already furnished,
+and the one thing it could do was undo a choice the creation screen had already taken. The engine
+operation went with the command the way `alchemy.refine` went with `/alchemy refine`, along with its
+regression tests; the sheet still prints the gendered realm titles, because reading what was chosen
+was never the duplicated part. 235 actions to 234, no mechanic removed.
+
 The rest of an NPC's life follows, and every piece of it writes a column or a table that was already
 there. **Children are born.** `npc_descendants` had no writer at all and `children_count` was read
 only by the query hunting for singles to marry, so married couples never had a child and the world

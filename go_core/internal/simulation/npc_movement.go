@@ -274,11 +274,9 @@ func (r *Runner) npcSectChanges(conn *storage.Conn, steps, gm int64) (int64, int
 // database, and the membership change itself is already committed.
 func (r *Runner) recordSectMove(conn *storage.Conn, sect, npcName, location, verb string, gm int64, now float64) {
 	title := npcName + " " + verb + " " + sect
-	summary := npcName + " " + verb + " " + sect + "."
+	summary := npcName + " has left " + sect + "; the sect is coming apart and they are not the first."
 	if verb == "joined" {
 		summary = npcName + " has sworn to " + sect + ", which is recruiting hard."
-	} else {
-		summary = npcName + " has left " + sect + "; the sect is coming apart and they are not the first."
 	}
 	if simTableExists(conn, "sect_politics_events") {
 		_, _ = conn.Execute(

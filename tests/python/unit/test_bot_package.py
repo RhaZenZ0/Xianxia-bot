@@ -749,7 +749,7 @@ SURFACE = {
     },
     "commands/character.py": {
         "groups": ('fate_group', 'bond_group'),
-        "roots": ('begin', 'gender', 'sheet', 'me', 'quests', 'inventory', 'inheritances', 'effects', 'reputation', 'grudges', 'daoheart', 'provenance', 'era', 'specialeffects', 'lifespan', 'karma', 'soul', 'afterlife', 'reincarnate'),
+        "roots": ('begin', 'sheet', 'me', 'quests', 'inventory', 'inheritances', 'effects', 'reputation', 'grudges', 'daoheart', 'provenance', 'era', 'specialeffects', 'lifespan', 'karma', 'soul', 'afterlife', 'reincarnate'),
         "leaves": {
             "fate_group": ('status', 'history'),
             "bond_group": ('status', 'propose', 'respond', 'dual_cultivate', 'sever'),

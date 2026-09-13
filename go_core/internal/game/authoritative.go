@@ -66,7 +66,6 @@ var authoritativeMutations = map[string]bool{
 	"law.comprehend":                  true,
 	"condition.treat":                 true,
 	"alchemy.purge":                   true,
-	"character.set_gender":            true,
 	"sect.abode.enter":                true,
 	"sect.abode.leave":                true,
 	"sect.abode.upgrade":              true,
@@ -394,8 +393,6 @@ func applyAuthoritative(databasePath, worldPath string, req ActionRequest) (Acti
 			} else {
 				mutation, err = resolveSceneAction(conn, catalog, req.ActorID, req.Payload)
 			}
-		case "character.set_gender":
-			mutation, err = setGenderAction(conn, req.ActorID, req.Payload)
 		case "sect.abode.enter":
 			mutation, err = sectAbodeMoveAction(conn, req.ActorID, req.Payload, "enter")
 		case "sect.abode.leave":

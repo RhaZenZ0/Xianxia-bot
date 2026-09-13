@@ -150,7 +150,7 @@ _MIGRATED_ROOTS = {
     "body", "bond", "boss", "bounty", "breakthrough", "caravan",
     "city", "civilization", "conceal", "condition", "craft", "crime", "cultivate",
     "dantian", "daoheart", "duel", "effects", "equipment", "era", "explore", "family",
-    "formation", "gender", "ghost", "grudges", "hunt", "hunter", "inheritances", "fate",
+    "formation", "ghost", "grudges", "hunt", "hunter", "inheritances", "fate",
     "innerworld", "inventory", "karma", "law", "lifespan", "manual", "market", "merchant", "shop", "trade", "blackmarket",
     "meridian", "npcinfo", "party", "perfect", "profession", "provenance", "reincarnate",
     "reputation", "rulers", "scene", "seclusion", "secretrealm", "sect", "sense",
@@ -198,8 +198,8 @@ _HUB_DEFINITIONS = (
             # number, they open the sheet - so the reads that describe who you
             # are now arrive together, and the pages that remain are the ones
             # a player actually navigates to.
-            _hub_page("sheet", "Overview", "Who you are now: the sheet, your age and longevity, karma, Dao heart, standing, inheritances, soul legacy and how the realms address you.",
-                      "lifespan", "karma", "daoheart", "reputation", "inheritances", "soul", "gender"),
+            _hub_page("sheet", "Overview", "Who you are now: the sheet, your age and longevity, karma, Dao heart, standing, inheritances and soul legacy.",
+                      "lifespan", "karma", "daoheart", "reputation", "inheritances", "soul"),
             # One page for "something is wrong with me". It was three - generic
             # effects, special/Law/curse/domain effects, and persistent
             # conditions - and curses were named by two of the three, so a
