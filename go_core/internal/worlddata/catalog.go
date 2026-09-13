@@ -327,6 +327,33 @@ type EventSiteTemplate struct {
 	NPCs      []EventSiteNPC  `json:"npcs"`
 }
 
+// PatronGift decides which tier material a cultivator's out-of-world gift
+// arrives as (support.vote_claim). The mapping is content rather than a Go
+// switch so a new path or profession is a content edit, and the material ref
+// it returns ("@herb"/"@ore"/"@core") is resolved against the world tier by
+// EventSites.Material, which is where every other tier material comes from.
+type PatronGift struct {
+	ByProfession map[string]string `json:"by_profession"`
+	ByPath       map[string]string `json:"by_path"`
+	Default      string            `json:"default"`
+}
+
+// Material returns the material ref for a cultivator. A profession they have
+// actually practised wins - a smith is given ore whatever they cultivate -
+// and the path is what answers for everyone else. Professions are offered
+// most-practised first by the caller; the first one named here wins.
+func (p PatronGift) Material(professions []string, path string) string {
+	for _, profession := range professions {
+		if ref, ok := p.ByProfession[profession]; ok && ref != "" {
+			return ref
+		}
+	}
+	if ref, ok := p.ByPath[path]; ok && ref != "" {
+		return ref
+	}
+	return p.Default
+}
+
 // EventSites turns an event category into the concrete roster players can act
 // on. Without it a world event is an announcement with nothing inside it.
 type EventSites struct {
@@ -555,6 +582,7 @@ type Catalog struct {
 	Locations           map[string]LocationDefinition  `json:"locations"`
 	UnexpectedEvents    []UnexpectedEvent              `json:"unexpected_events"`
 	EventSites          EventSites                     `json:"event_sites"`
+	PatronGift          PatronGift                     `json:"patron_gift"`
 	SecretRealms        map[string]SecretRealm         `json:"secret_realms"`
 	Inheritances        map[string]Inheritance         `json:"inheritances"`
 	NPCs                map[string]NPCDefinition       `json:"npcs"`

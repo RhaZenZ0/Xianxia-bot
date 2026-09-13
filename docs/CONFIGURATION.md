@@ -59,9 +59,18 @@ un-prefixed line of theirs looks like an action.
 DISBOARD, whichever you list on — and `VOTE_SITE_NAME` is what players see it
 called. Set the URL and `/vote` appears as a working command: it prints the
 link, and once per twelve hours (the cadence every listing site uses) a player
-can claim a patron's gift of fifteen low-grade stones in the currency of the
-world they are standing in. Leave `VOTE_SITE_URL` empty and `/vote` says so
+can claim a patron's gift — ten of the local world's low-grade currency plus
+five for every realm they have climbed inside that world, and one tier-material
+their craft or their path uses. Leave `VOTE_SITE_URL` empty and `/vote` says so
 and grants nothing.
+
+From Friday through Sunday the gift doubles. That window is measured in
+`Europe/Amsterdam` so it opens at local midnight all year rather than drifting
+an hour when the clocks change; it is a constant in the engine
+(`support_actions.go`), not a key here. When a listing URL is set, the bot also
+announces the weekend once in the server's announcement channel as it opens and
+once as it closes — the channel the GM already configures under
+**/admin → Server**, so there is nothing further to set.
 
 It must be a single `https://` URL with no spaces, or the bot refuses to
 start — the value is printed into a public channel, so a typo is caught at

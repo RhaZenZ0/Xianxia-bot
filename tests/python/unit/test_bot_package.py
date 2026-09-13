@@ -861,6 +861,12 @@ SURFACE = {
         "leaves": {
         },
     },
+    "commands/cooldowns.py": {
+        "groups": (),
+        "roots": ('cooldowns',),
+        "leaves": {
+        },
+    },
     "commands/support.py": {
         "groups": (),
         "roots": ('vote',),

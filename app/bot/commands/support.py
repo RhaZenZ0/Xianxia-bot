@@ -10,9 +10,13 @@ which means publishing an endpoint from a NAS that currently publishes nothing
 — a door opened for a thank-you. So the claim is taken on trust and the engine
 meters it at exactly the cadence a real vote has (`support.vote_claim`): an
 honest player is thanked once per vote, and a dishonest one is thanked no more
-often. The gift is deliberately small and arrives in the low-grade currency of
-the world the cultivator stands in, so it buys a few things at any tier and
-distorts no economy.
+often.
+
+The gift itself is the cultivator's: the engine sizes it by the realms they
+have climbed inside the world they stand in, pays it in that world's low-grade
+currency, and adds one material their craft or their path actually uses. On the
+operator's local Friday-to-Sunday it doubles. Every number in this module is
+read back off the engine's receipt - nothing here computes any part of a gift.
 """
 
 from __future__ import annotations
@@ -40,20 +44,40 @@ UNCONFIGURED = (
 )
 
 
-def _gift_line(result: dict) -> str:
-    """The engine's receipt, in the currency's own name rather than its id."""
-    amount = int(result.get("amount") or 0)
-    currency_id = str(result.get("currency") or "")
+def _catalogue_name(resolve, identifier: str, what: str) -> str:
+    """A catalogue name, or the raw id when the catalogue cannot name it.
+
+    Never raises: the gift has already been paid by the time this runs, so a
+    catalogue miss must cost the player a pretty word, not their receipt.
+    """
     try:
-        currency = WORLD.currency_name(currency_id) or currency_id
-    except Exception:  # a currency the catalogue does not name is still payable
-        log.exception("Could not resolve the vote gift currency %r", currency_id)
-        currency = currency_id
+        return resolve(identifier) or identifier
+    except Exception:
+        log.exception("Could not resolve the vote gift %s %r", what, identifier)
+        return identifier
+
+
+def _gift_line(result: dict) -> str:
+    """The engine's receipt, read back in names rather than ids.
+
+    Every number here is the engine's. The command computes no part of the
+    gift - it only spells out what `support.vote_claim` says it paid.
+    """
+    amount = int(result.get("amount") or 0)
+    currency = _catalogue_name(WORLD.currency_name, str(result.get("currency") or ""), "currency")
     balance = int(result.get("balance") or 0)
-    return (
-        f"🙏 Thank you. A patron's gift of **{amount} × {currency}** reaches you "
-        f"— you now hold **{balance}**."
-    )
+    line = f"🙏 Thank you. A patron's gift of **{amount} × {currency}**"
+    item_id = str(result.get("item_id") or "")
+    quantity = int(result.get("item_quantity") or 0)
+    # No item is a real outcome, not an error: a tier material the catalogue
+    # does not carry is dropped by the engine rather than granted as a phantom.
+    if item_id and quantity > 0:
+        item = _catalogue_name(WORLD.item_name, item_id, "item")
+        line += f" and **{quantity} × {item}**"
+    line += f" reaches you — you now hold **{balance}**."
+    if result.get("weekend"):
+        line += f"\n-# Doubled: the weekend bonus is running (×{int(result.get('multiplier') or 2)})."
+    return line
 
 
 class VoteClaimView(discord.ui.View):
@@ -119,6 +143,19 @@ async def vote(interaction: discord.Interaction) -> None:
         "Every vote lifts the server up its listing, which is how the next cultivator finds us.",
         f"Vote here: {url}",
     ]
+    # The weekend is the server's, not a cultivator's, so it is read before the
+    # character check and shown to everyone - a visitor who has not begun yet
+    # is exactly the person a doubled weekend should reach. `support.weekend`
+    # touches no database and needs no actor, which is why it can be asked here.
+    try:
+        weekend = dict(await ENGINE.action("support.weekend", interaction.user.id, {}) or {})
+    except GameEngineError:
+        log.exception("Could not read the weekend window; drawing /vote without it")
+        weekend = {}
+    if weekend.get("weekend"):
+        closes = int(weekend.get("closes_unix") or 0)
+        until = f" until <t:{closes}:R>" if closes else ""
+        lines.append(f"🎉 **Weekend bonus — the gift is doubled{until}.**")
     # The link is for everyone. A visitor with no cultivator yet is exactly the
     # person a listing brought in, so they are shown the page and told what
     # making one would get them, rather than being turned away by
@@ -135,9 +172,15 @@ async def vote(interaction: discord.Interaction) -> None:
     claimable = bool(status.get("claimable"))
     amount = int(status.get("amount") or 0)
     if claimable:
+        currency = _catalogue_name(WORLD.currency_name, str(status.get("currency") or ""), "currency")
+        waiting = f"**{amount} × {currency}**"
+        item_id = str(status.get("item_id") or "")
+        quantity = int(status.get("item_quantity") or 0)
+        if item_id and quantity > 0:
+            waiting += f" and **{quantity} × {_catalogue_name(WORLD.item_name, item_id, 'item')}**"
         lines.append(
-            f"\nThen press the button: a patron's gift of **{amount}** low-grade stones of your "
-            f"own world is waiting, and it renews every **12h**."
+            f"\nThen press the button: a patron's gift of {waiting} is waiting — the gift is sized "
+            f"to your realm, and it renews every **12h**."
         )
         view = VoteClaimView(owner_id=interaction.user.id, site=site)
         await interaction.response.send_message("\n".join(lines), view=view, ephemeral=False)

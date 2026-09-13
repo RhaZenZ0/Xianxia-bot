@@ -69,6 +69,7 @@ from .commands.law import condition_group, crime_group, law_group, manual_group,
 from .commands.scene import scene_group, scene_status, talk
 from .commands.secretrealm import secret_group, secret_status
 from .commands.sect import sect_group
+from .commands import cooldowns as _commands_cooldowns  # noqa: F401  (registers /cooldowns on import)
 from .commands import sense as _commands_sense  # noqa: F401  (registers its root commands on import)
 from .commands import support as _commands_support  # noqa: F401  (registers /vote on import)
 from .commands.territory import caravan_group, party_group, party_status, territory_group, war_group, war_status
@@ -842,7 +843,7 @@ def register_command_surface(client: XianxiaBot) -> None:
     # - see registered_group_command call sites above), never its own root
     # command, so it was never registered into ACTIONS._roots and
     # ACTIONS.root("act") raised KeyError on every bot startup.
-    for name in ("begin", "me", "quests", "action", "check", "admin", "menu", "vote"):
+    for name in ("begin", "me", "quests", "action", "check", "admin", "menu", "vote", "cooldowns"):
         client.tree.add_command(ACTIONS.root(name), guild=GUILD)
     for command in _HUB_COMMANDS:
         client.tree.add_command(command, guild=GUILD)

@@ -96,7 +96,7 @@ class TheChannelsAreDashboardOwned(unittest.TestCase):
 class TheMenuOpensEveryHub(unittest.TestCase):
     def test_menu_is_a_registered_root_on_the_tree(self):
         self.assertIn('name="menu"', SURFACE)
-        self.assertIn('("begin", "me", "quests", "action", "check", "admin", "menu", "vote")', SURFACE)
+        self.assertIn('("begin", "me", "quests", "action", "check", "admin", "menu", "vote", "cooldowns")', SURFACE)
 
     def test_it_lists_every_hub_and_gates_admin(self):
         select = _body(SURFACE, "MenuSelect")

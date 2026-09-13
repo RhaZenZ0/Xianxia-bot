@@ -208,6 +208,8 @@ var authoritativeQueries = map[string]bool{
 	"clan.status":          true,
 	"equipment.power":      true,
 	"support.vote_status":  true,
+	"support.weekend":      true,
+	"cooldown.status":      true,
 }
 
 var stage5CanonicalTimeNativeOperations = map[string]bool{
@@ -654,8 +656,36 @@ func applyAuthoritativeQuery(databasePath, worldPath string, req ActionRequest) 
 		}
 		v, _ := eventledger.CurrentActorVersion(conn, req.ActorID)
 		return ActionResponse{APIVersion: authoritativeAPIVersion, Operation: req.Operation, StateVersion: v, Result: result}, nil
+	case "support.weekend":
+		// World-level: no actor, no catalogue, no reads - the window is a
+		// function of the clock and the operator's zone.
+		return ActionResponse{APIVersion: authoritativeAPIVersion, Operation: req.Operation, Result: supportWeekendQuery()}, nil
+	case "cooldown.status":
+		// Needs the catalogue: whether a cultivator walks the ghost road is a
+		// content answer (death_qi_system.path), and deciding it in Python
+		// would move a rule out of the engine.
+		if strings.TrimSpace(worldPath) == "" {
+			return ActionResponse{}, errors.New("world catalog path is required")
+		}
+		catalog, loadErr := worlddata.Load(worldPath)
+		if loadErr != nil {
+			return ActionResponse{}, loadErr
+		}
+		result, qerr := cooldownStatusQuery(conn, catalog, req.ActorID)
+		if qerr != nil {
+			return ActionResponse{}, qerr
+		}
+		v, _ := eventledger.CurrentActorVersion(conn, req.ActorID)
+		return ActionResponse{APIVersion: authoritativeAPIVersion, Operation: req.Operation, StateVersion: v, Result: result}, nil
 	case "support.vote_status":
-		result, qerr := supportVoteStatusQuery(conn, req.ActorID)
+		if strings.TrimSpace(worldPath) == "" {
+			return ActionResponse{}, errors.New("world catalog path is required")
+		}
+		catalog, loadErr := worlddata.Load(worldPath)
+		if loadErr != nil {
+			return ActionResponse{}, loadErr
+		}
+		result, qerr := supportVoteStatusQuery(conn, catalog, req.ActorID)
 		if qerr != nil {
 			return ActionResponse{}, qerr
 		}

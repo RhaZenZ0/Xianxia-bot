@@ -366,6 +366,56 @@ class CityLifeContentTests(unittest.TestCase):
                 self.assertEqual(len({c["quest_key"] for c in by_city.get(city, [])}), len(by_city.get(city, [])))
 
 
+class PatronGiftContentTests(unittest.TestCase):
+    """The gift a patron leaves a cultivator for supporting the server.
+
+    The roster is content rather than a Go switch, which is the point: a new
+    path or profession should be a content edit. That only holds while the
+    content actually covers every path and every profession the engine can
+    write, so this is the check that makes the claim true.
+    """
+
+    # Written by advanceProfessionTx: the three that recipes name, plus the
+    # three the engine hardcodes - "Beast Taming" (beast_artifact_actions.go),
+    # "Artifact Refining" (same file) and "Foraging" (crafting_actions.go).
+    ENGINE_PROFESSIONS = {"Beast Taming", "Artifact Refining", "Foraging"}
+    MATERIAL_REFS = {"@herb", "@ore", "@core"}
+
+    def test_every_cultivation_path_has_a_gift(self):
+        gift = WORLD["patron_gift"]
+        for path in WORLD["paths"]:
+            with self.subTest(path=path):
+                self.assertIn(path, gift["by_path"], f"{path} has no patron gift")
+
+    def test_every_profession_the_engine_can_write_has_a_gift(self):
+        gift = WORLD["patron_gift"]
+        professions = {str(r["profession"]) for r in WORLD["recipes"].values() if r.get("profession")}
+        for profession in sorted(professions | self.ENGINE_PROFESSIONS):
+            with self.subTest(profession=profession):
+                self.assertIn(profession, gift["by_profession"])
+
+    def test_every_gift_resolves_to_a_real_item_in_every_world(self):
+        gift = WORLD["patron_gift"]
+        tiers = WORLD["event_sites"]["tier_materials"]
+        refs = set(gift["by_path"].values()) | set(gift["by_profession"].values()) | {gift["default"]}
+        self.assertTrue(refs)
+        for ref in sorted(refs):
+            with self.subTest(ref=ref):
+                if ref not in self.MATERIAL_REFS:
+                    # A literal item id is allowed, and must exist.
+                    self.assertIn(ref, WORLD["items"], f"{ref} is neither a tier material nor an item")
+                    continue
+                for world, materials in tiers.items():
+                    item = materials.get(ref[1:])
+                    self.assertTrue(item, f"{ref} is not written for {world}")
+                    self.assertIn(item, WORLD["items"], f"{ref} in {world} is not a real item")
+
+    def test_the_default_is_a_material_every_world_carries(self):
+        # A path or profession nobody wrote still has to pay something, so the
+        # default cannot be a literal item that only one world trades in.
+        self.assertIn(WORLD["patron_gift"]["default"], self.MATERIAL_REFS)
+
+
 class RoadSideSiteContentTests(unittest.TestCase):
     """v0.39.0: a place on every road between two cities."""
 
