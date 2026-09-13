@@ -462,7 +462,12 @@ last_game_minute=?,updated_at=? WHERE status='alive'`, []any{max1(steps / 2), st
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("batch-updated %d regions and %d living NPCs; %d took the road", regions, npcs, moved), nil
+	crossed, err := r.npcBreakthroughs(conn, gm)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("batch-updated %d regions and %d living NPCs; %d took the road, %d crossed a realm",
+		regions, npcs, moved, crossed), nil
 }
 
 func (r *Runner) npcLife(conn *storage.Conn, steps, gm int64) (string, error) {
@@ -536,7 +541,25 @@ func (r *Runner) npcLife(conn *storage.Conn, steps, gm int64) (string, error) {
 		}
 		marriages++
 	}
-	return fmt.Sprintf("batch-advanced NPC life; %d natural death(s), %d new marriage(s)", len(deaths), marriages), nil
+	born, err := r.npcChildbirth(conn, steps, gm)
+	if err != nil {
+		return "", err
+	}
+	promoted, err := r.npcCareers(conn, gm)
+	if err != nil {
+		return "", err
+	}
+	bonds, err := r.npcDiscipleBonds(conn, gm)
+	if err != nil {
+		return "", err
+	}
+	fought, killed, err := r.npcFeuds(conn, gm)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf(
+		"batch-advanced NPC life; %d natural death(s), %d new marriage(s), %d birth(s), %d promotion(s), %d new disciple(s), %d feud(s) settled (%d fatal)",
+		len(deaths), marriages, born, promoted, bonds, fought, killed), nil
 }
 
 func (r *Runner) economy(conn *storage.Conn, steps, gm int64) (string, error) {

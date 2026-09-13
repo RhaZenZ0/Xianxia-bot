@@ -28,6 +28,28 @@ composes all four ways the map joins up - roads, a city's own districts, the sit
 either end of a site's leg - and 429 stranded places became 17. A test holds the real content to it,
 because a fixture of two towns on a road passes that bug happily.
 
+The rest of an NPC's life follows, and every piece of it writes a column or a table that was already
+there. **Children are born.** `npc_descendants` had no writer at all and `children_count` was read
+only by the query hunting for singles to marry, so married couples never had a child and the world
+was demographically terminal: everyone died of old age and nobody was ever born. A healthy marriage
+now produces children up to four, named from the family name they are born to and a given name from
+the world's own pool, checked against every name already in use. **Realms are crossed.**
+`realm_index` was fixed at bootstrap, so `phase` crept to nine and stopped there for ever; a
+cultivator at stage nine can now break through, and it is paid for in wealth - the first thing wealth
+has ever been for in this simulation. **Careers go somewhere.** `career_progress` climbed to its
+ceiling and was read by nothing; inside a sect it buys the next rank up a five-rung ladder, and
+outside one it buys the reputation an unaffiliated cultivator lives on. **Masters take disciples.**
+`npc_disciple_bonds` had no writer while `world_status_queries.go` *queried* it, so "who is whose
+disciple" was a question the world could be asked and always answered empty; a cultivator four realms
+above another standing in the same place may now take them on, nobody serves two masters, and a bond
+ends when either party dies. **And grudges are answered.** `grudge` climbed to a hundred and nothing
+ever happened, which made old age the only death in the world. A grudge that has run its course is
+now settled, usually with an injury and occasionally with a killing.
+
+Each of those lands in `world_history_events` as public history - a birth, a promotion, a
+breakthrough, a new disciple, a duel, a death - because a world that changes silently reads exactly
+like one that does not change at all.
+
 And the sects take people and lose them. A sect whose recruitment pressure has climbed past sixty
 actually recruits the ambitious and masterless; one whose cohesion has fallen under thirty-five
 actually loses members to the road. Both numbers were already being maintained by the politics tick
