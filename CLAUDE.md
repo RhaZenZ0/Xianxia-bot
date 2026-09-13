@@ -241,7 +241,8 @@ counts purposes for the AI Routing page. The procedural floor is content: `narra
 `content/world.json` (eleven scene kinds by four world tiers - seven scenes and the four road-site
 explorations since v1.0.0-rc.2), chosen deterministically by
 `app/rules/narration_pool.py`. One per-player bucket (`TYPED_PLAY_BURST` / `TYPED_PLAY_PER_MINUTE`)
-meters every door - typed lines, `serialized_user_action` (slash and hub), Narrate-it - and reports
+meters every door - typed lines, shorthand commands (`x explore`, v1.0.0, the one door heard in
+every channel of the guild), `serialized_user_action` (slash and hub), Narrate-it - and reports
 per door. `tests/python/contracts/test_narrator_budget.py` holds all of it.
 
 ### Narration routes in the dashboard

@@ -279,6 +279,13 @@ The router never calls a model: a verb table (`content/typed_play.json`), entity
 who is actually present, and a picker when readings tie. `TYPED_PLAY_PREFIX` is one character;
 `$` by default.
 
+The shorthand (v1.0.0) is the other door and the only one heard in **every** channel of the guild:
+`x explore` runs `/explore`, `x travel go Greenriver Town` runs the `travel go` leaf, `x inv` runs
+`/inventory`. It acts only on a line that names a registered command, so `x marks the spot` in a
+chat channel is silence; inside the channels above, a shorthand line that names none falls through
+to the verb table. `/admin` is off the surface. `TYPED_PLAY_SHORTHAND` is `x` by default; empty
+turns it off.
+
 ### Cultivation, sects and manuals
 
 Realms and stages, breakthroughs and tribulations, spiritual roots, bloodlines and physiques, laws
