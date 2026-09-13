@@ -53,6 +53,27 @@ cannot drain the shared OpenRouter allowance for everyone. `TYPED_PLAY_HINT`
 shows a player, once a day, how to use the prefix the first time an
 un-prefixed line of theirs looks like an action.
 
+### Server listing / vote rewards (`/vote`)
+
+`VOTE_SITE_URL` is this server's page on a Discord listing site — Top.gg,
+DISBOARD, whichever you list on — and `VOTE_SITE_NAME` is what players see it
+called. Set the URL and `/vote` appears as a working command: it prints the
+link, and once per twelve hours (the cadence every listing site uses) a player
+can claim a patron's gift of fifteen low-grade stones in the currency of the
+world they are standing in. Leave `VOTE_SITE_URL` empty and `/vote` says so
+and grants nothing.
+
+It must be a single `https://` URL with no spaces, or the bot refuses to
+start — the value is printed into a public channel, so a typo is caught at
+boot rather than posted to every player.
+
+The claim is **taken on trust**: no listing site can tell this deployment that
+a vote happened without an inbound webhook, and that would mean publishing an
+endpoint from a box that currently publishes nothing. The twelve-hour cooldown
+is the engine's (`support.vote_claim`), so a player who claims without voting
+is thanked no more often than one who votes — and every claim is a row in the
+domain event ledger either way.
+
 ### Administrator chat monitor (`/admin` → Server → Chat Digest)
 
 Reads Discord message history and summarises it through the **same** free

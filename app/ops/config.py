@@ -51,6 +51,28 @@ def _typed_play_prefix(value: str | None) -> str:
     return prefix
 
 
+def _vote_site_url(value: str | None) -> str:
+    """The listing page `/vote` sends players to, or "" for "not configured".
+
+    The bot prints this into a public channel, so it is held to one https URL
+    with no whitespace in it: an operator typo that turns the link into a bare
+    word, or into a scheme Discord would render as something else, should fail
+    at startup rather than be posted to every player.
+    """
+    url = (value or "").strip()
+    if url == "":
+        return ""
+    if not url.startswith("https://") or len(url) > 300 or any(ch.isspace() for ch in url):
+        raise ValueError("VOTE_SITE_URL must be a single https:// URL")
+    return url
+
+
+def _vote_site_name(value: str | None) -> str:
+    """The site's name as players read it - "Top.gg", "DISBOARD", whichever."""
+    name = " ".join((value or "").split())[:40]
+    return name or "Top.gg"
+
+
 def _as_int_set(value: str | None, *, name: str = "value") -> set[int]:
     if not value:
         return set()
@@ -138,6 +160,8 @@ class Settings:
     typed_play_burst: int
     typed_play_per_minute: float
     typed_play_hint: bool
+    vote_site_name: str
+    vote_site_url: str
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -533,5 +557,7 @@ class Settings:
             typed_play_burst=typed_play_burst,
             typed_play_per_minute=typed_play_per_minute,
             typed_play_hint=_as_bool(os.getenv("TYPED_PLAY_HINT"), True),
+            vote_site_name=_vote_site_name(os.getenv("VOTE_SITE_NAME")),
+            vote_site_url=_vote_site_url(os.getenv("VOTE_SITE_URL")),
             **cooldowns,
         )

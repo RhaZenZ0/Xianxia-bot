@@ -171,6 +171,7 @@ var authoritativeMutations = map[string]bool{
 	"personal_world.leave":            true,
 	"commission.accept":               true,
 	"commission.resolve":              true,
+	"support.vote_claim":              true,
 }
 var authoritativeQueries = map[string]bool{
 	"character.lifespan":       true,
@@ -206,6 +207,7 @@ var authoritativeQueries = map[string]bool{
 	"sect.status":          true,
 	"clan.status":          true,
 	"equipment.power":      true,
+	"support.vote_status":  true,
 }
 
 var stage5CanonicalTimeNativeOperations = map[string]bool{
@@ -444,7 +446,8 @@ func applyAuthoritative(databasePath, worldPath string, req ActionRequest) (Acti
 			"exploration.explore", "exploration.event.act", "exploration.event.leave", "exploration.travel", "exploration.hunt",
 			"secret_realm.enter", "secret_realm.explore", "secret_realm.leave", "craft.resolve", "forage.resolve",
 			"beast.tame", "beast.feed", "beast.train", "beast.evolve", "beast.active", "artifact.bond", "artifact.awaken",
-			"pvp.challenge", "pvp.respond", "pvp.act", "manual.study", "manual.technique", "crime.atone", "world_event.act", "world_event.engage":
+			"pvp.challenge", "pvp.respond", "pvp.act", "manual.study", "manual.technique", "crime.atone", "world_event.act", "world_event.engage",
+			"support.vote_claim":
 			if strings.TrimSpace(worldPath) == "" {
 				return ActionResponse{}, errors.New("world catalog path is required")
 			}
@@ -579,6 +582,8 @@ func applyAuthoritative(databasePath, worldPath string, req ActionRequest) (Acti
 				mutation, err = worldEventActAction(conn, catalog, req.ActorID, req.Payload)
 			case "world_event.engage":
 				mutation, err = worldEventEngageAction(conn, catalog, req.ActorID, req.Payload)
+			case "support.vote_claim":
+				mutation, err = supportVoteClaimAction(conn, catalog, req.ActorID, req.Payload)
 			default:
 				err = fmt.Errorf("unsupported authoritative operation: %s", req.Operation)
 			}
@@ -644,6 +649,13 @@ func applyAuthoritativeQuery(databasePath, worldPath string, req ActionRequest) 
 		return ActionResponse{APIVersion: authoritativeAPIVersion, Operation: req.Operation, StateVersion: v, Result: result}, nil
 	case "exploration.event.status":
 		result, qerr := explorationEventStatusQuery(conn, req.ActorID, req.Payload)
+		if qerr != nil {
+			return ActionResponse{}, qerr
+		}
+		v, _ := eventledger.CurrentActorVersion(conn, req.ActorID)
+		return ActionResponse{APIVersion: authoritativeAPIVersion, Operation: req.Operation, StateVersion: v, Result: result}, nil
+	case "support.vote_status":
+		result, qerr := supportVoteStatusQuery(conn, req.ActorID)
 		if qerr != nil {
 			return ActionResponse{}, qerr
 		}

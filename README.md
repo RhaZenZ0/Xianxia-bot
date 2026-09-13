@@ -279,6 +279,21 @@ The router never calls a model: a verb table (`content/typed_play.json`), entity
 who is actually present, and a picker when readings tie. `TYPED_PLAY_PREFIX` is one character;
 `$` by default.
 
+### Bringing players in
+
+`/vote` prints the server's page on whichever listing site the operator set (`VOTE_SITE_URL` /
+`VOTE_SITE_NAME` — Top.gg, DISBOARD, any of them), because a small server is found by ranking on
+that list and the list ranks on votes. Under the link is one button: a patron's gift of fifteen
+low-grade stones in the currency of the world the cultivator stands in, once every twelve hours,
+which is the cadence every listing site resets a vote on.
+
+Nothing verifies the vote. Verifying it would mean an inbound webhook, and that means publishing an
+endpoint from a box that publishes nothing — a door opened for a thank-you. So the claim is taken
+on trust and the *cooldown* is the engine's (`support.vote_claim`, a domain-event row per grant):
+a player who claims without voting is thanked no more often than one who votes, and the gift is
+small enough at every tier to be a thank-you rather than an income. Leave `VOTE_SITE_URL` empty and
+the command says so and grants nothing.
+
 ### Cultivation, sects and manuals
 
 Realms and stages, breakthroughs and tribulations, spiritual roots, bloodlines and physiques, laws

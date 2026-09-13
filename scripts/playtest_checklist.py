@@ -323,6 +323,7 @@ def build() -> str:
               "| a lot listed at a grand house appears in its channel; a bid updates the card; the tick strikes it | [ ] |",
               "| a lot at a local floor appears in the world's shared channel | [ ] |",
               "| `/menu` opens every hub; Admin only for an administrator | [ ] |",
+              "| `/vote` prints the listing link and pays the gift once; a second claim names the wait | [ ] |",
               "| `/admin player mute` for `30m` expires on its own; `/admin player inspect` shows it | [ ] |",
               "",
               "### The surface regrouping (v1.0.0-rc.13)", "",
