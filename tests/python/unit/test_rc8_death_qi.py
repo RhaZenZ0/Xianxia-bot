@@ -128,7 +128,7 @@ class TheGroundTheHoursAndTheResidue(unittest.TestCase):
     def test_schema_forty_one_carries_the_road_on_the_qi_body(self):
         from app.database import SCHEMA_VERSION
 
-        self.assertEqual(SCHEMA_VERSION, 41)
+        self.assertGreaterEqual(SCHEMA_VERSION, 41)
         self.assertIn('        41,\n        "death_qi",', CORE_SOURCE)
         for column in ("qi_type", "corruption", "ghost_form"):
             self.assertIn(f"ALTER TABLE character_qi_body ADD COLUMN {column}", CORE_SOURCE)

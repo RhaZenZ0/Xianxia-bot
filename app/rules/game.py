@@ -139,6 +139,15 @@ class World:
     def unexpected_events(self) -> list[dict[str, Any]]:
         return list(self.data.get("unexpected_events", []))
 
+    def event_site_objective(self, category: str) -> str:
+        """The shared goal an event category's site is worked towards. Falls
+        back to the default template so a category nobody wrote a site for
+        still reads as something to do rather than as nothing."""
+        sites = dict(self.data.get("event_sites") or {})
+        categories = dict(sites.get("categories") or {})
+        template = categories.get(str(category)) or sites.get("default") or {}
+        return str(dict(template).get("objective") or "")
+
     @property
     def secret_realms(self) -> dict[str, dict[str, Any]]:
         return self.data.get("secret_realms", {})

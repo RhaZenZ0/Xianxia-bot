@@ -26,7 +26,7 @@ from .remote import GoDatabaseTransport
 log = logging.getLogger("xianxia.database")
 
 
-SCHEMA_VERSION = 41
+SCHEMA_VERSION = 42
 # A readiness probe must validate more than the schema-version marker.  If the
 # SQLite file is removed or replaced while the bot is running, SQLite will
 # happily create a new empty file at the same path.  Checking these tables lets
@@ -55,6 +55,7 @@ OPERATIONAL_REQUIRED_TABLES = frozenset(
         "slow_query_log",
         "startup_events",
         "world_events",
+        "world_event_nodes",
         "world_event_participation",
         "world_history_events",
         "world_state",
@@ -1644,6 +1645,43 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
             "ALTER TABLE character_qi_body ADD COLUMN qi_type TEXT NOT NULL DEFAULT 'spirit'",
             "ALTER TABLE character_qi_body ADD COLUMN corruption INTEGER NOT NULL DEFAULT 0",
             "ALTER TABLE character_qi_body ADD COLUMN ghost_form INTEGER NOT NULL DEFAULT 0",
+        ),
+    ),
+    (
+        42,
+        "world_event_sites",
+        (
+            # A world event used to be an empty room: the action menu moved
+            # contribution integers and the only reward in the whole scene was
+            # a single first-participation claim. world_event_nodes is what is
+            # actually inside an event - the beasts, the herb and ore nodes,
+            # the relics and the tasks - each with a finite `remaining` that
+            # depletes as players work it, so a scene can be cleared out and a
+            # late arrival can see that it was.
+            """CREATE TABLE IF NOT EXISTS world_event_nodes (
+                node_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                event_key TEXT NOT NULL,
+                node_key TEXT NOT NULL,
+                node_type TEXT NOT NULL,
+                name TEXT NOT NULL,
+                descriptor TEXT NOT NULL DEFAULT '',
+                rank INTEGER NOT NULL DEFAULT 1,
+                total INTEGER NOT NULL DEFAULT 1,
+                remaining INTEGER NOT NULL DEFAULT 0,
+                cleared_by INTEGER NOT NULL DEFAULT 0,
+                tn INTEGER NOT NULL DEFAULT 12,
+                attribute TEXT NOT NULL DEFAULT 'insight',
+                item_id TEXT NOT NULL DEFAULT '',
+                item_qty INTEGER NOT NULL DEFAULT 0,
+                cultivation INTEGER NOT NULL DEFAULT 0,
+                spirit_stones INTEGER NOT NULL DEFAULT 0,
+                contribution INTEGER NOT NULL DEFAULT 1,
+                created_at REAL NOT NULL,
+                updated_at REAL NOT NULL,
+                UNIQUE(event_key,node_key)
+            )""",
+            """CREATE INDEX IF NOT EXISTS idx_world_event_nodes_event
+               ON world_event_nodes(event_key,node_type,remaining DESC)""",
         ),
     ),
 )
@@ -3816,6 +3854,39 @@ class Database:
                 (str(event_key), max(1, min(100, int(limit)))),
             )
             return [dict(r) for r in await cur.fetchall()]
+
+    async def list_world_event_nodes(self, event_key: str) -> list[dict[str, Any]]:
+        """Return the concrete site of one world event: the beasts, herb and ore
+        nodes, relics and tasks that are actually inside it, with how many of
+        each are left. Ordered so what is still workable sorts to the top."""
+        async with self._connect() as db:
+            db.row_factory = aiosqlite.Row
+            cur = await db.execute(
+                """SELECT * FROM world_event_nodes WHERE event_key=?
+                   ORDER BY (remaining>0) DESC,
+                            CASE node_type WHEN 'beast' THEN 0 WHEN 'task' THEN 1
+                                           WHEN 'herb' THEN 2 WHEN 'ore' THEN 3 ELSE 4 END,
+                            node_key""",
+                (str(event_key),),
+            )
+            return [dict(r) for r in await cur.fetchall()]
+
+    async def world_event_site_progress(self, event_key: str) -> dict[str, Any]:
+        """How much of an event's site has been cleared - the shared objective
+        readout the scene panel leads with."""
+        nodes = await self.list_world_event_nodes(str(event_key))
+        total = sum(int(n.get("total") or 0) for n in nodes)
+        remaining = sum(int(n.get("remaining") or 0) for n in nodes)
+        cleared = total - remaining
+        return {
+            "nodes": len(nodes),
+            "total": total,
+            "remaining": remaining,
+            "cleared": cleared,
+            "percent": (cleared * 100 // total) if total else 0,
+            "beasts_remaining": sum(int(n.get("remaining") or 0) for n in nodes if n.get("node_type") == "beast"),
+            "resolved": bool(total) and remaining == 0,
+        }
 
     async def get_world_event_actions(self, event_key: str, *, limit: int = 20) -> list[dict[str, Any]]:
         async with self._connect() as db:

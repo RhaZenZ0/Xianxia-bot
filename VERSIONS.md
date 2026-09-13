@@ -481,6 +481,9 @@ mechanical authority paths.
 - **Schema 27** added the v0.19.29 mute/freeze moderation columns on `characters`
   (`is_muted`, `is_frozen`, `moderation_reason`).
 - **Schema 28** added the Quest Forge definition table (`quest_definitions`).
+- **Schema 42** added what is actually inside a world event (`world_event_nodes`): the beasts,
+  herb and ore nodes, relics and tasks a scene contains, each with a finite `remaining` that
+  depletes as players work it, so an event can be cleared out instead of only being announced.
 - **Schema 41** added the ghost road to the qi body - which qi it holds, the residue death qi
   leaves and the form the residue has made (`character_qi_body.qi_type`, `.corruption`,
   `.ghost_form`) (v1.0.0-rc.8).

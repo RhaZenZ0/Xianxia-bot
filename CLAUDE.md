@@ -143,7 +143,7 @@ internal/server/        HTTP control/data plane
 ```
 
 Every Go SQLite connection uses `journal_mode=WAL`, `foreign_keys=ON`, `busy_timeout=10000`,
-`synchronous=NORMAL`. Current schema version is 41; historical migrations are kept so old databases
+`synchronous=NORMAL`. Current schema version is 42; historical migrations are kept so old databases
 can upgrade in place — see `VERSIONS.md` for the full schema/release history.
 
 ### RAG / memory (`app/ai/rag`)
@@ -166,6 +166,30 @@ locations/manuals, raw DB dumps, and GM-only state.
 etc.), separate from current structured state (what's true now — always wins over history). Rows
 carry visibility levels `public` / `participant` / `faction` / `hidden`; hidden rows never reach
 narrator RAG, and a focused NPC does not inherit the player's participant-only knowledge.
+
+### World events and their sites
+
+A world event is a row in `world_events` (category, severity, location, expiry) plus a **site**:
+the concrete, finite things inside it, in `world_event_nodes` (schema 42). Before the site existed an
+event was an empty room - the action menu rolled 2d10 and moved four integers, the only reward in a
+whole scene was one first-participation claim, "Gather Resources" granted no item, and the Battle
+button fought an anonymous "hostile manifestation".
+
+Nodes come in five kinds - `beast`, `herb`, `ore`, `relic`, `task` - and each carries a `total` and a
+`remaining` that depletes as players work it, so a scene can be cleared out and a late arrival can
+see that it was. The roster is content, not code: `event_sites` in `content/world.json` holds one
+template per event category (plus a `default` for categories nobody wrote), each node's count a
+`[min,max]` pair scaled by event severity. Material rewards are written `@herb`/`@ore`/`@core` and
+resolved against the world tier the event landed in, so one template stays correct from the Mortal
+World to the Celestial.
+
+Go owns all of it. `SpawnWorldEventNodes` is called from every world-event spawn path - the
+player-triggered exploration event and the native autonomous simulation batch - so no event can reach
+a player empty; it is idempotent per event key. `world_event.engage` resolves one attempt against one
+node (attribute check vs the node's TN, and on success a guarded `remaining>0` decrement plus the real
+item, cultivation and spirit stones), and an event battle names a real beast from the roster, with the
+node key riding the combat `source` as `event:<key>|node:<node>` so the kill depletes it. Python only
+reads the site (`DB.list_world_event_nodes`, `DB.world_event_site_progress`) and draws it.
 
 ### Narration routing
 

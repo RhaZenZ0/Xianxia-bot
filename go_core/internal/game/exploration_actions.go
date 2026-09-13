@@ -1077,7 +1077,7 @@ func activateUnexpectedEventTx(conn *storage.Conn, catalog worlddata.Catalog, us
 			return nil, errors.New("event_key is required when an unexpected world event is selected")
 		}
 		ends := now + float64(maxI64(1, event.DurationHours))*3600
-		payload := map[string]any{"definition_id": event.ID, "category": event.Category, "severity": event.Severity, "consequence_text": event.ConsequenceText, "player_reward": event.PlayerReward, "player_effect": event.PlayerEffect, "karma_delta": event.KarmaDelta, "fate_delta": event.FateDelta, "world_effect": event.WorldEffect}
+		payload := map[string]any{"definition_id": event.ID, "category": event.Category, "severity": event.Severity, "description": event.Description, "consequence_text": event.ConsequenceText, "player_reward": event.PlayerReward, "player_effect": event.PlayerEffect, "karma_delta": event.KarmaDelta, "fate_delta": event.FateDelta, "world_effect": event.WorldEffect}
 		enc, _ := json.Marshal(payload)
 		_, err := conn.Execute(`UPDATE world_events SET active=0 WHERE active=1 AND ends_at<=?`, []any{now})
 		if err != nil {
@@ -1099,6 +1099,11 @@ func activateUnexpectedEventTx(conn *storage.Conn, catalog worlddata.Catalog, us
 				return nil, effectErr
 			}
 			out["impacts"] = impacts
+			nodes, siteErr := SpawnWorldEventNodes(conn, catalog, eventKey, event.Category, c.Location, event.Severity, now)
+			if siteErr != nil {
+				return nil, siteErr
+			}
+			out["site_nodes"] = nodes
 			uid := userID
 			summary := fmt.Sprintf("A server-wide %s manifested at %s. %s", event.Category, c.Location, event.Description)
 			if len(impacts) > 0 {

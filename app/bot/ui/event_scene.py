@@ -63,10 +63,44 @@ class EventActionSelect(discord.ui.Select):
         for key in _event_action_keys(owner.category, owner.event_type):
             rule=EVENT_ACTION_RULES[key]
             options.append(discord.SelectOption(label=rule["label"], value=key, emoji=rule["emoji"]))
-        super().__init__(placeholder="Choose an event action…", min_values=1, max_values=1, options=options, row=0)
+        super().__init__(placeholder="Take a stance on the event…", min_values=1, max_values=1, options=options, row=3)
 
     async def callback(self, interaction: discord.Interaction) -> None:
         await self.owner.run_event_action(interaction, self.values[0])
+
+
+NODE_EMOJI = {"beast": "⚔️", "task": "📜", "herb": "🌿", "ore": "⛏️", "relic": "🔮"}
+
+
+class EventSiteSelect(discord.ui.Select):
+    """The menu of things that are actually in the event: the beasts still
+    standing, the herb and ore nodes still unpicked, the tasks still undone.
+    It is rebuilt from live state on every render, so a node someone else
+    cleared stops being offered."""
+
+    def __init__(self, owner: "EventSceneView", nodes: list[dict[str, Any]]) -> None:
+        self.owner=owner
+        options=[]
+        for node in nodes[:25]:
+            key=str(node.get("node_key") or "")
+            if not key:
+                continue
+            remaining=int(node.get("remaining") or 0); total=int(node.get("total") or 0)
+            payout=EventSceneView._node_payout(node)
+            options.append(discord.SelectOption(
+                label=f"{str(node.get('name') or 'Unknown')[:70]} ({remaining}/{total})"[:100],
+                value=key[:100],
+                description=(payout or str(node.get("descriptor") or ""))[:100],
+                emoji=NODE_EMOJI.get(str(node.get("node_type")), "•"),
+            ))
+        if not options:
+            options=[discord.SelectOption(label="Nothing left here", value="__none__", emoji="✅")]
+        super().__init__(placeholder="Work the site — fight, harvest, or carry out a task…", min_values=1, max_values=1, options=options, row=0)
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        if self.values[0]=="__none__":
+            await interaction.response.send_message("This site has been cleared out.", ephemeral=False); return
+        await self.owner.engage_node(interaction, self.values[0])
 
 
 class EventNpcTalkModal(discord.ui.Modal):
@@ -148,22 +182,129 @@ class EventSceneView(discord.ui.View):
         self.severity=max(1,min(10,int(severity or 1)))
         self.add_item(EventActionSelect(self))
 
-    def embed(self) -> discord.Embed:
+    def embed(
+        self, *, description: str = "", objective: str = "", site: list[dict[str, Any]] | None = None,
+        progress: dict[str, Any] | None = None, participants: list[dict[str, Any]] | None = None,
+    ) -> discord.Embed:
+        """The scene panel.
+
+        This used to be four fields of text explaining what its own buttons
+        did, which is why an event read as an empty room: the description, the
+        stakes and everything actually in the scene were all held elsewhere.
+        It now leads with what the event *is*, what the site still holds, and
+        how far the room has got - and falls back to the skeleton only when the
+        live read fails.
+        """
         active=self.expires_at>time.time(); colour=0x9B59B6 if active else 0x5C6370
+        header=(f"**{self.category}** • Severity **{self.severity}/10** • {'🟢 Active' if active else '⚫ Closed'}\n"
+                +(f"📍 **{self.location}**\n" if self.location else "")+f"⏳ Closes <t:{int(self.expires_at)}:R>")
+        if description:
+            header += f"\n\n> {description}"
+        embed=discord.Embed(title=f"🌌 {self.title}", description=header[:4000], color=colour)
+
+        site=list(site or []); progress=dict(progress or {})
+        if progress.get("total"):
+            cleared=int(progress.get("cleared",0)); total=int(progress.get("total",0))
+            percent=int(progress.get("percent",0)); filled=max(0,min(16,round(percent*16/100)))
+            bar="█"*filled+"░"*(16-filled)
+            line=f"`{bar}` **{percent}%** cleared — {cleared}/{total} handled"
+            if progress.get("resolved"):
+                line+="\n✅ **The site is cleared.** What remains is the aftermath."
+            embed.add_field(name=f"🎯 {objective or 'Event objective'}"[:256], value=line[:1024], inline=False)
+
+        for group, label in (("beast","⚔️ Hostiles"),("task","📜 Tasks"),("herb","🌿 Herbs"),("ore","⛏️ Ore & Veins"),("relic","🔮 Relics")):
+            rows=[n for n in site if str(n.get("node_type"))==group]
+            if not rows:
+                continue
+            lines=[]
+            for n in rows[:6]:
+                remaining=int(n.get("remaining") or 0); total=int(n.get("total") or 0)
+                mark="✅" if remaining<=0 else "•"
+                bits=[f"**{n.get('name','Unknown')}** — {remaining}/{total} left"]
+                if group=="beast" and int(n.get("rank") or 0)>1:
+                    bits.append(f"rank {int(n['rank'])}")
+                bits.append(f"TN {int(n.get('tn') or 0)} ({n.get('attribute','insight')})")
+                payout=self._node_payout(n)
+                if payout:
+                    bits.append(payout)
+                lines.append(f"{mark} "+" · ".join(bits))
+            embed.add_field(name=label, value="\n".join(lines)[:1024], inline=False)
+
+        if not site:
+            embed.add_field(
+                name="🎮 Event Actions",
+                value="Choose a context-specific action from the menu. Results use character attributes, event severity, and persistent participation state.",
+                inline=False,
+            )
+
+        people=list(participants or [])
+        if people:
+            net=sum(int(x.get("contribution") or 0) for x in people)
+            top=" · ".join(f"{x.get('character_name','Cultivator')} {int(x.get('contribution') or 0):+d}" for x in people[:5])
+            embed.add_field(name=f"👥 Cultivators here ({len(people)})", value=f"net contribution **{net:+d}**\n{top}"[:1024], inline=False)
+
         mode=("Type normal RP messages here — the narrator reacts automatically." if SETTINGS.auto_narrate_event_threads
               else "Mention the bot for free-form RP, or use the controls below.")
-        embed=discord.Embed(
-            title=f"🌌 {self.title}",
-            description=(f"**{self.category}** • Severity **{self.severity}/10** • {'🟢 Active' if active else '⚫ Closed'}\n"
-                         +(f"📍 **{self.location}**\n" if self.location else "")+f"⏳ Closes <t:{int(self.expires_at)}:R>"),
-            color=colour,
-        )
-        embed.add_field(name="🎮 Event Actions",value="Choose a context-specific action from the menu. Results use character attributes, event severity, and persistent participation state.",inline=False)
-        embed.add_field(name="🧭 Connected Systems",value="**Systems** exposes real mechanics available here: combat, secret realms, territory wars, auctions, parties, bosses, formations, bounty hunters, black markets and regional state.",inline=False)
-        embed.add_field(name="👥 Living Scene",value="**Participants** shows players and mechanically present NPCs. **Talk** opens direct NPC dialogue without remembering a slash command.",inline=False)
-        embed.add_field(name="💬 Free-form RP",value=mode,inline=False)
+        embed.add_field(name="💬 Free-form RP", value=mode, inline=False)
         embed.set_footer(text="Go/SQLite remains authoritative • Event choices cannot bypass location, rolls, cooldowns or permissions")
         return embed
+
+    @staticmethod
+    def _node_payout(node: dict[str, Any]) -> str:
+        """The one-line 'what this pays' a player needs before choosing a node."""
+        parts=[]
+        item=str(node.get("item_id") or ""); qty=int(node.get("item_qty") or 0)
+        if item and qty>0:
+            parts.append(WORLD.item_names({item: qty}))
+        if int(node.get("cultivation") or 0):
+            parts.append(f"{int(node['cultivation'])} cultivation")
+        if int(node.get("spirit_stones") or 0):
+            parts.append(f"{int(node['spirit_stones'])} spirit stones")
+        return ("→ "+", ".join(parts)) if parts else ""
+
+    async def _site_state(self) -> tuple[str, str, list[dict[str, Any]], dict[str, Any], list[dict[str, Any]]]:
+        """Load everything the panel shows in one place: what the event is, the
+        objective, the site roster, its progress and who is working it."""
+        description=objective=""
+        site: list[dict[str, Any]]=[]; progress: dict[str, Any]={}; participants: list[dict[str, Any]]=[]
+        if not self.event_key:
+            return description, objective, site, progress, participants
+        try:
+            record=await DB.get_world_event(self.event_key) or {}
+            payload=dict(record.get("payload") or {})
+            description=str(payload.get("description") or "").strip()
+            if not description:
+                # Events spawned before the description was persisted still have
+                # their definition id, and the catalogue still has the prose.
+                definition=str(payload.get("definition_id") or "")
+                for candidate in WORLD.unexpected_events():
+                    if str(candidate.get("id") or "")==definition:
+                        description=str(candidate.get("description") or "").strip(); break
+            objective=str(WORLD.event_site_objective(self.category) or "").strip()
+            site=await DB.list_world_event_nodes(self.event_key)
+            progress=await DB.world_event_site_progress(self.event_key)
+            participants=await DB.list_world_event_participants(self.event_key, limit=10)
+        except Exception:
+            log.exception("Could not load the event site for %s", self.event_key)
+        return description, objective, site, progress, participants
+
+    async def render(self) -> discord.Embed:
+        """Build the panel against live state, refreshing the site select with
+        whatever is still workable."""
+        description, objective, site, progress, participants = await self._site_state()
+        self._refresh_site_select(site)
+        return self.embed(
+            description=description, objective=objective, site=site,
+            progress=progress, participants=participants,
+        )
+
+    def _refresh_site_select(self, site: list[dict[str, Any]]) -> None:
+        for item in list(self.children):
+            if isinstance(item, EventSiteSelect):
+                self.remove_item(item)
+        workable=[n for n in site if int(n.get("remaining") or 0)>0]
+        if workable:
+            self.add_item(EventSiteSelect(self, workable))
 
     async def _character_here(self, interaction: discord.Interaction) -> dict[str, Any] | None:
         character=await DB.get_character(interaction.user.id)
@@ -218,6 +359,64 @@ class EventSceneView(discord.ui.View):
         if int(first.get("fate_delta",0)): reward_details.append(f"Fate {int(first['fate_delta']):+d} → {int(first.get('fate',0))}/9")
         if reward_details: lines.append("First-participation outcome: "+" • ".join(reward_details))
         await interaction.response.send_message("\n".join(lines),ephemeral=False)
+
+    async def engage_node(self, interaction: discord.Interaction, node_key: str) -> None:
+        """Work one node of the site. Unlike the abstract action menu this pays
+        the real item, cultivation and spirit stones the roster attached to it,
+        and it can be repeated for as long as the node holds out."""
+        character=await self._character_here(interaction)
+        if not character:
+            return
+        if not self.event_key:
+            await interaction.response.send_message("This event scene is missing its canonical event key.",ephemeral=False); return
+        try:
+            envelope=await ENGINE.authoritative_action(
+                "world_event.engage",interaction.user.id,{"event_key":self.event_key,"node_key":node_key},
+                action_id=f"discord:{interaction.id}:world_event.engage:{self.event_key}:{node_key}",
+            )
+        except GameEngineError as exc:
+            await interaction.response.send_message(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
+        outcome=dict(envelope.get("result") or {})
+        success=bool(outcome.get("success")); roll=dict(outcome.get("roll") or {})
+        node_type=str(outcome.get("node_type") or "task"); name=str(outcome.get("name") or "the site")
+        verb={"beast":"drive off","herb":"harvest","ore":"cut loose","relic":"recover","task":"carry out"}.get(node_type,"work")
+        sign="+" if int(roll.get("modifier",0))>=0 else ""
+        lines=[
+            f"{NODE_EMOJI.get(node_type,'•')} **{name} — {'SUCCESS' if success else 'FAILURE'}**",
+            f"2d10 ({int(roll.get('die1',0))}+{int(roll.get('die2',0))}) {sign}{int(roll.get('modifier',0))} = "
+            f"**{int(roll.get('total',0))}** vs TN **{int(outcome.get('tn',0))}** — **{roll.get('degree','Result')}**",
+        ]
+        if success:
+            gains=[]
+            if int(outcome.get("cultivation_awarded",0)): gains.append(f"Cultivation +{int(outcome['cultivation_awarded'])}")
+            if int(outcome.get("spirit_stones",0)): gains.append(f"Spirit Stones +{int(outcome['spirit_stones'])}")
+            items=dict(outcome.get("items") or {})
+            if items: gains.append(WORLD.item_names(items))
+            if gains: lines.append("You "+verb+" it. **"+" • ".join(gains)+"**")
+            else: lines.append(f"You {verb} it.")
+            lines.append(f"{int(outcome.get('remaining',0))} of {int(outcome.get('total',0))} left here.")
+        else:
+            lines.append(f"You fail to {verb} it. Nothing is taken; it is still there.")
+        site=dict(outcome.get("site") or {})
+        if site.get("total"):
+            lines.append(f"Site progress: **{int(site.get('percent',0))}%** — {int(site.get('cleared',0))}/{int(site.get('total',0))} handled.")
+            if site.get("resolved"):
+                lines.append("✅ **The whole site is cleared.**")
+        await interaction.response.send_message("\n".join(lines),ephemeral=False)
+
+    async def _next_beast(self) -> dict[str, Any] | None:
+        """The next living member of the event's beast roster, so an event
+        battle is a named creature with its own loot rather than an anonymous
+        'hostile manifestation'."""
+        if not self.event_key:
+            return None
+        try:
+            for node in await DB.list_world_event_nodes(self.event_key):
+                if str(node.get("node_type"))=="beast" and int(node.get("remaining") or 0)>0:
+                    return node
+        except Exception:
+            log.exception("Could not read the beast roster for %s", self.event_key)
+        return None
 
     async def _open_scene_actions(self, interaction: discord.Interaction, *, default_action: str) -> None:
         character=await self._character_here(interaction)
@@ -313,21 +512,34 @@ class EventSceneView(discord.ui.View):
         if c is None:return
         if await DB.get_active_battle(interaction.user.id):
             await EVENT_HANDLERS.invoke("battle", interaction); return
-        text=f"{self.category} {self.event_type}".casefold()
-        if not any(x in text for x in ("beast","demon","invasion","tide","attack","war","calamity")):
-            await interaction.response.send_message("No event-specific hostile manifestation is currently forcing a battle here. Use **Systems** to inspect other combat mechanics.",ephemeral=False);return
-        source=f"event:{self.event_key or self.title}"
+        # The roster decides who you fight. Only when an event has no beasts
+        # left (or never had any) does the old category sniff test apply.
+        beast=await self._next_beast()
+        if beast is None:
+            text=f"{self.category} {self.event_type}".casefold()
+            if not any(x in text for x in ("beast","demon","invasion","tide","attack","war","calamity")):
+                await interaction.response.send_message("No event-specific hostile manifestation is currently forcing a battle here. Use **Systems** to inspect other combat mechanics.",ephemeral=False);return
+            npc_name=f"{self.title} — hostile manifestation"; severity=int(self.severity); source=f"event:{self.event_key or self.title}"
+            tail="Defeating this manifestation contributes to the event; it is not a persistent NPC life."
+        else:
+            npc_name=str(beast.get("name") or "Hostile")
+            severity=max(1,min(10,int(beast.get("rank") or self.severity)))
+            source=f"event:{self.event_key or self.title}|node:{beast.get('node_key')}"
+            remaining=int(beast.get("remaining") or 0)
+            descriptor=str(beast.get("descriptor") or "").strip()
+            tail=((descriptor+"\n") if descriptor else "")+(
+                f"{remaining} still standing. Killing it takes one off the event and pays what it carries.")
         try:
             envelope=await COMBAT.start(
-                interaction.user.id,kind="event",npc_name=f"{self.title} — hostile manifestation",
-                severity=int(self.severity),source=source,target_key=f"{source}:{interaction.user.id}",
+                interaction.user.id,kind="event",npc_name=npc_name,
+                severity=severity,source=source,target_key=f"{source}:{interaction.user.id}",
                 action_id=f"discord:{interaction.id}:combat.start:{source}",
             )
         except GameEngineError as exc:
             await interaction.response.send_message(f"❌ {_explain_engine_error(exc)}",ephemeral=False);return
         result=dict(envelope.get("result") or {}); bid=int(result.get("battle_id") or 0)
         battle=await DB.get_active_battle(interaction.user.id); embed,view=await EVENT_HANDLERS.invoke("battle_panel", interaction.user.id,c,battle or result)
-        await interaction.response.send_message(content=f"⚔️ **Event confrontation #{bid} begins.** Defeating this manifestation contributes to the event; it is not a persistent NPC life.",embed=embed,view=view)
+        await interaction.response.send_message(content=f"⚔️ **Event confrontation #{bid} — {npc_name}.**\n{tail}",embed=embed,view=view)
 
     @discord.ui.button(label="Scene Action",emoji="🎭",style=discord.ButtonStyle.success,row=2)
     async def scene_action(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
@@ -335,7 +547,8 @@ class EventSceneView(discord.ui.View):
 
     @discord.ui.button(label="Refresh",emoji="🔄",style=discord.ButtonStyle.secondary,row=2)
     async def refresh(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
-        await interaction.response.edit_message(embed=self.embed(),view=self)
+        embed=await self.render()
+        await interaction.response.edit_message(embed=embed,view=self)
 
     async def on_error(self, interaction: discord.Interaction, error: Exception, item: discord.ui.Item[Any]) -> None:
         await _report_game_ui_error(interaction,error,where=f"event-scene:{type(item).__name__}")
@@ -466,7 +679,7 @@ async def spawn_event_thread(
         )
         await thread.send(
             content=f"{interaction.user.mention} opened this live event scene.",
-            embed=event_view.embed(),
+            embed=await event_view.render(),
             view=event_view,
         )
     except (discord.Forbidden, discord.HTTPException):
@@ -508,7 +721,7 @@ async def spawn_system_event_thread(
         )
         await thread.send(
             content="**The world moves on its own.** Travel to the event location to participate.",
-            embed=event_view.embed(),
+            embed=await event_view.render(),
             view=event_view,
         )
     except (discord.Forbidden,discord.HTTPException):

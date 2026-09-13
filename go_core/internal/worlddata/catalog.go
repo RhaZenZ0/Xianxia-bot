@@ -284,6 +284,65 @@ type UnexpectedEvent struct {
 	WorldEffect     map[string]any `json:"world_effect"`
 }
 
+// EventSiteNode is one concrete thing inside a world event: a beast to fight,
+// an herb or ore node to harvest, a relic to recover, or a task to carry out.
+// Count is a [min,max] pair scaled by event severity when the site is spawned,
+// and Item may be the symbolic "@herb"/"@ore"/"@core", resolved against the
+// world tier the event landed in so one template stays correct in every world.
+type EventSiteNode struct {
+	Key          string  `json:"key"`
+	Type         string  `json:"type"`
+	Name         string  `json:"name"`
+	Descriptor   string  `json:"descriptor"`
+	Count        []int64 `json:"count"`
+	RankBonus    int64   `json:"rank_bonus"`
+	TN           int64   `json:"tn"`
+	Attribute    string  `json:"attribute"`
+	Item         string  `json:"item"`
+	ItemQty      int64   `json:"item_qty"`
+	Cultivation  int64   `json:"cultivation"`
+	SpiritStones int64   `json:"spirit_stones"`
+	Contribution int64   `json:"contribution"`
+}
+
+// EventSiteTemplate is the roster one event category spawns.
+type EventSiteTemplate struct {
+	Objective string          `json:"objective"`
+	Nodes     []EventSiteNode `json:"nodes"`
+}
+
+// EventSites turns an event category into the concrete roster players can act
+// on. Without it a world event is an announcement with nothing inside it.
+type EventSites struct {
+	TierMaterials map[string]map[string]string `json:"tier_materials"`
+	TierRank      map[string]int64             `json:"tier_rank"`
+	Default       EventSiteTemplate            `json:"default"`
+	Categories    map[string]EventSiteTemplate `json:"categories"`
+}
+
+// Template returns the roster for a category, falling back to the default one
+// so an event category nobody wrote a site for is still not empty.
+func (e EventSites) Template(category string) EventSiteTemplate {
+	if tpl, ok := e.Categories[category]; ok && len(tpl.Nodes) > 0 {
+		return tpl
+	}
+	return e.Default
+}
+
+// Material resolves "@herb"/"@ore"/"@core" against a world tier. Anything else
+// is already a literal item id and is returned unchanged.
+func (e EventSites) Material(world, ref string) string {
+	if len(ref) == 0 || ref[0] != '@' {
+		return ref
+	}
+	if tier, ok := e.TierMaterials[world]; ok {
+		if id, ok := tier[ref[1:]]; ok {
+			return id
+		}
+	}
+	return ""
+}
+
 type SecretRealmRoom struct {
 	Name           string           `json:"name"`
 	Description    string           `json:"description"`
@@ -478,6 +537,7 @@ type Catalog struct {
 	LawSystem           LawSystem                      `json:"law_system"`
 	Locations           map[string]LocationDefinition  `json:"locations"`
 	UnexpectedEvents    []UnexpectedEvent              `json:"unexpected_events"`
+	EventSites          EventSites                     `json:"event_sites"`
 	SecretRealms        map[string]SecretRealm         `json:"secret_realms"`
 	Inheritances        map[string]Inheritance         `json:"inheritances"`
 	NPCs                map[string]NPCDefinition       `json:"npcs"`

@@ -127,6 +127,7 @@ type SpawnedWorldEvent struct {
 	Severity        int64    `json:"severity"`
 	ExpiresAt       float64  `json:"expires_at"`
 	Impacts         []string `json:"impacts,omitempty"`
+	SiteNodes       int64    `json:"site_nodes,omitempty"`
 }
 
 type Runner struct {
@@ -905,12 +906,18 @@ func (r *Runner) autonomousWorldEvents(conn *storage.Conn, steps, gm int64) (str
 		duration = 2
 	}
 	ends := now + float64(duration)*3600
-	payload := map[string]any{"definition_id": pick.event.ID, "category": pick.event.Category, "severity": pick.event.Severity, "consequence_text": pick.event.ConsequenceText, "player_reward": pick.event.PlayerReward, "player_effect": pick.event.PlayerEffect, "karma_delta": pick.event.KarmaDelta, "fate_delta": pick.event.FateDelta, "world_effect": pick.event.WorldEffect, "autonomous": true}
+	payload := map[string]any{"definition_id": pick.event.ID, "category": pick.event.Category, "severity": pick.event.Severity, "description": pick.event.Description, "consequence_text": pick.event.ConsequenceText, "player_reward": pick.event.PlayerReward, "player_effect": pick.event.PlayerEffect, "karma_delta": pick.event.KarmaDelta, "fate_delta": pick.event.FateDelta, "world_effect": pick.event.WorldEffect, "autonomous": true}
 	enc, _ := json.Marshal(payload)
 	if _, err = conn.Execute(`INSERT INTO world_events(event_key,dedupe_key,event_type,title,location,payload_json,active,starts_at,ends_at) VALUES(?,?,?,?,?,?,1,?,?)`, []any{eventKey, dedupe, "random_event", pick.event.Title, pick.location, string(enc), now, ends}); err != nil {
 		return "", nil, err
 	}
 	impacts, err := r.applyAutonomousWorldEffect(conn, pick.event, pick.location, gm, now)
+	if err != nil {
+		return "", nil, err
+	}
+	// An autonomous event that nobody triggered still has to have something
+	// inside it when the first player walks in, so the site spawns with it.
+	siteNodes, err := game.SpawnWorldEventNodes(conn, r.World, eventKey, pick.event.Category, pick.location, pick.event.Severity, now)
 	if err != nil {
 		return "", nil, err
 	}
@@ -925,6 +932,6 @@ func (r *Runner) autonomousWorldEvents(conn *storage.Conn, steps, gm int64) (str
 			return "", nil, err
 		}
 	}
-	evt := SpawnedWorldEvent{EventKey: eventKey, EventID: pick.event.ID, Title: pick.event.Title, Category: pick.event.Category, Description: pick.event.Description, ConsequenceText: pick.event.ConsequenceText, Location: pick.location, Severity: pick.event.Severity, ExpiresAt: ends, Impacts: impacts}
+	evt := SpawnedWorldEvent{EventKey: eventKey, EventID: pick.event.ID, Title: pick.event.Title, Category: pick.event.Category, Description: pick.event.Description, ConsequenceText: pick.event.ConsequenceText, Location: pick.location, Severity: pick.event.Severity, ExpiresAt: ends, Impacts: impacts, SiteNodes: siteNodes}
 	return "spawned autonomous world event " + pick.event.Title, []SpawnedWorldEvent{evt}, nil
 }
