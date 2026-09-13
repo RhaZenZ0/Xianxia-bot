@@ -103,7 +103,7 @@ async def cultivate(interaction: discord.Interaction) -> None:
         extra += "\n🪷 This stage is already full: the session gathered nothing, banked nothing and risked nothing. Break through before meditating again."
     ready = ""
     if result.get("ready"):
-        ready = "\n✨ Stage 9 is full. Choose **/quest → Realm Perfection → Start** or **/quest → Main Progression → Breakthrough**." if int(c.get("phase", 1)) == 9 else "\n✨ You are ready to attempt **/quest → Main Progression → Breakthrough**."
+        ready = "\n✨ Stage 9 is full. Choose **/ascend → Realm Perfection → Start** or **/ascend → Main Progression → Breakthrough**." if int(c.get("phase", 1)) == 9 else "\n✨ You are ready to attempt **/ascend → Main Progression → Breakthrough**."
     await interaction.followup.send(
         f"🧘 **{c['name']} cultivates.**\nYou circulate qi through your meridians and gain **+{gain} cultivation essence**.\nProgress: **{total}/{cost}**{extra}{ready}"
     )
@@ -164,7 +164,7 @@ async def insight(interaction: discord.Interaction) -> None:
     except GameEngineError as exc:
         message = str(exc)
         if "already banked" in message:
-            message = "An insight is already banked. It is spent when you cross the realm gate at **/quest → Main Progression → Breakthrough**."
+            message = "An insight is already banked. It is spent when you cross the realm gate at **/ascend → Main Progression → Breakthrough**."
         elif "costs" in message and "Insight XP" in message:
             message += " Insight XP comes from exploring, quests, battles and the Refine stance (**/cultivation → Cultivate → Stance**)."
         await interaction.followup.send(f"❌ {message}", ephemeral=False)
@@ -173,7 +173,7 @@ async def insight(interaction: discord.Interaction) -> None:
     await interaction.followup.send(
         f"💡 **{c['name']} banks an insight into {result.get('next_realm') or 'the next realm'}.**\n"
         f"Spent **{int(result.get('cost', 0))} Insight XP** (**{int(result.get('insight_xp', 0))}** left). "
-        f"The realm gate out of **{result.get('realm') or 'this realm'}** is open: fill Stage 9 and attempt **/quest → Main Progression → Breakthrough**.",
+        f"The realm gate out of **{result.get('realm') or 'this realm'}** is open: fill Stage 9 and attempt **/ascend → Main Progression → Breakthrough**.",
         ephemeral=False,
     )
 
@@ -324,13 +324,13 @@ async def breakthrough(interaction: discord.Interaction, confirm: bool = False, 
     except GameEngineError as exc:
         message = str(exc)
         if "perfection choice requires explicit confirmation" in message:
-            message = "⚠️ **Stage 9 choice**\nYou can pursue **/quest → Realm Perfection → Start** for a stronger long-term foundation, or explicitly confirm this breakthrough to skip it."
+            message = "⚠️ **Stage 9 choice**\nYou can pursue **/ascend → Realm Perfection → Start** for a stronger long-term foundation, or explicitly confirm this breakthrough to skip it."
         elif "no moment to seize" in message or "seized once already" in message:
             message = "⚠️ **No moment to seize**\nA seized moment is one more roll after a failed attempt at this same stage, and only one. Fill the stage and attempt it again."
         elif "seizing the moment costs" in message:
             message += " Insight XP comes from exploring, quests, battles and the Refine stance (**/cultivation → Cultivate → Stance**)."
         elif "realm gate" in message:
-            message = f"⚠️ **The realm gate is closed**\n{message}\nBank the insight under **/cultivation → Cultivate → Insight**, or complete **/quest → Realm Perfection**. The sheet at **/cultivation** shows your Insight XP and the odds."
+            message = f"⚠️ **The realm gate is closed**\n{message}\nBank the insight under **/cultivation → Cultivate → Insight**, or complete **/ascend → Realm Perfection**. The sheet at **/cultivation** shows your Insight XP and the odds."
         await interaction.followup.send(f"❌ {message}" if not message.startswith("⚠️") else message, ephemeral=False)
         return
     result = dict(envelope.get("result") or {})
@@ -421,7 +421,7 @@ async def body_sheet(interaction: discord.Interaction) -> None:
                 f"Quests {p['completed_quests']}/{WORLD.body_perfection_quest_count()}"
             )
         else:
-            lines.append("Stage 9 choice: **/quest → Body Perfection → Start** or **/cultivation → Body → Breakthrough**.")
+            lines.append("Stage 9 choice: **/ascend → Body Perfection → Start** or **/cultivation → Body → Breakthrough**.")
     await interaction.response.send_message("\n".join(lines), ephemeral=False)
 
 
@@ -458,7 +458,7 @@ async def body_cultivate(interaction: discord.Interaction) -> None:
     if int(result.get("perfection_gain", 0)):
         extra += f"\n★ Body refinement deepens by **+{int(result['perfection_gain'])}%**."
     if result.get("ready"):
-        extra += "\n✨ Body Stage 9 is full. Choose **/quest → Body Perfection → Start** or **/cultivation → Body → Breakthrough**." if int(c.get("body_phase", 1)) == 9 else "\n✨ Your body is ready for **/cultivation → Body → Breakthrough**."
+        extra += "\n✨ Body Stage 9 is full. Choose **/ascend → Body Perfection → Start** or **/cultivation → Body → Breakthrough**." if int(c.get("body_phase", 1)) == 9 else "\n✨ Your body is ready for **/cultivation → Body → Breakthrough**."
     await interaction.followup.send(f"💪 **{c['name']} tempers the body.**\nYou refine flesh, blood, bone, and meridians for **+{gain} body essence**.\nProgress: **{total}/{cost}**{extra}")
 
 
@@ -480,7 +480,7 @@ async def body_breakthrough(interaction: discord.Interaction, confirm: bool = Fa
     except GameEngineError as exc:
         message = str(exc)
         if "perfection choice requires explicit confirmation" in message:
-            message = "⚠️ **Body Stage 9 choice**\nPursue **/quest → Body Perfection → Start** for a stronger physical foundation, or explicitly confirm this breakthrough to skip it."
+            message = "⚠️ **Body Stage 9 choice**\nPursue **/ascend → Body Perfection → Start** for a stronger physical foundation, or explicitly confirm this breakthrough to skip it."
         await interaction.followup.send(f"❌ {message}" if not message.startswith("⚠️") else message, ephemeral=False)
         return
     result = dict(envelope.get("result") or {})
@@ -533,7 +533,7 @@ async def bodyperfect_start(interaction: discord.Interaction) -> None:
     await interaction.followup.send(
         f"★ **Perfect Body Path begun: {WORLD.body_realm_name(ri, c.get('gender'))}**\n"
         f"Training can contribute **{WORLD.body_perfection_training_cap()}%**; the remaining progress comes from seven physical trials.\n\n"
-        f"First quest: **{q['title']}**\n{q['description']}\nUse **/quest → Body Perfection → Quest**."
+        f"First quest: **{q['title']}**\n{q['description']}\nUse **/ascend → Body Perfection → Quest**."
     )
 
 
@@ -580,7 +580,7 @@ async def bodyperfect_quest(interaction: discord.Interaction, action: app_comman
             await interaction.response.send_message("No active Perfect Body Path.", ephemeral=False)
             return
         if p["quest_index"] >= WORLD.body_perfection_quest_count():
-            await interaction.response.send_message("All Body Perfection quests are complete. Use **/quest → Body Perfection → Trial**.", ephemeral=False)
+            await interaction.response.send_message("All Body Perfection quests are complete. Use **/ascend → Body Perfection → Trial**.", ephemeral=False)
             return
         q = WORLD.body_perfection_quest(ri, p["quest_index"], c)
         await interaction.response.send_message(
@@ -606,7 +606,7 @@ async def bodyperfect_quest(interaction: discord.Interaction, action: app_comman
         prep = int(result.get("preparation", 0)); required = int(result.get("preparation_required", 0))
         await interaction.response.send_message(
             f"💪 **{result.get('title','Body Perfection')} — Preparation**\nProgress: **{min(prep, required)}/{required}**\n{result.get('clue','')}" +
-            ("\n✨ The trial is available with **/quest → Body Perfection → Quest → Attempt**." if prep >= required else ""),
+            ("\n✨ The trial is available with **/ascend → Body Perfection → Quest → Attempt**." if prep >= required else ""),
             ephemeral=False,
         )
         return
@@ -711,7 +711,7 @@ async def perfect_start(interaction: discord.Interaction) -> None:
     await interaction.followup.send(
         f"★ **Perfect Path begun: {WORLD.realm_name(c['realm_index'], c.get('gender'))}**\n"
         f"Perfection starts at **0%**. Training contributes at most **{WORLD.perfection_training_cap()}%**; the rest comes from seven long quests.\n\n"
-        f"**First Quest — {quest['title']}**\n{quest['description']}\nPreparation: 0/{quest['preparation_required']}\nUse **/quest → Realm Perfection → Quest**.",
+        f"**First Quest — {quest['title']}**\n{quest['description']}\nPreparation: 0/{quest['preparation_required']}\nUse **/ascend → Realm Perfection → Quest**.",
         ephemeral=False,
     )
 
@@ -722,7 +722,7 @@ async def perfect_info(interaction: discord.Interaction) -> None:
     if not c: return
     p = await DB.get_perfection(interaction.user.id, c["realm_index"])
     if not p:
-        await interaction.response.send_message("No Perfect Path is active. At Stage 9 use **/quest → Realm Perfection → Start**.", ephemeral=False); return
+        await interaction.response.send_message("No Perfect Path is active. At Stage 9 use **/ascend → Realm Perfection → Start**.", ephemeral=False); return
     status = "COMPLETED" if p["completed"] else ("ACTIVE" if p["active"] else "INACTIVE")
     text = (f"★ **{WORLD.realm_name(c['realm_index'], c.get("gender"))} Perfection — {status}**\n"
             f"Progress: **{p['progress']}%**\nTraining: **{p['training_progress']}/{WORLD.perfection_training_cap()}**\n"
@@ -746,10 +746,10 @@ async def perfect_quest(interaction: discord.Interaction, action: app_commands.C
     p = await DB.get_perfection(interaction.user.id, c["realm_index"])
     if action.value == "info":
         if not p or not p["active"]:
-            await interaction.response.send_message("Start the Perfect Path first with **/quest → Realm Perfection → Start**.", ephemeral=False)
+            await interaction.response.send_message("Start the Perfect Path first with **/ascend → Realm Perfection → Start**.", ephemeral=False)
             return
         if p["quest_index"] >= WORLD.perfection_quest_count():
-            await interaction.response.send_message("All seven quests are complete. Reach 100% and use **/quest → Realm Perfection → Trial**.", ephemeral=False)
+            await interaction.response.send_message("All seven quests are complete. Reach 100% and use **/ascend → Realm Perfection → Trial**.", ephemeral=False)
             return
         q = WORLD.perfection_quest(c["realm_index"], p["quest_index"], c)
         await interaction.response.send_message(
@@ -773,7 +773,7 @@ async def perfect_quest(interaction: discord.Interaction, action: app_commands.C
         prep = int(result.get("preparation", 0)); required = int(result.get("preparation_required", 0))
         await interaction.response.send_message(
             f"🧭 **{result.get('title','Perfection')} — Preparation**\nProgress: **{min(prep, required)}/{required}**\n{result.get('clue','')}" +
-            ("\n✨ The trial is now available with **/quest → Realm Perfection → Quest → Attempt**." if prep >= required else ""), ephemeral=False,
+            ("\n✨ The trial is now available with **/ascend → Realm Perfection → Quest → Attempt**." if prep >= required else ""), ephemeral=False,
         )
         return
     roll = SimpleNamespace(**dict(result.get("roll") or {}))

@@ -25,7 +25,7 @@ class CommandCleanupTests(unittest.TestCase):
         self.assertEqual(
             set(hub_names),
             {
-                "character", "quest", "cultivation", "items", "npc", "world",
+                "character", "ascend", "cultivation", "items", "npc", "world",
                 "travel", "combat", "economy", "craft", "beast", "sect",
                 "family", "abode", "innerworld", "realm", "admin",
             },

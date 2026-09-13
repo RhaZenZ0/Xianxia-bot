@@ -18,7 +18,7 @@ _RANGE_ANNOTATION = re.compile(r"Range\[(int|float)\s*,\s*(-?\d+(?:\.\d+)?)\s*,\
 
 
 _HUB_COLOURS = {
-    "character": 0x6C7A89, "quest": 0xA87D32, "cultivation": 0x5B8C5A,
+    "character": 0x6C7A89, "ascend": 0xA87D32, "cultivation": 0x5B8C5A,
     "items": 0x8A6D3B, "npc": 0x6D78A8, "world": 0x3F7F73,
     "travel": 0x557A95, "combat": 0x9A4A4A, "economy": 0xA5863B,
     "craft": 0x8B6F47, "beast": 0x6B875F, "sect": 0x815D73,
@@ -27,7 +27,7 @@ _HUB_COLOURS = {
 }
 
 _HUB_ICONS = {
-    "character": "🧑", "quest": "☯️", "cultivation": "🧘", "items": "🎒",
+    "character": "🧑", "ascend": "☯️", "cultivation": "🧘", "items": "🎒",
     "npc": "👥", "world": "🌍", "travel": "🗺️", "combat": "⚔️",
     "economy": "💰", "craft": "🛠️", "beast": "🐉", "sect": "🏯",
     "family": "🏠", "abode": "🏡", "innerworld": "🌌", "realm": "🌀",
@@ -65,7 +65,7 @@ LAYOUT_HUB_NAMES: set[str] = {
     # stage 2
     "innerworld", "beast", "abode", "family",
     # stage 3
-    "quest", "cultivation", "sect",
+    "ascend", "cultivation", "sect",
     # stage 4
     "admin",
 }

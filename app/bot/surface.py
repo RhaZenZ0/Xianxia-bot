@@ -209,16 +209,20 @@ _HUB_DEFINITIONS = (
                       "reincarnate"),
         ),
     ),
+    # `/ascend`, not `/quest` (v1.0.0-rc.13). This hub holds no quests: it is
+    # breakthrough, the two Perfection paths and the tribulation gates. The
+    # quests are `/quests`, one character away, which is how long it took a
+    # player to pick the wrong one. Bounties moved to /character -> Consequences
+    # with the rest of what the world holds against you.
     HubDefinition(
-        name="quest",
-        title="☯ Quest Journal",
-        description="Progression objectives, Perfection paths and ascension gates.",
+        name="ascend",
+        title="☰ Ascension Path",
+        description="Breakthrough, the optional Perfection paths, and the heavenly tribulations that gate the next realm.",
         pages=(
             _hub_page("breakthrough", "Main Progression", "Normal realm breakthrough and Stage 9 progression."),
             _hub_page("perfect", "Realm Perfection", "Optional Stage 9 Realm Perfection path."),
             _hub_page("bodyperfect", "Body Perfection", "Optional Stage 9 Body Realm Perfection path."),
             _hub_page("tribulation", "Tribulation / Ascension", "Prepare for and attempt heavenly tribulations."),
-            _hub_page("bounty", "Bounties", "Active bounty objectives and consequences."),
         ),
     ),
     HubDefinition(
@@ -535,9 +539,9 @@ _MenuBase = discord.ui.LayoutView if LAYOUT_COMPONENTS_AVAILABLE else discord.ui
 # The menu's shape (v1.0.0-rc.3): four rows of four, grouped by what a player
 # is doing, instead of one sixteen-entry select. The hub names stay the hub
 # names; two get the label they should always have had.
-_HUB_LABELS = {"npc": "NPCs", "innerworld": "Inner World", "quest": "Quests"}
+_HUB_LABELS = {"npc": "NPCs", "innerworld": "Inner World", "ascend": "Ascension"}
 _MENU_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
-    ("You", "who you are and what you carry", ("character", "cultivation", "items", "quest")),
+    ("You", "who you are and what you carry", ("character", "cultivation", "items", "ascend")),
     ("World", "where you are and what is happening", ("world", "travel", "realm", "npc")),
     ("Doing", "fighting, making, trading, taming", ("combat", "craft", "economy", "beast")),
     ("Home", "the places that are yours", ("sect", "family", "abode", "innerworld")),
