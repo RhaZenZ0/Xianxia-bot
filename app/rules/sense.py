@@ -29,6 +29,33 @@ def approximate_realm(
     return f"a cultivator of the {realm_world(int(realm_index))}"
 
 
+def ground_reading_line(ground: Mapping[str, Any] | None) -> str:
+    """The line a sweep prints about the ground it is standing on, or "" when
+    the sweep read nothing.
+
+    The engine decides *how much* is known - `detail` is the precision tier
+    collapsed to three rungs - and this only chooses the words. A sweep that
+    failed sends no ground at all, which is why an empty mapping is a normal
+    answer rather than an error.
+    """
+    if not ground:
+        return ""
+    quality = str(ground.get("quality", "ordinary"))
+    where = str(ground.get("ground") or "")
+    detail = str(ground.get("detail", "vague"))
+    if detail == "vague":
+        return f"The qi of this ground feels **{quality}**, though you cannot tell what shapes it."
+    if detail == "named":
+        return f"The qi of this ground is **{quality}**" + (f", gathered by **{where}**." if where else ".")
+    multiplier = float(ground.get("multiplier", 1.0) or 1.0)
+    world_qi = float(ground.get("world_qi", 1.0) or 1.0)
+    return (
+        f"The qi of this ground is **{quality}** — cultivation here runs at **×{multiplier:g}**"
+        + (f", gathered by **{where}**" if where else "")
+        + f", in a world whose qi runs at **×{world_qi:g}**."
+    )
+
+
 def hidden_npc_names(
     hidden_masters: Mapping[str, Mapping[str, Any]],
     location: str | None = None,

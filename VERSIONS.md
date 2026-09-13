@@ -6,6 +6,32 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.0** (rc.15) makes a spiritual sense worth casting. It could not answer the one question the
+genre uses it for - is the qi here good enough to sit in - although the engine has known the answer
+since rc.4: `placeCultivationMultiplier` prices a road-side shrine, a temple quarter, a sect gate, a
+cave abode and its gathering array and a deployed array, and `placeQuality` is the word the Here line
+and the cultivation sheet already print for it. `/sense area` read none of it and returned scenery
+instead. It now reads that same number, so what a sweep reports and what a session actually pays
+cannot disagree, and the detail is what the sweep earned: a weak one gets the word for the ground, a
+better one what is gathering it, an overwhelming one the multiplier and the world's own qi density as
+numbers. Qualitative early, precise later, which is the progression the sense was always described as
+having.
+
+Two of the five readings `/sense` can give were unreachable. Resolving *what* a cultivator is got 2
+harder a realm while detecting them at all got 7, so precision was never the binding constraint: by
+the time a target was far enough above you to make the detail roll marginal, detection had already
+failed and the answer was "none" or "world". Swept over the realm ladder and some 2,900 attribute
+builds, `approx` was 0.3% of outcomes and `realm` 0.015%, both only for a minimum-stat realm-0
+character - the ladder was written and never walked. The slope is 5, so a peer still reads exact,
+someone one to three realms above reads approximate, and past that the realm alone; 6 and 7 were
+tried and collapse the top of it. The area sweep keeps 2, because it reads a place and its target
+number scales with the sensor's own realm, where the same slope would only cancel that growth.
+
+And every timed lookup the sense made asked for minute zero. An authoritative payload may not carry
+`game_minute`, so the field the action read was always unset - which means no active effect and no
+deployed location array has ever modified a sense reading, and every sense event was filed at the
+dawn of the world. It takes the clock from the engine now, like every other action. No schema change.
+
 **1.0.0** (rc.14) repairs a broken call in `/sense` and closes the class of fault it belongs to.
 Sensing another cultivator called `WORLD.approximate_realm(...)`, and there is no such method on
 `World`: the function lives in `app/rules/sense.py` and takes its two realm lookups as arguments, so
@@ -304,9 +330,12 @@ mechanical authority paths.
 
 ## Release status — v1.0.0
 
-- Current release: v1.0.0 (rc.14): a broken call in `/sense` repaired, and every attribute the
-  command surface reads off `DB`, `WORLD`, `SETTINGS` and `ENGINE` held to exist by a test. Tagged
-  `v1.0.0-rc.14` on the beta channel; the NAS drills and two quiet weeks make it `v1.0.0`.
+- Current release: v1.0.0 (rc.15): the spiritual sense reads the ground it is standing on, the two
+  middle readings it could give become reachable, and it stops asking the world for minute zero.
+  Tagged `v1.0.0-rc.15` on the beta channel; the NAS drills and two quiet weeks make it `v1.0.0`.
+- v1.0.0 (rc.14): a broken call in `/sense` repaired, and every attribute the command surface reads
+  off `DB`, `WORLD`, `SETTINGS` and `ENGINE` held to exist by a test. A NAS still on rc.12 needs the
+  fixed `update.sh` dropped in by hand before it can install this or anything after it - see rc.13.
 - v1.0.0 (rc.13): the hub surface regrouped around what a player is doing, the updater fix that makes
   a stamped release installable at all, and - cut into the same tree before it shipped - the `/craft`
   `NameError` and the thirty printed hub paths that drew no button.

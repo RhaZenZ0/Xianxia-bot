@@ -13,7 +13,7 @@ import discord
 from discord import app_commands
 
 from ...ops.game_engine import GameEngineError
-from ...rules.sense import approximate_realm, hidden_npc_names
+from ...rules.sense import approximate_realm, ground_reading_line, hidden_npc_names
 from ...rules.worldtime import cultivation_cycle_summary
 from ..character_state import current_effect_modifiers
 from ..formatting import human_duration, roll_line
@@ -225,6 +225,12 @@ async def sense_command(
         f"**{precision_tier.replace('_', ' ').title()}**",
         f"Effective range: **{int(sensed.get('range_m', 0)):,} m**",
     ]
+    # What the ground is worth to sit in - the same number the cultivation
+    # session will actually use, read at whatever detail the sweep earned.
+    ground_line = ground_reading_line(sensed.get("ground"))
+    if ground_line:
+        lines.append(f"• {ground_line}")
+
     hints = list(sensed.get("hints") or [])
     if hints:
         lines.extend(f"• {hint}" for hint in hints)
