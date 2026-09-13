@@ -110,3 +110,50 @@ class WhatTheChainAddsUpTo(unittest.TestCase):
 
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()
+
+
+class TheCraftReplyNamesItsProfession(unittest.TestCase):
+    """`_run_crafting` prints the recipe's profession on every result.
+
+    v1.0.0-rc.13 removed `/alchemy refine`, which was `/craft` with a
+    `required_profession` check the other door walked around. The gate went,
+    and `profession = str(r["profession"])` went with it - but three lines
+    below still read that name, so the first craft that came back with a
+    quality label would have raised NameError. Lint did not select pyflakes
+    and no test reached the branch.
+
+    This reads the source rather than driving the handler, because the handler
+    needs a live interaction and an engine; the defect was a name, and a name
+    is visible here.
+    """
+
+    def test_every_name_the_result_lines_read_is_defined_in_the_function(self):
+        import ast
+
+        from tests.support import PROJECT_ROOT
+
+        source = (PROJECT_ROOT / "app" / "bot" / "commands" / "exploration.py").read_text(encoding="utf-8")
+        func = next(
+            node for node in ast.walk(ast.parse(source))
+            if isinstance(node, ast.AsyncFunctionDef) and node.name == "_run_crafting"
+        )
+        assigned = {
+            target.id
+            for node in ast.walk(func) for target in getattr(node, "targets", ())
+            if isinstance(target, ast.Name)
+        }
+        assigned |= {a.arg for a in func.args.args}
+        assigned |= {
+            node.target.id for node in ast.walk(func)
+            if isinstance(node, (ast.For, ast.AsyncFor)) and isinstance(node.target, ast.Name)
+        }
+        assigned |= {
+            item.optional_vars.id for node in ast.walk(func)
+            if isinstance(node, (ast.With, ast.AsyncWith))
+            for item in node.items
+            if isinstance(getattr(item, "optional_vars", None), ast.Name)
+        }
+        self.assertIn("profession", assigned,
+                      "_run_crafting reads `profession`; nothing in it defines one")
+
+

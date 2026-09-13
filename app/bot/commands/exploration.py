@@ -605,6 +605,10 @@ async def _run_crafting(interaction: discord.Interaction, recipe: str) -> None:
             ephemeral=False,
         )
         return
+    # The recipe's profession is printed on every result line below and decides
+    # the alchemy-only batch wording. It was removed with the `required_profession`
+    # gate in the same edit, which left three uses of a name nothing defined.
+    profession = str(r["profession"])
     try:
         envelope = await ENGINE.authoritative_action(
             "craft.resolve",

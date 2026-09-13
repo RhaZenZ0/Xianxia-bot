@@ -31,5 +31,15 @@ extend-exclude = [".venv", "venv", "data"]
 #        is a stated choice: the port is `expose`-only and never published.
 #   S603/S607 subprocess - scripts/playtest_engine.py launching the engine it
 #        is written to drive, with arguments it constructs itself.
-select = ["E9", "S"]
+# F821 and its neighbours are the pyflakes rules that find a *bug* rather than
+# untidiness: a name nothing defines, a redefinition that silently shadows, a
+# `raise NotImplemented`. They were not selected, and one shipped - deleting a
+# local in v1.0.0-rc.13 left three uses of `profession` in `_run_crafting` that
+# would have raised NameError the first time a player crafted anything with a
+# quality result. All of them are clean today, so like the S rules they are a
+# ratchet and not a backlog. F401/F841 (unused import, unused variable) are
+# deliberately *not* here: they have ~113 existing hits, which would be a
+# backlog, and neither can crash anything.
+select = ["E9", "S", "F402", "F502", "F506", "F601", "F632", "F702", "F706",
+          "F707", "F811", "F821", "F822", "F823", "F901"]
 ignore = ["S608", "S110", "S310", "S105", "S104", "S603", "S607"]

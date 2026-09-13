@@ -592,6 +592,26 @@ class SecurityScanTests(unittest.TestCase):
         self.assertNotIn("audit", check.group(1).split(),
                          "make check must stay offline-runnable")
 
+    def test_the_pyflakes_rules_that_find_bugs_are_on(self):
+        """A name nothing defines must fail lint, not reach a player.
+
+        `select` was `["E9", "S"]`: syntax errors and bandit, and no pyflakes at
+        all. So deleting a local in v1.0.0-rc.13 left three uses of
+        `profession` in `_run_crafting` with nothing defining it - a NameError
+        the first time anyone crafted something with a quality result - and both
+        lint and 1270 tests passed over it, because no test exercises that
+        branch and nothing was looking for the class of fault.
+
+        Only the rules that find a bug are here. F401/F841 (unused import,
+        unused variable) are deliberately out: ~113 existing hits would be a
+        backlog rather than a ratchet, and neither can crash anything.
+        """
+        for rule in ("F821", "F811", "F822", "F823", "F632", "F901"):
+            self.assertRegex(
+                self.PYPROJECT, rf'select = \[[^\]]*"{rule}"',
+                f"{rule} finds a real defect and must stay selected",
+            )
+
     def test_the_python_security_rules_are_on_with_reasons_for_what_is_off(self):
         self.assertRegex(self.PYPROJECT, r'select = \[[^\]]*"S"', "flake8-bandit must be selected")
         ignored = re.search(r"^ignore = \[([^\]]*)\]", self.PYPROJECT, re.M)
