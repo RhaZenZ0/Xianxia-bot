@@ -408,6 +408,12 @@ type NPCDefinition struct {
 	// Merchant (v0.34.1) names the catalog merchant this NPC is the face of,
 	// so the trader's relocation moves the NPC too.
 	Merchant string `json:"merchant"`
+	// Circuit (v1.0.0-rc.15) is the road a wandering hidden master walks, a
+	// stop at a time. Python resolves which stop from the canonical clock, so
+	// the engine reads this only to leave those NPCs alone: an NPC whose
+	// whereabouts are already decided by content must not also be walked by
+	// the civilization tick, or the two answers fight.
+	Circuit []string `json:"circuit"`
 }
 
 type ManualDefinition struct {

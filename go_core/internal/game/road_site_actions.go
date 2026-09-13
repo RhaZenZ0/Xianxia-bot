@@ -2,6 +2,7 @@ package game
 
 import (
 	"sort"
+	"strings"
 
 	"xianxia/core/internal/gamerng"
 	"xianxia/core/internal/storage"
@@ -199,3 +200,68 @@ func roadSiteCandidates(catalog worlddata.Catalog, known map[string]bool, world 
 // huntingGroundBonus is the edge a hunting ground gives: the beasts are
 // there to be found, so the roll is easier and the spoils richer.
 const huntingGroundRollBonus int64 = 2
+
+// WhereAnNPCCanWalk is every place an NPC standing at `current` could be next,
+// using the map the players themselves walk rather than a second model of it.
+//
+// The world simulation needs this and had no way to ask. A first attempt in
+// the simulation package matched only `roads` and `gates`, which connects the
+// forty-eight cities and leaves the other four hundred and twenty-nine places
+// - every district, shop, waystation, shrine and hunting ground - with no
+// neighbour at all, so almost every NPC in the world could never move. The map
+// joins up four ways and this is all four:
+//
+//   - city to city along `roads` (world-, privacy- and realm-filtered, which
+//     is exactly canonicalRoadNeighbors, the player's own rule);
+//   - a district, shop or auction hall to the city it is inside, and back out
+//     to that city's other districts;
+//   - a city to the road sites on the legs leaving it;
+//   - a road site to either end of the leg it lies on.
+//
+// Private places are never offered: an NPC must not wander into somebody's
+// cave abode. The realm floor is read as the NPC's own realm index.
+func WhereAnNPCCanWalk(catalog worlddata.Catalog, current string, realmIndex int64) []string {
+	loc, ok := catalog.Locations[current]
+	if !ok {
+		return nil
+	}
+	seen := map[string]bool{current: true}
+	out := []string{}
+	add := func(name string) {
+		name = strings.TrimSpace(name)
+		if name == "" || seen[name] {
+			return
+		}
+		dest, exists := catalog.Locations[name]
+		if !exists || dest.Private || dest.World != loc.World || dest.MinRealmIndex > realmIndex {
+			return
+		}
+		seen[name] = true
+		out = append(out, name)
+	}
+
+	city := cityOf(catalog, current)
+	if city != current {
+		// Inside a city: its other parts, and the city itself.
+		add(city)
+		for _, part := range cityPartsOf(catalog, city) {
+			add(part)
+		}
+	} else {
+		for _, part := range cityPartsOf(catalog, current) {
+			add(part)
+		}
+		for _, neighbour := range canonicalRoadNeighbors(catalog, current, realmIndex) {
+			add(neighbour)
+			for _, site := range roadSitesOnLeg(catalog, current, neighbour) {
+				add(site)
+			}
+		}
+	}
+	if a, b, ok := roadSiteEndpoints(catalog, current); ok {
+		add(a)
+		add(b)
+	}
+	sort.Strings(out)
+	return out
+}

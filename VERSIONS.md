@@ -6,7 +6,37 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
-**1.0.0** (rc.15) makes a spiritual sense worth casting, and worth hiding from. It could not answer
+**1.0.0** (rc.15) sets the world's own people moving, and makes a spiritual sense worth casting at
+them. `npc_civilization_state` has carried `home_location`, `current_location` and `faction` since
+the simulation was built, and the daily tick moved wealth, influence, ambition, activity and phase -
+never any of those three. Nothing autonomous had ever written `current_location` at all: it was set
+at bootstrap and afterwards only touched by a merchant relocating, one game action and an admin
+undo. So every NPC in the world stood exactly where they were born, for the life of the world, and
+`current_npc_location`'s branch for "autonomous civilization travel has moved them away from their
+home region" was unreachable code guarding a thing that could not happen. `faction` was the same,
+chosen at bootstrap and frozen, so no sect ever gained or lost a member.
+
+They walk now. Each daily tick some of them set out along the road, step to a neighbouring place, or
+turn for home - weighted by trade, because a peddler is almost always travelling and a gate guard
+almost never is, and capped so a world does not relocate overnight. No journey is stored: a tick is
+one pass with nothing half-finished to reconcile if it is missed or replayed. The road they walk is
+the players' own map rule rather than a second copy of it, and that mattered more than it sounds -
+the first version here matched only `roads` and `gates`, which joins the forty-eight cities and
+leaves 429 of the world's 477 places (every district, waystation, shrine and shop) with no
+neighbour at all, so almost every NPC alive still could not have moved. `game.WhereAnNPCCanWalk`
+composes all four ways the map joins up - roads, a city's own districts, the sites on a leg, and
+either end of a site's leg - and 429 stranded places became 17. A test holds the real content to it,
+because a fixture of two towns on a road passes that bug happily.
+
+And the sects take people and lose them. A sect whose recruitment pressure has climbed past sixty
+actually recruits the ambitious and masterless; one whose cohesion has fallen under thirty-five
+actually loses members to the road. Both numbers were already being maintained by the politics tick
+and read by nothing. Each change is written to the sect's own log and to `world_history_events` as
+public history, because a named cultivator changing banner is what a town talks about. A settled
+sect - neither desperate nor coming apart - is left entirely alone; churn for its own sake is noise
+rather than a living world.
+
+The spiritual sense could not answer
 the one question the genre uses it for - is the qi here good enough to sit in - although the engine
 has known the answer since rc.4: `placeCultivationMultiplier` prices a road-side shrine, a temple
 quarter, a sect gate, a cave abode and its gathering array and a deployed array, and `placeQuality`

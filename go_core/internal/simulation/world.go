@@ -458,7 +458,11 @@ last_game_minute=?,updated_at=? WHERE status='alive'`, []any{max1(steps / 2), st
 			npcs = i64(row["n"])
 		}
 	}
-	return fmt.Sprintf("batch-updated %d regions and %d living NPCs", regions, npcs), nil
+	moved, err := r.npcTravel(conn, steps, gm)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("batch-updated %d regions and %d living NPCs; %d took the road", regions, npcs, moved), nil
 }
 
 func (r *Runner) npcLife(conn *storage.Conn, steps, gm int64) (string, error) {
@@ -566,7 +570,11 @@ func (r *Runner) sects(conn *storage.Conn, steps, gm int64) (string, error) {
 			count = i64(row["n"])
 		}
 	}
-	return fmt.Sprintf("batch-advanced politics for %d sects", count), nil
+	joined, left, err := r.npcSectChanges(conn, steps, gm)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("batch-advanced politics for %d sects; %d swore in, %d walked out", count, joined, left), nil
 }
 
 func (r *Runner) clans(conn *storage.Conn, steps, gm int64) (string, error) {
