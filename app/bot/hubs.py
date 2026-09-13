@@ -121,7 +121,7 @@ _PAGE_EMOJIS = {
     "bond": "🤝", "daoheart": "💠", "reputation": "🏷️", "grudges": "🔥", "crime": "⚖️",
     "bounty": "🎯", "inheritances": "📚", "effects": "✨", "specialeffects": "🌀",
     "condition": "🩹", "soul": "🕯️", "afterlife": "☸️", "reincarnate": "🌱",
-    "breakthrough": "⬆️", "perfect": "💎", "bodyperfect": "🥋", "tribulation": "⚡",
+    "breakthrough": "⬆️", "perfect": "💎", "tribulation": "⚡",
     "cultivate": "🧘", "seclusion": "🚪", "body": "🥋", "aptitude": "🧬", "law": "📖",
     "manual": "📚", "conceal": "🌫️", "profession": "🛠️", "inventory": "🎒", "storage": "📦",
     "use": "🧪", "equipment": "🛡️", "artifact": "🔮", "provenance": "🔎", "npcinfo": "👤",

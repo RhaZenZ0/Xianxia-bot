@@ -47,14 +47,15 @@ def test_python_go_authority_boundary_only_delegates_migrated_mechanics():
     expected_operations = {
         "check": "check.resolve",
         "_resolve_scene_action": "scene.action",
-        "perfect_start": "perfection.start",
-        "perfect_quest": "perfection.quest",
-        "perfect_trial": "perfection.trial",
-        "perfect_abandon": "perfection.abandon",
-        "bodyperfect_start": "perfection.body_start",
-        "bodyperfect_quest": "perfection.body_quest",
-        "bodyperfect_trial": "perfection.body_trial",
-        "bodyperfect_abandon": "perfection.body_abandon",
+        # v1.0.0-rc.13: the Realm and Body paths are one group taking a `path`,
+        # so a handler names the verb and `_PERFECTION_PATHS` holds the two
+        # prefixes it is joined to. Both halves are asserted - the verb here,
+        # the prefixes in the block below - so the boundary is still proven
+        # operation by operation.
+        "perfect_start": "start",
+        "perfect_quest": "quest",
+        "perfect_trial": "trial",
+        "perfect_abandon": "abandon",
         "law_comprehend": "law.comprehend",
         "condition_treat": "condition.treat",
         "tribulation_prepare": "tribulation.prepare",
@@ -91,6 +92,13 @@ def test_python_go_authority_boundary_only_delegates_migrated_mechanics():
         assert function_name in FUNCTIONS, function_name
         assert operation in _strings(function_name), (function_name, operation)
 
+    # The prefixes the four perfection verbs above are joined to. Without this
+    # the merged group could delegate to any operation name at all and the
+    # verb assertions would still pass.
+    cultivation = (PROJECT_ROOT / "app" / "bot" / "commands" / "cultivation.py").read_text(encoding="utf-8")
+    for prefix in ('action_prefix="perfection."', 'action_prefix="perfection.body_"'):
+        assert prefix in cultivation, prefix
+
     no_python_rolls = {
         "check",
         "_resolve_scene_action",
@@ -98,10 +106,6 @@ def test_python_go_authority_boundary_only_delegates_migrated_mechanics():
         "perfect_quest",
         "perfect_trial",
         "perfect_abandon",
-        "bodyperfect_start",
-        "bodyperfect_quest",
-        "bodyperfect_trial",
-        "bodyperfect_abandon",
         "law_comprehend",
         "condition_treat",
         "tribulation_prepare",

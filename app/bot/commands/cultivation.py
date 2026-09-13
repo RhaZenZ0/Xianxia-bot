@@ -6,6 +6,7 @@ main.py in definition order; reads only modules below main.py.
 from __future__ import annotations
 
 import time
+from dataclasses import dataclass
 from types import SimpleNamespace
 from typing import Any
 
@@ -103,7 +104,7 @@ async def cultivate(interaction: discord.Interaction) -> None:
         extra += "\n🪷 This stage is already full: the session gathered nothing, banked nothing and risked nothing. Break through before meditating again."
     ready = ""
     if result.get("ready"):
-        ready = "\n✨ Stage 9 is full. Choose **/ascend → Realm Perfection → Start** or **/ascend → Main Progression → Breakthrough**." if int(c.get("phase", 1)) == 9 else "\n✨ You are ready to attempt **/ascend → Main Progression → Breakthrough**."
+        ready = "\n✨ Stage 9 is full. Choose **/ascend → Perfection → Start** or **/ascend → Main Progression → Breakthrough**." if int(c.get("phase", 1)) == 9 else "\n✨ You are ready to attempt **/ascend → Main Progression → Breakthrough**."
     await interaction.followup.send(
         f"🧘 **{c['name']} cultivates.**\nYou circulate qi through your meridians and gain **+{gain} cultivation essence**.\nProgress: **{total}/{cost}**{extra}{ready}"
     )
@@ -324,13 +325,13 @@ async def breakthrough(interaction: discord.Interaction, confirm: bool = False, 
     except GameEngineError as exc:
         message = str(exc)
         if "perfection choice requires explicit confirmation" in message:
-            message = "⚠️ **Stage 9 choice**\nYou can pursue **/ascend → Realm Perfection → Start** for a stronger long-term foundation, or explicitly confirm this breakthrough to skip it."
+            message = "⚠️ **Stage 9 choice**\nYou can pursue **/ascend → Perfection → Start** for a stronger long-term foundation, or explicitly confirm this breakthrough to skip it."
         elif "no moment to seize" in message or "seized once already" in message:
             message = "⚠️ **No moment to seize**\nA seized moment is one more roll after a failed attempt at this same stage, and only one. Fill the stage and attempt it again."
         elif "seizing the moment costs" in message:
             message += " Insight XP comes from exploring, quests, battles and the Refine stance (**/cultivation → Cultivate → Stance**)."
         elif "realm gate" in message:
-            message = f"⚠️ **The realm gate is closed**\n{message}\nBank the insight under **/cultivation → Cultivate → Insight**, or complete **/ascend → Realm Perfection**. The sheet at **/cultivation** shows your Insight XP and the odds."
+            message = f"⚠️ **The realm gate is closed**\n{message}\nBank the insight under **/cultivation → Cultivate → Insight**, or complete **/ascend → Perfection**. The sheet at **/cultivation** shows your Insight XP and the odds."
         await interaction.followup.send(f"❌ {message}" if not message.startswith("⚠️") else message, ephemeral=False)
         return
     result = dict(envelope.get("result") or {})
@@ -421,7 +422,7 @@ async def body_sheet(interaction: discord.Interaction) -> None:
                 f"Quests {p['completed_quests']}/{WORLD.body_perfection_quest_count()}"
             )
         else:
-            lines.append("Stage 9 choice: **/ascend → Body Perfection → Start** or **/cultivation → Body → Breakthrough**.")
+            lines.append("Stage 9 choice: **/ascend → Perfection → Start** or **/cultivation → Body → Breakthrough**.")
     await interaction.response.send_message("\n".join(lines), ephemeral=False)
 
 
@@ -458,7 +459,7 @@ async def body_cultivate(interaction: discord.Interaction) -> None:
     if int(result.get("perfection_gain", 0)):
         extra += f"\n★ Body refinement deepens by **+{int(result['perfection_gain'])}%**."
     if result.get("ready"):
-        extra += "\n✨ Body Stage 9 is full. Choose **/ascend → Body Perfection → Start** or **/cultivation → Body → Breakthrough**." if int(c.get("body_phase", 1)) == 9 else "\n✨ Your body is ready for **/cultivation → Body → Breakthrough**."
+        extra += "\n✨ Body Stage 9 is full. Choose **/ascend → Perfection → Start** or **/cultivation → Body → Breakthrough**." if int(c.get("body_phase", 1)) == 9 else "\n✨ Your body is ready for **/cultivation → Body → Breakthrough**."
     await interaction.followup.send(f"💪 **{c['name']} tempers the body.**\nYou refine flesh, blood, bone, and meridians for **+{gain} body essence**.\nProgress: **{total}/{cost}**{extra}")
 
 
@@ -480,7 +481,7 @@ async def body_breakthrough(interaction: discord.Interaction, confirm: bool = Fa
     except GameEngineError as exc:
         message = str(exc)
         if "perfection choice requires explicit confirmation" in message:
-            message = "⚠️ **Body Stage 9 choice**\nPursue **/ascend → Body Perfection → Start** for a stronger physical foundation, or explicitly confirm this breakthrough to skip it."
+            message = "⚠️ **Body Stage 9 choice**\nPursue **/ascend → Perfection → Start** for a stronger physical foundation, or explicitly confirm this breakthrough to skip it."
         await interaction.followup.send(f"❌ {message}" if not message.startswith("⚠️") else message, ephemeral=False)
         return
     result = dict(envelope.get("result") or {})
@@ -508,342 +509,283 @@ async def body_breakthrough(interaction: discord.Interaction, confirm: bool = Fa
     await interaction.followup.send(text)
 
 
-bodyperfect_group = app_commands.Group(name="bodyperfect", description="Long-form Stage 9 Body Realm Perfection")
+# ---------------- Realm and Body Perfection ----------------
+# One group, not two (v1.0.0-rc.13). `/perfect *` and `/bodyperfect *` were the
+# same six verbs twelve times over - start, info, quest, clues, trial, abandon,
+# once for the cultivation realm and once for the body - differing only in
+# which engine action, which table and which nouns. The mechanic was always
+# one; only the spelling was two. It is now a `path` on each command, and the
+# two spellings that can drift apart are a single table below.
+@dataclass(frozen=True)
+class _PerfectionPath:
+    """Everything that differs between the Realm and Body Perfection paths."""
+    value: str
+    noun: str                 # "Perfection" / "Body Perfection"
+    path_name: str            # "Perfect Path" / "Perfect Body Path"
+    realm_key: str            # the character column holding the realm index
+    action_prefix: str        # "perfection." / "perfection.body_"
+    clue_heading: str
+    trial_heading: str
+    restore_hint: str
+    reward_line: str
+
+    def realm_index(self, character: dict) -> int:
+        return int(character.get(self.realm_key, 0) or 0)
+
+    def realm_name(self, character: dict) -> str:
+        name = WORLD.body_realm_name if self.value == "body" else WORLD.realm_name
+        return name(self.realm_index(character), character.get("gender"))
+
+    def training_cap(self) -> int:
+        return int(WORLD.body_perfection_training_cap() if self.value == "body"
+                   else WORLD.perfection_training_cap())
+
+    def quest_count(self) -> int:
+        return int(WORLD.body_perfection_quest_count() if self.value == "body"
+                   else WORLD.perfection_quest_count())
+
+    def quest(self, realm_index: int, index: int, character: dict) -> dict:
+        source = WORLD.body_perfection_quest if self.value == "body" else WORLD.perfection_quest
+        return source(realm_index, index, character)
+
+    async def record(self, user_id: int, realm_index: int):
+        read = DB.get_body_perfection if self.value == "body" else DB.get_perfection
+        return await read(user_id, realm_index)
+
+    def action(self, name: str) -> str:
+        return f"{self.action_prefix}{name}"
 
 
-@registered_group_command(bodyperfect_group, name="start", description="Begin the optional Perfect Body Path at Body Stage 9")
-@serialized_user_action
-async def bodyperfect_start(interaction: discord.Interaction) -> None:
-    await interaction.response.defer(ephemeral=False)
-    c = await require_character(interaction)
-    if not c:
-        return
-    wt = await current_world_time()
-    try:
-        await ENGINE.authoritative_action(
-            "perfection.body_start", interaction.user.id,
-            {},
-            action_id=f"discord:{interaction.id}:perfection.body_start",
-        )
-    except GameEngineError as exc:
-        await interaction.followup.send(f"Perfect Body Path could not begin: {exc}", ephemeral=False)
-        return
-    ri = int(c.get("body_realm_index", 0))
-    q = WORLD.body_perfection_quest(ri, 0, c)
-    await interaction.followup.send(
-        f"★ **Perfect Body Path begun: {WORLD.body_realm_name(ri, c.get('gender'))}**\n"
-        f"Training can contribute **{WORLD.body_perfection_training_cap()}%**; the remaining progress comes from seven physical trials.\n\n"
-        f"First quest: **{q['title']}**\n{q['description']}\nUse **/ascend → Body Perfection → Quest**."
-    )
+_PERFECTION_PATHS = {
+    "realm": _PerfectionPath(
+        value="realm", noun="Perfection", path_name="Perfect Path",
+        realm_key="realm_index", action_prefix="perfection.",
+        clue_heading="Discovered Realm Clues",
+        trial_heading="🌌 **FINAL REALM PERFECTION TRIAL**",
+        restore_hint="**/cultivation → Cultivate**",
+        reward_line="Your Max Qi and Vitality permanently increase, and future major breakthroughs gain a bonus.",
+    ),
+    "body": _PerfectionPath(
+        value="body", noun="Body Perfection", path_name="Perfect Body Path",
+        realm_key="body_realm_index", action_prefix="perfection.body_",
+        clue_heading="Discovered Body Realm Clues",
+        trial_heading="💥 **FINAL BODY REALM PERFECTION TRIAL**",
+        restore_hint="**/cultivation → Body → Cultivate**",
+        reward_line="Your physical foundation permanently improves: Max Vitality +10%, Max Qi +5%, and future body breakthroughs gain +2.",
+    ),
+}
 
-
-@registered_group_command(bodyperfect_group, name="info", description="View your Body Realm Perfection progress")
-async def bodyperfect_info(interaction: discord.Interaction) -> None:
-    c = await require_character(interaction)
-    if not c:
-        return
-    ri = int(c.get("body_realm_index", 0))
-    p = await DB.get_body_perfection(interaction.user.id, ri)
-    if not p:
-        await interaction.response.send_message("No Body Perfect Path is recorded for this realm.", ephemeral=False)
-        return
-    status = "Completed" if p["completed"] else "Active" if p["active"] else "Inactive"
-    text = (
-        f"★ **{WORLD.body_realm_name(ri, c.get('gender'))} Body Perfection — {status}**\n"
-        f"Progress: **{p['progress']}%**\nTraining: **{p['training_progress']}/{WORLD.body_perfection_training_cap()}**\n"
-        f"Quests: **{p['completed_quests']}/{WORLD.body_perfection_quest_count()}**"
-    )
-    if p["active"] and p["quest_index"] < WORLD.body_perfection_quest_count():
-        q = WORLD.body_perfection_quest(ri, p["quest_index"], c)
-        text += f"\nCurrent quest: **{q['title']}** — preparation **{p['quest_preparation']}/{q['preparation_required']}**"
-    await interaction.response.send_message(text, ephemeral=False)
-
-
-BODY_PERFECT_ACTIONS = [
+PERFECT_PATHS = [
+    app_commands.Choice(name="Realm — the cultivation realm", value="realm"),
+    app_commands.Choice(name="Body — the body realm", value="body"),
+]
+PERFECT_ACTIONS = [
     app_commands.Choice(name="Info", value="info"),
     app_commands.Choice(name="Prepare", value="prepare"),
     app_commands.Choice(name="Attempt", value="attempt"),
 ]
 
+perfect_group = app_commands.Group(name="perfect", description="Long-form Stage 9 Realm and Body Perfection")
 
-@registered_group_command(bodyperfect_group, name="quest", description="Inspect, prepare for, or attempt your current Body Perfection quest")
-@app_commands.choices(action=BODY_PERFECT_ACTIONS)
+
+def _perfection_path(choice: app_commands.Choice[str]) -> _PerfectionPath:
+    return _PERFECTION_PATHS[str(getattr(choice, "value", choice))]
+
+
+@registered_group_command(perfect_group, name="start", description="Begin the optional Perfect Path at Stage 9, for the realm or the body")
+@app_commands.choices(path=PERFECT_PATHS)
 @serialized_user_action
-async def bodyperfect_quest(interaction: discord.Interaction, action: app_commands.Choice[str]) -> None:
+async def perfect_start(interaction: discord.Interaction, path: app_commands.Choice[str]) -> None:
+    spec = _perfection_path(path)
+    await interaction.response.defer(ephemeral=False)
     c = await require_character(interaction)
     if not c:
         return
-    ri = int(c.get("body_realm_index", 0))
-    p = await DB.get_body_perfection(interaction.user.id, ri)
-    if action.value == "info":
-        if not p or not p["active"]:
-            await interaction.response.send_message("No active Perfect Body Path.", ephemeral=False)
-            return
-        if p["quest_index"] >= WORLD.body_perfection_quest_count():
-            await interaction.response.send_message("All Body Perfection quests are complete. Use **/ascend → Body Perfection → Trial**.", ephemeral=False)
-            return
-        q = WORLD.body_perfection_quest(ri, p["quest_index"], c)
-        await interaction.response.send_message(
-            f"📜 **Body Perfection Quest {p['quest_index']+1}/{WORLD.body_perfection_quest_count()} — {q['title']}**\n"
-            f"{q['description']}\nPreparation: **{p['quest_preparation']}/{q['preparation_required']}**\n"
-            f"Trial: **{q['attribute'].title()} — TN {q['tn']}**\nClue: *{q['clue']}*\n"
-            f"Reward: **+{q['progress_reward']}% Body Perfection**", ephemeral=False,
-        )
-        return
-    _, _, wt = await current_effect_modifiers(interaction.user.id)
+    await current_world_time()
     try:
-        envelope = await ENGINE.authoritative_action(
-            "perfection.body_quest", interaction.user.id,
-            {"mode": action.value, 
-             "quest_cooldown_seconds": SETTINGS.perfect_quest_cooldown_minutes * 60},
-            action_id=f"discord:{interaction.id}:perfection.body_quest:{action.value}",
+        await ENGINE.authoritative_action(
+            spec.action("start"), interaction.user.id, {},
+            action_id=f"discord:{interaction.id}:{spec.action('start')}",
         )
     except GameEngineError as exc:
-        await interaction.response.send_message(f"Body Perfection quest could not resolve: {exc}", ephemeral=False)
+        await interaction.followup.send(f"{spec.path_name} could not begin: {exc}", ephemeral=False)
+        return
+    realm_index = spec.realm_index(c)
+    quest = spec.quest(realm_index, 0, c)
+    await interaction.followup.send(
+        f"★ **{spec.path_name} begun: {spec.realm_name(c)}**\n"
+        f"{spec.noun} starts at **0%**. Training contributes at most **{spec.training_cap()}%**; "
+        f"the rest comes from {spec.quest_count()} long quests.\n\n"
+        f"**First Quest — {quest['title']}**\n{quest['description']}\n"
+        f"Preparation: 0/{quest['preparation_required']}\nUse **/ascend → Perfection → Quest**.",
+        ephemeral=False,
+    )
+
+
+@registered_group_command(perfect_group, name="info", description="View your Realm or Body Perfection progress")
+@app_commands.choices(path=PERFECT_PATHS)
+async def perfect_info(interaction: discord.Interaction, path: app_commands.Choice[str]) -> None:
+    spec = _perfection_path(path)
+    c = await require_character(interaction)
+    if not c:
+        return
+    realm_index = spec.realm_index(c)
+    p = await spec.record(interaction.user.id, realm_index)
+    if not p:
+        await interaction.response.send_message(
+            f"No {spec.path_name} is recorded for this realm. At Stage 9 use **/ascend → Perfection → Start**.",
+            ephemeral=False,
+        )
+        return
+    status = "COMPLETED" if p["completed"] else ("ACTIVE" if p["active"] else "INACTIVE")
+    text = (
+        f"★ **{spec.realm_name(c)} {spec.noun} — {status}**\n"
+        f"Progress: **{p['progress']}%**\nTraining: **{p['training_progress']}/{spec.training_cap()}**\n"
+        f"Quests: **{p['completed_quests']}/{spec.quest_count()}**"
+    )
+    if p["active"] and p["quest_index"] < spec.quest_count():
+        q = spec.quest(realm_index, p["quest_index"], c)
+        text += f"\n\nCurrent: **{q['title']}**\nPreparation: **{p['quest_preparation']}/{q['preparation_required']}**"
+    await interaction.response.send_message(text, ephemeral=False)
+
+
+@registered_group_command(perfect_group, name="quest", description="Inspect, prepare for, or attempt your current Perfection quest")
+@app_commands.choices(path=PERFECT_PATHS, action=PERFECT_ACTIONS)
+@serialized_user_action
+async def perfect_quest(interaction: discord.Interaction, path: app_commands.Choice[str], action: app_commands.Choice[str]) -> None:
+    spec = _perfection_path(path)
+    c = await require_character(interaction)
+    if not c:
+        return
+    realm_index = spec.realm_index(c)
+    p = await spec.record(interaction.user.id, realm_index)
+    if action.value == "info":
+        if not p or not p["active"]:
+            await interaction.response.send_message(
+                f"No active {spec.path_name}. Start it with **/ascend → Perfection → Start**.", ephemeral=False,
+            )
+            return
+        if p["quest_index"] >= spec.quest_count():
+            await interaction.response.send_message(
+                f"All {spec.noun} quests are complete. Reach 100% and use **/ascend → Perfection → Trial**.",
+                ephemeral=False,
+            )
+            return
+        q = spec.quest(realm_index, p["quest_index"], c)
+        await interaction.response.send_message(
+            f"📜 **{spec.noun} Quest {p['quest_index']+1}/{spec.quest_count()} — {q['title']}**\n{q['description']}\n"
+            f"Preparation: **{p['quest_preparation']}/{q['preparation_required']}**\n"
+            f"Trial: **{q['attribute'].title()} — TN {q['tn']}**\nClue: *{q['clue']}*\n"
+            f"Reward: **+{q['progress_reward']}% {spec.noun}**",
+            ephemeral=False,
+        )
+        return
+    await current_effect_modifiers(interaction.user.id)
+    try:
+        envelope = await ENGINE.authoritative_action(
+            spec.action("quest"), interaction.user.id,
+            {"mode": action.value,
+             "quest_cooldown_seconds": SETTINGS.perfect_quest_cooldown_minutes * 60},
+            action_id=f"discord:{interaction.id}:{spec.action('quest')}:{action.value}",
+        )
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"{spec.noun} quest could not resolve: {exc}", ephemeral=False)
         return
     result = dict(envelope.get("result") or {})
     if action.value == "prepare":
-        prep = int(result.get("preparation", 0)); required = int(result.get("preparation_required", 0))
+        prep = int(result.get("preparation", 0))
+        required = int(result.get("preparation_required", 0))
         await interaction.response.send_message(
-            f"💪 **{result.get('title','Body Perfection')} — Preparation**\nProgress: **{min(prep, required)}/{required}**\n{result.get('clue','')}" +
-            ("\n✨ The trial is available with **/ascend → Body Perfection → Quest → Attempt**." if prep >= required else ""),
+            f"🧭 **{result.get('title', spec.noun)} — Preparation**\n"
+            f"Progress: **{min(prep, required)}/{required}**\n{result.get('clue','')}" +
+            ("\n✨ The trial is now available with **/ascend → Perfection → Quest**, Attempt."
+             if prep >= required else ""),
             ephemeral=False,
         )
         return
     roll = SimpleNamespace(**dict(result.get("roll") or {}))
     if bool(result.get("success")):
-        text = f"{roll_line(roll)}\n✨ **{result.get('title','Body Perfection quest')} completed.** +{int(result.get('progress_reward',0))}% Body Perfection."
-    else:
-        text = f"{roll_line(roll)}\n⚠️ Your body cannot complete this tempering yet. Preparation is retained."
-    await interaction.response.send_message(text, ephemeral=False)
-
-
-@registered_group_command(bodyperfect_group, name="clues", description="Review Body Perfection clues you have discovered")
-async def bodyperfect_clues(interaction: discord.Interaction) -> None:
-    c = await require_character(interaction)
-    if not c:
-        return
-    p = await DB.get_body_perfection(interaction.user.id, int(c.get("body_realm_index", 0)))
-    clues = (p or {}).get("discovered", [])
-    await interaction.response.send_message(
-        "🔎 **Discovered Body Realm Clues**\n" + ("\n".join(f"• {x}" for x in clues) if clues else "None yet."),
-        ephemeral=False,
-    )
-
-
-@registered_group_command(bodyperfect_group, name="trial", description="Attempt the final Perfect Body Realm trial")
-@serialized_user_action
-async def bodyperfect_trial(interaction: discord.Interaction) -> None:
-    await interaction.response.defer(ephemeral=False)
-    c = await require_character(interaction)
-    if not c:
-        return
-    _, _, wt = await current_effect_modifiers(interaction.user.id)
-    try:
-        envelope = await ENGINE.authoritative_action(
-            "perfection.body_trial", interaction.user.id,
-            {"trial_cooldown_seconds": SETTINGS.perfect_trial_cooldown_minutes * 60},
-            action_id=f"discord:{interaction.id}:perfection.body_trial",
-        )
-    except GameEngineError as exc:
-        await interaction.followup.send(f"Final Body Perfection trial could not resolve: {exc}", ephemeral=False)
-        return
-    result = dict(envelope.get("result") or {})
-    lines = ["💥 **FINAL BODY REALM PERFECTION TRIAL**"]
-    for row in result.get("rolls", []):
-        lines.append(f"{row.get('name','Trial')}: {roll_line(SimpleNamespace(**dict(row)))}")
-    if bool(result.get("success")):
-        lines.append(
-            f"\n★ **PERFECT {WORLD.body_realm_name(int(c.get('body_realm_index',0)), c.get('gender')).upper()} ACHIEVED**\n"
-            "Your physical foundation permanently improves: Max Vitality +10%, Max Qi +5%, and future body breakthroughs gain +2."
-        )
-    else:
-        lines.append(
-            f"\n⚠️ The final body tempering fails. **{int(result.get('training_loss',0))}% recoverable Body Perfection training** is lost; "
-            "your body realm remains stable. Restore it with **/cultivation → Body → Cultivate** before trying again."
-        )
-    await reply_long(interaction, "\n".join(lines))
-
-
-@registered_group_command(bodyperfect_group, name="abandon", description="Abandon the active Perfect Body Path")
-@serialized_user_action
-async def bodyperfect_abandon(interaction: discord.Interaction) -> None:
-    await interaction.response.defer(ephemeral=False)
-    c = await require_character(interaction)
-    if not c:
-        return
-    wt = await current_world_time()
-    try:
-        envelope = await ENGINE.authoritative_action(
-            "perfection.body_abandon", interaction.user.id, {},
-            action_id=f"discord:{interaction.id}:perfection.body_abandon",
-        )
-    except GameEngineError as exc:
-        await interaction.followup.send(f"Perfect Body Path could not be abandoned: {exc}", ephemeral=False)
-        return
-    if not bool(dict(envelope.get("result") or {}).get("abandoned")):
-        await interaction.followup.send("No active Perfect Body Path to abandon.", ephemeral=False)
-        return
-    await interaction.followup.send("The Perfect Body Path has been abandoned. You may now break through normally.", ephemeral=False)
-
-
-# ---------------- Perfect Realm commands ----------------
-perfect_group = app_commands.Group(name="perfect", description="Long-form Stage 9 Realm Perfection")
-
-
-@registered_group_command(perfect_group, name="start", description="Begin the optional Perfect Path at Stage 9")
-@serialized_user_action
-async def perfect_start(interaction: discord.Interaction) -> None:
-    await interaction.response.defer(ephemeral=False)
-    c = await require_character(interaction)
-    if not c:
-        return
-    wt = await current_world_time()
-    try:
-        await ENGINE.authoritative_action(
-            "perfection.start", interaction.user.id, {},
-            action_id=f"discord:{interaction.id}:perfection.start",
-        )
-    except GameEngineError as exc:
-        await interaction.followup.send(f"Perfect Path could not begin: {exc}", ephemeral=False)
-        return
-    quest = WORLD.perfection_quest(int(c["realm_index"]), 0, c)
-    await interaction.followup.send(
-        f"★ **Perfect Path begun: {WORLD.realm_name(c['realm_index'], c.get('gender'))}**\n"
-        f"Perfection starts at **0%**. Training contributes at most **{WORLD.perfection_training_cap()}%**; the rest comes from seven long quests.\n\n"
-        f"**First Quest — {quest['title']}**\n{quest['description']}\nPreparation: 0/{quest['preparation_required']}\nUse **/ascend → Realm Perfection → Quest**.",
-        ephemeral=False,
-    )
-
-
-@registered_group_command(perfect_group, name="info", description="View your Realm Perfection progress")
-async def perfect_info(interaction: discord.Interaction) -> None:
-    c = await require_character(interaction)
-    if not c: return
-    p = await DB.get_perfection(interaction.user.id, c["realm_index"])
-    if not p:
-        await interaction.response.send_message("No Perfect Path is active. At Stage 9 use **/ascend → Realm Perfection → Start**.", ephemeral=False); return
-    status = "COMPLETED" if p["completed"] else ("ACTIVE" if p["active"] else "INACTIVE")
-    text = (f"★ **{WORLD.realm_name(c['realm_index'], c.get("gender"))} Perfection — {status}**\n"
-            f"Progress: **{p['progress']}%**\nTraining: **{p['training_progress']}/{WORLD.perfection_training_cap()}**\n"
-            f"Quests: **{p['completed_quests']}/{WORLD.perfection_quest_count()}**")
-    if p["active"] and p["quest_index"] < WORLD.perfection_quest_count():
-        q = WORLD.perfection_quest(c["realm_index"], p["quest_index"], c)
-        text += f"\n\nCurrent: **{q['title']}**\nPreparation: **{p['quest_preparation']}/{q['preparation_required']}**"
-    await interaction.response.send_message(text, ephemeral=False)
-
-
-PERFECT_ACTIONS=[app_commands.Choice(name="Info",value="info"),app_commands.Choice(name="Prepare",value="prepare"),app_commands.Choice(name="Attempt",value="attempt")]
-
-
-@registered_group_command(perfect_group, name="quest", description="Inspect, prepare for, or attempt your current Perfection quest")
-@app_commands.choices(action=PERFECT_ACTIONS)
-@serialized_user_action
-async def perfect_quest(interaction: discord.Interaction, action: app_commands.Choice[str]) -> None:
-    c = await require_character(interaction)
-    if not c:
-        return
-    p = await DB.get_perfection(interaction.user.id, c["realm_index"])
-    if action.value == "info":
-        if not p or not p["active"]:
-            await interaction.response.send_message("Start the Perfect Path first with **/ascend → Realm Perfection → Start**.", ephemeral=False)
-            return
-        if p["quest_index"] >= WORLD.perfection_quest_count():
-            await interaction.response.send_message("All seven quests are complete. Reach 100% and use **/ascend → Realm Perfection → Trial**.", ephemeral=False)
-            return
-        q = WORLD.perfection_quest(c["realm_index"], p["quest_index"], c)
-        await interaction.response.send_message(
-            f"📜 **Perfection Quest {p['quest_index']+1}/{WORLD.perfection_quest_count()} — {q['title']}**\n{q['description']}\n"
-            f"Preparation: **{p['quest_preparation']}/{q['preparation_required']}**\nTrial: **{q['attribute'].title()} — TN {q['tn']}**\nClue: *{q['clue']}*\nReward: **+{q['progress_reward']}% Perfection**", ephemeral=False,
-        )
-        return
-    _, _, wt = await current_effect_modifiers(interaction.user.id)
-    try:
-        envelope = await ENGINE.authoritative_action(
-            "perfection.quest", interaction.user.id,
-            {"mode": action.value, 
-             "quest_cooldown_seconds": SETTINGS.perfect_quest_cooldown_minutes * 60},
-            action_id=f"discord:{interaction.id}:perfection.quest:{action.value}",
-        )
-    except GameEngineError as exc:
-        await interaction.response.send_message(f"Perfection quest could not resolve: {exc}", ephemeral=False)
-        return
-    result = dict(envelope.get("result") or {})
-    if action.value == "prepare":
-        prep = int(result.get("preparation", 0)); required = int(result.get("preparation_required", 0))
-        await interaction.response.send_message(
-            f"🧭 **{result.get('title','Perfection')} — Preparation**\nProgress: **{min(prep, required)}/{required}**\n{result.get('clue','')}" +
-            ("\n✨ The trial is now available with **/ascend → Realm Perfection → Quest → Attempt**." if prep >= required else ""), ephemeral=False,
-        )
-        return
-    roll = SimpleNamespace(**dict(result.get("roll") or {}))
-    if bool(result.get("success")):
-        text = f"{roll_line(roll)}\n✨ **{result.get('title','Perfection quest')} completed.** +{int(result.get('progress_reward',0))}% Perfection."
+        text = (f"{roll_line(roll)}\n✨ **{result.get('title', spec.noun + ' quest')} completed.** "
+                f"+{int(result.get('progress_reward',0))}% {spec.noun}.")
     else:
         text = f"{roll_line(roll)}\n⚠️ The trial rejects your current understanding. Your preparation remains; try again later."
     await interaction.response.send_message(text, ephemeral=False)
 
 
-@registered_group_command(perfect_group, name="clues", description="Review Perfection clues you have discovered")
-async def perfect_clues(interaction: discord.Interaction) -> None:
-    c=await require_character(interaction)
-    if not c:return
-    p=await DB.get_perfection(interaction.user.id,c["realm_index"])
-    clues=(p or {}).get("discovered",[])
-    await interaction.response.send_message("🔎 **Discovered Realm Clues**\n"+("\n".join(f"• {x}" for x in clues) if clues else "None yet."),ephemeral=False)
+@registered_group_command(perfect_group, name="clues", description="Review the Perfection clues you have discovered")
+@app_commands.choices(path=PERFECT_PATHS)
+async def perfect_clues(interaction: discord.Interaction, path: app_commands.Choice[str]) -> None:
+    spec = _perfection_path(path)
+    c = await require_character(interaction)
+    if not c:
+        return
+    p = await spec.record(interaction.user.id, spec.realm_index(c))
+    clues = (p or {}).get("discovered", [])
+    await interaction.response.send_message(
+        f"🔎 **{spec.clue_heading}**\n" + ("\n".join(f"• {x}" for x in clues) if clues else "None yet."),
+        ephemeral=False,
+    )
 
 
-@registered_group_command(perfect_group, name="trial", description="Attempt the final Realm Perfection trial")
+@registered_group_command(perfect_group, name="trial", description="Attempt the final Realm or Body Perfection trial")
+@app_commands.choices(path=PERFECT_PATHS)
 @serialized_user_action
-async def perfect_trial(interaction: discord.Interaction) -> None:
+async def perfect_trial(interaction: discord.Interaction, path: app_commands.Choice[str]) -> None:
+    spec = _perfection_path(path)
     await interaction.response.defer(ephemeral=False)
     c = await require_character(interaction)
     if not c:
         return
-    _, _, wt = await current_effect_modifiers(interaction.user.id)
+    await current_effect_modifiers(interaction.user.id)
     try:
         envelope = await ENGINE.authoritative_action(
-            "perfection.trial", interaction.user.id,
+            spec.action("trial"), interaction.user.id,
             {"trial_cooldown_seconds": SETTINGS.perfect_trial_cooldown_minutes * 60},
-            action_id=f"discord:{interaction.id}:perfection.trial",
+            action_id=f"discord:{interaction.id}:{spec.action('trial')}",
         )
     except GameEngineError as exc:
-        await interaction.followup.send(f"Final Perfection trial could not resolve: {exc}", ephemeral=False)
+        await interaction.followup.send(f"Final {spec.noun} trial could not resolve: {exc}", ephemeral=False)
         return
     result = dict(envelope.get("result") or {})
-    lines = ["🌌 **FINAL REALM PERFECTION TRIAL**"]
+    lines = [spec.trial_heading]
     for row in result.get("rolls", []):
         lines.append(f"{row.get('name','Trial')}: {roll_line(SimpleNamespace(**dict(row)))}")
     if bool(result.get("success")):
-        lines.append(f"\n★ **PERFECT {WORLD.realm_name(c['realm_index'], c.get('gender')).upper()} ACHIEVED**\nYour Max Qi and Vitality permanently increase, and future major breakthroughs gain a bonus.")
+        lines.append(f"\n★ **PERFECT {spec.realm_name(c).upper()} ACHIEVED**\n{spec.reward_line}")
     else:
         lines.append(
-            f"\n⚠️ The final compression fails. **{int(result.get('training_loss',0))}% recoverable Perfection training** is lost, but your realm remains stable. "
-            "Restore it with **/cultivation → Cultivate** before trying again."
+            f"\n⚠️ The final compression fails. **{int(result.get('training_loss',0))}% recoverable "
+            f"{spec.noun} training** is lost, but your realm remains stable. "
+            f"Restore it with {spec.restore_hint} before trying again."
         )
     await reply_long(interaction, "\n".join(lines))
 
 
 @registered_group_command(perfect_group, name="abandon", description="Abandon the active Perfect Path and lose its progress")
+@app_commands.choices(path=PERFECT_PATHS)
 @serialized_user_action
-async def perfect_abandon(interaction: discord.Interaction) -> None:
+async def perfect_abandon(interaction: discord.Interaction, path: app_commands.Choice[str]) -> None:
+    spec = _perfection_path(path)
     await interaction.response.defer(ephemeral=False)
     c = await require_character(interaction)
     if not c:
         return
-    wt = await current_world_time()
+    await current_world_time()
     try:
         envelope = await ENGINE.authoritative_action(
-            "perfection.abandon", interaction.user.id, {},
-            action_id=f"discord:{interaction.id}:perfection.abandon",
+            spec.action("abandon"), interaction.user.id, {},
+            action_id=f"discord:{interaction.id}:{spec.action('abandon')}",
         )
     except GameEngineError as exc:
-        await interaction.followup.send(f"Perfect Path could not be abandoned: {exc}", ephemeral=False)
+        await interaction.followup.send(f"{spec.path_name} could not be abandoned: {exc}", ephemeral=False)
         return
     if not bool(dict(envelope.get("result") or {}).get("abandoned")):
-        await interaction.followup.send("No active Perfect Path to abandon.", ephemeral=False)
+        await interaction.followup.send(f"No active {spec.path_name} to abandon.", ephemeral=False)
         return
-    await interaction.followup.send("The Perfect Path has been abandoned. You may now break through normally.", ephemeral=False)
+    await interaction.followup.send(
+        f"The {spec.path_name} has been abandoned. You may now break through normally.", ephemeral=False,
+    )
+
 
 
 # ---------- Explicit heavenly tribulations / ascension gates ----------

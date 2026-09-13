@@ -756,12 +756,11 @@ SURFACE = {
         },
     },
     "commands/cultivation.py": {
-        "groups": ('seclusion_group', 'body_group', 'bodyperfect_group', 'perfect_group', 'tribulation_group', 'meridian_group', 'dantian_group', 'ghost_group'),
+        "groups": ('seclusion_group', 'body_group', 'perfect_group', 'tribulation_group', 'meridian_group', 'dantian_group', 'ghost_group'),
         "roots": ('cultivate', 'stance', 'insight', 'breakthrough'),
         "leaves": {
             "seclusion_group": ('start', 'status', 'end'),
             "body_group": ('sheet', 'cultivate', 'breakthrough'),
-            "bodyperfect_group": ('start', 'info', 'quest', 'clues', 'trial', 'abandon'),
             "perfect_group": ('start', 'info', 'quest', 'clues', 'trial', 'abandon'),
             "tribulation_group": ('status', 'prepare', 'attempt'),
             "meridian_group": ('status', 'open', 'heal'),

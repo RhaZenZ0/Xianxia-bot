@@ -40,7 +40,6 @@ from .commands.boss import boss_group, boss_status, hunter_group, hunter_status
 from .commands.character import begin as begin_command, bond_group, fate_group
 from .commands.cultivation import (
     body_group,
-    bodyperfect_group,
     dantian_group,
     ghost_group,
     meridian_group,
@@ -105,7 +104,6 @@ _GROUP_ACTION_ROOTS = {
     "aptitude": aptitude_group,
     "perfect": perfect_group,
     "body": body_group,
-    "bodyperfect": bodyperfect_group,
     "secretrealm": secret_group,
     "scene": scene_group,
     "storage": storage_group,
@@ -149,7 +147,7 @@ _GROUP_ACTION_ROOTS = {
 
 _MIGRATED_ROOTS = {
     "abode", "afterlife", "alchemy", "aptitude", "array", "artifact", "auction", "battle", "beast",
-    "body", "bodyperfect", "bond", "boss", "bounty", "breakthrough", "caravan",
+    "body", "bond", "boss", "bounty", "breakthrough", "caravan",
     "city", "civilization", "conceal", "condition", "craft", "crime", "cultivate",
     "dantian", "daoheart", "duel", "effects", "equipment", "era", "explore", "family",
     "formation", "gender", "ghost", "grudges", "hunt", "hunter", "inheritances", "fate",
@@ -220,8 +218,9 @@ _HUB_DEFINITIONS = (
         description="Breakthrough, the optional Perfection paths, and the heavenly tribulations that gate the next realm.",
         pages=(
             _hub_page("breakthrough", "Main Progression", "Normal realm breakthrough and Stage 9 progression."),
-            _hub_page("perfect", "Realm Perfection", "Optional Stage 9 Realm Perfection path."),
-            _hub_page("bodyperfect", "Body Perfection", "Optional Stage 9 Body Realm Perfection path."),
+            # One page, one group (v1.0.0-rc.13): `perfect` and `bodyperfect`
+            # were the same six verbs twice, and are now a `path` on each.
+            _hub_page("perfect", "Perfection", "The optional Stage 9 Perfection path, for the cultivation realm or the body: start it, work its quests, read its clues, attempt its final trial."),
             _hub_page("tribulation", "Tribulation / Ascension", "Prepare for and attempt heavenly tribulations."),
         ),
     ),
