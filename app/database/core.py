@@ -26,7 +26,7 @@ from .remote import GoDatabaseTransport
 log = logging.getLogger("xianxia.database")
 
 
-SCHEMA_VERSION = 43
+SCHEMA_VERSION = 44
 # A readiness probe must validate more than the schema-version marker.  If the
 # SQLite file is removed or replaced while the bot is running, SQLite will
 # happily create a new empty file at the same path.  Checking these tables lets
@@ -149,6 +149,9 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
                 occupation_until_game_minute INTEGER NOT NULL DEFAULT 0, updated_at REAL NOT NULL,
                 FOREIGN KEY(war_id) REFERENCES territory_wars(war_id) ON DELETE CASCADE
             )""",
+            # Read since v1.0.0-rc.15 by get_territory_wars, which attaches
+            # the last few to each war. Before that it was written by both the
+            # player tactic and the siege tick and read by nothing.
             """CREATE TABLE IF NOT EXISTS territory_war_actions (
                 action_id INTEGER PRIMARY KEY AUTOINCREMENT, war_id INTEGER NOT NULL, user_id INTEGER, side TEXT NOT NULL, tactic TEXT NOT NULL,
                 power INTEGER NOT NULL DEFAULT 0, siege_delta INTEGER NOT NULL DEFAULT 0, morale_delta INTEGER NOT NULL DEFAULT 0,
@@ -908,6 +911,13 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
             )""",
             """CREATE INDEX IF NOT EXISTS idx_authoritative_receipts_actor
                ON authoritative_action_receipts(actor_id,created_at DESC)""",
+            # Write-only on purpose, and audited as such in v1.0.0-rc.15:
+            # eventledger.TouchEntityVersion stamps it on every authoritative
+            # mutation and no code reads it. The version `expected_version` is
+            # checked against is the actor's, in authoritative_actor_versions.
+            # This is the per-entity forensic trail - which entity changed at
+            # which version - kept for a person reading it after an incident,
+            # which is what an audit trail is for. Not dead; deliberate.
             """CREATE TABLE IF NOT EXISTS authoritative_entity_versions (
                 domain TEXT NOT NULL,
                 entity_type TEXT NOT NULL,
@@ -1714,6 +1724,29 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
                ON world_event_npcs(name)""",
             """CREATE INDEX IF NOT EXISTS idx_world_event_npcs_location
                ON world_event_npcs(location)""",
+        ),
+    ),
+    (
+        44,
+        "drop_dead_core_ledger_tables",
+        (
+            # `core_state_versions` and `core_request_log` came in with
+            # migration 12, "versioned_core_write_ledger", and were never
+            # written and never read by anything - not one INSERT, not one
+            # SELECT, in any release since. The authority ledger that actually
+            # shipped is `authoritative_actor_versions`, `authoritative_action_
+            # receipts` and `domain_events`; these two were the shape of an
+            # earlier idea for it and nothing ever grew into them.
+            #
+            # Migration 12 keeps its statements, because a historical migration
+            # is how an old database walks forward and rewriting one changes a
+            # path somebody may still be on. The removal is its own step, so a
+            # database that created them drops them and a new one creates them
+            # and drops them again - which is cheap, and honest about the order
+            # things happened in.
+            """DROP INDEX IF EXISTS idx_core_request_scope""",
+            """DROP TABLE IF EXISTS core_request_log""",
+            """DROP TABLE IF EXISTS core_state_versions""",
         ),
     ),
 )
@@ -5920,6 +5953,17 @@ class Database:
             for row in rows:
                 cur=await db.execute("SELECT * FROM territory_war_operations WHERE war_id=?",(int(row['war_id']),))
                 op=await cur.fetchone(); row['operations']=dict(op) if op else {}
+                # The blow-by-blow. `territory_war_actions` is written by both
+                # the player tactic and the autonomous siege tick and was read
+                # by nothing at all: a war showed its siege percentage and
+                # never who had moved it. Attached here rather than behind a
+                # reader of its own, because a war and what happened in it are
+                # one answer.
+                cur=await db.execute(
+                    "SELECT side,tactic,power,siege_delta,morale_delta,game_minute,user_id"
+                    " FROM territory_war_actions WHERE war_id=? ORDER BY action_id DESC LIMIT 5",
+                    (int(row['war_id']),))
+                row['recent_actions']=[dict(r) for r in await cur.fetchall()]
             return rows
 
 

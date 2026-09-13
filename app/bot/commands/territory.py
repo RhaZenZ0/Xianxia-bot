@@ -68,6 +68,12 @@ async def war_status(interaction: discord.Interaction) -> None:
         op=w.get('operations') or {}
         occupation=f" • occupation until {op.get('occupation_until_game_minute')}" if int(op.get('occupation_until_game_minute') or 0)>0 else ""
         lines.append(f"\n`#{w['war_id']}` **{w['attacker_key']}** vs **{w['defender_key']}** for **{w['territory_key']}** • **{w['status']}**\nSiege **{op.get('siege_progress',0)}%** • morale A/D **{op.get('attacker_morale',100)}/{op.get('defender_morale',100)}** • forces A/D **{op.get('attacker_force',0)}/{op.get('defender_force',0)}**{occupation}"+(f" • winner **{op.get('winner_key')}**" if op.get('winner_key') else ""))
+        for a in (w.get('recent_actions') or []):
+            who=f"<@{a['user_id']}>" if a.get('user_id') else "the field"
+            lines.append(
+                f"   ↳ {who} — **{str(a.get('tactic','')).title()}** for {a.get('side')} "
+                f"(power {int(a.get('power') or 0)}, siege {int(a.get('siege_delta') or 0):+d}, "
+                f"morale {int(a.get('morale_delta') or 0):+d})")
     await reply_long(interaction,"\n".join(lines),ephemeral=False)
 
 

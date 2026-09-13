@@ -710,6 +710,10 @@ mechanical authority paths.
 - **Schema 27** added the v0.19.29 mute/freeze moderation columns on `characters`
   (`is_muted`, `is_frozen`, `moderation_reason`).
 - **Schema 28** added the Quest Forge definition table (`quest_definitions`).
+- **Schema 44** dropped `core_state_versions` and `core_request_log`, which came in with
+  migration 12 as the shape of an earlier write ledger and were never written or read by
+  anything in any release since. Migration 12 keeps its statements - a historical migration is
+  how an old database walks forward - so the removal is its own step rather than a rewrite.
 - **Schema 43** added the cast an event brings with it (`world_event_npcs`): the captain to
   report to, the elder to impress, the auctioneer whose floor it is - named at spawn, talkable
   through the ordinary NPC path, and event-scoped so the life simulation never inherits them.

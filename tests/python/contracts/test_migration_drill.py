@@ -30,6 +30,19 @@ from app.database import core as database_core
 # temporary or derived table), whose rows are not data. Empty today; a
 # future migration that legitimately rebuilds a table names it here with
 # the reason, so the drill stays honest about what it exempts.
+# Tables a migration drops on purpose. The drill's rule is that nothing
+# disappears silently, so an intentional removal is declared here with its
+# reason rather than the assertion being loosened.
+DROPPED_TABLES: dict[str, str] = {
+    "core_request_log": (
+        "migration 44: came in with 12 (versioned_core_write_ledger) and was "
+        "never written and never read by anything, in any release since. The "
+        "authority ledger that shipped is authoritative_actor_versions, "
+        "authoritative_action_receipts and domain_events."
+    ),
+    "core_state_versions": "migration 44: the other half of the same unused ledger.",
+}
+
 REBUILT_TABLES: dict[str, str] = {
     # Migrations 20 (shared_starter_birth_households) and 22
     # (canonical_family_homeland_cities) clear the pending creation offers on
@@ -92,7 +105,7 @@ class MigrationDrill(unittest.IsolatedAsyncioTestCase):
                         conn.execute("PRAGMA foreign_keys=OFF")
                         seeded = {}
                         for table in before:
-                            if table in REBUILT_TABLES or table in ("schema_version", "schema_migrations"):
+                            if table in REBUILT_TABLES or table in DROPPED_TABLES or table in ("schema_version", "schema_migrations"):
                                 continue
                             if _seed(conn, table):
                                 seeded[table] = conn.execute(f'SELECT COUNT(*) FROM "{table}"').fetchone()[0]
@@ -106,6 +119,10 @@ class MigrationDrill(unittest.IsolatedAsyncioTestCase):
                     with closing(sqlite3.connect(path)) as conn:
                         after_tables = set(_tables(conn))
                         for table, cols in before.items():
+                            if table in DROPPED_TABLES:
+                                self.assertNotIn(table, after_tables,
+                                                 f"schema {version}: {table} is declared dropped but survived")
+                                continue
                             self.assertIn(table, after_tables, f"schema {version}: table {table} is gone after migrating")
                             after_cols = {c[0] for c in _columns(conn, table)}
                             for name, *_ in cols:
