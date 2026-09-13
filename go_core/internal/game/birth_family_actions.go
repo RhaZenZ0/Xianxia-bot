@@ -45,10 +45,6 @@ type birthFamilyChoice struct {
 	BirthFamily
 }
 
-var birthFamilySurnames = []string{
-	"Chen", "Lin", "Zhao", "Shen", "Wei", "Su", "Bai", "Gu", "Han", "Luo",
-	"Xu", "Yan", "Jiang", "Qin", "Mu", "Tang", "Ye", "Feng", "Song", "Xie",
-}
 var birthFamilyMaleNames = []string{"Wei", "Jun", "Hao", "Tian", "Rui", "Feng", "Ming", "Bo", "Jian", "Kai"}
 var birthFamilyFemaleNames = []string{"Mei", "Lan", "Yue", "Xue", "Ling", "Hua", "Ning", "Qiao", "Yan", "Rin"}
 var birthFamilyBloodlines = []bloodlineTrait{

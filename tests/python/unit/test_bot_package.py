@@ -1015,5 +1015,36 @@ class RegistryBindingTests(unittest.TestCase):
         self.assertIn("EVENT_HANDLERS.register(name, ACTIONS.handler_for(command))", block)
 
 
+class BackgroundTaskTests(unittest.TestCase):
+    """A task nobody holds can be collected before it finishes.
+
+    asyncio keeps only a weak reference to a running task, so the language's
+    own advice is to save a strong one. The bot's five workers all live on
+    `self`; the emergency shutdown - scheduled when the health probe finds the
+    schema gone, from a worker that returns on the very next line - did not.
+    Losing that one would leave the process up on a database it has just
+    declared lost, which is the single outcome that branch exists to prevent.
+
+    Checked across the package rather than pinned to that line, because the
+    next one will be written the same way.
+    """
+
+    def test_no_create_task_result_is_thrown_away(self):
+        offenders = []
+        for module in sorted(BOT.rglob("*.py")):
+            for node in ast.walk(ast.parse(module.read_text(encoding="utf-8"))):
+                # A bare expression statement: the Task the call returns is
+                # referenced by nothing once this line is done.
+                if not isinstance(node, ast.Expr) or not isinstance(node.value, ast.Call):
+                    continue
+                called = node.value.func
+                if isinstance(called, ast.Attribute) and called.attr == "create_task":
+                    offenders.append(f"{module.relative_to(BOT)}:{node.lineno}")
+        self.assertEqual(
+            offenders, [],
+            "create_task result discarded (hold it on self, as the workers do): " + ", ".join(offenders),
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -87,6 +87,12 @@ class XianxiaBot(commands.Bot):
         self.update_check_task: asyncio.Task | None = None
         self.quest_forge_task: asyncio.Task | None = None
         self.route_audit_task: asyncio.Task | None = None
+        # The emergency shutdown below schedules close() and returns, so the
+        # only thing that can keep that task alive is this reference: the
+        # event loop holds a weak one, and a task nothing else refers to may
+        # be collected before it finishes. Deliberately NOT in the cancel list
+        # in close() - it is the task running close().
+        self.emergency_close_task: asyncio.Task | None = None
         self.announced_release: str | None = None
 
     async def _dashboard_discord_control(self, action: str, payload: dict[str, Any]) -> dict[str, Any]:
@@ -276,7 +282,13 @@ class XianxiaBot(commands.Bot):
                             self.health_state.clear_phase(
                                 "DATABASE_READY", reason="required SQLite tables disappeared"
                             )
-                            asyncio.create_task(self.close())
+                            # Held on self, not fire-and-forget: this worker
+                            # returns on the next line and a task with no
+                            # strong reference can be garbage-collected
+                            # mid-flight - which would leave the process up on
+                            # a database it has just declared lost, the one
+                            # outcome this branch exists to prevent.
+                            self.emergency_close_task = asyncio.create_task(self.close())
                             return
                         await DB.record_operational_alert("database_degraded", severity="critical", message="SQLite operational health probe failed", detail=detail, delivered=delivered)
                     if int(obs.get("recent_slow_queries_1h", 0)) >= 5:

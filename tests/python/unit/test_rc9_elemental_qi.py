@@ -94,7 +94,13 @@ class TheCatalogueCarriesTheElements(unittest.TestCase):
 
 class TheEngineReadsThem(unittest.TestCase):
     def test_the_relation_and_the_absorption_live_in_the_engine(self):
-        for symbol in ("func manualElementOf(", "func elementPhase(", "func elementRelation(",
+        # manualElementOf was on this list and was never called by anything:
+        # the method's element is read by manualCultivationMultiplier, as part
+        # of the bundle it needs anyway, and that reader is pinned by
+        # test_the_method_hands_back_its_element_and_both_sheets_carry_it
+        # below. A name a test keeps alive is not the same as a rule the
+        # engine owns, which is the thing this is here to assert.
+        for symbol in ("func elementPhase(", "func elementRelation(",
                        "func bestElementRelation(", "func rootAbsorptionBonus(", "func absorptionFor("):
             self.assertIn(symbol, GO_ELEMENTS, symbol)
         self.assertIn("relationResonant   = \"resonant\"", GO_ELEMENTS)

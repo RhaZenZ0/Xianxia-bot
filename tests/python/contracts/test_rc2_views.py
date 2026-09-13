@@ -91,6 +91,21 @@ class TradesOnTheDashboard(unittest.TestCase):
         self.assertIn('"trade_offers",', CONTRACT)
         self.assertIn("adminPost('trade.void'", APP_JS)
         self.assertIn("Trades Between Cultivators", APP_JS)
+
+    def test_the_cell_helper_escapes_what_it_renders(self):
+        """table() inserts a FUNCTION accessor raw so a cell can return markup,
+        which makes escaping the function's own job.
+
+        jsonText is wrapped in esc() at all five of its call sites; tradeSide
+        is used the same way and was not, which left a validation two layers
+        away in Go - cleanTradeItems rejecting an id that is not in the
+        catalogue - standing in for an escape that belongs in the renderer.
+        """
+        helper = APP_JS[APP_JS.index("function tradeSide("):]
+        helper = helper[:helper.index("\n")]
+        self.assertNotIn("${k} ", helper, "a trade item id reaches innerHTML unescaped")
+        for escaped in ("esc(k)", "esc(v)", "esc(stones)"):
+            self.assertIn(escaped, helper, f"tradeSide does not escape with {escaped}")
         actions = (GO / "actions.go").read_text(encoding="utf-8")
         self.assertIn('auditAdmin(conn, adminUserID, "admin.trade.void"', actions)
         self.assertIn("UPDATE trade_offers SET status='voided'", actions)

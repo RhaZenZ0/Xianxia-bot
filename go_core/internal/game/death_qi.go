@@ -347,13 +347,9 @@ func ghostAppeaseAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 		stones = 25
 	}
 	stones = stones * (1 + body.Corruption/25)
-	held, err := conn.Execute(`SELECT spirit_stones FROM characters WHERE user_id=?`, []any{userID})
+	purse, err := ghostStoneCount(conn, userID)
 	if err != nil {
 		return authoritativeMutation{}, err
-	}
-	purse := int64(0)
-	if row := firstRowMap(held); row != nil {
-		purse = i64(row["spirit_stones"])
 	}
 	if purse < stones {
 		return authoritativeMutation{}, fmt.Errorf("the rites cost %d spirit stones; you have %d", stones, purse)
@@ -429,8 +425,9 @@ func ghostStatusQuery(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 	}, nil
 }
 
-// ghostStoneCount is the purse read the appease rite needs; kept beside the
-// action so the surface can quote a price without a second query shape.
+// ghostStoneCount is the purse read the appease rite needs, and the one the
+// surface quotes a price against - one query shape, so the two cannot come to
+// disagree about what "what you have" means.
 func ghostStoneCount(conn *storage.Conn, userID int64) (int64, error) {
 	res, err := conn.Execute(`SELECT spirit_stones FROM characters WHERE user_id=?`, []any{userID})
 	if err != nil {
