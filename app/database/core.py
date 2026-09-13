@@ -26,7 +26,7 @@ from .remote import GoDatabaseTransport
 log = logging.getLogger("xianxia.database")
 
 
-SCHEMA_VERSION = 44
+SCHEMA_VERSION = 45
 # A readiness probe must validate more than the schema-version marker.  If the
 # SQLite file is removed or replaced while the bot is running, SQLite will
 # happily create a new empty file at the same path.  Checking these tables lets
@@ -1747,6 +1747,48 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
             """DROP INDEX IF EXISTS idx_core_request_scope""",
             """DROP TABLE IF EXISTS core_request_log""",
             """DROP TABLE IF EXISTS core_state_versions""",
+        ),
+    ),
+    (
+        45,
+        "npc_consignments_and_appraisal",
+        (
+            # v1.0.0-rc.15: the world's own people put things under the
+            # hammer. Every lot in every one of the forty-eight houses had to
+            # be listed by a player, so a floor nobody played on was an empty
+            # room with a steward standing in it.
+            #
+            # `seller_npc_name` mirrors the shape `merchant_bidder` (migration
+            # 38) and `merchant_buyer` (36) already established: the seller is
+            # a character OR a named NPC, and `seller_user_id` stays 0 for a
+            # consignment because it is foreign-keyed to `characters`.
+            "ALTER TABLE auctions ADD COLUMN seller_npc_name TEXT NOT NULL DEFAULT ''",
+            # A finder who cannot read what they found consigns it blind: the
+            # house will say roughly what grade it is and nothing more, and
+            # the reserve is what a house asks for something it cannot vouch
+            # for. `appraised=1` is the default so every lot written before
+            # this - and every player listing, which is of a thing out of
+            # their own bag - reads exactly as it did.
+            "ALTER TABLE auctions ADD COLUMN appraised INTEGER NOT NULL DEFAULT 1",
+            "ALTER TABLE auctions ADD COLUMN grade_band TEXT NOT NULL DEFAULT ''",
+            # What a cultivator has learned to recognise, shaped like
+            # `character_location_discoveries`: a composite key, the route by
+            # which it became known, and the minute it did. Knowing an item is
+            # per-person and permanent - the second Nine-Echo Sword Tablet you
+            # see, you read at a glance - which is what makes the Appraisal
+            # profession worth levelling.
+            """CREATE TABLE IF NOT EXISTS character_item_appraisals (
+                   user_id INTEGER NOT NULL,
+                   item_id TEXT NOT NULL,
+                   appraisal_kind TEXT NOT NULL DEFAULT 'insight',
+                   authenticity INTEGER NOT NULL DEFAULT 100,
+                   appraised_game_minute INTEGER NOT NULL DEFAULT 0,
+                   created_at REAL NOT NULL,
+                   PRIMARY KEY(user_id, item_id),
+                   FOREIGN KEY(user_id) REFERENCES characters(user_id) ON DELETE CASCADE
+               )""",
+            """CREATE INDEX IF NOT EXISTS idx_character_item_appraisals_user
+                   ON character_item_appraisals(user_id, appraised_game_minute DESC)""",
         ),
     ),
 )
@@ -5481,6 +5523,20 @@ class Database:
                 cur=await db.execute("SELECT * FROM auctions WHERE active=1 ORDER BY ends_at")
             return [dict(r) for r in await cur.fetchall()]
 
+    async def get_appraised_items(self, user_id: int) -> set[str]:
+        """Every item this cultivator has learned to recognise (schema 45).
+
+        A lot consigned blind hides what it is from the board and the live
+        card - but only from the people who cannot read it. Someone who has
+        appraised one before names it at a glance, which is the whole reward
+        for levelling the Appraisal profession.
+        """
+        async with self._connect() as db:
+            cur = await db.execute(
+                "SELECT item_id FROM character_item_appraisals WHERE user_id=?", (int(user_id),)
+            )
+            return {str(row[0]) for row in await cur.fetchall()}
+
 
 
     # ------------------------------------------------------------------
@@ -6122,6 +6178,9 @@ class Database:
             "background_seclusion": True,
             "black_markets": True,
             "autonomous_world_events": True,
+            # v1.0.0-rc.15: the world's own people find things and put them
+            # under the hammer, or take the illegal ones to the night market.
+            "npc_consignments": True,
             "merchants": True,
             # v0.31.0: the GM scene flag - model narration for explore and
             # hunt by default, instead of the procedural pool plus a button.

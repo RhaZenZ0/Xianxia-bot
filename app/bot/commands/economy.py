@@ -228,6 +228,21 @@ async def auction_leave(interaction:discord.Interaction)->None:
     await interaction.followup.send("\n".join(lines),ephemeral=False)
 
 
+def lot_identity(lot: dict, known: set[str]) -> tuple[str, str]:
+    """What a bidder is told a lot is, and the line explaining why (schema 45).
+
+    A lot the consignor could not read themselves goes under the hammer blind:
+    the house grades it by eye and says no more. It is blind only to people who
+    cannot read it either - anyone who has appraised one of these before names
+    it on sight, which is what the Appraisal profession buys.
+    """
+    item_id = str(lot.get("item_id") or "")
+    if int(lot.get("appraised") or 0) or item_id in known:
+        return WORLD.item_name(item_id), ""
+    band = str(lot.get("grade_band") or "of uncertain grade")
+    return "Unidentified Lot", f"\n❔ The house will only say it is **{band}**. Read it with **/economy → Auction House → Appraise**."
+
+
 @registered_group_command(auction_group, name="browse",description="Browse active lots in the current auction house")
 async def auction_browse(interaction:discord.Interaction)->None:
     c=await require_character(interaction)
@@ -237,19 +252,23 @@ async def auction_browse(interaction:discord.Interaction)->None:
         await interaction.response.send_message("Enter an auction house first with **/economy → Auction House → Enter**.",ephemeral=False);return
     house_id,house=found; lots=await DB.list_active_auctions(house_id)
     if not lots:
-        await interaction.response.send_message("The auction board currently has no active player lots.",ephemeral=False);return
+        await interaction.response.send_message("The auction board currently has no active lots.",ephemeral=False);return
+    known=await DB.get_appraised_items(interaction.user.id)
     now=time.time(); lines=[f"🏮 **{house['name']} — Active Lots**"+_house_size_note(house)]
     for lot in lots[:25]:
-        item_name=WORLD.item_name(str(lot['item_id'])); bid=int(lot.get('current_bid') or 0); minimum=max(int(lot['starting_bid']),bid+1)
+        item_name,blind=lot_identity(lot,known); bid=int(lot.get('current_bid') or 0); minimum=max(int(lot['starting_bid']),bid+1)
         bidder="Anonymous" if lot.get('anonymous') and lot.get('current_bidder_user_id') else "None"
         if lot.get('current_bidder_user_id') and not lot.get('anonymous'):
             bidder_c=await DB.get_character(int(lot['current_bidder_user_id'])); bidder=bidder_c['name'] if bidder_c else 'Unknown'
         elif not lot.get('current_bidder_user_id') and str(lot.get('merchant_bidder') or ''):
             bidder=f"{(WORLD.merchants.get(str(lot['merchant_bidder'])) or {}).get('name') or lot['merchant_bidder']} (travelling merchant)"
+        consignor=str(lot.get('seller_npc_name') or '')
+        found_line=f"\n🧭 Consigned by **{consignor}**." if consignor else ""
         lines.append(
             f"\n`#{lot['auction_id']}` **{item_name} x{lot['quantity']}**\n"
             f"Current: **{bid or 'No bids'} {WORLD.currency_name(str(lot['currency_id']))}** • next minimum **{minimum}**\n"
             f"High bidder: **{bidder}** • closes in **{human_duration(int(float(lot['ends_at'])-now))}**"
+            f"{found_line}{blind}"
         )
     await reply_long(interaction,"\n".join(lines),ephemeral=False)
 
@@ -292,6 +311,51 @@ async def auction_bid(interaction:discord.Interaction,auction_id:int,amount:app_
         await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
     await refresh_lot(interaction.guild,int(auction_id))
     await interaction.followup.send(f"🔨 Bid accepted on lot `#{auction_id}`: **{amount} {WORLD.currency_name(str(result.get('currency_id','low_spirit_stone')))}**.",ephemeral=False)
+
+
+def _appraisal_reply(result:dict)->str:
+    """What the reading came to.
+
+    The engine decides; this only says it. A misread is deliberately confident
+    - the mistake lives in the words rather than in any table, so a second look
+    can still find the truth.
+    """
+    name=str(result.get("name") or result.get("item_id") or "it")
+    reading=str(result.get("reading") or "")
+    if reading=="known":
+        return f"🔍 You know **{name}** on sight; there is nothing here you have not already read."
+    if reading=="certified":
+        return (f"📜 The floor's keeper turns **{name}** over twice and writes the certificate. "
+                f"**{int(result.get('fee') or 0)} {WORLD.currency_name(str(result.get('currency') or ''))}** lighter, "
+                "and you will know its like anywhere.")
+    if reading=="read":
+        return f"🔍 It resolves under your attention: **{name}**. You will recognise the next one."
+    if reading=="inconclusive":
+        return ("🌫️ You turn it over and learn nothing you can rely on. "
+                "Try again, or have the floor's keeper certify it with **paid**.")
+    believed=str(result.get("believed_grade") or "")
+    if believed=="ordinary":
+        return "🌫️ You look it over and put it down again — common stuff, you decide, and you are certain of it."
+    return "🌫️ You are sure of what you are holding, and quite wrong about it — this, you decide, is a legendary thing."
+
+
+@registered_group_command(auction_group, name="appraise",description="Read what a treasure actually is, by eye or by the floor's keeper")
+@app_commands.describe(item="Something you are carrying",auction_id="Or an open lot in front of you",paid="Pay the floor's keeper to be certain")
+@app_commands.autocomplete(item=carried_item_autocomplete)
+@serialized_user_action
+async def auction_appraise(interaction:discord.Interaction,item:str="",auction_id:int=0,paid:bool=False)->None:
+    await interaction.response.defer(ephemeral=False)
+    if not await require_character(interaction): return
+    if not item and auction_id<=0:
+        await interaction.followup.send("Name something you are carrying, or the number of a lot in front of you.",ephemeral=False);return
+    try:
+        envelope=await ENGINE.authoritative_action("appraisal.read",interaction.user.id,{"item_id":item,"auction_id":int(auction_id),"paid":bool(paid)},action_id=f"discord:{interaction.id}:appraisal.read")
+        result=dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
+    progress=dict(result.get("profession") or {})
+    trained=f"\n📈 Appraisal **{int(progress.get('level') or 0)}** ({int(progress.get('xp') or 0)} xp)." if progress else ""
+    await interaction.followup.send(_appraisal_reply(result)+trained,ephemeral=False)
 
 
 merchant_group=app_commands.Group(name="merchant",description="Find the travelling merchants and buy what they carry")

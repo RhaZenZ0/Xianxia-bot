@@ -32,9 +32,15 @@ var SystemIntervals = map[string]int64{
 	"sect_politics":           7 * minutesPerDay,
 	"clan_dynamics":           30 * minutesPerDay,
 	"autonomous_world_events": minutesPerDay,
+	// v1.0.0-rc.15: the world's own people put things under the hammer. Daily,
+	// like civilization - a floor that refills every half hour is a shop.
+	"npc_consignments": minutesPerDay,
 }
 
-var orderedSystems = []string{"npc_civilization", "npc_life", "dynamic_economy", "black_markets", "sect_politics", "clan_dynamics", "autonomous_world_events"}
+// Consignments run after the people have moved and before the advanced
+// maintenance bundle settles and bids, so a lot found today is on the floor
+// for the merchants to bid on in the same pass.
+var orderedSystems = []string{"npc_civilization", "npc_life", "dynamic_economy", "black_markets", "npc_consignments", "sect_politics", "clan_dynamics", "autonomous_world_events"}
 
 type Location struct {
 	World        string `json:"world"`
@@ -411,6 +417,8 @@ func (r *Runner) applySystem(conn *storage.Conn, system string, steps, gameMinut
 		summary, err = r.sects(conn, steps, gameMinute)
 	case "clan_dynamics":
 		summary, err = r.clans(conn, steps, gameMinute)
+	case "npc_consignments":
+		summary, err = r.npcConsignments(conn, steps, gameMinute)
 	case "autonomous_world_events":
 		summary, events, err = r.autonomousWorldEvents(conn, steps, gameMinute)
 	default:

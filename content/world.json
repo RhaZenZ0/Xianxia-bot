@@ -23219,18 +23219,20 @@
     "ice_spirit_blazing_grass": {
       "name": "Ice Spirit Blazing Grass",
       "description": "A rare fire-and-ice spiritual herb used in high-grade dual-element alchemy.",
-      "sect_value": 8,
+      "sect_value": 110,
       "auction_interest": "special",
       "door_event_chance": 30,
-      "hunter_realm_bonus": 0
+      "hunter_realm_bonus": 0,
+      "base_price": 900
     },
     "twin_extremes_fruit": {
       "name": "Twin Extremes Ice-Fire Fruit",
       "description": "A perfectly balanced red-white fruit holding opposing fire and ice essences.",
-      "sect_value": 8,
+      "sect_value": 130,
       "auction_interest": "special",
       "door_event_chance": 38,
-      "hunter_realm_bonus": 1
+      "hunter_realm_bonus": 1,
+      "base_price": 1050
     },
     "fire_spirit_root_herb": {
       "name": "Fire Spirit Root",
@@ -23318,58 +23320,65 @@
     "lesser_stygian_seal": {
       "name": "Lesser Stygian Seal",
       "description": "A soul relic that can influence weak restless dead nearby.",
-      "sect_value": 8,
+      "sect_value": 140,
       "auction_interest": "special",
       "door_event_chance": 42,
-      "hunter_realm_bonus": 1
+      "hunter_realm_bonus": 1,
+      "base_price": 1150
     },
     "cloud_stepping_boots": {
       "name": "Cloud-Stepping Boots",
       "description": "A movement relic allowing passive levitation and qi-powered flight.",
-      "sect_value": 8,
+      "sect_value": 150,
       "auction_interest": "special",
       "door_event_chance": 32,
-      "hunter_realm_bonus": 0
+      "hunter_realm_bonus": 0,
+      "base_price": 1250
     },
     "bone_comb": {
       "name": "The Bone Comb",
       "description": "A cursed beauty relic from the Eighteen Hells. Its gift always leaves a social and spiritual price.",
-      "sect_value": 8,
+      "sect_value": 120,
       "auction_interest": "special",
       "door_event_chance": 36,
-      "hunter_realm_bonus": 1
+      "hunter_realm_bonus": 1,
+      "base_price": 980
     },
     "cracked_nether_mirror": {
       "name": "Cracked Nether Mirror",
       "description": "A cursed divination mirror that can seek distant people while revealing the user in return.",
-      "sect_value": 8,
+      "sect_value": 135,
       "auction_interest": "special",
       "door_event_chance": 45,
-      "hunter_realm_bonus": 1
+      "hunter_realm_bonus": 1,
+      "base_price": 1100
     },
     "verdant_furnace_jade_slip": {
       "name": "Verdant Furnace Jade Slip",
       "description": "An inheritance slip containing fragments of the Verdant Immortal's alchemy path.",
-      "sect_value": 8,
+      "sect_value": 420,
       "auction_interest": "legendary",
       "door_event_chance": 62,
-      "hunter_realm_bonus": 2
+      "hunter_realm_bonus": 2,
+      "base_price": 3400
     },
     "nine_echo_sword_tablet": {
       "name": "Nine-Echo Sword Tablet",
       "description": "A sword inheritance tablet carrying nine layers of resonant sword intent.",
-      "sect_value": 8,
+      "sect_value": 480,
       "auction_interest": "legendary",
       "door_event_chance": 68,
-      "hunter_realm_bonus": 2
+      "hunter_realm_bonus": 2,
+      "base_price": 3900
     },
     "stygian_ghost_scripture": {
       "name": "Stygian Ghost Scripture",
       "description": "A dangerous soul inheritance for sensing, restraining and negotiating with the dead.",
-      "sect_value": 8,
+      "sect_value": 450,
       "auction_interest": "legendary",
       "door_event_chance": 70,
-      "hunter_realm_bonus": 2
+      "hunter_realm_bonus": 2,
+      "base_price": 3650
     },
     "spatial_pouch": {
       "name": "Common Spatial Pouch",
@@ -23405,7 +23414,8 @@
       },
       "auction_interest": "legendary",
       "door_event_chance": 75,
-      "hunter_realm_bonus": 3
+      "hunter_realm_bonus": 3,
+      "base_price": 40000
     },
     "nine_echo_spatial_token": {
       "name": "Nine-Echo Spatial Token",
@@ -23456,7 +23466,8 @@
       },
       "auction_interest": "special",
       "door_event_chance": 30,
-      "hunter_realm_bonus": 0
+      "hunter_realm_bonus": 0,
+      "base_price": 760
     },
     "hundred_year_peach": {
       "name": "Hundred-Year Longevity Peach",
@@ -23468,7 +23479,8 @@
       },
       "auction_interest": "legendary",
       "door_event_chance": 65,
-      "hunter_realm_bonus": 2
+      "hunter_realm_bonus": 2,
+      "base_price": 12000
     },
     "blood_sea_scripture_manual": {
       "name": "Blood Sea Scripture — Jade Manual",
@@ -23525,8 +23537,8 @@
       "name": "Netherworld Sacrificial Sutra",
       "type": "manual",
       "manual_id": "netherworld_sacrificial_sutra",
-      "sect_value": 120,
-      "base_price": 1200,
+      "sect_value": 400,
+      "base_price": 3200,
       "auction_interest": "legendary",
       "description": "A taboo sutra recording sacrificial exchanges of life, karma and power.",
       "legal_status": "forbidden",
@@ -25464,42 +25476,47 @@
     "salt_king_iron_slip": {
       "name": "Salt King's Iron Slip",
       "description": "A slip of salt-blackened iron from the barrow; the Salt King's body arts, in a script nobody living taught.",
-      "sect_value": 12,
+      "sect_value": 380,
       "auction_interest": "legendary",
       "door_event_chance": 60,
-      "hunter_realm_bonus": 2
+      "hunter_realm_bonus": 2,
+      "base_price": 3100
     },
     "pagoda_sutra_slip": {
       "name": "Pagoda Sutra Slip",
       "description": "A shard of the pagoda wall with a line of the sutra on it; the rest is in the reader.",
-      "sect_value": 12,
+      "sect_value": 400,
       "auction_interest": "legendary",
       "door_event_chance": 60,
-      "hunter_realm_bonus": 2
+      "hunter_realm_bonus": 2,
+      "base_price": 3250
     },
     "stele_sword_fragment": {
       "name": "Stele Sword Fragment",
       "description": "A fragment of the stele with one stroke of the inscription; the stroke is a sword form.",
-      "sect_value": 12,
+      "sect_value": 440,
       "auction_interest": "legendary",
       "door_event_chance": 60,
-      "hunter_realm_bonus": 2
+      "hunter_realm_bonus": 2,
+      "base_price": 3550
     },
     "weeping_wall_disk": {
       "name": "Weeping Wall Array Disk",
       "description": "A disk cut from the sanctum wall; the great array's first ring is etched on it, and it is damp.",
-      "sect_value": 12,
+      "sect_value": 520,
       "auction_interest": "legendary",
       "door_event_chance": 60,
-      "hunter_realm_bonus": 2
+      "hunter_realm_bonus": 2,
+      "base_price": 4200
     },
     "hollow_throne_seal": {
       "name": "Hollow Throne Seal",
       "description": "A seal of no metal anyone can name, from the vault under the hollow throne; it is heavier than it looks and lighter than it should be.",
-      "sect_value": 12,
+      "sect_value": 640,
       "auction_interest": "legendary",
       "door_event_chance": 60,
-      "hunter_realm_bonus": 2
+      "hunter_realm_bonus": 2,
+      "base_price": 5200
     },
     "paper_crane_charm": {
       "name": "Paper Crane Charm",

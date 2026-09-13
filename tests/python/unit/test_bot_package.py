@@ -780,7 +780,7 @@ SURFACE = {
         "roots": ('wallet', 'use'),
         "leaves": {
             "storage_group": ('status', 'deposit', 'withdraw'),
-            "auction_group": ('enter', 'leave', 'browse', 'sell', 'bid'),
+            "auction_group": ('enter', 'leave', 'browse', 'sell', 'bid', 'appraise'),
             "merchant_group": ('status', 'buy'),
             "shop_group": ('here', 'browse', 'buy', 'sell'),
             "trade_group": ('offer', 'status', 'accept', 'decline'),

@@ -267,6 +267,58 @@ column, keyed on the *family* rather than the character, and that is what makes 
 life is a new household, so it earns that household's heirloom, while asking the same household twice
 earns nothing. Creation also writes provenance for what it grants now, which it never did.
 
+And the forty-eight auction houses stopped being empty rooms with a steward standing in them. Every
+lot on every floor since the auctions shipped had to be listed by a player, and merchants were wired
+to them in the buy direction only - they bid, they take the unsold - so the world could consume
+treasure and never produce a single piece of it. The floors of a server nobody had played on were
+furniture.
+
+The world's own people find things now. A grave-robber, a tomb digger, a beast hunter or a
+herb-gatherer turns something up on their own time - weighted by trade, the way travel already is,
+because a scavenger is looking and a gate guard is not - and what happens next is decided by two
+questions. Is it legal? Contraband goes to the night market rather than a floor that would have the
+finder arrested for it. And can they read it? Because a realm-0 scavenger who digs a Nine-Echo Sword
+Tablet out of a barrow does not know what a Nine-Echo Sword Tablet is.
+
+That second question is the whole of it. A find the finder understands goes up with a reserve. A find
+they *don't* goes up blind: the house grades it by eye - "legendary or near it" - says no more than
+that, and opens at a quarter of the price it would otherwise ask, because a house cannot vouch for
+what it cannot name. Nothing here needed an NPC inventory table, and that is deliberate: a find is
+resolved and consigned in one pass, so there is no half-owned item to reconcile if a tick is missed
+or replayed. A full floor takes nothing more, exactly as it refuses a player's seventh lot, and the
+whole thing is capped per tick for the same reason travel is - thirty treasures surfacing overnight
+is a fire sale, not a living world. Each find lands in `world_history_events` as public history,
+because a treasure coming up out of the ground is what a town talks about.
+
+Settlement had to learn that a seller is not always a character. `seller_user_id` is foreign-keyed to
+`characters`, so a consignment's is 0, and the payout was a single `walletDeltaSim` on that column -
+which would have written a wallet for a character who does not exist. A finder is paid into the only
+purse they have, their own `wealth`, and an unsold consignment is simply taken home rather than
+pushed into user 0's bag. The GM dashboard's auction panel joined `characters` on that same column
+with an inner join, so every consignment would have been invisible there; it is a left join now.
+
+**Appraisal** is the other half, and it was a word in a list. "Appraisal" has been one of the eight
+professions since the progression system was written and nothing in either language ever granted a
+point of it; `item_provenance.authenticity` has been a column every writer sets to 100 and no rule
+ever read. Both are load-bearing now. `/economy → Auction House → Appraise` reads something in your
+bag or a lot standing open in front of you, two ways: your own eyes for nothing - Insight, the
+attribute every knowledge-flavoured verb in the game already rolls, plus your Appraisal level, against
+a target number that rises with the grade - or the floor's own keeper for a quarter of the thing's
+worth, which is certain. Practising trains the profession whether the reading lands or not; buying an
+answer teaches you nothing, because it is not practice.
+
+Knowing is per person and permanent, shaped like `character_location_discoveries`: the second
+Nine-Echo Sword Tablet you meet, you read at a glance. Which means a blind lot is blind only to the
+people who have not done the work - an appraiser walks the same floor as everybody else and sees what
+is actually on it. A badly botched reading is confidently wrong rather than merely unhelpful, and the
+mistake lives in the words rather than in any table, so a second look can still find the truth.
+
+Nine of the nineteen auction-grade items made all of that meaningless until they were fixed: they
+carried `sect_value` 8 - the same as a recovery pill - and no `base_price` at all, and every valuation
+in the game derives from those two numbers. A legendary sword tablet would have gone under the hammer
+for eight stones. They are priced against the goods that already had considered numbers now, and a
+content gate holds every auction-grade item to being worth more than ordinary stock.
+
 **1.0.0** (rc.14) repairs a broken call in `/sense` and closes the class of fault it belongs to.
 Sensing another cultivator called `WORLD.approximate_realm(...)`, and there is no such method on
 `World`: the function lives in `app/rules/sense.py` and takes its two realm lookups as arguments, so
@@ -823,6 +875,12 @@ mechanical authority paths.
 - **Schema 27** added the v0.19.29 mute/freeze moderation columns on `characters`
   (`is_muted`, `is_frozen`, `moderation_reason`).
 - **Schema 28** added the Quest Forge definition table (`quest_definitions`).
+- **Schema 45** let the world's own people put things under the hammer and gave a cultivator
+  somewhere to record what they have learned to recognise. `auctions` gained `seller_npc_name`
+  (mirroring `merchant_buyer` and `merchant_bidder`, because the seller column is foreign-keyed
+  to `characters` and a finder is not one), plus `appraised` and `grade_band` for a lot consigned
+  blind; `character_item_appraisals` is shaped like `character_location_discoveries` - a
+  composite key, the route by which it became known, and the minute it did.
 - **Schema 44** dropped `core_state_versions` and `core_request_log`, which came in with
   migration 12 as the shape of an earlier write ledger and were never written or read by
   anything in any release since. Migration 12 keeps its statements - a historical migration is

@@ -19,6 +19,8 @@ func setupBatch5AuthorityDB(t *testing.T) string {
 	defer conn.Close()
 
 	if err := conn.ExecScript(`
+CREATE TABLE IF NOT EXISTS character_item_appraisals(user_id INTEGER NOT NULL,item_id TEXT NOT NULL,appraisal_kind TEXT NOT NULL DEFAULT 'insight',authenticity INTEGER NOT NULL DEFAULT 100,appraised_game_minute INTEGER NOT NULL DEFAULT 0,created_at REAL NOT NULL DEFAULT 0,PRIMARY KEY(user_id,item_id));
+CREATE TABLE IF NOT EXISTS auctions(auction_id INTEGER PRIMARY KEY AUTOINCREMENT,house_id TEXT NOT NULL,seller_user_id INTEGER NOT NULL DEFAULT 0,seller_npc_name TEXT NOT NULL DEFAULT '',item_id TEXT NOT NULL,quantity INTEGER NOT NULL DEFAULT 1,currency_id TEXT NOT NULL,starting_bid INTEGER NOT NULL,current_bid INTEGER NOT NULL DEFAULT 0,current_bidder_user_id INTEGER,anonymous INTEGER NOT NULL DEFAULT 0,active INTEGER NOT NULL DEFAULT 1,appraised INTEGER NOT NULL DEFAULT 1,grade_band TEXT NOT NULL DEFAULT '',merchant_buyer TEXT NOT NULL DEFAULT '',merchant_bidder TEXT NOT NULL DEFAULT '',created_at REAL NOT NULL DEFAULT 0,ends_at REAL NOT NULL DEFAULT 0);
 CREATE TABLE equipment_instances(equipment_id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,item_id TEXT NOT NULL,slot TEXT NOT NULL DEFAULT 'weapon',durability INTEGER NOT NULL DEFAULT 100,max_durability INTEGER NOT NULL DEFAULT 100,quality INTEGER NOT NULL DEFAULT 100,equipped INTEGER NOT NULL DEFAULT 0,bound_at REAL NOT NULL DEFAULT 0,updated_at REAL NOT NULL DEFAULT 0);
 ALTER TABLE characters ADD COLUMN spirit_stones INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE characters ADD COLUMN insight_xp INTEGER NOT NULL DEFAULT 0;
