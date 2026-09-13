@@ -5,7 +5,7 @@ narrates but never decides, self-hosted on your own hardware.*
 
 [![CI](https://github.com/RhaZenZ0/Xianxia-bot/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/RhaZenZ0/Xianxia-bot/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/RhaZenZ0/Xianxia-bot?include_prereleases&label=release)](https://github.com/RhaZenZ0/Xianxia-bot/releases)
-[![Go 1.23+](https://img.shields.io/badge/go-1.23%2B-00ADD8)](go_core/go.mod)
+[![Go 1.25+](https://img.shields.io/badge/go-1.25%2B-00ADD8)](go_core/go.mod)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-3776AB)](requirements.txt)
 
 A persistent Xianxia role-playing game that lives in a Discord server and runs on a CPU-only
@@ -156,7 +156,7 @@ It takes a safety backup first, asks you to type `RESET`, leaves Discord channel
 
 ## Running without Docker
 
-Python 3.12+, Go 1.23+ and the SQLite development library (`libsqlite3-dev` on Debian/Ubuntu) for
+Python 3.12+, Go 1.25+ and the SQLite development library (`libsqlite3-dev` on Debian/Ubuntu) for
 the Go CGO binding.
 
 ```bash
@@ -536,7 +536,9 @@ make check              # lint + format-check + test-python + test-go, the pytho
 | --- | --- |
 | `make test-python` | `pytest -q` — `unit/` (Python-only), `integration/` (still Python-owned orchestration), `contracts/` (the Python↔Go, startup, deployment and release boundaries) |
 | `make test-go` | `cd go_core && go test ./...` — every Go-owned rule and state transition |
-| `make lint` | `ruff check app scripts` and `go vet ./...` |
+| `make lint` | `ruff check app scripts`, `go vet ./...` and `staticcheck ./...` — it fails rather than skips if staticcheck is absent; `make tools` installs the pinned version |
+| `make tools` | installs `staticcheck` and `govulncheck` at the versions the Makefile pins (the only versions CI runs) |
+| `make audit` | `govulncheck ./...` — the one check that needs the network, which is why it is not in `lint` or `check` |
 | `python scripts/check_dashboard_implementation.py` | the dashboard drift and coverage gate |
 | `python scripts/playtest_engine.py --launch` | the engine half of the playtest: every roadmap loop driven through a scratch engine |
 | `python scripts/playtest_checklist.py` | regenerates `docs/playtest/v<version>.md` |
@@ -546,8 +548,9 @@ make check              # lint + format-check + test-python + test-go, the pytho
 
 One workflow (`.github/workflows/ci.yml`) on every push to `main` and every pull request, in three
 jobs. `make check` covers the first two locally; the third has no local equivalent. `python` runs
-`ruff` and the whole pytest suite; `go` runs `go vet` and `go test -race`; and `containers`, which
-waits for both, builds the two images and then **starts** them:
+`ruff` and the whole pytest suite; `go` runs `go vet`, `staticcheck`, `govulncheck` and
+`go test -race`; and `containers`, which waits for both, builds the two images and then
+**starts** them:
 
 | Step | What it proves |
 | --- | --- |
@@ -555,6 +558,22 @@ waits for both, builds the two images and then **starts** them:
 | `docker build -f go_core/Dockerfile` | the engine image assembles |
 | `docker run … python -c "import app.bot, app.dashboard, app.ops.healthcheck"` | the bot image's three services import inside the image — every runtime dependency is installed in the final layer, not just at build time |
 | `docker run -d …` then `curl /livez` | the engine's entrypoint fixes up the data directory as root, drops to uid 10001 through `gosu`, opens SQLite and serves HTTP |
+
+Two security scans sit beside them. `govulncheck` is the Go half: `go_core` has no external
+dependencies — SQLite is direct cgo — so what it reports is standard-library advisories against the
+Go version in `go.mod`, and the fix for one is a Go bump. Its first run was one: the `go` directive
+said `1.23.0`, CI installs the toolchain that directive names, and Go 1.23.0 carried 26 advisories
+this code reaches. The directive is `1.25.13` now — the oldest release that clears all of them —
+which is why the floor is where it is. It needs the network, so it is `make
+audit` rather than part of `make lint`; `make check` stays runnable offline. The Python half needs
+nothing and rides the `ruff` call that was already there: `flake8-bandit` rules, with seven off for
+reasons written out in `pyproject.toml` and every other rule clean — so `eval`, `exec`, `pickle`,
+weak hashes, unverified TLS contexts, `shell=True` and `yaml.load` cannot appear quietly.
+
+`staticcheck` is a gate rather than a suggestion: `go vet` finds none of the dead code it does — by
+v1.0.0 six names had accumulated with no caller at all, and vet passed on every one. CI installs the
+version `STATICCHECK_VERSION` pins in the Makefile, read out of the Makefile rather than repeated in
+the workflow, so the two cannot drift.
 
 The last two matter because a build alone proves an image assembles, not that it starts: a missing
 runtime dependency, or a mistake in the ownership fixup `go_core/docker-entrypoint.sh` performs

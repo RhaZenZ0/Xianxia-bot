@@ -236,7 +236,7 @@ func familySupportActionGo(conn *storage.Conn, _ worlddata.Catalog, userID int64
 	influence := max64(0, i64(f["influence"]))
 	purity := max64(0, i64(f["bloodline_purity"]))
 	stones := int64(0)
-	items := map[string]int64{}
+	var items map[string]int64
 	switch arch {
 	case "martial_household":
 		stones = 6 + tier*4 + purity/20
@@ -646,7 +646,7 @@ func adjustFateGo(conn *storage.Conn, userID, delta int64, reason string, gm int
 }
 func daoPartnershipActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage, op string) (authoritativeMutation, error) {
 	now := nowSeconds()
-	out := map[string]any{}
+	var out map[string]any
 	if op == "dao.propose" {
 		var p daoProposePayload
 		if e := json.Unmarshal(raw, &p); e != nil {

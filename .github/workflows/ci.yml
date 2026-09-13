@@ -49,6 +49,32 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install --yes libsqlite3-dev
       - run: test -z "$(gofmt -l go_core)"
       - run: cd go_core && CGO_ENABLED=1 go vet ./...
+
+      # staticcheck, at the version the Makefile pins - read from the Makefile
+      # rather than repeated here, so CI and `make lint` cannot drift apart.
+      # vet finds none of the dead code it does: six names with no caller at
+      # all had accumulated by v1.0.0 and vet passed on every one of them.
+      - name: Install staticcheck at the pinned version
+        run: |
+          version="$(sed -n 's/^STATICCHECK_VERSION ?= //p' Makefile)"
+          test -n "$version" || { echo 'Makefile no longer pins STATICCHECK_VERSION' >&2; exit 1; }
+          echo "staticcheck $version"
+          go install "honnef.co/go/tools/cmd/staticcheck@$version"
+      - run: cd go_core && CGO_ENABLED=1 staticcheck ./...
+
+      # `make audit`, which is kept out of `make lint` and `make check` because
+      # it needs the network and those two stay runnable offline. go_core has
+      # no external dependencies - SQLite is direct cgo - so this reports
+      # standard-library advisories against the Go version in go.mod, which is
+      # a small surface and the one nothing else watches.
+      - name: Install govulncheck at the pinned version
+        run: |
+          version="$(sed -n 's/^GOVULNCHECK_VERSION ?= //p' Makefile)"
+          test -n "$version" || { echo 'Makefile no longer pins GOVULNCHECK_VERSION' >&2; exit 1; }
+          echo "govulncheck $version"
+          go install "golang.org/x/vuln/cmd/govulncheck@$version"
+      - run: cd go_core && CGO_ENABLED=1 govulncheck ./...
+
       - run: cd go_core && CGO_ENABLED=1 go test -race ./...
 
   containers:

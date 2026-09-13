@@ -491,7 +491,7 @@ func sectEconomyActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID i
 }
 func discipleshipActionGo(conn *storage.Conn, _ worlddata.Catalog, userID int64, raw json.RawMessage, op string) (authoritativeMutation, error) {
 	now := nowSeconds()
-	out := map[string]any{}
+	var out map[string]any
 	if op == "discipleship.request" {
 		var p discipleRequestPayload
 		if e := json.Unmarshal(raw, &p); e != nil {

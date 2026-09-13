@@ -157,7 +157,7 @@ func damageEquipmentGo(conn *storage.Conn, userID, amount int64) error {
 	return e
 }
 func conditionDefinitionGo(key string) (name, category, treatment string) {
-	name, category, treatment = strings.Title(strings.ReplaceAll(key, "_", " ")), "Condition", "recovery_pill"
+	name, category, treatment = titleWords(strings.ReplaceAll(key, "_", " ")), "Condition", "recovery_pill"
 	switch key {
 	case "flesh_wound":
 		name, category, treatment = "Flesh Wound", "Injury", "recovery_pill"
@@ -669,7 +669,7 @@ func combatTechniqueAction(conn *storage.Conn, catalog worlddata.Catalog, userID
 			return authoritativeMutation{}, e
 		}
 		if len(pw.Rows) == 0 {
-			return authoritativeMutation{}, errors.New("World Collapse requires a stabilized personal world")
+			return authoritativeMutation{}, errors.New("the World Collapse technique requires a stabilized personal world")
 		}
 	}
 	mod := comp/10 + c.RealmIndex*2 + c.Phase/3 + c.Attributes["insight"]

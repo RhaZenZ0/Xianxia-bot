@@ -325,7 +325,7 @@ func equipmentAction(conn *storage.Conn, _ worlddata.Catalog, userID int64, raw 
 }
 func partyAction(conn *storage.Conn, _ worlddata.Catalog, userID int64, raw json.RawMessage, op string) (authoritativeMutation, error) {
 	now := nowSeconds()
-	result := map[string]any{}
+	var result map[string]any
 	if op == "party.create" {
 		var p partyCreatePayload
 		if e := json.Unmarshal(raw, &p); e != nil {
@@ -688,7 +688,7 @@ func bossActActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64
 			)
 		}
 		_ = damageEquipmentGo(conn, userID, 1)
-		events = append(events, fmt.Sprintf("%s deals %d damage.", strings.Title(p.Style), damage))
+		events = append(events, fmt.Sprintf("%s deals %d damage.", titleWords(p.Style), damage))
 	}
 	if e != nil {
 		return authoritativeMutation{}, e

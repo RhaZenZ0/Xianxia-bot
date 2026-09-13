@@ -7,6 +7,7 @@ import (
 	"math"
 	"strings"
 	"time"
+	"unicode"
 
 	"xianxia/core/internal/core"
 	"xianxia/core/internal/storage"
@@ -196,6 +197,26 @@ func i64(v any) int64 { return storage.ParseInt(v) }
 // bounds check that a truncated value sails through is worse than no bounds
 // check at all, so the value is clamped into range before it is converted.
 func intFromDB(v any) int { return narrowToInt(storage.ParseInt(v)) }
+
+// titleWords upper-cases the first letter of every word.
+//
+// It stands in for strings.Title, which Go deprecated because its word
+// boundaries mishandle Unicode punctuation. Everything titled in this package
+// is content-derived ASCII - a snake_case catalogue key with its underscores
+// already turned into spaces, a combat style, a world name - so the plain rule
+// is the correct one here, and it keeps a module with no external dependencies
+// free of the golang.org/x/text the deprecation notice points at.
+func titleWords(s string) string {
+	out := []rune(s)
+	boundary := true
+	for i, r := range out {
+		if boundary {
+			out[i] = unicode.ToUpper(r)
+		}
+		boundary = !unicode.IsLetter(r) && !unicode.IsNumber(r)
+	}
+	return string(out)
+}
 
 // narrowToInt is the one place in this package an int64 becomes an int.
 func narrowToInt(v int64) int {

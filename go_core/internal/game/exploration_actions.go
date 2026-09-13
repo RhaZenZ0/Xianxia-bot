@@ -78,7 +78,7 @@ func applyCanonicalRewardTx(conn *storage.Conn, catalog worlddata.Catalog, userI
 	if err != nil {
 		return 0, err
 	}
-	currentCultivation := c.Cultivation
+	var currentCultivation int64
 	currentRes, err := conn.Execute(`SELECT cultivation FROM characters WHERE user_id=?`, []any{userID})
 	if err != nil {
 		return 0, err
@@ -978,7 +978,7 @@ func applyEventParticipationTx(conn *storage.Conn, catalog worlddata.Catalog, us
 		}
 		name := strings.TrimSpace(fmt.Sprint(effect["name"]))
 		if name == "" {
-			name = strings.Title(strings.ReplaceAll(key, "_", " "))
+			name = titleWords(strings.ReplaceAll(key, "_", " "))
 		}
 		duration := storage.ParseInt(effect["duration_game_minutes"])
 		if duration <= 0 {

@@ -37,7 +37,9 @@ Individual commands:
 ```bash
 make test-python     # python -m pytest -q
 make test-go         # cd go_core && CGO_ENABLED=1 go test ./...
-make lint            # ruff check app scripts; go vet ./...
+make lint            # ruff check app scripts; go vet ./...; staticcheck ./... (fails if staticcheck is missing)
+make tools           # installs staticcheck + govulncheck at the versions the Makefile pins; CI runs those
+make audit           # govulncheck ./... - the one check that needs the network, so it is not in lint/check
 make format-check    # gofmt -l go_core
 ```
 

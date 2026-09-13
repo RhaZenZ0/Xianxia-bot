@@ -98,7 +98,7 @@ func chooseSamsaraWorld(realm, karma int64) (string, error) {
 	if tier > 3 {
 		tier = 3
 	}
-	weights := []int64{0, 0, 0, 0}
+	var weights []int64
 	switch tier {
 	case 0:
 		weights = []int64{94 - local*5, 6 + local*5, 0, 0}
