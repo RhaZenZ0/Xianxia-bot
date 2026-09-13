@@ -169,14 +169,21 @@ _missing_action_roots = sorted(_MIGRATED_ROOTS - set(_ROOT_ACTIONS))
 if _missing_action_roots:
     raise RuntimeError(f"Command registry lost action roots: {_missing_action_roots}")
 
-def _hub_page(root: str, label: str, description: str, *extra_roots: str) -> HubPage:
+def _hub_page(root: str, label: str, description: str, *extra_roots: str,
+              only: tuple[str, ...] = (), key: str | None = None) -> HubPage:
     """One page of a hub. Extra roots (v1.0.0-rc.4) are gathered onto the same
     page, so a page can be a thing you are doing rather than one command's
     name; the page keeps the first root's key, which hint paths, the playtest
-    checklist and the emoji map resolve against."""
+    checklist and the emoji map resolve against.
+
+    `only` (v1.0.0-rc.13) names the leaves this page takes from that root, so
+    one large group can be several pages instead of one page four deep in Next
+    buttons. A page that takes a subset needs its own `key`, because a key is
+    what the page select and every hint path address a page by."""
     return HubPage(
-        key=root, label=label, description=description, command=_ROOT_ACTIONS[root],
+        key=key or root, label=label, description=description, command=_ROOT_ACTIONS[root],
         extras=tuple(_ROOT_ACTIONS[name] for name in extra_roots),
+        only=only,
     )
 
 
@@ -350,7 +357,19 @@ _HUB_DEFINITIONS = (
         title="🏯 Sect Hub",
         description="Sect membership, player discipleship, shared manor, resources, politics, territory and war.",
         pages=(
-            _hub_page("sect", "Sect", "Membership, player discipleship, shared manor, treasury and martial family."),
+            # Twenty-five actions were one page (v1.0.0-rc.13). A page shows
+            # eight, so seventeen of them sat behind a Next button with nothing
+            # to say they were there. Four pages, each a thing you came to do.
+            _hub_page("sect", "Sect", "Your membership and where you stand in it: rank, roster, politics, the martial family and how it addresses you.",
+                      only=("sect status", "sect roster", "sect politics", "sect address",
+                            "sect form", "sect family", "sect shadow")),
+            _hub_page("sect", "Recruitment", "Getting in: which sects recruit, who will sponsor you, and the entrance examination.",
+                      key="sect_recruitment", only=("sect recruitment",)),
+            _hub_page("sect", "Discipleship", "Master and disciple: ask, accept, reject, and the bond you already hold.",
+                      key="sect_discipleship", only=("sect discipleship",)),
+            _hub_page("sect", "Holdings", "What the sect keeps and what you may draw from it: the shared manor, your residence, the treasury, contribution and redemption.",
+                      key="sect_holdings", only=("sect manor", "sect abode", "sect treasury",
+                                                 "sect contribute", "sect redeem")),
             _hub_page("territory", "Territory", "Persistent territory control and claims."),
             _hub_page("war", "War", "Sieges, defenses and territorial conflict actions."),
         ),
@@ -359,13 +378,28 @@ _HUB_DEFINITIONS = (
         name="family",
         title="🏠 Family Hub",
         description="Birth family, clan structure, descendants, support and family history.",
-        pages=(_hub_page("family", "Family", "View and manage your persistent birth-family branch."),),
+        pages=(
+            _hub_page("family", "Family", "The household you belong to now: enter and leave it, ask it for support, and see the clan, its branches and your descendants.",
+                      only=("family view", "family enter", "family leave", "family support",
+                            "family clan", "family descendants", "family child")),
+            _hub_page("family", "Legacy", "What the family was and what it leaves you: its history and ancestry, ancestral sites, investigations, inheritance claims and their conflicts.",
+                      key="family_legacy",
+                      only=("family history", "family ancestry", "family legacy",
+                            "family investigate", "family quest", "family claim", "family conflict")),
+        ),
     ),
     HubDefinition(
         name="abode",
         title="🏡 Abode Hub",
         description="Establish, enter, upgrade and manage access to your private player-owned location.",
-        pages=(_hub_page("abode", "Player Property", "Private property type, facilities, visitors and location-scene access."),),
+        pages=(
+            _hub_page("abode", "Property", "The home itself: found it, enter and leave it, build and raise its facilities, and use one.",
+                      only=("abode status", "abode establish", "abode enter", "abode leave",
+                            "abode upgrade", "abode focus")),
+            _hub_page("abode", "Access", "Who else may come in: invite, revoke, see your guests, visit another cultivator's home, and the private thread it uses.",
+                      key="abode_access",
+                      only=("abode visit", "abode invite", "abode guests", "abode revoke", "abode thread")),
+        ),
     ),
     HubDefinition(
         name="innerworld",
@@ -522,13 +556,38 @@ _ADMIN_HUB_DEFINITION = HubDefinition(
         "Choose a section, then choose an action. Actions use the explicitly registered canonical handlers and audit logging."
     ),
     pages=(
-        HubPage(key="server", label="Server", description="Channels, health, AI/narrator status, chat monitoring, maintenance, backups and audit logs.", command=admin_server_group),
+        # Three pages of twelve, fifteen and twelve became eight (rc.13): the
+        # admin panel shows eight rows like every other, and a GM looking for
+        # `unmute` was paging blind through a list called "Players".
+        HubPage(key="server", label="Server", description="Install and wire the server: setup, channel bindings, realm capitals and what the current configuration looks like.", command=admin_server_group,
+                only=("admin server setup", "admin server status", "admin server basechannels",
+                      "admin server bind_channels", "admin server realmhubs")),
+        HubPage(key="operations", label="Operations", description="Running it: backups, maintenance, telemetry, the audit log, narrator health and the playtest board.", command=admin_server_group,
+                only=("admin server backup", "admin server maintenance", "admin server observability",
+                      "admin server audit", "admin server ai_status", "admin server chat_digest",
+                      "admin server playtest")),
         HubPage(key="world", label="World", description="Events, secret realms and canonical world time.", command=admin_world_group),
-        HubPage(key="player", label="Players", description="Inspect, restore, reward or move cultivators.", command=admin_player_group),
+        HubPage(key="player", label="Players", description="Inspect a cultivator and put one right: revive, teleport, clear a stuck battle or scene.", command=admin_player_group,
+                only=("admin player inspect", "admin player revive", "admin player teleport",
+                      "admin player clearbattle", "admin player forceendscene")),
+        HubPage(key="grants", label="Grants", description="Give: items, currency, spatial storage, and karma adjustments.", command=admin_player_group,
+                only=("admin player grant", "admin player grantcurrency",
+                      "admin player grantstorage", "admin player karma")),
+        HubPage(key="moderation", label="Moderation", description="Withhold: ban, freeze and mute, each with its undo.", command=admin_player_group,
+                only=("admin player ban", "admin player unban", "admin player freeze",
+                      "admin player unfreeze", "admin player mute", "admin player unmute")),
         HubPage(key="sect", label="Sects", description="Membership, ranks and master/disciple administration.", command=admin_sect_group),
-        HubPage(key="family", label="Families", description="Inspect hidden birth-family state.", command=admin_family_group),
-        HubPage(key="npc", label="NPCs", description="Inspect hidden canonical NPC state.", command=admin_npc_group),
-        HubPage(key="simulation", label="Simulation", description="Automation, regions, markets, factions and world simulation.", command=admin_sim_group),
+        # Two pages of one action each, both "show me the hidden state of a
+        # thing" (rc.13).
+        HubPage(key="hidden", label="Hidden State", description="Inspect what players cannot see: a cultivator's NPC birth family, and a canonical NPC's GM-only state.",
+                command=admin_family_group, extras=(admin_npc_group,)),
+        HubPage(key="simulation", label="Simulation", description="Drive it: run a system, set an interval, and see what the automation switches are doing.", command=admin_sim_group,
+                only=("admin simulation status", "admin simulation run", "admin simulation interval",
+                      "admin simulation automation", "admin simulation toggle",
+                      "admin simulation actions")),
+        HubPage(key="siminspect", label="Simulation Inspect", description="Read it: the world summary, a region, a market, a named NPC, a sect faction, a clan.", command=admin_sim_group,
+                only=("admin simulation world", "admin simulation region", "admin simulation market",
+                      "admin simulation npc", "admin simulation sect", "admin simulation clan")),
     ),
 )
 

@@ -57,7 +57,7 @@ class GUIIntegrityTests(unittest.TestCase):
             commands = re.findall(rf'^@registered_group_command\({re.escape(variable)}_group,\s*name="([^"]+)"', source, re.M)
             self.assertLessEqual(len(commands), 25, slash_name)
 
-    def test_admin_panel_has_seven_sections_and_all_actions_fit_selects(self):
+    def test_admin_panel_sections_are_wired_and_all_actions_fit_selects(self):
         source = bot_package_source()
         wiring = bot_module_defining("_ADMIN_HUB_DEFINITION").read_text(encoding="utf-8")
         start = wiring.index("_ADMIN_HUB_DEFINITION = HubDefinition(")
@@ -67,9 +67,14 @@ class GUIIntegrityTests(unittest.TestCase):
             "admin_server_group", "admin_world_group", "admin_player_group",
             "admin_sect_group", "admin_family_group", "admin_npc_group", "admin_sim_group",
         )
-        self.assertEqual(panel.count("HubPage("), 7)
+        # Ten pages over seven groups since v1.0.0-rc.13: Server, Players and
+        # Simulation were twelve, fifteen and twelve actions on a panel that
+        # shows eight, and the two one-action inspect pages became one. The
+        # count is not the claim - the claim below is that every group is
+        # wired and reachable, which is what a lost page would break.
+        self.assertEqual(panel.count("HubPage("), 10)
         for group in expected_groups:
-            self.assertEqual(panel.count(f"command={group}"), 1, group)
+            self.assertIn(group, panel, group)
         counts = [
             len(re.findall(rf"@registered_group_command\({re.escape(group)},\s*name=\"([^\"]+)\"", source))
             for group in expected_groups

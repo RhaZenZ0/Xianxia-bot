@@ -943,7 +943,10 @@ class CommandSurfaceTests(unittest.TestCase):
                 self.assertRegex(wiring, rf"\b{group}\b", f"{group} ({module}) is not wired in surface.py")
         for group in ("admin_server_group", "admin_world_group", "admin_player_group", "admin_sect_group",
                       "admin_family_group", "admin_npc_group", "admin_sim_group"):
-            self.assertIn(f"command={group}", wiring, group)
+            # `command=` or `extras=`: since rc.13 one page can gather two
+            # groups (Hidden State takes family and npc), and a page that
+            # names a subset of one group appears several times over.
+            self.assertTrue(f"command={group}" in wiring or f"extras=({group},)" in wiring, group)
 
     def test_the_module_level_autocompletes_are_imported_where_they_decorate(self):
         # `@app_commands.autocomplete(npc=local_npc_autocomplete)` evaluates
