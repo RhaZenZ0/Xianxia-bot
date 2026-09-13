@@ -6,15 +6,22 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
-**1.0.0** (rc.14) fixes the reading `/sense` gives most often, and closes the class of fault it
-belongs to. Sensing another cultivator called `WORLD.approximate_realm(...)`, and there is no such
-method on `World`: the function lives in `app/rules/sense.py` and takes its two realm lookups as
-arguments, so the call was wrong in both its name and its signature and raised `AttributeError`. It
-was not a corner. The engine answers `reveal = "approx"` whenever detection succeeds and precision
-lands on "success" or "strong", which is the ordinary middle outcome of sensing somebody - the three
+**1.0.0** (rc.14) repairs a broken call in `/sense` and closes the class of fault it belongs to.
+Sensing another cultivator called `WORLD.approximate_realm(...)`, and there is no such method on
+`World`: the function lives in `app/rules/sense.py` and takes its two realm lookups as arguments, so
+the call was wrong in both its name and its signature and would raise `AttributeError`. The three
 branches beside it read `realm_world`, `realm_name` and `body_realm_name`, all real methods, which is
-exactly why the fourth read as one. The function had been written for that call and never wired to
-it, so it had never run once.
+exactly why the fourth was written as one.
+
+Why nobody ever hit it is the more interesting half, and it is a balance fault rather than a lucky
+escape: the branch is reached only when detection succeeds *and* precision lands on "success" or
+"strong", and those two conditions are close to mutually exclusive. Precision's target number rises
+2 a realm while a concealed target's detection target rises 7, so by the time a target is far enough
+above you to make precision marginal, detection has already failed. Swept over the realm ladder and
+some 2,900 attribute builds, `approx` is 0.3% of outcomes and `realm` 0.015%, both confined to a
+minimum-stat realm-0 character; everyone else gets `exact` (66%), `none` (25%) or `world` (9%). Two
+of the five readings `/sense` can give are effectively dead, which is a tuning question for the sense
+system and not something this release changes. The call is simply correct now.
 
 Nothing was looking, and that is the half worth keeping. `F821`, selected in rc.13 after the `/craft`
 crash, finds a name nothing defines - not an attribute nothing defines - and no suite can walk every
@@ -297,10 +304,9 @@ mechanical authority paths.
 
 ## Release status — v1.0.0
 
-- Current release: v1.0.0 (rc.14): `/sense` no longer raises on the reading it gives most often, and
-  every attribute the command surface reads off `DB`, `WORLD`, `SETTINGS` and `ENGINE` is held to
-  exist by a test. Tagged `v1.0.0-rc.14` on the beta channel; the NAS drills and two quiet weeks make
-  it `v1.0.0`.
+- Current release: v1.0.0 (rc.14): a broken call in `/sense` repaired, and every attribute the
+  command surface reads off `DB`, `WORLD`, `SETTINGS` and `ENGINE` held to exist by a test. Tagged
+  `v1.0.0-rc.14` on the beta channel; the NAS drills and two quiet weeks make it `v1.0.0`.
 - v1.0.0 (rc.13): the hub surface regrouped around what a player is doing, the updater fix that makes
   a stamped release installable at all, and - cut into the same tree before it shipped - the `/craft`
   `NameError` and the thirty printed hub paths that drew no button.
