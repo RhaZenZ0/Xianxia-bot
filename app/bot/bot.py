@@ -40,7 +40,7 @@ from .services import AI_ROUTER, ALERTS, GUILD, NARRATOR, NARRATOR_CONTEXT, QUES
 from .threads import _private_scene_for_thread
 from .auction_feed import settle_lots
 from .locations import _known_locations, current_npc_location
-from .registry import EVENT_HANDLERS
+from .registry import EVENT_HANDLERS, VIEW_RESTORERS
 from .typed_play import (
     Candidate, MessageInteraction, TypedPlayPicker, TypedPlayUnsupported, VERB_TABLE,
     budget_refusal, command_specs, dispatch, hint_due, hint_text, picker_prompt,
@@ -234,6 +234,17 @@ class XianxiaBot(commands.Bot):
             await self._mark_startup_phase(
                 "SIMULATION_READY", {"game_minute": int(wt_state["game_minute"])}
             )
+
+            # Every panel that outlives a process gets registered again
+            # (v1.0.0-rc.22). Discord kept the messages across the restart; the
+            # views did not, so without this every live event scene and every
+            # interrupted exploration came back with dead controls. The
+            # registry is what makes this "all of them" rather than "the one
+            # somebody remembered" - each family registers its own restorer,
+            # and restore_all never raises.
+            phase = "PANELS_RESTORED"
+            restored = await VIEW_RESTORERS.restore_all(self)
+            log.info("PANELS_RESTORED %s", " ".join(f"{k}={v}" for k, v in sorted(restored.items())) or "none")
 
             phase = "COMMAND_SYNC"
             synced = await self.tree.sync(guild=GUILD)
@@ -618,11 +629,22 @@ class XianxiaBot(commands.Bot):
                             # arms says what is waiting rather than only that
                             # something happened.
                             site_nodes=int(event.get("site_nodes") or 0)
+                            # The type the engine gave the row rides through
+                            # rather than being flattened to "random_event"
+                            # here (v1.0.0-rc.22): a realm on rotation is a
+                            # secret_realm, which is what closes it under its
+                            # own label and draws it the realm's own panel.
+                            event_type=str(event.get("event_type") or "random_event")
+                            title=str(event.get("title") or "World Event")
+                            headline=(
+                                f"🌀 **SECRET REALM OPENS — {title}**" if event_type=="secret_realm"
+                                else f"⚡ **AUTONOMOUS WORLD EVENT — {title}**"
+                            )
                             await spawn_system_event_thread(
-                                guild,title=str(event.get("title") or "World Event"),event_type="random_event",
+                                guild,title=title,event_type=event_type,
                                 event_key=str(event.get("event_key") or ""),expires_at=float(event.get("expires_at") or time.time()+7200),
                                 announcement=(
-                                    f"⚡ **AUTONOMOUS WORLD EVENT — {event.get('title','World Event')}**\n📍 **{event.get('location','Unknown')}**\n{event.get('description','')}"
+                                    f"{headline}\n📍 **{event.get('location','Unknown')}**\n{event.get('description','')}"
                                     + (f"\n\n**Persistent consequence:** {consequence}" if consequence else "")
                                     + (f"\n**Systems changed:** {'; '.join(impacts)}" if impacts else "")
                                     + (f"\n**On site:** {site_nodes} things to fight, harvest or handle." if site_nodes else "")

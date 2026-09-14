@@ -54,26 +54,44 @@ func secretRealmIDs(catalog worlddata.Catalog) []string {
 	return ids
 }
 
+// OpenedSecretRealm is the realm a rotation tick opened, for the caller that
+// has to tell the world about it (v1.0.0-rc.22).
+//
+// The rotation used to answer with a count, and a count is not something the
+// bot can announce: the realm opened in SQLite, wrote its history row, and
+// no thread was ever created for it, so the one door the rotation exists to
+// open led to an event nobody could stand in. Everything a scene thread
+// needs is here, and nothing else.
+type OpenedSecretRealm struct {
+	EventKey    string
+	RealmID     string
+	Name        string
+	Description string
+	Location    string
+	EndsAt      float64
+	OpenHours   int64
+}
+
 // RotateSecretRealms opens the next realm in the rotation when the interval
-// has passed. It returns how many realms it opened this call (0 or 1). A
+// has passed. It returns the realm it opened, or nil when it opened none. A
 // realm already open skips its turn rather than extending; the rotation
 // still advances so the next tick tries the next one. The caller owns the
 // transaction.
-func RotateSecretRealms(conn *storage.Conn, catalog worlddata.Catalog, gm int64) (int64, error) {
+func RotateSecretRealms(conn *storage.Conn, catalog worlddata.Catalog, gm int64) (*OpenedSecretRealm, error) {
 	ids := secretRealmIDs(catalog)
 	if len(ids) == 0 || !tableExistsTx(conn, "world_events") {
-		return 0, nil
+		return nil, nil
 	}
 	state, err := readSecretRealmRotationTx(conn)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 	if state.LastGameMinute > 0 && gm-state.LastGameMinute < secretRealmRotationMinutes {
-		return 0, nil
+		return nil, nil
 	}
 	now := nowSeconds()
 	if _, err := conn.Execute(`UPDATE world_events SET active=0 WHERE active=1 AND ends_at<=?`, []any{now}); err != nil {
-		return 0, err
+		return nil, err
 	}
 	idx := state.Index % len(ids)
 	id := ids[idx]
@@ -84,22 +102,33 @@ func RotateSecretRealms(conn *storage.Conn, catalog worlddata.Catalog, gm int64)
 	dedupe := "secret_realm:" + id
 	existing, err := conn.Execute(`SELECT 1 FROM world_events WHERE dedupe_key=? AND active=1 AND ends_at>? LIMIT 1`, []any{dedupe, now})
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 	if len(existing.Rows) > 0 {
-		return 0, writeSecretRealmRotationTx(conn, state, now)
+		return nil, writeSecretRealmRotationTx(conn, state, now)
 	}
 	ends := now + float64(maxI64(1, realm.OpenHours))*3600
 	eventKey := fmt.Sprintf("secret_realm_rotation:%s:%d", id, gm)
 	payload, _ := json.Marshal(map[string]any{"definition_id": "rotation", "category": "Rotation", "realm_id": id})
 	if _, err := conn.Execute(`INSERT INTO world_events(event_key,dedupe_key,event_type,title,location,payload_json,active,starts_at,ends_at) VALUES(?,?,?,?,?,?,1,?,?) ON CONFLICT(event_key) DO UPDATE SET active=1,dedupe_key=excluded.dedupe_key,payload_json=excluded.payload_json,ends_at=excluded.ends_at`, []any{eventKey, dedupe, "secret_realm", realm.Name, realm.Location, string(payload), now, ends}); err != nil {
-		return 0, err
+		return nil, err
 	}
 	summary := fmt.Sprintf("%s has opened at %s. The entrance holds for about %d hours.", realm.Name, realm.Location, maxI64(1, realm.OpenHours))
 	if err := recordWorldHistoryTx(conn, "world_event:"+eventKey+":history", "secret_realm_opened", realm.Name+" opens", summary, 60, "public", realm.Location, "", "world", id, "World phenomenon", "location", realm.Location, realm.Location, nil, "", []string{"secret realm", "rotation", id}, gm, map[string]any{"realm_id": id, "open_hours": realm.OpenHours}, now); err != nil {
-		return 0, err
+		return nil, err
 	}
-	return 1, writeSecretRealmRotationTx(conn, state, now)
+	if err := writeSecretRealmRotationTx(conn, state, now); err != nil {
+		return nil, err
+	}
+	return &OpenedSecretRealm{
+		EventKey:    eventKey,
+		RealmID:     id,
+		Name:        realm.Name,
+		Description: realm.Description,
+		Location:    realm.Location,
+		EndsAt:      ends,
+		OpenHours:   maxI64(1, realm.OpenHours),
+	}, nil
 }
 
 // SecretRealmRotationView is what the dashboard and the rumours ask: which

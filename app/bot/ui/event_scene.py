@@ -11,6 +11,7 @@ nothing from main.py. Definition order is the order these had in main.py.
 """
 from __future__ import annotations
 
+import hashlib
 import time
 from typing import Any
 
@@ -18,7 +19,7 @@ import discord
 
 from ...ops.game_engine import GameEngineError
 from ..channels import _event_archive_minutes, _report_game_ui_error, _resolve_text_channel, event_channels
-from ..registry import EVENT_HANDLERS
+from ..registry import EVENT_HANDLERS, VIEW_RESTORERS
 from ..runtime import DB, ENGINE, SETTINGS, WORLD, _explain_engine_error, character_location_display, current_world_time, log, reply_long
 from ..services import COMBAT, SIM
 
@@ -39,6 +40,33 @@ EVENT_ACTION_RULES: dict[str, dict[str, Any]] = {
     "endure": {"label":"Endure", "emoji":"🗿", "attribute":"body", "tn":13, "contribution":2},
     "withdraw": {"label":"Withdraw", "emoji":"↩️", "attribute":"heart", "tn":0, "contribution":0},
 }
+
+
+# --------------------------------------------------------------------------
+# Surviving a restart (v1.0.0-rc.22)
+# --------------------------------------------------------------------------
+# A scene panel is a Discord message that outlives the process that sent it.
+# Until now its controls did not: the view carried a timeout and no custom_id,
+# so discord.py could only route a click to the in-memory instance that had
+# created it. Every reboot left the live event threads with dead buttons -
+# "This interaction failed" on a realm that was still open for six more hours.
+#
+# Persistence needs two things: no timeout, and a custom_id on every component
+# that is stable across processes and unique per event, so the view rebuilt at
+# startup is the one Discord's click reaches. The event key is what makes it
+# unique, and a digest of it is what keeps it inside Discord's 100-character
+# ceiling however long a key gets.
+
+def _event_custom_id(event_key: str, name: str) -> str:
+    """A stable component id for one event's panel.
+
+    Digested rather than spelled out because event keys are unbounded prose
+    ("secret_realm_rotation:hollow_throne_vault:44723" today, longer tomorrow)
+    and a custom_id is capped at 100 characters. The digest is of the key
+    alone, so the same event rebuilds the same ids on every boot.
+    """
+    digest = hashlib.blake2s(str(event_key or "").encode("utf-8"), digest_size=8).hexdigest()
+    return f"evt:{digest}:{name}"[:100]
 
 
 def _event_action_keys(category: str, event_type: str) -> tuple[str, ...]:
@@ -63,7 +91,10 @@ class EventActionSelect(discord.ui.Select):
         for key in _event_action_keys(owner.category, owner.event_type):
             rule=EVENT_ACTION_RULES[key]
             options.append(discord.SelectOption(label=rule["label"], value=key, emoji=rule["emoji"]))
-        super().__init__(placeholder="Take a stance on the event…", min_values=1, max_values=1, options=options, row=3)
+        super().__init__(
+            placeholder="Take a stance on the event…", min_values=1, max_values=1, options=options, row=3,
+            custom_id=_event_custom_id(owner.event_key, "stance"),
+        )
 
     async def callback(self, interaction: discord.Interaction) -> None:
         await self.owner.run_event_action(interaction, self.values[0])
@@ -95,7 +126,10 @@ class EventSiteSelect(discord.ui.Select):
             ))
         if not options:
             options=[discord.SelectOption(label="Nothing left here", value="__none__", emoji="✅")]
-        super().__init__(placeholder="Work the site — fight, harvest, or carry out a task…", min_values=1, max_values=1, options=options, row=0)
+        super().__init__(
+            placeholder="Work the site — fight, harvest, or carry out a task…", min_values=1, max_values=1,
+            options=options, row=0, custom_id=_event_custom_id(owner.event_key, "site"),
+        )
 
     async def callback(self, interaction: discord.Interaction) -> None:
         if self.values[0]=="__none__":
@@ -174,12 +208,23 @@ class EventSceneView(discord.ui.View):
         # has secret realms open for up to 12h. 172800 (48h) comfortably covers
         # today's longest realm with headroom for future content, while still
         # bounding the timer instead of leaving it unbounded.
-        remaining=max(300,min(172800,int(expires_at-time.time())))
-        super().__init__(timeout=remaining)
+        # No timeout (v1.0.0-rc.22). It used to be the event's remaining life,
+        # capped at 48h, which meant the controls died with the process that
+        # sent them: a reboot left every live scene with dead buttons. The
+        # closing time still governs play - _character_here refuses an event
+        # that has expired, and the expiry worker archives the thread - so
+        # nothing is lost by letting the view itself outlive the process.
+        super().__init__(timeout=None)
         self.title=str(title)[:160]; self.event_type=str(event_type or "event")[:80]
         self.expires_at=float(expires_at); self.location=str(location).strip()[:180] if location else None
         self.event_key=str(event_key or "")[:240]; self.category=str(category or "Event")[:80]
         self.severity=max(1,min(10,int(severity or 1)))
+        # The decorator gives each button a random custom_id, which is exactly
+        # what a persistent view cannot have. Stamped by label here, so the
+        # view rebuilt at startup answers the clicks of the one it replaces.
+        for item in self.children:
+            if isinstance(item, discord.ui.Button):
+                item.custom_id=_event_custom_id(self.event_key, str(item.label or "button").casefold().replace(" ", "_"))
         self.add_item(EventActionSelect(self))
 
     def embed(
@@ -726,10 +771,19 @@ async def spawn_system_event_thread(
     scene_channel = await _resolve_text_channel(guild, config.get("event_scene_channel_id"))
     if scene_channel is None:
         return None
+    # A realm the rotation brought round says so: it was not produced by the
+    # world's own upheaval, it is an entrance that came open on schedule.
+    realm = str(event_type) == "secret_realm"
+    intro = (
+        f"🌀 **SECRET REALM — {title}**\nThe rotation brought this entrance round; it holds until it closes."
+        if realm else
+        f"🌌 **AUTONOMOUS WORLD EVENT — {title}**\nThe living world produced this event without a player trigger."
+    )
     try:
-        scene_message = await scene_channel.send(f"🌌 **AUTONOMOUS WORLD EVENT — {title}**\nThe living world produced this event without a player trigger.")
+        scene_message = await scene_channel.send(intro)
         thread = await scene_message.create_thread(
-            name=(f"🌌 {title}")[:100], auto_archive_duration=_event_archive_minutes(), reason=f"Autonomous Xianxia event: {title}"
+            name=(f"{'🌀' if realm else '🌌'} {title}")[:100], auto_archive_duration=_event_archive_minutes(),
+            reason=f"Autonomous Xianxia event: {title}",
         )
     except (discord.Forbidden, discord.HTTPException):
         log.exception("Could not create autonomous event thread for %s", title); return None
@@ -759,3 +813,48 @@ async def spawn_system_event_thread(
     return thread
 
 
+async def restore_event_scene_views(bot: discord.Client) -> int:
+    """Re-register the panel of every scene that is still open (v1.0.0-rc.22).
+
+    Discord keeps the message; the process does not keep the view. Without
+    this, every reboot silently killed the controls of every live event - the
+    thread was still there, the realm was still open, and every button
+    answered "This interaction failed" until the event expired.
+
+    The panels are rebuilt from `event_threads` and the event's own row, which
+    is where the category, severity and entrance already live, so a restored
+    panel is the panel that was posted rather than a skeleton. One bad row
+    never costs the rest: a scene whose event has been deleted is skipped and
+    logged, not raised.
+
+    Returns how many were restored, for the startup log.
+    """
+    restored = 0
+    try:
+        rows = await DB.get_live_event_threads()
+    except Exception:
+        log.exception("Could not read the live event scenes to restore")
+        return 0
+    for row in rows:
+        event_key = str(row.get("event_key") or "")
+        if not event_key:
+            # A scene with no canonical key has no state to act on; its panel
+            # refuses every action anyway, so there is nothing to restore.
+            continue
+        try:
+            location = await _event_scene_location(event_key)
+            category, severity = await _event_scene_profile(event_key, str(row.get("event_type") or "event"))
+            view = EventSceneView(
+                title=str(row.get("title") or "Event"), event_type=str(row.get("event_type") or "event"),
+                expires_at=float(row.get("expires_at") or 0.0), location=location,
+                event_key=event_key, category=category, severity=severity,
+            )
+            bot.add_view(view, message_id=int(row.get("message_id") or 0) or None)
+        except Exception:
+            log.exception("Could not restore the event scene panel for %s", event_key)
+            continue
+        restored += 1
+    return restored
+
+
+VIEW_RESTORERS.register("event_scene", restore_event_scene_views)
