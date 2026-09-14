@@ -644,6 +644,12 @@ func spatialKeyActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID in
 	if ch == nil {
 		return authoritativeMutation{}, errors.New("character not found")
 	}
+	// The key opens its entrance where you are standing, and `secret_realm.enter`
+	// will only step through one at the realm's own entrance - so a key spent
+	// anywhere else was spent for nothing, silently. It is refused instead.
+	if fmt.Sprint(ch["location"]) != realm.Location {
+		return authoritativeMutation{}, fmt.Errorf("the token pulls toward %s; it opens nothing anywhere else", realm.Location)
+	}
 	r, e = conn.Execute(`SELECT quantity FROM inventory WHERE user_id=? AND item_id=?`, []any{userID, p.ItemID})
 	if e != nil {
 		return authoritativeMutation{}, e

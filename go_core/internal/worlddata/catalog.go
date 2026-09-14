@@ -140,9 +140,15 @@ type Item struct {
 	DoorEventChance  int64          `json:"door_event_chance"`
 	HunterRealmBonus int64          `json:"hunter_realm_bonus"`
 	StorageUpgrade   map[string]any `json:"storage_upgrade"`
-	ArrayDeploy      string         `json:"array_deploy"`
-	SpatialKey       map[string]any `json:"spatial_key"`
-	MarketExcluded   bool           `json:"market_excluded"`
+	// Flight (v1.0.0-rc.15) is the realm a rider effectively travels at while
+	// carrying this, which is how a cultivator who cannot yet fly gets off the
+	// road: the artifact does the flying. FlightName is what the reply calls
+	// it - a flying sword, a paper crane, a folded step.
+	Flight         int64          `json:"flight"`
+	FlightName     string         `json:"flight_name"`
+	ArrayDeploy    string         `json:"array_deploy"`
+	SpatialKey     map[string]any `json:"spatial_key"`
+	MarketExcluded bool           `json:"market_excluded"`
 }
 
 // MarketTradeable is the one rule for whether an item belongs in ordinary
@@ -383,6 +389,17 @@ type SecretRealm struct {
 	Rooms         []SecretRealmRoom `json:"rooms"`
 }
 
+// BirthFamilySendoff is what a household puts in a child's hands on the day
+// they leave it (v1.0.0-rc.15). Every archetype has one and no two share an
+// item: which flying artifact a family owns *is* the family - a tomb-watch
+// clan folds a burnt offering that will carry the living too, a weapon-smith's
+// child leaves on the blade they proved on the anvil, and a fallen clan has
+// only the cracked ancestral sword nobody would buy.
+type BirthFamilySendoff struct {
+	Item string `json:"item"`
+	Line string `json:"line"`
+}
+
 type Inheritance struct {
 	Name           string           `json:"name"`
 	Description    string           `json:"description"`
@@ -408,6 +425,12 @@ type NPCDefinition struct {
 	// Merchant (v0.34.1) names the catalog merchant this NPC is the face of,
 	// so the trader's relocation moves the NPC too.
 	Merchant string `json:"merchant"`
+	// Circuit (v1.0.0-rc.15) is the road a wandering hidden master walks, a
+	// stop at a time. Python resolves which stop from the canonical clock, so
+	// the engine reads this only to leave those NPCs alone: an NPC whose
+	// whereabouts are already decided by content must not also be walked by
+	// the civilization tick, or the two answers fight.
+	Circuit []string `json:"circuit"`
 }
 
 type ManualDefinition struct {
@@ -557,6 +580,7 @@ type Catalog struct {
 	EventSites          EventSites                     `json:"event_sites"`
 	SecretRealms        map[string]SecretRealm         `json:"secret_realms"`
 	Inheritances        map[string]Inheritance         `json:"inheritances"`
+	BirthFamilySendoff  map[string]BirthFamilySendoff  `json:"birth_family_sendoff"`
 	NPCs                map[string]NPCDefinition       `json:"npcs"`
 	TechniqueSystem     TechniqueSystemDefinition      `json:"technique_system"`
 	WorldRules          map[string]any                 `json:"world_rules"`

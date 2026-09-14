@@ -591,6 +591,33 @@ func recordAscensionHistory(conn *storage.Conn, userID int64, c mechanicsCharact
 	return err
 }
 
+// ascendToNewWorld carries a cultivator up.
+//
+// Ascension (飞升) is a tribulation-gated jump to the next plane, and until
+// now it was a jump that left you exactly where you were standing: the gate
+// was checked, the tribulation was cleared, the breakthrough landed, the
+// world-history row said "ascended to the Spiritual World" - and the
+// character was still in Greenriver Town, with a free `/realmhub go` the only
+// way to actually be there. The heavens did not take you anywhere.
+//
+// They do now: the crossing sets you down in the new world's capital, which
+// is the one place in it that is always known. Best-effort on the discovery
+// row - the capital is auto-known to anyone whose realm reaches it, so a
+// missing row costs nothing, and an ascension must not fail on one.
+func ascendToNewWorld(conn *storage.Conn, catalog worlddata.Catalog, userID int64, toWorld string, gameMinute int64, now float64) (string, error) {
+	hub := realmHubOf(catalog, toWorld)
+	if hub == "" {
+		return "", nil
+	}
+	if _, err := conn.Execute(`UPDATE characters SET location=?,updated_at=? WHERE user_id=?`, []any{hub, now, userID}); err != nil {
+		return "", err
+	}
+	_, _ = conn.Execute(
+		`INSERT OR IGNORE INTO character_location_discoveries(user_id,location,discovery_kind,discovered_game_minute,created_at) VALUES(?,?,'ascension',?,?)`,
+		[]any{userID, hub, gameMinute, now})
+	return hub, nil
+}
+
 func cultivationBreakthrough(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage, body bool) (authoritativeMutation, error) {
 	var p cultivationActionPayload
 	if err := json.Unmarshal(raw, &p); err != nil {
@@ -780,6 +807,14 @@ func cultivationBreakthrough(conn *storage.Conn, catalog worlddata.Catalog, user
 		if oldWorld != newWorld {
 			if err = recordAscensionHistory(conn, userID, c, body, oldWorld, newWorld, newRealm, realmName(realms, newRealm), p.GameMinute, now); err != nil {
 				return authoritativeMutation{}, err
+			}
+			arrived, err := ascendToNewWorld(conn, catalog, userID, newWorld, p.GameMinute, now)
+			if err != nil {
+				return authoritativeMutation{}, err
+			}
+			if arrived != "" {
+				result["ascended_from_location"] = c.Location
+				result["ascended_to_location"] = arrived
 			}
 		}
 	}

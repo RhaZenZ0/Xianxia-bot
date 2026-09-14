@@ -144,6 +144,23 @@ func currentWorld(c mechanicsCharacter, catalog worlddata.Catalog) string {
 	return "Mortal World"
 }
 
+// realmHubOf is the capital of a world - the one place in it that is always
+// known and always reachable. Map iteration is unordered, so a world with two
+// capitals would otherwise answer differently on different runs; the lowest
+// name wins, which is arbitrary but stable.
+func realmHubOf(catalog worlddata.Catalog, world string) string {
+	hub := ""
+	for name, loc := range catalog.Locations {
+		if loc.World != world || !loc.RealmHub {
+			continue
+		}
+		if hub == "" || name < hub {
+			hub = name
+		}
+	}
+	return hub
+}
+
 func worldMinRealm(catalog worlddata.Catalog, world string) int64 {
 	var best int64 = 1 << 62
 	for _, loc := range catalog.Locations {
@@ -171,6 +188,79 @@ type roadTravelProfile struct {
 	TravelMinutes   int64
 	DangerScore     int64
 	EncounterChance int64
+	Mode            string
+	Mount           string
+}
+
+// How a cultivator crosses ground, which in this genre is a question of realm
+// before it is a question of roads.
+//
+// Until now it was neither: every journey was a walk whose length came from
+// the terrain and was shortened by at most a third for realm, so an Ascension
+// Realm cultivator and a mortal porter crossed the same valley at broadly the
+// same speed, and a flying sword was a thing the setting had and the game did
+// not.
+//
+//   - Below Core Formation nobody leaves the ground unaided. They walk, unless
+//     they are carrying something that flies for them.
+//   - From Core Formation a cultivator flies - on a sword, by preference,
+//     because it carries you there and is still a sword when you arrive.
+//   - At the top of the mortal world and above, distance stops being crossed
+//     and starts being folded.
+//
+// A flying artifact sets the realm a rider *travels* at, which is the whole
+// point of one: it is how a Qi Refining disciple gets off the road at all.
+const (
+	travelFlightRealm = 3 // Core Formation
+	travelFoldRealm   = 7 // Ascension Realm
+)
+
+type travelMode struct {
+	Name       string
+	Divisor    int64
+	DangerDrop int64
+}
+
+func travelModeFor(effectiveRealm int64) travelMode {
+	switch {
+	case effectiveRealm >= travelFoldRealm:
+		return travelMode{Name: "folding space", Divisor: 8, DangerDrop: 25}
+	case effectiveRealm >= travelFlightRealm:
+		return travelMode{Name: "flying", Divisor: 3, DangerDrop: 10}
+	default:
+		return travelMode{Name: "on foot", Divisor: 1}
+	}
+}
+
+// bestFlightArtifact is the fastest thing a cultivator has that flies, as the
+// realm it carries them at and the words for it. Nothing to hand, or nothing
+// better than they already are, and they travel as themselves.
+//
+// It looks in two places, and the second is not an optimisation. A flying
+// sword is a weapon as well as a mount, and `equipment.bind` *removes* the
+// item from the inventory to make it an equipment instance - so a sword read
+// only off `inventory` would stop flying the moment its owner bound it, which
+// is precisely backwards: binding it is what makes it theirs. A broken one
+// carries nobody.
+func bestFlightArtifact(conn *storage.Conn, catalog worlddata.Catalog, userID int64) (int64, string, error) {
+	res, err := conn.Execute(`SELECT item_id FROM inventory WHERE user_id=? AND quantity>0
+        UNION SELECT item_id FROM equipment_instances WHERE user_id=? AND durability>0`,
+		[]any{userID, userID})
+	if err != nil {
+		return 0, "", err
+	}
+	best, name := int64(0), ""
+	for _, row := range res.Rows {
+		item, ok := catalog.Items[fmt.Sprint(row[0])]
+		if !ok || item.Flight <= best {
+			continue
+		}
+		best, name = item.Flight, item.FlightName
+		if name == "" {
+			name = item.Name
+		}
+	}
+	return best, name, nil
 }
 
 var roadEncounterIntn = gamerng.Intn
@@ -252,6 +342,13 @@ func roadWorldDangerBonus(world string) int64 {
 }
 
 func canonicalRoadTravelProfile(origin, destination worlddata.LocationDefinition, realmIndex int64) roadTravelProfile {
+	return canonicalRoadTravelProfileRiding(origin, destination, realmIndex, realmIndex, "")
+}
+
+// canonicalRoadTravelProfileRiding is the profile for a cultivator who may be
+// carrying something that flies: `ridingRealm` is the realm they cross ground
+// at, which is their own unless an artifact is doing the flying.
+func canonicalRoadTravelProfileRiding(origin, destination worlddata.LocationDefinition, realmIndex, ridingRealm int64, mount string) roadTravelProfile {
 	travel := (roadTerrainTravelMinutes(origin.Terrain)+roadTerrainTravelMinutes(destination.Terrain))/2 +
 		roadWorldTravelBonus(origin.World)
 	speedReduction := realmIndex * 2
@@ -259,8 +356,22 @@ func canonicalRoadTravelProfile(origin, destination worlddata.LocationDefinition
 		speedReduction = travel / 3
 	}
 	travel -= speedReduction
-	if travel < 30 {
-		travel = 30
+	mode := travelModeFor(ridingRealm)
+	if mode.Divisor > 1 {
+		travel /= mode.Divisor
+	}
+	// The floor scales with the mode: folding space must not bottom out at the
+	// same half hour a mountain footpath does, or the fastest travel in the
+	// setting would be indistinguishable from the slowest on a short leg.
+	floor := int64(30)
+	if mode.Divisor > 1 {
+		floor = 30 / mode.Divisor
+		if floor < 5 {
+			floor = 5
+		}
+	}
+	if travel < floor {
+		travel = floor
 	}
 
 	danger := (roadTerrainDanger(origin.Terrain)+roadTerrainDanger(destination.Terrain))/2 +
@@ -272,13 +383,19 @@ func canonicalRoadTravelProfile(origin, destination worlddata.LocationDefinition
 	if danger < 5 {
 		danger = 5
 	}
+	danger -= mode.DangerDrop
 	if danger > 45 {
 		danger = 45
+	}
+	if danger < 5 {
+		danger = 5
 	}
 	return roadTravelProfile{
 		TravelMinutes:   travel,
 		DangerScore:     danger,
 		EncounterChance: danger,
+		Mode:            mode.Name,
+		Mount:           mount,
 	}
 }
 
@@ -306,6 +423,13 @@ func roadLegCost(profile roadTravelProfile) int64 {
 }
 
 func canonicalRoadRoute(catalog worlddata.Catalog, origin, destination string, realmIndex int64) (roadRoutePlan, bool) {
+	return canonicalRoadRouteRiding(catalog, origin, destination, realmIndex, realmIndex, "")
+}
+
+// canonicalRoadRouteRiding plans the same route for a traveller who may be
+// carrying something that flies. Only the caller that has looked in their bags
+// can know that, so it passes the realm they actually cross ground at.
+func canonicalRoadRouteRiding(catalog worlddata.Catalog, origin, destination string, realmIndex, ridingRealm int64, mount string) (roadRoutePlan, bool) {
 	if origin == destination {
 		return roadRoutePlan{}, false
 	}
@@ -355,7 +479,7 @@ func canonicalRoadRoute(catalog worlddata.Catalog, origin, destination string, r
 			if !unvisited[neighbor] {
 				continue
 			}
-			profile := canonicalRoadTravelProfile(from, catalog.Locations[neighbor], realmIndex)
+			profile := canonicalRoadTravelProfileRiding(from, catalog.Locations[neighbor], realmIndex, ridingRealm, mount)
 			alt := best + profile.TravelMinutes
 			if alt < dist[neighbor] {
 				dist[neighbor] = alt
@@ -382,7 +506,7 @@ func canonicalRoadRoute(catalog worlddata.Catalog, origin, destination string, r
 	plan := roadRoutePlan{Nodes: nodes}
 	for i := 0; i+1 < len(nodes); i++ {
 		from, to := catalog.Locations[nodes[i]], catalog.Locations[nodes[i+1]]
-		profile := canonicalRoadTravelProfile(from, to, realmIndex)
+		profile := canonicalRoadTravelProfileRiding(from, to, realmIndex, ridingRealm, mount)
 		cost := roadLegCost(profile)
 		plan.Legs = append(plan.Legs, roadRouteLeg{From: nodes[i], To: nodes[i+1], Profile: profile, Cost: cost})
 		plan.TravelMinutes += profile.TravelMinutes
@@ -699,7 +823,7 @@ func knownLocationsTx(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 	}
 	if c.Location != "" && !strings.HasPrefix(c.Location, "abode:") && !strings.HasPrefix(c.Location, "personal_world:") {
 		known[c.Location] = true
-		for _, neighbor := range canonicalRoadNeighbors(catalog, c.Location, c.RealmIndex) {
+		for _, neighbor := range canonicalRoadNeighbors(catalog, c.Location, c.accessRealmIndex()) {
 			known[neighbor] = true
 		}
 		// Inside a shop, an auction hall, a gate or a district (v0.35.0,
@@ -708,7 +832,7 @@ func knownLocationsTx(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 		city := cityOf(catalog, c.Location)
 		if city != c.Location {
 			known[city] = true
-			for _, neighbor := range canonicalRoadNeighbors(catalog, city, c.RealmIndex) {
+			for _, neighbor := range canonicalRoadNeighbors(catalog, city, c.accessRealmIndex()) {
 				known[neighbor] = true
 			}
 		}
@@ -725,7 +849,7 @@ func knownLocationsTx(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 		}
 	}
 	for name, loc := range catalog.Locations {
-		if loc.RealmHub && c.RealmIndex >= worldMinRealm(catalog, loc.World) {
+		if loc.RealmHub && c.accessRealmIndex() >= worldMinRealm(catalog, loc.World) {
 			known[name] = true
 		}
 	}
@@ -767,18 +891,18 @@ func discoverNextLocationTx(conn *storage.Conn, catalog worlddata.Catalog, userI
 	// per knownLocationsTx), so this never stalls exploration - it just
 	// makes discovery follow the road network outward ring by ring instead
 	// of jumping anywhere at once.
-	frontier := roadFrontierTx(catalog, known, c.RealmIndex)
+	frontier := roadFrontierTx(catalog, known, c.accessRealmIndex())
 	candidates := []string{}
 	for name := range frontier {
 		loc, ok := catalog.Locations[name]
-		if !ok || known[name] || loc.World != world || loc.MinRealmIndex > c.RealmIndex || loc.Private || strings.HasPrefix(name, "abode:") || strings.HasPrefix(name, "personal_world:") {
+		if !ok || known[name] || loc.World != world || loc.MinRealmIndex > c.accessRealmIndex() || loc.Private || strings.HasPrefix(name, "abode:") || strings.HasPrefix(name, "personal_world:") {
 			continue
 		}
 		candidates = append(candidates, name)
 	}
 	// The sites on the roads out of a known city (v0.39.0) are found the
 	// same way as the next city along.
-	candidates = append(candidates, roadSiteCandidates(catalog, known, world, c.RealmIndex)...)
+	candidates = append(candidates, roadSiteCandidates(catalog, known, world, c.accessRealmIndex())...)
 	if len(candidates) == 0 {
 		return "", nil
 	}
@@ -1340,7 +1464,7 @@ func explorationTravelAction(conn *storage.Conn, catalog worlddata.Catalog, user
 	} else if dest.District != "" && originCity != dest.OutsideLocation {
 		return authoritativeMutation{}, fmt.Errorf("%s is in %s; travel there first", p.Destination, dest.OutsideLocation)
 	}
-	if c.RealmIndex < dest.MinRealmIndex {
+	if c.accessRealmIndex() < dest.MinRealmIndex {
 		return authoritativeMutation{}, errors.New("destination lies beyond the character's current cultivation")
 	}
 
@@ -1352,7 +1476,7 @@ func explorationTravelAction(conn *storage.Conn, catalog worlddata.Catalog, user
 		if !dest.RealmHub {
 			return authoritativeMutation{}, errors.New("destination is not a realm capital")
 		}
-		if c.RealmIndex < worldMinRealm(catalog, dest.World) {
+		if c.accessRealmIndex() < worldMinRealm(catalog, dest.World) {
 			return authoritativeMutation{}, errors.New("realm capital is not yet unlocked")
 		}
 	} else {
@@ -1373,6 +1497,10 @@ func explorationTravelAction(conn *storage.Conn, catalog worlddata.Catalog, user
 	dangerScore := int64(0)
 	encounterChance := int64(0)
 	roadConnection := false
+	// How they crossed it, and what carried them if anything did. Read off
+	// the plan rather than recomputed, so the words can never disagree with
+	// the minutes they were charged.
+	travelModeName, travelMount := travelModeFor(c.accessRealmIndex()).Name, ""
 
 	// A road-side site (v0.39.0) is half a leg from either end of its road
 	// and from the other sites on it; from a site the road leads nowhere
@@ -1384,7 +1512,7 @@ func explorationTravelAction(conn *storage.Conn, catalog worlddata.Catalog, user
 	if mode != "hub" {
 		plan, found := roadRoutePlan{}, false
 		if siteHop {
-			plan, found = roadSiteHop(catalog, originCity, p.Destination, c.RealmIndex)
+			plan, found = roadSiteHop(catalog, originCity, p.Destination, c.accessRealmIndex())
 			if !found {
 				if cur.RoadSite != "" {
 					a, b, _ := roadSiteEndpoints(catalog, c.Location)
@@ -1393,13 +1521,28 @@ func explorationTravelAction(conn *storage.Conn, catalog worlddata.Catalog, user
 				return authoritativeMutation{}, fmt.Errorf("%s lies on the road between %s and %s; travel to either first", p.Destination, dest.RoadLeg[0], dest.RoadLeg[1])
 			}
 		} else {
-			plan, found = canonicalRoadRoute(catalog, originCity, p.Destination, c.RealmIndex)
+			// What is in their bags decides how they cross the ground.
+			flight, mount, ferr := bestFlightArtifact(conn, catalog, userID)
+			if ferr != nil {
+				return authoritativeMutation{}, ferr
+			}
+			riding := c.accessRealmIndex()
+			if flight > riding {
+				riding = flight
+			} else {
+				mount = ""
+			}
+			plan, found = canonicalRoadRouteRiding(catalog, originCity, p.Destination, c.accessRealmIndex(), riding, mount)
 		}
 		if found {
 			roadConnection = true
 			route = plan.Nodes
 			travelCost = plan.Cost
 			dangerScore = plan.MaxDanger
+			if len(plan.Legs) > 0 {
+				travelModeName = plan.Legs[0].Profile.Mode
+				travelMount = plan.Legs[0].Profile.Mount
+			}
 			if err := chargeRoadTravelTx(conn, userID, travelCost, now); err != nil {
 				return authoritativeMutation{}, err
 			}
@@ -1509,6 +1652,8 @@ func explorationTravelAction(conn *storage.Conn, catalog worlddata.Catalog, user
 		"departure_game_minute":         p.GameMinute,
 		"arrival_game_minute":           arrivalGameMinute,
 		"travel_minutes":                travelMinutes,
+		"travel_mode":                   travelModeName,
+		"travel_mount":                  travelMount,
 		"travel_cost_spirit_stones":     travelCost,
 		"road_danger":                   dangerScore,
 		"road_encounter_chance_percent": encounterChance,

@@ -1055,6 +1055,13 @@ func reincarnateAction(conn *storage.Conn, catalog worlddata.Catalog, userID int
 			return authoritativeMutation{}, err
 		}
 	}
+	// A new life is born into a new household, and that household sends its
+	// own child out with its own heirloom (v1.0.0-rc.15). The guard is keyed
+	// on the family, so the previous incarnation's does not block this one.
+	sendoff, err := grantBirthFamilySendoffTx(conn, catalog, userID, familyID, firstNonempty(family.ID, family.Archetype), p.GameMinute, now)
+	if err != nil {
+		return authoritativeMutation{}, err
+	}
 	_, err = conn.Execute(`INSERT INTO currency_wallets(user_id,currency_id,balance) VALUES(?,?,25)`, []any{userID, currency})
 	if err != nil {
 		return authoritativeMutation{}, err
@@ -1075,6 +1082,9 @@ func reincarnateAction(conn *storage.Conn, catalog worlddata.Catalog, userID int
 		"memory_retention": memory, "talent_retention": mergedTalent, "partner_echo": i64(s[19]), "partner_name": fmt.Sprint(s[20]),
 		"comprehension_retention": mergedLaw, "insight_retention": mergedInsight, "legacy_points": totalLegacy,
 		"special_trait": trait, "incarnation_count": incarnation, "natural_lifespan_years": natural, "aptitudes": apt,
+	}
+	if sendoff != nil {
+		out["family_sendoff"] = sendoff
 	}
 	b, _ := json.Marshal(out)
 	_, _ = conn.Execute(`INSERT INTO event_log(user_id,event_type,payload_json,created_at) VALUES(?,?,?,?)`, []any{userID, "reincarnation", string(b), now})

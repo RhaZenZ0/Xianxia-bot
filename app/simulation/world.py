@@ -28,6 +28,7 @@ SIMULATION_SYSTEMS: tuple[str, ...] = (
     "sect_politics",
     "clan_dynamics",
     "autonomous_world_events",
+    "npc_consignments",
 )
 
 

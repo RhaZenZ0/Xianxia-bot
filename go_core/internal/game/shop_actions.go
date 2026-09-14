@@ -392,6 +392,16 @@ func shopSellAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64,
 		return authoritativeMutation{}, fmt.Errorf("%s does not buy %s", shop.Name, itemDisplayName(catalog, p.ItemID))
 	}
 	unit := max64(1, price)
+	// What the keeper is willing to pay depends on what they are being
+	// handed. A copy fetches a copy's price, which is what makes an
+	// appraisal worth paying for before you buy off a broker.
+	authenticity, known, err := itemAuthenticityTx(conn, userID, p.ItemID)
+	if err != nil {
+		return authoritativeMutation{}, err
+	}
+	if known {
+		unit = authenticityPrice(unit, authenticity)
+	}
 	missing, err := consumeInventoryTx(conn, userID, map[string]int64{p.ItemID: p.Quantity})
 	if err != nil {
 		return authoritativeMutation{}, err

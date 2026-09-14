@@ -203,7 +203,7 @@ func simulateBirthFamilyGo(conn *storage.Conn, userID int64, raw json.RawMessage
 	out := map[string]any{"family_id": familyID, "years_advanced": years, "wealth": wealth, "influence": influence, "stability": stability, "tier": tier, "bloodline_purity": purity, "branch_count": branches, "retainer_count": retainers, "last_simulated_game_minute": anchor, "history": history}
 	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "family", EventType: "family.simulate", EntityType: "birth_family", EntityID: fmt.Sprint(familyID), GameMinute: p.GameMinute, Payload: out}}, nil
 }
-func familySupportActionGo(conn *storage.Conn, _ worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
+func familySupportActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	var p familySupportPayload
 	if e := json.Unmarshal(raw, &p); e != nil {
 		return authoritativeMutation{}, e
@@ -292,6 +292,22 @@ func familySupportActionGo(conn *storage.Conn, _ worlddata.Catalog, userID int64
 		if tier >= 3 {
 			items["heart_calming_pill"] = 1
 		}
+	case "nether_market_house":
+		// A house of brokers pays in coin and in what the night market has
+		// most of. Both ghost households had no case at all and fell through
+		// to the plain default below, so the two families that deal in
+		// funeral goods handed over one ordinary recovery pill.
+		stones = 11 + tier*5 + wealth/11
+		items = map[string]int64{"spirit_herb": 1}
+		if tier >= 3 {
+			items["talisman_paper"] = 2
+		}
+	case "tomb_watch_clan":
+		stones = 5 + tier*3 + wealth/22
+		items = map[string]int64{"recovery_pill": 1, "talisman_paper": 2}
+		if tier >= 3 {
+			items["heart_calming_pill"] = 1
+		}
 	default:
 		stones = 6 + tier*4 + wealth/20
 		items = map[string]int64{"recovery_pill": 1}
@@ -338,7 +354,19 @@ func familySupportActionGo(conn *storage.Conn, _ worlddata.Catalog, userID int64
 			}
 		}
 	}
+	// The send-off (v1.0.0-rc.15). A character created before the household
+	// started sending its children out with something never got theirs at
+	// creation, so the first time they come home and ask, they are given it.
+	// `grantBirthFamilySendoffTx` is once per household, so this is silent
+	// for everyone who already has one.
+	sendoff, e := grantBirthFamilySendoffTx(conn, catalog, userID, fid, arch, p.GameMinute, now)
+	if e != nil {
+		return authoritativeMutation{}, e
+	}
 	out := map[string]any{"stones": stones, "items": items, "family_name": fmt.Sprint(f["family_name"]), "cost": cost, "clan_support_bonus": clanBonus, "active_branches": branches, "loyal_retainers": retainers, "helpful_relations": relations}
+	if sendoff != nil {
+		out["family_sendoff"] = sendoff
+	}
 	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "family", EventType: "family.support", EntityType: "birth_family", EntityID: fmt.Sprint(fid), GameMinute: p.GameMinute, Payload: out}}, nil
 }
 func inheritedChildRootGo(parentRoot string, roots []string, familyTier, karmaScore, bloodlinePurity int64) (string, error) {

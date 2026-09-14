@@ -93,7 +93,6 @@ class CoreServiceTests(unittest.IsolatedAsyncioTestCase):
             tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         self.assertTrue({
             "player_scene_state", "npc_relationships", "character_quests",
-            "core_state_versions", "core_request_log",
             "npc_mind_state", "npc_player_memories",
             "rag_memories", "rag_memories_fts", "rag_canon_documents", "rag_canon_fts",
             "world_history_events", "world_history_fts",

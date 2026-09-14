@@ -26,6 +26,7 @@ import discord
 from discord import app_commands
 
 from ..rules.realm_hubs import REALM_HUBS
+from ..rules.sense import circuit_stop
 from .runtime import DB, WORLD, current_world_time, log
 from .services import SIM
 
@@ -35,6 +36,22 @@ async def current_npc_location(npc_name: str, period: str | None = None) -> str 
     Daily world.json schedules still shape an NPC's routine while they remain in
     their home region, but there is no legacy no-simulation fallback anymore.
     """
+    # A hidden master who walks the road is wherever their circuit puts them
+    # this month, and that answer outranks both the daily schedule and the
+    # civilization simulation: these are recluses crossing the world on their
+    # own business, not townsfolk on a routine. It is a pure function of the
+    # canonical clock, so nothing has to tick to move them.
+    walking = WORLD.npcs.get(npc_name, {}).get("circuit")
+    if walking:
+        wt = await current_world_time()
+        stop = circuit_stop(
+            walking, int(getattr(wt, "total_minutes", 0)),
+            months=int(WORLD.npcs[npc_name].get("circuit_months", 2) or 2),
+            offset=int(WORLD.npcs[npc_name].get("circuit_offset", 0) or 0),
+        )
+        if stop:
+            return stop
+
     sim_state = await SIM.npc_status(npc_name)
     if period is None:
         period = (await current_world_time()).period
@@ -62,8 +79,21 @@ def _world_min_realm_index(world_name: str) -> int:
     return min(candidates) if candidates else 0
 
 
+def access_realm_index(character: dict[str, Any]) -> int:
+    """The cultivation a *place* is measured against.
+
+    The world-crossing tribulation is gated on either ladder - a body
+    cultivator clears the Mortal Body Ascension and breaks into the Spiritual
+    World's body realm exactly as a qi cultivator clears theirs - but every
+    location check read `realm_index` alone, so a body cultivator could
+    ascend into a world and then be locked out of it. Mirrors the engine's
+    `mechanicsCharacter.accessRealmIndex`.
+    """
+    return max(int(character.get("realm_index", 0) or 0), int(character.get("body_realm_index", 0) or 0))
+
+
 def _world_is_unlocked(character: dict[str, Any], world_name: str) -> bool:
-    return int(character.get("realm_index", 0)) >= _world_min_realm_index(str(world_name))
+    return access_realm_index(character) >= _world_min_realm_index(str(world_name))
 
 
 async def _known_locations(user_id: int, character: dict[str, Any]) -> set[str]:
@@ -96,7 +126,7 @@ async def _known_locations(user_id: int, character: dict[str, Any]) -> set[str]:
             neighbor_data = WORLD.locations.get(neighbor_name) or {}
             if not neighbor_data or bool(neighbor_data.get("private", False)):
                 continue
-            if int(character.get("realm_index", 0)) < int(neighbor_data.get("min_realm_index", 0)):
+            if access_realm_index(character) < int(neighbor_data.get("min_realm_index", 0)):
                 continue
             if str(neighbor_data.get("world") or "") != str(current_data.get("world") or ""):
                 continue
@@ -113,7 +143,7 @@ async def _location_is_visible(user_id: int, character: dict[str, Any], location
     data = WORLD.locations.get(str(location)) or await DB.get_location_definition(str(location))
     if not data:
         return False
-    if not _world_is_unlocked(character, str(data.get("world") or WORLD.realm_world(int(character.get("realm_index", 0))))):
+    if not _world_is_unlocked(character, str(data.get("world") or WORLD.realm_world(access_realm_index(character)))):
         return False
     return str(location) in await _known_locations(user_id, character)
 

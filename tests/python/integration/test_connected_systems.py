@@ -70,8 +70,15 @@ class ConnectedSystemsTests(unittest.IsolatedAsyncioTestCase):
             loc = world.locations[hub["location"]]
             self.assertTrue(loc.get("realm_hub"))
             self.assertGreaterEqual(len(loc.get("encounters", [])), 5)
-        formation_recipes = [r for r in world.recipes.values() if r.get("profession") == "Formation"]
-        self.assertGreaterEqual(len(formation_recipes), 5)
+        # v1.0.0-rc.15: the two arts are separate. Inscription had been one of
+        # the eight professions with no recipe of its own, while every talisman
+        # was filed under Formation; the array disks stayed with the arrays and
+        # the talismans went to the inscribers.
+        by_profession = {}
+        for recipe in world.recipes.values():
+            by_profession.setdefault(recipe.get("profession"), []).append(recipe)
+        self.assertGreaterEqual(len(by_profession.get("Formation", [])), 2)
+        self.assertGreaterEqual(len(by_profession.get("Inscription", [])), 5)
         self.assertIn("minor_qi_gathering_array_disk", world.items)
         self.assertIn("swift_wind_talisman", world.items)
 

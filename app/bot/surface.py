@@ -150,7 +150,7 @@ _MIGRATED_ROOTS = {
     "body", "bond", "boss", "bounty", "breakthrough", "caravan",
     "city", "civilization", "conceal", "condition", "craft", "crime", "cultivate",
     "dantian", "daoheart", "duel", "effects", "equipment", "era", "explore", "family",
-    "formation", "gender", "ghost", "grudges", "hunt", "hunter", "inheritances", "fate",
+    "formation", "ghost", "grudges", "hunt", "hunter", "inheritances", "fate",
     "innerworld", "inventory", "karma", "law", "lifespan", "manual", "market", "merchant", "shop", "trade", "blackmarket",
     "meridian", "npcinfo", "party", "perfect", "profession", "provenance", "reincarnate",
     "reputation", "rulers", "scene", "seclusion", "secretrealm", "sect", "sense",
@@ -198,8 +198,8 @@ _HUB_DEFINITIONS = (
             # number, they open the sheet - so the reads that describe who you
             # are now arrive together, and the pages that remain are the ones
             # a player actually navigates to.
-            _hub_page("sheet", "Overview", "Who you are now: the sheet, your age and longevity, karma, Dao heart, standing, inheritances, soul legacy and how the realms address you.",
-                      "lifespan", "karma", "daoheart", "reputation", "inheritances", "soul", "gender"),
+            _hub_page("sheet", "Overview", "Who you are now: the sheet, your age and longevity, karma, Dao heart, standing, inheritances and soul legacy.",
+                      "lifespan", "karma", "daoheart", "reputation", "inheritances", "soul"),
             # One page for "something is wrong with me". It was three - generic
             # effects, special/Law/curse/domain effects, and persistent
             # conditions - and curses were named by two of the three, so a
@@ -339,10 +339,10 @@ _HUB_DEFINITIONS = (
     HubDefinition(
         name="craft",
         title="🛠 Craft Hub",
-        description="Craft alchemy, forging and inscription recipes; deploy shared location arrays through Items → Use Item.",
+        description="Craft alchemy, forging, formation and talisman-inscription recipes; deploy shared location arrays through Items → Use Item.",
         pages=(
             _hub_page("alchemy", "Alchemy", "Refine pills, forage simulated herb resources, track toxicity and purge medicinal residue."),
-            _hub_page("craft", "General Crafting", "Practice alchemy, forging or Formation inscription from known recipes."),
+            _hub_page("craft", "General Crafting", "Practice alchemy, forging, formation or talisman inscription from known recipes."),
             _hub_page("profession", "Profession", "View crafting and support-profession mastery."),
         ),
     ),
@@ -382,6 +382,10 @@ _HUB_DEFINITIONS = (
             _hub_page("family", "Family", "The household you belong to now: enter and leave it, ask it for support, and see the clan, its branches and your descendants.",
                       only=("family view", "family enter", "family leave", "family support",
                             "family clan", "family descendants", "family child")),
+            _hub_page("family", "House", "The cultivation house you found with other players, as distinct from the household you were born into: its seat order, its invitations and its children.",
+                      key="family_house",
+                      only=("family house status", "family house found", "family house invite",
+                            "family house respond", "family house leave", "family house child")),
             _hub_page("family", "Legacy", "What the family was and what it leaves you: its history and ancestry, ancestral sites, investigations, inheritance claims and their conflicts.",
                       key="family_legacy",
                       only=("family history", "family ancestry", "family legacy",

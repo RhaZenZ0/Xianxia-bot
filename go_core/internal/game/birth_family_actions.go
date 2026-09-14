@@ -12,6 +12,7 @@ import (
 	"xianxia/core/internal/eventledger"
 	"xianxia/core/internal/gamerng"
 	"xianxia/core/internal/storage"
+	"xianxia/core/internal/worlddata"
 )
 
 type birthFamilyArchetype struct {
@@ -93,6 +94,51 @@ var birthFamilyArchetypes = []birthFamilyArchetype{
 	// child who can walk the ghost path; nobody else may take it.
 	{"nether_market_house", "ghost", "Nether-Market Household", 55, 30, 44, 2, -5, "Moonfen City", "Funeral rites, spirit money, corpse-brokerage, incense that carries and buyers no ledger names.", "Watched by the magistrate, hated by orthodox sects and owed favours by things that do not stay buried."},
 	{"tomb_watch_clan", "ghost", "Tomb-Watch Clan", 31, 39, 58, 2, -2, "Ashenwall City", "A necropolis to keep, grave-lore passed down, wards against what wakes and death qi thick enough to breathe.", "Grave-robbers, restless occupants, a duty that cannot be set down and neighbours who cross the road."},
+}
+
+// grantBirthFamilySendoffTx hands over the flying artifact the household sends
+// a child out of the door with (v1.0.0-rc.15).
+//
+// Before this, every one of the thirteen households gave a new cultivator the
+// same two spirit herbs and one spirit iron, so the hand-tuned Wealth beside
+// each of them - 26 for a ruined clan, 82 for an imperial one - bought a child
+// exactly nothing on the way out. Which artifact a family owns is now the
+// family: the roster is content (`birth_family_sendoff` in world.json), no two
+// households hand out the same object, and the two wealthiest send something
+// that is still carrying its rider at Core Formation.
+//
+// It is granted once per household, guarded on `item_provenance` rather than a
+// new column - and keyed on the *family* rather than the user, which is what
+// makes samsara work: a new life is a new household row, so it earns that
+// household's heirloom, while asking the same household twice gets nothing.
+func grantBirthFamilySendoffTx(conn *storage.Conn, catalog worlddata.Catalog, userID, familyID int64, archetype string, gameMinute int64, now float64) (map[string]any, error) {
+	sendoff, ok := catalog.BirthFamilySendoff[archetype]
+	if !ok || strings.TrimSpace(sendoff.Item) == "" {
+		return nil, nil
+	}
+	item, ok := catalog.Items[sendoff.Item]
+	if !ok {
+		return nil, nil
+	}
+	already, err := boolRow(conn,
+		`SELECT 1 FROM item_provenance WHERE user_id=? AND source_type='birth_family_sendoff' AND source_key=?`,
+		[]any{userID, fmt.Sprint(familyID)})
+	if err != nil || already {
+		return nil, err
+	}
+	if _, err = conn.Execute(
+		`INSERT INTO inventory(user_id,item_id,quantity) VALUES(?,?,1) ON CONFLICT(user_id,item_id) DO UPDATE SET quantity=quantity+1`,
+		[]any{userID, sendoff.Item}); err != nil {
+		return nil, err
+	}
+	if _, err = conn.Execute(`INSERT INTO item_provenance(user_id,item_id,quantity,source_type,source_key,ownership_mark,legal_status,authenticity,tracking_strength,acquired_game_minute,created_at,updated_at) VALUES(?,?,1,'birth_family_sendoff',?,?,'clean',100,0,?,?,?)`,
+		[]any{userID, sendoff.Item, fmt.Sprint(familyID), "sent out by the household", maxI64(0, gameMinute), now, now}); err != nil {
+		return nil, err
+	}
+	return map[string]any{
+		"item_id": sendoff.Item, "name": item.Name, "flight": item.Flight,
+		"flight_name": item.FlightName, "line": sendoff.Line,
+	}, nil
 }
 
 type birthFamilyHomelandProfile struct {
