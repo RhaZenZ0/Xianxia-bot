@@ -143,7 +143,7 @@ internal/server/        HTTP control/data plane
 ```
 
 Every Go SQLite connection uses `journal_mode=WAL`, `foreign_keys=ON`, `busy_timeout=10000`,
-`synchronous=NORMAL`. Current schema version is 47; historical migrations are kept so old databases
+`synchronous=NORMAL`. Current schema version is 48; historical migrations are kept so old databases
 can upgrade in place — see `VERSIONS.md` for the full schema/release history.
 
 ### The NPC life cycle (v1.0.0-rc.23)

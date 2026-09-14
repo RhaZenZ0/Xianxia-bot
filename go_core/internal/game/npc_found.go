@@ -55,7 +55,10 @@ func npcFound(conn *storage.Conn, userID int64, raw json.RawMessage) (any, error
 	status := strings.TrimSpace(fmt.Sprint(row[2]))
 	since := storage.ParseInt(row[3])
 	if status != "missing" {
-		return map[string]any{"found": false, "was_missing": false}, nil
+		// Not missing, but possibly buried. A search that arrives too late
+		// still arrives: the grave is the answer, and it is one that can be
+		// carried back.
+		return claimGraveResult(conn, userID, name, p.Location, p.GameMinute)
 	}
 	if !strings.EqualFold(current, strings.TrimSpace(p.Location)) {
 		// Somebody looking in the wrong place learns nothing, and the world
@@ -97,3 +100,81 @@ func npcFound(conn *storage.Conn, userID int64, raw json.RawMessage) (any, error
 // A player closing a disappearance is worth more than the world noticing one
 // resolved itself, and less than the disappearance was.
 const foundBySearchSignificance = 68
+
+// claimGraveResult is the other ending of a search. It grants what the dead were
+// carrying - their own purse and one thing off their trade, both recorded when
+// the grave was dug rather than invented now - and marks the grave visited, so
+// the answer is carried back by the first person to reach it and not by
+// everybody afterwards.
+func claimGraveResult(conn *storage.Conn, userID int64, name, location string, gameMinute int64) (any, error) {
+	miss := map[string]any{"found": false, "was_missing": false}
+	if !tableExistsTx(conn, "npc_graves") {
+		return miss, nil
+	}
+	res, err := conn.Execute(`SELECT location,home_location,days_missing,keepsake_item,keepsake_stones,claimed_by_user_id
+        FROM npc_graves WHERE npc_name=?`, []any{name})
+	if err != nil {
+		return nil, err
+	}
+	if len(res.Rows) == 0 {
+		return miss, nil
+	}
+	row := res.Rows[0]
+	where := strings.TrimSpace(fmt.Sprint(row[0]))
+	home := strings.TrimSpace(fmt.Sprint(row[1]))
+	days := storage.ParseInt(row[2])
+	item := strings.TrimSpace(fmt.Sprint(row[3]))
+	stones := storage.ParseInt(row[4])
+	if row[5] != nil {
+		// Somebody has already been here. The grave stays, and so does what
+		// it says; it simply has nothing left to hand over.
+		return map[string]any{"grave": true, "claimed": false, "already_claimed": true,
+			"npc_name": name, "location": where, "days_missing": days, "home_location": home}, nil
+	}
+	if !strings.EqualFold(where, strings.TrimSpace(location)) {
+		return map[string]any{"grave": true, "claimed": false, "elsewhere": true}, nil
+	}
+	now := float64(time.Now().UnixNano()) / 1e9
+	if _, err := conn.Execute(`UPDATE npc_graves
+        SET claimed_by_user_id=?,claimed_game_minute=?,updated_at=?
+        WHERE npc_name=? AND claimed_by_user_id IS NULL`,
+		[]any{userID, gameMinute, now, name}); err != nil {
+		return nil, err
+	}
+	if item != "" {
+		if _, err := conn.Execute(`INSERT INTO inventory(user_id,item_id,quantity) VALUES(?,?,1)
+            ON CONFLICT(user_id,item_id) DO UPDATE SET quantity=quantity+1`, []any{userID, item}); err != nil {
+			return nil, err
+		}
+	}
+	if stones > 0 {
+		if _, err := conn.Execute(`UPDATE characters SET spirit_stones=spirit_stones+?,updated_at=? WHERE user_id=?`,
+			[]any{stones, now, userID}); err != nil {
+			return nil, err
+		}
+	}
+	uid := userID
+	if err := recordWorldHistoryTx(conn,
+		fmt.Sprintf("npc_grave_found:%s:%d", name, gameMinute),
+		"npc_grave_found",
+		"What became of "+name,
+		fmt.Sprintf("%s was found at %s, %d day(s) after they stopped being anywhere. Word of it can be carried back to %s.",
+			name, where, days, home),
+		graveFoundSignificance, "public", where, "",
+		"player", fmt.Sprint(userID), fmt.Sprint(userID),
+		"npc", name, name,
+		&uid, name, []string{"npc_grave_found", "search"}, gameMinute,
+		map[string]any{"days_missing": days, "home_location": home, "keepsake_item": item, "keepsake_stones": stones},
+		now); err != nil {
+		return nil, err
+	}
+	return map[string]any{
+		"grave": true, "claimed": true, "npc_name": name, "location": where,
+		"home_location": home, "days_missing": days,
+		"keepsake_item": item, "keepsake_stones": stones,
+	}, nil
+}
+
+// Finding a grave answers the question the disappearance asked, which is worth
+// as much as closing it alive was.
+const graveFoundSignificance = 68

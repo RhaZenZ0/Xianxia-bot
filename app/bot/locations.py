@@ -205,6 +205,17 @@ async def local_npc_autocomplete(
                     names.append(name)
         except Exception:
             log.exception("Could not read the event cast at %s", location)
+        # A grave is a name you can address that the catalogue picker filters
+        # out, because the dead are filtered out of it (schema 48). It belongs
+        # in the list exactly where it stands and nowhere else - the same rule
+        # the missing follow, for the same reason.
+        try:
+            for grave in await DB.list_graves_at(location):
+                name = str(grave.get("npc_name") or "")
+                if name and name not in names and (not needle or needle in name.casefold()):
+                    names.append(name)
+        except Exception:
+            log.exception("Could not read the graves at %s", location)
     for name in await DB.search_catalog("npc", current, 25):
         if name in names:
             continue

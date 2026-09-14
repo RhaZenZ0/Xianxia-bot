@@ -26,7 +26,7 @@ from .remote import GoDatabaseTransport
 log = logging.getLogger("xianxia.database")
 
 
-SCHEMA_VERSION = 47
+SCHEMA_VERSION = 48
 # A readiness probe must validate more than the schema-version marker.  If the
 # SQLite file is removed or replaced while the bot is running, SQLite will
 # happily create a new empty file at the same path.  Checking these tables lets
@@ -1879,6 +1879,39 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
             """ALTER TABLE npc_civilization_state ADD COLUMN missing_since_game_minute INTEGER NOT NULL DEFAULT 0""",
             """CREATE INDEX IF NOT EXISTS idx_npc_missing
                    ON npc_civilization_state(status,missing_since_game_minute)""",
+        ),
+    ),
+    (
+        48,
+        "graves_for_those_nobody_found",
+        (
+            # v1.0.0-rc.23: somewhere to find the answer. A disappearance that
+            # runs out of grace kills the person at the end of it, and until
+            # now that was a history row and nothing else - the searcher who
+            # went looking arrived at an empty place and learned nothing,
+            # because `status='dead'` is not a thing you can stand in front
+            # of.
+            #
+            # A grave is. It holds where they actually ended up, what they were
+            # carrying when they stopped, and whether anybody has been to it -
+            # which is what lets the answer be carried back rather than simply
+            # known.
+            """CREATE TABLE IF NOT EXISTS npc_graves (
+                   npc_name TEXT PRIMARY KEY,
+                   location TEXT NOT NULL,
+                   world_name TEXT NOT NULL DEFAULT '',
+                   home_location TEXT NOT NULL DEFAULT '',
+                   died_game_minute INTEGER NOT NULL DEFAULT 0,
+                   days_missing INTEGER NOT NULL DEFAULT 0,
+                   keepsake_item TEXT NOT NULL DEFAULT '',
+                   keepsake_stones INTEGER NOT NULL DEFAULT 0,
+                   claimed_by_user_id INTEGER,
+                   claimed_game_minute INTEGER,
+                   created_at REAL NOT NULL,
+                   updated_at REAL NOT NULL
+               )""",
+            """CREATE INDEX IF NOT EXISTS idx_npc_graves_location
+                   ON npc_graves(location,claimed_by_user_id)""",
         ),
     ),
 )
@@ -5207,6 +5240,26 @@ class Database:
         # for eight hours must not join the permanent world - so they answer
         # here instead, uncached, because they stop existing when it closes.
         return await self.get_event_npc_definition(name)
+
+    async def list_graves_at(self, location: str, limit: int = 10) -> list[dict[str, Any]]:
+        """Unclaimed graves standing at one place (schema 48).
+
+        The same shape as `list_active_event_npcs`, and for the same reason: a
+        grave is a name you can address that is not in the permanent catalogue
+        picker, because the dead are filtered out of it. It belongs in the list
+        exactly where it stands and nowhere else.
+        """
+        if not str(location or "").strip():
+            return []
+        async with self._connect() as db:
+            db.row_factory = aiosqlite.Row
+            cur = await db.execute(
+                """SELECT npc_name,location,home_location,days_missing,keepsake_item,keepsake_stones
+                   FROM npc_graves WHERE location=? AND claimed_by_user_id IS NULL
+                   ORDER BY died_game_minute DESC LIMIT ?""",
+                (str(location), max(1, min(int(limit), 25))),
+            )
+            return [dict(r) for r in await cur.fetchall()]
 
     async def get_recipe_definition(self, name: str) -> dict[str, Any] | None:
         return await self._catalog_get("catalog_recipes", name)

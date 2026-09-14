@@ -78,6 +78,13 @@ const (
 	// years apart are waved through.
 	romanceAgeFraction = 0.35
 
+	// A widow may marry again, and it is harder in both of the ways that
+	// matter. Nobody is courted the week after a funeral, so there is a
+	// mourning period first; and afterwards the roll is colder, because the
+	// second time is not the first time and a town knows it.
+	mourningDays     = 45
+	widowChanceShare = 45
+
 	// A marriage that is a treaty rather than an affection. Bootstrap has
 	// always written clan `marriage_pact` rows and nothing has ever made one
 	// since, so the idea existed in this world and only ever described its
@@ -113,6 +120,10 @@ type romanceCandidate struct {
 	world    string
 	realm    int64
 	age      float64
+	// widowed is carried because remarriage is not a first marriage: it
+	// waits longer and it lands less often.
+	widowed  bool
+	freeFrom int64
 }
 
 // romanceBond is what `npc_social_relations` already says about a pair.
@@ -363,7 +374,7 @@ func (r *Runner) beginCourtships(conn *storage.Conn, steps, gm int64, now float6
 	// A widow may marry again; that is the whole reason widowing sets this
 	// column to something the pairing still reads.
 	res, err := conn.Execute(`SELECT c.npc_name,c.current_location,c.world_name,c.realm_index,
-            l.birth_game_minute,l.age_at_creation_years
+            l.birth_game_minute,l.age_at_creation_years,l.relationship_status,l.last_social_game_minute
         FROM npc_civilization_state c
         JOIN npc_life_state l ON l.npc_name=c.npc_name
         WHERE c.status='alive' AND l.health>0
@@ -372,13 +383,23 @@ func (r *Runner) beginCourtships(conn *storage.Conn, steps, gm int64, now float6
 	if err != nil {
 		return 0, err
 	}
+	mourning := int64(mourningDays) * minutesPerDay
 	people := make([]romanceCandidate, 0, len(res.Rows))
 	atLocation := map[string][]romanceCandidate{}
 	for _, row := range res.Rows {
 		person := romanceCandidate{
 			name: fmt.Sprint(row[0]), location: fmt.Sprint(row[1]),
 			world: fmt.Sprint(row[2]), realm: i64(row[3]),
-			age: lifespanmodel.AgeYears(gm, i64(row[4]), i64(row[5])),
+			age:     lifespanmodel.AgeYears(gm, i64(row[4]), i64(row[5])),
+			widowed: fmt.Sprint(row[6]) == "widowed",
+		}
+		if person.widowed {
+			// `last_social_game_minute` is stamped by the widowing itself, so
+			// the mourning period needs no column of its own.
+			person.freeFrom = i64(row[7]) + mourning
+			if gm < person.freeFrom {
+				continue
+			}
 		}
 		people = append(people, person)
 		atLocation[person.location] = append(atLocation[person.location], person)
@@ -412,7 +433,11 @@ func (r *Runner) beginCourtships(conn *storage.Conn, steps, gm int64, now float6
 		if err != nil {
 			return started, err
 		}
-		if int64(roll) >= chance {
+		theirs := chance
+		if courter.widowed || match.widowed {
+			theirs = max1(chance * widowChanceShare / 100)
+		}
+		if int64(roll) >= theirs {
 			continue
 		}
 		if err := r.openCourtship(conn, courter.name, match.name, gm, now); err != nil {

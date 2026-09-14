@@ -53,11 +53,12 @@ const erasedUserSentinel int64 = 0
 
 // erasureSubjectColumns are the column names that hold a Discord user id. Taken
 // from the live schema rather than invented: every one of these exists at
-// schema 46, and the classification test fails if the schema grows another.
+// schema 48, and the classification test fails if the schema grows another.
 var erasureSubjectColumns = map[string]bool{
 	"user_id": true, "actor_id": true, "admin_user_id": true,
-	"bidder_user_id": true, "challenger_user_id": true, "current_bidder_user_id": true,
-	"disciple_user_id": true, "founded_by_user_id": true, "founder_user_id": true,
+	"bidder_user_id": true, "challenger_user_id": true, "claimed_by_user_id": true,
+	"current_bidder_user_id": true,
+	"disciple_user_id":       true, "founded_by_user_id": true, "founder_user_id": true,
 	"from_user_id": true, "guest_user_id": true, "invitee_user_id": true,
 	"inviter_user_id": true, "leader_user_id": true, "master_user_id": true,
 	"owner_user_id": true, "parent_user_id": true, "player1_user_id": true,
@@ -81,6 +82,9 @@ var erasureAnonymise = map[string]string{
 	"quest_definitions.owner_user_id":      "authored content other players are mid-way through",
 	"sect_manors.founded_by_user_id":       "a sect its remaining disciples still belong to",
 	"player_families.founder_user_id":      "a family that outlives whoever founded it (NOT NULL, so it takes the sentinel)",
+	"npc_graves.claimed_by_user_id": "world canon - somebody was lost, died out there and was " +
+		"eventually found, and the grave goes on saying so. Only which cultivator reached it first " +
+		"is personal, so that is the part that goes; the grave stays emptied, because it was",
 }
 
 type erasureDisposition int

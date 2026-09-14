@@ -32,6 +32,7 @@ from ..runtime import (
     log,
     reply_long,
     require_character,
+    respond,
     serialized_user_action,
 )
 from ..services import (
@@ -46,6 +47,50 @@ from ..services import (
 )
 from ..ui.commissions import commission_reply_extras, offer_for as commission_offer_for
 from ..threads import _private_scene_for_thread, active_private_location_thread, ensure_expedition_thread
+
+
+async def _claim_grave_if_here(user_id: int, c: dict, npc: str, wt) -> str:
+    """Take what a grave holds, if this is the grave and it is here.
+
+    Returns the line to show, or "" when there is nothing to find - in which
+    case the caller says the plain thing about the dead. The engine checks the
+    location itself; standing in the wrong place learns you nothing.
+
+    Takes a user id rather than the interaction on purpose. It is not a
+    handler and must not read like one: acking is the caller's job, and it has
+    already done it before calling here.
+    """
+    try:
+        envelope = await ENGINE.authoritative_action(
+            "npc.found",
+            user_id,
+            {"npc_name": npc, "location": str(c.get("location") or ""), "game_minute": wt.total_minutes},
+        )
+    except GameEngineError:
+        log.exception("Could not read the grave of %s", npc)
+        return ""
+    result = (envelope or {}).get("result") or {}
+    if not result.get("grave"):
+        return ""
+    if result.get("already_claimed"):
+        return (
+            f"🪦 **{npc}**'s grave. Someone has been here before you; there is nothing left to carry "
+            f"back, only the fact of it."
+        )
+    if not result.get("claimed"):
+        return ""
+    days = int(result.get("days_missing") or 0)
+    home = str(result.get("home_location") or "")
+    item = str(result.get("keepsake_item") or "")
+    stones = int(result.get("keepsake_stones") or 0)
+    took = [WORLD.items.get(item, {}).get("name", item) for item in ([item] if item else [])]
+    if stones:
+        took.append(f"{stones} spirit stones")
+    carried = ", ".join(took) if took else "nothing but the fact of it"
+    return (
+        f"🪦 You find **{npc}**, {days} day(s) after they stopped being anywhere.\n"
+        f"You take **{carried}**. Word of this can go back to {home}."
+    )
 
 
 @registered_root_command(name="talk", description="Speak with a persistent NPC", guild=GUILD)
@@ -66,8 +111,20 @@ async def talk(
     wt = await current_world_time()
     npc_location = await current_npc_location(npc, wt.period)
     if npc_location == DEAD:
-        await interaction.response.send_message(
-            f"**{npc}** is dead. Whatever you have to say to them, the world is not going to carry it.",
+        # Dead, but possibly buried where you are standing. A search that
+        # arrives too late still arrives, and what the grave holds can be
+        # carried back to whoever asked (schema 48).
+        #
+        # Deferred before the engine call, never after: claiming a grave is a
+        # mutation, and this branch is exactly the guard-branch shape
+        # `test_ack_before_mutation` exists to catch. `respond` then routes
+        # through followup because the response is already used.
+        await interaction.response.defer()
+        grave_line = await _claim_grave_if_here(interaction.user.id, c, npc, wt)
+        await respond(
+            interaction,
+            grave_line
+            or f"**{npc}** is dead. Whatever you have to say to them, the world is not going to carry it.",
             ephemeral=False,
         )
         return

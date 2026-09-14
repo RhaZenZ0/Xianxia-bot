@@ -205,3 +205,154 @@ func contains(haystack, needle string) bool {
 		return false
 	})()
 }
+
+const graveTestSchema = `
+CREATE TABLE IF NOT EXISTS npc_graves(npc_name TEXT PRIMARY KEY,location TEXT NOT NULL,world_name TEXT NOT NULL DEFAULT '',home_location TEXT NOT NULL DEFAULT '',died_game_minute INTEGER NOT NULL DEFAULT 0,days_missing INTEGER NOT NULL DEFAULT 0,keepsake_item TEXT NOT NULL DEFAULT '',keepsake_stones INTEGER NOT NULL DEFAULT 0,claimed_by_user_id INTEGER,claimed_game_minute INTEGER,created_at REAL NOT NULL,updated_at REAL NOT NULL);
+`
+
+func gravesTable(t *testing.T, conn *storage.Conn) {
+	t.Helper()
+	if err := conn.ExecScript(graveTestSchema); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestTheKeepsakeIsReadOffTheTradeTheyPractised(t *testing.T) {
+	for profession, want := range map[string]string{
+		"herbalist":         "spirit_herb",
+		"Greenriver smith":  "spirit_iron",
+		"talisman scribe":   "talisman_paper",
+		"formation adept":   "array_disk_blank",
+		"beast hunter":      "beast_core",
+		"Apothecary keeper": "spirit_herb",
+		"gate guard":        "talisman_paper",
+	} {
+		if got := missingKeepsake(profession); got != want {
+			t.Fatalf("a %q was buried with %q, expected %q", profession, got, want)
+		}
+	}
+}
+
+func TestDyingOutThereLeavesAGraveHoldingTheirOwnPurse(t *testing.T) {
+	path := romanceDB(t)
+	r := romanceRunner()
+	gone := int64(100000)
+	missingNPC(t, path, "Lost Lu", "Greenriver Town", "Lonely Rock", gone, "missing")
+	conn := livesConn(t, path)
+	gravesTable(t, conn)
+	if _, err := conn.Execute(`UPDATE npc_civilization_state SET profession='herbalist',wealth=42 WHERE npc_name='Lost Lu'`, nil); err != nil {
+		t.Fatal(err)
+	}
+	past := gone + (missingGraceDays+1)*minutesPerDay
+	died := int64(0)
+	for tick := 0; tick < 40 && died == 0; tick++ {
+		got, err := r.npcMissingHardship(conn, past)
+		if err != nil {
+			t.Fatal(err)
+		}
+		died += got
+	}
+	romanceCommit(t, conn)
+	if died != 1 {
+		t.Fatalf("nobody died out there: %d", died)
+	}
+	if got := romanceStr(t, path, `SELECT location FROM npc_graves WHERE npc_name='Lost Lu'`); got != "Lonely Rock" {
+		t.Fatalf("the grave is at %q, not where they actually stopped", got)
+	}
+	if got := romanceStr(t, path, `SELECT home_location FROM npc_graves WHERE npc_name='Lost Lu'`); got != "Greenriver Town" {
+		t.Fatalf("the grave does not say where to carry the answer: %q", got)
+	}
+	if got := romanceStr(t, path, `SELECT keepsake_item FROM npc_graves WHERE npc_name='Lost Lu'`); got != "spirit_herb" {
+		t.Fatalf("a herbalist was buried with %q", got)
+	}
+	if got := storage.ParseInt(simScalar(t, path, `SELECT keepsake_stones FROM npc_graves WHERE npc_name='Lost Lu'`)); got != 42 {
+		t.Fatalf("the grave holds %d stones, they were carrying 42", got)
+	}
+	// The purse leaves the NPC as it enters the grave, or the world's total
+	// grows by the value of everybody who ever got lost.
+	if got := storage.ParseInt(simScalar(t, path, `SELECT wealth FROM npc_civilization_state WHERE npc_name='Lost Lu'`)); got != 0 {
+		t.Fatalf("the dead are still carrying %d stones the grave also has", got)
+	}
+	if got := storage.ParseInt(simScalar(t, path, `SELECT COUNT(*) FROM npc_graves WHERE claimed_by_user_id IS NOT NULL`)); got != 0 {
+		t.Fatal("a fresh grave was already marked visited")
+	}
+}
+
+func TestTheTownGivesUpBeforeTheWildernessDoes(t *testing.T) {
+	path := romanceDB(t)
+	r := romanceRunner()
+	gone := int64(100000)
+	missingNPC(t, path, "Lost Lu", "Greenriver Town", "Lonely Rock", gone, "missing")
+	missingNPC(t, path, "Waiting Wen", "Greenriver Town", "Greenriver Town", 0, "alive")
+	conn := livesConn(t, path)
+	if _, err := conn.Execute(`UPDATE npc_life_state SET relationship_status='married',spouse_name='Waiting Wen' WHERE npc_name='Lost Lu'`, nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := conn.Execute(`UPDATE npc_life_state SET relationship_status='married',spouse_name='Lost Lu' WHERE npc_name='Waiting Wen'`, nil); err != nil {
+		t.Fatal(err)
+	}
+	romanceCommit(t, conn)
+
+	// Inside the wait, nothing changes: the town is still setting a place.
+	if err := r.npcPresumedDead(conn, gone+(presumedDeadDays-1)*minutesPerDay); err != nil {
+		t.Fatal(err)
+	}
+	romanceCommit(t, conn)
+	if got := romanceStr(t, path, `SELECT relationship_status FROM npc_life_state WHERE npc_name='Waiting Wen'`); got != "married" {
+		t.Fatalf("the spouse was widowed early: %q", got)
+	}
+
+	// Past it, the marriage is dissolved from both sides.
+	if err := r.npcPresumedDead(conn, gone+(presumedDeadDays+1)*minutesPerDay); err != nil {
+		t.Fatal(err)
+	}
+	romanceCommit(t, conn)
+	if got := romanceStr(t, path, `SELECT relationship_status FROM npc_life_state WHERE npc_name='Waiting Wen'`); got != "widowed" {
+		t.Fatalf("the one at home is %q and may never marry again", got)
+	}
+	if got := romanceStr(t, path, `SELECT spouse_name FROM npc_life_state WHERE npc_name='Waiting Wen'`); got != "" {
+		t.Fatalf("the widow still carries a spouse: %q", got)
+	}
+	if got := romanceStr(t, path, `SELECT relationship_status FROM npc_life_state WHERE npc_name='Lost Lu'`); got != "single" {
+		t.Fatalf("the one still out there is %q; found later, they would be married to somebody who buried them", got)
+	}
+	// And they are still alive, still missing, and still exactly where they
+	// are. That is the whole of the tragedy and none of the bug.
+	if got := romanceStr(t, path, `SELECT status FROM npc_civilization_state WHERE npc_name='Lost Lu'`); got != "missing" {
+		t.Fatalf("being given up for dead killed them: status %q", got)
+	}
+	if got := romanceStr(t, path, `SELECT current_location FROM npc_civilization_state WHERE npc_name='Lost Lu'`); got != "Lonely Rock" {
+		t.Fatalf("they moved when the town stopped looking: %q", got)
+	}
+	if got := storage.ParseInt(simScalar(t, path, `SELECT COUNT(*) FROM world_history_events WHERE event_type='npc_presumed_dead'`)); got != 1 {
+		t.Fatalf("nobody recorded that the town had stopped waiting: %d", got)
+	}
+}
+
+func TestAWidowIsNotCourtedTheWeekAfterTheFuneral(t *testing.T) {
+	path := romanceDB(t)
+	r := romanceRunner()
+	romanceNPC(t, path, "Widow Wu", "Riverguard City", 0, 40, "widowed")
+	romanceNPC(t, path, "Suitor Su", "Riverguard City", 0, 42, "single")
+	conn := livesConn(t, path)
+	widowed := int64(500000)
+	if _, err := conn.Execute(`UPDATE npc_life_state SET last_social_game_minute=? WHERE npc_name='Widow Wu'`, []any{widowed}); err != nil {
+		t.Fatal(err)
+	}
+	romanceCommit(t, conn)
+
+	// Inside mourning the widow is not a candidate at all, so this holds on
+	// every run rather than most of them - no die is reached.
+	for tick := 0; tick < 30; tick++ {
+		if _, err := r.beginCourtships(conn, 1, widowed+(mourningDays-1)*minutesPerDay, 1); err != nil {
+			t.Fatal(err)
+		}
+	}
+	romanceCommit(t, conn)
+	if got := storage.ParseInt(simScalar(t, path, `SELECT COUNT(*) FROM npc_social_relations WHERE relation_type='courtship'`)); got != 0 {
+		t.Fatalf("a widow was courted %d time(s) inside the mourning period", got)
+	}
+	if got := romanceStr(t, path, `SELECT relationship_status FROM npc_life_state WHERE npc_name='Widow Wu'`); got != "widowed" {
+		t.Fatalf("the widow is %q before the mourning period is out", got)
+	}
+}

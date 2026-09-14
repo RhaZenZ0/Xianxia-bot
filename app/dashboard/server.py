@@ -621,7 +621,18 @@ class ReadOnlyDashboardStore:
                 )
             locations = [r["current_location"] for r in await self._fetchall(db, "SELECT DISTINCT current_location FROM npc_civilization_state WHERE current_location<>'' ORDER BY current_location")]
             factions = [r["faction"] for r in await self._fetchall(db, "SELECT DISTINCT faction FROM npc_civilization_state WHERE faction<>'' ORDER BY faction")]
-            return {"rows": rows, "locations": locations, "factions": factions}
+            # Schema 48: where the ones nobody found ended up, and whether
+            # anybody has been to them. A GM asking "what happened to X" should
+            # not have to read the history table to find out.
+            graves = await self._fetchall(
+                db,
+                """SELECT g.npc_name,g.location,g.home_location,g.days_missing,g.keepsake_item,
+                          g.keepsake_stones,g.died_game_minute,g.claimed_by_user_id,g.claimed_game_minute,
+                          c.name AS claimed_by_name
+                   FROM npc_graves g LEFT JOIN characters c ON c.user_id=g.claimed_by_user_id
+                   ORDER BY g.died_game_minute DESC LIMIT 100""",
+            )
+            return {"rows": rows, "locations": locations, "factions": factions, "graves": graves}
 
     async def npc_detail(self, name: str) -> dict[str, Any]:
         async with self._connect() as db:

@@ -55,3 +55,34 @@ class DeadNPCsAreNotOfferedTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class GravesAreFoundWhereTheyStandTests(unittest.TestCase):
+    """Schema 48. A grave is a name you can address that the catalogue picker
+    filters out, because the dead are filtered out of it. It belongs in the
+    list exactly where it stands - the same rule the missing follow."""
+
+    def test_the_picker_offers_a_grave_where_it_stands(self):
+        source = bot_function_source("local_npc_autocomplete")
+        self.assertIn("DB.list_graves_at(location)", source)
+        # Beside the live event cast, and for the same reason.
+        self.assertIn("DB.list_active_event_npcs(location)", source)
+
+    def test_talk_at_a_grave_finds_the_answer_instead_of_refusing(self):
+        source = bot_function_source("talk")
+        self.assertIn("_claim_grave_if_here", source)
+        # The plain refusal survives as the fallback when there is no grave here.
+        self.assertIn("is dead. Whatever you have to say to them", source)
+
+    def test_the_grave_is_claimed_through_the_engine_not_python(self):
+        source = bot_function_source("_claim_grave_if_here")
+        self.assertIn('"npc.found"', source)
+        self.assertIn('"location"', source)
+        # Not handler-shaped: it takes a bare user id, so it cannot ack and
+        # does not have to - the caller defers before reaching it.
+        self.assertIn("async def _claim_grave_if_here(user_id: int", source)
+        self.assertNotIn("interaction.response", source)
+        # Python reports; it does not decide. An already-visited grave still
+        # says what it says and hands over nothing.
+        self.assertIn('result.get("already_claimed")', source)
+        self.assertIn('result.get("claimed")', source)

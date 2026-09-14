@@ -1247,6 +1247,13 @@ mechanical authority paths.
 - **Schema 27** added the v0.19.29 mute/freeze moderation columns on `characters`
   (`is_muted`, `is_frozen`, `moderation_reason`).
 - **Schema 28** added the Quest Forge definition table (`quest_definitions`).
+- **Schema 48** gave a search somewhere to arrive. `npc_graves` holds where a missing person
+  actually ended up, what they were carrying when they stopped, and whether anybody has been to it.
+  Until now a disappearance that ran out of grace produced a history row and nothing else, so the
+  searcher who went looking stood in an empty place and learned nothing - `status='dead'` is not a
+  thing you can stand in front of. A grave is, and being able to carry something back from one is
+  what turns knowing into reporting. Nothing is dropped and no existing column changes meaning.
+
 - **Schema 47** gave a disappearance a length. `npc_civilization_state` gained
   `missing_since_game_minute`, and `status` carries `'missing'` beside `'alive'` and `'dead'`, so
   every batch that reads `WHERE status='alive'` stops offering a missing person by construction
