@@ -7,6 +7,7 @@ and lives in this file.
 """
 from __future__ import annotations
 
+import hashlib
 import time
 from collections.abc import Awaitable, Callable
 from types import SimpleNamespace
@@ -32,7 +33,7 @@ from ..discovery import (
 from ..formatting import human_duration, roll_line
 from ..hubs import HubDynamicOption, register_hub_option_provider
 from ..locations import _known_locations, access_realm_index, destination_groups, location_autocomplete
-from ..registry import registered_group_command, registered_root_command
+from ..registry import VIEW_RESTORERS, registered_group_command, registered_root_command
 from ..runtime import (
     DB,
     _sync_realm_presence_roles,
@@ -62,6 +63,16 @@ from ..ui.event_scene import spawn_event_thread
 from .sect import _sect_recruitment_at_location
 
 
+# Panels that outlive the process (v1.0.0-rc.22). An exploration encounter is
+# open for up to six hours; the view used to be open only as long as the bot
+# was. A digest keeps the id inside Discord's 100-character ceiling however
+# long an event id and a user id get, and includes the owner so two players in
+# the same encounter do not share controls.
+
+def _exploration_event_token(event_id: str, owner_user_id: int) -> str:
+    return hashlib.blake2s(f"{event_id}:{int(owner_user_id)}".encode("utf-8"), digest_size=8).hexdigest()
+
+
 class ExplorationEventView(discord.ui.View):
     """Personal exploration-event controls backed entirely by Go authority."""
 
@@ -69,8 +80,26 @@ class ExplorationEventView(discord.ui.View):
         self.owner_user_id = int(owner_user_id)
         self.event = dict(event or {})
         expires_at = float(self.event.get("expires_at") or time.time() + 7200)
-        super().__init__(timeout=max(300, min(21600, int(expires_at - time.time()))))
+        # No timeout (v1.0.0-rc.22): the encounter is open for up to six hours
+        # and the panel used to die with the process, so a reboot left the
+        # player staring at an interrupted exploration they could not act on.
+        # The engine still refuses an event that has ended, and `_sync_buttons`
+        # disables what is no longer available, so the closing time governs
+        # play whether or not the view is still counting.
+        super().__init__(timeout=None)
+        # The decorated ids are the same on every instance, which is fine for
+        # one live panel and wrong for two: namespaced by event and owner, a
+        # restored panel answers its own clicks and nobody else's.
+        self._stamp_custom_ids()
         self._sync_buttons()
+
+    def _stamp_custom_ids(self) -> None:
+        token = _exploration_event_token(str(self.event.get("event_id") or ""), self.owner_user_id)
+        for item in self.children:
+            if not isinstance(item, discord.ui.Button):
+                continue
+            action = str(item.custom_id or "").split(":")[-1] or "button"
+            item.custom_id = f"expl:{token}:{action}"[:100]
 
     def _available_keys(self) -> set[str]:
         return {
@@ -85,7 +114,7 @@ class ExplorationEventView(discord.ui.View):
         for item in self.children:
             if not isinstance(item, discord.ui.Button):
                 continue
-            custom_id = str(item.custom_id or "")
+            custom_id = "exploration_event:" + str(item.custom_id or "").split(":")[-1]
             if custom_id == "exploration_event:refresh":
                 item.disabled = False
                 continue
@@ -1502,3 +1531,37 @@ async def travel_status(interaction: discord.Interaction) -> None:
         "\nYou cannot take authoritative actions until you arrive."
     )
     await interaction.response.send_message(text, ephemeral=False)
+
+
+async def restore_exploration_event_views(bot: discord.Client) -> int:
+    """Re-register the panel of every exploration encounter still running.
+
+    The encounter is the engine's row; the buttons were the process's. After a
+    restart a player whose exploration was interrupted had a panel that
+    answered nothing and no command that would redraw it - the only way out
+    was to wait the event out. The engine's own status call is what rebuilds
+    each panel, so a restored one carries the actions that are still available
+    rather than the ones that were available when it was posted.
+    """
+    restored = 0
+    try:
+        rows = await DB.get_live_exploration_events()
+    except Exception:
+        log.exception("Could not read the live exploration encounters to restore")
+        return 0
+    for row in rows:
+        user_id = int(row.get("user_id") or 0)
+        event_id = str(row.get("event_id") or "")
+        if not user_id or not event_id:
+            continue
+        try:
+            status = await ENGINE.action("exploration.event.status", user_id, {"event_id": event_id})
+            bot.add_view(ExplorationEventView(user_id, dict(status or row)))
+        except Exception:
+            log.exception("Could not restore the exploration event panel for %s", event_id)
+            continue
+        restored += 1
+    return restored
+
+
+VIEW_RESTORERS.register("exploration_event", restore_exploration_event_views)

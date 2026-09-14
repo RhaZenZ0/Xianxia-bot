@@ -5,6 +5,7 @@ main.py in definition order; reads only modules below main.py.
 """
 from __future__ import annotations
 
+import time
 from typing import Any
 
 import discord
@@ -17,6 +18,7 @@ from ..registry import registered_group_command, registered_root_command
 from ..runtime import _explain_engine_error, DB, ENGINE, WORLD, current_world_time, player_property_label, reply_long, require_character, serialized_user_action
 from ..services import GUILD, PLAYER_PROPERTY_FACILITY_KEYS, PLAYER_PROPERTY_FACILITY_LABELS
 from ..threads import ensure_abode_thread, open_expedition_thread_after_exit
+from ..ui.event_scene import spawn_event_thread
 
 # ---------- Player-owned locations / homes ----------
 abode_group=app_commands.Group(name="abode",description="Your one home: found it, then build and raise its facilities")
@@ -267,7 +269,20 @@ async def spatial_key_command(interaction:discord.Interaction,item:str)->None:
         e=await ENGINE.authoritative_action("spatial_key.use",interaction.user.id,{"item_id":item},action_id=f"discord:{interaction.id}:spatial_key.use"); r=dict(e.get('result') or {})
     except GameEngineError as exc:
         await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False);return
-    await interaction.followup.send(f"🗝️ The key tears open a temporary entrance to **{r.get('realm_name',r.get('realm_id','a secret realm'))}**.",ephemeral=False)
+    # The key opens a world_events row, and a realm with no scene is an
+    # entrance nobody can stand in (v1.0.0-rc.22): every other path that opens
+    # one spawns its thread, so this one does too.
+    name=str(r.get('name') or r.get('realm_name') or r.get('realm_id') or 'Secret Realm')
+    thread=await spawn_event_thread(
+        interaction,title=name,event_type="secret_realm",
+        event_key=str(r.get("event_key") or ""),expires_at=float(r.get("ends_at") or time.time()+7200),
+        announcement=(
+            f"🗝️ **SPATIAL KEY — {name}**\n📍 Entrance: **{r.get('location') or 'Unknown'}**\n{r.get('description','')}\n\n"
+            "Travel there, then use **/realm → Secret Realms → Enter**. The thread below is the shared expedition scene."
+        ),
+    )
+    where=f"\n💬 **Live event thread:** {thread.mention}" if thread is not None else ""
+    await interaction.followup.send(f"🗝️ The key tears open a temporary entrance to **{name}**.{where}",ephemeral=False)
 
 
 # ---------- Personal world creation ----------

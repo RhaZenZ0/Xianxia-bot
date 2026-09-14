@@ -145,11 +145,30 @@ func (r *Runner) advancedMaintenance(conn *storage.Conn, gm int64, automation ma
 	}
 	// Secret realms (v0.39.0): the rotation opens the next one in turn, so
 	// every world always has a realm coming whether or not anyone is
-	// standing at its entrance.
+	// standing at its entrance. What it opened is carried out of here as a
+	// spawned event (v1.0.0-rc.22) because Discord is where a realm is
+	// actually entered: a rotation that only wrote SQLite opened an entrance
+	// with no thread, no announcement and no way in.
+	spawned := []SpawnedWorldEvent{}
 	if !hasBoolKey(automation, "secret_realms") || automation["secret_realms"] {
-		counts["secret_realms"], err = game.RotateSecretRealms(conn, r.World, gm)
+		opened, err := game.RotateSecretRealms(conn, r.World, gm)
 		if err != nil {
 			return Run{}, false, err
+		}
+		if opened != nil {
+			counts["secret_realms"] = 1
+			spawned = append(spawned, SpawnedWorldEvent{
+				EventKey:    opened.EventKey,
+				EventID:     opened.RealmID,
+				EventType:   "secret_realm",
+				Title:       opened.Name,
+				Category:    "Rotation",
+				Description: opened.Description,
+				Location:    opened.Location,
+				ExpiresAt:   opened.EndsAt,
+				ConsequenceText: fmt.Sprintf(
+					"The entrance holds for about %d hours before it closes again.", opened.OpenHours),
+			})
 		}
 	}
 	counts["hunters_spawned"], err = r.spawnHunters(conn, gm)
@@ -219,7 +238,7 @@ func (r *Runner) advancedMaintenance(conn *storage.Conn, gm int64, automation ma
 		return Run{}, false, nil
 	}
 	summary := fmt.Sprintf("auctions=%d merchants=%d merchant_bids=%d secret_realms=%d hunters_spawned=%d hunters_updated=%d wars=%d occupations=%d caravans_sent=%d caravans=%d seclusions=%d commissions_expired=%d moderations_expired=%d era_changed=%t", counts["auctions"], counts["merchants"], counts["merchant_bids"], counts["secret_realms"], counts["hunters_spawned"], counts["hunters_updated"], counts["wars"], counts["occupations"], counts["caravans_sent"], counts["caravans"], counts["seclusions"], counts["commissions_expired"], counts["moderations_expired"], eraChanged)
-	return Run{System: "advanced_world", DueSteps: 1, AppliedSteps: 1, Summary: summary}, true, nil
+	return Run{System: "advanced_world", DueSteps: 1, AppliedSteps: 1, Summary: summary, Events: spawned}, true, nil
 }
 
 func (r *Runner) finalizeAuctions(conn *storage.Conn, gm int64) (int64, error) {

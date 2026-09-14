@@ -123,8 +123,13 @@ type UnexpectedEvent struct {
 }
 
 type SpawnedWorldEvent struct {
-	EventKey        string   `json:"event_key"`
-	EventID         string   `json:"event_id"`
+	EventKey string `json:"event_key"`
+	EventID  string `json:"event_id"`
+	// EventType is the world_events row's own type ("random_event",
+	// "secret_realm"). The bot spawns one scene thread per event and used to
+	// call every one of them a random event, which is what closed a realm
+	// with "World event closed" and drew it the wrong panel.
+	EventType       string   `json:"event_type,omitempty"`
 	Title           string   `json:"title"`
 	Category        string   `json:"category"`
 	Description     string   `json:"description"`
@@ -981,6 +986,6 @@ func (r *Runner) autonomousWorldEvents(conn *storage.Conn, steps, gm int64) (str
 			return "", nil, err
 		}
 	}
-	evt := SpawnedWorldEvent{EventKey: eventKey, EventID: pick.event.ID, Title: pick.event.Title, Category: pick.event.Category, Description: pick.event.Description, ConsequenceText: pick.event.ConsequenceText, Location: pick.location, Severity: pick.event.Severity, ExpiresAt: ends, Impacts: impacts, SiteNodes: siteNodes}
+	evt := SpawnedWorldEvent{EventKey: eventKey, EventID: pick.event.ID, EventType: "random_event", Title: pick.event.Title, Category: pick.event.Category, Description: pick.event.Description, ConsequenceText: pick.event.ConsequenceText, Location: pick.location, Severity: pick.event.Severity, ExpiresAt: ends, Impacts: impacts, SiteNodes: siteNodes}
 	return "spawned autonomous world event " + pick.event.Title, []SpawnedWorldEvent{evt}, nil
 }

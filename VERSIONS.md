@@ -6,6 +6,56 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.0** (rc.22) fixes a door that opened onto nothing. Since v0.39.0 the world tick has rotated
+the secret realms - one every three game days, at its own entrance, so a realm at a ruin nobody walks
+to still comes round. It wrote the `world_events` row, it wrote the public history row the rumours
+carry, and it told the caller *how many realms it had opened*. A count is not something a bot can
+announce. Every other path that opens a realm - `/explore` rolling one, `/admin world spawnrealm` -
+spawns the Discord scene thread beside it; the rotation had no Python caller at all, so
+`/admin world events` listed a live realm reading `Thread: none` and there was no way in. The
+entrance was open for eight hours in a world where nobody could be told it existed.
+
+`RotateSecretRealms` now hands back the realm it opened - key, name, description, entrance, closing
+time - and the maintenance pass carries it out on the run as a spawned event, which is the channel
+the autonomous world events have always used to reach Discord. The bot already spawns one scene per
+event of every run, so the realm arrives with a thread, an announcement and the event panel.
+
+`SpawnedWorldEvent` gains an `event_type`, and that is the second half of the fix: the bot named
+every event it spawned a `random_event`, which is the type the expiry worker reads to decide whether
+a closing scene says "Secret realm closed" or "World event closed", and which the scene panel reads
+to decide what it draws. A realm flattened to a random event closed under the wrong words. The type
+the engine gave the row now rides through to the thread.
+
+Fixed beside it: `/spatialkey` had the same hole from the other end - the key consumed itself, the
+engine opened the realm, and the player was told an entrance existed with no scene to enter it
+through. It spawns its thread now, like every other opener.
+
+**And the panels come back after a reboot.** A scene thread is a Discord message that outlives the
+process that sent it; a `discord.ui.View` is not. `EventSceneView` carried a timeout and no
+`custom_id`, which is exactly the pair discord.py refuses to register for persistent listening, so
+every restart left every open event with dead controls - the thread still there, the realm open for
+six more hours, and every button answering "This interaction failed" until it expired. The same was
+true of `ExplorationEventView`, where it was worse: the encounter *pauses* exploration, so a player
+whose panel died had no way to resolve it and no command that would redraw it. They could only wait
+the event out.
+
+Both are persistent now - no timeout, and a `custom_id` on every component that is stable across
+processes and unique per event (a digest of the event key, which keeps it inside Discord's
+hundred-character ceiling however long a key gets; the exploration ids carry the owner too, so two
+cultivators in one encounter do not share controls). The closing time still governs play: the panel
+refuses an event that has expired and the tick still archives the thread, so nothing is lost by
+letting the view outlive the process.
+
+What makes it "every system" rather than "the two somebody remembered" is `VIEW_RESTORERS`, a
+registry beside `ACTIONS` and `EVENT_HANDLERS`. Each family registers its own restorer, startup
+walks them all in one step (`PANELS_RESTORED`), and one that fails never costs the others or the
+boot. Deliberately *not* in it: the hubs, pickers and confirms. Those time out inside fifteen
+minutes and are re-opened by running the command again - registering them would leave live-looking
+buttons on messages whose moment has passed, which is the opposite of the fix.
+
+Two new reads on the Python side (`get_live_event_threads`, `get_live_exploration_events`), both
+mirrors of sweeps that already existed. No schema change.
+
 **1.0.0** (rc.21) closes the last line of the profession audit, the one filed under "worth deciding
 separately" and left through two releases. `array_disk_blank`, `spirit_ink` and `talisman_paper`
 were named by items, by twelve recipes, by shops and by merchants, and by no gathering path at all -
