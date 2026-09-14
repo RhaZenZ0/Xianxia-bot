@@ -609,7 +609,13 @@ func (r *Runner) sects(conn *storage.Conn, steps, gm int64) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("batch-advanced politics for %d sects; %d swore in, %d walked out, %d wars declared", count, joined, left, declared), nil
+	// The disciples' own tribute (v1.0.0-rc.18), after the rolls have changed
+	// this tick: a sect stocks at the strength it actually has now.
+	stocked, err := r.sectTribute(conn, steps)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("batch-advanced politics for %d sects; %d swore in, %d walked out, %d wars declared, %d stocked to the treasuries", count, joined, left, declared, stocked), nil
 }
 
 func (r *Runner) clans(conn *storage.Conn, steps, gm int64) (string, error) {

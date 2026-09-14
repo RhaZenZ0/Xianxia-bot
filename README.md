@@ -470,6 +470,22 @@ Dynamic regional markets with supply, demand and a price index, rotating black m
 you dispatch and settle, protected auctions with escrowed bids, currencies per world, and a
 storage system from pouch to spatial ring. Item provenance is kept, and manuals never reach a market.
 
+The roads carry the world's own trade as well as yours: a travelling merchant sitting out its dwell
+at a stop sends a load ahead to the next one, planned by the same road planner your caravan uses and
+settled by the same resolver, with the takings going to its purse. And what you carry can be
+followed. Provenance records how strongly a thing is marked — an underworld broker's goods carry the
+night market's own heat, a hidden sect's grant carries its brand — and a bounty hunter closes faster
+on someone holding one, while shaking that hunter costs more. Never all of an escape: carrying the
+worst of it lengthens a chase rather than ending it, and the lever is the obvious one, because the
+trail is read off what is still in your bags or on your back. Sell the relic and it cools. A
+cultivator who has taken nothing is pursued exactly as before.
+
+Sects stock their own storehouses too. `sect_treasury` is what contribution points buy from, and it
+used to fill only when a player donated — so a sect nobody had joined had bare shelves forever. Its
+own disciples hand things in now, at a rate their numbers set and capped so a storehouse stays one,
+drawn from a content list that resolves against the tier of the world the sect's gate stands in. The
+cap refuses the next delivery and never takes back what you contributed.
+
 ### NPCs with lives
 
 NPCs cultivate, travel, work, marry, raise descendants who mature into simulated NPCs, take masters

@@ -634,6 +634,17 @@ func bountyHunterActionGo(conn *storage.Conn, _ worlddata.Catalog, userID int64,
 			power = max64(i64(attrs["body"]), i64(attrs["spirit"]))*3 + i64(c["realm_index"])*2 + equip["attack"]
 		}
 		gain := max64(5, 20+power-i64(hunt["hunter_power"])*2+stablePercentGo(p.PursuitID, userID, p.Action, p.GameMinute)/10)
+		// What you are carrying is what they are following (v1.0.0-rc.18).
+		// `item_provenance.tracking_strength` had five writers and no reader;
+		// this is the half of it a fugitive can feel. The floor inside
+		// trailEscapePenalty is the point: even carrying a hidden sect's
+		// brand an evade still makes progress, it just takes more of them -
+		// and the lever is to stop carrying the thing.
+		trail, err := carriedTrailTx(conn, userID)
+		if err != nil {
+			return authoritativeMutation{}, err
+		}
+		gain = max64(1, gain-trailEscapePenalty(gain, trail))
 		escape := min64(100, i64(hunt["escape_progress"])+gain)
 		pressure := max64(0, i64(hunt["pressure"])-gain/2)
 		status := fmt.Sprint(hunt["status"])
@@ -661,6 +672,15 @@ func bountyHunterActionGo(conn *storage.Conn, _ worlddata.Catalog, userID int64,
 		return authoritativeMutation{}, err
 	}
 	out := firstRowMap(final)
+	// Say what is giving them away. A rule the player cannot see is the fault
+	// this one was written to fix - `tracking_strength` spent five releases
+	// being printed as a number that decided nothing.
+	trail, err := carriedTrailTx(conn, userID)
+	if err != nil {
+		return authoritativeMutation{}, err
+	}
+	out["trail"] = trail
+	out["trail_word"] = trailWord(trail)
 	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "crime", EventType: "bounty_hunter.action", EntityType: "bounty_hunter_pursuit", EntityID: fmt.Sprint(p.PursuitID), GameMinute: p.GameMinute, Payload: out}}, nil
 }
 

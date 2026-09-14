@@ -6,6 +6,62 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.0** (rc.18) is the three faults rc.15's sweep reported and did not fix, and the one its own
+manifest shipped. Each is the same shape: a column, a branch or a table that the code was written
+around and nothing ever reached.
+
+**The manifest could not verify itself.** rc.16 shipped `RELEASE_MANIFEST.sha256` with a `.git` line
+in it, because the tree it was generated from was a git worktree, where `.git` is a one-line file
+rather than a directory. Nothing was wrong with the release - every other hash was correct - but
+`--verify` walks the tree it is checking, and in an ordinary clone `.git` is a directory and so is
+skipped, leaving an entry for a path the walker never yields. That reads as `MISSING .git` and fails
+the gate on every normal checkout, CI's included, which is where it was found: the one check whose
+whole job is to tell a corrupt package from a sound one, refusing a sound one. The exclusions are
+matched against every part of a path now rather than only its parents, so an excluded name is
+excluded whichever it is.
+
+**The world sends its own caravans.** `caravans.owner_type` has defaulted to `'npc'` since the table
+was built and the resolver has always had a branch reading `if owner_type == "player"` - the shape of
+code that expects a second kind of owner. There was never a second kind: the one production writer
+hardcodes `'player'`, so the default was unreachable, the guard guarded nothing, and every road in
+the four worlds was empty of trade unless a player put something on it. The travelling merchants are
+the natural senders - they already have a home, a route, a purse and a shelf of wares - so a merchant
+sitting out its dwell at a stop now sends a load ahead to the next one, planned by the same road
+planner a player's caravan uses, written as the same three rows, and settled by the same resolver.
+An arrival pays the sender, which meant the empty half of that branch had to be filled: a merchant's
+takings go to its trading purse and to the wealth the world reads, the way `payAuctionSeller` already
+paid an NPC consignor. One load per merchant at a time, four a tick, and a numeric `owner_key` is
+never written, so nothing a merchant sends can surface in a player's `/caravans`.
+
+**A sect with no players stocks its own storehouse.** `sect_treasury` is the shop a disciple spends
+contribution points at, and its only writer was `sect.contribute` - a player walking in with
+something in their bags. So the treasury of a sect no player had joined was empty when the world was
+made and empty a century later, and `sect_system.resource_policy` ("contribution points can be
+exchanged for stocked sect resources") described nothing that happened. The sects have their own
+people, and since rc.15 those rolls change every tick; they are the ones who hand things in now, at a
+rate their own numbers set, capped so a storehouse stays one. What they bring is content
+(`sect_system.tribute`), resolved against the tier of the world the sect's gate stands in through the
+same `EventSites.Material` the world events and the birth-family send-off use, so one three-line list
+is right for an Azure Cloud outer disciple and a Celestial Mandate Academy elder alike. A hidden sect
+takes none: its disciples have no counter to hand things in at. The cap refuses the next delivery and
+never takes anything back, so nothing a player contributed can be lost to a tick.
+
+**And what you carry can be followed.** `item_provenance.tracking_strength` is the sibling of
+`authenticity`, and had the same fault in the other direction: five writers set it with care - an
+underworld broker's goods at the post's own heat, a hidden sect's grant at seventy, a caravan's cargo
+at five or twenty depending on whether it is being smuggled - and nothing read it, so `/provenance`
+printed a number that decided nothing and a cultivator wearing a branded relic out of a night market
+was no easier to find than one carrying nothing. `bounty_hunter_pursuits` was sitting right there. The
+trail is the strongest mark on anything still carried *or worn* - worn matters, because
+`equipment.bind` takes an item out of the inventory and a trail read off the bags alone would go cold
+the moment its owner put the thing on - and it does two things and no more: a hunter closes faster,
+and shaking one costs more. Never all of an escape, because a fugitive who cannot run is a cutscene.
+An honest cultivator is pursued at exactly the rate this repo already had, since every honest writer
+passes zero. The lever is the obvious one and it is real: the trail is read off what is held, not off
+the provenance rows, which are never deleted - so selling the relic, or leaving it in a storehouse,
+cools it. `/hunter act` says in words what is giving you away, because a rule the player cannot see is
+the fault this one was written to fix. No schema change.
+
 **1.0.0** (rc.17) gives a small server a way to be found, and a cultivator a way to see what they are
 waiting on. `/vote` prints the server's page on whichever listing site the operator set
 (`VOTE_SITE_URL` / `VOTE_SITE_NAME` - Top.gg, DISBOARD, whichever) and offers one claim every twelve

@@ -519,6 +519,32 @@ type SectRecruitment struct {
 	Examiner string `json:"examiner"`
 }
 
+// SectTribute is what a sect's own disciples hand in (v1.0.0-rc.18).
+//
+// `sect_treasury` is the shop a disciple spends contribution points in, and
+// until now its only writer was `sect.contribute` - a player handing something
+// over. A sect with no player members therefore stocked nothing, ever, which
+// made the content's own `resource_policy` ("contribution points can be
+// exchanged for stocked sect resources") false for twelve of the thirteen
+// sects at any given time, and made joining a quiet sect strictly worse than
+// joining a busy one for a reason no player could see.
+//
+// The roster is content rather than code for the reason the event sites are:
+// `@herb`/`@ore`/`@core` resolve against the tier of the world the sect's gate
+// stands in, through the same `EventSites.Material`, so one list stays correct
+// from the Mortal World to the Celestial.
+type SectTribute struct {
+	// Materials are refs (`@herb`) or literal item ids, handed in together.
+	Materials []string `json:"materials"`
+	// DisciplesPerLot is how many living disciples it takes to bring in one
+	// of each material per tick. A sect is its people: a valley with three
+	// beast-tamers stocks more than a pavilion with two.
+	DisciplesPerLot int64 `json:"disciples_per_lot"`
+	// Cap is the most of any one material a treasury holds from tribute. A
+	// storehouse that grows without limit is not a storehouse.
+	Cap int64 `json:"cap"`
+}
+
 type SectDefinition struct {
 	Alignment string `json:"alignment"`
 	Hidden    bool   `json:"hidden"` // the Heaven-Devouring Demon Sect: no public trial, no entry manual
@@ -710,6 +736,28 @@ func Load(path string) (Catalog, error) {
 		return Catalog{}, fmt.Errorf("world catalog missing paths or roots")
 	}
 	return c, nil
+}
+
+// SectTribute reads the tribute block out of `sect_system`.
+//
+// `SectSystem` is an untyped map because most of what is in it (the rank
+// ladder, the policy prose) is read by Python off the same file; this is the
+// one part the engine acts on, so it is decoded into a shape rather than
+// indexed by string at the call site. Called once a tick, not once per sect.
+func (c Catalog) SectTribute() SectTribute {
+	raw, ok := c.SectSystem["tribute"]
+	if !ok {
+		return SectTribute{}
+	}
+	encoded, err := json.Marshal(raw)
+	if err != nil {
+		return SectTribute{}
+	}
+	var out SectTribute
+	if err := json.Unmarshal(encoded, &out); err != nil {
+		return SectTribute{}
+	}
+	return out
 }
 
 func (c Catalog) NormalizePath(raw string) (string, bool) {

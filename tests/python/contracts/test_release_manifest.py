@@ -10,9 +10,12 @@ This is a release gate. If it fails, the fix is to regenerate:
     python3 scripts/release_manifest.py --write
 """
 from tests.support import PROJECT_ROOT
+import importlib.util
 import subprocess
 import sys
+import tempfile
 import unittest
+from pathlib import Path
 
 SCRIPT = PROJECT_ROOT / "scripts" / "release_manifest.py"
 MANIFEST = PROJECT_ROOT / "RELEASE_MANIFEST.sha256"
@@ -54,6 +57,30 @@ class ReleaseManifestTests(unittest.TestCase):
             "RELEASE_MANIFEST.sha256 is out of date. Regenerate it with:\n"
             "    python3 scripts/release_manifest.py --write\n\n" + result.stdout + result.stderr,
         )
+
+    def test_walker_skips_excluded_names_that_are_files_not_directories(self):
+        """`.git` is a file in a worktree checkout, and hashing it broke the gate.
+
+        v1.0.0-rc.16 shipped a manifest with a `.git` line in it, because the
+        tree it was generated from was a git worktree, where `.git` is a
+        one-line file rather than a directory. Nothing was wrong with the
+        release: every other hash was correct. But `--verify` walks the tree it
+        is checking, and in an ordinary clone `.git` is a directory and so is
+        skipped - leaving an entry for a path the walker never yields, which
+        reads as `MISSING .git` and fails the gate on every normal checkout,
+        CI's included.
+
+        The exclusions are now matched against every part of a path rather than
+        only its parents, so an excluded name is excluded whichever it is.
+        """
+        for name in (".git", ".venv", "__pycache__"):
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                (root / "shipped.txt").write_text("real content\n", encoding="utf-8")
+                (root / name).write_text("gitdir: /elsewhere/.git/worktrees/x\n", encoding="utf-8")
+                listed = {rel.as_posix() for rel, _ in _manifest_module().iter_release_files(root)}
+                self.assertIn("shipped.txt", listed)
+                self.assertNotIn(name, listed, f"{name} is never part of a release")
 
     def test_manifest_check_uses_only_portable_checksum_flags(self):
         """The updater runs on a QNAP NAS, where sha256sum is BusyBox, not GNU.
@@ -111,6 +138,19 @@ class ReleaseManifestTests(unittest.TestCase):
         verify_at = source.index("verify_release_manifest\n")
         install_at = source.index('echo "Installing Xianxia RP')
         self.assertLess(verify_at, install_at, "manifest check must run before install begins")
+
+
+def _manifest_module():
+    """The release manifest script, imported as a module by path.
+
+    It lives in `scripts/` rather than in a package, so there is nothing to
+    import by name - and it is the walker itself that needs testing, not the
+    command line around it.
+    """
+    spec = importlib.util.spec_from_file_location("release_manifest", SCRIPT)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 if __name__ == "__main__":

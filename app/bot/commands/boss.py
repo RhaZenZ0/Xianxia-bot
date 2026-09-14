@@ -217,7 +217,12 @@ async def hunter_act(interaction: discord.Interaction, pursuit_id: int, action: 
     except GameEngineError as exc:
         await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
         return
+    # The trail is the engine's word for what the hunter is following - what
+    # the cultivator is still carrying that carries somebody's mark. It is read
+    # off the action result rather than computed here: the rule is Go's.
+    trail = f"\nTrail **{int(result.get('trail') or 0)}%** — {result.get('trail_word', '')}" if result.get("trail_word") else ""
     await interaction.followup.send(
-        f"🎯 **{result.get('hunter_name', 'Hunter')}** • status **{result.get('status', 'active')}** • pressure {result.get('pressure', 0)}% • escape {result.get('escape_progress', 0)}% • capture {result.get('capture_progress', 0)}%",
+        f"🎯 **{result.get('hunter_name', 'Hunter')}** • status **{result.get('status', 'active')}** • pressure {result.get('pressure', 0)}% • escape {result.get('escape_progress', 0)}% • capture {result.get('capture_progress', 0)}%"
+        + trail,
         ephemeral=False,
     )

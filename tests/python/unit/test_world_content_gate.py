@@ -281,6 +281,55 @@ class TreasureContentTests(unittest.TestCase):
                                 f"{key} is only sold outside {world}")
 
 
+class SectTributeContentTests(unittest.TestCase):
+    """v1.0.0-rc.18: a sect's own disciples stock its storehouse.
+
+    `sect_treasury` had one writer, `sect.contribute`, and it needed a player
+    holding the goods - so a sect with no player members stocked nothing, ever,
+    and `sect_system.resource_policy` ("contribution points can be exchanged for
+    stocked sect resources") described nothing that happened. What the disciples
+    bring is content, and these are the two things the engine cannot check for
+    itself: that the refs resolve on every tier, and that what they resolve to
+    is a real item.
+    """
+
+    @property
+    def tribute(self) -> dict:
+        return WORLD["sect_system"]["tribute"]
+
+    def test_the_tribute_roster_is_present_and_sized(self):
+        self.assertTrue(self.tribute["materials"], "the disciples bring nothing")
+        self.assertGreaterEqual(int(self.tribute["disciples_per_lot"]), 1)
+        self.assertGreaterEqual(int(self.tribute["cap"]), 1)
+
+    def test_every_material_resolves_on_every_tier_to_a_real_item(self):
+        tiers = WORLD["event_sites"]["tier_materials"]
+        self.assertGreaterEqual(len(tiers), 4, "the tier table lost a world")
+        for ref in self.tribute["materials"]:
+            for world, table in tiers.items():
+                with self.subTest(ref=ref, world=world):
+                    item = table[ref[1:]] if ref.startswith("@") else ref
+                    self.assertTrue(item, f"{ref} resolves to nothing in {world}")
+                    self.assertIn(item, WORLD["items"], f"{ref} is not an item in {world}")
+
+    def test_every_sect_that_takes_tribute_stands_in_a_world_with_a_tier(self):
+        """A gate in a world the tier table does not cover would stock nothing.
+
+        The hidden sect is the one exception and is excluded by the engine
+        rather than by content: its disciples have no counter to hand things
+        in at.
+        """
+        tiers = WORLD["event_sites"]["tier_materials"]
+        public = {name: s for name, s in WORLD["sects"].items() if not s.get("hidden")}
+        self.assertGreaterEqual(len(public), 12)
+        for name, sect in public.items():
+            with self.subTest(sect=name):
+                gate = str((sect.get("recruitment") or {}).get("location") or "")
+                self.assertTrue(gate, f"{name} has no gate to stand at")
+                world = WORLD["locations"][gate]["world"]
+                self.assertIn(world, tiers, f"{name} stands in {world}, which has no tier")
+
+
 class NpcContentTests(unittest.TestCase):
     def test_every_npc_has_the_narrator_fields(self):
         for name, npc in WORLD["npcs"].items():

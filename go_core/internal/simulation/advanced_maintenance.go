@@ -11,6 +11,7 @@ import (
 
 	"xianxia/core/internal/game"
 	"xianxia/core/internal/storage"
+	"xianxia/core/internal/worlddata"
 )
 
 var bountyHunterTitles = []string{
@@ -167,6 +168,13 @@ func (r *Runner) advancedMaintenance(conn *storage.Conn, gm int64, automation ma
 	if err != nil {
 		return Run{}, false, err
 	}
+	// The world's own trade (v1.0.0-rc.18): merchants send loads down the
+	// roads before the resolver settles what has arrived, so a caravan is
+	// never dispatched and resolved inside the same pass.
+	counts["caravans_sent"], err = game.DispatchNPCCaravans(conn, r.World, gm)
+	if err != nil {
+		return Run{}, false, err
+	}
 	counts["caravans"], err = r.advanceCaravans(conn, gm)
 	if err != nil {
 		return Run{}, false, err
@@ -210,7 +218,7 @@ func (r *Runner) advancedMaintenance(conn *storage.Conn, gm int64, automation ma
 	if !changed {
 		return Run{}, false, nil
 	}
-	summary := fmt.Sprintf("auctions=%d merchants=%d merchant_bids=%d secret_realms=%d hunters_spawned=%d hunters_updated=%d wars=%d occupations=%d caravans=%d seclusions=%d commissions_expired=%d moderations_expired=%d era_changed=%t", counts["auctions"], counts["merchants"], counts["merchant_bids"], counts["secret_realms"], counts["hunters_spawned"], counts["hunters_updated"], counts["wars"], counts["occupations"], counts["caravans"], counts["seclusions"], counts["commissions_expired"], counts["moderations_expired"], eraChanged)
+	summary := fmt.Sprintf("auctions=%d merchants=%d merchant_bids=%d secret_realms=%d hunters_spawned=%d hunters_updated=%d wars=%d occupations=%d caravans_sent=%d caravans=%d seclusions=%d commissions_expired=%d moderations_expired=%d era_changed=%t", counts["auctions"], counts["merchants"], counts["merchant_bids"], counts["secret_realms"], counts["hunters_spawned"], counts["hunters_updated"], counts["wars"], counts["occupations"], counts["caravans_sent"], counts["caravans"], counts["seclusions"], counts["commissions_expired"], counts["moderations_expired"], eraChanged)
 	return Run{System: "advanced_world", DueSteps: 1, AppliedSteps: 1, Summary: summary}, true, nil
 }
 
@@ -351,7 +359,16 @@ func (r *Runner) advanceHunters(conn *storage.Conn, gm int64) (int64, error) {
 	rows := maps(res)
 	for _, p := range rows {
 		elapsed := max64(1, (gm-i64(p["next_action_game_minute"]))/minutesPerDay+1)
-		pressure := min64(100, i64(p["pressure"])+int64(math.Round(float64(elapsed*(8+i64(p["hunter_power"])))*m)))
+		// The trail (v1.0.0-rc.18): a quarry carrying something with a seal
+		// still on it is found faster than one carrying nothing. This is the
+		// hunter's half of `item_provenance.tracking_strength`, which five
+		// writers set with care and nothing had ever read.
+		trail, err := game.CarriedTrail(conn, i64(p["user_id"]))
+		if err != nil {
+			return 0, err
+		}
+		step := int64(math.Round(float64(elapsed*(8+i64(p["hunter_power"]))) * m))
+		pressure := min64(100, i64(p["pressure"])+step+game.TrailPressureBonus(step, trail))
 		capture := i64(p["capture_progress"])
 		status := fmt.Sprint(p["status"])
 		if pressure >= 65 {
@@ -566,12 +583,9 @@ func (r *Runner) advanceCaravans(conn *storage.Conn, gm int64) (int64, error) {
 		if seized {
 			outcome = "seized"
 		}
-		if fmt.Sprint(c["owner_type"]) == "player" && final > 0 {
-			uid, e := strconv.ParseInt(fmt.Sprint(c["owner_key"]), 10, 64)
-			if e == nil {
-				if err = walletDeltaSim(conn, uid, currency, final); err != nil {
-					return 0, err
-				}
+		if final > 0 {
+			if err = payCaravanOwner(conn, r.World, c, currency, final); err != nil {
+				return 0, err
 			}
 		}
 		if _, err = conn.Execute(`UPDATE caravans SET status=?,updated_at=? WHERE caravan_id=?`, []any{outcome, now, i64(c["caravan_id"])}); err != nil {
@@ -595,6 +609,43 @@ func (r *Runner) advanceCaravans(conn *storage.Conn, gm int64) (int64, error) {
 		}
 	}
 	return int64(len(rows)), nil
+}
+
+// payCaravanOwner credits whoever sent the load (v1.0.0-rc.18).
+//
+// This used to be a bare `owner_type == "player"` guard with nothing on its
+// other side, which was correct for as long as only players could send a
+// caravan - and that was the fault, not the guard: the world produced no trade
+// of its own. Now that a merchant can send one, the branch has to pay one, and
+// it pays the way `payAuctionSeller` does, into the only purse an NPC has.
+func payCaravanOwner(conn *storage.Conn, catalog worlddata.Catalog, c map[string]any, currency string, amount int64) error {
+	key := strings.TrimSpace(fmt.Sprint(c["owner_key"]))
+	if key == "" || amount <= 0 {
+		return nil
+	}
+	if fmt.Sprint(c["owner_type"]) == "player" {
+		uid, err := strconv.ParseInt(key, 10, 64)
+		if err != nil {
+			// An owner_key that is not a user id is not a player caravan
+			// however the row is labelled; paying user 0 would write a
+			// wallet for a character that does not exist.
+			return nil
+		}
+		return walletDeltaSim(conn, uid, currency, amount)
+	}
+	// A merchant's takings go two places, because it has two purses and both
+	// are read: `merchant_state.budget` is what it bids and buys with, and
+	// `npc_civilization_state.wealth` is what the world and the narrator see.
+	if _, err := conn.Execute(`UPDATE merchant_state SET budget=budget+?,updated_at=? WHERE merchant=?`, []any{amount, nowFloat(), key}); err != nil {
+		return err
+	}
+	npc := game.NPCCaravanSenderName(catalog, key)
+	if npc == "" {
+		return nil
+	}
+	_, err := conn.Execute(`UPDATE npc_civilization_state SET wealth=MIN(9999,wealth+?),updated_at=? WHERE npc_name=?`,
+		[]any{maxSim(1, amount/8), nowFloat(), npc})
+	return err
 }
 
 func (r *Runner) advanceEra(conn *storage.Conn, gm int64) (bool, error) {
