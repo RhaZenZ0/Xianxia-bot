@@ -864,6 +864,18 @@ SURFACE = {
         "leaves": {
         },
     },
+    "commands/cooldowns.py": {
+        "groups": (),
+        "roots": ('cooldowns',),
+        "leaves": {
+        },
+    },
+    "commands/support.py": {
+        "groups": (),
+        "roots": ('vote',),
+        "leaves": {
+        },
+    },
     "commands/territory.py": {
         "groups": ('territory_group', 'war_group', 'caravan_group', 'party_group'),
         "roots": (),

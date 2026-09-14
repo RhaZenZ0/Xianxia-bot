@@ -61216,6 +61216,30 @@
     "grade_bonus_per_rank": 0.02,
     "purity_bonus_at_full": 0.1
   },
+  "patron_gift": {
+    "by_profession": {
+      "Alchemy": "@herb",
+      "Foraging": "@herb",
+      "Forging": "@ore",
+      "Formation": "@ore",
+      "Inscription": "@ore",
+      "Artifact Refining": "@ore",
+      "Beast Taming": "@core"
+    },
+    "by_path": {
+      "Sword Cultivator": "@ore",
+      "Qi Refiner": "@herb",
+      "Body Refiner": "@herb",
+      "Soul Cultivator": "@core",
+      "Beast Binder": "@core",
+      "Formation Adept": "@ore",
+      "Ghost Cultivator": "@core"
+    },
+    "default": "@herb",
+    "untiered": [
+      "@core"
+    ]
+  },
   "event_sites": {
     "tier_materials": {
       "Mortal World": {

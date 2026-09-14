@@ -62,6 +62,56 @@ the provenance rows, which are never deleted - so selling the relic, or leaving 
 cools it. `/hunter act` says in words what is giving you away, because a rule the player cannot see is
 the fault this one was written to fix. No schema change.
 
+**1.0.0** (rc.17) gives a small server a way to be found, and a cultivator a way to see what they are
+waiting on. `/vote` prints the server's page on whichever listing site the operator set
+(`VOTE_SITE_URL` / `VOTE_SITE_NAME` - Top.gg, DISBOARD, whichever) and offers one claim every twelve
+hours, the cadence every listing site resets a vote on. The gift is sized to the cultivator rather
+than flat: fifteen of the local world's low-grade currency and five more for every realm climbed
+inside that world - fifteen to fifty, and never less than the flat fifteen everybody used to get -
+and with it one material the character actually uses, a herb for an alchemist, ore for a smith or a
+sword cultivator, a beast core for a tamer, profession before path and resolved against the tier of
+the world they stand in through the same `EventSites.Material` the world events use. The mapping is
+content (`patron_gift` in `content/world.json`), so a new path needs no engine change. `@herb` and
+`@ore` tier by name; `@core` deliberately does not, because beast_core is the same item in all four
+worlds and nineteen recipes and nineteen shops across every tier - the Celestial tier-4 and tier-5
+floors included - still trade in it, so forking it into tiered cores would hand a Celestial tamer an
+item no recipe accepts and no shop buys. It tiers by number instead: one core in the Mortal World,
+four in the Celestial, the herb's own 2-to-20 ladder in another shape. Which refs work that way is
+content too (`patron_gift.untiered`), and the content gate checks it against the tier table in both
+directions.
+
+Nothing verifies the vote, and that is a decision rather than an omission. Verification means an
+inbound webhook, which means publishing an endpoint from a box that publishes nothing - a door opened
+for a thank-you, one release after Hardened I closed the last ones. So the claim is taken on trust
+and the *cadence* is the engine's: someone who claims without voting is thanked no more often than
+someone who votes, and the gift is small against what playing pays. From Friday 00:00 to Sunday 23:59
+the whole of it doubles, in a named zone (Europe/Amsterdam) rather than a fixed offset so the window
+opens at local midnight in December as well as June - one pure function over an injected time, pinned
+at eight instants either side of the daylight change, with the game package blank-importing
+`time/tzdata` because neither the engine image nor CI carries a timezone database. A worker announces
+the window once in the server's existing announcement channel when it opens and once when it closes,
+marked by the window's own key in `channel_messages`, so a restart mid-weekend cannot post twice and
+a first tick on a quiet Tuesday cannot announce the end of a weekend nobody heard about.
+
+`/cooldowns` is the aggregate view this repo never had. The engine meters two dozen waits plus half a
+dozen that are not cooldown rows at all - a road journey, closed-door seclusion, the sect trial's
+retry, a realm seal, the Samsara wait, a GM mute - and the only way to find one was to try the action
+and read the refusal. One query (`cooldown.status`) puts three clocks on one axis: wall-clock rows,
+game-minute waits converted through the world clock, and each wall-clock column, emitted as
+structured rows that Python turns into words. The case the conversion cannot cover is reported rather
+than faked - a world the GM has stopped has no real moment of arrival, so the card says so instead of
+counting down to 1970. Under the waits is everything *ready*, each naming the hub page that runs it
+and filtered so it is not noise: no ghost road unless the cultivator walks it, no perfection quest
+without a perfection under way. The roster of cooldown keys is the part that never existed -
+`admin.player.reset_cooldowns` deletes rows wholesale precisely because no such list did - and a Go
+test now walks the package AST for every `setCooldown` call and both raw inserts, resolving five
+expression shapes, with a second test pinning that the scanner still resolves all five because a
+scanner that matches nothing passes forever. A Python test mirrors it from the other side: every
+family the engine can emit has a label, and no label outlives its family. Fixed along the way:
+`support.vote_claim` wrote the wallet with a raw upsert instead of `walletDeltaTx`, skipping that
+helper's int64 overflow guard and its `low_spirit_stone` mirror onto the character sheet, so every
+Mortal-World claim left the sheet stale against the wallet. No schema change.
+
 **1.0.0** (rc.16) adds the shorthand: `x explore` runs `/explore`. Typed play has had one door since
 v0.21.1, the prefix, and it reaches the world through the verb table in `content/typed_play.json` -
 which is eight of the forty-three roots. There has never been a way to type a command by its own
