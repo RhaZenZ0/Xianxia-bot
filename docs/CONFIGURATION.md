@@ -69,38 +69,31 @@ cannot drain the shared OpenRouter allowance for everyone. `TYPED_PLAY_HINT`
 shows a player, once a day, how to use the prefix the first time an
 un-prefixed line of theirs looks like an action.
 
-### Server listing / vote rewards (`/vote`)
+### The patron's tribute (`/tribute`)
 
-`VOTE_SITE_URL` is this server's page on a Discord listing site — Top.gg,
-DISBOARD, whichever you list on — and `VOTE_SITE_NAME` is what players see it
-called. Left empty it reads "the server listing", which is deliberate: a
-default that named one site would label your listing with somebody else's
-brand until you noticed. Set the URL and `/vote` appears as a working command: it prints the
-link, and once per twenty-four hours (Discadia's vote cadence) a player
-can claim a patron's gift — fifteen of the local world's low-grade currency
-plus five for every realm they have climbed inside that world, and a
-tier-material their craft or their path uses (a beast core, which is the same
-item in every world, arrives in greater number instead of a richer name). Leave `VOTE_SITE_URL` empty and `/vote` says so
-and grants nothing.
+`/tribute` pays a cultivator a patron's gift once every twelve hours, doubled
+from Friday through Sunday. There is nothing to configure: it began as a reward
+for voting the server up a listing site, and it is now the world's own, so no
+listing, API key or endpoint is involved and there is nothing to verify.
 
-From Friday through Sunday the gift doubles. That window is measured in
-`Europe/Amsterdam` so it opens at local midnight all year rather than drifting
-an hour when the clocks change; it is a constant in the engine
-(`support_actions.go`), not a key here. When a listing URL is set, the bot also
-announces the weekend once in the server's announcement channel as it opens and
-once as it closes — the channel the GM already configures under
+The gift is fifteen of the local world's low-grade currency plus five for every
+realm the cultivator has climbed inside that world, and a tier-material their
+craft or their path uses (a beast core, which is the same item in every world,
+arrives in greater number instead of a richer name). The twelve hours and the
+weekend window are both engine constants (`supportVoteCooldownSeconds` and
+`supportWeekendZoneName` in `support_actions.go`), not keys here; the weekend is
+measured in `Europe/Amsterdam` so it opens at local midnight all year rather
+than drifting an hour when the clocks change.
+
+The bot announces the doubled weekend once in the server's announcement channel
+as it opens and once as it closes — the channel the GM already configures under
 **/admin → Server**, so there is nothing further to set.
 
-It must be a single `https://` URL with no spaces, or the bot refuses to
-start — the value is printed into a public channel, so a typo is caught at
-boot rather than posted to every player.
-
-The claim is **taken on trust**: no listing site can tell this deployment that
-a vote happened without an inbound webhook, and that would mean publishing an
-endpoint from a box that currently publishes nothing. The twelve-hour cooldown
-is the engine's (`support.vote_claim`), so a player who claims without voting
-is thanked no more often than one who votes — and every claim is a row in the
-domain event ledger either way.
+The engine operations behind it are still named `support.vote_*` and the
+cooldown key is still `support_vote`. Those strings are written into
+`domain_events` and `cooldowns`, so renaming them would orphan existing rows or
+hand every player a free claim; the name a player types is presentation, the
+name the ledger keeps is data.
 
 ### Administrator chat monitor (`/admin` → Server → Chat Digest)
 

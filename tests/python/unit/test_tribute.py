@@ -1,16 +1,21 @@
-"""`/vote`: the listing link, and the one grant the engine cannot verify.
+"""`/tribute`: the world's own gift, and the three things Python owns about it.
 
-A vote on Top.gg or DISBOARD happens on someone else's website and this
-deployment publishes nothing an inbound webhook could reach, so the claim is
-taken on trust. That makes three Python-owned properties worth holding, and
-none of them is the reward arithmetic — that is the engine's (`support.vote_claim`,
+The gift began as `/vote`, a thank-you for voting the server up a listing site,
+and was shaped around Top.gg's API and then Discadia's before both were dropped.
+What is left involves nothing outside this deployment, which removes the whole
+category of test this file used to carry - there is no URL to validate, no site
+name to bound, and nothing taken on trust because there is nothing to verify.
+
+Four properties are still Python's, and none of them is the reward arithmetic —
+that is the engine's (`support.vote_claim`,
 `go_core/internal/game/support_actions_test.go`):
 
-1. the operator's URL is validated before it is ever printed into a channel;
-2. `/vote` is a *registered* root, because a command a player cannot type is
-   no use as a link to a listing site;
-3. the command reads the gift off the engine's receipt rather than computing
-   one, and the claim button belongs to the cultivator who opened it.
+1. `/tribute` is a *registered* root, because a daily gift nobody can reach is
+   not a gift;
+2. the command reads what was paid off the engine's receipt rather than
+   computing it, and the claim button belongs to the cultivator who opened it;
+3. the cadence players are told is the one the engine actually enforces;
+4. the name it greets a player by is theirs, and cannot reach into the message.
 """
 from __future__ import annotations
 
@@ -23,92 +28,52 @@ from unittest.mock import patch
 
 from tests.support import PROJECT_ROOT
 
-from app.ops.config import _vote_site_name, _vote_site_url
-
 ENV = {"DISCORD_TOKEN": "test-token", "GUILD_ID": "123456789012345678",
        "ENGINE_AUTH_TOKEN": "test-engine-token-1234567890", "DATABASE_PATH": "data/test.sqlite3"}
 
 SUPPORT = (PROJECT_ROOT / "app" / "bot" / "commands" / "support.py").read_text(encoding="utf-8")
 SURFACE = (PROJECT_ROOT / "app" / "bot" / "surface.py").read_text(encoding="utf-8")
+SUPPORT_GO = (PROJECT_ROOT / "go_core" / "internal" / "game" / "support_actions.go").read_text(encoding="utf-8")
 
 
-class TheOperatorsListingURLIsValidated(unittest.TestCase):
-    def test_an_https_url_is_kept_and_an_absent_one_disables_the_command(self):
-        self.assertEqual(_vote_site_url("https://top.gg/servers/123"), "https://top.gg/servers/123")
-        self.assertEqual(_vote_site_url("  https://disboard.org/server/123  "), "https://disboard.org/server/123")
-        for absent in (None, "", "   "):
-            with self.subTest(absent=absent):
-                self.assertEqual(_vote_site_url(absent), "")
-
-    def test_anything_that_is_not_one_https_url_fails_at_startup(self):
-        # The value is printed into a public channel, so a typo is caught at
-        # boot rather than posted to every player.
-        for bad in ("top.gg/servers/123", "http://top.gg", "javascript:alert(1)",
-                    "https://top.gg/x https://evil.example", "https://" + "a" * 300):
-            with self.subTest(bad=bad):
-                with self.assertRaises(ValueError):
-                    _vote_site_url(bad)
-
-    def test_the_site_name_is_trimmed_bounded_and_defaulted(self):
-        # Deliberately names no site: a default that ships one brand labels
-        # every operator's listing with it until they notice.
-        self.assertEqual(_vote_site_name(None), "the server listing")
-        self.assertEqual(_vote_site_name("   "), "the server listing")
-        self.assertEqual(_vote_site_name(" DISBOARD "), "DISBOARD")
-        self.assertEqual(_vote_site_name("Top\n.gg"), "Top .gg")
-        self.assertEqual(len(_vote_site_name("x" * 90)), 40)
-
-
-class TheCadencePlayersAreToldIsTheOneTheEngineEnforces(unittest.TestCase):
-    """The wait is a Go constant; the promise is Python copy. They can drift.
-
-    The cadence is not a balance dial - it is whatever the listing site resets
-    a vote on (Discadia, a day). So it moves when the operator changes listing,
-    and when it moves the three places /vote states it in have to move with it.
-    Nothing but this test connects them, and a player told "every 24h" by a bot
-    that refuses them for 48 has been lied to by the software.
-    """
-
-    SUPPORT_GO = (PROJECT_ROOT / "go_core" / "internal" / "game" / "support_actions.go").read_text(encoding="utf-8")
-
-    def engine_cooldown_hours(self) -> int:
-        match = re.search(r"supportVoteCooldownSeconds int64 = (\d+) \* 60 \* 60", self.SUPPORT_GO)
-        self.assertIsNotNone(match, "supportVoteCooldownSeconds is no longer written as <hours> * 60 * 60")
-        return int(match.group(1))
-
-    def test_the_engine_meters_the_gift_at_discadias_cadence(self):
-        self.assertEqual(
-            self.engine_cooldown_hours(), 24,
-            "the vote cooldown no longer matches Discadia's 24h vote reset - if the "
-            "server has moved to another listing this is the right place to change it, "
-            "and docs/CONFIGURATION.md and README.md say the number out loud too",
-        )
-
-    def test_the_command_quotes_that_same_number_to_players(self):
-        hours = self.engine_cooldown_hours()
-        promised = set(re.findall(r"renews every \*\*(\d+)h\*\*|pays every \*\*(\d+)h\*\*", SUPPORT))
-        stated = {int(value) for pair in promised for value in pair if value}
-        self.assertTrue(stated, "/vote no longer tells a player how often the gift renews")
-        self.assertEqual(
-            stated, {hours},
-            f"/vote promises {sorted(stated)}h but the engine enforces {hours}h",
-        )
-
-
-class VoteIsARootAPlayerCanType(unittest.TestCase):
+class TributeIsARootAPlayerCanType(unittest.TestCase):
     def test_it_is_registered_with_discord_rather_than_buried_in_a_hub(self):
         # Only a handful of roots are on the tree (see register_command_surface);
-        # everything else is hub metadata. A listing link is worthless if the
-        # way to it is four taps into a panel, so /vote is one of the few.
-        self.assertIn('"menu", "vote"', SURFACE)
+        # everything else is hub metadata. A gift four taps into a panel is a
+        # gift most players never find, so /tribute is one of the few.
+        self.assertIn('"menu", "tribute"', SURFACE)
         self.assertIn("from .commands import support as _commands_support", SURFACE)
         with patch.dict(os.environ, ENV):
             surface = importlib.import_module("app.bot.surface")
-            self.assertEqual(surface.ACTIONS.root("vote").name, "vote")
+            self.assertEqual(surface.ACTIONS.root("tribute").name, "tribute")
 
 
-class TheClaimIsTheEnginesToDecide(unittest.TestCase):
-    def test_the_command_computes_no_reward_of_its_own(self):
+class NothingOutsideTheWorldIsInvolved(unittest.TestCase):
+    """The whole point of the rewrite: no listing, no key, no endpoint.
+
+    This is the test that fails if somebody reintroduces a site. The command
+    took a URL and a site name from the operator's environment for most of its
+    life, and a half-restored version of that is how it would come back.
+    """
+
+    def test_the_command_reads_no_listing_configuration(self):
+        for gone in ("vote_site_url", "vote_site_name", "VOTE_SITE_URL", "VOTE_SITE_NAME"):
+            with self.subTest(gone=gone):
+                self.assertNotIn(gone, SUPPORT)
+
+    def test_those_settings_no_longer_exist_at_all(self):
+        with patch.dict(os.environ, ENV):
+            from app.ops.config import Settings
+
+            settings = Settings.from_env()
+            for gone in ("vote_site_url", "vote_site_name"):
+                with self.subTest(gone=gone):
+                    self.assertFalse(hasattr(settings, gone), f"{gone} survived on Settings")
+
+    def test_the_engine_is_still_asked_by_its_old_operation_names(self):
+        # Deliberate: `support.vote_*` and the `support_vote` cooldown key are
+        # written into domain_events and cooldowns. Renaming them to match the
+        # command would orphan those rows, or hand every player a free claim.
         tree = ast.parse(SUPPORT)
         operations = {
             node.args[0].value
@@ -118,8 +83,11 @@ class TheClaimIsTheEnginesToDecide(unittest.TestCase):
             and node.args and isinstance(node.args[0], ast.Constant)
         }
         self.assertEqual(operations, {"support.vote_status", "support.vote_claim", "support.weekend"})
-        # The gift's size, its currency and the twelve-hour wait are all read
-        # back off the engine's result; nothing here multiplies anything.
+        self.assertIn('budget_refusal_line(interaction.user.id, "vote_claim")', SUPPORT)
+
+
+class TheGiftIsTheEnginesToDecide(unittest.TestCase):
+    def test_the_command_computes_no_reward_of_its_own(self):
         for read in ('result.get("amount")', 'result.get("currency")', 'result.get("balance")',
                      'result.get("item_id")', 'result.get("item_quantity")',
                      'status.get("remaining_seconds")', 'status.get("claimable")',
@@ -130,7 +98,6 @@ class TheClaimIsTheEnginesToDecide(unittest.TestCase):
     def test_the_button_is_owner_gated_and_spends_the_shared_budget(self):
         self.assertIn("async def interaction_check", SUPPORT)
         self.assertIn("!= self.owner_id", SUPPORT)
-        self.assertIn('budget_refusal_line(interaction.user.id, "vote_claim")', SUPPORT)
 
     def test_a_claim_carries_a_unique_action_id_so_a_retry_cannot_pay_twice(self):
         self.assertIn('action_id=f"discord:{interaction.id}:support.vote_claim"', SUPPORT)
@@ -158,19 +125,79 @@ class TheClaimIsTheEnginesToDecide(unittest.TestCase):
                               "weekend": True, "multiplier": 2})
         self.assertIn("Doubled", doubled)
 
-    def test_the_link_is_shown_to_someone_who_has_no_cultivator_yet(self):
-        # The person a listing site just brought in has no character. Turning
-        # them away before they have read the link would be the command
-        # defeating its own purpose, so only the *gift* needs a cultivator.
-        body = SUPPORT[SUPPORT.index("async def vote("):]
+    def test_someone_with_no_cultivator_yet_is_told_what_one_would_get_them(self):
+        # The tribute is a reason to begin, so the person who has not begun is
+        # exactly who should read about it rather than be turned away.
+        body = SUPPORT[SUPPORT.index("async def tribute("):]
         self.assertIn("DB.get_character(interaction.user.id) is None", body)
-        self.assertLess(body.index("Vote here:"), body.index("DB.get_character"))
         called = {
             node.func.id
             for node in ast.walk(ast.parse(SUPPORT))
             if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
         }
         self.assertNotIn("require_character", called)
+
+
+class ThePlayerIsGreetedByTheirOwnName(unittest.TestCase):
+    """A nickname is text somebody else chose, arriving in our message."""
+
+    def setUp(self):
+        with patch.dict(os.environ, ENV):
+            self.support = importlib.import_module("app.bot.commands.support")
+
+    def test_the_server_nickname_is_what_is_used(self):
+        from types import SimpleNamespace
+
+        self.assertEqual(self.support._addressed(SimpleNamespace(display_name="Elder Li")), "Elder Li")
+
+    def test_a_nickname_cannot_reach_into_the_rest_of_the_line(self):
+        # Without escaping, a cultivator called "**" bolds everything after
+        # their name in every message the gift is announced in.
+        from types import SimpleNamespace
+
+        escaped = self.support._addressed(SimpleNamespace(display_name="**Elder** _Li_"))
+        self.assertNotIn("**Elder**", escaped)
+        self.assertIn("Elder", escaped)
+
+    def test_a_missing_name_still_addresses_somebody(self):
+        from types import SimpleNamespace
+
+        self.assertEqual(self.support._addressed(SimpleNamespace(display_name="")), "Cultivator")
+        self.assertEqual(self.support._addressed(SimpleNamespace()), "Cultivator")
+
+    def test_the_receipt_greets_them_when_there_is_a_name_and_not_when_there_is_not(self):
+        paid = {"amount": 20, "currency": "low_spirit_stone", "balance": 20}
+        self.assertIn("Good work, **Elder Li**", self.support._gift_line(paid, name="Elder Li"))
+        self.assertNotIn("Good work", self.support._gift_line(paid))
+
+
+class TheCadencePlayersAreToldIsTheOneTheEngineEnforces(unittest.TestCase):
+    """The wait is a Go constant; the promise is Python copy. They can drift.
+
+    Nothing but this test connects them, and a player told "every 12h" by a bot
+    that refuses them for 24 has been lied to by the software.
+    """
+
+    def engine_cooldown_hours(self) -> int:
+        match = re.search(r"supportVoteCooldownSeconds int64 = (\d+) \* 60 \* 60", SUPPORT_GO)
+        self.assertIsNotNone(match, "supportVoteCooldownSeconds is no longer written as <hours> * 60 * 60")
+        return int(match.group(1))
+
+    def test_the_engine_meters_the_gift_twice_a_day(self):
+        self.assertEqual(
+            self.engine_cooldown_hours(), 12,
+            "the tribute cooldown moved - docs/CONFIGURATION.md and README.md say the "
+            "number out loud too, and so does the command",
+        )
+
+    def test_the_command_quotes_that_same_number_to_players(self):
+        hours = self.engine_cooldown_hours()
+        stated = {int(value) for value in re.findall(r"\*\*(\d+)h\*\*", SUPPORT)}
+        self.assertTrue(stated, "/tribute no longer tells a player how often the gift renews")
+        self.assertEqual(
+            stated, {hours},
+            f"/tribute promises {sorted(stated)}h but the engine enforces {hours}h",
+        )
 
 
 class TheWeekendAnnouncesItselfOnce(unittest.TestCase):
@@ -193,7 +220,7 @@ class TheWeekendAnnouncesItselfOnce(unittest.TestCase):
         self.assertEqual(state, "2026-06-12:open")
         self.assertIn("doubled", text)
         self.assertIn("<t:1781308800:R>", text)
-        self.assertIn("/vote", text)
+        self.assertIn("/tribute", text)
 
     def test_a_restart_inside_the_same_window_says_nothing(self):
         state, text = self.announce(self.OPEN, "2026-06-12:open")
@@ -201,7 +228,6 @@ class TheWeekendAnnouncesItselfOnce(unittest.TestCase):
         self.assertIsNone(text, "the weekend was announced twice")
 
     def test_the_close_is_only_said_to_a_server_that_heard_the_opening(self):
-        # The server was told this window opened, so it is told it ended.
         state, text = self.announce({**self.SHUT, "window_key": "2026-06-12"}, "2026-06-12:open")
         self.assertEqual(state, "2026-06-12:closed")
         self.assertIn("ended", text)
@@ -218,10 +244,11 @@ class TheWeekendAnnouncesItselfOnce(unittest.TestCase):
     def test_an_unreadable_window_changes_nothing(self):
         self.assertEqual(self.announce({}, "2026-06-12:open"), ("", None))
 
-    def test_the_worker_is_started_only_with_a_listing_and_cancelled_on_close(self):
+    def test_the_worker_always_runs_now_that_nothing_configures_it(self):
         bot_source = (PROJECT_ROOT / "app" / "bot" / "bot.py").read_text(encoding="utf-8")
-        self.assertIn("if SETTINGS.vote_site_url:", bot_source)
         self.assertIn("self.weekend_gift_task = asyncio.create_task(self.weekend_gift_worker())", bot_source)
+        # It used to start only when a listing URL was set. There is no listing.
+        self.assertNotIn("if SETTINGS.vote_site_url:", bot_source)
         self.assertIn('"route_audit_task", "weekend_gift_task"):', bot_source)
         # The engine owns the window; the worker must not compute its own.
         worker = bot_source[bot_source.index("async def announce_weekend_gift"):bot_source.index("async def weekend_gift_worker")]

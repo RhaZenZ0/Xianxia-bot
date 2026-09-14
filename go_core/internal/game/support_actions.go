@@ -19,20 +19,24 @@ import (
 	"xianxia/core/internal/worlddata"
 )
 
-// Supporting the server on a listing site (Top.gg, DISBOARD, whichever the
-// operator configured) is the one player action that happens outside the
-// world, so the engine cannot verify it - there is no inbound webhook on a NAS
-// that publishes nothing. What the engine *can* own is the part that touches
-// game state: the cadence, the size of the gift, and the receipt. A claim is
-// therefore taken on trust and metered at the cadence a real vote has, so an
-// honest player is rewarded once per vote and a dishonest one is rewarded no
-// faster than an honest one.
+// The patron's gift is the server's own, and nothing outside the world is
+// involved in it: no listing site, no API, no inbound endpoint. It began as a
+// reward for voting on a list and spent a while shaped around one, which is
+// why the operations are still called `vote`. What it actually is now is a
+// claim a cultivator may make once a cooldown, and the engine owns all three
+// parts that matter - the cadence, the size of the gift, and the receipt.
+//
+// Because nothing external gates it, there is nothing to verify and nothing to
+// take on trust: every claim is honest by construction, and the cooldown is
+// the only thing that decides how often one may be made.
 const (
-	// Discadia, which is the listing this server votes on, resets a vote after
-	// twenty-four hours. The number is the site's, not a game-balance dial:
-	// metering the gift at any other cadence would either thank an honest
-	// player twice for one vote or make them wait past the vote they cast.
-	supportVoteCooldownSeconds int64 = 24 * 60 * 60
+	// Twice a day. While the gift was tied to a listing this number had to be
+	// whatever that site reset a vote on; now that it is the server's own, it
+	// is a balance dial and nothing else - short enough that logging in twice
+	// is worth it, long enough that the gift stays a gift rather than income.
+	// It is stated to players in app/bot/commands/support.py, and a test holds
+	// the two together.
+	supportVoteCooldownSeconds int64 = 12 * 60 * 60
 	// The gift is the cultivator's, not a flat number. A flat 15 was wrong at
 	// both ends: shop lines run 3-59 in the Mortal World's low-grade stone and
 	// 6-468 in the Celestial World's, so one number is a windfall to a beginner
@@ -112,32 +116,7 @@ func supportVoteWeekendMultiplier(at time.Time) int64 {
 }
 
 type supportVotePayload struct {
-	GameMinute int64  `json:"game_minute"`
-	Site       string `json:"site"`
-}
-
-// supportSiteLabel bounds a name that came from the operator's environment
-// rather than from the world catalogue. It is echoed back into a result and a
-// domain event, so it is held to a short, printable, single-line label.
-func supportSiteLabel(raw string) string {
-	site := strings.TrimSpace(raw)
-	if site == "" {
-		return "the server listing"
-	}
-	cleaned := make([]rune, 0, 40)
-	for _, r := range site {
-		if len(cleaned) == 40 {
-			break
-		}
-		if r < 32 || r == 127 {
-			continue
-		}
-		cleaned = append(cleaned, r)
-	}
-	if len(cleaned) == 0 {
-		return "the server listing"
-	}
-	return string(cleaned)
+	GameMinute int64 `json:"game_minute"`
 }
 
 // supportGift is what a claim will pay. The claim and the status read both
@@ -282,9 +261,8 @@ func supportVoteClaimAction(conn *storage.Conn, catalog worlddata.Catalog, userI
 	if err = setCooldown(conn, userID, supportVoteAction, supportVoteCooldownSeconds, now); err != nil {
 		return authoritativeMutation{}, err
 	}
-	site := supportSiteLabel(p.Site)
 	result := map[string]any{
-		"site": site, "world": gift.World, "currency": gift.Currency,
+		"world": gift.World, "currency": gift.Currency,
 		"amount": gift.Amount, "balance": balance, "depth": gift.Depth,
 		"item_id": gift.ItemID, "item_quantity": gift.ItemQty,
 		"weekend": gift.Weekend, "multiplier": gift.Multiplier,

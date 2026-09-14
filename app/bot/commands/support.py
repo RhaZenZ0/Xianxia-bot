@@ -1,16 +1,17 @@
-"""`/vote`: the server's listing page, and the patron's gift for supporting it.
+"""`/tribute`: the world's own gift to a cultivator, once a cooldown.
 
-A vote on Top.gg (or DISBOARD, or whichever list the operator configured) is
-the one thing a player does for this world from outside it, and it is the
-cheapest way a small server is found at all: the listing ranks on votes, and
-Discadia, the listing this server votes on, resets the vote after a day.
+This began life as `/vote` - a thank-you for voting the server up a listing
+site - and spent a while shaped around one, first Top.gg's API and then
+Discadia's. Both are gone. Nothing outside this deployment is involved any
+more: no listing, no API, no inbound endpoint, and so nothing to verify and
+nothing taken on trust. A tribute is simply a claim a cultivator may make once
+every twelve hours, and the engine is the whole authority on it.
 
-Nothing here verifies the vote. Verification would mean an inbound webhook,
-which means publishing an endpoint from a NAS that currently publishes nothing
-— a door opened for a thank-you. So the claim is taken on trust and the engine
-meters it at exactly the cadence a real vote has (`support.vote_claim`): an
-honest player is thanked once per vote, and a dishonest one is thanked no more
-often.
+The engine operations are still called `support.vote_*` and the cooldown key is
+still `support_vote`, deliberately. Those strings are written into
+`domain_events` and `cooldowns` the moment anybody plays, and renaming them
+would orphan the rows or hand every player a free claim. The name a player
+types is presentation; the name the ledger keeps is data.
 
 The gift itself is the cultivator's: the engine sizes it by the realms they
 have climbed inside the world they stand in, pays it in that world's low-grade
@@ -30,18 +31,24 @@ from ..runtime import (
     budget_refusal_line,
     DB,
     ENGINE,
-    SETTINGS,
     WORLD,
     format_wait,
     log,
 )
 from ..services import GUILD
 
-UNCONFIGURED = (
-    "🗳️ No server listing is configured yet, so there is nothing to vote on. "
-    "An administrator sets `VOTE_SITE_URL` (and `VOTE_SITE_NAME`) in `.env` — "
-    "see `docs/CONFIGURATION.md`."
-)
+
+def _addressed(user: discord.abc.User) -> str:
+    """What to call the cultivator: their name on this server.
+
+    `display_name` is the server nickname when there is one and the account's
+    name otherwise, which is the name everyone in the channel already knows
+    them by. It is user-supplied text going into a message, so the markdown in
+    it is escaped - a nickname of "**" would otherwise reach in and bold the
+    rest of the line. Mentions cannot fire either way: the bot is built with
+    allowed_mentions disabled for users, roles and everyone.
+    """
+    return discord.utils.escape_markdown(getattr(user, "display_name", "") or "Cultivator")
 
 
 def _catalogue_name(resolve, identifier: str, what: str) -> str:
@@ -53,11 +60,11 @@ def _catalogue_name(resolve, identifier: str, what: str) -> str:
     try:
         return resolve(identifier) or identifier
     except Exception:
-        log.exception("Could not resolve the vote gift %s %r", what, identifier)
+        log.exception("Could not resolve the tribute %s %r", what, identifier)
         return identifier
 
 
-def _gift_line(result: dict) -> str:
+def _gift_line(result: dict, *, name: str = "") -> str:
     """The engine's receipt, read back in names rather than ids.
 
     Every number here is the engine's. The command computes no part of the
@@ -66,7 +73,8 @@ def _gift_line(result: dict) -> str:
     amount = int(result.get("amount") or 0)
     currency = _catalogue_name(WORLD.currency_name, str(result.get("currency") or ""), "currency")
     balance = int(result.get("balance") or 0)
-    line = f"🙏 Thank you. A patron's gift of **{amount} × {currency}**"
+    opening = f"🙏 Good work, **{name}**." if name else "🙏 Thank you."
+    line = f"{opening} A patron's gift of **{amount} × {currency}**"
     item_id = str(result.get("item_id") or "")
     quantity = int(result.get("item_quantity") or 0)
     # No item is a real outcome, not an error: a tier material the catalogue
@@ -80,30 +88,29 @@ def _gift_line(result: dict) -> str:
     return line
 
 
-class VoteClaimView(discord.ui.View):
-    """One button under the link: the claim the player says they have earned.
+class TributeClaimView(discord.ui.View):
+    """One button: the tribute this cultivator is owed.
 
     The button belongs to the cultivator who ran the command, and it is spent
     once — the engine refuses a second claim inside the cooldown anyway, but a
     disabled button says so before the round trip does.
     """
 
-    def __init__(self, *, owner_id: int, site: str) -> None:
+    def __init__(self, *, owner_id: int) -> None:
         super().__init__(timeout=900)
         self.owner_id = int(owner_id)
-        self.site = str(site)
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if int(interaction.user.id) != self.owner_id:
             await interaction.response.send_message(
-                "That claim belongs to the cultivator who opened it — run **/vote** yourself.",
+                "That tribute belongs to the cultivator who opened it — run **/tribute** yourself.",
                 ephemeral=False,
                 delete_after=15,
             )
             return False
         return True
 
-    @discord.ui.button(label="I voted — claim", style=discord.ButtonStyle.success, emoji="🗳️")
+    @discord.ui.button(label="Claim your tribute", style=discord.ButtonStyle.success, emoji="🎁")
     async def claim(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         refusal = budget_refusal_line(interaction.user.id, "vote_claim")
         if refusal:
@@ -117,32 +124,26 @@ class VoteClaimView(discord.ui.View):
             envelope = await ENGINE.authoritative_action(
                 "support.vote_claim",
                 interaction.user.id,
-                {"site": self.site},
+                {},
                 action_id=f"discord:{interaction.id}:support.vote_claim",
             )
             result = dict(envelope.get("result") or {})
         except GameEngineError as exc:
             await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
             return
-        await interaction.followup.send(_gift_line(result), ephemeral=False)
+        await interaction.followup.send(
+            _gift_line(result, name=_addressed(interaction.user)), ephemeral=False
+        )
 
 
 @registered_root_command(
-    name="vote",
-    description="Vote for this server on its listing page and claim a patron's gift",
+    name="tribute",
+    description="Claim the world's tribute to you — a patron's gift, once every 12h",
     guild=GUILD,
 )
-async def vote(interaction: discord.Interaction) -> None:
-    url = SETTINGS.vote_site_url
-    if not url:
-        await interaction.response.send_message(UNCONFIGURED, ephemeral=False, delete_after=60)
-        return
-    site = SETTINGS.vote_site_name
-    lines = [
-        f"🗳️ **Support this world — {site}**",
-        "Every vote lifts the server up its listing, which is how the next cultivator finds us.",
-        f"Vote here: {url}",
-    ]
+async def tribute(interaction: discord.Interaction) -> None:
+    name = _addressed(interaction.user)
+    lines = [f"🎁 **A tribute for {name}**"]
     # The weekend is the server's, not a cultivator's, so it is read before the
     # character check and shown to everyone - a visitor who has not begun yet
     # is exactly the person a doubled weekend should reach. `support.weekend`
@@ -150,18 +151,17 @@ async def vote(interaction: discord.Interaction) -> None:
     try:
         weekend = dict(await ENGINE.action("support.weekend", interaction.user.id, {}) or {})
     except GameEngineError:
-        log.exception("Could not read the weekend window; drawing /vote without it")
+        log.exception("Could not read the weekend window; drawing /tribute without it")
         weekend = {}
     if weekend.get("weekend"):
         closes = int(weekend.get("closes_unix") or 0)
         until = f" until <t:{closes}:R>" if closes else ""
         lines.append(f"🎉 **Weekend bonus — the gift is doubled{until}.**")
-    # The link is for everyone. A visitor with no cultivator yet is exactly the
-    # person a listing brought in, so they are shown the page and told what
-    # making one would get them, rather than being turned away by
-    # require_character before they have read the link.
+    # A visitor with no cultivator yet is told what one would get them rather
+    # than being turned away by require_character: the tribute is a reason to
+    # begin, so the person who has not begun is exactly who should read it.
     if await DB.get_character(interaction.user.id) is None:
-        lines.append("\nThe gift is for cultivators — **/begin** makes one, and then this pays every **24h**.")
+        lines.append("\nThe tribute is for cultivators — **/begin** makes one, and then this pays every **12h**.")
         await interaction.response.send_message("\n".join(lines), ephemeral=False)
         return
     try:
@@ -179,15 +179,15 @@ async def vote(interaction: discord.Interaction) -> None:
         if item_id and quantity > 0:
             waiting += f" and **{quantity} × {_catalogue_name(WORLD.item_name, item_id, 'item')}**"
         lines.append(
-            f"\nThen press the button: a patron's gift of {waiting} is waiting — the gift is sized "
-            f"to your realm, and it renews every **24h**."
+            f"\nA patron's gift of {waiting} is waiting — sized to your realm, "
+            f"and renewed every **12h**."
         )
-        view = VoteClaimView(owner_id=interaction.user.id, site=site)
+        view = TributeClaimView(owner_id=interaction.user.id)
         await interaction.response.send_message("\n".join(lines), view=view, ephemeral=False)
         return
     remaining = int(status.get("remaining_seconds") or 0)
     lines.append(
-        f"\nYou have already claimed this round — the next gift is ready in "
-        f"**{format_wait(remaining)}**. The vote itself is never wasted."
+        f"\nYou have already taken this tribute — the next is ready in "
+        f"**{format_wait(remaining)}**."
     )
     await interaction.response.send_message("\n".join(lines), ephemeral=False)

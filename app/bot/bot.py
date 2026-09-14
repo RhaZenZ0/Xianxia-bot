@@ -84,14 +84,14 @@ def weekend_announcement(window: dict[str, Any], stored: str) -> tuple[str, str 
         until = f" until <t:{closes}:R>" if closes else ""
         return state, (
             f"🎉 **The patron's gift is doubled{until}.**\n"
-            f"Vote for the server with **/vote** and claim twice the usual — "
-            f"every day, all weekend."
+            f"Claim it with **/tribute** and take twice the usual — "
+            f"every twelve hours, all weekend."
         )
     # A close is only worth saying to a server that was told it opened. Without
     # this, the first tick on a quiet Tuesday would announce the end of a
     # weekend nobody had heard about.
     if stored == f"{key}:open":
-        return state, "🕯️ The weekend's doubled gift has ended. **/vote** still pays, and still lifts us up the listing."
+        return state, "🕯️ The weekend's doubled gift has ended. **/tribute** still pays, every twelve hours."
     return state, None
 
 
@@ -267,8 +267,10 @@ class XianxiaBot(commands.Bot):
                 self.quest_forge_task = asyncio.create_task(self.quest_forge_worker())
             if SETTINGS.route_audit_hours:
                 self.route_audit_task = asyncio.create_task(self.route_audit_worker())
-            if SETTINGS.vote_site_url:
-                self.weekend_gift_task = asyncio.create_task(self.weekend_gift_worker())
+            # No longer gated on a listing being configured: the tribute is the
+            # server's own and always exists, so its doubled weekend always
+            # has something to announce.
+            self.weekend_gift_task = asyncio.create_task(self.weekend_gift_worker())
         except Exception as exc:
             self.health_state.fail(phase, exc)
             failure_detail = {
