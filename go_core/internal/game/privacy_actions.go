@@ -10,8 +10,10 @@ package game
 //
 // So the list is not written down. `erasureTargets` asks the live schema which
 // columns identify a person, which is the only way this can still be correct in
-// a year. `TestEveryUserColumnIsClassified` is the other half of that bargain:
-// it walks the same schema and fails if a column that looks like a person is in
+// a year. tests/python/contracts/test_privacy_erasure.py is the other half of
+// that bargain - it lives in Python because the fixtures in this package build
+// a schema by hand, and could only ever prove the fixture is classified. It
+// bootstraps the real database and fails if a column that looks like a person is in
 // neither the subject set below nor one of the two exception maps, so a new
 // table carrying a Discord id cannot be added without someone deciding what
 // erasure means for it.
