@@ -501,7 +501,13 @@ func abodeFocusActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID in
 	if lvl <= 0 {
 		return authoritativeMutation{}, errors.New("that facility has not been built yet")
 	}
-	effectID := map[string]string{"cultivation": "abode_cultivation_focus", "alchemy": "alchemy_inspiration", "forge": "forge_inspiration"}[p.Facility]
+	// "formation" was missing here (v1.0.0-rc.19) while being a perfectly valid
+	// facility in `abode_system.facilities`, so it passed every check above and
+	// then fell through this map to "" - the action succeeded and applied
+	// nothing. That is also why `craftEffectStat`'s "formation_bonus" was a stat
+	// no rule could ever grant, leaving Formation and Inscription crafts
+	// structurally at effect_bonus 0 while Alchemy and Forging got +2.
+	effectID := map[string]string{"cultivation": "abode_cultivation_focus", "alchemy": "alchemy_inspiration", "forge": "forge_inspiration", "formation": "formation_inspiration"}[p.Facility]
 	out := map[string]any{"facility": p.Facility, "level": lvl, "effect_id": effectID}
 	if effectID != "" {
 		effect := catalog.SpecialEffects[effectID]
@@ -562,6 +568,17 @@ type deployedArrayDef struct {
 var deployedArrayDefs = map[string]deployedArrayDef{
 	"minor_qi_gathering_array_disk": {"Minor Qi Gathering Array", 360, map[string]any{"description": "Formation flags draw ambient qi toward everyone cultivating at this location.", "modifiers": []any{map[string]any{"stat": "cultivation_gain", "operation": "mul", "value": 1.10}, map[string]any{"stat": "spirit", "operation": "add", "value": 1}}, "tags": []any{"formation", "location", "qi"}}},
 	"minor_warding_array_disk":      {"Minor Warding Array", 360, map[string]any{"description": "A compact defensive formation steadies cultivators and reinforces combat exchanges in this location.", "modifiers": []any{map[string]any{"stat": "will", "operation": "add", "value": 1}, map[string]any{"stat": "combat_bonus", "operation": "add", "value": 1}}, "tags": []any{"formation", "location", "defense"}}},
+	// The rest of the ladder (v1.0.0-rc.19). rc.15 moved six talisman recipes
+	// out of Formation and into Inscription, which was right, and left the
+	// profession with two disks at the same TN and nothing above the Mortal
+	// World - while eight array workshops stood in all four worlds with only
+	// Mortal goods to trade. Every one of these needs an entry here as well as
+	// a recipe: an item carrying `array_deploy` with no definition in this map
+	// is refused at deploy time, which would be the same fault one layer down.
+	"guiding_chalk_array":        {"Guiding Chalk Array", 180, map[string]any{"description": "A student's chalk circle, closed well enough to hold. It gathers a little qi and steadies the hand.", "modifiers": []any{map[string]any{"stat": "insight", "operation": "add", "value": 1}}, "tags": []any{"formation", "location", "qi"}}},
+	"moonveil_concealment_array": {"Moonveil Concealment Array", 360, map[string]any{"description": "Veil-work in crystal dust: footsteps and qi signatures blur at the boundary, and leaving is easier than arriving.", "modifiers": []any{map[string]any{"stat": "agility", "operation": "add", "value": 2}, map[string]any{"stat": "will", "operation": "add", "value": 1}}, "tags": []any{"formation", "location", "concealment"}}},
+	"golden_bastion_array":       {"Golden Bastion Array", 360, map[string]any{"description": "An immortal-gold lattice that hardens the air into a standing rampart around everyone inside it.", "modifiers": []any{map[string]any{"stat": "combat_bonus", "operation": "add", "value": 2}, map[string]any{"stat": "body", "operation": "add", "value": 2}}, "tags": []any{"formation", "location", "defense"}}},
+	"starfall_bulwark_array":     {"Starfall Bulwark Array", 480, map[string]any{"description": "Starsteel graven with falling-star sigils - the bulwark a Celestial formation master signs their name to.", "modifiers": []any{map[string]any{"stat": "combat_bonus", "operation": "add", "value": 3}, map[string]any{"stat": "will", "operation": "add", "value": 2}, map[string]any{"stat": "cultivation_gain", "operation": "mul", "value": 1.15}}, "tags": []any{"formation", "location", "defense", "qi"}}},
 }
 
 func deployArrayActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {

@@ -6,6 +6,61 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.0** (rc.19) makes the eight professions good, which four of them were not. `VERSIONS.md` set
+the bar when rc.15 repaired Appraisal and Inscription - a live profession has a recipe, a call that
+grants it and a check that rolls it - and this is that audit run across all eight, plus the question
+rc.15 did not ask: given a profession is alive, is it worth practising. The findings are kept in
+`docs/PROFESSIONS_AUDIT.md`, because four of the seven were invisible to a gate that existed
+specifically to catch them.
+
+**Appraisal had no content at all.** It was the only profession missing from
+`patron_gift.by_profession`, so a cultivator who practised nothing else fell through to the path
+table and silently got a different gift - and the gate written to catch exactly that hardcoded a set
+of three whose comment miscounted both halves, "the three that recipes name" (four do) and "the three
+the engine hardcodes" (four are, since rc.15 made Appraisal the fourth). It has a gift now, a beast
+core, the one material every tier trades, which suits the profession whose trade is value itself. The
+set is *derived*: two scanners read the grant sites and the level reads out of `go_core` and resolve
+both bare literals and named constants, with a companion test asserting they still resolve both
+shapes, because a scanner that matches nothing passes forever. A reading that misses now teaches 3
+against a hit's 12 rather than 5 - finding the right information is what moves the profession.
+
+**Two professions were written by six call sites and read by no rule.** `Beast Taming` and
+`Artifact Refining` accumulated levels that changed nothing: every read of the row went into the
+response payload, so the number was printed on the card and consulted by nobody, and a Grandmaster
+tamed no better than a first-timer. That is the `authenticity` and `tracking_strength` shape a third
+time. Taming had a roll already so the level joins it, and the training gain with it; Artifact
+Refining had no roll at all, so the level moves the one number the action does produce - the
+resonance each bonding gains, which is what awakening gates on, so a refiner who knows the work
+reaches an awakened artifact sooner rather than a different one. An unpractised cultivator is
+affected not at all, which is pinned.
+
+**Formation was hollowed out by rc.15's own fix.** Moving six talismans to Inscription was right;
+nothing refilled what it emptied, leaving two recipes at the same TN and nothing above the Mortal
+World, while eight array workshops stood in all four worlds with only Mortal goods to trade. It has
+six recipes spanning TN 12 to 26 now, one tier material per world, mirroring the Inscription ladder
+it was measured against - and each new disk carries a deployment definition, because an item with
+`array_deploy` and no entry in that map is refused at deploy time, which would have been the same
+fault one layer down. A gate holds both directions of that.
+
+**And the smaller ones.** `formation_bonus` was a stat nothing could grant, because `"formation"` was
+missing from the `abode.focus` map while being a perfectly valid facility - so building and focusing a
+formation workshop succeeded and applied nothing, and Formation and Inscription crafts sat
+structurally at effect_bonus 0 while their peers got +2. `manor_craft_bonus` omitted the
+`inscription` branch the Go authority had carried since rc.15, under a Go comment citing that file by
+line number. Thirteen crafted goods had no buyer anywhere - nine of the eleven pills, one talisman,
+and every armour above tier 1 while every blade sold - though all thirteen were already on sale
+somewhere; they are bought back now at the quarter of base price the median of all 748 existing entries
+already paid. Foraging yielded `spirit_herb` in all four worlds and now resolves through
+`EventSites.Material`, so a Celestial forager stops gathering Mortal weeds.
+
+The roster gate is the part that matters longest. `PROFESSIONS` is imported by no production module,
+and the three checks around it could not have caught rc.15's fault: one iterated a four-name tuple
+written inline under a docstring promising "every declared profession", one asserted three strings
+are members of a tuple, and one passes vacuously if every talisman is deleted. There is now one that
+iterates the roster itself and asks whether each profession is granted, whether its level changes
+anything, and whether the content knows it exists. Mutation-verified against all three faults. No
+schema change.
+
 **1.0.0** (rc.18) is the three faults rc.15's sweep reported and did not fix, and the one its own
 manifest shipped. Each is the same shape: a column, a branch or a table that the code was written
 around and nothing ever reached.

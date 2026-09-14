@@ -1,8 +1,9 @@
 # The eight professions — an audit
 
-Findings only. Nothing here is fixed; every entry names what is wrong, where, and what fixing it
-would mean, so the repairs can be chosen rather than assumed. Verified against the tree at the merge
-of v1.0.0-rc.18.
+Every finding below was **fixed in v1.0.0-rc.19**; the audit is kept as the record of what was
+wrong and why, because four of the seven were invisible to a gate that existed specifically to catch
+them. Each section ends with what was actually done. Verified against the tree at the merge of
+v1.0.0-rc.18; fixed on top of it.
 
 ## The bar
 
@@ -16,19 +17,19 @@ There is no roster in `content/world.json` and none in Go.
 
 ## Verdict
 
-| Profession | Recipes | Granted | Level read? | In content | Verdict |
-|---|---|---|---|---|---|
-| Alchemy | 11 (TN 12–26) | ✓ | ✓ | recipes, gift, family bonus | healthy |
-| Forging | 8 (TN 14–27) | ✓ | ✓ | recipes, gift | healthy |
-| Inscription | 6 (TN 12–25) | ✓ | ✓ | recipes, gift | alive; cannot reach its workshop buff |
-| Formation | **2 (TN 15, 15)** | ✓ | ✓ | recipes, gift | **hollow — Mortal tier only** |
-| Foraging | 0 (by design) | ✓ | ✓ | gift only | alive; yields tier-1 herbs in all four worlds |
-| Appraisal | 0 (by design) | ✓ | ✓ | **nothing** | **no content; the gate cannot see it** |
-| Beast Taming | 0 (by design) | ✓ | **✗** | gift only | **vanity counter** |
-| Artifact Refining | 0 (by design) | ✓ | **✗** | gift only | **vanity counter** |
+| Profession | Recipes | Granted | Level read? | In content | Was | Now |
+|---|---|---|---|---|---|---|
+| Alchemy | 11 (TN 12–26) | ✓ | ✓ | recipes, gift, family bonus | healthy | 9 dead outputs given buyers |
+| Forging | 8 (TN 14–27) | ✓ | ✓ | recipes, gift | healthy | 3 dead armours given buyers |
+| Inscription | 6 (TN 12–25) | ✓ | ✓ | recipes, gift | no workshop buff | buff reachable; Python mirror fixed |
+| Formation | 2 → **6** (TN 12–26) | ✓ | ✓ | recipes, gift | **Mortal tier only** | a ladder in all four worlds |
+| Foraging | 0 (by design) | ✓ | ✓ | gift only | tier-1 herb everywhere | gathers its own world's herb |
+| Appraisal | 0 (by design) | ✓ | ✓ | **nothing** | **no content at all** | gift added; trains only on a landed reading |
+| Beast Taming | 0 (by design) | ✓ | **✗ → ✓** | gift only | **vanity counter** | level enters the tame roll and the train gain |
+| Artifact Refining | 0 (by design) | ✓ | **✗ → ✓** | gift only | **vanity counter** | level draws the bond tighter |
 
-rc.15's repair held for what it targeted: all eight are grantable and none is unreachable from
-Discord. Three are nonetheless not good, for three different reasons.
+rc.15's repair held for what it targeted: all eight were grantable and none unreachable from
+Discord. Three were nonetheless not good, for three different reasons — all three are now.
 
 ---
 
@@ -54,9 +55,15 @@ any recipe, so `test_every_profession_the_engine_can_write_has_a_gift` never sub
 So rc.15 gave Appraisal an implementation and a test, and gave it no content — and did not update
 the one gate whose docstring promises to cover "every profession the engine can write".
 
-**Fix:** add `"Appraisal": "@herb"` (or whichever ref suits an appraiser) to `by_profession`, and
-derive `ENGINE_PROFESSIONS` from the Go sources rather than typing it out — every
-`advanceProfessionTx(conn, userID, "…"` literal plus `appraisalProfession`. Small and safe.
+**Fixed (rc.19).** `"Appraisal": "@core"` — a beast core is the one material every tier trades,
+which suits the profession whose trade is value itself rather than making anything. And
+`ENGINE_PROFESSIONS` is now *derived*: two scanners read the grant sites and the level reads out of
+`go_core`, resolving both bare literals and the named constants rc.19 introduced. A set read off the
+code cannot drift from it. A companion test asserts the scanners still resolve both argument shapes,
+because a scanner that matches nothing passes forever.
+
+Separately, at the owner's direction, a reading that *misses* now teaches 3 rather than 5 against a
+hit's 12: finding the right information is what moves the profession, failing at it only nudges.
 
 ## 2. Beast Taming and Artifact Refining are written by six call sites and read by no rule
 
@@ -77,10 +84,12 @@ the response payload for display. The levels are printed and never consulted.
 This is the `item_provenance.authenticity` and `tracking_strength` shape exactly — a column set with
 care by every writer and read by no rule — which the last two releases each fixed once.
 
-**Fix:** give each a term in the roll it belongs to. Taming has a roll already, so a level term is a
-one-line change. Artifact Refining has no roll at all, so making its level matter is a design
-decision, not a patch: either bonding gains a check, or the level shortens the resonance cooldown,
-or awakening's gate moves with it.
+**Fixed (rc.19).** Taming had a roll already, so the level joins it, and the training gain with it.
+Artifact Refining had no roll, so the level moves the one number the action does produce: the
+resonance each bonding gains, which is what awakening gates on — a refiner who knows the work reaches
+an awakened artifact sooner, not a different one. `profession_levels_test.go` runs each action twice
+against the same fixture, differing only in the practitioner's level, and a fourth test pins that an
+unpractised cultivator is affected not at all.
 
 ## 3. Formation was hollowed out by rc.15's own fix
 
@@ -105,7 +114,7 @@ four worlds** — `stoneback` and `ashenwall` (Mortal), `broken_halo` and `stone
 and every one of them buys only the two Mortal-tier disks, because those are the only disks that
 exist. A Celestial array workshop has nothing tier-appropriate to trade.
 
-**Fix:** proposed concretely below.
+**Fixed (rc.19)** — the ladder below was built as proposed.
 
 ## 4. `formation_bonus` is an effect nothing can grant
 
@@ -126,8 +135,8 @@ Net effect: Formation and Inscription crafts structurally always have `effect_bo
 Alchemy and Forging crafts get +2. `authenticity_test.go:148` asserts Inscription and Formation
 return the same effect stat — true, and both are equally unreachable.
 
-**Fix:** add a `formation_inspiration` special effect to content granting `formation_bonus`, and the
-`"formation"` key to that map. Small, and it closes a silent no-op a player can already trigger.
+**Fixed (rc.19).** Both halves: `formation_inspiration` grants `formation_bonus` +2 in content, and
+`"formation"` is in the focus map beside `"alchemy"` and `"forge"`.
 
 ## 5. The roster is dead code, and the gates assert the bug class
 
@@ -147,9 +156,10 @@ The gates around professions do not test what their names claim:
 
 So a ninth profession added tomorrow with no recipe, no grant and no effect passes the entire suite.
 
-**Fix:** one gate that iterates `PROFESSIONS` and asserts, per profession, that it is granted
-somewhere in Go, that its level is read somewhere in Go, and that it has a patron gift. That is the
-test rc.15 should have left behind.
+**Fixed (rc.19).** `ProfessionRosterTests` iterates `PROFESSIONS` and asks exactly those three
+questions. Mutation-verified against all three faults: removing Appraisal's gift, making Beast Taming
+unread, and breaking the scanner each fail it. The two weak tests are left in place — they assert
+nothing false, they were simply never enough on their own.
 
 ## 6. Python and Go disagree about Inscription
 
@@ -161,8 +171,8 @@ The Python helper the comment points at never received the same edit.
 Latent today: `manor_craft_bonus` is only ever called with the literal `"Alchemy"`
 (`app/bot/commands/exploration.py:744`). Ungated, and divergent from the authority.
 
-**Fix:** add the `inscription` branch. One line, and it removes a trap for whoever next reads that
-comment.
+**Fixed (rc.19).** `manor_craft_bonus` now matches `("formation", "inscription")`, agreeing with the
+Go authority its sibling's comment already pointed at.
 
 ## 7. Balance — the top of every crafting ladder has no sink
 
@@ -196,6 +206,22 @@ Two more, adjacent:
   a design call, but `/craft`'s own description says "from a known recipe", which is not true of
   anything.
 
+**Fixed (rc.19), except the last.** All thirteen orphans now have a buyer, by the rule the two
+working pills already followed: a shop that stocks a thing buys it back, at the quarter of base price
+every keeper in the catalogue already pays (the median of all 748 existing `buys` entries is exactly
+0.25, and it is the same quarter `auctionReserve` uses). No new shops — every orphan was already *on
+sale* somewhere, which is what made the hole so odd.
+
+The gate is the per-world form rather than the per-shop one: a provisioner stocking pills that an
+apothecary buys is correct, so what is held is that a crafted good is never stranded in a world with
+no counter for it.
+
+Foraging now resolves its common drop through `EventSites.Material`, so a Celestial forager brings
+back `heavenpetal_herb`.
+
+**Not fixed: the learning step.** That is a design decision about what the game is, not a fault, and
+it is left where it stands. `/craft`'s description still overstates it.
+
 ---
 
 ## Proposed: the Formation ladder
@@ -226,28 +252,26 @@ Formation *and* Inscription have no gathering path into their own base materials
 (`spirit_herb`) and Forging (`spirit_iron`) both do. A player can forage their way into an
 alchemist's career and must buy their way into an inscriber's.
 
-## Recommended order of repair
+## What was done
 
-**Small, safe, no design decision** — could be one change:
+All seven, in the release that followed the audit. In the order they were repaired:
 
-1. Appraisal's patron gift, plus deriving `ENGINE_PROFESSIONS` from the Go sources (§1).
-2. The `formation` key in `abode.focus` and a `formation_inspiration` effect (§4).
-3. The `inscription` branch in `sect_manor.py` (§6).
-4. The roster gate that iterates `PROFESSIONS` (§5) — this is what stops the next one.
+1. **Appraisal's patron gift**, and `ENGINE_PROFESSIONS` derived from the Go sources instead of typed
+   out (§1).
+2. **`formation_inspiration`** in content and the `"formation"` key in the focus map (§4).
+3. **The two vanity levels** given a term in the rules they belonged to (§2), and the
+   `sect_manor.py` mirror aligned with the Go authority (§6).
+4. **The Formation ladder** built as proposed below (§3).
+5. **Sinks for the thirteen orphans** and a tiered foraging drop (§7).
+6. **The roster gate** that iterates `PROFESSIONS` and asks all three questions (§5) — written last,
+   because until step 3 landed it would have failed on Beast Taming and Artifact Refining, which is
+   exactly the point of it.
 
-**Design decisions, worth their own discussion:**
+Left deliberately: the learning step (§7), which is a design decision rather than a fault.
 
-5. What a Beast Taming level and an Artifact Refining level should *do* (§2). Taming has a roll and
-   is easy; Artifact Refining has none and needs one invented.
-6. The Formation ladder (§3, proposed above) — content authoring.
-
-**A content pass of its own:**
-
-7. Sinks for the 13 crafted goods nothing buys, and a tiered foraging table (§7).
-
-Note that `docs/KNOWN_LIMITATIONS.md` is not the right home for any of these yet:
-`tests/python/contracts/test_playtest_gate.py` holds every entry there to being either **fixed** or
-**deferred**, and these are open.
+`docs/KNOWN_LIMITATIONS.md` still is not the right home for any of this —
+`tests/python/contracts/test_playtest_gate.py` holds every entry there to being either *fixed* or
+*deferred*, and it is a playtest punch list rather than an audit record.
 
 ## Re-running the checks
 
