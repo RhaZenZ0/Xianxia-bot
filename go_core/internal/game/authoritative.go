@@ -66,7 +66,6 @@ var authoritativeMutations = map[string]bool{
 	"law.comprehend":                  true,
 	"condition.treat":                 true,
 	"alchemy.purge":                   true,
-	"character.set_gender":            true,
 	"sect.abode.enter":                true,
 	"sect.abode.leave":                true,
 	"sect.abode.upgrade":              true,
@@ -105,6 +104,7 @@ var authoritativeMutations = map[string]bool{
 	"auction.leave":                   true,
 	"auction.sell":                    true,
 	"merchant.buy":                    true,
+	"appraisal.read":                  true,
 	"shop.buy":                        true,
 	"shop.sell":                       true,
 	"trade.offer":                     true,
@@ -144,6 +144,11 @@ var authoritativeMutations = map[string]bool{
 	"family.simulate":                 true,
 	"family.support":                  true,
 	"family.add_child":                true,
+	"player_family.found":             true,
+	"player_family.invite":            true,
+	"player_family.respond":           true,
+	"player_family.leave":             true,
+	"player_family.child":             true,
 	"seclusion.start":                 true,
 	"seclusion.settle":                true,
 	"dao.propose":                     true,
@@ -179,6 +184,7 @@ var authoritativeQueries = map[string]bool{
 	"effects.current":          true,
 	"lifecycle.samsara_status": true,
 	"sense.status":             true,
+	"player_family.status":     true,
 	"secret_realm.status":      true,
 	// v1.0.0: the rotation on its own, for the GM dashboard, which is not an
 	// actor and wants the whole schedule rather than one cultivator's view.
@@ -398,8 +404,6 @@ func applyAuthoritative(databasePath, worldPath string, req ActionRequest) (Acti
 			} else {
 				mutation, err = resolveSceneAction(conn, catalog, req.ActorID, req.Payload)
 			}
-		case "character.set_gender":
-			mutation, err = setGenderAction(conn, req.ActorID, req.Payload)
 		case "sect.abode.enter":
 			mutation, err = sectAbodeMoveAction(conn, req.ActorID, req.Payload, "enter")
 		case "sect.abode.leave":
@@ -428,7 +432,7 @@ func applyAuthoritative(databasePath, worldPath string, req ActionRequest) (Acti
 			mutation, err = dynastyClaimAction(conn, req.ActorID, req.Payload)
 		case "family.dynasty.conflict":
 			mutation, err = dynastyConflictAction(conn, req.ActorID, req.Payload)
-		case "auction.enter", "auction.leave", "auction.sell", "auction.bid", "black_market.trade", "market.trade", "bounty_hunter.act", "equipment.bind", "equipment.equip", "equipment.unequip", "equipment.repair", "party.create", "party.join", "party.leave", "formation.create", "formation.assign", "formation.activate", "formation.stance", "boss.start", "boss.act", "boss.claim", "territory.claim", "war.act", "caravan.dispatch", "caravan.settle", "sect.recruitment.recommendation", "sect.recruitment.trial", "sect.contribute", "sect.redeem", "discipleship.request", "discipleship.resolve", "discipleship.leave", "sect.manor.establish", "sect.manor.upgrade", "family.simulate", "family.support", "family.add_child", "seclusion.start", "seclusion.settle", "dao.propose", "dao.respond", "dao.sever", "dao.dual_cultivate", "storage.deposit", "storage.withdraw", "storage.upgrade", "abode.establish", "abode.enter", "abode.visit", "abode.leave", "abode.invite", "abode.revoke", "abode.upgrade", "abode.focus", "array.use", "array.deploy", "spatial_key.use", "personal_world.create", "personal_world.set_rule", "personal_world.enter", "personal_world.leave", "item.use", "sect.abode.upgrade", "merchant.buy", "shop.buy", "shop.sell", "trade.offer", "trade.accept", "trade.decline":
+		case "auction.enter", "auction.leave", "auction.sell", "auction.bid", "black_market.trade", "market.trade", "bounty_hunter.act", "equipment.bind", "equipment.equip", "equipment.unequip", "equipment.repair", "party.create", "party.join", "party.leave", "formation.create", "formation.assign", "formation.activate", "formation.stance", "boss.start", "boss.act", "boss.claim", "territory.claim", "war.act", "caravan.dispatch", "caravan.settle", "sect.recruitment.recommendation", "sect.recruitment.trial", "sect.contribute", "sect.redeem", "discipleship.request", "discipleship.resolve", "discipleship.leave", "sect.manor.establish", "sect.manor.upgrade", "family.simulate", "family.support", "family.add_child", "seclusion.start", "seclusion.settle", "dao.propose", "dao.respond", "dao.sever", "dao.dual_cultivate", "storage.deposit", "storage.withdraw", "storage.upgrade", "abode.establish", "abode.enter", "abode.visit", "abode.leave", "abode.invite", "abode.revoke", "abode.upgrade", "abode.focus", "array.use", "array.deploy", "spatial_key.use", "personal_world.create", "personal_world.set_rule", "personal_world.enter", "personal_world.leave", "item.use", "sect.abode.upgrade", "merchant.buy", "shop.buy", "shop.sell", "trade.offer", "trade.accept", "trade.decline", "appraisal.read":
 			if strings.TrimSpace(worldPath) == "" {
 				return ActionResponse{}, errors.New("world catalog path is required")
 			}
@@ -449,7 +453,8 @@ func applyAuthoritative(databasePath, worldPath string, req ActionRequest) (Acti
 			"secret_realm.enter", "secret_realm.explore", "secret_realm.leave", "craft.resolve", "forage.resolve",
 			"beast.tame", "beast.feed", "beast.train", "beast.evolve", "beast.active", "artifact.bond", "artifact.awaken",
 			"pvp.challenge", "pvp.respond", "pvp.act", "manual.study", "manual.technique", "crime.atone", "world_event.act", "world_event.engage",
-			"support.vote_claim":
+			"player_family.found", "player_family.invite", "player_family.respond",
+			"player_family.leave", "player_family.child", "support.vote_claim":
 			if strings.TrimSpace(worldPath) == "" {
 				return ActionResponse{}, errors.New("world catalog path is required")
 			}
@@ -526,6 +531,16 @@ func applyAuthoritative(databasePath, worldPath string, req ActionRequest) (Acti
 				mutation, err = conditionTreatAction(conn, catalog, req.ActorID, req.Payload)
 			case "sense.inspect":
 				mutation, err = senseInspectAction(conn, catalog, req.ActorID, req.Payload)
+			case "player_family.found":
+				mutation, err = playerFamilyFoundAction(conn, req.ActorID, req.Payload)
+			case "player_family.invite":
+				mutation, err = playerFamilyInviteAction(conn, req.ActorID, req.Payload)
+			case "player_family.respond":
+				mutation, err = playerFamilyRespondAction(conn, req.ActorID, req.Payload)
+			case "player_family.leave":
+				mutation, err = playerFamilyLeaveAction(conn, req.ActorID, req.Payload)
+			case "player_family.child":
+				mutation, err = playerFamilyChildAction(conn, catalog, req.ActorID, req.Payload)
 			case "sense.conceal":
 				mutation, err = senseConcealAction(conn, catalog, req.ActorID, req.Payload)
 			case "tribulation.prepare":
@@ -822,6 +837,13 @@ func applyAuthoritativeQuery(databasePath, worldPath string, req ActionRequest) 
 		}
 		v, _ := eventledger.CurrentActorVersion(conn, req.ActorID)
 		return ActionResponse{APIVersion: authoritativeAPIVersion, Operation: req.Operation, StateVersion: v, Result: result}, nil
+	case "player_family.status":
+		result, qerr := playerFamilyStatus(conn, req.ActorID)
+		if qerr != nil {
+			return ActionResponse{}, qerr
+		}
+		v, _ := eventledger.CurrentActorVersion(conn, req.ActorID)
+		return ActionResponse{APIVersion: authoritativeAPIVersion, Operation: req.Operation, StateVersion: v, Result: result}, nil
 	case "sense.status":
 		if strings.TrimSpace(worldPath) == "" {
 			return ActionResponse{}, errors.New("world catalog path is required")
@@ -1026,6 +1048,11 @@ func createCharacterAuthoritative(conn *storage.Conn, worldPath string, userID i
 			return authoritativeMutation{}, err
 		}
 	}
+	// And what the household itself puts in their hands (v1.0.0-rc.15).
+	sendoff, err := grantBirthFamilySendoffTx(conn, catalog, userID, familyID, firstNonempty(pFamily.ID, pFamily.Archetype), p.GameMinute, now)
+	if err != nil {
+		return authoritativeMutation{}, err
+	}
 	if _, err = conn.Execute(`INSERT INTO currency_wallets(user_id,currency_id,balance) VALUES(?,?,?)`, []any{userID, "low_spirit_stone", 25}); err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -1081,6 +1108,9 @@ func createCharacterAuthoritative(conn *storage.Conn, worldPath string, userID i
 		return authoritativeMutation{}, err
 	}
 	result := map[string]any{"created": true, "user_id": userID, "name": p.Name, "origin": origin, "path": path, "gender": gender, "location": householdLocation, "physical_location": location, "spiritual_root": root, "natural_lifespan_years": natural, "attributes": attrs, "qi_max": qiMax, "vitality_max": vitMax, "aptitudes": aptitude, "family_id": familyID, "family": pFamily}
+	if sendoff != nil {
+		result["family_sendoff"] = sendoff
+	}
 	return authoritativeMutation{Result: result, Event: eventledger.Event{Domain: "character", EventType: "character_created", EntityType: "character", EntityID: fmt.Sprint(userID), GameMinute: p.GameMinute, Payload: result}}, nil
 }
 

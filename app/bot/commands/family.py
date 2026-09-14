@@ -243,6 +243,27 @@ async def birth_family_clan(interaction:discord.Interaction)->None:
     await reply_long(interaction,text+"\n".join(details),ephemeral=False)
 
 
+def family_sendoff_line(result: dict) -> str:
+    """What the household put in your hands on the way out of the door.
+
+    Every one of the thirteen birth families sends a child out with a flying
+    artifact of its own - a tomb-watch clan folds a burnt offering, a
+    weapon-smith's child leaves on the blade they proved on the anvil - and no
+    two households give the same object. The engine decides whether there is
+    one to give (once per household, guarded on `item_provenance`); this only
+    says it.
+    """
+    sendoff = dict(result.get("family_sendoff") or {})
+    if not sendoff:
+        return ""
+    line = str(sendoff.get("line") or "").strip()
+    return (
+        f"\n🎁 The household sends you out with **{sendoff.get('name')}**"
+        + (f" — {line}" if line else ".")
+        + "\n✈️ It carries you: the road runs at a third of its walking hours while you have it."
+    )
+
+
 @registered_group_command(family_group, name="support",description="Ask your birth family for resources or emergency support")
 @serialized_user_action
 async def birth_family_support(interaction:discord.Interaction)->None:
@@ -254,7 +275,15 @@ async def birth_family_support(interaction:discord.Interaction)->None:
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
         await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
-    await interaction.followup.send(f"🏠 **{result.get('family_name','Your family')} supports you.**\nReceived: **{int(result.get('stones',0))} Low-Grade Spirit Stones**",ephemeral=False)
+    goods=""
+    for item_id,qty in sorted(dict(result.get("items") or {}).items()):
+        if int(qty)>0:
+            goods+=f", **{int(qty)}× {WORLD.item_name(str(item_id))}**"
+    await interaction.followup.send(
+        f"🏠 **{result.get('family_name','Your family')} supports you.**"
+        f"\nReceived: **{int(result.get('stones',0))} Low-Grade Spirit Stones**{goods}"
+        f"{family_sendoff_line(result)}",
+        ephemeral=False)
 
 @registered_group_command(family_group, name="history",description="View recent rises, setbacks and political changes in your family")
 async def birth_family_history(interaction:discord.Interaction)->None:
@@ -609,3 +638,194 @@ async def birth_family_descendants(interaction:discord.Interaction)->None:
             talent=f"Cultivation talent unawakened until around age {CHILD_CULTIVATION_AWAKENING_AGE}"
         lines.append(f"• **{child['name']}** — age **{age:.1f}**\n  {talent}")
     await reply_long(interaction,"\n".join(lines),ephemeral=False)
+
+
+# A house the players found themselves, as distinct from the birth family
+# above: that one is the NPC household a character is born into, this one is a
+# line they start. The four tables have carried it since the schema was
+# written - with a cascade, a unique seniority index and a dashboard panel
+# joining all of it - and nothing ever wrote a row, so the panel could only
+# ever be empty. Go owns every write, as always; these are the doors.
+house_group = app_commands.Group(
+    name="house",
+    description="A cultivation house you found with other players: found it, invite, seniority, children",
+    parent=family_group,
+)
+
+
+def _house_line(member: dict) -> str:
+    seat = int(member.get("seniority_order", 0))
+    mark = "👑 " if member.get("founder") else ""
+    realm = WORLD.realm_name(int(member.get("realm_index", 0)))
+    dead = "" if str(member.get("life_status", "alive")) == "alive" else " *(dead)*"
+    return f"`{seat}.` {mark}**{member.get('name', 'Unknown')}** — {realm} Stage {int(member.get('phase', 1))}{dead}"
+
+
+@registered_group_command(house_group, name="status", description="Your cultivation house: who sits in it, in what order, and its children")
+async def house_status(interaction: discord.Interaction) -> None:
+    c = await require_character(interaction)
+    if not c:
+        return
+    await interaction.response.defer(ephemeral=False)
+    try:
+        status = dict(await ENGINE.action("player_family.status", interaction.user.id, {}) or {})
+    except GameEngineError as exc:
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
+        return
+    lines: list[str] = []
+    invite = dict(status.get("invite") or {})
+    if invite and not invite.get("expired"):
+        lines.append(
+            f"✉️ **{invite.get('inviter')}** invites you into **{invite.get('family')}** "
+            f"at seniority **{int(invite.get('seniority_order', 0))}** — "
+            "**/family → House → Respond** to answer.\n"
+        )
+    if not status.get("in_family"):
+        lines.append("You belong to no house. **/family → House → Found** starts one.")
+        await interaction.followup.send("\n".join(lines), ephemeral=False)
+        return
+    lines.append(f"🏯 **{status.get('name')}**")
+    lines.extend(_house_line(m) for m in status.get("members", []))
+    children = list(status.get("children") or [])
+    if children:
+        lines.append("\n**Children of the house**")
+        for child in children:
+            talent = "may cultivate" if child.get("can_cultivate") else "no spiritual talent"
+            lines.append(
+                f"• **{child.get('name')}** ({child.get('gender')}) — {child.get('spiritual_root')}, {talent}"
+            )
+    await reply_long(interaction, "\n".join(lines), ephemeral=False)
+
+
+@registered_group_command(house_group, name="found", description="Found a new cultivation house and take its first seat")
+@serialized_user_action
+async def house_found(interaction: discord.Interaction, name: str) -> None:
+    c = await require_character(interaction)
+    if not c:
+        return
+    await interaction.response.defer(ephemeral=False)
+    try:
+        envelope = await ENGINE.authoritative_action(
+            "player_family.found", interaction.user.id, {"name": name},
+            action_id=f"discord:{interaction.id}:player_family.found",
+        )
+    except GameEngineError as exc:
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
+        return
+    result = dict(envelope.get("result") or {})
+    await interaction.followup.send(
+        f"🏯 **{result.get('name')}** is founded. **{result.get('founder')}** holds the first seat.\n"
+        "**/family → House → Invite** brings others in.",
+        ephemeral=False,
+    )
+
+
+@registered_group_command(house_group, name="invite", description="Invite another cultivator into your house at a seniority")
+@serialized_user_action
+async def house_invite(interaction: discord.Interaction, member: discord.Member, seniority: int = 0) -> None:
+    c = await require_character(interaction)
+    if not c:
+        return
+    await interaction.response.defer(ephemeral=False)
+    try:
+        envelope = await ENGINE.authoritative_action(
+            "player_family.invite", interaction.user.id,
+            {"invitee_user_id": member.id, "seniority_order": int(seniority)},
+            action_id=f"discord:{interaction.id}:player_family.invite",
+        )
+    except GameEngineError as exc:
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
+        return
+    result = dict(envelope.get("result") or {})
+    await interaction.followup.send(
+        f"✉️ {member.mention} — **{result.get('inviter')}** invites you into **{result.get('name')}** "
+        f"at seniority **{int(result.get('seniority_order', 0))}**.\n"
+        "Answer with **/family → House → Respond**.",
+        ephemeral=False,
+    )
+
+
+@registered_group_command(house_group, name="respond", description="Accept or decline the house invitation waiting for you")
+@serialized_user_action
+async def house_respond(interaction: discord.Interaction, accept: bool) -> None:
+    c = await require_character(interaction)
+    if not c:
+        return
+    await interaction.response.defer(ephemeral=False)
+    try:
+        envelope = await ENGINE.authoritative_action(
+            "player_family.respond", interaction.user.id, {"accept": bool(accept)},
+            action_id=f"discord:{interaction.id}:player_family.respond",
+        )
+    except GameEngineError as exc:
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
+        return
+    result = dict(envelope.get("result") or {})
+    if result.get("expired"):
+        await interaction.followup.send(
+            f"⌛ The invitation from **{result.get('name')}** had already expired.", ephemeral=False)
+        return
+    if result.get("accepted"):
+        await interaction.followup.send(
+            f"🏯 You join **{result.get('name')}** at seniority **{int(result.get('seniority_order', 0))}**.",
+            ephemeral=False)
+        return
+    await interaction.followup.send(f"You decline **{result.get('name')}**.", ephemeral=False)
+
+
+@registered_group_command(house_group, name="leave", description="Leave your cultivation house; the last one out dissolves it")
+@serialized_user_action
+async def house_leave(interaction: discord.Interaction) -> None:
+    c = await require_character(interaction)
+    if not c:
+        return
+    await interaction.response.defer(ephemeral=False)
+    try:
+        envelope = await ENGINE.authoritative_action(
+            "player_family.leave", interaction.user.id, {},
+            action_id=f"discord:{interaction.id}:player_family.leave",
+        )
+    except GameEngineError as exc:
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
+        return
+    result = dict(envelope.get("result") or {})
+    if result.get("dissolved"):
+        await interaction.followup.send(
+            f"🏯 You leave **{result.get('name')}**. Nobody remains, and the house is dissolved.", ephemeral=False)
+        return
+    await interaction.followup.send(
+        f"You leave **{result.get('name')}**; {int(result.get('remaining', 0))} remain.", ephemeral=False)
+
+
+@registered_group_command(house_group, name="child", description="Record a child born into your cultivation house")
+@app_commands.choices(gender=GENDER_CHOICES)
+@serialized_user_action
+async def house_child(interaction: discord.Interaction, name: str, gender: app_commands.Choice[str]) -> None:
+    c = await require_character(interaction)
+    if not c:
+        return
+    await interaction.response.defer(ephemeral=False)
+    life = await authoritative_lifespan(interaction.user.id)
+    if life.age_years < 18:
+        await interaction.followup.send(
+            "Your character must be at least **18 years old** to have a recorded child.", ephemeral=False)
+        return
+    try:
+        envelope = await ENGINE.authoritative_action(
+            "player_family.child", interaction.user.id,
+            {"child_name": name, "gender": gender.value},
+            action_id=f"discord:{interaction.id}:player_family.child",
+        )
+    except GameEngineError as exc:
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
+        return
+    result = dict(envelope.get("result") or {})
+    talent = (
+        f"a **{result.get('spiritual_root')}** root and the talent to cultivate"
+        if result.get("can_cultivate")
+        else f"a **{result.get('spiritual_root')}** root, but no talent for cultivation"
+    )
+    await interaction.followup.send(
+        f"👶 **{result.get('name')}** is born to **{result.get('parent')}** of **{result.get('family')}** — {talent}.",
+        ephemeral=False,
+    )

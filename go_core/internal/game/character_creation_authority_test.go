@@ -39,6 +39,7 @@ CREATE TABLE characters(
     muted_until REAL NOT NULL DEFAULT 0, frozen_until REAL NOT NULL DEFAULT 0, is_banned INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE inventory(user_id INTEGER NOT NULL,item_id TEXT NOT NULL,quantity INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(user_id,item_id));
+CREATE TABLE IF NOT EXISTS item_provenance(provenance_id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,item_id TEXT NOT NULL,quantity INTEGER NOT NULL DEFAULT 1,source_type TEXT NOT NULL DEFAULT 'unknown',source_key TEXT NOT NULL DEFAULT '',ownership_mark TEXT NOT NULL DEFAULT '',legal_status TEXT NOT NULL DEFAULT 'clean',authenticity INTEGER NOT NULL DEFAULT 100,tracking_strength INTEGER NOT NULL DEFAULT 0,acquired_game_minute INTEGER NOT NULL DEFAULT 0,created_at REAL NOT NULL DEFAULT 0,updated_at REAL NOT NULL DEFAULT 0);
 CREATE TABLE currency_wallets(user_id INTEGER NOT NULL,currency_id TEXT NOT NULL,balance INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(user_id,currency_id));
 CREATE TABLE storage_containers(user_id INTEGER NOT NULL,container_id TEXT NOT NULL,name TEXT NOT NULL,grade TEXT NOT NULL,slot_capacity INTEGER NOT NULL,living_space INTEGER NOT NULL,updated_at REAL NOT NULL,PRIMARY KEY(user_id,container_id));
 CREATE TABLE character_location_discoveries(user_id INTEGER NOT NULL,location TEXT NOT NULL,discovery_kind TEXT NOT NULL,discovered_game_minute INTEGER NOT NULL,created_at REAL NOT NULL,PRIMARY KEY(user_id,location));

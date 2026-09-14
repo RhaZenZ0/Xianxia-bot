@@ -129,6 +129,21 @@ class CharacterModal(discord.ui.Modal):
             ),
             inline=False,
         )
+        # What the household put in their hands on the way out of the door
+        # (v1.0.0-rc.15). Every one of the thirteen birth families sends its
+        # child out with a flying artifact of its own, and no two give the
+        # same object.
+        sendoff = dict(creation.get("family_sendoff") or {})
+        if sendoff:
+            embed.add_field(
+                name="🎁 Sent Out With",
+                value=(
+                    f"**{sendoff.get('name')}**\n"
+                    f"{str(sendoff.get('line') or '').strip()}\n"
+                    "It carries you — the road runs at a third of its walking hours while you have it."
+                ),
+                inline=False,
+            )
         embed.add_field(
             name="🧬 Birth Sex",
             value=f"**{self.selected_gender.title()}**",

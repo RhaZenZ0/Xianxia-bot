@@ -89,34 +89,6 @@ async def begin(interaction: discord.Interaction) -> None:
     )
 
 
-@registered_root_command(name="gender", description="Set Male or Female for gendered realm titles and forms of address", guild=GUILD)
-@app_commands.choices(gender=GENDER_CHOICES)
-async def set_gender(interaction: discord.Interaction, gender: app_commands.Choice[str]) -> None:
-    c = await require_character(interaction)
-    if not c:
-        return
-    # Ack first: the write is authoritative now, and an interaction token that
-    # expires before the first reply would have the player click again on a
-    # change that already landed.
-    await interaction.response.defer(ephemeral=False)
-    try:
-        await ENGINE.authoritative_action(
-            "character.set_gender", interaction.user.id, {"gender": gender.value},
-            action_id=f"discord:{interaction.id}:character.set_gender",
-        )
-    except GameEngineError as exc:
-        await interaction.followup.send(f"Character sex could not be set: {exc}", ephemeral=False)
-        return
-    main_name = WORLD.realm_name(c["realm_index"], gender.value)
-    body_name = WORLD.body_realm_name(c.get("body_realm_index", 0), gender.value)
-    await interaction.followup.send(
-        f"✅ Character sex set to **{gender.name}**.\n"
-        f"Qi realm title: **{main_name}**\nBody realm title: **{body_name}**\n"
-        "This changes titles/names only; it never changes stats, rolls, or progression.",
-        ephemeral=False,
-    )
-
-
 @registered_root_command(name="sheet", description="View your cultivation character", guild=GUILD)
 async def sheet(interaction: discord.Interaction) -> None:
     c = await require_character(interaction, allow_deceased=True)
@@ -532,8 +504,12 @@ async def inventory(interaction: discord.Interaction) -> None:
     else:
         lines = []
         for item_id, qty in inv.items():
-            item = WORLD.items.get(item_id, {"name": item_id, "description": ""})
-            lines.append(f"**{item['name']}** x{qty} — {item['description']}")
+            # The fallback only covers an id missing from the catalogue; an
+            # entry present but short a field must not take the listing down
+            # with it, so every read has its own default.
+            item = WORLD.items.get(item_id) or {}
+            name = str(item.get("name") or item_id)
+            lines.append(f"**{name}** x{qty} — {item.get('description') or ''}")
         text = "\n".join(lines)
     await interaction.response.send_message(
         f"**{c['name']}'s Carried Inventory**\nLow Spirit Stones: **{c['spirit_stones']}**\n\n{text}",

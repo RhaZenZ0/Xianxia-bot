@@ -374,6 +374,14 @@ async def breakthrough(interaction: discord.Interaction, confirm: bool = False, 
             mechanical += f"\n💪 Crossing into a new realm remade your foundation: {grown}. Every session from here gathers more."
         if float(result.get("world_mult", 1)) != 1.0 and result.get("ascended"):
             mechanical += f"\n🌏 The qi of **{result.get('to_world')}** is **x{float(result['world_mult']):.2f}** what you knew."
+        # Ascension carries you (v1.0.0-rc.15). Until now the crossing was
+        # announced and then left you standing exactly where you had been.
+        if result.get("ascended_to_location"):
+            mechanical += (
+                f"\n🕊️ The heavens take you. You rise from **{result.get('ascended_from_location')}** and come down in "
+                f"**{result.get('ascended_to_location')}**, the capital of {result.get('to_world')} — it is on your map now, "
+                "and the road out of it begins with **/travel**."
+            )
         master = dict(result.get("master_reward") or {})
         if master:
             mechanical += f"\n🎓 Your breakthrough feeds the master-disciple bond: **{master.get('master_name','Your master')}** receives **+{int(master.get('insight_xp',0))} Insight XP** and the lineage gains **+{int(master.get('attention',0))} Master Attention**."

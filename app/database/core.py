@@ -26,7 +26,7 @@ from .remote import GoDatabaseTransport
 log = logging.getLogger("xianxia.database")
 
 
-SCHEMA_VERSION = 43
+SCHEMA_VERSION = 45
 # A readiness probe must validate more than the schema-version marker.  If the
 # SQLite file is removed or replaced while the bot is running, SQLite will
 # happily create a new empty file at the same path.  Checking these tables lets
@@ -149,6 +149,9 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
                 occupation_until_game_minute INTEGER NOT NULL DEFAULT 0, updated_at REAL NOT NULL,
                 FOREIGN KEY(war_id) REFERENCES territory_wars(war_id) ON DELETE CASCADE
             )""",
+            # Read since v1.0.0-rc.15 by get_territory_wars, which attaches
+            # the last few to each war. Before that it was written by both the
+            # player tactic and the siege tick and read by nothing.
             """CREATE TABLE IF NOT EXISTS territory_war_actions (
                 action_id INTEGER PRIMARY KEY AUTOINCREMENT, war_id INTEGER NOT NULL, user_id INTEGER, side TEXT NOT NULL, tactic TEXT NOT NULL,
                 power INTEGER NOT NULL DEFAULT 0, siege_delta INTEGER NOT NULL DEFAULT 0, morale_delta INTEGER NOT NULL DEFAULT 0,
@@ -908,6 +911,13 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
             )""",
             """CREATE INDEX IF NOT EXISTS idx_authoritative_receipts_actor
                ON authoritative_action_receipts(actor_id,created_at DESC)""",
+            # Write-only on purpose, and audited as such in v1.0.0-rc.15:
+            # eventledger.TouchEntityVersion stamps it on every authoritative
+            # mutation and no code reads it. The version `expected_version` is
+            # checked against is the actor's, in authoritative_actor_versions.
+            # This is the per-entity forensic trail - which entity changed at
+            # which version - kept for a person reading it after an incident,
+            # which is what an audit trail is for. Not dead; deliberate.
             """CREATE TABLE IF NOT EXISTS authoritative_entity_versions (
                 domain TEXT NOT NULL,
                 entity_type TEXT NOT NULL,
@@ -1714,6 +1724,71 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
                ON world_event_npcs(name)""",
             """CREATE INDEX IF NOT EXISTS idx_world_event_npcs_location
                ON world_event_npcs(location)""",
+        ),
+    ),
+    (
+        44,
+        "drop_dead_core_ledger_tables",
+        (
+            # `core_state_versions` and `core_request_log` came in with
+            # migration 12, "versioned_core_write_ledger", and were never
+            # written and never read by anything - not one INSERT, not one
+            # SELECT, in any release since. The authority ledger that actually
+            # shipped is `authoritative_actor_versions`, `authoritative_action_
+            # receipts` and `domain_events`; these two were the shape of an
+            # earlier idea for it and nothing ever grew into them.
+            #
+            # Migration 12 keeps its statements, because a historical migration
+            # is how an old database walks forward and rewriting one changes a
+            # path somebody may still be on. The removal is its own step, so a
+            # database that created them drops them and a new one creates them
+            # and drops them again - which is cheap, and honest about the order
+            # things happened in.
+            """DROP INDEX IF EXISTS idx_core_request_scope""",
+            """DROP TABLE IF EXISTS core_request_log""",
+            """DROP TABLE IF EXISTS core_state_versions""",
+        ),
+    ),
+    (
+        45,
+        "npc_consignments_and_appraisal",
+        (
+            # v1.0.0-rc.15: the world's own people put things under the
+            # hammer. Every lot in every one of the forty-eight houses had to
+            # be listed by a player, so a floor nobody played on was an empty
+            # room with a steward standing in it.
+            #
+            # `seller_npc_name` mirrors the shape `merchant_bidder` (migration
+            # 38) and `merchant_buyer` (36) already established: the seller is
+            # a character OR a named NPC, and `seller_user_id` stays 0 for a
+            # consignment because it is foreign-keyed to `characters`.
+            "ALTER TABLE auctions ADD COLUMN seller_npc_name TEXT NOT NULL DEFAULT ''",
+            # A finder who cannot read what they found consigns it blind: the
+            # house will say roughly what grade it is and nothing more, and
+            # the reserve is what a house asks for something it cannot vouch
+            # for. `appraised=1` is the default so every lot written before
+            # this - and every player listing, which is of a thing out of
+            # their own bag - reads exactly as it did.
+            "ALTER TABLE auctions ADD COLUMN appraised INTEGER NOT NULL DEFAULT 1",
+            "ALTER TABLE auctions ADD COLUMN grade_band TEXT NOT NULL DEFAULT ''",
+            # What a cultivator has learned to recognise, shaped like
+            # `character_location_discoveries`: a composite key, the route by
+            # which it became known, and the minute it did. Knowing an item is
+            # per-person and permanent - the second Nine-Echo Sword Tablet you
+            # see, you read at a glance - which is what makes the Appraisal
+            # profession worth levelling.
+            """CREATE TABLE IF NOT EXISTS character_item_appraisals (
+                   user_id INTEGER NOT NULL,
+                   item_id TEXT NOT NULL,
+                   appraisal_kind TEXT NOT NULL DEFAULT 'insight',
+                   authenticity INTEGER NOT NULL DEFAULT 100,
+                   appraised_game_minute INTEGER NOT NULL DEFAULT 0,
+                   created_at REAL NOT NULL,
+                   PRIMARY KEY(user_id, item_id),
+                   FOREIGN KEY(user_id) REFERENCES characters(user_id) ON DELETE CASCADE
+               )""",
+            """CREATE INDEX IF NOT EXISTS idx_character_item_appraisals_user
+                   ON character_item_appraisals(user_id, appraised_game_minute DESC)""",
         ),
     ),
 )
@@ -5448,6 +5523,20 @@ class Database:
                 cur=await db.execute("SELECT * FROM auctions WHERE active=1 ORDER BY ends_at")
             return [dict(r) for r in await cur.fetchall()]
 
+    async def get_appraised_items(self, user_id: int) -> set[str]:
+        """Every item this cultivator has learned to recognise (schema 45).
+
+        A lot consigned blind hides what it is from the board and the live
+        card - but only from the people who cannot read it. Someone who has
+        appraised one before names it at a glance, which is the whole reward
+        for levelling the Appraisal profession.
+        """
+        async with self._connect() as db:
+            cur = await db.execute(
+                "SELECT item_id FROM character_item_appraisals WHERE user_id=?", (int(user_id),)
+            )
+            return {str(row[0]) for row in await cur.fetchall()}
+
 
 
     # ------------------------------------------------------------------
@@ -5920,6 +6009,17 @@ class Database:
             for row in rows:
                 cur=await db.execute("SELECT * FROM territory_war_operations WHERE war_id=?",(int(row['war_id']),))
                 op=await cur.fetchone(); row['operations']=dict(op) if op else {}
+                # The blow-by-blow. `territory_war_actions` is written by both
+                # the player tactic and the autonomous siege tick and was read
+                # by nothing at all: a war showed its siege percentage and
+                # never who had moved it. Attached here rather than behind a
+                # reader of its own, because a war and what happened in it are
+                # one answer.
+                cur=await db.execute(
+                    "SELECT side,tactic,power,siege_delta,morale_delta,game_minute,user_id"
+                    " FROM territory_war_actions WHERE war_id=? ORDER BY action_id DESC LIMIT 5",
+                    (int(row['war_id']),))
+                row['recent_actions']=[dict(r) for r in await cur.fetchall()]
             return rows
 
 
@@ -6078,6 +6178,9 @@ class Database:
             "background_seclusion": True,
             "black_markets": True,
             "autonomous_world_events": True,
+            # v1.0.0-rc.15: the world's own people find things and put them
+            # under the hammer, or take the illegal ones to the night market.
+            "npc_consignments": True,
             "merchants": True,
             # v0.31.0: the GM scene flag - model narration for explore and
             # hunt by default, instead of the procedural pool plus a button.

@@ -24,6 +24,7 @@ func setupCultivationDB(t *testing.T) string {
 	// The tables the training multipliers read, absent from the batch
 	// fixtures because no native test trained before this one.
 	if err := conn.ExecScript(`
+CREATE TABLE IF NOT EXISTS world_history_events(history_id INTEGER PRIMARY KEY AUTOINCREMENT,source_key TEXT NOT NULL UNIQUE,event_type TEXT NOT NULL,title TEXT NOT NULL,summary TEXT NOT NULL,significance INTEGER NOT NULL,visibility TEXT NOT NULL,location TEXT NOT NULL,world_name TEXT NOT NULL,faction TEXT NOT NULL,actor_type TEXT NOT NULL,actor_key TEXT NOT NULL,actor_name TEXT NOT NULL,target_type TEXT NOT NULL,target_key TEXT NOT NULL,target_name TEXT NOT NULL,related_user_id INTEGER,related_npc_name TEXT NOT NULL,tags TEXT NOT NULL,game_minute INTEGER NOT NULL,metadata_json TEXT NOT NULL,created_at REAL NOT NULL,updated_at REAL NOT NULL);
 CREATE TABLE IF NOT EXISTS world_eras(era_id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT NOT NULL,modifiers_json TEXT NOT NULL DEFAULT '{}',active INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE IF NOT EXISTS sect_membership(user_id INTEGER PRIMARY KEY,sect_name TEXT NOT NULL,contribution_points INTEGER NOT NULL DEFAULT 0,influence INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE IF NOT EXISTS sect_manors(sect_name TEXT PRIMARY KEY,name TEXT NOT NULL,base_location TEXT NOT NULL,qi_array_level INTEGER NOT NULL DEFAULT 0);

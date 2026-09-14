@@ -1,6 +1,8 @@
 package game
 
-// v0.23.0 regression tests for character.set_gender and sect.discover.
+// v0.23.0 regression tests for sect.discover. The character.set_gender tests
+// went with the operation in v1.0.0-rc.15: sex is chosen at creation, where
+// /begin requires it, so there is no second setter left to regress.
 
 import (
 	"encoding/json"
@@ -46,102 +48,6 @@ func identityScalar(t *testing.T, path, sql string, args ...any) int64 {
 		return 0
 	}
 	return storage.ParseInt(res.Rows[0][0])
-}
-
-func setGenderApply(t *testing.T, path string, actor int64, actionID, gender string) (map[string]any, error) {
-	t.Helper()
-	raw, err := json.Marshal(map[string]any{"gender": gender})
-	if err != nil {
-		t.Fatal(err)
-	}
-	out, err := ApplyWithWorld(path, "", ActionRequest{
-		APIVersion: authoritativeAPIVersion,
-		ActionID:   actionID,
-		Operation:  "character.set_gender",
-		ActorID:    actor,
-		Payload:    raw,
-	})
-	if err != nil {
-		return nil, err
-	}
-	result, _ := out.Result.(map[string]any)
-	return result, nil
-}
-
-func TestSettingGenderStoresItAndReportsWhatItWas(t *testing.T) {
-	path := setupIdentityDB(t)
-	result, err := setGenderApply(t, path, 42, "gender-1", "female")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if fmt.Sprint(result["gender"]) != "female" {
-		t.Fatalf("gender=%v", result["gender"])
-	}
-	if fmt.Sprint(result["previous_gender"]) != "neutral" {
-		t.Fatalf("previous_gender=%v, want the fixture's neutral", result["previous_gender"])
-	}
-	conn, err := storage.Open(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer conn.Close()
-	res, err := conn.Execute(`SELECT gender FROM characters WHERE user_id=42`, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := fmt.Sprint(firstRowMap(res)["gender"]); got != "female" {
-		t.Fatalf("stored gender=%q", got)
-	}
-}
-
-func TestAnUnknownGenderIsRefusedRatherThanCoercedToNeutral(t *testing.T) {
-	// Python mapped anything unrecognised to "neutral", so a typo silently
-	// changed the player's character to something they had not chosen.
-	path := setupIdentityDB(t)
-	if _, err := setGenderApply(t, path, 42, "gender-typo", "femle"); err == nil {
-		t.Fatal("a misspelled gender was accepted")
-	}
-	conn, err := storage.Open(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer conn.Close()
-	res, err := conn.Execute(`SELECT gender FROM characters WHERE user_id=42`, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := fmt.Sprint(firstRowMap(res)["gender"]); got != "neutral" {
-		t.Fatalf("gender=%q; the refused change was applied anyway", got)
-	}
-}
-
-func TestGenderIsCaseAndWhitespaceInsensitive(t *testing.T) {
-	path := setupIdentityDB(t)
-	if _, err := setGenderApply(t, path, 42, "gender-case", "  Male  "); err != nil {
-		t.Fatalf("a padded, capitalised choice was refused: %v", err)
-	}
-}
-
-func TestARepeatedGenderInteractionReplays(t *testing.T) {
-	path := setupIdentityDB(t)
-	first, err := setGenderApply(t, path, 42, "gender-retry", "female")
-	if err != nil {
-		t.Fatal(err)
-	}
-	second, err := setGenderApply(t, path, 42, "gender-retry", "female")
-	if err != nil {
-		t.Fatalf("the retry failed instead of replaying: %v", err)
-	}
-	// The second call must report the same "previous", not "female -> female":
-	// a replay is the original answer, not a fresh no-op.
-	if fmt.Sprint(first["previous_gender"]) != fmt.Sprint(second["previous_gender"]) {
-		t.Fatalf("replay says previous=%v, original said %v",
-			second["previous_gender"], first["previous_gender"])
-	}
-	if got := identityScalar(t, path,
-		`SELECT COUNT(*) FROM domain_events WHERE actor_id=42 AND event_type='gender_set'`); got != 1 {
-		t.Fatalf("domain_events=%d, want 1", got)
-	}
 }
 
 // ---------------------------------------------------------- sect.discover

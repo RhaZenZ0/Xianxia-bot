@@ -580,14 +580,14 @@ class Narrator:
             self.procedural_by_default += 1
             return fallback
         realm = self.world.realm_name(character["realm_index"], character.get("gender"))
-        location = self.world.locations[character["location"]]
+        location = self.world.locations.get(character["location"]) or {}
         recent = _recent_context(history, 8)
         style_memory = _style_memory(history, player_name=str(character.get("name") or ""))
         prompt = f"""
 SCENE TYPE: exploration opening
 WORLD: {self.world.name}
 LOCATION: {character['location']}
-LOCATION DESCRIPTION: {location['description']}
+LOCATION DESCRIPTION: {location.get('description') or 'No description recorded.'}
 PLAYER CHARACTER:
 {self._character_summary(character, realm)}
 

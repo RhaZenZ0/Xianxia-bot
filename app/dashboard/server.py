@@ -1469,9 +1469,14 @@ class ReadOnlyDashboardStore:
             )
             auctions = await self._fetchall_if_table(
                 db, "auctions",
-                """SELECT a.*,seller.name AS seller_name,COALESCE(bidder.name,NULLIF(a.merchant_bidder,'')) AS bidder_name,
+                # LEFT JOIN on the seller, not INNER (v1.0.0-rc.15): a lot
+                # consigned by one of the world's own people has no character
+                # behind it, and an inner join would have hidden every one of
+                # them from the GM.
+                """SELECT a.*,COALESCE(seller.name,NULLIF(a.seller_npc_name,'')) AS seller_name,
+                          COALESCE(bidder.name,NULLIF(a.merchant_bidder,'')) AS bidder_name,
                           (SELECT COUNT(*) FROM auction_bids b WHERE b.auction_id=a.auction_id) AS bid_count
-                   FROM auctions a JOIN characters seller ON seller.user_id=a.seller_user_id
+                   FROM auctions a LEFT JOIN characters seller ON seller.user_id=a.seller_user_id
                    LEFT JOIN characters bidder ON bidder.user_id=a.current_bidder_user_id
                    ORDER BY a.active DESC,a.ends_at DESC,a.auction_id DESC LIMIT 180""",
             )
@@ -1789,6 +1794,7 @@ class AdminDashboardController:
                 "background_seclusion": True,
                 "black_markets": True,
                 "autonomous_world_events": True,
+                "npc_consignments": True,
                 "merchants": True,
                 "secret_realms": True,
             }

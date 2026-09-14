@@ -100,12 +100,12 @@ INSERT INTO npc_civilization_state VALUES('Elder Test','Greenriver Town','Greenr
 func TestNPCLifeBatchAppliesNaturalDeath(t *testing.T) {
 	path := setupSimulationDB(t, `
 CREATE TABLE world_simulation_state(system TEXT PRIMARY KEY,last_game_minute INTEGER,interval_game_minutes INTEGER,last_run_real REAL,runs INTEGER);
-CREATE TABLE npc_civilization_state(npc_name TEXT PRIMARY KEY,current_location TEXT,realm_index INTEGER,status TEXT,activity TEXT,last_game_minute INTEGER,updated_at REAL);
-CREATE TABLE npc_life_state(npc_name TEXT PRIMARY KEY,birth_game_minute INTEGER,age_at_creation_years INTEGER,natural_lifespan_years INTEGER,health INTEGER,injury TEXT,injury_severity INTEGER,career_progress INTEGER,relationship_status TEXT,spouse_name TEXT,children_count INTEGER,last_social_game_minute INTEGER,last_cultivation_game_minute INTEGER,death_game_minute INTEGER,cause_of_death TEXT,updated_at REAL);
+CREATE TABLE npc_civilization_state(npc_name TEXT PRIMARY KEY,home_location TEXT,current_location TEXT,world_name TEXT,profession TEXT,faction TEXT DEFAULT 'Independent',wealth INTEGER DEFAULT 20,influence INTEGER DEFAULT 10,ambition INTEGER DEFAULT 50,realm_index INTEGER DEFAULT 0,phase INTEGER DEFAULT 1,status TEXT,activity TEXT,last_game_minute INTEGER DEFAULT 0,updated_at REAL DEFAULT 0);
+CREATE TABLE npc_life_state(npc_name TEXT PRIMARY KEY,birth_game_minute INTEGER,age_at_creation_years INTEGER,natural_lifespan_years INTEGER,health INTEGER,injury TEXT,injury_severity INTEGER,sect_rank TEXT,career_progress INTEGER,relationship_status TEXT,spouse_name TEXT,children_count INTEGER,last_social_game_minute INTEGER,last_cultivation_game_minute INTEGER,death_game_minute INTEGER,cause_of_death TEXT,updated_at REAL);
 CREATE TABLE npc_social_relations(npc_a TEXT,npc_b TEXT,affinity INTEGER,trust INTEGER,grudge INTEGER,relation_type TEXT,status TEXT,started_game_minute INTEGER,last_interaction_game_minute INTEGER,updated_at REAL,PRIMARY KEY(npc_a,npc_b));
 INSERT INTO world_simulation_state VALUES('npc_life',0,10080,0,0);
-INSERT INTO npc_civilization_state VALUES('Old Master','Greenriver Town',0,'alive','Cultivating',0,0);
-INSERT INTO npc_life_state VALUES('Old Master',0,90,70,100,'',0,0,'single','',0,0,0,NULL,'',0);
+INSERT INTO npc_civilization_state(npc_name,home_location,current_location,world_name,profession,status,activity,realm_index) VALUES('Old Master','Greenriver Town','Greenriver Town','Mortal World','Cultivator','alive','Cultivating',0);
+INSERT INTO npc_life_state(npc_name,birth_game_minute,age_at_creation_years,natural_lifespan_years,health,injury,injury_severity,sect_rank,career_progress,relationship_status,spouse_name,children_count,last_social_game_minute,last_cultivation_game_minute,death_game_minute,cause_of_death,updated_at) VALUES('Old Master',0,90,70,100,'',0,'Independent Cultivator',0,'single','',0,0,0,NULL,'',0);
 `)
 	runner, _ := NewRunner(path, "")
 	run, err := runner.Force(ForceRequest{System: "npc_life", Steps: 1, GameMinute: 7 * minutesPerDay})
@@ -126,12 +126,12 @@ INSERT INTO npc_life_state VALUES('Old Master',0,90,70,100,'',0,0,'single','',0,
 func TestNPCLifeUsesCanonicalHighRealmCeiling(t *testing.T) {
 	path := setupSimulationDB(t, `
 CREATE TABLE world_simulation_state(system TEXT PRIMARY KEY,last_game_minute INTEGER,interval_game_minutes INTEGER,last_run_real REAL,runs INTEGER);
-CREATE TABLE npc_civilization_state(npc_name TEXT PRIMARY KEY,current_location TEXT,realm_index INTEGER,status TEXT,activity TEXT,last_game_minute INTEGER,updated_at REAL);
-CREATE TABLE npc_life_state(npc_name TEXT PRIMARY KEY,birth_game_minute INTEGER,age_at_creation_years INTEGER,natural_lifespan_years INTEGER,health INTEGER,injury TEXT,injury_severity INTEGER,career_progress INTEGER,relationship_status TEXT,spouse_name TEXT,children_count INTEGER,last_social_game_minute INTEGER,last_cultivation_game_minute INTEGER,death_game_minute INTEGER,cause_of_death TEXT,updated_at REAL);
+CREATE TABLE npc_civilization_state(npc_name TEXT PRIMARY KEY,home_location TEXT,current_location TEXT,world_name TEXT,profession TEXT,faction TEXT DEFAULT 'Independent',wealth INTEGER DEFAULT 20,influence INTEGER DEFAULT 10,ambition INTEGER DEFAULT 50,realm_index INTEGER DEFAULT 0,phase INTEGER DEFAULT 1,status TEXT,activity TEXT,last_game_minute INTEGER DEFAULT 0,updated_at REAL DEFAULT 0);
+CREATE TABLE npc_life_state(npc_name TEXT PRIMARY KEY,birth_game_minute INTEGER,age_at_creation_years INTEGER,natural_lifespan_years INTEGER,health INTEGER,injury TEXT,injury_severity INTEGER,sect_rank TEXT,career_progress INTEGER,relationship_status TEXT,spouse_name TEXT,children_count INTEGER,last_social_game_minute INTEGER,last_cultivation_game_minute INTEGER,death_game_minute INTEGER,cause_of_death TEXT,updated_at REAL);
 CREATE TABLE npc_social_relations(npc_a TEXT,npc_b TEXT,affinity INTEGER,trust INTEGER,grudge INTEGER,relation_type TEXT,status TEXT,started_game_minute INTEGER,last_interaction_game_minute INTEGER,updated_at REAL,PRIMARY KEY(npc_a,npc_b));
 INSERT INTO world_simulation_state VALUES('npc_life',0,10080,0,0);
-INSERT INTO npc_civilization_state VALUES('Nascent Elder','Greenriver Town',4,'alive','Cultivating',0,0);
-INSERT INTO npc_life_state VALUES('Nascent Elder',0,1000,75,100,'',0,0,'single','',0,0,0,NULL,'',0);
+INSERT INTO npc_civilization_state(npc_name,home_location,current_location,world_name,profession,status,activity,realm_index) VALUES('Nascent Elder','Greenriver Town','Greenriver Town','Mortal World','Cultivator','alive','Cultivating',4);
+INSERT INTO npc_life_state(npc_name,birth_game_minute,age_at_creation_years,natural_lifespan_years,health,injury,injury_severity,sect_rank,career_progress,relationship_status,spouse_name,children_count,last_social_game_minute,last_cultivation_game_minute,death_game_minute,cause_of_death,updated_at) VALUES('Nascent Elder',0,1000,75,100,'',0,'Independent Cultivator',0,'single','',0,0,0,NULL,'',0);
 `)
 	runner, _ := NewRunner(path, "")
 	run, err := runner.Force(ForceRequest{System: "npc_life", Steps: 1, GameMinute: 7 * minutesPerDay})
@@ -149,14 +149,14 @@ INSERT INTO npc_life_state VALUES('Nascent Elder',0,1000,75,100,'',0,0,'single',
 func TestNPCLifeBatchCanCreateMarriageInOneTransaction(t *testing.T) {
 	path := setupSimulationDB(t, `
 CREATE TABLE world_simulation_state(system TEXT PRIMARY KEY,last_game_minute INTEGER,interval_game_minutes INTEGER,last_run_real REAL,runs INTEGER);
-CREATE TABLE npc_civilization_state(npc_name TEXT PRIMARY KEY,current_location TEXT,realm_index INTEGER,status TEXT,activity TEXT,last_game_minute INTEGER,updated_at REAL);
-CREATE TABLE npc_life_state(npc_name TEXT PRIMARY KEY,birth_game_minute INTEGER,age_at_creation_years INTEGER,natural_lifespan_years INTEGER,health INTEGER,injury TEXT,injury_severity INTEGER,career_progress INTEGER,relationship_status TEXT,spouse_name TEXT,children_count INTEGER,last_social_game_minute INTEGER,last_cultivation_game_minute INTEGER,death_game_minute INTEGER,cause_of_death TEXT,updated_at REAL);
+CREATE TABLE npc_civilization_state(npc_name TEXT PRIMARY KEY,home_location TEXT,current_location TEXT,world_name TEXT,profession TEXT,faction TEXT DEFAULT 'Independent',wealth INTEGER DEFAULT 20,influence INTEGER DEFAULT 10,ambition INTEGER DEFAULT 50,realm_index INTEGER DEFAULT 0,phase INTEGER DEFAULT 1,status TEXT,activity TEXT,last_game_minute INTEGER DEFAULT 0,updated_at REAL DEFAULT 0);
+CREATE TABLE npc_life_state(npc_name TEXT PRIMARY KEY,birth_game_minute INTEGER,age_at_creation_years INTEGER,natural_lifespan_years INTEGER,health INTEGER,injury TEXT,injury_severity INTEGER,sect_rank TEXT,career_progress INTEGER,relationship_status TEXT,spouse_name TEXT,children_count INTEGER,last_social_game_minute INTEGER,last_cultivation_game_minute INTEGER,death_game_minute INTEGER,cause_of_death TEXT,updated_at REAL);
 CREATE TABLE npc_social_relations(npc_a TEXT,npc_b TEXT,affinity INTEGER,trust INTEGER,grudge INTEGER,relation_type TEXT,status TEXT,started_game_minute INTEGER,last_interaction_game_minute INTEGER,updated_at REAL,PRIMARY KEY(npc_a,npc_b));
 INSERT INTO world_simulation_state VALUES('npc_life',0,10080,0,0);
-INSERT INTO npc_civilization_state VALUES('A','Greenriver Town',1,'alive','Cultivating',0,0);
-INSERT INTO npc_civilization_state VALUES('B','Greenriver Town',1,'alive','Cultivating',0,0);
-INSERT INTO npc_life_state VALUES('A',0,20,80,100,'',0,0,'single','',0,0,0,NULL,'',0);
-INSERT INTO npc_life_state VALUES('B',0,20,80,100,'',0,0,'single','',0,0,0,NULL,'',0);
+INSERT INTO npc_civilization_state(npc_name,home_location,current_location,world_name,profession,status,activity,realm_index) VALUES('A','Greenriver Town','Greenriver Town','Mortal World','Cultivator','alive','Cultivating',1);
+INSERT INTO npc_civilization_state(npc_name,home_location,current_location,world_name,profession,status,activity,realm_index) VALUES('B','Greenriver Town','Greenriver Town','Mortal World','Cultivator','alive','Cultivating',1);
+INSERT INTO npc_life_state(npc_name,birth_game_minute,age_at_creation_years,natural_lifespan_years,health,injury,injury_severity,sect_rank,career_progress,relationship_status,spouse_name,children_count,last_social_game_minute,last_cultivation_game_minute,death_game_minute,cause_of_death,updated_at) VALUES('A',0,20,80,100,'',0,'Independent Cultivator',0,'single','',0,0,0,NULL,'',0);
+INSERT INTO npc_life_state(npc_name,birth_game_minute,age_at_creation_years,natural_lifespan_years,health,injury,injury_severity,sect_rank,career_progress,relationship_status,spouse_name,children_count,last_social_game_minute,last_cultivation_game_minute,death_game_minute,cause_of_death,updated_at) VALUES('B',0,20,80,100,'',0,'Independent Cultivator',0,'single','',0,0,0,NULL,'',0);
 `)
 	runner, _ := NewRunner(path, "")
 	var gm int64

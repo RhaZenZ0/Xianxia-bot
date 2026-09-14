@@ -8,12 +8,14 @@ and the suite cannot drive every branch of every command.
 
 That is not hypothetical. `/sense` on a player called
 `WORLD.approximate_realm(...)` - a function that lives in `app/rules/sense.py`
-and takes its realm lookups as arguments, never a method on World - and so
-raised AttributeError on the *common* successful reading, the one the engine
-returns whenever detection succeeds with precision "success" or "strong". It
-had never run. The three branches beside it (`WORLD.realm_world`,
-`WORLD.realm_name`, `WORLD.body_realm_name`) are real methods, which is
-exactly why the fourth read as one.
+and takes its realm lookups as arguments, never a method on World - and would
+raise AttributeError on the reading the engine calls "approx". The three
+branches beside it (`WORLD.realm_world`, `WORLD.realm_name`,
+`WORLD.body_realm_name`) are real methods, which is exactly why the fourth was
+written as one. It had never run: that branch needs detection to succeed while
+precision is only marginal, and the two target numbers scale so differently
+(2 a realm against 7) that the window is all but empty - which is a balance
+fault in the sense system, not a reason the name was safe.
 
 So this walks `app/` and resolves every `<singleton>.<attribute>` against the
 real class: its methods, the annotations a dataclass declares, and whatever

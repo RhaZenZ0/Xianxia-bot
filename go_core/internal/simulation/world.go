@@ -32,9 +32,15 @@ var SystemIntervals = map[string]int64{
 	"sect_politics":           7 * minutesPerDay,
 	"clan_dynamics":           30 * minutesPerDay,
 	"autonomous_world_events": minutesPerDay,
+	// v1.0.0-rc.15: the world's own people put things under the hammer. Daily,
+	// like civilization - a floor that refills every half hour is a shop.
+	"npc_consignments": minutesPerDay,
 }
 
-var orderedSystems = []string{"npc_civilization", "npc_life", "dynamic_economy", "black_markets", "sect_politics", "clan_dynamics", "autonomous_world_events"}
+// Consignments run after the people have moved and before the advanced
+// maintenance bundle settles and bids, so a lot found today is on the floor
+// for the merchants to bid on in the same pass.
+var orderedSystems = []string{"npc_civilization", "npc_life", "dynamic_economy", "black_markets", "npc_consignments", "sect_politics", "clan_dynamics", "autonomous_world_events"}
 
 type Location struct {
 	World        string `json:"world"`
@@ -411,6 +417,8 @@ func (r *Runner) applySystem(conn *storage.Conn, system string, steps, gameMinut
 		summary, err = r.sects(conn, steps, gameMinute)
 	case "clan_dynamics":
 		summary, err = r.clans(conn, steps, gameMinute)
+	case "npc_consignments":
+		summary, err = r.npcConsignments(conn, steps, gameMinute)
 	case "autonomous_world_events":
 		summary, events, err = r.autonomousWorldEvents(conn, steps, gameMinute)
 	default:
@@ -458,7 +466,16 @@ last_game_minute=?,updated_at=? WHERE status='alive'`, []any{max1(steps / 2), st
 			npcs = i64(row["n"])
 		}
 	}
-	return fmt.Sprintf("batch-updated %d regions and %d living NPCs", regions, npcs), nil
+	moved, err := r.npcTravel(conn, steps, gm)
+	if err != nil {
+		return "", err
+	}
+	crossed, err := r.npcBreakthroughs(conn, gm)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("batch-updated %d regions and %d living NPCs; %d took the road, %d crossed a realm",
+		regions, npcs, moved, crossed), nil
 }
 
 func (r *Runner) npcLife(conn *storage.Conn, steps, gm int64) (string, error) {
@@ -532,7 +549,25 @@ func (r *Runner) npcLife(conn *storage.Conn, steps, gm int64) (string, error) {
 		}
 		marriages++
 	}
-	return fmt.Sprintf("batch-advanced NPC life; %d natural death(s), %d new marriage(s)", len(deaths), marriages), nil
+	born, err := r.npcChildbirth(conn, steps, gm)
+	if err != nil {
+		return "", err
+	}
+	promoted, err := r.npcCareers(conn, gm)
+	if err != nil {
+		return "", err
+	}
+	bonds, err := r.npcDiscipleBonds(conn, gm)
+	if err != nil {
+		return "", err
+	}
+	fought, killed, err := r.npcFeuds(conn, gm)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf(
+		"batch-advanced NPC life; %d natural death(s), %d new marriage(s), %d birth(s), %d promotion(s), %d new disciple(s), %d feud(s) settled (%d fatal)",
+		len(deaths), marriages, born, promoted, bonds, fought, killed), nil
 }
 
 func (r *Runner) economy(conn *storage.Conn, steps, gm int64) (string, error) {
@@ -566,7 +601,15 @@ func (r *Runner) sects(conn *storage.Conn, steps, gm int64) (string, error) {
 			count = i64(row["n"])
 		}
 	}
-	return fmt.Sprintf("batch-advanced politics for %d sects", count), nil
+	joined, left, err := r.npcSectChanges(conn, steps, gm)
+	if err != nil {
+		return "", err
+	}
+	declared, err := r.npcSectWars(conn, steps, gm)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("batch-advanced politics for %d sects; %d swore in, %d walked out, %d wars declared", count, joined, left, declared), nil
 }
 
 func (r *Runner) clans(conn *storage.Conn, steps, gm int64) (string, error) {
