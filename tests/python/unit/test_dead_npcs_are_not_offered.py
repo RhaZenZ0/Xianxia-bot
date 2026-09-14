@@ -1,4 +1,4 @@
-"""A dead NPC stops being somebody you can meet (v1.0.0-rc.23).
+"""A dead NPC stops being somebody you can meet (v1.0.0-rc.24).
 
 `current_npc_location` answered None for two different questions - "this NPC is
 dead" and "nothing knows where they are" - and every caller read None as the

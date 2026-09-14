@@ -1,6 +1,6 @@
 package game
 
-// Finding somebody the world had given up on (v1.0.0-rc.23).
+// Finding somebody the world had given up on (v1.0.0-rc.24).
 //
 // The simulation records a disappearance at a significance the Quest Forge
 // reads, so the world asks a player to go and find them. This is the other end

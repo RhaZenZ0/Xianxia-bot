@@ -532,7 +532,7 @@ func (r *Runner) npcLife(conn *storage.Conn, steps, gm int64) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	// Courtship instead of coincidence (v1.0.0-rc.23). The pairing that used
+	// Courtship instead of coincidence (v1.0.0-rc.24). The pairing that used
 	// to live here walked one sorted list of singles two at a time and kept a
 	// pair only if both landed on the same location - fifteen usable pairs out
 	// of the two hundred and forty that exist, at six percent, which is four
@@ -548,7 +548,7 @@ func (r *Runner) npcLife(conn *storage.Conn, steps, gm int64) (string, error) {
 	// Somebody walks out and does not arrive. This is the one autonomous
 	// event significant enough to reach the Quest Forge, which is the point
 	// of it - see npc_missing.go.
-	lost, lostForGood, err := r.npcDisappearances(conn, gm)
+	vanished, neverFound, err := r.npcDisappearances(conn, gm)
 	if err != nil {
 		return "", err
 	}
@@ -568,9 +568,20 @@ func (r *Runner) npcLife(conn *storage.Conn, steps, gm int64) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	// What they do when nobody has told them to (v1.0.0-rc.22). After the
+	// feuds, because a robbery is what starts the grudge a feud later
+	// settles, and a tick should not do both ends of that in one pass.
+	crimes, seen, murdered, err := r.npcCrimes(conn, gm)
+	if err != nil {
+		return "", err
+	}
+	hunts, kills, lost, err := r.npcBeastHunts(conn, gm)
+	if err != nil {
+		return "", err
+	}
 	return fmt.Sprintf(
-		"batch-advanced NPC life; %d natural death(s), %d courtship(s) begun, %d new marriage(s), %d courtship(s) ended, %d birth(s), %d promotion(s), %d new disciple(s), %d feud(s) settled (%d fatal), %d went missing, %d were never found",
-		len(deaths), courted, marriages, parted, born, promoted, bonds, fought, killed, lost, lostForGood), nil
+		"batch-advanced NPC life; %d natural death(s), %d courtship(s) begun, %d new marriage(s), %d courtship(s) ended, %d birth(s), %d promotion(s), %d new disciple(s), %d feud(s) settled (%d fatal), %d crime(s) (%d witnessed, %d fatal), %d hunt(s) (%d took quarry, %d fatal), %d went missing, %d were never found",
+		len(deaths), courted, marriages, parted, born, promoted, bonds, fought, killed, crimes, seen, murdered, hunts, kills, lost, vanished, neverFound), nil
 }
 
 func (r *Runner) economy(conn *storage.Conn, steps, gm int64) (string, error) {

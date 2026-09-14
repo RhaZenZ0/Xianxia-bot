@@ -508,6 +508,17 @@ politics and clan dynamics on their own intervals), with bounded catch-up after 
 a personality, a want, a fear and a secret for the narrator, and a memory of you. The narrator can
 describe all of it and change none of it.
 
+They also do things nobody told them to. A bandit robs the richest person standing beside them, a
+smuggler moves something the legal floors will not take, and a hunter goes out after the same beasts
+`/hunt` draws on and does not always come home whole. The money that moves is the victim's; the
+injury is on the hunter's sheet; the carcass reaches the nearest auction floor. Whether a crime is
+*known* is the size of the crowd that saw it — a robbery on an empty road is a `hidden` row the
+narrator never sees, so the world genuinely does not know who did it, while a robbery in a capital
+is public and leaves the victim holding a grudge against a name that a feud will eventually settle.
+A body is always found either way; whether it comes with a name is the same roll. NPCs hold no
+crime records and carry no bounties — that table is the player's, and a bounty nobody can collect
+would be a worse lie than silence.
+
 ### History and memory
 
 `world_history_events` records what mechanically happened — deaths, battles, succession, discoveries,

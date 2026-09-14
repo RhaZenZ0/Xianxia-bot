@@ -1,6 +1,6 @@
 package game
 
-// What a death does to the attachments the dead leave behind (v1.0.0-rc.23).
+// What a death does to the attachments the dead leave behind (v1.0.0-rc.24).
 //
 // Nothing in this engine had ever set `relationship_status` back from
 // 'married'. The only two writes to that column marked people married, so a

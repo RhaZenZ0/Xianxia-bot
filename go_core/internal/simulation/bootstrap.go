@@ -284,7 +284,7 @@ VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(npc_name) DO NOTHING`,
 		health := int64(100)
 		// A share of the world begins near the end of a life, so there are
 		// elders in it and the first funeral is not decades away
-		// (v1.0.0-rc.23). Hidden masters are left alone: they are content
+		// (v1.0.0-rc.24). Hidden masters are left alone: they are content
 		// with a job to do, not extras to be aged out from under it.
 		if data.HiddenMaster == nil && bootstrapElderly(seed) {
 			if age, frail, ok := bootstrapElderAge(realmIndex, phase, naturalLife, seed); ok {

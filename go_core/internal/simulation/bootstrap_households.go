@@ -1,7 +1,7 @@
 package simulation
 
 // The world should already have had a past when the player arrives
-// (v1.0.0-rc.23).
+// (v1.0.0-rc.24).
 //
 // Bootstrap wrote all 574 catalogue NPCs as 'single', with no spouse, no
 // children, and an age between eight and thirty-three percent of the way

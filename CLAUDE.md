@@ -146,7 +146,7 @@ Every Go SQLite connection uses `journal_mode=WAL`, `foreign_keys=ON`, `busy_tim
 `synchronous=NORMAL`. Current schema version is 48; historical migrations are kept so old databases
 can upgrade in place — see `VERSIONS.md` for the full schema/release history.
 
-### The NPC life cycle (v1.0.0-rc.23)
+### The NPC life cycle (v1.0.0-rc.24)
 
 `npc_romance.go` replaced a pairing that walked one globally sorted list of singles two at a time and
 kept a pair only if both landed on the same `current_location`. Against the shipped catalogue that
@@ -208,6 +208,23 @@ locations/manuals, raw DB dumps, and GM-only state.
 etc.), separate from current structured state (what's true now — always wins over history). Rows
 carry visibility levels `public` / `participant` / `faction` / `hidden`; hidden rows never reach
 narrator RAG, and a focused NPC does not inherit the player's participant-only knowledge.
+
+### What NPCs do on their own (`npc_deeds.go`, v1.0.0-rc.24)
+
+A step of the `npc_life` batch, after the feuds: a criminal trade (or anyone ambitious enough and
+poor enough) robs, beats or smuggles; a hunting trade goes out after a beast from the same roster
+`/hunt` uses (`game.RollHuntQuarry`). Everything writes a column that already existed — wealth and
+`activity` on `npc_civilization_state`, health and injury on `npc_life_state`, grudges in
+`npc_social_relations`, contraband in `black_market_stock`, lots in `auctions`, the record in
+`world_history_events`.
+
+**NPCs never get a `crime_records` row.** That table is FK'd to `characters` and is the player's:
+an NPC row there would mean a bounty nobody can collect and a capture nothing can perform. The
+visibility ladder above carries NPC crime instead — a crime with a witness is `public` and leaves a
+named grudge that `npcFeuds` later settles; one without is `hidden`, so it never reaches narrator
+RAG and the world really does not know who did it. A killing is always `public` (a body is found);
+the summary is what says whether the culprit is named. Making NPC crime prosecutable would be a
+schema change and is a separate decision — do not add it casually.
 
 ### World events and their sites
 
@@ -334,6 +351,14 @@ plane, and is read-only (no `admin_audit_log` row, and it sits under Systems, no
   put new tests in the layer they actually test, and don't duplicate Go-owned formulas/state
   transitions in pytest once a mechanic has moved to Go.
 - `tests/support.py` holds shared dependency shims and test path helpers.
+- **Never assert that a random thing happened, however many iterations you give it.** The simulation
+  is built out of low-probability rolls and `gamerng` is `crypto/rand` with no seed, so a
+  "sixty ticks and surely one landed" test fails for no reason at some rate you cannot drive to
+  zero. Use `gamerng.UseRoller(fn)` (v1.0.0-rc.24) — it lends the dice to one test and returns the
+  restore, which you must `defer`; `fn` receives the bound so one kind of roll can be answered
+  differently from another, and its answer is clamped into the die. It is test-only and a test in
+  `gamerng` walks every non-test file in `go_core` to keep it that way. Where the outcome can be
+  made certain by the *scenario* instead (overwhelming attributes, a stacked fixture), prefer that.
 
 ## Release delivery
 

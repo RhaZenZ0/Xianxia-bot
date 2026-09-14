@@ -1246,7 +1246,7 @@ async def city_rumours(interaction: discord.Interaction) -> None:
         await interaction.response.send_message("Rumours are traded in cities - at the gate, or in the lower town.", ephemeral=False)
         return
     # Rumours are kept where people drink, and this looked in the wrong room
-    # for both reasons at once (v1.0.0-rc.23). It wanted a `lower` district,
+    # for both reasons at once (v1.0.0-rc.24). It wanted a `lower` district,
     # which exists on exactly four locations in the whole world, and inside it
     # a name beginning "Innkeeper" or "Beggar King", which no NPC in the
     # catalogue has - Greenriver Town's are *Landlady* Yu Lian and *Old

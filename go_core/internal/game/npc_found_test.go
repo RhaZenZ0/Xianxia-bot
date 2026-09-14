@@ -8,7 +8,7 @@ import (
 	"xianxia/core/internal/storage"
 )
 
-// Finding somebody, or finding where they stopped (v1.0.0-rc.23, schema 48).
+// Finding somebody, or finding where they stopped (v1.0.0-rc.24, schema 48).
 // None of this is a die: the action reads a location and compares it, so every
 // assertion here holds on every run.
 

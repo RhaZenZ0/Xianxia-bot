@@ -7,7 +7,7 @@ import (
 	"xianxia/core/internal/storage"
 )
 
-// Disappearances (v1.0.0-rc.23, schema 47). The hardship half contains no die
+// Disappearances (v1.0.0-rc.24, schema 47). The hardship half contains no die
 // at all, so everything about the grace, the decline and the death is asserted
 // exactly; the vanishing itself is a roll and is only ever bounded.
 

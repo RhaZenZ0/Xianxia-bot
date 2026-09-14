@@ -1,6 +1,6 @@
 package simulation
 
-// Courtship, and why the world was not reproducing (v1.0.0-rc.23).
+// Courtship, and why the world was not reproducing (v1.0.0-rc.24).
 //
 // `npcLife` used to marry people by walking one globally sorted list of
 // singles two at a time - slots (0,1), (2,3), (4,5) - and keeping a pair only

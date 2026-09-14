@@ -1862,7 +1862,7 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
         47,
         "npcs_can_go_missing",
         (
-            # v1.0.0-rc.23: somebody who walked out of their own town and did
+            # v1.0.0-rc.24: somebody who walked out of their own town and did
             # not arrive anywhere. `npcTravel` deliberately stores no journey -
             # "nothing tracks how long they have been away - this is what makes
             # the journey end without storing a journey" - which is the right
@@ -1885,7 +1885,7 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
         48,
         "graves_for_those_nobody_found",
         (
-            # v1.0.0-rc.23: somewhere to find the answer. A disappearance that
+            # v1.0.0-rc.24: somewhere to find the answer. A disappearance that
             # runs out of grace kills the person at the end of it, and until
             # now that was a history row and nothing else - the searcher who
             # went looking arrived at an empty place and learned nothing,

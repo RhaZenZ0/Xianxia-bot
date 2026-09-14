@@ -159,7 +159,7 @@ INSERT INTO npc_life_state(npc_name,birth_game_minute,age_at_creation_years,natu
 INSERT INTO npc_life_state(npc_name,birth_game_minute,age_at_creation_years,natural_lifespan_years,health,injury,injury_severity,sect_rank,career_progress,relationship_status,spouse_name,children_count,last_social_game_minute,last_cultivation_game_minute,death_game_minute,cause_of_death,updated_at) VALUES('B',0,20,80,100,'',0,'Independent Cultivator',0,'single','',0,0,0,NULL,'',0);
 `)
 	// A marriage is the end of a courtship now, not a coin flip between two
-	// strangers (v1.0.0-rc.23), so the couple arrive already courting and one
+	// strangers (v1.0.0-rc.24), so the couple arrive already courting and one
 	// point short of the threshold. That keeps what this test is actually
 	// for - both life-state rows and the relation row landing in one
 	// transaction - and makes it certain by the fixture rather than by

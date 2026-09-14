@@ -10,7 +10,7 @@ import (
 	"xianxia/core/internal/worlddata"
 )
 
-// Courtship, widowing and the seeded households (v1.0.0-rc.23).
+// Courtship, widowing and the seeded households (v1.0.0-rc.24).
 //
 // Everything asserted here is certain by its fixture rather than by iteration.
 // `advanceCourtships`, `marryPair`, `endCourtship`, `seedHouseholds` and
@@ -319,7 +319,7 @@ func romanceDB(t *testing.T) string {
 	return livesDB(t)
 }
 
-// The seeded world (v1.0.0-rc.23). Bootstrap is keyed off `hash64` throughout,
+// The seeded world (v1.0.0-rc.24). Bootstrap is keyed off `hash64` throughout,
 // so these numbers are a property of the shipped content rather than of a die,
 // and the bands below are written down so the next person can see at a glance
 // whether the world still opens with a past in it.

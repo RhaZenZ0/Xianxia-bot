@@ -200,7 +200,7 @@ func applyCombatAftermathTx(conn *storage.Conn, userID int64, b battleRow, outco
 				// went on healing the corpse every npc_life tick - its bulk heal
 				// is `WHERE health>0` with no join to status - and advancing its
 				// career. Say it in both places, then free whoever they were
-				// attached to (v1.0.0-rc.23).
+				// attached to (v1.0.0-rc.24).
 				if tableExistsTx(conn, "npc_life_state") {
 					if _, err = conn.Execute(`UPDATE npc_life_state SET health=0,death_game_minute=?,cause_of_death=?,updated_at=? WHERE npc_name=?`,
 						[]any{gameMinute, fmt.Sprintf("killed by player %d", userID), now, target}); err != nil {

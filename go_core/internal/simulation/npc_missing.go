@@ -1,6 +1,6 @@
 package simulation
 
-// People who walk out of a town and do not arrive anywhere (v1.0.0-rc.23).
+// People who walk out of a town and do not arrive anywhere (v1.0.0-rc.24).
 //
 // `npcTravel` deliberately stores no journey - "nothing tracks how long they
 // have been away - this is what makes the journey end without storing a

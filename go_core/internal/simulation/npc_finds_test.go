@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 
+	"xianxia/core/internal/gamerng"
 	"xianxia/core/internal/storage"
 	"xianxia/core/internal/worlddata"
 )
@@ -122,13 +123,22 @@ func TestGraveRobbersPutThingsUnderTheHammer(t *testing.T) {
 	for i := 0; i < 30; i++ {
 		addFinder(t, path, fmt.Sprintf("Grave-Robber %02d", i), "Greenriver Town", "grave-robber", 0)
 	}
+	// Loaded dice, because the dice are not what this is about. A robber
+	// finds something 22% of the time and half of what this world holds is
+	// contraband no legal floor will take, so thirty of them came up empty
+	// about one run in fifty - and the assertion that caught it could only
+	// ever be "not zero", which is a weak thing to know. Every robber finds,
+	// and finds the legal treasure, so what the cap does is exact.
+	defer gamerng.UseRoller(func(n int) int {
+		if n == 100 {
+			return 0 // the find roll: everybody turns something up
+		}
+		return n - 1 // the item pick: the last of the sorted pool is the legal one
+	})()
 	runFinds(t, path, r, 1, 1440)
 	lots := i64(simScalar(t, path, `SELECT COUNT(*) FROM auctions WHERE active=1`))
-	if lots == 0 {
-		t.Fatal("thirty grave-robbers and the floor is still empty")
-	}
-	if lots > findCap {
-		t.Fatalf("the world held a fire sale: %d lots in one tick", lots)
+	if lots != findCap {
+		t.Fatalf("thirty finders and a cap of %d produced %d lot(s)", findCap, lots)
 	}
 	// The lot is the world's, not a player's, and it is on the right floor.
 	if seller := i64(simScalar(t, path, `SELECT seller_user_id FROM auctions LIMIT 1`)); seller != 0 {

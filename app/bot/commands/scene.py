@@ -187,7 +187,7 @@ async def talk(
             commission_offer = None
             commission_block = None
     await interaction.response.defer()
-    # Finding somebody the world had given up on (v1.0.0-rc.23). The presence
+    # Finding somebody the world had given up on (v1.0.0-rc.24). The presence
     # check above has already established that the player is standing where
     # this NPC is, which is the only way a disappearance can be closed - and
     # the engine checks it again itself rather than taking our word for it.
