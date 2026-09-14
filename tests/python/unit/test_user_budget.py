@@ -56,15 +56,17 @@ class UserBudgetTests(unittest.TestCase):
     def test_every_door_draws_on_the_same_bucket(self):
         # v0.31.0: a player refused a typed line is refused the slash command
         # too, and the snapshot says which door each refusal came through.
+        # The shorthand (v1.0.0) is the fourth door and draws on the same bucket.
         self.assertTrue(self.budget.try_acquire(1, door="typed"))
-        self.assertTrue(self.budget.try_acquire(1, door="slash"))
+        self.assertTrue(self.budget.try_acquire(1, door="shorthand"))
         self.assertTrue(self.budget.try_acquire(1, door="narrate_it"))
         self.assertFalse(self.budget.try_acquire(1, door="slash"))
         self.assertFalse(self.budget.try_acquire(1, door="typed"))
         doors = self.budget.snapshot()["doors"]
         self.assertEqual(doors["typed"], {"granted": 1, "refused": 1})
-        self.assertEqual(doors["slash"], {"granted": 1, "refused": 1})
+        self.assertEqual(doors["shorthand"], {"granted": 1, "refused": 0})
         self.assertEqual(doors["narrate_it"], {"granted": 1, "refused": 0})
+        self.assertEqual(doors["slash"], {"granted": 0, "refused": 1})
         self.assertEqual(self.budget.refused, 2)
 
     def test_idle_users_are_evicted(self):

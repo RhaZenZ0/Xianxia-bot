@@ -74,6 +74,19 @@ class ActionRegistry:
     def root(self, name: str) -> app_commands.Command[Any, ..., Any]:
         return self._roots[name]
 
+    def all_commands(self) -> dict[str, app_commands.Command[Any, ..., Any]]:
+        """Every bound command by qualified name, roots and group leaves alike.
+
+        The shorthand (v1.0.0) resolves a typed word against this whole table,
+        not only the roots.
+        """
+        commands: dict[str, app_commands.Command[Any, ..., Any]] = {}
+        for binding in self._bindings.values():
+            name = str(getattr(binding.command, "qualified_name", ""))
+            if name:
+                commands.setdefault(name, binding.command)
+        return commands
+
     def qualified(self, name: str) -> app_commands.Command[Any, ..., Any]:
         """A bound command by its qualified name ("travel go"), root or leaf.
 
@@ -81,10 +94,10 @@ class ActionRegistry:
         cheaper dictionary above."""
         if name in self._roots:
             return self._roots[name]
-        for binding in self._bindings.values():
-            if str(getattr(binding.command, "qualified_name", "")) == name:
-                return binding.command
-        raise KeyError(f"Unregistered action command: {name!r}")
+        command = self.all_commands().get(name)
+        if command is None:
+            raise KeyError(f"Unregistered action command: {name!r}")
+        return command
 
     def roots(self) -> dict[str, app_commands.Command[Any, ..., Any]]:
         return dict(self._roots)

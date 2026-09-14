@@ -43,9 +43,12 @@ from .locations import _known_locations, current_npc_location
 from .registry import EVENT_HANDLERS
 from .typed_play import (
     Candidate, MessageInteraction, TypedPlayPicker, TypedPlayUnsupported, VERB_TABLE,
-    budget_refusal, dispatch, hint_due, hint_text, picker_prompt,
+    budget_refusal, command_specs, dispatch, hint_due, hint_text, picker_prompt,
 )
-from .typed_play_router import addressed_npc, parse_prefixed, resolve_entities, route_line
+from .typed_play_router import (
+    addressed_npc, command_named, parse_prefixed, parse_shorthand, resolve_entities,
+    route_command, route_line,
+)
 from .ui.event_scene import spawn_system_event_thread
 
 # The doubled-weekend announcement: the slot its "already told the server"
@@ -699,6 +702,12 @@ class XianxiaBot(commands.Bot):
         if not SETTINGS.message_content_intent:
             return
 
+        # The shorthand is heard in every channel of the guild, not only the
+        # ones AUTO_NARRATE listens to, so it is read before the gate below.
+        # Both steps are pure - a slice and a dictionary lookup - so a line
+        # that is not one, or that names no command, costs nothing at all.
+        shorthand = parse_shorthand(message.content, SETTINGS.typed_play_shorthand)
+        named = command_named(shorthand, commands=command_specs()) if shorthand is not None else None
         mentioned = self.user is not None and self.user in message.mentions
         parent_id = message.channel.parent_id if isinstance(message.channel, discord.Thread) else None
         hub_record = await DB.get_realm_hub_by_channel(message.guild.id, int(parent_id or message.channel.id))
@@ -721,7 +730,10 @@ class XianxiaBot(commands.Bot):
             and isinstance(message.channel, discord.Thread)
             and await DB.is_active_event_thread(message.channel.id)
         )
-        if not mentioned and not auto_channel and not active_event_thread:
+        # A shorthand line that named a command is heard wherever it was typed;
+        # one that named none is only heard where typed play already listens,
+        # so "x marks the spot" in a chat channel stops here, silently.
+        if not mentioned and not auto_channel and not active_event_thread and named is None:
             return
 
         content = message.content
@@ -734,13 +746,13 @@ class XianxiaBot(commands.Bot):
         if not character:
             # Speech from someone without a cultivator is just chat. Only an
             # attempt to act, or a direct mention, earns the onboarding nudge.
-            if typed is not None or mentioned:
+            if typed is not None or mentioned or shorthand is not None:
                 await message.reply("Create your cultivator first with **/begin**.")
             return
         if isinstance(message.channel, discord.Thread) and parent_id:
             cfg = await DB.get_server_config(message.guild.id)
             if int(parent_id) == int(cfg.get("exploration_channel_id") or 0) and not private_scene:
-                if typed is not None or mentioned:
+                if typed is not None or mentioned or shorthand is not None:
                     await message.reply("This is not your active private expedition thread.")
                 return
         # Capitals are visible only while you stand in them (v0.21.6); a road
@@ -751,7 +763,7 @@ class XianxiaBot(commands.Bot):
         except Exception:
             log.exception("Realm presence role synchronization failed")
         if hub_record and str(character.get("location", "")) != str(hub_record.get("location", "")):
-            if typed is not None or mentioned:
+            if typed is not None or mentioned or shorthand is not None:
                 await message.reply(
                     f"🏙️ This channel represents **{hub_record['location']}** in **{hub_record['world_name']}**. "
                     f"Your cultivator is currently at **{await character_location_display(character)}**. "
@@ -766,6 +778,46 @@ class XianxiaBot(commands.Bot):
                 message=message, character=character, content=content,
                 private_scene=private_scene, epic=epic, via=via,
             )
+
+        # --- shorthand: "x explore" names a command, in any channel -----------
+        # The prefix wins if a line somehow reads as both. A line that names no
+        # command is only routed where typed play already listens; anywhere else
+        # it is speech and this returns having spent nothing, which is what lets
+        # the shorthand be heard guild-wide without "x marks the spot" in a
+        # chat channel drawing a picker.
+        if shorthand is not None and typed is None:
+            listening = bool(mentioned or auto_channel or active_event_thread)
+            if named is None and not listening:
+                return
+            refusal = budget_refusal(message.author.id, door="shorthand")
+            if refusal:
+                await message.reply(refusal, mention_author=False, delete_after=20)
+                return
+            present = await EVENT_HANDLERS.invoke("scene_action_targets", character)
+            known = await _known_locations(message.author.id, character)
+            inventory = await DB.get_inventory(message.author.id)
+            carried = [(item_id, WORLD.item_name(item_id)) for item_id, quantity in dict(inventory or {}).items() if int(quantity or 0) > 0]
+            if named is not None:
+                route = route_command(shorthand, match=named, table=VERB_TABLE, present=present,
+                                      locations=sorted(known), items=carried)
+            else:
+                route = route_line(shorthand, table=VERB_TABLE, present=present, all_npcs=WORLD.npcs,
+                                   locations=sorted(known), items=carried)
+            if route.kind == "refusal":
+                await message.reply(route.message, mention_author=False, delete_after=30)
+                return
+            if route.kind == "dispatch" and route.single is not None:
+                await self._dispatch_typed(message, route.single)
+                return
+            # Only the verb-table fallback can be ambiguous, and that runs only
+            # where typed play already listens, so the picker never appears in
+            # an ordinary chat channel.
+            view = TypedPlayPicker(owner_id=message.author.id, route=route, narrate=narrate)
+            try:
+                view.message = await message.reply(picker_prompt(route), view=view, mention_author=False)
+            except discord.HTTPException:
+                log.exception("Typed play could not post its shorthand picker")
+            return
 
         # --- un-prefixed: speech, unless it addresses someone -----------------
         if typed is None:

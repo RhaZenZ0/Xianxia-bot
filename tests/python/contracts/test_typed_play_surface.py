@@ -199,7 +199,7 @@ class PrefixSettingTests(unittest.TestCase):
 
     def test_env_example_documents_the_knobs(self):
         env = (PROJECT_ROOT / ".env.example").read_text(encoding="utf-8")
-        for key in ("TYPED_PLAY_PREFIX=", "TYPED_PLAY_BURST=", "TYPED_PLAY_PER_MINUTE=", "TYPED_PLAY_HINT="):
+        for key in ("TYPED_PLAY_PREFIX=", "TYPED_PLAY_SHORTHAND=", "TYPED_PLAY_BURST=", "TYPED_PLAY_PER_MINUTE=", "TYPED_PLAY_HINT="):
             self.assertIn(key, env, key)
 
 
@@ -211,6 +211,105 @@ class HintTests(unittest.TestCase):
         self.assertRegex(TYPED_PLAY, r"_HINTED\.get\(int\(user_id\)\) == day")
         self.assertRegex(BOT_PY, r"looks_like_action\(content\) and hint_due\(")
         self.assertIn("delete_after=45", BOT_PY)
+
+
+class ShorthandBranchTests(unittest.TestCase):
+    """Contract 5: the shorthand branch of on_message (v1.0.0).
+
+    The shorthand is heard in every channel of the guild, so the rules that
+    keep it from turning ordinary chat into game actions are the ones worth
+    pinning: it is free until it names a command, it spends a token before it
+    reads or dispatches anything, and it never offers a picker of its own.
+    """
+
+    def setUp(self):
+        self.on_message = _method(bot_class_source("XianxiaBot"), "on_message")
+        self.branch = next(
+            node for node in self.on_message.body
+            if isinstance(node, ast.If) and "shorthand is not None" in _if_test_text(node)
+        )
+
+    def test_a_line_that_names_no_command_is_only_heard_where_typed_play_listens(self):
+        # The channel gate itself carries the rule, so there is one place for
+        # it rather than a second channel test inside the branch.
+        gate = next(
+            node for node in self.on_message.body
+            if isinstance(node, ast.If) and "auto_channel" in _if_test_text(node)
+            and len(node.body) == 1 and isinstance(node.body[0], ast.Return)
+        )
+        self.assertIn("named is None", _if_test_text(gate))
+
+    def test_naming_a_command_costs_nothing_until_it_is_named(self):
+        # Both steps are pure, and both come before the first read, so a line
+        # that is not a shorthand never pays for one.
+        body = [ast.unparse(node) for node in self.on_message.body]
+        named = next(i for i, text in enumerate(body) if "command_named(" in text)
+        first_read = next(i for i, text in enumerate(body) if "await DB." in text)
+        self.assertLess(named, first_read)
+
+    def test_the_branch_is_budgeted_before_it_reads_or_dispatches(self):
+        text = "\n".join(ast.unparse(node) for node in self.branch.body)
+        spend = text.index("budget_refusal(")
+        for later in ("EVENT_HANDLERS.invoke('scene_action_targets'", "_known_locations(",
+                      "route_command(", "route_line(", "_dispatch_typed("):
+            self.assertLess(spend, text.index(later), later)
+
+    def test_the_shorthand_spends_its_own_door(self):
+        self.assertIn('budget_refusal(message.author.id, door="shorthand")', BOT_PY)
+
+    def test_a_named_command_never_draws_a_picker(self):
+        # route_command answers with dispatch or refusal - it never offers a
+        # choice - so the picker below it is reachable only from the verb-table
+        # fallback, which runs only where typed play already listens.
+        router = (PROJECT_ROOT / "app" / "bot" / "typed_play_router.py").read_text(encoding="utf-8")
+        body = router[router.index("def route_command("):]
+        body = body[:body.index("\ndef ") if "\ndef " in body else len(body)]
+        self.assertNotIn('Route("picker"', body)
+
+    def test_every_refusal_still_covers_a_shorthand_line(self):
+        # The onboarding nudge, the expedition-thread refusal and the hub
+        # location mismatch each answer an attempt to act; a shorthand line is
+        # one, so none of them may go quiet for it.
+        guards = [
+            node for node in ast.walk(self.on_message)
+            if isinstance(node, ast.If) and "typed is not None" in _if_test_text(node)
+        ]
+        self.assertEqual(len(guards), 3, "the three refusal guards moved")
+        for guard in guards:
+            self.assertIn("shorthand is not None", _if_test_text(guard))
+
+    def test_the_admin_tree_is_off_the_shorthand_surface(self):
+        self.assertIn('SHORTHAND_EXCLUDED = ("admin",)', TYPED_PLAY)
+        self.assertIn("SHORTHAND_EXCLUDED", TYPED_PLAY.split("def command_specs(")[1])
+        # Every admin group hangs off admin_group, so one excluded root name
+        # covers the whole tree however deep a leaf sits.
+        core = (PROJECT_ROOT / "app" / "bot" / "admin" / "core.py").read_text(encoding="utf-8")
+        groups = re.findall(r"app_commands\.Group\(\n(.*?)\)\n", core, re.S)
+        self.assertTrue(groups, "no admin groups found")
+        for group in groups[1:]:  # the first is admin_group itself
+            self.assertIn("parent=admin_group", group)
+
+
+class EveryDoorIsLabelledTests(unittest.TestCase):
+    """Every door the code spends is named on the AI Routing page.
+
+    The label map falls back to the raw key, so a missed edit degrades quietly
+    into a panel that says "narrate_it" at an operator. This is what stops it.
+    """
+
+    def test_the_dashboard_names_every_door(self):
+        doors = set()
+        for path in (PROJECT_ROOT / "app").rglob("*.py"):
+            source = path.read_text(encoding="utf-8")
+            doors.update(re.findall(r"door=[\"'](\w+)[\"']", source))
+            doors.update(re.findall(r"budget_refusal_line\([^)]*?,\s*[\"'](\w+)[\"']", source))
+        self.assertIn("shorthand", doors)
+        labels = (PROJECT_ROOT / "dashboard" / "app.js").read_text(encoding="utf-8")
+        mapping = labels[labels.index("{typed:'Typed play'"):]
+        mapping = mapping[:mapping.index("}")]
+        for door in sorted(doors):
+            self.assertIn(f"{door}:", mapping, door)
+
 
 
 if __name__ == "__main__":

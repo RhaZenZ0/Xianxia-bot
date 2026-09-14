@@ -47,6 +47,22 @@ version complains about interpolation, quote it: `TYPED_PLAY_PREFIX='$'`.
 `>` was the default before v0.25.1 and is still worth considering: Discord
 renders `> text` as a blockquote, so action lines look different from speech.
 
+`TYPED_PLAY_SHORTHAND` (v1.0.0, default `x`, empty disables) is the other door:
+`x explore` runs `/explore`, `x travel go Greenriver Town` runs the `travel go`
+leaf, and `x inv` runs `/inventory` — an unambiguous abbreviation counts. Unlike
+the prefix it is a word rather than a symbol, it is case-insensitive, and it is
+heard in **every** channel of the guild, not only the ones above. What keeps
+that safe is that it acts only on a line that names a real command: `x marks the
+spot` in a chat channel is answered with silence, at the cost of one dictionary
+lookup. Inside the channels typed play already listens to, a shorthand line that
+names no command falls through to the verb table, so `x search the ravine` still
+works there. `/admin` is off the surface entirely, and a command that takes a
+value Discord picks from a list — `/check`, `/stance` — says so and sends you to
+the slash command rather than guessing. Because the token is matched as a whole
+word in front of a command name it may safely be a letter, but the words that
+start ordinary sentences (`i`, `we`, `the`, …) are still refused, and it may not
+begin with `TYPED_PLAY_PREFIX`.
+
 `TYPED_PLAY_BURST` / `TYPED_PLAY_PER_MINUTE` are a per-player token bucket on
 every typed line that can reach the engine or the narrator, so one player
 cannot drain the shared OpenRouter allowance for everyone. `TYPED_PLAY_HINT`
