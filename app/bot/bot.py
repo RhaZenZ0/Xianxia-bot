@@ -51,6 +51,50 @@ from .typed_play_router import (
 )
 from .ui.event_scene import spawn_system_event_thread
 
+# The doubled-weekend announcement: the slot its "already told the server"
+# marker lives in (channel_messages, a presentation table), and how often the
+# worker looks. The window turns over at local midnight; a quarter hour is
+# close enough for a three-day bonus and costs one engine call that reads no
+# database.
+WEEKEND_GIFT_KEY = "weekend_gift"
+WEEKEND_GIFT_CHECK_SECONDS = 900
+
+
+def weekend_announcement(window: dict[str, Any], stored: str) -> tuple[str, str | None]:
+    """What to store for this weekend window, and what (if anything) to say.
+
+    Split out of the worker so it can be tested without a Discord guild: the
+    whole of the "have we already told them" decision is here, and the worker
+    only does the posting.
+
+    `window` is the engine's `support.weekend` result - the window belongs to
+    the engine, and recomputing it here would be a second copy of a rule.
+    `stored` is what was announced last, as "<window key>:open" or
+    "<window key>:closed". Returns ("", None) when the window cannot be read.
+    """
+    key = str(window.get("window_key") or "")
+    if not key:
+        return "", None
+    weekend = bool(window.get("weekend"))
+    state = f"{key}:{'open' if weekend else 'closed'}"
+    if stored == state:
+        return state, None
+    if weekend:
+        closes = int(window.get("closes_unix") or 0)
+        until = f" until <t:{closes}:R>" if closes else ""
+        return state, (
+            f"🎉 **The patron's gift is doubled{until}.**\n"
+            f"Vote for the server with **/vote** and claim twice the usual — "
+            f"every twelve hours, all weekend."
+        )
+    # A close is only worth saying to a server that was told it opened. Without
+    # this, the first tick on a quiet Tuesday would announce the end of a
+    # weekend nobody had heard about.
+    if stored == f"{key}:open":
+        return state, "🕯️ The weekend's doubled gift has ended. **/vote** still pays, and still lifts us up the listing."
+    return state, None
+
+
 class XianxiaBot(commands.Bot):
     def __init__(self) -> None:
         intents = discord.Intents.default()
@@ -90,6 +134,7 @@ class XianxiaBot(commands.Bot):
         self.update_check_task: asyncio.Task | None = None
         self.quest_forge_task: asyncio.Task | None = None
         self.route_audit_task: asyncio.Task | None = None
+        self.weekend_gift_task: asyncio.Task | None = None
         # The emergency shutdown below schedules close() and returns, so the
         # only thing that can keep that task alive is this reference: the
         # event loop holds a weak one, and a task nothing else refers to may
@@ -211,6 +256,8 @@ class XianxiaBot(commands.Bot):
                 self.quest_forge_task = asyncio.create_task(self.quest_forge_worker())
             if SETTINGS.route_audit_hours:
                 self.route_audit_task = asyncio.create_task(self.route_audit_worker())
+            if SETTINGS.vote_site_url:
+                self.weekend_gift_task = asyncio.create_task(self.weekend_gift_worker())
         except Exception as exc:
             self.health_state.fail(phase, exc)
             failure_detail = {
@@ -392,6 +439,61 @@ class XianxiaBot(commands.Bot):
         except asyncio.CancelledError:
             pass
 
+    async def announce_weekend_gift(self) -> None:
+        """Post once when the doubled weekend opens, and once when it closes.
+
+        The window itself is the engine's (`support.weekend`): a weekend
+        computed here as well would be a second copy of a rule, and two copies
+        are how a bonus comes to be announced at one hour and paid from
+        another. The decision of whether the server has already been told is
+        `weekend_announcement` above; this only posts and remembers.
+
+        The marker is the window key in `channel_messages`, a presentation
+        table Python owns, so a restart mid-weekend re-reads what was
+        announced rather than announcing it again.
+        """
+        guild = self.get_guild(SETTINGS.guild_id)
+        if guild is None:
+            return
+        window = dict(await ENGINE.action("support.weekend", 0, {}) or {})
+        stored_messages = await DB.get_channel_messages(guild.id)
+        stored = str((stored_messages.get(WEEKEND_GIFT_KEY) or {}).get("content") or "")
+        state, text = weekend_announcement(window, stored)
+        if not state or state == stored:
+            return
+        message_id: int | None = None
+        if text:
+            channel_id = (await DB.get_server_config(guild.id)).get("announcement_channel_id")
+            channel = guild.get_channel(int(channel_id)) if channel_id else None
+            if isinstance(channel, discord.TextChannel):
+                try:
+                    message_id = (await channel.send(text)).id
+                except (discord.Forbidden, discord.HTTPException):
+                    # Deliberately not stored: an unsent announcement is
+                    # retried on the next tick, not marked as delivered.
+                    log.exception("Could not announce the weekend gift")
+                    return
+        await DB.set_channel_message(guild.id, WEEKEND_GIFT_KEY, content=state, message_id=message_id)
+
+    async def weekend_gift_worker(self) -> None:
+        # Same per-iteration exception boundary as the workers above. The
+        # window turns over at local midnight, so a quarter-hour tick puts the
+        # announcement within fifteen minutes of it - close enough for a bonus
+        # that runs three days, and cheap: the engine query reads no database.
+        await self.wait_until_ready()
+        try:
+            await asyncio.sleep(45)
+            while not self.is_closed():
+                try:
+                    await self.announce_weekend_gift()
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
+                    log.exception("Weekend gift announcement iteration failed")
+                await asyncio.sleep(WEEKEND_GIFT_CHECK_SECONDS)
+        except asyncio.CancelledError:
+            pass
+
     async def update_check_worker(self) -> None:
         # Same per-iteration exception boundary as operational_health_worker.
         # First check a minute after the command sync, then every
@@ -535,7 +637,7 @@ class XianxiaBot(commands.Bot):
             pass
 
     async def close(self) -> None:
-        for task_name in ("event_expiry_task", "operational_health_task", "update_check_task", "quest_forge_task", "route_audit_task"):
+        for task_name in ("event_expiry_task", "operational_health_task", "update_check_task", "quest_forge_task", "route_audit_task", "weekend_gift_task"):
             task = getattr(self, task_name, None)
             if task:
                 task.cancel()

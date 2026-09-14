@@ -333,6 +333,51 @@ type EventSiteTemplate struct {
 	NPCs      []EventSiteNPC  `json:"npcs"`
 }
 
+// PatronGift decides which tier material a cultivator's out-of-world gift
+// arrives as (support.vote_claim). The mapping is content rather than a Go
+// switch so a new path or profession is a content edit, and the material ref
+// it returns ("@herb"/"@ore"/"@core") is resolved against the world tier by
+// EventSites.Material, which is where every other tier material comes from.
+type PatronGift struct {
+	ByProfession map[string]string `json:"by_profession"`
+	ByPath       map[string]string `json:"by_path"`
+	Default      string            `json:"default"`
+	// Refs the tier table does not actually tier. "@herb" and "@ore" name a
+	// different, richer item in each world; "@core" is beast_core in all four
+	// deliberately - it is the one material every world's recipes and shops
+	// still trade in, so it cannot be split per tier without rewriting them.
+	// A gift of an untiered material is made worth the same by arriving in
+	// greater number instead. See Untiered.
+	UntieredRefs []string `json:"untiered"`
+}
+
+// Untiered reports whether a material ref keeps the same item in every world,
+// and so has to be scaled by quantity rather than by identity.
+func (p PatronGift) Untiered(ref string) bool {
+	for _, candidate := range p.UntieredRefs {
+		if candidate == ref {
+			return true
+		}
+	}
+	return false
+}
+
+// Material returns the material ref for a cultivator. A profession they have
+// actually practised wins - a smith is given ore whatever they cultivate -
+// and the path is what answers for everyone else. Professions are offered
+// most-practised first by the caller; the first one named here wins.
+func (p PatronGift) Material(professions []string, path string) string {
+	for _, profession := range professions {
+		if ref, ok := p.ByProfession[profession]; ok && ref != "" {
+			return ref
+		}
+	}
+	if ref, ok := p.ByPath[path]; ok && ref != "" {
+		return ref
+	}
+	return p.Default
+}
+
 // EventSites turns an event category into the concrete roster players can act
 // on. Without it a world event is an announcement with nothing inside it.
 type EventSites struct {
@@ -578,6 +623,7 @@ type Catalog struct {
 	Locations           map[string]LocationDefinition  `json:"locations"`
 	UnexpectedEvents    []UnexpectedEvent              `json:"unexpected_events"`
 	EventSites          EventSites                     `json:"event_sites"`
+	PatronGift          PatronGift                     `json:"patron_gift"`
 	SecretRealms        map[string]SecretRealm         `json:"secret_realms"`
 	Inheritances        map[string]Inheritance         `json:"inheritances"`
 	BirthFamilySendoff  map[string]BirthFamilySendoff  `json:"birth_family_sendoff"`

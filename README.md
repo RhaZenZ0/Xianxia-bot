@@ -286,6 +286,61 @@ chat channel is silence; inside the channels above, a shorthand line that names 
 to the verb table. `/admin` is off the surface. `TYPED_PLAY_SHORTHAND` is `x` by default; empty
 turns it off.
 
+### Bringing players in
+
+`/vote` prints the server's page on whichever listing site the operator set (`VOTE_SITE_URL` /
+`VOTE_SITE_NAME` — Top.gg, DISBOARD, any of them), because a small server is found by ranking on
+that list and the list ranks on votes. Under the link is one button, once every twelve hours — the
+cadence every listing site resets a vote on.
+
+The gift is the cultivator's own. Fifteen of the local world's low-grade currency, and five more for
+every realm climbed inside that world, so it runs fifteen to fifty and stays a few cheap wares at
+every tier rather than a windfall in the Mortal World and an insult in the Celestial — and never
+less than the flat fifteen it replaced. With it comes one material the character actually uses — a
+herb for an alchemist, ore for a smith or a sword cultivator, a beast core for a tamer — chosen by
+the craft they practise before the road they walk, and resolved against the tier of the world they
+stand in. The mapping is content (`patron_gift` in `content/world.json`), so a new path needs no
+engine change.
+
+Two of those three materials tier by name: a herb runs from a spirit herb to a heavenpetal, an ore
+from spirit iron to starsteel. A beast core does not — it is the same item in all four worlds
+because nineteen recipes and nineteen shops across every tier still trade in it, and splitting it
+would hand a Celestial tamer something nothing accepts. So it tiers by number instead: one core in
+the Mortal World, four in the Celestial, which is the herb's own ladder in another shape. Which
+materials work that way is content too (`untiered`), and the content gate checks the list against
+the tier table in both directions.
+
+From Friday through Sunday, the operator's local time, the whole gift doubles. The window is the
+engine's (`support.weekend`, measured in a named zone so it follows daylight saving rather than
+drifting an hour in winter), `/vote` says so above the link, and the bot announces it once in the
+server's announcement channel when it opens and once when it closes — the marker is the window's
+own key, so a restart mid-weekend does not post twice.
+
+Nothing verifies the vote. Verifying it would mean an inbound webhook, and that means publishing an
+endpoint from a box that publishes nothing — a door opened for a thank-you. So the claim is taken
+on trust and the *cooldown* is the engine's (`support.vote_claim`, a domain-event row per grant):
+a player who claims without voting is thanked no more often than one who votes, and the gift is
+small enough at every tier to be a thank-you rather than an income. Leave `VOTE_SITE_URL` empty and
+the command says so and grants nothing.
+
+### What you are waiting on
+
+`/cooldowns` is the answer to "what can I do right now", which nothing in the game could give before
+it: the engine meters two dozen waits and half a dozen more that are not cooldowns at all — a road
+journey, closed-door seclusion, the sect trial's retry, a secret realm's seal, the Samsara wait —
+and the only way to find one was to try the action and read the refusal.
+
+One engine read (`cooldown.status`) puts all of it on one axis. Three clocks meet there: a cooldown
+row is wall-clock, a journey and seclusion are world-minutes, moderation and Samsara are their own
+columns, and everything leaves as a timestamp Discord counts down live. A wait the GM has frozen the
+world under says so rather than counting down to 1970. Under the waits is everything that is *ready*,
+each naming the hub page that runs it — and a cultivator is never offered the ghost road's actions
+unless they walk it, or a perfection quest without a perfection under way.
+
+The list of cooldown keys is the engine's roster, and a Go test scans the package for every
+`setCooldown` call and every raw insert to hold it complete; a Python test holds the card's wording
+to the same roster from the other side. A cooldown added later cannot go unnamed on either.
+
 ### Cultivation, sects and manuals
 
 Realms and stages, breakthroughs and tribulations, spiritual roots, bloodlines and physiques, laws

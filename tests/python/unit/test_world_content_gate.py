@@ -545,6 +545,75 @@ class CityLifeContentTests(unittest.TestCase):
                 self.assertEqual(len({c["quest_key"] for c in by_city.get(city, [])}), len(by_city.get(city, [])))
 
 
+class PatronGiftContentTests(unittest.TestCase):
+    """The gift a patron leaves a cultivator for supporting the server.
+
+    The roster is content rather than a Go switch, which is the point: a new
+    path or profession should be a content edit. That only holds while the
+    content actually covers every path and every profession the engine can
+    write, so this is the check that makes the claim true.
+    """
+
+    # Written by advanceProfessionTx: the three that recipes name, plus the
+    # three the engine hardcodes - "Beast Taming" (beast_artifact_actions.go),
+    # "Artifact Refining" (same file) and "Foraging" (crafting_actions.go).
+    ENGINE_PROFESSIONS = {"Beast Taming", "Artifact Refining", "Foraging"}
+    MATERIAL_REFS = {"@herb", "@ore", "@core"}
+
+    def test_every_cultivation_path_has_a_gift(self):
+        gift = WORLD["patron_gift"]
+        for path in WORLD["paths"]:
+            with self.subTest(path=path):
+                self.assertIn(path, gift["by_path"], f"{path} has no patron gift")
+
+    def test_every_profession_the_engine_can_write_has_a_gift(self):
+        gift = WORLD["patron_gift"]
+        professions = {str(r["profession"]) for r in WORLD["recipes"].values() if r.get("profession")}
+        for profession in sorted(professions | self.ENGINE_PROFESSIONS):
+            with self.subTest(profession=profession):
+                self.assertIn(profession, gift["by_profession"])
+
+    def test_every_gift_resolves_to_a_real_item_in_every_world(self):
+        gift = WORLD["patron_gift"]
+        tiers = WORLD["event_sites"]["tier_materials"]
+        refs = set(gift["by_path"].values()) | set(gift["by_profession"].values()) | {gift["default"]}
+        self.assertTrue(refs)
+        for ref in sorted(refs):
+            with self.subTest(ref=ref):
+                if ref not in self.MATERIAL_REFS:
+                    # A literal item id is allowed, and must exist.
+                    self.assertIn(ref, WORLD["items"], f"{ref} is neither a tier material nor an item")
+                    continue
+                for world, materials in tiers.items():
+                    item = materials.get(ref[1:])
+                    self.assertTrue(item, f"{ref} is not written for {world}")
+                    self.assertIn(item, WORLD["items"], f"{ref} in {world} is not a real item")
+
+    def test_an_untiered_material_is_one_the_tier_table_really_does_not_tier(self):
+        # The list exists so a material that is the same item in every world
+        # can be scaled by number instead. An entry that *does* tier would be
+        # paid twice over.
+        gift = WORLD["patron_gift"]
+        tiers = WORLD["event_sites"]["tier_materials"]
+        for ref in gift.get("untiered", []):
+            with self.subTest(ref=ref):
+                self.assertIn(ref, self.MATERIAL_REFS)
+                items = {materials.get(ref[1:]) for materials in tiers.values()}
+                self.assertEqual(len(items), 1, f"{ref} names {items} - it tiers, so it must not be listed as untiered")
+        # And the other way: a ref that is the same everywhere must be listed,
+        # or a Celestial cultivator is quietly given a Mortal World gift.
+        for ref in self.MATERIAL_REFS:
+            with self.subTest(ref=ref):
+                items = {materials.get(ref[1:]) for materials in tiers.values()}
+                if len(items) == 1:
+                    self.assertIn(ref, gift.get("untiered", []), f"{ref} is the same item in every world but is not listed as untiered")
+
+    def test_the_default_is_a_material_every_world_carries(self):
+        # A path or profession nobody wrote still has to pay something, so the
+        # default cannot be a literal item that only one world trades in.
+        self.assertIn(WORLD["patron_gift"]["default"], self.MATERIAL_REFS)
+
+
 class RoadSideSiteContentTests(unittest.TestCase):
     """v0.39.0: a place on every road between two cities."""
 

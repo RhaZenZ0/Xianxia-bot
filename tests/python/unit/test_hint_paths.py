@@ -29,7 +29,7 @@ ENV = {"DISCORD_TOKEN": "test-token", "GUILD_ID": "123456789012345678",
 
 # Roots that are commands rather than hubs: `**/quests**` names one and is not
 # a hub path at all.
-ROOT_COMMANDS = {"quests", "me", "begin", "action", "check", "menu"}
+ROOT_COMMANDS = {"quests", "me", "begin", "action", "check", "menu", "vote", "cooldowns"}
 
 
 def _modules():
