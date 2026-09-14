@@ -49,8 +49,10 @@ class TheOperatorsListingURLIsValidated(unittest.TestCase):
                     _vote_site_url(bad)
 
     def test_the_site_name_is_trimmed_bounded_and_defaulted(self):
-        self.assertEqual(_vote_site_name(None), "Top.gg")
-        self.assertEqual(_vote_site_name("   "), "Top.gg")
+        # Deliberately names no site: a default that ships one brand labels
+        # every operator's listing with it until they notice.
+        self.assertEqual(_vote_site_name(None), "the server listing")
+        self.assertEqual(_vote_site_name("   "), "the server listing")
         self.assertEqual(_vote_site_name(" DISBOARD "), "DISBOARD")
         self.assertEqual(_vote_site_name("Top\n.gg"), "Top .gg")
         self.assertEqual(len(_vote_site_name("x" * 90)), 40)

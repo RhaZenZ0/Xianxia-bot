@@ -73,7 +73,9 @@ un-prefixed line of theirs looks like an action.
 
 `VOTE_SITE_URL` is this server's page on a Discord listing site — Top.gg,
 DISBOARD, whichever you list on — and `VOTE_SITE_NAME` is what players see it
-called. Set the URL and `/vote` appears as a working command: it prints the
+called. Left empty it reads "the server listing", which is deliberate: a
+default that named one site would label your listing with somebody else's
+brand until you noticed. Set the URL and `/vote` appears as a working command: it prints the
 link, and once per twelve hours (the cadence every listing site uses) a player
 can claim a patron's gift — fifteen of the local world's low-grade currency
 plus five for every realm they have climbed inside that world, and a

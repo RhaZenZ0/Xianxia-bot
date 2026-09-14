@@ -107,9 +107,16 @@ def _vote_site_url(value: str | None) -> str:
 
 
 def _vote_site_name(value: str | None) -> str:
-    """The site's name as players read it - "Top.gg", "DISBOARD", whichever."""
+    """The site's name as players read it - "Top.gg", "DISBOARD", whichever.
+
+    The default names no site on purpose. Shipping one means every operator
+    who sets VOTE_SITE_URL and forgets this key sends their players to a page
+    labelled with somebody else's brand, which is at best confusing and at
+    worst wrong. "the server listing" is what the engine already falls back to
+    (supportSiteLabel in support_actions.go), so both sides say the same thing.
+    """
     name = " ".join((value or "").split())[:40]
-    return name or "Top.gg"
+    return name or "the server listing"
 
 
 def _as_int_set(value: str | None, *, name: str = "value") -> set[int]:
