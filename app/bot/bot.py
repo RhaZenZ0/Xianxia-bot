@@ -33,7 +33,7 @@ from .admin.narration_control import (
 )
 from .channels import post_server_log
 from .character_state import _remember_freeform_npc_scene
-from .runtime import DB, ENGINE, SETTINGS, TYPED_PLAY_BUDGET, WORLD, _sync_realm_presence_roles, character_location_display, chunk_text, current_world_time, log
+from .runtime import DB, ENGINE, SETTINGS, TOPGG, TYPED_PLAY_BUDGET, WORLD, _sync_realm_presence_roles, character_location_display, chunk_text, current_world_time, log
 from ..ai.quest_forge import store_draft
 from ..rules.quests import QUEST_DEFINITIONS, static_quest_seed_rows
 from .services import AI_ROUTER, ALERTS, GUILD, NARRATOR, NARRATOR_CONTEXT, QUEST_FORGE, SIM
@@ -58,6 +58,12 @@ from .ui.event_scene import spawn_system_event_thread
 # database.
 WEEKEND_GIFT_KEY = "weekend_gift"
 WEEKEND_GIFT_CHECK_SECONDS = 900
+
+# How often the listing is told how many servers the bot is in. Top.gg shows
+# the number on the listing page and nothing depends on it being to the
+# minute, so half an hour is frequent enough to look alive and rare enough
+# that a listing outage costs nothing.
+TOPGG_METRICS_SECONDS = 1800
 
 
 def weekend_announcement(window: dict[str, Any], stored: str) -> tuple[str, str | None]:
@@ -135,6 +141,7 @@ class XianxiaBot(commands.Bot):
         self.quest_forge_task: asyncio.Task | None = None
         self.route_audit_task: asyncio.Task | None = None
         self.weekend_gift_task: asyncio.Task | None = None
+        self.topgg_metrics_task: asyncio.Task | None = None
         # The emergency shutdown below schedules close() and returns, so the
         # only thing that can keep that task alive is this reference: the
         # event loop holds a weak one, and a task nothing else refers to may
@@ -258,6 +265,8 @@ class XianxiaBot(commands.Bot):
                 self.route_audit_task = asyncio.create_task(self.route_audit_worker())
             if SETTINGS.vote_site_url:
                 self.weekend_gift_task = asyncio.create_task(self.weekend_gift_worker())
+            if SETTINGS.topgg_post_metrics and TOPGG.enabled:
+                self.topgg_metrics_task = asyncio.create_task(self.topgg_metrics_worker())
         except Exception as exc:
             self.health_state.fail(phase, exc)
             failure_detail = {
@@ -475,6 +484,40 @@ class XianxiaBot(commands.Bot):
                     return
         await DB.set_channel_message(guild.id, WEEKEND_GIFT_KEY, content=state, message_id=message_id)
 
+    async def post_topgg_metrics(self) -> bool:
+        """Tell the listing how many servers the bot is in. Never raises.
+
+        The count is Discord's, which is why this lives in the bot and not in
+        the engine: `self.guilds` is the only place it exists. The result is
+        recorded as a health check beside `release_channel`, so an operator
+        whose token has been rotated finds out from `/admin` rather than from
+        a listing page that quietly stopped updating.
+        """
+        servers = len(self.guilds)
+        posted = await TOPGG.post_metrics(server_count=servers, shard_count=self.shard_count or 1)
+        detail: dict[str, Any] = {"server_count": servers}
+        if not posted:
+            detail["reason"] = "Top.gg did not accept the metrics post"
+        self.health_state.set_check("topgg_metrics", posted, **detail)
+        return posted
+
+    async def topgg_metrics_worker(self) -> None:
+        # Same per-iteration exception boundary as the workers above: a listing
+        # site having a bad day must never end the worker that talks to it.
+        await self.wait_until_ready()
+        try:
+            await asyncio.sleep(60)
+            while not self.is_closed():
+                try:
+                    await self.post_topgg_metrics()
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
+                    log.exception("Top.gg metrics iteration failed")
+                await asyncio.sleep(TOPGG_METRICS_SECONDS)
+        except asyncio.CancelledError:
+            pass
+
     async def weekend_gift_worker(self) -> None:
         # Same per-iteration exception boundary as the workers above. The
         # window turns over at local midnight, so a quarter-hour tick puts the
@@ -637,12 +680,15 @@ class XianxiaBot(commands.Bot):
             pass
 
     async def close(self) -> None:
-        for task_name in ("event_expiry_task", "operational_health_task", "update_check_task", "quest_forge_task", "route_audit_task", "weekend_gift_task"):
+        for task_name in ("event_expiry_task", "operational_health_task", "update_check_task", "quest_forge_task", "route_audit_task", "weekend_gift_task", "topgg_metrics_task"):
             task = getattr(self, task_name, None)
             if task:
                 task.cancel()
         self.health_state.clear_phase("DISCORD_READY", reason="shutdown")
         self.health_state.set_check("discord_gateway", False, reason="shutdown")
+        # The listing's client holds a keep-alive pool; closing it here keeps
+        # shutdown as quiet as the engine and database transports already are.
+        await TOPGG.aclose()
         await self.health_server.stop()
         await super().close()
 

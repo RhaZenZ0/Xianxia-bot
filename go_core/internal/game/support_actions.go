@@ -111,6 +111,13 @@ func supportVoteWeekendMultiplier(at time.Time) int64 {
 type supportVotePayload struct {
 	GameMinute int64  `json:"game_minute"`
 	Site       string `json:"site"`
+	// Whether the surface confirmed the vote against the listing's API before
+	// asking for the gift (v1.0.0, app/ops/topgg.py). It changes nothing about
+	// what is paid - the cooldown is what bounds a dishonest claim, and it
+	// bounds a verified one identically - so it is carried only into the
+	// receipt and the event ledger, where it can be counted later. Absent
+	// means false, which is what every claim made before this field was one.
+	Verified bool `json:"verified"`
 }
 
 // supportSiteLabel bounds a name that came from the operator's environment
@@ -286,6 +293,7 @@ func supportVoteClaimAction(conn *storage.Conn, catalog worlddata.Catalog, userI
 		"item_id": gift.ItemID, "item_quantity": gift.ItemQty,
 		"weekend": gift.Weekend, "multiplier": gift.Multiplier,
 		"next_claim_seconds": supportVoteCooldownSeconds,
+		"verified":           p.Verified,
 	}
 	return authoritativeMutation{
 		Result: result,
