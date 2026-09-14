@@ -18,23 +18,40 @@ func TestTheRotationOpensTheRealmsInTurnOneEveryThreeDays(t *testing.T) {
 	if len(ids) < 2 {
 		t.Fatalf("need at least two realms, have %v", ids)
 	}
+	var last *OpenedSecretRealm
 	open := func(gm int64) int64 {
 		conn, err := storage.Open(path)
 		if err != nil {
 			t.Fatal(err)
 		}
 		defer conn.Close()
-		n, err := RotateSecretRealms(conn, catalog, gm)
+		opened, err := RotateSecretRealms(conn, catalog, gm)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if err := conn.Commit(); err != nil {
 			t.Fatal(err)
 		}
-		return n
+		last = opened
+		if opened == nil {
+			return 0
+		}
+		return 1
 	}
 	if got := open(1000); got != 1 {
 		t.Fatalf("first tick should open a realm, opened %d", got)
+	}
+	// What it opened has to reach the caller, not just SQLite: the bot spawns
+	// the scene thread from these fields, and a rotation that answered with a
+	// count opened an entrance nobody could be told about.
+	if last == nil || last.RealmID != ids[0] {
+		t.Fatalf("the tick should hand back the realm it opened, got %+v", last)
+	}
+	if last.EventKey == "" || last.Name == "" || last.Location == "" || last.EndsAt <= 0 || last.OpenHours <= 0 {
+		t.Fatalf("an opened realm must carry everything a scene thread needs: %+v", last)
+	}
+	if got := fmt.Sprint(actionScalar(t, path, `SELECT event_key FROM world_events WHERE dedupe_key=? AND active=1`, "secret_realm:"+ids[0])); got != last.EventKey {
+		t.Fatalf("event key %q does not name the row it opened (%q)", last.EventKey, got)
 	}
 	first := catalog.SecretRealms[ids[0]]
 	if got := fmt.Sprint(actionScalar(t, path, `SELECT location FROM world_events WHERE dedupe_key=? AND active=1`, "secret_realm:"+ids[0])); got != first.Location {

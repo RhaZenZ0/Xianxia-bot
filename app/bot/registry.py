@@ -123,8 +123,56 @@ class HandlerRegistry:
         return await handler(*args, **kwargs)
 
 
+class RestoreRegistry:
+    """Panels that have to be re-registered after a restart (v1.0.0-rc.22).
+
+    Discord keeps a message forever; a `discord.ui.View` lives only as long as
+    the process that sent it. A panel anchored to a message players come back
+    to - an event scene open for two days, an exploration encounter open for
+    six hours - therefore comes back from a reboot with dead controls unless
+    something registers it again. That is what this collects.
+
+    A panel only belongs here if it outlives a process. The hub pages, the
+    pickers and the confirms all time out inside fifteen minutes and are
+    re-opened by running the command again; registering those would leave
+    live-looking buttons on messages whose moment has passed, which is the
+    opposite of the fix.
+
+    Each restorer is `async (bot) -> int`, answering how many it restored. One
+    failing restorer never costs the others, and none of them can stop the bot
+    starting: a world that comes up with one stale panel is better than a world
+    that does not come up.
+    """
+
+    def __init__(self) -> None:
+        self._restorers: dict[str, Any] = {}
+
+    def register(self, name: str, restorer: Any) -> None:
+        key = str(name)
+        if key in self._restorers:
+            raise RuntimeError(f"Duplicate view restorer registration: {key}")
+        self._restorers[key] = restorer
+
+    def names(self) -> tuple[str, ...]:
+        return tuple(sorted(self._restorers))
+
+    async def restore_all(self, bot: Any) -> dict[str, int]:
+        """Every registered panel family, in name order. Never raises."""
+        import logging
+
+        restored: dict[str, int] = {}
+        for name in sorted(self._restorers):
+            try:
+                restored[name] = int(await self._restorers[name](bot) or 0)
+            except Exception:
+                logging.getLogger("xianxia").exception("Could not restore the %s panels", name)
+                restored[name] = 0
+        return restored
+
+
 ACTIONS = ActionRegistry()
 EVENT_HANDLERS = HandlerRegistry()
+VIEW_RESTORERS = RestoreRegistry()
 
 
 def registered_root_command(**kwargs: Any):

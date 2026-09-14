@@ -264,6 +264,14 @@ header carries a Here line saying what the place you stand in is and who is abou
 pickers is one message that changes; a red button asks once before it runs; a panel that goes quiet
 for fifteen minutes keeps a Reopen button. Battles and events have their own in-place panels.
 
+The panels that outlive a process come back when it does. A scene thread, an event open for two
+days, an exploration encounter that has paused someone's expedition — Discord keeps those messages
+across a restart and the views that drove them do not, so a reboot used to leave live scenes with
+dead buttons. Each family of long-lived panel registers a restorer (`VIEW_RESTORERS`), and startup
+re-registers every one of them before it takes a command. The short-lived panels stay out of it on
+purpose: a hub page or a confirm times out in minutes and is re-opened by running the command
+again.
+
 ### Typed play
 
 With `AUTO_NARRATE=true` the bot listens in realm-hub channels, private scene threads and

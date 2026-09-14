@@ -4489,6 +4489,41 @@ class Database:
             )
             return [dict(row) for row in await cur.fetchall()]
 
+    async def get_live_event_threads(self) -> list[dict[str, Any]]:
+        """The scenes that are still open, for the startup view restore.
+
+        The mirror of get_expired_event_threads: those are closed on the tick,
+        these are the ones whose panels have to be re-registered so their
+        controls work again after a reboot (v1.0.0-rc.22).
+        """
+        now = time.time()
+        async with self._connect() as db:
+            db.row_factory = aiosqlite.Row
+            cur = await db.execute(
+                "SELECT * FROM event_threads WHERE active=1 AND expires_at>? ORDER BY expires_at", (now,)
+            )
+            return [dict(row) for row in await cur.fetchall()]
+
+    async def get_live_exploration_events(self) -> list[dict[str, Any]]:
+        """Every player still standing in an unresolved exploration encounter.
+
+        One row per participant, because the panel is personal: the encounter
+        is shared state but each cultivator has their own controls. Read at
+        startup to register those controls again (v1.0.0-rc.22).
+        """
+        now = time.time()
+        async with self._connect() as db:
+            db.row_factory = aiosqlite.Row
+            cur = await db.execute(
+                """SELECT p.user_id, p.event_id, e.title, e.location, e.expires_at
+                     FROM exploration_event_participants p
+                     JOIN exploration_events e ON e.event_id=p.event_id
+                    WHERE p.status='active' AND e.state='active' AND e.expires_at>?
+                    ORDER BY e.expires_at""",
+                (now,),
+            )
+            return [dict(row) for row in await cur.fetchall()]
+
     async def get_event_thread_by_key(self, event_key: str) -> dict[str, Any] | None:
         async with self._connect() as db:
             db.row_factory = aiosqlite.Row
