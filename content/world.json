@@ -25766,6 +25766,223 @@
       "sect_value": 176,
       "base_price": 440,
       "array_deploy": "starfall_bulwark_array"
+    },
+    "heart_calming_pill_method": {
+      "name": "Heart Calming Pill — Method Slip",
+      "description": "A jade slip carrying the method for Heart Calming Pill. Reading it once is enough for anyone with the hands for the work; the slip itself stays yours afterwards.",
+      "sect_value": 14,
+      "base_price": 42,
+      "teaches_recipe": "Heart Calming Pill"
+    },
+    "qi_replenishment_pill_method": {
+      "name": "Qi Replenishment Pill — Method Slip",
+      "description": "A jade slip carrying the method for Qi Replenishment Pill. Reading it once is enough for anyone with the hands for the work; the slip itself stays yours afterwards.",
+      "sect_value": 14,
+      "base_price": 42,
+      "teaches_recipe": "Qi Replenishment Pill"
+    },
+    "longevity_pill_method": {
+      "name": "Longevity Pill — Method Slip",
+      "description": "A jade slip carrying the method for Longevity Pill. Reading it once is enough for anyone with the hands for the work; the slip itself stays yours afterwards.",
+      "sect_value": 312,
+      "base_price": 938,
+      "teaches_recipe": "Longevity Pill"
+    },
+    "spirit_iron_armor_method": {
+      "name": "Spirit-Iron Lamellar — Method Slip",
+      "description": "A jade slip carrying the method for Spirit-Iron Lamellar. Reading it once is enough for anyone with the hands for the work; the slip itself stays yours afterwards.",
+      "sect_value": 17,
+      "base_price": 52,
+      "teaches_recipe": "Spirit-Iron Lamellar"
+    },
+    "minor_qi_gathering_array_disk_method": {
+      "name": "Minor Qi-Gathering Array Disk — Method Slip",
+      "description": "A jade slip carrying the method for Minor Qi-Gathering Array Disk. Reading it once is enough for anyone with the hands for the work; the slip itself stays yours afterwards.",
+      "sect_value": 30,
+      "base_price": 90,
+      "teaches_recipe": "Minor Qi-Gathering Array Disk"
+    },
+    "minor_warding_array_disk_method": {
+      "name": "Minor Warding Array Disk — Method Slip",
+      "description": "A jade slip carrying the method for Minor Warding Array Disk. Reading it once is enough for anyone with the hands for the work; the slip itself stays yours afterwards.",
+      "sect_value": 33,
+      "base_price": 100,
+      "teaches_recipe": "Minor Warding Array Disk"
+    },
+    "spirit_crystal_sword_method": {
+      "name": "Spirit-Crystal Sword — Method Slip",
+      "description": "A jade slip carrying the method for Spirit-Crystal Sword. Reading it once is enough for anyone with the hands for the work; the slip itself stays yours afterwards.",
+      "sect_value": 50,
+      "base_price": 150,
+      "teaches_recipe": "Spirit-Crystal Sword"
+    },
+    "spirit_crystal_mail_method": {
+      "name": "Spirit-Crystal Mail — Method Slip",
+      "description": "A jade slip carrying the method for Spirit-Crystal Mail. Reading it once is enough for anyone with the hands for the work; the slip itself stays yours afterwards.",
+      "sect_value": 60,
+      "base_price": 182,
+      "teaches_recipe": "Spirit-Crystal Mail"
+    },
+    "moonveil_recovery_pill_method": {
+      "name": "Moonveil Recovery Pill — Method Slip",
+      "description": "A jade slip carrying the method for Moonveil Recovery Pill. Reading it once is enough for anyone with the hands for the work; the slip itself stays yours afterwards.",
+      "sect_value": 40,
+      "base_price": 122,
+      "teaches_recipe": "Moonveil Recovery Pill"
+    },
+    "spirit_condensation_pill_method": {
+      "name": "Spirit Condensation Pill — Method Slip",
+      "description": "A jade slip carrying the method for Spirit Condensation Pill. Reading it once is enough for anyone with the hands for the work; the slip itself stays yours afterwards.",
+      "sect_value": 46,
+      "base_price": 140,
+      "teaches_recipe": "Spirit Condensation Pill"
+    },
+    "crystal_ward_talisman_method": {
+      "name": "Crystal-Ward Talisman — Method Slip",
+      "description": "A jade slip carrying the method for Crystal-Ward Talisman. Reading it once is enough for anyone with the hands for the work; the slip itself stays yours afterwards.",
+      "sect_value": 32,
+      "base_price": 96,
+      "teaches_recipe": "Crystal-Ward Talisman"
+    },
+    "immortal_gold_sabre_method": {
+      "name": "Immortal-Gold Sabre — Method Slip",
+      "description": "A jade slip carrying the method for Immortal-Gold Sabre. Reading it once is enough for anyone with the hands for the work; the slip itself stays yours afterwards.",
+      "sect_value": 124,
+      "base_price": 374,
+      "teaches_recipe": "Immortal-Gold Sabre"
+    },
+    "immortal_gold_plate_method": {
+      "name": "Immortal-Gold Plate — Method Slip",
+      "description": "A jade slip carrying the method for Immortal-Gold Plate. Reading it once is enough for anyone with the hands for the work; the slip itself stays yours afterwards.",
+      "sect_value": 150,
+      "base_price": 452,
+      "teaches_recipe": "Immortal-Gold Plate"
+    },
+    "dawnlotus_vitality_pill_method": {
+      "name": "Dawn Lotus Vitality Pill — Method Slip",
+      "description": "A jade slip carrying the method for Dawn Lotus Vitality Pill. Reading it once is enough for anyone with the hands for the work; the slip itself stays yours afterwards.",
+      "sect_value": 100,
+      "base_price": 300,
+      "teaches_recipe": "Dawn Lotus Vitality Pill"
+    },
+    "immortal_marrow_pill_method": {
+      "name": "Immortal Marrow Pill — Method Slip",
+      "description": "A jade slip carrying the method for Immortal Marrow Pill. Reading it once is enough for anyone with the hands for the work; the slip itself stays yours afterwards.",
+      "sect_value": 117,
+      "base_price": 352,
+      "teaches_recipe": "Immortal Marrow Pill"
+    },
+    "golden_edge_talisman_method": {
+      "name": "Golden-Edge Talisman — Method Slip",
+      "description": "A jade slip carrying the method for Golden-Edge Talisman. Reading it once is enough for anyone with the hands for the work; the slip itself stays yours afterwards.",
+      "sect_value": 64,
+      "base_price": 192,
+      "teaches_recipe": "Golden-Edge Talisman"
+    },
+    "starsteel_glaive_method": {
+      "name": "Starsteel Glaive — Method Slip",
+      "description": "A jade slip carrying the method for Starsteel Glaive. Reading it once is enough for anyone with the hands for the work; the slip itself stays yours afterwards.",
+      "sect_value": 312,
+      "base_price": 938,
+      "teaches_recipe": "Starsteel Glaive"
+    },
+    "starsteel_aegis_method": {
+      "name": "Starsteel Aegis — Method Slip",
+      "description": "A jade slip carrying the method for Starsteel Aegis. Reading it once is enough for anyone with the hands for the work; the slip itself stays yours afterwards.",
+      "sect_value": 374,
+      "base_price": 1124,
+      "teaches_recipe": "Starsteel Aegis"
+    },
+    "heavenpetal_elixir_method": {
+      "name": "Heaven-Petal Elixir — Method Slip",
+      "description": "A jade slip carrying the method for Heaven-Petal Elixir. Reading it once is enough for anyone with the hands for the work; the slip itself stays yours afterwards.",
+      "sect_value": 249,
+      "base_price": 748,
+      "teaches_recipe": "Heaven-Petal Elixir"
+    },
+    "starlight_dao_pill_method": {
+      "name": "Starlight Dao Pill — Method Slip",
+      "description": "A jade slip carrying the method for Starlight Dao Pill. Reading it once is enough for anyone with the hands for the work; the slip itself stays yours afterwards.",
+      "sect_value": 291,
+      "base_price": 874,
+      "teaches_recipe": "Starlight Dao Pill"
+    },
+    "starfall_talisman_method": {
+      "name": "Starfall Talisman — Method Slip",
+      "description": "A jade slip carrying the method for Starfall Talisman. Reading it once is enough for anyone with the hands for the work; the slip itself stays yours afterwards.",
+      "sect_value": 128,
+      "base_price": 384,
+      "teaches_recipe": "Starfall Talisman"
+    },
+    "moonveil_concealment_array_method": {
+      "name": "Moonveil Concealment Array — Method Slip",
+      "description": "A jade slip carrying the method for Moonveil Concealment Array. Reading it once is enough for anyone with the hands for the work; the slip itself stays yours afterwards.",
+      "sect_value": 73,
+      "base_price": 220,
+      "teaches_recipe": "Moonveil Concealment Array"
+    },
+    "golden_bastion_array_method": {
+      "name": "Golden Bastion Array — Method Slip",
+      "description": "A jade slip carrying the method for Golden Bastion Array. Reading it once is enough for anyone with the hands for the work; the slip itself stays yours afterwards.",
+      "sect_value": 146,
+      "base_price": 440,
+      "teaches_recipe": "Golden Bastion Array"
+    },
+    "starfall_bulwark_array_method": {
+      "name": "Starfall Bulwark Array — Method Slip",
+      "description": "A jade slip carrying the method for Starfall Bulwark Array. Reading it once is enough for anyone with the hands for the work; the slip itself stays yours afterwards.",
+      "sect_value": 293,
+      "base_price": 880,
+      "teaches_recipe": "Starfall Bulwark Array"
+    },
+    "recovery_pill_method": {
+      "name": "Recovery Pill — Method Slip",
+      "description": "A jade slip carrying the method for Recovery Pill. Reading it once is enough for anyone with the hands for the work; the slip itself stays yours afterwards.",
+      "sect_value": 12,
+      "base_price": 36,
+      "teaches_recipe": "Recovery Pill"
+    },
+    "qi_pill_method": {
+      "name": "Qi Nourishing Pill — Method Slip",
+      "description": "A jade slip carrying the method for Qi Nourishing Pill. Reading it once is enough for anyone with the hands for the work; the slip itself stays yours afterwards.",
+      "sect_value": 12,
+      "base_price": 36,
+      "teaches_recipe": "Qi Nourishing Pill"
+    },
+    "spirit_iron_sword_method": {
+      "name": "Spirit-Iron Sword — Method Slip",
+      "description": "A jade slip carrying the method for Spirit-Iron Sword. Reading it once is enough for anyone with the hands for the work; the slip itself stays yours afterwards.",
+      "sect_value": 12,
+      "base_price": 36,
+      "teaches_recipe": "Spirit-Iron Sword"
+    },
+    "swift_wind_talisman_method": {
+      "name": "Swift-Wind Talisman — Method Slip",
+      "description": "A jade slip carrying the method for Swift-Wind Talisman. Reading it once is enough for anyone with the hands for the work; the slip itself stays yours afterwards.",
+      "sect_value": 12,
+      "base_price": 36,
+      "teaches_recipe": "Swift-Wind Talisman"
+    },
+    "stone_skin_talisman_method": {
+      "name": "Stone-Skin Talisman — Method Slip",
+      "description": "A jade slip carrying the method for Stone-Skin Talisman. Reading it once is enough for anyone with the hands for the work; the slip itself stays yours afterwards.",
+      "sect_value": 13,
+      "base_price": 40,
+      "teaches_recipe": "Stone-Skin Talisman"
+    },
+    "spirit_focus_talisman_method": {
+      "name": "Spirit-Focus Talisman — Method Slip",
+      "description": "A jade slip carrying the method for Spirit-Focus Talisman. Reading it once is enough for anyone with the hands for the work; the slip itself stays yours afterwards.",
+      "sect_value": 16,
+      "base_price": 48,
+      "teaches_recipe": "Spirit-Focus Talisman"
+    },
+    "guiding_chalk_array_method": {
+      "name": "Guiding Chalk Array — Method Slip",
+      "description": "A jade slip carrying the method for Guiding Chalk Array. Reading it once is enough for anyone with the hands for the work; the slip itself stays yours afterwards.",
+      "sect_value": 14,
+      "base_price": 44,
+      "teaches_recipe": "Guiding Chalk Array"
     }
   },
   "recipes": {
@@ -25778,7 +25995,8 @@
       },
       "output": {
         "recovery_pill": 1
-      }
+      },
+      "min_level": 0
     },
     "Qi Nourishing Pill": {
       "profession": "Alchemy",
@@ -25789,7 +26007,8 @@
       },
       "output": {
         "qi_pill": 1
-      }
+      },
+      "min_level": 0
     },
     "Spirit-Iron Sword": {
       "profession": "Forging",
@@ -25800,7 +26019,8 @@
       },
       "output": {
         "spirit_iron_sword": 1
-      }
+      },
+      "min_level": 0
     },
     "Heart Calming Pill": {
       "profession": "Alchemy",
@@ -25811,7 +26031,8 @@
       },
       "output": {
         "heart_calming_pill": 1
-      }
+      },
+      "min_level": 1
     },
     "Qi Replenishment Pill": {
       "profession": "Alchemy",
@@ -25822,7 +26043,8 @@
       },
       "output": {
         "qi_replenishment_pill": 1
-      }
+      },
+      "min_level": 1
     },
     "Longevity Pill": {
       "profession": "Alchemy",
@@ -25834,7 +26056,8 @@
       },
       "output": {
         "longevity_pill": 1
-      }
+      },
+      "min_level": 2
     },
     "Spirit-Iron Lamellar": {
       "profession": "Forging",
@@ -25845,7 +26068,8 @@
       },
       "output": {
         "spirit_iron_armor": 1
-      }
+      },
+      "min_level": 1
     },
     "Swift-Wind Talisman": {
       "profession": "Inscription",
@@ -25856,7 +26080,8 @@
       },
       "output": {
         "swift_wind_talisman": 1
-      }
+      },
+      "min_level": 0
     },
     "Stone-Skin Talisman": {
       "profession": "Inscription",
@@ -25868,7 +26093,8 @@
       },
       "output": {
         "stone_skin_talisman": 1
-      }
+      },
+      "min_level": 0
     },
     "Spirit-Focus Talisman": {
       "profession": "Inscription",
@@ -25880,7 +26106,8 @@
       },
       "output": {
         "spirit_focus_talisman": 1
-      }
+      },
+      "min_level": 0
     },
     "Minor Qi-Gathering Array Disk": {
       "profession": "Formation",
@@ -25892,7 +26119,8 @@
       },
       "output": {
         "minor_qi_gathering_array_disk": 1
-      }
+      },
+      "min_level": 1
     },
     "Minor Warding Array Disk": {
       "profession": "Formation",
@@ -25904,7 +26132,8 @@
       },
       "output": {
         "minor_warding_array_disk": 1
-      }
+      },
+      "min_level": 1
     },
     "Spirit-Crystal Sword": {
       "profession": "Forging",
@@ -25915,7 +26144,8 @@
       },
       "output": {
         "spirit_crystal_sword": 1
-      }
+      },
+      "min_level": 2
     },
     "Spirit-Crystal Mail": {
       "profession": "Forging",
@@ -25926,7 +26156,8 @@
       },
       "output": {
         "spirit_crystal_mail": 1
-      }
+      },
+      "min_level": 2
     },
     "Moonveil Recovery Pill": {
       "profession": "Alchemy",
@@ -25938,7 +26169,8 @@
       },
       "output": {
         "moonveil_recovery_pill": 1
-      }
+      },
+      "min_level": 1
     },
     "Spirit Condensation Pill": {
       "profession": "Alchemy",
@@ -25949,7 +26181,8 @@
       },
       "output": {
         "spirit_condensation_pill": 1
-      }
+      },
+      "min_level": 2
     },
     "Crystal-Ward Talisman": {
       "profession": "Inscription",
@@ -25961,7 +26194,8 @@
       },
       "output": {
         "crystal_ward_talisman": 1
-      }
+      },
+      "min_level": 1
     },
     "Immortal-Gold Sabre": {
       "profession": "Forging",
@@ -25972,7 +26206,8 @@
       },
       "output": {
         "immortal_gold_sabre": 1
-      }
+      },
+      "min_level": 3
     },
     "Immortal-Gold Plate": {
       "profession": "Forging",
@@ -25983,7 +26218,8 @@
       },
       "output": {
         "immortal_gold_plate": 1
-      }
+      },
+      "min_level": 3
     },
     "Dawn Lotus Vitality Pill": {
       "profession": "Alchemy",
@@ -25995,7 +26231,8 @@
       },
       "output": {
         "dawnlotus_vitality_pill": 1
-      }
+      },
+      "min_level": 2
     },
     "Immortal Marrow Pill": {
       "profession": "Alchemy",
@@ -26006,7 +26243,8 @@
       },
       "output": {
         "immortal_marrow_pill": 1
-      }
+      },
+      "min_level": 3
     },
     "Golden-Edge Talisman": {
       "profession": "Inscription",
@@ -26018,7 +26256,8 @@
       },
       "output": {
         "golden_edge_talisman": 1
-      }
+      },
+      "min_level": 2
     },
     "Starsteel Glaive": {
       "profession": "Forging",
@@ -26029,7 +26268,8 @@
       },
       "output": {
         "starsteel_glaive": 1
-      }
+      },
+      "min_level": 4
     },
     "Starsteel Aegis": {
       "profession": "Forging",
@@ -26040,7 +26280,8 @@
       },
       "output": {
         "starsteel_aegis": 1
-      }
+      },
+      "min_level": 4
     },
     "Heaven-Petal Elixir": {
       "profession": "Alchemy",
@@ -26052,7 +26293,8 @@
       },
       "output": {
         "heavenpetal_elixir": 1
-      }
+      },
+      "min_level": 3
     },
     "Starlight Dao Pill": {
       "profession": "Alchemy",
@@ -26063,7 +26305,8 @@
       },
       "output": {
         "starlight_dao_pill": 1
-      }
+      },
+      "min_level": 4
     },
     "Starfall Talisman": {
       "profession": "Inscription",
@@ -26075,7 +26318,8 @@
       },
       "output": {
         "starfall_talisman": 1
-      }
+      },
+      "min_level": 3
     },
     "Guiding Chalk Array": {
       "profession": "Formation",
@@ -26086,7 +26330,8 @@
       },
       "output": {
         "guiding_chalk_array": 1
-      }
+      },
+      "min_level": 0
     },
     "Moonveil Concealment Array": {
       "profession": "Formation",
@@ -26098,7 +26343,8 @@
       },
       "output": {
         "moonveil_concealment_array": 1
-      }
+      },
+      "min_level": 2
     },
     "Golden Bastion Array": {
       "profession": "Formation",
@@ -26110,7 +26356,8 @@
       },
       "output": {
         "golden_bastion_array": 1
-      }
+      },
+      "min_level": 3
     },
     "Starfall Bulwark Array": {
       "profession": "Formation",
@@ -26122,7 +26369,8 @@
       },
       "output": {
         "starfall_bulwark_array": 1
-      }
+      },
+      "min_level": 4
     }
   },
   "perfection": {
@@ -52979,6 +53227,18 @@
           "quantity": 1,
           "price": 350,
           "made_here": false
+        },
+        {
+          "item_id": "immortal_gold_sabre_method",
+          "quantity": 1,
+          "price": 374,
+          "made_here": false
+        },
+        {
+          "item_id": "immortal_gold_plate_method",
+          "quantity": 1,
+          "price": 452,
+          "made_here": false
         }
       ],
       "buys": {
@@ -53042,6 +53302,12 @@
           "quantity": 5,
           "price": 27,
           "made_here": false
+        },
+        {
+          "item_id": "golden_bastion_array_method",
+          "quantity": 1,
+          "price": 440,
+          "made_here": false
         }
       ],
       "buys": {
@@ -53101,6 +53367,24 @@
           "item_id": "stygian_tomb_token",
           "quantity": 1,
           "price": 420,
+          "made_here": false
+        },
+        {
+          "item_id": "minor_qi_gathering_array_disk_method",
+          "quantity": 1,
+          "price": 90,
+          "made_here": false
+        },
+        {
+          "item_id": "minor_warding_array_disk_method",
+          "quantity": 1,
+          "price": 100,
+          "made_here": false
+        },
+        {
+          "item_id": "guiding_chalk_array_method",
+          "quantity": 1,
+          "price": 44,
           "made_here": false
         }
       ],
@@ -53205,6 +53489,18 @@
           "quantity": 1,
           "price": 260,
           "made_here": false
+        },
+        {
+          "item_id": "spirit_iron_armor_method",
+          "quantity": 1,
+          "price": 65,
+          "made_here": false
+        },
+        {
+          "item_id": "spirit_iron_sword_method",
+          "quantity": 1,
+          "price": 45,
+          "made_here": false
         }
       ],
       "buys": {
@@ -53277,6 +53573,36 @@
           "quantity": 2,
           "price": 46,
           "made_here": true
+        },
+        {
+          "item_id": "heart_calming_pill_method",
+          "quantity": 1,
+          "price": 52,
+          "made_here": false
+        },
+        {
+          "item_id": "qi_replenishment_pill_method",
+          "quantity": 1,
+          "price": 52,
+          "made_here": false
+        },
+        {
+          "item_id": "longevity_pill_method",
+          "quantity": 1,
+          "price": 1172,
+          "made_here": false
+        },
+        {
+          "item_id": "recovery_pill_method",
+          "quantity": 1,
+          "price": 45,
+          "made_here": false
+        },
+        {
+          "item_id": "qi_pill_method",
+          "quantity": 1,
+          "price": 45,
+          "made_here": false
         }
       ],
       "buys": {
@@ -53344,6 +53670,24 @@
           "item_id": "paper_crane_charm",
           "quantity": 2,
           "price": 72,
+          "made_here": false
+        },
+        {
+          "item_id": "swift_wind_talisman_method",
+          "quantity": 1,
+          "price": 45,
+          "made_here": false
+        },
+        {
+          "item_id": "stone_skin_talisman_method",
+          "quantity": 1,
+          "price": 50,
+          "made_here": false
+        },
+        {
+          "item_id": "spirit_focus_talisman_method",
+          "quantity": 1,
+          "price": 60,
           "made_here": false
         }
       ],
@@ -53462,6 +53806,12 @@
           "item_id": "spirit_crystal_ore",
           "quantity": 4,
           "price": 11,
+          "made_here": false
+        },
+        {
+          "item_id": "moonveil_concealment_array_method",
+          "quantity": 1,
+          "price": 220,
           "made_here": false
         }
       ],
@@ -53635,6 +53985,18 @@
           "quantity": 1,
           "price": 540,
           "made_here": false
+        },
+        {
+          "item_id": "starsteel_glaive_method",
+          "quantity": 1,
+          "price": 1172,
+          "made_here": false
+        },
+        {
+          "item_id": "starsteel_aegis_method",
+          "quantity": 1,
+          "price": 1405,
+          "made_here": false
         }
       ],
       "buys": {
@@ -53761,6 +54123,18 @@
           "quantity": 1,
           "price": 364,
           "made_here": true
+        },
+        {
+          "item_id": "heavenpetal_elixir_method",
+          "quantity": 1,
+          "price": 935,
+          "made_here": false
+        },
+        {
+          "item_id": "starlight_dao_pill_method",
+          "quantity": 1,
+          "price": 1092,
+          "made_here": false
         }
       ],
       "buys": {
@@ -53853,6 +54227,12 @@
           "item_id": "void_stride_talisman",
           "quantity": 1,
           "price": 2200,
+          "made_here": false
+        },
+        {
+          "item_id": "starfall_talisman_method",
+          "quantity": 1,
+          "price": 480,
           "made_here": false
         }
       ],
@@ -54146,6 +54526,18 @@
           "quantity": 1,
           "price": 292,
           "made_here": true
+        },
+        {
+          "item_id": "heavenpetal_elixir_method",
+          "quantity": 1,
+          "price": 748,
+          "made_here": false
+        },
+        {
+          "item_id": "starlight_dao_pill_method",
+          "quantity": 1,
+          "price": 874,
+          "made_here": false
         }
       ],
       "buys": {
@@ -54190,6 +54582,18 @@
           "item_id": "spirit_iron",
           "quantity": 8,
           "price": 5,
+          "made_here": false
+        },
+        {
+          "item_id": "spirit_iron_armor_method",
+          "quantity": 1,
+          "price": 52,
+          "made_here": false
+        },
+        {
+          "item_id": "spirit_iron_sword_method",
+          "quantity": 1,
+          "price": 36,
           "made_here": false
         }
       ],
@@ -54239,6 +54643,24 @@
           "item_id": "paper_crane_charm",
           "quantity": 2,
           "price": 60,
+          "made_here": false
+        },
+        {
+          "item_id": "swift_wind_talisman_method",
+          "quantity": 1,
+          "price": 36,
+          "made_here": false
+        },
+        {
+          "item_id": "stone_skin_talisman_method",
+          "quantity": 1,
+          "price": 40,
+          "made_here": false
+        },
+        {
+          "item_id": "spirit_focus_talisman_method",
+          "quantity": 1,
+          "price": 48,
           "made_here": false
         }
       ],
@@ -54302,6 +54724,18 @@
           "item_id": "azure_flying_sword",
           "quantity": 1,
           "price": 260,
+          "made_here": false
+        },
+        {
+          "item_id": "spirit_crystal_sword_method",
+          "quantity": 1,
+          "price": 150,
+          "made_here": false
+        },
+        {
+          "item_id": "spirit_crystal_mail_method",
+          "quantity": 1,
+          "price": 182,
           "made_here": false
         }
       ],
@@ -54368,6 +54802,12 @@
           "item_id": "paper_crane_charm",
           "quantity": 2,
           "price": 72,
+          "made_here": false
+        },
+        {
+          "item_id": "crystal_ward_talisman_method",
+          "quantity": 1,
+          "price": 96,
           "made_here": false
         }
       ],
@@ -54488,6 +54928,18 @@
           "quantity": 1,
           "price": 292,
           "made_here": true
+        },
+        {
+          "item_id": "heavenpetal_elixir_method",
+          "quantity": 1,
+          "price": 748,
+          "made_here": false
+        },
+        {
+          "item_id": "starlight_dao_pill_method",
+          "quantity": 1,
+          "price": 874,
+          "made_here": false
         }
       ],
       "buys": {
@@ -54581,6 +55033,12 @@
           "quantity": 1,
           "price": 1800,
           "made_here": false
+        },
+        {
+          "item_id": "starfall_talisman_method",
+          "quantity": 1,
+          "price": 384,
+          "made_here": false
         }
       ],
       "buys": {
@@ -54618,6 +55076,18 @@
           "item_id": "spirit_iron",
           "quantity": 8,
           "price": 5,
+          "made_here": false
+        },
+        {
+          "item_id": "spirit_iron_armor_method",
+          "quantity": 1,
+          "price": 52,
+          "made_here": false
+        },
+        {
+          "item_id": "spirit_iron_sword_method",
+          "quantity": 1,
+          "price": 36,
           "made_here": false
         }
       ],
@@ -54711,6 +55181,12 @@
           "item_id": "immortal_gold_ore",
           "quantity": 5,
           "price": 27,
+          "made_here": false
+        },
+        {
+          "item_id": "golden_bastion_array_method",
+          "quantity": 1,
+          "price": 440,
           "made_here": false
         }
       ],
@@ -54905,6 +55381,18 @@
           "quantity": 1,
           "price": 440,
           "made_here": false
+        },
+        {
+          "item_id": "starsteel_glaive_method",
+          "quantity": 1,
+          "price": 938,
+          "made_here": false
+        },
+        {
+          "item_id": "starsteel_aegis_method",
+          "quantity": 1,
+          "price": 1124,
+          "made_here": false
         }
       ],
       "buys": {
@@ -54994,6 +55482,12 @@
           "item_id": "void_stride_talisman",
           "quantity": 1,
           "price": 1800,
+          "made_here": false
+        },
+        {
+          "item_id": "starfall_talisman_method",
+          "quantity": 1,
+          "price": 384,
           "made_here": false
         }
       ],
@@ -55248,6 +55742,12 @@
           "quantity": 1,
           "price": 1800,
           "made_here": false
+        },
+        {
+          "item_id": "starfall_talisman_method",
+          "quantity": 1,
+          "price": 384,
+          "made_here": false
         }
       ],
       "buys": {
@@ -55341,6 +55841,24 @@
           "item_id": "paper_crane_charm",
           "quantity": 2,
           "price": 60,
+          "made_here": false
+        },
+        {
+          "item_id": "swift_wind_talisman_method",
+          "quantity": 1,
+          "price": 36,
+          "made_here": false
+        },
+        {
+          "item_id": "stone_skin_talisman_method",
+          "quantity": 1,
+          "price": 40,
+          "made_here": false
+        },
+        {
+          "item_id": "spirit_focus_talisman_method",
+          "quantity": 1,
+          "price": 48,
           "made_here": false
         }
       ],
@@ -55544,6 +56062,18 @@
           "quantity": 1,
           "price": 350,
           "made_here": false
+        },
+        {
+          "item_id": "immortal_gold_sabre_method",
+          "quantity": 1,
+          "price": 374,
+          "made_here": false
+        },
+        {
+          "item_id": "immortal_gold_plate_method",
+          "quantity": 1,
+          "price": 452,
+          "made_here": false
         }
       ],
       "buys": {
@@ -55674,6 +56204,36 @@
           "quantity": 10,
           "price": 3,
           "made_here": false
+        },
+        {
+          "item_id": "heart_calming_pill_method",
+          "quantity": 1,
+          "price": 42,
+          "made_here": false
+        },
+        {
+          "item_id": "qi_replenishment_pill_method",
+          "quantity": 1,
+          "price": 42,
+          "made_here": false
+        },
+        {
+          "item_id": "longevity_pill_method",
+          "quantity": 1,
+          "price": 938,
+          "made_here": false
+        },
+        {
+          "item_id": "recovery_pill_method",
+          "quantity": 1,
+          "price": 36,
+          "made_here": false
+        },
+        {
+          "item_id": "qi_pill_method",
+          "quantity": 1,
+          "price": 36,
+          "made_here": false
         }
       ],
       "buys": {
@@ -55798,6 +56358,18 @@
           "quantity": 1,
           "price": 350,
           "made_here": false
+        },
+        {
+          "item_id": "immortal_gold_sabre_method",
+          "quantity": 1,
+          "price": 374,
+          "made_here": false
+        },
+        {
+          "item_id": "immortal_gold_plate_method",
+          "quantity": 1,
+          "price": 452,
+          "made_here": false
         }
       ],
       "buys": {
@@ -55873,6 +56445,12 @@
           "quantity": 2,
           "price": 96,
           "made_here": false
+        },
+        {
+          "item_id": "golden_edge_talisman_method",
+          "quantity": 1,
+          "price": 192,
+          "made_here": false
         }
       ],
       "buys": {
@@ -55945,6 +56523,18 @@
           "quantity": 2,
           "price": 44,
           "made_here": true
+        },
+        {
+          "item_id": "moonveil_recovery_pill_method",
+          "quantity": 1,
+          "price": 122,
+          "made_here": false
+        },
+        {
+          "item_id": "spirit_condensation_pill_method",
+          "quantity": 1,
+          "price": 140,
+          "made_here": false
         }
       ],
       "buys": {
@@ -56012,6 +56602,12 @@
           "item_id": "paper_crane_charm",
           "quantity": 2,
           "price": 72,
+          "made_here": false
+        },
+        {
+          "item_id": "crystal_ward_talisman_method",
+          "quantity": 1,
+          "price": 96,
           "made_here": false
         }
       ],
@@ -56172,6 +56768,18 @@
           "quantity": 2,
           "price": 110,
           "made_here": true
+        },
+        {
+          "item_id": "dawnlotus_vitality_pill_method",
+          "quantity": 1,
+          "price": 300,
+          "made_here": false
+        },
+        {
+          "item_id": "immortal_marrow_pill_method",
+          "quantity": 1,
+          "price": 352,
+          "made_here": false
         }
       ],
       "buys": {
@@ -56212,6 +56820,18 @@
           "item_id": "spirit_iron",
           "quantity": 8,
           "price": 5,
+          "made_here": false
+        },
+        {
+          "item_id": "spirit_iron_armor_method",
+          "quantity": 1,
+          "price": 52,
+          "made_here": false
+        },
+        {
+          "item_id": "spirit_iron_sword_method",
+          "quantity": 1,
+          "price": 36,
           "made_here": false
         }
       ],
@@ -56342,6 +56962,18 @@
           "quantity": 2,
           "price": 110,
           "made_here": true
+        },
+        {
+          "item_id": "dawnlotus_vitality_pill_method",
+          "quantity": 1,
+          "price": 300,
+          "made_here": false
+        },
+        {
+          "item_id": "immortal_marrow_pill_method",
+          "quantity": 1,
+          "price": 352,
+          "made_here": false
         }
       ],
       "buys": {
@@ -56418,6 +57050,12 @@
           "item_id": "paper_crane_charm",
           "quantity": 2,
           "price": 96,
+          "made_here": false
+        },
+        {
+          "item_id": "golden_edge_talisman_method",
+          "quantity": 1,
+          "price": 192,
           "made_here": false
         }
       ],
@@ -56550,6 +57188,12 @@
           "quantity": 2,
           "price": 72,
           "made_here": false
+        },
+        {
+          "item_id": "crystal_ward_talisman_method",
+          "quantity": 1,
+          "price": 96,
+          "made_here": false
         }
       ],
       "buys": {
@@ -56671,6 +57315,18 @@
           "quantity": 2,
           "price": 44,
           "made_here": true
+        },
+        {
+          "item_id": "moonveil_recovery_pill_method",
+          "quantity": 1,
+          "price": 122,
+          "made_here": false
+        },
+        {
+          "item_id": "spirit_condensation_pill_method",
+          "quantity": 1,
+          "price": 140,
+          "made_here": false
         }
       ],
       "buys": {
@@ -56714,6 +57370,36 @@
           "item_id": "spirit_herb",
           "quantity": 10,
           "price": 3,
+          "made_here": false
+        },
+        {
+          "item_id": "heart_calming_pill_method",
+          "quantity": 1,
+          "price": 42,
+          "made_here": false
+        },
+        {
+          "item_id": "qi_replenishment_pill_method",
+          "quantity": 1,
+          "price": 42,
+          "made_here": false
+        },
+        {
+          "item_id": "longevity_pill_method",
+          "quantity": 1,
+          "price": 938,
+          "made_here": false
+        },
+        {
+          "item_id": "recovery_pill_method",
+          "quantity": 1,
+          "price": 36,
+          "made_here": false
+        },
+        {
+          "item_id": "qi_pill_method",
+          "quantity": 1,
+          "price": 36,
           "made_here": false
         }
       ],
@@ -56764,6 +57450,24 @@
           "item_id": "paper_crane_charm",
           "quantity": 2,
           "price": 60,
+          "made_here": false
+        },
+        {
+          "item_id": "swift_wind_talisman_method",
+          "quantity": 1,
+          "price": 36,
+          "made_here": false
+        },
+        {
+          "item_id": "stone_skin_talisman_method",
+          "quantity": 1,
+          "price": 40,
+          "made_here": false
+        },
+        {
+          "item_id": "spirit_focus_talisman_method",
+          "quantity": 1,
+          "price": 48,
           "made_here": false
         }
       ],
@@ -56845,6 +57549,12 @@
           "item_id": "void_stride_talisman",
           "quantity": 1,
           "price": 1800,
+          "made_here": false
+        },
+        {
+          "item_id": "starfall_talisman_method",
+          "quantity": 1,
+          "price": 384,
           "made_here": false
         }
       ],
@@ -56968,6 +57678,18 @@
           "quantity": 1,
           "price": 292,
           "made_here": true
+        },
+        {
+          "item_id": "heavenpetal_elixir_method",
+          "quantity": 1,
+          "price": 748,
+          "made_here": false
+        },
+        {
+          "item_id": "starlight_dao_pill_method",
+          "quantity": 1,
+          "price": 874,
+          "made_here": false
         }
       ],
       "buys": {
@@ -57048,6 +57770,12 @@
           "item_id": "paper_crane_charm",
           "quantity": 2,
           "price": 96,
+          "made_here": false
+        },
+        {
+          "item_id": "golden_edge_talisman_method",
+          "quantity": 1,
+          "price": 192,
           "made_here": false
         }
       ],
@@ -57145,6 +57873,18 @@
           "quantity": 2,
           "price": 110,
           "made_here": true
+        },
+        {
+          "item_id": "dawnlotus_vitality_pill_method",
+          "quantity": 1,
+          "price": 300,
+          "made_here": false
+        },
+        {
+          "item_id": "immortal_marrow_pill_method",
+          "quantity": 1,
+          "price": 352,
+          "made_here": false
         }
       ],
       "buys": {
@@ -57333,6 +58073,12 @@
           "quantity": 1,
           "price": 1800,
           "made_here": false
+        },
+        {
+          "item_id": "starfall_talisman_method",
+          "quantity": 1,
+          "price": 384,
+          "made_here": false
         }
       ],
       "buys": {
@@ -57442,6 +58188,18 @@
           "item_id": "azure_flying_sword",
           "quantity": 1,
           "price": 440,
+          "made_here": false
+        },
+        {
+          "item_id": "starsteel_glaive_method",
+          "quantity": 1,
+          "price": 938,
+          "made_here": false
+        },
+        {
+          "item_id": "starsteel_aegis_method",
+          "quantity": 1,
+          "price": 1124,
           "made_here": false
         }
       ],
@@ -57602,6 +58360,24 @@
           "quantity": 2,
           "price": 60,
           "made_here": false
+        },
+        {
+          "item_id": "swift_wind_talisman_method",
+          "quantity": 1,
+          "price": 36,
+          "made_here": false
+        },
+        {
+          "item_id": "stone_skin_talisman_method",
+          "quantity": 1,
+          "price": 40,
+          "made_here": false
+        },
+        {
+          "item_id": "spirit_focus_talisman_method",
+          "quantity": 1,
+          "price": 48,
+          "made_here": false
         }
       ],
       "buys": {
@@ -57640,6 +58416,36 @@
           "item_id": "spirit_herb",
           "quantity": 10,
           "price": 3,
+          "made_here": false
+        },
+        {
+          "item_id": "heart_calming_pill_method",
+          "quantity": 1,
+          "price": 42,
+          "made_here": false
+        },
+        {
+          "item_id": "qi_replenishment_pill_method",
+          "quantity": 1,
+          "price": 42,
+          "made_here": false
+        },
+        {
+          "item_id": "longevity_pill_method",
+          "quantity": 1,
+          "price": 938,
+          "made_here": false
+        },
+        {
+          "item_id": "recovery_pill_method",
+          "quantity": 1,
+          "price": 36,
+          "made_here": false
+        },
+        {
+          "item_id": "qi_pill_method",
+          "quantity": 1,
+          "price": 36,
           "made_here": false
         }
       ],
@@ -57702,6 +58508,12 @@
           "item_id": "paper_crane_charm",
           "quantity": 2,
           "price": 72,
+          "made_here": false
+        },
+        {
+          "item_id": "crystal_ward_talisman_method",
+          "quantity": 1,
+          "price": 96,
           "made_here": false
         }
       ],
@@ -57774,6 +58586,18 @@
           "quantity": 2,
           "price": 44,
           "made_here": true
+        },
+        {
+          "item_id": "moonveil_recovery_pill_method",
+          "quantity": 1,
+          "price": 122,
+          "made_here": false
+        },
+        {
+          "item_id": "spirit_condensation_pill_method",
+          "quantity": 1,
+          "price": 140,
+          "made_here": false
         }
       ],
       "buys": {
@@ -57883,6 +58707,18 @@
           "item_id": "azure_flying_sword",
           "quantity": 1,
           "price": 440,
+          "made_here": false
+        },
+        {
+          "item_id": "immortal_gold_sabre_method",
+          "quantity": 1,
+          "price": 467,
+          "made_here": false
+        },
+        {
+          "item_id": "immortal_gold_plate_method",
+          "quantity": 1,
+          "price": 565,
           "made_here": false
         }
       ],
@@ -58010,6 +58846,18 @@
           "quantity": 1,
           "price": 273,
           "made_here": true
+        },
+        {
+          "item_id": "dawnlotus_vitality_pill_method",
+          "quantity": 1,
+          "price": 375,
+          "made_here": false
+        },
+        {
+          "item_id": "immortal_marrow_pill_method",
+          "quantity": 1,
+          "price": 440,
+          "made_here": false
         }
       ],
       "buys": {
@@ -58102,6 +58950,12 @@
           "item_id": "void_stride_talisman",
           "quantity": 1,
           "price": 1800,
+          "made_here": false
+        },
+        {
+          "item_id": "golden_edge_talisman_method",
+          "quantity": 1,
+          "price": 240,
           "made_here": false
         }
       ],
@@ -58361,6 +59215,12 @@
           "quantity": 2,
           "price": 96,
           "made_here": false
+        },
+        {
+          "item_id": "golden_edge_talisman_method",
+          "quantity": 1,
+          "price": 192,
+          "made_here": false
         }
       ],
       "buys": {
@@ -58491,6 +59351,12 @@
           "item_id": "paper_crane_charm",
           "quantity": 2,
           "price": 72,
+          "made_here": false
+        },
+        {
+          "item_id": "crystal_ward_talisman_method",
+          "quantity": 1,
+          "price": 96,
           "made_here": false
         }
       ],
@@ -58648,6 +59514,12 @@
           "quantity": 2,
           "price": 96,
           "made_here": false
+        },
+        {
+          "item_id": "golden_edge_talisman_method",
+          "quantity": 1,
+          "price": 192,
+          "made_here": false
         }
       ],
       "buys": {
@@ -58720,6 +59592,36 @@
           "quantity": 10,
           "price": 3,
           "made_here": false
+        },
+        {
+          "item_id": "heart_calming_pill_method",
+          "quantity": 1,
+          "price": 42,
+          "made_here": false
+        },
+        {
+          "item_id": "qi_replenishment_pill_method",
+          "quantity": 1,
+          "price": 42,
+          "made_here": false
+        },
+        {
+          "item_id": "longevity_pill_method",
+          "quantity": 1,
+          "price": 938,
+          "made_here": false
+        },
+        {
+          "item_id": "recovery_pill_method",
+          "quantity": 1,
+          "price": 36,
+          "made_here": false
+        },
+        {
+          "item_id": "qi_pill_method",
+          "quantity": 1,
+          "price": 36,
+          "made_here": false
         }
       ],
       "buys": {
@@ -58781,6 +59683,12 @@
           "item_id": "starsteel_ore",
           "quantity": 2,
           "price": 72,
+          "made_here": false
+        },
+        {
+          "item_id": "starfall_bulwark_array_method",
+          "quantity": 1,
+          "price": 880,
           "made_here": false
         }
       ],
@@ -59139,6 +60047,18 @@
           "quantity": 1,
           "price": 440,
           "made_here": false
+        },
+        {
+          "item_id": "starsteel_glaive_method",
+          "quantity": 1,
+          "price": 938,
+          "made_here": false
+        },
+        {
+          "item_id": "starsteel_aegis_method",
+          "quantity": 1,
+          "price": 1124,
+          "made_here": false
         }
       ],
       "buys": {
@@ -59334,6 +60254,18 @@
           "quantity": 1,
           "price": 350,
           "made_here": false
+        },
+        {
+          "item_id": "immortal_gold_sabre_method",
+          "quantity": 1,
+          "price": 374,
+          "made_here": false
+        },
+        {
+          "item_id": "immortal_gold_plate_method",
+          "quantity": 1,
+          "price": 452,
+          "made_here": false
         }
       ],
       "buys": {
@@ -59487,6 +60419,18 @@
           "item_id": "azure_flying_sword",
           "quantity": 1,
           "price": 260,
+          "made_here": false
+        },
+        {
+          "item_id": "spirit_crystal_sword_method",
+          "quantity": 1,
+          "price": 150,
+          "made_here": false
+        },
+        {
+          "item_id": "spirit_crystal_mail_method",
+          "quantity": 1,
+          "price": 182,
           "made_here": false
         }
       ],
@@ -59643,6 +60587,18 @@
           "quantity": 1,
           "price": 350,
           "made_here": false
+        },
+        {
+          "item_id": "spirit_crystal_sword_method",
+          "quantity": 1,
+          "price": 187,
+          "made_here": false
+        },
+        {
+          "item_id": "spirit_crystal_mail_method",
+          "quantity": 1,
+          "price": 227,
+          "made_here": false
         }
       ],
       "buys": {
@@ -59742,6 +60698,18 @@
           "quantity": 2,
           "price": 110,
           "made_here": true
+        },
+        {
+          "item_id": "moonveil_recovery_pill_method",
+          "quantity": 1,
+          "price": 152,
+          "made_here": false
+        },
+        {
+          "item_id": "spirit_condensation_pill_method",
+          "quantity": 1,
+          "price": 175,
+          "made_here": false
         }
       ],
       "buys": {
@@ -59818,6 +60786,12 @@
           "item_id": "paper_crane_charm",
           "quantity": 2,
           "price": 96,
+          "made_here": false
+        },
+        {
+          "item_id": "crystal_ward_talisman_method",
+          "quantity": 1,
+          "price": 120,
           "made_here": false
         }
       ],
@@ -60110,6 +61084,18 @@
           "quantity": 8,
           "price": 5,
           "made_here": false
+        },
+        {
+          "item_id": "spirit_iron_armor_method",
+          "quantity": 1,
+          "price": 52,
+          "made_here": false
+        },
+        {
+          "item_id": "spirit_iron_sword_method",
+          "quantity": 1,
+          "price": 36,
+          "made_here": false
         }
       ],
       "buys": {
@@ -60164,6 +61150,24 @@
           "item_id": "stygian_tomb_token",
           "quantity": 1,
           "price": 420,
+          "made_here": false
+        },
+        {
+          "item_id": "minor_qi_gathering_array_disk_method",
+          "quantity": 1,
+          "price": 90,
+          "made_here": false
+        },
+        {
+          "item_id": "minor_warding_array_disk_method",
+          "quantity": 1,
+          "price": 100,
+          "made_here": false
+        },
+        {
+          "item_id": "guiding_chalk_array_method",
+          "quantity": 1,
+          "price": 44,
           "made_here": false
         }
       ],
@@ -60230,6 +61234,18 @@
           "quantity": 1,
           "price": 260,
           "made_here": false
+        },
+        {
+          "item_id": "spirit_crystal_sword_method",
+          "quantity": 1,
+          "price": 150,
+          "made_here": false
+        },
+        {
+          "item_id": "spirit_crystal_mail_method",
+          "quantity": 1,
+          "price": 182,
+          "made_here": false
         }
       ],
       "buys": {
@@ -60283,6 +61299,12 @@
           "item_id": "spirit_crystal_ore",
           "quantity": 4,
           "price": 11,
+          "made_here": false
+        },
+        {
+          "item_id": "moonveil_concealment_array_method",
+          "quantity": 1,
+          "price": 220,
           "made_here": false
         }
       ],
@@ -60348,6 +61370,18 @@
           "item_id": "azure_flying_sword",
           "quantity": 1,
           "price": 260,
+          "made_here": false
+        },
+        {
+          "item_id": "spirit_crystal_sword_method",
+          "quantity": 1,
+          "price": 150,
+          "made_here": false
+        },
+        {
+          "item_id": "spirit_crystal_mail_method",
+          "quantity": 1,
+          "price": 182,
           "made_here": false
         }
       ],
@@ -60522,6 +61556,18 @@
           "quantity": 1,
           "price": 440,
           "made_here": false
+        },
+        {
+          "item_id": "starsteel_glaive_method",
+          "quantity": 1,
+          "price": 938,
+          "made_here": false
+        },
+        {
+          "item_id": "starsteel_aegis_method",
+          "quantity": 1,
+          "price": 1124,
+          "made_here": false
         }
       ],
       "buys": {
@@ -60593,6 +61639,12 @@
           "item_id": "starsteel_ore",
           "quantity": 2,
           "price": 72,
+          "made_here": false
+        },
+        {
+          "item_id": "starfall_bulwark_array_method",
+          "quantity": 1,
+          "price": 880,
           "made_here": false
         }
       ],
@@ -62681,55 +63733,68 @@
   "birth_family_sendoff": {
     "fallen_martial_clan": {
       "item": "cracked_ancestral_blade",
-      "line": "Your uncle takes it off the wall himself and does not meet your eye. Bring it back better than it goes out."
+      "line": "Your uncle takes it off the wall himself and does not meet your eye. Bring it back better than it goes out.",
+      "trade": "Forging"
     },
     "tomb_watch_clan": {
       "item": "funeral_paper_crane",
-      "line": "Folded at the graveside and handed over still warm. The dead can spare one, they tell you."
+      "line": "Folded at the graveside and handed over still warm. The dead can spare one, they tell you.",
+      "trade": "Inscription"
     },
     "body_tempering_family": {
       "item": "cloudstep_sandals",
-      "line": "Weighted to your stride over a winter of measuring. Do not ride anything, your father says. Step."
+      "line": "Weighted to your stride over a winter of measuring. Do not ride anything, your father says. Step.",
+      "trade": "Alchemy"
     },
     "border_garrison_family": {
       "item": "garrison_signal_kite",
-      "line": "Off the wall, colours and all, signed out of the quartermaster's book against your name."
+      "line": "Off the wall, colours and all, signed out of the quartermaster's book against your name.",
+      "trade": "Formation"
     },
     "martial_household": {
       "item": "riverreed_leaf",
-      "line": "Cut from the household's own reed bed the morning you leave, and lacquered while you pack."
+      "line": "Cut from the household's own reed bed the morning you leave, and lacquered while you pack.",
+      "trade": "Forging"
     },
     "spear_guard_family": {
       "item": "ironbanner_pennant",
-      "line": "The company stands to as it comes down off the pole. Go where the banner goes."
+      "line": "The company stands to as it comes down off the pole. Go where the banner goes.",
+      "trade": "Forging"
     },
     "sword_hall_family": {
       "item": "hall_practice_sword",
-      "line": "The blade you learned the first form on. The hall keeps the good ones; you have earned the honest one."
+      "line": "The blade you learned the first form on. The hall keeps the good ones; you have earned the honest one.",
+      "trade": "Forging"
     },
     "hidden_weapon_family": {
       "item": "moonfen_shadow_fan",
-      "line": "Handed over without ceremony, in the dark, by someone who was not there a moment before."
+      "line": "Handed over without ceremony, in the dark, by someone who was not there a moment before.",
+      "trade": "Inscription"
     },
     "weaponsmith_martial_family": {
       "item": "forge_proof_sword",
-      "line": "Your own proof blade, with your own mark on it. The family does not buy a child a sword."
+      "line": "Your own proof blade, with your own mark on it. The family does not buy a child a sword.",
+      "trade": "Forging"
     },
     "nether_market_house": {
       "item": "nether_market_lantern",
-      "line": "Lit off the house lamp so the trade knows the flame. Owe nobody on the road, your mother says."
+      "line": "Lit off the house lamp so the trade knows the flame. Owe nobody on the road, your mother says.",
+      "trade": "Inscription"
     },
     "escort_martial_family": {
       "item": "escort_cargo_skiff",
-      "line": "Cut down to one rider in the yard while you watch. Every escort's first solo run leaves on this."
+      "line": "Cut down to one rider in the yard while you watch. Every escort's first solo run leaves on this.",
+      "trade": "Formation"
     },
     "alchemy_family": {
       "item": "medicine_gathering_gourd",
-      "line": "Panniers lashed on and the cliff-herb map folded into the left one. Come back with something worth the trip."
+      "line": "Panniers lashed on and the cliff-herb map folded into the left one. Come back with something worth the trip.",
+      "trade": "Alchemy"
     },
     "noble_martial_clan": {
       "item": "qin_ancestral_sword",
-      "line": "Taken down off the ancestral rack in front of the whole household. The clan's name goes with it, and so do its enemies."
+      "line": "Taken down off the ancestral rack in front of the whole household. The clan's name goes with it, and so do its enemies.",
+      "trade": "Formation"
     }
   }
 }

@@ -562,6 +562,106 @@ class FormationLadderTests(unittest.TestCase):
                 self.assertIn(ore, costs, f"no Formation recipe reaches {ore}")
 
 
+class TheLearningStepTests(unittest.TestCase):
+    """A method is taught and then worked (v1.0.0-rc.20).
+
+    Every recipe used to be craftable by anyone from character creation while
+    `/craft`'s description said "from a known recipe" and nothing tracked
+    knowledge. Now a household teaches its own craft and everything else is a
+    jade slip - which means two new ways to ship something dead: a recipe no
+    slip teaches, and a slip no shop sells.
+    """
+
+    RECIPES = WORLD["recipes"]
+    ITEMS = WORLD["items"]
+    SHOPS = WORLD["shops"]
+    PROFESSION_SHOP = {"Alchemy": "apothecary", "Forging": "weaponsmith",
+                       "Inscription": "talisman", "Formation": "array"}
+
+    def _slips(self) -> dict:
+        return {i: v["teaches_recipe"] for i, v in self.ITEMS.items() if v.get("teaches_recipe")}
+
+    def test_every_recipe_has_a_slip_that_teaches_it(self):
+        """Including the entry methods: a household teaches only its own craft,
+        so another craft's basics have to be buyable or they are unreachable."""
+        taught = set(self._slips().values())
+        for name in self.RECIPES:
+            with self.subTest(recipe=name):
+                self.assertIn(name, taught, f"no method slip teaches {name}")
+
+    def test_every_slip_teaches_a_real_recipe(self):
+        for slip, recipe in self._slips().items():
+            with self.subTest(slip=slip):
+                self.assertIn(recipe, self.RECIPES, f"{slip} teaches a method this world does not have")
+
+    def test_every_slip_is_actually_obtainable(self):
+        """A slip nobody sells is a recipe nobody can learn."""
+        for slip in self._slips():
+            sellers = [k for k, shop in self.SHOPS.items()
+                       if any(line["item_id"] == slip for line in shop.get("sells", []))]
+            with self.subTest(slip=slip):
+                self.assertTrue(sellers, f"{slip} is sold nowhere")
+
+    def test_a_slip_is_sold_by_the_trade_that_uses_it(self):
+        for slip, recipe in self._slips().items():
+            want = self.PROFESSION_SHOP[self.RECIPES[recipe]["profession"]]
+            kinds = {shop["kind"] for shop in self.SHOPS.values()
+                     if any(line["item_id"] == slip for line in shop.get("sells", []))}
+            with self.subTest(slip=slip):
+                self.assertIn(want, kinds, f"{slip} is not sold by any {want}")
+
+    def test_every_recipe_states_a_level_its_profession_can_reach(self):
+        """advanceProfessionTx caps a profession at 6; a method above that is
+        one nobody could ever work."""
+        for name, recipe in self.RECIPES.items():
+            with self.subTest(recipe=name):
+                level = int(recipe.get("min_level", -1))
+                self.assertGreaterEqual(level, 0, f"{name} has no min_level")
+                self.assertLessEqual(level, 6, f"{name} asks for a level no profession reaches")
+
+    def test_every_craft_keeps_an_entry_method(self):
+        """Crafting is the only source of profession experience, so a craft whose
+        easiest method is gated behind a level could never be practised into."""
+        by_profession = {}
+        for recipe in self.RECIPES.values():
+            by_profession.setdefault(recipe["profession"], []).append(int(recipe["min_level"]))
+        for profession, levels in sorted(by_profession.items()):
+            with self.subTest(profession=profession):
+                self.assertIn(0, levels, f"{profession} has no method anyone could start on")
+
+
+
+class TheHouseholdsTradeTests(unittest.TestCase):
+    """What a family teaches, and that it is teachable.
+
+    A household teaches its own craft and nothing else, so an archetype without
+    a trade would send its children out knowing nothing at all.
+    """
+
+    SENDOFF = WORLD["birth_family_sendoff"]
+    PROFESSIONS = {r["profession"] for r in WORLD["recipes"].values()}
+
+    def test_every_household_passes_on_a_craft(self):
+        self.assertGreaterEqual(len(self.SENDOFF), 13)
+        for archetype, entry in self.SENDOFF.items():
+            with self.subTest(archetype=archetype):
+                trade = str(entry.get("trade") or "")
+                self.assertTrue(trade, f"{archetype} teaches nothing")
+                self.assertIn(trade, self.PROFESSIONS, f"{archetype} teaches {trade!r}, which is not a craft")
+
+    def test_the_trades_are_not_all_one_craft(self):
+        """Every household teaching Forging would make three crafts unlearnable
+        at home, which is the shape of a mapping written without looking."""
+        trades = {a: e["trade"] for a, e in self.SENDOFF.items()}
+        self.assertGreaterEqual(len(set(trades.values())), 4, f"households cover only {set(trades.values())}")
+
+    def test_every_craft_is_some_households_trade(self):
+        covered = {e["trade"] for e in self.SENDOFF.values()}
+        for profession in sorted(self.PROFESSIONS):
+            with self.subTest(profession=profession):
+                self.assertIn(profession, covered, f"no household passes on {profession}")
+
+
 class ProfessionRosterTests(unittest.TestCase):
     """Every declared profession is granted, read and gifted.
 

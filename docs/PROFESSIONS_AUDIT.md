@@ -1,9 +1,10 @@
 # The eight professions — an audit
 
-Every finding below was **fixed in v1.0.0-rc.19**; the audit is kept as the record of what was
-wrong and why, because four of the seven were invisible to a gate that existed specifically to catch
-them. Each section ends with what was actually done. Verified against the tree at the merge of
-v1.0.0-rc.18; fixed on top of it.
+Every finding below was **fixed in v1.0.0-rc.19**, except the learning step, which was a design
+call rather than a fault and was made in **v1.0.0-rc.20** (see §7). The audit is kept as the record
+of what was wrong and why, because four of the seven were invisible to a gate that existed
+specifically to catch them. Each section ends with what was actually done. Verified against the tree
+at the merge of v1.0.0-rc.18; fixed on top of it.
 
 ## The bar
 
@@ -219,8 +220,16 @@ no counter for it.
 Foraging now resolves its common drop through `EventSites.Material`, so a Celestial forager brings
 back `heavenpetal_herb`.
 
-**Not fixed: the learning step.** That is a design decision about what the game is, not a fault, and
-it is left where it stands. `/craft`'s description still overstates it.
+**The learning step, fixed in rc.20.** It was left here as a design call rather than a fault, and
+the call came back the other way: a method is now two things, one you were taught and one your level
+reaches, asked separately because the two refusals send a player to different places. `character_recipes`
+(schema 46) records the first; a `min_level` derived from each recipe's own TN gates the second.
+Knowledge arrives by jade slip - thirty-one items, one per recipe, sold by the shop kind that already
+trades that profession's goods, and not consumed by reading - or from the household you were born to,
+which teaches its trade's entry methods plus the lowest method of that trade in its own world, so a
+samsara into a Celestial forging house is taught what that world actually uses. Migration 46
+grandfathers every character alive at the time with the entry methods and everything their profession
+level already reached, so nothing was taken from anyone. `/craft`'s description is true now.
 
 ---
 
@@ -267,7 +276,8 @@ All seven, in the release that followed the audit. In the order they were repair
    because until step 3 landed it would have failed on Beast Taming and Artifact Refining, which is
    exactly the point of it.
 
-Left deliberately: the learning step (§7), which is a design decision rather than a fault.
+Left deliberately at the time: the learning step (§7), which was a design decision rather than a
+fault. It was made in rc.20 and is described at the end of §7.
 
 `docs/KNOWN_LIMITATIONS.md` still is not the right home for any of this —
 `tests/python/contracts/test_playtest_gate.py` holds every entry there to being either *fixed* or

@@ -136,6 +136,7 @@ CREATE TABLE dao_progress(user_id INTEGER NOT NULL,dao_id TEXT NOT NULL,progress
 CREATE TABLE inventory(user_id INTEGER NOT NULL,item_id TEXT NOT NULL,quantity INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(user_id,item_id));
 CREATE TABLE IF NOT EXISTS item_provenance(provenance_id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,item_id TEXT NOT NULL,quantity INTEGER NOT NULL DEFAULT 1,source_type TEXT NOT NULL DEFAULT 'unknown',source_key TEXT NOT NULL DEFAULT '',ownership_mark TEXT NOT NULL DEFAULT '',legal_status TEXT NOT NULL DEFAULT 'clean',authenticity INTEGER NOT NULL DEFAULT 100,tracking_strength INTEGER NOT NULL DEFAULT 0,acquired_game_minute INTEGER NOT NULL DEFAULT 0,created_at REAL NOT NULL DEFAULT 0,updated_at REAL NOT NULL DEFAULT 0);
 CREATE TABLE profession_progress(user_id INTEGER NOT NULL,profession TEXT NOT NULL,level INTEGER NOT NULL DEFAULT 0,xp INTEGER NOT NULL DEFAULT 0,successes INTEGER NOT NULL DEFAULT 0,failures INTEGER NOT NULL DEFAULT 0,quality_points INTEGER NOT NULL DEFAULT 0,updated_at REAL NOT NULL DEFAULT 0,PRIMARY KEY(user_id,profession));
+CREATE TABLE character_recipes(user_id INTEGER NOT NULL,recipe TEXT NOT NULL,learned_game_minute INTEGER NOT NULL DEFAULT 0,source TEXT NOT NULL DEFAULT '',created_at REAL NOT NULL DEFAULT 0,PRIMARY KEY(user_id,recipe));
 CREATE TABLE civilization_regions(location TEXT PRIMARY KEY,world_name TEXT NOT NULL,spirit_resources INTEGER NOT NULL DEFAULT 50);
 CREATE TABLE cave_abodes(user_id INTEGER PRIMARY KEY,location_key TEXT NOT NULL UNIQUE,base_location TEXT NOT NULL,herb_garden_level INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE cave_abode_access(owner_user_id INTEGER NOT NULL,guest_user_id INTEGER NOT NULL,PRIMARY KEY(owner_user_id,guest_user_id));
@@ -169,6 +170,15 @@ INSERT INTO character_fate(user_id,points,lifetime_earned,lifetime_spent,updated
 		t.Fatal(err)
 	}
 	return path
+}
+
+// batch4TeachRecipe records that a character knows a method (v1.0.0-rc.20).
+// Crafting asks for knowledge as well as a level, so a fixture character who is
+// meant to be able to make a thing has to have been taught it.
+func batch4TeachRecipe(t *testing.T, path string, userID int64, recipe string) {
+	t.Helper()
+	batch4Exec(t, path, `INSERT INTO character_recipes(user_id,recipe,source) VALUES(?,?,'fixture')
+		ON CONFLICT(user_id,recipe) DO NOTHING`, userID, recipe)
 }
 
 func batch4Exec(t *testing.T, path, sql string, args ...any) {

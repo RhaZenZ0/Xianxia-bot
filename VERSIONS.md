@@ -6,6 +6,50 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.0** (rc.20) is the one finding rc.19 wrote down and deliberately left: the learning step.
+`/craft`'s own description promised a dish made "from a known recipe" and nothing in the game knew
+anything - every one of the thirty-one methods was workable by every cultivator from the minute they
+were born, materials permitting, and a profession row sprang into existence the first time its verb
+was used. That is the whole of what a craft was: do you have the herbs.
+
+**A method is two things now, and they are asked separately.** Whether you were ever taught it, and
+whether your hands are good enough for it - and the refusals are worded differently on purpose,
+because a player told the wrong one goes looking in the wrong place. "You do not know the method for
+X; it is carried on a jade slip" sends them to a shop. "X asks for Alchemy 3 and you are 1" sends
+them back to the bench. Every recipe carries a `min_level` derived from the target number it always
+had (`(TN-14)/4 + 1`, clamped to 0-4), so the ladders that were already spaced are now gated at the
+spacing they were already written with: seven entry methods anyone can work, and four at the top that
+want a master.
+
+**Knowledge is a table, not a flag.** `character_recipes` is the third of its family after
+`character_manuals` and `character_item_appraisals` - the same shape, the same per-character
+composite key, and the same incarnation wipe, because what you learned is not what you are. A method
+reaches it by two roads. The first is a **jade slip**: thirty-one items, one per recipe, priced at
+twice the base price of the thing they teach, sold by the shop kind that already trades that
+profession's goods in that world, and *not consumed by reading* - a method passed down a sect is a
+thing this genre does, and burning the slip would make an inheritance impossible. `/learn` reads
+one, reports whether the hands are ready, and says so without refusing the lesson.
+
+**The second road is the family you were born to.** A household that has a trade teaches it at the
+send-off, which is where the deadlock was: crafting is the only thing that raises a crafting
+profession, so a family that taught only its own high method would hand a child a craft they could
+never reach the bottom of. So what is taught is every entry method of the family's trade *plus* the
+lowest method of that trade in the household's own world - which is what makes it right under
+samsara. Reincarnate into a Celestial forging house and you are taught the Mortal fundamentals you
+can actually work and the starsteel method you cannot yet, rather than a Mortal smith's education in
+a world that stopped using it. Thirteen households, each mapped to one craft by what they already
+are: five forging, three inscription, three formation, two alchemy. The teaching happens ahead of
+both of `grantBirthFamilySendoffTx`'s early returns, so a second life in the same household is
+taught again rather than silently skipped.
+
+**And nobody loses anything.** Every character alive when this lands knew nothing at all, so the
+gate would have arrived as a takeaway on all of them at once. Migration 46 credits each of them with
+the entry methods and with everything their profession level already reached - an Alchemy 3 keeps
+every pill an Alchemy 3 could work the day before and gains nothing they could not - and two drills
+in `test_migration_drill.py` hold that, one for a mid-career crafter and one for a cultivator who
+never crafted at all. The live database dates from v0.29, so this is every cultivator who has ever
+existed. Schema 46.
+
 **1.0.0** (rc.19) makes the eight professions good, which four of them were not. `VERSIONS.md` set
 the bar when rc.15 repaired Appraisal and Inscription - a live profession has a recipe, a call that
 grants it and a check that rolls it - and this is that audit run across all eight, plus the question
@@ -1116,6 +1160,12 @@ mechanical authority paths.
 - **Schema 27** added the v0.19.29 mute/freeze moderation columns on `characters`
   (`is_muted`, `is_frozen`, `moderation_reason`).
 - **Schema 28** added the Quest Forge definition table (`quest_definitions`).
+- **Schema 46** gave a method somewhere to be known. `character_recipes` is the third table in
+  the family of `character_manuals` and `character_item_appraisals` - a composite key, the route
+  by which it was learned, and the minute it was - because crafting now asks whether a cultivator
+  was ever taught the thing they are making. The migration grandfathers every character alive at
+  the time: each keeps the entry methods and everything their profession level already reached,
+  so the release lands as nothing taken away.
 - **Schema 45** let the world's own people put things under the hammer and gave a cultivator
   somewhere to record what they have learned to recognise. `auctions` gained `seller_npc_name`
   (mirroring `merchant_buyer` and `merchant_bidder`, because the seller column is foreign-keyed

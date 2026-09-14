@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -112,6 +113,16 @@ var birthFamilyArchetypes = []birthFamilyArchetype{
 // makes samsara work: a new life is a new household row, so it earns that
 // household's heirloom, while asking the same household twice gets nothing.
 func grantBirthFamilySendoffTx(conn *storage.Conn, catalog worlddata.Catalog, userID, familyID int64, archetype string, gameMinute int64, now float64) (map[string]any, error) {
+	// What the household teaches before it hands anything over (v1.0.0-rc.20).
+	//
+	// Deliberately ahead of both early returns below. The heirloom is guarded
+	// once per household, and an archetype with no send-off returns before it -
+	// but a cultivator must always leave home knowing how to make the ordinary
+	// things, including one who reincarnates back into the household they came
+	// from, whose `character_recipes` were wiped with the rest of the old life.
+	if err := teachHouseholdMethodsTx(conn, catalog, userID, familyID, archetype, gameMinute, now); err != nil {
+		return nil, err
+	}
 	sendoff, ok := catalog.BirthFamilySendoff[archetype]
 	if !ok || strings.TrimSpace(sendoff.Item) == "" {
 		return nil, nil
@@ -705,4 +716,110 @@ func loadBirthFamilyChoice(conn *storage.Conn, userID int64, choiceID string) (b
 		return birthFamilyChoice{}, errors.New("stored birth-family choice is invalid")
 	}
 	return birthFamilyChoice{FamilyID: familyID, BirthFamily: canonical}, nil
+}
+
+// teachHouseholdMethodsTx is the family's own schooling: the methods of the
+// household's own craft, at the tier of the world it stands in.
+//
+// A household teaches what it does and nothing else - a smith's child leaves
+// knowing the forge, not the medicine room - so every other craft's methods
+// have to be bought as slips. That is why every recipe in the game has one,
+// including the entry methods: "common" means cheap and everywhere, not free.
+//
+// Two things are taught. The craft's *entry* methods, which are the ones
+// anybody can actually make at level 0 - without these a child of a Celestial
+// household could never craft at all, and since crafting is the only source of
+// profession experience, could never rise to the methods they did know. And the
+// craft's entry method at the household's own world tier, which is the point of
+// being born high: a Celestial smith's child grows up around starsteel and
+// knows the work long before their hands are equal to it.
+//
+// Idempotent, because the three callers - creation, the dao-family path and
+// samsara - can each run against a character who already knows these.
+func teachHouseholdMethodsTx(conn *storage.Conn, catalog worlddata.Catalog, userID, familyID int64, archetype string, gameMinute int64, now float64) error {
+	trade := strings.TrimSpace(catalog.BirthFamilySendoff[archetype].Trade)
+	if trade == "" {
+		return nil
+	}
+	world := householdWorldTx(conn, catalog, familyID)
+	taught := map[string]bool{}
+	for name, recipe := range catalog.Recipes {
+		if recipe.Profession == trade && recipe.MinLevel <= 0 {
+			taught[name] = true
+		}
+	}
+	if local, ok := entryRecipeForWorld(catalog, trade, world); ok {
+		taught[local] = true
+	}
+	names := make([]string, 0, len(taught))
+	for name := range taught {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		if _, err := conn.Execute(
+			`INSERT INTO character_recipes(user_id,recipe,learned_game_minute,source,created_at)
+			 VALUES(?,?,?,'birth_family',?) ON CONFLICT(user_id,recipe) DO NOTHING`,
+			[]any{userID, name, maxI64(0, gameMinute), now}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// entryRecipeForWorld is the easiest method of a craft that a given world's own
+// materials make - the thing a household there actually works with.
+func entryRecipeForWorld(catalog worlddata.Catalog, trade, world string) (string, bool) {
+	best, bestTN := "", int64(0)
+	for name, recipe := range catalog.Recipes {
+		if recipe.Profession != trade || recipeWorld(catalog, recipe) != world {
+			continue
+		}
+		if best == "" || recipe.TN < bestTN || (recipe.TN == bestTN && name < best) {
+			best, bestTN = name, recipe.TN
+		}
+	}
+	return best, best != ""
+}
+
+// recipeWorld is the world a method belongs to: the highest tier among the
+// materials it asks for, resolved through the same tier table the event sites,
+// the send-off and the sect tribute use.
+func recipeWorld(catalog worlddata.Catalog, recipe worlddata.Recipe) string {
+	worlds := []string{"Mortal World", "Spiritual World", "Immortal World", "Celestial World"}
+	best := 0
+	for material := range recipe.Cost {
+		for tier, name := range worlds {
+			if tier == 0 {
+				continue
+			}
+			if catalog.EventSites.Material(name, "@herb") == material || catalog.EventSites.Material(name, "@ore") == material {
+				if tier > best {
+					best = tier
+				}
+			}
+		}
+	}
+	return worlds[best]
+}
+
+// householdWorldTx is the world a household stands in, read off its own row
+// rather than plumbed through three call sites that each know it differently.
+// An unknown or unplaced family is treated as Mortal, which is where the
+// starting worlds are and what the rest of the birth-family code defaults to.
+func householdWorldTx(conn *storage.Conn, catalog worlddata.Catalog, familyID int64) string {
+	const fallback = "Mortal World"
+	res, err := conn.Execute(`SELECT location FROM birth_families WHERE family_id=?`, []any{familyID})
+	if err != nil {
+		return fallback
+	}
+	row := firstRowMap(res)
+	if row == nil {
+		return fallback
+	}
+	location, ok := catalog.Locations[strings.TrimSpace(fmt.Sprint(row["location"]))]
+	if !ok || strings.TrimSpace(location.World) == "" {
+		return fallback
+	}
+	return location.World
 }

@@ -340,6 +340,31 @@ func craftResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 		level = i64(row["level"])
 	}
 
+	// The two halves of the learning step (v1.0.0-rc.20).
+	//
+	// Until now every recipe in the game was craftable by anyone from character
+	// creation, materials permitting - `/craft`'s own description said "from a
+	// known recipe" and nothing tracked knowledge. A method is now two things: a
+	// thing you have been taught, and work you are good enough to do. They are
+	// checked separately because the refusals mean different things, and a
+	// player who is told the wrong one goes looking in the wrong place.
+	//
+	// Knowledge is asked for on every recipe, including the common ones: a
+	// cultivator is taught those by their own household on the way out the door
+	// (`teachHouseholdMethodsTx`), so "common" means freely taught rather than
+	// silently assumed - and the one place it is granted is the one place to
+	// look when somebody cannot make a thing they should be able to.
+	known, err := knowsRecipeTx(conn, userID, p.Recipe)
+	if err != nil {
+		return authoritativeMutation{}, err
+	}
+	if !known {
+		return authoritativeMutation{}, fmt.Errorf("you do not know the method for %s; it is carried on a jade slip", p.Recipe)
+	}
+	if level < recipe.MinLevel {
+		return authoritativeMutation{}, fmt.Errorf("%s asks for %s %d and you are %d", p.Recipe, profession, recipe.MinLevel, level)
+	}
+
 	if strings.EqualFold(profession, "Alchemy") {
 		if _, err := settlePillToxicityEffectTx(conn, userID, gameMinute); err != nil {
 			return authoritativeMutation{}, err
@@ -807,4 +832,83 @@ func forageResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID i
 			Payload:    evp,
 		},
 	}, nil
+}
+
+// --- the learning step ----------------------------------------------------
+//
+// Modelled on `manual.study` (manual_forbidden_actions.go): you must hold the
+// slip, and the first reading records it. The slip is *not* consumed, exactly
+// as a manual is not - a method passed around a sect is a thing this genre does,
+// and destroying the item would make a shared inheritance impossible.
+
+// knowsRecipeTx is whether this cultivator has been taught a method.
+func knowsRecipeTx(conn *storage.Conn, userID int64, recipe string) (bool, error) {
+	res, err := conn.Execute(`SELECT 1 AS known FROM character_recipes WHERE user_id=? AND recipe=?`, []any{userID, recipe})
+	if err != nil {
+		return false, err
+	}
+	return firstRowMap(res) != nil, nil
+}
+
+type recipeLearnPayload struct {
+	ItemID     string `json:"item_id"`
+	GameMinute int64  `json:"game_minute"`
+}
+
+// recipeLearnAction reads a method slip and records the method.
+func recipeLearnAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
+	var p recipeLearnPayload
+	if err := json.Unmarshal(raw, &p); err != nil {
+		return authoritativeMutation{}, err
+	}
+	itemID := strings.TrimSpace(p.ItemID)
+	item, ok := catalog.Items[itemID]
+	if !ok {
+		return authoritativeMutation{}, fmt.Errorf("unknown item: %s", itemID)
+	}
+	recipeName := item.Learns()
+	if recipeName == "" {
+		return authoritativeMutation{}, errors.New("that is not a method slip")
+	}
+	recipe, ok := catalog.Recipes[recipeName]
+	if !ok {
+		return authoritativeMutation{}, fmt.Errorf("the slip carries a method this world does not have: %s", recipeName)
+	}
+	held, err := inventoryQuantityTx(conn, userID, itemID)
+	if err != nil {
+		return authoritativeMutation{}, err
+	}
+	if held <= 0 {
+		return authoritativeMutation{}, errors.New("you are not carrying that slip")
+	}
+	known, err := knowsRecipeTx(conn, userID, recipeName)
+	if err != nil {
+		return authoritativeMutation{}, err
+	}
+	gameMinute, err := canonicalWorldGameMinute(conn)
+	if err != nil {
+		return authoritativeMutation{}, err
+	}
+	if !known {
+		if _, err = conn.Execute(
+			`INSERT INTO character_recipes(user_id,recipe,learned_game_minute,source,created_at)
+			 VALUES(?,?,?,?,?) ON CONFLICT(user_id,recipe) DO NOTHING`,
+			[]any{userID, recipeName, gameMinute, "method_slip:" + itemID, nowSeconds()}); err != nil {
+			return authoritativeMutation{}, err
+		}
+	}
+	// The level is reported rather than required: a method can be studied
+	// before the hands are ready for it, which is the ordinary way of things.
+	level, err := professionLevelTx(conn, userID, recipe.Profession)
+	if err != nil {
+		return authoritativeMutation{}, err
+	}
+	out := map[string]any{
+		"item_id": itemID, "recipe": recipeName, "profession": recipe.Profession,
+		"min_level": recipe.MinLevel, "level": level, "already_known": known,
+		"ready": level >= recipe.MinLevel, "game_minute": gameMinute,
+	}
+	return authoritativeMutation{Result: out, Event: eventledger.Event{
+		Domain: "crafting", EventType: "recipe.learn", EntityType: "character",
+		EntityID: fmt.Sprint(userID), GameMinute: gameMinute, Payload: out}}, nil
 }

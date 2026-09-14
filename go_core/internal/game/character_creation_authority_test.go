@@ -54,6 +54,7 @@ CREATE TABLE birth_families(
     confederacy_name TEXT NOT NULL,created_at REAL NOT NULL,updated_at REAL NOT NULL,starter_key TEXT NOT NULL DEFAULT ''
 );
 CREATE UNIQUE INDEX idx_birth_families_starter_key ON birth_families(starter_key) WHERE starter_key<>'';
+CREATE TABLE character_recipes(user_id INTEGER NOT NULL,recipe TEXT NOT NULL,learned_game_minute INTEGER NOT NULL DEFAULT 0,source TEXT NOT NULL DEFAULT '',created_at REAL NOT NULL DEFAULT 0,PRIMARY KEY(user_id,recipe));
 CREATE TABLE character_birth_family(user_id INTEGER PRIMARY KEY,family_id INTEGER NOT NULL,birth_order INTEGER NOT NULL,generation INTEGER NOT NULL,last_support_game_minute INTEGER NOT NULL);
 CREATE TABLE birth_family_npcs(npc_id INTEGER PRIMARY KEY AUTOINCREMENT,family_id INTEGER NOT NULL,name TEXT NOT NULL,relation TEXT NOT NULL,gender TEXT NOT NULL,age_at_creation INTEGER NOT NULL,birth_game_minute INTEGER NOT NULL,natural_lifespan_years INTEGER NOT NULL,status TEXT NOT NULL,spiritual_root TEXT NOT NULL,realm_index INTEGER NOT NULL,phase INTEGER NOT NULL,personality TEXT NOT NULL,created_at REAL NOT NULL);
 CREATE TABLE character_spiritual_roots(user_id INTEGER PRIMARY KEY,grade TEXT NOT NULL,purity INTEGER NOT NULL,elements_json TEXT NOT NULL,mutation TEXT NOT NULL,stability INTEGER NOT NULL,refinement_progress INTEGER NOT NULL,compatibility INTEGER NOT NULL,updated_at REAL NOT NULL);

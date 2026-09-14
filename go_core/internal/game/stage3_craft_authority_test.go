@@ -159,6 +159,11 @@ func TestCraftResolveDerivesCanonicalAlchemyContextAndTime(t *testing.T) {
 		successful_refinements,flawless_refinements,best_margin,last_quality,updated_at
 	) VALUES(42,50,100,0,0,0,-99,'',0)`)
 
+	// Since v1.0.0-rc.20 a method has to be known before it can be worked.
+	// This fixture's character is the grandfathered case: they could make this
+	// the day before the learning step landed, so they know it.
+	batch4TeachRecipe(t, path, 42, "Recovery Pill")
+
 	result := batch4Result(t, batch4Apply(
 		t,
 		path,
@@ -319,6 +324,8 @@ func TestCraftResolveDerivesForgingAndFormationFacilities(t *testing.T) {
 				tc.location,
 				fmt.Sprintf(`{"modifiers":[{"stat":%q,"operation":"add","value":%d}]}`, tc.effectStat, tc.wantEffect-4),
 			)
+
+			batch4TeachRecipe(t, path, 42, tc.recipe)
 
 			result := batch4Result(t, batch4Apply(
 				t,

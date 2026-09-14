@@ -26,7 +26,7 @@ from .remote import GoDatabaseTransport
 log = logging.getLogger("xianxia.database")
 
 
-SCHEMA_VERSION = 45
+SCHEMA_VERSION = 46
 # A readiness probe must validate more than the schema-version marker.  If the
 # SQLite file is removed or replaced while the bot is running, SQLite will
 # happily create a new empty file at the same path.  Checking these tables lets
@@ -1789,6 +1789,73 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
                )""",
             """CREATE INDEX IF NOT EXISTS idx_character_item_appraisals_user
                    ON character_item_appraisals(user_id, appraised_game_minute DESC)""",
+        ),
+    ),
+    (
+        46,
+        "recipe_knowledge_and_the_learning_step",
+        (
+            # v1.0.0-rc.20: the learning step. Every recipe in the game used to
+            # be craftable by anyone from character creation, materials
+            # permitting, while `/craft`'s own description said "from a known
+            # recipe" and nothing tracked knowledge. A method is now two things
+            # - taught, and within your level - and this is where the taught
+            # half lives, in the family of `character_manuals` and
+            # `character_item_appraisals`.
+            """CREATE TABLE IF NOT EXISTS character_recipes (
+                   user_id INTEGER NOT NULL,
+                   recipe TEXT NOT NULL,
+                   learned_game_minute INTEGER NOT NULL DEFAULT 0,
+                   source TEXT NOT NULL DEFAULT '',
+                   created_at REAL NOT NULL DEFAULT 0,
+                   PRIMARY KEY(user_id, recipe),
+                   FOREIGN KEY(user_id) REFERENCES characters(user_id) ON DELETE CASCADE
+               )""",
+            """CREATE INDEX IF NOT EXISTS idx_character_recipes_user
+                   ON character_recipes(user_id, learned_game_minute DESC)""",
+            # Grandfathering, in two halves. Nobody may experience this update
+            # as a takeaway: an existing cultivator keeps everything they could
+            # make the day before it landed.
+            #
+            # First the common methods, which a new character is now taught by
+            # their household on the way out the door - every existing one is
+            # credited with the same schooling.
+            "INSERT INTO character_recipes(user_id,recipe,source) SELECT user_id, 'Guiding Chalk Array', 'grandfathered' FROM characters WHERE true ON CONFLICT(user_id,recipe) DO NOTHING",
+            "INSERT INTO character_recipes(user_id,recipe,source) SELECT user_id, 'Qi Nourishing Pill', 'grandfathered' FROM characters WHERE true ON CONFLICT(user_id,recipe) DO NOTHING",
+            "INSERT INTO character_recipes(user_id,recipe,source) SELECT user_id, 'Recovery Pill', 'grandfathered' FROM characters WHERE true ON CONFLICT(user_id,recipe) DO NOTHING",
+            "INSERT INTO character_recipes(user_id,recipe,source) SELECT user_id, 'Spirit-Focus Talisman', 'grandfathered' FROM characters WHERE true ON CONFLICT(user_id,recipe) DO NOTHING",
+            "INSERT INTO character_recipes(user_id,recipe,source) SELECT user_id, 'Spirit-Iron Sword', 'grandfathered' FROM characters WHERE true ON CONFLICT(user_id,recipe) DO NOTHING",
+            "INSERT INTO character_recipes(user_id,recipe,source) SELECT user_id, 'Stone-Skin Talisman', 'grandfathered' FROM characters WHERE true ON CONFLICT(user_id,recipe) DO NOTHING",
+            "INSERT INTO character_recipes(user_id,recipe,source) SELECT user_id, 'Swift-Wind Talisman', 'grandfathered' FROM characters WHERE true ON CONFLICT(user_id,recipe) DO NOTHING",
+            # Then everything their profession level already reached. The join
+            # is against `profession_progress`, so a Grandmaster alchemist keeps
+            # the whole alchemy ladder and a novice keeps only what they had.
+            # New recipes authored after this migration are not swept in - they
+            # are learned like anything else.
+            "INSERT INTO character_recipes(user_id,recipe,source) SELECT p.user_id, 'Crystal-Ward Talisman', 'grandfathered' FROM profession_progress p WHERE p.profession='Inscription' AND p.level>=1 ON CONFLICT(user_id,recipe) DO NOTHING",
+            "INSERT INTO character_recipes(user_id,recipe,source) SELECT p.user_id, 'Dawn Lotus Vitality Pill', 'grandfathered' FROM profession_progress p WHERE p.profession='Alchemy' AND p.level>=2 ON CONFLICT(user_id,recipe) DO NOTHING",
+            "INSERT INTO character_recipes(user_id,recipe,source) SELECT p.user_id, 'Golden Bastion Array', 'grandfathered' FROM profession_progress p WHERE p.profession='Formation' AND p.level>=3 ON CONFLICT(user_id,recipe) DO NOTHING",
+            "INSERT INTO character_recipes(user_id,recipe,source) SELECT p.user_id, 'Golden-Edge Talisman', 'grandfathered' FROM profession_progress p WHERE p.profession='Inscription' AND p.level>=2 ON CONFLICT(user_id,recipe) DO NOTHING",
+            "INSERT INTO character_recipes(user_id,recipe,source) SELECT p.user_id, 'Heart Calming Pill', 'grandfathered' FROM profession_progress p WHERE p.profession='Alchemy' AND p.level>=1 ON CONFLICT(user_id,recipe) DO NOTHING",
+            "INSERT INTO character_recipes(user_id,recipe,source) SELECT p.user_id, 'Heaven-Petal Elixir', 'grandfathered' FROM profession_progress p WHERE p.profession='Alchemy' AND p.level>=3 ON CONFLICT(user_id,recipe) DO NOTHING",
+            "INSERT INTO character_recipes(user_id,recipe,source) SELECT p.user_id, 'Immortal Marrow Pill', 'grandfathered' FROM profession_progress p WHERE p.profession='Alchemy' AND p.level>=3 ON CONFLICT(user_id,recipe) DO NOTHING",
+            "INSERT INTO character_recipes(user_id,recipe,source) SELECT p.user_id, 'Immortal-Gold Plate', 'grandfathered' FROM profession_progress p WHERE p.profession='Forging' AND p.level>=3 ON CONFLICT(user_id,recipe) DO NOTHING",
+            "INSERT INTO character_recipes(user_id,recipe,source) SELECT p.user_id, 'Immortal-Gold Sabre', 'grandfathered' FROM profession_progress p WHERE p.profession='Forging' AND p.level>=3 ON CONFLICT(user_id,recipe) DO NOTHING",
+            "INSERT INTO character_recipes(user_id,recipe,source) SELECT p.user_id, 'Longevity Pill', 'grandfathered' FROM profession_progress p WHERE p.profession='Alchemy' AND p.level>=2 ON CONFLICT(user_id,recipe) DO NOTHING",
+            "INSERT INTO character_recipes(user_id,recipe,source) SELECT p.user_id, 'Minor Qi-Gathering Array Disk', 'grandfathered' FROM profession_progress p WHERE p.profession='Formation' AND p.level>=1 ON CONFLICT(user_id,recipe) DO NOTHING",
+            "INSERT INTO character_recipes(user_id,recipe,source) SELECT p.user_id, 'Minor Warding Array Disk', 'grandfathered' FROM profession_progress p WHERE p.profession='Formation' AND p.level>=1 ON CONFLICT(user_id,recipe) DO NOTHING",
+            "INSERT INTO character_recipes(user_id,recipe,source) SELECT p.user_id, 'Moonveil Concealment Array', 'grandfathered' FROM profession_progress p WHERE p.profession='Formation' AND p.level>=2 ON CONFLICT(user_id,recipe) DO NOTHING",
+            "INSERT INTO character_recipes(user_id,recipe,source) SELECT p.user_id, 'Moonveil Recovery Pill', 'grandfathered' FROM profession_progress p WHERE p.profession='Alchemy' AND p.level>=1 ON CONFLICT(user_id,recipe) DO NOTHING",
+            "INSERT INTO character_recipes(user_id,recipe,source) SELECT p.user_id, 'Qi Replenishment Pill', 'grandfathered' FROM profession_progress p WHERE p.profession='Alchemy' AND p.level>=1 ON CONFLICT(user_id,recipe) DO NOTHING",
+            "INSERT INTO character_recipes(user_id,recipe,source) SELECT p.user_id, 'Spirit Condensation Pill', 'grandfathered' FROM profession_progress p WHERE p.profession='Alchemy' AND p.level>=2 ON CONFLICT(user_id,recipe) DO NOTHING",
+            "INSERT INTO character_recipes(user_id,recipe,source) SELECT p.user_id, 'Spirit-Crystal Mail', 'grandfathered' FROM profession_progress p WHERE p.profession='Forging' AND p.level>=2 ON CONFLICT(user_id,recipe) DO NOTHING",
+            "INSERT INTO character_recipes(user_id,recipe,source) SELECT p.user_id, 'Spirit-Crystal Sword', 'grandfathered' FROM profession_progress p WHERE p.profession='Forging' AND p.level>=2 ON CONFLICT(user_id,recipe) DO NOTHING",
+            "INSERT INTO character_recipes(user_id,recipe,source) SELECT p.user_id, 'Spirit-Iron Lamellar', 'grandfathered' FROM profession_progress p WHERE p.profession='Forging' AND p.level>=1 ON CONFLICT(user_id,recipe) DO NOTHING",
+            "INSERT INTO character_recipes(user_id,recipe,source) SELECT p.user_id, 'Starfall Bulwark Array', 'grandfathered' FROM profession_progress p WHERE p.profession='Formation' AND p.level>=4 ON CONFLICT(user_id,recipe) DO NOTHING",
+            "INSERT INTO character_recipes(user_id,recipe,source) SELECT p.user_id, 'Starfall Talisman', 'grandfathered' FROM profession_progress p WHERE p.profession='Inscription' AND p.level>=3 ON CONFLICT(user_id,recipe) DO NOTHING",
+            "INSERT INTO character_recipes(user_id,recipe,source) SELECT p.user_id, 'Starlight Dao Pill', 'grandfathered' FROM profession_progress p WHERE p.profession='Alchemy' AND p.level>=4 ON CONFLICT(user_id,recipe) DO NOTHING",
+            "INSERT INTO character_recipes(user_id,recipe,source) SELECT p.user_id, 'Starsteel Aegis', 'grandfathered' FROM profession_progress p WHERE p.profession='Forging' AND p.level>=4 ON CONFLICT(user_id,recipe) DO NOTHING",
+            "INSERT INTO character_recipes(user_id,recipe,source) SELECT p.user_id, 'Starsteel Glaive', 'grandfathered' FROM profession_progress p WHERE p.profession='Forging' AND p.level>=4 ON CONFLICT(user_id,recipe) DO NOTHING",
         ),
     ),
 )
