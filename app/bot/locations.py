@@ -30,6 +30,16 @@ from ..rules.sense import circuit_stop
 from .runtime import DB, WORLD, current_world_time, log
 from .services import SIM
 
+# `current_npc_location` returned None for two different things - "this NPC is
+# dead" and "nothing knows where they are" - and every caller read None as the
+# second. So a dead NPC was offered in every picker at every location, and
+# `/talk` and `/npcinfo` treated a corpse as somebody standing where they fell.
+# DEAD separates the two. It is not a location and never matches one, so the
+# callers that compare against a real place already do the right thing with it;
+# the ones that would show it to a player are the ones that had to change.
+DEAD = "\x00dead"
+
+
 async def current_npc_location(npc_name: str, period: str | None = None) -> str | None:
     """Resolve the mechanical NPC location from initialized simulation state.
 
@@ -55,6 +65,8 @@ async def current_npc_location(npc_name: str, period: str | None = None) -> str 
     sim_state = await SIM.npc_status(npc_name)
     if period is None:
         period = (await current_world_time()).period
+    if sim_state and str(sim_state.get("status") or "") not in ("", "alive"):
+        return DEAD
     if sim_state and sim_state.get("status") == "alive" and sim_state.get("current_location"):
         current = str(sim_state["current_location"])
         home = str(sim_state.get("home_location") or current)
@@ -188,6 +200,8 @@ async def local_npc_autocomplete(
         if name in names:
             continue
         npc_location = await current_npc_location(name, wt.period)
+        if npc_location == DEAD:
+            continue
         if location and npc_location and npc_location != location:
             continue
         if not needle or needle in name.casefold():

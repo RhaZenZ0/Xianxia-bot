@@ -312,6 +312,12 @@ class MemoryRAGRetriever:
             "leadership_change", "location_destroyed", "major_battle", "inheritance",
             "ascension", "blood_feud", "discovery", "friendship", "discipleship",
             "faction_change", "rank_promotion", "descendant_birth", "npc_breakthrough",
+            # The NPC simulation's own kinds, which were all missing: a
+            # murder scored below a wedding because `npc_killing` is not the
+            # string "death", and nothing the world's own people did to each
+            # other counted as notable at all.
+            "npc_killing", "npc_duel", "npc_marriage", "npc_political_marriage",
+            "npc_birth", "npc_discipleship", "sect_promotion", "sect_membership",
         } else 0.0
         return lexical * 0.75 + significance * 1.45 + recency * 0.55 + locality + faction_bonus + mention_bonus + type_bonus
 

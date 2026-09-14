@@ -196,6 +196,20 @@ func applyCombatAftermathTx(conn *storage.Conn, userID int64, b battleRow, outco
 				if _, err = conn.Execute(`UPDATE npc_civilization_state SET status='dead',activity=?,last_game_minute=?,updated_at=? WHERE npc_name=?`, []any{fmt.Sprintf("Killed by player %d", userID), gameMinute, now, target}); err != nil {
 					return combatAftermathResult{}, err
 				}
+				// Only `npc_civilization_state` used to be told. `npc_life_state`
+				// went on healing the corpse every npc_life tick - its bulk heal
+				// is `WHERE health>0` with no join to status - and advancing its
+				// career. Say it in both places, then free whoever they were
+				// attached to (v1.0.0-rc.23).
+				if tableExistsTx(conn, "npc_life_state") {
+					if _, err = conn.Execute(`UPDATE npc_life_state SET health=0,death_game_minute=?,cause_of_death=?,updated_at=? WHERE npc_name=?`,
+						[]any{gameMinute, fmt.Sprintf("killed by player %d", userID), now, target}); err != nil {
+						return combatAftermathResult{}, err
+					}
+				}
+				if err = ReleaseNPCBondsTx(conn, target, gameMinute, now); err != nil {
+					return combatAftermathResult{}, err
+				}
 				regionSev := maxI64(severity, 1+storage.ParseInt(n[3])/25)
 				if tableExistsTx(conn, "civilization_regions") {
 					if _, err = conn.Execute(`UPDATE civilization_regions SET security=MAX(0,security-?),unrest=MIN(100,unrest+?),prosperity=MAX(0,prosperity-?),last_game_minute=?,updated_at=? WHERE location=?`, []any{regionSev * 2, regionSev * 3, maxI64(1, regionSev), gameMinute, now, currentLoc}); err != nil {

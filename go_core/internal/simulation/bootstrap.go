@@ -26,6 +26,8 @@ type BootstrapResult struct {
 	ClanBranchesCreated      int64 `json:"clan_branches_created"`
 	RetainerGroupsCreated    int64 `json:"retainer_groups_created"`
 	ClanRelationsCreated     int64 `json:"clan_relations_created"`
+	NPCHouseholdsSeeded      int64 `json:"npc_households_seeded"`
+	NPCChildrenSeeded        int64 `json:"npc_children_seeded"`
 }
 
 var clanRelationTypes = []string{"alliance", "marriage_pact", "trade_pact", "rivalry", "blood_feud"}
@@ -176,6 +178,11 @@ func (r *Runner) Bootstrap(req BootstrapRequest) (BootstrapResult, error) {
 	if out.NPCMoodsInitialized, err = r.bootstrapNPCMoods(conn, req.GameMinute); err != nil {
 		return BootstrapResult{}, err
 	}
+	// After the NPCs exist and before the clans, because a household is
+	// something the world already had rather than something it derives.
+	if err = r.seedHouseholds(conn, req.GameMinute, &out); err != nil {
+		return BootstrapResult{}, err
+	}
 	if err = r.bootstrapClans(conn, req.GameMinute, &out); err != nil {
 		return BootstrapResult{}, err
 	}
@@ -274,10 +281,20 @@ VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(npc_name) DO NOTHING`,
 		}
 		naturalLife := lifespanmodel.NaturalYearsFromSeed(seed)
 		startingAge := lifespanmodel.BootstrapAge(realmIndex, phase, naturalLife, seed)
+		health := int64(100)
+		// A share of the world begins near the end of a life, so there are
+		// elders in it and the first funeral is not decades away
+		// (v1.0.0-rc.23). Hidden masters are left alone: they are content
+		// with a job to do, not extras to be aged out from under it.
+		if data.HiddenMaster == nil && bootstrapElderly(seed) {
+			if age, frail, ok := bootstrapElderAge(realmIndex, phase, naturalLife, seed); ok {
+				startingAge, health = age, frail
+			}
+		}
 		rank := bootstrapRank(data, faction, realmIndex, influence)
 		if _, err = conn.Execute(`INSERT INTO npc_life_state(npc_name,birth_game_minute,age_at_creation_years,natural_lifespan_years,health,injury,injury_severity,sect_rank,career_progress,relationship_status,spouse_name,children_count,last_social_game_minute,last_cultivation_game_minute,updated_at)
-VALUES(?,?,?,?,100,'',0,?,?, 'single','',0,?,?,?) ON CONFLICT(npc_name) DO NOTHING`,
-			[]any{npcName, gameMinute, startingAge, naturalLife, rank, int64(seed % 31), gameMinute, gameMinute, now}); err != nil {
+VALUES(?,?,?,?,?,'',0,?,?, 'single','',0,?,?,?) ON CONFLICT(npc_name) DO NOTHING`,
+			[]any{npcName, gameMinute, startingAge, naturalLife, health, rank, int64(seed % 31), gameMinute, gameMinute, now}); err != nil {
 			return err
 		}
 	}

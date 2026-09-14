@@ -21,7 +21,7 @@ from ...rules.npc_memory import classify_memory, exchange_memory_summary, public
 from .. import scene_layout
 from ..character_state import announce_quest_progress, current_effect_modifiers
 from ..formatting import roll_line
-from ..locations import _location_is_visible, current_npc_location, local_npc_autocomplete
+from ..locations import DEAD, _location_is_visible, current_npc_location, local_npc_autocomplete
 from ..registry import EVENT_HANDLERS, registered_group_command, registered_root_command
 from ..runtime import (
     DB,
@@ -65,6 +65,12 @@ async def talk(
         return
     wt = await current_world_time()
     npc_location = await current_npc_location(npc, wt.period)
+    if npc_location == DEAD:
+        await interaction.response.send_message(
+            f"**{npc}** is dead. Whatever you have to say to them, the world is not going to carry it.",
+            ephemeral=False,
+        )
+        return
     if npc_location and npc_location != c.get("location"):
         await interaction.response.send_message(
             f"**{npc}** is currently at **{npc_location}** during the **{wt.period}**, not **{await character_location_display(c)}**.",
@@ -632,7 +638,11 @@ async def npc_info_command(interaction: discord.Interaction, npc: str) -> None:
     if not c:
         return
     wt = await current_world_time()
-    current_location = await current_npc_location(npc, wt.period) or data.get("location", "Unknown")
+    resolved_location = await current_npc_location(npc, wt.period)
+    if resolved_location == DEAD:
+        await interaction.response.send_message(f"🪦 **{npc}** is dead.", ephemeral=False)
+        return
+    current_location = resolved_location or data.get("location", "Unknown")
     if not await _location_is_visible(interaction.user.id, c, str(current_location)):
         await interaction.response.send_message("You have no reliable knowledge of that cultivator yet.", ephemeral=False)
         return

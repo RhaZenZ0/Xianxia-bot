@@ -518,41 +518,27 @@ func (r *Runner) npcLife(conn *storage.Conn, steps, gm int64) (string, error) {
 		if err != nil {
 			return "", err
 		}
+		// A widow may marry again; nothing used to tell her she was one.
+		if err = game.ReleaseNPCBondsTx(conn, name, gm, now); err != nil {
+			return "", err
+		}
 	}
 	_, err = conn.Execute(`UPDATE npc_social_relations SET affinity=MAX(-100,MIN(100,affinity+CASE WHEN grudge>40 THEN -1 WHEN trust>35 THEN 1 ELSE 0 END)),trust=MAX(-100,MIN(100,trust+CASE WHEN affinity>40 THEN 1 WHEN grudge>50 THEN -1 ELSE 0 END)),grudge=MAX(-100,MIN(100,grudge-CASE WHEN grudge>0 THEN 1 ELSE 0 END)),last_interaction_game_minute=?,updated_at=? WHERE status='active'`, []any{gm, now})
 	if err != nil {
 		return "", err
 	}
-	// Pair a bounded number of compatible single NPCs at the same location. This is done in Go,
-	// in the same transaction, so autonomous social life never causes Python/SQLite round trips.
-	singlesRes, err := conn.Execute(`SELECT c.npc_name,c.current_location,l.children_count FROM npc_civilization_state c JOIN npc_life_state l ON l.npc_name=c.npc_name WHERE c.status='alive' AND l.relationship_status='single' ORDER BY c.current_location,c.npc_name LIMIT 200`, nil)
+	// Courtship instead of coincidence (v1.0.0-rc.23). The pairing that used
+	// to live here walked one sorted list of singles two at a time and kept a
+	// pair only if both landed on the same location - fifteen usable pairs out
+	// of the two hundred and forty that exist, at six percent, which is four
+	// weddings a month in a world of five hundred and seventy-four people. See
+	// npc_romance.go for the geography that makes that the wrong rule.
+	//
+	// Before childbirth, so a couple married this tick can have children the
+	// next one rather than waiting a full pass.
+	courted, marriages, parted, err := r.npcRomance(conn, steps, gm)
 	if err != nil {
 		return "", err
-	}
-	singles := maps(singlesRes)
-	marriages := 0
-	for i := 0; i+1 < len(singles); i += 2 {
-		a, b := singles[i], singles[i+1]
-		if fmt.Sprint(a["current_location"]) != fmt.Sprint(b["current_location"]) {
-			continue
-		}
-		an, bn := fmt.Sprint(a["npc_name"]), fmt.Sprint(b["npc_name"])
-		if hash64(an, bn, fmt.Sprint(gm))%100 >= uint64(min64(35, steps+5)) {
-			continue
-		}
-		if _, err = conn.Execute(`UPDATE npc_life_state SET relationship_status='married',spouse_name=?,last_social_game_minute=?,updated_at=? WHERE npc_name=?`, []any{bn, gm, now, an}); err != nil {
-			return "", err
-		}
-		if _, err = conn.Execute(`UPDATE npc_life_state SET relationship_status='married',spouse_name=?,last_social_game_minute=?,updated_at=? WHERE npc_name=?`, []any{an, gm, now, bn}); err != nil {
-			return "", err
-		}
-		pair := []string{an, bn}
-		sort.Strings(pair)
-		_, err = conn.Execute(`INSERT INTO npc_social_relations(npc_a,npc_b,affinity,trust,grudge,relation_type,status,started_game_minute,last_interaction_game_minute,updated_at) VALUES(?,?,55,45,0,'marriage','active',?,?,?) ON CONFLICT(npc_a,npc_b) DO UPDATE SET relation_type='marriage',status='active',affinity=MAX(affinity,55),trust=MAX(trust,45),updated_at=excluded.updated_at`, []any{pair[0], pair[1], gm, gm, now})
-		if err != nil {
-			return "", err
-		}
-		marriages++
 	}
 	born, err := r.npcChildbirth(conn, steps, gm)
 	if err != nil {
@@ -571,8 +557,8 @@ func (r *Runner) npcLife(conn *storage.Conn, steps, gm int64) (string, error) {
 		return "", err
 	}
 	return fmt.Sprintf(
-		"batch-advanced NPC life; %d natural death(s), %d new marriage(s), %d birth(s), %d promotion(s), %d new disciple(s), %d feud(s) settled (%d fatal)",
-		len(deaths), marriages, born, promoted, bonds, fought, killed), nil
+		"batch-advanced NPC life; %d natural death(s), %d courtship(s) begun, %d new marriage(s), %d courtship(s) ended, %d birth(s), %d promotion(s), %d new disciple(s), %d feud(s) settled (%d fatal)",
+		len(deaths), courted, marriages, parted, born, promoted, bonds, fought, killed), nil
 }
 
 func (r *Runner) economy(conn *storage.Conn, steps, gm int64) (string, error) {

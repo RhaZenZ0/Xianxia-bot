@@ -158,18 +158,15 @@ INSERT INTO npc_civilization_state(npc_name,home_location,current_location,world
 INSERT INTO npc_life_state(npc_name,birth_game_minute,age_at_creation_years,natural_lifespan_years,health,injury,injury_severity,sect_rank,career_progress,relationship_status,spouse_name,children_count,last_social_game_minute,last_cultivation_game_minute,death_game_minute,cause_of_death,updated_at) VALUES('A',0,20,80,100,'',0,'Independent Cultivator',0,'single','',0,0,0,NULL,'',0);
 INSERT INTO npc_life_state(npc_name,birth_game_minute,age_at_creation_years,natural_lifespan_years,health,injury,injury_severity,sect_rank,career_progress,relationship_status,spouse_name,children_count,last_social_game_minute,last_cultivation_game_minute,death_game_minute,cause_of_death,updated_at) VALUES('B',0,20,80,100,'',0,'Independent Cultivator',0,'single','',0,0,0,NULL,'',0);
 `)
+	// A marriage is the end of a courtship now, not a coin flip between two
+	// strangers (v1.0.0-rc.23), so the couple arrive already courting and one
+	// point short of the threshold. That keeps what this test is actually
+	// for - both life-state rows and the relation row landing in one
+	// transaction - and makes it certain by the fixture rather than by
+	// hunting for a game minute whose hash happens to agree.
+	seedCourtship(t, path, "A", "B", courtshipMarryAt-courtshipGain)
 	runner, _ := NewRunner(path, "")
-	var gm int64
-	for candidate := int64(1); candidate < 10000; candidate++ {
-		if hash64("A", "B", fmt.Sprint(candidate))%100 < 35 {
-			gm = candidate
-			break
-		}
-	}
-	if gm == 0 {
-		t.Fatal("could not find deterministic marriage minute")
-	}
-	if _, err := runner.Force(ForceRequest{System: "npc_life", Steps: 120, GameMinute: gm}); err != nil {
+	if _, err := runner.Force(ForceRequest{System: "npc_life", Steps: 120, GameMinute: 4321}); err != nil {
 		t.Fatal(err)
 	}
 	if got := simScalar(t, path, "SELECT spouse_name FROM npc_life_state WHERE npc_name='A'"); got != "B" {
@@ -177,6 +174,29 @@ INSERT INTO npc_life_state(npc_name,birth_game_minute,age_at_creation_years,natu
 	}
 	if got := simScalar(t, path, "SELECT relation_type FROM npc_social_relations WHERE npc_a='A' AND npc_b='B'"); got != "marriage" {
 		t.Fatalf("relation=%v", got)
+	}
+}
+
+// seedCourtship puts a pair one tick away from the altar.
+func seedCourtship(t *testing.T, path, a, b string, affinity int64) {
+	t.Helper()
+	conn, err := storage.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	if _, err := conn.Execute(`INSERT INTO npc_social_relations(
+        npc_a,npc_b,affinity,trust,grudge,relation_type,status,
+        started_game_minute,last_interaction_game_minute,updated_at)
+        VALUES(?,?,?,0,0,'courtship','active',0,0,0)`, []any{a, b, affinity}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := conn.Execute(`UPDATE npc_life_state SET relationship_status='courting' WHERE npc_name IN (?,?)`,
+		[]any{a, b}); err != nil {
+		t.Fatal(err)
+	}
+	if err := conn.Commit(); err != nil {
+		t.Fatal(err)
 	}
 }
 

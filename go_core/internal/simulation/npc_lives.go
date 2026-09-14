@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"strings"
 
+	"xianxia/core/internal/game"
 	"xianxia/core/internal/gamerng"
 	"xianxia/core/internal/storage"
 )
@@ -96,9 +97,19 @@ func (r *Runner) npcChildbirth(conn *storage.Conn, steps, gm int64) (int64, erro
 	if !simTableExists(conn, "npc_descendants") || !simTableExists(conn, "npc_life_state") {
 		return 0, nil
 	}
+	// The spouse has to be alive as well, which nothing used to check: the
+	// join is on `l.npc_name` only, so `c.status='alive'` spoke for one half
+	// of the couple and a widow went on bearing a dead man's children. The
+	// widowing in ReleaseNPCBondsTx also closes this, by taking her out of
+	// 'married' - this is the belt to that pair of braces, because a death
+	// path added later will not know to call it.
 	res, err := conn.Execute(`SELECT l.npc_name,l.spouse_name,c.current_location
-        FROM npc_life_state l JOIN npc_civilization_state c ON c.npc_name=l.npc_name
-        WHERE c.status='alive' AND l.relationship_status='married' AND l.spouse_name<>''
+        FROM npc_life_state l
+        JOIN npc_civilization_state c ON c.npc_name=l.npc_name
+        JOIN npc_civilization_state s ON s.npc_name=l.spouse_name
+        JOIN npc_life_state ls ON ls.npc_name=l.spouse_name
+        WHERE c.status='alive' AND s.status='alive' AND ls.health>0
+          AND l.relationship_status='married' AND l.spouse_name<>''
           AND l.health>=? AND l.children_count<?
           AND l.npc_name < l.spouse_name
         ORDER BY l.npc_name LIMIT 150`, []any{childbirthMinHealth, childbirthMaxKids})
@@ -425,6 +436,9 @@ func (r *Runner) npcFeuds(conn *storage.Conn, gm int64) (int64, int64, error) {
 			}
 			if _, err := conn.Execute(`UPDATE npc_civilization_state SET status='dead',activity='Deceased',last_game_minute=?,updated_at=? WHERE npc_name=?`,
 				[]any{gm, now, loser}); err != nil {
+				return fought, killed, err
+			}
+			if err := game.ReleaseNPCBondsTx(conn, loser, gm, now); err != nil {
 				return fought, killed, err
 			}
 			r.recordNPCHistory(conn, "npc_killing", fmt.Sprintf("npc_feud_death:%s:%s:%d", winner, loser, gm),

@@ -131,7 +131,10 @@ async def caravan_status(interaction: discord.Interaction) -> None:
     if arrived: lines.append(f"\n✅ **{len(arrived)} caravan(s) resolved on this check.**")
     for row in rows[:15]:
         remaining=max(0,int(row['arrive_game_minute'])-wt.total_minutes)
-        details=f"escort {int(row.get('escort_strength') or 0)} • {'smuggling' if int(row.get('smuggling') or 0) else f'tax {int(row.get("tax_rate") or 0)}%'}"
+        # The inner f-string reused the outer quote character, which is also
+        # 3.12-only (PEP 701). Same text, spelled so 3.11 can parse it.
+        toll_note='smuggling' if int(row.get('smuggling') or 0) else 'tax '+str(int(row.get('tax_rate') or 0))+'%'
+        details=f"escort {int(row.get('escort_strength') or 0)} • {toll_note}"
         if row['status']=='traveling': details+=f" • {remaining} game minutes"
         else: details+=f" • payout {int(row.get('payout_final') or 0)} • toll {int(row.get('toll_paid') or 0)} • losses {int((row.get('losses') or {}).get('percent',0))}%"
         lines.append(f"\n`#{row['caravan_id']}` {row['origin']} → **{row['destination']}** • **{row['status']}** • {details}")
