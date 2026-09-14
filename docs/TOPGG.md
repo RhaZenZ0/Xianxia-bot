@@ -105,6 +105,34 @@ trust-based claim. Set `TOPGG_VERIFY_VOTES=false` to keep posting your server
 count while paying every claim on trust, or `TOPGG_POST_METRICS=false` to
 verify votes without publishing a server count.
 
+## Why there is no SDK in `requirements.txt`
+
+Top.gg publishes `topggpy` for Python, and it is not used here. The reasons are
+worth writing down, because the question comes back every time someone reads
+the Top.gg docs:
+
+- **It targets the previous API.** `topggpy` 1.4.0 sends the bare token as
+  `Authorization` and calls `/bots/<id>/check` and `/bots/stats`. The current
+  API — the one Top.gg's own actively maintained Go SDK uses, and the one this
+  bot calls — is `Bearer` auth against `/v1/projects/@me/...`. Adopting the
+  Python SDK would mean moving *backwards* one API version.
+- **Its last stable release was November 2021.** That is a long time for
+  something sitting in the path that decides whether a player gets paid.
+- **It depends on `discord.py` without a bound.** This project pins
+  `discord.py` exactly and installs `requirements.lock` under
+  `--require-hashes`; an unbounded transitive pin on the Discord library is
+  the one dependency shape that policy exists to prevent.
+- **Its headline feature is the one thing this deployment cannot use.** The
+  built-in webhook server needs an inbound port open on the host. That is the
+  door `/vote` has always been written to keep shut, and the whole reason the
+  check here is an outbound call.
+
+What the SDKs *are* good for is telling you what the API actually does.
+`app/ops/topgg.py` was written against the Go SDK's source for exactly that
+reason, and `tests/python/unit/test_topgg.py` pins the request shape — the URL
+and the `Bearer` header — so that if Top.gg moves again, a test says so rather
+than a `401` in production.
+
 ## Reference
 
 - Configuration keys: [CONFIGURATION.md](CONFIGURATION.md)
