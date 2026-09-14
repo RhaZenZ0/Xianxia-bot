@@ -687,16 +687,16 @@ async def method_slip_autocomplete(interaction: discord.Interaction, current: st
     return out
 
 
-@registered_root_command(name="learn", description="Read a method slip and commit the method to memory", guild=GUILD)
+@registered_root_command(name="learn", description="Read a method slip - the method is yours for good and the slip is spent", guild=GUILD)
 @app_commands.autocomplete(slip=method_slip_autocomplete)
 @serialized_user_action
 async def learn(interaction: discord.Interaction, slip: str) -> None:
     """The other half of the learning step (v1.0.0-rc.20).
 
     A household teaches its own craft and nothing else, so everything else is a
-    jade slip bought from the trade that uses it. Reading one is permanent and
-    does not consume the slip - a method passed around a sect is a thing this
-    genre does.
+    jade slip bought from the trade that uses it. The method is permanent and
+    the slip is not: one impression, one reading. Re-reading a method already
+    carried spends nothing, so nobody burns a spare for no gain.
     """
     if not await require_character(interaction):
         return
@@ -717,9 +717,11 @@ async def learn(interaction: discord.Interaction, slip: str) -> None:
     min_level = int(result.get("min_level") or 0)
     level = int(result.get("level") or 0)
     if result.get("already_known"):
-        head = f"📜 You already carry the method for **{recipe}**."
+        head = (f"📜 You already carry the method for **{recipe}**, "
+                "so the slip stays in your bags unread.")
     else:
-        head = f"📜 You read the slip through, and the method for **{recipe}** is yours."
+        head = (f"📜 You read the slip through. The method for **{recipe}** is yours, "
+                "and the jade is blank.")
     if result.get("ready"):
         tail = f"\n{profession} {level} — your hands are equal to it. **/craft** it when you have the materials."
     else:
@@ -827,7 +829,7 @@ async def alchemy_status(interaction: discord.Interaction) -> None:
     await reply_long(interaction, "\n".join(lines), ephemeral=False)
 
 
-@registered_group_command(alchemy_group, name="forage", description="Gather medicinal herbs using the current region's simulated spirit resources")
+@registered_group_command(alchemy_group, name="forage", description="Gather herbs and craft makings using the current region's simulated spirit resources")
 @serialized_user_action
 async def alchemy_forage(interaction: discord.Interaction) -> None:
     c = await require_character(interaction)
@@ -836,7 +838,7 @@ async def alchemy_forage(interaction: discord.Interaction) -> None:
     remaining = await DB.cooldown_remaining(interaction.user.id, "alchemy_forage")
     if remaining:
         await interaction.response.send_message(
-            f"The nearby herb beds need time to recover. Forage again in **{human_duration(remaining)}**.", ephemeral=False,
+            f"The nearby beds and seams need time to recover. Forage again in **{human_duration(remaining)}**.", ephemeral=False,
         )
         return
     try:
@@ -863,7 +865,7 @@ async def alchemy_forage(interaction: discord.Interaction) -> None:
     )
     if not success:
         await interaction.response.send_message(
-            f"🌿 **Medicinal Forage — {forage_location}**\n{roll_line(result)}\n"
+            f"🌿 **Forage — {forage_location}**\n{roll_line(result)}\n"
             f"Regional spirit resources: **{int(resolved.get('spirit_resources',0))}/100**.{bonus_bits} "
             "You find no usable harvest this time."
             f"\n🧺 Foraging: **{profession_rank(level)}** Lv.{level} "
@@ -873,10 +875,15 @@ async def alchemy_forage(interaction: discord.Interaction) -> None:
     awarded = {str(k): int(v) for k, v in dict(resolved.get("loot") or {}).items()}
     rare = str(resolved.get("rare_found") or "")
     rare_line = f"\n✨ Rare find: **{WORLD.item_name(rare)}**." if rare else ""
+    # The makings of the other three crafts (v1.0.0-rc.21). They are already in
+    # `Harvested`, but naming them is the point: a forager who does not know
+    # that ink and paper come out of the hills has no reason to look.
+    makings = {str(k): int(v) for k, v in dict(resolved.get("materials_found") or {}).items()}
+    makings_line = f"\n📜 Craft makings: **{WORLD.item_names(makings)}**." if makings else ""
     await interaction.response.send_message(
-        f"🌿 **Medicinal Forage — {forage_location}**\n{roll_line(result)}\n"
+        f"🌿 **Forage — {forage_location}**\n{roll_line(result)}\n"
         f"Regional spirit resources: **{int(resolved.get('spirit_resources',0))}/100**.{bonus_bits}\n"
-        f"Harvested: **{WORLD.item_names(awarded)}**.{rare_line}\n"
+        f"Harvested: **{WORLD.item_names(awarded)}**.{rare_line}{makings_line}\n"
         f"🧺 Foraging: **{profession_rank(level)}** Lv.{level} "
         f"• XP {int(forage_progress.get('xp',0))}/{profession_xp_needed(level)}"
     )

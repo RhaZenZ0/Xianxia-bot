@@ -183,6 +183,13 @@ template per event category (plus a `default` for categories nobody wrote), each
 resolved against the world tier the event landed in, so one template stays correct from the Mortal
 World to the Celestial.
 
+`forage_materials` (v1.0.0-rc.21) is the sibling roster, and the reason the two are separate is that
+these are tier-flat: `talisman_paper`, `spirit_ink` and `array_disk_blank` serve a Mortal scribe and
+a Celestial one alike, so they carry a find chance and a `min_resources` floor rather than a per-world
+material. `forageResolveAction` rolls them beside the tiered herb. Before it existed, shops were their
+only source, so Alchemy and Forging could be gathered into and Inscription and Formation could only
+be bought into - `EveryCraftCanBeGatheredIntoTests` is what holds that shut.
+
 Go owns all of it. `SpawnWorldEventNodes` is called from every world-event spawn path - the
 player-triggered exploration event and the native autonomous simulation batch - so no event can reach
 a player empty; it is idempotent per event key. `world_event.engage` resolves one attempt against one

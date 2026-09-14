@@ -6,6 +6,40 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.0** (rc.21) closes the last line of the profession audit, the one filed under "worth deciding
+separately" and left through two releases. `array_disk_blank`, `spirit_ink` and `talisman_paper`
+were named by items, by twelve recipes, by shops and by merchants, and by no gathering path at all -
+no event-site node, no secret-realm treasure, no forage table. So a player could forage their way
+into an alchemist's career and had to buy their way into an inscriber's, and rc.20 sharpened it:
+Formation now asked forty-four stones for the entry slip before the first gram of material.
+
+**Foraging finds them.** `forage_materials` is the roster and it is content, the way `event_sites` is
+- `talisman_paper` at 22% above 35 regional spirit resources, `spirit_ink` at 18% above 45,
+`array_disk_blank` at 8% above 60, the gradient following what each thing actually is: bark and fibre
+is commoner than a prepared substrate. Richness and the forager's own level both improve the odds,
+under the same 65% cap the rare pool already used, so no single find becomes reliable and the
+profession gains a reason to be levelled by somebody who is not an alchemist. The roster is walked in
+sorted key order rather than by ranging the map, because a Go map range is randomised and an unsorted
+loop would spend the RNG differently every call and be unpinnable by a test.
+
+**Which also fixes Foraging.** It was a herb feeder wearing a general name: filed under `/craft →
+Alchemy → Forage`, described as "Gather medicinal herbs", reporting a "Medicinal Forage", and
+training a profession called Foraging that fed one craft out of four. The wording is honest now and
+the finds are named in their own line, because a forager who does not know that ink and paper come
+out of the hills has no reason to look. The command path and the `alchemy_forage` cooldown key are
+deliberately unchanged - renaming the door is a breaking surface change that buys nothing.
+
+**And two gates, because the block could so easily have shipped dead.**
+`EveryCraftCanBeGatheredIntoTests` asks of each craft whether it has one entry method every material
+of which has a source that is not a shop counter, and names the missing materials when it does not -
+dropping the roster makes it say, in as many words, that Formation can only be bought into.
+`ForageMaterialsAreReadTests` asserts the engine iterates the roster and reports what it finds; a
+roster in content that no action reads would be the `authenticity` and `tracking_strength` shape a
+fifth time. Both mutation-verified. Four Go tests cover the behaviour, including the one that had to
+zero the fixture's attributes to see a failed forage at all - a cultivator with 100 in everything
+never misses, and a test that can only pass by never running is the same fault in miniature. No
+schema change.
+
 **1.0.0** (rc.20) is the one finding rc.19 wrote down and deliberately left: the learning step.
 `/craft`'s own description promised a dish made "from a known recipe" and nothing in the game knew
 anything - every one of the thirty-one methods was workable by every cultivator from the minute they
@@ -26,9 +60,12 @@ want a master.
 composite key, and the same incarnation wipe, because what you learned is not what you are. A method
 reaches it by two roads. The first is a **jade slip**: thirty-one items, one per recipe, priced at
 twice the base price of the thing they teach, sold by the shop kind that already trades that
-profession's goods in that world, and *not consumed by reading* - a method passed down a sect is a
-thing this genre does, and burning the slip would make an inheritance impossible. `/learn` reads
-one, reports whether the hands are ready, and says so without refusing the lesson.
+profession's goods in that world, and **spent by the reading**: the jade holds one impression of a
+method and goes blank as it is taken, so a method reaches a second cultivator only by a second slip.
+That is what keeps a shop's stock worth buying and a rare method worth guarding. The one exception is
+the one that would make `/learn` a trap - reading a method you already carry teaches nothing and so
+costs nothing, and the slip stays in the bags for somebody who needs it. `/learn` reads one, reports
+whether the hands are ready, and says so without refusing the lesson.
 
 **The second road is the family you were born to.** A household that has a trade teaches it at the
 send-off, which is where the deadlock was: crafting is the only thing that raises a crafting

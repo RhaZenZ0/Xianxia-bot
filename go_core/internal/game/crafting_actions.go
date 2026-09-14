@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -758,6 +759,59 @@ func forageResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID i
 	if row := firstRowMap(pr); row != nil {
 		level = i64(row["level"])
 	}
+
+	// The makings of the other three crafts (v1.0.0-rc.21).
+	//
+	// `talisman_paper`, `spirit_ink` and `array_disk_blank` were named by
+	// items, recipes, shops and merchants and by no gathering path at all - no
+	// event-site node, no secret-realm treasure, no forage table - so Alchemy
+	// and Forging could be gathered into and Inscription and Formation could
+	// only be bought into. A forager brings them back now, which is also what
+	// stops Foraging being a herb feeder for one profession out of four.
+	//
+	// The roster is content (`forage_materials`), and the iteration is over
+	// sorted keys rather than the map itself: a Go map range is randomised, so
+	// an unsorted loop would spend the RNG in a different order every call and
+	// no seeded test could pin it.
+	materialsFound := map[string]int64{}
+	materialIDs := make([]string, 0, len(catalog.ForageMaterials))
+	for id := range catalog.ForageMaterials {
+		materialIDs = append(materialIDs, id)
+	}
+	sort.Strings(materialIDs)
+	for _, id := range materialIDs {
+		spec := catalog.ForageMaterials[id]
+		// The same guard the tiered herb uses: content naming an item the
+		// catalogue does not carry must not write an inventory row for a
+		// thing that does not exist.
+		if _, ok := catalog.Items[id]; !ok {
+			continue
+		}
+		if spec.Chance <= 0 || spec.Max <= 0 || resources < spec.MinResources {
+			continue
+		}
+		// Richness and a practised eye both help, and the cap is the one the
+		// rare pool already uses so no single find becomes reliable.
+		chance := minI64(65, spec.Chance+maxI64(0, resources-50)/3+level)
+		materialRoll, rollErr := gamerng.Intn(100)
+		if rollErr != nil {
+			return authoritativeMutation{}, rollErr
+		}
+		if int64(materialRoll) >= chance {
+			continue
+		}
+		found := int64(1)
+		if spec.Max > 1 {
+			extra, extraErr := gamerng.Intn(int(spec.Max))
+			if extraErr != nil {
+				return authoritativeMutation{}, extraErr
+			}
+			found = int64(extra) + 1
+		}
+		lootPlan[id] += found
+		materialsFound[id] = found
+	}
+
 	mod := cr.Attributes["insight"] + cr.Attributes["spirit"] + level + contextBonus + resourceBonus
 	roll, err := roll2d10(mod, tn)
 	if err != nil {
@@ -774,6 +828,11 @@ func forageResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID i
 		if err := addInventoryTx(conn, userID, loot); err != nil {
 			return authoritativeMutation{}, err
 		}
+	} else {
+		// Nothing is carried home from a failed forage, so nothing is
+		// reported as found. The plan is built before the roll because the
+		// roll needs no part of it, not because a miss still finds things.
+		materialsFound = map[string]int64{}
 	}
 
 	xp := int64(4)
@@ -807,6 +866,7 @@ func forageResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID i
 		"success":             success,
 		"loot":                loot,
 		"rare_found":          rareFound,
+		"materials_found":     materialsFound,
 		"spirit_resources":    resources,
 		"resource_bonus":      resourceBonus,
 		"world_name":          worldName,
@@ -836,10 +896,13 @@ func forageResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID i
 
 // --- the learning step ----------------------------------------------------
 //
-// Modelled on `manual.study` (manual_forbidden_actions.go): you must hold the
-// slip, and the first reading records it. The slip is *not* consumed, exactly
-// as a manual is not - a method passed around a sect is a thing this genre does,
-// and destroying the item would make a shared inheritance impossible.
+// You must hold the slip, and the first reading records the method and spends
+// the slip: a jade slip carries one impression of a method and is blank after
+// it is taken. So a method reaches a second cultivator only by a second slip,
+// which is what keeps a shop's stock worth buying and a rare method worth
+// guarding. Reading one whose method you already carry costs nothing and
+// spends nothing: it reports that you know it and leaves the slip in the bags,
+// because a slip burnt for nothing would be a trap rather than a rule.
 
 // knowsRecipeTx is whether this cultivator has been taught a method.
 func knowsRecipeTx(conn *storage.Conn, userID int64, recipe string) (bool, error) {
@@ -896,6 +959,16 @@ func recipeLearnAction(conn *storage.Conn, catalog worlddata.Catalog, userID int
 			[]any{userID, recipeName, gameMinute, "method_slip:" + itemID, nowSeconds()}); err != nil {
 			return authoritativeMutation{}, err
 		}
+		// One impression, one reading. The knowledge is written first and the
+		// slip spent second, both inside the one action transaction, so a
+		// failure between them cannot leave a cultivator charged and untaught.
+		missing, spendErr := consumeInventoryTx(conn, userID, map[string]int64{itemID: 1})
+		if spendErr != nil {
+			return authoritativeMutation{}, spendErr
+		}
+		if len(missing) > 0 {
+			return authoritativeMutation{}, fmt.Errorf("you are not carrying that slip")
+		}
 	}
 	// The level is reported rather than required: a method can be studied
 	// before the hands are ready for it, which is the ordinary way of things.
@@ -907,6 +980,7 @@ func recipeLearnAction(conn *storage.Conn, catalog worlddata.Catalog, userID int
 		"item_id": itemID, "recipe": recipeName, "profession": recipe.Profession,
 		"min_level": recipe.MinLevel, "level": level, "already_known": known,
 		"ready": level >= recipe.MinLevel, "game_minute": gameMinute,
+		"slip_consumed": !known,
 	}
 	return authoritativeMutation{Result: out, Event: eventledger.Event{
 		Domain: "crafting", EventType: "recipe.learn", EntityType: "character",
