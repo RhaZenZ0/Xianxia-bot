@@ -85,7 +85,7 @@ def weekend_announcement(window: dict[str, Any], stored: str) -> tuple[str, str 
         return state, (
             f"🎉 **The patron's gift is doubled{until}.**\n"
             f"Vote for the server with **/vote** and claim twice the usual — "
-            f"every twelve hours, all weekend."
+            f"every day, all weekend."
         )
     # A close is only worth saying to a server that was told it opened. Without
     # this, the first tick on a quiet Tuesday would announce the end of a

@@ -300,8 +300,9 @@ turns it off.
 
 `/vote` prints the server's page on whichever listing site the operator set (`VOTE_SITE_URL` /
 `VOTE_SITE_NAME` — Top.gg, DISBOARD, any of them), because a small server is found by ranking on
-that list and the list ranks on votes. Under the link is one button, once every twelve hours — the
-cadence every listing site resets a vote on.
+that list and the list ranks on votes. Under the link is one button, once every twenty-four hours —
+the cadence Discadia resets a vote on. A listing whose vote resets on a different clock wants
+`supportVoteCooldownSeconds` (`go_core/internal/game/support_actions.go`) moved to match it.
 
 The gift is the cultivator's own. Fifteen of the local world's low-grade currency, and five more for
 every realm climbed inside that world, so it runs fifteen to fifty and stays a few cheap wares at

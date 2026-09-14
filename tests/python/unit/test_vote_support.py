@@ -17,6 +17,7 @@ from __future__ import annotations
 import ast
 import importlib
 import os
+import re
 import unittest
 from unittest.mock import patch
 
@@ -56,6 +57,42 @@ class TheOperatorsListingURLIsValidated(unittest.TestCase):
         self.assertEqual(_vote_site_name(" DISBOARD "), "DISBOARD")
         self.assertEqual(_vote_site_name("Top\n.gg"), "Top .gg")
         self.assertEqual(len(_vote_site_name("x" * 90)), 40)
+
+
+class TheCadencePlayersAreToldIsTheOneTheEngineEnforces(unittest.TestCase):
+    """The wait is a Go constant; the promise is Python copy. They can drift.
+
+    The cadence is not a balance dial - it is whatever the listing site resets
+    a vote on (Discadia, a day). So it moves when the operator changes listing,
+    and when it moves the three places /vote states it in have to move with it.
+    Nothing but this test connects them, and a player told "every 24h" by a bot
+    that refuses them for 48 has been lied to by the software.
+    """
+
+    SUPPORT_GO = (PROJECT_ROOT / "go_core" / "internal" / "game" / "support_actions.go").read_text(encoding="utf-8")
+
+    def engine_cooldown_hours(self) -> int:
+        match = re.search(r"supportVoteCooldownSeconds int64 = (\d+) \* 60 \* 60", self.SUPPORT_GO)
+        self.assertIsNotNone(match, "supportVoteCooldownSeconds is no longer written as <hours> * 60 * 60")
+        return int(match.group(1))
+
+    def test_the_engine_meters_the_gift_at_discadias_cadence(self):
+        self.assertEqual(
+            self.engine_cooldown_hours(), 24,
+            "the vote cooldown no longer matches Discadia's 24h vote reset - if the "
+            "server has moved to another listing this is the right place to change it, "
+            "and docs/CONFIGURATION.md and README.md say the number out loud too",
+        )
+
+    def test_the_command_quotes_that_same_number_to_players(self):
+        hours = self.engine_cooldown_hours()
+        promised = set(re.findall(r"renews every \*\*(\d+)h\*\*|pays every \*\*(\d+)h\*\*", SUPPORT))
+        stated = {int(value) for pair in promised for value in pair if value}
+        self.assertTrue(stated, "/vote no longer tells a player how often the gift renews")
+        self.assertEqual(
+            stated, {hours},
+            f"/vote promises {sorted(stated)}h but the engine enforces {hours}h",
+        )
 
 
 class VoteIsARootAPlayerCanType(unittest.TestCase):

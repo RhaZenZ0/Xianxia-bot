@@ -343,8 +343,8 @@ func TestASupportVoteClaimIsPayableAgainOnceTheWaitHasPassed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Twelve hours later, to the second: the row is the whole gate, so ageing
-	// it is the same thing as waiting.
+	// A day later: the row is the whole gate, so ageing it is the same thing
+	// as waiting, whatever the cadence constant happens to be.
 	batch4Exec(t, path, `UPDATE cooldowns SET available_at=0 WHERE user_id=42 AND action='support_vote'`)
 
 	second, err := supportVoteClaim(t, path, "vote-2", "Top.gg")

@@ -76,7 +76,7 @@ DISBOARD, whichever you list on — and `VOTE_SITE_NAME` is what players see it
 called. Left empty it reads "the server listing", which is deliberate: a
 default that named one site would label your listing with somebody else's
 brand until you noticed. Set the URL and `/vote` appears as a working command: it prints the
-link, and once per twelve hours (the cadence every listing site uses) a player
+link, and once per twenty-four hours (Discadia's vote cadence) a player
 can claim a patron's gift — fifteen of the local world's low-grade currency
 plus five for every realm they have climbed inside that world, and a
 tier-material their craft or their path uses (a beast core, which is the same

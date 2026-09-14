@@ -3,7 +3,7 @@
 A vote on Top.gg (or DISBOARD, or whichever list the operator configured) is
 the one thing a player does for this world from outside it, and it is the
 cheapest way a small server is found at all: the listing ranks on votes, and
-every list worth the name resets the vote after twelve hours.
+Discadia, the listing this server votes on, resets the vote after a day.
 
 Nothing here verifies the vote. Verification would mean an inbound webhook,
 which means publishing an endpoint from a NAS that currently publishes nothing
@@ -84,7 +84,7 @@ class VoteClaimView(discord.ui.View):
     """One button under the link: the claim the player says they have earned.
 
     The button belongs to the cultivator who ran the command, and it is spent
-    once — the engine refuses a second claim inside twelve hours anyway, but a
+    once — the engine refuses a second claim inside the cooldown anyway, but a
     disabled button says so before the round trip does.
     """
 
@@ -161,7 +161,7 @@ async def vote(interaction: discord.Interaction) -> None:
     # making one would get them, rather than being turned away by
     # require_character before they have read the link.
     if await DB.get_character(interaction.user.id) is None:
-        lines.append("\nThe gift is for cultivators — **/begin** makes one, and then this pays every **12h**.")
+        lines.append("\nThe gift is for cultivators — **/begin** makes one, and then this pays every **24h**.")
         await interaction.response.send_message("\n".join(lines), ephemeral=False)
         return
     try:
@@ -180,7 +180,7 @@ async def vote(interaction: discord.Interaction) -> None:
             waiting += f" and **{quantity} × {_catalogue_name(WORLD.item_name, item_id, 'item')}**"
         lines.append(
             f"\nThen press the button: a patron's gift of {waiting} is waiting — the gift is sized "
-            f"to your realm, and it renews every **12h**."
+            f"to your realm, and it renews every **24h**."
         )
         view = VoteClaimView(owner_id=interaction.user.id, site=site)
         await interaction.response.send_message("\n".join(lines), view=view, ephemeral=False)

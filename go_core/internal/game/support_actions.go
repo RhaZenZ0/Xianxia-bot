@@ -28,8 +28,11 @@ import (
 // honest player is rewarded once per vote and a dishonest one is rewarded no
 // faster than an honest one.
 const (
-	// Top.gg, DISBOARD and every other list that matters use twelve hours.
-	supportVoteCooldownSeconds int64 = 12 * 60 * 60
+	// Discadia, which is the listing this server votes on, resets a vote after
+	// twenty-four hours. The number is the site's, not a game-balance dial:
+	// metering the gift at any other cadence would either thank an honest
+	// player twice for one vote or make them wait past the vote they cast.
+	supportVoteCooldownSeconds int64 = 24 * 60 * 60
 	// The gift is the cultivator's, not a flat number. A flat 15 was wrong at
 	// both ends: shop lines run 3-59 in the Mortal World's low-grade stone and
 	// 6-468 in the Celestial World's, so one number is a windfall to a beginner
