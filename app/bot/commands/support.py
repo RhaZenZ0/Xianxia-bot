@@ -1,11 +1,11 @@
 """`/tribute`: the world's own gift to a cultivator, once a cooldown.
 
-This began life as `/vote` - a thank-you for voting the server up a listing
-site - and spent a while shaped around one, first Top.gg's API and then
-Discadia's. Both are gone. Nothing outside this deployment is involved any
-more: no listing, no API, no inbound endpoint, and so nothing to verify and
-nothing taken on trust. A tribute is simply a claim a cultivator may make once
-every twelve hours, and the engine is the whole authority on it.
+This began life as `/vote`, a thank-you for voting the server up a listing
+site, and was shaped around one for a while. The server lists nowhere, so
+nothing outside this deployment is involved any more: no listing, no API, no
+inbound endpoint, and so nothing to verify and nothing taken on trust. A
+tribute is simply a claim a cultivator may make once every twelve hours, and
+the engine is the whole authority on it.
 
 The engine operations are still called `support.vote_*` and the cooldown key is
 still `support_vote`, deliberately. Those strings are written into
