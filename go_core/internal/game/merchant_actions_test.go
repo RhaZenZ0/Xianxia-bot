@@ -446,7 +446,11 @@ func TestAMerchantBidsOnALotItValuesAndIsRefundedWhenOutbid(t *testing.T) {
 	holderBudget := escrowScalar(t, path, `SELECT budget FROM merchant_state WHERE merchant=?`, holder)
 	batch4Exec(t, path, `UPDATE characters SET location='Golden Pavilion Auction House' WHERE user_id=42`)
 	batch4Exec(t, path, `INSERT INTO currency_wallets(user_id,currency_id,balance) VALUES(42,'low_spirit_stone',100)`)
-	raw, _ := json.Marshal(map[string]any{"auction_id": 9, "amount": current + 10})
+	// Outbid past what the merchant thinks the sword is worth, taken from the
+	// catalogue rather than written here: a literal would go stale the next
+	// time the item is repriced, which is exactly how it went stale before.
+	beyondValuation := maxI64(current+10, catalog.Items["spirit_iron_sword"].SectValue+5)
+	raw, _ := json.Marshal(map[string]any{"auction_id": 9, "amount": beyondValuation})
 	if _, err := ApplyWithWorld(path, world, ActionRequest{APIVersion: authoritativeAPIVersion, ActionID: "outbid-merchant", Operation: "auction.bid", ActorID: 42, Payload: raw}); err != nil {
 		t.Fatal(err)
 	}
@@ -456,8 +460,8 @@ func TestAMerchantBidsOnALotItValuesAndIsRefundedWhenOutbid(t *testing.T) {
 	if got := escrowScalar(t, path, `SELECT budget FROM merchant_state WHERE merchant=?`, holder); got != holderBudget+current {
 		t.Fatalf("holder budget=%d want %d refunded", got, holderBudget+current)
 	}
-	// A merchant never pays above its valuation: at 8 (the sword's value)
-	// the next minimum is 9, so no bid is placed.
+	// A merchant never pays above its valuation: the bid above already
+	// cleared it, so the next minimum is out of reach and no bid is placed.
 	withMerchantConn(t, path, func(conn *storage.Conn) {
 		placed, _ = MerchantsBid(conn, catalog, 2002)
 	})

@@ -37,6 +37,19 @@ class LocationContentTests(unittest.TestCase):
                 for text in encounters:
                     self.assertGreater(len(text.strip()), 20)
 
+    def test_every_travel_endpoint_has_ground_and_weather(self):
+        # `terrain` prices every road journey (the fallback branch is a flat
+        # 75 minutes for a jade terrace and a volcanic pass alike) and both it
+        # and `climate` now reach the narrator and the `/sense area` sweep.
+        # An interior has no weather, so only the places a road can end at
+        # are held to this.
+        for name, loc in WORLD["locations"].items():
+            if loc.get("district") or loc.get("shop") or loc.get("auction_house"):
+                continue
+            with self.subTest(location=name):
+                self.assertTrue(str(loc.get("terrain") or "").strip(), f"{name} has no terrain")
+                self.assertTrue(str(loc.get("climate") or "").strip(), f"{name} has no climate")
+
     def test_every_location_has_at_least_one_npc(self):
         # A location the narrator can be asked about needs someone to voice
         # it. The three samsara arrival grounds were the last without one.
@@ -100,6 +113,172 @@ class AuctionHouseContentTests(unittest.TestCase):
                     self.assertLessEqual(int(house["max_lot_minutes"]), 720, "a local lot is short")
                 else:
                     self.assertGreaterEqual(int(house["max_active_lots"]), 20)
+
+
+class WorldCrossingContentTests(unittest.TestCase):
+    """v1.0.0-rc.15: the gates between the worlds are payable and run both ways."""
+
+    def test_every_array_charges_the_world_it_departs_from(self):
+        # Three of the four crossings charged the DESTINATION world's tier-1
+        # currency, which no reward path grants and no exchange converts - so
+        # they could only be paid by someone who had already arrived. Dead
+        # content, wired end to end.
+        tier_one = {c["world"]: key for key, c in WORLD["currencies"].items() if int(c.get("tier") or 0) == 1}
+        for key, array in WORLD["teleport_arrays"].items():
+            with self.subTest(array=key):
+                origin = WORLD["locations"][array["from"]]
+                self.assertEqual(array["currency"], tier_one[origin["world"]], "an array must be payable where it stands")
+                self.assertGreater(int(array["cost"]), 0)
+                self.assertIn(array["to"], WORLD["locations"])
+
+    def test_no_array_is_a_one_way_trap(self):
+        pairs = {(a["from"], a["to"]) for a in WORLD["teleport_arrays"].values()}
+        for origin, destination in sorted(pairs):
+            with self.subTest(leg=f"{origin} -> {destination}"):
+                self.assertIn((destination, origin), pairs, "no way back")
+
+    def test_a_capital_is_a_city(self):
+        # death_qi.go applies a city's gathering penalty only where
+        # settlement_type is set, so a capital without one is quietly exempt.
+        for name, loc in WORLD["locations"].items():
+            if loc.get("realm_hub"):
+                with self.subTest(capital=name):
+                    self.assertEqual(loc.get("settlement_type"), "city")
+
+
+class PricedLikeSomethingTests(unittest.TestCase):
+    """v1.0.0-rc.15: every item is worth a decided number.
+
+    Five separate valuation sites fall back to `max(8, sect_value*8)` when an
+    item has no `base_price`, so an unpriced item is not merely undecided -
+    it is priced by an accident. 37 items had no price at all and a dozen
+    shared the exact placeholder 8, which made a Spirit-Iron Sword, a Recovery
+    Pill and a set of Formation Flags worth the same.
+    """
+
+    def test_every_item_has_a_price_of_its_own(self):
+        for key, item in WORLD["items"].items():
+            with self.subTest(item=key):
+                self.assertGreater(int(item.get("base_price") or 0), 0, f"{key} is priced by a fallback")
+                self.assertGreater(int(item.get("sect_value") or 0), 0)
+
+    def test_a_sword_is_not_a_pill(self):
+        items = WORLD["items"]
+        self.assertGreater(int(items["spirit_iron_sword"]["sect_value"]), int(items["recovery_pill"]["sect_value"]))
+
+    def test_the_auction_floors_are_not_one_floor_copied(self):
+        # 43 of the 48 were byte-identical, and the consignment tick reads the
+        # lot cap to decide whether the world's finders can list anything.
+        shapes = {
+            (h.get("size"), int(h["max_active_lots"]), int(h["max_lot_minutes"]))
+            for h in WORLD["auction_houses"].values()
+        }
+        self.assertGreaterEqual(len(shapes), 5, "every floor is the same floor")
+        for key, house in WORLD["auction_houses"].items():
+            with self.subTest(house=key):
+                if house.get("size") == "local":
+                    self.assertLess(int(house["max_active_lots"]), 10)
+                    self.assertLessEqual(int(house["max_lot_minutes"]), 720)
+
+
+class ProfessionsAreAllLiveTests(unittest.TestCase):
+    """Every declared profession makes something.
+
+    "Appraisal" sat in the list for releases with nothing granting it, and
+    "Inscription" sat beside it in exactly the same state - eight professions,
+    six of them real.
+    """
+
+    def test_every_crafting_profession_has_recipes(self):
+        professions = {str(r.get("profession")) for r in WORLD["recipes"].values()}
+        for craft in ("Alchemy", "Forging", "Formation", "Inscription"):
+            with self.subTest(profession=craft):
+                self.assertIn(craft, professions, f"{craft} is declared and makes nothing")
+
+    def test_the_talismans_belong_to_the_inscribers(self):
+        for key, recipe in WORLD["recipes"].items():
+            if "Talisman" in key:
+                with self.subTest(recipe=key):
+                    self.assertEqual(recipe.get("profession"), "Inscription")
+
+
+class BirthFamilySendoffTests(unittest.TestCase):
+    """v1.0.0-rc.15: a household that can afford to does not send a child out
+    to walk. Thirteen archetypes, thirteen heirlooms, no two the same."""
+
+    SENDOFF = WORLD["birth_family_sendoff"]
+
+    def _archetypes(self):
+        import re
+
+        source = (PROJECT_ROOT / "go_core" / "internal" / "game" / "birth_family_actions.go").read_text(encoding="utf-8")
+        found = set(re.findall(r'\{"([a-z_]+)", "(?:martial|ghost)",', source))
+        self.assertEqual(len(found), 13, "the archetype table changed shape")
+        return found
+
+    def test_every_household_sends_its_child_out_with_something(self):
+        self.assertEqual(set(self.SENDOFF), self._archetypes(), "an archetype with no send-off")
+
+    def test_no_two_households_give_the_same_thing(self):
+        items = [str(entry["item"]) for entry in self.SENDOFF.values()]
+        self.assertEqual(len(set(items)), len(items), "two households hand out the same object")
+
+    def test_every_heirloom_is_a_real_described_flying_artifact(self):
+        for archetype, entry in self.SENDOFF.items():
+            with self.subTest(archetype=archetype):
+                item = WORLD["items"].get(str(entry["item"]))
+                self.assertIsNotNone(item, f"{archetype} sends out an item that does not exist")
+                self.assertEqual(item.get("type"), "flight")
+                self.assertGreaterEqual(int(item.get("flight") or 0), 3, "an heirloom that does not fly")
+                self.assertTrue(str(item.get("flight_name") or "").strip())
+                self.assertGreater(len(str(item.get("description") or "").strip()), 40)
+                self.assertGreater(int(item.get("base_price") or 0), 0)
+                self.assertTrue(item.get("market_excluded"), "an heirloom is inherited, not stocked")
+                self.assertGreater(len(str(entry.get("line") or "").strip()), 20, "no words for the handover")
+
+    def test_the_rich_houses_send_the_better_artifact(self):
+        # The gift tracks the Wealth already written beside each household:
+        # flight 5 above 60, flight 3 below it. A flight-3 heirloom goes quiet
+        # once the owner's own realm reaches Core Formation; a flight-5 one
+        # keeps carrying them to Ascension.
+        from app.rules.birthfamily import FAMILY_ARCHETYPES
+
+        wealth_of = {str(a["id"]): int(a["wealth"]) for a in FAMILY_ARCHETYPES}
+        for archetype, entry in self.SENDOFF.items():
+            wealth = wealth_of[archetype]
+            flight = int(WORLD["items"][str(entry["item"])]["flight"])
+            with self.subTest(archetype=archetype, wealth=wealth):
+                self.assertEqual(flight, 5 if wealth >= 60 else 3)
+
+
+class TreasureContentTests(unittest.TestCase):
+    """v1.0.0-rc.15: a treasure the engine can read is a treasure somebody can
+    hold. Both halves had been missing for the spatial keys - they named
+    secret realms that do not exist, and nothing sold them."""
+
+    def test_every_spatial_key_names_a_real_secret_realm(self):
+        keys = {k: v for k, v in WORLD["items"].items() if v.get("spatial_key")}
+        self.assertGreaterEqual(len(keys), 3)
+        for key, item in keys.items():
+            with self.subTest(item=key):
+                rid = str(item["spatial_key"].get("secret_realm_id") or "")
+                self.assertIn(rid, WORLD["secret_realms"], f"{key} opens nothing")
+                self.assertGreater(int(item["spatial_key"].get("open_hours") or 0), 0)
+
+    def test_every_spatial_key_is_sold_in_the_world_its_realm_is_in(self):
+        for key, item in WORLD["items"].items():
+            if not item.get("spatial_key"):
+                continue
+            realm = WORLD["secret_realms"][str(item["spatial_key"]["secret_realm_id"])]
+            world = WORLD["locations"][realm["location"]]["world"]
+            shelves = [
+                shop for shop in WORLD["shops"].values()
+                if any(line["item_id"] == key for line in shop["sells"])
+            ]
+            with self.subTest(item=key):
+                self.assertTrue(shelves, f"{key} is sold nowhere")
+                self.assertTrue(any(shop["world"] == world for shop in shelves),
+                                f"{key} is only sold outside {world}")
 
 
 class NpcContentTests(unittest.TestCase):
@@ -166,7 +345,7 @@ class TravellingMerchantContentTests(unittest.TestCase):
                     item = items[ware["item_id"]]
                     self.assertFalse(item.get("market_excluded"), ware["item_id"])
                     self.assertFalse(item.get("auction_interest"), f"{ware['item_id']} is auction-grade, not shop stock")
-                    self.assertNotEqual(item.get("category"), "manual", ware["item_id"])
+                    self.assertNotEqual(item.get("type"), "manual", ware["item_id"])
                     self.assertGreater(int(ware["quantity"]), 0)
                     self.assertGreater(int(ware["price"]), 0)
 

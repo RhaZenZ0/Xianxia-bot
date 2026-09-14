@@ -13,7 +13,7 @@ import discord
 from discord import app_commands
 
 from ...ops.game_engine import GameEngineError
-from ...rules.sense import approximate_realm, hidden_npc_names
+from ...rules.sense import approximate_realm, ground_reading_line, hidden_npc_names
 from ...rules.worldtime import cultivation_cycle_summary
 from ..character_state import current_effect_modifiers
 from ..formatting import human_duration, roll_line
@@ -99,7 +99,11 @@ async def sense_command(
             f"Range: **{int(status.get('range_m', 0)):,} m**\n"
             f"Aura concealment: **{'Active' if status.get('concealment_active') else 'Off'}**\n"
             f"Current concealment strength: **{int(status.get('concealment_strength', 0))}**\n\n"
-            "Power penetrates concealment, Precision controls how much detail you can identify, and Range controls area scans.",
+            "Power penetrates concealment, Precision controls how much detail you can identify, and Range "
+            "decides how far you can reach — this place always, and the places a road leaves it for once "
+            "it is wide enough.\n"
+            + ("*Concealed: the three above are at three quarters of their full value.*"
+               if status.get("concealment_active") else ""),
             ephemeral=False,
         )
         return
@@ -126,6 +130,17 @@ async def sense_command(
         precision_tier = str(precision.get("tier", "failure"))
         detection_tier = str(sensed.get("detection_tier", "failure"))
         reveal = str(sensed.get("reveal", "none"))
+        if reveal == "out_of_range":
+            # No roll was made and nothing was learned - not even where they
+            # are - so this prints the reach and nothing else.
+            await respond(
+                interaction,
+                f"🔍 **Spiritual Sense**\n{sensed.get('reading')}\n"
+                f"Your sense reaches **{int(sensed.get('range_m', 0)):,} m** — this place, "
+                "and once it is wide enough, the places a road leaves it for.",
+                ephemeral=False,
+            )
+            return
         if reveal == "none":
             reading = (
                 "Their aura slips away from your probing sense; you cannot obtain a reliable cultivation reading."
@@ -152,10 +167,19 @@ async def sense_command(
                 f"Main cultivation: **{WORLD.realm_name(int(sensed.get('target_realm_index', 0)), tc.get('gender'))} — Stage {int(sensed.get('target_phase', 1))}**.\n"
                 f"Body cultivation: **{body_name} — Stage {tc.get('body_phase', 1)}**."
             )
-        await respond(interaction, 
+        # A probe the target can feel is said out loud, to them, the way a
+        # trade offer is: the engine already claimed they would feel it, and
+        # until now nothing anywhere told them. It is the only counter-play
+        # there is - knowing you were read, and by whom.
+        felt = (
+            f"\n\n⚡ {target.mention} — you feel a spiritual sense settle over you. "
+            f"**{c['name']}** is reading your cultivation."
+            if sensed.get("target_noticed") else ""
+        )
+        await respond(interaction,
             f"🔍 **Spiritual Sense — {tc['name']}**\n{roll_line(roll)}\n"
             f"Precision: **{int(precision.get('total', 0))}** vs detail TN **{int(precision.get('tn', 0))}** — **{precision_tier.replace('_', ' ').title()}**\n\n"
-            f"{reading}",
+            f"{reading}{felt}",
             ephemeral=False,
         )
         return
@@ -225,6 +249,12 @@ async def sense_command(
         f"**{precision_tier.replace('_', ' ').title()}**",
         f"Effective range: **{int(sensed.get('range_m', 0)):,} m**",
     ]
+    # What the ground is worth to sit in - the same number the cultivation
+    # session will actually use, read at whatever detail the sweep earned.
+    ground_line = ground_reading_line(sensed.get("ground"))
+    if ground_line:
+        lines.append(f"• {ground_line}")
+
     hints = list(sensed.get("hints") or [])
     if hints:
         lines.extend(f"• {hint}" for hint in hints)
@@ -270,7 +300,12 @@ async def conceal_command(interaction: discord.Interaction, active: bool) -> Non
     await interaction.followup.send(
         f"{'🌑' if active else '✨'} Aura concealment **{'enabled' if active else 'disabled'}**.\n"
         f"Current concealment strength: **{strength}**.\n"
-        "Concealment suppresses your readable aura; it does not make you physically invisible.",
+        "Concealment suppresses your readable aura; it does not make you physically invisible.\n"
+        + ("A folded aura does not reach: while concealed your own Spiritual Sense — power, "
+           "precision and range — runs at three quarters. A forbidden technique used openly is "
+           "witnessed every time; concealed, only sometimes."
+           if active else
+           "Your sense runs at full reach again, and your cultivation is readable to anyone who looks."),
         ephemeral=False,
     )
 

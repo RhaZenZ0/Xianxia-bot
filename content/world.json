@@ -2291,7 +2291,9 @@
       ],
       "world": "Mortal World",
       "min_realm_index": 0,
-      "safe_zone": false
+      "safe_zone": false,
+      "terrain": "mountain forest",
+      "climate": "cool-highland"
     },
     "Moonfen Marsh": {
       "description": "A dangerous wetland rich in medicinal plants, poisonous insects, ghost-lotus flowers and hidden alchemist camps.",
@@ -2308,7 +2310,9 @@
       ],
       "world": "Mortal World",
       "min_realm_index": 0,
-      "safe_zone": false
+      "safe_zone": false,
+      "terrain": "wetland marsh",
+      "climate": "cold-damp"
     },
     "Golden Pavilion Auction House": {
       "description": "A many-tiered auction pavilion protected by ancient formations and discreet hidden experts. Violence inside is forbidden; the protection ends at the front doors.",
@@ -2401,7 +2405,10 @@
         "East": [
           "Jadeflow Spirit City"
         ]
-      }
+      },
+      "terrain": "imperial jade terrace",
+      "settlement_type": "city",
+      "climate": "temperate"
     },
     "Nine-Heavens Immortal Court": {
       "description": "The central court of an Immortal World domain, suspended above immortal clouds and guarded by law formations.",
@@ -2432,7 +2439,10 @@
         "West": [
           "Ninefold Noble Immortal City"
         ]
-      }
+      },
+      "terrain": "highland cloud court",
+      "settlement_type": "city",
+      "climate": "cool-highland"
     },
     "Celestial Mandate Palace": {
       "description": "A palace-city at the heart of the Celestial World, where sovereign decrees can redirect the fate of entire star regions.",
@@ -2463,7 +2473,10 @@
         "East": [
           "Mandate Crown Celestial City"
         ]
-      }
+      },
+      "terrain": "imperial starlit plain",
+      "settlement_type": "city",
+      "climate": "cool-dry"
     },
     "Spirit Jade Rebirth Enclave": {
       "description": "A protected lower district in the Spiritual World where mortal-born descendants, reincarnated souls and weak juniors can survive beneath stabilizing formations.",
@@ -2479,7 +2492,9 @@
         "Two mortal-born juniors trade rumours about which ancestor is paying for their protection.",
         "A caravan from the capital delivers spirit rice and takes away a list of names.",
         "An old woman insists she has been reborn here twice and that the enclave is smaller each time."
-      ]
+      ],
+      "terrain": "sheltered jade valley",
+      "climate": "warm-humid"
     },
     "Nine-Heavens Rebirth Terrace": {
       "description": "A sheltered Immortal World terrace maintained for newborn clan members and reincarnated souls whose bodies have not yet rebuilt immortal cultivation.",
@@ -2495,7 +2510,9 @@
         "A crack in a cradle formation lets a breath of raw immortal qi through; a junior collapses, then laughs.",
         "A visiting elder inspects the reincarnated with the eyes of someone looking for one face in particular.",
         "A servant is caught copying names off the rebirth ledger and is escorted away without a word."
-      ]
+      ],
+      "terrain": "highland terrace",
+      "climate": "cool-windy"
     },
     "Celestial Cradle Province": {
       "description": "A rare Celestial World province protected by sovereign law formations, allowing reincarnated souls to begin again in mortal-strength bodies without being crushed by the realm itself.",
@@ -2511,7 +2528,9 @@
         "Provincial clerks re-register a family under a new name at the empress's written instruction.",
         "A mortal-strength body sits in meditation for the first time and the surrounding grass bends toward it.",
         "A sealed message from the Immortal World arrives addressed to a child born this morning."
-      ]
+      ],
+      "terrain": "warded plain",
+      "climate": "dry-temperate"
     },
     "Azure Cloud Mountain Gate": {
       "description": "A white-stone stairway climbs through cloud-wrapped pines to the public mountain gate of the Azure Cloud Sect. Sword marks left by generations of applicants cover the testing plaza.",
@@ -2530,7 +2549,9 @@
         "Sword intent clings to the testing plaza, layered by generations of applicants.",
         "The gate's protective formation runs the full height of the stair and stops exactly at the last step.",
         "Higher up the mountain, disciplined qi moves in ordered lines, out of reach of sense."
-      ]
+      ],
+      "terrain": "mountain stair",
+      "climate": "cool-windy"
     },
     "Crimson Furnace Valley": {
       "description": "Red cliffs surround a furnace valley veined with fire-aspected qi. Herb terraces, pill halls and bronze examination furnaces mark the Crimson Furnace Sect recruitment grounds.",
@@ -2549,7 +2570,9 @@
         "Fire-aspected qi rises from the valley floor in slow pulses, strongest near the bronze furnaces.",
         "The herb terraces carry a green, medicinal spiritual scent that masks weaker signatures.",
         "Heat-shimmer around the pill halls makes every life-sign there hard to count."
-      ]
+      ],
+      "terrain": "volcanic valley",
+      "climate": "hot"
     },
     "Frozen Moon Terrace": {
       "description": "A high terrace above a cold mirror-lake where frost formations glow beneath moonstone tiles. Frozen Moon Palace tests patience, control and formation sense here.",
@@ -2568,7 +2591,9 @@
         "Cold, still qi lies over the mirror-lake like a second surface; ripples in it are formations, not water.",
         "Moonstone tiles hold a faint stored light that answers to patience rather than pressure.",
         "Whatever watches from the palace above keeps its presence perfectly level."
-      ]
+      ],
+      "terrain": "frozen highland",
+      "climate": "cold"
     },
     "Black Serpent Ravine": {
       "description": "A humid ravine of black bamboo, beast pens and poison gardens. The Black Serpent Clan judges recruits by fieldcraft, nerve and their respect for dangerous creatures.",
@@ -2587,7 +2612,9 @@
         "Beast life-signs crowd the pens and the bamboo, some of them large and awake.",
         "Poison-aspected qi seeps from the gardens and dulls the edge of spiritual sense.",
         "The clan's own cultivators are hard to place; they keep their presence low the way their beasts do."
-      ]
+      ],
+      "terrain": "humid ravine",
+      "climate": "warm-humid"
     },
     "Blood River Gorge": {
       "description": "A hidden gorge where iron-red water cuts through dark stone. Blood River banners appear only to those who have been shown the correct trail or survived long enough to be noticed.",
@@ -2607,7 +2634,9 @@
         "The iron-red water carries a faint, hungry blood qi that tugs at the meridians.",
         "Hostile attention rests on the gorge from at least two vantage points on the cliffs.",
         "Something old has been fed here, and the stone remembers it."
-      ]
+      ],
+      "terrain": "river gorge",
+      "climate": "warm-humid"
     },
     "Corpse Lantern Necropolis": {
       "description": "A concealed funerary complex lit by blue soul-lanterns. Names of the dead are carved into black tablets while quiet archivists test whether visitors can face death without losing themselves.",
@@ -2627,7 +2656,9 @@
         "Soul-aspected qi hangs in the blue lantern-light, cold and patient.",
         "The black tablets each hold a faint residual presence, as if the names were listening.",
         "No living heat reads from the archivists; their signatures are thin and steady as lamp flames."
-      ]
+      ],
+      "terrain": "mist necropolis",
+      "climate": "cold-damp"
     },
     "Riverguard City": {
       "description": "A public temperate cultivation city shaped by temperate river martial district. Its family districts are part of the normal world: travelers can discover, visit, trade, and interact here. The city functions as a complete family starting region with local trade, cultivation resources, household politics, work, and recurring problems.",
@@ -8803,7 +8834,9 @@
       "sense_hints": [
         "The arrays in the cliff move qi in patterns too regular to be natural.",
         "Ordered, patient qi; the sect above is a place of long practice."
-      ]
+      ],
+      "terrain": "jade cliff",
+      "climate": "cool-dry"
     },
     "Thousand Beast Valley Mouth": {
       "description": "The mouth of a wide valley in the Spiritual World, closed by a fence of bone and a gate that a beast, not a man, opens. Cages, kennels and roosts climb the slopes beyond it.",
@@ -8819,7 +8852,9 @@
       "sense_hints": [
         "Beast qi in a hundred flavours crowds the valley beyond the gate.",
         "Something old and very large sleeps under the far ridge and the valley arranges itself around it."
-      ]
+      ],
+      "terrain": "forest valley",
+      "climate": "warm-humid"
     },
     "Heavenblade Sword Terrace": {
       "description": "A terrace of immortal gold cut into the mountain above the Immortal Court, where a single sword stands point-down in the stone and has for ten thousand years. Applicants are asked to draw it and are judged by how they fail.",
@@ -8835,7 +8870,9 @@
       "sense_hints": [
         "Sword intent cuts the air above the terrace in a line that has not moved in ten thousand years.",
         "The mountain above is disciplined qi in rows; a sword sect at practice."
-      ]
+      ],
+      "terrain": "mountain peak",
+      "climate": "cool-windy"
     },
     "Ashen Lotus Shrine Gate": {
       "description": "A shrine gate of grey stone in a burnt lotus field below the Immortal Court, where the ash never settles. The pavilion recruits openly here, which the Court tolerates because it cannot stop it.",
@@ -8851,7 +8888,9 @@
       "sense_hints": [
         "Soul qi rises off the ash field in slow spirals; something below it is patient.",
         "Cold fire and colder intent; the shrine is a door, not a wall."
-      ]
+      ],
+      "terrain": "dry ash field",
+      "climate": "dry-temperate"
     },
     "Mandate Academy Star Steps": {
       "description": "Nine hundred steps of starlight rise from the Palace grounds to the Academy's first hall. Each step asks a question; applicants who reach the top have answered them.",
@@ -8867,7 +8906,9 @@
       "sense_hints": [
         "Celestial law presses on the steps in graded weights; each landing is heavier.",
         "The Academy above is ordered qi arranged by argument rather than rank."
-      ]
+      ],
+      "terrain": "mountain stair",
+      "climate": "cool-highland"
     },
     "Void Serpent Pit": {
       "description": "A pit in the Celestial World whose bottom nobody has seen, ringed by serpent-carved stones. The cult recruits at the rim, and the Palace lets it, because the pit was here before the Palace.",
@@ -8883,7 +8924,9 @@
       "sense_hints": [
         "Serpent qi coils up out of the pit in slow waves; the rim is the only still ground.",
         "Something vast turns over far below and the whole rim breathes with it."
-      ]
+      ],
+      "terrain": "broken peak",
+      "climate": "cold"
     },
     "Adamant Body Forge": {
       "description": "Adamant Body's smithy: a stone-cold forge hall where Smith Guo Tie hammers spirit iron into blades and lamellar at the anvil, and sells the ore beside them. Tier 3 work - immortal-grade goods few can afford. The forge sits off Adamant Body Immortal City's main street and closes only when the coals do.",
@@ -12142,7 +12185,14 @@
         "Afternoon": "Golden Pavilion Auction House",
         "Evening": "Greenriver Town",
         "Night": "Greenriver Town"
-      }
+      },
+      "circuit": [
+        "Greenriver Town",
+        "Riverguard City",
+        "Azure Crown Imperial City",
+        "Jadewood Medicine City"
+      ],
+      "circuit_months": 2
     },
     "Old Lin the Janitor": {
       "role": "Quiet janitor who sweeps unused courtyards near an old sect outpost",
@@ -13321,7 +13371,7 @@
       "speech": "Low and even, the cadence of someone reading aloud; asks what year you think it is before anything else.",
       "want": "Every soul that arrives entered in the ledger under the name it will live by, and every stabilising tile whole before the pressure outside rises again.",
       "fear": "That the enclave is genuinely smaller each time the old woman says so, and that one day a tile cracks while she is on the road with the list of names.",
-      "secret": "She has read the enclave's oldest ledger, the one that records the Jade line's true heir dying in infancy, and keeps that page under a tile only she replaces; she has told no one, including the Sovereign.",
+      "secret": "She has read the enclave's oldest ledger, the one that records the Jade line's true heir dying in infancy, and keeps that page under a tile only she replaces; she has told no one, including the Sovereign. She is Soul Transformation Stage 2 and wears a warden's authority far above her cultivation; the enclave's ledgers are genuinely hers, and that is the part nobody doubts.",
       "location": "Spirit Jade Rebirth Enclave",
       "schedule": {
         "Dawn": "Spirit Jade Rebirth Enclave",
@@ -13329,6 +13379,20 @@
         "Afternoon": "Spirit Jade Capital",
         "Evening": "Spirit Jade Rebirth Enclave",
         "Night": "Spirit Jade Rebirth Enclave"
+      },
+      "hidden_master": {
+        "kind": "fake",
+        "true_name": "Wen Shuang",
+        "true_title": "None",
+        "true_realm_index": 9,
+        "true_stage": 2,
+        "concealment": 11,
+        "deception": 34,
+        "projected_realm_index": 15,
+        "projected_stage": 5,
+        "public_threat": "A warden nobody wishes to test",
+        "sense_false_reading": "A cold, immense pressure that sits oddly still around the ledgers",
+        "fraud_item": "Enclave Warden's Pressure Seal"
       }
     },
     "Terrace Matron Gu Yanli": {
@@ -13887,7 +13951,24 @@
         "Night": "Moonfen Mistwater Auction Pavilion"
       },
       "personality": "Quiet, patient, unsettling to strangers and unexpectedly kind to the frightened.",
-      "secret": "She keeps one dredged relic that was never listed, and speaks to it after the last lantern is out."
+      "secret": "She keeps one dredged relic that was never listed, and speaks to it after the last lantern is out. She is Zhou Suqin, the Mistwater Arbiter, a True Immortal who keeps the pavilion floor because every lie in the world eventually comes to auction.",
+      "hidden_master": {
+        "kind": "real",
+        "true_name": "Zhou Suqin",
+        "true_title": "Mistwater Arbiter",
+        "true_realm_index": 16,
+        "true_stage": 3,
+        "concealment": 60,
+        "deception": 14,
+        "public_threat": "The pavilion's quiet keeper",
+        "sense_false_reading": "A mortal woman counting lots, and nothing beneath it",
+        "mentor_tags": [
+          "Soul Cultivator",
+          "judgement",
+          "patience",
+          "worldly knowledge"
+        ]
+      }
     },
     "Pavilion Keeper Zhu Shaoyu": {
       "role": "Moonfrost Mistwater Auction Pavilion pavilion keeper",
@@ -14230,7 +14311,29 @@
         "Night": "Greenriver Town"
       },
       "personality": "Cheerful, nosy, unhurried and impossible to insult; remembers what every town needs.",
-      "secret": "Half his 'auction finds' are bought unsold at the Pavilion for the reserve; the stories are the markup."
+      "secret": "Half his 'auction finds' are bought unsold at the Pavilion for the reserve; the stories are the markup. He is Foundation Establishment Stage 1 and has let four towns believe he is a retired expert slumming it, because a senior's cart is not robbed and a senior's prices are not argued with.",
+      "circuit": [
+        "Greenriver Town",
+        "Riverguard City",
+        "Jadewood Medicine City",
+        "Azure Crown Imperial City"
+      ],
+      "circuit_months": 2,
+      "circuit_offset": 1,
+      "hidden_master": {
+        "kind": "fake",
+        "true_name": "Hu San",
+        "true_title": "None",
+        "true_realm_index": 2,
+        "true_stage": 1,
+        "concealment": 8,
+        "deception": 29,
+        "projected_realm_index": 6,
+        "projected_stage": 4,
+        "public_threat": "A peddler who used to be somebody, they say",
+        "sense_false_reading": "A settled, weighty aura that the mule plainly does not respect",
+        "fraud_item": "Cracked Aura-Weight Pendant"
+      }
     },
     "Madam Wen of the Silk Road": {
       "role": "caravan mistress and travelling merchant",
@@ -21638,7 +21741,7 @@
       "speech": "Talks over the shoulder while doing three other things.",
       "want": "Keep the yard full and the road between Adamant Body Immortal City and Heavenblade Immortal City open in both directions.",
       "fear": "A bandit season that closes the road and empties the yard.",
-      "secret": "Sells the merchants word of who passed and when.",
+      "secret": "Sells the merchants word of who passed and when. He is Fang Shan, the Halfmoon Sovereign, an Immortal Sovereign who keeps a waystation on the road he once closed with his own hands.",
       "schedule": {
         "Dawn": "Halfmoon Waystation",
         "Morning": "Halfmoon Waystation",
@@ -21646,7 +21749,24 @@
         "Evening": "Halfmoon Waystation",
         "Night": "Halfmoon Waystation"
       },
-      "shop": "halfmoon_waystation"
+      "shop": "halfmoon_waystation",
+      "hidden_master": {
+        "kind": "real",
+        "true_name": "Fang Shan",
+        "true_title": "Halfmoon Sovereign",
+        "true_realm_index": 23,
+        "true_stage": 5,
+        "concealment": 66,
+        "deception": 9,
+        "public_threat": "A waystation keeper, growing old",
+        "sense_false_reading": "Nothing - a still room, a lamp, an empty chair",
+        "mentor_tags": [
+          "Sword Cultivator",
+          "restraint",
+          "regret",
+          "dao insight"
+        ]
+      }
     },
     "Hunter Guo Jun": {
       "role": "wilderness hunter on the Adamant Body Immortal City-Solar Furnace Immortal City road",
@@ -21730,13 +21850,30 @@
       "speech": "Softly, with long pauses that are not for effect.",
       "want": "Keep the bell rung at noon until someone comes to take it over.",
       "fear": "Dying before the next keeper comes.",
-      "secret": "Was a sect deacon once, and left after a killing nobody has connected to the shrine.",
+      "secret": "Was a sect deacon once, and left after a killing nobody has connected to the shrine. He is Lu Kun, the Quiet Pine Sage, a Dao Comprehension cultivator who stepped down from the Spiritual World and has swept the same shrine for ninety years.",
       "schedule": {
         "Dawn": "Wayside Shrine of the Quiet Pine",
         "Morning": "Wayside Shrine of the Quiet Pine",
         "Afternoon": "Wayside Shrine of the Quiet Pine",
         "Evening": "Wayside Shrine of the Quiet Pine",
         "Night": "Wayside Shrine of the Quiet Pine"
+      },
+      "hidden_master": {
+        "kind": "real",
+        "true_name": "Lu Kun",
+        "true_title": "Quiet Pine Sage",
+        "true_realm_index": 13,
+        "true_stage": 4,
+        "concealment": 52,
+        "deception": 12,
+        "public_threat": "A shrine hermit, apparently unremarkable",
+        "sense_false_reading": "Nothing at all - the stillness of the pine, and of the man under it",
+        "mentor_tags": [
+          "Qi Refiner",
+          "stillness",
+          "dao insight",
+          "patience"
+        ]
       }
     },
     "Keeper Mo Rong": {
@@ -21804,7 +21941,7 @@
       "speech": "Talks over the shoulder while doing three other things.",
       "want": "Keep the yard full and the road between Celestial Mandate Palace and Celestial River City open in both directions.",
       "fear": "A bandit season that closes the road and empties the yard.",
-      "secret": "Sells the merchants word of who passed and when.",
+      "secret": "Sells the merchants word of who passed and when. He is Celestial Stage 1 and every inch of the rest is a Celestial-grade forgery he cannot afford to have examined twice.",
       "schedule": {
         "Dawn": "Broken Axle Waystation",
         "Morning": "Broken Axle Waystation",
@@ -21812,7 +21949,21 @@
         "Evening": "Broken Axle Waystation",
         "Night": "Broken Axle Waystation"
       },
-      "shop": "broken_axle_waystation"
+      "shop": "broken_axle_waystation",
+      "hidden_master": {
+        "kind": "fake",
+        "true_name": "Qin Jie",
+        "true_title": "None",
+        "true_realm_index": 24,
+        "true_stage": 1,
+        "concealment": 13,
+        "deception": 38,
+        "projected_realm_index": 28,
+        "projected_stage": 4,
+        "public_threat": "A Celestial Emperor keeping a waystation, or so the road says",
+        "sense_false_reading": "An overwhelming imperial pressure, a half-beat out of time with his breathing",
+        "fraud_item": "Counterfeit Emperor's Aura Array"
+      }
     },
     "Hunter Ruan Pan": {
       "role": "wilderness hunter on the Celestial Mandate Palace-Mandate Crown Celestial City road",
@@ -21859,13 +22010,30 @@
       "speech": "Softly, with long pauses that are not for effect.",
       "want": "Keep the bell rung at noon until someone comes to take it over.",
       "fear": "Dying before the next keeper comes.",
-      "secret": "Was a sect deacon once, and left after a killing nobody has connected to the shrine.",
+      "secret": "Was a sect deacon once, and left after a killing nobody has connected to the shrine. He is Tang Bao, the Kneeling Stone Saint, a Dao Saint who knelt once and has not explained to anyone, in eight thousand years, what for.",
       "schedule": {
         "Dawn": "Shrine of the Kneeling Stone",
         "Morning": "Shrine of the Kneeling Stone",
         "Afternoon": "Shrine of the Kneeling Stone",
         "Evening": "Shrine of the Kneeling Stone",
         "Night": "Shrine of the Kneeling Stone"
+      },
+      "hidden_master": {
+        "kind": "real",
+        "true_name": "Tang Bao",
+        "true_title": "Kneeling Stone Saint",
+        "true_realm_index": 30,
+        "true_stage": 3,
+        "concealment": 74,
+        "deception": 6,
+        "public_threat": "A beggar kneeling at a roadside stone",
+        "sense_false_reading": "Less than a mortal. The sense finds the stone, and not the man beside it",
+        "mentor_tags": [
+          "Perfect Realm",
+          "humility",
+          "penance",
+          "dao insight"
+        ]
       }
     },
     "Hunter Wei Hao": {
@@ -21931,13 +22099,30 @@
       "speech": "Softly, with long pauses that are not for effect.",
       "want": "Keep the bell rung at noon until someone comes to take it over.",
       "fear": "Dying before the next keeper comes.",
-      "secret": "Was a sect deacon once, and left after a killing nobody has connected to the shrine.",
+      "secret": "Was a sect deacon once, and left after a killing nobody has connected to the shrine. He is Zhou Shan, the Bellkeeper of the Long Road, a Star Immortal who rings the shrine bell for travellers and has not named himself in four hundred years.",
       "schedule": {
         "Dawn": "Shrine of the Traveller's Bell",
         "Morning": "Shrine of the Traveller's Bell",
         "Afternoon": "Shrine of the Traveller's Bell",
         "Evening": "Shrine of the Traveller's Bell",
         "Night": "Shrine of the Traveller's Bell"
+      },
+      "hidden_master": {
+        "kind": "real",
+        "true_name": "Zhou Shan",
+        "true_title": "Bellkeeper of the Long Road",
+        "true_realm_index": 19,
+        "true_stage": 6,
+        "concealment": 58,
+        "deception": 10,
+        "public_threat": "An old man who rings a bell",
+        "sense_false_reading": "The faint warmth of a mortal who has sat too long in one place",
+        "mentor_tags": [
+          "Formation Adept",
+          "endurance",
+          "roads",
+          "dao insight"
+        ]
       }
     },
     "Keeper Cao Jun": {
@@ -22634,23 +22819,353 @@
         "Evening": "Thousand Beast Valley Mouth",
         "Night": "Thousand Beast Valley Mouth"
       }
+    },
+    "The Barefoot Pilgrim": {
+      "role": "barefoot pilgrim walking the Spiritual World's shrine road, never staying a season",
+      "location": "Shrine of the River Mother",
+      "realm": "No detectable cultivation",
+      "stage": 1,
+      "personality": "Unhurried, courteous to everyone, entirely uninterested in being believed.",
+      "speech": "Short answers, and one question back that is harder than it sounds.",
+      "want": "Walk every shrine on the road once more before the road changes.",
+      "fear": "Being recognised, and having to stop walking.",
+      "secret": "She is Ruan Qingci, the Barefoot Transcendent, a Transcendence Realm cultivator who put down a sect of nine thousand and has not sat on a chair since.",
+      "schedule": {},
+      "circuit": [
+        "Shrine of the River Mother",
+        "Cold Spring Waystation",
+        "Shrine of the Hundred Cairns",
+        "Willow Ford Waystation",
+        "Shrine of the Traveller's Bell"
+      ],
+      "circuit_months": 2,
+      "hidden_master": {
+        "kind": "real",
+        "true_name": "Ruan Qingci",
+        "true_title": "Barefoot Transcendent",
+        "true_realm_index": 15,
+        "true_stage": 8,
+        "concealment": 57,
+        "deception": 11,
+        "public_threat": "A pilgrim with no shoes",
+        "sense_false_reading": "Road dust, tired feet, and nothing underneath either",
+        "mentor_tags": [
+          "Qi Refiner",
+          "detachment",
+          "roads",
+          "dao insight"
+        ]
+      }
+    },
+    "Elder Brother Pang": {
+      "role": "travelling seller of 'ancestral' cultivation manuals, working the spirit cities in turn",
+      "location": "Jadeflow Spirit City",
+      "realm": "Suppressed aura",
+      "stage": 1,
+      "personality": "Warm, generous with tea, and never in the same city when a buyer comes back.",
+      "speech": "Confidential murmurs, a great many titles, and prices that fall dramatically at the door.",
+      "want": "Sell the last of the Nirvana manuals before anyone reads one properly.",
+      "fear": "A customer who is genuinely Nirvana.",
+      "secret": "He is Nirvana Stage 1 and the aura is a rented array-plate; two of the nine manuals he sells are real, which is exactly why the other seven move.",
+      "schedule": {},
+      "circuit": [
+        "Jadeflow Spirit City",
+        "Galevein Spirit City",
+        "Moonfrost Spirit City",
+        "Stoneheart Spirit City",
+        "Northwind Spirit City"
+      ],
+      "circuit_months": 2,
+      "circuit_offset": 2,
+      "hidden_master": {
+        "kind": "fake",
+        "true_name": "Pang Er",
+        "true_title": "None",
+        "true_realm_index": 11,
+        "true_stage": 1,
+        "concealment": 12,
+        "deception": 36,
+        "projected_realm_index": 15,
+        "projected_stage": 2,
+        "public_threat": "A senior of some transcendent lineage, he implies",
+        "sense_false_reading": "A vast, patient pressure that flickers when he laughs",
+        "fraud_item": "Rented Ninefold Aura Plate"
+      }
+    },
+    "The Ferryman of the Yellow Gourd": {
+      "role": "ferryman who poles travellers across wherever the road meets water",
+      "location": "Yellow Gourd Waystation",
+      "realm": "No detectable cultivation",
+      "stage": 1,
+      "personality": "Talks about the weather and the water and nothing else, however hard you push.",
+      "speech": "Flat, friendly, and completely without curiosity about who you are.",
+      "want": "Carry everyone who asks, and refuse the ones who do not.",
+      "fear": "The one passenger he did not carry.",
+      "secret": "He is Dao Integration and has been ferrying the same four crossings for six hundred years; the sects that looked for him gave up four centuries ago.",
+      "schedule": {},
+      "circuit": [
+        "Yellow Gourd Waystation",
+        "Old Ferry Waystation",
+        "Willow Ford Waystation"
+      ],
+      "circuit_months": 3,
+      "hidden_master": {
+        "kind": "real",
+        "true_name": "Unnamed",
+        "true_title": "The Ferryman",
+        "true_realm_index": 14,
+        "true_stage": 5,
+        "concealment": 55,
+        "deception": 9,
+        "public_threat": "A ferryman",
+        "sense_false_reading": "Water, wet rope, and a mortal who has done this a long time",
+        "mentor_tags": [
+          "Soul Cultivator",
+          "patience",
+          "crossings",
+          "silence"
+        ]
+      }
+    },
+    "The Lamp-Carrier": {
+      "role": "old woman carrying an unlit lamp between the Immortal World's shrines",
+      "location": "Shrine of the Cold Lamp",
+      "realm": "No detectable cultivation",
+      "stage": 1,
+      "personality": "Kind, absent, and very hard to end a conversation with.",
+      "speech": "Wanders into long stories that turn out, afterwards, to have been about you.",
+      "want": "Find the shrine where the lamp is supposed to be lit.",
+      "fear": "Lighting it at the wrong one.",
+      "secret": "She is Meng Zhaoxi, the Cold Lamp Sovereign, a Void Immortal who burned a city and has been looking for the right place to answer for it since.",
+      "schedule": {},
+      "circuit": [
+        "Shrine of the Cold Lamp",
+        "Dust Road Waystation",
+        "Shrine of the Last Step",
+        "Iron Kettle Waystation",
+        "Shrine of the Lost Sandal",
+        "Crow's Rest Waystation"
+      ],
+      "circuit_months": 2,
+      "hidden_master": {
+        "kind": "real",
+        "true_name": "Meng Zhaoxi",
+        "true_title": "Cold Lamp Sovereign",
+        "true_realm_index": 21,
+        "true_stage": 4,
+        "concealment": 63,
+        "deception": 15,
+        "public_threat": "A confused old woman with a lamp",
+        "sense_false_reading": "Nothing, and a faint smell of smoke that is not coming from the lamp",
+        "mentor_tags": [
+          "Formation Adept",
+          "penance",
+          "memory",
+          "dao insight"
+        ]
+      }
+    },
+    "Master Yun of the Nine Seals": {
+      "role": "self-styled immortal appraiser who tours the immortal cities authenticating relics",
+      "location": "Skyroad Immortal City",
+      "realm": "Suppressed aura",
+      "stage": 1,
+      "personality": "Imperious, impatient, and genuinely knowledgeable about everything except his own realm.",
+      "speech": "Clipped verdicts, heavy sighs, and a fee named before the relic is unwrapped.",
+      "want": "Reach a city where nobody has heard the Nine Seals story yet.",
+      "fear": "An appraisal witnessed by someone who can actually read auras.",
+      "secret": "He is Earth Immortal Stage 2 wearing a Sky Immortal's borrowed seal-array; his appraisals are honest, which is the only reason the fraud has survived this long.",
+      "schedule": {},
+      "circuit": [
+        "Skyroad Immortal City",
+        "Immortal River City",
+        "Golden Spear Immortal City",
+        "Lunar Veil Immortal City",
+        "Adamant Body Immortal City"
+      ],
+      "circuit_months": 2,
+      "circuit_offset": 1,
+      "hidden_master": {
+        "kind": "fake",
+        "true_name": "Yun Feiyan",
+        "true_title": "None",
+        "true_realm_index": 17,
+        "true_stage": 2,
+        "concealment": 14,
+        "deception": 39,
+        "projected_realm_index": 21,
+        "projected_stage": 6,
+        "public_threat": "A Void Immortal appraiser, by his own account",
+        "sense_false_reading": "Nine layered pressures, each a fraction out of step with the next",
+        "fraud_item": "Borrowed Nine-Seal Array"
+      }
+    },
+    "The Sandal-Mender": {
+      "role": "mender of shoes who sets up at whichever waystation the road is busiest",
+      "location": "Shrine of the Lost Sandal",
+      "realm": "No detectable cultivation",
+      "stage": 1,
+      "personality": "Cheerful, fast, and charges mortals less than he charges cultivators.",
+      "speech": "Chatter while he works, and a flat refusal to discuss cultivation at all.",
+      "want": "Mend enough shoes that the road stops eating travellers.",
+      "fear": "Being thanked properly.",
+      "secret": "He is Chaos Immortal and mends shoes because the last thing he did at his full strength killed everyone he was trying to save.",
+      "schedule": {},
+      "circuit": [
+        "Shrine of the Lost Sandal",
+        "Halfmoon Waystation",
+        "Ashen Lotus Shrine Gate",
+        "Crow's Rest Waystation"
+      ],
+      "circuit_months": 3,
+      "circuit_offset": 1,
+      "hidden_master": {
+        "kind": "real",
+        "true_name": "Bo Shen",
+        "true_title": "The Sandal-Mender",
+        "true_realm_index": 22,
+        "true_stage": 1,
+        "concealment": 61,
+        "deception": 7,
+        "public_threat": "A cobbler at a shrine gate",
+        "sense_false_reading": "Leather, awl, and a man who has knelt too long",
+        "mentor_tags": [
+          "Body Refiner",
+          "humility",
+          "roads",
+          "atonement"
+        ]
+      }
+    },
+    "The Milestone Beggar": {
+      "role": "beggar who sits at a different milestone each season and asks for nothing",
+      "location": "Ninth Milestone Waystation",
+      "realm": "No detectable cultivation",
+      "stage": 1,
+      "personality": "Silent unless spoken to twice, and then unnervingly direct.",
+      "speech": "One sentence at a time, each of which takes a week to stop thinking about.",
+      "want": "Count the milestones to the end of the road.",
+      "fear": "Reaching it.",
+      "secret": "He is Xu Wangqing, the Ninth Milestone Ancestor, a Celestial Ancestor who has refused the last ascension nine times and counts the refusals in stones.",
+      "schedule": {},
+      "circuit": [
+        "Ninth Milestone Waystation",
+        "Shrine of the Mended Bowl",
+        "Two Bridges Waystation",
+        "Red Kite Waystation",
+        "Shrine of the Unnamed Sword"
+      ],
+      "circuit_months": 2,
+      "hidden_master": {
+        "kind": "real",
+        "true_name": "Xu Wangqing",
+        "true_title": "Ninth Milestone Ancestor",
+        "true_realm_index": 29,
+        "true_stage": 2,
+        "concealment": 71,
+        "deception": 13,
+        "public_threat": "A beggar at a milestone",
+        "sense_false_reading": "Absolutely nothing, in a way that becomes uncomfortable the longer you hold it",
+        "mentor_tags": [
+          "Perfect Realm",
+          "refusal",
+          "dao insight",
+          "endurance"
+        ]
+      }
+    },
+    "The Veiled Duchess": {
+      "role": "veiled noblewoman touring the celestial cities with a retinue of four",
+      "location": "Starroad Celestial City",
+      "realm": "Suppressed aura",
+      "stage": 1,
+      "personality": "Gracious, glacial, and never seen to eat, drink, or remove the veil.",
+      "speech": "Through an attendant, always, which is itself the trick.",
+      "want": "Be received in one more court before the letters catch up with her.",
+      "fear": "A Celestial Lord who knew the real Duchess.",
+      "secret": "She is Celestial Duke Stage 3 and the retinue are hired; the veil hides an ordinary face and a very good pressure-array sewn into the hem.",
+      "schedule": {},
+      "circuit": [
+        "Starroad Celestial City",
+        "Worldstone Celestial City",
+        "Mandate Spear City",
+        "Lunar Shadow Celestial City",
+        "Firmament Blade City",
+        "Solar Crucible Celestial City"
+      ],
+      "circuit_months": 2,
+      "circuit_offset": 3,
+      "hidden_master": {
+        "kind": "fake",
+        "true_name": "Shu Lianyi",
+        "true_title": "None",
+        "true_realm_index": 25,
+        "true_stage": 3,
+        "concealment": 16,
+        "deception": 41,
+        "projected_realm_index": 28,
+        "projected_stage": 7,
+        "public_threat": "A Celestial Emperor's kinswoman, the retinue says",
+        "sense_false_reading": "An immense, still authority that sits a handspan to the left of where she stands",
+        "fraud_item": "Hemmed Pressure-Array Veil"
+      }
+    },
+    "The Bowl-Mender": {
+      "role": "itinerant who mends broken bowls with gold and will not explain why",
+      "location": "Shrine of the Mended Bowl",
+      "realm": "No detectable cultivation",
+      "stage": 1,
+      "personality": "Absorbed in the work, indifferent to rank, and impossible to hurry.",
+      "speech": "Almost nothing, and then a question about what you broke.",
+      "want": "Mend one bowl that stays mended.",
+      "fear": "That none of them do.",
+      "secret": "She is Dao Saint, and every bowl she has mended in two thousand years is a piece of a single formation nobody has noticed is being assembled across the Celestial World.",
+      "schedule": {},
+      "circuit": [
+        "Shrine of the Mended Bowl",
+        "Broken Axle Waystation",
+        "Shrine of the Unnamed Sword",
+        "Ninth Milestone Waystation"
+      ],
+      "circuit_months": 3,
+      "circuit_offset": 2,
+      "hidden_master": {
+        "kind": "real",
+        "true_name": "Ji Wanluo",
+        "true_title": "Goldseam Saint",
+        "true_realm_index": 30,
+        "true_stage": 1,
+        "concealment": 73,
+        "deception": 18,
+        "public_threat": "A tinker with a pot of gold lacquer",
+        "sense_false_reading": "A mortal woman, and something in the bowls that does not read at all",
+        "mentor_tags": [
+          "Formation Adept",
+          "patience",
+          "repair",
+          "dao insight"
+        ]
+      }
     }
   },
   "items": {
     "spirit_herb": {
       "name": "Spirit Herb",
       "description": "A common medicinal herb used in basic alchemy.",
-      "sect_value": 2
+      "sect_value": 2,
+      "base_price": 5
     },
     "beast_core": {
       "name": "Low Beast Core",
       "description": "A crystallized knot of spiritual energy from a low-rank beast.",
-      "sect_value": 5
+      "sect_value": 5,
+      "base_price": 13
     },
     "spirit_iron": {
       "name": "Spirit Iron",
       "description": "Iron ore with a faint spiritual resonance, suitable for beginner forging.",
-      "sect_value": 3
+      "sect_value": 3,
+      "base_price": 8
     },
     "recovery_pill": {
       "name": "Recovery Pill",
@@ -22661,12 +23176,13 @@
           "vitality_restore": 8
         },
         "consume": true
-      }
+      },
+      "base_price": 18
     },
     "qi_pill": {
       "name": "Qi Nourishing Pill",
       "description": "A basic cultivation pill that can improve meditation gains.",
-      "sect_value": 8,
+      "sect_value": 9,
       "use": {
         "effect_key": "qi_nourishment",
         "name": "Qi Nourishment",
@@ -22686,49 +23202,56 @@
             "cultivation"
           ]
         }
-      }
+      },
+      "base_price": 18
     },
     "spirit_iron_sword": {
       "name": "Spirit-Iron Sword",
       "description": "A low-grade sword capable of carrying qi.",
-      "sect_value": 8
+      "sect_value": 16,
+      "base_price": 18
     },
     "bugslayer_sword": {
       "name": "Bugslayer Sword",
       "description": "A one-of-a-kind, indestructible reward blade granted for uncovering flaws hidden in the Heavenly Dao. Passive — Heavenly Flawfinder: a strong normal attack exposes a weakness, dealing bonus damage and disrupting the counter.",
       "sect_value": 40,
-      "market_excluded": true
+      "market_excluded": true,
+      "base_price": 80
     },
     "formation_flags": {
       "name": "Formation Flags",
       "description": "A reusable set of simple formation anchors.",
-      "sect_value": 8
+      "sect_value": 10,
+      "base_price": 19
     },
     "ice_spirit_blazing_grass": {
       "name": "Ice Spirit Blazing Grass",
       "description": "A rare fire-and-ice spiritual herb used in high-grade dual-element alchemy.",
-      "sect_value": 8,
+      "sect_value": 110,
       "auction_interest": "special",
       "door_event_chance": 30,
-      "hunter_realm_bonus": 0
+      "hunter_realm_bonus": 0,
+      "base_price": 900
     },
     "twin_extremes_fruit": {
       "name": "Twin Extremes Ice-Fire Fruit",
       "description": "A perfectly balanced red-white fruit holding opposing fire and ice essences.",
-      "sect_value": 8,
+      "sect_value": 130,
       "auction_interest": "special",
       "door_event_chance": 38,
-      "hunter_realm_bonus": 1
+      "hunter_realm_bonus": 1,
+      "base_price": 1050
     },
     "fire_spirit_root_herb": {
       "name": "Fire Spirit Root",
       "description": "A medicinal root rich in fire-affinity energy; prized by fire cultivators.",
-      "sect_value": 8
+      "sect_value": 12,
+      "base_price": 24
     },
     "heart_calming_pill": {
       "name": "Heart Calming Pill",
       "description": "Settles the mind, aids insight and suppresses heart-demon disturbances.",
-      "sect_value": 8,
+      "sect_value": 11,
       "use": {
         "effect_key": "heart_calm",
         "name": "Heart-Calming State",
@@ -22758,23 +23281,25 @@
             "mental"
           ]
         }
-      }
+      },
+      "base_price": 21
     },
     "qi_replenishment_pill": {
       "name": "Qi Replenishment Pill",
       "description": "Rapidly restores expended qi during dangerous adventures.",
-      "sect_value": 8,
+      "sect_value": 11,
       "use": {
         "instant": {
           "qi_restore": 12
         },
         "consume": true
-      }
+      },
+      "base_price": 21
     },
     "purging_phoenix_pill": {
       "name": "Purging Phoenix Pill",
       "description": "Incinerates poison with phoenix-like medicinal flame; dangerous without cooling medicine.",
-      "sect_value": 8,
+      "sect_value": 14,
       "use": {
         "effect_key": "phoenix_purge",
         "name": "Purging Phoenix Flame",
@@ -22801,63 +23326,71 @@
             "risky"
           ]
         }
-      }
+      },
+      "base_price": 26
     },
     "lesser_stygian_seal": {
       "name": "Lesser Stygian Seal",
       "description": "A soul relic that can influence weak restless dead nearby.",
-      "sect_value": 8,
+      "sect_value": 140,
       "auction_interest": "special",
       "door_event_chance": 42,
-      "hunter_realm_bonus": 1
+      "hunter_realm_bonus": 1,
+      "base_price": 1150
     },
     "cloud_stepping_boots": {
       "name": "Cloud-Stepping Boots",
       "description": "A movement relic allowing passive levitation and qi-powered flight.",
-      "sect_value": 8,
+      "sect_value": 150,
       "auction_interest": "special",
       "door_event_chance": 32,
-      "hunter_realm_bonus": 0
+      "hunter_realm_bonus": 0,
+      "base_price": 1250
     },
     "bone_comb": {
       "name": "The Bone Comb",
       "description": "A cursed beauty relic from the Eighteen Hells. Its gift always leaves a social and spiritual price.",
-      "sect_value": 8,
+      "sect_value": 120,
       "auction_interest": "special",
       "door_event_chance": 36,
-      "hunter_realm_bonus": 1
+      "hunter_realm_bonus": 1,
+      "base_price": 980
     },
     "cracked_nether_mirror": {
       "name": "Cracked Nether Mirror",
       "description": "A cursed divination mirror that can seek distant people while revealing the user in return.",
-      "sect_value": 8,
+      "sect_value": 135,
       "auction_interest": "special",
       "door_event_chance": 45,
-      "hunter_realm_bonus": 1
+      "hunter_realm_bonus": 1,
+      "base_price": 1100
     },
     "verdant_furnace_jade_slip": {
       "name": "Verdant Furnace Jade Slip",
       "description": "An inheritance slip containing fragments of the Verdant Immortal's alchemy path.",
-      "sect_value": 8,
+      "sect_value": 420,
       "auction_interest": "legendary",
       "door_event_chance": 62,
-      "hunter_realm_bonus": 2
+      "hunter_realm_bonus": 2,
+      "base_price": 3400
     },
     "nine_echo_sword_tablet": {
       "name": "Nine-Echo Sword Tablet",
       "description": "A sword inheritance tablet carrying nine layers of resonant sword intent.",
-      "sect_value": 8,
+      "sect_value": 480,
       "auction_interest": "legendary",
       "door_event_chance": 68,
-      "hunter_realm_bonus": 2
+      "hunter_realm_bonus": 2,
+      "base_price": 3900
     },
     "stygian_ghost_scripture": {
       "name": "Stygian Ghost Scripture",
       "description": "A dangerous soul inheritance for sensing, restraining and negotiating with the dead.",
-      "sect_value": 8,
+      "sect_value": 450,
       "auction_interest": "legendary",
       "door_event_chance": 70,
-      "hunter_realm_bonus": 2
+      "hunter_realm_bonus": 2,
+      "base_price": 3650
     },
     "spatial_pouch": {
       "name": "Common Spatial Pouch",
@@ -22868,7 +23401,8 @@
         "grade": "Mortal",
         "slot_capacity": 24,
         "living_space": false
-      }
+      },
+      "base_price": 72
     },
     "spatial_ring": {
       "name": "Earth-Grade Spatial Ring",
@@ -22879,7 +23413,8 @@
         "grade": "Earth",
         "slot_capacity": 80,
         "living_space": false
-      }
+      },
+      "base_price": 240
     },
     "living_world_ring": {
       "name": "Living World Ring",
@@ -22893,37 +23428,41 @@
       },
       "auction_interest": "legendary",
       "door_event_chance": 75,
-      "hunter_realm_bonus": 3
+      "hunter_realm_bonus": 3,
+      "base_price": 40000
     },
     "nine_echo_spatial_token": {
       "name": "Nine-Echo Spatial Token",
       "description": "A sword-marked spatial token that can force open the entrance to the Sword Grave of Nine Echoes for a short time.",
       "sect_value": 900,
       "spatial_key": {
-        "secret_realm_id": "sword_grave",
+        "secret_realm_id": "sword_grave_nine_echoes",
         "open_hours": 2,
         "consumed": true
-      }
+      },
+      "base_price": 544
     },
     "verdant_grotto_key": {
       "name": "Verdant Grotto Key",
       "description": "A jade key carrying the spatial coordinates of the Verdant Immortal Grotto.",
       "sect_value": 700,
       "spatial_key": {
-        "secret_realm_id": "verdant_grotto",
+        "secret_realm_id": "verdant_immortal_grotto",
         "open_hours": 2,
         "consumed": true
-      }
+      },
+      "base_price": 448
     },
     "stygian_tomb_token": {
       "name": "Stygian Lantern Token",
       "description": "A cold black token that resonates with the sealed Stygian Lantern Tomb.",
       "sect_value": 1200,
       "spatial_key": {
-        "secret_realm_id": "stygian_tomb",
+        "secret_realm_id": "stygian_lantern_tomb",
         "open_hours": 2,
         "consumed": true
-      }
+      },
+      "base_price": 672
     },
     "longevity_pill": {
       "name": "Longevity Pill",
@@ -22932,7 +23471,8 @@
       "use": {
         "lifespan_years": 10,
         "consume": true
-      }
+      },
+      "base_price": 469
     },
     "jade_life_herb": {
       "name": "Jade Life Herb",
@@ -22944,7 +23484,8 @@
       },
       "auction_interest": "special",
       "door_event_chance": 30,
-      "hunter_realm_bonus": 0
+      "hunter_realm_bonus": 0,
+      "base_price": 760
     },
     "hundred_year_peach": {
       "name": "Hundred-Year Longevity Peach",
@@ -22956,7 +23497,8 @@
       },
       "auction_interest": "legendary",
       "door_event_chance": 65,
-      "hunter_realm_bonus": 2
+      "hunter_realm_bonus": 2,
+      "base_price": 12000
     },
     "blood_sea_scripture_manual": {
       "name": "Blood Sea Scripture — Jade Manual",
@@ -23013,8 +23555,8 @@
       "name": "Netherworld Sacrificial Sutra",
       "type": "manual",
       "manual_id": "netherworld_sacrificial_sutra",
-      "sect_value": 120,
-      "base_price": 1200,
+      "sect_value": 400,
+      "base_price": 3200,
       "auction_interest": "legendary",
       "description": "A taboo sutra recording sacrificial exchanges of life, karma and power.",
       "legal_status": "forbidden",
@@ -23023,7 +23565,8 @@
     "spirit_iron_armor": {
       "name": "Spirit-Iron Lamellar",
       "description": "Layered spirit-iron plates etched with simple qi-dispersing channels.",
-      "sect_value": 10
+      "sect_value": 10,
+      "base_price": 26
     },
     "talisman_paper": {
       "name": "Spirit Talisman Paper",
@@ -23046,7 +23589,7 @@
     "swift_wind_talisman": {
       "name": "Swift-Wind Talisman",
       "description": "A movement talisman that lightens the body and sharpens footwork for a short time.",
-      "sect_value": 8,
+      "sect_value": 9,
       "base_price": 18,
       "use": {
         "effect_key": "swift_wind_talisman",
@@ -24631,22 +25174,26 @@
     "spirit_crystal_ore": {
       "name": "Spirit-Crystal Ore",
       "description": "Ore veined with spirit crystal; the smiths of the Spiritual World will not work anything less.",
-      "sect_value": 6
+      "sect_value": 6,
+      "base_price": 18
     },
     "moonveil_herb": {
       "name": "Moonveil Herb",
       "description": "A pale herb that opens only under moonlight and holds a night of qi in each leaf.",
-      "sect_value": 5
+      "sect_value": 5,
+      "base_price": 14
     },
     "spirit_crystal_sword": {
       "name": "Spirit-Crystal Sword",
       "description": "A blade of spirit crystal folded over iron; it carries qi the way a river carries light.",
-      "sect_value": 30
+      "sect_value": 30,
+      "base_price": 75
     },
     "spirit_crystal_mail": {
       "name": "Spirit-Crystal Mail",
       "description": "Interlocking crystal scales over silk; light, and it drinks a blow before the body feels it.",
-      "sect_value": 36
+      "sect_value": 36,
+      "base_price": 91
     },
     "moonveil_recovery_pill": {
       "name": "Moonveil Recovery Pill",
@@ -24657,7 +25204,8 @@
           "vitality_restore": 20
         },
         "consume": true
-      }
+      },
+      "base_price": 61
     },
     "spirit_condensation_pill": {
       "name": "Spirit Condensation Pill",
@@ -24682,7 +25230,8 @@
             "cultivation"
           ]
         }
-      }
+      },
+      "base_price": 70
     },
     "crystal_ward_talisman": {
       "name": "Crystal-Ward Talisman",
@@ -24718,22 +25267,26 @@
     "immortal_gold_ore": {
       "name": "Immortal-Gold Ore",
       "description": "Gold that does not tarnish and does not bend; forged, it holds an edge for a century.",
-      "sect_value": 12
+      "sect_value": 12,
+      "base_price": 43
     },
     "dawnlotus_herb": {
       "name": "Dawn Lotus",
       "description": "A lotus that blooms at first light and holds the sunrise in its petals.",
-      "sect_value": 10
+      "sect_value": 10,
+      "base_price": 37
     },
     "immortal_gold_sabre": {
       "name": "Immortal-Gold Sabre",
       "description": "A heavy sabre of immortal gold; its edge answers the wielder's qi with its own.",
-      "sect_value": 60
+      "sect_value": 60,
+      "base_price": 187
     },
     "immortal_gold_plate": {
       "name": "Immortal-Gold Plate",
       "description": "Plates of immortal gold over spirit-crystal mail; a wall that walks.",
-      "sect_value": 72
+      "sect_value": 72,
+      "base_price": 226
     },
     "dawnlotus_vitality_pill": {
       "name": "Dawn Lotus Vitality Pill",
@@ -24744,7 +25297,8 @@
           "vitality_restore": 45
         },
         "consume": true
-      }
+      },
+      "base_price": 150
     },
     "immortal_marrow_pill": {
       "name": "Immortal Marrow Pill",
@@ -24769,7 +25323,8 @@
             "cultivation"
           ]
         }
-      }
+      },
+      "base_price": 176
     },
     "golden_edge_talisman": {
       "name": "Golden-Edge Talisman",
@@ -24805,22 +25360,26 @@
     "starsteel_ore": {
       "name": "Starsteel Ore",
       "description": "Ore fallen from beyond the sky; cold to the touch, and it rings when the stars are out.",
-      "sect_value": 24
+      "sect_value": 24,
+      "base_price": 109
     },
     "heavenpetal_herb": {
       "name": "Heaven-Petal Bloom",
       "description": "A flower that grows only where the celestial mandate has touched the ground.",
-      "sect_value": 20
+      "sect_value": 20,
+      "base_price": 91
     },
     "starsteel_glaive": {
       "name": "Starsteel Glaive",
       "description": "A glaive of starsteel; it cuts the air a heartbeat before the arm moves.",
-      "sect_value": 120
+      "sect_value": 120,
+      "base_price": 469
     },
     "starsteel_aegis": {
       "name": "Starsteel Aegis",
       "description": "A starsteel cuirass worked with celestial script; the mandate itself turns the blow.",
-      "sect_value": 144
+      "sect_value": 144,
+      "base_price": 562
     },
     "heavenpetal_elixir": {
       "name": "Heaven-Petal Elixir",
@@ -24831,7 +25390,8 @@
           "vitality_restore": 90
         },
         "consume": true
-      }
+      },
+      "base_price": 374
     },
     "starlight_dao_pill": {
       "name": "Starlight Dao Pill",
@@ -24856,7 +25416,8 @@
             "cultivation"
           ]
         }
-      }
+      },
+      "base_price": 437
     },
     "starfall_talisman": {
       "name": "Starfall Talisman",
@@ -24952,42 +25513,231 @@
     "salt_king_iron_slip": {
       "name": "Salt King's Iron Slip",
       "description": "A slip of salt-blackened iron from the barrow; the Salt King's body arts, in a script nobody living taught.",
-      "sect_value": 12,
+      "sect_value": 380,
       "auction_interest": "legendary",
       "door_event_chance": 60,
-      "hunter_realm_bonus": 2
+      "hunter_realm_bonus": 2,
+      "base_price": 3100
     },
     "pagoda_sutra_slip": {
       "name": "Pagoda Sutra Slip",
       "description": "A shard of the pagoda wall with a line of the sutra on it; the rest is in the reader.",
-      "sect_value": 12,
+      "sect_value": 400,
       "auction_interest": "legendary",
       "door_event_chance": 60,
-      "hunter_realm_bonus": 2
+      "hunter_realm_bonus": 2,
+      "base_price": 3250
     },
     "stele_sword_fragment": {
       "name": "Stele Sword Fragment",
       "description": "A fragment of the stele with one stroke of the inscription; the stroke is a sword form.",
-      "sect_value": 12,
+      "sect_value": 440,
       "auction_interest": "legendary",
       "door_event_chance": 60,
-      "hunter_realm_bonus": 2
+      "hunter_realm_bonus": 2,
+      "base_price": 3550
     },
     "weeping_wall_disk": {
       "name": "Weeping Wall Array Disk",
       "description": "A disk cut from the sanctum wall; the great array's first ring is etched on it, and it is damp.",
-      "sect_value": 12,
+      "sect_value": 520,
       "auction_interest": "legendary",
       "door_event_chance": 60,
-      "hunter_realm_bonus": 2
+      "hunter_realm_bonus": 2,
+      "base_price": 4200
     },
     "hollow_throne_seal": {
       "name": "Hollow Throne Seal",
       "description": "A seal of no metal anyone can name, from the vault under the hollow throne; it is heavier than it looks and lighter than it should be.",
-      "sect_value": 12,
+      "sect_value": 640,
       "auction_interest": "legendary",
       "door_event_chance": 60,
-      "hunter_realm_bonus": 2
+      "hunter_realm_bonus": 2,
+      "base_price": 5200
+    },
+    "paper_crane_charm": {
+      "name": "Paper Crane Charm",
+      "description": "A folded crane that unfolds into a bird large enough for one rider. Cheap, slow, and it will not survive rain.",
+      "sect_value": 6,
+      "base_price": 90,
+      "type": "flight",
+      "flight": 3,
+      "flight_name": "a paper crane"
+    },
+    "wind_gourd": {
+      "name": "Riding Gourd",
+      "description": "A hollow gourd that swells to seat a cultivator and drifts on the wind. Undignified, and every peddler on the road has one.",
+      "sect_value": 9,
+      "base_price": 180,
+      "type": "flight",
+      "flight": 3,
+      "flight_name": "a riding gourd"
+    },
+    "azure_flying_sword": {
+      "name": "Azure Flying Sword",
+      "description": "A blue-steel sword long enough to stand on. The default of every sect disciple who can afford one: it carries you, and it is still a sword when you arrive.",
+      "sect_value": 24,
+      "base_price": 620,
+      "type": "flight",
+      "flight": 5,
+      "flight_name": "a flying sword"
+    },
+    "cloudskiff_boat": {
+      "name": "Cloudskiff Flying Boat",
+      "description": "A lacquered skiff that rides the cloud layer, built to carry a party and their cargo rather than one cultivator in a hurry.",
+      "sect_value": 40,
+      "base_price": 1500,
+      "type": "flight",
+      "flight": 5,
+      "flight_name": "a flying boat"
+    },
+    "crane_saddle_token": {
+      "name": "Crane-Summons Token",
+      "description": "A jade token that calls a bonded immortal crane. Faster than any sword, and it decides for itself whether it likes you.",
+      "sect_value": 66,
+      "base_price": 4200,
+      "type": "flight",
+      "flight": 7,
+      "flight_name": "a summoned crane"
+    },
+    "void_stride_talisman": {
+      "name": "Void-Stride Talisman",
+      "description": "A talisman that folds the road between two points you have already walked. One use, and the walk had to come first.",
+      "sect_value": 120,
+      "base_price": 9000,
+      "type": "flight",
+      "flight": 9,
+      "flight_name": "a folded step"
+    },
+    "cracked_ancestral_blade": {
+      "name": "Cracked Ancestral Blade",
+      "description": "The clan's flying sword, from before the clan fell. The crack runs a third of the way up the spine and the creditors would not take it. It still lifts a rider, slowly, and it still cuts.",
+      "sect_value": 10,
+      "base_price": 140,
+      "type": "flight",
+      "flight": 3,
+      "flight_name": "a cracked ancestral blade",
+      "market_excluded": true
+    },
+    "funeral_paper_crane": {
+      "name": "Funeral Paper Crane",
+      "description": "Folded from the heavy grey paper the tomb-watch burn for the dead, and inked with the ward that keeps an offering from being taken on the road. It carries the living just as well, which the family does not say aloud.",
+      "sect_value": 7,
+      "base_price": 110,
+      "type": "flight",
+      "flight": 3,
+      "flight_name": "a funeral paper crane",
+      "market_excluded": true
+    },
+    "cloudstep_sandals": {
+      "name": "Cloudstep Sandals",
+      "description": "Straw over hammered iron soles, each one weighted to the exact stride of the wearer. A body cultivator does not ride: they step off the mountain and the next step lands where they meant it to.",
+      "sect_value": 14,
+      "base_price": 130,
+      "type": "flight",
+      "flight": 3,
+      "flight_name": "a cloudstep stride",
+      "market_excluded": true
+    },
+    "garrison_signal_kite": {
+      "name": "Garrison Signal Kite",
+      "description": "A scout's kite off the frozen wall, oiled against the ice and cut wide enough to take a rider's weight in a headwind. The garrison's colours are still on the spar.",
+      "sect_value": 13,
+      "base_price": 125,
+      "type": "flight",
+      "flight": 3,
+      "flight_name": "a garrison signal kite",
+      "market_excluded": true
+    },
+    "riverreed_leaf": {
+      "name": "Riverreed Leaf",
+      "description": "One reed leaf off the Riverguard water, lacquered stiff and carrying a household charm at the stem. It rides low and quiet, the way the river district likes things.",
+      "sect_value": 7,
+      "base_price": 115,
+      "type": "flight",
+      "flight": 3,
+      "flight_name": "a riverreed leaf",
+      "market_excluded": true
+    },
+    "ironbanner_pennant": {
+      "name": "Ironbanner Pennant",
+      "description": "The company pennant, stiffened along the hoist so it will take a rider standing. A spear guard is taught to go where the banner goes; this is that instruction made literal.",
+      "sect_value": 13,
+      "base_price": 125,
+      "type": "flight",
+      "flight": 3,
+      "flight_name": "a company pennant",
+      "market_excluded": true
+    },
+    "hall_practice_sword": {
+      "name": "Hall Practice Sword",
+      "description": "The training blade every child of the hall learns the forms on, dull along the last hand's breadth so a beginner keeps their fingers. It flies badly and reliably, which is what a practice sword is for.",
+      "sect_value": 12,
+      "base_price": 160,
+      "type": "flight",
+      "flight": 3,
+      "flight_name": "a practice flying sword",
+      "market_excluded": true
+    },
+    "moonfen_shadow_fan": {
+      "name": "Moonfen Shadow Fan",
+      "description": "Ribs of black marsh-cane over silk dyed the colour of standing water. It rides the fog rather than the wind, and it is very hard to see against a grey sky, which was the point.",
+      "sect_value": 10,
+      "base_price": 145,
+      "type": "flight",
+      "flight": 3,
+      "flight_name": "a shadow fan",
+      "market_excluded": true
+    },
+    "forge_proof_sword": {
+      "name": "Forge-Proof Sword",
+      "description": "The blade an apprentice proves on the anvil before the family will call them a smith. Honest spirit iron, no ornament, and the maker's mark punched where their own master's would go.",
+      "sect_value": 12,
+      "base_price": 165,
+      "type": "flight",
+      "flight": 3,
+      "flight_name": "a proof blade",
+      "market_excluded": true
+    },
+    "nether_market_lantern": {
+      "name": "Nether-Market Lantern",
+      "description": "A paper lantern on a hooked pole, burning the cold blue the night markets trade under. It lifts its bearer as readily as it lights them, and buyers know from a long way off exactly whose house is coming.",
+      "sect_value": 11,
+      "base_price": 150,
+      "type": "flight",
+      "flight": 3,
+      "flight_name": "a night-market lantern",
+      "market_excluded": true
+    },
+    "escort_cargo_skiff": {
+      "name": "Escort Cargo Skiff",
+      "description": "A caravan flying boat cut down to one rider and a strapped load - the escort agency's own pattern, the one they put a child on the first time they send them down a road alone.",
+      "sect_value": 14,
+      "base_price": 190,
+      "type": "flight",
+      "flight": 3,
+      "flight_name": "a caravan skiff",
+      "market_excluded": true
+    },
+    "medicine_gathering_gourd": {
+      "name": "Medicine-Gathering Gourd",
+      "description": "A high-riding spirit gourd with the panniers still lashed to it, cut and cured by the family for reaching the cliff herbs nobody else can price. It goes where a ladder will not.",
+      "sect_value": 30,
+      "base_price": 700,
+      "type": "flight",
+      "flight": 5,
+      "flight_name": "a gathering gourd",
+      "market_excluded": true
+    },
+    "qin_ancestral_sword": {
+      "name": "Qin Ancestral Sword",
+      "description": "Azure steel with the clan seal inlaid at the ricasso, taken down off the ancestral rack and put into a young hand with the whole household watching. It is a real sword and a real mount, and everyone on the road will know which family it came from.",
+      "sect_value": 34,
+      "base_price": 820,
+      "type": "flight",
+      "flight": 5,
+      "flight_name": "the clan's azure sword",
+      "market_excluded": true
     }
   },
   "recipes": {
@@ -25070,7 +25820,7 @@
       }
     },
     "Swift-Wind Talisman": {
-      "profession": "Formation",
+      "profession": "Inscription",
       "tn": 12,
       "cost": {
         "talisman_paper": 1,
@@ -25081,7 +25831,7 @@
       }
     },
     "Stone-Skin Talisman": {
-      "profession": "Formation",
+      "profession": "Inscription",
       "tn": 13,
       "cost": {
         "talisman_paper": 1,
@@ -25093,7 +25843,7 @@
       }
     },
     "Spirit-Focus Talisman": {
-      "profession": "Formation",
+      "profession": "Inscription",
       "tn": 14,
       "cost": {
         "talisman_paper": 1,
@@ -25174,7 +25924,7 @@
       }
     },
     "Crystal-Ward Talisman": {
-      "profession": "Formation",
+      "profession": "Inscription",
       "tn": 17,
       "cost": {
         "talisman_paper": 2,
@@ -25231,7 +25981,7 @@
       }
     },
     "Golden-Edge Talisman": {
-      "profession": "Formation",
+      "profession": "Inscription",
       "tn": 21,
       "cost": {
         "talisman_paper": 2,
@@ -25288,7 +26038,7 @@
       }
     },
     "Starfall Talisman": {
-      "profession": "Formation",
+      "profession": "Inscription",
       "tn": 25,
       "cost": {
         "talisman_paper": 2,
@@ -28242,7 +28992,7 @@
       "entrance_location": "Jadeflow Spirit City",
       "size": "local",
       "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_lot_minutes": 390,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_spirit_crystal",
@@ -28254,7 +29004,7 @@
       "location": "Immortal River Riverside Auction Hall",
       "entrance_location": "Immortal River City",
       "size": "local",
-      "max_active_lots": 6,
+      "max_active_lots": 7,
       "max_lot_minutes": 360,
       "protected_interior": true,
       "door_rule": true,
@@ -28267,8 +29017,8 @@
       "location": "Celestial River Riverside Auction Hall",
       "entrance_location": "Celestial River City",
       "size": "local",
-      "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_active_lots": 8,
+      "max_lot_minutes": 330,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_celestial_crystal",
@@ -28280,8 +29030,8 @@
       "location": "Four-Roads Caravan Crossroads Auction Yard",
       "entrance_location": "Four-Roads Caravan City",
       "size": "local",
-      "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_active_lots": 4,
+      "max_lot_minutes": 480,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_spirit_stone",
@@ -28293,8 +29043,8 @@
       "location": "Galevein Crossroads Auction Yard",
       "entrance_location": "Galevein Spirit City",
       "size": "local",
-      "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_active_lots": 5,
+      "max_lot_minutes": 450,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_spirit_crystal",
@@ -28307,7 +29057,7 @@
       "entrance_location": "Skyroad Immortal City",
       "size": "local",
       "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_lot_minutes": 420,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_immortal_stone",
@@ -28319,8 +29069,8 @@
       "location": "Starroad Crossroads Auction Yard",
       "entrance_location": "Starroad Celestial City",
       "size": "local",
-      "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_active_lots": 7,
+      "max_lot_minutes": 390,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_celestial_crystal",
@@ -28332,8 +29082,8 @@
       "location": "Emberforge Furnace Auction Gallery",
       "entrance_location": "Emberforge City",
       "size": "local",
-      "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_active_lots": 4,
+      "max_lot_minutes": 480,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_spirit_stone",
@@ -28345,8 +29095,8 @@
       "location": "Vermilion Furnace Furnace Auction Gallery",
       "entrance_location": "Vermilion Furnace City",
       "size": "local",
-      "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_active_lots": 5,
+      "max_lot_minutes": 450,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_spirit_crystal",
@@ -28359,7 +29109,7 @@
       "entrance_location": "Solar Furnace Immortal City",
       "size": "local",
       "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_lot_minutes": 420,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_immortal_stone",
@@ -28371,8 +29121,8 @@
       "location": "Solar Crucible Furnace Auction Gallery",
       "entrance_location": "Solar Crucible Celestial City",
       "size": "local",
-      "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_active_lots": 7,
+      "max_lot_minutes": 390,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_celestial_crystal",
@@ -28384,8 +29134,8 @@
       "location": "Stoneback Mountain Highland Auction Lodge",
       "entrance_location": "Stoneback Mountain City",
       "size": "local",
-      "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_active_lots": 4,
+      "max_lot_minutes": 480,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_spirit_stone",
@@ -28397,8 +29147,8 @@
       "location": "Stoneheart Highland Auction Lodge",
       "entrance_location": "Stoneheart Spirit City",
       "size": "local",
-      "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_active_lots": 5,
+      "max_lot_minutes": 450,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_spirit_crystal",
@@ -28411,7 +29161,7 @@
       "entrance_location": "Adamant Body Immortal City",
       "size": "local",
       "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_lot_minutes": 420,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_immortal_stone",
@@ -28423,8 +29173,8 @@
       "location": "Worldstone Highland Auction Lodge",
       "entrance_location": "Worldstone Celestial City",
       "size": "local",
-      "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_active_lots": 7,
+      "max_lot_minutes": 390,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_celestial_crystal",
@@ -28436,8 +29186,8 @@
       "location": "Cloudblade Sword Peak Auction Terrace",
       "entrance_location": "Cloudblade City",
       "size": "local",
-      "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_active_lots": 4,
+      "max_lot_minutes": 480,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_spirit_stone",
@@ -28449,8 +29199,8 @@
       "location": "Cloudedge Sword Peak Auction Terrace",
       "entrance_location": "Cloudedge Spirit City",
       "size": "local",
-      "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_active_lots": 5,
+      "max_lot_minutes": 450,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_spirit_crystal",
@@ -28463,7 +29213,7 @@
       "entrance_location": "Heavenblade Immortal City",
       "size": "local",
       "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_lot_minutes": 420,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_immortal_stone",
@@ -28475,8 +29225,8 @@
       "location": "Firmament Blade Sword Peak Auction Terrace",
       "entrance_location": "Firmament Blade City",
       "size": "local",
-      "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_active_lots": 7,
+      "max_lot_minutes": 390,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_celestial_crystal",
@@ -28488,8 +29238,8 @@
       "location": "Ironbanner Bannered Auction Ground",
       "entrance_location": "Ironbanner City",
       "size": "local",
-      "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_active_lots": 4,
+      "max_lot_minutes": 480,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_spirit_stone",
@@ -28501,8 +29251,8 @@
       "location": "Spearwall Bannered Auction Ground",
       "entrance_location": "Spearwall Spirit City",
       "size": "local",
-      "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_active_lots": 5,
+      "max_lot_minutes": 450,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_spirit_crystal",
@@ -28515,7 +29265,7 @@
       "entrance_location": "Golden Spear Immortal City",
       "size": "local",
       "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_lot_minutes": 420,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_immortal_stone",
@@ -28527,8 +29277,8 @@
       "location": "Mandate Spear Bannered Auction Ground",
       "entrance_location": "Mandate Spear City",
       "size": "local",
-      "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_active_lots": 7,
+      "max_lot_minutes": 390,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_celestial_crystal",
@@ -28540,8 +29290,8 @@
       "location": "Moonfen Mistwater Auction Pavilion",
       "entrance_location": "Moonfen City",
       "size": "local",
-      "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_active_lots": 4,
+      "max_lot_minutes": 480,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_spirit_stone",
@@ -28553,8 +29303,8 @@
       "location": "Moonfrost Mistwater Auction Pavilion",
       "entrance_location": "Moonfrost Spirit City",
       "size": "local",
-      "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_active_lots": 5,
+      "max_lot_minutes": 450,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_spirit_crystal",
@@ -28567,7 +29317,7 @@
       "entrance_location": "Lunar Veil Immortal City",
       "size": "local",
       "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_lot_minutes": 420,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_immortal_stone",
@@ -28579,8 +29329,8 @@
       "location": "Lunar Shadow Mistwater Auction Pavilion",
       "entrance_location": "Lunar Shadow Celestial City",
       "size": "local",
-      "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_active_lots": 7,
+      "max_lot_minutes": 390,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_celestial_crystal",
@@ -28592,8 +29342,8 @@
       "location": "Frostwatch Frontier Auction Hall",
       "entrance_location": "Frostwatch City",
       "size": "local",
-      "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_active_lots": 4,
+      "max_lot_minutes": 480,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_spirit_stone",
@@ -28605,8 +29355,8 @@
       "location": "Northwind Frontier Auction Hall",
       "entrance_location": "Northwind Spirit City",
       "size": "local",
-      "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_active_lots": 5,
+      "max_lot_minutes": 450,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_spirit_crystal",
@@ -28619,7 +29369,7 @@
       "entrance_location": "Polar Gate Immortal City",
       "size": "local",
       "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_lot_minutes": 420,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_immortal_stone",
@@ -28631,8 +29381,8 @@
       "location": "Froststar Frontier Auction Hall",
       "entrance_location": "Froststar Border City",
       "size": "local",
-      "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_active_lots": 7,
+      "max_lot_minutes": 390,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_celestial_crystal",
@@ -28644,8 +29394,8 @@
       "location": "Ashenwall Relic Auction Court",
       "entrance_location": "Ashenwall City",
       "size": "local",
-      "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_active_lots": 4,
+      "max_lot_minutes": 480,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_spirit_stone",
@@ -28657,8 +29407,8 @@
       "location": "Broken Halo Relic Auction Court",
       "entrance_location": "Broken Halo Spirit City",
       "size": "local",
-      "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_active_lots": 5,
+      "max_lot_minutes": 450,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_spirit_crystal",
@@ -28671,7 +29421,7 @@
       "entrance_location": "Fallen Star Immortal City",
       "size": "local",
       "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_lot_minutes": 420,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_immortal_stone",
@@ -28683,8 +29433,8 @@
       "location": "Ruined Constellation Relic Auction Court",
       "entrance_location": "Ruined Constellation City",
       "size": "local",
-      "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_active_lots": 7,
+      "max_lot_minutes": 390,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_celestial_crystal",
@@ -28696,8 +29446,8 @@
       "location": "Jadewood Medicine Garden Auction Hall",
       "entrance_location": "Jadewood Medicine City",
       "size": "local",
-      "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_active_lots": 4,
+      "max_lot_minutes": 480,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_spirit_stone",
@@ -28709,8 +29459,8 @@
       "location": "Hundred Herb Garden Auction Hall",
       "entrance_location": "Hundred Herb Spirit City",
       "size": "local",
-      "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_active_lots": 5,
+      "max_lot_minutes": 450,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_spirit_crystal",
@@ -28723,7 +29473,7 @@
       "entrance_location": "Jade Cauldron Immortal City",
       "size": "local",
       "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_lot_minutes": 420,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_immortal_stone",
@@ -28735,8 +29485,8 @@
       "location": "Divine Herb Garden Auction Hall",
       "entrance_location": "Divine Herb Celestial City",
       "size": "local",
-      "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_active_lots": 7,
+      "max_lot_minutes": 390,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_celestial_crystal",
@@ -28749,7 +29499,7 @@
       "entrance_location": "Jade Crown Spirit City",
       "size": "local",
       "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_lot_minutes": 390,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_spirit_crystal",
@@ -28761,7 +29511,7 @@
       "location": "Ninefold Noble Noble Auction Court",
       "entrance_location": "Ninefold Noble Immortal City",
       "size": "local",
-      "max_active_lots": 6,
+      "max_active_lots": 7,
       "max_lot_minutes": 360,
       "protected_interior": true,
       "door_rule": true,
@@ -28774,8 +29524,8 @@
       "location": "Mandate Crown Noble Auction Court",
       "entrance_location": "Mandate Crown Celestial City",
       "size": "local",
-      "max_active_lots": 6,
-      "max_lot_minutes": 360,
+      "max_active_lots": 8,
+      "max_lot_minutes": 330,
       "protected_interior": true,
       "door_rule": true,
       "default_currency": "low_celestial_crystal",
@@ -29104,24 +29854,56 @@
       "name": "Ascendant Jade Gate",
       "from": "Azure Crown Imperial City",
       "to": "Spirit Jade Capital",
-      "currency": "low_spirit_crystal",
-      "cost": 1,
+      "currency": "low_spirit_stone",
+      "cost": 200,
       "min_realm_index": 8
     },
     "spirit_immortal": {
       "name": "Immortal Cloud Crossing",
       "from": "Spirit Jade Capital",
       "to": "Nine-Heavens Immortal Court",
-      "currency": "low_immortal_stone",
-      "cost": 1,
+      "currency": "low_spirit_crystal",
+      "cost": 200,
       "min_realm_index": 16
     },
     "immortal_celestial": {
       "name": "Celestial Mandate Gate",
       "from": "Nine-Heavens Immortal Court",
       "to": "Celestial Mandate Palace",
+      "currency": "low_immortal_stone",
+      "cost": 200,
+      "min_realm_index": 24
+    },
+    "imperial_greenriver": {
+      "name": "Greenriver–Imperial Transit Array (Return)",
+      "from": "Azure Crown Imperial City",
+      "to": "Greenriver Town",
+      "currency": "low_spirit_stone",
+      "cost": 10,
+      "min_realm_index": 1
+    },
+    "spirit_imperial": {
+      "name": "Ascendant Jade Gate (Return)",
+      "from": "Spirit Jade Capital",
+      "to": "Azure Crown Imperial City",
+      "currency": "low_spirit_crystal",
+      "cost": 200,
+      "min_realm_index": 8
+    },
+    "immortal_spirit": {
+      "name": "Immortal Cloud Crossing (Return)",
+      "from": "Nine-Heavens Immortal Court",
+      "to": "Spirit Jade Capital",
+      "currency": "low_immortal_stone",
+      "cost": 200,
+      "min_realm_index": 16
+    },
+    "celestial_immortal": {
+      "name": "Celestial Mandate Gate (Return)",
+      "from": "Celestial Mandate Palace",
+      "to": "Nine-Heavens Immortal Court",
       "currency": "low_celestial_crystal",
-      "cost": 1,
+      "cost": 200,
       "min_realm_index": 24
     }
   },
@@ -52090,6 +52872,12 @@
           "quantity": 1,
           "price": 141,
           "made_here": true
+        },
+        {
+          "item_id": "azure_flying_sword",
+          "quantity": 1,
+          "price": 350,
+          "made_here": false
         }
       ],
       "buys": {
@@ -52100,7 +52888,8 @@
         "spirit_crystal_ore": 4,
         "immortal_gold_ore": 9,
         "spirit_crystal_sword": 22,
-        "immortal_gold_sabre": 45
+        "immortal_gold_sabre": 45,
+        "azure_flying_sword": 122
       }
     },
     "adamant_body_array_workshop": {
@@ -52190,12 +52979,33 @@
           "quantity": 1,
           "price": 26,
           "made_here": true
+        },
+        {
+          "item_id": "verdant_grotto_key",
+          "quantity": 1,
+          "price": 280,
+          "made_here": false
+        },
+        {
+          "item_id": "nine_echo_spatial_token",
+          "quantity": 1,
+          "price": 340,
+          "made_here": false
+        },
+        {
+          "item_id": "stygian_tomb_token",
+          "quantity": 1,
+          "price": 420,
+          "made_here": false
         }
       ],
       "buys": {
         "array_disk_blank": 3,
         "formation_flags": 4,
-        "minor_warding_array_disk": 10
+        "minor_warding_array_disk": 10,
+        "verdant_grotto_key": 98,
+        "nine_echo_spatial_token": 118,
+        "stygian_tomb_token": 147
       }
     },
     "ashenwall_provisions": {
@@ -52283,6 +53093,12 @@
           "quantity": 1,
           "price": 59,
           "made_here": true
+        },
+        {
+          "item_id": "azure_flying_sword",
+          "quantity": 1,
+          "price": 260,
+          "made_here": false
         }
       ],
       "buys": {
@@ -52291,7 +53107,8 @@
         "spirit_iron_sword": 5,
         "spirit_iron_armor": 6,
         "spirit_crystal_ore": 3,
-        "spirit_crystal_sword": 18
+        "spirit_crystal_sword": 18,
+        "azure_flying_sword": 91
       }
     },
     "azure_crown_apothecary": {
@@ -52411,6 +53228,12 @@
           "quantity": 2,
           "price": 39,
           "made_here": true
+        },
+        {
+          "item_id": "paper_crane_charm",
+          "quantity": 2,
+          "price": 72,
+          "made_here": false
         }
       ],
       "buys": {
@@ -52418,7 +53241,8 @@
         "spirit_ink": 1,
         "swift_wind_talisman": 5,
         "stone_skin_talisman": 5,
-        "crystal_ward_talisman": 15
+        "crystal_ward_talisman": 15,
+        "paper_crane_charm": 25
       }
     },
     "azure_crown_provisions": {
@@ -52468,6 +53292,12 @@
           "quantity": 2,
           "price": 45,
           "made_here": false
+        },
+        {
+          "item_id": "wind_gourd",
+          "quantity": 1,
+          "price": 130,
+          "made_here": false
         }
       ],
       "buys": {
@@ -52475,7 +53305,8 @@
         "spirit_iron": 1,
         "beast_core": 3,
         "talisman_paper": 1,
-        "moonveil_herb": 3
+        "moonveil_herb": 3,
+        "wind_gourd": 45
       }
     },
     "broken_halo_array_workshop": {
@@ -52576,6 +53407,12 @@
           "quantity": 2,
           "price": 44,
           "made_here": false
+        },
+        {
+          "item_id": "wind_gourd",
+          "quantity": 1,
+          "price": 130,
+          "made_here": false
         }
       ],
       "buys": {
@@ -52583,7 +53420,8 @@
         "spirit_iron": 1,
         "beast_core": 3,
         "talisman_paper": 1,
-        "moonveil_herb": 3
+        "moonveil_herb": 3,
+        "wind_gourd": 45
       }
     },
     "celestial_mandate_forge": {
@@ -52675,6 +53513,12 @@
           "quantity": 1,
           "price": 468,
           "made_here": true
+        },
+        {
+          "item_id": "azure_flying_sword",
+          "quantity": 1,
+          "price": 540,
+          "made_here": false
         }
       ],
       "buys": {
@@ -52687,7 +53531,8 @@
         "starsteel_ore": 30,
         "spirit_crystal_sword": 37,
         "immortal_gold_sabre": 75,
-        "starsteel_glaive": 150
+        "starsteel_glaive": 150,
+        "azure_flying_sword": 189
       }
     },
     "celestial_mandate_apothecary": {
@@ -52869,6 +53714,18 @@
           "quantity": 2,
           "price": 312,
           "made_here": true
+        },
+        {
+          "item_id": "paper_crane_charm",
+          "quantity": 1,
+          "price": 150,
+          "made_here": false
+        },
+        {
+          "item_id": "void_stride_talisman",
+          "quantity": 1,
+          "price": 2200,
+          "made_here": false
         }
       ],
       "buys": {
@@ -52878,7 +53735,9 @@
         "stone_skin_talisman": 11,
         "crystal_ward_talisman": 30,
         "golden_edge_talisman": 60,
-        "starfall_talisman": 120
+        "starfall_talisman": 120,
+        "paper_crane_charm": 52,
+        "void_stride_talisman": 770
       }
     },
     "celestial_mandate_provisions": {
@@ -52958,6 +53817,12 @@
           "quantity": 1,
           "price": 360,
           "made_here": false
+        },
+        {
+          "item_id": "wind_gourd",
+          "quantity": 1,
+          "price": 270,
+          "made_here": false
         }
       ],
       "buys": {
@@ -52967,7 +53832,8 @@
         "talisman_paper": 2,
         "moonveil_herb": 6,
         "dawnlotus_herb": 12,
-        "heavenpetal_herb": 25
+        "heavenpetal_herb": 25,
+        "wind_gourd": 94
       }
     },
     "celestial_river_beast_hall": {
@@ -53023,6 +53889,12 @@
           "quantity": 2,
           "price": 72,
           "made_here": false
+        },
+        {
+          "item_id": "crane_saddle_token",
+          "quantity": 1,
+          "price": 1150,
+          "made_here": false
         }
       ],
       "buys": {
@@ -53031,7 +53903,8 @@
         "fire_spirit_root_herb": 8,
         "spirit_crystal_ore": 6,
         "immortal_gold_ore": 12,
-        "starsteel_ore": 24
+        "starsteel_ore": 24,
+        "crane_saddle_token": 402
       }
     },
     "celestial_river_apothecary": {
@@ -53220,13 +54093,20 @@
           "quantity": 3,
           "price": 12,
           "made_here": true
+        },
+        {
+          "item_id": "paper_crane_charm",
+          "quantity": 2,
+          "price": 60,
+          "made_here": false
         }
       ],
       "buys": {
         "talisman_paper": 1,
         "spirit_ink": 1,
         "swift_wind_talisman": 4,
-        "stone_skin_talisman": 4
+        "stone_skin_talisman": 4,
+        "paper_crane_charm": 21
       }
     },
     "cloudedge_forge": {
@@ -53276,6 +54156,12 @@
           "quantity": 1,
           "price": 57,
           "made_here": true
+        },
+        {
+          "item_id": "azure_flying_sword",
+          "quantity": 1,
+          "price": 260,
+          "made_here": false
         }
       ],
       "buys": {
@@ -53284,7 +54170,8 @@
         "spirit_iron_sword": 4,
         "spirit_iron_armor": 6,
         "spirit_crystal_ore": 3,
-        "spirit_crystal_sword": 18
+        "spirit_crystal_sword": 18,
+        "azure_flying_sword": 91
       }
     },
     "cloudedge_talisman_hall": {
@@ -53334,6 +54221,12 @@
           "quantity": 2,
           "price": 38,
           "made_here": true
+        },
+        {
+          "item_id": "paper_crane_charm",
+          "quantity": 2,
+          "price": 72,
+          "made_here": false
         }
       ],
       "buys": {
@@ -53341,7 +54234,8 @@
         "spirit_ink": 1,
         "swift_wind_talisman": 4,
         "stone_skin_talisman": 5,
-        "crystal_ward_talisman": 14
+        "crystal_ward_talisman": 14,
+        "paper_crane_charm": 25
       }
     },
     "divine_herb_apothecary": {
@@ -53523,6 +54417,18 @@
           "quantity": 2,
           "price": 250,
           "made_here": true
+        },
+        {
+          "item_id": "paper_crane_charm",
+          "quantity": 2,
+          "price": 120,
+          "made_here": false
+        },
+        {
+          "item_id": "void_stride_talisman",
+          "quantity": 1,
+          "price": 1800,
+          "made_here": false
         }
       ],
       "buys": {
@@ -53532,7 +54438,9 @@
         "stone_skin_talisman": 9,
         "crystal_ward_talisman": 24,
         "golden_edge_talisman": 48,
-        "starfall_talisman": 96
+        "starfall_talisman": 96,
+        "paper_crane_charm": 42,
+        "void_stride_talisman": 630
       }
     },
     "emberforge_smithy": {
@@ -53727,6 +54635,12 @@
           "quantity": 2,
           "price": 108,
           "made_here": false
+        },
+        {
+          "item_id": "wind_gourd",
+          "quantity": 1,
+          "price": 175,
+          "made_here": false
         }
       ],
       "buys": {
@@ -53735,7 +54649,8 @@
         "beast_core": 3,
         "talisman_paper": 1,
         "moonveil_herb": 3,
-        "dawnlotus_herb": 7
+        "dawnlotus_herb": 7,
+        "wind_gourd": 61
       }
     },
     "firmament_blade_forge": {
@@ -53827,6 +54742,12 @@
           "quantity": 1,
           "price": 375,
           "made_here": true
+        },
+        {
+          "item_id": "azure_flying_sword",
+          "quantity": 1,
+          "price": 440,
+          "made_here": false
         }
       ],
       "buys": {
@@ -53839,7 +54760,8 @@
         "starsteel_ore": 24,
         "spirit_crystal_sword": 30,
         "immortal_gold_sabre": 60,
-        "starsteel_glaive": 120
+        "starsteel_glaive": 120,
+        "azure_flying_sword": 154
       }
     },
     "firmament_blade_talisman_hall": {
@@ -53901,6 +54823,18 @@
           "quantity": 2,
           "price": 250,
           "made_here": true
+        },
+        {
+          "item_id": "paper_crane_charm",
+          "quantity": 2,
+          "price": 120,
+          "made_here": false
+        },
+        {
+          "item_id": "void_stride_talisman",
+          "quantity": 1,
+          "price": 1800,
+          "made_here": false
         }
       ],
       "buys": {
@@ -53910,7 +54844,9 @@
         "stone_skin_talisman": 9,
         "crystal_ward_talisman": 24,
         "golden_edge_talisman": 48,
-        "starfall_talisman": 96
+        "starfall_talisman": 96,
+        "paper_crane_charm": 42,
+        "void_stride_talisman": 630
       }
     },
     "four_roads_provisions": {
@@ -54058,6 +54994,12 @@
           "quantity": 1,
           "price": 288,
           "made_here": false
+        },
+        {
+          "item_id": "wind_gourd",
+          "quantity": 1,
+          "price": 220,
+          "made_here": false
         }
       ],
       "buys": {
@@ -54067,7 +55009,8 @@
         "talisman_paper": 2,
         "moonveil_herb": 5,
         "dawnlotus_herb": 10,
-        "heavenpetal_herb": 20
+        "heavenpetal_herb": 20,
+        "wind_gourd": 77
       }
     },
     "froststar_talisman_hall": {
@@ -54129,6 +55072,18 @@
           "quantity": 2,
           "price": 250,
           "made_here": true
+        },
+        {
+          "item_id": "paper_crane_charm",
+          "quantity": 2,
+          "price": 120,
+          "made_here": false
+        },
+        {
+          "item_id": "void_stride_talisman",
+          "quantity": 1,
+          "price": 1800,
+          "made_here": false
         }
       ],
       "buys": {
@@ -54138,7 +55093,9 @@
         "stone_skin_talisman": 9,
         "crystal_ward_talisman": 24,
         "golden_edge_talisman": 48,
-        "starfall_talisman": 96
+        "starfall_talisman": 96,
+        "paper_crane_charm": 42,
+        "void_stride_talisman": 630
       }
     },
     "frostwatch_provisions": {
@@ -54214,13 +55171,20 @@
           "quantity": 3,
           "price": 12,
           "made_here": true
+        },
+        {
+          "item_id": "paper_crane_charm",
+          "quantity": 2,
+          "price": 60,
+          "made_here": false
         }
       ],
       "buys": {
         "talisman_paper": 1,
         "spirit_ink": 1,
         "swift_wind_talisman": 4,
-        "stone_skin_talisman": 4
+        "stone_skin_talisman": 4,
+        "paper_crane_charm": 21
       }
     },
     "galevein_provisions": {
@@ -54270,6 +55234,12 @@
           "quantity": 2,
           "price": 44,
           "made_here": false
+        },
+        {
+          "item_id": "wind_gourd",
+          "quantity": 1,
+          "price": 130,
+          "made_here": false
         }
       ],
       "buys": {
@@ -54277,7 +55247,8 @@
         "spirit_iron": 1,
         "beast_core": 3,
         "talisman_paper": 1,
-        "moonveil_herb": 3
+        "moonveil_herb": 3,
+        "wind_gourd": 45
       }
     },
     "galevein_beast_hall": {
@@ -54401,6 +55372,12 @@
           "quantity": 1,
           "price": 141,
           "made_here": true
+        },
+        {
+          "item_id": "azure_flying_sword",
+          "quantity": 1,
+          "price": 350,
+          "made_here": false
         }
       ],
       "buys": {
@@ -54411,7 +55388,8 @@
         "spirit_crystal_ore": 4,
         "immortal_gold_ore": 9,
         "spirit_crystal_sword": 22,
-        "immortal_gold_sabre": 45
+        "immortal_gold_sabre": 45,
+        "azure_flying_sword": 122
       }
     },
     "golden_spear_provisions": {
@@ -54479,6 +55457,12 @@
           "quantity": 2,
           "price": 108,
           "made_here": false
+        },
+        {
+          "item_id": "wind_gourd",
+          "quantity": 1,
+          "price": 175,
+          "made_here": false
         }
       ],
       "buys": {
@@ -54487,7 +55471,8 @@
         "beast_core": 3,
         "talisman_paper": 1,
         "moonveil_herb": 3,
-        "dawnlotus_herb": 7
+        "dawnlotus_herb": 7,
+        "wind_gourd": 61
       }
     },
     "greenriver_apothecary": {
@@ -54637,6 +55622,12 @@
           "quantity": 1,
           "price": 141,
           "made_here": true
+        },
+        {
+          "item_id": "azure_flying_sword",
+          "quantity": 1,
+          "price": 350,
+          "made_here": false
         }
       ],
       "buys": {
@@ -54647,7 +55638,8 @@
         "spirit_crystal_ore": 4,
         "immortal_gold_ore": 9,
         "spirit_crystal_sword": 22,
-        "immortal_gold_sabre": 45
+        "immortal_gold_sabre": 45,
+        "azure_flying_sword": 122
       }
     },
     "heavenblade_talisman_hall": {
@@ -54703,6 +55695,12 @@
           "quantity": 2,
           "price": 94,
           "made_here": true
+        },
+        {
+          "item_id": "paper_crane_charm",
+          "quantity": 2,
+          "price": 96,
+          "made_here": false
         }
       ],
       "buys": {
@@ -54711,7 +55709,8 @@
         "swift_wind_talisman": 6,
         "stone_skin_talisman": 6,
         "crystal_ward_talisman": 18,
-        "golden_edge_talisman": 36
+        "golden_edge_talisman": 36,
+        "paper_crane_charm": 33
       }
     },
     "hundred_herb_apothecary": {
@@ -54831,6 +55830,12 @@
           "quantity": 2,
           "price": 38,
           "made_here": true
+        },
+        {
+          "item_id": "paper_crane_charm",
+          "quantity": 2,
+          "price": 72,
+          "made_here": false
         }
       ],
       "buys": {
@@ -54838,7 +55843,8 @@
         "spirit_ink": 1,
         "swift_wind_talisman": 4,
         "stone_skin_talisman": 5,
-        "crystal_ward_talisman": 14
+        "crystal_ward_talisman": 14,
+        "paper_crane_charm": 25
       }
     },
     "immortal_river_beast_hall": {
@@ -54888,6 +55894,12 @@
           "quantity": 2,
           "price": 27,
           "made_here": false
+        },
+        {
+          "item_id": "crane_saddle_token",
+          "quantity": 1,
+          "price": 900,
+          "made_here": false
         }
       ],
       "buys": {
@@ -54895,7 +55907,8 @@
         "spirit_herb": 1,
         "fire_spirit_root_herb": 6,
         "spirit_crystal_ore": 4,
-        "immortal_gold_ore": 9
+        "immortal_gold_ore": 9,
+        "crane_saddle_token": 315
       }
     },
     "immortal_river_apothecary": {
@@ -55210,6 +56223,12 @@
           "quantity": 2,
           "price": 94,
           "made_here": true
+        },
+        {
+          "item_id": "paper_crane_charm",
+          "quantity": 2,
+          "price": 96,
+          "made_here": false
         }
       ],
       "buys": {
@@ -55218,7 +56237,8 @@
         "swift_wind_talisman": 6,
         "stone_skin_talisman": 6,
         "crystal_ward_talisman": 18,
-        "golden_edge_talisman": 36
+        "golden_edge_talisman": 36,
+        "paper_crane_charm": 33
       }
     },
     "jade_crown_provisions": {
@@ -55268,6 +56288,12 @@
           "quantity": 2,
           "price": 44,
           "made_here": false
+        },
+        {
+          "item_id": "wind_gourd",
+          "quantity": 1,
+          "price": 130,
+          "made_here": false
         }
       ],
       "buys": {
@@ -55275,7 +56301,8 @@
         "spirit_iron": 1,
         "beast_core": 3,
         "talisman_paper": 1,
-        "moonveil_herb": 3
+        "moonveil_herb": 3,
+        "wind_gourd": 45
       }
     },
     "jade_crown_talisman_hall": {
@@ -55325,6 +56352,12 @@
           "quantity": 2,
           "price": 38,
           "made_here": true
+        },
+        {
+          "item_id": "paper_crane_charm",
+          "quantity": 2,
+          "price": 72,
+          "made_here": false
         }
       ],
       "buys": {
@@ -55332,7 +56365,8 @@
         "spirit_ink": 1,
         "swift_wind_talisman": 4,
         "stone_skin_talisman": 5,
-        "crystal_ward_talisman": 14
+        "crystal_ward_talisman": 14,
+        "paper_crane_charm": 25
       }
     },
     "jadeflow_beast_hall": {
@@ -55528,13 +56562,20 @@
           "quantity": 3,
           "price": 12,
           "made_here": true
+        },
+        {
+          "item_id": "paper_crane_charm",
+          "quantity": 2,
+          "price": 60,
+          "made_here": false
         }
       ],
       "buys": {
         "talisman_paper": 1,
         "spirit_ink": 1,
         "swift_wind_talisman": 4,
-        "stone_skin_talisman": 4
+        "stone_skin_talisman": 4,
+        "paper_crane_charm": 21
       }
     },
     "lunar_shadow_talisman_hall": {
@@ -55596,6 +56637,18 @@
           "quantity": 2,
           "price": 250,
           "made_here": true
+        },
+        {
+          "item_id": "paper_crane_charm",
+          "quantity": 2,
+          "price": 120,
+          "made_here": false
+        },
+        {
+          "item_id": "void_stride_talisman",
+          "quantity": 1,
+          "price": 1800,
+          "made_here": false
         }
       ],
       "buys": {
@@ -55605,7 +56658,9 @@
         "stone_skin_talisman": 9,
         "crystal_ward_talisman": 24,
         "golden_edge_talisman": 48,
-        "starfall_talisman": 96
+        "starfall_talisman": 96,
+        "paper_crane_charm": 42,
+        "void_stride_talisman": 630
       }
     },
     "lunar_shadow_apothecary": {
@@ -55781,6 +56836,12 @@
           "quantity": 2,
           "price": 94,
           "made_here": true
+        },
+        {
+          "item_id": "paper_crane_charm",
+          "quantity": 2,
+          "price": 96,
+          "made_here": false
         }
       ],
       "buys": {
@@ -55789,7 +56850,8 @@
         "swift_wind_talisman": 6,
         "stone_skin_talisman": 6,
         "crystal_ward_talisman": 18,
-        "golden_edge_talisman": 36
+        "golden_edge_talisman": 36,
+        "paper_crane_charm": 33
       }
     },
     "lunar_veil_apothecary": {
@@ -55964,6 +57026,12 @@
           "quantity": 1,
           "price": 288,
           "made_here": false
+        },
+        {
+          "item_id": "wind_gourd",
+          "quantity": 1,
+          "price": 220,
+          "made_here": false
         }
       ],
       "buys": {
@@ -55973,7 +57041,8 @@
         "talisman_paper": 2,
         "moonveil_herb": 5,
         "dawnlotus_herb": 10,
-        "heavenpetal_herb": 20
+        "heavenpetal_herb": 20,
+        "wind_gourd": 77
       }
     },
     "mandate_crown_talisman_hall": {
@@ -56035,6 +57104,18 @@
           "quantity": 2,
           "price": 250,
           "made_here": true
+        },
+        {
+          "item_id": "paper_crane_charm",
+          "quantity": 2,
+          "price": 120,
+          "made_here": false
+        },
+        {
+          "item_id": "void_stride_talisman",
+          "quantity": 1,
+          "price": 1800,
+          "made_here": false
         }
       ],
       "buys": {
@@ -56044,7 +57125,9 @@
         "stone_skin_talisman": 9,
         "crystal_ward_talisman": 24,
         "golden_edge_talisman": 48,
-        "starfall_talisman": 96
+        "starfall_talisman": 96,
+        "paper_crane_charm": 42,
+        "void_stride_talisman": 630
       }
     },
     "mandate_spear_forge": {
@@ -56136,6 +57219,12 @@
           "quantity": 1,
           "price": 375,
           "made_here": true
+        },
+        {
+          "item_id": "azure_flying_sword",
+          "quantity": 1,
+          "price": 440,
+          "made_here": false
         }
       ],
       "buys": {
@@ -56148,7 +57237,8 @@
         "starsteel_ore": 24,
         "spirit_crystal_sword": 30,
         "immortal_gold_sabre": 60,
-        "starsteel_glaive": 120
+        "starsteel_glaive": 120,
+        "azure_flying_sword": 154
       }
     },
     "mandate_spear_provisions": {
@@ -56228,6 +57318,12 @@
           "quantity": 1,
           "price": 288,
           "made_here": false
+        },
+        {
+          "item_id": "wind_gourd",
+          "quantity": 1,
+          "price": 220,
+          "made_here": false
         }
       ],
       "buys": {
@@ -56237,7 +57333,8 @@
         "talisman_paper": 2,
         "moonveil_herb": 5,
         "dawnlotus_herb": 10,
-        "heavenpetal_herb": 20
+        "heavenpetal_herb": 20,
+        "wind_gourd": 77
       }
     },
     "moonfen_talisman_hall": {
@@ -56275,13 +57372,20 @@
           "quantity": 3,
           "price": 12,
           "made_here": true
+        },
+        {
+          "item_id": "paper_crane_charm",
+          "quantity": 2,
+          "price": 60,
+          "made_here": false
         }
       ],
       "buys": {
         "talisman_paper": 1,
         "spirit_ink": 1,
         "swift_wind_talisman": 4,
-        "stone_skin_talisman": 4
+        "stone_skin_talisman": 4,
+        "paper_crane_charm": 21
       }
     },
     "moonfen_apothecary": {
@@ -56369,6 +57473,12 @@
           "quantity": 2,
           "price": 38,
           "made_here": true
+        },
+        {
+          "item_id": "paper_crane_charm",
+          "quantity": 2,
+          "price": 72,
+          "made_here": false
         }
       ],
       "buys": {
@@ -56376,7 +57486,8 @@
         "spirit_ink": 1,
         "swift_wind_talisman": 4,
         "stone_skin_talisman": 5,
-        "crystal_ward_talisman": 14
+        "crystal_ward_talisman": 14,
+        "paper_crane_charm": 25
       }
     },
     "moonfrost_apothecary": {
@@ -56538,6 +57649,12 @@
           "quantity": 1,
           "price": 351,
           "made_here": true
+        },
+        {
+          "item_id": "azure_flying_sword",
+          "quantity": 1,
+          "price": 440,
+          "made_here": false
         }
       ],
       "buys": {
@@ -56550,7 +57667,8 @@
         "starsteel_ore": 22,
         "spirit_crystal_sword": 28,
         "immortal_gold_sabre": 56,
-        "starsteel_glaive": 112
+        "starsteel_glaive": 112,
+        "azure_flying_sword": 154
       }
     },
     "nine_heavens_apothecary": {
@@ -56732,6 +57850,18 @@
           "quantity": 2,
           "price": 234,
           "made_here": true
+        },
+        {
+          "item_id": "paper_crane_charm",
+          "quantity": 2,
+          "price": 120,
+          "made_here": false
+        },
+        {
+          "item_id": "void_stride_talisman",
+          "quantity": 1,
+          "price": 1800,
+          "made_here": false
         }
       ],
       "buys": {
@@ -56741,7 +57871,9 @@
         "stone_skin_talisman": 8,
         "crystal_ward_talisman": 22,
         "golden_edge_talisman": 45,
-        "starfall_talisman": 90
+        "starfall_talisman": 90,
+        "paper_crane_charm": 42,
+        "void_stride_talisman": 630
       }
     },
     "nine_heavens_provisions": {
@@ -56821,6 +57953,12 @@
           "quantity": 1,
           "price": 270,
           "made_here": false
+        },
+        {
+          "item_id": "wind_gourd",
+          "quantity": 1,
+          "price": 220,
+          "made_here": false
         }
       ],
       "buys": {
@@ -56830,7 +57968,8 @@
         "talisman_paper": 1,
         "moonveil_herb": 4,
         "dawnlotus_herb": 9,
-        "heavenpetal_herb": 18
+        "heavenpetal_herb": 18,
+        "wind_gourd": 77
       }
     },
     "ninefold_noble_provisions": {
@@ -56898,6 +58037,12 @@
           "quantity": 2,
           "price": 108,
           "made_here": false
+        },
+        {
+          "item_id": "wind_gourd",
+          "quantity": 1,
+          "price": 175,
+          "made_here": false
         }
       ],
       "buys": {
@@ -56906,7 +58051,8 @@
         "beast_core": 3,
         "talisman_paper": 1,
         "moonveil_herb": 3,
-        "dawnlotus_herb": 7
+        "dawnlotus_herb": 7,
+        "wind_gourd": 61
       }
     },
     "ninefold_noble_talisman_hall": {
@@ -56962,6 +58108,12 @@
           "quantity": 2,
           "price": 94,
           "made_here": true
+        },
+        {
+          "item_id": "paper_crane_charm",
+          "quantity": 2,
+          "price": 96,
+          "made_here": false
         }
       ],
       "buys": {
@@ -56970,7 +58122,8 @@
         "swift_wind_talisman": 6,
         "stone_skin_talisman": 6,
         "crystal_ward_talisman": 18,
-        "golden_edge_talisman": 36
+        "golden_edge_talisman": 36,
+        "paper_crane_charm": 33
       }
     },
     "northwind_provisions": {
@@ -57020,6 +58173,12 @@
           "quantity": 2,
           "price": 44,
           "made_here": false
+        },
+        {
+          "item_id": "wind_gourd",
+          "quantity": 1,
+          "price": 130,
+          "made_here": false
         }
       ],
       "buys": {
@@ -57027,7 +58186,8 @@
         "spirit_iron": 1,
         "beast_core": 3,
         "talisman_paper": 1,
-        "moonveil_herb": 3
+        "moonveil_herb": 3,
+        "wind_gourd": 45
       }
     },
     "northwind_talisman_hall": {
@@ -57077,6 +58237,12 @@
           "quantity": 2,
           "price": 38,
           "made_here": true
+        },
+        {
+          "item_id": "paper_crane_charm",
+          "quantity": 2,
+          "price": 72,
+          "made_here": false
         }
       ],
       "buys": {
@@ -57084,7 +58250,8 @@
         "spirit_ink": 1,
         "swift_wind_talisman": 4,
         "stone_skin_talisman": 5,
-        "crystal_ward_talisman": 14
+        "crystal_ward_talisman": 14,
+        "paper_crane_charm": 25
       }
     },
     "polar_gate_provisions": {
@@ -57152,6 +58319,12 @@
           "quantity": 2,
           "price": 108,
           "made_here": false
+        },
+        {
+          "item_id": "wind_gourd",
+          "quantity": 1,
+          "price": 175,
+          "made_here": false
         }
       ],
       "buys": {
@@ -57160,7 +58333,8 @@
         "beast_core": 3,
         "talisman_paper": 1,
         "moonveil_herb": 3,
-        "dawnlotus_herb": 7
+        "dawnlotus_herb": 7,
+        "wind_gourd": 61
       }
     },
     "polar_gate_talisman_hall": {
@@ -57216,6 +58390,12 @@
           "quantity": 2,
           "price": 94,
           "made_here": true
+        },
+        {
+          "item_id": "paper_crane_charm",
+          "quantity": 2,
+          "price": 96,
+          "made_here": false
         }
       ],
       "buys": {
@@ -57224,7 +58404,8 @@
         "swift_wind_talisman": 6,
         "stone_skin_talisman": 6,
         "crystal_ward_talisman": 18,
-        "golden_edge_talisman": 36
+        "golden_edge_talisman": 36,
+        "paper_crane_charm": 33
       }
     },
     "riverguard_beast_hall": {
@@ -57437,6 +58618,12 @@
           "quantity": 1,
           "price": 288,
           "made_here": false
+        },
+        {
+          "item_id": "wind_gourd",
+          "quantity": 1,
+          "price": 220,
+          "made_here": false
         }
       ],
       "buys": {
@@ -57446,7 +58633,8 @@
         "talisman_paper": 2,
         "moonveil_herb": 5,
         "dawnlotus_herb": 10,
-        "heavenpetal_herb": 20
+        "heavenpetal_herb": 20,
+        "wind_gourd": 77
       }
     },
     "skyroad_provisions": {
@@ -57514,6 +58702,12 @@
           "quantity": 2,
           "price": 108,
           "made_here": false
+        },
+        {
+          "item_id": "wind_gourd",
+          "quantity": 1,
+          "price": 175,
+          "made_here": false
         }
       ],
       "buys": {
@@ -57522,7 +58716,8 @@
         "beast_core": 3,
         "talisman_paper": 1,
         "moonveil_herb": 3,
-        "dawnlotus_herb": 7
+        "dawnlotus_herb": 7,
+        "wind_gourd": 61
       }
     },
     "skyroad_beast_hall": {
@@ -57572,6 +58767,12 @@
           "quantity": 2,
           "price": 27,
           "made_here": false
+        },
+        {
+          "item_id": "crane_saddle_token",
+          "quantity": 1,
+          "price": 900,
+          "made_here": false
         }
       ],
       "buys": {
@@ -57579,7 +58780,8 @@
         "spirit_herb": 1,
         "fire_spirit_root_herb": 6,
         "spirit_crystal_ore": 4,
-        "immortal_gold_ore": 9
+        "immortal_gold_ore": 9,
+        "crane_saddle_token": 315
       }
     },
     "solar_crucible_smithy": {
@@ -57671,6 +58873,12 @@
           "quantity": 1,
           "price": 375,
           "made_here": true
+        },
+        {
+          "item_id": "azure_flying_sword",
+          "quantity": 1,
+          "price": 440,
+          "made_here": false
         }
       ],
       "buys": {
@@ -57683,7 +58891,8 @@
         "starsteel_ore": 24,
         "spirit_crystal_sword": 30,
         "immortal_gold_sabre": 60,
-        "starsteel_glaive": 120
+        "starsteel_glaive": 120,
+        "azure_flying_sword": 154
       }
     },
     "solar_crucible_provisions": {
@@ -57763,6 +58972,12 @@
           "quantity": 1,
           "price": 288,
           "made_here": false
+        },
+        {
+          "item_id": "wind_gourd",
+          "quantity": 1,
+          "price": 220,
+          "made_here": false
         }
       ],
       "buys": {
@@ -57772,7 +58987,8 @@
         "talisman_paper": 2,
         "moonveil_herb": 5,
         "dawnlotus_herb": 10,
-        "heavenpetal_herb": 20
+        "heavenpetal_herb": 20,
+        "wind_gourd": 77
       }
     },
     "solar_furnace_smithy": {
@@ -57846,6 +59062,12 @@
           "quantity": 1,
           "price": 141,
           "made_here": true
+        },
+        {
+          "item_id": "azure_flying_sword",
+          "quantity": 1,
+          "price": 350,
+          "made_here": false
         }
       ],
       "buys": {
@@ -57856,7 +59078,8 @@
         "spirit_crystal_ore": 4,
         "immortal_gold_ore": 9,
         "spirit_crystal_sword": 22,
-        "immortal_gold_sabre": 45
+        "immortal_gold_sabre": 45,
+        "azure_flying_sword": 122
       }
     },
     "solar_furnace_provisions": {
@@ -57924,6 +59147,12 @@
           "quantity": 2,
           "price": 108,
           "made_here": false
+        },
+        {
+          "item_id": "wind_gourd",
+          "quantity": 1,
+          "price": 175,
+          "made_here": false
         }
       ],
       "buys": {
@@ -57932,7 +59161,8 @@
         "beast_core": 3,
         "talisman_paper": 1,
         "moonveil_herb": 3,
-        "dawnlotus_herb": 7
+        "dawnlotus_herb": 7,
+        "wind_gourd": 61
       }
     },
     "spearwall_forge": {
@@ -57982,6 +59212,12 @@
           "quantity": 1,
           "price": 57,
           "made_here": true
+        },
+        {
+          "item_id": "azure_flying_sword",
+          "quantity": 1,
+          "price": 260,
+          "made_here": false
         }
       ],
       "buys": {
@@ -57990,7 +59226,8 @@
         "spirit_iron_sword": 4,
         "spirit_iron_armor": 6,
         "spirit_crystal_ore": 3,
-        "spirit_crystal_sword": 18
+        "spirit_crystal_sword": 18,
+        "azure_flying_sword": 91
       }
     },
     "spearwall_provisions": {
@@ -58040,6 +59277,12 @@
           "quantity": 2,
           "price": 44,
           "made_here": false
+        },
+        {
+          "item_id": "wind_gourd",
+          "quantity": 1,
+          "price": 130,
+          "made_here": false
         }
       ],
       "buys": {
@@ -58047,7 +59290,8 @@
         "spirit_iron": 1,
         "beast_core": 3,
         "talisman_paper": 1,
-        "moonveil_herb": 3
+        "moonveil_herb": 3,
+        "wind_gourd": 45
       }
     },
     "spirit_jade_forge": {
@@ -58121,6 +59365,12 @@
           "quantity": 1,
           "price": 141,
           "made_here": true
+        },
+        {
+          "item_id": "azure_flying_sword",
+          "quantity": 1,
+          "price": 350,
+          "made_here": false
         }
       ],
       "buys": {
@@ -58131,7 +59381,8 @@
         "spirit_crystal_ore": 4,
         "immortal_gold_ore": 9,
         "spirit_crystal_sword": 22,
-        "immortal_gold_sabre": 45
+        "immortal_gold_sabre": 45,
+        "azure_flying_sword": 122
       }
     },
     "spirit_jade_apothecary": {
@@ -58282,6 +59533,12 @@
           "quantity": 2,
           "price": 94,
           "made_here": true
+        },
+        {
+          "item_id": "paper_crane_charm",
+          "quantity": 2,
+          "price": 96,
+          "made_here": false
         }
       ],
       "buys": {
@@ -58290,7 +59547,8 @@
         "swift_wind_talisman": 6,
         "stone_skin_talisman": 6,
         "crystal_ward_talisman": 18,
-        "golden_edge_talisman": 36
+        "golden_edge_talisman": 36,
+        "paper_crane_charm": 33
       }
     },
     "spirit_jade_provisions": {
@@ -58358,6 +59616,12 @@
           "quantity": 2,
           "price": 108,
           "made_here": false
+        },
+        {
+          "item_id": "wind_gourd",
+          "quantity": 1,
+          "price": 175,
+          "made_here": false
         }
       ],
       "buys": {
@@ -58366,7 +59630,8 @@
         "beast_core": 3,
         "talisman_paper": 1,
         "moonveil_herb": 3,
-        "dawnlotus_herb": 7
+        "dawnlotus_herb": 7,
+        "wind_gourd": 61
       }
     },
     "starroad_provisions": {
@@ -58446,6 +59711,12 @@
           "quantity": 1,
           "price": 288,
           "made_here": false
+        },
+        {
+          "item_id": "wind_gourd",
+          "quantity": 1,
+          "price": 220,
+          "made_here": false
         }
       ],
       "buys": {
@@ -58455,7 +59726,8 @@
         "talisman_paper": 2,
         "moonveil_herb": 5,
         "dawnlotus_herb": 10,
-        "heavenpetal_herb": 20
+        "heavenpetal_herb": 20,
+        "wind_gourd": 77
       }
     },
     "starroad_beast_hall": {
@@ -58511,6 +59783,12 @@
           "quantity": 2,
           "price": 72,
           "made_here": false
+        },
+        {
+          "item_id": "crane_saddle_token",
+          "quantity": 1,
+          "price": 1150,
+          "made_here": false
         }
       ],
       "buys": {
@@ -58519,7 +59797,8 @@
         "fire_spirit_root_herb": 8,
         "spirit_crystal_ore": 6,
         "immortal_gold_ore": 12,
-        "starsteel_ore": 24
+        "starsteel_ore": 24,
+        "crane_saddle_token": 402
       }
     },
     "stoneback_forge": {
@@ -58582,12 +59861,33 @@
           "quantity": 1,
           "price": 26,
           "made_here": true
+        },
+        {
+          "item_id": "verdant_grotto_key",
+          "quantity": 1,
+          "price": 280,
+          "made_here": false
+        },
+        {
+          "item_id": "nine_echo_spatial_token",
+          "quantity": 1,
+          "price": 340,
+          "made_here": false
+        },
+        {
+          "item_id": "stygian_tomb_token",
+          "quantity": 1,
+          "price": 420,
+          "made_here": false
         }
       ],
       "buys": {
         "array_disk_blank": 3,
         "formation_flags": 4,
-        "minor_warding_array_disk": 10
+        "minor_warding_array_disk": 10,
+        "verdant_grotto_key": 98,
+        "nine_echo_spatial_token": 118,
+        "stygian_tomb_token": 147
       }
     },
     "stoneheart_forge": {
@@ -58637,6 +59937,12 @@
           "quantity": 1,
           "price": 57,
           "made_here": true
+        },
+        {
+          "item_id": "azure_flying_sword",
+          "quantity": 1,
+          "price": 260,
+          "made_here": false
         }
       ],
       "buys": {
@@ -58645,7 +59951,8 @@
         "spirit_iron_sword": 4,
         "spirit_iron_armor": 6,
         "spirit_crystal_ore": 3,
-        "spirit_crystal_sword": 18
+        "spirit_crystal_sword": 18,
+        "azure_flying_sword": 91
       }
     },
     "stoneheart_array_workshop": {
@@ -58746,6 +60053,12 @@
           "quantity": 1,
           "price": 57,
           "made_here": true
+        },
+        {
+          "item_id": "azure_flying_sword",
+          "quantity": 1,
+          "price": 260,
+          "made_here": false
         }
       ],
       "buys": {
@@ -58754,7 +60067,8 @@
         "spirit_iron_sword": 4,
         "spirit_iron_armor": 6,
         "spirit_crystal_ore": 3,
-        "spirit_crystal_sword": 18
+        "spirit_crystal_sword": 18,
+        "azure_flying_sword": 91
       }
     },
     "vermilion_furnace_provisions": {
@@ -58804,6 +60118,12 @@
           "quantity": 2,
           "price": 44,
           "made_here": false
+        },
+        {
+          "item_id": "wind_gourd",
+          "quantity": 1,
+          "price": 130,
+          "made_here": false
         }
       ],
       "buys": {
@@ -58811,7 +60131,8 @@
         "spirit_iron": 1,
         "beast_core": 3,
         "talisman_paper": 1,
-        "moonveil_herb": 3
+        "moonveil_herb": 3,
+        "wind_gourd": 45
       }
     },
     "worldstone_forge": {
@@ -58903,6 +60224,12 @@
           "quantity": 1,
           "price": 375,
           "made_here": true
+        },
+        {
+          "item_id": "azure_flying_sword",
+          "quantity": 1,
+          "price": 440,
+          "made_here": false
         }
       ],
       "buys": {
@@ -58915,7 +60242,8 @@
         "starsteel_ore": 24,
         "spirit_crystal_sword": 30,
         "immortal_gold_sabre": 60,
-        "starsteel_glaive": 120
+        "starsteel_glaive": 120,
+        "azure_flying_sword": 154
       }
     },
     "worldstone_array_workshop": {
@@ -59018,12 +60346,19 @@
           "quantity": 8,
           "price": 5,
           "made_here": false
+        },
+        {
+          "item_id": "cloudskiff_boat",
+          "quantity": 1,
+          "price": 520,
+          "made_here": false
         }
       ],
       "buys": {
         "beast_core": 3,
         "spirit_herb": 1,
-        "spirit_iron": 2
+        "spirit_iron": 2,
+        "cloudskiff_boat": 182
       }
     },
     "grey_mule_waystation": {
@@ -59190,12 +60525,19 @@
           "quantity": 9,
           "price": 7,
           "made_here": false
+        },
+        {
+          "item_id": "cloudskiff_boat",
+          "quantity": 1,
+          "price": 650,
+          "made_here": false
         }
       ],
       "buys": {
         "beast_core": 4,
         "spirit_herb": 1,
-        "spirit_iron": 2
+        "spirit_iron": 2,
+        "cloudskiff_boat": 227
       }
     },
     "red_kite_waystation": {
@@ -59233,12 +60575,19 @@
           "quantity": 9,
           "price": 7,
           "made_here": false
+        },
+        {
+          "item_id": "cloudskiff_boat",
+          "quantity": 1,
+          "price": 650,
+          "made_here": false
         }
       ],
       "buys": {
         "beast_core": 4,
         "spirit_herb": 1,
-        "spirit_iron": 2
+        "spirit_iron": 2,
+        "cloudskiff_boat": 227
       }
     },
     "salt_cart_waystation": {
@@ -59319,12 +60668,19 @@
           "quantity": 9,
           "price": 7,
           "made_here": false
+        },
+        {
+          "item_id": "cloudskiff_boat",
+          "quantity": 1,
+          "price": 650,
+          "made_here": false
         }
       ],
       "buys": {
         "beast_core": 4,
         "spirit_herb": 1,
-        "spirit_iron": 2
+        "spirit_iron": 2,
+        "cloudskiff_boat": 227
       }
     },
     "willow_ford_waystation": {
@@ -59405,12 +60761,19 @@
           "quantity": 8,
           "price": 5,
           "made_here": false
+        },
+        {
+          "item_id": "cloudskiff_boat",
+          "quantity": 1,
+          "price": 520,
+          "made_here": false
         }
       ],
       "buys": {
         "beast_core": 3,
         "spirit_herb": 1,
-        "spirit_iron": 2
+        "spirit_iron": 2,
+        "cloudskiff_boat": 182
       }
     },
     "dust_road_waystation": {
@@ -59448,12 +60811,19 @@
           "quantity": 8,
           "price": 5,
           "made_here": false
+        },
+        {
+          "item_id": "cloudskiff_boat",
+          "quantity": 1,
+          "price": 520,
+          "made_here": false
         }
       ],
       "buys": {
         "beast_core": 3,
         "spirit_herb": 1,
-        "spirit_iron": 2
+        "spirit_iron": 2,
+        "cloudskiff_boat": 182
       }
     },
     "blue_tile_waystation": {
@@ -59577,12 +60947,19 @@
           "quantity": 8,
           "price": 5,
           "made_here": false
+        },
+        {
+          "item_id": "cloudskiff_boat",
+          "quantity": 1,
+          "price": 520,
+          "made_here": false
         }
       ],
       "buys": {
         "beast_core": 3,
         "spirit_herb": 1,
-        "spirit_iron": 2
+        "spirit_iron": 2,
+        "cloudskiff_boat": 182
       }
     },
     "two_bridges_waystation": {
@@ -59620,12 +60997,19 @@
           "quantity": 9,
           "price": 7,
           "made_here": false
+        },
+        {
+          "item_id": "cloudskiff_boat",
+          "quantity": 1,
+          "price": 650,
+          "made_here": false
         }
       ],
       "buys": {
         "beast_core": 4,
         "spirit_herb": 1,
-        "spirit_iron": 2
+        "spirit_iron": 2,
+        "cloudskiff_boat": 227
       }
     },
     "yellow_gourd_waystation": {
@@ -60971,5 +62355,59 @@
       "Ning Cailing",
       "Duan Shu"
     ]
+  },
+  "birth_family_sendoff": {
+    "fallen_martial_clan": {
+      "item": "cracked_ancestral_blade",
+      "line": "Your uncle takes it off the wall himself and does not meet your eye. Bring it back better than it goes out."
+    },
+    "tomb_watch_clan": {
+      "item": "funeral_paper_crane",
+      "line": "Folded at the graveside and handed over still warm. The dead can spare one, they tell you."
+    },
+    "body_tempering_family": {
+      "item": "cloudstep_sandals",
+      "line": "Weighted to your stride over a winter of measuring. Do not ride anything, your father says. Step."
+    },
+    "border_garrison_family": {
+      "item": "garrison_signal_kite",
+      "line": "Off the wall, colours and all, signed out of the quartermaster's book against your name."
+    },
+    "martial_household": {
+      "item": "riverreed_leaf",
+      "line": "Cut from the household's own reed bed the morning you leave, and lacquered while you pack."
+    },
+    "spear_guard_family": {
+      "item": "ironbanner_pennant",
+      "line": "The company stands to as it comes down off the pole. Go where the banner goes."
+    },
+    "sword_hall_family": {
+      "item": "hall_practice_sword",
+      "line": "The blade you learned the first form on. The hall keeps the good ones; you have earned the honest one."
+    },
+    "hidden_weapon_family": {
+      "item": "moonfen_shadow_fan",
+      "line": "Handed over without ceremony, in the dark, by someone who was not there a moment before."
+    },
+    "weaponsmith_martial_family": {
+      "item": "forge_proof_sword",
+      "line": "Your own proof blade, with your own mark on it. The family does not buy a child a sword."
+    },
+    "nether_market_house": {
+      "item": "nether_market_lantern",
+      "line": "Lit off the house lamp so the trade knows the flame. Owe nobody on the road, your mother says."
+    },
+    "escort_martial_family": {
+      "item": "escort_cargo_skiff",
+      "line": "Cut down to one rider in the yard while you watch. Every escort's first solo run leaves on this."
+    },
+    "alchemy_family": {
+      "item": "medicine_gathering_gourd",
+      "line": "Panniers lashed on and the cliff-herb map folded into the left one. Come back with something worth the trip."
+    },
+    "noble_martial_clan": {
+      "item": "qin_ancestral_sword",
+      "line": "Taken down off the ancestral rack in front of the whole household. The clan's name goes with it, and so do its enemies."
+    }
   }
 }

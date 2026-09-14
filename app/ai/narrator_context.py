@@ -19,6 +19,23 @@ def _clip(value: Any, limit: int = 260) -> str:
     return text[: max(0, limit - 1)].rstrip() + "…"
 
 
+def _ground_line(loc: dict[str, Any]) -> str:
+    """The ground and the weather of a place, for the prose that stands on it.
+
+    `climate`, `terrain` and `settlement_type` had been written into 98, 155
+    and 45 locations of `content/world.json` and read by almost nothing -
+    `climate` by *nothing at all*, in either language. They are exactly the
+    detail a narrator needs and cannot invent without contradicting the
+    world, so they go in the packet beside the description.
+    """
+    parts = [
+        str(loc.get("terrain") or "").strip(),
+        str(loc.get("climate") or "").strip(),
+        str(loc.get("settlement_type") or "").strip(),
+    ]
+    return f"Ground and weather: {_join(parts, empty='not recorded')}"
+
+
 def _join(items: Iterable[str], *, empty: str = "None") -> str:
     values = [x for x in (str(v).strip() for v in items) if x]
     return ", ".join(values) if values else empty
@@ -394,6 +411,7 @@ class NarratorContextBuilder:
                 f"World time: {wt.display}",
                 f"Location: {location} | world: {world_name}",
                 f"Location description: {_clip(loc.get('description', 'No description recorded.'), 360)}",
+                _ground_line(loc),
                 f"Protection: {'PROTECTED; violence cannot mechanically begin here' if loc.get('safe_zone') else 'not protected'}",
                 f"Player: {_clip(character.get('name', 'Unnamed cultivator'), 100)} | {realm_name} stage {character.get('phase', 1)} | path {_clip(character.get('path', 'Unknown'), 80)} | aura concealment {'on' if character.get('concealment_active') else 'off'}",
             ]
@@ -575,6 +593,7 @@ class NarratorContextBuilder:
             f"World time: {wt.display} | canonical game-minute {game_minute}",
             f"Location: {location} | world: {world_name}",
             f"Location description: {_clip(loc.get('description', 'No description recorded.'), 520)}",
+            _ground_line(loc),
             f"Location protection: {'PROTECTED / violence cannot mechanically begin here' if loc.get('safe_zone') else 'not marked as a protected interior'}",
             f"Character: {_clip(character.get('name', 'Unnamed cultivator'), 100)} | cultivation style {_clip(character.get('path', 'Unknown'), 90)} | spiritual root {_clip(character.get('spiritual_root', 'Unknown'), 80)}",
             f"Public origin: {_clip(character.get('origin', 'No origin recorded.'), 260)}",

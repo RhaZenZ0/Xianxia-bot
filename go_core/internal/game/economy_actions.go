@@ -431,7 +431,13 @@ func blackMarketTradeAction(conn *storage.Conn, catalog worlddata.Catalog, userI
 		if err = addInventoryTx(conn, userID, map[string]int64{p.ItemID: p.Quantity}); err != nil {
 			return authoritativeMutation{}, err
 		}
-		_, err = conn.Execute(`INSERT INTO item_provenance(user_id,item_id,quantity,source_type,source_key,ownership_mark,legal_status,authenticity,tracking_strength,acquired_game_minute,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`, []any{userID, p.ItemID, p.Quantity, "black_market", fmt.Sprint(post["world_name"]), "underworld broker", fmt.Sprint(stock["legal_status"]), 100, max64(5, i64(post["heat"])/4), p.GameMinute, now, now})
+		// Some of what the underworld sells is fake, and until now the
+		// provenance row said flatly that none of it was.
+		authenticity, aerr := rollUnderworldAuthenticity()
+		if aerr != nil {
+			return authoritativeMutation{}, aerr
+		}
+		_, err = conn.Execute(`INSERT INTO item_provenance(user_id,item_id,quantity,source_type,source_key,ownership_mark,legal_status,authenticity,tracking_strength,acquired_game_minute,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`, []any{userID, p.ItemID, p.Quantity, "black_market", fmt.Sprint(post["world_name"]), "underworld broker", fmt.Sprint(stock["legal_status"]), authenticity, max64(5, i64(post["heat"])/4), p.GameMinute, now, now})
 		if err != nil {
 			return authoritativeMutation{}, err
 		}

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from typing import Any
+
+from .worldtime import MINUTES_PER_MONTH
 
 
 RealmName = Callable[[int, str | None], str]
@@ -27,6 +29,77 @@ def approximate_realm(
     if precision_tier == "success":
         return name
     return f"a cultivator of the {realm_world(int(realm_index))}"
+
+
+DEFAULT_CIRCUIT_MONTHS = 2
+
+
+def circuit_stop(
+    circuit: Sequence[str],
+    game_minute: int,
+    *,
+    months: int = DEFAULT_CIRCUIT_MONTHS,
+    offset: int = 0,
+) -> str | None:
+    """Where a wandering hidden master is standing at `game_minute`.
+
+    A recluse who never moves is a landmark, not a rumour. These walk: each
+    stop on the circuit holds them for a couple of world-months, and then they
+    are somewhere else and the town has only a story about the old beggar who
+    used to sit by the gate. `offset` staggers them so two masters sharing a
+    road are not always in the same town on the same month.
+
+    It is a pure function of the canonical clock rather than anything stored,
+    so it needs no simulation tick and no state - ask at any minute and get the
+    same answer, which is also what makes it testable.
+    """
+    stops = [str(stop) for stop in circuit if str(stop).strip()]
+    if not stops:
+        return None
+    span = max(1, int(months)) * MINUTES_PER_MONTH
+    elapsed = max(0, int(game_minute)) // span
+    return stops[(elapsed + int(offset)) % len(stops)]
+
+
+def ground_reading_line(ground: Mapping[str, Any] | None) -> str:
+    """The line a sweep prints about the ground it is standing on, or "" when
+    the sweep read nothing.
+
+    The engine decides *how much* is known - `detail` is the precision tier
+    collapsed to three rungs - and this only chooses the words. A sweep that
+    failed sends no ground at all, which is why an empty mapping is a normal
+    answer rather than an error.
+    """
+    if not ground:
+        return ""
+    quality = str(ground.get("quality", "ordinary"))
+    where = str(ground.get("ground") or "")
+    detail = str(ground.get("detail", "vague"))
+    if detail == "vague":
+        return f"The qi of this ground feels **{quality}**, though you cannot tell what shapes it."
+    land = _land_reading(ground)
+    if detail == "named":
+        return f"The qi of this ground is **{quality}**" + (f", gathered by **{where}**." if where else ".") + land
+    multiplier = float(ground.get("multiplier", 1.0) or 1.0)
+    world_qi = float(ground.get("world_qi", 1.0) or 1.0)
+    return (
+        f"The qi of this ground is **{quality}** — cultivation here runs at **×{multiplier:g}**"
+        + (f", gathered by **{where}**" if where else "")
+        + f", in a world whose qi runs at **×{world_qi:g}**."
+        + land
+    )
+
+
+def _land_reading(ground: Mapping[str, Any]) -> str:
+    """The land a sweep reads under the qi: its terrain and its weather.
+
+    Both are content the world has always carried - `terrain` priced every
+    road journey, and `climate` was read by nothing whatsoever in either
+    language until it was given to the narrator and to this sweep.
+    """
+    parts = [str(ground.get("terrain") or "").strip(), str(ground.get("climate") or "").strip()]
+    said = ", ".join(p for p in parts if p)
+    return f" The land itself reads as **{said}**." if said else ""
 
 
 def hidden_npc_names(

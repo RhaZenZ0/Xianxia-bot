@@ -217,18 +217,27 @@ array_group=app_commands.Group(name="array",description="Use public teleportatio
 async def array_list(interaction:discord.Interaction)->None:
     c=await require_character(interaction)
     if not c:return
-    options=[d for d in WORLD.teleport_arrays.values() if d.get('from')==c['location']]
-    if not options: await interaction.response.send_message("No public teleportation array is anchored at this location.",ephemeral=False);return
+    anchored=[d for d in WORLD.teleport_arrays.values() if d.get('from')==c['location']]
+    if not anchored: await interaction.response.send_message("No public teleportation array is anchored at this location.",ephemeral=False);return
+    # An array your realm cannot withstand is listed as what it is rather
+    # than offered and then refused by the engine.
+    realm=int(c.get('realm_index') or 0)
     lines=[f"🌀 **Teleportation Arrays — {c['location']}**"]
-    for d in options: lines.append(f"• **{d['name']}** → {d['to']} • {d['cost']} {WORLD.currency_name(str(d['currency']))}")
+    for d in anchored:
+        line=f"• **{d['name']}** → {d['to']} • {d['cost']} {WORLD.currency_name(str(d['currency']))}"
+        if realm<int(d.get('min_realm_index') or 0):
+            line+=f" — *sealed: needs {WORLD.realm_name(int(d.get('min_realm_index') or 0))}*"
+        lines.append(line)
     await interaction.response.send_message("\n".join(lines),ephemeral=False)
 
 
 async def array_destination_autocomplete(interaction:discord.Interaction,current:str)->list[app_commands.Choice[str]]:
     c=await DB.get_character(interaction.user.id); needle=current.casefold().strip(); out=[]
     if c:
+        realm=int(c.get('realm_index') or 0)
         for aid,d in WORLD.teleport_arrays.items():
-            if d.get('from')==c['location'] and (not needle or needle in str(d['to']).casefold() or needle in str(d['name']).casefold()): out.append(app_commands.Choice(name=f"{d['name']} → {d['to']}"[:100],value=aid[:100]))
+            if d.get('from')!=c['location'] or realm<int(d.get('min_realm_index') or 0): continue
+            if not needle or needle in str(d['to']).casefold() or needle in str(d['name']).casefold(): out.append(app_commands.Choice(name=f"{d['name']} → {d['to']}"[:100],value=aid[:100]))
     return out[:25]
 
 
@@ -243,7 +252,8 @@ async def array_use(interaction:discord.Interaction,array:str)->None:
         e=await ENGINE.authoritative_action("array.use",interaction.user.id,{"array_id":array},action_id=f"discord:{interaction.id}:array.use"); r=dict(e.get('result') or {})
     except GameEngineError as exc:
         await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False);return
-    await interaction.followup.send(f"🌀 The formation ignites and folds the route beneath you. You arrive at **{r.get('location',r.get('destination','your destination'))}**.",ephemeral=False)
+    spent=f" The transit takes **{r.get('cost')} {WORLD.currency_name(str(r.get('currency') or ''))}**." if r.get('cost') else ""
+    await interaction.followup.send(f"🌀 The formation ignites and folds the route beneath you. You arrive at **{r.get('to') or 'your destination'}**.{spent}",ephemeral=False)
 
 
 @registered_root_command(name="spatialkey",description="Use a spatial key/token to open its linked secret dimension",guild=GUILD)

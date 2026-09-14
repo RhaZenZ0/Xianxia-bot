@@ -46,6 +46,7 @@ ADMIN_AUTOMATION_CHOICES = [
     app_commands.Choice(name="Autonomous sect politics", value="sect_politics"),
     app_commands.Choice(name="Dynamic economy", value="dynamic_economy"),
     app_commands.Choice(name="Rotating black markets", value="black_markets"),
+    app_commands.Choice(name="NPC finds and consignments", value="npc_consignments"),
     app_commands.Choice(name="Martial clan dynamics", value="clan_dynamics"),
     app_commands.Choice(name="Background cultivation / seclusion", value="background_seclusion"),
     app_commands.Choice(name="Travelling merchants", value="merchants"),
@@ -61,6 +62,7 @@ SIMULATION_SYSTEM_CHOICES = [
     app_commands.Choice(name="Autonomous sect politics", value="sect_politics"),
     app_commands.Choice(name="Dynamic economy", value="dynamic_economy"),
     app_commands.Choice(name="Rotating black markets", value="black_markets"),
+    app_commands.Choice(name="NPC finds and consignments", value="npc_consignments"),
     app_commands.Choice(name="Martial clan dynamics", value="clan_dynamics"),
     app_commands.Choice(name="Background cultivation / seclusion", value="background_seclusion"),
 ]

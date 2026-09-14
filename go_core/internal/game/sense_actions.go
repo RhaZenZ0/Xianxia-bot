@@ -176,6 +176,12 @@ func senseStatsGo(conn *storage.Conn, catalog worlddata.Catalog, userID, gameMin
 	power += ep
 	precision += epr
 	rng += erng
+	// The price of hiding: a folded aura does not reach as far.
+	if c.ConcealmentActive {
+		power = power * concealedSenseNumerator / concealedSenseDenominator
+		precision = precision * concealedSenseNumerator / concealedSenseDenominator
+		rng = rng * concealedSenseNumerator / concealedSenseDenominator
+	}
 	if power < 1 {
 		power = 1
 	}
@@ -187,8 +193,27 @@ func senseStatsGo(conn *storage.Conn, catalog worlddata.Catalog, userID, gameMin
 	}
 	return c, power, precision, rng, nil
 }
+
+// Folding your aura away costs you the reach of it: while concealed, a
+// cultivator senses at three quarters of their power and precision.
+//
+// Concealment had no cost at all, which made it not a decision - a free toggle
+// nobody had a reason to ever turn off. It now trades one thing for the other,
+// which is the shape the fiction already has: you cannot be both the quiet one
+// in the corner and the one sweeping the room. The one place it was already a
+// real choice stays untouched - a forbidden technique used unconcealed is
+// witnessed every time, concealed only sometimes, and that remains the reason
+// a cultivator with something to hide pays this price gladly.
+const concealedSenseNumerator, concealedSenseDenominator = 3, 4
+
+// Concealment rose 7 a realm (will and spirit one each, plus realm*5) against
+// a sense power that rose 10, so it fell three behind every realm and stopped
+// meaning anything between peers: from realm 4 a concealed cultivator read as
+// `exact` 100% of the time. At realm*8 the two rise together, so hiding keeps
+// the worth it had at the bottom of the ladder all the way up it, and a master
+// stays hidden from a junior the way the fiction says they do.
 func concealmentPowerGo(c senseCharacter) int64 {
-	base := c.Will + c.Spirit + c.Realm*5 + c.Phase/2 + c.ConcealmentBonus
+	base := c.Will + c.Spirit + c.Realm*8 + c.Phase/2 + c.ConcealmentBonus
 	if !c.ConcealmentActive {
 		return maxI64(2, base/3)
 	}
@@ -210,8 +235,42 @@ func senseTier(m int64) string {
 		return "critical_failure"
 	}
 }
-func precisionResult(d1, d2, precision, targetRealm, extra int64) map[string]any {
-	tn := 10 + maxI64(0, targetRealm)*2 + maxI64(0, extra)
+
+// How much harder each realm of the thing being read makes it to resolve.
+//
+// These were both 2, and that made two of the five readings /sense can give
+// unreachable. Detection against a concealed cultivator gets 7 harder a realm
+// (their concealment is will + spirit + realm*5) while resolving *what* they
+// are got only 2, so precision was never the binding constraint: by the time a
+// target was far enough above the sensor to make the detail roll marginal,
+// detection had already failed and the answer was "none" or "world". Swept
+// over the realm ladder and ~2,900 attribute builds, `approx` came out at 0.3%
+// of outcomes and `realm` at 0.015%, both only for a minimum-stat realm-0
+// character; everything else was `exact`.
+//
+// At 6 the detail roll degrades at a rate detection can outlive, so the ladder
+// the readings describe is actually walked. Against a concealed cultivator,
+// with concealment now rising 10 a realm alongside sense power, that lands on
+// the shape the fiction has: someone well below you reads exact, one realm
+// below reads exact or approximate, a peer reads approximate, and anyone above
+// you cannot be read at all - only the world they belong to, if that.
+//
+// 6 and not 5: 5 was tuned against concealment rising 7 a realm, and raising
+// it to 10 moved the detection curve out from under that number - at 5 the
+// graded readings fell back to 0.2% of outcomes, which is where they started.
+// 7 and 8 were tried and turn most of the band into "world".
+//
+// The area sweep keeps 2. It reads a place, not a cultivator, and its target
+// number scales with the *sensor's* own realm, so the same slope there would
+// only cancel the sensor's growth and freeze the sweep at one detail level.
+// Two is what makes a sweep qualitative early and precise later.
+const (
+	precisionPerTargetRealm = 6
+	precisionPerAreaRealm   = 2
+)
+
+func precisionResult(d1, d2, precision, targetRealm, perRealm, extra int64) map[string]any {
+	tn := 10 + maxI64(0, targetRealm)*maxI64(0, perRealm) + maxI64(0, extra)
 	total := d1 + d2 + precision
 	margin := total - tn
 	return map[string]any{"total": total, "tn": tn, "margin": margin, "tier": senseTier(margin)}
@@ -263,7 +322,7 @@ func hiddenSenseReading(catalog worlddata.Catalog, sensor senseCharacter, power,
 	total := d1 + d2 + power
 	margin := total - target
 	tier := senseTier(margin)
-	pt := precisionResult(d1, d2, precision, h.TrueRealmIndex, 0)
+	pt := precisionResult(d1, d2, precision, h.TrueRealmIndex, precisionPerTargetRealm, 0)
 	precisionTier := pt["tier"].(string)
 	reading := h.SenseFalseReading
 	if tier == "critical_failure" || tier == "failure" {
@@ -305,12 +364,138 @@ func hiddenSenseReading(catalog worlddata.Catalog, sensor senseCharacter, power,
 	return map[string]any{"target": target, "margin": margin, "tier": tier, "kind": h.Kind, "reading": reading, "reveal": reveal, "precision": pt}, nil
 }
 
+// What a sweep reads off the ground itself: whether the qi here is worth
+// sitting in, which is the one thing a spiritual sense is for in the genre and
+// the one thing this command could not answer.
+//
+// It invents nothing. The cultivation engine has priced the ground since
+// v1.0.0-rc.4 - a road-side shrine, a temple quarter, a sect gate, a cave
+// abode and its gathering array, a deployed array - and `placeQuality` is the
+// word the Here line and the cultivation sheet already use for it. The sweep
+// simply reads the same number, so what a player senses and what they will
+// actually gather sitting there cannot disagree.
+//
+// The detail is the precision tier, which is what makes the reading
+// qualitative early and precise later: a weak sweep gets the word for the
+// ground, a better one what is making it so, and only an overwhelming one the
+// multiplier and the world's own qi density as numbers. A failed sweep, or one
+// whose detail roll failed outright, reads nothing at all.
+func senseGroundReading(conn *storage.Conn, catalog worlddata.Catalog, userID int64, sensor senseCharacter, gameMinute int64, roll, prec map[string]any) (map[string]any, error) {
+	if success, _ := roll["success"].(bool); !success {
+		return nil, nil
+	}
+	tier, _ := prec["tier"].(string)
+	if tier == "critical_failure" || tier == "failure" {
+		return nil, nil
+	}
+	name, mult, err := placeCultivationMultiplier(conn, catalog, userID, sensor.Location, gameMinute)
+	if err != nil {
+		return nil, err
+	}
+	out := map[string]any{"quality": placeQuality(mult), "detail": "vague"}
+	if tier == "partial" {
+		return out, nil
+	}
+	out["detail"] = "named"
+	out["ground"] = name
+	// A sweep that can name what gathers the qi can also read the land it
+	// gathers over. `terrain` and `climate` are written into the content and
+	// were read by the road planner and by nothing at all respectively; this
+	// is the second reader `climate` never had.
+	if loc, ok := catalog.Locations[sensor.Location]; ok {
+		if loc.Terrain != "" {
+			out["terrain"] = loc.Terrain
+		}
+		if loc.Climate != "" {
+			out["climate"] = loc.Climate
+		}
+	}
+	if tier == "overwhelming" {
+		out["detail"] = "exact"
+		out["multiplier"] = mult
+		if loc, ok := catalog.Locations[sensor.Location]; ok {
+			out["world"] = loc.World
+			out["world_qi"] = worldQiMultiplier(catalog, loc.World)
+		}
+	}
+	return out, nil
+}
+
+// How far the sense has to carry to leave the place you are standing in. A
+// cultivator reaches the next town along the road at 25km, which is where the
+// range curve lands around Soul Formation.
+const senseNeighbourRangeMeters = 25000
+
+// Whether a sense can reach the place a target is standing in at all.
+//
+// It could reach anywhere. `/sense @someone` worked across the whole world -
+// from the Mortal World to the Celestial, with no check of any kind - while
+// range_m was computed with the most elaborate formula in this file, carried
+// bonuses and effect modifiers, and was then only ever printed. Sensing an NPC
+// already required standing with them; sensing a player required nothing.
+//
+// Now the place you are is always within reach, the places joined to it by
+// road or gate are within reach once the range curve has grown enough to cross
+// one, and everywhere else is not. Adjacency is the world's own, so the reach
+// of a spiritual sense follows the map a player already walks.
+func senseReaches(catalog worlddata.Catalog, sensorLocation, targetLocation string, rangeMeters int64) bool {
+	if sensorLocation == "" || targetLocation == "" {
+		return false
+	}
+	if sensorLocation == targetLocation {
+		return true
+	}
+	if rangeMeters < senseNeighbourRangeMeters {
+		return false
+	}
+	loc, ok := catalog.Locations[sensorLocation]
+	if !ok {
+		return false
+	}
+	for _, road := range loc.Roads {
+		if road == targetLocation {
+			return true
+		}
+	}
+	for _, behind := range loc.Gates {
+		for _, name := range behind {
+			if name == targetLocation {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// Whether the cultivator being read feels it happen.
+//
+// The engine already told the sensor "the target immediately feels your
+// probing sense" on one branch, and nothing anywhere backed the sentence: a
+// probe was silent, free and unlimited, so there was no counter-play to any of
+// it. A probe is felt when the one being read is at least as perceptive as the
+// one reading them - they notice a sense brush against their own - or when the
+// reading went all the way to `exact`, because at that depth it is not a brush
+// but a hand laid on the dantian.
+func senseTargetNotices(sensorPower, targetPower int64, reveal string) bool {
+	return targetPower >= sensorPower || reveal == "exact"
+}
+
 func senseInspectAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	var p sensePayload
 	if err := json.Unmarshal(raw, &p); err != nil {
 		return authoritativeMutation{}, err
 	}
-	sensor, power, precision, rng, err := senseStatsGo(conn, catalog, userID, p.GameMinute)
+	// The clock, from the engine rather than the caller. An authoritative
+	// payload may not carry game_minute (rejectCallerGameMinute forbids it),
+	// so p.GameMinute was always zero here - which meant every timed lookup
+	// under senseStatsGo asked for minute 0 and matched nothing: no active
+	// effect and no deployed location array has ever modified a sense reading,
+	// and every sense event was filed at the dawn of the world.
+	gameMinute, err := canonicalWorldGameMinute(conn)
+	if err != nil {
+		return authoritativeMutation{}, err
+	}
+	sensor, power, precision, rng, err := senseStatsGo(conn, catalog, userID, gameMinute)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -321,13 +506,20 @@ func senseInspectAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 		if err != nil {
 			return authoritativeMutation{}, err
 		}
+		if !senseReaches(catalog, sensor.Location, target.Location, rng) {
+			// Deliberately says nothing about where they are: a sense that
+			// could not find them has not learned their whereabouts either.
+			result["reveal"] = "out_of_range"
+			result["reading"] = "You cast your sense outward and find nothing of them within its reach."
+			break
+		}
 		tn := 10 + concealmentPowerGo(target)
 		roll, err := rollCheck(power, tn)
 		if err != nil {
 			return authoritativeMutation{}, err
 		}
 		det := senseTier(roll["margin"].(int64))
-		prec := precisionResult(roll["die1"].(int64), roll["die2"].(int64), precision, target.Realm, 0)
+		prec := precisionResult(roll["die1"].(int64), roll["die2"].(int64), precision, target.Realm, precisionPerTargetRealm, 0)
 		reveal := "none"
 		pt := prec["tier"].(string)
 		if det == "partial" || pt == "critical_failure" || pt == "failure" {
@@ -348,6 +540,11 @@ func senseInspectAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 		result["target_realm_index"] = target.Realm
 		result["target_phase"] = target.Phase
 		result["target_concealed"] = target.ConcealmentActive
+		_, targetPower, _, _, err := senseStatsGo(conn, catalog, p.TargetUserID, gameMinute)
+		if err != nil {
+			return authoritativeMutation{}, err
+		}
+		result["target_noticed"] = senseTargetNotices(power, targetPower, reveal)
 	case "npc":
 		npc, ok := catalog.NPCs[p.NPCName]
 		if !ok {
@@ -398,7 +595,7 @@ func senseInspectAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 		if err != nil {
 			return authoritativeMutation{}, err
 		}
-		prec := precisionResult(roll["die1"].(int64), roll["die2"].(int64), precision, sensor.Realm, 2)
+		prec := precisionResult(roll["die1"].(int64), roll["die2"].(int64), precision, sensor.Realm, precisionPerAreaRealm, 2)
 		hints := []string{}
 		if loc, ok := catalog.Locations[sensor.Location]; ok && roll["success"].(bool) {
 			count := 1
@@ -438,10 +635,17 @@ func senseInspectAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 		result["hidden_signals"] = signals
 		result["event_visibility"] = roll["margin"].(int64) >= 0
 		result["location"] = sensor.Location
+		ground, err := senseGroundReading(conn, catalog, userID, sensor, gameMinute, roll, prec)
+		if err != nil {
+			return authoritativeMutation{}, err
+		}
+		if ground != nil {
+			result["ground"] = ground
+		}
 	default:
 		return authoritativeMutation{}, errors.New("mode must be player, npc, or area")
 	}
-	return authoritativeMutation{Result: result, Event: eventledger.Event{Domain: "sense", EventType: "spiritual_sense_resolved", EntityType: "character", EntityID: fmt.Sprint(userID), GameMinute: p.GameMinute, Payload: result}}, nil
+	return authoritativeMutation{Result: result, Event: eventledger.Event{Domain: "sense", EventType: "spiritual_sense_resolved", EntityType: "character", EntityID: fmt.Sprint(userID), GameMinute: gameMinute, Payload: result}}, nil
 }
 func degreeFromMarginGo(m int64) string {
 	switch {
@@ -474,6 +678,12 @@ func senseConcealAction(conn *storage.Conn, _ worlddata.Catalog, userID int64, r
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
+	// As above: the caller may not send game_minute, so p.GameMinute is zero
+	// and every concealment change was filed at minute 0 of the world.
+	gameMinute, err := canonicalWorldGameMinute(conn)
+	if err != nil {
+		return authoritativeMutation{}, err
+	}
 	active := int64(0)
 	if p.Active {
 		active = 1
@@ -488,6 +698,6 @@ func senseConcealAction(conn *storage.Conn, _ worlddata.Catalog, userID int64, r
 	}
 	return authoritativeMutation{Result: result, Event: eventledger.Event{
 		Domain: "sense", EventType: "aura_concealment_changed", EntityType: "character",
-		EntityID: fmt.Sprint(userID), GameMinute: p.GameMinute, Payload: result,
+		EntityID: fmt.Sprint(userID), GameMinute: gameMinute, Payload: result,
 	}}, nil
 }

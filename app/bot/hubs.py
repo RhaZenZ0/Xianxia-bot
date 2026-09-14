@@ -117,7 +117,7 @@ _SUCCESS_ACTION_WORDS = frozenset({
 })
 
 _PAGE_EMOJIS = {
-    "sheet": "📜", "gender": "🪪", "lifespan": "⌛", "karma": "☯️", "fate": "🧧",
+    "sheet": "📜", "lifespan": "⌛", "karma": "☯️", "fate": "🧧",
     "bond": "🤝", "daoheart": "💠", "reputation": "🏷️", "grudges": "🔥", "crime": "⚖️",
     "bounty": "🎯", "inheritances": "📚", "effects": "✨", "specialeffects": "🌀",
     "condition": "🩹", "soul": "🕯️", "afterlife": "☸️", "reincarnate": "🌱",

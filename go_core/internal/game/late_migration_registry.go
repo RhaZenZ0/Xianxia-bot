@@ -20,6 +20,8 @@ func applyLateMigrationAction(conn *storage.Conn, catalog worlddata.Catalog, use
 		return auctionBidAction(conn, catalog, userID, raw)
 	case "merchant.buy":
 		return merchantBuyAction(conn, catalog, userID, raw)
+	case "appraisal.read":
+		return appraisalAction(conn, catalog, userID, raw)
 	case "shop.buy":
 		return shopBuyAction(conn, catalog, userID, raw)
 	case "shop.sell":

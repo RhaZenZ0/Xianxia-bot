@@ -33,6 +33,22 @@ type mechanicsCharacter struct {
 	LifeStatus                   string
 }
 
+// accessRealmIndex is the cultivation a *place* is measured against.
+//
+// The world-crossing tribulation is gated on either ladder - a body
+// cultivator clears the Mortal Body Ascension and breaks into the Spiritual
+// World's body realm exactly as a qi cultivator clears theirs. Every location
+// check, though, read `realm_index` alone, so a body cultivator could ascend
+// into a world and then be locked out of it: the capital they arrive in
+// admits realm 8 and their qi ladder is still at 0. Whichever ladder carried
+// them is the one that answers.
+func (c mechanicsCharacter) accessRealmIndex() int64 {
+	if c.BodyRealmIndex > c.RealmIndex {
+		return c.BodyRealmIndex
+	}
+	return c.RealmIndex
+}
+
 type resolvedModifiers struct {
 	Add map[string]float64
 	Mul map[string]float64

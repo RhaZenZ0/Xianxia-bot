@@ -238,9 +238,9 @@ func TestCraftResolveDerivesForgingAndFormationFacilities(t *testing.T) {
 			wantModifier:    217,
 		},
 		{
-			name:            "formation",
+			name:            "inscription",
 			recipe:          "Swift-Wind Talisman",
-			profession:      "Formation",
+			profession:      "Inscription",
 			location:        "formation_cave",
 			effectStat:      "formation_bonus",
 			abodeColumn:     "formation_level",

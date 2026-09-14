@@ -6,7 +6,7 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
-**1.0.0** (rc.15) adds the shorthand: `x explore` runs `/explore`. Typed play has had one door since
+**1.0.0** (rc.16) adds the shorthand: `x explore` runs `/explore`. Typed play has had one door since
 v0.21.1, the prefix, and it reaches the world through the verb table in `content/typed_play.json` -
 which is eight of the forty-three roots. There has never been a way to type a command by its own
 name, and there could not be: `TYPED_PLAY_PREFIX` is one character and refuses letters outright, for
@@ -33,15 +33,385 @@ name, so the AI Routing page says which of the four a refusal came through. `TYP
 `x`, empty disables it, and the words that start ordinary sentences are refused as tokens. No schema
 change.
 
-**1.0.0** (rc.14) fixes the reading `/sense` gives most often, and closes the class of fault it
-belongs to. Sensing another cultivator called `WORLD.approximate_realm(...)`, and there is no such
-method on `World`: the function lives in `app/rules/sense.py` and takes its two realm lookups as
-arguments, so the call was wrong in both its name and its signature and raised `AttributeError`. It
-was not a corner. The engine answers `reveal = "approx"` whenever detection succeeds and precision
-lands on "success" or "strong", which is the ordinary middle outcome of sensing somebody - the three
+**1.0.0** (rc.15) sets the world's own people moving, and makes a spiritual sense worth casting at
+them. `npc_civilization_state` has carried `home_location`, `current_location` and `faction` since
+the simulation was built, and the daily tick moved wealth, influence, ambition, activity and phase -
+never any of those three. Nothing autonomous had ever written `current_location` at all: it was set
+at bootstrap and afterwards only touched by a merchant relocating, one game action and an admin
+undo. So every NPC in the world stood exactly where they were born, for the life of the world, and
+`current_npc_location`'s branch for "autonomous civilization travel has moved them away from their
+home region" was unreachable code guarding a thing that could not happen. `faction` was the same,
+chosen at bootstrap and frozen, so no sect ever gained or lost a member.
+
+They walk now. Each daily tick some of them set out along the road, step to a neighbouring place, or
+turn for home - weighted by trade, because a peddler is almost always travelling and a gate guard
+almost never is, and capped so a world does not relocate overnight. No journey is stored: a tick is
+one pass with nothing half-finished to reconcile if it is missed or replayed. The road they walk is
+the players' own map rule rather than a second copy of it, and that mattered more than it sounds -
+the first version here matched only `roads` and `gates`, which joins the forty-eight cities and
+leaves 429 of the world's 477 places (every district, waystation, shrine and shop) with no
+neighbour at all, so almost every NPC alive still could not have moved. `game.WhereAnNPCCanWalk`
+composes all four ways the map joins up - roads, a city's own districts, the sites on a leg, and
+either end of a site's leg - and 429 stranded places became 17. A test holds the real content to it,
+because a fixture of two towns on a road passes that bug happily.
+
+Players can found a house. `player_families`, `player_family_members`, `player_family_invites` and
+`family_children` have carried one since the schema was written - with foreign keys, a cascade, a
+unique seniority index and a GM dashboard panel joining founders to members to children - and nothing
+ever wrote a single row into any of them. The panel could only ever be empty, and character deletion
+carefully cleaned up rows that could not exist. The design was finished; only the doors were missing.
+
+`/family house` is the doors: found one and take its first seat, invite another cultivator at a
+seniority, accept or decline the offer waiting for you, leave, and record a child born into the line.
+The house is distinct from the birth family beside it - that is the NPC household a character is born
+into, this is a line they start - which is why it is its own page rather than more actions on the old
+one. Nothing here invents state, and the schema had already decided most of the rules: a name is
+UNIQUE so two houses cannot share one, a member is UNIQUE so nobody belongs to two, an invitee is
+UNIQUE so nobody holds two offers, and (house, seniority) is UNIQUE so two people cannot hold the
+same seat. Each of those is now a refusal a player can read rather than a constraint error, and the
+seat is checked when the invitation is written rather than when it is answered, which is the worst
+possible moment to discover it. A child's spiritual root and talent are the world's to roll, not the
+parent's to choose; the last member out dissolves the house; and a founder who leaves hands it to the
+most senior who stays rather than leaving `founder_user_id` pointing at somebody gone.
+
+`/gender` is gone. A cultivator's sex is chosen at creation - `/begin` will not make a character
+without it - so a second setter afterwards was a door onto a room the player had already furnished,
+and the one thing it could do was undo a choice the creation screen had already taken. The engine
+operation went with the command the way `alchemy.refine` went with `/alchemy refine`, along with its
+regression tests; the sheet still prints the gendered realm titles, because reading what was chosen
+was never the duplicated part. 235 actions to 234, no mechanic removed.
+
+The rest of an NPC's life follows, and every piece of it writes a column or a table that was already
+there. **Children are born.** `npc_descendants` had no writer at all and `children_count` was read
+only by the query hunting for singles to marry, so married couples never had a child and the world
+was demographically terminal: everyone died of old age and nobody was ever born. A healthy marriage
+now produces children up to four, named from the family name they are born to and a given name from
+the world's own pool, checked against every name already in use. **Realms are crossed.**
+`realm_index` was fixed at bootstrap, so `phase` crept to nine and stopped there for ever; a
+cultivator at stage nine can now break through, and it is paid for in wealth - the first thing wealth
+has ever been for in this simulation. **Careers go somewhere.** `career_progress` climbed to its
+ceiling and was read by nothing; inside a sect it buys the next rank up a five-rung ladder, and
+outside one it buys the reputation an unaffiliated cultivator lives on. **Masters take disciples.**
+`npc_disciple_bonds` had no writer while `world_status_queries.go` *queried* it, so "who is whose
+disciple" was a question the world could be asked and always answered empty; a cultivator four realms
+above another standing in the same place may now take them on, nobody serves two masters, and a bond
+ends when either party dies. **And grudges are answered.** `grudge` climbed to a hundred and nothing
+ever happened, which made old age the only death in the world. A grudge that has run its course is
+now settled, usually with an injury and occasionally with a killing.
+
+Each of those lands in `world_history_events` as public history - a birth, a promotion, a
+breakthrough, a new disciple, a duel, a death - because a world that changes silently reads exactly
+like one that does not change at all.
+
+And the sects take people and lose them. A sect whose recruitment pressure has climbed past sixty
+actually recruits the ambitious and masterless; one whose cohesion has fallen under thirty-five
+actually loses members to the road. Both numbers were already being maintained by the politics tick
+and read by nothing. Each change is written to the sect's own log and to `world_history_events` as
+public history, because a named cultivator changing banner is what a town talks about. A settled
+sect - neither desperate nor coming apart - is left entirely alone; churn for its own sake is noise
+rather than a living world.
+
+The spiritual sense could not answer
+the one question the genre uses it for - is the qi here good enough to sit in - although the engine
+has known the answer since rc.4: `placeCultivationMultiplier` prices a road-side shrine, a temple
+quarter, a sect gate, a cave abode and its gathering array and a deployed array, and `placeQuality`
+is the word the Here line and the cultivation sheet already print for it. `/sense area` read none of
+it and returned scenery instead. It reads that same number now, so what a sweep reports and what a
+session actually pays cannot disagree, and the detail is what the sweep earned: a weak one gets the
+word for the ground, a better one what is gathering it, an overwhelming one the multiplier and the
+world's own qi density as numbers. Qualitative early and precise later, which is the progression a
+spiritual sense was always described as having.
+
+Concealment cost nothing and did nothing. It was a free toggle with no reason ever to be off, and it
+rose 7 a realm against a sense power that rose 10, so it fell behind every realm and stopped
+mattering entirely: from Nascent Soul a concealed cultivator was read exactly, every single time. It
+rises 10 a realm now, so hiding keeps the worth it had at the bottom of the ladder all the way up it,
+and it has a price - a folded aura does not reach, so while concealed your own sense runs at three
+quarters of its power, precision and range. Hide or look; not both. The one place concealment was
+already a real decision is untouched and is now the reason to pay it: a forbidden technique used
+openly is witnessed every time, and concealed only sometimes.
+
+Two of the five readings `/sense` can give were unreachable. Resolving *what* a cultivator is got 2
+harder a realm while detecting them at all got 7, so precision was never the binding constraint: by
+the time a target was far enough above you to make the detail roll marginal, detection had already
+failed and the answer was "none" or "world". Swept over the realm ladder and some 2,900 attribute
+builds, `approx` was 0.3% of outcomes and `realm` 0.015%, both only for a minimum-stat realm-0
+character - a ladder written and never walked. The slope is 6, chosen against the concealment above
+rather than the old one, and it reads the way the fiction does: someone well below you exactly, one
+realm below exactly or approximately, a peer approximately, and anyone above you not at all - only
+the world they belong to, if that. The area sweep keeps 2, because it reads a place and its target
+number already scales with the sensor's own realm, where the same slope would only cancel that
+growth.
+
+A sense also reached the entire world. `/sense` on a player checked nothing - not distance, not
+location - while sensing an NPC already required standing with them, and `range_m` was computed with
+the most elaborate formula in the file, took bonuses and effect modifiers, and was then only ever
+printed. It is a rule now: the place you are standing in is always within reach, the places a road or
+gate joins it to once your range passes 25km, and nowhere else. A sense that cannot find someone does
+not learn where they are either.
+
+And a probe was silent. The engine told the sensor "the target immediately feels your probing sense"
+while nothing anywhere told the target, so there was no counter-play to being read at all. A
+cultivator feels a sense settle over them when they are at least as perceptive as the one reading
+them, or when the reading went all the way to the dantian, and the reply names who did it - the way a
+trade offer names who sent it.
+
+The hidden masters they might be reading went from three to twenty. All the interesting machinery
+here - the collapsing false aura, the seamless void too perfect to be natural, the glimpse of
+something vastly beyond your realm - served three NPCs out of five hundred and sixty-five, all of
+them in one town in the Mortal World. There are twenty now, spread evenly over all four worlds,
+thirteen genuine and seven frauds: a shrine hermit who is a Dao Comprehension sage, an innkeeper
+letting a rumour do her haggling, a Dao Saint kneeling at a roadside stone, a waystation keeper whose
+Celestial Emperor pressure is a forgery half a beat out of time with his breathing. The eight added
+to existing NPCs keep the lore they already had - the hidden truth is written under it, not over it.
+
+Half of them walk. A recluse who never moves is a landmark rather than a rumour, so ten of the twenty
+hold a stop for two or three world-months and are then somewhere else: the barefoot pilgrim crossing
+the Spiritual World's shrine road, the lamp-carrier going shrine to shrine in the Immortal World
+looking for the one she is supposed to light, the beggar counting Celestial milestones, and the
+frauds especially - a manual-seller and a relic appraiser working their cities in rotation, which is
+precisely how a fraud survives. `circuit_stop` is a pure function of the canonical clock, so nobody
+ticks and nothing is stored: ask at any minute and the road answers the same. A `circuit_offset`
+staggers two who share a road, and a contract holds every stop to being a real place, because a
+circuit naming somewhere that does not exist would strand a master where no player can stand and
+nothing would say so.
+
+And every timed lookup the sense made asked for minute zero. An authoritative payload may not carry
+`game_minute`, so the field the action read was always unset - which means no active effect and no
+deployed location array has ever modified a sense reading, and every sense event was filed at the
+dawn of the world. It takes the clock from the engine now, like every other action. No schema change.
+
+And how a cultivator crosses ground is finally a question of realm. Every journey in the game was a
+walk: terrain set the minutes, realm shaved at most a third off them, and that was the whole ladder -
+so an Ascension Realm ancestor and a mortal porter crossed the same valley at nearly the same speed,
+and the flying sword this genre is built on existed only inside item descriptions. There are three
+ways to cross ground now, and the realm you cross it at decides which. Below Core Formation nobody
+leaves the ground unaided and the road is a road. From Core Formation a cultivator flies: a third of
+the hours and ten off the danger, because what walks the road cannot reach you. From Ascension Realm
+distance stops being crossed and starts being folded - an eighth of the hours, twenty-five off the
+danger, and a floor that scales with the mode so the fastest travel in the setting is not
+indistinguishable from the slowest on a short leg.
+
+Six flying artifacts let a disciple off the road before their own realm would: a paper crane charm
+and a wind gourd (Core Formation), an azure flying sword and a cloudskiff boat, a crane-summons token,
+and a void-stride talisman that folds space for whoever holds it. What is in the bags sets the realm
+you *travel* at, which is the entire point of one - it is how a Qi Refining disciple gets airborne at
+all. They are on real shelves, by shop kind and by tier: the crane in the talisman halls from the
+Mortal World up, the gourd with the provisioners, the sword at the smiths, the boat at the
+waystations, the crane token at the beast halls, the void talisman only in the Celestial World, each
+of them the dearest thing on its shelf and each bought back by the keeper who sold it. An artifact no
+shop sells is scenery, which is what the six were the day they were written.
+
+The flying sword is also a sword. It is the one artifact that both carries a rider and takes the
+weapon slot, in all three stat tables the parity contract holds to each other - which is the genre's
+own reason it is the default: you do not choose between going and fighting. That made a second rule
+necessary. `equipment.bind` takes an item *out* of the inventory to make it an equipment instance, so
+a mount read only off `inventory` would have stopped flying the moment its owner bound it, which is
+exactly backwards - binding it is what makes it theirs. The lookup reads both, and a sword broken to
+nothing carries nobody.
+
+Underneath it, the roads got their ground back. Twenty locations had no `terrain` at all, among them
+all three higher-world capitals, so every journey to or from Spirit Jade Capital, Nine-Heavens
+Immortal Court or Celestial Mandate Palace was priced by the fallback branch - a flat seventy-five
+minutes, the same for a jade terrace as for a volcanic pass. All 102 travel endpoints in the world
+carry terrain now; the remaining 375 locations are districts, gates, shops and auction floors inside
+them, which no road ever ends at.
+
+And the hardest journey in the genre had three doors, two of them shut. Ascension - 飞升, the
+tribulation-gated jump to the next plane - had every piece built: the three waves of lightning, heart
+and void, the gate on the breakthrough that refuses an uncleared tribulation, the `world_history_events`
+row at significance 98 reading "ascended to the Spiritual World". And then the cultivator was still
+standing in Greenriver Town, with a free `/realmhub go` as the only way to actually be in the world
+they had just crossed into. The heavens took nobody anywhere. They do now: the crossing sets you down
+in the new world's capital, puts it on your map, and says so. An ordinary breakthrough inside a world
+still moves nobody, and an uncleared tribulation still refuses.
+
+The teleportation arrays were dead content wired end to end. Three of the four charged the
+*destination* world's tier-1 currency - which no reward path grants, which no exchange converts, and
+which can only be earned by selling in the world you are trying to reach. The chain was circular: the
+Ascendant Jade Gate wanted spirit crystals from someone who had never been to the Spiritual World.
+They charge the world you are standing in now, the way the tribulation's own preparation does, and a
+crossing costs what a crossing should. Each of the four also got its return leg, because a one-way
+gate is a trap. The `/array` picker no longer offers a gate your realm cannot withstand, and the
+arrival message names where you came down instead of "your destination" - it had been reading two
+keys the engine never returned.
+
+One more thing the crossing exposed: the world-crossing tribulation is gated on either ladder - a
+body cultivator clears the Mortal Body Ascension exactly as a qi cultivator clears theirs - but every
+location check in both languages read `realm_index` alone. A body cultivator could therefore ascend
+into a world and be locked out of it, arriving in a capital that admits realm 8 with a qi ladder
+still at zero. Whichever ladder carried them is the one that answers now, in the engine and in the
+pickers alike.
+
+And a capital is a city. `death_qi.go` gives a city its gathering penalty only where `settlement_type`
+is set, and the three higher-world capitals had none - so a death-qi cultivator gathering in Spirit
+Jade Capital, Nine-Heavens Immortal Court or Celestial Mandate Palace quietly escaped a penalty every
+mortal-world city pays. A content gate holds every realm hub to being a city.
+
+Two more things the world had written down and nobody could reach. `climate` was parsed into
+`LocationDefinition.Climate` and read by **nothing at all**, in either language - ninety-eight
+locations' worth of weather that existed only as a key in a file. It reaches the narrator now, beside
+the description and the protection, and a sense sweep that can name what gathers the qi also reads
+the land it gathers over. The twenty places that had neither terrain nor climate have both, and a
+content gate holds every travel endpoint to both; an interior has no weather, so the 375 districts,
+shops and auction floors are correctly left alone.
+
+And the three spatial keys opened nothing. Each carried a `secret_realm_id` the engine looks up
+exactly - `sword_grave`, `verdant_grotto`, `stygian_tomb` - against a catalogue holding
+`sword_grave_nine_echoes`, `verdant_immortal_grotto` and `stygian_lantern_tomb`, so `spatial_key.use`
+could only ever answer "the token's coordinates no longer correspond to a known realm". Nobody had
+found out, because nothing sold them either: a working action, a working item, and no way to hold
+one. They name their realms correctly, the Mortal World's array workshops keep them (an array master
+trading in spatial coordinates is exactly who would), and a key spent away from its own entrance is
+now refused rather than silently wasted - `secret_realm.enter` only ever steps through at the
+realm's own mouth.
+
+And the household you were born into finally puts something in your hands. Thirteen birth families
+carry a hand-tuned wealth from 26 for a ruined clan to 82 for an imperial one, a written boon and a
+written risk each - and every one of them handed a new cultivator the same two spirit herbs and one
+spirit iron, so what a family was worth bought their child exactly nothing on the way out of the
+door. Each sends its own flying artifact now, and no two households give the same object, because
+which artifact a family owns *is* the family: a tomb-watch clan folds a burnt offering that will
+carry the living too, a weapon-smith's child leaves on the blade they proved on the anvil, a body
+cultivator is given weighted sandals and told not to ride anything, and a fallen clan has only the
+cracked ancestral sword nobody would buy. The roster is content, the same way the event sites and the
+narration pool are.
+
+Power tracks the purse already written beside each house: flight 3 below wealth 60, which carries a
+disciple until their own realm reaches Core Formation and then goes quiet, and flight 5 for the
+Alchemy Family and the Noble Martial Clan, which keeps carrying them to Ascension. The four heirloom
+swords are deliberately under the shop ladder - the cracked blade and the two training swords below
+the spirit-iron sword anyone can buy, the clan sword under the spirit-crystal one - because the gift
+is the flight, not the edge. And they are heirlooms rather than stock: no shop sells one, so the
+sixty-stone paper crane on the shelf is still the road for anyone whose family could not do better.
+
+There are two doors and one guard. A character made today leaves home carrying it. A character made
+before this comes home and asks - `/family support` hands it over the first time and never again -
+which is also where two households stopped being ignored: neither ghost house had a case in that
+switch at all, so the two families that trade in funeral goods and grave-lore handed over one
+ordinary recovery pill like everybody else. The guard is an `item_provenance` row rather than a new
+column, keyed on the *family* rather than the character, and that is what makes samsara work: a new
+life is a new household, so it earns that household's heirloom, while asking the same household twice
+earns nothing. Creation also writes provenance for what it grants now, which it never did.
+
+And the forty-eight auction houses stopped being empty rooms with a steward standing in them. Every
+lot on every floor since the auctions shipped had to be listed by a player, and merchants were wired
+to them in the buy direction only - they bid, they take the unsold - so the world could consume
+treasure and never produce a single piece of it. The floors of a server nobody had played on were
+furniture.
+
+The world's own people find things now. A grave-robber, a tomb digger, a beast hunter or a
+herb-gatherer turns something up on their own time - weighted by trade, the way travel already is,
+because a scavenger is looking and a gate guard is not - and what happens next is decided by two
+questions. Is it legal? Contraband goes to the night market rather than a floor that would have the
+finder arrested for it. And can they read it? Because a realm-0 scavenger who digs a Nine-Echo Sword
+Tablet out of a barrow does not know what a Nine-Echo Sword Tablet is.
+
+That second question is the whole of it. A find the finder understands goes up with a reserve. A find
+they *don't* goes up blind: the house grades it by eye - "legendary or near it" - says no more than
+that, and opens at a quarter of the price it would otherwise ask, because a house cannot vouch for
+what it cannot name. Nothing here needed an NPC inventory table, and that is deliberate: a find is
+resolved and consigned in one pass, so there is no half-owned item to reconcile if a tick is missed
+or replayed. A full floor takes nothing more, exactly as it refuses a player's seventh lot, and the
+whole thing is capped per tick for the same reason travel is - thirty treasures surfacing overnight
+is a fire sale, not a living world. Each find lands in `world_history_events` as public history,
+because a treasure coming up out of the ground is what a town talks about.
+
+Settlement had to learn that a seller is not always a character. `seller_user_id` is foreign-keyed to
+`characters`, so a consignment's is 0, and the payout was a single `walletDeltaSim` on that column -
+which would have written a wallet for a character who does not exist. A finder is paid into the only
+purse they have, their own `wealth`, and an unsold consignment is simply taken home rather than
+pushed into user 0's bag. The GM dashboard's auction panel joined `characters` on that same column
+with an inner join, so every consignment would have been invisible there; it is a left join now.
+
+**Appraisal** is the other half, and it was a word in a list. "Appraisal" has been one of the eight
+professions since the progression system was written and nothing in either language ever granted a
+point of it; `item_provenance.authenticity` has been a column every writer sets to 100 and no rule
+ever read. Both are load-bearing now. `/economy → Auction House → Appraise` reads something in your
+bag or a lot standing open in front of you, two ways: your own eyes for nothing - Insight, the
+attribute every knowledge-flavoured verb in the game already rolls, plus your Appraisal level, against
+a target number that rises with the grade - or the floor's own keeper for a quarter of the thing's
+worth, which is certain. Practising trains the profession whether the reading lands or not; buying an
+answer teaches you nothing, because it is not practice.
+
+Knowing is per person and permanent, shaped like `character_location_discoveries`: the second
+Nine-Echo Sword Tablet you meet, you read at a glance. Which means a blind lot is blind only to the
+people who have not done the work - an appraiser walks the same floor as everybody else and sees what
+is actually on it. A badly botched reading is confidently wrong rather than merely unhelpful, and the
+mistake lives in the words rather than in any table, so a second look can still find the truth.
+
+Nine of the nineteen auction-grade items made all of that meaningless until they were fixed: they
+carried `sect_value` 8 - the same as a recovery pill - and no `base_price` at all, and every valuation
+in the game derives from those two numbers. A legendary sword tablet would have gone under the hammer
+for eight stones. They are priced against the goods that already had considered numbers now, and a
+content gate holds every auction-grade item to being worth more than ordinary stock.
+
+And then a sweep for the same four faults everywhere else, which found five more and one of its own.
+
+**A crash, shipped the day before.** The smuggling path wrote `black_market_stock(world_name,
+location, item_id, quantity, price, ...)`. That table has no `location` and no `price`, and its
+`currency_id` and `unit_price` are NOT NULL - so every contraband find raised a bare SQL error,
+which aborted the consignment tick and, because the runner wraps a system in `BEGIN IMMEDIATE`,
+rolled back every legal lot in the same pass. Two of the nineteen findable items are contraband, so
+roughly one find in nine took it down. It passed CI because the test fixture beside it had invented
+a matching schema of its own. The insert names the real columns now, the fixture is the production
+one, and a contract test compares the two column lists directly - the fixture is what actually
+failed here, so the fixture is what is now held to the table.
+
+**Sects go to war on their own.** `territory_wars` had exactly one writer, `territory.claim`, and it
+always made the acting player's sect the attacker. Thirteen sects, a full siege resolver with scores,
+morale, occupations and an era war-pressure modifier - and the map could only ever be contested by
+somebody at a keyboard. A sect with standing and means and a weakly-held rival border now moves on
+it, rarely, never onto ground already contested and never at a wall it cannot breach. It opens the
+same operation row a player's war does, taken from the engine's own statement rather than written
+afresh, because a siege with no operation row is a war the tick cannot fight.
+
+**Inscription was Appraisal all over again.** Eight professions, and the eighth had no recipe, no
+call that granted it and no check that rolled it - the exact shape "Appraisal" was in before this
+release. Six of the eight recipes filed under Formation were talismans; only the two array disks
+were formation work. The talismans belong to the inscribers now, and because a talisman bench and an
+array table are the same room here - the sect manor's own description says its grand defensive array
+doubles as an inscription workshop - inscription shares the formation workshop, manor hall and effect
+bonus. Splitting them without that would have quietly stripped every talisman recipe of its bonuses,
+which is the fault this sweep was looking for, committed in the act of fixing another one.
+
+**And `item_provenance.authenticity` finally means something.** Five writers, every one of them
+passing the literal 100, and no rule anywhere reading it: the column recorded precisely that nothing
+in the world was ever fake. Some of what the underworld sells is fake. A broker's goods now enter at
+a rolled authenticity, a keeper pays a forgery what a forgery is worth - so passing one off at full
+price depends on the buyer not having had it read - and an appraisal is where a holder finds out
+which they are carrying. The worst provenance is the one that counts: if one of the three seals in
+your bag is a copy you cannot know which, and neither can the keeper pricing them. Nothing here
+touches what an item *does*; authenticity is information and money, not power.
+
+The placeholders got the rest of it. 43 of the 48 auction houses were byte-identical - local, six
+lots, 360 minutes - which mattered more than it looks, because the consignment tick reads the lot cap
+to decide whether the world's finders can put anything on a floor at all. A floor's size is the trade
+that passes through it now: roads met, world, and how many shops the city keeps, giving nine distinct
+floors instead of two. And the repricing from earlier in this release was half a job - 37 items still
+had no `base_price` and a dozen still carried the exact placeholder 8, so a Spirit-Iron Sword, a
+Recovery Pill and a set of Formation Flags were worth the same through the `max(8, sect_value*8)`
+fallback that five separate valuation sites use. Every item has a decided price now, anchored on
+what the shops already charge, and content gates hold all of it: every item priced, a sword dearer
+than a pill, the floors not one floor copied, and every declared crafting profession making
+something.
+
+**1.0.0** (rc.14) repairs a broken call in `/sense` and closes the class of fault it belongs to.
+Sensing another cultivator called `WORLD.approximate_realm(...)`, and there is no such method on
+`World`: the function lives in `app/rules/sense.py` and takes its two realm lookups as arguments, so
+the call was wrong in both its name and its signature and would raise `AttributeError`. The three
 branches beside it read `realm_world`, `realm_name` and `body_realm_name`, all real methods, which is
-exactly why the fourth read as one. The function had been written for that call and never wired to
-it, so it had never run once.
+exactly why the fourth was written as one.
+
+Why nobody ever hit it is the more interesting half, and it is a balance fault rather than a lucky
+escape: the branch is reached only when detection succeeds *and* precision lands on "success" or
+"strong", and those two conditions are close to mutually exclusive. Precision's target number rises
+2 a realm while a concealed target's detection target rises 7, so by the time a target is far enough
+above you to make precision marginal, detection has already failed. Swept over the realm ladder and
+some 2,900 attribute builds, `approx` is 0.3% of outcomes and `realm` 0.015%, both confined to a
+minimum-stat realm-0 character; everyone else gets `exact` (66%), `none` (25%) or `world` (9%). Two
+of the five readings `/sense` can give are effectively dead, which is a tuning question for the sense
+system and not something this release changes. The call is simply correct now.
 
 Nothing was looking, and that is the half worth keeping. `F821`, selected in rc.13 after the `/craft`
 crash, finds a name nothing defines - not an attribute nothing defines - and no suite can walk every
@@ -324,13 +694,15 @@ mechanical authority paths.
 
 ## Release status — v1.0.0
 
-- Current release: v1.0.0 (rc.15): the shorthand — `x explore` runs `/explore`, resolved against the
+- Current release: v1.0.0 (rc.16): the shorthand — `x explore` runs `/explore`, resolved against the
   registered command table and heard in every channel of the guild, silent on a line that names no
-  command. Tagged `v1.0.0-rc.15` on the beta channel; the NAS drills and two quiet weeks make it
+  command. Tagged `v1.0.0-rc.16` on the beta channel; the NAS drills and two quiet weeks make it
   `v1.0.0`.
-- v1.0.0 (rc.14): `/sense` no longer raises on the reading it gives most often, and
-  every attribute the command surface reads off `DB`, `WORLD`, `SETTINGS` and `ENGINE` is held to
-  exist by a test.
+- v1.0.0 (rc.15): the spiritual sense reads the ground it is standing on, the two middle readings it
+  could give become reachable, and it stops asking the world for minute zero.
+- v1.0.0 (rc.14): a broken call in `/sense` repaired, and every attribute the command surface reads
+  off `DB`, `WORLD`, `SETTINGS` and `ENGINE` held to exist by a test. A NAS still on rc.12 needs the
+  fixed `update.sh` dropped in by hand before it can install this or anything after it - see rc.13.
 - v1.0.0 (rc.13): the hub surface regrouped around what a player is doing, the updater fix that makes
   a stamped release installable at all, and - cut into the same tree before it shipped - the `/craft`
   `NameError` and the thirty printed hub paths that drew no button.
@@ -583,6 +955,16 @@ mechanical authority paths.
 - **Schema 27** added the v0.19.29 mute/freeze moderation columns on `characters`
   (`is_muted`, `is_frozen`, `moderation_reason`).
 - **Schema 28** added the Quest Forge definition table (`quest_definitions`).
+- **Schema 45** let the world's own people put things under the hammer and gave a cultivator
+  somewhere to record what they have learned to recognise. `auctions` gained `seller_npc_name`
+  (mirroring `merchant_buyer` and `merchant_bidder`, because the seller column is foreign-keyed
+  to `characters` and a finder is not one), plus `appraised` and `grade_band` for a lot consigned
+  blind; `character_item_appraisals` is shaped like `character_location_discoveries` - a
+  composite key, the route by which it became known, and the minute it did.
+- **Schema 44** dropped `core_state_versions` and `core_request_log`, which came in with
+  migration 12 as the shape of an earlier write ledger and were never written or read by
+  anything in any release since. Migration 12 keeps its statements - a historical migration is
+  how an old database walks forward - so the removal is its own step rather than a rewrite.
 - **Schema 43** added the cast an event brings with it (`world_event_npcs`): the captain to
   report to, the elder to impress, the auctioneer whose floor it is - named at spawn, talkable
   through the ordinary NPC path, and event-scoped so the life simulation never inherits them.

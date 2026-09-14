@@ -227,7 +227,7 @@ func (r *Runner) finalizeAuctions(conn *storage.Conn, gm int64) (int64, error) {
 			if _, err = conn.Execute(`INSERT INTO inventory(user_id,item_id,quantity) VALUES(?,?,?) ON CONFLICT(user_id,item_id) DO UPDATE SET quantity=inventory.quantity+excluded.quantity`, []any{winner, fmt.Sprint(a["item_id"]), i64(a["quantity"])}); err != nil {
 				return 0, err
 			}
-			if err = walletDeltaSim(conn, i64(a["seller_user_id"]), fmt.Sprint(a["currency_id"]), i64(a["current_bid"])); err != nil {
+			if err = payAuctionSeller(conn, a, i64(a["current_bid"])); err != nil {
 				return 0, err
 			}
 			if err = game.AuctionStruckProsperityTx(conn, r.World, a); err != nil {
@@ -265,8 +265,15 @@ func (r *Runner) finalizeAuctions(conn *storage.Conn, gm int64) (int64, error) {
 				}
 			}
 			if !bought {
-				if _, err = conn.Execute(`INSERT INTO inventory(user_id,item_id,quantity) VALUES(?,?,?) ON CONFLICT(user_id,item_id) DO UPDATE SET quantity=inventory.quantity+excluded.quantity`, []any{i64(a["seller_user_id"]), fmt.Sprint(a["item_id"]), i64(a["quantity"])}); err != nil {
-					return 0, err
+				// Back to whoever consigned it. A player gets the goods
+				// returned to their bag; one of the world's own people simply
+				// takes it home again, and there is no bag to put it in -
+				// writing the row anyway would have credited user 0, a
+				// character that does not exist.
+				if seller := i64(a["seller_user_id"]); seller > 0 {
+					if _, err = conn.Execute(`INSERT INTO inventory(user_id,item_id,quantity) VALUES(?,?,?) ON CONFLICT(user_id,item_id) DO UPDATE SET quantity=inventory.quantity+excluded.quantity`, []any{seller, fmt.Sprint(a["item_id"]), i64(a["quantity"])}); err != nil {
+						return 0, err
+					}
 				}
 			}
 		}
@@ -275,6 +282,35 @@ func (r *Runner) finalizeAuctions(conn *storage.Conn, gm int64) (int64, error) {
 		}
 	}
 	return int64(len(rows)), nil
+}
+
+// payAuctionSeller credits whoever put the lot up (v1.0.0-rc.15).
+//
+// A lot used to have exactly one kind of seller, so the payout was one
+// `walletDeltaSim` on `seller_user_id`. A consignment from one of the world's
+// own people has no character behind it - `seller_user_id` is 0, because the
+// column is foreign-keyed to `characters` - and paying user 0 would have
+// written a wallet row for a character that does not exist. A finder is paid
+// into the only purse they have: their own `wealth`.
+func payAuctionSeller(conn *storage.Conn, a map[string]any, amount int64) error {
+	if seller := i64(a["seller_user_id"]); seller > 0 {
+		return walletDeltaSim(conn, seller, fmt.Sprint(a["currency_id"]), amount)
+	}
+	npc := strings.TrimSpace(fmt.Sprint(a["seller_npc_name"]))
+	if npc == "" || amount <= 0 {
+		return nil
+	}
+	_, err := conn.Execute(
+		`UPDATE npc_civilization_state SET wealth=MIN(9999,wealth+?),updated_at=? WHERE npc_name=?`,
+		[]any{maxSim(1, amount/8), nowFloat(), npc})
+	return err
+}
+
+func maxSim(a, b int64) int64 {
+	if a > b {
+		return a
+	}
+	return b
 }
 
 func (r *Runner) spawnHunters(conn *storage.Conn, gm int64) (int64, error) {
