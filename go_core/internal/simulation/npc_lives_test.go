@@ -295,11 +295,20 @@ func TestABreakthroughNeedsTheMeansForIt(t *testing.T) {
 
 // npc_disciple_bonds had no writer while world_status_queries.go *queried* it,
 // so "who is whose disciple" was a question the world always answered empty.
+//
+// The hall is deliberately full. Taking a disciple is one `gamerng` roll per
+// candidate pair at `discipleChance` (20 in 100), and this test asserts that
+// *somebody* is taken - which with the fifteen youths it first had was a false
+// failure once in every 28 runs (0.8^15 = 3.5%), and duly failed a CI run that
+// had nothing to do with it. Seventy puts that at one run in six million
+// (0.8^70), which is the same bargain `TestTheWorldsPeopleConsignWhatTheyFind`
+// makes with its thirty grave-robbers. The production roll is untouched: the
+// sample was too small to ask the question, not the odds wrong.
 func TestMastersTakeDisciples(t *testing.T) {
 	path := livesDB(t)
 	r := livesRunner()
 	addNPC(t, path, "Elder Gao", "Greenriver Town", "Greenriver Town", "Mortal World", "Elder", 60, "Azure Cloud Sect")
-	for i := 0; i < 15; i++ {
+	for i := 0; i < 70; i++ {
 		addNPC(t, path, fmt.Sprintf("Youth %02d", i), "Greenriver Town", "Greenriver Town",
 			"Mortal World", "Cultivator", 50, "Independent")
 	}
