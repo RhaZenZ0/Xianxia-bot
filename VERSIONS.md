@@ -48,6 +48,21 @@ nobody can collect and a capture nothing can perform. Making NPC crime *prosecut
 change and a separate decision; making it real is not, and this is real - the money moves, the
 grudge is held, the contraband is on the night market, and the hunter does not always come home.
 
+**The dice can be borrowed by a test now.** Two tests in the simulation package asserted that a
+low-probability thing eventually happened - a sect declaring war on a 12% roll, a grave-robber
+turning something up on a 22% one - against `crypto/rand`, and so failed for no reason about one run
+in two thousand and one in fifty respectively. More iterations only make that number small; it never
+reaches zero, and a test that fails for no reason is worse than no test because it teaches the next
+person to re-run CI instead of reading it. `gamerng.UseRoller` lends the dice to one test and hands
+back the restore; the roller is given the bound it was called with, so a test can answer a 1-in-100
+chance differently from a pick out of a list, and its answer is clamped into the die so no test can
+roll something impossible. Production is untouched - there is still no seed, and a test in `gamerng`
+walks every non-test file in the engine to prove nothing outside a `_test.go` ever calls it.
+
+Both tests are better for it rather than merely quieter: the grave-robber one now pins that thirty
+finders produce *exactly* `findCap` lots instead of "not zero", and the sect-war one runs a single
+week instead of rolling sixty and hoping.
+
 Also in this release: the shorthand's abbreviation rule ate one word too few. A group with a single
 leaf abbreviates to that leaf, and the leaf's own word was left sitting in the line - `x prof status`
 ran `/profession status` and then offered "status" to its first parameter. Both such groups take no

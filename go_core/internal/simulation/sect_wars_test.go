@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 
+	"xianxia/core/internal/gamerng"
 	"xianxia/core/internal/storage"
 )
 
@@ -89,12 +90,14 @@ func runWars(t *testing.T, path string, r *Runner, steps, gm int64) int64 {
 func TestAnAmbitiousSectMovesOnAWeakNeighbour(t *testing.T) {
 	path := sectWarDB(t)
 	r := &Runner{}
-	declared := int64(0)
-	for tick := 0; tick < 60 && declared == 0; tick++ {
-		declared += runWars(t, path, r, 1, int64(10000+tick*10080))
-	}
-	if declared == 0 {
-		t.Fatal("sixty weeks of politics and no sect ever moved on anyone")
+	// One week, and the week the sect moves. Before this the test rolled the
+	// real 12% chance up to sixty times and asserted that one of them landed,
+	// which came up empty about one run in two thousand - a failure that says
+	// nothing about the code and costs somebody an afternoon. The rules being
+	// tested are who moves and on what, and neither is a matter of chance.
+	defer gamerng.UseRoller(func(int) int { return 0 })()
+	if declared := runWars(t, path, r, 1, 10000); declared != 1 {
+		t.Fatalf("an ambitious sect beside a weakly-held border declared %d war(s)", declared)
 	}
 	if got := fmt.Sprint(simScalar(t, path, `SELECT attacker_key FROM territory_wars LIMIT 1`)); got != "Azure Reed Sect" {
 		t.Fatalf("the weak sect declared instead: %q", got)

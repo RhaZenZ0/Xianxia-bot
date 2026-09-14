@@ -309,6 +309,14 @@ plane, and is read-only (no `admin_audit_log` row, and it sits under Systems, no
   put new tests in the layer they actually test, and don't duplicate Go-owned formulas/state
   transitions in pytest once a mechanic has moved to Go.
 - `tests/support.py` holds shared dependency shims and test path helpers.
+- **Never assert that a random thing happened, however many iterations you give it.** The simulation
+  is built out of low-probability rolls and `gamerng` is `crypto/rand` with no seed, so a
+  "sixty ticks and surely one landed" test fails for no reason at some rate you cannot drive to
+  zero. Use `gamerng.UseRoller(fn)` (v1.0.0-rc.23) — it lends the dice to one test and returns the
+  restore, which you must `defer`; `fn` receives the bound so one kind of roll can be answered
+  differently from another, and its answer is clamped into the die. It is test-only and a test in
+  `gamerng` walks every non-test file in `go_core` to keep it that way. Where the outcome can be
+  made certain by the *scenario* instead (overwhelming attributes, a stacked fixture), prefer that.
 
 ## Release delivery
 
