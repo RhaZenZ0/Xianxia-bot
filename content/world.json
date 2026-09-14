@@ -28580,7 +28580,16 @@
         "level": 80
       }
     ],
-    "resource_policy": "Sect members donate materials for contribution points. Higher ranks and accumulated influence determine political weight; contribution points can be exchanged for stocked sect resources."
+    "resource_policy": "Sect members donate materials for contribution points. Higher ranks and accumulated influence determine political weight; contribution points can be exchanged for stocked sect resources.",
+    "tribute": {
+      "materials": [
+        "@herb",
+        "@ore",
+        "@core"
+      ],
+      "disciples_per_lot": 2,
+      "cap": 60
+    }
   },
   "sects": {
     "Azure Cloud Sect": {

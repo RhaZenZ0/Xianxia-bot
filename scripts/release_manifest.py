@@ -27,6 +27,14 @@ from pathlib import Path
 MANIFEST_NAME = "RELEASE_MANIFEST.sha256"
 
 # Directories never shipped, or not content-stable across machines.
+#
+# Matched against every part of a path, the last one included, because several
+# of these are not always directories. `.git` is a *file* in a git worktree or
+# a submodule checkout - one line reading `gitdir: ...` - and hashing that
+# produced a manifest entry for a path that does not exist in an ordinary
+# clone. v1.0.0-rc.16 shipped exactly that: the tree was correct, every other
+# hash was right, and `--verify` failed with `MISSING .git` on any machine
+# whose `.git` was a directory, which is every machine that clones normally.
 EXCLUDED_DIRS = frozenset({
     ".git", "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache",
     "node_modules", "data", "updates", "update_backups", ".venv", "venv",
@@ -56,7 +64,7 @@ def iter_release_files(root: Path):
         if not path.is_file() or path.is_symlink():
             continue
         relative = path.relative_to(root)
-        if any(part in EXCLUDED_DIRS for part in relative.parts[:-1]):
+        if any(part in EXCLUDED_DIRS for part in relative.parts):
             continue
         if relative.name in EXCLUDED_NAMES or relative.name.endswith(EXCLUDED_SUFFIXES):
             continue
