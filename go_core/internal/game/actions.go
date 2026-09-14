@@ -51,6 +51,8 @@ func ApplyWithWorld(databasePath, worldPath string, req ActionRequest) (ActionRe
 	switch req.Operation {
 	case "relationship.update":
 		result, err = relationshipUpdate(conn, req.ActorID, req.Payload)
+	case "npc.found":
+		result, err = npcFound(conn, req.ActorID, req.Payload)
 	case "scene.transition":
 		result, err = sceneTransition(conn, req.ActorID, req.Payload)
 	case "quest.progress":

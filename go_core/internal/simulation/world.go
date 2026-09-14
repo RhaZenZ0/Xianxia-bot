@@ -486,7 +486,12 @@ last_game_minute=?,updated_at=? WHERE status='alive'`, []any{max1(steps / 2), st
 func (r *Runner) npcLife(conn *storage.Conn, steps, gm int64) (string, error) {
 	now := nowFloat()
 	heal := max1(steps / 2)
-	_, err := conn.Execute(`UPDATE npc_life_state SET health=MIN(100,health+?),injury_severity=MAX(0,injury_severity-?),injury=CASE WHEN injury_severity<=? THEN '' ELSE injury END,career_progress=MIN(1000,career_progress+MAX(1,?)),last_cultivation_game_minute=?,updated_at=? WHERE health>0`, []any{heal, max1(steps / 3), max1(steps / 3), steps, gm, now})
+	// Only the living, and only those the world can still see. This was
+	// `WHERE health>0` with no join to status, so it healed anybody whose
+	// death had been written in `npc_civilization_state` and nowhere else,
+	// and - from schema 47 - it would have undone a missing person's hunger
+	// every tick and made the disappearance survivable forever.
+	_, err := conn.Execute(`UPDATE npc_life_state SET health=MIN(100,health+?),injury_severity=MAX(0,injury_severity-?),injury=CASE WHEN injury_severity<=? THEN '' ELSE injury END,career_progress=MIN(1000,career_progress+MAX(1,?)),last_cultivation_game_minute=?,updated_at=? WHERE health>0 AND EXISTS(SELECT 1 FROM npc_civilization_state c WHERE c.npc_name=npc_life_state.npc_name AND c.status='alive')`, []any{heal, max1(steps / 3), max1(steps / 3), steps, gm, now})
 	if err != nil {
 		return "", err
 	}
@@ -540,6 +545,13 @@ func (r *Runner) npcLife(conn *storage.Conn, steps, gm int64) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	// Somebody walks out and does not arrive. This is the one autonomous
+	// event significant enough to reach the Quest Forge, which is the point
+	// of it - see npc_missing.go.
+	lost, lostForGood, err := r.npcDisappearances(conn, gm)
+	if err != nil {
+		return "", err
+	}
 	born, err := r.npcChildbirth(conn, steps, gm)
 	if err != nil {
 		return "", err
@@ -557,8 +569,8 @@ func (r *Runner) npcLife(conn *storage.Conn, steps, gm int64) (string, error) {
 		return "", err
 	}
 	return fmt.Sprintf(
-		"batch-advanced NPC life; %d natural death(s), %d courtship(s) begun, %d new marriage(s), %d courtship(s) ended, %d birth(s), %d promotion(s), %d new disciple(s), %d feud(s) settled (%d fatal)",
-		len(deaths), courted, marriages, parted, born, promoted, bonds, fought, killed), nil
+		"batch-advanced NPC life; %d natural death(s), %d courtship(s) begun, %d new marriage(s), %d courtship(s) ended, %d birth(s), %d promotion(s), %d new disciple(s), %d feud(s) settled (%d fatal), %d went missing, %d were never found",
+		len(deaths), courted, marriages, parted, born, promoted, bonds, fought, killed, lost, lostForGood), nil
 }
 
 func (r *Runner) economy(conn *storage.Conn, steps, gm int64) (string, error) {

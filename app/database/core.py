@@ -26,7 +26,7 @@ from .remote import GoDatabaseTransport
 log = logging.getLogger("xianxia.database")
 
 
-SCHEMA_VERSION = 46
+SCHEMA_VERSION = 47
 # A readiness probe must validate more than the schema-version marker.  If the
 # SQLite file is removed or replaced while the bot is running, SQLite will
 # happily create a new empty file at the same path.  Checking these tables lets
@@ -1856,6 +1856,29 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
             "INSERT INTO character_recipes(user_id,recipe,source) SELECT p.user_id, 'Starlight Dao Pill', 'grandfathered' FROM profession_progress p WHERE p.profession='Alchemy' AND p.level>=4 ON CONFLICT(user_id,recipe) DO NOTHING",
             "INSERT INTO character_recipes(user_id,recipe,source) SELECT p.user_id, 'Starsteel Aegis', 'grandfathered' FROM profession_progress p WHERE p.profession='Forging' AND p.level>=4 ON CONFLICT(user_id,recipe) DO NOTHING",
             "INSERT INTO character_recipes(user_id,recipe,source) SELECT p.user_id, 'Starsteel Glaive', 'grandfathered' FROM profession_progress p WHERE p.profession='Forging' AND p.level>=4 ON CONFLICT(user_id,recipe) DO NOTHING",
+        ),
+    ),
+    (
+        47,
+        "npcs_can_go_missing",
+        (
+            # v1.0.0-rc.23: somebody who walked out of their own town and did
+            # not arrive anywhere. `npcTravel` deliberately stores no journey -
+            # "nothing tracks how long they have been away - this is what makes
+            # the journey end without storing a journey" - which is the right
+            # rule for an errand and the wrong one for a disappearance, because
+            # the whole point of a disappearance is how long it has lasted.
+            # This is the one thing about a journey worth keeping: the minute
+            # it stopped being one.
+            #
+            # `status` carries 'missing' beside 'alive' and 'dead'. Every
+            # autonomous batch already reads `WHERE status='alive'`, so a
+            # missing person stops travelling, courting, working and bearing
+            # children by construction rather than by a rule written four more
+            # times.
+            """ALTER TABLE npc_civilization_state ADD COLUMN missing_since_game_minute INTEGER NOT NULL DEFAULT 0""",
+            """CREATE INDEX IF NOT EXISTS idx_npc_missing
+                   ON npc_civilization_state(status,missing_since_game_minute)""",
         ),
     ),
 )

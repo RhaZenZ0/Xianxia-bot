@@ -69,10 +69,10 @@ func TestRunDueCapsWorkWithoutDiscardingBacklog(t *testing.T) {
 	path := setupSimulationDB(t, `
 CREATE TABLE world_simulation_state(system TEXT PRIMARY KEY,last_game_minute INTEGER,interval_game_minutes INTEGER,last_run_real REAL,runs INTEGER);
 CREATE TABLE civilization_regions(location TEXT PRIMARY KEY,world_name TEXT,population INTEGER,prosperity INTEGER,security INTEGER,spirit_resources INTEGER,food_supply INTEGER,migration_pressure INTEGER,unrest INTEGER,last_game_minute INTEGER,updated_at REAL);
-CREATE TABLE npc_civilization_state(npc_name TEXT PRIMARY KEY,home_location TEXT,current_location TEXT,world_name TEXT,profession TEXT,faction TEXT,wealth INTEGER,influence INTEGER,ambition INTEGER,realm_index INTEGER,phase INTEGER,status TEXT,activity TEXT,last_game_minute INTEGER,updated_at REAL);
+CREATE TABLE npc_civilization_state(npc_name TEXT PRIMARY KEY,home_location TEXT,current_location TEXT,world_name TEXT,profession TEXT,faction TEXT,wealth INTEGER,influence INTEGER,ambition INTEGER,realm_index INTEGER,phase INTEGER,status TEXT,activity TEXT,missing_since_game_minute INTEGER DEFAULT 0,last_game_minute INTEGER,updated_at REAL);
 INSERT INTO world_simulation_state VALUES('npc_civilization',0,1440,0,0);
 INSERT INTO civilization_regions VALUES('Greenriver Town','Mortal World',1000,50,50,50,50,0,0,0,0);
-INSERT INTO npc_civilization_state VALUES('Elder Test','Greenriver Town','Greenriver Town','Mortal World','Elder','Independent',20,20,20,1,1,'alive','Cultivating',0,0);
+INSERT INTO npc_civilization_state(npc_name,home_location,current_location,world_name,profession,faction,wealth,influence,ambition,realm_index,phase,status,activity,last_game_minute,updated_at) VALUES('Elder Test','Greenriver Town','Greenriver Town','Mortal World','Elder','Independent',20,20,20,1,1,'alive','Cultivating',0,0);
 `)
 	runner, err := NewRunner(path, "")
 	if err != nil {
@@ -100,7 +100,7 @@ INSERT INTO npc_civilization_state VALUES('Elder Test','Greenriver Town','Greenr
 func TestNPCLifeBatchAppliesNaturalDeath(t *testing.T) {
 	path := setupSimulationDB(t, `
 CREATE TABLE world_simulation_state(system TEXT PRIMARY KEY,last_game_minute INTEGER,interval_game_minutes INTEGER,last_run_real REAL,runs INTEGER);
-CREATE TABLE npc_civilization_state(npc_name TEXT PRIMARY KEY,home_location TEXT,current_location TEXT,world_name TEXT,profession TEXT,faction TEXT DEFAULT 'Independent',wealth INTEGER DEFAULT 20,influence INTEGER DEFAULT 10,ambition INTEGER DEFAULT 50,realm_index INTEGER DEFAULT 0,phase INTEGER DEFAULT 1,status TEXT,activity TEXT,last_game_minute INTEGER DEFAULT 0,updated_at REAL DEFAULT 0);
+CREATE TABLE npc_civilization_state(npc_name TEXT PRIMARY KEY,home_location TEXT,current_location TEXT,world_name TEXT,profession TEXT,faction TEXT DEFAULT 'Independent',wealth INTEGER DEFAULT 20,influence INTEGER DEFAULT 10,ambition INTEGER DEFAULT 50,realm_index INTEGER DEFAULT 0,phase INTEGER DEFAULT 1,status TEXT,activity TEXT,missing_since_game_minute INTEGER DEFAULT 0,last_game_minute INTEGER DEFAULT 0,updated_at REAL DEFAULT 0);
 CREATE TABLE npc_life_state(npc_name TEXT PRIMARY KEY,birth_game_minute INTEGER,age_at_creation_years INTEGER,natural_lifespan_years INTEGER,health INTEGER,injury TEXT,injury_severity INTEGER,sect_rank TEXT,career_progress INTEGER,relationship_status TEXT,spouse_name TEXT,children_count INTEGER,last_social_game_minute INTEGER,last_cultivation_game_minute INTEGER,death_game_minute INTEGER,cause_of_death TEXT,updated_at REAL);
 CREATE TABLE npc_social_relations(npc_a TEXT,npc_b TEXT,affinity INTEGER,trust INTEGER,grudge INTEGER,relation_type TEXT,status TEXT,started_game_minute INTEGER,last_interaction_game_minute INTEGER,updated_at REAL,PRIMARY KEY(npc_a,npc_b));
 INSERT INTO world_simulation_state VALUES('npc_life',0,10080,0,0);
@@ -126,7 +126,7 @@ INSERT INTO npc_life_state(npc_name,birth_game_minute,age_at_creation_years,natu
 func TestNPCLifeUsesCanonicalHighRealmCeiling(t *testing.T) {
 	path := setupSimulationDB(t, `
 CREATE TABLE world_simulation_state(system TEXT PRIMARY KEY,last_game_minute INTEGER,interval_game_minutes INTEGER,last_run_real REAL,runs INTEGER);
-CREATE TABLE npc_civilization_state(npc_name TEXT PRIMARY KEY,home_location TEXT,current_location TEXT,world_name TEXT,profession TEXT,faction TEXT DEFAULT 'Independent',wealth INTEGER DEFAULT 20,influence INTEGER DEFAULT 10,ambition INTEGER DEFAULT 50,realm_index INTEGER DEFAULT 0,phase INTEGER DEFAULT 1,status TEXT,activity TEXT,last_game_minute INTEGER DEFAULT 0,updated_at REAL DEFAULT 0);
+CREATE TABLE npc_civilization_state(npc_name TEXT PRIMARY KEY,home_location TEXT,current_location TEXT,world_name TEXT,profession TEXT,faction TEXT DEFAULT 'Independent',wealth INTEGER DEFAULT 20,influence INTEGER DEFAULT 10,ambition INTEGER DEFAULT 50,realm_index INTEGER DEFAULT 0,phase INTEGER DEFAULT 1,status TEXT,activity TEXT,missing_since_game_minute INTEGER DEFAULT 0,last_game_minute INTEGER DEFAULT 0,updated_at REAL DEFAULT 0);
 CREATE TABLE npc_life_state(npc_name TEXT PRIMARY KEY,birth_game_minute INTEGER,age_at_creation_years INTEGER,natural_lifespan_years INTEGER,health INTEGER,injury TEXT,injury_severity INTEGER,sect_rank TEXT,career_progress INTEGER,relationship_status TEXT,spouse_name TEXT,children_count INTEGER,last_social_game_minute INTEGER,last_cultivation_game_minute INTEGER,death_game_minute INTEGER,cause_of_death TEXT,updated_at REAL);
 CREATE TABLE npc_social_relations(npc_a TEXT,npc_b TEXT,affinity INTEGER,trust INTEGER,grudge INTEGER,relation_type TEXT,status TEXT,started_game_minute INTEGER,last_interaction_game_minute INTEGER,updated_at REAL,PRIMARY KEY(npc_a,npc_b));
 INSERT INTO world_simulation_state VALUES('npc_life',0,10080,0,0);
@@ -149,7 +149,7 @@ INSERT INTO npc_life_state(npc_name,birth_game_minute,age_at_creation_years,natu
 func TestNPCLifeBatchCanCreateMarriageInOneTransaction(t *testing.T) {
 	path := setupSimulationDB(t, `
 CREATE TABLE world_simulation_state(system TEXT PRIMARY KEY,last_game_minute INTEGER,interval_game_minutes INTEGER,last_run_real REAL,runs INTEGER);
-CREATE TABLE npc_civilization_state(npc_name TEXT PRIMARY KEY,home_location TEXT,current_location TEXT,world_name TEXT,profession TEXT,faction TEXT DEFAULT 'Independent',wealth INTEGER DEFAULT 20,influence INTEGER DEFAULT 10,ambition INTEGER DEFAULT 50,realm_index INTEGER DEFAULT 0,phase INTEGER DEFAULT 1,status TEXT,activity TEXT,last_game_minute INTEGER DEFAULT 0,updated_at REAL DEFAULT 0);
+CREATE TABLE npc_civilization_state(npc_name TEXT PRIMARY KEY,home_location TEXT,current_location TEXT,world_name TEXT,profession TEXT,faction TEXT DEFAULT 'Independent',wealth INTEGER DEFAULT 20,influence INTEGER DEFAULT 10,ambition INTEGER DEFAULT 50,realm_index INTEGER DEFAULT 0,phase INTEGER DEFAULT 1,status TEXT,activity TEXT,missing_since_game_minute INTEGER DEFAULT 0,last_game_minute INTEGER DEFAULT 0,updated_at REAL DEFAULT 0);
 CREATE TABLE npc_life_state(npc_name TEXT PRIMARY KEY,birth_game_minute INTEGER,age_at_creation_years INTEGER,natural_lifespan_years INTEGER,health INTEGER,injury TEXT,injury_severity INTEGER,sect_rank TEXT,career_progress INTEGER,relationship_status TEXT,spouse_name TEXT,children_count INTEGER,last_social_game_minute INTEGER,last_cultivation_game_minute INTEGER,death_game_minute INTEGER,cause_of_death TEXT,updated_at REAL);
 CREATE TABLE npc_social_relations(npc_a TEXT,npc_b TEXT,affinity INTEGER,trust INTEGER,grudge INTEGER,relation_type TEXT,status TEXT,started_game_minute INTEGER,last_interaction_game_minute INTEGER,updated_at REAL,PRIMARY KEY(npc_a,npc_b));
 INSERT INTO world_simulation_state VALUES('npc_life',0,10080,0,0);

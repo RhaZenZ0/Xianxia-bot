@@ -1247,6 +1247,16 @@ mechanical authority paths.
 - **Schema 27** added the v0.19.29 mute/freeze moderation columns on `characters`
   (`is_muted`, `is_frozen`, `moderation_reason`).
 - **Schema 28** added the Quest Forge definition table (`quest_definitions`).
+- **Schema 47** gave a disappearance a length. `npc_civilization_state` gained
+  `missing_since_game_minute`, and `status` carries `'missing'` beside `'alive'` and `'dead'`, so
+  every batch that reads `WHERE status='alive'` stops offering a missing person by construction
+  rather than by a rule written four more times. `npcTravel` deliberately stores no journey -
+  "nothing tracks how long they have been away - this is what makes the journey end without storing
+  a journey" - which is the right rule for an errand and the wrong one for a disappearance, because
+  how long it has lasted is the whole of what makes one. It is the single thing about a journey
+  worth keeping: the minute it stopped being one. Nothing is dropped and no existing column changes
+  meaning, so an old database upgrades by adding a column with a default of zero.
+
 - **Schema 46** gave a method somewhere to be known. `character_recipes` is the third table in
   the family of `character_manuals` and `character_item_appraisals` - a composite key, the route
   by which it was learned, and the minute it was - because crafting now asks whether a cultivator

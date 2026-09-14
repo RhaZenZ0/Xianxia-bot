@@ -130,6 +130,32 @@ async def talk(
             commission_offer = None
             commission_block = None
     await interaction.response.defer()
+    # Finding somebody the world had given up on (v1.0.0-rc.23). The presence
+    # check above has already established that the player is standing where
+    # this NPC is, which is the only way a disappearance can be closed - and
+    # the engine checks it again itself rather than taking our word for it.
+    #
+    # After the defer, never before it: this is a mutation, and every other
+    # path out of this handler acks inside a guard branch, so an engine call
+    # up there would be the unacked-mutation shape `test_ack_before_mutation`
+    # exists to catch.
+    found_note = ""
+    if str(npc_state.get("status") or "") == "missing":
+        try:
+            found = await ENGINE.authoritative_action(
+                "npc.found",
+                interaction.user.id,
+                {"npc_name": npc, "location": str(c.get("location") or ""), "game_minute": wt.total_minutes},
+            )
+            result = (found or {}).get("result") or {}
+            if result.get("found"):
+                days = int(result.get("days_missing") or 0)
+                found_note = (
+                    f"\n\n🔎 **{npc}** had been missing for **{days}** day(s). "
+                    "Word of where they were goes back the way you came."
+                )
+        except GameEngineError:
+            log.exception("Could not close the disappearance of %s", npc)
     try:
         answer = await NARRATOR_QUEUE.run(
             "talk_to_npc",
@@ -197,7 +223,7 @@ async def talk(
         except Exception:
             log.exception("Commission card build failed for %s", npc)
             commission_card, commission_view = ("", None)
-    await reply_long(interaction, f"**{npc}**\n{answer}{recommendation_hint}")
+    await reply_long(interaction, f"**{npc}**\n{answer}{found_note}{recommendation_hint}")
     if commission_card:
         # Posted as its own message so the buttons are attached to the
         # canonical card, never to a paragraph the model wrote.

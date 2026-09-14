@@ -25,7 +25,10 @@ class DeadNPCsAreNotOfferedTests(unittest.TestCase):
         # An NPC with no simulation state at all is still "unknown", not dead:
         # that is the existing "do not filter on what you do not know" rule and
         # it has to survive.
-        self.assertIn('not in ("", "alive")', source)
+        self.assertIn('not in ("", "alive", "missing")', source)
+        # ...and a missing NPC is neither: they are exactly where they are,
+        # the world simply does not know it (schema 47).
+        self.assertIn('if status == "missing":', source)
         self.assertIn("return None", source)
 
     def test_the_picker_skips_the_dead(self):
