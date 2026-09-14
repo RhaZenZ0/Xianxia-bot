@@ -29,11 +29,60 @@ import discord
 
 from .registry import ACTIONS, EVENT_HANDLERS
 from .runtime import SETTINGS, TYPED_PLAY_BUDGET, log
-from .typed_play_router import Candidate, Route, VerbTable
+from .typed_play_router import Candidate, CommandParameter, CommandSpec, Route, VerbTable
 
 VERB_TABLE = VerbTable.load()
 
 NarrateFn = Callable[[Any], Awaitable[None]]
+
+# Commands the shorthand never reaches (v1.0.0). The /admin tree is gated in
+# every handler by require_admin, which reads interaction.user and so refuses a
+# typed line correctly - but a chat line should not be the thing that finds the
+# one leaf where somebody forgot the guard.
+SHORTHAND_EXCLUDED = ("admin",)
+
+# How a Discord option type answers "can a player type this?". Anything absent
+# is "other", which the router treats as not fillable: an unmapped annotation
+# is refused rather than handed to a handler as the wrong type.
+_PARAMETER_KINDS = {
+    "string": "str",
+    "integer": "int",
+    "boolean": "bool",
+    "user": "member",
+    "mentionable": "member",
+}
+
+_COMMAND_SPECS: dict[str, CommandSpec] | None = None
+
+
+def _parameter_kind(parameter: Any) -> str:
+    """What kind of value a registered command's parameter takes."""
+    if getattr(parameter, "choices", ()):
+        return "choice"
+    option_type = getattr(parameter, "type", None)
+    return _PARAMETER_KINDS.get(str(getattr(option_type, "name", "")), "other")
+
+
+def command_specs() -> dict[str, CommandSpec]:
+    """Every command the shorthand may name, as plain data, keyed by name.
+
+    Built once from the same registry the hubs and typed play dispatch through,
+    so a command added anywhere is reachable by name without a second list to
+    keep in step.
+    """
+    global _COMMAND_SPECS
+    if _COMMAND_SPECS is None:
+        specs: dict[str, CommandSpec] = {}
+        for name, command in ACTIONS.all_commands().items():
+            if name.split(" ", 1)[0] in SHORTHAND_EXCLUDED:
+                continue
+            parameters = tuple(
+                CommandParameter(str(p.name), _parameter_kind(p), bool(getattr(p, "required", False)))
+                for p in getattr(command, "parameters", ())
+            )
+            specs[name.casefold()] = CommandSpec(name, parameters)
+        _COMMAND_SPECS = specs
+    return _COMMAND_SPECS
 
 
 class TypedPlayUnsupported(RuntimeError):

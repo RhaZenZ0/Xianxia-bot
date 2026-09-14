@@ -244,3 +244,57 @@ class ConfigTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TypedPlayShorthandTests(unittest.TestCase):
+    """TYPED_PLAY_SHORTHAND (v1.0.0): the word that names a command.
+
+    Unlike the prefix it may be a letter, because it is only heard as a whole
+    word in front of a real command name.
+    """
+
+    def base_env(self):
+        return ConfigTests.base_env(self)
+
+    def _settings(self, **overrides):
+        env = self.base_env()
+        env.update(overrides)
+        with patch.dict(os.environ, env, clear=True):
+            return Settings.from_env()
+
+    def test_the_default_is_x(self):
+        self.assertEqual(self._settings().typed_play_shorthand, "x")
+
+    def test_empty_disables_it(self):
+        self.assertEqual(self._settings(TYPED_PLAY_SHORTHAND="").typed_play_shorthand, "")
+        self.assertEqual(self._settings(TYPED_PLAY_SHORTHAND="   ").typed_play_shorthand, "")
+
+    def test_it_is_casefolded_so_the_capital_works_too(self):
+        self.assertEqual(self._settings(TYPED_PLAY_SHORTHAND="Act").typed_play_shorthand, "act")
+
+    def test_a_phrase_is_rejected(self):
+        with self.assertRaises(ValueError):
+            self._settings(TYPED_PLAY_SHORTHAND="do it")
+
+    def test_a_word_that_starts_ordinary_speech_is_rejected(self):
+        # The whole reason the prefix refuses letters: with "i" as the token,
+        # every "I explore the ravine" in the guild would become an action.
+        for word in ("i", "I", "we", "my", "the", "do"):
+            with self.subTest(word=word), self.assertRaises(ValueError):
+                self._settings(TYPED_PLAY_SHORTHAND=word)
+
+    def test_a_token_whose_casefold_changes_length_is_rejected(self):
+        # "ß".casefold() is "ss", which would misalign the parser's slice.
+        with self.assertRaises(ValueError):
+            self._settings(TYPED_PLAY_SHORTHAND="ß")
+
+    def test_an_over_long_token_is_rejected(self):
+        with self.assertRaises(ValueError):
+            self._settings(TYPED_PLAY_SHORTHAND="abcdefghi")
+
+    def test_it_may_not_collide_with_the_prefix(self):
+        # Otherwise one line would parse as both an action and a shorthand.
+        with self.assertRaises(ValueError):
+            self._settings(TYPED_PLAY_PREFIX="$", TYPED_PLAY_SHORTHAND="$")
+        with self.assertRaises(ValueError):
+            self._settings(TYPED_PLAY_PREFIX="$", TYPED_PLAY_SHORTHAND="$do")

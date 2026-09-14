@@ -30,7 +30,7 @@ import json
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Iterable, Sequence
+from typing import Any, Iterable, Mapping, Sequence
 
 DEFAULT_TABLE_PATH = Path(__file__).resolve().parents[2] / "content" / "typed_play.json"
 
@@ -50,6 +50,17 @@ _WORD_RE = re.compile(r"[a-z0-9']+")
 
 
 ARGUMENT_SOURCES = ("location", "item", "npc", "player")
+
+# --- the shorthand ("x explore", v1.0.0) -----------------------------------
+# A qualified command name is at most two words ("travel go").
+MAX_COMMAND_WORDS = 2
+# Shorter than this, a first word is not an abbreviation, it is a coincidence.
+MIN_ABBREVIATION = 3
+# The parameter kinds plain words can fill. A choice or a member would reach
+# the handler as the wrong type, so those commands stay slash-only.
+FILLABLE_KINDS = frozenset({"str", "int", "bool"})
+_TRUE_WORDS = frozenset({"true", "yes", "on", "1"})
+_FALSE_WORDS = frozenset({"false", "no", "off", "0"})
 
 
 @dataclass(frozen=True)
@@ -86,6 +97,42 @@ class VerbAction:
     @property
     def source(self) -> str:
         return self.arguments[0].source if self.arguments else ""
+
+
+@dataclass(frozen=True)
+class CommandParameter:
+    """One parameter of a registered command, as plain data (v1.0.0).
+
+    ``kind`` is the shape a shorthand line has to supply: ``str``, ``int`` and
+    ``bool`` are words a player can type; ``choice`` and ``member`` are picked
+    from a list Discord draws; ``other`` is anything nobody has mapped, and is
+    deliberately treated like the two above - refused rather than guessed.
+    """
+    name: str
+    kind: str
+    required: bool = False
+
+
+@dataclass(frozen=True)
+class CommandSpec:
+    """A registered command reduced to what the shorthand needs to know.
+
+    Built from the Discord command objects by ``typed_play.command_specs``;
+    kept as plain data here so this module stays loadable without discord.py.
+    """
+    name: str                                       # qualified: "explore", "travel go"
+    parameters: tuple[CommandParameter, ...] = ()
+
+    @property
+    def required(self) -> tuple[CommandParameter, ...]:
+        return tuple(parameter for parameter in self.parameters if parameter.required)
+
+
+@dataclass(frozen=True)
+class CommandMatch:
+    """The command a shorthand line names, and how many words said it."""
+    spec: CommandSpec
+    words: int
 
 
 @dataclass(frozen=True)
@@ -136,6 +183,16 @@ class VerbTable:
             (alias.casefold().strip(), action) for action in self.actions for alias in action.aliases if alias.strip()
         ]
         self._alias_index.sort(key=lambda item: len(item[0]), reverse=True)
+        # A root by the command it runs, so the shorthand can fill "x use a
+        # healing pill" the same way the prefix fills "$ I drink a healing pill".
+        self._by_command: dict[str, VerbAction] = {}
+        for action in self.actions:
+            if action.kind == "root" and action.command:
+                self._by_command.setdefault(action.command, action)
+
+    def for_command(self, name: str) -> VerbAction | None:
+        """The root entry describing ``name``, or None if the table has none."""
+        return self._by_command.get(name)
 
     @classmethod
     def load(cls, path: Path | str = DEFAULT_TABLE_PATH) -> "VerbTable":
@@ -365,6 +422,60 @@ def addressed_npc(text: str, present: Iterable[str]) -> str | None:
 
 # -- stage 3: route --------------------------------------------------------
 
+def _argument_sources(
+    present: Sequence[str],
+    locations: Iterable[str],
+    items: Iterable[tuple[str, str]],
+) -> dict[str, list[tuple[str, str]]]:
+    """What each argument source is resolved against, as (value, display) pairs.
+
+    A ``player`` value is the Discord user id; ``typed_play.dispatch`` swaps it
+    for the member before the handler sees it.
+    """
+    return {
+        "location": [(name, name) for name in locations],
+        "item": list(items),
+        "npc": [(name, name) for name in present if not _player_target_name(name)],
+        "player": [(name.split(":", 1)[0].removeprefix("Player ").strip(), _player_target_name(name)) for name in present if _player_target_name(name)],
+    }
+
+
+def _root_candidate(
+    action: VerbAction,
+    text: str,
+    sources: dict[str, list[tuple[str, str]]],
+    score: int = 0,
+) -> tuple[Candidate | None, VerbArgument | None]:
+    """The Candidate a root becomes, or the required argument that stopped it.
+
+    Shared by the prefixed line and the shorthand so both fill a root's
+    arguments by the same rules; exactly one of the two returns is set.
+    """
+    if not action.arguments:
+        return Candidate("root", action.label, {"command": action.command}, score), None
+    values: dict[str, str] = {}
+    argument_sources: dict[str, str] = {}
+    displays: list[str] = []
+    for argument in action.arguments:
+        found = resolve_argument(text, sources.get(argument.source, ()))
+        if found is None:
+            if argument.optional:
+                continue
+            return None, argument
+        values[argument.parameter], display = found
+        argument_sources[argument.parameter] = argument.source
+        displays.append(display)
+    payload = {"command": action.command, "arguments": values, "sources": argument_sources}
+    return Candidate("root", " → ".join([action.label, *displays]), payload, score), None
+
+
+def _argument_prompt(unresolved: Sequence[VerbArgument]) -> str:
+    """What to tell a player whose line named a root but not its argument."""
+    wants = {"location": "a place you know", "item": "something you carry", "npc": "someone who is here", "player": "a cultivator who is here"}
+    asks = sorted({f"{a.parameter.replace('_', ' ')} needs {wants.get(a.source, 'a name')}" for a in unresolved})
+    return "; ".join(asks).capitalize() + "."
+
+
 def parse_prefixed(content: str, prefix: str) -> str | None:
     """The action text of a prefixed line, or None if the line is not prefixed.
 
@@ -403,12 +514,7 @@ def route_line(
     """
     text = text.strip()[:MAX_LINE_CHARS]
     present_list = list(present)
-    sources: dict[str, list[tuple[str, str]]] = {
-        "location": [(name, name) for name in locations],
-        "item": list(items),
-        "npc": [(name, name) for name in present_list if not _player_target_name(name)],
-        "player": [(name.split(":", 1)[0].removeprefix("Player ").strip(), _player_target_name(name)) for name in present_list if _player_target_name(name)],
-    }
+    sources = _argument_sources(present_list, locations, items)
     unresolved: list[VerbArgument] = []
     entities = resolve_entities(text, present)
     npc = next((e for e in entities if not _player_target_name(e)), None)
@@ -424,28 +530,11 @@ def route_line(
     candidates: list[Candidate] = []
     for action, score in ranked:
         if action.kind == "root":
-            if action.arguments:
-                values: dict[str, str] = {}
-                argument_sources: dict[str, str] = {}
-                displays: list[str] = []
-                missing = None
-                for argument in action.arguments:
-                    found = resolve_argument(text, sources.get(argument.source, ()))
-                    if found is None:
-                        if argument.optional:
-                            continue
-                        missing = argument
-                        break
-                    values[argument.parameter], display = found
-                    argument_sources[argument.parameter] = argument.source
-                    displays.append(display)
-                if missing is not None:
-                    unresolved.append(missing)
-                    continue
-                candidates.append(Candidate("root", " → ".join([action.label, *displays]),
-                                            {"command": action.command, "arguments": values, "sources": argument_sources}, score))
+            candidate, missing = _root_candidate(action, text, sources, score)
+            if missing is not None:
+                unresolved.append(missing)
                 continue
-            candidates.append(Candidate("root", action.label, {"command": action.command}, score))
+            candidates.append(candidate)
         elif action.kind == "scene":
             label = action.label if target == "Environment" else f"{action.label} → {_player_target_name(target) or target}"
             candidates.append(Candidate("scene", label, {"scene_action": action.scene_action, "target": target, "detail": text}, score))
@@ -463,9 +552,7 @@ def route_line(
 
     if not candidates:
         if unresolved:
-            wants = {"location": "a place you know", "item": "something you carry", "npc": "someone who is here", "player": "a cultivator who is here"}
-            asks = sorted({f"{a.parameter.replace('_', ' ')} needs {wants.get(a.source, 'a name')}" for a in unresolved})
-            return Route("picker", (), message="; ".join(asks).capitalize() + ".", text=text)
+            return Route("picker", (), message=_argument_prompt(unresolved), text=text)
         return Route("picker", (), text=text)
 
     top = candidates[0]
@@ -477,3 +564,156 @@ def route_line(
     if top.score >= 100 and runner.score < 100:
         return Route("dispatch", (top,), text=text)
     return Route("picker", tuple(candidates[:MAX_PICKER_CANDIDATES]), text=text)
+
+
+# --------------------------------------------------------------------------
+# The shorthand: "x explore" names a command (v1.0.0)
+# --------------------------------------------------------------------------
+
+def parse_shorthand(content: str, token: str) -> str | None:
+    """What follows the shorthand token on a line ("x explore" -> "explore").
+
+    None when the line does not open with the token as a whole word, so
+    "xylophone" is speech and a bare "x" is speech. Matched by slicing and
+    casefolded comparison rather than a regex, so the token needs no escaping
+    and "X explore" works. An empty token disables the shorthand.
+    """
+    if not token:
+        return None
+    raw = content.lstrip()
+    if raw[:len(token)].casefold() != token:
+        return None
+    rest = raw[len(token):]
+    if not rest[:1].isspace():
+        return None
+    text = rest.strip()
+    if not text:
+        return None
+    return text[:MAX_LINE_CHARS]
+
+
+def command_named(text: str, *, commands: Mapping[str, CommandSpec]) -> CommandMatch | None:
+    """The command a shorthand line names, or None if it names none.
+
+    Pure and cheap - a few dictionary lookups, no IO - because this is what
+    decides whether a line typed outside a scene channel is heard at all.
+    An exact name wins, longest first so "travel go" beats "travel". Several
+    commands spell as one word what a player types as two, so the words are
+    also tried joined: "x world events" is /worldevents, not /world with the
+    rest of the line dropped. Failing all that, a first word of at least
+    MIN_ABBREVIATION characters that begins exactly one command's first word is
+    that command ("x inv" is /inventory); two candidates identify neither, and
+    the router never guesses.
+    """
+    words = text.split()
+    if not words:
+        return None
+    for depth in range(min(MAX_COMMAND_WORDS, len(words)), 0, -1):
+        joined = words[:depth]
+        for name in (" ".join(joined), "".join(joined)):
+            spec = commands.get(name.casefold())
+            if spec is not None:
+                return CommandMatch(spec, depth)
+    head = words[0].casefold()
+    if len(head) < MIN_ABBREVIATION:
+        return None
+    matched = {spec.name: spec for name, spec in commands.items() if name.split(" ", 1)[0].startswith(head)}
+    if len(matched) != 1:
+        return None
+    return CommandMatch(next(iter(matched.values())), 1)
+
+
+def _parameter_value(parameter: CommandParameter, words: str) -> str | int | bool | None:
+    """``words`` as the parameter's own type, or None if they are not it."""
+    if parameter.kind == "str":
+        return words
+    if parameter.kind == "int":
+        try:
+            return int(words.strip())
+        except ValueError:
+            return None
+    if parameter.kind == "bool":
+        word = words.strip().casefold()
+        if word in _TRUE_WORDS:
+            return True
+        if word in _FALSE_WORDS:
+            return False
+    return None
+
+
+def _fillable(required: Sequence[CommandParameter], words: Sequence[str]) -> bool:
+    """Whether ``words`` can fill these required parameters without guessing.
+
+    Every one has to be a kind a player can type, and there has to be a word
+    for each. At most one may be free text, and it has to be the last, because
+    two free-text parameters give the line no boundary between them: splitting
+    "merchant buy zhao jade talisman" is a guess, and the router never guesses.
+    """
+    if len(words) < len(required) or any(p.kind not in FILLABLE_KINDS for p in required):
+        return False
+    free_text = [index for index, p in enumerate(required) if p.kind == "str"]
+    return not free_text or (len(free_text) == 1 and free_text[0] == len(required) - 1)
+
+
+def _shorthand_refusal(spec: CommandSpec) -> str:
+    """Why a named command could not be run from a shorthand line."""
+    unfillable = sorted(p.name.replace("_", " ") for p in spec.required if p.kind not in FILLABLE_KINDS)
+    if unfillable:
+        return (
+            f"`/{spec.name}` picks {', '.join(unfillable)} from a list — "
+            "use the slash command or its hub."
+        )
+    wants = ", ".join(p.name.replace("_", " ") for p in spec.required)
+    return f"`/{spec.name}` needs {wants} — use the slash command or its hub."
+
+
+def route_command(
+    text: str,
+    *,
+    match: CommandMatch,
+    table: VerbTable,
+    present: Sequence[str] = (),
+    locations: Iterable[str] = (),
+    items: Iterable[tuple[str, str]] = (),
+) -> Route:
+    """Turn a shorthand line that names a command into a Route.
+
+    The words that named the command are consumed; what is left fills its
+    arguments, two ways. A command the verb table already describes is filled
+    the way a prefixed line fills it - entity resolution against what is
+    present - so "x use a healing pill" reaches a real inventory id rather than
+    the words. Any other command takes its *required* parameters positionally,
+    last one greedy, and only while they are plain words: a choice or a member
+    would reach the handler as the wrong type, so those go back to the slash
+    command. Optional parameters are never filled, so "x sense" runs bare.
+
+    Returns dispatch or refusal, never a picker: the line named one command, so
+    there is never a choice to put to the player.
+    """
+    text = text.strip()[:MAX_LINE_CHARS]
+    spec = match.spec
+    remainder = " ".join(text.split()[match.words:])
+    action = table.for_command(spec.name)
+    if action is not None and action.arguments:
+        sources = _argument_sources(list(present), locations, items)
+        candidate, missing = _root_candidate(action, remainder, sources, 100)
+        if candidate is not None:
+            return Route("dispatch", (candidate,), text=text)
+        # A named command with an argument it could not fill is not ambiguity -
+        # there is nothing to pick between - so it is answered, not offered.
+        return Route("refusal", message=_argument_prompt([missing]), text=text)
+    required = spec.required
+    if not required:
+        return Route("dispatch", (Candidate("root", f"/{spec.name}", {"command": spec.name}, 100),), text=text)
+    words = remainder.split()
+    if not _fillable(required, words):
+        return Route("refusal", message=_shorthand_refusal(spec), text=text)
+    values: dict[str, Any] = {}
+    for index, parameter in enumerate(required):
+        chunk = " ".join(words[index:]) if index == len(required) - 1 else words[index]
+        value = _parameter_value(parameter, chunk)
+        if value is None:
+            return Route("refusal", message=_shorthand_refusal(spec), text=text)
+        values[parameter.name] = value
+    label = " → ".join([f"/{spec.name}", *(str(v) for v in values.values())])
+    return Route("dispatch", (Candidate("root", label, {"command": spec.name, "arguments": values}, 100),), text=text)

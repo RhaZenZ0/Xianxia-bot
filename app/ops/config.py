@@ -51,6 +51,45 @@ def _typed_play_prefix(value: str | None) -> str:
     return prefix
 
 
+# Words an ordinary sentence starts with. The prefix refuses letters outright
+# for this reason; the shorthand may be a word, so it refuses the words that
+# would swallow speech instead - "i explore the ravine" must stay speech even
+# for an operator who sets the shorthand to "i".
+_SPEECH_WORDS = frozenset({
+    "a", "an", "and", "as", "at", "but", "do", "for", "he", "her", "his", "i",
+    "if", "in", "is", "it", "its", "me", "my", "no", "not", "of", "ok", "on",
+    "or", "our", "she", "so", "the", "their", "they", "to", "up", "we", "yes",
+    "you", "your",
+})
+
+
+def _typed_play_shorthand(value: str | None, *, prefix: str) -> str:
+    """The word that turns a plain line into a command ("x explore").
+
+    Unlike the prefix above this may be a letter, because it is matched as a
+    whole word followed by a space and only acts when what follows names a real
+    command: "x marks the spot" resolves to nothing and stays speech. Casefolded,
+    so "X explore" works too. Empty disables the shorthand entirely.
+
+    ASCII only, because the parser compares a casefolded slice of the line
+    against it and a character whose casefold changes length ("ß" -> "ss") would
+    misalign that slice. It may not begin with the prefix either, so no setting
+    can make one line parse as both an action and a shorthand.
+    """
+    token = (value if value is not None else "x").strip()
+    if token == "":
+        return ""
+    if len(token) > 8:
+        raise ValueError("TYPED_PLAY_SHORTHAND must be at most 8 characters, or empty to disable")
+    if not token.isascii() or any(character.isspace() for character in token):
+        raise ValueError("TYPED_PLAY_SHORTHAND must be a single ASCII word with no spaces")
+    if token.casefold() in _SPEECH_WORDS:
+        raise ValueError(f"TYPED_PLAY_SHORTHAND must not be {token!r}: it would swallow ordinary speech")
+    if prefix and token.startswith(prefix):
+        raise ValueError("TYPED_PLAY_SHORTHAND must not start with TYPED_PLAY_PREFIX")
+    return token.casefold()
+
+
 def _as_int_set(value: str | None, *, name: str = "value") -> set[int]:
     if not value:
         return set()
@@ -135,6 +174,7 @@ class Settings:
     quest_reward_max_stones: int
     quest_reward_max_items: int
     typed_play_prefix: str
+    typed_play_shorthand: str
     typed_play_burst: int
     typed_play_per_minute: float
     typed_play_hint: bool
@@ -456,6 +496,7 @@ class Settings:
             if quest_budget[key] < 0:
                 raise ValueError(f"{key} cannot be negative")
         typed_play_prefix = _typed_play_prefix(os.getenv("TYPED_PLAY_PREFIX"))
+        typed_play_shorthand = _typed_play_shorthand(os.getenv("TYPED_PLAY_SHORTHAND"), prefix=typed_play_prefix)
         typed_play_burst = _as_int(os.getenv("TYPED_PLAY_BURST"), 4, name="TYPED_PLAY_BURST")
         typed_play_per_minute = _as_float(os.getenv("TYPED_PLAY_PER_MINUTE"), 6.0, name="TYPED_PLAY_PER_MINUTE")
         if typed_play_burst < 1:
@@ -530,6 +571,7 @@ class Settings:
             quest_reward_max_stones=quest_budget["QUEST_REWARD_MAX_STONES"],
             quest_reward_max_items=quest_budget["QUEST_REWARD_MAX_ITEMS"],
             typed_play_prefix=typed_play_prefix,
+            typed_play_shorthand=typed_play_shorthand,
             typed_play_burst=typed_play_burst,
             typed_play_per_minute=typed_play_per_minute,
             typed_play_hint=_as_bool(os.getenv("TYPED_PLAY_HINT"), True),

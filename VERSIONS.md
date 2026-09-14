@@ -6,6 +6,33 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.0** (rc.16) adds the shorthand: `x explore` runs `/explore`. Typed play has had one door since
+v0.21.1, the prefix, and it reaches the world through the verb table in `content/typed_play.json` -
+which is eight of the forty-three roots. There has never been a way to type a command by its own
+name, and there could not be: `TYPED_PLAY_PREFIX` is one character and refuses letters outright, for
+the reason its docstring gives, that "i explore" must never become an action because somebody set the
+prefix to "i". So the shorthand is a word rather than a symbol, and it earns that by resolving
+against the *registered command table* - `ACTIONS`, the same one the hubs and typed play dispatch
+through - rather than against a second list kept in this repo. `x travel go Greenriver Town` reaches
+the group leaf; `x inv` reaches `/inventory` when exactly one command begins that way; `x world
+events` reaches `/worldevents` rather than running `/world` and dropping the rest.
+
+The reason it can be heard in every channel of the guild, which the prefix is not, is that it does
+nothing at all until a line names a real command. `x marks the spot` in a chat channel costs one
+dictionary lookup and returns before the first database read - the gate that already decided which
+channels typed play listens in carries the rule, so there is one place for it rather than a channel
+test in the branch as well. Inside the channels it always listened to, a shorthand line that names no
+command still falls through to the verb table, so `x search the ravine` is unchanged. Arguments are
+filled two ways and neither guesses: a command the verb table already describes gets the entity
+resolution the prefix gets, so `x use a healing pill` reaches a real inventory id; anything else fills
+its required parameters positionally, and only while they are plain words with a boundary between
+them. Two free-text parameters have no such boundary - splitting `merchant buy zhao jade talisman` is
+a coin flip - so that, and a value Discord picks from a list, and the whole `/admin` tree, are
+answered with the slash command instead. The new door spends the same per-player bucket under its own
+name, so the AI Routing page says which of the four a refusal came through. `TYPED_PLAY_SHORTHAND` is
+`x`, empty disables it, and the words that start ordinary sentences are refused as tokens. No schema
+change.
+
 **1.0.0** (rc.15) sets the world's own people moving, and makes a spiritual sense worth casting at
 them. `npc_civilization_state` has carried `home_location`, `current_location` and `faction` since
 the simulation was built, and the daily tick moved wealth, influence, ambition, activity and phase -
@@ -667,9 +694,12 @@ mechanical authority paths.
 
 ## Release status — v1.0.0
 
-- Current release: v1.0.0 (rc.15): the spiritual sense reads the ground it is standing on, the two
-  middle readings it could give become reachable, and it stops asking the world for minute zero.
-  Tagged `v1.0.0-rc.15` on the beta channel; the NAS drills and two quiet weeks make it `v1.0.0`.
+- Current release: v1.0.0 (rc.16): the shorthand — `x explore` runs `/explore`, resolved against the
+  registered command table and heard in every channel of the guild, silent on a line that names no
+  command. Tagged `v1.0.0-rc.16` on the beta channel; the NAS drills and two quiet weeks make it
+  `v1.0.0`.
+- v1.0.0 (rc.15): the spiritual sense reads the ground it is standing on, the two middle readings it
+  could give become reachable, and it stops asking the world for minute zero.
 - v1.0.0 (rc.14): a broken call in `/sense` repaired, and every attribute the command surface reads
   off `DB`, `WORLD`, `SETTINGS` and `ENGINE` held to exist by a test. A NAS still on rc.12 needs the
   fixed `update.sh` dropped in by hand before it can install this or anything after it - see rc.13.

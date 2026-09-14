@@ -366,3 +366,162 @@ class TwoArgumentRootTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             router.VerbTable.from_data({"actions": [{"key": "x", "kind": "root", "command": "use", "arguments": [{"parameter": "item", "source": "item"}, {"parameter": "item", "source": "player"}]}]})
 
+
+
+# ---------------------------------------------------------------------------
+# The shorthand: "x explore" names a command (v1.0.0)
+# ---------------------------------------------------------------------------
+
+_CS = router.CommandSpec
+_CP = router.CommandParameter
+
+COMMANDS = {
+    spec.name: spec
+    for spec in (
+        _CS("explore"),
+        _CS("inventory"),
+        _CS("travel go", (_CP("destination", "str", True),)),
+        _CS("travel status"),
+        _CS("use", (_CP("item", "str", True),)),
+        _CS("npcinfo", (_CP("npc", "str", True),)),
+        _CS("talk", (_CP("npc", "str", True), _CP("message", "str", True))),
+        _CS("conceal", (_CP("active", "bool", True),)),
+        _CS("check", (_CP("attribute", "choice", True), _CP("action", "str", True))),
+        _CS("sense", (_CP("target", "member", False), _CP("area", "bool", False))),
+        _CS("stipend", (_CP("amount", "int", True),)),
+        _CS("shop buy", (_CP("item", "str", True),)),
+        _CS("auction bid", (_CP("auction_id", "int", True), _CP("amount", "int", True))),
+        _CS("merchant buy", (_CP("merchant", "str", True), _CP("item", "str", True))),
+        _CS("worldevents"),
+        _CS("world"),
+    )
+}
+
+
+def _shorthand(text: str):
+    """The Route a shorthand line becomes, or None when it names no command."""
+    match = router.command_named(text, commands=COMMANDS)
+    if match is None:
+        return None
+    return router.route_command(text, match=match, table=TABLE, present=PRESENT,
+                                locations=KNOWN, items=CARRIED)
+
+
+class ShorthandParseTests(unittest.TestCase):
+    def test_token_is_taken_as_a_whole_word(self):
+        self.assertEqual(router.parse_shorthand("x explore", "x"), "explore")
+        self.assertEqual(router.parse_shorthand("  x  explore the ravine ", "x"), "explore the ravine")
+
+    def test_case_does_not_matter(self):
+        self.assertEqual(router.parse_shorthand("X explore", "x"), "explore")
+
+    def test_a_word_merely_starting_with_the_token_is_speech(self):
+        self.assertIsNone(router.parse_shorthand("xexplore", "x"))
+        self.assertIsNone(router.parse_shorthand("xylophone lessons", "x"))
+
+    def test_a_bare_token_is_speech(self):
+        self.assertIsNone(router.parse_shorthand("x", "x"))
+        self.assertIsNone(router.parse_shorthand("x   ", "x"))
+
+    def test_an_empty_token_disables_the_shorthand(self):
+        self.assertIsNone(router.parse_shorthand("x explore", ""))
+
+    def test_a_longer_token_works(self):
+        self.assertEqual(router.parse_shorthand("do explore", "do"), "explore")
+        self.assertIsNone(router.parse_shorthand("done exploring", "do"))
+
+    def test_line_is_capped(self):
+        long = "x " + "a" * 5000
+        self.assertEqual(len(router.parse_shorthand(long, "x")), router.MAX_LINE_CHARS)
+
+
+class ShorthandCommandTests(unittest.TestCase):
+    # (line, expected candidate ids) - None means "names no command at all",
+    # which is what keeps an ordinary chat channel silent.
+    ROWS = (
+        ("explore", ["root:explore"]),
+        ("explore the ravine", ["root:explore"]),          # a zero-arg root ignores the rest
+        ("travel status", ["root:travel status"]),         # a group leaf by its qualified name
+        ("travel go Greenriver Town", ["root:travel go:Greenriver Town"]),
+        ("npcinfo Steward Qiao", ["root:npcinfo:Steward Qiao"]),
+        ("shop buy jade talisman", ["root:shop buy:jade talisman"]),  # one free-text argument, greedy
+        ("auction bid 4 500", ["root:auction bid:4:500"]),            # numbers have their own boundaries
+        ("conceal on", ["root:conceal:True"]),
+        ("stipend 40", ["root:stipend:40"]),
+        ("sense", ["root:sense"]),                         # all-optional runs bare
+        ("marks the spot", None),
+        ("", None),
+    )
+
+    def test_rows(self):
+        for line, expected in self.ROWS:
+            with self.subTest(text=line):
+                route = _shorthand(line)
+                if expected is None:
+                    self.assertIsNone(route)
+                    continue
+                self.assertEqual(route.kind, "dispatch", route.message)
+                self.assertEqual(_ids(route), expected)
+
+    def test_a_verb_table_argument_is_resolved_against_what_is_carried(self):
+        # "use" is in the verb table, so the shorthand fills it the way the
+        # prefix does: a real inventory id, not the words the player typed.
+        route = _shorthand("use healing pill")
+        self.assertEqual(_ids(route), ["root:use:healing_pill"])
+
+    def test_a_verb_table_argument_that_resolves_to_nothing_is_answered(self):
+        route = _shorthand("travel go")
+        self.assertEqual(route.kind, "refusal")
+        self.assertIn("place you know", route.message)
+
+    def test_a_choice_parameter_is_sent_to_the_slash_command(self):
+        route = _shorthand("check might climb the wall")
+        self.assertEqual(route.kind, "refusal")
+        self.assertIn("/check", route.message)
+        self.assertIn("from a list", route.message)
+
+    def test_a_required_parameter_with_nothing_to_fill_it_is_refused(self):
+        route = _shorthand("npcinfo")
+        self.assertEqual(route.kind, "refusal")
+        self.assertIn("/npcinfo", route.message)
+
+    def test_a_word_that_is_not_the_parameters_type_is_refused(self):
+        self.assertEqual(_shorthand("stipend plenty").kind, "refusal")
+        self.assertEqual(_shorthand("conceal maybe").kind, "refusal")
+
+    def test_two_free_text_parameters_are_never_split(self):
+        # "merchant buy zhao jade talisman" has no boundary between the two,
+        # and a guess here would buy the wrong thing from the wrong person.
+        route = _shorthand("merchant buy zhao jade talisman")
+        self.assertEqual(route.kind, "refusal")
+        self.assertIn("/merchant buy", route.message)
+        self.assertEqual(_shorthand("talk Qiao what news").kind, "refusal")
+
+    def test_a_name_spelled_as_one_word_is_found_when_typed_as_two(self):
+        # Otherwise "x world events" would silently run /world and drop the rest.
+        self.assertEqual(_ids(_shorthand("world events")), ["root:worldevents"])
+        self.assertEqual(_ids(_shorthand("world")), ["root:world"])
+
+    def test_an_exact_name_beats_an_abbreviation(self):
+        self.assertEqual(_ids(_shorthand("use healing pill")), ["root:use:healing_pill"])
+
+    def test_a_unique_abbreviation_is_the_command_it_begins(self):
+        self.assertEqual(_ids(_shorthand("inv")), ["root:inventory"])
+        self.assertEqual(_ids(_shorthand("expl")), ["root:explore"])
+
+    def test_an_ambiguous_abbreviation_names_nothing(self):
+        # "travel go" and "travel status" both begin with "tra".
+        self.assertIsNone(_shorthand("tra somewhere"))
+
+    def test_an_abbreviation_must_be_long_enough_to_mean_it(self):
+        self.assertIsNone(router.command_named("in", commands=COMMANDS))
+        self.assertEqual(router.command_named("inv", commands=COMMANDS).spec.name, "inventory")
+
+    def test_the_longest_qualified_name_wins(self):
+        match = router.command_named("travel go Greenriver Town", commands=COMMANDS)
+        self.assertEqual((match.spec.name, match.words), ("travel go", 2))
+
+    def test_a_command_absent_from_the_table_is_never_named(self):
+        # /admin is excluded from the table the bot builds, so no shorthand
+        # line can reach it however it is spelled.
+        self.assertIsNone(router.command_named("admin world spawn", commands=COMMANDS))

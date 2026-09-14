@@ -46,8 +46,8 @@ class UserBudget:
     _buckets: dict[int, _Bucket] = field(default_factory=dict, repr=False)
     granted: int = 0
     refused: int = 0
-    # Per door (typed / slash / narrate_it), so the AI Routing page can say
-    # which path the refusals come from.
+    # Per door (typed / shorthand / slash / narrate_it), so the AI Routing page
+    # can say which path the refusals come from.
     doors: dict[str, dict[str, int]] = field(default_factory=dict, repr=False)
 
     def __post_init__(self) -> None:
