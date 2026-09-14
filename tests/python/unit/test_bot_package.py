@@ -696,7 +696,7 @@ SURFACE = {
         "groups": (),
         "roots": (),
         "leaves": {
-            "admin_player_group": ('karma', 'grantstorage', 'grantcurrency', 'grant'),
+            "admin_player_group": ('karma', 'grantstorage', 'grantcurrency', 'grant', 'erase'),
             "admin_sect_group": ('setsect', 'removesect', 'setmaster', 'clearmaster', 'sectrank', 'masterattention'),
             "admin_world_group": ('advancetime', 'events', 'spawnrealm', 'closeevent', 'questforge', 'quests'),
             "admin_server_group": ('maintenance',),

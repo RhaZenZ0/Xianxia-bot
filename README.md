@@ -20,6 +20,9 @@ describes what the engine has already decided, and the game keeps running when t
 - `docs/ROADMAP_1_0.md` — what is left before 1.0 and the test that gates each milestone.
 - `docs/KNOWN_LIMITATIONS.md` — the punch list, every entry fixed or deferred with a reason.
 - `docs/playtest/` — the live-server checklist for the current release.
+- `docs/TOPGG.md` — listing the bot on Top.gg, and verifying votes against their API.
+- `docs/TERMS.md` / `docs/PRIVACY.md` — what players agree to, and what the bot holds about them.
+  The Discord Developer Portal wants a URL for each; these two files are those URLs.
 - `docs/COMMISSIONS_DESIGN.md` — the design of commissions and typed play.
 - `docs/history/` — the record of how the tree got here; nothing in it describes the current release.
 
@@ -520,6 +523,14 @@ deterministic scoring, a small scene packet. Raw player text is tokenised before
 events, player inspection, teleport, revive, currency, karma and cooldowns, moderation (mute, freeze
 and ban with an expiry the engine enforces, force-end-scene, all undoable from the audit log), sect
 and NPC management, simulation automation and forced runs, the Quest Forge, backups and audit logs.
+
+**Honouring a deletion request.** `/admin player erase` removes everything the bot holds about one
+person, across every table in the schema that carries a Discord id — it discovers them by reading the
+schema, so it does not go stale as the game grows. Shared world state (history, a sect or family they
+founded, quests they authored) keeps its row and loses the link rather than vanishing out from under
+the players who are still in it, and the audit log keeps its record that the erasure happened. It is
+the one admin action `undo_last` cannot reverse, so it takes a typed `confirm: ERASE` rather than a
+button. `docs/PRIVACY.md` is what it is promising on behalf of.
 
 **The playtest board.** **/admin → Server → Playtest → Post** puts one message per hub page in
 `#playtest`, pre-reacted ✅ ❌ 💡; testers react and reply under the page, and **Report** tallies the

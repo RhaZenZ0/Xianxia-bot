@@ -40,6 +40,10 @@ FREE_TEXT = frozenset({
     "duration",        # 30m / 2h / 1d, parsed by rules.moderation
     "category_name",   # a Discord category to create
     "story",           # the Quest Forge brief
+    # Typed on purpose. /admin player erase cannot be undone, so the
+    # confirmation is a word the GM has to write out; a one-option
+    # dropdown would turn the safety back into a click.
+    "confirm",
 })
 
 # The parameters the roadmap named as picker-less at v0.32.0 (five), plus the
