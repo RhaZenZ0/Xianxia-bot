@@ -2172,7 +2172,12 @@ class LayoutHubView(_LayoutHubBase):
         fixed = 1 + 1 + 3 + 1 + 1 + 5
         if self.last_result and not self.expired:
             container.add_item(discord.ui.Separator())
-            container.add_item(discord.ui.TextDisplay(f"### 📜 Result\n{self._result_text()}"[:_LAYOUT_RESULT_LIMIT + 48]))
+            # `##`, not `###` (v1.0.0-rc.21): the result is the thing the
+            # player pressed a button to read, and at `###` it sat at the same
+            # weight as the page block listing the actions below it - the
+            # answer and the menu reading as equals. Discord has no lever for
+            # body size, so the heading is the whole of what can be leaned on.
+            container.add_item(discord.ui.TextDisplay(f"## 📜 Result\n{self._result_text()}"[:_LAYOUT_RESULT_LIMIT + 48]))
             fixed += 2
             result_row = self._result_row()
             if result_row is not None:
