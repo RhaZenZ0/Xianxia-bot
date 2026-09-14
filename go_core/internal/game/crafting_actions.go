@@ -896,10 +896,13 @@ func forageResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID i
 
 // --- the learning step ----------------------------------------------------
 //
-// Modelled on `manual.study` (manual_forbidden_actions.go): you must hold the
-// slip, and the first reading records it. The slip is *not* consumed, exactly
-// as a manual is not - a method passed around a sect is a thing this genre does,
-// and destroying the item would make a shared inheritance impossible.
+// You must hold the slip, and the first reading records the method and spends
+// the slip: a jade slip carries one impression of a method and is blank after
+// it is taken. So a method reaches a second cultivator only by a second slip,
+// which is what keeps a shop's stock worth buying and a rare method worth
+// guarding. Reading one whose method you already carry costs nothing and
+// spends nothing: it reports that you know it and leaves the slip in the bags,
+// because a slip burnt for nothing would be a trap rather than a rule.
 
 // knowsRecipeTx is whether this cultivator has been taught a method.
 func knowsRecipeTx(conn *storage.Conn, userID int64, recipe string) (bool, error) {
@@ -956,6 +959,16 @@ func recipeLearnAction(conn *storage.Conn, catalog worlddata.Catalog, userID int
 			[]any{userID, recipeName, gameMinute, "method_slip:" + itemID, nowSeconds()}); err != nil {
 			return authoritativeMutation{}, err
 		}
+		// One impression, one reading. The knowledge is written first and the
+		// slip spent second, both inside the one action transaction, so a
+		// failure between them cannot leave a cultivator charged and untaught.
+		missing, spendErr := consumeInventoryTx(conn, userID, map[string]int64{itemID: 1})
+		if spendErr != nil {
+			return authoritativeMutation{}, spendErr
+		}
+		if len(missing) > 0 {
+			return authoritativeMutation{}, fmt.Errorf("you are not carrying that slip")
+		}
 	}
 	// The level is reported rather than required: a method can be studied
 	// before the hands are ready for it, which is the ordinary way of things.
@@ -967,6 +980,7 @@ func recipeLearnAction(conn *storage.Conn, catalog worlddata.Catalog, userID int
 		"item_id": itemID, "recipe": recipeName, "profession": recipe.Profession,
 		"min_level": recipe.MinLevel, "level": level, "already_known": known,
 		"ready": level >= recipe.MinLevel, "game_minute": gameMinute,
+		"slip_consumed": !known,
 	}
 	return authoritativeMutation{Result: out, Event: eventledger.Event{
 		Domain: "crafting", EventType: "recipe.learn", EntityType: "character",

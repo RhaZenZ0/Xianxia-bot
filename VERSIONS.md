@@ -60,9 +60,12 @@ want a master.
 composite key, and the same incarnation wipe, because what you learned is not what you are. A method
 reaches it by two roads. The first is a **jade slip**: thirty-one items, one per recipe, priced at
 twice the base price of the thing they teach, sold by the shop kind that already trades that
-profession's goods in that world, and *not consumed by reading* - a method passed down a sect is a
-thing this genre does, and burning the slip would make an inheritance impossible. `/learn` reads
-one, reports whether the hands are ready, and says so without refusing the lesson.
+profession's goods in that world, and **spent by the reading**: the jade holds one impression of a
+method and goes blank as it is taken, so a method reaches a second cultivator only by a second slip.
+That is what keeps a shop's stock worth buying and a rare method worth guarding. The one exception is
+the one that would make `/learn` a trap - reading a method you already carry teaches nothing and so
+costs nothing, and the slip stays in the bags for somebody who needs it. `/learn` reads one, reports
+whether the hands are ready, and says so without refusing the lesson.
 
 **The second road is the family you were born to.** A household that has a trade teaches it at the
 send-off, which is where the deadlock was: crafting is the only thing that raises a crafting

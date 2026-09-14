@@ -225,7 +225,8 @@ the call came back the other way: a method is now two things, one you were taugh
 reaches, asked separately because the two refusals send a player to different places. `character_recipes`
 (schema 46) records the first; a `min_level` derived from each recipe's own TN gates the second.
 Knowledge arrives by jade slip - thirty-one items, one per recipe, sold by the shop kind that already
-trades that profession's goods, and not consumed by reading - or from the household you were born to,
+trades that profession's goods, and spent by the reading, one impression per slip - or from the
+household you were born to,
 which teaches its trade's entry methods plus the lowest method of that trade in its own world, so a
 samsara into a Celestial forging house is taught what that world actually uses. Migration 46
 grandfathers every character alive at the time with the entry methods and everything their profession

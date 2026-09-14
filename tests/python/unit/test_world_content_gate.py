@@ -629,6 +629,23 @@ class TheLearningStepTests(unittest.TestCase):
             with self.subTest(profession=profession):
                 self.assertIn(0, levels, f"{profession} has no method anyone could start on")
 
+    def test_no_slip_promises_to_survive_its_own_reading(self):
+        """A slip is spent by reading it, and the copy has to say so.
+
+        `/craft` promising a dish made "from a known recipe" while nothing
+        tracked knowledge is the fault that started this whole audit: copy that
+        describes a rule the engine does not follow. A slip whose description
+        still says it stays yours would be the same thing about consumption.
+        """
+        kept = ("stays yours", "keeps the slip", "is not consumed", "without consuming")
+        for slip in self._slips():
+            description = str(self.ITEMS[slip].get("description") or "").casefold()
+            with self.subTest(slip=slip):
+                self.assertTrue(description, f"{slip} has no description")
+                for claim in kept:
+                    self.assertNotIn(claim, description,
+                                     f"{slip} promises to survive a reading, and recipe.learn spends it")
+
 
 
 class TheHouseholdsTradeTests(unittest.TestCase):

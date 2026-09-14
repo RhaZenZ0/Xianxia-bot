@@ -687,16 +687,16 @@ async def method_slip_autocomplete(interaction: discord.Interaction, current: st
     return out
 
 
-@registered_root_command(name="learn", description="Read a method slip and commit the method to memory", guild=GUILD)
+@registered_root_command(name="learn", description="Read a method slip - the method is yours for good and the slip is spent", guild=GUILD)
 @app_commands.autocomplete(slip=method_slip_autocomplete)
 @serialized_user_action
 async def learn(interaction: discord.Interaction, slip: str) -> None:
     """The other half of the learning step (v1.0.0-rc.20).
 
     A household teaches its own craft and nothing else, so everything else is a
-    jade slip bought from the trade that uses it. Reading one is permanent and
-    does not consume the slip - a method passed around a sect is a thing this
-    genre does.
+    jade slip bought from the trade that uses it. The method is permanent and
+    the slip is not: one impression, one reading. Re-reading a method already
+    carried spends nothing, so nobody burns a spare for no gain.
     """
     if not await require_character(interaction):
         return
@@ -717,9 +717,11 @@ async def learn(interaction: discord.Interaction, slip: str) -> None:
     min_level = int(result.get("min_level") or 0)
     level = int(result.get("level") or 0)
     if result.get("already_known"):
-        head = f"📜 You already carry the method for **{recipe}**."
+        head = (f"📜 You already carry the method for **{recipe}**, "
+                "so the slip stays in your bags unread.")
     else:
-        head = f"📜 You read the slip through, and the method for **{recipe}** is yours."
+        head = (f"📜 You read the slip through. The method for **{recipe}** is yours, "
+                "and the jade is blank.")
     if result.get("ready"):
         tail = f"\n{profession} {level} — your hands are equal to it. **/craft** it when you have the materials."
     else:
