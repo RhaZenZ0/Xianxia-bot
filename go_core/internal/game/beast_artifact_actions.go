@@ -68,6 +68,29 @@ func loadLivingCompanionActor(conn *storage.Conn, userID int64) (mechanicsCharac
 	return character, nil
 }
 
+// The two professions this file grants. They were string literals at six call
+// sites and read by nothing; naming them is half of making them mean something.
+const (
+	beastTamingProfession      = "Beast Taming"
+	artifactRefiningProfession = "Artifact Refining"
+	// What a bonding gains in resonance before the refiner's own skill.
+	artifactBondResonanceStep = int64(8)
+)
+
+// professionLevelTx is the level a cultivator has earned in one profession, or
+// zero if they have never practised it.
+func professionLevelTx(conn *storage.Conn, userID int64, profession string) (int64, error) {
+	res, err := conn.Execute(`SELECT level FROM profession_progress WHERE user_id=? AND profession=?`, []any{userID, profession})
+	if err != nil {
+		return 0, err
+	}
+	row := firstRowMap(res)
+	if row == nil {
+		return 0, nil
+	}
+	return maxI64(0, i64(row["level"])), nil
+}
+
 func canonicalBeastTrainingContext(conn *storage.Conn, userID int64, location string) (int64, int64, error) {
 	location = strings.TrimSpace(location)
 	if location == "" {
@@ -170,7 +193,15 @@ func beastTameAction(conn *storage.Conn, _ worlddata.Catalog, userID int64, raw 
 		pathBonus = 4
 	}
 	bondExperience := minI64(count, 4)
-	modifier := character.Attributes["spirit"] + character.Attributes["presence"] + character.Attributes["will"]/2 + pathBonus + bondExperience
+	// The tamer's own craft (v1.0.0-rc.19). "Beast Taming" was written by four
+	// call sites in this file and read by none: every read of the row went into
+	// the response payload for display, so a Grandmaster tamed no better than a
+	// first-timer. The level belongs in the roll it was already sitting beside.
+	tamingLevel, err := professionLevelTx(conn, userID, beastTamingProfession)
+	if err != nil {
+		return authoritativeMutation{}, err
+	}
+	modifier := character.Attributes["spirit"] + character.Attributes["presence"] + character.Attributes["will"]/2 + pathBonus + bondExperience + tamingLevel
 	roll, err := roll2d10(modifier, i64(encounter["taming_tn"]))
 	if err != nil {
 		return authoritativeMutation{}, err
@@ -187,7 +218,7 @@ func beastTameAction(conn *storage.Conn, _ worlddata.Catalog, userID int64, raw 
 		if _, err = conn.Execute(`UPDATE wild_beast_encounters SET status='escaped',updated_at=? WHERE encounter_id=?`, []any{now, p.EncounterID}); err != nil {
 			return authoritativeMutation{}, err
 		}
-		if _, err = advanceProfessionTx(conn, userID, "Beast Taming", false, 6, 0, now); err != nil {
+		if _, err = advanceProfessionTx(conn, userID, beastTamingProfession, false, 6, 0, now); err != nil {
 			return authoritativeMutation{}, err
 		}
 	} else {
@@ -219,7 +250,7 @@ func beastTameAction(conn *storage.Conn, _ worlddata.Catalog, userID int64, raw 
 			xp += margin
 		}
 		quality := maxI64(0, margin)
-		if _, err = advanceProfessionTx(conn, userID, "Beast Taming", true, xp, quality, now); err != nil {
+		if _, err = advanceProfessionTx(conn, userID, beastTamingProfession, true, xp, quality, now); err != nil {
 			return authoritativeMutation{}, err
 		}
 	}
@@ -348,7 +379,11 @@ func beastTrainAction(conn *storage.Conn, _ worlddata.Catalog, userID int64, raw
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
-	gain := clampI64(6+character.Attributes["spirit"]/3+contextBonus, 1, 25)
+	trainingLevel, err := professionLevelTx(conn, userID, beastTamingProfession)
+	if err != nil {
+		return authoritativeMutation{}, err
+	}
+	gain := clampI64(6+character.Attributes["spirit"]/3+contextBonus+trainingLevel, 1, 25)
 	if _, err = conn.Execute(
 		`UPDATE spirit_beasts SET loyalty=MIN(100,loyalty+?),intelligence=MIN(100,intelligence+MAX(1,?/3)),updated_at=? WHERE user_id=? AND beast_id=?`,
 		[]any{gain, gain, now, userID, p.BeastID},
@@ -358,7 +393,7 @@ func beastTrainAction(conn *storage.Conn, _ worlddata.Catalog, userID int64, raw
 	if err = setCooldown(conn, userID, key, beastTrainCooldownSeconds, now); err != nil {
 		return authoritativeMutation{}, err
 	}
-	prog, err := advanceProfessionTx(conn, userID, "Beast Taming", true, 8, gain/3, now)
+	prog, err := advanceProfessionTx(conn, userID, beastTamingProfession, true, 8, gain/3, now)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -415,7 +450,7 @@ func beastEvolveAction(conn *storage.Conn, _ worlddata.Catalog, userID int64, ra
 	); err != nil {
 		return authoritativeMutation{}, err
 	}
-	prog, err := advanceProfessionTx(conn, userID, "Beast Taming", true, 25, 10, now)
+	prog, err := advanceProfessionTx(conn, userID, beastTamingProfession, true, 25, 10, now)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -525,11 +560,23 @@ func artifactBondAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 	} else if rem > 0 {
 		return authoritativeMutation{}, fmt.Errorf("artifact resonance cooldown: %d seconds", rem)
 	}
+	// A refiner's hand (v1.0.0-rc.19). "Artifact Refining" had the same fault as
+	// Beast Taming and less to fix it with: bonding is deterministic, so there
+	// is no roll for a level to enter. What there is, is a rate - and a refiner
+	// who knows the work draws a bond tight faster. The level adds to the
+	// resonance each bonding gains, which is what awakening gates on, so the
+	// profession shortens the road to an awakened artifact rather than changing
+	// where it ends.
+	refiningLevel, err := professionLevelTx(conn, userID, artifactRefiningProfession)
+	if err != nil {
+		return authoritativeMutation{}, err
+	}
+	resonanceGain := artifactBondResonanceStep + refiningLevel
 	if _, err = conn.Execute(
 		`INSERT INTO artifact_bonds(user_id,item_id,bond_level,resonance,awakened,spirit_name,temperament,created_at,updated_at)
-		 VALUES(?,?,1,10,0,'','dormant',?,?)
-		 ON CONFLICT(user_id,item_id) DO UPDATE SET bond_level=MIN(10,artifact_bonds.bond_level+1),resonance=MIN(100,artifact_bonds.resonance+8),updated_at=excluded.updated_at`,
-		[]any{userID, p.ItemID, now, now},
+		 VALUES(?,?,1,?,0,'','dormant',?,?)
+		 ON CONFLICT(user_id,item_id) DO UPDATE SET bond_level=MIN(10,artifact_bonds.bond_level+1),resonance=MIN(100,artifact_bonds.resonance+?),updated_at=excluded.updated_at`,
+		[]any{userID, p.ItemID, minI64(100, 10+refiningLevel), now, now, resonanceGain},
 	); err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -541,7 +588,7 @@ func artifactBondAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 		return authoritativeMutation{}, err
 	}
 	qualityPoints := maxI64(1, i64(row["resonance"])/20)
-	prog, err := advanceProfessionTx(conn, userID, "Artifact Refining", true, 10, qualityPoints, now)
+	prog, err := advanceProfessionTx(conn, userID, artifactRefiningProfession, true, 10, qualityPoints, now)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -597,7 +644,7 @@ func artifactAwakenAction(conn *storage.Conn, _ worlddata.Catalog, userID int64,
 	); err != nil {
 		return authoritativeMutation{}, err
 	}
-	prog, err := advanceProfessionTx(conn, userID, "Artifact Refining", true, 30, 15, now)
+	prog, err := advanceProfessionTx(conn, userID, artifactRefiningProfession, true, 30, 15, now)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}

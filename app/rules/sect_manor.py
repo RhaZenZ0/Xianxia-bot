@@ -60,10 +60,15 @@ def manor_craft_bonus(manor: dict[str, Any] | None, profession: str) -> int:
         level = int((manor or {}).get("alchemy_hall_level", 0))
     elif profession_key == "forging":
         level = int((manor or {}).get("forge_pavilion_level", 0))
-    elif profession_key == "formation":
+    elif profession_key in ("formation", "inscription"):
         # The manor's grand defensive array doubles as an inscription workshop
         # for formation masters, connecting shared sect construction to the
         # Formation profession without adding a redundant fifth facility.
+        #
+        # "inscription" was missing here until v1.0.0-rc.19 while
+        # `craftManorFacilityColumn` (crafting_actions.go) had carried it since
+        # rc.15 - and that function's sibling cites this file by line number.
+        # The authority is Go; this mirror simply disagreed with it.
         level = int((manor or {}).get("defense_array_level", 0))
     else:
         return 0

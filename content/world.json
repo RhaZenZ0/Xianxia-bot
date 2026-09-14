@@ -25738,6 +25738,34 @@
       "flight": 5,
       "flight_name": "the clan's azure sword",
       "market_excluded": true
+    },
+    "guiding_chalk_array": {
+      "name": "Guiding Chalk Array",
+      "description": "A student's chalked circle on a portable disk: the first array a formation apprentice learns to close.",
+      "sect_value": 9,
+      "base_price": 22,
+      "array_deploy": "guiding_chalk_array"
+    },
+    "moonveil_concealment_array": {
+      "name": "Moonveil Concealment Array",
+      "description": "Veil-work drawn in crystal dust; footsteps and qi signatures blur inside its boundary.",
+      "sect_value": 44,
+      "base_price": 110,
+      "array_deploy": "moonveil_concealment_array"
+    },
+    "golden_bastion_array": {
+      "name": "Golden Bastion Array",
+      "description": "An immortal-gold lattice that hardens the air itself into a standing rampart.",
+      "sect_value": 88,
+      "base_price": 220,
+      "array_deploy": "golden_bastion_array"
+    },
+    "starfall_bulwark_array": {
+      "name": "Starfall Bulwark Array",
+      "description": "Starsteel graven with falling-star sigils: the bulwark a Celestial formation master signs their name to.",
+      "sect_value": 176,
+      "base_price": 440,
+      "array_deploy": "starfall_bulwark_array"
     }
   },
   "recipes": {
@@ -26047,6 +26075,53 @@
       },
       "output": {
         "starfall_talisman": 1
+      }
+    },
+    "Guiding Chalk Array": {
+      "profession": "Formation",
+      "tn": 12,
+      "cost": {
+        "array_disk_blank": 1,
+        "spirit_ink": 1
+      },
+      "output": {
+        "guiding_chalk_array": 1
+      }
+    },
+    "Moonveil Concealment Array": {
+      "profession": "Formation",
+      "tn": 18,
+      "cost": {
+        "array_disk_blank": 2,
+        "spirit_crystal_ore": 1,
+        "spirit_ink": 2
+      },
+      "output": {
+        "moonveil_concealment_array": 1
+      }
+    },
+    "Golden Bastion Array": {
+      "profession": "Formation",
+      "tn": 22,
+      "cost": {
+        "array_disk_blank": 2,
+        "immortal_gold_ore": 1,
+        "spirit_ink": 2
+      },
+      "output": {
+        "golden_bastion_array": 1
+      }
+    },
+    "Starfall Bulwark Array": {
+      "profession": "Formation",
+      "tn": 26,
+      "cost": {
+        "array_disk_blank": 2,
+        "spirit_ink": 2,
+        "starsteel_ore": 1
+      },
+      "output": {
+        "starfall_bulwark_array": 1
       }
     }
   },
@@ -29844,6 +29919,23 @@
       "modifiers": [
         {
           "stat": "alchemy_bonus",
+          "operation": "add",
+          "value": 2
+        }
+      ]
+    },
+    "formation_inspiration": {
+      "name": "Formation Inspiration",
+      "category": "Home",
+      "description": "A private array table, chalked and re-chalked, steadies the hand for disks and talismans alike.",
+      "tags": [
+        "home",
+        "formation"
+      ],
+      "severity": 1,
+      "modifiers": [
+        {
+          "stat": "formation_bonus",
           "operation": "add",
           "value": 2
         }
@@ -52898,7 +52990,9 @@
         "immortal_gold_ore": 9,
         "spirit_crystal_sword": 22,
         "immortal_gold_sabre": 45,
-        "azure_flying_sword": 122
+        "azure_flying_sword": 122,
+        "spirit_crystal_mail": 22,
+        "immortal_gold_plate": 56
       }
     },
     "adamant_body_array_workshop": {
@@ -52956,7 +53050,9 @@
         "minor_qi_gathering_array_disk": 13,
         "minor_warding_array_disk": 15,
         "spirit_crystal_ore": 4,
-        "immortal_gold_ore": 9
+        "immortal_gold_ore": 9,
+        "guiding_chalk_array": 5,
+        "golden_bastion_array": 55
       }
     },
     "ashenwall_array_workshop": {
@@ -53014,7 +53110,8 @@
         "minor_warding_array_disk": 10,
         "verdant_grotto_key": 98,
         "nine_echo_spatial_token": 118,
-        "stygian_tomb_token": 147
+        "stygian_tomb_token": 147,
+        "guiding_chalk_array": 5
       }
     },
     "ashenwall_provisions": {
@@ -53117,7 +53214,8 @@
         "spirit_iron_armor": 6,
         "spirit_crystal_ore": 3,
         "spirit_crystal_sword": 18,
-        "azure_flying_sword": 91
+        "azure_flying_sword": 91,
+        "spirit_crystal_mail": 22
       }
     },
     "azure_crown_apothecary": {
@@ -53187,7 +53285,11 @@
         "beast_core": 3,
         "recovery_pill": 5,
         "qi_pill": 5,
-        "moonveil_herb": 3
+        "moonveil_herb": 3,
+        "heart_calming_pill": 5,
+        "qi_replenishment_pill": 5,
+        "moonveil_recovery_pill": 15,
+        "spirit_condensation_pill": 17
       }
     },
     "azure_crown_talisman_hall": {
@@ -53251,7 +53353,8 @@
         "swift_wind_talisman": 5,
         "stone_skin_talisman": 5,
         "crystal_ward_talisman": 15,
-        "paper_crane_charm": 25
+        "paper_crane_charm": 25,
+        "spirit_focus_talisman": 6
       }
     },
     "azure_crown_provisions": {
@@ -53315,7 +53418,8 @@
         "beast_core": 3,
         "talisman_paper": 1,
         "moonveil_herb": 3,
-        "wind_gourd": 45
+        "wind_gourd": 45,
+        "moonveil_recovery_pill": 15
       }
     },
     "broken_halo_array_workshop": {
@@ -53366,7 +53470,9 @@
         "formation_flags": 4,
         "minor_qi_gathering_array_disk": 10,
         "minor_warding_array_disk": 12,
-        "spirit_crystal_ore": 3
+        "spirit_crystal_ore": 3,
+        "guiding_chalk_array": 5,
+        "moonveil_concealment_array": 27
       }
     },
     "broken_halo_provisions": {
@@ -53430,7 +53536,8 @@
         "beast_core": 3,
         "talisman_paper": 1,
         "moonveil_herb": 3,
-        "wind_gourd": 45
+        "wind_gourd": 45,
+        "moonveil_recovery_pill": 15
       }
     },
     "celestial_mandate_forge": {
@@ -53541,7 +53648,10 @@
         "spirit_crystal_sword": 37,
         "immortal_gold_sabre": 75,
         "starsteel_glaive": 150,
-        "azure_flying_sword": 189
+        "azure_flying_sword": 189,
+        "spirit_crystal_mail": 22,
+        "immortal_gold_plate": 56,
+        "starsteel_aegis": 140
       }
     },
     "celestial_mandate_apothecary": {
@@ -53661,7 +53771,16 @@
         "qi_pill": 10,
         "moonveil_herb": 6,
         "dawnlotus_herb": 12,
-        "heavenpetal_herb": 25
+        "heavenpetal_herb": 25,
+        "heart_calming_pill": 5,
+        "qi_replenishment_pill": 5,
+        "longevity_pill": 117,
+        "moonveil_recovery_pill": 15,
+        "spirit_condensation_pill": 17,
+        "dawnlotus_vitality_pill": 37,
+        "immortal_marrow_pill": 44,
+        "heavenpetal_elixir": 93,
+        "starlight_dao_pill": 109
       }
     },
     "celestial_mandate_talisman_hall": {
@@ -53746,7 +53865,8 @@
         "golden_edge_talisman": 60,
         "starfall_talisman": 120,
         "paper_crane_charm": 52,
-        "void_stride_talisman": 770
+        "void_stride_talisman": 770,
+        "spirit_focus_talisman": 6
       }
     },
     "celestial_mandate_provisions": {
@@ -53842,7 +53962,10 @@
         "moonveil_herb": 6,
         "dawnlotus_herb": 12,
         "heavenpetal_herb": 25,
-        "wind_gourd": 94
+        "wind_gourd": 94,
+        "moonveil_recovery_pill": 15,
+        "dawnlotus_vitality_pill": 37,
+        "heavenpetal_elixir": 93
       }
     },
     "celestial_river_beast_hall": {
@@ -54033,7 +54156,16 @@
         "qi_pill": 8,
         "moonveil_herb": 5,
         "dawnlotus_herb": 10,
-        "heavenpetal_herb": 20
+        "heavenpetal_herb": 20,
+        "heart_calming_pill": 5,
+        "qi_replenishment_pill": 5,
+        "longevity_pill": 117,
+        "moonveil_recovery_pill": 15,
+        "spirit_condensation_pill": 17,
+        "dawnlotus_vitality_pill": 37,
+        "immortal_marrow_pill": 44,
+        "heavenpetal_elixir": 93,
+        "starlight_dao_pill": 109
       }
     },
     "cloudblade_forge": {
@@ -54180,7 +54312,8 @@
         "spirit_iron_armor": 6,
         "spirit_crystal_ore": 3,
         "spirit_crystal_sword": 18,
-        "azure_flying_sword": 91
+        "azure_flying_sword": 91,
+        "spirit_crystal_mail": 22
       }
     },
     "cloudedge_talisman_hall": {
@@ -54244,7 +54377,8 @@
         "swift_wind_talisman": 4,
         "stone_skin_talisman": 5,
         "crystal_ward_talisman": 14,
-        "paper_crane_charm": 25
+        "paper_crane_charm": 25,
+        "spirit_focus_talisman": 6
       }
     },
     "divine_herb_apothecary": {
@@ -54364,7 +54498,16 @@
         "qi_pill": 8,
         "moonveil_herb": 5,
         "dawnlotus_herb": 10,
-        "heavenpetal_herb": 20
+        "heavenpetal_herb": 20,
+        "heart_calming_pill": 5,
+        "qi_replenishment_pill": 5,
+        "longevity_pill": 117,
+        "moonveil_recovery_pill": 15,
+        "spirit_condensation_pill": 17,
+        "dawnlotus_vitality_pill": 37,
+        "immortal_marrow_pill": 44,
+        "heavenpetal_elixir": 93,
+        "starlight_dao_pill": 109
       }
     },
     "divine_herb_talisman_hall": {
@@ -54449,7 +54592,8 @@
         "golden_edge_talisman": 48,
         "starfall_talisman": 96,
         "paper_crane_charm": 42,
-        "void_stride_talisman": 630
+        "void_stride_talisman": 630,
+        "spirit_focus_talisman": 6
       }
     },
     "emberforge_smithy": {
@@ -54576,7 +54720,9 @@
         "minor_qi_gathering_array_disk": 13,
         "minor_warding_array_disk": 15,
         "spirit_crystal_ore": 4,
-        "immortal_gold_ore": 9
+        "immortal_gold_ore": 9,
+        "guiding_chalk_array": 5,
+        "golden_bastion_array": 55
       }
     },
     "fallen_star_provisions": {
@@ -54659,7 +54805,9 @@
         "talisman_paper": 1,
         "moonveil_herb": 3,
         "dawnlotus_herb": 7,
-        "wind_gourd": 61
+        "wind_gourd": 61,
+        "moonveil_recovery_pill": 15,
+        "dawnlotus_vitality_pill": 37
       }
     },
     "firmament_blade_forge": {
@@ -54770,7 +54918,10 @@
         "spirit_crystal_sword": 30,
         "immortal_gold_sabre": 60,
         "starsteel_glaive": 120,
-        "azure_flying_sword": 154
+        "azure_flying_sword": 154,
+        "spirit_crystal_mail": 22,
+        "immortal_gold_plate": 56,
+        "starsteel_aegis": 140
       }
     },
     "firmament_blade_talisman_hall": {
@@ -54855,7 +55006,8 @@
         "golden_edge_talisman": 48,
         "starfall_talisman": 96,
         "paper_crane_charm": 42,
-        "void_stride_talisman": 630
+        "void_stride_talisman": 630,
+        "spirit_focus_talisman": 6
       }
     },
     "four_roads_provisions": {
@@ -55019,7 +55171,10 @@
         "moonveil_herb": 5,
         "dawnlotus_herb": 10,
         "heavenpetal_herb": 20,
-        "wind_gourd": 77
+        "wind_gourd": 77,
+        "moonveil_recovery_pill": 15,
+        "dawnlotus_vitality_pill": 37,
+        "heavenpetal_elixir": 93
       }
     },
     "froststar_talisman_hall": {
@@ -55104,7 +55259,8 @@
         "golden_edge_talisman": 48,
         "starfall_talisman": 96,
         "paper_crane_charm": 42,
-        "void_stride_talisman": 630
+        "void_stride_talisman": 630,
+        "spirit_focus_talisman": 6
       }
     },
     "frostwatch_provisions": {
@@ -55257,7 +55413,8 @@
         "beast_core": 3,
         "talisman_paper": 1,
         "moonveil_herb": 3,
-        "wind_gourd": 45
+        "wind_gourd": 45,
+        "moonveil_recovery_pill": 15
       }
     },
     "galevein_beast_hall": {
@@ -55398,7 +55555,9 @@
         "immortal_gold_ore": 9,
         "spirit_crystal_sword": 22,
         "immortal_gold_sabre": 45,
-        "azure_flying_sword": 122
+        "azure_flying_sword": 122,
+        "spirit_crystal_mail": 22,
+        "immortal_gold_plate": 56
       }
     },
     "golden_spear_provisions": {
@@ -55481,7 +55640,9 @@
         "talisman_paper": 1,
         "moonveil_herb": 3,
         "dawnlotus_herb": 7,
-        "wind_gourd": 61
+        "wind_gourd": 61,
+        "moonveil_recovery_pill": 15,
+        "dawnlotus_vitality_pill": 37
       }
     },
     "greenriver_apothecary": {
@@ -55648,7 +55809,9 @@
         "immortal_gold_ore": 9,
         "spirit_crystal_sword": 22,
         "immortal_gold_sabre": 45,
-        "azure_flying_sword": 122
+        "azure_flying_sword": 122,
+        "spirit_crystal_mail": 22,
+        "immortal_gold_plate": 56
       }
     },
     "heavenblade_talisman_hall": {
@@ -55719,7 +55882,8 @@
         "stone_skin_talisman": 6,
         "crystal_ward_talisman": 18,
         "golden_edge_talisman": 36,
-        "paper_crane_charm": 33
+        "paper_crane_charm": 33,
+        "spirit_focus_talisman": 6
       }
     },
     "hundred_herb_apothecary": {
@@ -55789,7 +55953,11 @@
         "beast_core": 3,
         "recovery_pill": 4,
         "qi_pill": 4,
-        "moonveil_herb": 3
+        "moonveil_herb": 3,
+        "heart_calming_pill": 5,
+        "qi_replenishment_pill": 5,
+        "moonveil_recovery_pill": 15,
+        "spirit_condensation_pill": 17
       }
     },
     "hundred_herb_talisman_hall": {
@@ -55853,7 +56021,8 @@
         "swift_wind_talisman": 4,
         "stone_skin_talisman": 5,
         "crystal_ward_talisman": 14,
-        "paper_crane_charm": 25
+        "paper_crane_charm": 25,
+        "spirit_focus_talisman": 6
       }
     },
     "immortal_river_beast_hall": {
@@ -56012,7 +56181,13 @@
         "recovery_pill": 6,
         "qi_pill": 6,
         "moonveil_herb": 3,
-        "dawnlotus_herb": 7
+        "dawnlotus_herb": 7,
+        "heart_calming_pill": 5,
+        "qi_replenishment_pill": 5,
+        "moonveil_recovery_pill": 15,
+        "spirit_condensation_pill": 17,
+        "dawnlotus_vitality_pill": 37,
+        "immortal_marrow_pill": 44
       }
     },
     "ironbanner_forge": {
@@ -56176,7 +56351,13 @@
         "recovery_pill": 6,
         "qi_pill": 6,
         "moonveil_herb": 3,
-        "dawnlotus_herb": 7
+        "dawnlotus_herb": 7,
+        "heart_calming_pill": 5,
+        "qi_replenishment_pill": 5,
+        "moonveil_recovery_pill": 15,
+        "spirit_condensation_pill": 17,
+        "dawnlotus_vitality_pill": 37,
+        "immortal_marrow_pill": 44
       }
     },
     "jade_cauldron_talisman_hall": {
@@ -56247,7 +56428,8 @@
         "stone_skin_talisman": 6,
         "crystal_ward_talisman": 18,
         "golden_edge_talisman": 36,
-        "paper_crane_charm": 33
+        "paper_crane_charm": 33,
+        "spirit_focus_talisman": 6
       }
     },
     "jade_crown_provisions": {
@@ -56311,7 +56493,8 @@
         "beast_core": 3,
         "talisman_paper": 1,
         "moonveil_herb": 3,
-        "wind_gourd": 45
+        "wind_gourd": 45,
+        "moonveil_recovery_pill": 15
       }
     },
     "jade_crown_talisman_hall": {
@@ -56375,7 +56558,8 @@
         "swift_wind_talisman": 4,
         "stone_skin_talisman": 5,
         "crystal_ward_talisman": 14,
-        "paper_crane_charm": 25
+        "paper_crane_charm": 25,
+        "spirit_focus_talisman": 6
       }
     },
     "jadeflow_beast_hall": {
@@ -56495,7 +56679,11 @@
         "beast_core": 3,
         "recovery_pill": 4,
         "qi_pill": 4,
-        "moonveil_herb": 3
+        "moonveil_herb": 3,
+        "heart_calming_pill": 5,
+        "qi_replenishment_pill": 5,
+        "moonveil_recovery_pill": 15,
+        "spirit_condensation_pill": 17
       }
     },
     "jadewood_apothecary": {
@@ -56669,7 +56857,8 @@
         "golden_edge_talisman": 48,
         "starfall_talisman": 96,
         "paper_crane_charm": 42,
-        "void_stride_talisman": 630
+        "void_stride_talisman": 630,
+        "spirit_focus_talisman": 6
       }
     },
     "lunar_shadow_apothecary": {
@@ -56789,7 +56978,16 @@
         "qi_pill": 8,
         "moonveil_herb": 5,
         "dawnlotus_herb": 10,
-        "heavenpetal_herb": 20
+        "heavenpetal_herb": 20,
+        "heart_calming_pill": 5,
+        "qi_replenishment_pill": 5,
+        "longevity_pill": 117,
+        "moonveil_recovery_pill": 15,
+        "spirit_condensation_pill": 17,
+        "dawnlotus_vitality_pill": 37,
+        "immortal_marrow_pill": 44,
+        "heavenpetal_elixir": 93,
+        "starlight_dao_pill": 109
       }
     },
     "lunar_veil_talisman_hall": {
@@ -56860,7 +57058,8 @@
         "stone_skin_talisman": 6,
         "crystal_ward_talisman": 18,
         "golden_edge_talisman": 36,
-        "paper_crane_charm": 33
+        "paper_crane_charm": 33,
+        "spirit_focus_talisman": 6
       }
     },
     "lunar_veil_apothecary": {
@@ -56955,7 +57154,13 @@
         "recovery_pill": 6,
         "qi_pill": 6,
         "moonveil_herb": 3,
-        "dawnlotus_herb": 7
+        "dawnlotus_herb": 7,
+        "heart_calming_pill": 5,
+        "qi_replenishment_pill": 5,
+        "moonveil_recovery_pill": 15,
+        "spirit_condensation_pill": 17,
+        "dawnlotus_vitality_pill": 37,
+        "immortal_marrow_pill": 44
       }
     },
     "mandate_crown_provisions": {
@@ -57051,7 +57256,10 @@
         "moonveil_herb": 5,
         "dawnlotus_herb": 10,
         "heavenpetal_herb": 20,
-        "wind_gourd": 77
+        "wind_gourd": 77,
+        "moonveil_recovery_pill": 15,
+        "dawnlotus_vitality_pill": 37,
+        "heavenpetal_elixir": 93
       }
     },
     "mandate_crown_talisman_hall": {
@@ -57136,7 +57344,8 @@
         "golden_edge_talisman": 48,
         "starfall_talisman": 96,
         "paper_crane_charm": 42,
-        "void_stride_talisman": 630
+        "void_stride_talisman": 630,
+        "spirit_focus_talisman": 6
       }
     },
     "mandate_spear_forge": {
@@ -57247,7 +57456,10 @@
         "spirit_crystal_sword": 30,
         "immortal_gold_sabre": 60,
         "starsteel_glaive": 120,
-        "azure_flying_sword": 154
+        "azure_flying_sword": 154,
+        "spirit_crystal_mail": 22,
+        "immortal_gold_plate": 56,
+        "starsteel_aegis": 140
       }
     },
     "mandate_spear_provisions": {
@@ -57343,7 +57555,10 @@
         "moonveil_herb": 5,
         "dawnlotus_herb": 10,
         "heavenpetal_herb": 20,
-        "wind_gourd": 77
+        "wind_gourd": 77,
+        "moonveil_recovery_pill": 15,
+        "dawnlotus_vitality_pill": 37,
+        "heavenpetal_elixir": 93
       }
     },
     "moonfen_talisman_hall": {
@@ -57496,7 +57711,8 @@
         "swift_wind_talisman": 4,
         "stone_skin_talisman": 5,
         "crystal_ward_talisman": 14,
-        "paper_crane_charm": 25
+        "paper_crane_charm": 25,
+        "spirit_focus_talisman": 6
       }
     },
     "moonfrost_apothecary": {
@@ -57566,7 +57782,11 @@
         "beast_core": 3,
         "recovery_pill": 4,
         "qi_pill": 4,
-        "moonveil_herb": 3
+        "moonveil_herb": 3,
+        "heart_calming_pill": 5,
+        "qi_replenishment_pill": 5,
+        "moonveil_recovery_pill": 15,
+        "spirit_condensation_pill": 17
       }
     },
     "nine_heavens_forge": {
@@ -57677,7 +57897,10 @@
         "spirit_crystal_sword": 28,
         "immortal_gold_sabre": 56,
         "starsteel_glaive": 112,
-        "azure_flying_sword": 154
+        "azure_flying_sword": 154,
+        "spirit_crystal_mail": 22,
+        "immortal_gold_plate": 56,
+        "starsteel_aegis": 140
       }
     },
     "nine_heavens_apothecary": {
@@ -57797,7 +58020,16 @@
         "qi_pill": 7,
         "moonveil_herb": 4,
         "dawnlotus_herb": 9,
-        "heavenpetal_herb": 18
+        "heavenpetal_herb": 18,
+        "heart_calming_pill": 5,
+        "qi_replenishment_pill": 5,
+        "longevity_pill": 117,
+        "moonveil_recovery_pill": 15,
+        "spirit_condensation_pill": 17,
+        "dawnlotus_vitality_pill": 37,
+        "immortal_marrow_pill": 44,
+        "heavenpetal_elixir": 93,
+        "starlight_dao_pill": 109
       }
     },
     "nine_heavens_talisman_hall": {
@@ -57882,7 +58114,8 @@
         "golden_edge_talisman": 45,
         "starfall_talisman": 90,
         "paper_crane_charm": 42,
-        "void_stride_talisman": 630
+        "void_stride_talisman": 630,
+        "spirit_focus_talisman": 6
       }
     },
     "nine_heavens_provisions": {
@@ -57978,7 +58211,10 @@
         "moonveil_herb": 4,
         "dawnlotus_herb": 9,
         "heavenpetal_herb": 18,
-        "wind_gourd": 77
+        "wind_gourd": 77,
+        "moonveil_recovery_pill": 15,
+        "dawnlotus_vitality_pill": 37,
+        "heavenpetal_elixir": 93
       }
     },
     "ninefold_noble_provisions": {
@@ -58061,7 +58297,9 @@
         "talisman_paper": 1,
         "moonveil_herb": 3,
         "dawnlotus_herb": 7,
-        "wind_gourd": 61
+        "wind_gourd": 61,
+        "moonveil_recovery_pill": 15,
+        "dawnlotus_vitality_pill": 37
       }
     },
     "ninefold_noble_talisman_hall": {
@@ -58132,7 +58370,8 @@
         "stone_skin_talisman": 6,
         "crystal_ward_talisman": 18,
         "golden_edge_talisman": 36,
-        "paper_crane_charm": 33
+        "paper_crane_charm": 33,
+        "spirit_focus_talisman": 6
       }
     },
     "northwind_provisions": {
@@ -58196,7 +58435,8 @@
         "beast_core": 3,
         "talisman_paper": 1,
         "moonveil_herb": 3,
-        "wind_gourd": 45
+        "wind_gourd": 45,
+        "moonveil_recovery_pill": 15
       }
     },
     "northwind_talisman_hall": {
@@ -58260,7 +58500,8 @@
         "swift_wind_talisman": 4,
         "stone_skin_talisman": 5,
         "crystal_ward_talisman": 14,
-        "paper_crane_charm": 25
+        "paper_crane_charm": 25,
+        "spirit_focus_talisman": 6
       }
     },
     "polar_gate_provisions": {
@@ -58343,7 +58584,9 @@
         "talisman_paper": 1,
         "moonveil_herb": 3,
         "dawnlotus_herb": 7,
-        "wind_gourd": 61
+        "wind_gourd": 61,
+        "moonveil_recovery_pill": 15,
+        "dawnlotus_vitality_pill": 37
       }
     },
     "polar_gate_talisman_hall": {
@@ -58414,7 +58657,8 @@
         "stone_skin_talisman": 6,
         "crystal_ward_talisman": 18,
         "golden_edge_talisman": 36,
-        "paper_crane_charm": 33
+        "paper_crane_charm": 33,
+        "spirit_focus_talisman": 6
       }
     },
     "riverguard_beast_hall": {
@@ -58547,7 +58791,9 @@
         "minor_warding_array_disk": 20,
         "spirit_crystal_ore": 6,
         "immortal_gold_ore": 12,
-        "starsteel_ore": 24
+        "starsteel_ore": 24,
+        "guiding_chalk_array": 5,
+        "starfall_bulwark_array": 110
       }
     },
     "ruined_constellation_provisions": {
@@ -58643,7 +58889,10 @@
         "moonveil_herb": 5,
         "dawnlotus_herb": 10,
         "heavenpetal_herb": 20,
-        "wind_gourd": 77
+        "wind_gourd": 77,
+        "moonveil_recovery_pill": 15,
+        "dawnlotus_vitality_pill": 37,
+        "heavenpetal_elixir": 93
       }
     },
     "skyroad_provisions": {
@@ -58726,7 +58975,9 @@
         "talisman_paper": 1,
         "moonveil_herb": 3,
         "dawnlotus_herb": 7,
-        "wind_gourd": 61
+        "wind_gourd": 61,
+        "moonveil_recovery_pill": 15,
+        "dawnlotus_vitality_pill": 37
       }
     },
     "skyroad_beast_hall": {
@@ -58901,7 +59152,10 @@
         "spirit_crystal_sword": 30,
         "immortal_gold_sabre": 60,
         "starsteel_glaive": 120,
-        "azure_flying_sword": 154
+        "azure_flying_sword": 154,
+        "spirit_crystal_mail": 22,
+        "immortal_gold_plate": 56,
+        "starsteel_aegis": 140
       }
     },
     "solar_crucible_provisions": {
@@ -58997,7 +59251,10 @@
         "moonveil_herb": 5,
         "dawnlotus_herb": 10,
         "heavenpetal_herb": 20,
-        "wind_gourd": 77
+        "wind_gourd": 77,
+        "moonveil_recovery_pill": 15,
+        "dawnlotus_vitality_pill": 37,
+        "heavenpetal_elixir": 93
       }
     },
     "solar_furnace_smithy": {
@@ -59088,7 +59345,9 @@
         "immortal_gold_ore": 9,
         "spirit_crystal_sword": 22,
         "immortal_gold_sabre": 45,
-        "azure_flying_sword": 122
+        "azure_flying_sword": 122,
+        "spirit_crystal_mail": 22,
+        "immortal_gold_plate": 56
       }
     },
     "solar_furnace_provisions": {
@@ -59171,7 +59430,9 @@
         "talisman_paper": 1,
         "moonveil_herb": 3,
         "dawnlotus_herb": 7,
-        "wind_gourd": 61
+        "wind_gourd": 61,
+        "moonveil_recovery_pill": 15,
+        "dawnlotus_vitality_pill": 37
       }
     },
     "spearwall_forge": {
@@ -59236,7 +59497,8 @@
         "spirit_iron_armor": 6,
         "spirit_crystal_ore": 3,
         "spirit_crystal_sword": 18,
-        "azure_flying_sword": 91
+        "azure_flying_sword": 91,
+        "spirit_crystal_mail": 22
       }
     },
     "spearwall_provisions": {
@@ -59300,7 +59562,8 @@
         "beast_core": 3,
         "talisman_paper": 1,
         "moonveil_herb": 3,
-        "wind_gourd": 45
+        "wind_gourd": 45,
+        "moonveil_recovery_pill": 15
       }
     },
     "spirit_jade_forge": {
@@ -59391,7 +59654,9 @@
         "immortal_gold_ore": 9,
         "spirit_crystal_sword": 22,
         "immortal_gold_sabre": 45,
-        "azure_flying_sword": 122
+        "azure_flying_sword": 122,
+        "spirit_crystal_mail": 22,
+        "immortal_gold_plate": 56
       }
     },
     "spirit_jade_apothecary": {
@@ -59486,7 +59751,13 @@
         "recovery_pill": 6,
         "qi_pill": 6,
         "moonveil_herb": 3,
-        "dawnlotus_herb": 7
+        "dawnlotus_herb": 7,
+        "heart_calming_pill": 5,
+        "qi_replenishment_pill": 5,
+        "moonveil_recovery_pill": 15,
+        "spirit_condensation_pill": 17,
+        "dawnlotus_vitality_pill": 37,
+        "immortal_marrow_pill": 44
       }
     },
     "spirit_jade_talisman_hall": {
@@ -59557,7 +59828,8 @@
         "stone_skin_talisman": 6,
         "crystal_ward_talisman": 18,
         "golden_edge_talisman": 36,
-        "paper_crane_charm": 33
+        "paper_crane_charm": 33,
+        "spirit_focus_talisman": 6
       }
     },
     "spirit_jade_provisions": {
@@ -59640,7 +59912,9 @@
         "talisman_paper": 1,
         "moonveil_herb": 3,
         "dawnlotus_herb": 7,
-        "wind_gourd": 61
+        "wind_gourd": 61,
+        "moonveil_recovery_pill": 15,
+        "dawnlotus_vitality_pill": 37
       }
     },
     "starroad_provisions": {
@@ -59736,7 +60010,10 @@
         "moonveil_herb": 5,
         "dawnlotus_herb": 10,
         "heavenpetal_herb": 20,
-        "wind_gourd": 77
+        "wind_gourd": 77,
+        "moonveil_recovery_pill": 15,
+        "dawnlotus_vitality_pill": 37,
+        "heavenpetal_elixir": 93
       }
     },
     "starroad_beast_hall": {
@@ -59896,7 +60173,8 @@
         "minor_warding_array_disk": 10,
         "verdant_grotto_key": 98,
         "nine_echo_spatial_token": 118,
-        "stygian_tomb_token": 147
+        "stygian_tomb_token": 147,
+        "guiding_chalk_array": 5
       }
     },
     "stoneheart_forge": {
@@ -59961,7 +60239,8 @@
         "spirit_iron_armor": 6,
         "spirit_crystal_ore": 3,
         "spirit_crystal_sword": 18,
-        "azure_flying_sword": 91
+        "azure_flying_sword": 91,
+        "spirit_crystal_mail": 22
       }
     },
     "stoneheart_array_workshop": {
@@ -60012,7 +60291,9 @@
         "formation_flags": 4,
         "minor_qi_gathering_array_disk": 10,
         "minor_warding_array_disk": 12,
-        "spirit_crystal_ore": 3
+        "spirit_crystal_ore": 3,
+        "guiding_chalk_array": 5,
+        "moonveil_concealment_array": 27
       }
     },
     "vermilion_furnace_smithy": {
@@ -60077,7 +60358,8 @@
         "spirit_iron_armor": 6,
         "spirit_crystal_ore": 3,
         "spirit_crystal_sword": 18,
-        "azure_flying_sword": 91
+        "azure_flying_sword": 91,
+        "spirit_crystal_mail": 22
       }
     },
     "vermilion_furnace_provisions": {
@@ -60141,7 +60423,8 @@
         "beast_core": 3,
         "talisman_paper": 1,
         "moonveil_herb": 3,
-        "wind_gourd": 45
+        "wind_gourd": 45,
+        "moonveil_recovery_pill": 15
       }
     },
     "worldstone_forge": {
@@ -60252,7 +60535,10 @@
         "spirit_crystal_sword": 30,
         "immortal_gold_sabre": 60,
         "starsteel_glaive": 120,
-        "azure_flying_sword": 154
+        "azure_flying_sword": 154,
+        "spirit_crystal_mail": 22,
+        "immortal_gold_plate": 56,
+        "starsteel_aegis": 140
       }
     },
     "worldstone_array_workshop": {
@@ -60317,7 +60603,9 @@
         "minor_warding_array_disk": 20,
         "spirit_crystal_ore": 6,
         "immortal_gold_ore": 12,
-        "starsteel_ore": 24
+        "starsteel_ore": 24,
+        "guiding_chalk_array": 5,
+        "starfall_bulwark_array": 110
       }
     },
     "halfmoon_waystation": {
@@ -61224,7 +61512,8 @@
       "Formation": "@ore",
       "Inscription": "@ore",
       "Artifact Refining": "@ore",
-      "Beast Taming": "@core"
+      "Beast Taming": "@core",
+      "Appraisal": "@core"
     },
     "by_path": {
       "Sword Cultivator": "@ore",

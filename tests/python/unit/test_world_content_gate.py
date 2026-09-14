@@ -11,8 +11,10 @@ rulers shared one copy-pasted speech/want/fear.
 from __future__ import annotations
 
 import json
+import re
 import unittest
 
+from app.rules.progression_systems import PROFESSIONS
 from tests.support import PROJECT_ROOT
 
 WORLD = json.loads((PROJECT_ROOT / "content" / "world.json").read_text(encoding="utf-8"))
@@ -351,6 +353,281 @@ class NpcContentTests(unittest.TestCase):
         self.assertEqual(qiao["location"], "Golden Pavilion Auction House")
 
 
+# --- the professions the engine itself names -------------------------------
+#
+# Two scanners over `go_core`, so the gates below are answerable from the code
+# rather than from a list somebody has to remember to update. Both resolve Go
+# string constants, because the grant sites stopped being bare literals when
+# rc.19 gave them names.
+
+GO_GAME_ROOT = PROJECT_ROOT / "go_core" / "internal" / "game"
+
+
+def _profession_go_sources() -> dict:
+    return {
+        path: path.read_text(encoding="utf-8")
+        for path in GO_GAME_ROOT.rglob("*.go")
+        if not path.name.endswith("_test.go")
+    }
+
+
+def _go_string_consts(sources: dict) -> dict:
+    """Every `name = "value"` constant in the package, for resolving arguments."""
+    out = {}
+    for text in sources.values():
+        for name, value in re.findall(r'(\w+)\s*=\s*"([^"]*)"', text):
+            out.setdefault(name, value)
+    return out
+
+
+def _resolve_go_arg(token: str, consts: dict) -> str:
+    token = token.strip()
+    if token.startswith('"') and token.endswith('"'):
+        return token[1:-1]
+    return consts.get(token, "")
+
+
+def engine_granted_professions() -> set:
+    """Professions written by a hardcoded `advanceProfessionTx` argument.
+
+    A call passing a variable - the craft path passes the recipe's own
+    profession - is deliberately not resolved here. Those are covered by the
+    recipe half of the gates, which is already data-driven.
+    """
+    sources = _profession_go_sources()
+    consts = _go_string_consts(sources)
+    found = set()
+    for text in sources.values():
+        for arg in re.findall(r"advanceProfessionTx\(\s*conn\s*,\s*userID\s*,\s*([^,]+),", text):
+            name = _resolve_go_arg(arg, consts)
+            if name:
+                found.add(name)
+    return found
+
+
+def engine_level_readers() -> set:
+    """Professions whose *level* the engine reads by name.
+
+    Two shapes: `professionLevelTx(conn, userID, X)`, and any line that reads
+    `level` out of `profession_progress` while naming a profession on the same
+    line. The craft path reads the level for whatever profession a recipe
+    names, generically, so recipe professions are not found here and are
+    allowed for separately by the callers.
+    """
+    sources = _profession_go_sources()
+    consts = _go_string_consts(sources)
+    found = set()
+    for text in sources.values():
+        for arg in re.findall(r"professionLevelTx\(\s*conn\s*,\s*userID\s*,\s*([^)]+)\)", text):
+            name = _resolve_go_arg(arg, consts)
+            if name:
+                found.add(name)
+        for line in text.splitlines():
+            if "profession_progress" not in line or "level" not in line:
+                continue
+            for quoted, ident in re.findall(r"'([^']+)'|\b([A-Za-z_]\w*Profession)\b", line):
+                name = _resolve_go_arg(f'"{quoted}"' if quoted else ident, consts)
+                if name:
+                    found.add(name)
+    return found
+
+
+class CraftedGoodsHaveAMarketTests(unittest.TestCase):
+    """What a profession makes, somebody buys (v1.0.0-rc.19).
+
+    Thirteen crafted goods had no buyer anywhere: nine of the eleven alchemy
+    pills, the three armours above tier 1 - while every blade sold - and one
+    talisman. Every one of them was already *sold* by shops, so the world
+    stocked things it would not take back, and a crafter's whole late career
+    produced goods only another player would take.
+
+    The rule is the one the two working pills already followed: a shop that
+    sells a thing buys it back, at the quarter of base price every keeper in
+    the catalogue already pays.
+    """
+
+    def _buyers(self) -> dict:
+        buyers = {}
+        for shop in WORLD["shops"].values():
+            for item_id in (shop.get("buys") or {}):
+                buyers[item_id] = buyers.get(item_id, 0) + 1
+        return buyers
+
+    def test_every_crafted_output_has_a_buyer(self):
+        buyers = self._buyers()
+        for name, recipe in WORLD["recipes"].items():
+            for output in (recipe.get("output") or {}):
+                with self.subTest(recipe=name, item=output):
+                    self.assertGreater(buyers.get(output, 0), 0,
+                                       f"{output} is crafted by {name} and no shop buys it")
+
+    def test_armour_sells_as_readily_as_blades(self):
+        """The sharpest case: every blade had a buyer and no armour above tier 1 did."""
+        buyers = self._buyers()
+        for armour in ("spirit_iron_armor", "spirit_crystal_mail", "immortal_gold_plate", "starsteel_aegis"):
+            with self.subTest(item=armour):
+                self.assertGreater(buyers.get(armour, 0), 0, f"{armour} has no buyer")
+
+    def test_a_crafted_good_can_be_sold_in_the_world_it_is_stocked_in(self):
+        """The per-world form of the rule, which is the one this world follows.
+
+        Not "every shop buys back what it sells" - a provisioner stocks pills
+        and an apothecary is who buys them, which is right. What matters is
+        that a crafter is never made to cross worlds to find a counter: a good
+        on sale in a world is bought in that same world.
+        """
+        crafted = {out for r in WORLD["recipes"].values() for out in (r.get("output") or {})}
+        sold, bought = {}, {}
+        for shop in WORLD["shops"].values():
+            for line in shop.get("sells", []):
+                if line["item_id"] in crafted:
+                    sold.setdefault(line["item_id"], set()).add(shop["world"])
+            for item_id in (shop.get("buys") or {}):
+                if item_id in crafted:
+                    bought.setdefault(item_id, set()).add(shop["world"])
+        for item_id in sorted(crafted):
+            with self.subTest(item=item_id):
+                stranded = sold.get(item_id, set()) - bought.get(item_id, set())
+                self.assertEqual(stranded, set(),
+                                 f"{item_id} is stocked in {sorted(stranded)} and bought by nobody there")
+
+
+class DeployableArrayTests(unittest.TestCase):
+    """A disk that deploys nothing is the same fault one layer down.
+
+    `array_deploy` on an item is resolved against `deployedArrayDefs`, a map in
+    `property_storage_actions.go`. An item carrying the field with no entry
+    there is refused at deploy time with "formation disk has no valid
+    deployment definition" - so it would craft, sell, and do nothing. rc.19
+    added four disks to refill the Formation ladder and this is what holds them
+    (and the next four) to being real.
+    """
+
+    def _deployment_definitions(self) -> set:
+        source = (PROJECT_ROOT / "go_core" / "internal" / "game" / "property_storage_actions.go").read_text(encoding="utf-8")
+        block = source[source.index("deployedArrayDefs = map[string]deployedArrayDef{"):]
+        block = block[: block.index("\n}\n")]
+        return set(re.findall(r'^\s*"([^"]+)":', block, re.MULTILINE))
+
+    def test_every_deployable_item_has_a_definition(self):
+        defined = self._deployment_definitions()
+        self.assertGreaterEqual(len(defined), 2, f"the definition scanner found only {defined}")
+        for item_id, item in WORLD["items"].items():
+            ref = str(item.get("array_deploy") or "")
+            if not ref:
+                continue
+            with self.subTest(item=item_id):
+                self.assertIn(ref, defined, f"{item_id} deploys {ref}, which no definition covers")
+
+    def test_every_definition_belongs_to_a_real_item(self):
+        """And the other direction: a definition nothing can reach is dead code."""
+        deployable = {str(i.get("array_deploy")) for i in WORLD["items"].values() if i.get("array_deploy")}
+        for ref in self._deployment_definitions():
+            with self.subTest(ref=ref):
+                self.assertIn(ref, deployable, f"{ref} is defined and no item deploys it")
+
+
+class FormationLadderTests(unittest.TestCase):
+    """Formation makes something at every tier (v1.0.0-rc.19).
+
+    rc.15 moved six talisman recipes out of Formation into Inscription, which
+    was right, and left the profession with two recipes at the same TN and
+    nothing above the Mortal World - while eight array workshops stood in all
+    four worlds with only Mortal goods to trade.
+    """
+
+    def _formation(self) -> dict:
+        return {k: v for k, v in WORLD["recipes"].items() if v.get("profession") == "Formation"}
+
+    def test_formation_spans_a_real_ladder(self):
+        tns = sorted(int(r["tn"]) for r in self._formation().values())
+        self.assertGreaterEqual(len(tns), 6, "Formation is thin again")
+        self.assertGreaterEqual(tns[-1] - tns[0], 12, f"Formation's TNs barely move: {tns}")
+
+    def test_no_crafting_profession_is_left_far_behind(self):
+        """The comparison that found this: one profession with a sixth of another's ladder."""
+        spans = {}
+        for recipe in WORLD["recipes"].values():
+            spans.setdefault(str(recipe["profession"]), []).append(int(recipe["tn"]))
+        counts = {p: len(t) for p, t in spans.items()}
+        fewest, most = min(counts.values()), max(counts.values())
+        self.assertGreaterEqual(fewest * 2, most,
+                                f"one profession has less than half another's recipes: {counts}")
+
+    def test_every_tier_material_reaches_a_formation_recipe(self):
+        """A ladder that stops at the Mortal World is the fault this replaced."""
+        costs = {item for r in self._formation().values() for item in r["cost"]}
+        for ore in ("spirit_crystal_ore", "immortal_gold_ore", "starsteel_ore"):
+            with self.subTest(material=ore):
+                self.assertIn(ore, costs, f"no Formation recipe reaches {ore}")
+
+
+class ProfessionRosterTests(unittest.TestCase):
+    """Every declared profession is granted, read and gifted.
+
+    This is the gate rc.15 should have left behind. "Appraisal" sat in the
+    roster for releases with nothing granting it and "Inscription" beside it in
+    the same state; rc.15 repaired both and left three checks that could not
+    have caught either - one iterating a four-name tuple written inline, one
+    asserting three strings are members of a tuple, and one that passes
+    vacuously if every talisman is deleted.
+
+    So this iterates `PROFESSIONS` itself and asks the three questions the
+    repo's own bar asks: is it granted, does its level change anything, and
+    does the content know it exists.
+    """
+
+    RECIPE_PROFESSIONS = {str(r["profession"]) for r in WORLD["recipes"].values() if r.get("profession")}
+
+    def test_the_roster_is_the_one_in_the_code(self):
+        self.assertEqual(len(PROFESSIONS), 8, "the roster changed size; every test below iterates it")
+        self.assertEqual(len(set(PROFESSIONS)), len(PROFESSIONS), "a profession is listed twice")
+
+    def test_every_profession_is_granted_somewhere(self):
+        grantable = engine_granted_professions() | self.RECIPE_PROFESSIONS
+        for profession in PROFESSIONS:
+            with self.subTest(profession=profession):
+                self.assertIn(profession, grantable,
+                              f"{profession} is declared and nothing can grant it")
+
+    def test_every_profession_level_changes_something(self):
+        """A level nobody reads is a vanity counter.
+
+        "Beast Taming" and "Artifact Refining" were written by six call sites
+        and read by none until rc.19: every read went into the response payload
+        for display, so a Grandmaster tamed no better than a first-timer. That
+        is the `authenticity` / `tracking_strength` fault shape, and this is
+        what stops the next one.
+        """
+        readers = engine_level_readers() | self.RECIPE_PROFESSIONS
+        for profession in PROFESSIONS:
+            with self.subTest(profession=profession):
+                self.assertIn(profession, readers,
+                              f"{profession} accumulates a level no rule reads")
+
+    def test_every_profession_has_a_patron_gift(self):
+        gift = WORLD["patron_gift"]["by_profession"]
+        for profession in PROFESSIONS:
+            with self.subTest(profession=profession):
+                self.assertIn(profession, gift, f"{profession} has no patron gift")
+
+    def test_the_scanners_still_resolve_both_argument_shapes(self):
+        """A scanner that matches nothing passes forever.
+
+        Both grant shapes must still resolve: a bare literal ("Foraging", in
+        crafting_actions.go) and a named constant (the rest, since rc.19). If a
+        refactor renamed the helper or changed the call shape these gates would
+        go quiet rather than fail, so this asserts they are still finding things.
+        """
+        granted = engine_granted_professions()
+        self.assertIn("Foraging", granted, "the literal-argument shape stopped resolving")
+        self.assertIn("Appraisal", granted, "the named-constant shape stopped resolving")
+        self.assertGreaterEqual(len(granted), 4, f"the grant scanner found only {granted}")
+        readers = engine_level_readers()
+        self.assertIn("Beast Taming", readers, "the professionLevelTx shape stopped resolving")
+        self.assertIn("Foraging", readers, "the inline-SQL shape stopped resolving")
+
+
 if __name__ == "__main__":
     unittest.main()
 
@@ -603,10 +880,14 @@ class PatronGiftContentTests(unittest.TestCase):
     write, so this is the check that makes the claim true.
     """
 
-    # Written by advanceProfessionTx: the three that recipes name, plus the
-    # three the engine hardcodes - "Beast Taming" (beast_artifact_actions.go),
-    # "Artifact Refining" (same file) and "Foraging" (crafting_actions.go).
-    ENGINE_PROFESSIONS = {"Beast Taming", "Artifact Refining", "Foraging"}
+    # Derived from the Go sources rather than typed out (v1.0.0-rc.19). This
+    # was a hand-written set of three, its comment miscounting both halves -
+    # recipes name four professions, not three, and the engine hardcodes four,
+    # not three. "Appraisal" was the fourth, added by rc.15 and never added
+    # here, so this gate - the one whose docstring promises to cover "every
+    # profession the engine can write" - could not see that Appraisal had no
+    # patron gift at all. A set read off the code cannot drift from it.
+    ENGINE_PROFESSIONS = engine_granted_professions()
     MATERIAL_REFS = {"@herb", "@ore", "@core"}
 
     def test_every_cultivation_path_has_a_gift(self):

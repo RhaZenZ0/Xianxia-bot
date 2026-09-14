@@ -676,9 +676,20 @@ func forageResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID i
 	}
 	tn := maxI64(8, 12+worldTier*2-resourceBonus)
 	commonQty := maxI64(1, 1+resources/35+maxI64(0, cr.RealmIndex)/8)
-	lootPlan := map[string]int64{"spirit_herb": minI64(5, commonQty)}
+	// The world's own herb (v1.0.0-rc.19). This was the literal "spirit_herb"
+	// in all four worlds, so a Celestial forager gathered Mortal weeds - the
+	// one profession whose whole output ignored the tier it was practised in.
+	// Resolved through the same `EventSites.Material` the world-event sites,
+	// the birth-family send-off and the sect tribute use, with the same guard:
+	// a ref the item catalogue does not carry falls back to the Mortal herb
+	// rather than producing a row for an item that does not exist.
+	commonHerb := catalog.EventSites.Material(worldName, "@herb")
+	if _, ok := catalog.Items[commonHerb]; !ok || commonHerb == "" {
+		commonHerb = "spirit_herb"
+	}
+	lootPlan := map[string]int64{commonHerb: minI64(5, commonQty)}
 	if gardenLevel > 0 {
-		lootPlan["spirit_herb"] += maxI64(1, gardenLevel/2)
+		lootPlan[commonHerb] += maxI64(1, gardenLevel/2)
 	}
 
 	type rareCandidate struct {

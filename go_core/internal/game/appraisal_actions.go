@@ -34,6 +34,13 @@ import (
 
 const appraisalProfession = "Appraisal"
 
+// What a reading is worth. A hit teaches four times what a miss does - see the
+// comment at the grant site.
+const (
+	appraisalReadingXP = int64(12)
+	appraisalMissXP    = int64(3)
+)
+
 type appraisalPayload struct {
 	ItemID    string `json:"item_id"`
 	AuctionID int64  `json:"auction_id"`
@@ -204,9 +211,25 @@ func appraisalAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64
 	}
 	success := roll["success"].(bool)
 	margin := roll["margin"].(int64)
-	// Practice counts whether or not the reading lands - a wrong answer
-	// teaches an appraiser as much as a right one.
-	progress, err := advanceProfessionTx(conn, userID, appraisalProfession, success, map[bool]int64{true: 12, false: 5}[success], 0, now)
+	// A miss teaches less than a hit (v1.0.0-rc.19).
+	//
+	// rc.15 paid 5 against a hit's 12, on the reasoning that a wrong answer
+	// teaches an appraiser as much as a right one. It does not: a botched
+	// reading here is *confidently* wrong, and the appraiser walks away
+	// believing something false. But it is not worth nothing either - the
+	// hands still did the work - so the miss keeps a grant and the gap widens
+	// to four to one. Finding the right answer is what moves the profession;
+	// failing at it only nudges.
+	//
+	// The paid reading above still teaches nothing (buying an answer is not
+	// practice) and a thing already known returns before this line.
+	xp := appraisalMissXP
+	quality := int64(0)
+	if success {
+		xp = appraisalReadingXP
+		quality = maxI64(0, margin)
+	}
+	progress, err := advanceProfessionTx(conn, userID, appraisalProfession, success, xp, quality, now)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
