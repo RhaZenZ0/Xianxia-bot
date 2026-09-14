@@ -20,7 +20,6 @@ describes what the engine has already decided, and the game keeps running when t
 - `docs/ROADMAP_1_0.md` — what is left before 1.0 and the test that gates each milestone.
 - `docs/KNOWN_LIMITATIONS.md` — the punch list, every entry fixed or deferred with a reason.
 - `docs/playtest/` — the live-server checklist for the current release.
-- `docs/TOPGG.md` — listing the bot on Top.gg, and verifying votes against their API.
 - `docs/TERMS.md` / `docs/PRIVACY.md` — what players agree to, and what the bot holds about them.
   The Discord Developer Portal wants a URL for each; these two files are those URLs.
 - `docs/COMMISSIONS_DESIGN.md` — the design of commissions and typed play.

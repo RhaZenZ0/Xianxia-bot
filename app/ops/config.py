@@ -112,27 +112,6 @@ def _vote_site_name(value: str | None) -> str:
     return name or "Top.gg"
 
 
-def _topgg_token(value: str | None) -> str:
-    """The Top.gg project token, or "" for "the integration is off".
-
-    Unlike `VOTE_SITE_URL` this is a secret and is never printed anywhere, so
-    the only shape worth refusing is one that cannot be a token at all: a value
-    with whitespace inside it is a copy-paste that took the surrounding line
-    with it, and it would otherwise fail as a silent 401 on every vote check
-    hours later. `Bearer ` is stripped rather than refused - it is what the
-    curl examples in top.gg's own documentation show, so an operator pasting
-    one in is making the most forgivable mistake there is.
-    """
-    token = (value or "").strip()
-    if token[:7].casefold() == "bearer ":
-        token = token[7:].strip()
-    if token == "":
-        return ""
-    if any(character.isspace() for character in token):
-        raise ValueError("TOPGG_TOKEN must be a single token with no spaces in it")
-    return token
-
-
 def _as_int_set(value: str | None, *, name: str = "value") -> set[int]:
     if not value:
         return set()
@@ -223,9 +202,6 @@ class Settings:
     typed_play_hint: bool
     vote_site_name: str
     vote_site_url: str
-    topgg_token: str
-    topgg_verify_votes: bool
-    topgg_post_metrics: bool
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -625,8 +601,5 @@ class Settings:
             typed_play_hint=_as_bool(os.getenv("TYPED_PLAY_HINT"), True),
             vote_site_name=_vote_site_name(os.getenv("VOTE_SITE_NAME")),
             vote_site_url=_vote_site_url(os.getenv("VOTE_SITE_URL")),
-            topgg_token=_topgg_token(os.getenv("TOPGG_TOKEN")),
-            topgg_verify_votes=_as_bool(os.getenv("TOPGG_VERIFY_VOTES"), True),
-            topgg_post_metrics=_as_bool(os.getenv("TOPGG_POST_METRICS"), True),
             **cooldowns,
         )

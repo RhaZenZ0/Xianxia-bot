@@ -1,27 +1,20 @@
-"""`/vote`: the listing link, and the claim that is now checked before it pays.
+"""`/vote`: the listing link, and the one grant the engine cannot verify.
 
-A vote happens on someone else's website. This deployment still publishes
-nothing an inbound webhook could reach, but Top.gg answers the same question on
-an outbound call, so since v1.0.0 the claim is verified when `TOPGG_TOKEN` is
-set and taken on trust when it is not (`app/ops/topgg.py`, and
-`tests/python/unit/test_topgg.py` for the check itself).
-
-That makes four Python-owned properties worth holding here, and none of them is
-the reward arithmetic — that is the engine's (`support.vote_claim`,
+A vote on Top.gg or DISBOARD happens on someone else's website and this
+deployment publishes nothing an inbound webhook could reach, so the claim is
+taken on trust. That makes three Python-owned properties worth holding, and
+none of them is the reward arithmetic — that is the engine's (`support.vote_claim`,
 `go_core/internal/game/support_actions_test.go`):
 
 1. the operator's URL is validated before it is ever printed into a channel;
 2. `/vote` is a *registered* root, because a command a player cannot type is
    no use as a link to a listing site;
 3. the command reads the gift off the engine's receipt rather than computing
-   one, and the claim button belongs to the cultivator who opened it;
-4. the verification refuses only a confident "no vote", and refusing leaves the
-   player able to try again.
+   one, and the claim button belongs to the cultivator who opened it.
 """
 from __future__ import annotations
 
 import ast
-import asyncio
 import importlib
 import os
 import unittest
@@ -141,157 +134,6 @@ class TheClaimIsTheEnginesToDecide(unittest.TestCase):
         self.assertNotIn("require_character", called)
 
 
-class TheClaimIsCheckedBeforeItPays(unittest.TestCase):
-    """The verification, from the button's side.
-
-    `test_topgg.py` pins what the check answers; this pins what the button does
-    with each answer. The asymmetry is the same one, seen from the other end: a
-    confident NOT_VOTED is the only thing that stops a claim, and stopping a
-    claim must leave the player able to make it.
-    """
-
-    def setUp(self):
-        with patch.dict(os.environ, ENV):
-            self.support = importlib.import_module("app.bot.commands.support")
-
-    def press(self, check, *, engine_result=None):
-        """Press the claim button against a given Top.gg verdict.
-
-        Returns (interaction, view, engine_calls) so a test can assert on what
-        the player saw, what the button became, and what the engine was asked.
-        """
-        from unittest.mock import AsyncMock, MagicMock
-
-        view = self.support.VoteClaimView(owner_id=7, site="Top.gg")
-        button = view.children[0]
-        interaction = MagicMock()
-        interaction.id = 99
-        interaction.user.id = 7
-        interaction.response.defer = AsyncMock()
-        interaction.edit_original_response = AsyncMock()
-        interaction.followup.send = AsyncMock()
-        engine_calls = []
-
-        async def authoritative_action(operation, actor, payload, **kwargs):
-            engine_calls.append((operation, actor, payload))
-            return {"result": engine_result or {
-                "amount": 20, "currency": "low_spirit_stone", "balance": 20,
-            }}
-
-        with patch.object(self.support, "_vote_check", AsyncMock(return_value=check)), \
-             patch.object(self.support, "budget_refusal_line", return_value=None), \
-             patch.object(self.support.ENGINE, "authoritative_action", side_effect=authoritative_action):
-            asyncio.run(self.support.VoteClaimView.claim(view, interaction, button))
-        return interaction, view, engine_calls
-
-    def said(self, interaction) -> str:
-        return "\n".join(str(call.args[0]) for call in interaction.followup.send.call_args_list)
-
-    def test_a_confirmed_vote_pays_and_records_that_it_was_verified(self):
-        from app.ops.topgg import VOTED, VoteCheck
-
-        interaction, view, calls = self.press(VoteCheck(VOTED, expires_unix=1))
-        self.assertEqual(len(calls), 1, "a verified claim must reach the engine")
-        operation, actor, payload = calls[0]
-        self.assertEqual(operation, "support.vote_claim")
-        self.assertEqual(actor, 7)
-        self.assertIs(payload["verified"], True)
-        self.assertIn("Thank you", self.said(interaction))
-        self.assertTrue(view.children[0].disabled, "a spent claim must not stay pressable")
-
-    def test_no_live_vote_refuses_without_asking_the_engine(self):
-        from app.ops.topgg import NOT_VOTED, VoteCheck
-
-        interaction, view, calls = self.press(VoteCheck(NOT_VOTED))
-        self.assertEqual(calls, [], "a refused claim must never reach the engine")
-        self.assertFalse(
-            view.children[0].disabled,
-            "the button must stay live: a player who pressed a moment too early "
-            "has to be able to press again",
-        )
-        said = self.said(interaction)
-        self.assertIn("Top.gg", said)
-        self.assertIn("again", said, "a refusal must say what to do next")
-
-    def test_an_outage_pays_but_is_not_recorded_as_verified(self):
-        # The whole design rests on this: Top.gg being unreachable costs the
-        # player nothing, and the receipt still tells the truth about it.
-        from app.ops.topgg import UNCONFIGURED, UNKNOWN, VoteCheck
-
-        for state in (UNKNOWN, UNCONFIGURED):
-            with self.subTest(state=state):
-                interaction, view, calls = self.press(VoteCheck(state))
-                self.assertEqual(len(calls), 1, f"{state} must still pay the gift")
-                self.assertIs(calls[0][2]["verified"], False)
-                self.assertIn("Thank you", self.said(interaction))
-
-    def test_the_interaction_is_acknowledged_before_the_round_trip(self):
-        # Discord drops an interaction that is not answered within three
-        # seconds, and the check is a call to someone else's website. Deferring
-        # after it would make a slow Top.gg look like a dead button.
-        from app.ops.topgg import VOTED, VoteCheck
-
-        interaction, _, _ = self.press(VoteCheck(VOTED, expires_unix=1))
-        interaction.response.defer.assert_awaited_once()
-        source = SUPPORT[SUPPORT.index("async def claim("):]
-        self.assertLess(
-            source.index("response.defer()"), source.index("_vote_check("),
-            "the defer must come before the Top.gg round trip",
-        )
-
-    def switched(self, verify: bool):
-        """`SETTINGS` with the verification switch flipped.
-
-        Settings is frozen - deliberately, it is read at import time all over
-        the bot - so a test replaces the whole object rather than a field.
-        """
-        import dataclasses
-
-        return patch.object(
-            self.support, "SETTINGS",
-            dataclasses.replace(self.support.SETTINGS, topgg_verify_votes=verify),
-        )
-
-    def test_verification_is_live_only_with_both_a_token_and_the_switch(self):
-        from unittest.mock import PropertyMock
-
-        for token, switch, expected in ((True, True, True), (True, False, False),
-                                        (False, True, False), (False, False, False)):
-            with self.subTest(token=token, switch=switch):
-                with patch.object(type(self.support.TOPGG), "enabled", PropertyMock(return_value=token)), \
-                     self.switched(switch):
-                    self.assertEqual(self.support._verification_is_live(), expected)
-
-    def test_the_check_is_skipped_entirely_when_the_switch_is_off(self):
-        from unittest.mock import AsyncMock
-        from app.ops.topgg import UNCONFIGURED
-
-        with self.switched(False), \
-             patch.object(self.support.TOPGG, "vote_state", AsyncMock()) as asked:
-            check = asyncio.run(self.support._vote_check(7))
-        asked.assert_not_awaited()
-        self.assertEqual(check.state, UNCONFIGURED)
-
-
-class TheMetricsWorkerFollowsTheToken(unittest.TestCase):
-    def test_it_runs_only_with_a_token_and_is_cancelled_on_close(self):
-        bot_source = (PROJECT_ROOT / "app" / "bot" / "bot.py").read_text(encoding="utf-8")
-        self.assertIn("if SETTINGS.topgg_post_metrics and TOPGG.enabled:", bot_source)
-        self.assertIn("self.topgg_metrics_task = asyncio.create_task(self.topgg_metrics_worker())", bot_source)
-        self.assertIn('"weekend_gift_task", "topgg_metrics_task"):', bot_source)
-        # The client holds a keep-alive pool, so shutdown has to close it.
-        self.assertIn("await TOPGG.aclose()", bot_source)
-
-    def test_the_count_is_discords_and_its_result_is_a_health_check(self):
-        # The server count is the one number the engine cannot supply - it only
-        # exists in discord.py - which is why this worker lives in the bot.
-        bot_source = (PROJECT_ROOT / "app" / "bot" / "bot.py").read_text(encoding="utf-8")
-        worker = bot_source[bot_source.index("async def post_topgg_metrics"):bot_source.index("async def topgg_metrics_worker")]
-        self.assertIn("len(self.guilds)", worker)
-        self.assertIn("TOPGG.post_metrics(server_count=", worker)
-        self.assertIn('set_check("topgg_metrics", posted', worker)
-
-
 class TheWeekendAnnouncesItselfOnce(unittest.TestCase):
     """The doubled weekend is only worth running if players hear about it.
 
@@ -341,7 +183,7 @@ class TheWeekendAnnouncesItselfOnce(unittest.TestCase):
         bot_source = (PROJECT_ROOT / "app" / "bot" / "bot.py").read_text(encoding="utf-8")
         self.assertIn("if SETTINGS.vote_site_url:", bot_source)
         self.assertIn("self.weekend_gift_task = asyncio.create_task(self.weekend_gift_worker())", bot_source)
-        self.assertIn('"weekend_gift_task", "topgg_metrics_task"):', bot_source)
+        self.assertIn('"route_audit_task", "weekend_gift_task"):', bot_source)
         # The engine owns the window; the worker must not compute its own.
         worker = bot_source[bot_source.index("async def announce_weekend_gift"):bot_source.index("async def weekend_gift_worker")]
         self.assertIn('ENGINE.action("support.weekend"', worker)
