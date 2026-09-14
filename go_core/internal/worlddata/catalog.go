@@ -149,6 +149,12 @@ type Item struct {
 	ArrayDeploy    string         `json:"array_deploy"`
 	SpatialKey     map[string]any `json:"spatial_key"`
 	MarketExcluded bool           `json:"market_excluded"`
+	// TeachesRecipe (v1.0.0-rc.20) is the method a jade slip carries. Reading
+	// one is how every recipe a household did not teach is learned. Declared
+	// last on purpose: a comment inside the struct starts a new gofmt
+	// alignment block and silently re-indents every field below it, which
+	// `test_flight_travel.py` pins by exact text.
+	TeachesRecipe string `json:"teaches_recipe"`
 }
 
 // MarketTradeable is the one rule for whether an item belongs in ordinary
@@ -205,7 +211,18 @@ type Recipe struct {
 	TN         int64            `json:"tn"`
 	Cost       map[string]int64 `json:"cost"`
 	Output     map[string]int64 `json:"output"`
+	// MinLevel is the profession level the method asks for (v1.0.0-rc.20).
+	// Zero means common knowledge: every profession keeps at least one entry
+	// recipe anyone can make, so a new cultivator is never locked out of their
+	// own craft. Anything above zero must be *learned* as well - the two halves
+	// are deliberately separate, because knowing a method and being good enough
+	// to use it are different things.
+	MinLevel int64 `json:"min_level"`
 }
+
+// Learns is the recipe a method slip carries, or "" for an ordinary item.
+func (i Item) Learns() string { return strings.TrimSpace(i.TeachesRecipe) }
+
 type LawStage struct {
 	Index int    `json:"index"`
 	Name  string `json:"name"`
@@ -443,6 +460,11 @@ type SecretRealm struct {
 type BirthFamilySendoff struct {
 	Item string `json:"item"`
 	Line string `json:"line"`
+	// Trade is the craft the household passes on (v1.0.0-rc.20): the one whose
+	// methods a child is taught before they leave. Read off what the archetype
+	// already is - a weapon-smith's family forges, a tomb-watch clan inscribes -
+	// and kept in content so it is tunable without an engine change.
+	Trade string `json:"trade"`
 }
 
 type Inheritance struct {

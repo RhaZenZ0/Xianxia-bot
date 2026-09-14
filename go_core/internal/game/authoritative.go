@@ -84,6 +84,7 @@ var authoritativeMutations = map[string]bool{
 	"secret_realm.explore":            true,
 	"secret_realm.leave":              true,
 	"craft.resolve":                   true,
+	"recipe.learn":                    true,
 	"forage.resolve":                  true,
 	"beast.tame":                      true,
 	"beast.feed":                      true,
@@ -220,6 +221,7 @@ var authoritativeQueries = map[string]bool{
 
 var stage5CanonicalTimeNativeOperations = map[string]bool{
 	"craft.resolve":   true,
+	"recipe.learn":    true,
 	"forage.resolve":  true,
 	"beast.tame":      true,
 	"beast.feed":      true,
@@ -450,7 +452,7 @@ func applyAuthoritative(databasePath, worldPath string, req ActionRequest) (Acti
 			"perfection.body_start", "perfection.body_quest", "perfection.body_trial", "perfection.body_abandon", "law.comprehend",
 			"law.technique", "sect.shadow", "condition.treat", "sense.inspect", "sense.conceal", "tribulation.prepare", "tribulation.attempt",
 			"exploration.explore", "exploration.event.act", "exploration.event.leave", "exploration.travel", "exploration.hunt",
-			"secret_realm.enter", "secret_realm.explore", "secret_realm.leave", "craft.resolve", "forage.resolve",
+			"secret_realm.enter", "secret_realm.explore", "secret_realm.leave", "craft.resolve", "recipe.learn", "forage.resolve",
 			"beast.tame", "beast.feed", "beast.train", "beast.evolve", "beast.active", "artifact.bond", "artifact.awaken",
 			"pvp.challenge", "pvp.respond", "pvp.act", "manual.study", "manual.technique", "crime.atone", "world_event.act", "world_event.engage",
 			"player_family.found", "player_family.invite", "player_family.respond",
@@ -565,6 +567,8 @@ func applyAuthoritative(databasePath, worldPath string, req ActionRequest) (Acti
 				mutation, err = secretRealmLeaveAction(conn, req.ActorID, req.Payload)
 			case "craft.resolve":
 				mutation, err = craftResolveAction(conn, catalog, req.ActorID, req.Payload)
+			case "recipe.learn":
+				mutation, err = recipeLearnAction(conn, catalog, req.ActorID, req.Payload)
 			case "forage.resolve":
 				mutation, err = forageResolveAction(conn, catalog, req.ActorID, req.Payload)
 			case "beast.tame":

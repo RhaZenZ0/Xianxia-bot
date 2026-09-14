@@ -657,11 +657,74 @@ async def _run_crafting(interaction: discord.Interaction, recipe: str) -> None:
     )
 
 
-@registered_root_command(name="craft", description="Practice alchemy, forging, formation or talisman inscription from a known recipe", guild=GUILD)
+@registered_root_command(name="craft", description="Practice alchemy, forging, formation or talisman inscription from a method you know", guild=GUILD)
 @app_commands.autocomplete(recipe=recipe_autocomplete)
 @serialized_user_action
 async def craft(interaction: discord.Interaction, recipe: str) -> None:
     await _run_crafting(interaction, recipe)
+
+
+async def method_slip_autocomplete(interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
+    """The slips actually in the bags, so a player is never offered one they lack."""
+    try:
+        held = await DB.get_inventory(interaction.user.id)
+    except Exception:
+        return []
+    needle = current.casefold().strip()
+    out: list[app_commands.Choice[str]] = []
+    for item_id, quantity in sorted(held.items()):
+        if int(quantity) <= 0:
+            continue
+        definition = WORLD.items.get(item_id) or {}
+        if not definition.get("teaches_recipe"):
+            continue
+        label = str(definition.get("name") or item_id)
+        if needle and needle not in label.casefold() and needle not in item_id.casefold():
+            continue
+        out.append(app_commands.Choice(name=label[:100], value=item_id))
+        if len(out) >= 25:
+            break
+    return out
+
+
+@registered_root_command(name="learn", description="Read a method slip and commit the method to memory", guild=GUILD)
+@app_commands.autocomplete(slip=method_slip_autocomplete)
+@serialized_user_action
+async def learn(interaction: discord.Interaction, slip: str) -> None:
+    """The other half of the learning step (v1.0.0-rc.20).
+
+    A household teaches its own craft and nothing else, so everything else is a
+    jade slip bought from the trade that uses it. Reading one is permanent and
+    does not consume the slip - a method passed around a sect is a thing this
+    genre does.
+    """
+    if not await require_character(interaction):
+        return
+    await interaction.response.defer(ephemeral=False)
+    try:
+        envelope = await ENGINE.authoritative_action(
+            "recipe.learn",
+            interaction.user.id,
+            {"item_id": slip},
+            action_id=f"discord:{interaction.id}:recipe.learn",
+        )
+        result = dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
+        return
+    recipe = str(result.get("recipe") or slip)
+    profession = str(result.get("profession") or "")
+    min_level = int(result.get("min_level") or 0)
+    level = int(result.get("level") or 0)
+    if result.get("already_known"):
+        head = f"📜 You already carry the method for **{recipe}**."
+    else:
+        head = f"📜 You read the slip through, and the method for **{recipe}** is yours."
+    if result.get("ready"):
+        tail = f"\n{profession} {level} — your hands are equal to it. **/craft** it when you have the materials."
+    else:
+        tail = f"\n{profession} {level}, and the work asks for **{min_level}**. The method keeps; practise until you reach it."
+    await interaction.followup.send(head + tail, ephemeral=False)
 
 
 class NarrateItView(discord.ui.View):

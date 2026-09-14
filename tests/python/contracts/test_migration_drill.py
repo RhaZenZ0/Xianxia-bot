@@ -12,6 +12,7 @@ here before it reached a NAS.
 """
 from __future__ import annotations
 
+import json
 import sqlite3
 import tempfile
 import unittest
@@ -19,7 +20,7 @@ from contextlib import closing
 from pathlib import Path
 from unittest.mock import patch
 
-from tests.support import install_aiosqlite_shim
+from tests.support import PROJECT_ROOT, install_aiosqlite_shim
 
 install_aiosqlite_shim()
 
@@ -135,3 +136,73 @@ class MigrationDrill(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class GrandfatheringDrill(unittest.IsolatedAsyncioTestCase):
+    """Nobody loses a method they could already work (v1.0.0-rc.20).
+
+    The learning step gates crafting on knowledge, and every character created
+    before it existed knew nothing at all - so without this, the update would
+    land as a takeaway on every live cultivator at once. Migration 46 credits
+    each of them with every method their profession level already reaches.
+    """
+
+    async def _at(self, path: Path, version: int) -> None:
+        migrations = tuple(m for m in database_core.SCHEMA_MIGRATIONS if int(m[0]) <= version)
+        with patch.object(database_core, "SCHEMA_VERSION", version), patch.object(database_core, "SCHEMA_MIGRATIONS", migrations):
+            await Database(path).init()
+
+    async def test_an_existing_cultivator_keeps_what_their_level_reached(self):
+        world = json.loads((PROJECT_ROOT / "content" / "world.json").read_text(encoding="utf-8"))
+        recipes = world["recipes"]
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "grandfather.sqlite3"
+            await self._at(path, 45)  # the release before the learning step
+
+            with sqlite3.connect(path) as db:
+                db.execute(
+                    "INSERT INTO characters(user_id,discord_name,name,origin,path,spiritual_root,concept,"
+                    "gender,location,attributes_json,created_at,updated_at) "
+                    "VALUES(7,'d','Mid-Career','o','Sword Cultivator','Fire Root','c','neutral','Greenriver Town','{}',0,0)"
+                )
+                # An alchemist three levels in, and nothing else practised.
+                db.execute(
+                    "INSERT INTO profession_progress(user_id,profession,level,xp,updated_at) VALUES(7,'Alchemy',3,0,0)"
+                )
+                db.commit()
+
+            await Database(path).init()  # forward to current, applying 46
+
+            with sqlite3.connect(path) as db:
+                known = {row[0] for row in db.execute("SELECT recipe FROM character_recipes WHERE user_id=7")}
+
+        # Everything an Alchemy 3 could work the day before is still theirs...
+        for name, recipe in recipes.items():
+            if recipe["profession"] == "Alchemy" and int(recipe["min_level"]) <= 3:
+                self.assertIn(name, known, f"{name} was taken away from a level-3 alchemist")
+        # ...and the entry methods of every craft, which anyone could make.
+        for name, recipe in recipes.items():
+            if int(recipe["min_level"]) == 0:
+                self.assertIn(name, known, f"{name} is an entry method and was taken away")
+        # But not what they could never have worked anyway.
+        for name, recipe in recipes.items():
+            if recipe["profession"] == "Alchemy" and int(recipe["min_level"]) > 3:
+                self.assertNotIn(name, known, f"{name} was handed to a level-3 alchemist who never had it")
+
+    async def test_a_character_with_no_professions_still_keeps_the_entry_methods(self):
+        world = json.loads((PROJECT_ROOT / "content" / "world.json").read_text(encoding="utf-8"))
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "grandfather-novice.sqlite3"
+            await self._at(path, 45)
+            with sqlite3.connect(path) as db:
+                db.execute(
+                    "INSERT INTO characters(user_id,discord_name,name,origin,path,spiritual_root,concept,"
+                    "gender,location,attributes_json,created_at,updated_at) "
+                    "VALUES(8,'d','Never Crafted','o','Sword Cultivator','Fire Root','c','neutral','Greenriver Town','{}',0,0)"
+                )
+                db.commit()
+            await Database(path).init()
+            with sqlite3.connect(path) as db:
+                known = {row[0] for row in db.execute("SELECT recipe FROM character_recipes WHERE user_id=8")}
+        entry = {n for n, r in world["recipes"].items() if int(r["min_level"]) == 0}
+        self.assertEqual(known, entry, "a cultivator who never crafted should keep exactly the entry methods")
