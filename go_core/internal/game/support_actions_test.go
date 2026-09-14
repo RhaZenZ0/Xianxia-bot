@@ -1,10 +1,9 @@
 package game
 
-// `support.vote_claim` is the one gameplay grant nobody can verify: a vote on a
-// server listing happens on someone else's website, and this deployment
-// publishes no inbound endpoint for the listing site to call back to. The
-// engine's job is therefore the half it *can* own - the cadence, the size and
-// the receipt - and these tests are what hold that half honest.
+// `support.vote_claim` pays the patron's gift, which is the server's own and
+// involves nothing outside the world - no listing, no API, nothing to verify.
+// The engine owns all of it: the cadence, the size and the receipt, and these
+// tests are what hold those honest.
 //
 // Two properties carry most of the weight. A claim that could be repeated at
 // will would be an economy exploit rather than a thank-you, so the cooldown is
@@ -42,9 +41,9 @@ func setupSupportVoteDB(t *testing.T) string {
 	return path
 }
 
-func supportVoteClaimAs(t *testing.T, path string, actor int64, actionID string, site string) (map[string]any, error) {
+func supportVoteClaimAs(t *testing.T, path string, actor int64, actionID string) (map[string]any, error) {
 	t.Helper()
-	raw, err := json.Marshal(map[string]any{"site": site})
+	raw, err := json.Marshal(map[string]any{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,9 +64,9 @@ func supportVoteClaimAs(t *testing.T, path string, actor int64, actionID string,
 	return result, nil
 }
 
-func supportVoteClaim(t *testing.T, path, actionID string, site string) (map[string]any, error) {
+func supportVoteClaim(t *testing.T, path, actionID string) (map[string]any, error) {
 	t.Helper()
-	return supportVoteClaimAs(t, path, 42, actionID, site)
+	return supportVoteClaimAs(t, path, 42, actionID)
 }
 
 func supportVoteStatusAs(t *testing.T, path string, actor int64) map[string]any {
@@ -131,7 +130,7 @@ func TestTheLadderNeverPaysLessThanTheFlatGiftItReplaced(t *testing.T) {
 func TestASupportVoteClaimPaysTheLocalCurrencyAndSetsTheTwelveHourWait(t *testing.T) {
 	path := setupSupportVoteDB(t)
 
-	result, err := supportVoteClaim(t, path, "vote-1", "Top.gg")
+	result, err := supportVoteClaim(t, path, "vote-1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -152,9 +151,6 @@ func TestASupportVoteClaimPaysTheLocalCurrencyAndSetsTheTwelveHourWait(t *testin
 	}
 	if got, want := i64(result["amount"]), expectedGift(0, multiplier); got != want {
 		t.Fatalf("amount = %d, want %d", got, want)
-	}
-	if got := result["site"]; got != "Top.gg" {
-		t.Fatalf("site = %v, want Top.gg", got)
 	}
 	if got := i64(result["next_claim_seconds"]); got != supportVoteCooldownSeconds {
 		t.Fatalf("next_claim_seconds = %d, want %d", got, supportVoteCooldownSeconds)
@@ -178,7 +174,7 @@ func TestASupportVoteClaimMirrorsLowSpiritStonesOntoTheCharacterSheet(t *testing
 	path := setupSupportVoteDB(t)
 	before := supportScalar(t, path, `SELECT spirit_stones FROM characters WHERE user_id=42`)
 
-	result, err := supportVoteClaim(t, path, "vote-1", "Top.gg")
+	result, err := supportVoteClaim(t, path, "vote-1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -197,11 +193,11 @@ func TestTheGiftGrowsWithTheRealmsClimbedInsideThisWorld(t *testing.T) {
 	path := setupSupportVoteDB(t)
 
 	// Actor 43 is one realm further up the same world than actor 42.
-	shallow, err := supportVoteClaim(t, path, "vote-shallow", "Top.gg")
+	shallow, err := supportVoteClaim(t, path, "vote-shallow")
 	if err != nil {
 		t.Fatal(err)
 	}
-	deeper, err := supportVoteClaimAs(t, path, 43, "vote-deeper", "Top.gg")
+	deeper, err := supportVoteClaimAs(t, path, 43, "vote-deeper")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -223,7 +219,7 @@ func TestTheGiftArrivesAsTheMaterialTheCultivatorsPathUses(t *testing.T) {
 
 	// Actor 42 walks the Sword Cultivator's road, which content maps to "@ore";
 	// in the Mortal World that resolves to spirit iron.
-	result, err := supportVoteClaim(t, path, "vote-1", "Top.gg")
+	result, err := supportVoteClaim(t, path, "vote-1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -244,7 +240,7 @@ func TestAnUntieredMaterialArrivesInGreaterNumberHigherUp(t *testing.T) {
 	path := setupSupportVoteDB(t)
 	// A Beast Binder is given "@core"; the fixture stands in the Mortal World.
 	batch4Exec(t, path, `UPDATE characters SET path='Beast Binder' WHERE user_id=42`)
-	mortal, err := supportVoteClaim(t, path, "vote-mortal", "Top.gg")
+	mortal, err := supportVoteClaim(t, path, "vote-mortal")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -258,7 +254,7 @@ func TestAnUntieredMaterialArrivesInGreaterNumberHigherUp(t *testing.T) {
 	// The same cultivator standing in the Celestial World is given four.
 	batch4Exec(t, path, `UPDATE characters SET location='Celestial Mandate Palace',realm_index=24 WHERE user_id=42`)
 	batch4Exec(t, path, `UPDATE cooldowns SET available_at=0 WHERE user_id=42 AND action='support_vote'`)
-	celestial, err := supportVoteClaim(t, path, "vote-celestial", "Top.gg")
+	celestial, err := supportVoteClaim(t, path, "vote-celestial")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -274,7 +270,7 @@ func TestAnUntieredMaterialArrivesInGreaterNumberHigherUp(t *testing.T) {
 	// A tiered material is unaffected: one is already the right one.
 	batch4Exec(t, path, `UPDATE characters SET path='Sword Cultivator' WHERE user_id=42`)
 	batch4Exec(t, path, `UPDATE cooldowns SET available_at=0 WHERE user_id=42 AND action='support_vote'`)
-	ore, err := supportVoteClaim(t, path, "vote-ore", "Top.gg")
+	ore, err := supportVoteClaim(t, path, "vote-ore")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -293,7 +289,7 @@ func TestAPractisedCraftChoosesTheGiftOverThePath(t *testing.T) {
 	// than the road they walk.
 	batch4Exec(t, path, `INSERT INTO profession_progress(user_id,profession,level,xp,updated_at) VALUES(42,'Alchemy',3,40,0)`)
 
-	result, err := supportVoteClaim(t, path, "vote-1", "Top.gg")
+	result, err := supportVoteClaim(t, path, "vote-1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -308,7 +304,7 @@ func TestAnUntouchedProfessionRowDoesNotChooseTheGift(t *testing.T) {
 	path := setupSupportVoteDB(t)
 	batch4Exec(t, path, `INSERT INTO profession_progress(user_id,profession,level,xp,updated_at) VALUES(42,'Alchemy',0,0,0)`)
 
-	result, err := supportVoteClaim(t, path, "vote-1", "Top.gg")
+	result, err := supportVoteClaim(t, path, "vote-1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -319,12 +315,12 @@ func TestAnUntouchedProfessionRowDoesNotChooseTheGift(t *testing.T) {
 
 func TestASecondSupportVoteClaimInsideTwelveHoursIsRefusedAndPaysNothing(t *testing.T) {
 	path := setupSupportVoteDB(t)
-	first, err := supportVoteClaim(t, path, "vote-1", "Top.gg")
+	first, err := supportVoteClaim(t, path, "vote-1")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	_, err = supportVoteClaim(t, path, "vote-2", "Top.gg")
+	_, err = supportVoteClaim(t, path, "vote-2")
 	if err == nil {
 		t.Fatal("a second claim inside the window succeeded")
 	}
@@ -339,15 +335,15 @@ func TestASecondSupportVoteClaimInsideTwelveHoursIsRefusedAndPaysNothing(t *test
 
 func TestASupportVoteClaimIsPayableAgainOnceTheWaitHasPassed(t *testing.T) {
 	path := setupSupportVoteDB(t)
-	first, err := supportVoteClaim(t, path, "vote-1", "Top.gg")
+	first, err := supportVoteClaim(t, path, "vote-1")
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Twelve hours later, to the second: the row is the whole gate, so ageing
-	// it is the same thing as waiting.
+	// A day later: the row is the whole gate, so ageing it is the same thing
+	// as waiting, whatever the cadence constant happens to be.
 	batch4Exec(t, path, `UPDATE cooldowns SET available_at=0 WHERE user_id=42 AND action='support_vote'`)
 
-	second, err := supportVoteClaim(t, path, "vote-2", "Top.gg")
+	second, err := supportVoteClaim(t, path, "vote-2")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -359,7 +355,7 @@ func TestASupportVoteClaimIsPayableAgainOnceTheWaitHasPassed(t *testing.T) {
 
 func TestAReplayedSupportVoteActionIDPaysOnce(t *testing.T) {
 	path := setupSupportVoteDB(t)
-	first, err := supportVoteClaim(t, path, "vote-1", "Top.gg")
+	first, err := supportVoteClaim(t, path, "vote-1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -367,7 +363,7 @@ func TestAReplayedSupportVoteActionIDPaysOnce(t *testing.T) {
 	// The same action_id again is a retry, not a second claim: it must come
 	// back as the stored receipt rather than as the cooldown refusal a fresh
 	// claim would get, and it must not pay twice.
-	result, err := supportVoteClaim(t, path, "vote-1", "Top.gg")
+	result, err := supportVoteClaim(t, path, "vote-1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -388,7 +384,7 @@ func TestTheVoteStatusPromisesExactlyWhatTheClaimPays(t *testing.T) {
 	batch4Exec(t, path, `INSERT INTO profession_progress(user_id,profession,level,xp,updated_at) VALUES(42,'Forging',5,90,0)`)
 
 	promised := supportVoteStatus(t, path)
-	paid, err := supportVoteClaim(t, path, "vote-1", "Top.gg")
+	paid, err := supportVoteClaim(t, path, "vote-1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -415,7 +411,7 @@ func TestSupportVoteStatusReportsTheWaitAndGrantsNothing(t *testing.T) {
 		t.Fatalf("remaining_seconds = %d before any claim, want 0", got)
 	}
 
-	paid, err := supportVoteClaim(t, path, "vote-1", "Top.gg")
+	paid, err := supportVoteClaim(t, path, "vote-1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -433,21 +429,6 @@ func TestSupportVoteStatusReportsTheWaitAndGrantsNothing(t *testing.T) {
 	balance := supportScalar(t, path, `SELECT balance FROM currency_wallets WHERE user_id=42 AND currency_id='low_spirit_stone'`)
 	if balance != i64(paid["amount"]) {
 		t.Fatalf("wallet balance = %d after three status reads, want the one gift %d", balance, i64(paid["amount"]))
-	}
-}
-
-func TestTheSiteLabelIsBoundedBecauseItComesFromTheEnvironment(t *testing.T) {
-	for _, tc := range []struct{ in, want string }{
-		{"Top.gg", "Top.gg"},
-		{"  DISBOARD  ", "DISBOARD"},
-		{"", "the server listing"},
-		{"   ", "the server listing"},
-		{"Top\n.gg\r", "Top.gg"},
-		{strings.Repeat("a", 80), strings.Repeat("a", 40)},
-	} {
-		if got := supportSiteLabel(tc.in); got != tc.want {
-			t.Fatalf("supportSiteLabel(%q) = %q, want %q", tc.in, got, tc.want)
-		}
 	}
 }
 
@@ -573,63 +554,5 @@ func TestTheWeekendQueryAnswersWithoutAnActorOrADatabase(t *testing.T) {
 	}
 	if got := result["zone"]; got != supportWeekendZoneName {
 		t.Fatalf("zone = %v, want %s", got, supportWeekendZoneName)
-	}
-}
-
-// Since v1.0.0 a claim can be checked against the listing's API before it is
-// asked for (app/ops/topgg.py), and the surface says which it was. The engine
-// does not verify anything itself - it cannot, the check is an outbound HTTPS
-// call and this action runs inside a write transaction - so all it owes the
-// flag is an honest record: the same gift either way, and a receipt that says
-// whether anybody checked.
-//
-// The gift deliberately does NOT depend on it. A verified claim and an
-// unverified one are bounded by the same twelve-hour cooldown, so paying them
-// differently would punish the player for Top.gg being unreachable rather than
-// for anything they did.
-func TestAClaimRecordsWhetherTheVoteWasVerifiedWithoutChangingTheGift(t *testing.T) {
-	for _, verified := range []bool{true, false} {
-		t.Run(fmt.Sprintf("verified=%t", verified), func(t *testing.T) {
-			path := setupSupportVoteDB(t)
-			raw, err := json.Marshal(map[string]any{"site": "Top.gg", "verified": verified})
-			if err != nil {
-				t.Fatal(err)
-			}
-			out, err := ApplyWithWorld(path, batch4WorldPath(t), ActionRequest{
-				APIVersion: authoritativeAPIVersion,
-				ActionID:   fmt.Sprintf("vote-verified-%t", verified),
-				Operation:  "support.vote_claim",
-				ActorID:    42,
-				Payload:    raw,
-			})
-			if err != nil {
-				t.Fatal(err)
-			}
-			result, ok := out.Result.(map[string]any)
-			if !ok {
-				t.Fatalf("support.vote_claim result type %T", out.Result)
-			}
-			if got := result["verified"]; got != verified {
-				t.Fatalf("verified = %v, want %v", got, verified)
-			}
-			// The gift is the cultivator's realm and world, never the flag.
-			if got, want := i64(result["amount"]), expectedGift(0, i64(result["multiplier"])); got != want {
-				t.Fatalf("amount = %d, want %d - the gift must not depend on verification", got, want)
-			}
-		})
-	}
-}
-
-// A claim from a deployment that has no Top.gg token sends no `verified` at
-// all, which is every claim made before the field existed. It must read as
-// false rather than fail the unmarshal and cost the player their gift.
-func TestAClaimWithNoVerifiedFieldIsRecordedAsUnverified(t *testing.T) {
-	path := setupSupportVoteDB(t)
-	result, err := supportVoteClaim(t, path, "vote-no-flag", "Top.gg")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := result["verified"]; got != false {
-		t.Fatalf("verified = %v on a payload that omits it, want false", got)
 	}
 }

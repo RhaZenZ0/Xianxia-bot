@@ -59,11 +59,6 @@ pre-written template text.
 **The administrator chat digest.** If a GM runs the chat monitor, a transcript
 of recent channel messages is sent to the same AI provider to be summarised.
 
-**Top.gg.** If the operator has configured vote rewards, your Discord user ID
-is sent to Top.gg to check whether you voted, so the reward can be paid. See
-[TOPGG.md](TOPGG.md). Nothing else is sent; if this is not configured, Top.gg
-is never contacted.
-
 **GitHub.** The bot checks for its own updates. No player data is involved.
 
 Nothing else leaves. There are no analytics, no advertising, no trackers, and

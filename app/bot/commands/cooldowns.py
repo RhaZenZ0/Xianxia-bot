@@ -37,7 +37,7 @@ from ..runtime import (
 from ..services import GUILD
 
 # family -> (mark, what it is, where it is done). The path is the repo's way of
-# naming a reachable action; a bare root like **/vote** is a command instead.
+# naming a reachable action; a bare root like **/tribute** is a command instead.
 # `tests/python/unit/test_cooldowns_command.py` holds this table to the engine
 # roster in go_core/internal/game/cooldown_status.go, in both directions.
 FAMILY_LABELS: dict[str, tuple[str, str, str]] = {
@@ -50,7 +50,7 @@ FAMILY_LABELS: dict[str, tuple[str, str, str]] = {
     "perfect_trial": ("⚔️", "Perfection trial", "**/ascend → Perfection → Trial**"),
     "body_perfect_quest": ("✨", "Body perfection quest", "**/ascend → Perfection → Quest**"),
     "body_perfect_trial": ("⚔️", "Body perfection trial", "**/ascend → Perfection → Trial**"),
-    "support_vote": ("🗳️", "The patron's gift", "**/vote**"),
+    "support_vote": ("🎁", "The patron's tribute", "**/tribute**"),
     "alchemy_purge": ("🧪", "Purge pill toxicity", "**/craft → Alchemy → Purge**"),
     "alchemy_forage": ("🌿", "Forage for herbs and craft makings", "**/craft → Alchemy → Forage**"),
     "beast_tame": ("🐾", "Tame a beast", "**/beast → Companions → Tame**"),
@@ -160,12 +160,6 @@ async def cooldowns(interaction: discord.Interaction) -> None:
         return
     waits = [dict(row) for row in (status.get("waits") or [])]
     ready = [dict(row) for row in (status.get("ready") or [])]
-    # The one filter that is Python's: whether a listing site exists is
-    # configuration, and the engine has no business reading the operator's .env.
-    if not SETTINGS.vote_site_url:
-        waits = [row for row in waits if row.get("family") != "support_vote"]
-        ready = [row for row in ready if row.get("family") != "support_vote"]
-
     beasts = await _beast_names(interaction.user.id, waits)
     lines = [f"⏳ **Cooldowns — {character['name']}**"]
     if waits:

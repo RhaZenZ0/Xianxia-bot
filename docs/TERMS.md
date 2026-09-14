@@ -33,8 +33,9 @@ Play fairly and in good faith. Specifically, don't:
 - **Run multiple characters to advantage yourself.** One person, one
   cultivator. Alt accounts that trade with, vote for, or fight each other are
   not on.
-- **Claim rewards you did not earn.** The vote reward assumes you actually
-  voted; where the operator has configured it, that is checked.
+- **Claim rewards you did not earn.** The vote reward is taken on trust —
+  nothing checks it — so claiming without voting is simply dishonest rather
+  than difficult.
 - **Write things into the world that would not be acceptable to say in the
   channel.** Character names, chat and typed actions are all player-authored
   text that other people read.
@@ -85,9 +86,9 @@ that your data survives. It runs on someone's home hardware. It can go down,
 lose progress, roll back, or stop forever without notice. The world can be
 reset. Keep nothing here you would be upset to lose — it is a game.
 
-Features that depend on third parties (AI narration, Top.gg vote rewards) stop
-working when those third parties do. The game is designed to keep running
-without them, with plainer text.
+The one feature that depends on a third party is AI narration, and it stops
+working when that third party does. The game is designed to keep running
+without it, with plainer text.
 
 ## Liability
 
