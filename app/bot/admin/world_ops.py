@@ -741,3 +741,87 @@ async def admin_quests_retire_autocomplete(interaction: discord.Interaction, cur
         app_commands.Choice(name=f"{r['title']} ({r['quest_key']})"[:100], value=str(r["quest_key"]))
         for r in rows if not needle or needle in str(r["title"]).casefold() or needle in str(r["quest_key"])
     ][:25]
+
+
+@registered_group_command(
+    admin_player_group,
+    name="erase",
+    description="Permanently erase everything this bot holds about a person (data-protection request)",
+)
+async def admin_erase(
+    interaction: discord.Interaction,
+    member: discord.Member,
+    confirm: str,
+    reason: str = "data protection request",
+) -> None:
+    """Honour a player's request to have their data deleted.
+
+    This is the command behind the promise in `docs/PRIVACY.md`, and it is the
+    only one here that cannot be undone - `admin.undo_last` reverses a grant by
+    replaying its before/after, and there is no before to replay for a hundred
+    deleted rows. So it takes the same typed confirmation the destructive
+    server-setup actions take rather than a button: a GM who meant to type
+    `/admin player inspect` does not accidentally type ERASE as well.
+
+    What is erased, what is anonymised and what is kept is the engine's to
+    decide (`go_core/internal/game/privacy_actions.go`); this only asks, and
+    reads the receipt back.
+    """
+    if not await require_admin(interaction):
+        return
+    if confirm.strip().upper() != "ERASE":
+        await interaction.response.send_message(
+            "❌ Not erased. This cannot be undone, so it needs `confirm: ERASE` typed exactly.",
+            ephemeral=False,
+        )
+        return
+    if member.id == interaction.user.id:
+        # The engine refuses this too; catching it here costs a round trip and
+        # says why in words rather than as an engine error.
+        await interaction.response.send_message(
+            "❌ You cannot erase yourself through the console — it would take the audit trail's "
+            "author with it. Stop the bot and use `./reset_database.sh` if you really mean it.",
+            ephemeral=False,
+        )
+        return
+    # Deferred: the erasure walks every table in the schema, which is longer
+    # than Discord's three seconds on a NAS disk.
+    await interaction.response.defer()
+    try:
+        result = dict(
+            await ENGINE.action(
+                "admin.player.erase",
+                interaction.user.id,
+                {"user_id": member.id, "reason": reason},
+            )
+            or {}
+        )
+    except GameEngineError as exc:
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
+        return
+    deleted = int(result.get("rows_deleted") or 0)
+    anonymised = int(result.get("rows_anonymised") or 0)
+    tables = int(result.get("tables_touched") or 0)
+    if not result.get("had_character") and deleted == 0 and anonymised == 0:
+        await interaction.followup.send(
+            f"✅ Nothing to erase — this bot held no data for {member.mention}.", ephemeral=False
+        )
+        return
+    lines = [
+        f"✅ Erased everything held about {member.mention}.",
+        f"**{deleted}** rows deleted and **{anonymised}** anonymised across **{tables}** tables.",
+        "-# Shared world state (history, a founded sect or family, authored quests) keeps its row "
+        "and loses the link. The audit log keeps its record that this was done.",
+    ]
+    await interaction.followup.send("\n".join(lines), ephemeral=False)
+    # audit_admin's own row is the Discord-side mirror; the engine has already
+    # written the authoritative one inside the same transaction as the deletes.
+    await audit_admin(
+        interaction,
+        "player.erase",
+        target=f"user:{member.id}",
+        before={"had_character": bool(result.get("had_character"))},
+        after={"rows_deleted": deleted, "rows_anonymised": anonymised},
+        reason=reason,
+        database_log=False,
+    )
