@@ -55,6 +55,7 @@ from ..database import Database
 from ..rules.game import World
 from ..ops.game_engine import GameEngineClient, GameEngineError
 from ..ops.user_budget import UserBudget
+from ..ops.topgg import TopggClient
 from ..rules.realm_hubs import REALM_HUBS, presence_world_for, realm_presence_role_name
 from ..simulation import MINUTES_PER_DAY
 from ..rules.worldtime import from_game_minutes, MINUTES_PER_YEAR
@@ -74,6 +75,10 @@ DB = Database(
     slow_query_ms=SETTINGS.slow_query_ms,
     engine_url=SETTINGS.game_engine_url,
 )
+# The listing's own API (v1.0.0). Constructed whether or not a token is set -
+# an unconfigured client answers UNCONFIGURED to everything and opens no
+# socket, so nothing downstream has to ask whether it exists.
+TOPGG = TopggClient(SETTINGS.topgg_token)
 _USER_ACTION_LOCKS: dict[int, asyncio.Lock] = {}
 # When each lock was last taken. A lock is evicted once its holder has been
 # idle this long and nothing is waiting on it, so the table follows the

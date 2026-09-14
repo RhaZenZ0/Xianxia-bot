@@ -93,6 +93,47 @@ It must be a single `https://` URL with no spaces, or the bot refuses to
 start — the value is printed into a public channel, so a typo is caught at
 boot rather than posted to every player.
 
+### Top.gg (`TOPGG_TOKEN`, `TOPGG_VERIFY_VOTES`, `TOPGG_POST_METRICS`)
+
+`VOTE_SITE_URL` above works for any listing site and checks nothing. If you
+list on Top.gg specifically, these three turn the claim from an honest-system
+gift into a verified one. **[docs/TOPGG.md](TOPGG.md) is the step-by-step**;
+this is what the keys mean.
+
+`TOPGG_TOKEN` is the **project token** from your listing's Webhooks/API page
+(`https://top.gg/bot/<your bot id>/webhooks`). It is a secret, it is never
+printed anywhere, and it is the only one of the three that has to be set —
+leave it empty and the other two do nothing. A leading `Bearer ` is stripped
+for you, because that is how Top.gg's own curl examples show it; a value with
+a space anywhere else in it fails at boot rather than becoming a silent `401`
+on every vote hours later.
+
+You do **not** need OAuth, a client secret, or a redirect URI. Top.gg's OAuth
+flow exists so an application can manage *other people's* listings, and it
+needs a public `https` callback this deployment has not got. A project token
+is your own listing's own credential and is the right one here.
+
+`TOPGG_VERIFY_VOTES` (default `true`) decides whether `/vote`'s claim button
+checks the vote before paying. With it on, pressing the button calls
+`GET /v1/projects/@me/votes/<user id>` and a claim is refused only when Top.gg
+answers and says there is no live vote — the player is told to vote and press
+again, and the button stays live so they can. **The check fails open**: a
+Top.gg outage, a rate limit, a timeout or a token you have just rotated all pay
+the gift on trust exactly as before, because a third party's bad day is not a
+reason to take something from a player who did nothing wrong. The engine's
+twelve-hour cooldown still bounds what any of that can cost.
+
+`TOPGG_POST_METRICS` (default `true`) posts your server count to the listing
+every thirty minutes so the page shows a live number. It is the one thing here
+that needs Discord rather than the engine — the count is `len(bot.guilds)` —
+and its last result shows up as the `topgg_metrics` health check, so a rotated
+token surfaces in `/admin` rather than as a listing that quietly stopped
+updating.
+
+Both features are outbound-only. Nothing is published from this deployment and
+no port is opened; Top.gg's inbound vote webhook is deliberately not used, for
+the same reason it never was.
+
 The claim is **taken on trust**: no listing site can tell this deployment that
 a vote happened without an inbound webhook, and that would mean publishing an
 endpoint from a box that currently publishes nothing. The twelve-hour cooldown
