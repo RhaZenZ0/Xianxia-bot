@@ -570,9 +570,20 @@ func (r *Runner) npcLife(conn *storage.Conn, steps, gm int64) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	// What they do when nobody has told them to (v1.0.0-rc.22). After the
+	// feuds, because a robbery is what starts the grudge a feud later
+	// settles, and a tick should not do both ends of that in one pass.
+	crimes, seen, murdered, err := r.npcCrimes(conn, gm)
+	if err != nil {
+		return "", err
+	}
+	hunts, kills, lost, err := r.npcBeastHunts(conn, gm)
+	if err != nil {
+		return "", err
+	}
 	return fmt.Sprintf(
-		"batch-advanced NPC life; %d natural death(s), %d new marriage(s), %d birth(s), %d promotion(s), %d new disciple(s), %d feud(s) settled (%d fatal)",
-		len(deaths), marriages, born, promoted, bonds, fought, killed), nil
+		"batch-advanced NPC life; %d natural death(s), %d new marriage(s), %d birth(s), %d promotion(s), %d new disciple(s), %d feud(s) settled (%d fatal), %d crime(s) (%d witnessed, %d fatal), %d hunt(s) (%d took quarry, %d fatal)",
+		len(deaths), marriages, born, promoted, bonds, fought, killed, crimes, seen, murdered, hunts, kills, lost), nil
 }
 
 func (r *Runner) economy(conn *storage.Conn, steps, gm int64) (string, error) {

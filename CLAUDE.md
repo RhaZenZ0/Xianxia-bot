@@ -167,6 +167,23 @@ etc.), separate from current structured state (what's true now — always wins o
 carry visibility levels `public` / `participant` / `faction` / `hidden`; hidden rows never reach
 narrator RAG, and a focused NPC does not inherit the player's participant-only knowledge.
 
+### What NPCs do on their own (`npc_deeds.go`, v1.0.0-rc.23)
+
+A step of the `npc_life` batch, after the feuds: a criminal trade (or anyone ambitious enough and
+poor enough) robs, beats or smuggles; a hunting trade goes out after a beast from the same roster
+`/hunt` uses (`game.RollHuntQuarry`). Everything writes a column that already existed — wealth and
+`activity` on `npc_civilization_state`, health and injury on `npc_life_state`, grudges in
+`npc_social_relations`, contraband in `black_market_stock`, lots in `auctions`, the record in
+`world_history_events`.
+
+**NPCs never get a `crime_records` row.** That table is FK'd to `characters` and is the player's:
+an NPC row there would mean a bounty nobody can collect and a capture nothing can perform. The
+visibility ladder above carries NPC crime instead — a crime with a witness is `public` and leaves a
+named grudge that `npcFeuds` later settles; one without is `hidden`, so it never reaches narrator
+RAG and the world really does not know who did it. A killing is always `public` (a body is found);
+the summary is what says whether the culprit is named. Making NPC crime prosecutable would be a
+schema change and is a separate decision — do not add it casually.
+
 ### World events and their sites
 
 A world event is a row in `world_events` (category, severity, location, expiry) plus a **site**:

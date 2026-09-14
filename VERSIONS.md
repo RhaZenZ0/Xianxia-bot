@@ -6,6 +6,56 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.0** (rc.23) gives the world's own people something to do when nobody has told them to. The
+simulation already gave them births, marriages, careers, breakthroughs, masters and feuds, and
+`npc_consignments` already had a grave-robber or a herb-gatherer turn something up and put it under
+the hammer. Between those the world was law-abiding by omission: `crime_records` is keyed to
+`characters` and always has been, so the only crime this world could record was a player's, and the
+only way an NPC's trade ever showed was a lot appearing on a floor. A hunter and a bandit lived
+exactly the same life.
+
+**A bandit robs somebody.** `npc_deeds.go` runs after the feuds in the `npc_life` batch - after,
+because a robbery is what starts the grudge a feud later settles, and one tick should not do both
+ends of that. A criminal trade needs no excuse; anyone else needs ambition at 70 and fifteen coins
+to their name, which is the difference between a thief and a desperate man. The victim is the
+richest person standing in the same place who has more than the thief does, so nobody is ever robbed
+of what they do not have. Most of it is theft, some is smuggling, a few turn violent and a fifth of
+those end in a death - and the money that moves is the victim's, not new money.
+
+**And the visibility ladder does the work a crime table would have done.** A crime somebody saw is a
+`public` row: the town talks about it, the narrator's RAG can surface it, and the victim holds a
+grudge against a *name*, which `npcFeuds` will eventually settle. A crime nobody saw is `hidden`,
+which by the rule this repo already keeps never reaches narrator RAG at all - so the world genuinely
+does not know who did it rather than politely pretending not to. Whether it was seen is the size of
+the crowd: two people on an empty road is fifteen percent, a busy capital is most of the time. A
+killing is the one thing always found, because a body is; whether it is attached to a name is the
+same roll as anything else, and the summary is what says which.
+
+**A hunter goes out.** The world's hunters draw on the same roster `/hunt` does - `RollHuntQuarry`
+is that roster exported, because a second list kept in the simulation package would be a second set
+of animals and the point is that these are the same woods. What they bring down goes to the nearest
+floor, which is where their finds already went; what brings *them* down leaves the injury on
+`npc_life_state`, and occasionally the cause of death. Death needs a margin of ten or worse, which
+is deliberately out of a competent hunter's reach: at the first draft's one-in-seventy per outing
+the trade emptied itself of everyone who practised it inside a season, which is not a living world,
+it is a cull.
+
+Everything here writes a column or a table that already existed - wealth and activity on
+`npc_civilization_state`, health and injury on `npc_life_state`, grudges in `npc_social_relations`,
+contraband in `black_market_stock`, lots in `auctions`, the record in `world_history_events`. **No
+NPC gets a crime record**, because that table is the player's: a row in it would mean a bounty
+nobody can collect and a capture nothing can perform. Making NPC crime *prosecutable* is a schema
+change and a separate decision; making it real is not, and this is real - the money moves, the
+grudge is held, the contraband is on the night market, and the hunter does not always come home.
+
+Also in this release: the shorthand's abbreviation rule ate one word too few. A group with a single
+leaf abbreviates to that leaf, and the leaf's own word was left sitting in the line - `x prof status`
+ran `/profession status` and then offered "status" to its first parameter. Both such groups take no
+parameters today so the word was dropped harmlessly; it is consumed properly now, before the next
+one is less lucky. And the rc.16 entry above claimed a shorthand line in a chat channel "returns
+before the first database read", which was never true of `on_message` - it is corrected in place
+rather than quietly left. No schema change.
+
 **1.0.0** (rc.22) fixes a door that opened onto nothing. Since v0.39.0 the world tick has rotated
 the secret realms - one every three game days, at its own entrance, so a realm at a ruin nobody walks
 to still comes round. It wrote the `world_events` row, it wrote the public history row the rumours
@@ -311,9 +361,12 @@ events` reaches `/worldevents` rather than running `/world` and dropping the res
 
 The reason it can be heard in every channel of the guild, which the prefix is not, is that it does
 nothing at all until a line names a real command. `x marks the spot` in a chat channel costs one
-dictionary lookup and returns before the first database read - the gate that already decided which
-channels typed play listens in carries the rule, so there is one place for it rather than a channel
-test in the branch as well. Inside the channels it always listened to, a shorthand line that names no
+dictionary lookup and no database read of its own - `on_message` already reads the hub row and the
+character for every line in the guild, and the shorthand adds nothing to that - so the gate that
+already decided which channels typed play listens in carries the rule, and there is one place for it
+rather than a channel test in the branch as well. (This paragraph used to say the line "returns
+before the first database read", which was never true of `on_message` and is corrected here rather
+than quietly left.) Inside the channels it always listened to, a shorthand line that names no
 command still falls through to the verb table, so `x search the ravine` is unchanged. Arguments are
 filled two ways and neither guesses: a command the verb table already describes gets the entity
 resolution the prefix gets, so `x use a healing pill` reaches a real inventory id; anything else fills
