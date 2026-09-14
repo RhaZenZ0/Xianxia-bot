@@ -461,7 +461,10 @@ class ResultsInThePanelTests(unittest.TestCase):
         self.assertEqual(hub_view.last_result, "")
 
     def test_the_panel_renders_the_result_block_and_refresh_clears_it(self):
-        self.assertIn('container.add_item(discord.ui.TextDisplay(f"### 📜 Result\\n{self._result_text()}"', HUBS_SOURCE)
+        # `##`: one step above the page block below it, so the answer the
+        # player asked for does not read as a peer of the action menu.
+        self.assertIn('container.add_item(discord.ui.TextDisplay(f"## 📜 Result\\n{self._result_text()}"', HUBS_SOURCE)
+        self.assertNotIn('f"### 📜 Result', HUBS_SOURCE)
         self.assertIn('self.hub_view.last_result = ""', HUBS_SOURCE)
         self.assertIn("_LAYOUT_RESULT_LIMIT = 1000", HUBS_SOURCE)
         # Only the first output of an action goes in the panel; the rest go beside it.
