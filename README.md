@@ -20,7 +20,6 @@ describes what the engine has already decided, and the game keeps running when t
 - `docs/ROADMAP_1_0.md` — what is left before 1.0 and the test that gates each milestone.
 - `docs/KNOWN_LIMITATIONS.md` — the punch list, every entry fixed or deferred with a reason.
 - `docs/playtest/` — the live-server checklist for the current release.
-- `docs/TOPGG.md` — listing the bot on Top.gg, and verifying votes against their API.
 - `docs/TERMS.md` / `docs/PRIVACY.md` — what players agree to, and what the bot holds about them.
   The Discord Developer Portal wants a URL for each; these two files are those URLs.
 - `docs/COMMISSIONS_DESIGN.md` — the design of commissions and typed play.
@@ -297,12 +296,18 @@ chat channel is silence; inside the channels above, a shorthand line that names 
 to the verb table. `/admin` is off the surface. `TYPED_PLAY_SHORTHAND` is `x` by default; empty
 turns it off.
 
-### Bringing players in
+### The patron's tribute
 
-`/vote` prints the server's page on whichever listing site the operator set (`VOTE_SITE_URL` /
-`VOTE_SITE_NAME` — Top.gg, DISBOARD, any of them), because a small server is found by ranking on
-that list and the list ranks on votes. Under the link is one button, once every twelve hours — the
-cadence every listing site resets a vote on.
+`/tribute` gives a cultivator a patron's gift, once every twelve hours, addressed to them by their
+name on the server. Nothing outside this deployment is involved: it began as a thank-you for voting
+the server up a listing site and is now the world's own, so there is no listing, no API key, no
+endpoint, and nothing to verify or take on trust. The cadence is a balance dial rather than
+somebody else's reset — `supportVoteCooldownSeconds` in `go_core/internal/game/support_actions.go`.
+
+The engine operations behind it are still `support.vote_*` and the cooldown key is still
+`support_vote`: those strings are written into `domain_events` and `cooldowns` the moment anybody
+plays, so renaming them would orphan the rows or hand every player a free claim. What a player types
+is presentation; what the ledger keeps is data.
 
 The gift is the cultivator's own. Fifteen of the local world's low-grade currency, and five more for
 every realm climbed inside that world, so it runs fifteen to fifty and stays a few cheap wares at
@@ -323,16 +328,13 @@ the tier table in both directions.
 
 From Friday through Sunday, the operator's local time, the whole gift doubles. The window is the
 engine's (`support.weekend`, measured in a named zone so it follows daylight saving rather than
-drifting an hour in winter), `/vote` says so above the link, and the bot announces it once in the
+drifting an hour in winter), `/tribute` says so at the top, and the bot announces it once in the
 server's announcement channel when it opens and once when it closes — the marker is the window's
 own key, so a restart mid-weekend does not post twice.
 
-Nothing verifies the vote. Verifying it would mean an inbound webhook, and that means publishing an
-endpoint from a box that publishes nothing — a door opened for a thank-you. So the claim is taken
-on trust and the *cooldown* is the engine's (`support.vote_claim`, a domain-event row per grant):
-a player who claims without voting is thanked no more often than one who votes, and the gift is
-small enough at every tier to be a thank-you rather than an income. Leave `VOTE_SITE_URL` empty and
-the command says so and grants nothing.
+There is nothing to verify: no listing site is involved, so a tribute is honest by construction and
+the *cooldown* is the whole of it (`support.vote_claim`, a domain-event row per grant). The gift is
+small enough at every tier to stay a thank-you rather than an income.
 
 ### What you are waiting on
 
@@ -505,6 +507,17 @@ native batched tick (`npc_civilization` daily, `npc_life` weekly, economy, black
 politics and clan dynamics on their own intervals), with bounded catch-up after downtime. Each has
 a personality, a want, a fear and a secret for the narrator, and a memory of you. The narrator can
 describe all of it and change none of it.
+
+They also do things nobody told them to. A bandit robs the richest person standing beside them, a
+smuggler moves something the legal floors will not take, and a hunter goes out after the same beasts
+`/hunt` draws on and does not always come home whole. The money that moves is the victim's; the
+injury is on the hunter's sheet; the carcass reaches the nearest auction floor. Whether a crime is
+*known* is the size of the crowd that saw it — a robbery on an empty road is a `hidden` row the
+narrator never sees, so the world genuinely does not know who did it, while a robbery in a capital
+is public and leaves the victim holding a grudge against a name that a feud will eventually settle.
+A body is always found either way; whether it comes with a name is the same roll. NPCs hold no
+crime records and carry no bounties — that table is the player's, and a bounty nobody can collect
+would be a worse lie than silence.
 
 ### History and memory
 

@@ -72,6 +72,11 @@ Python-owned boundary rather than a second implementation of an engine formula.
 Worth stating outright if you did it: that a new gate was verified to *fail*
 when the thing it guards is removed, and what it said when it failed. A test
 that can only pass is not a gate.
+
+No test asserts that a random thing happened, however many iterations it is
+given - `gamerng` is crypto/rand with no seed, so that test fails at some rate
+you cannot drive to zero. Lend the dice with `gamerng.UseRoller(fn)` and defer
+the restore, or make the outcome certain by the scenario instead.
 -->
 
 ## Checks

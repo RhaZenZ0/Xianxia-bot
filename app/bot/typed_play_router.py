@@ -604,6 +604,13 @@ def command_named(text: str, *, commands: Mapping[str, CommandSpec]) -> CommandM
     MIN_ABBREVIATION characters that begins exactly one command's first word is
     that command ("x inv" is /inventory); two candidates identify neither, and
     the router never guesses.
+
+    An abbreviation can land on a two-word name - a group with a single leaf
+    abbreviates to that leaf - and then the leaf's own word is still sitting in
+    the line. It is consumed too when it is there, so "x prof status" runs
+    /profession status rather than running it and handing "status" to its first
+    parameter. Today both such groups take no parameters and the word was
+    dropped harmlessly; the next one will not be so lucky.
     """
     words = text.split()
     if not words:
@@ -620,7 +627,11 @@ def command_named(text: str, *, commands: Mapping[str, CommandSpec]) -> CommandM
     matched = {spec.name: spec for name, spec in commands.items() if name.split(" ", 1)[0].startswith(head)}
     if len(matched) != 1:
         return None
-    return CommandMatch(next(iter(matched.values())), 1)
+    spec = next(iter(matched.values()))
+    parts = spec.name.casefold().split(" ")
+    if len(parts) > 1 and len(words) > 1 and words[1].casefold() == parts[1]:
+        return CommandMatch(spec, 2)
+    return CommandMatch(spec, 1)
 
 
 def _parameter_value(parameter: CommandParameter, words: str) -> str | int | bool | None:

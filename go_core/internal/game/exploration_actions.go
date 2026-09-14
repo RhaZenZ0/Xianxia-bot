@@ -1769,6 +1769,32 @@ func randomHuntBeast(realmIndex int64) (huntBeast, error) {
 	return b, nil
 }
 
+// HuntQuarry is one animal off the roster /hunt draws on, in the shape the
+// world tick needs (v1.0.0-rc.22). The world's own hunters go after the same
+// beasts a player does - a second roster kept in the simulation package would
+// be a second set of animals, and the point is that these are the same woods.
+type HuntQuarry struct {
+	Name        string
+	TN          int64
+	Rank        int64
+	Loot        map[string]int64
+	Stones      int64
+	Cultivation int64
+}
+
+// RollHuntQuarry draws one beast scaled to the hunter's realm.
+func RollHuntQuarry(realmIndex int64) (HuntQuarry, error) {
+	b, err := randomHuntBeast(realmIndex)
+	if err != nil {
+		return HuntQuarry{}, err
+	}
+	loot := make(map[string]int64, len(b.Loot))
+	for id, qty := range b.Loot {
+		loot[id] = qty
+	}
+	return HuntQuarry{Name: b.Name, TN: b.TN, Rank: b.Rank, Loot: loot, Stones: b.Stones, Cultivation: b.Cultivation}, nil
+}
+
 func explorationHuntAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	var p huntPayload
 	if err := json.Unmarshal(raw, &p); err != nil {

@@ -45,7 +45,7 @@ def engine_families() -> set[str]:
 class TheCardIsARootAPlayerCanType(unittest.TestCase):
     def test_it_is_registered_with_discord(self):
         self.assertIn("from .commands import cooldowns as _commands_cooldowns", SURFACE)
-        self.assertIn('"vote", "cooldowns"', SURFACE)
+        self.assertIn('"tribute", "cooldowns"', SURFACE)
         with patch.dict(os.environ, ENV):
             surface = importlib.import_module("app.bot.surface")
             self.assertEqual(surface.ACTIONS.root("cooldowns").name, "cooldowns")
@@ -105,11 +105,12 @@ class EveryFamilyHasWords(unittest.TestCase):
 
 
 class PythonOwnsOnlyTheConfiguration(unittest.TestCase):
-    def test_the_vote_row_is_dropped_when_no_listing_is_configured(self):
-        # Whether a listing site exists is .env, not a rule - so this is the
-        # one thing the engine deliberately does not decide.
-        self.assertIn("if not SETTINGS.vote_site_url:", COMMAND)
-        self.assertIn('row.get("family") != "support_vote"', COMMAND)
+    def test_the_tribute_row_is_never_filtered_out(self):
+        # It used to be dropped when no listing site was configured. The
+        # tribute is the server's own now, so it always exists and the card
+        # has nothing configuration-dependent left to hide.
+        self.assertNotIn("vote_site_url", COMMAND)
+        self.assertNotIn('row.get("family") != "support_vote"', COMMAND)
 
     def test_the_beast_lookup_only_runs_when_a_beast_is_on_the_card(self):
         body = COMMAND[COMMAND.index("async def _beast_names"):COMMAND.index("@registered_root_command")]

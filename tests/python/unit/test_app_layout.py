@@ -33,7 +33,7 @@ PACKAGES = {
     },
     "ops": {
         "config", "core_services", "game_engine", "health", "healthcheck", "http_limits", "operations",
-        "performance", "release_channel", "topgg", "user_budget",
+        "performance", "release_channel", "user_budget",
     },
     "dashboard": {"server", "contract"},
 }

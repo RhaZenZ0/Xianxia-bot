@@ -872,7 +872,7 @@ SURFACE = {
     },
     "commands/support.py": {
         "groups": (),
-        "roots": ('vote',),
+        "roots": ('tribute',),
         "leaves": {
         },
     },

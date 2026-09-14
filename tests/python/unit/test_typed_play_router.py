@@ -394,6 +394,11 @@ COMMANDS = {
         _CS("merchant buy", (_CP("merchant", "str", True), _CP("item", "str", True))),
         _CS("worldevents"),
         _CS("world"),
+        # A group with one leaf: "prof" names it, and the leaf's own word is
+        # still in the line when a player spells the group out.
+        _CS("profession status"),
+        _CS("seclusion start", (_CP("days", "int", True),)),
+        _CS("seclusion end"),
     )
 }
 
@@ -512,6 +517,25 @@ class ShorthandCommandTests(unittest.TestCase):
     def test_an_ambiguous_abbreviation_names_nothing(self):
         # "travel go" and "travel status" both begin with "tra".
         self.assertIsNone(_shorthand("tra somewhere"))
+
+    def test_an_abbreviation_onto_a_single_leaf_group_eats_the_leaf_word(self):
+        # "prof" is the only command whose first word begins that way, so it
+        # names "profession status" - and "status" must be consumed, not left
+        # in the line for the command's first parameter to swallow.
+        match = router.command_named("prof status", commands=COMMANDS)
+        self.assertEqual((match.spec.name, match.words), ("profession status", 2))
+        # Without the leaf word it is still the same command, one word spent.
+        bare = router.command_named("prof", commands=COMMANDS)
+        self.assertEqual((bare.spec.name, bare.words), ("profession status", 1))
+        self.assertEqual(_ids(_shorthand("prof status")), ["root:profession status"])
+
+    def test_a_leaf_word_is_only_eaten_when_it_is_the_leafs_own(self):
+        # "secl" is ambiguous (start and end), so nothing is named - the rule
+        # above must not make a group with two leaves resolvable.
+        self.assertIsNone(router.command_named("secl start 7", commands=COMMANDS))
+        # And a word that is not the leaf's name stays an argument.
+        match = router.command_named("profession elsewhere", commands=COMMANDS)
+        self.assertEqual((match.spec.name, match.words), ("profession status", 1))
 
     def test_an_abbreviation_must_be_long_enough_to_mean_it(self):
         self.assertIsNone(router.command_named("in", commands=COMMANDS))
