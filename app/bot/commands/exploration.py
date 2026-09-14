@@ -827,7 +827,7 @@ async def alchemy_status(interaction: discord.Interaction) -> None:
     await reply_long(interaction, "\n".join(lines), ephemeral=False)
 
 
-@registered_group_command(alchemy_group, name="forage", description="Gather medicinal herbs using the current region's simulated spirit resources")
+@registered_group_command(alchemy_group, name="forage", description="Gather herbs and craft makings using the current region's simulated spirit resources")
 @serialized_user_action
 async def alchemy_forage(interaction: discord.Interaction) -> None:
     c = await require_character(interaction)
@@ -836,7 +836,7 @@ async def alchemy_forage(interaction: discord.Interaction) -> None:
     remaining = await DB.cooldown_remaining(interaction.user.id, "alchemy_forage")
     if remaining:
         await interaction.response.send_message(
-            f"The nearby herb beds need time to recover. Forage again in **{human_duration(remaining)}**.", ephemeral=False,
+            f"The nearby beds and seams need time to recover. Forage again in **{human_duration(remaining)}**.", ephemeral=False,
         )
         return
     try:
@@ -863,7 +863,7 @@ async def alchemy_forage(interaction: discord.Interaction) -> None:
     )
     if not success:
         await interaction.response.send_message(
-            f"🌿 **Medicinal Forage — {forage_location}**\n{roll_line(result)}\n"
+            f"🌿 **Forage — {forage_location}**\n{roll_line(result)}\n"
             f"Regional spirit resources: **{int(resolved.get('spirit_resources',0))}/100**.{bonus_bits} "
             "You find no usable harvest this time."
             f"\n🧺 Foraging: **{profession_rank(level)}** Lv.{level} "
@@ -873,10 +873,15 @@ async def alchemy_forage(interaction: discord.Interaction) -> None:
     awarded = {str(k): int(v) for k, v in dict(resolved.get("loot") or {}).items()}
     rare = str(resolved.get("rare_found") or "")
     rare_line = f"\n✨ Rare find: **{WORLD.item_name(rare)}**." if rare else ""
+    # The makings of the other three crafts (v1.0.0-rc.21). They are already in
+    # `Harvested`, but naming them is the point: a forager who does not know
+    # that ink and paper come out of the hills has no reason to look.
+    makings = {str(k): int(v) for k, v in dict(resolved.get("materials_found") or {}).items()}
+    makings_line = f"\n📜 Craft makings: **{WORLD.item_names(makings)}**." if makings else ""
     await interaction.response.send_message(
-        f"🌿 **Medicinal Forage — {forage_location}**\n{roll_line(result)}\n"
+        f"🌿 **Forage — {forage_location}**\n{roll_line(result)}\n"
         f"Regional spirit resources: **{int(resolved.get('spirit_resources',0))}/100**.{bonus_bits}\n"
-        f"Harvested: **{WORLD.item_names(awarded)}**.{rare_line}\n"
+        f"Harvested: **{WORLD.item_names(awarded)}**.{rare_line}{makings_line}\n"
         f"🧺 Foraging: **{profession_rank(level)}** Lv.{level} "
         f"• XP {int(forage_progress.get('xp',0))}/{profession_xp_needed(level)}"
     )

@@ -1096,3 +1096,125 @@ class RoadSideSiteContentTests(unittest.TestCase):
                 self.assertGreaterEqual(len(shop["sells"]), 3)
                 self.assertGreaterEqual(len(shop["buys"]), 2)
 
+
+
+# --- every craft can be gathered into --------------------------------------
+#
+# The last finding of the rc.19 audit, filed under "worth deciding
+# separately" and decided in rc.21: `array_disk_blank`, `spirit_ink` and
+# `talisman_paper` were named by items, recipes, shops and merchants and by no
+# gathering path at all, so a player could forage their way into an
+# alchemist's career and had to buy their way into an inscriber's.
+
+CRAFTING_ACTIONS = GO_GAME_ROOT / "crafting_actions.go"
+
+
+def _forage_rare_pool() -> set:
+    """The rare forage candidates, read off the engine rather than retyped."""
+    return set(re.findall(r'rareCandidate\{"(\w+)"', CRAFTING_ACTIONS.read_text(encoding="utf-8")))
+
+
+def _gatherable_items() -> set:
+    """Every item obtainable without paying a shop for it."""
+    sites = WORLD["event_sites"]
+    tiers = sites["tier_materials"]
+    found = set()
+    # `@herb`/`@ore`/`@core` resolve to these, and the forage common drop is
+    # the same `@herb`, so one pass covers event-site nodes and foraging both.
+    for mats in tiers.values():
+        found |= set(mats.values())
+    templates = [sites["default"], *sites["categories"].values()]
+    for tpl in templates:
+        for node in tpl.get("nodes") or []:
+            item = str(node.get("item") or "")
+            if item and not item.startswith("@"):
+                found.add(item)
+    for realm in WORLD["secret_realms"].values():
+        for room in realm.get("rooms") or []:
+            found |= set((room.get("items") or {}).keys())
+    found |= _forage_rare_pool()
+    found |= set(WORLD["forage_materials"])
+    return found
+
+
+class EveryCraftCanBeGatheredIntoTests(unittest.TestCase):
+    """A player can enter any of the four crafts without a shop (v1.0.0-rc.21).
+
+    The bar is one *entry* method - a `min_level == 0` recipe - all of whose
+    materials have a source that is not a shop counter. It is deliberately not
+    "every recipe", because a Celestial method wanting starsteel ore is
+    supposed to send you somewhere dangerous for it; the rule is that no craft
+    is sealed behind money at the door.
+    """
+
+    def _crafts(self) -> set:
+        return {r["profession"] for r in WORLD["recipes"].values()}
+
+    def test_every_craft_has_an_entry_method_that_can_be_gathered_for(self):
+        gatherable = _gatherable_items()
+        for craft in sorted(self._crafts()):
+            entries = {n: r for n, r in WORLD["recipes"].items()
+                       if r["profession"] == craft and int(r["min_level"]) == 0}
+            with self.subTest(craft=craft):
+                self.assertTrue(entries, f"{craft} has no entry method at all")
+                reachable = {n for n, r in entries.items() if set(r["cost"]) <= gatherable}
+                self.assertTrue(
+                    reachable,
+                    f"{craft} can only be bought into: no entry method's materials "
+                    f"{sorted({m for r in entries.values() for m in r['cost']} - gatherable)} can be gathered",
+                )
+
+    def test_the_scanner_resolves_the_pools_it_reads(self):
+        """A scanner that matches nothing passes forever (the rc.19 lesson)."""
+        rare = _forage_rare_pool()
+        self.assertIn("jade_life_herb", rare, "the rare-pool scanner stopped matching the engine")
+        self.assertGreaterEqual(len(rare), 4)
+        gatherable = _gatherable_items()
+        for known in ("spirit_herb", "spirit_iron", "beast_core", "heavenpetal_herb"):
+            self.assertIn(known, gatherable, f"the gatherable scanner lost {known}")
+
+    def test_the_forage_makings_are_real_items_that_a_recipe_wants(self):
+        costs = {m for r in WORLD["recipes"].values() for m in r["cost"]}
+        for item_id, spec in WORLD["forage_materials"].items():
+            with self.subTest(item=item_id):
+                self.assertIn(item_id, WORLD["items"], f"{item_id} is foraged and is not an item")
+                self.assertIn(item_id, costs, f"{item_id} is foraged and no recipe wants it")
+                self.assertGreater(int(spec["chance"]), 0)
+                self.assertGreater(int(spec["max"]), 0)
+                self.assertGreaterEqual(int(spec["min_resources"]), 0)
+
+
+class ForageMaterialsAreReadTests(unittest.TestCase):
+    """The block is consumed by the engine, not merely carried by it.
+
+    `authenticity`, `tracking_strength` and two profession levels all shipped
+    as state written with care and read by nothing. A roster in content that
+    no action iterates would be the same fault a fifth time.
+    """
+
+    def test_the_forage_action_iterates_the_roster(self):
+        source = CRAFTING_ACTIONS.read_text(encoding="utf-8")
+        forage = source[source.index("func forageResolveAction"):]
+        forage = forage[:forage.index("\nfunc ")]
+        # assertTrue rather than assertIn: the haystack is a whole Go
+        # function, and dumping it into the failure makes the one line that
+        # matters unfindable.
+        self.assertTrue("catalog.ForageMaterials" in forage,
+                        "forageResolveAction never reads catalog.ForageMaterials: "
+                        "forage_materials is content nothing consumes")
+        self.assertTrue("materials_found" in forage,
+                        "forageResolveAction never reports materials_found, so no "
+                        "player learns the makings are out there")
+
+    def test_the_slice_the_scanner_cut_is_the_real_function(self):
+        """Pins the scanner: a renamed function would silently empty it."""
+        source = CRAFTING_ACTIONS.read_text(encoding="utf-8")
+        self.assertIn("func forageResolveAction", source)
+        forage = source[source.index("func forageResolveAction"):]
+        forage = forage[:forage.index("\nfunc ")]
+        self.assertTrue("alchemy_forage" in forage, "the cut slice is not the forage action")
+
+    def test_the_catalogue_carries_the_block(self):
+        catalog = (PROJECT_ROOT / "go_core" / "internal" / "worlddata" / "catalog.go").read_text(encoding="utf-8")
+        self.assertIn('json:"forage_materials"', catalog)
+        self.assertIn("type ForageMaterial struct", catalog)

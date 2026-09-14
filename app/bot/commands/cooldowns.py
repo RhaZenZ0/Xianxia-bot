@@ -52,7 +52,7 @@ FAMILY_LABELS: dict[str, tuple[str, str, str]] = {
     "body_perfect_trial": ("⚔️", "Body perfection trial", "**/ascend → Perfection → Trial**"),
     "support_vote": ("🗳️", "The patron's gift", "**/vote**"),
     "alchemy_purge": ("🧪", "Purge pill toxicity", "**/craft → Alchemy → Purge**"),
-    "alchemy_forage": ("🌿", "Forage for herbs", "**/craft → Alchemy → Forage**"),
+    "alchemy_forage": ("🌿", "Forage for herbs and craft makings", "**/craft → Alchemy → Forage**"),
     "beast_tame": ("🐾", "Tame a beast", "**/beast → Companions → Tame**"),
     "meridian_heal": ("🩹", "Heal a meridian", "**/cultivation → Qi Body → Heal**"),
     "qi_refine": ("💠", "Refine your qi", "**/cultivation → Qi Body → Refine**"),

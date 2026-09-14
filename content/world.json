@@ -63730,6 +63730,23 @@
       "Duan Shu"
     ]
   },
+  "forage_materials": {
+    "talisman_paper": {
+      "chance": 22,
+      "min_resources": 35,
+      "max": 2
+    },
+    "spirit_ink": {
+      "chance": 18,
+      "min_resources": 45,
+      "max": 2
+    },
+    "array_disk_blank": {
+      "chance": 8,
+      "min_resources": 60,
+      "max": 1
+    }
+  },
   "birth_family_sendoff": {
     "fallen_martial_clan": {
       "item": "cracked_ancestral_blade",

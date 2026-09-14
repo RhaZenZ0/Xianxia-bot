@@ -261,6 +261,20 @@ Formation *and* Inscription have no gathering path into their own base materials
 (`spirit_herb`) and Forging (`spirit_iron`) both do. A player can forage their way into an
 alchemist's career and must buy their way into an inscriber's.
 
+**Decided and fixed in rc.21: foraging finds them.** `forage_materials` in `content/world.json` is
+the roster - `talisman_paper` at 22% above 35 regional spirit resources, `spirit_ink` at 18% above
+45, `array_disk_blank` at 8% above 60 - and `forageResolveAction` rolls it beside the herbs, with
+richness and Foraging level both improving the odds under the same 65% cap the rare pool uses. So
+every craft can now be entered without a shop, and Foraging stops being a herb feeder for one
+profession out of four. Two gates hold it: `EveryCraftCanBeGatheredIntoTests` asserts each craft has
+an entry method whose every material has a non-shop source, and `ForageMaterialsAreReadTests` asserts
+the engine actually iterates the roster - the block would otherwise be content nothing reads, which
+is the fault this document keeps finding.
+
+Still shop-only by design: the higher-tier materials. A Celestial method wanting starsteel ore is
+supposed to send you somewhere for it; the rule is only that no craft is sealed behind money *at the
+door*.
+
 ## What was done
 
 All seven, in the release that followed the audit. In the order they were repaired:
@@ -277,7 +291,9 @@ All seven, in the release that followed the audit. In the order they were repair
    exactly the point of it.
 
 Left deliberately at the time: the learning step (§7), which was a design decision rather than a
-fault. It was made in rc.20 and is described at the end of §7.
+fault. It was made in rc.20 and is described at the end of §7. The one remaining gap - Formation and
+Inscription having no gathering path into their own base materials - was closed in rc.21 and is
+recorded above, at the end of the Formation ladder section.
 
 `docs/KNOWN_LIMITATIONS.md` still is not the right home for any of this —
 `tests/python/contracts/test_playtest_gate.py` holds every entry there to being either *fixed* or

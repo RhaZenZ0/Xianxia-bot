@@ -693,6 +693,23 @@ type Catalog struct {
 	// ElementalQi (v1.0.0-rc.9): the five phases and what they are worth to
 	// absorption.
 	ElementalQi ElementalQiSystem `json:"elemental_qi_system"`
+	// ForageMaterials (v1.0.0-rc.21): the worked makings a forager can bring
+	// back beside the herbs - talisman paper, spirit ink, array blanks. Until
+	// this existed, shops were their only source, so Alchemy and Forging could
+	// be gathered into and Inscription and Formation could only be bought
+	// into. Unlike `@herb`/`@ore` these are tier-flat: one talisman paper
+	// serves a Mortal scribe and a Celestial one, so there is no per-world
+	// resolution and the roster is a plain map of item id to how it is found.
+	ForageMaterials map[string]ForageMaterial `json:"forage_materials"`
+}
+
+// ForageMaterial is one entry of that roster. Chance is the base percentage
+// per forage, MinResources the region richness below which the makings are
+// simply not there, and Max the most a single trip can bring back.
+type ForageMaterial struct {
+	Chance       int64 `json:"chance"`
+	MinResources int64 `json:"min_resources"`
+	Max          int64 `json:"max"`
 }
 
 // Shop is one city shop. Sells is what it stocks (MadeHere lines are the
