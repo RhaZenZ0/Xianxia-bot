@@ -342,6 +342,24 @@ using it. The statements stay inside `sync_world_catalog` rather than in a helpe
 `test_authority_boundary` reads the write allowlists off the method that contains the SQL, and
 moving them out would mean widening an authority gate for a refactor that changes no authority.
 
+### The readiness probe (`OPERATIONAL_REQUIRED_TABLES`)
+
+`operational_health` exists to tell a healthy versioned database from the empty file SQLite will
+create if the real one is removed or replaced while the bot is running. It does that by checking
+that a set of tables is present — and since v1.0.0-rc.28 that set is **exact**: every table a fresh
+bootstrap makes, all 169 of them.
+
+It used to be a sample of twenty-seven written for v0.20.7 and never revisited. By schema 49 it
+still named two catalogue mirrors nothing reads for their content and omitted
+`npc_civilization_state`, `inventory`, `character_quests`, `battles` and everything added in
+twenty-nine releases. **A sample cannot be kept honest, because nothing says which tables belong in
+it.** An exact set can: `test_startup_health` holds it against a real bootstrap rather than against
+another list, so adding a table without listing it fails there. That test is the whole mechanism —
+the literal is only reviewable because the test makes it true.
+
+FTS5 virtual tables and their shadow tables are deliberately excluded: they are made by
+`CREATE VIRTUAL TABLE` and rebuilt from their base tables, so their absence is a different fault.
+
 ### RAG / memory (`app/ai/rag`)
 
 Deterministic and SQLite-first (FTS5), not embedding/vector-based. Retrieval never creates game

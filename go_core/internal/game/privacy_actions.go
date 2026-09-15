@@ -4,7 +4,7 @@ package game
 //
 // A player can ask for their data back out of this bot, and until now the only
 // honest answer was "the operator will go through the database by hand". That
-// is not an answer at schema 46: a Discord id appears in 103 tables under 27
+// is not an answer at schema 49: a Discord id appears in 104 tables under 28
 // different column names, and a hand-written list of them is a list that goes
 // stale the first time somebody adds a table.
 //
@@ -53,7 +53,7 @@ const erasedUserSentinel int64 = 0
 
 // erasureSubjectColumns are the column names that hold a Discord user id. Taken
 // from the live schema rather than invented: every one of these exists at
-// schema 48, and the classification test fails if the schema grows another.
+// schema 49, and the classification test fails if the schema grows another.
 var erasureSubjectColumns = map[string]bool{
 	"user_id": true, "actor_id": true, "admin_user_id": true,
 	"bidder_user_id": true, "challenger_user_id": true, "claimed_by_user_id": true,

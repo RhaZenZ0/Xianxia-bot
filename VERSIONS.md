@@ -8,6 +8,26 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 **1.0.0** (rc.28) stops the content path costing what it cost.
 
+Also here: the readiness probe was a sample, and the sample had gone stale. `operational_health`
+exists to tell a healthy versioned database from the empty file SQLite will happily create if the
+real one is removed or replaced while the bot is running, and it did that by checking a set of
+tables - twenty-seven of them, written for v0.20.7 and never touched again. Twenty-nine releases
+later it still named `catalog_manuals` and `catalog_techniques`, and did not name
+`npc_civilization_state`, which is the table the entire simulation runs on, nor `inventory`,
+`character_quests`, `battles`, or anything added since. It would not have noticed the simulation's
+own table going missing.
+
+It is exact now - every one of the 169 tables a fresh bootstrap makes - and a test holds it against
+a real bootstrap rather than against another list, so adding a table without listing it fails there.
+That is the part that matters: a sample cannot be kept honest, because nothing says which tables
+belong in it. The cost is one set difference against `sqlite_master`, which the probe already reads.
+
+This is also what the decision not to retire `catalog_manuals` and `catalog_techniques` above rests
+on, and it rests on it less than it looked: those two are not load-bearing *because* they are in the
+probe - they are in it by accident of when the set was written. What is real is `catalog_counts`
+reporting their rows in the CATALOG_READY startup phase, and two rows in eighteen hundred not being
+worth giving that up.
+
 Nothing here changes a rule. All three are the same shape of problem: work on the hot path that
 looks like a lookup and is not.
 
