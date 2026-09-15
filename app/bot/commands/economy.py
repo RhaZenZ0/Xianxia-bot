@@ -20,7 +20,8 @@ from ..formatting import human_duration
 from ..pickers import auction_currency_autocomplete, usable_item_autocomplete
 from ..registry import registered_group_command, registered_root_command
 from ..runtime import _explain_engine_error, DB, ENGINE, WORLD, carried_item_autocomplete, character_location_display, current_world_time, log, reply_long, require_character, respond, serialized_user_action
-from ..services import GUILD, SIM
+from ..character_state import announce_quest_progress
+from ..services import GUILD, QUESTS, SIM
 
 @registered_root_command(name="wallet", description="View all cultivation currencies you currently hold", guild=GUILD)
 async def wallet_command(interaction: discord.Interaction) -> None:
@@ -532,6 +533,23 @@ async def shop_browse(interaction:discord.Interaction)->None:
     await reply_long(interaction,"\n".join(lines))
 
 
+async def _report_trade(interaction:discord.Interaction,item_id:str)->None:
+    """One trade, reported once, whichever way the goods went.
+
+    Buying and selling are the same objective (`trade`) because a shop is one
+    thing a beginner has to be shown, not two - and because the quantity is
+    deliberately not the amount: buying ten herbs is one visit to one keeper,
+    and an objective that wanted ten of them would be satisfied by one click.
+    """
+    try:
+        wt=await current_world_time()
+        await announce_quest_progress(interaction,await QUESTS.progress(
+            interaction.user.id,"trade",amount=1,target=str(item_id),
+            game_minute=wt.total_minutes))
+    except Exception:
+        log.exception("Quest progress update failed after a shop trade")
+
+
 @registered_group_command(shop_group, name="buy",description="Buy from the shelf of the shop you are inside")
 @serialized_user_action
 async def shop_buy(interaction:discord.Interaction,item:str,quantity:app_commands.Range[int,1,100]=1)->None:
@@ -543,6 +561,7 @@ async def shop_buy(interaction:discord.Interaction,item:str,quantity:app_command
     except GameEngineError as exc:
         await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
     made=" - the keeper's own work" if bool(result.get("made_here")) else ""
+    await _report_trade(interaction,str(result.get("item_id") or item))
     await interaction.followup.send(
         f"🏪 **{result.get('shop_name')}** sells you **{WORLD.item_name(str(result.get('item_id') or item))} ×{int(result.get('quantity') or quantity)}**{made} "
         f"for **{int(result.get('total') or 0)} {WORLD.currency_name(str(result.get('currency_id') or 'low_spirit_stone'))}** "
@@ -578,6 +597,7 @@ async def shop_sell(interaction:discord.Interaction,item:str,quantity:app_comman
     except GameEngineError as exc:
         await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
     shelf=" It goes straight onto the shelf." if bool(result.get("on_the_shelf")) else ""
+    await _report_trade(interaction,str(result.get("item_id") or item))
     await interaction.followup.send(
         f"🏪 **{result.get('shop_name')}** buys **{WORLD.item_name(str(result.get('item_id') or item))} ×{int(result.get('quantity') or quantity)}** "
         f"for **{int(result.get('total') or 0)} {WORLD.currency_name(str(result.get('currency_id') or 'low_spirit_stone'))}** "

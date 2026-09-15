@@ -75,12 +75,41 @@ def static_quest_seed_rows(definitions: dict[str, dict] | None = None) -> list[d
 # objective type -> what its `target` must name (None = no target allowed).
 # The engine matches targets case-insensitively (go_core/internal/core,
 # progressQuest); the bot reports these types from the commands named.
+#
+# This list is the ceiling on everything the quest system can ask for - static
+# quests, commissions and the Quest Forge alike - because a type nothing
+# reports can never be progressed. Until v1.0.0-rc.25 it was the first five,
+# and that was honest rather than stale: there were exactly five
+# `QUESTS.progress(...)` calls in the whole bot and they were these. It also
+# meant cultivation, combat, crafting, travel, the shops and the hills were
+# invisible to every quest in the game - nobody could be asked to meditate,
+# win a fight, make something, walk somewhere, buy something or pick a herb.
+#
+# The six below close that, and they cost the engine nothing: `progressQuest`
+# matches `objective.Type` against no whitelist at all, so a new type is a
+# vocabulary entry here plus one line at the command that already does the
+# work. What each type costs is a *reporter*, and the rule is that the report
+# is written after the authoritative action has already succeeded - the engine
+# decides that something happened, and this only says so.
 OBJECTIVE_TYPES: dict[str, dict[str, Any]] = {
     "explore": {"target": "location", "label": "Explore {target}", "untargeted": "Complete an exploration"},
     "talk": {"target": "npc", "label": "Speak with {target}", "untargeted": "Speak with a persistent NPC"},
     "scene_action": {"target": "scene_action", "label": "Resolve a Scene Action: {target}", "untargeted": "Resolve a Scene Action"},
     "sect_discovery": {"target": None, "label": "", "untargeted": "Discover a sect route"},
     "sect_trial": {"target": None, "label": "", "untargeted": "Attempt a sect entrance trial"},
+    "cultivate": {"target": None, "label": "", "untargeted": "Sit one cultivation session"},
+    "travel": {"target": "location", "label": "Travel to {target}", "untargeted": "Travel to another known place"},
+    # Untargeted on purpose. The reporter passes the opponent's name, which an
+    # untargeted objective accepts and a later targeted one could use - but
+    # there is no roster to validate a draft against, because an opponent may
+    # be a catalogue NPC, an event manifestation or a beast off the hunt
+    # roster, and only the first of those is in `world.npcs`. A quest that
+    # names a beast the validator cannot find would be refused; one that names
+    # an NPC would pass and then be unreachable for everybody who met a beast.
+    "combat_win": {"target": None, "label": "", "untargeted": "Win a battle"},
+    "craft": {"target": "recipe", "label": "Craft {target}", "untargeted": "Craft something from a method you know"},
+    "trade": {"target": "item", "label": "Buy or sell {target}", "untargeted": "Buy or sell at a shop"},
+    "gather": {"target": "item", "label": "Gather {target}", "untargeted": "Forage a material out of the hills"},
 }
 SCENE_ACTION_KEYS = ("observe", "investigate", "influence", "stealth", "physical", "qi", "resolve", "aid")
 REWARD_KEYS = ("insight_xp", "spirit_stones", "items")
@@ -146,6 +175,15 @@ def validate_quest_definition(draft: dict[str, Any], world: Any, budget: dict[st
     items = rewardable_items(world)
     location_lookup = {name.lower(): name for name in locations}
     npc_lookup = {name.lower(): name for name in npcs}
+    # Recipes are keyed by their own display name ("Recovery Pill"); items are
+    # keyed by id with the name beside it, so a `gather spirit_herb` objective
+    # stores the id the reporter will send and prints "Gather Spirit Herb".
+    recipe_lookup = {name.lower(): name for name in dict(getattr(world, "recipes", {}) or {})}
+    # Every catalogue item, not `rewardable_items`: that set exists to stop a
+    # quest *paying out* something unique or market-excluded, which is a
+    # different question from whether a quest may ask you to pick one up.
+    all_items = dict(getattr(world, "items", {}) or {})
+    item_lookup = {str(key).lower(): str(key) for key in all_items}
 
     objectives_in = draft.get("objectives")
     objectives: list[dict[str, Any]] = []
@@ -173,6 +211,10 @@ def validate_quest_definition(draft: dict[str, Any], world: Any, budget: dict[st
             continue
         target_raw = raw.get("target")
         target: str | None = None
+        # What the label prints, which is the target itself everywhere except
+        # an item: the objective has to store `spirit_herb`, because that is
+        # what the reporter sends, and the player has to read "Spirit Herb".
+        target_label: str | None = None
         if target_raw not in (None, ""):
             target_text = str(target_raw).strip()
             if spec["target"] is None:
@@ -193,13 +235,25 @@ def validate_quest_definition(draft: dict[str, Any], world: Any, budget: dict[st
                 if target not in SCENE_ACTION_KEYS:
                     errors.append(f"objective {index + 1}: unknown scene action {target_text!r} (allowed: {', '.join(SCENE_ACTION_KEYS)})")
                     continue
+            elif spec["target"] == "recipe":
+                target = recipe_lookup.get(target_text.lower())
+                if target is None:
+                    errors.append(f"objective {index + 1}: unknown recipe {target_text!r}")
+                    continue
+            elif spec["target"] == "item":
+                target = item_lookup.get(target_text.lower().replace(" ", "_"))
+                if target is None:
+                    errors.append(f"objective {index + 1}: unknown item {target_text!r}")
+                    continue
+                target_label = str(all_items[target].get("name") or target)
         objective_id = re.sub(r"[^a-z0-9_]+", "_", str(raw.get("id") or f"{kind}_{index + 1}").lower()).strip("_") or f"{kind}_{index + 1}"
         if objective_id in seen_ids:
             objective_id = f"{objective_id}_{index + 1}"
         seen_ids.add(objective_id)
         label = str(raw.get("label") or "").strip()[:90]
         if not label:
-            label = spec["label"].format(target=target.title() if spec["target"] == "scene_action" else target) if target else spec["untargeted"]
+            printed = target_label or target
+            label = spec["label"].format(target=printed.title() if spec["target"] == "scene_action" else printed) if target else spec["untargeted"]
         objective = {"id": objective_id, "type": kind, "count": count, "label": label}
         if target is not None:
             objective["target"] = target
