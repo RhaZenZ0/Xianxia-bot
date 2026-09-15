@@ -188,6 +188,27 @@ written at 82 and is the first one that can. Resolution is mechanical: the `npc.
 it only when the caller is standing where the NPC actually is, and the engine checks that itself
 rather than taking `/talk`'s word for it.
 
+### Somebody gets there first (`npc_grave_robbing.go`)
+
+The Tomb-Watch Clan has listed "Grave-robbers" among its troubles since the birth families were
+written, and `npcFindChance` has always given the best find rate in the game to a grave/tomb/relic/
+scaveng/prospect/digger/miner/salvage trade — but their finds were abstract, drawn from a catalogue
+pool, because until schema 48 there was nothing in the world to dig up. A step of `npc_life`, last,
+turns over the graves nobody came for, so arriving late is no longer the same as arriving.
+
+Two things hold it in shape. **The grace** (`graveRobGraceDays`, 21 — three ticks) is the window in
+which the grave is the searcher's alone: long enough for the Forge to draft the quest, a GM to pass
+it and somebody to walk there. And **the deed is `hidden` while the goods are not**: nobody stood in
+the wilderness and watched, so the history row never reaches narrator RAG and the world genuinely
+does not know — but the keepsake goes under the hammer at the nearest house, and `auctions` is the
+one fence of the two that carries `seller_npc_name`. A player who reaches an emptied grave and later
+finds the dead herbalist's satchel listed under a known digger's name has worked it out from the
+world rather than been told. The GM dashboard's Graves table reads the hidden row directly, because
+a GM is not a player.
+
+Emptiness is `claimed_game_minute`, never `claimed_by_user_id` — the latter anonymises on erasure
+(see `erasureAnonymise`), so keying off it would let an erasure refill a grave.
+
 ### RAG / memory (`app/ai/rag`)
 
 Deterministic and SQLite-first (FTS5), not embedding/vector-based. Retrieval never creates game

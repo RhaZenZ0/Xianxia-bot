@@ -624,11 +624,20 @@ class ReadOnlyDashboardStore:
             # Schema 48: where the ones nobody found ended up, and whether
             # anybody has been to them. A GM asking "what happened to X" should
             # not have to read the history table to find out.
+            #
+            # `robbed_by` is the world getting there first. The robbery row is
+            # `hidden` on purpose - nobody stood in the wilderness and watched,
+            # so it never reaches narrator RAG and no player is ever told - but
+            # a GM is not a player, and without this an emptied grave and an
+            # untouched one read identically in this table.
             graves = await self._fetchall(
                 db,
                 """SELECT g.npc_name,g.location,g.home_location,g.days_missing,g.keepsake_item,
                           g.keepsake_stones,g.died_game_minute,g.claimed_by_user_id,g.claimed_game_minute,
-                          c.name AS claimed_by_name
+                          c.name AS claimed_by_name,
+                          (SELECT h.actor_name FROM world_history_events h
+                            WHERE h.event_type='npc_grave_robbery' AND h.target_name=g.npc_name
+                            ORDER BY h.game_minute DESC LIMIT 1) AS robbed_by
                    FROM npc_graves g LEFT JOIN characters c ON c.user_id=g.claimed_by_user_id
                    ORDER BY g.died_game_minute DESC LIMIT 100""",
             )

@@ -579,9 +579,16 @@ func (r *Runner) npcLife(conn *storage.Conn, steps, gm int64) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	// Last, and after the disappearances above rather than beside them: a
+	// grave dug this tick must not also be emptied this tick, and the grace
+	// in npc_grave_robbing.go is what holds that open for the searcher.
+	robbedGraves, err := r.npcGraveRobbing(conn, gm)
+	if err != nil {
+		return "", err
+	}
 	return fmt.Sprintf(
-		"batch-advanced NPC life; %d natural death(s), %d courtship(s) begun, %d new marriage(s), %d courtship(s) ended, %d birth(s), %d promotion(s), %d new disciple(s), %d feud(s) settled (%d fatal), %d crime(s) (%d witnessed, %d fatal), %d hunt(s) (%d took quarry, %d fatal), %d went missing, %d were never found",
-		len(deaths), courted, marriages, parted, born, promoted, bonds, fought, killed, crimes, seen, murdered, hunts, kills, lost, vanished, neverFound), nil
+		"batch-advanced NPC life; %d natural death(s), %d courtship(s) begun, %d new marriage(s), %d courtship(s) ended, %d birth(s), %d promotion(s), %d new disciple(s), %d feud(s) settled (%d fatal), %d crime(s) (%d witnessed, %d fatal), %d hunt(s) (%d took quarry, %d fatal), %d went missing, %d were never found, %d grave(s) robbed",
+		len(deaths), courted, marriages, parted, born, promoted, bonds, fought, killed, crimes, seen, murdered, hunts, kills, lost, vanished, neverFound, robbedGraves), nil
 }
 
 func (r *Runner) economy(conn *storage.Conn, steps, gm int64) (string, error) {

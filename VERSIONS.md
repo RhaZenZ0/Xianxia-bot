@@ -55,6 +55,17 @@ marked dead, and is still out there and still findable, which is the whole of th
 of the bug. If nobody comes, a grave holds where they stopped and what they were carrying: their own
 purse, and one thing read off the trade they practised. The first searcher to reach it takes it.
 
+**And somebody else may.** The Tomb-Watch Clan has listed "Grave-robbers" among its troubles since
+the birth families were written, and `npcFindChance` has always given the best find rate in the game
+to a digging trade - but their finds were abstract, drawn from a catalogue pool, because there was
+nothing in the world to dig up. There is now. A grave keeps a grace of twenty-one days, three ticks,
+in which it is the searcher's alone; past that a digger within reach may turn it over, so arriving
+late stops being the same as arriving. The deed is `hidden` and the goods are not: nobody was out
+there to see it done, so the world genuinely does not know, but the keepsake goes under the hammer
+at the nearest house and `auctions` is the one fence of the two that records who brought it in. A
+player who reaches an emptied grave and later finds the dead herbalist's satchel listed under a
+known digger's name has worked it out from the world rather than been told.
+
 Also here: `npcLife`'s bulk heal was `WHERE health>0` with no join to status, so it healed anybody
 whose death had been written in `npc_civilization_state` and nowhere else. The city rumour teller
 looked for a `lower` district that four of the forty-eight cities have, and inside it a name
