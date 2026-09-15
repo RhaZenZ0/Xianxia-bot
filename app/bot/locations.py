@@ -85,6 +85,22 @@ async def current_npc_location(npc_name: str, period: str | None = None) -> str 
         if current == home:
             return WORLD.npc_location_at(npc_name, period) or current
         return current
+    # Somebody the world made for itself who has no simulation row (schema 49).
+    # A matured descendant gets one at the moment they come of age, so this is
+    # really about a starter household's relatives: they stand in the household
+    # and nowhere else, and they are never walked by the civilization tick.
+    #
+    # It matters that this answers rather than falling through. `None` here
+    # means "nothing knows where they are", which every caller reads as "do not
+    # filter by location" - so without this a player could talk to somebody
+    # else's uncle from the other side of the world.
+    try:
+        registered = await DB.get_registered_npc(npc_name)
+    except Exception:
+        log.exception("Could not read the registry location of %s", npc_name)
+        registered = None
+    if registered and str(registered.get("location") or ""):
+        return str(registered["location"])
     return None
 
 
@@ -216,6 +232,18 @@ async def local_npc_autocomplete(
                     names.append(name)
         except Exception:
             log.exception("Could not read the graves at %s", location)
+        # And the people this world made for itself (schema 49): a child of two
+        # NPCs who has grown up, a relative of the household a player was born
+        # into. They are in neither the catalogue nor the event cast, and until
+        # this the household a new character is standing in printed its own
+        # relatives under `/family` while `/talk` refused every one of them.
+        try:
+            for person in await DB.list_registered_npcs_at(location):
+                name = str(person.get("name") or "")
+                if name and name not in names and (not needle or needle in name.casefold()):
+                    names.append(name)
+        except Exception:
+            log.exception("Could not read the registered NPCs at %s", location)
     for name in await DB.search_catalog("npc", current, 25):
         if name in names:
             continue
