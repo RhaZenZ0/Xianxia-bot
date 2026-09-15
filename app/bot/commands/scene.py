@@ -21,7 +21,7 @@ from ...rules.npc_memory import classify_memory, exchange_memory_summary, public
 from .. import scene_layout
 from ..character_state import announce_quest_progress, current_effect_modifiers
 from ..formatting import roll_line
-from ..locations import DEAD, _location_is_visible, current_npc_location, local_npc_autocomplete
+from ..locations import DEAD, _location_is_visible, current_npc_location, local_npc_autocomplete, npcs_present
 from ..registry import EVENT_HANDLERS, registered_group_command, registered_root_command
 from ..runtime import (
     DB,
@@ -315,9 +315,7 @@ async def _scene_action_targets(character: dict[str, Any]) -> list[str]:
     wt = await current_world_time()
     targets: list[str] = []
     location = str(character.get("location") or "")
-    for npc_name in WORLD.npcs:
-        if await current_npc_location(npc_name, wt.period) == location:
-            targets.append(npc_name)
+    targets.extend(await npcs_present(location, wt.period))
     player_rows = await DB.get_characters_at_location(
         location, exclude_user_id=int(character.get("user_id") or 0) or None
     )
@@ -766,10 +764,7 @@ async def scene_status(interaction: discord.Interaction) -> None:
         return
     wt=await current_world_time()
     loc=await DB.get_location_definition(c["location"]) or WORLD.locations.get(c["location"],{})
-    local=[]
-    for name in WORLD.npcs:
-        if await current_npc_location(name,wt.period)==c["location"]:
-            local.append(name)
+    local=await npcs_present(str(c["location"]),wt.period)
     lines=[
         f"🎭 **Scene — {await character_location_display(c)}**",
         f"Time: **{wt.display}**",

@@ -211,6 +211,7 @@ var authoritativeQueries = map[string]bool{
 	"world.recent_actions": true,
 	"civilization.status":  true,
 	"npc.status":           true,
+	"npc.at_location":      true,
 	"sect.status":          true,
 	"clan.status":          true,
 	"equipment.power":      true,

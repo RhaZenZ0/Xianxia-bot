@@ -104,6 +104,65 @@ async def current_npc_location(npc_name: str, period: str | None = None) -> str 
     return None
 
 
+async def npcs_present(location: str, period: str | None = None) -> list[str]:
+    """Who is standing at one place, resolved in a bounded number of queries.
+
+    This replaces the shape every caller used until v1.0.0-rc.28:
+
+        for npc_name in WORLD.npcs:
+            if await current_npc_location(npc_name, period) == location:
+
+    which is 574 iterations with an engine round trip inside each, serially,
+    to draw one picker - and `/action` and `/scene status` both did it on every
+    open. It is now one query for everybody the engine knows about, plus the
+    in-process content file for the two kinds of person the engine cannot
+    answer for: a catalogue NPC whose daily schedule puts them here and who has
+    no simulation row yet, and a hidden master walking a circuit, whose
+    whereabouts are a pure function of the canonical clock.
+
+    The order of precedence is the same one `current_npc_location` keeps, and
+    it has to be: a circuit outranks everything, then the simulation, then the
+    content file's schedule. Answering differently here from there would mean a
+    picker that offers somebody `/talk` then refuses.
+    """
+    where = str(location or "")
+    if not where:
+        return []
+    if period is None:
+        period = (await current_world_time()).period
+    present: list[str] = []
+    seen: set[str] = set()
+    engine_rows: list[dict[str, Any]] = []
+    try:
+        engine_rows = await SIM.npcs_at_location(where)
+    except Exception:
+        log.exception("Could not read who is standing at %s", where)
+    accounted: set[str] = set()
+    for row in engine_rows:
+        name = str(row.get("npc_name") or "")
+        if not name:
+            continue
+        accounted.add(name)
+        # A circuit-walker is placed by content against the canonical clock and
+        # that answer outranks the simulation, exactly as current_npc_location
+        # has it - so they are resolved below rather than trusted from here.
+        if (WORLD.npcs.get(name) or {}).get("circuit"):
+            continue
+        present.append(name)
+        seen.add(name)
+    for name, definition in WORLD.npcs.items():
+        if name in seen:
+            continue
+        # Anybody the engine accounted for is settled: it said they are
+        # elsewhere, or it placed them here already.
+        if name in accounted and not (definition or {}).get("circuit"):
+            continue
+        if await current_npc_location(name, period) == where:
+            present.append(name)
+            seen.add(name)
+    return sorted(present)
+
+
 def _world_min_realm_index(world_name: str) -> int:
     hub = REALM_HUBS.get(str(world_name))
     if hub is not None:

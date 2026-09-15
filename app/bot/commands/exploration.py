@@ -32,7 +32,7 @@ from ..discovery import (
 )
 from ..formatting import human_duration, roll_line
 from ..hubs import HubDynamicOption, register_hub_option_provider
-from ..locations import _known_locations, access_realm_index, destination_groups, location_autocomplete
+from ..locations import _known_locations, access_realm_index, destination_groups, location_autocomplete, npcs_present
 from ..registry import VIEW_RESTORERS, registered_group_command, registered_root_command
 from ..runtime import (
     DB,
@@ -1111,7 +1111,7 @@ async def city_look(interaction: discord.Interaction) -> None:
     here_data = WORLD.locations.get(here) or {}
     if here_data.get("road_site"):
         leg = [str(x) for x in list(here_data.get("road_leg") or [])]
-        people = sorted(name for name, npc in WORLD.npcs.items() if str(npc.get("location")) == here)
+        people = await npcs_present(here)
         lines = [f"🛤️ **{here}** — {ROAD_SITE_LABEL.get(str(here_data.get('road_site')), 'a place')} on the {' – '.join(leg)} road.", str(here_data.get("description") or "")]
         lines.append(f"**Here:** {', '.join(people[:12]) if people else 'nobody of note at the moment'}.")
         lines.append(_road_site_line(str(here_data.get("road_site")), here, leg).strip())
@@ -1128,7 +1128,7 @@ async def city_look(interaction: discord.Interaction) -> None:
         lines.append("**Gates:** " + "; ".join(f"{g} → {', '.join(faces.get(str(WORLD.locations[g].get('gate')), []))}" for g in gates))
     if districts:
         lines.append("**Districts:** " + ", ".join(districts))
-    people = sorted(name for name, npc in WORLD.npcs.items() if str(npc.get("location")) == here)
+    people = await npcs_present(here)
     if people:
         lines.append(f"**Here:** {', '.join(people[:12])}" + (" …" if len(people) > 12 else ""))
     else:

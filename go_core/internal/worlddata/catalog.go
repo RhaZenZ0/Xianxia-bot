@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
+	"time"
 )
 
 type Path struct {
@@ -805,7 +807,49 @@ type MerchantWare struct {
 	Price    int64  `json:"price"`
 }
 
+// loaded is the parsed catalogue, keyed by file and stamped with what the file
+// looked like when it was read.
+type loaded struct {
+	catalog Catalog
+	modTime time.Time
+	size    int64
+}
+
+var (
+	catalogMu    sync.RWMutex
+	catalogCache = map[string]loaded{}
+)
+
+// Load reads and parses `content/world.json`, once per version of the file.
+//
+// It was a bare ReadFile + Unmarshal with no cache, and fifteen of its
+// seventeen call sites are in authoritative.go - inside the request path. So
+// every single player action re-read and re-parsed two and a half megabytes of
+// JSON, on hardware this project exists to run on: a CPU-only NAS. It is the
+// largest avoidable per-action cost in the engine.
+//
+// Keyed on (path, modification time, size) rather than on the path alone,
+// which is what keeps an operator's edit from needing a restart: touch the
+// file and the next call re-reads it. Stat is one syscall against a parse of
+// millions of bytes. Size is carried beside the timestamp because some
+// filesystems keep mtime at one-second resolution, and two edits inside the
+// same second that change the length would otherwise serve the older parse.
+//
+// The Catalog is returned by value and every field in it is read-only after
+// parsing, so handing the same one to concurrent callers is safe - nothing in
+// this package writes to a loaded catalogue.
 func Load(path string) (Catalog, error) {
+	info, statErr := os.Stat(path)
+	if statErr == nil {
+		catalogMu.RLock()
+		hit, ok := catalogCache[path]
+		catalogMu.RUnlock()
+		if ok && hit.size == info.Size() && hit.modTime.Equal(info.ModTime()) {
+			return hit.catalog, nil
+		}
+	}
+	// A failed Stat is not a failure: fall through and let ReadFile produce
+	// the real error, or succeed if the file is readable but unstattable.
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return Catalog{}, err
@@ -816,6 +860,11 @@ func Load(path string) (Catalog, error) {
 	}
 	if len(c.Paths) == 0 || len(c.Roots) == 0 {
 		return Catalog{}, fmt.Errorf("world catalog missing paths or roots")
+	}
+	if statErr == nil {
+		catalogMu.Lock()
+		catalogCache[path] = loaded{catalog: c, modTime: info.ModTime(), size: info.Size()}
+		catalogMu.Unlock()
 	}
 	return c, nil
 }
