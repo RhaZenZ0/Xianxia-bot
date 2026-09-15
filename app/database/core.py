@@ -3919,8 +3919,8 @@ class Database:
                     """INSERT INTO quest_definitions(quest_key,title,description,source_type,source_key,objectives_json,
                            rewards_json,status,origin,created_by,created_at,updated_at,
                            giver_npc,realm_band,tier,deadline_game_minutes,variants_json,
-                           requires_sect,reward_visibility,boast)
-                       VALUES(?,?,?,?,?,?,?,'approved','content',0,?,?,?,?,?,?,?,?,?,?)""",
+                           requires_sect,reward_visibility,boast,seed_json)
+                       VALUES(?,?,?,?,?,?,?,'approved','content',0,?,?,?,?,?,?,?,?,?,?,?)""",
                     (
                         key, str(entry.get("title", "")), str(entry.get("description", "")),
                         str(entry.get("source_type", "commission")), str(entry.get("source_key", "")),
@@ -3931,6 +3931,13 @@ class Database:
                         str(entry.get("requires_sect", "") or ""),
                         str(entry.get("reward_visibility", "shown") or "shown"),
                         str(entry.get("boast", "") or ""),
+                        # v1.0.0-rc.26: `seed_json` is where a chained quest
+                        # names the one that follows it, and the engine reads
+                        # the chain from here rather than from the content
+                        # file - so a GM who re-points it in the workbench is
+                        # obeyed. This row is insert-only, so it is the
+                        # starting shape and never the running one.
+                        json.dumps(dict(entry.get("seed", {}))),
                     ),
                 )
                 inserted += 1

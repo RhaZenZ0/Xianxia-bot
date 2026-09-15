@@ -1111,9 +1111,21 @@ func createCharacterAuthoritative(conn *storage.Conn, worldPath string, userID i
 	if _, err = conn.Execute(`INSERT INTO event_log(user_id,event_type,payload_json,created_at) VALUES(?,?,?,?)`, []any{userID, "character_created", string(legacyEvent), now}); err != nil {
 		return authoritativeMutation{}, err
 	}
+	// The first leg of the beginner path, handed over in the same transaction
+	// that made the character (v1.0.0-rc.26). Beside the send-off on purpose:
+	// one is what the household puts in their hands and the other is what it
+	// expects them to do with it, and a character who exists without either
+	// would be a character nobody ever told what to do next.
+	beginnerQuest, err := grantBeginnerPathTx(conn, catalog, userID, p.GameMinute)
+	if err != nil {
+		return authoritativeMutation{}, err
+	}
 	result := map[string]any{"created": true, "user_id": userID, "name": p.Name, "origin": origin, "path": path, "gender": gender, "location": householdLocation, "physical_location": location, "spiritual_root": root, "natural_lifespan_years": natural, "attributes": attrs, "qi_max": qiMax, "vitality_max": vitMax, "aptitudes": aptitude, "family_id": familyID, "family": pFamily}
 	if sendoff != nil {
 		result["family_sendoff"] = sendoff
+	}
+	if beginnerQuest != "" {
+		result["beginner_quest"] = beginnerQuest
 	}
 	return authoritativeMutation{Result: result, Event: eventledger.Event{Domain: "character", EventType: "character_created", EntityType: "character", EntityID: fmt.Sprint(userID), GameMinute: p.GameMinute, Payload: result}}, nil
 }

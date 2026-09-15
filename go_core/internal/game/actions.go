@@ -538,6 +538,24 @@ func questProgress(conn *storage.Conn, userID int64, raw json.RawMessage) (any, 
 			return nil, grantErr
 		}
 		transition["rewards_granted"] = granted
+		// A chained quest hands over the next one in the same transaction that
+		// finished this one (v1.0.0-rc.26), so a player is never between
+		// stages: either the chain advanced or nothing did. Only an ordinary
+		// quest chains - a commission is something a giver offers in person,
+		// and finishing one must never put another in your hands by itself.
+		followOn, followErr := questFollowOnTx(conn, p.QuestKey)
+		if followErr != nil {
+			return nil, followErr
+		}
+		if followOn != "" {
+			handed, handErr := grantOrdinaryQuestTx(conn, userID, followOn, gameMinute)
+			if handErr != nil {
+				return nil, handErr
+			}
+			if handed {
+				transition["follow_on"] = followOn
+			}
+		}
 	}
 	if err := conn.Commit(); err != nil {
 		return nil, err

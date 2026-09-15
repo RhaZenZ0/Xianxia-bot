@@ -63813,5 +63813,99 @@
       "line": "Taken down off the ancestral rack in front of the whole household. The clan's name goes with it, and so do its enemies.",
       "trade": "Formation"
     }
-  }
+  },
+  "beginner_path": [
+    {
+      "quest_key": "beginner_household",
+      "title": "Before the Door",
+      "description": "You are eighteen, indoors, and nobody has asked anything of you yet. Sit once and try one thing, and the household will consider you grown enough to leave.",
+      "opening": "The house has been awake since before you were. Somewhere past the screen a kettle is being set down harder than it needs to be. Nobody is going to tell you to begin.",
+      "objectives": [
+        {
+          "id": "sit",
+          "type": "cultivate",
+          "count": 1,
+          "label": "Sit one session - **/cultivation → Cultivate**"
+        },
+        {
+          "id": "reach",
+          "type": "scene_action",
+          "count": 1,
+          "label": "Do something with the room - **/action**"
+        }
+      ],
+      "rewards": {
+        "insight_xp": 15
+      },
+      "follow_on": "beginner_town"
+    },
+    {
+      "quest_key": "beginner_town",
+      "title": "Out of the Gate",
+      "description": "The household is not the world. Step outside with **/family → Leave**, then find out what is standing in the street and what the keeper will sell you.",
+      "opening": "The door gives onto a street that was there the whole time. People are already walking in it, on errands that were never going to wait for you.",
+      "objectives": [
+        {
+          "id": "look",
+          "type": "explore",
+          "count": 1,
+          "label": "Look around outside - **/world → Act → Explore**"
+        },
+        {
+          "id": "speak",
+          "type": "talk",
+          "count": 1,
+          "label": "Say something to somebody - **/npc → People → Talk**"
+        },
+        {
+          "id": "deal",
+          "type": "trade",
+          "count": 1,
+          "label": "Buy or sell one thing - **/economy → City Shops → Browse**"
+        }
+      ],
+      "rewards": {
+        "insight_xp": 25,
+        "spirit_stones": 20
+      },
+      "follow_on": "beginner_road"
+    },
+    {
+      "quest_key": "beginner_road",
+      "title": "What the Road Gives",
+      "description": "Your household taught you a trade before it taught you anything else. Walk somewhere, pick up what the hills owe you, make one thing with it, and find out what happens when something does not want you there.",
+      "opening": "Past the last wall the road stops being a street. Whatever you brought with you is all you have, and the methods your family drilled into you are worth exactly what you can make with them.",
+      "objectives": [
+        {
+          "id": "walk",
+          "type": "travel",
+          "count": 1,
+          "label": "Go somewhere else - **/travel**"
+        },
+        {
+          "id": "pick",
+          "type": "gather",
+          "count": 1,
+          "label": "Take something out of the hills - **/craft → Alchemy → Forage**"
+        },
+        {
+          "id": "make",
+          "type": "craft",
+          "count": 1,
+          "label": "Make one thing from a method you know - **/craft → General Crafting → Craft**"
+        },
+        {
+          "id": "stand",
+          "type": "combat_win",
+          "count": 1,
+          "label": "Come out of one fight standing - **/world → Act → Hunt**"
+        }
+      ],
+      "rewards": {
+        "insight_xp": 40,
+        "spirit_stones": 40
+      },
+      "follow_on": ""
+    }
+  ]
 }

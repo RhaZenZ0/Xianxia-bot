@@ -343,6 +343,24 @@ class QuestService:
                     # a completed quest that could never be paid, because the
                     # next progress report only looks at active ones.
                     current["rewards_granted"] = dict(transition.get("rewards_granted") or {})
+                # v1.0.0-rc.26: a chained quest handed the next one over in the
+                # same engine transaction that finished this one. Resolved here
+                # rather than by the caller because this class already has the
+                # catalog, and presentation should not be doing lookups to find
+                # out what it was just told.
+                follow_on = str(transition.get("follow_on") or "")
+                if follow_on:
+                    handed = catalog.get(follow_on) or await self.definition(follow_on) or {}
+                    # Its objectives travel raw. Which of them is "next" is a
+                    # rule and lives in app/rules/quests.py, and `ops` may not
+                    # import `rules` - the layering in test_app_layout.py puts
+                    # them side by side, not one above the other. Presentation
+                    # asks the rule; this only carries the facts.
+                    current["follow_on"] = {
+                        "quest_key": follow_on,
+                        "title": str(handed.get("title") or follow_on),
+                        "objectives": list(handed.get("objectives") or []),
+                    }
             changed.append(current)
         return changed
 

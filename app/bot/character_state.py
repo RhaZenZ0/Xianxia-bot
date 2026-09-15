@@ -12,6 +12,7 @@ from typing import Any
 from ..rules.aptitudes import aptitude_effects
 from ..rules.effects import aggregate_modifiers, normalize_effect_payload
 from ..rules.npc_memory import classify_memory, scene_memory_summary
+from ..rules.quests import next_objective_label
 from ..rules.worldtime import from_game_minutes
 from .runtime import DB, ENGINE, WORLD, log
 from .services import SIM
@@ -138,8 +139,27 @@ async def announce_quest_progress(interaction: Any, changed: list[dict[str, Any]
                     lines.append(f"-# Standing with {giver or 'them'} rises.")
             else:
                 lines.append(f"📜 **Quest complete: {title}**" + (" — " + ", ".join(parts) if parts else ""))
+            # A chained quest handed the next one over in the same engine
+            # transaction (v1.0.0-rc.26). Saying so here is the point of the
+            # chain: the player finishes something and is immediately told
+            # what the next thing is, rather than being returned to sixteen
+            # equally-weighted hubs.
+            handed = dict(row.get("follow_on") or {})
+            if handed:
+                lines.append(f"📜 **New quest: {handed.get('title') or handed.get('quest_key')}**")
+                first = next_objective_label(handed.get("objectives"), {})
+                if first:
+                    lines.append(f"-# Next: {first}")
         else:
             lines.append(f"📜 Quest progress: **{title}**")
+            # What is still outstanding, which this used to leave the player to
+            # work out. The labels are written as hub paths, so this names a
+            # real command - and inside a hub panel `suggested_actions` turns
+            # it into the button.
+            terms = dict(row.get("terms") or {})
+            outstanding = next_objective_label(terms.get("objectives"), row.get("progress"))
+            if outstanding:
+                lines.append(f"-# Next: {outstanding}")
     if not lines:
         return
     try:

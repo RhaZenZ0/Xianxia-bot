@@ -35,7 +35,7 @@ from .channels import post_server_log
 from .character_state import _remember_freeform_npc_scene
 from .runtime import DB, ENGINE, SETTINGS, TYPED_PLAY_BUDGET, WORLD, _sync_realm_presence_roles, character_location_display, chunk_text, current_world_time, log
 from ..ai.quest_forge import store_draft
-from ..rules.quests import QUEST_DEFINITIONS, static_quest_seed_rows
+from ..rules.quests import QUEST_DEFINITIONS, beginner_path_seed_rows, static_quest_seed_rows
 from .services import AI_ROUTER, ALERTS, GUILD, NARRATOR, NARRATOR_CONTEXT, QUEST_FORGE, SIM
 from .threads import _private_scene_for_thread
 from .auction_feed import settle_lots
@@ -220,8 +220,18 @@ class XianxiaBot(commands.Bot):
             # v0.23.1: the static quests are seeded through the same path. They
             # carry no giver, so they stay ordinary quests - the row exists so
             # the engine can tell `first_steps` from a key nobody defined.
+            #
+            # v1.0.0-rc.26: the beginner path comes through here too, and it is
+            # the reason the seeding has to happen before anybody can be made:
+            # `character.create` hands the first stage over in the transaction
+            # that makes the character, and a definition that is not here yet
+            # costs that player their quest. It cannot cost them the character
+            # - the engine treats a missing definition as "no quest" rather
+            # than as an error - but the window should not exist at all.
             seeded_commissions = await DB.sync_commission_pool(
-                list(WORLD.data.get("commissions") or []) + static_quest_seed_rows(QUEST_DEFINITIONS)
+                list(WORLD.data.get("commissions") or [])
+                + static_quest_seed_rows(QUEST_DEFINITIONS)
+                + beginner_path_seed_rows(WORLD)
             )
             catalog_counts = await DB.catalog_counts()
             rag_counts = await DB.rag_stats()
