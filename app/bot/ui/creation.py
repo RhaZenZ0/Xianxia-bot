@@ -174,6 +174,26 @@ class CharacterModal(discord.ui.Modal):
             ),
             inline=False,
         )
+        # The first leg of the beginner path, which the engine handed over in
+        # the transaction that made this character (v1.0.0-rc.26). Named here
+        # because a quest nobody is told about is the problem this solves:
+        # `first_steps` has been seeded on every boot since v0.23.1, has always
+        # been listed in `/quests`, and had never been given to anybody.
+        beginner = str(creation.get("beginner_quest") or "")
+        stage = next(
+            (s for s in list(WORLD.data.get("beginner_path") or []) if str(s.get("quest_key")) == beginner),
+            {},
+        ) if beginner else {}
+        if stage:
+            steps = "\n".join(f"▫️ {str(o.get('label') or '')}" for o in list(stage.get("objectives") or [])[:4])
+            embed.add_field(
+                name=f"📜 {stage.get('title') or 'Your first task'}",
+                value=(
+                    f"{str(stage.get('opening') or '').strip()}\n\n{steps}\n\n"
+                    "Everything you are carrying is in **/quests**."
+                ),
+                inline=False,
+            )
         embed.add_field(
             name="Next steps",
             value=(

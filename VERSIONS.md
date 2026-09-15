@@ -6,6 +6,47 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.0** (rc.26) gives a new cultivator something to do.
+
+`first_steps` - "First Steps Beneath Heaven" - has been in this repo since before the Quest Forge,
+with exactly the right three objectives, and no player has ever held it. It is seeded into
+`quest_definitions` on every boot and it is listed in `/quests`. What never existed is any path that
+hands it to somebody: the only two statements in the engine that write a `character_quests` row are
+both in `commission_actions.go` and both want a giver, which the static quests deliberately do not
+have. So a new player was never short of a quest - they were short of being given one, and `/quests`
+is one of sixteen equally-weighted hubs with nothing saying it is theirs today.
+
+`beginner_path` in `content/world.json` is three stages, and the engine hands the first one over in
+the same transaction that makes the character, beside the send-off the household puts in their
+hands. Each stage hands over the next as it completes, so a player is never between them. There is
+deliberately no second quest mechanism: a stage is an ordinary `quest_definitions` row seeded the
+way the authored commission pool is, and once handed over it is pinned, progressed, completed and
+paid by the code every other quest uses. Only who gives it to you is new.
+
+The stages are shaped by where the player actually is, which is the part that took the most care. A
+character is created *inside* their birth-family household, and the engine refuses exploring,
+travelling and hunting in a private residence - so a first stage asking for any of those is
+unfinishable until the player works out that `/family` and its Leave action exist, which is the
+problem the path is meant to solve rather than one it may cause. Stage one is therefore a session
+and one scene action, both of which work indoors; stage two is the street, and it is the stage that
+names how to get out of the house; stage three is the road, the trade the household taught, and one
+fight. The test that holds this reads the refusals out of the Go source rather than trusting a list,
+so a new gate in the engine fails a test instead of stranding somebody.
+
+Three refusals are worth stating because they are what stops this going wrong quietly. A definition
+that has not seeded yet costs that player their quest and never the character they were making. A
+quest with a giver is never handed over, whatever a chain says - a commission takes the
+one-at-a-time slot and carries a deadline, and it is offered in person or not at all. And the chain
+is read off `quest_definitions.seed_json` rather than off the content file, so a GM who re-points it
+in the workbench is obeyed and the shipped file is only ever the starting shape.
+
+A quest advancing also stopped being a dead end. It used to say "Quest progress: <title>" and
+nothing else - it confirmed something counted and left the player exactly where they were. It now
+names the first objective still outstanding, and because every label is written as a hub path, that
+line names a real command; inside a hub panel `suggested_actions` turns it into the button. The
+creation card names the stage and its steps too, so the answer to "which door, now" arrives before
+the first one is even asked for.
+
 **1.0.0** (rc.25) lets a quest ask for more than five things.
 
 `OBJECTIVE_TYPES` is the ceiling on every quest in this game - the two static ones, every

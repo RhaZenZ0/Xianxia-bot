@@ -235,6 +235,39 @@ reporter names a type the vocabulary does not have.
 or a beast off the hunt roster, and only the first is in `world.npcs`, so there is no roster a draft
 could be validated against. The reports carry the name anyway, for the day there is one.
 
+### The path a new cultivator is put on (`beginner_path`, v1.0.0-rc.26)
+
+`first_steps` — "First Steps Beneath Heaven" — has been in `app/rules/quests.py` since before the
+Forge, with exactly the right three objectives, and **no player has ever held it**. It is seeded
+into `quest_definitions` on every boot and it is listed in `/quests`; what never existed is a path
+that hands it to anybody. The only two statements in the engine that write a `character_quests` row
+are both in `commission_actions.go` and both want a `giver_npc`, which the static quests
+deliberately do not have. A new player is not short of a quest — they are short of being *given*
+one, and `/quests` is one of sixteen equally-weighted hubs with nothing saying it is theirs.
+
+`content/world.json` → `beginner_path` is an ordered list of stages; `grantBeginnerPathTx` hands the
+first over in the transaction that makes the character, beside the birth-family send-off, and each
+stage hands over the next as it completes. **There is no second quest mechanism**: a stage is an
+ordinary `quest_definitions` row seeded the way the authored commission pool is, and once handed
+over it is pinned, progressed, completed and paid by the code every other quest uses.
+
+Four rules hold it:
+
+- **The first stage must be completable indoors.** A character is created at `birth_family:<id>`, a
+  private residence, and `explorationExploreAction`, `explorationTravelAction` and
+  `explorationHuntAction` all refuse there. `cultivationTrain` and `scene.action` do not, which is
+  why stage one is those two. `test_beginner_path.py` reads those refusals out of the Go source
+  rather than trusting a list, so a new gate in the engine fails the test rather than the player.
+- **A missing definition costs the quest, never the character.** `grantOrdinaryQuestTx` treats an
+  absent definition, an absent table and an already-held quest as three kinds of "no", not errors.
+- **A commission is never handed over.** A `giver_npc` means the one-at-a-time slot and a deadline,
+  offered in person; the grant refuses one whatever a chain says.
+- **The chain is read off `quest_definitions.seed_json`, not off the content file**, so a GM who
+  re-points it in the dashboard workbench is obeyed and the shipped file is only the starting shape.
+
+"Fires once" is the `(user_id, quest_key)` primary key — the row is the memory, which is what makes
+the grant safe to call from creation, a dao-family rebirth and a samsara return alike.
+
 ### RAG / memory (`app/ai/rag`)
 
 Deterministic and SQLite-first (FTS5), not embedding/vector-based. Retrieval never creates game

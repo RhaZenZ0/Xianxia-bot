@@ -451,6 +451,28 @@ type SecretRealm struct {
 	Rooms         []SecretRealmRoom `json:"rooms"`
 }
 
+// BeginnerStage is one leg of the path a new cultivator is put on the moment
+// they are made (v1.0.0-rc.26). The send-off above is what the household puts
+// in their hands; this is what it expects them to do with it.
+//
+// The engine reads one field of it - which quest to hand over first - because
+// that is the only part that is a mechanic. The prose, the objectives and the
+// rewards are seeded into `quest_definitions` from here by the same path the
+// authored commission pool takes, and from then on a stage is an ordinary
+// quest like any other: the same terms pinning, the same progress, the same
+// payment inside the transaction that completes it. Nothing about a beginner
+// quest is a special case once it has been handed over, which is the point -
+// a second mechanism would be a second thing to keep correct.
+type BeginnerStage struct {
+	QuestKey string `json:"quest_key"`
+	Title    string `json:"title"`
+	// FollowOn is carried here for the content to read as one document. The
+	// engine does not use it: chaining reads `seed_json` off the definition
+	// row, so a GM who edits the chain in the dashboard is obeyed and the
+	// shipped file is only ever the starting shape.
+	FollowOn string `json:"follow_on"`
+}
+
 // BirthFamilySendoff is what a household puts in a child's hands on the day
 // they leave it (v1.0.0-rc.15). Every archetype has one and no two share an
 // item: which flying artifact a family owns *is* the family - a tomb-watch
@@ -675,6 +697,7 @@ type Catalog struct {
 	SecretRealms        map[string]SecretRealm         `json:"secret_realms"`
 	Inheritances        map[string]Inheritance         `json:"inheritances"`
 	BirthFamilySendoff  map[string]BirthFamilySendoff  `json:"birth_family_sendoff"`
+	BeginnerPath        []BeginnerStage                `json:"beginner_path"`
 	NPCs                map[string]NPCDefinition       `json:"npcs"`
 	TechniqueSystem     TechniqueSystemDefinition      `json:"technique_system"`
 	WorldRules          map[string]any                 `json:"world_rules"`

@@ -7,6 +7,7 @@ table, and - in source, since discord.py is absent - the admin commands and
 the bot worker.
 """
 import asyncio
+import ast
 import json
 import tempfile
 import time
@@ -460,6 +461,30 @@ class ServiceAndStorageTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(catalog["first_steps"]["source_type"], "system")
 
 
+def _progress_payload_keys(service_source: str) -> set[str]:
+    """The keys QuestService.progress sends to `quest.progress`.
+
+    Read off the call rather than by searching the method text, so a key added
+    to the payload fails and a value handed back to the caller does not.
+    """
+    tree = ast.parse(service_source)
+    progress = next(
+        node for node in ast.walk(tree)
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == "progress"
+    )
+    for node in ast.walk(progress):
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        if not isinstance(func, ast.Attribute) or func.attr != "action":
+            continue
+        payload = next((a for a in node.args if isinstance(a, ast.Dict)), None)
+        if payload is None:
+            raise AssertionError("quest.progress is no longer called with a literal payload")
+        return {k.value for k in payload.keys if isinstance(k, ast.Constant)}
+    raise AssertionError("QuestService.progress no longer calls the engine")
+
+
 class SurfaceTests(unittest.TestCase):
     """The admin commands and the worker, read in source."""
 
@@ -496,9 +521,17 @@ class SurfaceTests(unittest.TestCase):
         # what the player accepted off their own row, so the progress report
         # says neither what the quest asks for nor what it pays. (The catalog
         # above it still carries both - that is what an offer is made of.)
-        report = body[body.index("async def progress"):body.index("def visible_to")]
-        self.assertNotIn('"rewards"', report)
-        self.assertNotIn('"objectives"', report)
+        #
+        # Checked on the payload rather than on the whole method, because the
+        # direction is the whole point: sending objectives to the engine is
+        # Python deciding the terms, and it is what this forbids. Carrying some
+        # back out to presentation is not that, and until v1.0.0-rc.26 a
+        # substring search over the method body could not tell the two apart.
+        self.assertEqual(
+            _progress_payload_keys(service),
+            {"quest_key", "objective_type", "amount", "target"},
+            "quest.progress must send the event and nothing about the terms",
+        )
         self.assertNotIn("INSERT", body)
 
     def test_the_worker_is_opt_in_idempotent_and_announces(self):

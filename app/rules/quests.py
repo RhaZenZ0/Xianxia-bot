@@ -33,6 +33,83 @@ QUEST_DEFINITIONS: dict[str, dict] = {
 }
 
 
+def next_objective_label(objectives: Any, progress: Any) -> str:
+    """The first objective still short of its count, or "" when none is.
+
+    This is the whole of "which door, now". A new character faces sixteen
+    equally-weighted hubs with nothing saying which one is theirs today, and
+    until v1.0.0-rc.26 a quest advancing said only "Quest progress: <title>" -
+    it confirmed that something counted and then left the player exactly where
+    they were. Naming what is still outstanding turns the journal into a
+    pointer, and because the labels are written as hub paths, the reply names
+    a real command (and, inside a hub panel, earns it as a button through
+    `suggested_actions`).
+
+    Objectives are taken in their authored order, so the first one outstanding
+    is the one the author meant to come next.
+    """
+    done = dict(progress or {})
+    for objective in list(objectives or []):
+        if not isinstance(objective, dict):
+            continue
+        required = max(1, int(objective.get("count", 1) or 1))
+        try:
+            current = int(done.get(str(objective.get("id") or ""), 0) or 0)
+        except (TypeError, ValueError):
+            current = 0
+        if current < required:
+            label = str(objective.get("label") or "").strip()
+            if not label:
+                return ""
+            if required > 1:
+                return f"{label} ({current}/{required})"
+            return label
+    return ""
+
+
+def beginner_path_seed_rows(world: Any) -> list[dict[str, Any]]:
+    """The beginner path from `content/world.json`, shaped for the same seeder.
+
+    The stages are content, not code, for the reason everything else in this
+    file's neighbourhood is: the prose is the whole point of them and prose
+    belongs in `content/world.json` beside the birth-family send-off, which is
+    the thing they follow on from. What they are *not* is a new pipeline - a
+    stage is an ordinary `quest_definitions` row, seeded exactly the way the
+    authored commission pool is, and once a player is holding it the engine
+    pins, progresses, completes and pays it as it would any other quest.
+
+    `seed.follow_on` is the chain, and it lands in `seed_json`, which is where
+    the engine reads it back from. That indirection is deliberate: a GM who
+    re-points a chain in the dashboard workbench edits the row, and the shipped
+    file is only ever the starting shape.
+    """
+    rows: list[dict[str, Any]] = []
+    for stage in list(getattr(world, "data", {}).get("beginner_path") or []):
+        key = str(stage.get("quest_key") or "").strip()
+        if not key:
+            continue
+        rows.append({
+            "quest_key": key,
+            "title": str(stage.get("title", "")),
+            "description": str(stage.get("description", "")),
+            "source_type": "system",
+            "source_key": "beginner_path",
+            "objectives": list(stage.get("objectives", [])),
+            "rewards": dict(stage.get("rewards", {})),
+            # No giver, so it is an ordinary quest: it occupies no commission
+            # slot, carries no deadline, and `grantOrdinaryQuestTx` will hand
+            # it over. A giver here would make the engine refuse it, which is
+            # the guard rather than the bug.
+            "giver_npc": "",
+            "realm_band": "",
+            "tier": 1,
+            "deadline_game_minutes": 0,
+            "variants": [],
+            "seed": {"follow_on": str(stage.get("follow_on") or "")},
+        })
+    return rows
+
+
 def static_quest_seed_rows(definitions: dict[str, dict] | None = None) -> list[dict[str, Any]]:
     """The static quests, shaped for `Database.sync_commission_pool`.
 
