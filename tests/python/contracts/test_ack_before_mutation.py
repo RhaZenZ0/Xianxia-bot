@@ -50,6 +50,11 @@ MUTATE_MARKER = "authoritative_action("
 NOT_AN_INTERACTION_ENTRYPOINT = {
     "_current_birth_family",
     "settle_seclusion_for_user",
+    # Takes a bare user id, not an interaction, so it cannot ack anything - the
+    # exemption this module's own docstring describes. `/talk` defers before
+    # calling it, on the one branch that reaches it, and that branch is checked
+    # here independently.
+    "_claim_grave_if_here",
 }
 
 # `if not interaction.response.is_done(): await interaction.response.defer(...)`

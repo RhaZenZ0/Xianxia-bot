@@ -6,6 +6,74 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.0** (rc.24) lets the world's own people marry each other, bear children, and be lost.
+
+Four weddings a month in a world of five hundred and seventy-four people, and less than one child
+anywhere in the first month of it. Both had the same cause. `npcLife` walked one globally sorted
+list of singles two at a time - slots (0,1), (2,3), (4,5) - and kept a pair only if both happened to
+land on the same `current_location`. Measured against this catalogue that is fifteen usable pairs
+out of the two hundred and forty that exist, and six percent of fifteen is 0.9 weddings a tick. The
+deeper reason is geography: four hundred and seventy-seven places hold those people and three
+hundred and ninety-two are the only person standing where they stand, so under a rule that both must
+be on the same tile those three hundred and ninety-two could never marry anybody, ever. Counting a
+whole city instead - which `game.WhereAnNPCCanWalk` already models, district to city and back out -
+drops that number to fifty-six.
+
+**Courtship.** A pair within reach of each other gain ground each tick and marry at seventy; a pair
+the roads have separated cool and part. Realm and age have to agree *proportionally*, because sixty
+years is a lifetime to a mortal and a rounding error to a Nascent Soul elder. Nobody courts their
+own kin, and nobody courts somebody they hold a grudge against - which only became checkable at all
+once rc.23 gave this engine something that raises that column. There is deliberately no gender rule:
+not one of the 574 catalogue NPCs carries a gender field, so a rule would be inventing content
+rather than reading it. Two sects on speaking terms and short of an alliance also marry their
+weightiest unattached members to each other, which is the first thing that has ever *made* a
+`marriage_pact` rather than describing one at bootstrap.
+
+**A world with a past.** Bootstrap wrote all 574 of them as single, childless and nowhere near the
+end of a life, so a new world was 574 strangers and the first funeral was decades away. It now opens
+with 88 households, 176 people married, 104 children and 29 people near the end of the span their
+realm allows - all keyed off `hash64` like the rest of bootstrap, so the same content makes the same
+world twice.
+
+**Widows.** Nothing had ever set `relationship_status` back from 'married': the only two writes to
+that column marked people married. A widow stayed married to a corpse for the rest of her life,
+could never be courted again, and went on bearing his children, because `npcChildbirth` read the
+column and never checked the spouse's pulse. `ReleaseNPCBondsTx` now runs on all three death paths.
+A widow may marry again, and it is harder in both of the ways that matter: a mourning period first,
+and afterwards a colder roll.
+
+**Disappearances** (schema 47) and **graves** (schema 48). Somebody away from home can vanish.
+`status` carries 'missing' beside 'alive' and 'dead', so every batch that reads `WHERE
+status='alive'` stops offering them by construction rather than by a rule written four more times.
+They cannot free themselves - if they wandered home the quest would be decoration - but the
+surroundings feed them for sixty days before it starts costing them. The point of the feature is the
+significance: `forge_quests_from_history` drafts a quest per public history row at or above 80, and
+this whole package topped out at 74, so no autonomous event had ever been able to reach the Quest
+Forge at all. A disappearance is written at 82 and is the first one that can. At a hundred and
+twenty days the town gives up and the marriage is dissolved from both sides - the person is *not*
+marked dead, and is still out there and still findable, which is the whole of the tragedy and none
+of the bug. If nobody comes, a grave holds where they stopped and what they were carrying: their own
+purse, and one thing read off the trade they practised. The first searcher to reach it takes it.
+
+**And somebody else may.** The Tomb-Watch Clan has listed "Grave-robbers" among its troubles since
+the birth families were written, and `npcFindChance` has always given the best find rate in the game
+to a digging trade - but their finds were abstract, drawn from a catalogue pool, because there was
+nothing in the world to dig up. There is now. A grave keeps a grace of twenty-one days, three ticks,
+in which it is the searcher's alone; past that a digger within reach may turn it over, so arriving
+late stops being the same as arriving. The deed is `hidden` and the goods are not: nobody was out
+there to see it done, so the world genuinely does not know, but the keepsake goes under the hammer
+at the nearest house and `auctions` is the one fence of the two that records who brought it in. A
+player who reaches an emptied grave and later finds the dead herbalist's satchel listed under a
+known digger's name has worked it out from the world rather than been told.
+
+Also here: `npcLife`'s bulk heal was `WHERE health>0` with no join to status, so it healed anybody
+whose death had been written in `npc_civilization_state` and nowhere else. The city rumour teller
+looked for a `lower` district that four of the forty-eight cities have, and inside it a name
+beginning "Innkeeper" - which no NPC in the catalogue has; the `inn` district is in all forty-eight
+and every one has its landlady standing in it, so 4/48 becomes 48/48. The dead stopped being offered
+in every picker at every location. And two f-strings used syntax only legal from Python 3.12, so
+`python -m compileall app` - one of this repo's own checks - could not run on 3.11.
+
 **1.0.0** (rc.23) gives the world's own people something to do when nobody has told them to. The
 simulation already gave them births, marriages, careers, breakthroughs, masters and feuds, and
 `npc_consignments` already had a grave-robber or a herb-gatherer turn something up and put it under
@@ -1315,6 +1383,23 @@ mechanical authority paths.
 - **Schema 27** added the v0.19.29 mute/freeze moderation columns on `characters`
   (`is_muted`, `is_frozen`, `moderation_reason`).
 - **Schema 28** added the Quest Forge definition table (`quest_definitions`).
+- **Schema 48** gave a search somewhere to arrive. `npc_graves` holds where a missing person
+  actually ended up, what they were carrying when they stopped, and whether anybody has been to it.
+  Until now a disappearance that ran out of grace produced a history row and nothing else, so the
+  searcher who went looking stood in an empty place and learned nothing - `status='dead'` is not a
+  thing you can stand in front of. A grave is, and being able to carry something back from one is
+  what turns knowing into reporting. Nothing is dropped and no existing column changes meaning.
+
+- **Schema 47** gave a disappearance a length. `npc_civilization_state` gained
+  `missing_since_game_minute`, and `status` carries `'missing'` beside `'alive'` and `'dead'`, so
+  every batch that reads `WHERE status='alive'` stops offering a missing person by construction
+  rather than by a rule written four more times. `npcTravel` deliberately stores no journey -
+  "nothing tracks how long they have been away - this is what makes the journey end without storing
+  a journey" - which is the right rule for an errand and the wrong one for a disappearance, because
+  how long it has lasted is the whole of what makes one. It is the single thing about a journey
+  worth keeping: the minute it stopped being one. Nothing is dropped and no existing column changes
+  meaning, so an old database upgrades by adding a column with a default of zero.
+
 - **Schema 46** gave a method somewhere to be known. `character_recipes` is the third table in
   the family of `character_manuals` and `character_item_appraisals` - a composite key, the route
   by which it was learned, and the minute it was - because crafting now asks whether a cultivator

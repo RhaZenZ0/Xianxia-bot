@@ -676,13 +676,23 @@ async def _run_crafting(interaction: discord.Interaction, recipe: str) -> None:
         if profession == "Alchemy" and success and mult > 1:
             quality_line += f" • output ×{mult}"
 
+    # Built outside the f-string: a backslash inside an f-string expression is
+    # only legal from Python 3.12 (PEP 701), and `python -m compileall app` is
+    # one of this repo's checks. Same output, one line per bonus that applies.
+    bonus_lines = [
+        f"{label}: **+{value}**\n"
+        for label, value in (
+            ("Player-property facility bonus", facility_bonus),
+            ("Sect-manor facility bonus", manor_facility_bonus),
+            ("Birth-family Alchemy tradition", inherited_family_bonus),
+            ("Profession mastery bonus", profession_bonus),
+        )
+        if value
+    ]
     await interaction.response.send_message(
         f"**{profession}: {recipe}**\n{roll_line(result)}\n"
-        f"{('Player-property facility bonus: **+'+str(facility_bonus)+'**\n') if facility_bonus else ''}"
-        f"{('Sect-manor facility bonus: **+'+str(manor_facility_bonus)+'**\n') if manor_facility_bonus else ''}"
-        f"{('Birth-family Alchemy tradition: **+'+str(inherited_family_bonus)+'**\n') if inherited_family_bonus else ''}"
-        f"{('Profession mastery bonus: **+'+str(profession_bonus)+'**\n') if profession_bonus else ''}"
-        f"{outcome}{quality_line}{mastery_line}"
+        + "".join(bonus_lines)
+        + f"{outcome}{quality_line}{mastery_line}"
     )
 
 
@@ -1235,10 +1245,27 @@ async def city_rumours(interaction: discord.Interaction) -> None:
     if not parts and not WORLD.locations.get(city, {}).get("gates"):
         await interaction.response.send_message("Rumours are traded in cities - at the gate, or in the lower town.", ephemeral=False)
         return
+    # Rumours are kept where people drink, and this looked in the wrong room
+    # for both reasons at once (v1.0.0-rc.24). It wanted a `lower` district,
+    # which exists on exactly four locations in the whole world, and inside it
+    # a name beginning "Innkeeper" or "Beggar King", which no NPC in the
+    # catalogue has - Greenriver Town's are *Landlady* Yu Lian and *Old
+    # Beggar* Chen. So forty-four of the forty-eight cities fell through to
+    # the gate captain and the lower town never spoke. The `inn` district is
+    # in all forty-eight and every one of them has its landlady standing in
+    # it, so ask there first and match what an NPC *does*, not what they are
+    # called.
     teller = ""
-    lower = next((name for name in parts if WORLD.locations[name].get("district") == "lower"), "")
-    if lower:
-        teller = next((n for n, npc in WORLD.npcs.items() if str(npc.get("location")) == lower and n.startswith(("Innkeeper", "Beggar King"))), "")
+    for district in ("inn", "lower"):
+        part = next((name for name in parts if WORLD.locations[name].get("district") == district), "")
+        if not part:
+            continue
+        teller = next((n for n, npc in WORLD.npcs.items()
+                       if str(npc.get("location")) == part
+                       and any(word in str(npc.get("role") or "").casefold()
+                               for word in ("innkeep", "beggar", "tavern", "teahouse", "landlad", "landlord"))), "")
+        if teller:
+            break
     if not teller:
         gate = next((name for name in parts if WORLD.locations[name].get("gate")), "")
         teller = next((n for n, npc in WORLD.npcs.items() if str(npc.get("location")) == gate and n.startswith("Gate Captain")), "") if gate else ""

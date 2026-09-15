@@ -595,7 +595,7 @@ class ReadOnlyDashboardStore:
             params.append(status.strip())
         params.append(limit)
         sql = """SELECT c.npc_name,c.home_location,c.current_location,c.world_name,c.profession,c.faction,c.wealth,c.influence,c.ambition,
-                        c.realm_index,c.phase,c.status,c.activity,c.last_game_minute,
+                        c.realm_index,c.phase,c.status,c.activity,c.missing_since_game_minute,c.last_game_minute,
                         l.birth_game_minute,l.age_at_creation_years,l.natural_lifespan_years,l.health,l.injury,l.injury_severity,l.sect_rank,
                         l.relationship_status,l.spouse_name,l.children_count,l.death_game_minute,l.cause_of_death,
                         m.current_goal,m.mood,m.focus_target,m.recent_event,m.goal_progress
@@ -610,9 +610,38 @@ class ReadOnlyDashboardStore:
                 if row.get("birth_game_minute") is not None:
                     elapsed = max(0, int(clock["game_minute"]) - int(row.get("birth_game_minute") or 0))
                     row["age_years"] = round(float(row.get("age_at_creation_years") or 18) + elapsed / (60 * 24 * 30 * 12), 1)
+                # Schema 47: how long a disappearance has run is the figure a
+                # GM actually needs, because the surroundings only keep
+                # somebody alive for so long.
+                since = int(row.get("missing_since_game_minute") or 0)
+                row["days_missing"] = (
+                    max(0, int(clock["game_minute"]) - since) // (60 * 24)
+                    if since > 0 and str(row.get("status") or "") == "missing"
+                    else 0
+                )
             locations = [r["current_location"] for r in await self._fetchall(db, "SELECT DISTINCT current_location FROM npc_civilization_state WHERE current_location<>'' ORDER BY current_location")]
             factions = [r["faction"] for r in await self._fetchall(db, "SELECT DISTINCT faction FROM npc_civilization_state WHERE faction<>'' ORDER BY faction")]
-            return {"rows": rows, "locations": locations, "factions": factions}
+            # Schema 48: where the ones nobody found ended up, and whether
+            # anybody has been to them. A GM asking "what happened to X" should
+            # not have to read the history table to find out.
+            #
+            # `robbed_by` is the world getting there first. The robbery row is
+            # `hidden` on purpose - nobody stood in the wilderness and watched,
+            # so it never reaches narrator RAG and no player is ever told - but
+            # a GM is not a player, and without this an emptied grave and an
+            # untouched one read identically in this table.
+            graves = await self._fetchall(
+                db,
+                """SELECT g.npc_name,g.location,g.home_location,g.days_missing,g.keepsake_item,
+                          g.keepsake_stones,g.died_game_minute,g.claimed_by_user_id,g.claimed_game_minute,
+                          c.name AS claimed_by_name,
+                          (SELECT h.actor_name FROM world_history_events h
+                            WHERE h.event_type='npc_grave_robbery' AND h.target_name=g.npc_name
+                            ORDER BY h.game_minute DESC LIMIT 1) AS robbed_by
+                   FROM npc_graves g LEFT JOIN characters c ON c.user_id=g.claimed_by_user_id
+                   ORDER BY g.died_game_minute DESC LIMIT 100""",
+            )
+            return {"rows": rows, "locations": locations, "factions": factions, "graves": graves}
 
     async def npc_detail(self, name: str) -> dict[str, Any]:
         async with self._connect() as db:

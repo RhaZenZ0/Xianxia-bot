@@ -61,7 +61,7 @@ from ...rules.sect_recruitment import (
     trial_profile,
 )
 from ..registry import registered_group_command
-from ..locations import _known_locations, current_npc_location
+from ..locations import DEAD, _known_locations, current_npc_location
 from ..character_state import announce_quest_progress
 from ..formatting import player_property_facility_lines, player_property_unbuilt
 from ..services import PLAYER_PROPERTY_FACILITY_LABELS, QUESTS, SIM
@@ -385,6 +385,8 @@ async def sect_recruitment_recommendation(interaction: discord.Interaction, npc:
     if not rec:
         await interaction.response.send_message("That NPC's sect has no public recruitment path configured.",ephemeral=False);return
     wt=await current_world_time(); npc_location=await current_npc_location(npc,wt.period)
+    if npc_location==DEAD:
+        await interaction.response.send_message(f"**{npc}** is dead and recommends nobody.",ephemeral=False);return
     if npc_location!=str(c.get('location') or ''):
         await interaction.response.send_message(f"**{npc}** is currently at **{npc_location or 'an unknown location'}**, not **{await character_location_display(c)}**.",ephemeral=False);return
     memory=await DB.get_npc_memory(interaction.user.id,npc)

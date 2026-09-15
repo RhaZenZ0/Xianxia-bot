@@ -23,7 +23,7 @@ CREATE TABLE npc_civilization_state(
     wealth INTEGER NOT NULL DEFAULT 20, influence INTEGER NOT NULL DEFAULT 10,
     ambition INTEGER NOT NULL DEFAULT 50, realm_index INTEGER NOT NULL DEFAULT 0,
     phase INTEGER NOT NULL DEFAULT 1, status TEXT NOT NULL DEFAULT 'alive',
-    activity TEXT NOT NULL DEFAULT '', last_game_minute INTEGER NOT NULL DEFAULT 0,
+    activity TEXT NOT NULL DEFAULT '', missing_since_game_minute INTEGER NOT NULL DEFAULT 0, last_game_minute INTEGER NOT NULL DEFAULT 0,
     updated_at REAL NOT NULL DEFAULT 0);
 CREATE TABLE auctions(
     auction_id INTEGER PRIMARY KEY AUTOINCREMENT, house_id TEXT NOT NULL, seller_user_id INTEGER NOT NULL DEFAULT 0,

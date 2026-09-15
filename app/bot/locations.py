@@ -30,6 +30,16 @@ from ..rules.sense import circuit_stop
 from .runtime import DB, WORLD, current_world_time, log
 from .services import SIM
 
+# `current_npc_location` returned None for two different things - "this NPC is
+# dead" and "nothing knows where they are" - and every caller read None as the
+# second. So a dead NPC was offered in every picker at every location, and
+# `/talk` and `/npcinfo` treated a corpse as somebody standing where they fell.
+# DEAD separates the two. It is not a location and never matches one, so the
+# callers that compare against a real place already do the right thing with it;
+# the ones that would show it to a player are the ones that had to change.
+DEAD = "\x00dead"
+
+
 async def current_npc_location(npc_name: str, period: str | None = None) -> str | None:
     """Resolve the mechanical NPC location from initialized simulation state.
 
@@ -55,8 +65,19 @@ async def current_npc_location(npc_name: str, period: str | None = None) -> str 
     sim_state = await SIM.npc_status(npc_name)
     if period is None:
         period = (await current_world_time()).period
-    if sim_state and sim_state.get("status") == "alive" and sim_state.get("current_location"):
+    status = str((sim_state or {}).get("status") or "")
+    if sim_state and status not in ("", "alive", "missing"):
+        return DEAD
+    if sim_state and status in ("alive", "missing") and sim_state.get("current_location"):
         current = str(sim_state["current_location"])
+        # A missing person is exactly where they are; the world simply does
+        # not know it (schema 47). Answering truthfully here is what makes the
+        # picker's own location filter do the work - they are hidden from
+        # every place except the one a searcher would actually find them in -
+        # and it keeps the daily schedule out of it, because somebody who has
+        # vanished is not keeping to one.
+        if status == "missing":
+            return current
         home = str(sim_state.get("home_location") or current)
         # Normal daily schedules still apply while the NPC remains in their home
         # region. Autonomous civilization travel overrides the schedule only when
@@ -184,10 +205,23 @@ async def local_npc_autocomplete(
                     names.append(name)
         except Exception:
             log.exception("Could not read the event cast at %s", location)
+        # A grave is a name you can address that the catalogue picker filters
+        # out, because the dead are filtered out of it (schema 48). It belongs
+        # in the list exactly where it stands and nowhere else - the same rule
+        # the missing follow, for the same reason.
+        try:
+            for grave in await DB.list_graves_at(location):
+                name = str(grave.get("npc_name") or "")
+                if name and name not in names and (not needle or needle in name.casefold()):
+                    names.append(name)
+        except Exception:
+            log.exception("Could not read the graves at %s", location)
     for name in await DB.search_catalog("npc", current, 25):
         if name in names:
             continue
         npc_location = await current_npc_location(name, wt.period)
+        if npc_location == DEAD:
+            continue
         if location and npc_location and npc_location != location:
             continue
         if not needle or needle in name.casefold():

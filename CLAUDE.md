@@ -143,8 +143,71 @@ internal/server/        HTTP control/data plane
 ```
 
 Every Go SQLite connection uses `journal_mode=WAL`, `foreign_keys=ON`, `busy_timeout=10000`,
-`synchronous=NORMAL`. Current schema version is 46; historical migrations are kept so old databases
+`synchronous=NORMAL`. Current schema version is 48; historical migrations are kept so old databases
 can upgrade in place — see `VERSIONS.md` for the full schema/release history.
+
+### The NPC life cycle (v1.0.0-rc.24)
+
+`npc_romance.go` replaced a pairing that walked one globally sorted list of singles two at a time and
+kept a pair only if both landed on the same `current_location`. Against the shipped catalogue that
+is fifteen usable pairs out of two hundred and forty, at six percent — four weddings a month in a
+world of 574 people, and so almost no couples for `npcChildbirth` to work with. The cause is
+geography: 477 places hold those people and **392 are the only person standing where they stand**.
+Courting now reaches one step, through `game.WhereAnNPCCanWalk` (district↔city), which drops that
+392 to 56. A courtship gains affinity while the pair stay in reach and cools when the roads separate
+them; realm and age must agree *proportionally* (sixty years is a lifetime to a mortal and nothing to
+a Nascent Soul elder); kin and standing grudges are excluded. **There is deliberately no gender
+rule — not one of the 574 catalogue NPCs carries a gender field, so a rule would be inventing
+content rather than reading it.** Two sects on speaking terms also marry their weightiest unattached
+members to each other, which is the first thing that has ever *made* a `marriage_pact` rather than
+describing one at bootstrap.
+
+`bootstrap_households.go` gives a new world a past: ~88 households, ~176 married, ~104 children and
+~29 people near the end of the span their realm allows, all keyed off `hash64` so the same content
+makes the same world twice.
+
+`ReleaseNPCBondsTx` (in `game`, so all three death paths can reach it) widows the survivor. Nothing
+had ever set `relationship_status` back from `'married'`, so a widow stayed married to a corpse,
+could never be courted again, and went on bearing his children.
+
+### NPCs who go missing (`npc_missing.go`, schema 47)
+
+Somebody away from home can vanish. `status` carries `'missing'` beside `'alive'` and `'dead'`, so
+every batch that reads `WHERE status='alive'` stops offering them by construction, and
+`missing_since_game_minute` is the one thing about a journey worth storing — `npcTravel` deliberately
+stores none, which is right for an errand and wrong for a disappearance.
+
+**They cannot free themselves.** If they wandered home the quest would be decoration. What they can
+do is last: the surroundings feed them for `missingGraceDays`, then health drains and they die of it.
+That deadline is what makes the search mean something.
+
+The significance is the point. `forge_quests_from_history` drafts a quest per public history row at
+or above `QUEST_FORGE_MIN_SIGNIFICANCE` (default **80**) — and the whole simulation package tops out
+at 74, so **no autonomous event has ever been able to reach the Quest Forge**. A disappearance is
+written at 82 and is the first one that can. Resolution is mechanical: the `npc.found` action clears
+it only when the caller is standing where the NPC actually is, and the engine checks that itself
+rather than taking `/talk`'s word for it.
+
+### Somebody gets there first (`npc_grave_robbing.go`)
+
+The Tomb-Watch Clan has listed "Grave-robbers" among its troubles since the birth families were
+written, and `npcFindChance` has always given the best find rate in the game to a grave/tomb/relic/
+scaveng/prospect/digger/miner/salvage trade — but their finds were abstract, drawn from a catalogue
+pool, because until schema 48 there was nothing in the world to dig up. A step of `npc_life`, last,
+turns over the graves nobody came for, so arriving late is no longer the same as arriving.
+
+Two things hold it in shape. **The grace** (`graveRobGraceDays`, 21 — three ticks) is the window in
+which the grave is the searcher's alone: long enough for the Forge to draft the quest, a GM to pass
+it and somebody to walk there. And **the deed is `hidden` while the goods are not**: nobody stood in
+the wilderness and watched, so the history row never reaches narrator RAG and the world genuinely
+does not know — but the keepsake goes under the hammer at the nearest house, and `auctions` is the
+one fence of the two that carries `seller_npc_name`. A player who reaches an emptied grave and later
+finds the dead herbalist's satchel listed under a known digger's name has worked it out from the
+world rather than been told. The GM dashboard's Graves table reads the hidden row directly, because
+a GM is not a player.
+
+Emptiness is `claimed_game_minute`, never `claimed_by_user_id` — the latter anonymises on erasure
+(see `erasureAnonymise`), so keying off it would let an erasure refill a grave.
 
 ### RAG / memory (`app/ai/rag`)
 
@@ -167,7 +230,7 @@ etc.), separate from current structured state (what's true now — always wins o
 carry visibility levels `public` / `participant` / `faction` / `hidden`; hidden rows never reach
 narrator RAG, and a focused NPC does not inherit the player's participant-only knowledge.
 
-### What NPCs do on their own (`npc_deeds.go`, v1.0.0-rc.23)
+### What NPCs do on their own (`npc_deeds.go`, v1.0.0-rc.24)
 
 A step of the `npc_life` batch, after the feuds: a criminal trade (or anyone ambitious enough and
 poor enough) robs, beats or smuggles; a hunting trade goes out after a beast from the same roster
@@ -312,7 +375,7 @@ plane, and is read-only (no `admin_audit_log` row, and it sits under Systems, no
 - **Never assert that a random thing happened, however many iterations you give it.** The simulation
   is built out of low-probability rolls and `gamerng` is `crypto/rand` with no seed, so a
   "sixty ticks and surely one landed" test fails for no reason at some rate you cannot drive to
-  zero. Use `gamerng.UseRoller(fn)` (v1.0.0-rc.23) — it lends the dice to one test and returns the
+  zero. Use `gamerng.UseRoller(fn)` (v1.0.0-rc.24) — it lends the dice to one test and returns the
   restore, which you must `defer`; `fn` receives the bound so one kind of roll can be answered
   differently from another, and its answer is clamped into the die. It is test-only and a test in
   `gamerng` walks every non-test file in `go_core` to keep it that way. Where the outcome can be
