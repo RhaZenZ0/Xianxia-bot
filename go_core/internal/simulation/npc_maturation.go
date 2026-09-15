@@ -166,8 +166,17 @@ func (r *Runner) householdOf(conn *storage.Conn, parentA, parentB string) (strin
 
 // realmName is what the registry prints for a realm index, read off the
 // content file rather than spelled out here.
+//
+// The bound is compared in int64 rather than narrowing the index to `int`
+// first. `realmIndex` comes out of the database through ParseInt, and on a
+// 32-bit build `int(realmIndex)` truncates - a stored value above 2^31 wraps
+// to something small, passes a `< len()` test written that way, and then
+// panics when the slice is actually indexed with the full 64-bit value. Go
+// indexes a slice with any integer type, so the conversion buys nothing and
+// the check is exact at every word size. (CodeQL, go/incorrect-integer-
+// conversion, on the first version of this.)
 func (r *Runner) realmName(realmIndex int64) string {
-	if realmIndex >= 0 && int(realmIndex) < len(r.World.Realms) {
+	if realmIndex >= 0 && realmIndex < int64(len(r.World.Realms)) {
 		if name := r.World.Realms[realmIndex].Name; name != "" {
 			return name
 		}

@@ -207,3 +207,25 @@ func TestGrowingUpIsNotAQuest(t *testing.T) {
 		t.Fatalf("%d coming-of-age row(s) can reach the Quest Forge", high)
 	}
 }
+
+// A realm index out of range names no realm and panics on nothing, at any word
+// size. The first version narrowed the index to `int` before the bound check,
+// which on a 32-bit build lets a stored value above 2^31 wrap small, pass the
+// test, and then panic when the slice is indexed with the full 64-bit value.
+func TestARealmIndexOutOfRangeNamesNothingRatherThanPanicking(t *testing.T) {
+	r := maturationRunner()
+	for _, index := range []int64{-1, int64(len(r.World.Realms)), 1 << 31, 1 << 40, 1<<63 - 1} {
+		t.Run(fmt.Sprint(index), func(t *testing.T) {
+			if got := r.realmName(index); got != "Mortal" {
+				t.Fatalf("realm index %d named %q", index, got)
+			}
+		})
+	}
+	// And a real one still answers, so the guard did not simply refuse
+	// everything.
+	if len(r.World.Realms) > 0 && r.World.Realms[0].Name != "" {
+		if got := r.realmName(0); got != r.World.Realms[0].Name {
+			t.Fatalf("realm 0 named %q, expected %q", got, r.World.Realms[0].Name)
+		}
+	}
+}
