@@ -185,7 +185,13 @@ async def sense_command(
         return
 
     if npc:
-        if npc not in WORLD.npcs:
+        # The same resolver `/talk` uses (v1.0.0-rc.27). This was `npc not in
+        # WORLD.npcs` - the parsed content file and nothing else - while its own
+        # picker has offered a running event's cast since schema 43 and the
+        # people this world made for itself since schema 49. So an NPC you could
+        # talk to was refused here with "Unknown NPC.", which is the sort of
+        # inconsistency that reads as the bot being broken rather than as a gate.
+        if await DB.get_npc_definition(npc) is None:
             await respond(interaction, "Unknown NPC.", ephemeral=False)
             return
         npc_location = await current_npc_location(npc, wt.period)

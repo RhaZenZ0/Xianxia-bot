@@ -522,6 +522,25 @@ type NPCDefinition struct {
 	Circuit []string `json:"circuit"`
 }
 
+// GeneratedTraits is the prose a person this world made for itself is given
+// (v1.0.0-rc.27). A child born to two NPCs, or a relative of a starter
+// household, has a name and a location and nothing a narrator can speak with;
+// `birth_family_npcs` says so outright by carrying the literal "Member of a
+// shared starter household" in its personality column for every relative in
+// the game.
+//
+// Content rather than code, for the same reason the send-off and the narration
+// pool are: the prose is the point of it. Picked by `hash64` of the name, so
+// the same world makes the same person twice - and deliberately small pools,
+// because a hundred bland variations read worse than a dozen written ones.
+type GeneratedTraits struct {
+	Role        []string `json:"role"`
+	Personality []string `json:"personality"`
+	Speech      []string `json:"speech"`
+	Want        []string `json:"want"`
+	Fear        []string `json:"fear"`
+}
+
 type ManualDefinition struct {
 	Name      string `json:"name"`
 	ItemID    string `json:"item_id"`
@@ -698,6 +717,7 @@ type Catalog struct {
 	Inheritances        map[string]Inheritance         `json:"inheritances"`
 	BirthFamilySendoff  map[string]BirthFamilySendoff  `json:"birth_family_sendoff"`
 	BeginnerPath        []BeginnerStage                `json:"beginner_path"`
+	GeneratedTraits     GeneratedTraits                `json:"npc_generated_traits"`
 	NPCs                map[string]NPCDefinition       `json:"npcs"`
 	TechniqueSystem     TechniqueSystemDefinition      `json:"technique_system"`
 	WorldRules          map[string]any                 `json:"world_rules"`

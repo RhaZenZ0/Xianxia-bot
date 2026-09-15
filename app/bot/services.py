@@ -95,6 +95,12 @@ NARRATOR = Narrator(
     world=WORLD,
     provider=SETTINGS.narrator_provider,
     ai_router=AI_ROUTER,
+    # Who an NPC is when the content file does not know them (v1.0.0-rc.27):
+    # an event's cast, or somebody this world made for itself. Passed in rather
+    # than imported because `app/ai` sits below `app/database` in the layering,
+    # and NarratorContextBuilder below is handed the same object for the same
+    # reason.
+    npc_resolver=DB,
 )
 
 NARRATOR_CONTEXT = NarratorContextBuilder(

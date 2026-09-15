@@ -143,7 +143,7 @@ internal/server/        HTTP control/data plane
 ```
 
 Every Go SQLite connection uses `journal_mode=WAL`, `foreign_keys=ON`, `busy_timeout=10000`,
-`synchronous=NORMAL`. Current schema version is 48; historical migrations are kept so old databases
+`synchronous=NORMAL`. Current schema version is 49; historical migrations are kept so old databases
 can upgrade in place — see `VERSIONS.md` for the full schema/release history.
 
 ### The NPC life cycle (v1.0.0-rc.24)
@@ -267,6 +267,49 @@ Four rules hold it:
 
 "Fires once" is the `(user_id, quest_key)` primary key — the row is the memory, which is what makes
 the grant safe to call from creation, a dao-family rebirth and a samsara return alike.
+
+### People this world makes for itself (`npc_registry`, schema 49)
+
+Three populations, and until v1.0.0-rc.27 only one of them could be spoken to. `catalog_npcs` is a
+mirror of `content/world.json`, rewritten from the file at every boot. `birth_family_npcs` is a
+starter household's relatives. `npc_descendants` is children born to two NPCs — and
+`generated_as_npc` on it had existed since the life cycle was written, read by **nothing**, written
+twice as a hardcoded `0`, because there was nowhere to promote a child *into*.
+
+`npc_registry` is that somewhere: authored state, written at runtime, carried in backups, and never
+touched by a rebuild from the content file. **It is deliberately a second table rather than an
+`origin='catalogue'` row in the mirror** — a rebuild is an unconditional `DELETE` over the derived
+table, and the registry is never named in that statement, so no wrong predicate can wipe the world's
+own people on every boot. A name the content file already carries is never taken; the catalogue
+wins, because two people answering to one name is worse than a birth refused.
+
+`origin` is `descendant` / `birth_family` / `event` / `gm`, each with a different lifetime. It is
+GM-facing and `get_registered_npc` strips it before the row can reach a narrator prompt.
+
+- **Coming of age** (`npc_maturation.go`) — at `maturityYears` (18, the same age a played character
+  starts at) a descendant gets prose from `npc_generated_traits`, a registry row, and rows in both
+  simulation tables, so every batch reading `WHERE status='alive'` starts offering them. From then
+  they are an ordinary NPC: courtable, sendable, eventually buried. An orphan is left for a later
+  tick rather than given an invented town.
+- **Relatives** — registered by `registerHouseholdRelativesTx`, called from
+  `grantBirthFamilySendoffTx`, which is the one helper all three doors into a household use, ahead
+  of its early returns because a household with no heirloom still has a family in it.
+- **The prose is content** (`npc_generated_traits` in `world.json`), picked by `hash64` of the name
+  *per field* — one index across all five pools would weld fear to personality and make the world's
+  own people read as a handful of archetypes.
+
+Three readers had drifted from the gate they sit behind, and all three are fixed here.
+`DB.get_npc_definition` now resolves catalogue → registry → running event's cast.
+`narrator.py` was a bare `self.world.npcs[npc_name]` plus six bare field subscripts while the gate
+upstream already fell back to the event cast, so a militia captain passed the gate and `KeyError`'d
+— `/talk`'s `except Exception` turned that into *"the narrator service failed to answer."* It takes
+a duck-typed `npc_resolver` now, injected because `test_app_layout.py` puts `ai` below `database`,
+exactly as `NarratorContextBuilder` already did. And `/sense` refused with *"Unknown NPC."* anybody
+outside the content file while its own picker offered them.
+
+`current_npc_location` answers the registry when there is no simulation row. That matters because
+`None` means "nothing knows where they are", which every caller reads as *do not filter by
+location* — so without it somebody else's uncle would be talkable from across the world.
 
 ### RAG / memory (`app/ai/rag`)
 

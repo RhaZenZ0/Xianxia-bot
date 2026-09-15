@@ -398,8 +398,16 @@ class Narrator:
         world: World,
         provider: str = "procedural",
         ai_router: AITaskRouter | None = None,
+        npc_resolver: Any | None = None,
     ):
         self.world = world
+        # Who an NPC is, when `content/world.json` does not know (v1.0.0-rc.27).
+        #
+        # Duck-typed and injected rather than imported, because
+        # `test_app_layout.py` puts `ai` *below* `database` - this module may
+        # not reach a repository, and NarratorContextBuilder already solves the
+        # same problem the same way. An awaitable `get_npc_definition(name)`.
+        self.npc_resolver = npc_resolver
         self.provider = provider.strip().lower() or "procedural"
         self.ai_router = ai_router
         # Monitoring counters.  A silent procedural fallback is exactly the
@@ -652,6 +660,35 @@ Narrate a concise hunting clash consistent with the fixed result. On success, th
 """
         return await self._generate(prompt, max_output_tokens=170, fallback=fallback, tier="routine", purpose="narrate_it")
 
+    async def _npc_profile(self, npc_name: str) -> dict[str, Any]:
+        """The public profile of an NPC, from wherever they live.
+
+        This was `self.world.npcs[npc_name]`, a bare subscript into the parsed
+        content file, followed by six more bare subscripts for role, realm,
+        personality, speech, want and fear. The gate upstream is wider than
+        that lookup: `scene.py` resolves through `DB.get_npc_definition`, which
+        since schema 43 falls back to the cast of a running world event and
+        since schema 49 to `npc_registry` - so an event's militia captain, a
+        grown child of two NPCs and a player's own elder sister all passed the
+        gate and then raised `KeyError` here. `/talk`'s `except Exception`
+        turned every one of them into "the narrator service failed to answer."
+
+        `NarratorContextBuilder._public_npc` has always done this correctly;
+        the two classes had simply diverged. Nothing hidden is added - role,
+        manner and stated want are what any bystander already knows.
+        """
+        public = (getattr(self.world, "npcs", {}) or {}).get(npc_name)
+        if public:
+            return dict(public)
+        getter = getattr(self.npc_resolver, "get_npc_definition", None)
+        if getter is None:
+            return {}
+        try:
+            return dict(await getter(npc_name) or {})
+        except Exception:
+            log.exception("Could not resolve the NPC profile for %s", npc_name)
+            return {}
+
     async def talk_to_npc(
         self,
         *,
@@ -666,7 +703,7 @@ Narrate a concise hunting clash consistent with the fixed result. On success, th
         salient_memories: list[dict[str, Any]] | None = None,
         commission_context: dict[str, Any] | None = None,
     ) -> str:
-        npc = self.world.npcs[npc_name]
+        npc = await self._npc_profile(npc_name)
         realm = self.world.realm_name(character["realm_index"], character.get("gender"))
         recent = _recent_context(history, 8)
         style_memory = _style_memory(history, player_name=str(character.get("name") or ""), npc_name=npc_name)
@@ -689,12 +726,12 @@ PLAYER CHARACTER:
 {self._character_summary(character, realm)}
 
 NPC NAME: {npc_name}
-NPC ROLE: {npc['role']}
-NPC REALM: {npc['realm']}
-NPC PERSONALITY: {npc['personality']}
-NPC SPEECH STYLE: {npc['speech']}
-NPC LONG-TERM WANT: {npc['want']}
-NPC FEAR: {npc['fear']}
+NPC ROLE: {npc.get('role') or 'A local of no stated standing.'}
+NPC REALM: {npc.get('realm') or 'Unstated'}
+NPC PERSONALITY: {npc.get('personality') or 'Reserved; gives little away.'}
+NPC SPEECH STYLE: {npc.get('speech') or 'Plain, unhurried speech.'}
+NPC LONG-TERM WANT: {npc.get('want') or 'To get through the day without trouble.'}
+NPC FEAR: {npc.get('fear') or 'Trouble they cannot walk away from.'}
 NPC SECRET / HIDDEN STATE: {secret_for_prompt}
 NPC CURRENT ACTIVITY: {current_activity}
 NPC CURRENT GOAL: {current_goal}

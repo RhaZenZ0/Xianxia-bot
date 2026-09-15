@@ -123,6 +123,14 @@ func grantBirthFamilySendoffTx(conn *storage.Conn, catalog worlddata.Catalog, us
 	if err := teachHouseholdMethodsTx(conn, catalog, userID, familyID, archetype, gameMinute, now); err != nil {
 		return nil, err
 	}
+	// And who is in the house (v1.0.0-rc.27). Here for the same two reasons as
+	// the schooling above: this is the one helper all three doors into a
+	// household call, so it registers the relatives whichever way somebody
+	// arrived, and it is ahead of the early returns because a household with
+	// no heirloom still has a family in it.
+	if err := registerHouseholdRelativesTx(conn, catalog, familyID, gameMinute); err != nil {
+		return nil, err
+	}
 	sendoff, ok := catalog.BirthFamilySendoff[archetype]
 	if !ok || strings.TrimSpace(sendoff.Item) == "" {
 		return nil, nil
@@ -822,4 +830,56 @@ func householdWorldTx(conn *storage.Conn, catalog worlddata.Catalog, familyID in
 		return fallback
 	}
 	return location.World
+}
+
+// registerHouseholdRelativesTx makes a starter household's relatives people
+// you can speak to (v1.0.0-rc.27, schema 49).
+//
+// `birth_family_npcs` is a third NPC population - not the catalogue, not
+// `npc_civilization_state` - and nothing could resolve a name in it.
+// `DB.get_npc_definition` tries the catalogue and then the cast of a running
+// world event, and that is all. So `/family` printed these names under "Close
+// relatives", the creation card sent every new player straight to that
+// command as one of the first three things to do, and `/talk` answered
+// "Unknown NPC." to every single one: a room with people in it that the game
+// would not let you address.
+//
+// Called at creation rather than where the rows are written, because
+// `ensureStarterBirthFamily` runs for every household *offered* and this
+// should only populate the one somebody actually joined. Insert-only and
+// keyed on the name, so the three doors into a household - creation, the
+// dao-family path and a samsara return - can each run it against relatives
+// who are already registered, exactly as teachHouseholdMethodsTx does.
+//
+// The prose is generated rather than copied: `birth_family_npcs.personality`
+// is the hardcoded literal "Member of a shared starter household" for every
+// relative in the game, and there are no speech, want or fear columns at all.
+// Their `relation` becomes their role, because to a player that is precisely
+// what they are - the elder sister, the uncle who does the accounts.
+func registerHouseholdRelativesTx(conn *storage.Conn, catalog worlddata.Catalog, familyID, gameMinute int64) error {
+	if familyID <= 0 || !tableExistsTx(conn, "birth_family_npcs") || !tableExistsTx(conn, "npc_registry") {
+		return nil
+	}
+	res, err := conn.Execute(
+		`SELECT name,relation FROM birth_family_npcs WHERE family_id=? AND status='alive' ORDER BY npc_id`,
+		[]any{familyID})
+	if err != nil {
+		return err
+	}
+	where := birthFamilyHouseholdLocation(familyID)
+	for _, row := range res.Rows {
+		name := strings.TrimSpace(fmt.Sprint(row[0]))
+		if name == "" {
+			continue
+		}
+		person := GenerateNPCTraits(catalog.GeneratedTraits, name)
+		person.Origin = NPCOriginBirthFamily
+		person.Role = firstNonempty(fmt.Sprint(row[1]), "Relative")
+		person.Location = where
+		person.SourceKey = fmt.Sprintf("birth_family:%d", familyID)
+		if _, err := RegisterNPCTx(conn, person, gameMinute); err != nil {
+			return err
+		}
+	}
+	return nil
 }

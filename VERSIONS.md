@@ -6,6 +6,61 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.0** (rc.27) lets the world keep the people it makes.
+
+Two things had the same cause, and the cause was a missing table.
+
+`npcChildbirth` has been writing `npc_descendants` rows since the life cycle was built, and every
+one of them sets `generated_as_npc` to 0. Nothing has ever set it to 1 and nothing has ever read it
+- it appears in the DDL and in two INSERTs that hardcode it. That is not an oversight, it is the
+absence of anywhere to promote a child into: `catalog_npcs` is a mirror of `content/world.json` and
+is rewritten from the file at every boot, so a runtime NPC written there is deleted by the next
+restart, and `npc_civilization_state` says where somebody is and what they are doing and has no room
+for who they are. So the world's own children were named, recorded and counted in their parents'
+`children_count`, and then nothing: they never aged into anybody, never stood anywhere, could not be
+spoken to, could not marry and could not have children of their own. A world producing people who
+are permanently four years old is not reproducing, it is keeping a list.
+
+The same gap was why a player could not talk to their own family. A starter household's relatives
+live in `birth_family_npcs`, a third population that is neither the catalogue nor the simulation,
+and `DB.get_npc_definition` tried the catalogue and then the cast of a running world event and
+stopped. So `/family` printed those names under "Close relatives", the creation card sent every new
+player straight to that command as one of the first three things to do, and `/talk` answered
+"Unknown NPC." to every single one of them - a room with people in it the game would not let you
+address. Their `personality` column is the literal "Member of a shared starter household" for every
+relative in the game, and there are no speech, want or fear columns at all, so there was nothing to
+say to a narrator even if one had been asked.
+
+`npc_registry` (schema 49) is the missing half: authored state, written while the game runs, carried
+in backups, and never touched by a rebuild from the content file. Keeping it out of the catalogue
+mirror rather than adding an origin flag to it is the whole safety property - a rebuild is an
+unconditional DELETE over the derived table, and this one is never named in that statement, so no
+wrong predicate can wipe the people the world made for itself. A name the content file already
+carries is never taken; the catalogue wins, because two people answering to one name is worse than a
+birth refused.
+
+At eighteen - the same age a played character starts at, because a child of this world should not
+come of age on a different clock from a child of it who happens to be played - a descendant becomes
+a person: prose from `npc_generated_traits`, a registry row so `/talk` can find them, and rows in
+the two simulation tables so every tick that reads `WHERE status='alive'` starts offering them. From
+that minute they are an ordinary NPC. The courtship can court them, the deeds step can send them
+out, and they will eventually be buried. A child whose parents are both gone is left alone rather
+than given an invented town to grow up in; a later tick may find a household again.
+
+The prose is content and deliberately small pools, because a hundred bland variations read worse
+than a dozen written ones. It is picked by `hash64` of the name, field by field rather than one
+index across all five, so the same world makes the same person twice and nobody's fear is welded to
+their personality forever.
+
+And `narrator.py` stopped crashing on anybody it did not recognise. Its NPC dialogue prompt opened
+with a bare subscript into the parsed content file and then six more for role, realm, personality,
+speech, want and fear - while the gate upstream resolves through `DB.get_npc_definition`, which has
+fallen back to a running event's cast since schema 43. So an event's militia captain passed the gate
+and raised `KeyError`, and `/talk`'s `except Exception` turned it into "the narrator service failed
+to answer." `NarratorContextBuilder` had always done this correctly; the two classes had simply
+drifted apart. `/sense` had drifted the same way, refusing with "Unknown NPC." anybody its own
+picker was offering.
+
 **1.0.0** (rc.26) gives a new cultivator something to do.
 
 `first_steps` - "First Steps Beneath Heaven" - has been in this repo since before the Quest Forge,
@@ -1460,6 +1515,16 @@ mechanical authority paths.
 - **Schema 27** added the v0.19.29 mute/freeze moderation columns on `characters`
   (`is_muted`, `is_frozen`, `moderation_reason`).
 - **Schema 28** added the Quest Forge definition table (`quest_definitions`).
+- **Schema 49** gave the people this world makes for itself somewhere to live. `npc_registry` holds
+  who somebody is - role, manner, what they want, what they are afraid of - for anybody who is not
+  in `content/world.json`. `npc_descendants.generated_as_npc` had existed since the life cycle was
+  written and was read by nothing, written twice as a hardcoded 0, because there was nowhere to
+  promote a child *into*: `catalog_npcs` is a mirror of the content file and is rewritten from it at
+  every boot, and `npc_civilization_state` says where a person is and not who they are. It is
+  deliberately a second table rather than a flag on the mirror, and that is the whole safety
+  property - a rebuild is an unconditional DELETE over the derived table, and this one is never
+  named in the statement, so no wrong predicate can wipe the world's own people.
+
 - **Schema 48** gave a search somewhere to arrive. `npc_graves` holds where a missing person
   actually ended up, what they were carrying when they stopped, and whether anybody has been to it.
   Until now a disappearance that ran out of grace produced a history row and nothing else, so the

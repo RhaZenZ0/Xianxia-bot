@@ -63730,6 +63730,61 @@
       "Duan Shu"
     ]
   },
+  "npc_generated_traits": {
+    "role": [
+      "Household hand",
+      "Junior of the family trade",
+      "Runner and errand-keeper",
+      "Apprentice at the family bench",
+      "Yard help",
+      "Keeper of the family's small accounts"
+    ],
+    "personality": [
+      "Quiet, and slower to speak than to decide.",
+      "Cheerful in a way that has never been tested.",
+      "Watchful; counts the exits without meaning to.",
+      "Blunt, and privately worried that it costs them.",
+      "Stubborn about small things and pliable about large ones.",
+      "Generous with what they have, which is not much.",
+      "Proud of the household and embarrassed to say so.",
+      "Restless, and bad at sitting through anything.",
+      "Careful with money and careless with promises.",
+      "Warm to strangers and short with family.",
+      "Funny when tired, guarded when rested.",
+      "Solemn, as though the work were already theirs."
+    ],
+    "speech": [
+      "Short sentences, and a pause before the important one.",
+      "Talks around a question until it answers itself.",
+      "Plain and fast, with the local swallowing of endings.",
+      "Formal, in the way of someone who learned it from books.",
+      "Half a joke in everything, including the bad news.",
+      "Repeats your last words back before replying.",
+      "Quiet enough that people lean in, which they have noticed.",
+      "Names prices and distances in everything, out of habit.",
+      "Trails off rather than finishing a disagreement.",
+      "Uses the household's sayings without knowing they are the household's."
+    ],
+    "want": [
+      "To be counted as an adult by people who watched them grow up.",
+      "To leave, once, and come back having been somewhere.",
+      "To be better at the family trade than the one who taught them.",
+      "To put money aside where nobody can ask them for it.",
+      "To find out what happened to somebody nobody will discuss.",
+      "To be owed a favour by someone who matters.",
+      "To learn a method the household does not have.",
+      "To be the one people send for when it goes wrong."
+    ],
+    "fear": [
+      "That the household is smaller than they were told.",
+      "Being kept here, politely, forever.",
+      "Owing somebody they cannot refuse.",
+      "That their root is as ordinary as it looks.",
+      "Outliving the people who know their childhood name.",
+      "Being the one who loses what was handed down.",
+      "That the road is exactly as dangerous as they say."
+    ]
+  },
   "forage_materials": {
     "talisman_paper": {
       "chance": 22,

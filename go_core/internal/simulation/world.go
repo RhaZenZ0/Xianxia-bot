@@ -586,9 +586,18 @@ func (r *Runner) npcLife(conn *storage.Conn, steps, gm int64) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	// The children born above, eighteen years on. After the births rather than
+	// beside them for the obvious reason, and after the deaths because a
+	// descendant whose parents both died this tick has no household to come of
+	// age in - npcMaturation leaves them for a later pass rather than
+	// inventing a town to put them in.
+	grown, err := r.npcMaturation(conn, gm)
+	if err != nil {
+		return "", err
+	}
 	return fmt.Sprintf(
-		"batch-advanced NPC life; %d natural death(s), %d courtship(s) begun, %d new marriage(s), %d courtship(s) ended, %d birth(s), %d promotion(s), %d new disciple(s), %d feud(s) settled (%d fatal), %d crime(s) (%d witnessed, %d fatal), %d hunt(s) (%d took quarry, %d fatal), %d went missing, %d were never found, %d grave(s) robbed",
-		len(deaths), courted, marriages, parted, born, promoted, bonds, fought, killed, crimes, seen, murdered, hunts, kills, lost, vanished, neverFound, robbedGraves), nil
+		"batch-advanced NPC life; %d natural death(s), %d courtship(s) begun, %d new marriage(s), %d courtship(s) ended, %d birth(s), %d promotion(s), %d new disciple(s), %d feud(s) settled (%d fatal), %d crime(s) (%d witnessed, %d fatal), %d hunt(s) (%d took quarry, %d fatal), %d went missing, %d were never found, %d grave(s) robbed, %d came of age",
+		len(deaths), courted, marriages, parted, born, promoted, bonds, fought, killed, crimes, seen, murdered, hunts, kills, lost, vanished, neverFound, robbedGraves, grown), nil
 }
 
 func (r *Runner) economy(conn *storage.Conn, steps, gm int64) (string, error) {

@@ -26,7 +26,7 @@ from .remote import GoDatabaseTransport
 log = logging.getLogger("xianxia.database")
 
 
-SCHEMA_VERSION = 48
+SCHEMA_VERSION = 49
 # A readiness probe must validate more than the schema-version marker.  If the
 # SQLite file is removed or replaced while the bot is running, SQLite will
 # happily create a new empty file at the same path.  Checking these tables lets
@@ -1912,6 +1912,56 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
                )""",
             """CREATE INDEX IF NOT EXISTS idx_npc_graves_location
                    ON npc_graves(location,claimed_by_user_id)""",
+        ),
+    ),
+    (
+        49,
+        "npcs_the_world_made_itself",
+        (
+            # v1.0.0-rc.27: somewhere to put a person this world produced.
+            #
+            # `npc_descendants.generated_as_npc` has existed since the life
+            # cycle was written and is read by *nothing*: it appears in the DDL
+            # and in two INSERTs that hardcode it to 0. The reason is that there
+            # was nowhere to promote a child *into*. `catalog_npcs` is a mirror
+            # of `content/world.json` and is wiped and rewritten from the file
+            # at every boot, so a runtime NPC written there would be deleted by
+            # the next restart; `npc_civilization_state` carries where somebody
+            # is and what they are doing, and has no room for who they are.
+            #
+            # So: a second table, deliberately not the catalogue mirror. This
+            # one is authored state - written at runtime, carried in backups,
+            # and never touched by a rebuild from the content file. Keeping the
+            # two apart is the whole safety property: a rebuild is an
+            # unconditional DELETE over the derived table and this one is never
+            # named in the statement, so no wrong predicate can ever wipe the
+            # people the world made for itself.
+            #
+            # `origin` says who made them, and each has a different lifetime:
+            # 'descendant' is born and grows up, 'birth_family' is a relative
+            # of a player's starter household, 'event' is a world event's cast,
+            # and 'gm' is somebody a GM wrote by hand.
+            """CREATE TABLE IF NOT EXISTS npc_registry (
+                   name TEXT PRIMARY KEY,
+                   origin TEXT NOT NULL DEFAULT 'gm',
+                   role TEXT NOT NULL DEFAULT '',
+                   realm TEXT NOT NULL DEFAULT '',
+                   personality TEXT NOT NULL DEFAULT '',
+                   speech TEXT NOT NULL DEFAULT '',
+                   want TEXT NOT NULL DEFAULT '',
+                   fear TEXT NOT NULL DEFAULT '',
+                   secret TEXT NOT NULL DEFAULT '',
+                   location TEXT NOT NULL DEFAULT '',
+                   sect_affiliation TEXT NOT NULL DEFAULT '',
+                   source_key TEXT NOT NULL DEFAULT '',
+                   created_game_minute INTEGER NOT NULL DEFAULT 0,
+                   created_at REAL NOT NULL,
+                   updated_at REAL NOT NULL
+               )""",
+            """CREATE INDEX IF NOT EXISTS idx_npc_registry_location
+                   ON npc_registry(location,name)""",
+            """CREATE INDEX IF NOT EXISTS idx_npc_registry_origin
+                   ON npc_registry(origin,created_game_minute DESC)""",
         ),
     ),
 )
@@ -5239,14 +5289,69 @@ class Database:
         return await self._catalog_get("catalog_locations", name)
 
     async def get_npc_definition(self, name: str) -> dict[str, Any] | None:
+        """Who this is, from the three places a person in this world can live.
+
+        The catalogue first, because a name `content/world.json` carries is
+        always that person and `npc_registry` refuses to take a name the
+        catalogue already has. Then the registry - people this world made for
+        itself: a child of two NPCs who has grown up, a relative of a starter
+        household. Then a running event's cast, who are deliberately in neither
+        table because an eight-hour militia captain must not join the permanent
+        world, and who stop answering the moment the event closes.
+        """
         definition = await self._catalog_get("catalog_npcs", name)
         if definition is not None:
             return definition
-        # An event's cast are real people for as long as the event runs. They
-        # are deliberately not in catalog_npcs - a militia captain who exists
-        # for eight hours must not join the permanent world - so they answer
-        # here instead, uncached, because they stop existing when it closes.
+        registered = await self.get_registered_npc(name)
+        if registered is not None:
+            return registered
         return await self.get_event_npc_definition(name)
+
+    async def get_registered_npc(self, name: str) -> dict[str, Any] | None:
+        """One person out of `npc_registry` (schema 49), in catalogue shape.
+
+        Uncached on purpose, unlike the catalogue mirror: these rows are
+        written while the game is running - a descendant comes of age in a
+        simulation tick - so a cache would hide a person for as long as it
+        lived. The keys are the catalogue's, so every reader that already knows
+        how to draw an NPC needs to learn nothing.
+        """
+        if not str(name or "").strip():
+            return None
+        async with self._connect() as db:
+            db.row_factory = aiosqlite.Row
+            cur = await db.execute(
+                """SELECT name,origin,role,realm,personality,speech,want,fear,secret,
+                          location,sect_affiliation
+                   FROM npc_registry WHERE name=?""",
+                (str(name),),
+            )
+            row = await cur.fetchone()
+        if row is None:
+            return None
+        person = dict(row)
+        # `origin` is how they came to exist and is nobody's business but the
+        # GM's; it must not reach a narrator prompt as though it were a trait.
+        person.pop("origin", None)
+        return person
+
+    async def list_registered_npcs_at(self, location: str, limit: int = 25) -> list[dict[str, Any]]:
+        """The registry's people standing at one place, for the pickers.
+
+        The same shape and the same reason as `list_active_event_npcs` and
+        `list_graves_at`: a name you can address that the catalogue picker
+        cannot turn up, because the catalogue does not know they exist.
+        """
+        if not str(location or "").strip():
+            return []
+        async with self._connect() as db:
+            db.row_factory = aiosqlite.Row
+            cur = await db.execute(
+                """SELECT name,role,realm,location FROM npc_registry
+                   WHERE location=? ORDER BY name LIMIT ?""",
+                (str(location), max(1, min(int(limit), 50))),
+            )
+            return [dict(r) for r in await cur.fetchall()]
 
     async def list_graves_at(self, location: str, limit: int = 10) -> list[dict[str, Any]]:
         """Unclaimed graves standing at one place (schema 48).
