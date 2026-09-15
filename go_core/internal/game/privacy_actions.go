@@ -84,7 +84,8 @@ var erasureAnonymise = map[string]string{
 	"player_families.founder_user_id":      "a family that outlives whoever founded it (NOT NULL, so it takes the sentinel)",
 	"npc_graves.claimed_by_user_id": "world canon - somebody was lost, died out there and was " +
 		"eventually found, and the grave goes on saying so. Only which cultivator reached it first " +
-		"is personal, so that is the part that goes; the grave stays emptied, because it was",
+		"is personal, so that is the part that goes; the grave stays emptied, because it was - " +
+		"`claimed_game_minute` is what carries that, and nothing here touches it",
 }
 
 type erasureDisposition int

@@ -143,3 +143,28 @@ func TestSomebodyWhoWasNeverMissingHasNoGrave(t *testing.T) {
 		t.Fatal("a living NPC was given a grave")
 	}
 }
+
+func TestErasingTheFinderDoesNotRefillTheGrave(t *testing.T) {
+	conn := graveDB(t)
+	if got := claim(t, conn, 7, "Lost Lu", "Lonely Rock"); got["claimed"] != true {
+		t.Fatalf("setup: the first claim found nothing: %v", got)
+	}
+	// Exactly what `erasureAnonymise` does to this column: the finder's id is
+	// personal and goes, while the grave is world canon and stays.
+	if _, err := conn.Execute(`UPDATE npc_graves SET claimed_by_user_id=NULL WHERE claimed_by_user_id=?`, []any{7}); err != nil {
+		t.Fatal(err)
+	}
+	second := claim(t, conn, 8, "Lost Lu", "Lonely Rock")
+	if second["claimed"] == true {
+		t.Fatal("erasing the finder refilled the grave: the keepsake and the purse can be taken a second time")
+	}
+	if second["already_claimed"] != true {
+		t.Fatalf("an emptied grave whose finder was erased should still read as emptied: %v", second)
+	}
+	if q := storage.ParseInt(graveScalar(t, conn, `SELECT COUNT(*) FROM inventory WHERE user_id=8`)); q != 0 {
+		t.Fatalf("the second searcher took %d item(s) out of an erasure", q)
+	}
+	if s := storage.ParseInt(graveScalar(t, conn, `SELECT spirit_stones FROM characters WHERE user_id=8`)); s != 100 {
+		t.Fatalf("the second searcher took stones out of an erasure: %d", s)
+	}
+}

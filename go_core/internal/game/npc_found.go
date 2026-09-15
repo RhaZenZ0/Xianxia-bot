@@ -111,7 +111,12 @@ func claimGraveResult(conn *storage.Conn, userID int64, name, location string, g
 	if !tableExistsTx(conn, "npc_graves") {
 		return miss, nil
 	}
-	res, err := conn.Execute(`SELECT location,home_location,days_missing,keepsake_item,keepsake_stones,claimed_by_user_id
+	// `claimed_game_minute` is what says the grave has been emptied, not
+	// `claimed_by_user_id`. Who reached it first is personal and is erased on
+	// request (it anonymises - see erasureAnonymise); *that* it was reached is
+	// world canon and stays. Testing the id would mean an erasure refilled the
+	// grave and its keepsake could be taken a second time.
+	res, err := conn.Execute(`SELECT location,home_location,days_missing,keepsake_item,keepsake_stones,claimed_game_minute
         FROM npc_graves WHERE npc_name=?`, []any{name})
 	if err != nil {
 		return nil, err
@@ -137,7 +142,7 @@ func claimGraveResult(conn *storage.Conn, userID int64, name, location string, g
 	now := float64(time.Now().UnixNano()) / 1e9
 	if _, err := conn.Execute(`UPDATE npc_graves
         SET claimed_by_user_id=?,claimed_game_minute=?,updated_at=?
-        WHERE npc_name=? AND claimed_by_user_id IS NULL`,
+        WHERE npc_name=? AND claimed_game_minute IS NULL`,
 		[]any{userID, gameMinute, now, name}); err != nil {
 		return nil, err
 	}

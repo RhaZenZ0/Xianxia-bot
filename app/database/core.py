@@ -5244,6 +5244,11 @@ class Database:
     async def list_graves_at(self, location: str, limit: int = 10) -> list[dict[str, Any]]:
         """Unclaimed graves standing at one place (schema 48).
 
+        Unclaimed is `claimed_game_minute IS NULL`, not a null finder: who
+        reached a grave first is personal and erasable, while the fact that it
+        was reached is world canon. Keying this off the user id would let an
+        erasure refill the grave.
+
         The same shape as `list_active_event_npcs`, and for the same reason: a
         grave is a name you can address that is not in the permanent catalogue
         picker, because the dead are filtered out of it. It belongs in the list
@@ -5255,7 +5260,7 @@ class Database:
             db.row_factory = aiosqlite.Row
             cur = await db.execute(
                 """SELECT npc_name,location,home_location,days_missing,keepsake_item,keepsake_stones
-                   FROM npc_graves WHERE location=? AND claimed_by_user_id IS NULL
+                   FROM npc_graves WHERE location=? AND claimed_game_minute IS NULL
                    ORDER BY died_game_minute DESC LIMIT ?""",
                 (str(location), max(1, min(int(limit), 25))),
             )
