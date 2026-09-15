@@ -5229,35 +5229,66 @@ class Database:
     # Normalized world catalog
     # ------------------------------------------------------------------
     async def sync_world_catalog(self, world_data: dict[str, Any]) -> None:
+        """Mirror the content file into the catalogue tables, in one request.
+
+        Every write here is built first and sent once. Against the shipped
+        content that is a little over two thousand statements - roughly 1,800
+        catalogue rows plus one territory node per location - and on the
+        Go-backed path each `db.execute` is its own HTTP POST, so boot spent
+        two thousand round trips rewriting content that had not changed since
+        the last boot. `/v1/db/batch` has existed on the transport since the Go
+        engine landed and nothing on this path used it.
+
+        The statements stay in this method rather than in a helper on purpose:
+        `test_authority_boundary` reads the write allowlists off the method
+        that contains the SQL, and moving it out would have meant widening an
+        authority gate to accommodate a refactor that changes no authority.
+        """
         now = time.time()
-        mappings = (
+        statements: list[dict[str, Any]] = []
+        for table, mapping in (
             ("catalog_locations", world_data.get("locations", {})),
             ("catalog_npcs", world_data.get("npcs", {})),
             ("catalog_recipes", world_data.get("recipes", {})),
             ("catalog_manuals", world_data.get("technique_system", {}).get("manuals", {})),
             ("catalog_techniques", world_data.get("technique_system", {}).get("techniques", {})),
-        )
+        ):
+            for name, data in dict(mapping or {}).items():
+                statements.append({
+                    "sql": f"""INSERT INTO {table}(name,data_json,updated_at) VALUES(?,?,?)
+                               ON CONFLICT(name) DO UPDATE SET data_json=excluded.data_json,updated_at=excluded.updated_at""",
+                    "params": (str(name), json.dumps(data, ensure_ascii=False), now),
+                })
+        # Every normal location is also a persistent territory node. This
+        # gives wars, resource control and caravans a canonical map without
+        # requiring a destructive content migration.
+        for location_name, location_data in dict(world_data.get("locations", {}) or {}).items():
+            text = (str(location_data.get("description", "")) + " " + " ".join(location_data.get("encounters", []))).casefold()
+            resource = "spirit_herbs" if "herb" in text else ("ore" if "ore" in text or "mine" in text else ("beast_grounds" if "beast" in text else "mixed"))
+            statements.append({
+                "sql": """INSERT INTO territory_state(territory_key,name,region,resource_type,updated_game_minute,updated_at)
+                          VALUES(?,?,?,?,0,?) ON CONFLICT(territory_key) DO UPDATE SET name=excluded.name,region=excluded.region,
+                          resource_type=excluded.resource_type,updated_at=excluded.updated_at""",
+                "params": (str(location_name), str(location_name), str(location_name), resource, now),
+            })
+
+        if self._go_transport is not None:
+            # One request, one transaction, the same statements in the same
+            # order. `transaction=True` is what keeps this equivalent to the
+            # BEGIN IMMEDIATE it replaced: a boot interrupted half way through
+            # must not leave the catalogue half rewritten.
+            await self._go_transport.batch(statements, transaction=True)
+        else:
+            async with self._connect() as db:
+                await db.execute("BEGIN IMMEDIATE")
+                for statement in statements:
+                    await db.execute(statement["sql"], statement["params"])
+                await db.commit()
+
+        # The baseline era, once. Kept out of the batch because it is a
+        # read-then-write: batching it would mean sending an INSERT that must
+        # not run, and the condition is cheap to ask once at boot.
         async with self._connect() as db:
-            await db.execute("BEGIN IMMEDIATE")
-            for table, mapping in mappings:
-                for name, data in mapping.items():
-                    await db.execute(
-                        f"""INSERT INTO {table}(name,data_json,updated_at) VALUES(?,?,?)
-                            ON CONFLICT(name) DO UPDATE SET data_json=excluded.data_json,updated_at=excluded.updated_at""",
-                        (str(name), json.dumps(data, ensure_ascii=False), now),
-                    )
-            # Every normal location is also a persistent territory node. This
-            # gives wars, resource control and caravans a canonical map without
-            # requiring a destructive content migration.
-            for location_name, location_data in world_data.get("locations", {}).items():
-                text = (str(location_data.get("description", "")) + " " + " ".join(location_data.get("encounters", []))).casefold()
-                resource = "spirit_herbs" if "herb" in text else ("ore" if "ore" in text or "mine" in text else ("beast_grounds" if "beast" in text else "mixed"))
-                await db.execute(
-                    """INSERT INTO territory_state(territory_key,name,region,resource_type,updated_game_minute,updated_at)
-                       VALUES(?,?,?,?,0,?) ON CONFLICT(territory_key) DO UPDATE SET name=excluded.name,region=excluded.region,
-                       resource_type=excluded.resource_type,updated_at=excluded.updated_at""",
-                    (str(location_name), str(location_name), str(location_name), resource, now),
-                )
             cur = await db.execute("SELECT 1 FROM world_eras WHERE active=1 LIMIT 1")
             if not await cur.fetchone():
                 await db.execute(
@@ -5265,7 +5296,6 @@ class Database:
                     ("Jade Meridian Awakening Era", "The baseline era of the shared cultivation world.", now),
                 )
             await db.commit()
-        self._catalog_cache.clear()
 
     async def _catalog_get(self, table: str, name: str) -> dict[str, Any] | None:
         if table not in {"catalog_locations", "catalog_npcs", "catalog_recipes", "catalog_manuals", "catalog_techniques"}:

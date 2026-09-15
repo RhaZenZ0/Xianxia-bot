@@ -162,6 +162,16 @@ class WorldSimulator:
     async def npc_status(self, npc_name: str) -> dict[str, Any] | None:
         return self._found(await self._query("npc.status", {"npc_name": str(npc_name)}))
 
+    async def npcs_at_location(self, location: str) -> list[dict[str, Any]]:
+        """Everybody the engine has standing at one place, in one query.
+
+        The alternative, and what every caller did until v1.0.0-rc.28, was to
+        walk the whole catalogue asking `npc.status` per name - 574 HTTP round
+        trips, serially, to draw one picker.
+        """
+        result = await self._query("npc.at_location", {"location": str(location)})
+        return [dict(row) for row in list((result or {}).get("npcs") or [])]
+
     async def sect_status(self, sect_name: str) -> dict[str, Any] | None:
         return self._found(await self._query("sect.status", {"sect_name": str(sect_name)}))
 

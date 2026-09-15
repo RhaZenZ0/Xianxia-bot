@@ -6,6 +6,46 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.0** (rc.28) stops the content path costing what it cost.
+
+Nothing here changes a rule. All three are the same shape of problem: work on the hot path that
+looks like a lookup and is not.
+
+Asking who is standing somewhere was five hundred and seventy-four round trips to the engine. Every
+surface that draws it - the `/action` target picker, `/scene status`, `/world`, a city's Look - walked
+the whole NPC catalogue calling `npc.status` once per name, inside an await, so one after another.
+There is now a single `npc.at_location` query, and one resolver, `npcs_present`, that all of them
+use. It asks the engine once and then resolves only what the engine cannot answer for: a catalogue
+NPC whose daily schedule puts them here and who has no simulation row yet, and a hidden master
+walking a circuit, whose whereabouts are a pure function of the canonical clock.
+
+That resolver keeps the same order of precedence the single-NPC lookup does - circuit, then the
+simulation, then the schedule - because a picker that offers somebody and a command that then
+refuses them is worse than either being wrong on its own. The new query is also deliberately narrow:
+`npc.status` carries relationships, disciple bonds and a whole life row, and loading all of that for
+everybody in a city in order to decide whether to print their name is what made the old shape slow
+twice over.
+
+`worlddata.Load` read and parsed two and a half megabytes of JSON on every call, with no cache, and
+fifteen of its seventeen call sites are inside the request path in `authoritative.go` - so every
+player action re-parsed the whole world, on the CPU-only hardware this project exists to run on. It
+is keyed on the file's modification time and size now rather than on the path, so an operator
+editing content on a live NAS still does not need a restart; size is in the key beside the timestamp
+because some filesystems keep mtime at one-second resolution.
+
+And boot spent about two thousand HTTP round trips rewriting content that had not changed since the
+last boot. On the Go-backed path every `db.execute` is its own POST, and the catalogue sync made one
+per row. They go in a single batch request now, through an endpoint that has existed on the
+transport since the Go engine landed with nothing on this path using it.
+
+One thing was *not* done, and the reason is worth recording. The plan had `catalog_manuals` and
+`catalog_techniques` retired here as unread write amplification. They are unread for their
+*content* - no getter exists and `search_catalog` is never called with either kind - but they are
+not unread: both are in `OPERATIONAL_REQUIRED_TABLES`, which is the readiness probe that tells a
+healthy versioned database from an empty file SQLite created at the same path, and `catalog_counts`
+reports their row counts in the `CATALOG_READY` startup phase an operator watches. Two rows of every
+eighteen hundred is not worth giving that up.
+
 **1.0.0** (rc.27) lets the world keep the people it makes.
 
 Two things had the same cause, and the cause was a missing table.
