@@ -6,6 +6,42 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.0** (rc.25) lets a quest ask for more than five things.
+
+`OBJECTIVE_TYPES` is the ceiling on every quest in this game - the two static ones, every
+commission, and anything the Quest Forge drafts - because `quest.progress` only advances an
+objective whose type matches an event somebody reported. It held five: explore, talk, scene action,
+and the two sect steps. That was honest rather than stale, which is the part worth saying: there
+were exactly five `QUESTS.progress(...)` calls in the whole bot and they were those five.
+
+So cultivation, combat, crafting, travel, the shops and the hills were invisible to the quest
+system. Nobody could be asked to sit a session, win a fight, make something from a method they knew,
+walk to a place, buy something from a keeper or pick a herb out of a hillside - not by a GM's
+commission, not by the Forge, not by anything. `cultivate`, `travel`, `combat_win`, `craft`, `trade`
+and `gather` close that, and the engine needed no change at all to take them: `progressQuest`
+matches an objective's type against no whitelist, so what a new type actually costs is a reporter.
+Each is one line at the command that already does the work, written after the authoritative action
+has succeeded - the engine decides that something happened and the reporter only says so.
+
+Some of the care is in what does *not* report. A failed refinement spends the ingredients and is a
+real part of the trade, but it does not satisfy "craft a Recovery Pill". A replayed combat finalize
+is not a second victory, because the engine did not apply its consequence twice. A travel objective
+is credited against where you actually ended up rather than where you asked for, since a road
+journey that stops at the gate would otherwise never satisfy an objective naming the city. And
+buying ten herbs is one visit to one keeper, not ten trades.
+
+`combat_win` is untargeted on purpose: an opponent may be a catalogue NPC, an event manifestation or
+a beast off the hunt roster, and only the first of those is in `world.npcs`, so there is no roster a
+draft could be held to. The reports carry the opponent's name regardless, which an untargeted
+objective accepts and a future targeted one could use.
+
+`craft` and `gather`/`trade` name a recipe and an item, so the Forge's validator and the dashboard's
+"points at something the world does not have" audit both learned those two kinds. An item objective
+stores the id the reporter will send and prints the name a player would recognise, so nobody reads
+"Gather spirit_herb". And `test_quest_objective_reporters.py` holds the whole thing shut in both
+directions: a type with no reporter is a quest nobody can finish, and a reporter naming a type the
+vocabulary lacks is a report going nowhere.
+
 **1.0.0** (rc.24) lets the world's own people marry each other, bear children, and be lost.
 
 Four weddings a month in a world of five hundred and seventy-four people, and less than one child

@@ -689,6 +689,17 @@ async def _run_crafting(interaction: discord.Interaction, recipe: str) -> None:
         )
         if value
     ]
+    # Only a craft that produced something counts. A failed refinement spends
+    # the ingredients and is a real part of the trade, but "craft a Recovery
+    # Pill" is not satisfied by not crafting one.
+    if success:
+        try:
+            wt_craft = await current_world_time()
+            await announce_quest_progress(interaction, await QUESTS.progress(
+                interaction.user.id, "craft", amount=1, target=recipe,
+                game_minute=wt_craft.total_minutes))
+        except Exception:
+            log.exception("Quest progress update failed after crafting")
     await interaction.response.send_message(
         f"**{profession}: {recipe}**\n{roll_line(result)}\n"
         + "".join(bonus_lines)
@@ -919,6 +930,18 @@ async def alchemy_forage(interaction: discord.Interaction) -> None:
     # that ink and paper come out of the hills has no reason to look.
     makings = {str(k): int(v) for k, v in dict(resolved.get("materials_found") or {}).items()}
     makings_line = f"\n📜 Craft makings: **{WORLD.item_names(makings)}**." if makings else ""
+    # One report per distinct material that actually came out of the hills,
+    # herbs and craft makings alike, so a targeted objective can name the thing
+    # it wants. The failed-forage branch above returns before this and reports
+    # nothing, which is the same rule crafting keeps.
+    try:
+        wt_forage = await current_world_time()
+        for material in sorted({**awarded, **makings}):
+            await announce_quest_progress(interaction, await QUESTS.progress(
+                interaction.user.id, "gather", amount=1, target=str(material),
+                game_minute=wt_forage.total_minutes))
+    except Exception:
+        log.exception("Quest progress update failed after foraging")
     await interaction.response.send_message(
         f"🌿 **Forage — {forage_location}**\n{roll_line(result)}\n"
         f"Regional spirit resources: **{int(resolved.get('spirit_resources',0))}/100**.{bonus_bits}\n"
@@ -1500,6 +1523,17 @@ async def travel(interaction: discord.Interaction, destination: str) -> None:
         rows=await DB.get_realm_hub_channels(interaction.guild.id)
         row=next((r for r in rows if str(r.get("world_name"))==world_name),None)
         if row: meeting=f"\n💬 Public meeting channel: <#{int(row['channel_id'])}>."
+    # Where they ended up, not where they asked for: a road journey that stops
+    # at the gate arrives at `arrived_at`, and an objective naming the city
+    # would never be satisfied by somebody standing in it.
+    try:
+        wt_travel = await current_world_time()
+        await announce_quest_progress(interaction, await QUESTS.progress(
+            interaction.user.id, "travel", amount=1,
+            target=str(result.get("arrived_at") or result.get("destination") or destination),
+            game_minute=wt_travel.total_minutes))
+    except Exception:
+        log.exception("Quest progress update failed after travel")
     await interaction.followup.send(
         f"🗺️ **{c['name']} travels to {result.get('destination') or destination}.**\n{desc}{gate_line}{envoy_line}{shop_line}{road}{merchants}{safe}{meeting}{site_line}{sites_found}"
     )

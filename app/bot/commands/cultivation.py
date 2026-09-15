@@ -16,7 +16,7 @@ from discord import app_commands
 from ...ops.game_engine import GameEngineError
 from ...rules.progression_systems import ascension_gate
 from ...simulation import MINUTES_PER_DAY
-from ..character_state import current_effect_modifiers
+from ..character_state import announce_quest_progress, current_effect_modifiers
 from ..formatting import roll_line
 from ..status_cards import _ELEMENT_MARKS
 from ..registry import registered_group_command, registered_root_command
@@ -35,7 +35,7 @@ from ..runtime import (
     serialized_user_action,
     settle_seclusion_for_user,
 )
-from ..services import GUILD, NARRATOR, NARRATOR_CONTEXT
+from ..services import GUILD, NARRATOR, NARRATOR_CONTEXT, QUESTS
 
 @registered_root_command(name="cultivate", description="Meditate and gather cultivation essence", guild=GUILD)
 @serialized_user_action
@@ -105,6 +105,11 @@ async def cultivate(interaction: discord.Interaction) -> None:
     ready = ""
     if result.get("ready"):
         ready = "\n✨ Stage 9 is full. Choose **/ascend → Perfection → Start** or **/ascend → Main Progression → Breakthrough**." if int(c.get("phase", 1)) == 9 else "\n✨ You are ready to attempt **/ascend → Main Progression → Breakthrough**."
+    try:
+        await announce_quest_progress(interaction, await QUESTS.progress(
+            interaction.user.id, "cultivate", amount=1, game_minute=wt.total_minutes))
+    except Exception:
+        log.exception("Quest progress update failed after cultivation")
     await interaction.followup.send(
         f"🧘 **{c['name']} cultivates.**\nYou circulate qi through your meridians and gain **+{gain} cultivation essence**.\nProgress: **{total}/{cost}**{extra}{ready}"
     )

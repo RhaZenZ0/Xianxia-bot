@@ -209,6 +209,32 @@ a GM is not a player.
 Emptiness is `claimed_game_minute`, never `claimed_by_user_id` — the latter anonymises on erasure
 (see `erasureAnonymise`), so keying off it would let an erasure refill a grave.
 
+### What a quest is allowed to ask for (`app/rules/quests.py`)
+
+`OBJECTIVE_TYPES` is the ceiling on every quest in the game — the static ones, commissions, and
+anything the Quest Forge drafts — because `quest.progress` only advances an objective whose type
+matches an event somebody reported. The engine enforces nothing here: `progressQuest`
+(`go_core/internal/core/contracts.go`) matches `objective.Type` against no whitelist at all, so a
+vocabulary entry with no reporter behind it is not an error anywhere — it is a quest nobody can
+finish, draftable in the Forge without warning.
+
+Which is how it sat at five (`explore`, `talk`, `scene_action`, `sect_discovery`, `sect_trial`) for
+several releases: there were exactly five `QUESTS.progress(...)` calls in the bot and they were
+those. **Cultivation, combat, crafting, travel, the shops and the hills reported nothing**, so no
+quest could ask a player to meditate, win a fight, make something, walk somewhere, buy something or
+pick a herb. v1.0.0-rc.25 adds `cultivate`, `travel`, `combat_win`, `craft`, `trade` and `gather`.
+
+Two rules for adding another. The report is written **after** the authoritative action has already
+succeeded — the engine decides that something happened and the reporter only says so, never the
+other way round. And a new type costs Go nothing: a vocabulary entry, one line at the command that
+already does the work, and a target kind in `validate_quest_definition` if it names something.
+`tests/python/unit/test_quest_objective_reporters.py` fails if a type ever loses its reporter or a
+reporter names a type the vocabulary does not have.
+
+`combat_win` is deliberately untargeted: an opponent may be a catalogue NPC, an event manifestation
+or a beast off the hunt roster, and only the first is in `world.npcs`, so there is no roster a draft
+could be validated against. The reports carry the name anyway, for the day there is one.
+
 ### RAG / memory (`app/ai/rag`)
 
 Deterministic and SQLite-first (FTS5), not embedding/vector-based. Retrieval never creates game

@@ -23,6 +23,7 @@ from ...rules.battle import matchup_label, suppression_label, vitality_band, vit
 from ...ops.game_engine import GameEngineError
 from ...rules.worldtime import MINUTES_PER_YEAR
 from ..channels import _report_game_ui_error
+from ..character_state import announce_quest_progress
 from ..formatting import human_duration, roll_line
 from ..registry import EVENT_HANDLERS, registered_group_command, registered_root_command
 from ..runtime import (
@@ -33,11 +34,12 @@ from ..runtime import (
     _USER_ACTION_LOCKS,
     _record_true_death_history,
     current_world_time,
+    log,
     reply_long,
     require_character,
     serialized_user_action,
 )
-from ..services import COMBAT, GUILD, SIM
+from ..services import COMBAT, GUILD, QUESTS, SIM
 
 
 battle_group = app_commands.Group(name="battle",description="Resolve active danger scenes such as auction-door ambushes")
@@ -322,6 +324,23 @@ async def _finish_battle(interaction:discord.Interaction,outcome:str,*,expected_
         await _battle_reply(interaction,content=f"❌ {_explain_engine_error(exc)}",view=None,ephemeral=False,edit_panel=edit_panel);return
     result=dict(envelope.get("result") or {})
     replayed=bool(envelope.get("replayed"))
+    # Before the manifestation branch below returns, because a hostile
+    # manifestation is a battle won as much as a persistent NPC is. The
+    # opponent's name rides along even though `combat_win` is untargeted in
+    # OBJECTIVE_TYPES: an untargeted objective accepts any event of its type,
+    # and the day there is a roster a draft could be validated against, the
+    # reports are already carrying what it would need.
+    #
+    # A replayed finalize is not a second victory - the engine did not apply
+    # its consequence twice and neither may the journal.
+    if not replayed:
+        try:
+            await announce_quest_progress(interaction, await QUESTS.progress(
+                interaction.user.id, "combat_win", amount=1,
+                target=str(result.get("npc_name") or b.get("npc_name") or ""),
+                game_minute=wt.total_minutes))
+        except Exception:
+            log.exception("Quest progress update failed after a battle")
     if result.get("event_manifestation"):
         verb="disperse" if outcome=="kill" else "drive off"
         await _battle_reply(

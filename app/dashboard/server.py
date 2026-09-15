@@ -1284,6 +1284,11 @@ class ReadOnlyDashboardStore:
         referenced_locations: set[str] = set()
         unknown_targets: list[dict[str, str]] = []
         npc_names = {str(name).lower() for name in world.npcs}
+        # v1.0.0-rc.25: `craft` and `trade`/`gather` objectives name a recipe
+        # and an item, so the "points at something the world does not have"
+        # audit has to know about both or it silently passes every one of them.
+        recipe_names = {str(name).lower() for name in dict(getattr(world, "recipes", {}) or {})}
+        item_ids = {str(key).lower() for key in dict(getattr(world, "items", {}) or {})}
         location_names = {
             str(name) for name, loc in world.locations.items() if not (loc or {}).get("private")
         }
@@ -1306,6 +1311,12 @@ class ReadOnlyDashboardStore:
                 elif expects == "npc" and target.lower() not in npc_names:
                     unknown_targets.append({"quest_key": str(row.get("quest_key")), "type": kind, "target": target,
                                             "expects": "npc"})
+                elif expects == "recipe" and target.lower() not in recipe_names:
+                    unknown_targets.append({"quest_key": str(row.get("quest_key")), "type": kind, "target": target,
+                                            "expects": "recipe"})
+                elif expects == "item" and target.lower().replace(" ", "_") not in item_ids:
+                    unknown_targets.append({"quest_key": str(row.get("quest_key")), "type": kind, "target": target,
+                                            "expects": "item"})
         return {
             "realm_bands": sorted(({"band": band, "count": count} for band, count in bands.items()),
                                   key=lambda item: item["band"]),

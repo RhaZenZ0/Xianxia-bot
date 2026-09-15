@@ -57,6 +57,55 @@ class ValidatorTests(unittest.TestCase):
         self.assertEqual(definition["rewards"], {"insight_xp": 30, "items": {"spirit_herb": 2}})
         self.assertEqual(definition["source_type"], "forge")
 
+    def test_the_six_new_kinds_validate_against_the_world_they_name(self):
+        """v1.0.0-rc.25. A recipe is keyed by its own name and an item by its
+        id, so the objective has to store the id the reporter will send while
+        the label prints the name a player would recognise."""
+        draft = {
+            "title": "The Apprentice's Round",
+            "description": "Sit one session, walk one road, make one pill and pick one herb.",
+            "objectives": [
+                {"type": "cultivate"},
+                {"type": "travel", "target": "greenriver town"},
+                {"type": "craft", "target": "recovery pill"},
+                {"type": "gather", "target": "Spirit Herb"},
+            ],
+            "rewards": {"insight_xp": 20},
+        }
+        definition, errors = validate_quest_definition(draft, WORLD, BUDGET)
+        self.assertEqual(errors, [])
+        objectives = definition["objectives"]
+        self.assertEqual([o["type"] for o in objectives], ["cultivate", "travel", "craft", "gather"])
+        self.assertNotIn("target", objectives[0])
+        self.assertEqual(objectives[0]["label"], "Sit one cultivation session")
+        self.assertEqual(objectives[1]["target"], "Greenriver Town")
+        self.assertEqual(objectives[2]["target"], "Recovery Pill")
+        # The id is stored, the name is printed. A label of "Gather spirit_herb"
+        # would be the objective leaking a database key at the player.
+        self.assertEqual(objectives[3]["target"], "spirit_herb")
+        self.assertEqual(objectives[3]["label"], "Gather Spirit Herb")
+
+    def test_a_recipe_or_item_the_world_lacks_is_refused(self):
+        bad = {
+            "title": "Dead Ends Everywhere",
+            "description": "Every one of these points at something that does not exist.",
+            "objectives": [
+                {"type": "craft", "target": "Dragonbone Elixir"},
+                {"type": "gather", "target": "moon_dust"},
+                {"type": "combat_win", "target": "Elder Su Yan"},
+            ],
+            "rewards": {"insight_xp": 10},
+        }
+        definition, errors = validate_quest_definition(bad, WORLD, BUDGET)
+        self.assertIsNone(definition)
+        joined = "\n".join(errors)
+        self.assertIn("unknown recipe 'Dragonbone Elixir'", joined)
+        self.assertIn("unknown item 'moon_dust'", joined)
+        # combat_win is untargeted on purpose: an opponent may be a catalogue
+        # NPC, an event manifestation or a beast, and only the first is in
+        # world.npcs, so there is no roster a draft could be held to.
+        self.assertIn("combat_win takes no target", joined)
+
     def test_everything_the_world_lacks_is_an_error_not_a_silent_drop(self):
         bad = {
             "title": "Bad", "description": "x",
@@ -110,7 +159,11 @@ class ValidatorTests(unittest.TestCase):
                 cleaned, errors = validate_quest_definition(definition, WORLD, {"max_xp": 100, "max_stones": 0, "max_items": 0})
                 self.assertEqual(errors, [])
                 self.assertEqual([o["type"] for o in cleaned["objectives"]], [o["type"] for o in definition["objectives"]])
-        self.assertEqual(set(OBJECTIVE_TYPES), {"explore", "talk", "scene_action", "sect_discovery", "sect_trial"})
+        self.assertEqual(
+            set(OBJECTIVE_TYPES),
+            {"explore", "talk", "scene_action", "sect_discovery", "sect_trial",
+             "cultivate", "travel", "combat_win", "craft", "trade", "gather"},
+        )
 
     def test_the_procedural_draft_always_validates(self):
         for event in (
