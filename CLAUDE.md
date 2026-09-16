@@ -312,6 +312,38 @@ Four rules hold it:
 "Fires once" is the `(user_id, quest_key)` primary key — the row is the memory, which is what makes
 the grant safe to call from creation, a dao-family rebirth and a samsara return alike.
 
+### What the household teaches, and how well (Tradition + Tutoring, v1.0.0-rc.31)
+
+Every one of the thirteen birth families names a trade in its send-off (`birth_family_sendoff` in
+`world.json` — Forging ×5, Inscription ×3, Formation ×3, Alchemy ×2), and `teachHouseholdMethodsTx`
+has handed every child the entry methods of that trade since rc.20. What varied was nothing: the
+only bonus in the game was +2 on Alchemy rolls keyed on the archetype string `"alchemy_family"` — so
+`body_tempering_family`, which teaches Alchemy, got nothing, and the five Forging, three Inscription
+and three Formation houses got nothing for the trade they teach. Two things vary now, and both read
+data the household already carries (`household_tutoring.go`).
+
+**Tradition is flat and keyed on the trade.** `householdTradeBonusTx` gives +2 on a roll in the trade
+the send-off names, whichever family, whichever trade; forage is Alchemy's gathering half, so it is
+the two Alchemy houses' bonus and nobody else's. The Python `family_profession_bonus` is the same rule
+for display — it takes the roster, not an archetype string — and the engine's result carries
+`family_trade` so the craft and forage labels name the trade instead of assuming Alchemy.
+
+**Tutoring is what the household could afford.** `tutorHouseholdTradeTx` writes a
+`profession_progress` row for the trade at the send-off, banded on `birth_families.wealth` at that
+moment: below 40 (fallen martial clan 26, tomb-watch 31, body-tempering 36) shows you the basics —
+level 0, 0 XP; 40–59 (the eight middling houses) a journeyman in the family, 30 XP, halfway to
+Apprentice; 60–79 (alchemy family 61) a hired tutor, 55 XP; 80 and above (noble martial clan 82) a
+master retained — you leave an **Apprentice**. Wealth rather than tier because tier cannot tell the
+fallen clan (26) from the martial household (42) — both tier 2 — and the fallen clan should teach
+worse. Capped at level 1: a head start, not mastery.
+
+**The row is the memory.** The grant checks for an existing `profession_progress` row and writes only
+when there is none, so the dao-family rebirth and the samsara return — which reach a household with
+progress already in hand — keep every point they earned. It runs ahead of the heirloom guard for the
+same reason the schooling does: a household with no heirloom still teaches. The send-off result
+carries a `tutoring` block and `family_tutoring_line` says who taught you; nothing is decided in
+presentation.
+
 ### People this world makes for itself (`npc_registry`, schema 49)
 
 Three populations, and until v1.0.0-rc.27 only one of them could be spoken to. `catalog_npcs` is a

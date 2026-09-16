@@ -185,8 +185,24 @@ async def run(url: str, token: str, db_path: str) -> Report:
         if created is not None and not created.get("created"):
             report.add("FAIL", f"character.create {uid}", f"created=false: {created.get('reason')}")
 
-    # ---- 2. $ I explore ----------------------------------------------------
+    # ---- 1b. what the household taught (v1.0.0-rc.31) -------------------------
+    # families[0] is the Martial Household: trade Forging, Wealth 42, which is
+    # the 30-XP band - so the head start and the tradition bonus are both
+    # certain by the scenario, not by a roll.
+    taught = await step(report, "the household's profession row", db.get_profession_progress(PLAYER, "Forging"))
+    if taught is not None:
+        report.add("PASS" if taught and int(taught.get("xp", -1)) == 30 and int(taught.get("level", -1)) == 0 else "FAIL",
+                   "a journeyman in the family starts you halfway to Apprentice", f"{taught}")
     await step(report, "teleport to Greenriver Town", gm("admin.player.teleport", {"user_id": PLAYER, "location": "Greenriver Town", "reason": "playtest"}))
+    sword = dict(world["recipes"]["Spirit-Iron Sword"])
+    for item_id, qty in dict(sword.get("cost") or {}).items():
+        await step(report, f"grant {item_id} x{qty} for the forge", gm("admin.player.adjust_item", {"user_id": PLAYER, "item_id": item_id, "quantity": int(qty), "reason": "playtest"}))
+    forged = await step(report, "craft.resolve a Forging recipe the household taught", act("craft.resolve", PLAYER, {"recipe": "Spirit-Iron Sword"}))
+    if forged is not None:
+        report.add("PASS" if int(forged.get("family_bonus", 0)) == 2 and str(forged.get("family_trade")) == "Forging" else "FAIL",
+                   "a Forging house's tradition rides a Forging roll", f"family_bonus={forged.get('family_bonus')} trade={forged.get('family_trade')!r}")
+
+    # ---- 2. $ I explore ----------------------------------------------------
     explored = await step(report, "exploration.explore", act("exploration.explore", PLAYER, {
         "cooldown_seconds": 0, "unexpected_event_chance_percent": 0, "event_key": aid("exploration:event")}))
     if explored is not None and not (explored.get("narration") or explored.get("summary") or explored.get("encounter") or explored):

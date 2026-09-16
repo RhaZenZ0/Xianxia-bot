@@ -38,7 +38,7 @@ from discord import app_commands
 
 from ...ops.game_engine import GameEngineError
 from ...rules.worldtime import MINUTES_PER_MONTH, MINUTES_PER_YEAR
-from ...rules.birthfamily import family_tier_name
+from ...rules.birthfamily import family_tier_name, family_tutoring_line
 from ..registry import registered_group_command
 from ..channels import _get_thread
 from ..services import SIM
@@ -261,6 +261,7 @@ def family_sendoff_line(result: dict) -> str:
         f"\n🎁 The household sends you out with **{sendoff.get('name')}**"
         + (f" — {line}" if line else ".")
         + "\n✈️ It carries you: the road runs at a third of its walking hours while you have it."
+        + family_tutoring_line(sendoff)
     )
 
 

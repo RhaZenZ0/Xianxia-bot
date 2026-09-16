@@ -136,26 +136,6 @@ func canonicalCraftManorBonus(conn *storage.Conn, userID int64, location, profes
 	return level * 2, nil
 }
 
-func canonicalCraftFamilyBonus(conn *storage.Conn, userID int64, profession string) (int64, error) {
-	if !strings.EqualFold(strings.TrimSpace(profession), "Alchemy") {
-		return 0, nil
-	}
-	res, err := conn.Execute(
-		`SELECT f.archetype
-		   FROM character_birth_family c
-		   JOIN birth_families f ON f.family_id=c.family_id
-		  WHERE c.user_id=?`,
-		[]any{userID},
-	)
-	if err != nil {
-		return 0, err
-	}
-	if row := firstRowMap(res); row != nil && strings.TrimSpace(fmt.Sprint(row["archetype"])) == "alchemy_family" {
-		return 2, nil
-	}
-	return 0, nil
-}
-
 func professionXPNeeded(level int64) int64 {
 	if level < 0 {
 		level = 0
@@ -386,7 +366,10 @@ func craftResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
-	familyBonus, err := canonicalCraftFamilyBonus(conn, userID, profession)
+	// The household's tradition (v1.0.0-rc.31): +2 in the trade it teaches,
+	// whichever trade that is - until now only one archetype string earned
+	// it, and only on Alchemy.
+	familyBonus, familyTrade, err := householdTradeBonusTx(conn, catalog, userID, profession)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -537,6 +520,7 @@ func craftResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 		"facility_bonus":       facilityBonus,
 		"manor_facility_bonus": manorFacilityBonus,
 		"family_bonus":         familyBonus,
+		"family_trade":         familyTrade,
 		"context_bonus":        contextBonus,
 	}
 	evp, _ := json.Marshal(result)
@@ -633,19 +617,12 @@ func forageResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID i
 		return authoritativeMutation{}, errors.New("character location is required")
 	}
 
-	familyBonus := int64(0)
-	family, familyErr := conn.Execute(
-		`SELECT f.archetype
-		   FROM character_birth_family c
-		   JOIN birth_families f ON f.family_id=c.family_id
-		  WHERE c.user_id=?`,
-		[]any{userID},
-	)
+	// The hills are Alchemy's gathering half, so the tradition bonus here is
+	// the Alchemy houses' - both of them, now that it is keyed on the trade
+	// rather than on one archetype's name.
+	familyBonus, familyTrade, familyErr := householdForageBonusTx(conn, catalog, userID)
 	if familyErr != nil {
 		return authoritativeMutation{}, familyErr
-	}
-	if row := firstRowMap(family); row != nil && strings.TrimSpace(fmt.Sprint(row["archetype"])) == "alchemy_family" {
-		familyBonus = 2
 	}
 	gardenBonus := gardenLevel * 2
 	gameMinute, err := canonicalWorldGameMinute(conn)
@@ -876,6 +853,7 @@ func forageResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID i
 		"effect_bonus":        effectBonus,
 		"game_minute":         gameMinute,
 		"family_bonus":        familyBonus,
+		"family_trade":        familyTrade,
 		"garden_level":        gardenLevel,
 		"garden_bonus":        gardenBonus,
 		"context_bonus":       contextBonus,
