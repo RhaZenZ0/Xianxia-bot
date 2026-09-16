@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import ast
 import re
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -144,11 +145,15 @@ class ReadersFollowTheEngine(unittest.TestCase):
             content_table_for("characters", True)
 
     def test_the_database_switch_reads_the_transport(self):
-        db = Database(Path("/nonexistent/for-this-test.sqlite3"))
-        self.assertIsNone(db._go_transport)
-        self.assertEqual(db.content_table("catalog_npcs"), "catalog_npcs")
-        db._go_transport = object()  # any engine-backed transport
-        self.assertEqual(db.content_table("catalog_npcs"), "content_npcs")
+        # A real directory: Database.__init__ creates the parent, and a path
+        # under / is only creatable by root - which the first version of this
+        # test was, locally, and CI's runner is not.
+        with tempfile.TemporaryDirectory() as scratch:
+            db = Database(Path(scratch) / "switch.sqlite3")
+            self.assertIsNone(db._go_transport)
+            self.assertEqual(db.content_table("catalog_npcs"), "catalog_npcs")
+            db._go_transport = object()  # any engine-backed transport
+            self.assertEqual(db.content_table("catalog_npcs"), "content_npcs")
 
     def test_every_catalogue_reader_resolves_through_the_switch(self):
         tree = ast.parse(CORE)
