@@ -114,16 +114,20 @@ async def npcs_present(location: str, period: str | None = None) -> list[str]:
 
     which is 574 iterations with an engine round trip inside each, serially,
     to draw one picker - and `/action` and `/scene status` both did it on every
-    open. It is now one query for everybody the engine knows about, plus the
-    in-process content file for the two kinds of person the engine cannot
-    answer for: a catalogue NPC whose daily schedule puts them here and who has
-    no simulation row yet, and a hidden master walking a circuit, whose
-    whereabouts are a pure function of the canonical clock.
+    open.
+
+    The bound comes from asking content first. One query gets everybody the
+    engine has standing here; then, rather than asking the engine about the
+    other five hundred and seventy, the in-process catalogue rules out
+    everybody it does not put here this period, and only what is left costs a
+    round trip. Content can be wrong in exactly one direction - it does not
+    know about autonomous travel - and that direction is covered by the first
+    query, because somebody the simulation walked here has a row saying so.
 
     The order of precedence is the same one `current_npc_location` keeps, and
     it has to be: a circuit outranks everything, then the simulation, then the
     content file's schedule. Answering differently here from there would mean a
-    picker that offers somebody `/talk` then refuses.
+    picker that offers somebody `/talk` then refuses them.
     """
     where = str(location or "")
     if not where:
@@ -137,26 +141,53 @@ async def npcs_present(location: str, period: str | None = None) -> list[str]:
         engine_rows = await SIM.npcs_at_location(where)
     except Exception:
         log.exception("Could not read who is standing at %s", where)
-    accounted: set[str] = set()
+    settled: set[str] = set()
     for row in engine_rows:
         name = str(row.get("npc_name") or "")
         if not name:
             continue
-        accounted.add(name)
+        settled.add(name)
         # A circuit-walker is placed by content against the canonical clock and
         # that answer outranks the simulation, exactly as current_npc_location
         # has it - so they are resolved below rather than trusted from here.
         if (WORLD.npcs.get(name) or {}).get("circuit"):
             continue
+        # Somebody standing in their home region is still keeping to a daily
+        # routine, and the routine can take them out of the room their row
+        # names. That is the one thing the engine's answer cannot know, because
+        # the schedule is content - so it is applied here, on the same terms
+        # `current_npc_location` applies it: home only, and never to somebody
+        # who has vanished, because a missing person keeps no routine
+        # (schema 47) and their row is the whole truth about where they are.
+        home = str(row.get("home_location") or where)
+        if str(row.get("status") or "") != "missing" and str(row.get("current_location") or where) == home:
+            if (WORLD.npc_location_at(name, period) or where) != where:
+                continue
         present.append(name)
         seen.add(name)
     for name, definition in WORLD.npcs.items():
         if name in seen:
             continue
-        # Anybody the engine accounted for is settled: it said they are
-        # elsewhere, or it placed them here already.
-        if name in accounted and not (definition or {}).get("circuit"):
+        # A circuit stop is a pure function of the canonical clock, so these
+        # cost nothing to resolve and are the one group the engine cannot rule
+        # on at all.
+        if (definition or {}).get("circuit"):
+            if await current_npc_location(name, period) == where:
+                present.append(name)
+                seen.add(name)
             continue
+        # Everybody the engine returned has been ruled on above.
+        if name in settled:
+            continue
+        # And content has ruled out everybody it does not put here this period.
+        # Skipping them without asking is the whole point: resolving each in
+        # turn is the per-NPC round trip this function exists to remove, and
+        # doing it for the five hundred who are demonstrably somewhere else
+        # kept the old cost while looking like it had gone.
+        if (WORLD.npc_location_at(name, period) or "") != where:
+            continue
+        # Content says here, so the engine gets the last word - it may have
+        # walked them away, or buried them.
         if await current_npc_location(name, period) == where:
             present.append(name)
             seen.add(name)

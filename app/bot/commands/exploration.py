@@ -689,9 +689,20 @@ async def _run_crafting(interaction: discord.Interaction, recipe: str) -> None:
         )
         if value
     ]
+    await interaction.response.send_message(
+        f"**{profession}: {recipe}**\n{roll_line(result)}\n"
+        + "".join(bonus_lines)
+        + f"{outcome}{quality_line}{mastery_line}"
+    )
     # Only a craft that produced something counts. A failed refinement spends
     # the ingredients and is a real part of the trade, but "craft a Recovery
     # Pill" is not satisfied by not crafting one.
+    #
+    # Reported *after* the result is on screen. This command never defers, so the
+    # interaction has exactly one `response`, and a reporter with something to say
+    # would spend it on the quest line - leaving the craft roll to raise
+    # InteractionResponded and the player to watch their pill vanish into a
+    # progress notice. `announce_quest_progress` takes its followup branch here.
     if success:
         try:
             wt_craft = await current_world_time()
@@ -700,11 +711,6 @@ async def _run_crafting(interaction: discord.Interaction, recipe: str) -> None:
                 game_minute=wt_craft.total_minutes))
         except Exception:
             log.exception("Quest progress update failed after crafting")
-    await interaction.response.send_message(
-        f"**{profession}: {recipe}**\n{roll_line(result)}\n"
-        + "".join(bonus_lines)
-        + f"{outcome}{quality_line}{mastery_line}"
-    )
 
 
 @registered_root_command(name="craft", description="Practice alchemy, forging, formation or talisman inscription from a method you know", guild=GUILD)
@@ -930,10 +936,21 @@ async def alchemy_forage(interaction: discord.Interaction) -> None:
     # that ink and paper come out of the hills has no reason to look.
     makings = {str(k): int(v) for k, v in dict(resolved.get("materials_found") or {}).items()}
     makings_line = f"\n📜 Craft makings: **{WORLD.item_names(makings)}**." if makings else ""
+    await interaction.response.send_message(
+        f"🌿 **Forage — {forage_location}**\n{roll_line(result)}\n"
+        f"Regional spirit resources: **{int(resolved.get('spirit_resources',0))}/100**.{bonus_bits}\n"
+        f"Harvested: **{WORLD.item_names(awarded)}**.{rare_line}{makings_line}\n"
+        f"🧺 Foraging: **{profession_rank(level)}** Lv.{level} "
+        f"• XP {int(forage_progress.get('xp',0))}/{profession_xp_needed(level)}"
+    )
     # One report per distinct material that actually came out of the hills,
     # herbs and craft makings alike, so a targeted objective can name the thing
     # it wants. The failed-forage branch above returns before this and reports
     # nothing, which is the same rule crafting keeps.
+    #
+    # After the harvest is on screen, for the reason `_run_crafting` gives: this
+    # command does not defer, so the one `response` belongs to the result and the
+    # reporter gets the followup.
     try:
         wt_forage = await current_world_time()
         for material in sorted({**awarded, **makings}):
@@ -942,13 +959,6 @@ async def alchemy_forage(interaction: discord.Interaction) -> None:
                 game_minute=wt_forage.total_minutes))
     except Exception:
         log.exception("Quest progress update failed after foraging")
-    await interaction.response.send_message(
-        f"🌿 **Forage — {forage_location}**\n{roll_line(result)}\n"
-        f"Regional spirit resources: **{int(resolved.get('spirit_resources',0))}/100**.{bonus_bits}\n"
-        f"Harvested: **{WORLD.item_names(awarded)}**.{rare_line}{makings_line}\n"
-        f"🧺 Foraging: **{profession_rank(level)}** Lv.{level} "
-        f"• XP {int(forage_progress.get('xp',0))}/{profession_xp_needed(level)}"
-    )
 
 
 @registered_group_command(alchemy_group, name="purge", description="Slowly purge medicinal residue by spending Qi in controlled circulation")

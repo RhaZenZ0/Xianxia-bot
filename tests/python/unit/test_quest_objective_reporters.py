@@ -1,4 +1,5 @@
-"""Every objective type has a reporter, and every reporter has a type.
+"""Every objective type has a reporter, every reporter has a type, and no
+reporter speaks before the command it rides on has answered.
 
 `OBJECTIVE_TYPES` is the ceiling on everything the quest system can ask a
 player for - static quests, commissions and the Quest Forge alike - because
@@ -22,6 +23,7 @@ from app.rules.quests import OBJECTIVE_TYPES
 from tests.support import PROJECT_ROOT
 
 COMMANDS = PROJECT_ROOT / "app" / "bot" / "commands"
+BOT = PROJECT_ROOT / "app" / "bot"
 
 
 def reported_objective_types() -> dict[str, set[str]]:
@@ -88,6 +90,88 @@ class QuestObjectiveReporterTests(unittest.TestCase):
                     objective, reported,
                     f"nothing reports {objective!r}, so no quest can ask a beginner to touch {system}",
                 )
+
+
+def _enclosing_functions(tree: ast.AST) -> list[ast.AST]:
+    return [
+        node for node in ast.walk(tree)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    ]
+
+
+def _response_calls(func: ast.AST, method: str) -> list[int]:
+    """Line numbers of `<something>.response.<method>(...)` inside `func`,
+    skipping any nested function - a view callback owns its own interaction."""
+    lines: list[int] = []
+    for node in ast.walk(func):
+        if node is not func and isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        if not isinstance(node, ast.Call):
+            continue
+        attr = node.func
+        if not isinstance(attr, ast.Attribute) or attr.attr != method:
+            continue
+        inner = attr.value
+        if isinstance(inner, ast.Attribute) and inner.attr == "response":
+            lines.append(node.lineno)
+    return lines
+
+
+def _reporter_calls(func: ast.AST) -> list[int]:
+    lines: list[int] = []
+    for node in ast.walk(func):
+        if node is not func and isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "announce_quest_progress":
+            lines.append(node.lineno)
+    return lines
+
+
+class ReporterOrderingTests(unittest.TestCase):
+    """A reporter must never spend the interaction's one response.
+
+    `announce_quest_progress` (app/bot/character_state.py) posts through
+    `interaction.followup.send` when the interaction has already been answered
+    and through `interaction.response.send_message` when it has not - it has
+    to, because a command that defers has no other way to be heard. The
+    consequence is that a reporter placed *before* a command's only
+    `interaction.response.send_message` consumes it: the player is told their
+    quest advanced and never sees the craft roll or the harvest, while the
+    engine has already granted the items, and the real reply raises
+    `InteractionResponded` outside any `except`.
+
+    So within one function body, every `announce_quest_progress(...)` must
+    either sit behind a `.response.defer(...)`, or have no
+    `.response.send_message(...)` after it. Nothing else in the suite drives a
+    slash-command callback with an interaction double, so this source scan is
+    the only thing holding the rule.
+    """
+
+    def test_no_reporter_speaks_before_its_command_answers(self):
+        offenders: list[str] = []
+        for path in sorted(BOT.rglob("*.py")):
+            tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+            for func in _enclosing_functions(tree):
+                reports = _reporter_calls(func)
+                if not reports:
+                    continue
+                defers = _response_calls(func, "defer")
+                sends = _response_calls(func, "send_message")
+                for line in reports:
+                    if any(d < line for d in defers):
+                        continue
+                    late = [s for s in sends if s > line]
+                    if late:
+                        offenders.append(
+                            f"{path.relative_to(PROJECT_ROOT)}:{line} in {func.name}() reports before "
+                            f"interaction.response.send_message at line {late[0]}"
+                        )
+        self.assertEqual(
+            offenders, [],
+            "these quest reporters consume the interaction's one response, so the command's own "
+            "result is never shown and raises InteractionResponded - move the report after the "
+            "reply, or defer first:\n  " + "\n  ".join(offenders),
+        )
 
 
 if __name__ == "__main__":

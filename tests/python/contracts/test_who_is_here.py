@@ -12,8 +12,14 @@ does, so a picker cannot offer somebody `/talk` then refuse them.
 from __future__ import annotations
 
 import ast
+import asyncio
+import contextlib
+import importlib
+import os
 import re
 import unittest
+from types import SimpleNamespace
+from unittest.mock import patch
 
 from tests.support import PROJECT_ROOT
 
@@ -97,6 +103,15 @@ class TheResolverAgreesWithTheSingleLookup(unittest.TestCase):
         self.assertEqual(present.count("SIM.npcs_at_location"), 1)
         self.assertNotIn("SIM.npc_status", present)
 
+    def test_it_rules_people_out_from_content_before_asking(self):
+        """The text check above is not enough on its own, and shipped a
+        function that still cost 558 round trips while passing it: the calls
+        were one level down, inside `current_npc_location`. What actually
+        bounds the cost is the catalogue check that comes *before* the
+        fallback resolves anybody - `WhoIsHereCostsOneQuery` measures it."""
+        present = code(LOCATIONS, "npcs_present")
+        self.assertIn('if (WORLD.npc_location_at(name, period) or "") != where:', present)
+
     def test_an_engine_failure_degrades_rather_than_raises(self):
         """Drawing a scene must not become impossible because one query failed."""
         present = code(LOCATIONS, "npcs_present")
@@ -171,6 +186,139 @@ class TheCatalogueIsParsedOncePerVersion(unittest.TestCase):
         # Keyed on the file's stat, so an operator editing content on a live
         # NAS does not need a restart.
         self.assertIn("catalogCache", load)
+
+
+def _locations_module():
+    """`app.bot.locations` with the engine and the registry replaced.
+
+    Importing it pulls in the whole bot runtime, which reads the environment,
+    so this mirrors the env other `app.bot` tests use.
+    """
+    env = {"DISCORD_TOKEN": "test-token", "GUILD_ID": "123456789012345678",
+           "ENGINE_AUTH_TOKEN": "test-engine-token-1234567890",
+           "DATABASE_PATH": "data/test.sqlite3"}
+    with patch.dict(os.environ, env):
+        return importlib.import_module("app.bot.locations")
+
+
+class _CountingSim:
+    """One shared table of simulation rows, and a count of what it was asked.
+
+    Everybody sits at home, which is how a freshly bootstrapped world starts
+    and the only state in which the daily schedule applies at all - so it is
+    also the state in which the schedule and the simulation can disagree.
+    """
+
+    def __init__(self, catalogue):
+        self.rows = {
+            name: {"npc_name": name, "home_location": str(d.get("location")),
+                   "current_location": str(d.get("location")), "status": "alive"}
+            for name, d in catalogue.items() if d.get("location")
+        }
+        self.at_location_calls = 0
+        self.status_calls = 0
+
+    async def npcs_at_location(self, location):
+        self.at_location_calls += 1
+        return [dict(r) for r in self.rows.values() if r["current_location"] == str(location)]
+
+    async def npc_status(self, npc_name):
+        self.status_calls += 1
+        row = self.rows.get(str(npc_name))
+        return dict(row) if row else None
+
+
+class _NoRegistry:
+    async def get_registered_npc(self, name):
+        return None
+
+
+@contextlib.contextmanager
+def _wired(module):
+    sim = _CountingSim(module.WORLD.npcs)
+
+    async def _clock():
+        return SimpleNamespace(total_minutes=0, period="Morning")
+
+    saved = (module.SIM, module.DB, module.current_world_time)
+    module.SIM, module.DB, module.current_world_time = sim, _NoRegistry(), _clock
+    try:
+        yield sim
+    finally:
+        module.SIM, module.DB, module.current_world_time = saved
+
+
+PERIODS = ("Dawn", "Morning", "Afternoon", "Evening", "Night")
+
+
+class WhoIsHereCostsOneQuery(unittest.TestCase):
+    """The cost is measured, not read off the source.
+
+    The first version of `npcs_present` passed every source check in this file
+    and still cost 558 engine round trips per open: it asked the engine for
+    everybody at one location, then fell through to `current_npc_location` -
+    one `npc.status` each - for all five hundred and seventy the query had not
+    returned, which is everybody in the world who is somewhere else. The saving
+    was fifteen calls out of 574. Nothing here could see that, because the
+    calls were one level down.
+    """
+
+    def test_one_open_does_not_scale_with_the_catalogue(self):
+        module = _locations_module()
+        with _wired(module) as sim:
+            where = str(next(iter(module.WORLD.npcs.values())).get("location"))
+            asyncio.run(module.npcs_present(where, "Afternoon"))
+        self.assertEqual(sim.at_location_calls, 1)
+        # The engine is asked about somebody only when content puts them here
+        # and the answer is therefore in doubt. That is a handful of people at
+        # any one place - never a number that tracks the catalogue.
+        self.assertLessEqual(
+            sim.status_calls, 12,
+            f"drawing one scene cost {sim.status_calls} npc.status round trips against a "
+            f"catalogue of {len(module.WORLD.npcs)}; the per-NPC loop is back",
+        )
+
+    def test_it_agrees_with_the_single_lookup_wherever_a_schedule_moves_somebody(self):
+        """The disagreement this catches is not hypothetical: with everybody
+        sitting at home, fourteen catalogue NPCs keep a schedule that takes
+        them elsewhere, and the first version offered all of them in the room
+        their simulation row named - while `/talk` sent them to the room their
+        schedule named. Twenty such pairs across the five periods."""
+        module = _locations_module()
+        world = module.WORLD
+        movers = {
+            name for name, d in world.npcs.items()
+            if any(str((d.get("schedule") or {}).get(p) or "") not in ("", str(d.get("location") or ""))
+                   for p in PERIODS)
+        }
+        self.assertTrue(movers, "no catalogue NPC keeps a schedule, so this proves nothing")
+        places = sorted(
+            {str(world.npcs[n].get("location") or "") for n in movers}
+            | {str((world.npcs[n].get("schedule") or {}).get(p) or "") for n in movers for p in PERIODS}
+        ) 
+        places = [p for p in places if p]
+
+        async def sweep():
+            wrong = []
+            for period in PERIODS:
+                for where in places:
+                    listed = set(await module.npcs_present(where, period))
+                    for name in sorted(movers):
+                        actually = await module.current_npc_location(name, period)
+                        if (actually == where) != (name in listed):
+                            wrong.append(f"{period} {where}: npcs_present says "
+                                         f"{'yes' if name in listed else 'no'} to {name!r}, "
+                                         f"current_npc_location says {actually!r}")
+            return wrong
+
+        module_wired = _wired(module)
+        with module_wired:
+            wrong = asyncio.run(sweep())
+        self.assertEqual(
+            wrong, [],
+            "the picker and the command disagree about where somebody is, so a player is "
+            "offered an NPC and then refused:\n  " + "\n  ".join(wrong[:10]),
+        )
 
 
 if __name__ == "__main__":
