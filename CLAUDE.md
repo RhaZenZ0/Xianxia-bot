@@ -338,11 +338,95 @@ fallen clan (26) from the martial household (42) — both tier 2 — and the fal
 worse. Capped at level 1: a head start, not mastery.
 
 **The row is the memory.** The grant checks for an existing `profession_progress` row and writes only
-when there is none, so the dao-family rebirth and the samsara return — which reach a household with
-progress already in hand — keep every point they earned. It runs ahead of the heirloom guard for the
-same reason the schooling does: a household with no heirloom still teaches. The send-off result
-carries a `tutoring` block and `family_tutoring_line` says who taught you; nothing is decided in
-presentation.
+when there is none. The door that needs that guard is `family.support`'s backfill
+(`family_dao_actions.go`): a character created before rc.15 who has been forging for months comes home,
+asks, and keeps every point. **There is no dao-family rebirth** — `rebirth_mode` is only ever
+`'samsara'` — and samsara does not reach the guard at all: `reincarnateAction` deletes
+`profession_progress` and `character_recipes` before it calls the send-off, so a new life is tutored
+fresh by its new household. (rc.31's version of this paragraph said both rebirths "keep every point";
+that was wrong on both counts.) The grant runs ahead of the heirloom guard for the same reason the
+schooling does: a household with no heirloom still teaches. The send-off result carries a `tutoring`
+block and `family_tutoring_line` says who taught you; nothing is decided in presentation.
+
+### What the hands remember (the craft echo, v1.0.0-rc.32)
+
+Everything samsara carries is an *echo* — realm resets to 0 but `law_echo/25` rides comprehension
+rolls (`soulLawBonus`), talent and insight carry as percentages, and `memory_seed` is a ceiling that
+`awakened_memory` climbs toward through breakthroughs and law insight. Crafting was the one thing a
+soul had done that it could not remember. `craft_echo.go` is two halves. `pastLifeProfessionsTx` reads
+the dying life's trades (every `profession_progress` row past level 0) into the past-life entry in
+`soul_legacy.past_lives_json`, **before** the wipe at `lifecycle_actions.go` runs — the record is
+written first, so the rows are still there, and no schema changed. `craftEchoTx` reads them back on
+every craft and forage roll: the best level that profession reached in any recorded life (the most
+recent life wins a tie and is the one named), scaled by `awakened_memory/memory_seed` and capped at
+`craftEchoCap` (+3). A fresh rebirth remembers nothing — `awakened_memory` is reset to 0 — and as
+memory wakes, the hands remember. It rides `contextBonus` beside the household tradition, so a reborn
+smith born into a Forging house is deliberately the best smith in town. The result carries
+`craft_echo`, `craft_echo_life` and `craft_echo_level`; `/soul` names the trades a visible life
+carried; nothing is decided in presentation. `craft_echo_test.go` holds the cap, the gate and
+most-recent-wins; `test_craft_echo.py` holds that the record is written before the wipe.
+
+### A house worth coming back to (v1.0.0-rc.32)
+
+Until now the birth household gave a child an heirloom, a trade and a +2 on the way out of the door,
+and after that one handout of stones every three in-world months — which **could be asked for from
+anywhere in the world**. `/family enter` was a free teleport. `treasury_balance` was written once at
+bootstrap and read by nothing. The household was ordinary ground (`placeCultivationMultiplier` →
+1.0) and refused seclusion. The family simulation ran only when somebody looked at it and never
+involved the player. Nothing in the game ever said "go home". `household_return.go` is the reasons to,
+and none of them needed schema:
+
+- **Presence.** `family.support`, `family.contribute`, `family.tutor` and `family.errand` refuse
+  unless the character stands in `birth_family:<id>` (`requireAtHomeTx`), and the door itself opens
+  only from the family's own town: `familyHouseholdEnterAction` refuses from anywhere else with
+  "travel there first". The panel hides each door where it would refuse (`register_hidden_actions`
+  in `hubs.py`, `_household_hidden_actions` in `surface.py`): the hub asks one async provider for
+  the paths to leave off whenever it refreshes its status, and a failed lookup hides nothing. The
+  same door does the rest of the game's late doors (`PROGRESSION_GATES`, `_progression_hidden_actions`):
+  a law before the realm that can hold one, tribulations off a world-crossing gate, Perfection off
+  stage 9, a sect's rooms to somebody in no sect, a home's keys with no home, an inner world with none,
+  a beast's training with no beast, a house's seats with no house, the Samsara legacy in a first life.
+  Only what the engine would refuse outright is hidden - never a status read or the door into the
+  system, because a road nobody can see is a road nobody learns exists - and a hidden door is not
+  silent: every provider answers `path -> reason`, and the page prints each as a locked line
+  ("🔒 Comprehend — a Law needs Foundation Establishment; you stand at Qi Condensation"). `test_hidden_actions.py`
+  holds every hidden name to a row on the playtest checklist, so a renamed command cannot leave a
+  stale hide behind.
+- **The hearth.** `birthFamilyCultivationMultiplier` is `1.04 + 0.02 × tier`, held under the
+  shrine's 1.15 — a good place to sit, never the best — read by `placeCultivationMultiplier` and by
+  `seclusionEnvironmentGo` (the household is a seclusion site now) from one helper so the two cannot
+  drift.
+- **The purse.** `family.contribute {amount}` spends low spirit stones into `treasury_balance`, raises
+  `wealth` a fifth as fast and `influence` a twenty-fifth (both capped at 100), writes a line into
+  `history_json`, and raises the player's standing with the house — `faction_reputation` under the key
+  `family:<id>`, a table that imposes no vocabulary. Support pays a bounded standing term
+  (`standing/10`, at most 10 stones).
+- **Taught again.** `family.tutor` re-reads `householdTutoring(current wealth)` and raises the trade's
+  row to the band — level up to 1, XP up to the band's — and never lowers either; a house that can
+  teach nothing new says so and names the wealth at which it could. This is what makes the purse
+  worth filling for a crafter.
+- **Needed.** `return_home` is an objective type, reported by `/family enter` and by the talisman
+  after the reply. `household_errands` in `world.json` is a pool per trade (three each), ordinary
+  giver-less quests whose last objective is always the door; `family.errand` hands the next unheld one
+  over through `grantOrdinaryQuestTx`, one at a time. **Only a key with the `errand_` prefix may pay
+  `household_standing`** — the engine ignores it on any other key and the validator refuses it on any
+  other draft — so the Forge cannot inflate a house's opinion of a player. A finished errand goes into
+  the chronicle. The beginner path gained a fourth stage, `beginner_home`, so the first hour ends
+  where it began.
+- **The round trip.** Two talismans, Apprentice Inscription methods whose slips the talisman hall sells
+  (not entry methods: the grandfathering migration deliberately sweeps in nothing authored after it). The
+  **Hearth-Return Talisman** (`use.homeward`, one folded into every send-off) carries you home from
+  anywhere and marks where it found you on the scene's metadata; the **Waymark Talisman**
+  (`use.waymark`) is read inside the household and takes you back to that mark. Walking in from the
+  town leaves no mark, so a waymark after walking in is refused unspent, and leaving on foot is always
+  the street. Both are refused before they are consumed — mid-battle, in seclusion, or with no mark.
+
+Errands are quests, not commissions, on purpose: a commission's `giver_npc` is content fixed at
+authoring time while relatives are generated names, and `grantOrdinaryQuestTx` refuses a giver by
+design. Two things are deferred, deliberately: relatives never age or die (that needs a simulation
+pass over `birth_family_npcs`, which no batch reads today), and the family simulation still writes
+only `history_json` rather than `world_history_events`, because starter households are shared and
+the visibility of a shared family's news is a decision, not a default.
 
 ### People this world makes for itself (`npc_registry`, schema 49)
 

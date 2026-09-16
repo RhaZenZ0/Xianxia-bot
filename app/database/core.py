@@ -6418,6 +6418,15 @@ class Database:
     # ------------------------------------------------------------------
     # Birth family, karma, true death, and reincarnation
     # ------------------------------------------------------------------
+    async def get_player_family_membership(self, user_id: int) -> dict[str, Any] | None:
+        """The row that says which player-founded house this character sits in,
+        or None (v1.0.0-rc.32: read by the panel to hide the house's doors)."""
+        async with self._connect() as db:
+            db.row_factory = aiosqlite.Row
+            cur = await db.execute("SELECT * FROM player_family_members WHERE user_id=?", (int(user_id),))
+            row = await cur.fetchone()
+            return dict(row) if row else None
+
     async def get_birth_family(self, user_id: int) -> dict[str, Any] | None:
         async with self._connect() as db:
             db.row_factory = aiosqlite.Row

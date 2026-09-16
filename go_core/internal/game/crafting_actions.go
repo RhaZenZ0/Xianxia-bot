@@ -373,7 +373,13 @@ func craftResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
-	contextBonus := effectBonus + facilityBonus + manorFacilityBonus + familyBonus
+	// And what a past life's hands remember (v1.0.0-rc.32), as far as the
+	// soul's memory has woken.
+	craftEcho, craftEchoLife, craftEchoLevel, err := craftEchoTx(conn, userID, profession)
+	if err != nil {
+		return authoritativeMutation{}, err
+	}
+	contextBonus := effectBonus + facilityBonus + manorFacilityBonus + familyBonus + craftEcho
 	mod := base + level + contextBonus
 
 	roll, err := roll2d10(mod, recipe.TN)
@@ -521,6 +527,9 @@ func craftResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 		"manor_facility_bonus": manorFacilityBonus,
 		"family_bonus":         familyBonus,
 		"family_trade":         familyTrade,
+		"craft_echo":           craftEcho,
+		"craft_echo_life":      craftEchoLife,
+		"craft_echo_level":     craftEchoLevel,
 		"context_bonus":        contextBonus,
 	}
 	evp, _ := json.Marshal(result)
@@ -624,6 +633,10 @@ func forageResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID i
 	if familyErr != nil {
 		return authoritativeMutation{}, familyErr
 	}
+	craftEcho, craftEchoLife, craftEchoLevel, echoErr := craftEchoTx(conn, userID, "Foraging")
+	if echoErr != nil {
+		return authoritativeMutation{}, echoErr
+	}
 	gardenBonus := gardenLevel * 2
 	gameMinute, err := canonicalWorldGameMinute(conn)
 	if err != nil {
@@ -636,7 +649,7 @@ func forageResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID i
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
-	contextBonus := effectBonus + familyBonus + gardenBonus
+	contextBonus := effectBonus + familyBonus + gardenBonus + craftEcho
 
 	resources := int64(50)
 	worldName := "Mortal World"
@@ -854,6 +867,9 @@ func forageResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID i
 		"game_minute":         gameMinute,
 		"family_bonus":        familyBonus,
 		"family_trade":        familyTrade,
+		"craft_echo":          craftEcho,
+		"craft_echo_life":     craftEchoLife,
+		"craft_echo_level":    craftEchoLevel,
 		"garden_level":        gardenLevel,
 		"garden_bonus":        gardenBonus,
 		"context_bonus":       contextBonus,

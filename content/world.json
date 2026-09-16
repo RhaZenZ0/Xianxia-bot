@@ -25983,6 +25983,40 @@
       "sect_value": 14,
       "base_price": 44,
       "teaches_recipe": "Guiding Chalk Array"
+    },
+    "hearth_return_talisman": {
+      "name": "Hearth-Return Talisman",
+      "description": "A folded paper charm inked with the household's own door. Burn it anywhere and you stand inside your birth household, and the paper remembers where it found you.",
+      "sect_value": 6,
+      "base_price": 30,
+      "use": {
+        "homeward": true,
+        "consume": true
+      }
+    },
+    "waymark_talisman": {
+      "name": "Waymark Talisman",
+      "description": "The other half of a journey home. Read inside your birth household, it carries you back to wherever a Hearth-Return Talisman found you.",
+      "sect_value": 6,
+      "base_price": 30,
+      "use": {
+        "waymark": true,
+        "consume": true
+      }
+    },
+    "hearth_return_talisman_method": {
+      "name": "Hearth-Return Talisman — Method Slip",
+      "description": "A scribe's slip carrying the brushwork of the Hearth-Return Talisman: the household's own door, folded into paper.",
+      "sect_value": 12,
+      "base_price": 40,
+      "teaches_recipe": "Hearth-Return Talisman"
+    },
+    "waymark_talisman_method": {
+      "name": "Waymark Talisman — Method Slip",
+      "description": "A scribe's slip carrying the brushwork of the Waymark Talisman: the mark a Hearth-Return leaves, and the way back to it.",
+      "sect_value": 12,
+      "base_price": 40,
+      "teaches_recipe": "Waymark Talisman"
     }
   },
   "recipes": {
@@ -26371,6 +26405,30 @@
         "starfall_bulwark_array": 1
       },
       "min_level": 4
+    },
+    "Hearth-Return Talisman": {
+      "profession": "Inscription",
+      "tn": 12,
+      "cost": {
+        "talisman_paper": 1,
+        "spirit_ink": 1
+      },
+      "output": {
+        "hearth_return_talisman": 1
+      },
+      "min_level": 1
+    },
+    "Waymark Talisman": {
+      "profession": "Inscription",
+      "tn": 12,
+      "cost": {
+        "talisman_paper": 1,
+        "spirit_ink": 1
+      },
+      "output": {
+        "waymark_talisman": 1
+      },
+      "min_level": 1
     }
   },
   "perfection": {
@@ -53689,6 +53747,30 @@
           "quantity": 1,
           "price": 60,
           "made_here": false
+        },
+        {
+          "item_id": "hearth_return_talisman",
+          "quantity": 2,
+          "price": 30,
+          "made_here": true
+        },
+        {
+          "item_id": "waymark_talisman",
+          "quantity": 2,
+          "price": 30,
+          "made_here": true
+        },
+        {
+          "item_id": "hearth_return_talisman_method",
+          "quantity": 1,
+          "price": 45,
+          "made_here": false
+        },
+        {
+          "item_id": "waymark_talisman_method",
+          "quantity": 1,
+          "price": 45,
+          "made_here": false
         }
       ],
       "buys": {
@@ -53698,7 +53780,9 @@
         "stone_skin_talisman": 5,
         "crystal_ward_talisman": 15,
         "paper_crane_charm": 25,
-        "spirit_focus_talisman": 6
+        "spirit_focus_talisman": 6,
+        "hearth_return_talisman": 5,
+        "waymark_talisman": 5
       }
     },
     "azure_crown_provisions": {
@@ -63960,7 +64044,426 @@
         "insight_xp": 40,
         "spirit_stones": 40
       },
+      "follow_on": "beginner_home"
+    },
+    {
+      "quest_key": "beginner_home",
+      "title": "The Road Home",
+      "description": "The road has had you for a while. Go back to the house you were sent out of - stand in its town and step in with **/family → Enter** - say something to somebody there, and sit once under its roof. Then ask what it needs of you: **/family → Errand**.",
+      "opening": "The gate looks smaller than it did. Somebody inside has already heard your step and is pretending not to have.",
+      "objectives": [
+        {
+          "id": "home",
+          "type": "return_home",
+          "count": 1,
+          "label": "Step back into your birth household - **/family → Enter**"
+        },
+        {
+          "id": "speak",
+          "type": "talk",
+          "count": 1,
+          "label": "Say something to somebody - **/npc → People → Talk**"
+        },
+        {
+          "id": "sit",
+          "type": "cultivate",
+          "count": 1,
+          "label": "Sit one session under the family's roof - **/cultivation → Cultivate**"
+        }
+      ],
+      "rewards": {
+        "insight_xp": 30,
+        "spirit_stones": 25,
+        "items": {
+          "hearth_return_talisman": 1
+        }
+      },
       "follow_on": ""
     }
-  ]
+  ],
+  "household_errands": {
+    "Forging": [
+      {
+        "quest_key": "errand_forging_iron",
+        "title": "Iron for the Hearth",
+        "description": "The forge is short of iron and the household will not send a child to the market empty-handed twice. Deal in spirit iron and bring the ledger home.",
+        "opening": "Your mother counts the ingots on the shelf without looking at you. There are fewer than there were.",
+        "objectives": [
+          {
+            "id": "deal",
+            "type": "trade",
+            "count": 2,
+            "target": "spirit_iron",
+            "label": "Buy or sell spirit iron twice - **/economy → Shop**"
+          },
+          {
+            "id": "home",
+            "type": "return_home",
+            "count": 1,
+            "label": "Bring it home - **/family → Enter**"
+          }
+        ],
+        "rewards": {
+          "spirit_stones": 25,
+          "insight_xp": 15,
+          "household_standing": 6,
+          "items": {
+            "waymark_talisman": 1
+          }
+        }
+      },
+      {
+        "quest_key": "errand_forging_blade",
+        "title": "A Blade Proved",
+        "description": "A household that teaches the hammer wants to see what your hands make of it. Forge a Spirit-Iron Sword and carry it back through the door.",
+        "opening": "The anvil has a new dent in it that nobody will explain. Somebody expects you to leave one of your own.",
+        "objectives": [
+          {
+            "id": "make",
+            "type": "craft",
+            "count": 1,
+            "target": "Spirit-Iron Sword",
+            "label": "Forge a Spirit-Iron Sword - **/craft → General Crafting → Craft**"
+          },
+          {
+            "id": "home",
+            "type": "return_home",
+            "count": 1,
+            "label": "Bring it home - **/family → Enter**"
+          }
+        ],
+        "rewards": {
+          "spirit_stones": 35,
+          "insight_xp": 25,
+          "household_standing": 8,
+          "items": {
+            "hearth_return_talisman": 1
+          }
+        }
+      },
+      {
+        "quest_key": "errand_forging_cores",
+        "title": "The Hunt's Due",
+        "description": "Beast cores quench a blade better than water. Come out of two fights standing, gather what the hills give, and bring both home.",
+        "opening": "Your father says the last core in the house went into your uncle's spear, and looks at the door.",
+        "objectives": [
+          {
+            "id": "stand",
+            "type": "combat_win",
+            "count": 2,
+            "label": "Win two fights - **/world → Act → Hunt**"
+          },
+          {
+            "id": "pick",
+            "type": "gather",
+            "count": 1,
+            "label": "Take something out of the hills - **/craft → Alchemy → Forage**"
+          },
+          {
+            "id": "home",
+            "type": "return_home",
+            "count": 1,
+            "label": "Bring it home - **/family → Enter**"
+          }
+        ],
+        "rewards": {
+          "spirit_stones": 45,
+          "insight_xp": 35,
+          "household_standing": 10,
+          "items": {
+            "hearth_return_talisman": 1,
+            "waymark_talisman": 1
+          }
+        }
+      }
+    ],
+    "Inscription": [
+      {
+        "quest_key": "errand_inscription_paper",
+        "title": "Paper and Ink",
+        "description": "The household's brushes are dry. Bring back talisman paper from the hills and put it on the writing table yourself.",
+        "opening": "There is one sheet left on the table and your mother has been not-using it for a week.",
+        "objectives": [
+          {
+            "id": "pick",
+            "type": "gather",
+            "count": 1,
+            "target": "talisman_paper",
+            "label": "Gather talisman paper - **/craft → Alchemy → Forage**"
+          },
+          {
+            "id": "home",
+            "type": "return_home",
+            "count": 1,
+            "label": "Bring it home - **/family → Enter**"
+          }
+        ],
+        "rewards": {
+          "spirit_stones": 25,
+          "insight_xp": 15,
+          "household_standing": 6,
+          "items": {
+            "waymark_talisman": 1
+          }
+        }
+      },
+      {
+        "quest_key": "errand_inscription_wind",
+        "title": "Wind at the Door",
+        "description": "Inscribe a Swift-Wind Talisman the way the household taught you, and bring it home so the old people can judge the brushwork.",
+        "opening": "Your sibling's talisman is pinned to the lintel. Yours is not, yet.",
+        "objectives": [
+          {
+            "id": "make",
+            "type": "craft",
+            "count": 1,
+            "target": "Swift-Wind Talisman",
+            "label": "Inscribe a Swift-Wind Talisman - **/craft → General Crafting → Craft**"
+          },
+          {
+            "id": "home",
+            "type": "return_home",
+            "count": 1,
+            "label": "Bring it home - **/family → Enter**"
+          }
+        ],
+        "rewards": {
+          "spirit_stones": 35,
+          "insight_xp": 25,
+          "household_standing": 8,
+          "items": {
+            "hearth_return_talisman": 1
+          }
+        }
+      },
+      {
+        "quest_key": "errand_inscription_stone",
+        "title": "Stone for the Walls",
+        "description": "A Stone-Skin Talisman for the household's walls, and one honest deal at a shop to prove the family name still buys things.",
+        "opening": "Somebody chalked a mark on the gatepost last month. The household would like the walls to be harder than chalk.",
+        "objectives": [
+          {
+            "id": "make",
+            "type": "craft",
+            "count": 1,
+            "target": "Stone-Skin Talisman",
+            "label": "Inscribe a Stone-Skin Talisman - **/craft → General Crafting → Craft**"
+          },
+          {
+            "id": "deal",
+            "type": "trade",
+            "count": 1,
+            "label": "Buy or sell at a shop - **/economy → Shop**"
+          },
+          {
+            "id": "home",
+            "type": "return_home",
+            "count": 1,
+            "label": "Bring it home - **/family → Enter**"
+          }
+        ],
+        "rewards": {
+          "spirit_stones": 45,
+          "insight_xp": 35,
+          "household_standing": 10,
+          "items": {
+            "hearth_return_talisman": 1,
+            "waymark_talisman": 1
+          }
+        }
+      }
+    ],
+    "Formation": [
+      {
+        "quest_key": "errand_formation_disk",
+        "title": "A Blank Disk",
+        "description": "The household's last blank formation disk was used on the well. Find one in the hills and bring it back.",
+        "opening": "The array under the threshold hums a little flat. Everybody has noticed and nobody has said.",
+        "objectives": [
+          {
+            "id": "pick",
+            "type": "gather",
+            "count": 1,
+            "target": "array_disk_blank",
+            "label": "Gather a blank formation disk - **/craft → Alchemy → Forage**"
+          },
+          {
+            "id": "home",
+            "type": "return_home",
+            "count": 1,
+            "label": "Bring it home - **/family → Enter**"
+          }
+        ],
+        "rewards": {
+          "spirit_stones": 25,
+          "insight_xp": 15,
+          "household_standing": 6,
+          "items": {
+            "waymark_talisman": 1
+          }
+        }
+      },
+      {
+        "quest_key": "errand_formation_chalk",
+        "title": "Chalk on the Threshold",
+        "description": "Lay a Guiding Chalk Array the way the household lays them, and bring it home to be walked over and judged.",
+        "opening": "Your father laid the first array in this house before you were born and still checks it every morning.",
+        "objectives": [
+          {
+            "id": "make",
+            "type": "craft",
+            "count": 1,
+            "target": "Guiding Chalk Array",
+            "label": "Lay a Guiding Chalk Array - **/craft → General Crafting → Craft**"
+          },
+          {
+            "id": "home",
+            "type": "return_home",
+            "count": 1,
+            "label": "Bring it home - **/family → Enter**"
+          }
+        ],
+        "rewards": {
+          "spirit_stones": 35,
+          "insight_xp": 25,
+          "household_standing": 8,
+          "items": {
+            "hearth_return_talisman": 1
+          }
+        }
+      },
+      {
+        "quest_key": "errand_formation_ward",
+        "title": "The Ward Held",
+        "description": "Prove the ward and the hand that laid it: come out of a fight standing, lay a Guiding Chalk Array, and come home.",
+        "opening": "A ward that has never been tested is a drawing. The household would like to know which yours is.",
+        "objectives": [
+          {
+            "id": "stand",
+            "type": "combat_win",
+            "count": 1,
+            "label": "Win a fight - **/world → Act → Hunt**"
+          },
+          {
+            "id": "make",
+            "type": "craft",
+            "count": 1,
+            "target": "Guiding Chalk Array",
+            "label": "Lay a Guiding Chalk Array - **/craft → General Crafting → Craft**"
+          },
+          {
+            "id": "home",
+            "type": "return_home",
+            "count": 1,
+            "label": "Bring it home - **/family → Enter**"
+          }
+        ],
+        "rewards": {
+          "spirit_stones": 45,
+          "insight_xp": 35,
+          "household_standing": 10,
+          "items": {
+            "hearth_return_talisman": 1,
+            "waymark_talisman": 1
+          }
+        }
+      }
+    ],
+    "Alchemy": [
+      {
+        "quest_key": "errand_alchemy_herbs",
+        "title": "Herbs for the Stove",
+        "description": "The stove is cold for want of spirit herbs. Gather three and bring them home before the old people notice the jar is empty.",
+        "opening": "The herb jar is turned with its label to the wall, which in this house means it is empty.",
+        "objectives": [
+          {
+            "id": "pick",
+            "type": "gather",
+            "count": 3,
+            "target": "spirit_herb",
+            "label": "Gather three spirit herbs - **/craft → Alchemy → Forage**"
+          },
+          {
+            "id": "home",
+            "type": "return_home",
+            "count": 1,
+            "label": "Bring it home - **/family → Enter**"
+          }
+        ],
+        "rewards": {
+          "spirit_stones": 25,
+          "insight_xp": 15,
+          "household_standing": 6,
+          "items": {
+            "waymark_talisman": 1
+          }
+        }
+      },
+      {
+        "quest_key": "errand_alchemy_pill",
+        "title": "A Pill for the Old",
+        "description": "Refine a Recovery Pill the way the household taught you, and carry it home for whoever needs it most.",
+        "opening": "Somebody in the house is coughing behind a screen and nobody is talking about it.",
+        "objectives": [
+          {
+            "id": "make",
+            "type": "craft",
+            "count": 1,
+            "target": "Recovery Pill",
+            "label": "Refine a Recovery Pill - **/craft → General Crafting → Craft**"
+          },
+          {
+            "id": "home",
+            "type": "return_home",
+            "count": 1,
+            "label": "Bring it home - **/family → Enter**"
+          }
+        ],
+        "rewards": {
+          "spirit_stones": 35,
+          "insight_xp": 25,
+          "household_standing": 8,
+          "items": {
+            "hearth_return_talisman": 1
+          }
+        }
+      },
+      {
+        "quest_key": "errand_alchemy_nourish",
+        "title": "Nourishing the House",
+        "description": "A Qi Nourishing Pill for the household's cultivators, and one honest deal at a shop, and then home.",
+        "opening": "The household's stove has fed three generations. It would like to be fed in turn.",
+        "objectives": [
+          {
+            "id": "make",
+            "type": "craft",
+            "count": 1,
+            "target": "Qi Nourishing Pill",
+            "label": "Refine a Qi Nourishing Pill - **/craft → General Crafting → Craft**"
+          },
+          {
+            "id": "deal",
+            "type": "trade",
+            "count": 1,
+            "label": "Buy or sell at a shop - **/economy → Shop**"
+          },
+          {
+            "id": "home",
+            "type": "return_home",
+            "count": 1,
+            "label": "Bring it home - **/family → Enter**"
+          }
+        ],
+        "rewards": {
+          "spirit_stones": 45,
+          "insight_xp": 35,
+          "household_standing": 10,
+          "items": {
+            "hearth_return_talisman": 1,
+            "waymark_talisman": 1
+          }
+        }
+      }
+    ]
+  }
 }

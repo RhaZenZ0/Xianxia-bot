@@ -6,6 +6,26 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.0** (rc.32) gives a soul back its hands, and a household its reasons.
+
+The craft echo: samsara used to wipe `profession_progress` before the new household tutored the new
+life, so a past life's crafting left no trace while everything else the soul had done survived as an
+echo. The trades a life practised now go into its past-life record ahead of the wipe (no schema
+change), and a new life's craft and forage rolls carry an echo of the best of them, scaled by how much
+of the soul's memory has woken and capped at +3. The rc.31 note that "the dao-family rebirth and the
+samsara return keep every point they earned" was wrong on both counts and is corrected.
+
+A house worth coming back to: the household's one handout could be claimed from anywhere and the door
+was a free teleport. Now the door opens from the family's town, and support, the coffers
+(`family.contribute` — the never-read `treasury_balance` finally does something), a second round of
+teaching (`family.tutor`) and the household's errands (`family.errand`, twelve authored quests that end
+at the door) are asked for inside. The family hall is a cultivation site and a seclusion site. The
+panel now hides a door where it would refuse - the household's, and the game's later ones (laws,
+tribulations, Perfection, sect rooms, abode keys, inner world, beasts, the house, the Samsara legacy). A
+`return_home` objective, a fourth beginner stage, and two Apprentice-Inscription talismans — Hearth-Return
+home from anywhere, Waymark back to where it found you — make the round trip. The hub hides each household
+door where it would refuse.
+
 **1.0.0** (rc.28) stops the content path costing what it cost.
 
 Also here: the readiness probe was a sample, and the sample had gone stale. `operational_health`

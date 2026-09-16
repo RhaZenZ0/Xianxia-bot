@@ -67,6 +67,40 @@ def next_objective_label(objectives: Any, progress: Any) -> str:
     return ""
 
 
+def household_errand_seed_rows(world: Any) -> list[dict[str, Any]]:
+    """The household errands from `content/world.json`, shaped for the same seeder.
+
+    `household_errands` is keyed by the trade a house teaches; each entry is
+    an ordinary quest definition with no giver, which `family.errand` hands
+    over at home one at a time through `grantOrdinaryQuestTx`. The key carries
+    the `errand_` prefix, which is what lets the reward `household_standing`
+    exist at all (see `validate_quest_definition`).
+    """
+    rows: list[dict[str, Any]] = []
+    pools = dict(getattr(world, "data", {}).get("household_errands") or {})
+    for trade in sorted(pools):
+        for errand in list(pools[trade] or []):
+            key = str(errand.get("quest_key") or "").strip()
+            if not key.startswith(HOUSEHOLD_ERRAND_PREFIX):
+                continue
+            rows.append({
+                "quest_key": key,
+                "title": str(errand.get("title", "")),
+                "description": str(errand.get("description", "")),
+                "source_type": "system",
+                "source_key": f"household_errand:{trade}",
+                "objectives": list(errand.get("objectives", [])),
+                "rewards": dict(errand.get("rewards", {})),
+                "giver_npc": "",
+                "realm_band": "",
+                "tier": 1,
+                "deadline_game_minutes": 0,
+                "variants": [],
+                "seed": {"trade": str(trade), "opening": str(errand.get("opening") or "")},
+            })
+    return rows
+
+
 def beginner_path_seed_rows(world: Any) -> list[dict[str, Any]]:
     """The beginner path from `content/world.json`, shaped for the same seeder.
 
@@ -187,9 +221,20 @@ OBJECTIVE_TYPES: dict[str, dict[str, Any]] = {
     "craft": {"target": "recipe", "label": "Craft {target}", "untargeted": "Craft something from a method you know"},
     "trade": {"target": "item", "label": "Buy or sell {target}", "untargeted": "Buy or sell at a shop"},
     "gather": {"target": "item", "label": "Gather {target}", "untargeted": "Forage a material out of the hills"},
+    # Reported by `/family → Enter` and by a Hearth-Return Talisman
+    # (v1.0.0-rc.32). Untargeted by construction: the household is the
+    # player's own, and `birth_family:<id>` is not a catalogue location.
+    "return_home": {"target": None, "label": "", "untargeted": "Return to your birth household"},
 }
 SCENE_ACTION_KEYS = ("observe", "investigate", "influence", "stealth", "physical", "qi", "resolve", "aid")
 REWARD_KEYS = ("insight_xp", "spirit_stones", "items")
+# What a household errand may pay besides those (v1.0.0-rc.32): standing with
+# the house. Only an errand's key may carry it - the engine pays it on no other
+# key and the validator refuses it on any other draft - so the Forge cannot
+# inflate a house's opinion of a player by drafting a quest that says so.
+HOUSEHOLD_ERRAND_PREFIX = "errand_"
+HOUSEHOLD_STANDING_REWARD_KEY = "household_standing"
+HOUSEHOLD_STANDING_REWARD_MAX = 25
 MAX_OBJECTIVES = 4
 MAX_OBJECTIVE_COUNT = 5
 
@@ -338,9 +383,22 @@ def validate_quest_definition(draft: dict[str, Any], world: Any, budget: dict[st
 
     rewards_in = draft.get("rewards") if isinstance(draft.get("rewards"), dict) else {}
     rewards: dict[str, Any] = {}
-    unknown = sorted(set(rewards_in) - set(REWARD_KEYS))
+    allowed_rewards = set(REWARD_KEYS)
+    is_errand = str(draft.get("quest_key") or "").startswith(HOUSEHOLD_ERRAND_PREFIX)
+    if is_errand:
+        allowed_rewards.add(HOUSEHOLD_STANDING_REWARD_KEY)
+    unknown = sorted(set(rewards_in) - allowed_rewards)
     if unknown:
-        errors.append(f"unknown reward keys: {', '.join(unknown)} (allowed: {', '.join(REWARD_KEYS)})")
+        errors.append(f"unknown reward keys: {', '.join(unknown)} (allowed: {', '.join(sorted(allowed_rewards))})")
+    if is_errand and HOUSEHOLD_STANDING_REWARD_KEY in rewards_in:
+        try:
+            standing = int(rewards_in[HOUSEHOLD_STANDING_REWARD_KEY])
+        except (TypeError, ValueError):
+            standing = -1
+        if not 0 <= standing <= HOUSEHOLD_STANDING_REWARD_MAX:
+            errors.append(f"reward {HOUSEHOLD_STANDING_REWARD_KEY} must be 0-{HOUSEHOLD_STANDING_REWARD_MAX}")
+        elif standing:
+            rewards[HOUSEHOLD_STANDING_REWARD_KEY] = standing
     for key, cap_key in (("insight_xp", "max_xp"), ("spirit_stones", "max_stones")):
         if key in rewards_in:
             try:

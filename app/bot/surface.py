@@ -16,6 +16,7 @@ import discord
 from discord import app_commands
 
 from ..database import SCHEMA_VERSION
+from ..rules.progression_systems import ASCENSION_GATES
 from .admin.core import (
     admin_family_group,
     admin_npc_group,
@@ -83,6 +84,7 @@ from .hubs import (
     register_hubs,
     register_menu_builder,
     register_menu_facts,
+    register_hidden_actions,
     send_hub,
 )
 from .locations import here_summary
@@ -381,9 +383,12 @@ _HUB_DEFINITIONS = (
         title="🏠 Family Hub",
         description="Birth family, clan structure, descendants, support and family history.",
         pages=(
-            _hub_page("family", "Family", "The household you belong to now: enter and leave it, ask it for support, and see the clan, its branches and your descendants.",
-                      only=("family view", "family enter", "family leave", "family support",
+            _hub_page("family", "Family", "The household you belong to now: enter and leave it, and see the clan, its branches and your descendants.",
+                      only=("family view", "family enter", "family leave",
                             "family clan", "family descendants", "family child")),
+            _hub_page("family", "Hearth", "What the house gives to somebody standing in it (v1.0.0-rc.32): its support, its coffers, its teaching and its errands.",
+                      key="family_hearth",
+                      only=("family support", "family contribute", "family tutor", "family errand")),
             _hub_page("family", "House", "The cultivation house you found with other players, as distinct from the household you were born into: its seat order, its invitations and its children.",
                       key="family_house",
                       only=("family house status", "family house found", "family house invite",
@@ -796,6 +801,123 @@ async def menu(interaction: discord.Interaction) -> None:
 
 register_menu_builder(lambda owner_id, is_admin, owner_name, facts="": MenuView(owner_id=owner_id, is_admin=is_admin, owner_name=owner_name, facts=facts))
 register_menu_facts(_menu_facts)
+
+
+# The household's doors (v1.0.0-rc.32). Enter opens only from the family's
+# town, and support, the purse, the teaching and the errands are asked for
+# inside - so the panel shows each only where it would work, rather than a
+# button that refuses.
+# Named as the leaves are, without the slash a hint path carries: these are
+# matched against `HubAction.path`, never printed to a player.
+HOUSEHOLD_DOOR = "family enter"
+HOUSEHOLD_INDOOR_ACTIONS = ("family leave", "family support", "family contribute", "family tutor", "family errand")
+
+
+def _action_paths(reason: str, *names: str) -> dict[str, str]:
+    """path -> why it is shut, which the panel prints as a locked line."""
+    return {"/" + name: reason for name in names}
+
+
+async def _household_hidden_actions(interaction: discord.Interaction) -> dict[str, str]:
+    c = await DB.get_character(interaction.user.id)
+    if not c:
+        return {}
+    fam = await DB.get_birth_family(interaction.user.id)
+    if not fam:
+        return _action_paths("no birth household is recorded", HOUSEHOLD_DOOR, *HOUSEHOLD_INDOOR_ACTIONS)
+    here = str(c.get("location") or "")
+    inside = here == f"birth_family:{int(fam.get('family_id') or 0)}"
+    if inside:
+        return _action_paths("you are already inside", HOUSEHOLD_DOOR)
+    town = str(fam.get("location") or "")
+    hidden = _action_paths("asked for inside the household", *HOUSEHOLD_INDOOR_ACTIONS)
+    if here != town:
+        hidden.update(_action_paths(f"the household stands in {town}; travel there, or burn a Hearth-Return Talisman", HOUSEHOLD_DOOR))
+    return hidden
+
+
+# And the doors that open later in the game (v1.0.0-rc.32). Each entry hides
+# only what the engine would refuse outright for this character - a law
+# before the realm that can hold one, a sect's rooms to somebody in no sect,
+# a home's keys to somebody with no home - and never a status read or the
+# door into the system itself. The rules are read off the same state the
+# engine reads: realm and stage, the membership row, the abode row, the
+# personal world, the beasts, the house, the soul record.
+LAW_MIN_REALM_INDEX = int((WORLD.data.get("law_system") or {}).get("normal_min_realm_index") or 6)
+PROGRESSION_GATES: dict[str, tuple[str, ...]] = {
+    # gate -> the leaves hidden while the gate is shut
+    "law": ("law comprehend", "law technique"),
+    "tribulation": ("tribulation prepare", "tribulation attempt"),
+    "perfection": ("perfect start",),
+    "sect_member": ("sect roster", "sect politics", "sect address", "sect family", "sect shadow",
+                    "sect manor establish", "sect manor upgrade", "sect abode", "sect treasury", "sect contribute", "sect redeem",
+                    "sect discipleship request", "sect discipleship accept", "sect discipleship reject", "sect discipleship leave"),
+    "sect_outsider": ("sect recruitment recommendation", "sect recruitment trial"),
+    "abode": ("abode enter", "abode leave", "abode upgrade", "abode focus", "abode invite", "abode revoke", "abode guests", "abode thread"),
+    "abode_owner": ("abode establish",),
+    "innerworld": ("innerworld enter", "innerworld leave", "innerworld setrule"),
+    "innerworld_owner": ("innerworld create",),
+    "beast": ("beast feed", "beast train", "beast evolve", "beast active"),
+    "house_member": ("family house invite", "family house leave", "family house child"),
+    "house_outsider": ("family house found",),
+    "samsara": ("family ancestry", "family legacy", "family investigate", "family quest", "family claim", "family conflict"),
+}
+
+
+async def _progression_hidden_actions(interaction: discord.Interaction) -> dict[str, str]:
+    c = await DB.get_character(interaction.user.id)
+    if not c:
+        return {}
+    uid = interaction.user.id
+    realm = int(c.get("realm_index") or 0)
+    phase = int(c.get("phase") or 1)
+    shut: dict[str, str] = {}
+    if realm < LAW_MIN_REALM_INDEX:
+        shut["law"] = f"a Law needs {WORLD.realm_name(LAW_MIN_REALM_INDEX)}; you stand at {WORLD.realm_name(realm)}"
+    if realm not in ASCENSION_GATES:
+        shut["tribulation"] = "only at a world-crossing gate (realms " + ", ".join(str(r) for r in sorted(ASCENSION_GATES)) + ")"
+    if phase != 9:
+        shut["perfection"] = "Perfection begins at stage 9"
+    if not await DB.get_sect_membership(uid):
+        shut["sect_member"] = "you are in no sect — see Recruitment"
+    else:
+        shut["sect_outsider"] = "you already belong to a sect"
+    if not await DB.get_abode(uid):
+        shut["abode"] = "you have no property yet — Establish one"
+    else:
+        shut["abode_owner"] = "you already hold a property"
+    if not await DB.get_personal_world(uid):
+        shut["innerworld"] = "you have no personal world yet — Create one"
+    else:
+        shut["innerworld_owner"] = "your personal world already exists"
+    if not await DB.get_spirit_beasts(uid):
+        shut["beast"] = "no beast is contracted yet — Tame one"
+    if not await DB.get_player_family_membership(uid):
+        shut["house_member"] = "you belong to no house — Found one or answer an invitation"
+    else:
+        shut["house_outsider"] = "you already sit in a house"
+    legacy = await DB.get_soul_legacy(uid)
+    if int((legacy or {}).get("incarnation_count") or 1) <= 1 and not (legacy or {}).get("past_lives"):
+        shut["samsara"] = "a first life has no past to trace"
+    hidden: dict[str, str] = {}
+    for gate, reason in shut.items():
+        hidden.update(_action_paths(reason, *PROGRESSION_GATES[gate]))
+    return hidden
+
+
+async def _hidden_actions(interaction: discord.Interaction) -> dict[str, str]:
+    """Every door the panel leaves off for this player, and why. Each provider
+    is asked on its own, so one failing lookup hides nothing from the others."""
+    hidden: dict[str, str] = {}
+    for provider in (_household_hidden_actions, _progression_hidden_actions):
+        try:
+            hidden.update(await provider(interaction))
+        except Exception:
+            log.exception("Hidden-action provider %s failed", getattr(provider, "__name__", provider))
+    return hidden
+
+
+register_hidden_actions(_hidden_actions)
 
 
 register_hubs(*_HUB_DEFINITIONS, _ADMIN_HUB_DEFINITION)

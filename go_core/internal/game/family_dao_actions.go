@@ -218,6 +218,11 @@ func familySupportActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID
 	if f == nil {
 		return authoritativeMutation{}, errors.New("no birth family is recorded")
 	}
+	// Asked for at home (v1.0.0-rc.32). Until now the one thing the house
+	// gave after the send-off could be claimed from the far side of the world.
+	if _, err := requireAtHomeTx(conn, userID, "the household's support"); err != nil {
+		return authoritativeMutation{}, err
+	}
 	remain := p.CooldownGameMinutes - max64(0, p.GameMinute-i64(f["last_support_game_minute"]))
 	if remain > 0 {
 		return authoritativeMutation{}, fmt.Errorf("family support cooldown has %d in-world minutes remaining", remain)
@@ -313,6 +318,14 @@ func familySupportActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID
 		items = map[string]int64{"recovery_pill": 1}
 	}
 	stones += clanBonus
+	// And what the ledger remembers of you (v1.0.0-rc.32): a bounded term
+	// for standing earned by contributing and by bringing errands home.
+	standing, e := householdStandingTx(conn, userID, fid)
+	if e != nil {
+		return authoritativeMutation{}, e
+	}
+	standingBonus := clamp(standing/10, 0, householdSupportStandingCap)
+	stones += standingBonus
 	if retainers >= 20 && (arch == "martial_household" || arch == "escort_martial_family" || arch == "border_garrison_family" || arch == "noble_martial_clan") {
 		items["recovery_pill"]++
 	}
@@ -363,7 +376,7 @@ func familySupportActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID
 	if e != nil {
 		return authoritativeMutation{}, e
 	}
-	out := map[string]any{"stones": stones, "items": items, "family_name": fmt.Sprint(f["family_name"]), "cost": cost, "clan_support_bonus": clanBonus, "active_branches": branches, "loyal_retainers": retainers, "helpful_relations": relations}
+	out := map[string]any{"stones": stones, "items": items, "family_name": fmt.Sprint(f["family_name"]), "cost": cost, "clan_support_bonus": clanBonus, "standing_bonus": standingBonus, "standing": standing, "standing_band": householdStandingBand(standing), "active_branches": branches, "loyal_retainers": retainers, "helpful_relations": relations}
 	if sendoff != nil {
 		out["family_sendoff"] = sendoff
 	}

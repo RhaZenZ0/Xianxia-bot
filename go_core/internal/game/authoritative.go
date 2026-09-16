@@ -145,6 +145,9 @@ var authoritativeMutations = map[string]bool{
 	"family.simulate":                 true,
 	"family.support":                  true,
 	"family.add_child":                true,
+	"family.contribute":               true,
+	"family.tutor":                    true,
+	"family.errand":                   true,
 	"player_family.found":             true,
 	"player_family.invite":            true,
 	"player_family.respond":           true,
@@ -427,6 +430,8 @@ func applyAuthoritative(databasePath, worldPath string, req ActionRequest) (Acti
 			mutation, err = familyHouseholdEnterAction(conn, req.ActorID, req.Payload)
 		case "family.household.leave":
 			mutation, err = familyHouseholdLeaveAction(conn, req.ActorID, req.Payload)
+		case "family.contribute":
+			mutation, err = familyContributeActionGo(conn, req.ActorID, req.Payload)
 		case "family.lineage.investigate":
 			mutation, err = lineageInvestigateAction(conn, req.ActorID, req.Payload)
 		case "family.lineage.quest":
@@ -435,7 +440,7 @@ func applyAuthoritative(databasePath, worldPath string, req ActionRequest) (Acti
 			mutation, err = dynastyClaimAction(conn, req.ActorID, req.Payload)
 		case "family.dynasty.conflict":
 			mutation, err = dynastyConflictAction(conn, req.ActorID, req.Payload)
-		case "auction.enter", "auction.leave", "auction.sell", "auction.bid", "black_market.trade", "market.trade", "bounty_hunter.act", "equipment.bind", "equipment.equip", "equipment.unequip", "equipment.repair", "party.create", "party.join", "party.leave", "formation.create", "formation.assign", "formation.activate", "formation.stance", "boss.start", "boss.act", "boss.claim", "territory.claim", "war.act", "caravan.dispatch", "caravan.settle", "sect.recruitment.recommendation", "sect.recruitment.trial", "sect.contribute", "sect.redeem", "discipleship.request", "discipleship.resolve", "discipleship.leave", "sect.manor.establish", "sect.manor.upgrade", "family.simulate", "family.support", "family.add_child", "seclusion.start", "seclusion.settle", "dao.propose", "dao.respond", "dao.sever", "dao.dual_cultivate", "storage.deposit", "storage.withdraw", "storage.upgrade", "abode.establish", "abode.enter", "abode.visit", "abode.leave", "abode.invite", "abode.revoke", "abode.upgrade", "abode.focus", "array.use", "array.deploy", "spatial_key.use", "personal_world.create", "personal_world.set_rule", "personal_world.enter", "personal_world.leave", "item.use", "sect.abode.upgrade", "merchant.buy", "shop.buy", "shop.sell", "trade.offer", "trade.accept", "trade.decline", "appraisal.read":
+		case "auction.enter", "auction.leave", "auction.sell", "auction.bid", "black_market.trade", "market.trade", "bounty_hunter.act", "equipment.bind", "equipment.equip", "equipment.unequip", "equipment.repair", "party.create", "party.join", "party.leave", "formation.create", "formation.assign", "formation.activate", "formation.stance", "boss.start", "boss.act", "boss.claim", "territory.claim", "war.act", "caravan.dispatch", "caravan.settle", "sect.recruitment.recommendation", "sect.recruitment.trial", "sect.contribute", "sect.redeem", "discipleship.request", "discipleship.resolve", "discipleship.leave", "sect.manor.establish", "sect.manor.upgrade", "family.simulate", "family.support", "family.add_child", "family.tutor", "family.errand", "seclusion.start", "seclusion.settle", "dao.propose", "dao.respond", "dao.sever", "dao.dual_cultivate", "storage.deposit", "storage.withdraw", "storage.upgrade", "abode.establish", "abode.enter", "abode.visit", "abode.leave", "abode.invite", "abode.revoke", "abode.upgrade", "abode.focus", "array.use", "array.deploy", "spatial_key.use", "personal_world.create", "personal_world.set_rule", "personal_world.enter", "personal_world.leave", "item.use", "sect.abode.upgrade", "merchant.buy", "shop.buy", "shop.sell", "trade.offer", "trade.accept", "trade.decline", "appraisal.read":
 			if strings.TrimSpace(worldPath) == "" {
 				return ActionResponse{}, errors.New("world catalog path is required")
 			}

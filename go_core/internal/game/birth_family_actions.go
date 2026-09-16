@@ -160,9 +160,21 @@ func grantBirthFamilySendoffTx(conn *storage.Conn, catalog worlddata.Catalog, us
 		[]any{userID, sendoff.Item, fmt.Sprint(familyID), "sent out by the household", maxI64(0, gameMinute), now, now}); err != nil {
 		return nil, err
 	}
+	// And the way back (v1.0.0-rc.32): one Hearth-Return Talisman, folded
+	// at the door, inside the same once-guard as the heirloom.
+	talisman := ""
+	if _, known := catalog.Items[hearthReturnTalismanItem]; known {
+		if _, err = conn.Execute(
+			`INSERT INTO inventory(user_id,item_id,quantity) VALUES(?,?,1) ON CONFLICT(user_id,item_id) DO UPDATE SET quantity=quantity+1`,
+			[]any{userID, hearthReturnTalismanItem}); err != nil {
+			return nil, err
+		}
+		talisman = hearthReturnTalismanItem
+	}
 	out := map[string]any{
 		"item_id": sendoff.Item, "name": item.Name, "flight": item.Flight,
 		"flight_name": item.FlightName, "line": sendoff.Line, "trade": strings.TrimSpace(sendoff.Trade),
+		"talisman": talisman,
 	}
 	if tutoring != nil {
 		out["tutoring"] = tutoring

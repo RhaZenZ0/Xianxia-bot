@@ -540,6 +540,16 @@ func questProgress(conn *storage.Conn, userID int64, raw json.RawMessage) (any, 
 			return nil, grantErr
 		}
 		transition["rewards_granted"] = granted
+		// A household errand brought home (v1.0.0-rc.32) also moves the
+		// house's opinion of you and goes into its chronicle; on any other
+		// key this is a no-op.
+		standing, standingErr := householdErrandCompletedTx(conn, userID, p.QuestKey, terms.Rewards)
+		if standingErr != nil {
+			return nil, standingErr
+		}
+		if standing > 0 {
+			transition["household_standing"] = standing
+		}
 		// A chained quest hands over the next one in the same transaction that
 		// finished this one (v1.0.0-rc.26), so a player is never between
 		// stages: either the chain advanced or nothing did. Only an ordinary

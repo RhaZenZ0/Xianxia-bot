@@ -84,6 +84,8 @@ func seedFamily(t *testing.T, path string, wealth int64) {
 		wealth)
 	batch4Exec(t, path,
 		`INSERT INTO character_birth_family(user_id,family_id) VALUES(42,1)`)
+	// Support is asked for at home (v1.0.0-rc.32).
+	batch4Exec(t, path, `UPDATE characters SET location=? WHERE user_id=42`, birthFamilyHouseholdLocation(1))
 }
 
 func familySupportApply(t *testing.T, path string) (map[string]any, error) {
