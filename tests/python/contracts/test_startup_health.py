@@ -12,7 +12,7 @@ from tests.support import install_aiosqlite_shim
 
 install_aiosqlite_shim()
 
-from app.database import Database, SCHEMA_VERSION
+from app.database import Database, OPERATIONAL_REQUIRED_TABLES, SCHEMA_VERSION
 from app.database import bootstrap as database_bootstrap
 from app.ops.health import HealthServer, HealthState, STARTUP_PHASES
 from app.ops import healthcheck
@@ -26,6 +26,62 @@ class SchemaMigrationTests(unittest.IsolatedAsyncioTestCase):
 
     async def asyncTearDown(self):
         self.tmp.cleanup()
+
+    async def test_the_readiness_probe_names_every_table_a_bootstrap_makes(self):
+        """The probe is exact, and this is what keeps it exact.
+
+        It was a sample of twenty-seven written for v0.20.7 and never touched
+        again. By schema 49 it still named two catalogue mirrors nothing reads
+        for their content, and did not name `npc_civilization_state` - the
+        table the whole simulation runs on - nor `inventory`,
+        `character_quests`, `battles`, or anything added in the twenty-nine
+        releases since. A probe meant to tell a healthy versioned database from
+        an empty file SQLite made at the same path would not have noticed the
+        simulation's own table going missing.
+
+        A sample cannot be kept honest, because nothing says which tables
+        belong in it. This holds the set against a real bootstrap rather than
+        against another list, so a table added without being listed fails here
+        and the set cannot drift again.
+        """
+        await Database(self.path).init()
+        with closing(sqlite3.connect(self.path)) as conn:
+            # FTS5 virtual tables and their shadow tables are excluded: they
+            # are made by CREATE VIRTUAL TABLE and rebuilt from their base
+            # tables, so their absence is a different fault.
+            actual = {
+                str(row[0]) for row in conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table' "
+                    "AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '%_fts%'"
+                )
+            }
+        unguarded = sorted(actual - OPERATIONAL_REQUIRED_TABLES)
+        self.assertEqual(
+            unguarded, [],
+            "these tables exist in a fresh database and the readiness probe would not "
+            "notice them missing - add them to OPERATIONAL_REQUIRED_TABLES: " + ", ".join(unguarded),
+        )
+        phantom = sorted(OPERATIONAL_REQUIRED_TABLES - actual)
+        self.assertEqual(
+            phantom, [],
+            "the readiness probe requires tables a fresh database does not have, so it would "
+            "report a healthy database unhealthy: " + ", ".join(phantom),
+        )
+
+    async def test_the_probe_would_notice_an_empty_file(self):
+        """Its actual job, stated as a test: a database that is not the one we
+        think it is must fail, and a healthy one must pass."""
+        await Database(self.path).init()
+        health = await Database(self.path).operational_health()
+        self.assertTrue(health.get("schema_intact"), health)
+        self.assertEqual(health.get("missing_tables"), [])
+
+        empty = Path(self.tmp.name) / "empty.sqlite3"
+        with closing(sqlite3.connect(empty)) as conn:
+            conn.execute("CREATE TABLE placeholder(x INTEGER)")
+        health = await Database(empty).operational_health()
+        self.assertFalse(health.get("schema_intact"), health)
+        self.assertGreater(len(health.get("missing_tables") or []), 100)
 
     async def test_fresh_database_records_explicit_schema_version(self):
         db = Database(self.path)

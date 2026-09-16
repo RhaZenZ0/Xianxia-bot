@@ -17,7 +17,7 @@ from ...rules.sense import approximate_realm, ground_reading_line, hidden_npc_na
 from ...rules.worldtime import cultivation_cycle_summary
 from ..character_state import current_effect_modifiers
 from ..formatting import human_duration, roll_line
-from ..locations import _known_locations, _world_is_unlocked, current_npc_location, local_npc_autocomplete
+from ..locations import _known_locations, _world_is_unlocked, current_npc_location, local_npc_autocomplete, npcs_present
 from ..registry import registered_root_command
 from ..runtime import (
     DB,
@@ -394,10 +394,7 @@ async def world(interaction: discord.Interaction) -> None:
         marker = "📍" if name == c.get("location") else "🧭"
         lines.append(f"\n{marker} **{name}** — {data['description']}")
     wt = await current_world_time()
-    nearby = []
-    for npc_name in WORLD.npcs:
-        if await current_npc_location(npc_name, wt.period) == c.get("location"):
-            nearby.append(npc_name)
+    nearby = await npcs_present(str(c.get("location") or ""), wt.period)
     if nearby:
         lines.append("\n**NPCs currently here:** " + ", ".join(nearby[:20]))
     lines.append("\n\nExplore known regions to discover additional routes. Higher worlds and their inhabitants remain hidden until your cultivation reaches them.")

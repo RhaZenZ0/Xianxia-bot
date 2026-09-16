@@ -224,12 +224,18 @@ those. **Cultivation, combat, crafting, travel, the shops and the hills reported
 quest could ask a player to meditate, win a fight, make something, walk somewhere, buy something or
 pick a herb. v1.0.0-rc.25 adds `cultivate`, `travel`, `combat_win`, `craft`, `trade` and `gather`.
 
-Two rules for adding another. The report is written **after** the authoritative action has already
+Three rules for adding another. The report is written **after** the authoritative action has already
 succeeded — the engine decides that something happened and the reporter only says so, never the
-other way round. And a new type costs Go nothing: a vocabulary entry, one line at the command that
-already does the work, and a target kind in `validate_quest_definition` if it names something.
-`tests/python/unit/test_quest_objective_reporters.py` fails if a type ever loses its reporter or a
-reporter names a type the vocabulary does not have.
+other way round. It is also written after the command has **answered**: `announce_quest_progress`
+falls back to `interaction.response.send_message` when the interaction has not been answered yet (it
+has to — a command that defers has no other way to be heard), so a reporter placed ahead of a
+command's only reply spends it, and the player is told their quest advanced and never sees the craft
+roll or the harvest while the engine has already granted the items. `/craft` and `/alchemy forage`
+shipped that way in rc.25 and are fixed in rc.28. And a new type costs Go nothing: a vocabulary
+entry, one line at the command that already does the work, and a target kind in
+`validate_quest_definition` if it names something.
+`tests/python/unit/test_quest_objective_reporters.py` fails if a type ever loses its reporter, if a
+reporter names a type the vocabulary does not have, or if one speaks before its command answers.
 
 `combat_win` is deliberately untargeted: an opponent may be a catalogue NPC, an event manifestation
 or a beast off the hunt roster, and only the first is in `world.npcs`, so there is no roster a draft
@@ -310,6 +316,72 @@ outside the content file while its own picker offered them.
 `current_npc_location` answers the registry when there is no simulation row. That matters because
 `None` means "nothing knows where they are", which every caller reads as *do not filter by
 location* — so without it somebody else's uncle would be talkable from across the world.
+
+### What it costs to draw a scene (v1.0.0-rc.28)
+
+Three things on the content path cost far more than they look, and all three are on the hot path.
+
+**"Who is standing here" was 574 engine round trips.** Every surface that draws it — `/action`'s
+target picker, `/scene status`, `/world`, `/world → City → Look` — walked the whole NPC catalogue
+calling `npc.status` per name, inside an `await`, so serially. `npcs_present(location, period)` in
+`app/bot/locations.py` is the one resolver now.
+
+**What bounds it is asking content first, and that is easy to get wrong in a way no source check can
+see.** One `npc.at_location` query gets everybody the engine has standing here; the obvious next
+step — fall through to `current_npc_location` for everybody the query did not return — is the old
+cost with a new shape, because the people it did not return are the five hundred and fifty-eight who
+are demonstrably somewhere else. So the in-process catalogue rules them out before anybody is
+resolved: only an NPC content places here this period can still be in doubt, and only those cost a
+round trip. Measured against the shipped catalogue, one open is `npc.at_location` ×1 and
+`npc.status` ×1. Content can be wrong in exactly one direction — it does not know about autonomous
+travel — and that direction is covered by the first query, because somebody the simulation walked
+here has a row saying so.
+
+It keeps the same order of precedence `current_npc_location` does, and it has to: circuit first, then
+the simulation, then the schedule. A picker that offers somebody `/talk` then refuses them is worse
+than either being wrong alone — and the schedule is the half the engine cannot know, because it is
+content: a row at its NPC's *home* is a routine, not a whereabouts, so the fourteen catalogue NPCs
+whose day takes them out of their home town were offered in the wrong room at twenty (place, period)
+pairs until the override was applied here too. A missing person is exempt: they keep no routine
+(schema 47) and their row is the whole truth. `npc.at_location` is deliberately narrow —
+`npc.status` carries relationships, disciple bonds and the life row, and loading all of that for
+everybody in a city to decide whether to list them is what made the old shape slow twice over.
+
+`test_who_is_here.py` measures both of those with a counting fake rather than reading the source,
+because the source reads correctly in both the fast and the slow version — the round trips are one
+level down, inside `current_npc_location`.
+
+**`worlddata.Load` re-parsed 2.5 MB per action.** Fifteen of its seventeen call sites are in
+`authoritative.go`, inside the request path. It is memoised on `(path, mtime, size)` — not on the
+path alone, so an operator editing content on a live NAS still does not need a restart. Size is in
+the key beside the timestamp because some filesystems keep mtime at one-second resolution, and two
+edits inside the same second that change the length would otherwise serve the older parse.
+
+**Boot spent ~2,000 HTTP round trips rewriting unchanged content.** On the Go-backed path each
+`db.execute` is one POST, and `sync_world_catalog` made about 1,800 catalogue upserts plus one
+territory node per location, one at a time. They go in a single `/v1/db/batch` request now — an
+endpoint that had existed on the transport since the Go engine landed with nothing on this path
+using it. The statements stay inside `sync_world_catalog` rather than in a helper because
+`test_authority_boundary` reads the write allowlists off the method that contains the SQL, and
+moving them out would mean widening an authority gate for a refactor that changes no authority.
+
+### The readiness probe (`OPERATIONAL_REQUIRED_TABLES`)
+
+`operational_health` exists to tell a healthy versioned database from the empty file SQLite will
+create if the real one is removed or replaced while the bot is running. It does that by checking
+that a set of tables is present — and since v1.0.0-rc.28 that set is **exact**: every table a fresh
+bootstrap makes, all 169 of them.
+
+It used to be a sample of twenty-seven written for v0.20.7 and never revisited. By schema 49 it
+still named two catalogue mirrors nothing reads for their content and omitted
+`npc_civilization_state`, `inventory`, `character_quests`, `battles` and everything added in
+twenty-nine releases. **A sample cannot be kept honest, because nothing says which tables belong in
+it.** An exact set can: `test_startup_health` holds it against a real bootstrap rather than against
+another list, so adding a table without listing it fails there. That test is the whole mechanism —
+the literal is only reviewable because the test makes it true.
+
+FTS5 virtual tables and their shadow tables are deliberately excluded: they are made by
+`CREATE VIRTUAL TABLE` and rebuilt from their base tables, so their absence is a different fault.
 
 ### RAG / memory (`app/ai/rag`)
 

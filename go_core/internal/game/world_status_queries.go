@@ -31,6 +31,7 @@ var worldStatusQueries = map[string]bool{
 	"world.recent_actions": true,
 	"civilization.status":  true,
 	"npc.status":           true,
+	"npc.at_location":      true,
 	"sect.status":          true,
 	"clan.status":          true,
 	"equipment.power":      true,
@@ -215,6 +216,16 @@ func applyWorldStatusQuery(conn *storage.Conn, worldPath string, req ActionReque
 			return ActionResponse{}, err
 		}
 		return queryResponse(conn, req, result), nil
+	case "npc.at_location":
+		location := payload.text("location")
+		if location == "" {
+			return ActionResponse{}, errors.New("location is required")
+		}
+		result, err := npcsAtLocationGo(conn, location)
+		if err != nil {
+			return ActionResponse{}, err
+		}
+		return queryResponse(conn, req, result), nil
 	case "sect.status":
 		name := payload.text("sect_name")
 		if name == "" {
@@ -318,6 +329,58 @@ func civilizationStatusGo(conn *storage.Conn, location string) (map[string]any, 
 		return nil, err
 	}
 	out["npcs"] = rowsToMaps(res)
+	return out, nil
+}
+
+// npcsAtLocationGo answers "who is standing here" in one query.
+//
+// It exists because asking it one NPC at a time cost 574 HTTP round trips.
+// `/action`'s target picker and `/scene status` both walked every name in the
+// catalogue calling `npc.status` on each - inside an `await`, so serially -
+// and the whole of that work is one indexed SELECT.
+//
+// Deliberately narrow: where somebody is and the few things a picker prints
+// beside their name. `npc.status` stays as it is for the single-NPC case,
+// with its relationships, bonds and life row; loading all of that for every
+// person in a city to decide whether to list them is what made this slow in
+// the first place.
+//
+// Both populations answer here. `npc_civilization_state` carries the
+// catalogue's people and anybody who has come of age; `npc_registry` carries
+// those who never get a simulation row, which is a starter household's
+// relatives. Missing people are included and the caller decides - they are
+// exactly where they are, and the world simply does not know it.
+func npcsAtLocationGo(conn *storage.Conn, location string) (map[string]any, error) {
+	out := map[string]any{"location": location}
+	people := []map[string]any{}
+	if tableExistsTx(conn, "npc_civilization_state") {
+		res, err := conn.Execute(`SELECT npc_name,home_location,current_location,world_name,profession,faction,
+            realm_index,phase,status,activity
+            FROM npc_civilization_state
+            WHERE current_location=? AND status IN ('alive','missing')
+            ORDER BY npc_name`, []any{location})
+		if err != nil {
+			return nil, err
+		}
+		people = append(people, rowsToMaps(res)...)
+	}
+	if tableExistsTx(conn, "npc_registry") {
+		// Only those the simulation does not already account for: a matured
+		// descendant is in both tables, and the simulation row is the
+		// authoritative answer about where they are.
+		res, err := conn.Execute(`SELECT r.name AS npc_name,r.location AS current_location,r.location AS home_location,
+            r.role AS profession,r.realm AS realm_name,r.sect_affiliation AS faction,'alive' AS status,'' AS activity
+            FROM npc_registry r
+            WHERE r.location=? AND NOT EXISTS(
+                SELECT 1 FROM npc_civilization_state c WHERE c.npc_name=r.name)
+            ORDER BY r.name`, []any{location})
+		if err != nil {
+			return nil, err
+		}
+		people = append(people, rowsToMaps(res)...)
+	}
+	out["npcs"] = people
+	out["count"] = int64(len(people))
 	return out, nil
 }
 

@@ -6,6 +6,66 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.0** (rc.28) stops the content path costing what it cost.
+
+Also here: the readiness probe was a sample, and the sample had gone stale. `operational_health`
+exists to tell a healthy versioned database from the empty file SQLite will happily create if the
+real one is removed or replaced while the bot is running, and it did that by checking a set of
+tables - twenty-seven of them, written for v0.20.7 and never touched again. Twenty-nine releases
+later it still named `catalog_manuals` and `catalog_techniques`, and did not name
+`npc_civilization_state`, which is the table the entire simulation runs on, nor `inventory`,
+`character_quests`, `battles`, or anything added since. It would not have noticed the simulation's
+own table going missing.
+
+It is exact now - every one of the 169 tables a fresh bootstrap makes - and a test holds it against
+a real bootstrap rather than against another list, so adding a table without listing it fails there.
+That is the part that matters: a sample cannot be kept honest, because nothing says which tables
+belong in it. The cost is one set difference against `sqlite_master`, which the probe already reads.
+
+This is also what the decision not to retire `catalog_manuals` and `catalog_techniques` above rests
+on, and it rests on it less than it looked: those two are not load-bearing *because* they are in the
+probe - they are in it by accident of when the set was written. What is real is `catalog_counts`
+reporting their rows in the CATALOG_READY startup phase, and two rows in eighteen hundred not being
+worth giving that up.
+
+Nothing here changes a rule. All three are the same shape of problem: work on the hot path that
+looks like a lookup and is not.
+
+Asking who is standing somewhere was five hundred and seventy-four round trips to the engine. Every
+surface that draws it - the `/action` target picker, `/scene status`, `/world`, a city's Look - walked
+the whole NPC catalogue calling `npc.status` once per name, inside an await, so one after another.
+There is now a single `npc.at_location` query, and one resolver, `npcs_present`, that all of them
+use. It asks the engine once and then resolves only what the engine cannot answer for: a catalogue
+NPC whose daily schedule puts them here and who has no simulation row yet, and a hidden master
+walking a circuit, whose whereabouts are a pure function of the canonical clock.
+
+That resolver keeps the same order of precedence the single-NPC lookup does - circuit, then the
+simulation, then the schedule - because a picker that offers somebody and a command that then
+refuses them is worse than either being wrong on its own. The new query is also deliberately narrow:
+`npc.status` carries relationships, disciple bonds and a whole life row, and loading all of that for
+everybody in a city in order to decide whether to print their name is what made the old shape slow
+twice over.
+
+`worlddata.Load` read and parsed two and a half megabytes of JSON on every call, with no cache, and
+fifteen of its seventeen call sites are inside the request path in `authoritative.go` - so every
+player action re-parsed the whole world, on the CPU-only hardware this project exists to run on. It
+is keyed on the file's modification time and size now rather than on the path, so an operator
+editing content on a live NAS still does not need a restart; size is in the key beside the timestamp
+because some filesystems keep mtime at one-second resolution.
+
+And boot spent about two thousand HTTP round trips rewriting content that had not changed since the
+last boot. On the Go-backed path every `db.execute` is its own POST, and the catalogue sync made one
+per row. They go in a single batch request now, through an endpoint that has existed on the
+transport since the Go engine landed with nothing on this path using it.
+
+One thing was *not* done, and the reason is worth recording. The plan had `catalog_manuals` and
+`catalog_techniques` retired here as unread write amplification. They are unread for their
+*content* - no getter exists and `search_catalog` is never called with either kind - but they are
+not unread: both are in `OPERATIONAL_REQUIRED_TABLES`, which is the readiness probe that tells a
+healthy versioned database from an empty file SQLite created at the same path, and `catalog_counts`
+reports their row counts in the `CATALOG_READY` startup phase an operator watches. Two rows of every
+eighteen hundred is not worth giving that up.
+
 **1.0.0** (rc.27) lets the world keep the people it makes.
 
 Two things had the same cause, and the cause was a missing table.

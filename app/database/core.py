@@ -31,34 +31,195 @@ SCHEMA_VERSION = 49
 # SQLite file is removed or replaced while the bot is running, SQLite will
 # happily create a new empty file at the same path.  Checking these tables lets
 # the runtime distinguish that condition from a healthy versioned database.
+#
+# This is every table a fresh bootstrap produces, and being *exact* is the
+# point (v1.0.0-rc.28). It used to be a sample of twenty-seven, written for
+# v0.20.7 and never touched again: by schema 49 it still listed two catalogue
+# mirrors nothing reads for their content, and did not list
+# `npc_civilization_state` - the table the whole simulation runs on - nor
+# `inventory`, `character_quests`, `battles`, or anything added in the
+# twenty-nine releases since. A probe that would not notice the simulation's
+# own table going missing is not a readiness probe.
+#
+# A sample cannot be kept honest, because nothing says which tables belong in
+# it; an exact set can, and `test_startup_health` holds it to a real bootstrap
+# rather than to another list. Adding a table without listing it here fails
+# that test, which is the whole mechanism. The cost is one set difference
+# against `sqlite_master` - the probe already reads it.
+#
+# FTS5 virtual tables and their shadow tables are deliberately absent: they are
+# created by CREATE VIRTUAL TABLE and rebuilt from their base tables, so their
+# absence is a different fault from a missing table.
 OPERATIONAL_REQUIRED_TABLES = frozenset(
     {
+        "active_effects",
         "admin_audit_log",
+        "alchemy_batches",
+        "alchemy_state",
+        "artifact_bonds",
+        "auction_bids",
+        "auction_door_risks",
+        "auction_house_channels",
+        "auction_lot_messages",
+        "auctions",
+        "authoritative_action_receipts",
+        "authoritative_actor_versions",
+        "authoritative_entity_versions",
+        "battles",
+        "birth_families",
+        "birth_family_household_threads",
+        "birth_family_npcs",
+        "black_market_posts",
+        "black_market_stock",
+        "body_realm_perfection",
+        "boss_encounters",
+        "boss_participants",
+        "boss_reward_claims",
+        "bounties",
+        "bounty_hunter_pursuits",
+        "caravan_events",
+        "caravan_operations",
+        "caravans",
         "catalog_locations",
         "catalog_manuals",
         "catalog_npcs",
         "catalog_recipes",
         "catalog_techniques",
-        "characters",
+        "cave_abode_access",
+        "cave_abodes",
+        "channel_messages",
+        "character_birth_family",
+        "character_bloodlines",
+        "character_conditions",
         "character_creation_family_options",
+        "character_fate",
+        "character_item_appraisals",
+        "character_location_discoveries",
+        "character_manuals",
+        "character_physiques",
+        "character_qi_body",
+        "character_quests",
+        "character_recipes",
+        "character_sect_discoveries",
+        "character_social_state",
+        "character_spiritual_roots",
+        "characters",
+        "civilization_events",
+        "civilization_regions",
+        "cooldowns",
+        "crime_records",
+        "currency_wallets",
+        "dao_partnerships",
+        "dao_progress",
+        "deployed_location_arrays",
+        "disciple_requests",
+        "domain_events",
+        "economy_events",
+        "economy_markets",
+        "equipment_instances",
+        "event_claims",
+        "event_log",
+        "event_threads",
+        "expedition_threads",
+        "exploration_event_actions",
+        "exploration_event_participants",
+        "exploration_events",
+        "faction_reputation",
+        "family_children",
+        "fate_ledger",
+        "formation_positions",
+        "grudges",
+        "hidden_sect_membership",
+        "inheritances",
+        "inventory",
+        "item_provenance",
+        "law_progress",
+        "martial_clan_branches",
+        "martial_clan_relations",
+        "martial_clan_retainers",
+        "merchant_state",
+        "merchant_stock",
+        "npc_civilization_state",
+        "npc_descendants",
+        "npc_disciple_bonds",
+        "npc_graves",
+        "npc_life_state",
+        "npc_memory",
         "npc_mind_state",
         "npc_player_memories",
-        "npc_life_state",
+        "npc_registry",
+        "npc_relationships",
         "npc_social_relations",
+        "operational_alerts",
+        "parties",
+        "party_formations",
+        "party_members",
+        "personal_worlds",
+        "player_families",
+        "player_family_invites",
+        "player_family_members",
+        "player_scene_state",
+        "playtest_items",
+        "profession_progress",
+        "pvp_challenges",
+        "pvp_matches",
+        "quest_definitions",
         "rag_canon_documents",
         "rag_memories",
-        "operational_alerts",
         "realm_hub_channels",
+        "realm_perfection",
+        "reincarnation_state",
+        "samsara_ancestral_leads",
+        "samsara_dynasty_claims",
+        "samsara_dynasty_conflicts",
+        "samsara_dynasty_history",
+        "samsara_investigation_quests",
+        "scene_history",
         "schema_migrations",
         "schema_version",
+        "seclusion_sessions",
+        "secret_realm_runs",
+        "sect_abodes",
+        "sect_factions",
+        "sect_lineage",
+        "sect_manor_projects",
+        "sect_manors",
+        "sect_membership",
+        "sect_politics_events",
+        "sect_politics_state",
+        "sect_recommendations",
+        "sect_recruitment_attempts",
+        "sect_relations",
+        "sect_treasury",
+        "sects",
         "server_config",
+        "shop_state",
+        "shop_stock",
         "slow_query_log",
+        "soul_legacy",
+        "spirit_beasts",
         "startup_events",
-        "world_events",
+        "storage_containers",
+        "storage_inventory",
+        "territory_state",
+        "territory_war_actions",
+        "territory_war_operations",
+        "territory_wars",
+        "trade_offers",
+        "tribulation_attempts",
+        "tribulation_state",
+        "wild_beast_encounters",
+        "witness_records",
+        "world_action_events",
+        "world_era_events",
+        "world_eras",
+        "world_event_actions",
         "world_event_nodes",
         "world_event_npcs",
         "world_event_participation",
+        "world_events",
         "world_history_events",
+        "world_simulation_state",
         "world_state",
     }
 )
@@ -5229,35 +5390,66 @@ class Database:
     # Normalized world catalog
     # ------------------------------------------------------------------
     async def sync_world_catalog(self, world_data: dict[str, Any]) -> None:
+        """Mirror the content file into the catalogue tables, in one request.
+
+        Every write here is built first and sent once. Against the shipped
+        content that is a little over two thousand statements - roughly 1,800
+        catalogue rows plus one territory node per location - and on the
+        Go-backed path each `db.execute` is its own HTTP POST, so boot spent
+        two thousand round trips rewriting content that had not changed since
+        the last boot. `/v1/db/batch` has existed on the transport since the Go
+        engine landed and nothing on this path used it.
+
+        The statements stay in this method rather than in a helper on purpose:
+        `test_authority_boundary` reads the write allowlists off the method
+        that contains the SQL, and moving it out would have meant widening an
+        authority gate to accommodate a refactor that changes no authority.
+        """
         now = time.time()
-        mappings = (
+        statements: list[dict[str, Any]] = []
+        for table, mapping in (
             ("catalog_locations", world_data.get("locations", {})),
             ("catalog_npcs", world_data.get("npcs", {})),
             ("catalog_recipes", world_data.get("recipes", {})),
             ("catalog_manuals", world_data.get("technique_system", {}).get("manuals", {})),
             ("catalog_techniques", world_data.get("technique_system", {}).get("techniques", {})),
-        )
+        ):
+            for name, data in dict(mapping or {}).items():
+                statements.append({
+                    "sql": f"""INSERT INTO {table}(name,data_json,updated_at) VALUES(?,?,?)
+                               ON CONFLICT(name) DO UPDATE SET data_json=excluded.data_json,updated_at=excluded.updated_at""",
+                    "params": (str(name), json.dumps(data, ensure_ascii=False), now),
+                })
+        # Every normal location is also a persistent territory node. This
+        # gives wars, resource control and caravans a canonical map without
+        # requiring a destructive content migration.
+        for location_name, location_data in dict(world_data.get("locations", {}) or {}).items():
+            text = (str(location_data.get("description", "")) + " " + " ".join(location_data.get("encounters", []))).casefold()
+            resource = "spirit_herbs" if "herb" in text else ("ore" if "ore" in text or "mine" in text else ("beast_grounds" if "beast" in text else "mixed"))
+            statements.append({
+                "sql": """INSERT INTO territory_state(territory_key,name,region,resource_type,updated_game_minute,updated_at)
+                          VALUES(?,?,?,?,0,?) ON CONFLICT(territory_key) DO UPDATE SET name=excluded.name,region=excluded.region,
+                          resource_type=excluded.resource_type,updated_at=excluded.updated_at""",
+                "params": (str(location_name), str(location_name), str(location_name), resource, now),
+            })
+
+        if self._go_transport is not None:
+            # One request, one transaction, the same statements in the same
+            # order. `transaction=True` is what keeps this equivalent to the
+            # BEGIN IMMEDIATE it replaced: a boot interrupted half way through
+            # must not leave the catalogue half rewritten.
+            await self._go_transport.batch(statements, transaction=True)
+        else:
+            async with self._connect() as db:
+                await db.execute("BEGIN IMMEDIATE")
+                for statement in statements:
+                    await db.execute(statement["sql"], statement["params"])
+                await db.commit()
+
+        # The baseline era, once. Kept out of the batch because it is a
+        # read-then-write: batching it would mean sending an INSERT that must
+        # not run, and the condition is cheap to ask once at boot.
         async with self._connect() as db:
-            await db.execute("BEGIN IMMEDIATE")
-            for table, mapping in mappings:
-                for name, data in mapping.items():
-                    await db.execute(
-                        f"""INSERT INTO {table}(name,data_json,updated_at) VALUES(?,?,?)
-                            ON CONFLICT(name) DO UPDATE SET data_json=excluded.data_json,updated_at=excluded.updated_at""",
-                        (str(name), json.dumps(data, ensure_ascii=False), now),
-                    )
-            # Every normal location is also a persistent territory node. This
-            # gives wars, resource control and caravans a canonical map without
-            # requiring a destructive content migration.
-            for location_name, location_data in world_data.get("locations", {}).items():
-                text = (str(location_data.get("description", "")) + " " + " ".join(location_data.get("encounters", []))).casefold()
-                resource = "spirit_herbs" if "herb" in text else ("ore" if "ore" in text or "mine" in text else ("beast_grounds" if "beast" in text else "mixed"))
-                await db.execute(
-                    """INSERT INTO territory_state(territory_key,name,region,resource_type,updated_game_minute,updated_at)
-                       VALUES(?,?,?,?,0,?) ON CONFLICT(territory_key) DO UPDATE SET name=excluded.name,region=excluded.region,
-                       resource_type=excluded.resource_type,updated_at=excluded.updated_at""",
-                    (str(location_name), str(location_name), str(location_name), resource, now),
-                )
             cur = await db.execute("SELECT 1 FROM world_eras WHERE active=1 LIMIT 1")
             if not await cur.fetchone():
                 await db.execute(
@@ -5265,7 +5457,6 @@ class Database:
                     ("Jade Meridian Awakening Era", "The baseline era of the shared cultivation world.", now),
                 )
             await db.commit()
-        self._catalog_cache.clear()
 
     async def _catalog_get(self, table: str, name: str) -> dict[str, Any] | None:
         if table not in {"catalog_locations", "catalog_npcs", "catalog_recipes", "catalog_manuals", "catalog_techniques"}:
