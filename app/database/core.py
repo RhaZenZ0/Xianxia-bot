@@ -26,7 +26,7 @@ from .remote import GoDatabaseTransport
 log = logging.getLogger("xianxia.database")
 
 
-SCHEMA_VERSION = 49
+SCHEMA_VERSION = 50
 # A readiness probe must validate more than the schema-version marker.  If the
 # SQLite file is removed or replaced while the bot is running, SQLite will
 # happily create a new empty file at the same path.  Checking these tables lets
@@ -1921,8 +1921,13 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
             #
             # `seller_npc_name` mirrors the shape `merchant_bidder` (migration
             # 38) and `merchant_buyer` (36) already established: the seller is
-            # a character OR a named NPC, and `seller_user_id` stays 0 for a
-            # consignment because it is foreign-keyed to `characters`.
+            # a character OR a named NPC.
+            #
+            # This release wrote 0 into `seller_user_id` for a consignment and
+            # said it did so *because* the column is foreign-keyed to
+            # `characters`. That reasoning is backwards and the feature never
+            # once worked: being foreign-keyed is exactly why 0 is refused.
+            # Migration 50 makes the column nullable and NULL the sentinel.
             "ALTER TABLE auctions ADD COLUMN seller_npc_name TEXT NOT NULL DEFAULT ''",
             # A finder who cannot read what they found consigns it blind: the
             # house will say roughly what grade it is and nothing more, and
@@ -2123,6 +2128,86 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
                    ON npc_registry(location,name)""",
             """CREATE INDEX IF NOT EXISTS idx_npc_registry_origin
                    ON npc_registry(origin,created_game_minute DESC)""",
+        ),
+    ),
+    (
+        50,
+        "an_npc_consignment_has_no_character_behind_it",
+        (
+            # v1.0.0-rc.29: `npc_consignments` has never once put a lot on a
+            # floor, and it took the second half of every world tick down with
+            # it on the way past.
+            #
+            # `consignToNearestHouse` writes `seller_user_id=0` for a find by
+            # one of the world's own people. The column is NOT NULL and
+            # foreign-keyed to `characters`, every Go connection sets
+            # `PRAGMA foreign_keys=ON`, and no character has user id 0 - so the
+            # INSERT is refused with "FOREIGN KEY constraint failed" every
+            # time. `runSystems` returns on the first error and
+            # `npc_consignments` is fifth of eight, so `sect_politics`,
+            # `clan_dynamics`, `autonomous_world_events` and the whole
+            # `advancedMaintenance` bundle never ran either: commissions never
+            # expired, auctions never settled, merchants never bid, and the
+            # secret realm never rotated. The batch is daily, so this happened
+            # every day, from rc.15.
+            #
+            # The readers were all written correctly for it - `payAuctionSeller`
+            # pays a finder's own `wealth`, and each guard is
+            # `if seller := i64(...); seller > 0` - so nothing downstream
+            # changes here. `storage.ParseInt(nil)` is 0, which means NULL takes
+            # exactly the path 0 was meant to take. Only the value it hinges on
+            # has to become one the table can hold.
+            #
+            # SQLite cannot drop NOT NULL in place, so this is the table
+            # rebuild - with one wrinkle worth stating, because getting it
+            # wrong is silent. `auction_bids` is foreign-keyed to `auctions`
+            # ON DELETE CASCADE, and under `foreign_keys=ON` a DROP TABLE
+            # performs an implicit DELETE that fires that cascade. A plain
+            # rebuild therefore destroys every bid on every live lot, and
+            # `PRAGMA defer_foreign_keys` does not stop it (measured, both).
+            # So the bids are parked in a table carrying no foreign key of its
+            # own, and put back once the parent exists again.
+            "DROP TABLE IF EXISTS migrate50_auctions",
+            "DROP TABLE IF EXISTS migrate50_auction_bids",
+            """CREATE TABLE migrate50_auctions (
+                   auction_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                   house_id TEXT NOT NULL,
+                   seller_user_id INTEGER,
+                   item_id TEXT NOT NULL,
+                   quantity INTEGER NOT NULL,
+                   currency_id TEXT NOT NULL,
+                   starting_bid INTEGER NOT NULL,
+                   current_bid INTEGER NOT NULL DEFAULT 0,
+                   current_bidder_user_id INTEGER,
+                   anonymous INTEGER NOT NULL DEFAULT 0,
+                   active INTEGER NOT NULL DEFAULT 1,
+                   created_at REAL NOT NULL,
+                   ends_at REAL NOT NULL,
+                   merchant_buyer TEXT NOT NULL DEFAULT '',
+                   merchant_bidder TEXT NOT NULL DEFAULT '',
+                   seller_npc_name TEXT NOT NULL DEFAULT '',
+                   appraised INTEGER NOT NULL DEFAULT 1,
+                   grade_band TEXT NOT NULL DEFAULT '',
+                   FOREIGN KEY(seller_user_id) REFERENCES characters(user_id) ON DELETE CASCADE,
+                   FOREIGN KEY(current_bidder_user_id) REFERENCES characters(user_id) ON DELETE SET NULL
+               )""",
+            # NULLIF heals any 0 that reached the column on a database whose
+            # foreign keys were ever off, so the rebuild cannot carry a value
+            # the new foreign key would reject.
+            """INSERT INTO migrate50_auctions(auction_id,house_id,seller_user_id,item_id,quantity,
+                   currency_id,starting_bid,current_bid,current_bidder_user_id,anonymous,active,
+                   created_at,ends_at,merchant_buyer,merchant_bidder,seller_npc_name,appraised,grade_band)
+               SELECT auction_id,house_id,NULLIF(seller_user_id,0),item_id,quantity,
+                   currency_id,starting_bid,current_bid,current_bidder_user_id,anonymous,active,
+                   created_at,ends_at,merchant_buyer,merchant_bidder,seller_npc_name,appraised,grade_band
+               FROM auctions""",
+            "CREATE TABLE migrate50_auction_bids AS SELECT * FROM auction_bids",
+            "DROP TABLE auctions",
+            "ALTER TABLE migrate50_auctions RENAME TO auctions",
+            """CREATE INDEX IF NOT EXISTS idx_auctions_active_end
+                   ON auctions(active, ends_at)""",
+            "INSERT INTO auction_bids SELECT * FROM migrate50_auction_bids",
+            "DROP TABLE migrate50_auction_bids",
         ),
     ),
 )
@@ -2782,7 +2867,10 @@ class Database:
                 CREATE TABLE IF NOT EXISTS auctions (
                     auction_id INTEGER PRIMARY KEY AUTOINCREMENT,
                     house_id TEXT NOT NULL,
-                    seller_user_id INTEGER NOT NULL,
+                    -- NULL when the world's own people put the lot up: the
+                    -- column is foreign-keyed to `characters`, so there is no
+                    -- integer that can stand for "nobody". See migration 50.
+                    seller_user_id INTEGER,
                     item_id TEXT NOT NULL,
                     quantity INTEGER NOT NULL,
                     currency_id TEXT NOT NULL,

@@ -1575,6 +1575,20 @@ mechanical authority paths.
 - **Schema 27** added the v0.19.29 mute/freeze moderation columns on `characters`
   (`is_muted`, `is_frozen`, `moderation_reason`).
 - **Schema 28** added the Quest Forge definition table (`quest_definitions`).
+- **Schema 50** let one of the world's own people actually sell what they found.
+  `auctions.seller_user_id` lost its `NOT NULL`, because it is foreign-keyed to `characters` and a
+  consignment has no character behind it - so there is no integer that can mean "nobody", and the 0
+  that `npc_consignments` had written since rc.15 was refused by that foreign key every single time.
+  `runSystems` returns on the first error and the consignment batch is fifth of eight, so
+  `sect_politics`, `clan_dynamics`, `autonomous_world_events` and the whole advanced-maintenance
+  bundle never ran either: commissions did not expire, auctions did not settle, merchants did not
+  bid, and the secret realm never rotated. The batch is daily, so this was every day. NULL is the
+  sentinel now; `storage.ParseInt(nil)` is 0, so every reader's existing `seller > 0` guard - and
+  `payAuctionSeller` paying a finder's own `wealth` - was already correct and is untouched. The
+  rebuild parks `auction_bids` in a table carrying no foreign key first, because `auction_bids` is
+  `ON DELETE CASCADE` on `auctions` and a DROP under `foreign_keys=ON` fires that cascade; the bids
+  are put back once the new parent exists.
+
 - **Schema 49** gave the people this world makes for itself somewhere to live. `npc_registry` holds
   who somebody is - role, manner, what they want, what they are afraid of - for anybody who is not
   in `content/world.json`. `npc_descendants.generated_as_npc` had existed since the life cycle was

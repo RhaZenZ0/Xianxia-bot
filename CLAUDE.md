@@ -143,7 +143,7 @@ internal/server/        HTTP control/data plane
 ```
 
 Every Go SQLite connection uses `journal_mode=WAL`, `foreign_keys=ON`, `busy_timeout=10000`,
-`synchronous=NORMAL`. Current schema version is 49; historical migrations are kept so old databases
+`synchronous=NORMAL`. Current schema version is 50; historical migrations are kept so old databases
 can upgrade in place — see `VERSIONS.md` for the full schema/release history.
 
 ### The NPC life cycle (v1.0.0-rc.24)
@@ -208,6 +208,33 @@ a GM is not a player.
 
 Emptiness is `claimed_game_minute`, never `claimed_by_user_id` — the latter anonymises on erasure
 (see `erasureAnonymise`), so keying off it would let an erasure refill a grave.
+
+### One system's error ends the tick (`npc_consignments`, schema 50)
+
+`runSystems` walks `orderedSystems` and `return`s on the first error, so a batch that throws does
+not merely fail — it takes every batch ordered after it, and the whole `advancedMaintenance` bundle,
+with it. `npc_consignments` is fifth of eight.
+
+It threw on every run from v1.0.0-rc.15 to rc.28. `consignToNearestHouse` wrote `seller_user_id=0`
+for a find by one of the world's own people, and that column is foreign-keyed to `characters` while
+every Go connection sets `foreign_keys=ON` — so SQLite refused it, every time, because **0 is not a
+sentinel, it is just an id nobody holds**. The migration comment that introduced it had the
+reasoning exactly backwards: it said 0 was used *because* the column is foreign-keyed, when being
+foreign-keyed is precisely why 0 cannot be stored. The consequence was that `sect_politics`,
+`clan_dynamics`, `autonomous_world_events`, commission expiry, auction settlement, merchant bidding
+and secret-realm rotation had not run since rc.15. The batch is daily, so this was every day.
+
+Schema 50 drops the `NOT NULL` and makes NULL the sentinel. **Nothing downstream changed**, because
+every reader was already correct: `storage.ParseInt(nil)` is `0`, so each `if seller := i64(...);
+seller > 0` guard reads a NULL exactly as it was always meant to read the sentinel, and
+`payAuctionSeller` still pays a finder into their own `wealth`. Only the value it hinged on had to
+become one the table can hold.
+
+The rebuild has one trap worth knowing before writing another: `auction_bids` is `ON DELETE CASCADE`
+on `auctions`, and under `foreign_keys=ON` a `DROP TABLE` performs an implicit `DELETE` that fires
+that cascade — so a plain rebuild silently destroys every bid on every live lot, and
+`PRAGMA defer_foreign_keys` does not prevent it (both measured). The migration parks the bids in a
+table carrying no foreign key of its own and puts them back once the new parent exists.
 
 ### What a quest is allowed to ask for (`app/rules/quests.py`)
 
@@ -546,6 +573,13 @@ plane, and is read-only (no `admin_audit_log` row, and it sits under Systems, no
   put new tests in the layer they actually test, and don't duplicate Go-owned formulas/state
   transitions in pytest once a mechanic has moved to Go.
 - `tests/support.py` holds shared dependency shims and test path helpers.
+- **A fixture must carry the constraints production carries.** `npc_consignments` shipped broken
+  for thirteen releases with its Go test green, because the test's `auctions` fixture declared
+  `seller_user_id INTEGER NOT NULL DEFAULT 0` with no foreign key and no `characters` table at all,
+  while production foreign-keys that column and opens every connection with `foreign_keys=ON`. The
+  fixture accepted the one value production refused. A fixture that cannot fail the way production
+  fails is not testing production — copy the real DDL, foreign keys included, and seed the parent
+  rows.
 - **Never assert that a random thing happened, however many iterations you give it.** The simulation
   is built out of low-probability rolls and `gamerng` is `crypto/rand` with no seed, so a
   "sixty ticks and surely one landed" test fails for no reason at some rate you cannot drive to

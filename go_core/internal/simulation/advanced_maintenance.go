@@ -295,8 +295,8 @@ func (r *Runner) finalizeAuctions(conn *storage.Conn, gm int64) (int64, error) {
 				// Back to whoever consigned it. A player gets the goods
 				// returned to their bag; one of the world's own people simply
 				// takes it home again, and there is no bag to put it in -
-				// writing the row anyway would have credited user 0, a
-				// character that does not exist.
+				// writing the row anyway would have credited a character that
+				// does not exist. i64(NULL) is 0, so the guard holds.
 				if seller := i64(a["seller_user_id"]); seller > 0 {
 					if _, err = conn.Execute(`INSERT INTO inventory(user_id,item_id,quantity) VALUES(?,?,?) ON CONFLICT(user_id,item_id) DO UPDATE SET quantity=inventory.quantity+excluded.quantity`, []any{seller, fmt.Sprint(a["item_id"]), i64(a["quantity"])}); err != nil {
 						return 0, err
@@ -315,10 +315,12 @@ func (r *Runner) finalizeAuctions(conn *storage.Conn, gm int64) (int64, error) {
 //
 // A lot used to have exactly one kind of seller, so the payout was one
 // `walletDeltaSim` on `seller_user_id`. A consignment from one of the world's
-// own people has no character behind it - `seller_user_id` is 0, because the
-// column is foreign-keyed to `characters` - and paying user 0 would have
-// written a wallet row for a character that does not exist. A finder is paid
-// into the only purse they have: their own `wealth`.
+// own people has no character behind it - `seller_user_id` is NULL, because
+// the column is foreign-keyed to `characters` and so has no integer that can
+// stand for "nobody" (schema 50; it was 0 until then, and the foreign key
+// refused every such row). `storage.ParseInt(nil)` is 0, so the guard below
+// reads a NULL exactly as it was always meant to read the sentinel. A finder
+// is paid into the only purse they have: their own `wealth`.
 func payAuctionSeller(conn *storage.Conn, a map[string]any, amount int64) error {
 	if seller := i64(a["seller_user_id"]); seller > 0 {
 		return walletDeltaSim(conn, seller, fmt.Sprint(a["currency_id"]), amount)

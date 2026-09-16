@@ -351,6 +351,16 @@ async def run(url: str, token: str, db_path: str) -> Report:
             await step(report, "auction.leave", act("auction.leave", PLAYER, {}))
             if row and not bool(row.get("on_the_road")):
                 await step(report, f"teleport to {row.get('location')}", gm("admin.player.teleport", {"user_id": PLAYER, "location": str(row.get("location")), "reason": "playtest"}))
+                # The merchant resells a floor find at the item's own base
+                # price, which for the curio above is 980 - more than the 300
+                # road stones this player was ever given. That never showed
+                # until schema 50, because the tick this step depends on threw
+                # before it could name a buyer and the whole branch was
+                # skipped. Fund it from the price the merchant is actually
+                # asking rather than a constant, so a content edit cannot
+                # quietly put the step out of reach again.
+                asking = int(find[0].get("price") or 0)
+                await step(report, "grant the player the asking price", gm("admin.player.grant_currency", {"user_id": PLAYER, "currency_id": "low_spirit_stone", "amount": asking, "reason": "playtest"}))
                 await step(report, "merchant.buy the floor find", act("merchant.buy", PLAYER, {"merchant": buyer, "item_id": find_item, "quantity": 1}))
             else:
                 report.add("PASS", "merchant.buy the floor find", f"skipped: {buyer} is {row.get('whereabouts')}")
@@ -372,15 +382,27 @@ async def run(url: str, token: str, db_path: str) -> Report:
                    "a merchant bids the starting bid from its purse", f"merchant_bidder={holder!r} current_bid={lot_row.get('current_bid')}")
         if holder:
             after = {str(r.get("merchant")): int(r.get("budget") or 0) for r in list((await engine.action("merchant.status", PLAYER, {}) or {}).get("merchants") or [])}
-            report.add("PASS" if after.get(holder, 0) == before.get(holder, 0) - int(lot_row.get("current_bid") or 0) else "FAIL",
-                       "the purse is the escrow", f"{before.get(holder)} -> {after.get(holder)}")
+            # At least this lot's bid, not exactly it. The same tick lets the
+            # merchant bid on every open lot it can reach, and since schema 50
+            # the world's own people put lots on that floor too - so a purse
+            # that moved by more than this bid is the feature working, not a
+            # miscount. What must hold is that this lot's escrow came out of
+            # the purse; the refund below is what pins the amount exactly.
+            bid = int(lot_row.get("current_bid") or 0)
+            drop = before.get(holder, 0) - after.get(holder, 0)
+            report.add("PASS" if drop >= bid > 0 else "FAIL",
+                       "the purse is the escrow", f"{before.get(holder)} -> {after.get(holder)} (out {drop}, this lot {bid})")
             await step(report, "teleport the buyer to the capital", gm("admin.player.teleport", {"user_id": BUYER, "location": capital, "reason": "playtest"}))
             await step(report, "auction.enter (buyer, capital)", act("auction.enter", BUYER, {}))
             await step(report, "the buyer outbids the merchant", act("auction.bid", BUYER, {"auction_id": valued_id, "amount": int(lot_row.get("current_bid") or 0) + 5}))
             lot_row = await db.get_auction(valued_id) or {}
             refunded = {str(r.get("merchant")): int(r.get("budget") or 0) for r in list((await engine.action("merchant.status", PLAYER, {}) or {}).get("merchants") or [])}
-            report.add("PASS" if not str(lot_row.get("merchant_bidder") or "") and refunded.get(holder, 0) == before.get(holder, 0) else "FAIL",
-                       "outbid, the merchant is refunded and cleared", f"merchant_bidder={lot_row.get('merchant_bidder')!r} budget {after.get(holder)} -> {refunded.get(holder)}")
+            # Exactly this lot's bid comes back, measured from the purse as it
+            # stood after the bidding tick rather than before it - the merchant
+            # may hold escrow on other lots from the same tick, and those are
+            # not refunded by this outbid.
+            report.add("PASS" if not str(lot_row.get("merchant_bidder") or "") and refunded.get(holder, 0) == after.get(holder, 0) + bid else "FAIL",
+                       "outbid, the merchant is refunded and cleared", f"merchant_bidder={lot_row.get('merchant_bidder')!r} budget {after.get(holder)} -> {refunded.get(holder)} (+{bid} expected)")
 
     # ---- 11. city life (v0.38.0) ---------------------------------------------
     # The capital's board offers work from its own people; a shop trade moves
@@ -737,7 +759,32 @@ async def run(url: str, token: str, db_path: str) -> Report:
                        "incense lifts some of what clings",
                        f"-{shed.get('corruption_shed')} to {shed.get('corruption')} for {shed.get('stones_spent')} stones")
 
-    # ---- 19. backups -------------------------------------------------------
+    # ---- 19. every simulation system can run -------------------------------
+    #
+    # `npc_consignments` consigned an NPC's find with `seller_user_id=0` into a
+    # column that is NOT NULL and foreign-keyed to `characters`, so SQLite
+    # refused every one of them. `runSystems` returns on the first error and
+    # that system is fifth of eight, so `sect_politics`, `clan_dynamics`,
+    # `autonomous_world_events` and the whole maintenance bundle never ran
+    # either - commissions never expired, auctions never settled, merchants
+    # never bid and the secret realm never rotated. It had been that way since
+    # rc.15 and ten steps of this playtest failed on it; schema 50 makes the
+    # column nullable.
+    #
+    # One bad system taking the rest of the tick down with it is the general
+    # shape, so this forces each system in turn rather than only the one that
+    # broke. `Force` runs a system whether or not it is due, which is what
+    # makes this deterministic - *whether* anybody finds something on a given
+    # day is a roll, so the summary is reported and never asserted on. See the
+    # rule in CLAUDE.md: never assert that a random thing happened.
+    systems = ("npc_civilization", "npc_life", "dynamic_economy", "black_markets",
+               "npc_consignments", "sect_politics", "clan_dynamics", "autonomous_world_events")
+    for system in systems:
+        forced = await step(report, f"force {system}", engine.force_simulation(system, 3, await clock()))
+        if forced is not None:
+            report.add("PASS", f"{system} survives its own writes", str(forced.get("summary") or ""))
+
+    # ---- 20. backups -------------------------------------------------------
     backup = await step(report, "create a backup", transport.create_backup())
     listed = await step(report, "list backups", transport.list_backups())
     if backup and listed is not None and not any(row.get("name") == backup.get("name") for row in listed):

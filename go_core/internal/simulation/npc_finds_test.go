@@ -25,14 +25,26 @@ CREATE TABLE npc_civilization_state(
     phase INTEGER NOT NULL DEFAULT 1, status TEXT NOT NULL DEFAULT 'alive',
     activity TEXT NOT NULL DEFAULT '', missing_since_game_minute INTEGER NOT NULL DEFAULT 0, last_game_minute INTEGER NOT NULL DEFAULT 0,
     updated_at REAL NOT NULL DEFAULT 0);
+-- The characters table and the two foreign keys are load-bearing here, and
+-- leaving them out is how npc_consignments shipped broken for thirteen
+-- releases while this file stayed green. Production declares seller_user_id
+-- foreign-keyed to characters, and every connection sets PRAGMA
+-- foreign_keys=ON (storage/sqlite.go), so the 0 the consignment used to write
+-- was refused on every single call - while this fixture, which declared the
+-- column NOT NULL DEFAULT 0 with no foreign key and no parent table, accepted
+-- it happily. A fixture that cannot fail the way production fails is not
+-- testing production. (schema 50)
+CREATE TABLE characters(user_id INTEGER PRIMARY KEY);
 CREATE TABLE auctions(
-    auction_id INTEGER PRIMARY KEY AUTOINCREMENT, house_id TEXT NOT NULL, seller_user_id INTEGER NOT NULL DEFAULT 0,
+    auction_id INTEGER PRIMARY KEY AUTOINCREMENT, house_id TEXT NOT NULL, seller_user_id INTEGER,
     seller_npc_name TEXT NOT NULL DEFAULT '', item_id TEXT NOT NULL, quantity INTEGER NOT NULL DEFAULT 1,
     currency_id TEXT NOT NULL, starting_bid INTEGER NOT NULL, current_bid INTEGER NOT NULL DEFAULT 0,
     current_bidder_user_id INTEGER, anonymous INTEGER NOT NULL DEFAULT 0, active INTEGER NOT NULL DEFAULT 1,
     appraised INTEGER NOT NULL DEFAULT 1, grade_band TEXT NOT NULL DEFAULT '',
     merchant_buyer TEXT NOT NULL DEFAULT '', merchant_bidder TEXT NOT NULL DEFAULT '',
-    created_at REAL NOT NULL, ends_at REAL NOT NULL);
+    created_at REAL NOT NULL, ends_at REAL NOT NULL,
+    FOREIGN KEY(seller_user_id) REFERENCES characters(user_id) ON DELETE CASCADE,
+    FOREIGN KEY(current_bidder_user_id) REFERENCES characters(user_id) ON DELETE SET NULL);
 -- Production shapes, copied from app/database/core.py:279-300. An earlier
 -- version of this fixture invented location/price columns on the stock table
 -- and left out the NOT NULL currency_id/unit_price, which made a broken
@@ -238,6 +250,11 @@ func TestAFullFloorTakesNoConsignment(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// A player's lot needs a player: seller_user_id is foreign-keyed to
+	// characters now that this fixture carries the constraint production has.
+	if _, err := conn.Execute(`INSERT INTO characters(user_id) VALUES(42)`, nil); err != nil {
+		t.Fatal(err)
+	}
 	for i := 0; i < 6; i++ {
 		if _, err := conn.Execute(`INSERT INTO auctions(house_id,seller_user_id,item_id,currency_id,starting_bid,active,created_at,ends_at) VALUES('golden_pavilion',42,'sword_tablet','low_spirit_stone',10,1,0,9e9)`, nil); err != nil {
 			t.Fatal(err)
@@ -263,5 +280,53 @@ func TestARootedTradeFindsAlmostNothing(t *testing.T) {
 	}
 	if npcFindChance("beast hunter") <= npcFindChance("gate guard") {
 		t.Fatal("a hunter walks the wilds and a guard does not")
+	}
+}
+
+// A consignment stores no seller id at all, and that is the whole fix.
+//
+// `seller_user_id` is foreign-keyed to `characters`, so there is no integer
+// that can stand for "one of the world's own people" - 0 is refused like any
+// other id nobody holds. From rc.15 to rc.28 the consignment wrote 0 anyway,
+// so every call raised FOREIGN KEY constraint failed; and because runSystems
+// returns on the first error and this batch is fifth of eight, sect_politics,
+// clan_dynamics, autonomous_world_events and the whole advanced-maintenance
+// bundle never ran on any tick that reached it. Schema 50 makes the column
+// nullable and NULL the sentinel. storage.ParseInt(nil) is 0, so every reader
+// guard that was written as `seller > 0` keeps working unchanged.
+func TestAConsignmentNamesTheNPCAndNoCharacter(t *testing.T) {
+	path := findsDB(t)
+	r := findsRunner()
+	delete(r.World.Items, "ghost_sutra")
+	// Loaded, so the assertion is about what a consignment stores rather than
+	// about whether anybody happened to find something today.
+	restore := gamerng.UseRoller(func(bound int) int { return 0 })
+	defer restore()
+	addFinder(t, path, "Digger Yun", "Greenriver Town", "grave-robber", 0)
+	runFinds(t, path, r, 3, 1440)
+
+	if n := i64(simScalar(t, path, `SELECT COUNT(*) FROM auctions`)); n != 1 {
+		t.Fatalf("want one consigned lot, got %d", n)
+	}
+	if got := fmt.Sprint(simScalar(t, path, `SELECT seller_npc_name FROM auctions`)); got != "Digger Yun" {
+		t.Fatalf("the lot does not name its finder: %q", got)
+	}
+	if n := i64(simScalar(t, path, `SELECT COUNT(*) FROM auctions WHERE seller_user_id IS NULL`)); n != 1 {
+		t.Fatal("a consignment must store NULL, not an id no character holds")
+	}
+	// And the guard every reader uses still sends it down the NPC path.
+	var seller any
+	rows, err := storage.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	res, err := rows.Execute(`SELECT seller_user_id FROM auctions`, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	seller = res.Rows[0][0]
+	if i64(seller) != 0 {
+		t.Fatalf("i64(NULL) must be 0 so the `seller > 0` guard takes the NPC path, got %v", i64(seller))
 	}
 }
