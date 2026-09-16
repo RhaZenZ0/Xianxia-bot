@@ -38,10 +38,11 @@ from discord import app_commands
 
 from ...ops.game_engine import GameEngineError
 from ...rules.worldtime import MINUTES_PER_MONTH, MINUTES_PER_YEAR
-from ...rules.birthfamily import family_tier_name
+from ...rules.birthfamily import family_tier_name, family_tutoring_line
 from ..registry import registered_group_command
 from ..channels import _get_thread
-from ..services import SIM
+from ..character_state import announce_quest_progress
+from ..services import QUESTS, SIM
 from ..threads import ensure_birth_family_household_thread, open_expedition_thread_after_exit
 from ..runtime import (
     _explain_engine_error,
@@ -84,6 +85,7 @@ async def birth_family_view(interaction:discord.Interaction)->None:
     fam=await _current_birth_family(interaction.user.id)
     if not fam:
         await interaction.response.send_message("No birth family is recorded for this character.",ephemeral=False);return
+    standing=await household_standing(interaction.user.id,int(fam.get("family_id") or 0))
     lines=[
         f"🏠 **{fam['family_name']} — {family_tier_name(int(fam.get('tier',1)))}**",
         f"Background: **{str(fam.get('archetype','family')).replace('_',' ').title()}**",
@@ -91,13 +93,14 @@ async def birth_family_view(interaction:discord.Interaction)->None:
         f"Generation: **{fam.get('member_generation',1)}** • Your birth order: **#{fam.get('birth_order',1)}**",
         f"Family head: **{fam.get('head_title','Family Head')} {fam.get('head_name','Unknown')}** — {WORLD.realm_name(int(fam.get('head_realm_index',0)))} Stage {fam.get('head_phase',1)}",
         f"Wealth **{fam.get('wealth',0)}/100** • Influence **{fam.get('influence',0)}/100** • Stability **{fam.get('stability',0)}/100**",
+        f"Coffers: **{int(fam.get('treasury_balance',0) or 0)} spirit stones** • Your standing: **{household_standing_band(standing)}** ({standing:+d})",
         f"Bloodline status: **{str(fam.get('line_status','active')).title()}**",
         (f"Clan structure: **{str(fam.get('clan_structure','extended_household')).replace('_',' ').title()}**"),
         (f"Ancestral bloodline: **{fam.get('bloodline_name','None')}** • Purity **{fam.get('bloodline_purity',0)}%**" if int(fam.get('bloodline_purity',0)) > 0 else "Ancestral bloodline: **None awakened**"),
         "\n**Close relatives**",
     ]
     for npc in fam.get('npcs',[])[:12]:
-        status_note = " ☠️" if npc.get("status")=="deceased" else ""
+        status_note = " ☠️" if npc.get("status") in ("dead","deceased") else ""
         lines.append(f"• **{npc['relation']}** — {npc['name']} • {WORLD.realm_name(int(npc.get('realm_index',0)))} Stage {npc.get('phase',1)}{status_note}")
     if c.get("life_status")=="deceased":
         state=await DB.get_reincarnation_state(interaction.user.id)
@@ -120,10 +123,28 @@ async def birth_family_view(interaction:discord.Interaction)->None:
     else:
         lines.extend([
             "",
-            "🏠 Use **/family → Enter** to visit the shared household. Players born into this same "
-            "starter family meet in the same scene.",
+            f"🏠 The household stands in **{fam.get('location') or 'its home town'}**: go there and use **/family → Enter**, "
+            "or burn a Hearth-Return Talisman from anywhere. Support, the coffers, the household's teaching and its errands are all asked for inside.",
         ])
     await reply_long(interaction,"\n".join(lines),ephemeral=False)
+
+
+async def household_standing(user_id:int, family_id:int)->int:
+    """The player's standing with their own household, off `faction_reputation`
+    under the engine's `family:<id>` key (v1.0.0-rc.32)."""
+    key=f"family:{int(family_id)}"
+    for row in await DB.get_reputations(int(user_id)):
+        if str(row.get("faction_key") or "")==key:
+            return int(row.get("score") or 0)
+    return 0
+
+
+def household_standing_band(standing:int)->str:
+    """The engine's four words for a standing (household_return.go), for display."""
+    if standing>=70: return "a pillar of the house"
+    if standing>=35: return "trusted"
+    if standing>=10: return "known"
+    return "a stranger to the ledger"
 
 @registered_group_command(family_group, name="enter", description="Enter your shared birth-family household")
 @serialized_user_action
@@ -163,6 +184,12 @@ async def birth_family_enter(interaction: discord.Interaction) -> None:
             "The canonical shared location is active, but Discord could not create/recover its household thread.",
             ephemeral=False,
         )
+    # Coming home is something a quest can ask for (v1.0.0-rc.32). Reported
+    # after the reply, once the engine has already moved the character.
+    try:
+        await announce_quest_progress(interaction, await QUESTS.progress(interaction.user.id, "return_home", game_minute=wt.total_minutes))
+    except Exception:
+        log.exception("Quest progress update failed after entering the household")
 
 @registered_group_command(family_group, name="leave", description="Leave your shared birth-family household")
 @serialized_user_action
@@ -261,6 +288,7 @@ def family_sendoff_line(result: dict) -> str:
         f"\n🎁 The household sends you out with **{sendoff.get('name')}**"
         + (f" — {line}" if line else ".")
         + "\n✈️ It carries you: the road runs at a third of its walking hours while you have it."
+        + family_tutoring_line(sendoff)
     )
 
 
@@ -284,6 +312,59 @@ async def birth_family_support(interaction:discord.Interaction)->None:
         f"\nReceived: **{int(result.get('stones',0))} Low-Grade Spirit Stones**{goods}"
         f"{family_sendoff_line(result)}",
         ephemeral=False)
+
+@registered_group_command(family_group, name="contribute",description="Put spirit stones into your household's coffers (asked for at home)")
+@serialized_user_action
+async def birth_family_contribute(interaction:discord.Interaction, amount:app_commands.Range[int,1,500])->None:
+    await interaction.response.defer(ephemeral=False)
+    if not await require_character(interaction): return
+    try:
+        envelope=await ENGINE.authoritative_action("family.contribute",interaction.user.id,{"amount":int(amount)},action_id=f"discord:{interaction.id}:family.contribute")
+        result=dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
+    await interaction.followup.send(
+        f"🏠 **{int(result.get('amount',0))} spirit stones** go into **{result.get('family_name','the household')}**'s coffers."
+        f"\nCoffers: **{int(result.get('treasury_balance',0))}** • Wealth **{int(result.get('wealth',0))}/100** • Influence **{int(result.get('influence',0))}/100**"
+        f"\nYour standing: **{result.get('standing_band','')}** ({int(result.get('standing',0)):+d}, +{int(result.get('standing_gain',0))}). You keep **{int(result.get('balance',0))}** low spirit stones.",
+        ephemeral=False)
+
+
+@registered_group_command(family_group, name="tutor",description="Ask the household to teach its trade again, as well as it can now afford (at home)")
+@serialized_user_action
+async def birth_family_tutor(interaction:discord.Interaction)->None:
+    await interaction.response.defer(ephemeral=False)
+    if not await require_character(interaction): return
+    try:
+        envelope=await ENGINE.authoritative_action("family.tutor",interaction.user.id,{},action_id=f"discord:{interaction.id}:family.tutor")
+        result=dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
+    level=int(result.get("level",0)); xp=int(result.get("xp",0)); trade=str(result.get("profession",""))
+    taught=(f"you now stand an **Apprentice** of {trade}" if level>=1 else f"**{xp} XP** toward Apprentice {trade}")
+    await interaction.followup.send(
+        f"🛠️ **{result.get('family_name','The household')}** teaches again — {result.get('tutor','')}: {taught}."
+        f"\nThe house holds wealth **{int(result.get('wealth',0))}/100**; a richer house teaches better.",
+        ephemeral=False)
+
+
+@registered_group_command(family_group, name="errand",description="Ask the household what it needs of you (at home; one errand at a time)")
+@serialized_user_action
+async def birth_family_errand(interaction:discord.Interaction)->None:
+    await interaction.response.defer(ephemeral=False)
+    if not await require_character(interaction): return
+    try:
+        envelope=await ENGINE.authoritative_action("family.errand",interaction.user.id,{},action_id=f"discord:{interaction.id}:family.errand")
+        result=dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
+    opening=str(result.get("opening") or "").strip()
+    await interaction.followup.send(
+        f"📜 **{result.get('family_name','The household')}** asks something of you: **{result.get('title','an errand')}**."
+        + (f"\n*{opening}*" if opening else "")
+        + "\nIt is in your **/quests** now. Bring it home with **/family → Enter** when it is done.",
+        ephemeral=False)
+
 
 @registered_group_command(family_group, name="history",description="View recent rises, setbacks and political changes in your family")
 async def birth_family_history(interaction:discord.Interaction)->None:

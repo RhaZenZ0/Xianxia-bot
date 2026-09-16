@@ -810,7 +810,7 @@ SURFACE = {
         "groups": ('family_group', 'house_group'),
         "roots": (),
         "leaves": {
-            "family_group": ('view', 'enter', 'leave', 'clan', 'support', 'history', 'ancestry', 'investigate', 'legacy', 'quest', 'claim', 'conflict', 'child', 'descendants'),
+            "family_group": ('view', 'enter', 'leave', 'clan', 'support', 'contribute', 'tutor', 'errand', 'history', 'ancestry', 'investigate', 'legacy', 'quest', 'claim', 'conflict', 'child', 'descendants'),
             # v1.0.0-rc.15: the house players found themselves, as distinct
             # from the birth family above.
             "house_group": ('status', 'found', 'invite', 'respond', 'leave', 'child'),

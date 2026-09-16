@@ -20,8 +20,10 @@ from ..formatting import human_duration
 from ..pickers import auction_currency_autocomplete, usable_item_autocomplete
 from ..registry import registered_group_command, registered_root_command
 from ..runtime import _explain_engine_error, DB, ENGINE, WORLD, carried_item_autocomplete, character_location_display, current_world_time, log, reply_long, require_character, respond, serialized_user_action
+from ..channels import _get_thread
 from ..character_state import announce_quest_progress
 from ..services import GUILD, QUESTS, SIM
+from ..threads import ensure_birth_family_household_thread, open_expedition_thread_after_exit
 
 @registered_root_command(name="wallet", description="View all cultivation currencies you currently hold", guild=GUILD)
 async def wallet_command(interaction: discord.Interaction) -> None:
@@ -115,12 +117,45 @@ async def use_item_command(interaction: discord.Interaction, item: str) -> None:
         )
     if state.get("effect_name"):
         lines.append(f"Effect applied: **{state['effect_name']}**.")
+    homeward = dict(state.get("homeward") or {})
+    waymark = dict(state.get("waymark") or {})
+    if homeward:
+        lines.append(f"🏠 The paper burns and you are standing inside **{homeward.get('family_name','your birth household')}**. "
+                     f"It remembers where it found you: **{homeward.get('return_location') or 'nowhere in particular'}**.")
+    if waymark:
+        lines.append(f"🧭 The mark takes hold and you are back at **{waymark.get('location','where you were')}**.")
     if int(state.get("toxicity_gain", 0)):
         lines.append(
             f"⚗️ Medicinal residue **+{int(state['toxicity_gain'])}** → pill toxicity "
             f"**{int(state.get('pill_toxicity', 0))}/100 ({state.get('toxicity_band', '')})**."
         )
     await respond(interaction, "\n".join(lines))
+    # The talismans move the character between the household scene and the
+    # world (v1.0.0-rc.32), so the Discord side follows: the household thread
+    # on the way in, the expedition thread on the way out, and coming home is
+    # something a quest can ask for. All after the reply.
+    if homeward:
+        fam = await DB.get_birth_family(interaction.user.id)
+        if fam:
+            thread = await ensure_birth_family_household_thread(interaction, fam)
+            if thread is not None:
+                await interaction.followup.send(f"Shared household scene: {thread.mention}", ephemeral=False)
+        try:
+            await announce_quest_progress(interaction, await QUESTS.progress(interaction.user.id, "return_home", game_minute=(await current_world_time()).total_minutes))
+        except Exception:
+            log.exception("Quest progress update failed after a Hearth-Return Talisman")
+    if waymark:
+        fam = await DB.get_birth_family(interaction.user.id)
+        if fam and interaction.guild is not None:
+            household_row = await DB.get_birth_family_household_thread(interaction.guild.id, int(fam["family_id"]))
+            if household_row:
+                thread = await _get_thread(interaction.guild, household_row.get("thread_id"))
+                if thread is not None:
+                    try:
+                        await thread.remove_user(interaction.user)
+                    except (discord.Forbidden, discord.HTTPException):
+                        pass
+        await open_expedition_thread_after_exit(interaction)
 
 
 storage_group = app_commands.Group(name="storage", description="Manage your spatial pouch, ring, or inner-space treasure")

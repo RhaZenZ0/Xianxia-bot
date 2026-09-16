@@ -128,6 +128,12 @@ type ItemUse struct {
 	Name                string         `json:"name"`
 	DurationGameMinutes int64          `json:"duration_game_minutes"`
 	LifespanYears       int64          `json:"lifespan_years"`
+	// Homeward (v1.0.0-rc.32) is the Hearth-Return Talisman: using it puts
+	// the character inside their birth household from anywhere and marks
+	// where it found them. Waymark is the other half, the Waymark Talisman:
+	// read inside the household, it returns them to that mark.
+	Homeward bool `json:"homeward"`
+	Waymark  bool `json:"waymark"`
 }
 type Item struct {
 	Name string  `json:"name"`
@@ -475,6 +481,16 @@ type BeginnerStage struct {
 	FollowOn string `json:"follow_on"`
 }
 
+// HouseholdErrand is one thing a birth household asks of its own child
+// (v1.0.0-rc.32), keyed by the trade the house teaches. Like a beginner
+// stage it is an ordinary quest definition seeded from the content; the
+// engine reads only its key, its title and its opening.
+type HouseholdErrand struct {
+	QuestKey string `json:"quest_key"`
+	Title    string `json:"title"`
+	Opening  string `json:"opening"`
+}
+
 // BirthFamilySendoff is what a household puts in a child's hands on the day
 // they leave it (v1.0.0-rc.15). Every archetype has one and no two share an
 // item: which flying artifact a family owns *is* the family - a tomb-watch
@@ -719,6 +735,7 @@ type Catalog struct {
 	Inheritances        map[string]Inheritance         `json:"inheritances"`
 	BirthFamilySendoff  map[string]BirthFamilySendoff  `json:"birth_family_sendoff"`
 	BeginnerPath        []BeginnerStage                `json:"beginner_path"`
+	HouseholdErrands    map[string][]HouseholdErrand   `json:"household_errands"`
 	GeneratedTraits     GeneratedTraits                `json:"npc_generated_traits"`
 	NPCs                map[string]NPCDefinition       `json:"npcs"`
 	TechniqueSystem     TechniqueSystemDefinition      `json:"technique_system"`

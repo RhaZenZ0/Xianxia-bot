@@ -163,7 +163,7 @@ class ValidatorTests(unittest.TestCase):
         self.assertEqual(
             set(OBJECTIVE_TYPES),
             {"explore", "talk", "scene_action", "sect_discovery", "sect_trial",
-             "cultivate", "travel", "combat_win", "craft", "trade", "gather"},
+             "cultivate", "travel", "combat_win", "craft", "trade", "gather", "return_home"},
         )
 
     def test_the_procedural_draft_always_validates(self):

@@ -50,6 +50,17 @@ func placeCultivationMultiplier(conn *storage.Conn, catalog worlddata.Catalog, u
 		}
 	}
 	if name == "" {
+		// The family's own hall (v1.0.0-rc.32): a good place to sit, never
+		// the best one.
+		hearth, hearthMult, err := birthFamilyCultivationMultiplier(conn, location)
+		if err != nil {
+			return "", 1, err
+		}
+		if hearth != "" {
+			name, mult = hearth, hearthMult
+		}
+	}
+	if name == "" {
 		r, err := conn.Execute(`SELECT name,cultivation_level,formation_level FROM cave_abodes WHERE location_key=?`, []any{location})
 		if err != nil {
 			return "", 1, err

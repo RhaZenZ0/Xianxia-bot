@@ -924,9 +924,15 @@ func reincarnateAction(conn *storage.Conn, catalog worlddata.Catalog, userID int
 			oldLegacy[k] = lr.Rows[0][i]
 		}
 	}
+	// The trades this life practised go into its record before the wipe
+	// below clears them (v1.0.0-rc.32): they are what the craft echo reads.
+	professions, err := pastLifeProfessionsTx(conn, userID)
+	if err != nil {
+		return authoritativeMutation{}, err
+	}
 	past := []map[string]any{}
 	_ = json.Unmarshal([]byte(fmt.Sprint(oldLegacy["past_lives_json"])), &past)
-	past = append(past, map[string]any{"name": fmt.Sprint(s[2]), "family": oldFamName, "realm_index": i64(s[13]), "phase": i64(s[14]), "body_realm_index": i64(s[15]), "body_phase": i64(s[16]), "path": fmt.Sprint(s[18]), "spiritual_root": oldRoot, "karma": karma, "death_reason": fmt.Sprint(s[1])})
+	past = append(past, map[string]any{"name": fmt.Sprint(s[2]), "family": oldFamName, "realm_index": i64(s[13]), "phase": i64(s[14]), "body_realm_index": i64(s[15]), "body_phase": i64(s[16]), "path": fmt.Sprint(s[18]), "spiritual_root": oldRoot, "karma": karma, "death_reason": fmt.Sprint(s[1]), "professions": professions})
 	if len(past) > 50 {
 		past = past[len(past)-50:]
 	}
@@ -1082,6 +1088,7 @@ func reincarnateAction(conn *storage.Conn, catalog worlddata.Catalog, userID int
 		"memory_retention": memory, "talent_retention": mergedTalent, "partner_echo": i64(s[19]), "partner_name": fmt.Sprint(s[20]),
 		"comprehension_retention": mergedLaw, "insight_retention": mergedInsight, "legacy_points": totalLegacy,
 		"special_trait": trait, "incarnation_count": incarnation, "natural_lifespan_years": natural, "aptitudes": apt,
+		"past_life_trades": professions,
 	}
 	if sendoff != nil {
 		out["family_sendoff"] = sendoff

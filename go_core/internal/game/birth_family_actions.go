@@ -123,6 +123,12 @@ func grantBirthFamilySendoffTx(conn *storage.Conn, catalog worlddata.Catalog, us
 	if err := teachHouseholdMethodsTx(conn, catalog, userID, familyID, archetype, gameMinute, now); err != nil {
 		return nil, err
 	}
+	// And how well it taught them (v1.0.0-rc.31): the head start the
+	// household's Wealth bought in that trade, once, guarded on the row.
+	tutoring, err := tutorHouseholdTradeTx(conn, catalog, userID, familyID, archetype, now)
+	if err != nil {
+		return nil, err
+	}
 	// And who is in the house (v1.0.0-rc.27). Here for the same two reasons as
 	// the schooling above: this is the one helper all three doors into a
 	// household call, so it registers the relatives whichever way somebody
@@ -154,10 +160,26 @@ func grantBirthFamilySendoffTx(conn *storage.Conn, catalog worlddata.Catalog, us
 		[]any{userID, sendoff.Item, fmt.Sprint(familyID), "sent out by the household", maxI64(0, gameMinute), now, now}); err != nil {
 		return nil, err
 	}
-	return map[string]any{
+	// And the way back (v1.0.0-rc.32): one Hearth-Return Talisman, folded
+	// at the door, inside the same once-guard as the heirloom.
+	talisman := ""
+	if _, known := catalog.Items[hearthReturnTalismanItem]; known {
+		if _, err = conn.Execute(
+			`INSERT INTO inventory(user_id,item_id,quantity) VALUES(?,?,1) ON CONFLICT(user_id,item_id) DO UPDATE SET quantity=quantity+1`,
+			[]any{userID, hearthReturnTalismanItem}); err != nil {
+			return nil, err
+		}
+		talisman = hearthReturnTalismanItem
+	}
+	out := map[string]any{
 		"item_id": sendoff.Item, "name": item.Name, "flight": item.Flight,
-		"flight_name": item.FlightName, "line": sendoff.Line,
-	}, nil
+		"flight_name": item.FlightName, "line": sendoff.Line, "trade": strings.TrimSpace(sendoff.Trade),
+		"talisman": talisman,
+	}
+	if tutoring != nil {
+		out["tutoring"] = tutoring
+	}
+	return out, nil
 }
 
 type birthFamilyHomelandProfile struct {
@@ -745,7 +767,7 @@ func loadBirthFamilyChoice(conn *storage.Conn, userID int64, choiceID string) (b
 // Idempotent, because the three callers - creation, the dao-family path and
 // samsara - can each run against a character who already knows these.
 func teachHouseholdMethodsTx(conn *storage.Conn, catalog worlddata.Catalog, userID, familyID int64, archetype string, gameMinute int64, now float64) error {
-	trade := strings.TrimSpace(catalog.BirthFamilySendoff[archetype].Trade)
+	trade := householdTradeFor(catalog, archetype)
 	if trade == "" {
 		return nil
 	}

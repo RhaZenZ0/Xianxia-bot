@@ -65,11 +65,21 @@ func seclusionEnvironmentGo(conn *storage.Conn, catalog worlddata.Catalog, userI
 	if manor != nil && fmt.Sprint(manor["base_location"]) != residenceBase {
 		manor = nil
 	}
-	if abode == nil && sectAbode == nil && !safe && manor == nil {
-		return nil, 0, errors.New("closed-door seclusion requires a protected/safe location, a residence with a cultivation chamber, or your sect's manor")
+	// The birth household (v1.0.0-rc.32): the family's walls are a protected
+	// site, worth what the hearth is worth to active cultivation.
+	hearth, hearthMult, e := birthFamilyCultivationMultiplier(conn, location)
+	if e != nil {
+		return nil, 0, e
+	}
+	if abode == nil && sectAbode == nil && !safe && manor == nil && hearth == "" {
+		return nil, 0, errors.New("closed-door seclusion requires a protected/safe location, a residence with a cultivation chamber, your sect's manor, or your birth household")
 	}
 	base := 0.85
 	switch {
+	case hearth != "":
+		base = hearthMult
+		env["site"] = "household"
+		env["abode_name"] = hearth
 	case abode != nil:
 		level := max64(0, i64(abode["cultivation_level"]))
 		base = math.Min(1.45, 1.05+0.05*float64(level))

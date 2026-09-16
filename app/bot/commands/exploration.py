@@ -657,6 +657,7 @@ async def _run_crafting(interaction: discord.Interaction, recipe: str) -> None:
     facility_bonus = int(resolved.get("facility_bonus", 0))
     manor_facility_bonus = int(resolved.get("manor_facility_bonus", 0))
     inherited_family_bonus = int(resolved.get("family_bonus", 0))
+    craft_echo = int(resolved.get("craft_echo", 0))
     profession_bonus = int(resolved.get("profession_bonus", 0))
     output = {str(k): int(v) for k, v in dict(resolved.get("output") or {}).items()}
     success = bool(resolved.get("success"))
@@ -684,7 +685,8 @@ async def _run_crafting(interaction: discord.Interaction, recipe: str) -> None:
         for label, value in (
             ("Player-property facility bonus", facility_bonus),
             ("Sect-manor facility bonus", manor_facility_bonus),
-            ("Birth-family Alchemy tradition", inherited_family_bonus),
+            (f"Birth-family {resolved.get('family_trade') or 'trade'} tradition", inherited_family_bonus),
+            (f"Past-life {profession} memory ({resolved.get('craft_echo_life') or 'a life before'})", craft_echo),
             ("Profession mastery bonus", profession_bonus),
         )
         if value
@@ -859,7 +861,7 @@ async def alchemy_status(interaction: discord.Interaction) -> None:
     band, band_text = toxicity_band(pill_toxicity)
     member_manor = await DB.get_member_sect_manor(interaction.user.id)
     birth_family = await DB.get_birth_family(interaction.user.id)
-    inherited_family_bonus = family_profession_bonus(birth_family, "Alchemy")
+    inherited_family_bonus = family_profession_bonus(birth_family, "Alchemy", WORLD.data.get("birth_family_sendoff"))
     manor_bonus = 0
     if member_manor and str(member_manor.get("base_location", "")) == str(c.get("location", "")):
         manor_bonus = manor_craft_bonus(member_manor, "Alchemy")
@@ -915,9 +917,11 @@ async def alchemy_forage(interaction: discord.Interaction) -> None:
     forage_location = str(resolved.get("location") or c.get("location", ""))
     inherited_forage_bonus = int(resolved.get("family_bonus", 0))
     garden_bonus = int(resolved.get("garden_bonus", 0))
+    craft_echo = int(resolved.get("craft_echo", 0))
     bonus_bits = (
-        f"{(' • Alchemy-family herb lore **+'+str(inherited_forage_bonus)+'**') if inherited_forage_bonus else ''}"
+        f"{(' • Household herb lore **+'+str(inherited_forage_bonus)+'**') if inherited_forage_bonus else ''}"
         f"{(' • Property herb garden **+'+str(garden_bonus)+'**') if garden_bonus else ''}"
+        f"{(' • A past life’s hands **+'+str(craft_echo)+'**') if craft_echo else ''}"
     )
     if not success:
         await interaction.response.send_message(

@@ -35,7 +35,7 @@ from .channels import post_server_log
 from .character_state import _remember_freeform_npc_scene
 from .runtime import DB, ENGINE, SETTINGS, TYPED_PLAY_BUDGET, WORLD, _sync_realm_presence_roles, character_location_display, chunk_text, current_world_time, log
 from ..ai.quest_forge import store_draft
-from ..rules.quests import QUEST_DEFINITIONS, beginner_path_seed_rows, static_quest_seed_rows
+from ..rules.quests import QUEST_DEFINITIONS, beginner_path_seed_rows, household_errand_seed_rows, static_quest_seed_rows
 from .services import AI_ROUTER, ALERTS, GUILD, NARRATOR, NARRATOR_CONTEXT, QUEST_FORGE, SIM
 from .threads import _private_scene_for_thread
 from .auction_feed import settle_lots
@@ -236,6 +236,7 @@ class XianxiaBot(commands.Bot):
                 list(WORLD.data.get("commissions") or [])
                 + static_quest_seed_rows(QUEST_DEFINITIONS)
                 + beginner_path_seed_rows(WORLD)
+                + household_errand_seed_rows(WORLD)
             )
             catalog_counts = await DB.catalog_counts()
             rag_counts = await DB.rag_stats()

@@ -263,19 +263,60 @@ def family_tier_name(tier: int) -> str:
     return names.get(max(1, min(5, int(tier))), "Established Family")
 
 
-def family_profession_bonus(family: dict[str, Any] | None, profession: str) -> int:
-    """Return a small inherited profession bonus from a birth-family tradition.
+FAMILY_TRADE_BONUS = 2
 
-    Family backgrounds should provide identity and a modest head start without
+
+def family_trade(family: dict[str, Any] | None, sendoff: dict[str, Any] | None) -> str:
+    """The trade a birth family teaches, read off the send-off roster
+    (`birth_family_sendoff` in world.json) by the family's archetype."""
+    if not family or not sendoff:
+        return ""
+    archetype = str(family.get("archetype") or family.get("id") or "")
+    return str(dict(sendoff.get(archetype) or {}).get("trade") or "").strip()
+
+
+def family_profession_bonus(family: dict[str, Any] | None, profession: str, sendoff: dict[str, Any] | None) -> int:
+    """What a birth-family tradition adds to a roll in its own trade - for
+    display; the engine (`householdTradeBonusTx`) is what decides the roll.
+
+    Family backgrounds provide identity and a modest head start without
     replacing profession mastery, facilities, attributes or actual crafting
-    progression.  The Alchemy Family therefore contributes a flat +2 only to
-    Alchemy-related checks.
+    progression: a flat +2, in the one trade the household teaches. Until
+    v1.0.0-rc.31 this was keyed on the archetype string "alchemy_family" and
+    on Alchemy alone, so the body-tempering family - which teaches Alchemy -
+    got nothing, and no Forging, Inscription or Formation house got anything
+    for the trade it teaches.
     """
-    if not family:
-        return 0
-    if str(family.get("archetype") or family.get("id") or "") == "alchemy_family" and str(profession).casefold() == "alchemy":
-        return 2
+    trade = family_trade(family, sendoff)
+    if trade and trade.casefold() == str(profession).casefold():
+        return FAMILY_TRADE_BONUS
     return 0
+
+
+
+def family_tutoring_line(sendoff: dict[str, Any]) -> str:
+    """Who taught you the household's trade, and how far that took you.
+
+    Every household teaches its trade's entry methods; what its Wealth bought
+    on top is the engine's `tutoring` block (v1.0.0-rc.31): a tutor line and
+    the level and XP the child starts at, capped at Apprentice. Nothing is
+    decided here - the row was written in the same transaction as the
+    heirloom, and this only says it.
+    """
+    tutoring = dict(sendoff.get("tutoring") or {})
+    trade = str(tutoring.get("profession") or sendoff.get("trade") or "").strip()
+    if not trade:
+        return ""
+    tutor = str(tutoring.get("tutor") or "shown the basics").strip()
+    level = int(tutoring.get("level") or 0)
+    xp = int(tutoring.get("xp") or 0)
+    if level >= 1:
+        start = f"you leave an **Apprentice** of {trade}"
+    elif xp > 0:
+        start = f"you leave with **{xp} XP** toward Apprentice {trade}"
+    else:
+        start = f"you leave knowing the basics of {trade}"
+    return f"\n🛠️ {tutor.capitalize()}: {start}, and the household's **+{FAMILY_TRADE_BONUS} {trade} tradition** goes with you."
 
 
 def karma_label(score: int) -> str:

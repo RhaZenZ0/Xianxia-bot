@@ -327,6 +327,33 @@ def register_menu_facts(facts: Any) -> None:
     _MENU_FACTS = facts
 
 
+# Actions a player cannot use where they stand (v1.0.0-rc.32). The surface
+# registers one async provider returning the paths ("/family enter") to leave
+# off the panel for this player right now; it is asked whenever the panel
+# refreshes its status, and a failure hides nothing rather than everything.
+_HIDDEN_ACTIONS: Any = None
+
+
+def register_hidden_actions(provider: Any) -> None:
+    global _HIDDEN_ACTIONS
+    _HIDDEN_ACTIONS = provider
+
+
+async def hidden_actions(interaction: discord.Interaction) -> dict[str, str]:
+    """path -> why it is shut for this player ("" when the provider gave no
+    reason). A provider may answer with a set of paths or a mapping."""
+    if not callable(_HIDDEN_ACTIONS):
+        return {}
+    try:
+        answer = await _HIDDEN_ACTIONS(interaction) or {}
+        if isinstance(answer, dict):
+            return {str(path): str(reason or "") for path, reason in answer.items()}
+        return {str(path): "" for path in answer}
+    except Exception:
+        log.exception("Hidden-action lookup unavailable")
+        return {}
+
+
 async def menu_facts(interaction: discord.Interaction) -> str:
     """The facts line for a menu, or nothing when the lookup is unavailable
     or fails - the menu itself must never fail on its header."""
@@ -2101,6 +2128,7 @@ class LayoutHubView(_LayoutHubBase):
         return self.definition.pages[0] if self.definition.pages else None
 
     async def refresh_status(self, interaction: discord.Interaction) -> None:
+        self.hidden_paths = await hidden_actions(interaction)
         if not callable(self.status_provider):
             return
         try:
@@ -2112,6 +2140,26 @@ class LayoutHubView(_LayoutHubBase):
             ]
         except Exception:
             log.exception("Could not refresh live hub status for %s", self.definition.name)
+
+    def page_actions(self, page: HubPage | None) -> list[HubAction]:
+        """The page's actions this player can use where they stand."""
+        if page is None:
+            return []
+        hidden = getattr(self, "hidden_paths", None) or {}
+        return [action for action in _leaf_actions(page) if action.path not in hidden]
+
+    def locked_lines(self, page: HubPage | None) -> str:
+        """The doors this page leaves off for this player, and why: a road
+        nobody can see is a road nobody learns exists."""
+        if page is None:
+            return ""
+        hidden = getattr(self, "hidden_paths", None) or {}
+        lines = []
+        for action in _leaf_actions(page):
+            if action.path in hidden:
+                reason = hidden[action.path]
+                lines.append(f"🔒 {action.label}" + (f" — {reason}" if reason else ""))
+        return ("\n" + "\n".join(lines[:6])) if lines else ""
 
     def _header_text(self) -> str:
         icon = _hub_icon(self.definition.name)
@@ -2148,7 +2196,7 @@ class LayoutHubView(_LayoutHubBase):
                 f"{total} action{'s' if total != 1 else ''}"
             )
         body = page.description or "System actions"
-        return f"### {_page_emoji(page.key)} {page.label}\n{body}\n{meta}"[:600]
+        return f"### {_page_emoji(page.key)} {page.label}\n{body}{self.locked_lines(page)}\n{meta}"[:900]
 
     def _action_text(self, action: HubAction) -> str:
         description = " ".join(str(action.description).split())[:150] or "Run this action."
@@ -2204,7 +2252,7 @@ class LayoutHubView(_LayoutHubBase):
             self.add_item(container)
             return
 
-        actions = _leaf_actions(page)
+        actions = self.page_actions(page)
         total = len(actions)
         if self.action_offset >= total:
             self.action_offset = 0
@@ -2317,6 +2365,7 @@ class CommandHubView(discord.ui.View):
         return self.definition.pages[0] if self.definition.pages else None
 
     async def refresh_status(self, interaction: discord.Interaction) -> None:
+        self.hidden_paths = await hidden_actions(interaction)
         if not callable(self.status_provider):
             return
         try:
@@ -2330,6 +2379,26 @@ class CommandHubView(discord.ui.View):
             self.status_fields = fields
         except Exception:
             log.exception("Could not refresh live hub status for %s", self.definition.name)
+
+    def page_actions(self, page: HubPage | None) -> list[HubAction]:
+        """The page's actions this player can use where they stand."""
+        if page is None:
+            return []
+        hidden = getattr(self, "hidden_paths", None) or {}
+        return [action for action in _leaf_actions(page) if action.path not in hidden]
+
+    def locked_lines(self, page: HubPage | None) -> str:
+        """The doors this page leaves off for this player, and why: a road
+        nobody can see is a road nobody learns exists."""
+        if page is None:
+            return ""
+        hidden = getattr(self, "hidden_paths", None) or {}
+        lines = []
+        for action in _leaf_actions(page):
+            if action.path in hidden:
+                reason = hidden[action.path]
+                lines.append(f"🔒 {action.label}" + (f" — {reason}" if reason else ""))
+        return ("\n" + "\n".join(lines[:6])) if lines else ""
 
     def build_embed(self) -> discord.Embed:
         page = self.page
@@ -2345,12 +2414,12 @@ class CommandHubView(discord.ui.View):
             embed.add_field(name="No actions", value="No migrated actions are configured for this hub.", inline=False)
             return embed
 
-        actions = _leaf_actions(page)
+        actions = self.page_actions(page)
         page_index = next((idx for idx, item in enumerate(self.definition.pages, 1) if item.key == page.key), 1)
         total_pages = max(1, len(self.definition.pages))
         embed.description = (
             f"### {_page_emoji(page.key)} {page.label}\n"
-            f"{page.description or 'System actions'}\n"
+            f"{page.description or 'System actions'}{self.locked_lines(page)}\n"
             f"`{page_index}/{total_pages}`  •  {len(actions)} action{'s' if len(actions) != 1 else ''}"
         )
 
@@ -2387,7 +2456,7 @@ class CommandHubView(discord.ui.View):
         else:
             action_row = 0
         page = self.page
-        actions = _leaf_actions(page) if page is not None else []
+        actions = self.page_actions(page)
         if actions:
             self.add_item(HubActionSelect(self, actions, row=action_row))
         quick_row = action_row + 1

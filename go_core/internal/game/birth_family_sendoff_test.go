@@ -187,6 +187,8 @@ func TestComingHomeAndAskingGetsTheHeirloomOnce(t *testing.T) {
 	catalog := districtCatalog(t)
 	fid := sendoffFamily(t, path, "sword_hall_family", "test:sword", 3, 90)
 	batch4Exec(t, path, `INSERT INTO character_birth_family(user_id,family_id,birth_order,generation,last_support_game_minute) VALUES(42,?,1,1,-999999999)`, fid)
+	// Coming home means standing in it (v1.0.0-rc.32).
+	batch4Exec(t, path, `UPDATE characters SET location=? WHERE user_id=42`, birthFamilyHouseholdLocation(fid))
 
 	batch4SetCanonicalGameMinute(t, path, 5000)
 	first := batch4Result(t, batch4Apply(t, path, world, "family.support", 1, map[string]any{"cooldown_game_minutes": 100}))
@@ -223,6 +225,7 @@ func TestTheGhostHouseholdsSupportTheirOwn(t *testing.T) {
 		batch4Exec(t, path, `INSERT INTO characters(user_id,name,gender,path,spiritual_root,location,attributes_json,realm_index,phase,cultivation,body_realm_index,body_phase,body_cultivation,life_status,karma_score,qi,qi_max,vitality,vitality_max) VALUES(?,'Ghost Test','neutral','Rogue Cultivator','Water Root','Greenriver Town','{}',0,1,0,0,1,0,'alive',0,10,10,10,10)`, user)
 		fid := sendoffFamily(t, path, spec.archetype, spec.starter, 3, 90)
 		batch4Exec(t, path, `INSERT INTO character_birth_family(user_id,family_id,birth_order,generation,last_support_game_minute) VALUES(?,?,1,1,-999999999)`, user, fid)
+		batch4Exec(t, path, `UPDATE characters SET location=? WHERE user_id=?`, birthFamilyHouseholdLocation(fid), user)
 
 		batch4SetCanonicalGameMinute(t, path, int64(6000+i*1000))
 		raw, _ := json.Marshal(map[string]any{"cooldown_game_minutes": 100})

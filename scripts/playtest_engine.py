@@ -110,7 +110,8 @@ async def run(url: str, token: str, db_path: str) -> Report:
     from app.database import Database
     from app.database.remote import GoDatabaseTransport
     from app.ops.game_engine import GameEngineClient
-    from app.rules.quests import QUEST_DEFINITIONS, static_quest_seed_rows
+    from app.rules.quests import QUEST_DEFINITIONS, beginner_path_seed_rows, household_errand_seed_rows, static_quest_seed_rows
+    from app.rules.game import World
 
     world = json.loads((ROOT / "content" / "world.json").read_text(encoding="utf-8"))
     engine = GameEngineClient(url, auth_token=token)
@@ -135,8 +136,10 @@ async def run(url: str, token: str, db_path: str) -> Report:
 
     # ---- 0. the world ------------------------------------------------------
     await step(report, "seed the catalog", db.sync_world_catalog(world))
-    await step(report, "seed the commission pool and static quests",
-               db.sync_commission_pool(list(world.get("commissions") or []) + static_quest_seed_rows(QUEST_DEFINITIONS)))
+    content = World(ROOT / "content" / "world.json")
+    await step(report, "seed the commission pool, static quests, the beginner path and the household errands",
+               db.sync_commission_pool(list(world.get("commissions") or []) + static_quest_seed_rows(QUEST_DEFINITIONS)
+                                       + beginner_path_seed_rows(content) + household_errand_seed_rows(content)))
     gm0 = await step(report, "world clock", clock())
     await step(report, "simulation bootstrap", engine.bootstrap_simulation(int(gm0 or 0)))
 
@@ -185,8 +188,79 @@ async def run(url: str, token: str, db_path: str) -> Report:
         if created is not None and not created.get("created"):
             report.add("FAIL", f"character.create {uid}", f"created=false: {created.get('reason')}")
 
-    # ---- 2. $ I explore ----------------------------------------------------
+    # ---- 1b. what the household taught (v1.0.0-rc.31) -------------------------
+    # families[0] is the Martial Household: trade Forging, Wealth 42, which is
+    # the 30-XP band - so the head start and the tradition bonus are both
+    # certain by the scenario, not by a roll.
+    taught = await step(report, "the household's profession row", db.get_profession_progress(PLAYER, "Forging"))
+    if taught is not None:
+        report.add("PASS" if taught and int(taught.get("xp", -1)) == 30 and int(taught.get("level", -1)) == 0 else "FAIL",
+                   "a journeyman in the family starts you halfway to Apprentice", f"{taught}")
     await step(report, "teleport to Greenriver Town", gm("admin.player.teleport", {"user_id": PLAYER, "location": "Greenriver Town", "reason": "playtest"}))
+    sword = dict(world["recipes"]["Spirit-Iron Sword"])
+    for item_id, qty in dict(sword.get("cost") or {}).items():
+        await step(report, f"grant {item_id} x{qty} for the forge", gm("admin.player.adjust_item", {"user_id": PLAYER, "item_id": item_id, "quantity": int(qty), "reason": "playtest"}))
+    forged = await step(report, "craft.resolve a Forging recipe the household taught", act("craft.resolve", PLAYER, {"recipe": "Spirit-Iron Sword"}))
+    if forged is not None:
+        report.add("PASS" if int(forged.get("family_bonus", 0)) == 2 and str(forged.get("family_trade")) == "Forging" else "FAIL",
+                   "a Forging house's tradition rides a Forging roll", f"family_bonus={forged.get('family_bonus')} trade={forged.get('family_trade')!r}")
+
+    # ---- 1c. a house worth coming back to (v1.0.0-rc.32) -------------------
+    # The household's gifts are asked for inside it, the door opens from its
+    # town, and two talismans make the round trip from anywhere. Every step
+    # here is decided by the scenario - the Martial Household's wealth of 42,
+    # a contribution of a known size - and never by a roll.
+    fam = await step(report, "the birth family", db.get_birth_family(PLAYER))
+    home_town = str((fam or {}).get("location") or "Riverguard City")
+    far_town = "Greenriver Town" if home_town != "Greenriver Town" else "Riverguard City"
+    household = f"birth_family:{int((fam or {}).get('family_id') or 0)}"
+    await step(report, f"teleport to {far_town}, away from home", gm("admin.player.teleport", {"user_id": PLAYER, "location": far_town, "reason": "playtest"}))
+    await step(report, "family.support away from home is refused", act("family.support", PLAYER, {"cooldown_game_minutes": 100}),
+               expect_error="asked for at home")
+    await step(report, "the door does not open from another town", act("family.household.enter", PLAYER, {}),
+               expect_error="travel there first")
+    burned = await step(report, "a Hearth-Return Talisman from the send-off carries you home", act("item.use", PLAYER, {"item_id": "hearth_return_talisman"}))
+    if burned is not None:
+        home = dict(burned.get("homeward") or {})
+        report.add("PASS" if home.get("location") == household and home.get("return_location") == far_town else "FAIL",
+                   "the talisman marks where it found you", f"{home}")
+    supported = await step(report, "family.support at home", act("family.support", PLAYER, {"cooldown_game_minutes": 100}))
+    if supported is not None:
+        report.add("PASS" if int(supported.get("standing_bonus", -1)) == 0 else "FAIL", "a stranger to the ledger earns no standing term", f"{supported.get('standing_bonus')}")
+    # Support just cost the house a few stones of wealth, so the figures are
+    # relative to what it holds now rather than to the archetype's 42.
+    before = await step(report, "the family after support", db.get_birth_family(PLAYER)) or {}
+    await step(report, "grant 400 stones for the coffers", gm("admin.player.grant_currency", {"user_id": PLAYER, "currency_id": "low_spirit_stone", "amount": 400, "reason": "playtest"}))
+    given = await step(report, "family.contribute 240", act("family.contribute", PLAYER, {"amount": 240}))
+    if given is not None:
+        want_wealth = min(100, int(before.get("wealth", 0)) + 48)
+        report.add("PASS" if int(given.get("treasury_balance", 0)) == int(before.get("treasury_balance", 0)) + 240 and int(given.get("wealth", 0)) == want_wealth and int(given.get("standing", 0)) == 10 else "FAIL",
+                   "240 stones: coffers +240, wealth +48, standing capped at 10 for one gift", f"{given} (wealth before {before.get('wealth')})")
+    taught_again = await step(report, "family.tutor after the house grew richer", act("family.tutor", PLAYER, {}))
+    if taught_again is not None:
+        report.add("PASS" if int(taught_again.get("level", 0)) == 1 and taught_again.get("tutor") == "a master retained" else "FAIL",
+                   "a master retained makes you an Apprentice of Forging", f"{taught_again}")
+    await step(report, "family.tutor again is refused", act("family.tutor", PLAYER, {}), expect_error="taught you all it can")
+    errand = await step(report, "family.errand", act("family.errand", PLAYER, {}))
+    if errand is not None:
+        report.add("PASS" if str(errand.get("quest_key", "")).startswith("errand_forging_") else "FAIL", "a Forging house asks a Forging errand", f"{errand.get('quest_key')}")
+    await step(report, "a second errand while one is carried is refused", act("family.errand", PLAYER, {}), expect_error="finish the errand")
+    await step(report, "grant a Waymark Talisman", gm("admin.player.adjust_item", {"user_id": PLAYER, "item_id": "waymark_talisman", "quantity": 1, "reason": "playtest"}))
+    marked = await step(report, "a Waymark Talisman takes you back to the mark", act("item.use", PLAYER, {"item_id": "waymark_talisman"}))
+    if marked is not None:
+        report.add("PASS" if dict(marked.get("waymark") or {}).get("location") == "Greenriver Town" else "FAIL", "back where the hearth talisman found you", f"{marked.get('waymark')}")
+    await step(report, f"teleport to {home_town}, the family's town", gm("admin.player.teleport", {"user_id": PLAYER, "location": home_town, "reason": "playtest"}))
+    walked = await step(report, "the door opens from the family's town", act("family.household.enter", PLAYER, {}))
+    if walked is not None:
+        report.add("PASS" if walked.get("location") == household and not walked.get("return_location") else "FAIL", "walking in leaves no mark", f"{walked}")
+    sat = await step(report, "cultivation.train at the hearth", act("cultivation.train", PLAYER, {"cooldown_seconds": 0}))
+    if sat is not None:
+        report.add("PASS" if str(sat.get("place_name", "")).endswith("Household") and float(sat.get("place_mult", 1)) > 1 else "FAIL",
+                   "the family's hall is a good place to sit", f"{sat.get('place_name')} x{sat.get('place_mult')}")
+    await step(report, "family.household.leave", act("family.household.leave", PLAYER, {}))
+    await step(report, "teleport back to Greenriver Town", gm("admin.player.teleport", {"user_id": PLAYER, "location": "Greenriver Town", "reason": "playtest"}))
+
+    # ---- 2. $ I explore ----------------------------------------------------
     explored = await step(report, "exploration.explore", act("exploration.explore", PLAYER, {
         "cooldown_seconds": 0, "unexpected_event_chance_percent": 0, "event_key": aid("exploration:event")}))
     if explored is not None and not (explored.get("narration") or explored.get("summary") or explored.get("encounter") or explored):
@@ -828,6 +902,30 @@ async def run(url: str, token: str, db_path: str) -> Report:
         report.add("FAIL", "list backups", "the new backup is not listed")
     if backup:
         await step(report, "restore that backup", transport.restore_backup(str(backup.get("name"))))
+
+    # ---- 21. samsara, and what the hands remember (v1.0.0-rc.32) -------------
+    # Last, because it ends the character. The trades this life practised go
+    # into its record before the wipe, and a fresh rebirth remembers nothing
+    # of them yet: awakened memory is 0, so the echo is 0 by construction.
+    await step(report, "lifecycle.true_death", act("lifecycle.true_death", PLAYER, {"reason": "playtest", "max_wait_seconds": 1}))
+    await step(report, "the wheel is hurried", gm("admin.player.force_reincarnation_ready", {"user_id": PLAYER, "reason": "playtest"}))
+    reborn = await step(report, "lifecycle.reincarnate", act("lifecycle.reincarnate", PLAYER, {"name": "Second Wen", "gender": "female", "path": "Sword Cultivator"}))
+    if reborn is not None:
+        trades = dict(reborn.get("past_life_trades") or {})
+        report.add("PASS" if int(trades.get("Forging", 0)) == 1 else "FAIL", "the past life's Apprentice Forging is recorded", f"{trades}")
+    legacy = await step(report, "the soul record", db.get_soul_legacy(PLAYER))
+    if legacy is not None:
+        past = list(legacy.get("past_lives") or [])
+        report.add("PASS" if past and isinstance(past[-1].get("professions"), dict) else "FAIL", "the record carries the professions", f"{past[-1] if past else past}")
+    # The new life's household teaches its own trade; craft one of its
+    # entry methods, whichever trade that turned out to be.
+    new_trade = str(dict((reborn or {}).get("family_sendoff") or {}).get("trade") or "Forging")
+    recipe_name = next((name for name, r in world["recipes"].items() if r.get("profession") == new_trade and int(r.get("min_level", 0)) == 0), "Spirit-Iron Sword")
+    for item_id, qty in dict(world["recipes"][recipe_name].get("cost") or {}).items():
+        await step(report, f"grant {item_id} x{qty} for the new life's {new_trade}", gm("admin.player.adjust_item", {"user_id": PLAYER, "item_id": item_id, "quantity": int(qty), "reason": "playtest"}))
+    reforged = await step(report, f"craft.resolve {recipe_name} in the new life", act("craft.resolve", PLAYER, {"recipe": recipe_name}))
+    if reforged is not None:
+        report.add("PASS" if int(reforged.get("craft_echo", -1)) == 0 else "FAIL", "a fresh rebirth remembers nothing yet: craft_echo is 0", f"{reforged.get('craft_echo')}")
     return report
 
 

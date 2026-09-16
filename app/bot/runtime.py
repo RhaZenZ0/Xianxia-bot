@@ -198,6 +198,15 @@ def _explain_engine_error(exc: Exception) -> str:
         what = (cooldown.group("what") or "").strip() or "This action"
         seconds = int(cooldown.group("seconds"))
         text = f"⏳ {what[:1].upper()}{what[1:]} is still on cooldown — ready in **{format_wait(seconds)}**."
+    # "family support cooldown has 129600 in-world minutes remaining" is game
+    # time, not wall-clock (v1.0.0-rc.32): say it in the world's days.
+    # Inline so the function stays pure (test_cooldown_wording execs it out
+    # of the source); 1440 is MINUTES_PER_DAY.
+    support = re.search(r"family support cooldown has (?P<minutes>\d+) in-world minutes remaining", text)
+    if support:
+        minutes = int(support.group("minutes"))
+        days = max(1, -(-minutes // 1440))
+        text = f"⏳ The household has given what it can for now — it can support you again in **{days} in-world day{'s' if days != 1 else ''}**."
     if "private residence or personal world" in text:
         # Spell these the way a player can actually reach them. The individual
         # gameplay commands are not registered with Discord - only the 16 hub

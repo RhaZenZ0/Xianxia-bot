@@ -32,7 +32,7 @@ type itemUsePayload struct {
 // Storage upgrades and array deployment have their own actions.
 func itemHasActiveUse(item worlddata.Item) bool {
 	u := item.Use
-	return u.Instant.QiRestore > 0 || u.Instant.VitalityRestore > 0 || len(u.Effect) > 0 || u.LifespanYears > 0
+	return u.Instant.QiRestore > 0 || u.Instant.VitalityRestore > 0 || len(u.Effect) > 0 || u.LifespanYears > 0 || u.Homeward || u.Waymark
 }
 
 // isPillItem is app/rules/alchemy.py is_pill: a "pill" tag on the effect, or
@@ -169,6 +169,48 @@ func itemUseActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64
 	}
 	now := float64(time.Now().UnixNano()) / 1e9
 
+	// 0. homeward (v1.0.0-rc.32) - the Hearth-Return Talisman is refused
+	// before it is spent: mid-battle, in seclusion, or with no household to
+	// go to, the paper stays in the pouch.
+	var homeward map[string]any
+	if item.Use.Homeward {
+		fought, e := conn.Execute(`SELECT 1 FROM battles WHERE user_id=? AND status='active' LIMIT 1`, []any{userID})
+		if e != nil {
+			return authoritativeMutation{}, e
+		}
+		if len(fought.Rows) > 0 {
+			return authoritativeMutation{}, errors.New("the talisman will not carry you out of a battle")
+		}
+		if tableExistsTx(conn, "seclusion_sessions") {
+			secluded, e := conn.Execute(`SELECT 1 FROM seclusion_sessions WHERE user_id=? AND status='active' LIMIT 1`, []any{userID})
+			if e != nil {
+				return authoritativeMutation{}, e
+			}
+			if len(secluded.Rows) > 0 {
+				return authoritativeMutation{}, errors.New("the talisman will not carry you out of seclusion")
+			}
+		}
+		here, e := conn.Execute(`SELECT location FROM characters WHERE user_id=?`, []any{userID})
+		if e != nil {
+			return authoritativeMutation{}, e
+		}
+		if len(here.Rows) == 0 {
+			return authoritativeMutation{}, errors.New("character not found")
+		}
+		if homeward, e = enterHouseholdTx(conn, userID, fmt.Sprint(here.Rows[0][0])); e != nil {
+			return authoritativeMutation{}, e
+		}
+	}
+	// 0b. waymark - the other half of the round trip, read at home only;
+	// refused before it is spent when there is no mark to go back to.
+	var waymark map[string]any
+	if item.Use.Waymark {
+		var e error
+		if waymark, e = returnToWaymarkTx(conn, userID); e != nil {
+			return authoritativeMutation{}, e
+		}
+	}
+
 	// 1. consume - one from the carried inventory, the row goes at zero.
 	r, e := conn.Execute(`SELECT quantity FROM inventory WHERE user_id=? AND item_id=?`, []any{userID, p.ItemID})
 	if e != nil {
@@ -186,6 +228,12 @@ func itemUseActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64
 		return authoritativeMutation{}, e
 	}
 	out := map[string]any{"item_id": p.ItemID, "item_name": itemName, "consumed": 1}
+	if homeward != nil {
+		out["homeward"] = homeward
+	}
+	if waymark != nil {
+		out["waymark"] = waymark
+	}
 
 	// 2. restore - clamped to the maxima; an active battle's HP bar follows.
 	qiRestore, vitRestore := maxI64(0, item.Use.Instant.QiRestore), maxI64(0, item.Use.Instant.VitalityRestore)

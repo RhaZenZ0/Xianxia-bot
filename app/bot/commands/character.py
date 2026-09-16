@@ -821,7 +821,9 @@ async def soul_status(interaction:discord.Interaction)->None:
     if visible_count>0:
         lines.append("\n**Awakened past-life echoes**")
         for life in past[-visible_count:]:
-            lines.append(f"• **{life.get('name','Unknown')}** — {life.get('path') or 'Unknown Path'}; karma {int(life.get('karma',0)):+d}; death: {life.get('death_reason','unknown')}")
+            trades=dict(life.get("professions") or {})
+            trade_bit=("; hands: "+", ".join(f"{k} Lv.{int(v)}" for k,v in sorted(trades.items()))) if trades else ""
+            lines.append(f"• **{life.get('name','Unknown')}** — {life.get('path') or 'Unknown Path'}; karma {int(life.get('karma',0)):+d}; death: {life.get('death_reason','unknown')}{trade_bit}")
     elif past:
         lines.append("\nYour previous incarnations remain sealed. Breakthroughs and deep Law insights can awaken fragments.")
     await reply_long(interaction,"\n".join(lines),ephemeral=False)
@@ -929,6 +931,9 @@ async def reincarnate(interaction:discord.Interaction,name:str,path:str,gender:a
         "Your previous realm, Qi/Body cultivation, inventory, money, and direct Law progress are gone.",
         "Past-life memories are sealed and can awaken gradually through breakthroughs and deep comprehension.",
     ]
+    trades=dict(result.get("past_life_trades") or {})
+    if trades:
+        lines.append("🛠️ The hands remember: "+", ".join(f"**{k}** Lv.{int(v)}" for k,v in sorted(trades.items()))+" — an echo that returns to your crafts as memory awakens.")
     if result.get("lineage_status"):
         lines.append(f"Lineage outcome: **{str(result['lineage_status']).replace('_',' ').title()}**")
     if result.get("lineage_summary"):
