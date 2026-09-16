@@ -26,7 +26,7 @@ from .remote import GoDatabaseTransport
 log = logging.getLogger("xianxia.database")
 
 
-SCHEMA_VERSION = 50
+SCHEMA_VERSION = 51
 # A readiness probe must validate more than the schema-version marker.  If the
 # SQLite file is removed or replaced while the bot is running, SQLite will
 # happily create a new empty file at the same path.  Checking these tables lets
@@ -106,6 +106,15 @@ OPERATIONAL_REQUIRED_TABLES = frozenset(
         "characters",
         "civilization_events",
         "civilization_regions",
+        "content_items",
+        "content_locations",
+        "content_manuals",
+        "content_merchants",
+        "content_npcs",
+        "content_recipes",
+        "content_sects",
+        "content_shops",
+        "content_techniques",
         "cooldowns",
         "crime_records",
         "currency_wallets",
@@ -223,6 +232,36 @@ OPERATIONAL_REQUIRED_TABLES = frozenset(
         "world_state",
     }
 )
+# The five catalogue reads and the table each goes to when the engine owns the
+# database (schema 51). The two are the same content: catalog_* is written by
+# Python from its in-memory copy of world.json, content_* by the engine from
+# the file, and only the second is deleted from when an entry goes. Readers
+# name the catalog_* table; this picks.
+CONTENT_FOR_CATALOG = {
+    "catalog_locations": "content_locations",
+    "catalog_npcs": "content_npcs",
+    "catalog_recipes": "content_recipes",
+    "catalog_manuals": "content_manuals",
+    "catalog_techniques": "content_techniques",
+}
+
+
+def content_table_for(catalog_table: str, engine_backed: bool) -> str:
+    """The table a catalogue read goes to.
+
+    Engine-backed - which is production, always - it is the content_* table
+    the engine writes. On the local-SQLite path there is no engine to write
+    those, so it stays the catalog_* table `sync_world_catalog` fills; that
+    path is tests and one-off scripts. A mode switch rather than a per-row
+    fallback, so a production read is one query against one table and never a
+    quiet second look somewhere else. Shared by `Database` and the dashboard's
+    read-only store, which carries its own transport.
+    """
+    if catalog_table not in CONTENT_FOR_CATALOG:
+        raise ValueError("Unknown catalog")
+    return CONTENT_FOR_CATALOG[catalog_table] if engine_backed else catalog_table
+
+
 SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
     (
         1,
@@ -2210,6 +2249,101 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
             "DROP TABLE migrate50_auction_bids",
         ),
     ),
+    (
+        51,
+        "content_tables_the_engine_writes",
+        (
+            # v1.0.0-rc.30: the content file, as tables with columns.
+            #
+            # `catalog_*` is five blobs - `(name, data_json, updated_at)` -
+            # written by Python from its in-memory copy of world.json, one
+            # upsert per entry, never a delete, so a renamed NPC lived in
+            # `catalog_npcs` forever. These nine are written by the engine
+            # (`internal/contentsync`) from the file itself, in one
+            # transaction, only when the file's hash has changed, and a
+            # removed entry is removed. Every row still carries the entry's
+            # exact bytes in `data_json` - readers that want the whole entry
+            # take that, as they took the blob before - and the typed columns
+            # beside it are a projection for the queries that filter or join:
+            # every NPC in a district, every manual of a path, every location
+            # in a world, as one indexed read instead of a parse of 2.5 MB.
+            #
+            # The projection is defined once, in Go (`contentsync.Sections`);
+            # this DDL is held to it by `test_content_tables.py`, so a column
+            # added on one side without the other fails a test rather than
+            # boot. A missing key is NULL, never '', so the parity test there
+            # can count them against the file.
+            #
+            # Derived, like `catalog_*`: rebuilt from the file, never backed
+            # up as truth, and deliberately separate from `npc_registry`,
+            # which is authored state the rebuild must never touch. The five
+            # `catalog_*` tables are still written this release so a rollback
+            # finds them intact; they go with their readers in a later one.
+            """CREATE TABLE IF NOT EXISTS content_npcs (
+                   name TEXT PRIMARY KEY,
+                   role TEXT, realm TEXT, location TEXT, district TEXT, shop TEXT,
+                   sect_affiliation TEXT, merchant TEXT,
+                   circuit INTEGER, hidden_master INTEGER,
+                   data_json TEXT NOT NULL, updated_at REAL NOT NULL
+               )""",
+            "CREATE INDEX IF NOT EXISTS idx_content_npcs_location ON content_npcs(location)",
+            "CREATE INDEX IF NOT EXISTS idx_content_npcs_district ON content_npcs(district)",
+            """CREATE TABLE IF NOT EXISTS content_locations (
+                   name TEXT PRIMARY KEY,
+                   world TEXT, outside_location TEXT, settlement_type TEXT, district TEXT,
+                   road_site TEXT, shop TEXT, auction_house TEXT,
+                   safe_zone INTEGER, private INTEGER, min_realm_index INTEGER,
+                   data_json TEXT NOT NULL, updated_at REAL NOT NULL
+               )""",
+            "CREATE INDEX IF NOT EXISTS idx_content_locations_world ON content_locations(world)",
+            "CREATE INDEX IF NOT EXISTS idx_content_locations_outside ON content_locations(outside_location)",
+            """CREATE TABLE IF NOT EXISTS content_items (
+                   name TEXT PRIMARY KEY,
+                   display_name TEXT, type TEXT, legal_status TEXT, auction_interest TEXT, manual_id TEXT,
+                   base_price INTEGER, sect_value INTEGER, market_excluded INTEGER,
+                   data_json TEXT NOT NULL, updated_at REAL NOT NULL
+               )""",
+            "CREATE INDEX IF NOT EXISTS idx_content_items_type ON content_items(type)",
+            """CREATE TABLE IF NOT EXISTS content_recipes (
+                   name TEXT PRIMARY KEY,
+                   profession TEXT, tn INTEGER, min_level INTEGER,
+                   data_json TEXT NOT NULL, updated_at REAL NOT NULL
+               )""",
+            "CREATE INDEX IF NOT EXISTS idx_content_recipes_profession ON content_recipes(profession)",
+            """CREATE TABLE IF NOT EXISTS content_sects (
+                   name TEXT PRIMARY KEY,
+                   alignment TEXT, specialty TEXT, recruitment_location TEXT, hidden INTEGER,
+                   data_json TEXT NOT NULL, updated_at REAL NOT NULL
+               )""",
+            """CREATE TABLE IF NOT EXISTS content_shops (
+                   name TEXT PRIMARY KEY,
+                   display_name TEXT, kind TEXT, city TEXT, world TEXT, location TEXT, keeper TEXT, currency TEXT,
+                   tier INTEGER,
+                   data_json TEXT NOT NULL, updated_at REAL NOT NULL
+               )""",
+            "CREATE INDEX IF NOT EXISTS idx_content_shops_city ON content_shops(city)",
+            """CREATE TABLE IF NOT EXISTS content_merchants (
+                   name TEXT PRIMARY KEY,
+                   display_name TEXT, world TEXT, home TEXT, currency TEXT,
+                   budget INTEGER, markup_percent INTEGER,
+                   data_json TEXT NOT NULL, updated_at REAL NOT NULL
+               )""",
+            """CREATE TABLE IF NOT EXISTS content_manuals (
+                   name TEXT PRIMARY KEY,
+                   display_name TEXT, item_id TEXT, alignment TEXT, path TEXT, grade TEXT, element TEXT, sect TEXT,
+                   min_realm_index INTEGER,
+                   data_json TEXT NOT NULL, updated_at REAL NOT NULL
+               )""",
+            "CREATE INDEX IF NOT EXISTS idx_content_manuals_path ON content_manuals(path)",
+            """CREATE TABLE IF NOT EXISTS content_techniques (
+                   name TEXT PRIMARY KEY,
+                   display_name TEXT, manual TEXT,
+                   min_mastery INTEGER, qi_cost INTEGER, karma_cost INTEGER, exposure INTEGER,
+                   data_json TEXT NOT NULL, updated_at REAL NOT NULL
+               )""",
+            "CREATE INDEX IF NOT EXISTS idx_content_techniques_manual ON content_techniques(manual)",
+        ),
+    ),
 )
 
 
@@ -3821,7 +3955,7 @@ class Database:
         out: dict[str, int] = {}
         async with self._connect() as db:
             for key, table in tables.items():
-                cur = await db.execute(f"SELECT COUNT(*) FROM {table}")
+                cur = await db.execute(f"SELECT COUNT(*) FROM {self.content_table(table)}")
                 out[key] = int((await cur.fetchone())[0])
         return out
 
@@ -5546,9 +5680,25 @@ class Database:
                 )
             await db.commit()
 
+    def content_table(self, catalog_table: str) -> str:
+        """The table a catalogue read goes to - see `content_table_for`."""
+        return content_table_for(catalog_table, self._go_transport is not None)
+
+    async def sync_content(self) -> dict[str, Any]:
+        """Have the engine bring content_* up to content/world.json (schema 51).
+
+        Hash-gated on the engine side, so it is a no-op when nothing changed.
+        db-init calls it the moment the migration has run and the bot at
+        CATALOG_READY; together with the engine's own apply at start that
+        guarantees the tables are full before any reader, in every boot order.
+        No engine is the local path, whose readers use catalog_*: not an error.
+        """
+        if self._go_transport is None:
+            return {"skipped": True, "reason": "no engine: the local path reads catalog_*"}
+        return await self._go_transport.sync_content()
+
     async def _catalog_get(self, table: str, name: str) -> dict[str, Any] | None:
-        if table not in {"catalog_locations", "catalog_npcs", "catalog_recipes", "catalog_manuals", "catalog_techniques"}:
-            raise ValueError("Unknown catalog")
+        table = self.content_table(table)
         key = (table, str(name))
         cached = self._catalog_cache.get(key)
         if cached is not None:
@@ -5664,6 +5814,7 @@ class Database:
         table = {"location": "catalog_locations", "npc": "catalog_npcs", "recipe": "catalog_recipes", "manual": "catalog_manuals", "technique": "catalog_techniques"}.get(kind)
         if table is None:
             return []
+        table = self.content_table(table)
         needle = f"%{query.strip()}%"
         async with self._connect() as db:
             cur = await db.execute(

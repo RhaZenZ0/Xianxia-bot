@@ -143,7 +143,7 @@ internal/server/        HTTP control/data plane
 ```
 
 Every Go SQLite connection uses `journal_mode=WAL`, `foreign_keys=ON`, `busy_timeout=10000`,
-`synchronous=NORMAL`. Current schema version is 50; historical migrations are kept so old databases
+`synchronous=NORMAL`. Current schema version is 51; historical migrations are kept so old databases
 can upgrade in place — see `VERSIONS.md` for the full schema/release history.
 
 ### The NPC life cycle (v1.0.0-rc.24)
@@ -402,6 +402,50 @@ endpoint that had existed on the transport since the Go engine landed with nothi
 using it. The statements stay inside `sync_world_catalog` rather than in a helper because
 `test_authority_boundary` reads the write allowlists off the method that contains the SQL, and
 moving them out would mean widening an authority gate for a refactor that changes no authority.
+
+### The content file as tables (`content_*`, `internal/contentsync`, schema 51)
+
+Nine derived tables — `content_npcs`, `content_locations`, `content_items`, `content_recipes`,
+`content_sects`, `content_shops`, `content_merchants`, `content_manuals`, `content_techniques` —
+mirror `content/world.json` with real, indexed columns. **The engine alone writes them**, from the
+file itself, hash-gated (`world_state['content_version']`), in one transaction, with deletes: the
+Python-written `catalog_*` blobs only ever upserted, so a renamed NPC lived in `catalog_npcs`
+forever.
+
+**Every row is the entry's raw bytes plus a projection.** `data_json` is the exact JSON of that entry
+as it sits in the file, and the typed columns beside it are read off it by `contentsync.Sections` —
+`Text`, `Integer`, or a presence `Flag` for the fields whose value is a structure (`circuit`,
+`hidden_master`). An absent key is `NULL`, never `''`. This is deliberately not the struct-widening
+the plan first called for, which it named "silent when wrong": a field missed in a Go struct is an
+empty column and nothing errors. Keeping the file's own bytes makes the blob complete by
+construction, and `TestProjectionMatchesTheRawEntries` holds every projected column against the real
+2.5 MB — the count of non-NULL cells must equal the count of entries carrying the key.
+
+**Three doors, one apply, and the order is the point.** The tables are filled by the engine but
+created by Python's migration, which in the compose stack runs *after* the engine is healthy — so
+the engine's guarded apply at `server.New` finds no tables on a first boot and does nothing. db-init
+(`app.database.bootstrap`) calls `POST /v1/content/sync` the moment `init()` has run, the bot calls it
+again at `CATALOG_READY` before it counts, and the GM's `admin.content.reload` runs the same apply
+on demand. Together those guarantee the tables are full before any reader in every boot order;
+`test_content_tables.py` asserts the ordering rather than hoping.
+
+**Readers switch by mode, not by fallback.** `content_table_for(catalog_table, engine_backed)` sends
+an engine-backed read — which is production, always — to `content_*`, and a local-SQLite read (tests,
+one-off scripts, where no engine fills the tables) to `catalog_*`. One query against one table; never
+a quiet second look. `_catalog_get`, `search_catalog`, `catalog_counts` and the dashboard's two
+catalogue reads all resolve through it. `catalog_*` is still written this release so a rollback finds
+it intact; it goes, with its readers and with `DROPPED_TABLES` entries for the migration drill, in a
+later one. Go's own rules keep reading the memoised in-memory catalogue — a table of what the engine
+already holds parsed would be a slower copy, not a source.
+
+**The GM sync tells the truth now.** `/admin server maintenance → Sync world catalog` used to write
+`WORLD.data` — this process's copy, parsed at import — and report that it had resynced from
+`world.json`, which it had not. It re-reads the file on both sides: Python fills `catalog_*` from a
+fresh parse (the running `WORLD` is left alone — a hot swap of a dict 347 call sites read is not a
+maintenance action), the engine applies into `content_*` with an audit row in the same commit, and the
+message reports the content hash, whether anything changed, and that this bot's in-process
+presentation applies the edit at its next restart. `worlddata.Load` is memoised on the file's stat,
+so the Go rules had already picked the edit up on their own.
 
 ### The readiness probe (`OPERATIONAL_REQUIRED_TABLES`)
 

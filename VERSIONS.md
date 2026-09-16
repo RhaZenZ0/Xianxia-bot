@@ -1575,6 +1575,22 @@ mechanical authority paths.
 - **Schema 27** added the v0.19.29 mute/freeze moderation columns on `characters`
   (`is_muted`, `is_frozen`, `moderation_reason`).
 - **Schema 28** added the Quest Forge definition table (`quest_definitions`).
+- **Schema 51** put the content file into tables with columns. Nine derived `content_*` tables
+  (`npcs`, `locations`, `items`, `recipes`, `sects`, `shops`, `merchants`, `manuals`, `techniques`) are
+  written by the engine alone - `internal/contentsync` - from `content/world.json`, hash-gated, in one
+  transaction, and with deletes, which the Python-written `catalog_*` blobs never had: an entry renamed
+  in the file lived in `catalog_npcs` forever. Every row carries the entry's exact bytes in `data_json`
+  and a typed projection beside it - `content_locations(road_site, district, settlement_type, ...)`,
+  `content_npcs(location, district, ...)` - so "every NPC in this district" is an indexed read rather
+  than a parse of 2.5 MB. The projection is defined once, in Go, and the migration's DDL is held to it
+  by a contract test; a parity test counts every projected column against the real file. The tables
+  are filled by the engine but created by this migration, which in the compose stack runs after the
+  engine is already healthy, so db-init calls `/v1/content/sync` the moment it has run and the bot
+  again at `CATALOG_READY`; engine-backed readers switch to `content_*`, the local-SQLite path stays on
+  `catalog_*`, and `catalog_*` is still written so a rollback finds it intact. The GM's "Sync world
+  catalog" re-reads the file on both sides (`admin.content.reload`, audited) instead of rewriting the
+  bot's in-memory copy and saying it had.
+
 - **Schema 50** let one of the world's own people actually sell what they found.
   `auctions.seller_user_id` lost its `NOT NULL`, because it is foreign-keyed to `characters` and a
   consignment has no character behind it - so there is no integer that can mean "nobody", and the 0

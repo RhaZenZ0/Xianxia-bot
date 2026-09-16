@@ -140,6 +140,37 @@ async def run(url: str, token: str, db_path: str) -> Report:
     gm0 = await step(report, "world clock", clock())
     await step(report, "simulation bootstrap", engine.bootstrap_simulation(int(gm0 or 0)))
 
+    # ---- 0b. the content file as tables (schema 51) ------------------------
+    # The engine writes content_* from world.json, hash-gated. db-init already
+    # synced once after the migration in this harness; asking again must be a
+    # no-op that still reports the counts, and the counts must be the file's.
+    synced = await step(report, "content sync", transport.sync_content())
+    if synced is not None:
+        ts = dict(world.get("technique_system") or {})
+        expected = {
+            "content_npcs": len(world.get("npcs") or {}), "content_locations": len(world.get("locations") or {}),
+            "content_items": len(world.get("items") or {}), "content_recipes": len(world.get("recipes") or {}),
+            "content_sects": len(world.get("sects") or {}), "content_shops": len(world.get("shops") or {}),
+            "content_merchants": len(world.get("merchants") or {}),
+            "content_manuals": len(ts.get("manuals") or {}), "content_techniques": len(ts.get("techniques") or {}),
+        }
+        counts = {str(k): int(v) for k, v in dict(synced.get("counts") or {}).items()}
+        wrong = {t: (counts.get(t), n) for t, n in expected.items() if counts.get(t) != n}
+        report.add("PASS" if not wrong and not synced.get("skipped") else "FAIL", "every content table holds the file's rows",
+                   f"{sum(counts.values())} rows" if not wrong else f"mismatch {wrong}")
+        report.add("PASS" if not synced.get("applied") else "FAIL", "an unchanged file is not rewritten", f"hash {str(synced.get('hash') or '')[:12]}")
+        npc = await step(report, "a catalogue NPC is read back through content_npcs", db.get_npc_definition("Elder Su Yan"))
+        if npc is not None:
+            report.add("PASS" if npc.get("role") and npc.get("location") else "FAIL", "the blob is the whole entry", f"{sorted(npc)[:6]}...")
+        reloaded = await step(report, "admin.content.reload", gm("admin.content.reload", {"reason": "playtest"}))
+        if reloaded is not None:
+            report.add("PASS" if not reloaded.get("applied") and reloaded.get("hash") == synced.get("hash") else "FAIL",
+                       "the GM reload sees the same file and changes nothing", f"applied={reloaded.get('applied')}")
+            audit = await step(report, "the reload is audited", db.get_admin_audit_log(10))
+            if audit is not None:
+                report.add("PASS" if any(str(r.get("action")) == "admin.content.reload" for r in audit) else "FAIL",
+                           "admin_audit_log carries admin.content.reload", f"{len(audit)} recent rows")
+
     # ---- 1. begin ----------------------------------------------------------
     for uid, name in ((PLAYER, "Playtest Lin"), (BUYER, "Playtest Bidder")):
         offers = await step(report, f"family options for {uid}", act("character.family_options", uid, {"world_name": "Mortal World"}))
