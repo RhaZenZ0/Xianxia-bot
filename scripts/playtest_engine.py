@@ -359,9 +359,15 @@ async def run(url: str, token: str, db_path: str) -> Report:
                 # skipped. Fund it from the price the merchant is actually
                 # asking rather than a constant, so a content edit cannot
                 # quietly put the step out of reach again.
-                asking = int(find[0].get("price") or 0)
-                await step(report, "grant the player the asking price", gm("admin.player.grant_currency", {"user_id": PLAYER, "currency_id": "low_spirit_stone", "amount": asking, "reason": "playtest"}))
-                await step(report, "merchant.buy the floor find", act("merchant.buy", PLAYER, {"merchant": buyer, "item_id": find_item, "quantity": 1}))
+                # `find` is [] when the lot is not in the pack - already a FAIL
+                # two lines up - and a diagnostic script must report that, not
+                # crash on it before the sections that follow get to run.
+                asking = int((find[0] if find else {}).get("price") or 0)
+                if asking > 0:
+                    await step(report, "grant the player the asking price", gm("admin.player.grant_currency", {"user_id": PLAYER, "currency_id": "low_spirit_stone", "amount": asking, "reason": "playtest"}))
+                    await step(report, "merchant.buy the floor find", act("merchant.buy", PLAYER, {"merchant": buyer, "item_id": find_item, "quantity": 1}))
+                else:
+                    report.add("FAIL", "merchant.buy the floor find", "no asking price to fund: the lot never reached the pack")
             else:
                 report.add("PASS", "merchant.buy the floor find", f"skipped: {buyer} is {row.get('whereabouts')}")
 

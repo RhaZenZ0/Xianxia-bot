@@ -1587,7 +1587,10 @@ mechanical authority paths.
   `payAuctionSeller` paying a finder's own `wealth` - was already correct and is untouched. The
   rebuild parks `auction_bids` in a table carrying no foreign key first, because `auction_bids` is
   `ON DELETE CASCADE` on `auctions` and a DROP under `foreign_keys=ON` fires that cascade; the bids
-  are put back once the new parent exists.
+  are put back once the new parent exists. One reader was not already correct: the merchant
+  settlement path paid the seller's wallet unconditionally, so the first NPC lot a merchant won would
+  have refilled the same hole one step downstream - `game.PayLotSellerTx` is the single payout both
+  settlement paths use now.
 
 - **Schema 49** gave the people this world makes for itself somewhere to live. `npc_registry` holds
   who somebody is - role, manner, what they want, what they are afraid of - for anybody who is not

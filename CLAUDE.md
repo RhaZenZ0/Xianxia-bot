@@ -230,6 +230,17 @@ seller > 0` guard reads a NULL exactly as it was always meant to read the sentin
 `payAuctionSeller` still pays a finder into their own `wealth`. Only the value it hinged on had to
 become one the table can hold.
 
+**Except one reader, one step downstream — and the review found it, not the playtest**, because a
+consignment carries hours of real time before settlement and the harness never waits that long.
+`merchantTakesLotTx` paid `walletDeltaTx(conn, i64(seller_user_id), …)` unconditionally, and
+`MerchantsBid` bids on every open lot, so the first NPC consignment a merchant won or bought would
+have written `currency_wallets(user_id=0)` — foreign-keyed to `characters`, refused — and ended the
+maintenance pass before its commit, then again on every tick after, since the lot stays active with
+its `ends_at` in the past. The same failure the schema fixed, moved one step. `game.PayLotSellerTx`
+is the one payout now: both settlement paths call it, `test_npc_consignments.py` holds that neither
+carries its own copy, and `TestAMerchantWinningAnNPCLotPaysTheFinderNotUserZero` fails with the
+production error when the old call is put back.
+
 The rebuild has one trap worth knowing before writing another: `auction_bids` is `ON DELETE CASCADE`
 on `auctions`, and under `foreign_keys=ON` a `DROP TABLE` performs an implicit `DELETE` that fires
 that cascade — so a plain rebuild silently destroys every bid on every live lot, and

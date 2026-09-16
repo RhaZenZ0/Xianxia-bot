@@ -27,7 +27,7 @@ CREATE TABLE merchant_stock(
 	acquired_game_minute INTEGER NOT NULL DEFAULT 0, updated_at REAL NOT NULL DEFAULT 0,
 	PRIMARY KEY(merchant,item_id)
 );
-CREATE TABLE npc_civilization_state(npc_name TEXT PRIMARY KEY,home_location TEXT,current_location TEXT,world_name TEXT,updated_at REAL);
+CREATE TABLE npc_civilization_state(npc_name TEXT PRIMARY KEY,home_location TEXT,current_location TEXT,world_name TEXT,wealth INTEGER NOT NULL DEFAULT 20,updated_at REAL);
 `
 
 func setupMerchantDB(t *testing.T) string {
@@ -42,7 +42,8 @@ func setupMerchantDB(t *testing.T) string {
 ALTER TABLE auctions ADD COLUMN merchant_buyer TEXT NOT NULL DEFAULT '';
 ALTER TABLE auctions ADD COLUMN merchant_bidder TEXT NOT NULL DEFAULT '';
 CREATE TABLE IF NOT EXISTS auction_bids(bid_id INTEGER PRIMARY KEY AUTOINCREMENT, auction_id INTEGER NOT NULL, bidder_user_id INTEGER NOT NULL, amount INTEGER NOT NULL, created_at REAL NOT NULL DEFAULT 0);
-INSERT INTO npc_civilization_state VALUES('Old Hu the Peddler','Greenriver Town','Greenriver Town','Mortal World',0);
+ALTER TABLE auctions ADD COLUMN seller_npc_name TEXT NOT NULL DEFAULT '';
+INSERT INTO npc_civilization_state(npc_name,home_location,current_location,world_name,updated_at) VALUES('Old Hu the Peddler','Greenriver Town','Greenriver Town','Mortal World',0);
 `); err != nil {
 		t.Fatal(err)
 	}
@@ -496,5 +497,47 @@ func TestAMerchantHoldingTheHighBidWinsTheLot(t *testing.T) {
 	}
 	if got := fmt.Sprint(actionScalar(t, path, `SELECT merchant_buyer||'|'||merchant_bidder FROM auctions WHERE auction_id=10`)); got != "old_hu_the_peddler|" {
 		t.Fatalf("lot record=%q", got)
+	}
+}
+
+// An NPC lot a merchant wins pays the finder's wealth, and never user 0.
+//
+// Schema 50 let one of the world's own people put a lot on the floor with no
+// character behind it, and MerchantsBid bids on every open lot, so a merchant
+// will win one. merchantTakesLotTx then paid walletDeltaTx(conn, 0, ...): a
+// currency_wallets row for user 0, foreign-keyed to characters and refused,
+// which ended the maintenance pass before its commit - and, since the lot
+// stays active with its ends_at in the past, on every tick after. The same
+// failure the schema repaired, one step downstream. The fixture carries that
+// foreign key now, so the old code fails here exactly as production would.
+func TestAMerchantWinningAnNPCLotPaysTheFinderNotUserZero(t *testing.T) {
+	path := setupMerchantDB(t)
+	catalog := merchantCatalog(t)
+	batch4Exec(t, path, `INSERT INTO merchant_state(merchant,location,destination,dwell_until_game_minute,budget,route_index) VALUES('old_hu_the_peddler','Greenriver Town','',9000,390,0)`)
+	batch4Exec(t, path, `INSERT INTO npc_civilization_state(npc_name,home_location,current_location,world_name,wealth,updated_at) VALUES('Digger Yun','Greenriver Town','Greenriver Town','Mortal World',20,0)`)
+	batch4Exec(t, path, `INSERT INTO auctions(auction_id,house_id,seller_user_id,seller_npc_name,item_id,quantity,currency_id,starting_bid,current_bid,current_bidder_user_id,merchant_bidder,active,created_at,ends_at) VALUES(11,'golden_pavilion',NULL,'Digger Yun','bone_comb',1,'low_spirit_stone',5,40,NULL,'old_hu_the_peddler',1,0,0)`)
+	withMerchantConn(t, path, func(conn *storage.Conn) {
+		res, _ := conn.Execute(`SELECT * FROM auctions WHERE auction_id=11`, nil)
+		key, won, err := MerchantWinsLot(conn, catalog, firstRowMap(res), 3000)
+		if err != nil {
+			t.Fatalf("settling an NPC lot: %v", err)
+		}
+		if !won || key != "old_hu_the_peddler" {
+			t.Fatalf("won=%v key=%q", won, key)
+		}
+	})
+	if n := escrowScalar(t, path, `SELECT COUNT(*) FROM currency_wallets WHERE user_id=0`); n != 0 {
+		t.Fatalf("a wallet was written for user 0: %d rows", n)
+	}
+	// The hammer price is 40 and a finder's purse takes an eighth of it, the
+	// rate the simulation's own settlement has always paid.
+	if got := escrowScalar(t, path, `SELECT wealth FROM npc_civilization_state WHERE npc_name='Digger Yun'`); got != 25 {
+		t.Fatalf("finder wealth=%d want 25 (20 + 40/8)", got)
+	}
+	if got := fmt.Sprint(actionScalar(t, path, `SELECT merchant_buyer FROM auctions WHERE auction_id=11`)); got != "old_hu_the_peddler" {
+		t.Fatalf("lot record=%q", got)
+	}
+	if got := escrowScalar(t, path, `SELECT quantity FROM merchant_stock WHERE merchant='old_hu_the_peddler' AND item_id='bone_comb'`); got != 1 {
+		t.Fatalf("pack=%d want 1", got)
 	}
 }

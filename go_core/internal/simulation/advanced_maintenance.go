@@ -322,17 +322,10 @@ func (r *Runner) finalizeAuctions(conn *storage.Conn, gm int64) (int64, error) {
 // reads a NULL exactly as it was always meant to read the sentinel. A finder
 // is paid into the only purse they have: their own `wealth`.
 func payAuctionSeller(conn *storage.Conn, a map[string]any, amount int64) error {
-	if seller := i64(a["seller_user_id"]); seller > 0 {
-		return walletDeltaSim(conn, seller, fmt.Sprint(a["currency_id"]), amount)
-	}
-	npc := strings.TrimSpace(fmt.Sprint(a["seller_npc_name"]))
-	if npc == "" || amount <= 0 {
-		return nil
-	}
-	_, err := conn.Execute(
-		`UPDATE npc_civilization_state SET wealth=MIN(9999,wealth+?),updated_at=? WHERE npc_name=?`,
-		[]any{maxSim(1, amount/8), nowFloat(), npc})
-	return err
+	// One helper for both settlement paths. The merchant path in `game` used
+	// to carry its own payout with no NPC branch at all, which is how an NPC
+	// lot a merchant won would have re-broken the pass schema 50 repaired.
+	return game.PayLotSellerTx(conn, a, amount, nowFloat())
 }
 
 func maxSim(a, b int64) int64 {
