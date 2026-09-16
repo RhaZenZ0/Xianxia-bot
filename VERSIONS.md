@@ -1575,6 +1575,39 @@ mechanical authority paths.
 - **Schema 27** added the v0.19.29 mute/freeze moderation columns on `characters`
   (`is_muted`, `is_frozen`, `moderation_reason`).
 - **Schema 28** added the Quest Forge definition table (`quest_definitions`).
+- **Schema 51** put the content file into tables with columns. Nine derived `content_*` tables
+  (`npcs`, `locations`, `items`, `recipes`, `sects`, `shops`, `merchants`, `manuals`, `techniques`) are
+  written by the engine alone - `internal/contentsync` - from `content/world.json`, hash-gated, in one
+  transaction, and with deletes, which the Python-written `catalog_*` blobs never had: an entry renamed
+  in the file lived in `catalog_npcs` forever. Every row carries the entry's exact bytes in `data_json`
+  and a typed projection beside it - `content_locations(road_site, district, settlement_type, ...)`,
+  `content_npcs(location, district, ...)` - so "every NPC in this district" is an indexed read rather
+  than a parse of 2.5 MB. The projection is defined once, in Go, and the migration's DDL is held to it
+  by a contract test; a parity test counts every projected column against the real file. The tables
+  are filled by the engine but created by this migration, which in the compose stack runs after the
+  engine is already healthy, so db-init calls `/v1/content/sync` the moment it has run and the bot
+  again at `CATALOG_READY`; engine-backed readers switch to `content_*`, the local-SQLite path stays on
+  `catalog_*`, and `catalog_*` is still written so a rollback finds it intact. The GM's "Sync world
+  catalog" re-reads the file on both sides (`admin.content.reload`, audited) instead of rewriting the
+  bot's in-memory copy and saying it had.
+
+- **Schema 50** let one of the world's own people actually sell what they found.
+  `auctions.seller_user_id` lost its `NOT NULL`, because it is foreign-keyed to `characters` and a
+  consignment has no character behind it - so there is no integer that can mean "nobody", and the 0
+  that `npc_consignments` had written since rc.15 was refused by that foreign key every single time.
+  `runSystems` returns on the first error and the consignment batch is fifth of eight, so
+  `sect_politics`, `clan_dynamics`, `autonomous_world_events` and the whole advanced-maintenance
+  bundle never ran either: commissions did not expire, auctions did not settle, merchants did not
+  bid, and the secret realm never rotated. The batch is daily, so this was every day. NULL is the
+  sentinel now; `storage.ParseInt(nil)` is 0, so every reader's existing `seller > 0` guard - and
+  `payAuctionSeller` paying a finder's own `wealth` - was already correct and is untouched. The
+  rebuild parks `auction_bids` in a table carrying no foreign key first, because `auction_bids` is
+  `ON DELETE CASCADE` on `auctions` and a DROP under `foreign_keys=ON` fires that cascade; the bids
+  are put back once the new parent exists. One reader was not already correct: the merchant
+  settlement path paid the seller's wallet unconditionally, so the first NPC lot a merchant won would
+  have refilled the same hole one step downstream - `game.PayLotSellerTx` is the single payout both
+  settlement paths use now.
+
 - **Schema 49** gave the people this world makes for itself somewhere to live. `npc_registry` holds
   who somebody is - role, manner, what they want, what they are afraid of - for anybody who is not
   in `content/world.json`. `npc_descendants.generated_as_npc` had existed since the life cycle was

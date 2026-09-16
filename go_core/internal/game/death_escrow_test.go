@@ -28,7 +28,7 @@ func setupEscrowDB(t *testing.T) string {
 ALTER TABLE characters ADD COLUMN spirit_stones INTEGER NOT NULL DEFAULT 0;
 CREATE TABLE auctions(
 	auction_id INTEGER PRIMARY KEY AUTOINCREMENT, house_id TEXT NOT NULL DEFAULT 'h',
-	seller_user_id INTEGER NOT NULL, item_id TEXT NOT NULL, quantity INTEGER NOT NULL DEFAULT 1,
+	seller_user_id INTEGER REFERENCES characters(user_id) ON DELETE CASCADE, item_id TEXT NOT NULL, quantity INTEGER NOT NULL DEFAULT 1,
 	currency_id TEXT NOT NULL DEFAULT 'low_spirit_stone', starting_bid INTEGER NOT NULL DEFAULT 10,
 	current_bid INTEGER NOT NULL DEFAULT 0, current_bidder_user_id INTEGER,
 	anonymous INTEGER NOT NULL DEFAULT 0, active INTEGER NOT NULL DEFAULT 1,

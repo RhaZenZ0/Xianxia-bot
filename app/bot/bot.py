@@ -213,6 +213,10 @@ class XianxiaBot(commands.Bot):
 
             phase = "CATALOG_READY"
             await DB.sync_world_catalog(WORLD.data)
+            # The engine fills content_* from the file (schema 51); asking
+            # before the counts below are read is what makes CATALOG_READY
+            # report the tables the readers actually use.
+            content_sync = await DB.sync_content()
             await DB.sync_rag_canon(WORLD.data)
             # v0.22.0: the authored commission pool. Insert-only, so a GM's
             # edits and retirements survive every restart.
@@ -236,6 +240,8 @@ class XianxiaBot(commands.Bot):
             catalog_counts = await DB.catalog_counts()
             rag_counts = await DB.rag_stats()
             await self._mark_startup_phase("CATALOG_READY", {**catalog_counts, "commissions_seeded": seeded_commissions,
+                                                             "content_hash": str(content_sync.get("hash") or "")[:12],
+                                                             "content_applied": bool(content_sync.get("applied")),
                                                              **{f"rag_{k}": v for k, v in rag_counts.items()}})
 
             phase = "SIMULATION_READY"

@@ -332,16 +332,50 @@ func pickMerchantForLot(conn *storage.Conn, catalog worlddata.Catalog, city, cur
 	return "", merchantState{}, nil
 }
 
+// PayLotSellerTx credits whoever put the lot up, and is the one place that
+// knows a lot has two kinds of seller.
+//
+// A character is paid into their wallet. One of the world's own people
+// (schema 50: `seller_user_id` NULL, `seller_npc_name` set) has no wallet -
+// `currency_wallets.user_id` is foreign-keyed to `characters` - so they are
+// paid into the only purse they have, their own `wealth`, at the same rate the
+// simulation's settlement has always used. `i64(NULL)` is 0, so the guard is
+// the `seller > 0` every reader already carries.
+//
+// Until this existed `merchantTakesLotTx` paid `walletDeltaTx(conn, 0, ...)`
+// unconditionally: schema 50 let an NPC lot reach the floor, `MerchantsBid`
+// bids on every open lot, and the first one a merchant won or bought would
+// have written `currency_wallets(user_id=0)`, been refused by that foreign
+// key, and ended the maintenance pass before its commit - on every tick
+// thereafter, since the lot stays active with its `ends_at` in the past. The
+// same failure the schema fixed, moved one step downstream. Both settlement
+// paths call this so they cannot drift apart again.
+func PayLotSellerTx(conn *storage.Conn, auction map[string]any, amount int64, now float64) error {
+	if seller := i64(auction["seller_user_id"]); seller > 0 {
+		_, err := walletDeltaTx(conn, seller, strings.TrimSpace(fmt.Sprint(auction["currency_id"])), amount, now)
+		return err
+	}
+	npc := ""
+	if v := auction["seller_npc_name"]; v != nil {
+		npc = strings.TrimSpace(fmt.Sprint(v))
+	}
+	if npc == "" || amount <= 0 || !tableExistsTx(conn, "npc_civilization_state") {
+		return nil
+	}
+	_, err := conn.Execute(`UPDATE npc_civilization_state SET wealth=MIN(9999,wealth+?),updated_at=? WHERE npc_name=?`,
+		[]any{max64(1, amount/8), now, npc})
+	return err
+}
+
 // merchantTakesLotTx settles a lot into a merchant's pack: the seller is
 // paid the price, the purse pays it unless it already did at bidding time,
 // the goods go into the pack at the resale price, and the lot records who
 // took it.
 func merchantTakesLotTx(conn *storage.Conn, catalog worlddata.Catalog, key string, state merchantState, auction map[string]any, price int64, alreadyPaid bool, gm int64, now float64) error {
 	m := catalog.Merchants[key]
-	currency := strings.TrimSpace(fmt.Sprint(auction["currency_id"]))
 	quantity := max64(1, i64(auction["quantity"]))
 	itemID := fmt.Sprint(auction["item_id"])
-	if _, err := walletDeltaTx(conn, i64(auction["seller_user_id"]), currency, price, now); err != nil {
+	if err := PayLotSellerTx(conn, auction, price, now); err != nil {
 		return err
 	}
 	if !alreadyPaid {

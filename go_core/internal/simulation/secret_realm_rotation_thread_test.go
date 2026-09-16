@@ -23,7 +23,7 @@ import (
 // as a failure in this test instead of silently skipping the rotation.
 const maintenanceRotationSchema = `
 CREATE TABLE auctions(auction_id INTEGER PRIMARY KEY AUTOINCREMENT, house_id TEXT NOT NULL DEFAULT '',
-    seller_user_id INTEGER NOT NULL DEFAULT 0, item_id TEXT NOT NULL DEFAULT '', quantity INTEGER NOT NULL DEFAULT 1,
+    seller_user_id INTEGER REFERENCES characters(user_id) ON DELETE CASCADE, item_id TEXT NOT NULL DEFAULT '', quantity INTEGER NOT NULL DEFAULT 1,
     currency_id TEXT NOT NULL DEFAULT 'low_spirit_stone', starting_bid INTEGER NOT NULL DEFAULT 0,
     current_bid INTEGER NOT NULL DEFAULT 0, current_bidder_user_id INTEGER NOT NULL DEFAULT 0,
     anonymous INTEGER NOT NULL DEFAULT 0, active INTEGER NOT NULL DEFAULT 1, ends_at REAL NOT NULL DEFAULT 0,

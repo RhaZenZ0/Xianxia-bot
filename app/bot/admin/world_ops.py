@@ -19,6 +19,7 @@ from discord import app_commands
 from ...rules.advanced_catalog import GRADES
 from ...rules.advanced_runtime import EQUIPMENT_DEFINITIONS
 from ...rules.birthfamily import karma_label
+from ...rules.game import World
 from ...ops.game_engine import GameEngineError
 from ...rules.worldtime import from_game_minutes
 from ..formatting import human_duration
@@ -439,8 +440,33 @@ async def admin_maintenance(interaction:discord.Interaction,action:app_commands.
     if not await require_admin(interaction):return
     await interaction.response.defer(ephemeral=False)
     if action.value=="sync":
-        await DB.sync_world_catalog(WORLD.data)
-        await interaction.followup.send("✅ Locations, NPCs and recipes were resynced from world.json into SQLite.",ephemeral=False);return
+        # Until schema 51 this wrote `WORLD.data` - this process's in-memory
+        # copy, parsed at import - and then reported that it had resynced
+        # from world.json, which it had not: no edit to the file could reach
+        # the database without a restart. It re-reads the file now, on both
+        # sides. Python fills catalog_* from a fresh parse (the running WORLD
+        # is left alone: a hot swap of the dict 347 call sites read is not a
+        # maintenance action), and the engine runs its own hash-gated apply
+        # into content_* through `admin.content.reload`, which is also what
+        # puts the audit row down. The message then says what is and is not
+        # live, rather than what the operator hoped.
+        fresh = World(WORLD.content_path)
+        await DB.sync_world_catalog(fresh.data)
+        try:
+            reload = dict(await ENGINE.action("admin.content.reload", interaction.user.id, {"reason": "admin maintenance sync"}) or {})
+        except GameEngineError as exc:
+            await interaction.followup.send(
+                "⚠️ catalog_* was resynced from a fresh read of world.json, but the engine refused to reload its content tables: "
+                + _explain_engine_error(exc), ephemeral=False)
+            return
+        counts = {str(k): int(v) for k, v in dict(reload.get("counts") or {}).items()}
+        verdict = "changed - the tables were rewritten" if reload.get("applied") else ("skipped - the content tables are not migrated" if reload.get("skipped") else "unchanged since the last apply")
+        await interaction.followup.send(
+            f"✅ world.json re-read from disk. Engine content hash `{str(reload.get('hash') or '')[:12]}`: {verdict}"
+            + (f" ({sum(counts.values()):,} rows across {len(counts)} tables)" if counts else "") + ".\n"
+            "Go-owned rules and the content tables serve the new file now; this bot's in-process presentation applies it at its next restart.",
+            ephemeral=False)
+        return
     if action.value=="vacuum":
         await DB.vacuum();await interaction.followup.send("✅ SQLite VACUUM completed.",ephemeral=False);return
     wt=await current_world_time(); counts=await DB.maintenance_cleanup(wt.total_minutes)

@@ -193,6 +193,23 @@ class GoDatabaseTransport:
             raise RemoteDatabaseError(f"Go SQLite maintenance failed ({response.status_code}): {response.text}")
         return dict(response.json())
 
+    async def sync_content(self) -> dict[str, Any]:
+        """Ask the engine to bring the content_* tables up to content/world.json.
+
+        Schema 51: the engine owns those tables and writes them from the file,
+        hash-gated, so this is a no-op whenever nothing changed. db-init calls
+        it the moment the migration has run and the bot calls it at
+        CATALOG_READY, which is what guarantees the tables are full before any
+        reader in any boot order - including the first, where the engine is
+        healthy before Python has created them and its own apply at start
+        found nothing to write.
+        """
+        headers = {"X-Xianxia-Engine-Token": self._auth_token} if self._auth_token else None
+        response = await self._client.post(f"{self.engine_url}/v1/content/sync", json={}, headers=headers)
+        if response.status_code >= 400:
+            raise RemoteDatabaseError(f"Go content sync failed ({response.status_code}): {response.text}")
+        return dict(response.json())
+
     async def create_backup(self) -> dict[str, Any]:
         headers = {"X-Xianxia-Engine-Token": self._auth_token} if self._auth_token else None
         response = await self._client.post(f"{self.engine_url}/v1/db/backups", json={}, headers=headers)

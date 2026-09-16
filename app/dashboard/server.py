@@ -28,6 +28,7 @@ from ..ops.http_limits import (
 )
 from ..rules.worldtime import from_game_minutes
 from ..database.remote import GoDatabaseTransport, RemoteDatabaseError
+from ..database.core import content_table_for
 from ..ops.game_engine import GameEngineClient, GameEngineError
 
 # Release-blocking browser/API/schema contract shared with the standard checker.
@@ -310,6 +311,10 @@ class ReadOnlyDashboardStore:
         # authoritative queries rather than recomputed on this side.
         self._engine = GameEngineClient(engine_url) if engine_url else None
         self._quest_world: _QuestWorld | None = None
+
+    def content_table(self, catalog_table: str) -> str:
+        """The catalogue table a read goes to: content_* when engine-backed (schema 51)."""
+        return content_table_for(catalog_table, self._go_transport is not None)
 
     def quest_world(self) -> _QuestWorld:
         """The content pack, read once, for quest validation and coverage."""
@@ -662,7 +667,7 @@ class ReadOnlyDashboardStore:
             disciples = await self._fetchall(db, "SELECT * FROM npc_disciple_bonds WHERE master_name=? OR disciple_name=? ORDER BY started_game_minute DESC", (name, name))
             descendants = await self._fetchall(db, "SELECT * FROM npc_descendants WHERE parent_a=? OR parent_b=? ORDER BY birth_game_minute DESC", (name, name))
             history = await self._fetchall(db, "SELECT * FROM world_history_events WHERE actor_name=? OR target_name=? OR related_npc_name=? ORDER BY game_minute DESC,significance DESC LIMIT 40", (name, name, name))
-            catalog = await self._fetchone(db, "SELECT data_json FROM catalog_npcs WHERE name=?", (name,))
+            catalog = await self._fetchone(db, f"SELECT data_json FROM {self.content_table('catalog_npcs')} WHERE name=?", (name,))
             gm_definition: dict[str, Any] = {}
             if catalog:
                 try:
@@ -1816,7 +1821,7 @@ class AdminDashboardController:
                 db,
                 "SELECT user_id,name,discord_name,life_status,location,realm_index,phase,karma_score,vitality,vitality_max,qi,qi_max,is_muted,is_frozen,is_banned,muted_until,frozen_until,moderation_reason FROM characters ORDER BY name",
             )
-            locations = [str(r["name"]) for r in await self.store._fetchall(db, "SELECT name FROM catalog_locations ORDER BY name")]
+            locations = [str(r["name"]) for r in await self.store._fetchall(db, f"SELECT name FROM {self.store.content_table('catalog_locations')} ORDER BY name")]
             if not locations:
                 try:
                     world = json.loads((ROOT / "content" / "world.json").read_text(encoding="utf-8"))

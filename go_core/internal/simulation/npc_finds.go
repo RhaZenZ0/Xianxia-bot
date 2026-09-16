@@ -202,8 +202,13 @@ func (r *Runner) consignToNearestHouse(conn *storage.Conn, npcName, where, itemI
 	if house.MaxLotMinutes > 0 && minutes > house.MaxLotMinutes {
 		minutes = house.MaxLotMinutes
 	}
+	// NULL, not 0: `seller_user_id` is foreign-keyed to `characters`, so the
+	// only value meaning "no character behind this lot" is the absent one.
+	// This wrote 0 from rc.15 to rc.28 and was refused every time, which threw
+	// the whole tick before `sect_politics` and everything after it could run
+	// (schema 50).
 	_, err := conn.Execute(`INSERT INTO auctions(house_id,seller_user_id,seller_npc_name,item_id,quantity,currency_id,starting_bid,current_bid,current_bidder_user_id,anonymous,active,appraised,grade_band,created_at,ends_at)
-        VALUES(?,0,?,?,1,?,?,0,NULL,0,1,?,?,?,?)`,
+        VALUES(?,NULL,?,?,1,?,?,0,NULL,0,1,?,?,?,?)`,
 		[]any{houseID, npcName, itemID, currency, reserve, boolInt(appraised), band, now, now + float64(minutes*60)})
 	return err == nil, err
 }

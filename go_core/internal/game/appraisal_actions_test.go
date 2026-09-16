@@ -76,7 +76,7 @@ func TestPayingTheKeeperIsCertainAndCostsWhatItSays(t *testing.T) {
 	batch4Exec(t, path, `INSERT INTO currency_wallets(user_id,currency_id,balance) VALUES(42,'low_spirit_crystal',100000) ON CONFLICT(user_id,currency_id) DO UPDATE SET balance=100000`)
 	batch4Exec(t, path, `INSERT INTO currency_wallets(user_id,currency_id,balance) VALUES(42,'low_immortal_stone',100000) ON CONFLICT(user_id,currency_id) DO UPDATE SET balance=100000`)
 	batch4Exec(t, path, `INSERT INTO currency_wallets(user_id,currency_id,balance) VALUES(42,'low_celestial_crystal',100000) ON CONFLICT(user_id,currency_id) DO UPDATE SET balance=100000`)
-	batch4Exec(t, path, `INSERT INTO auctions(house_id,seller_user_id,seller_npc_name,item_id,quantity,currency_id,starting_bid,active,appraised,grade_band,created_at,ends_at) VALUES(?,0,'Grave-Robber Shen','nine_echo_sword_tablet',1,'low_spirit_stone',240,1,0,'legendary or near it',0,9e9)`, houseID)
+	batch4Exec(t, path, `INSERT INTO auctions(house_id,seller_user_id,seller_npc_name,item_id,quantity,currency_id,starting_bid,active,appraised,grade_band,created_at,ends_at) VALUES(?,NULL,'Grave-Robber Shen','nine_echo_sword_tablet',1,'low_spirit_stone',240,1,0,'legendary or near it',0,9e9)`, houseID)
 	lot := i64(actionScalar(t, path, `SELECT auction_id FROM auctions WHERE seller_npc_name='Grave-Robber Shen'`))
 	batch4SetCanonicalGameMinute(t, path, 3000)
 

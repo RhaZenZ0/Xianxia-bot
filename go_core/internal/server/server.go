@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"xianxia/core/internal/backupcrypt"
+	"xianxia/core/internal/contentsync"
 	"xianxia/core/internal/core"
 	"xianxia/core/internal/game"
 	"xianxia/core/internal/simulation"
@@ -66,7 +67,38 @@ func New(databasePath string, worldPath string) (*Server, error) {
 	if len(token) < minEngineTokenLength {
 		return nil, fmt.Errorf("ENGINE_AUTH_TOKEN must be set to at least %d characters", minEngineTokenLength)
 	}
+	// Bring content_* up to the file the runner just parsed (schema 51). On
+	// a database the migration has not reached yet - every first boot, since
+	// the engine is healthy before Python runs it - this finds no tables and
+	// does nothing; db-init then calls /v1/content/sync the moment they
+	// exist. On every later restart it is what makes an edit to world.json
+	// reach the tables without anybody pressing anything. A failure here is
+	// logged, not fatal: the same apply runs again on the sync endpoint and
+	// reports there, where an operator sees it.
+	if result, err := contentsync.ApplyPath(databasePath, worldPath, unixNow()); err != nil {
+		log.Printf("content sync at start: %v", err)
+	} else if result.Applied {
+		log.Printf("content sync at start: applied %s (%d bytes)", result.Hash[:12], result.Size)
+	}
 	return &Server{databasePath: databasePath, worldPath: worldPath, sessions: storage.NewSessionManager(databasePath), simulation: runner, authToken: token, backups: backupPolicyFromEnv()}, nil
+}
+
+func unixNow() float64 { return float64(time.Now().UnixNano()) / 1e9 }
+
+// contentSync runs the hash-gated apply of content/world.json into the
+// content_* tables and reports what it did. Idempotent and cheap when nothing
+// changed, so db-init and the bot both call it at startup without thinking.
+func (s *Server) contentSync(w http.ResponseWriter, r *http.Request) {
+	if !method(w, r, http.MethodPost) {
+		return
+	}
+	defer r.Body.Close()
+	result, err := contentsync.ApplyPath(s.databasePath, s.worldPath, unixNow())
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "content_sync_failed", "message": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
 }
 
 // minEngineTokenLength is the shortest ENGINE_AUTH_TOKEN the engine will run
@@ -117,6 +149,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/readyz", s.readyz)
 	mux.HandleFunc("/v1/game/action", s.gameAction)
 	mux.HandleFunc("/v1/simulation/bootstrap", s.simulationBootstrap)
+	mux.HandleFunc("/v1/content/sync", s.contentSync)
 	mux.HandleFunc("/v1/simulation/run-due", s.simulationRunDue)
 	mux.HandleFunc("/v1/simulation/force", s.simulationForce)
 	mux.HandleFunc("/v1/db/session", s.dbSession)

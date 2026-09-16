@@ -83,6 +83,8 @@ func ApplyWithWorld(databasePath, worldPath string, req ActionRequest) (ActionRe
 		result, err = adminTradeVoid(conn, req.ActorID, req.Payload)
 	case "admin.narration.set_chain":
 		result, err = adminNarrationSetChain(conn, req.ActorID, req.Payload)
+	case "admin.content.reload":
+		result, err = adminContentReload(conn, worldPath, req.ActorID, req.Payload)
 	case "admin.simulation.interval":
 		result, err = adminSimulationInterval(conn, req.ActorID, req.Payload)
 	case "admin.commission.review":

@@ -27,11 +27,19 @@ async def bootstrap() -> dict[str, object]:
             "SQLite bootstrap did not produce an operational schema: "
             + json.dumps({"schema": schema, "probe": probe}, sort_keys=True)
         )
+    # The content tables (schema 51) are the engine's to fill, and this is
+    # the first moment after the migration when they exist to be filled. In
+    # the compose stack the engine was healthy - and had already looked for
+    # them and found nothing - before this process ran, so without this call
+    # the bot and the dashboard could start against nine empty tables. No
+    # engine (a local test path) is not a failure: those readers use catalog_*.
+    content = await database.sync_content()
     return {
         "path": str(database.path),
         "schema_version": int(schema["current"]),
         "migrations": int(schema["migrations"]),
         "journal_mode": str(probe["journal_mode"]),
+        "content": {k: content.get(k) for k in ("applied", "skipped", "hash") if k in content},
     }
 
 

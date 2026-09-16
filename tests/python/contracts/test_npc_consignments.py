@@ -54,11 +54,24 @@ class TheEngineOwnsTheFinding(unittest.TestCase):
 
     def test_a_consignment_is_paid_into_a_purse_not_a_wallet(self):
         # `seller_user_id` is foreign-keyed to `characters`, so a finder's is
-        # 0; paying user 0 would write a wallet for somebody who is not there.
+        # NULL (schema 50; it was 0 and refused); paying user 0 would write a
+        # wallet for somebody who is not there. The payout lives in one place,
+        # `game.PayLotSellerTx`, because the merchant settlement path carried
+        # its own copy with no NPC branch and would have re-broken the pass the
+        # first time a merchant won an NPC lot. Both callers must go through it.
+        merchant = (GO / "game" / "merchant_actions.go").read_text(encoding="utf-8")
+        self.assertIn("func PayLotSellerTx(", merchant)
+        self.assertIn("UPDATE npc_civilization_state SET wealth=MIN(9999,wealth+?)", merchant)
+        self.assertIn("if seller := i64(auction[\"seller_user_id\"]); seller > 0 {", merchant)
+        takes = merchant[merchant.index("func merchantTakesLotTx("):]
+        takes = takes[:takes.index("\nfunc ")]
+        self.assertIn("PayLotSellerTx(conn, auction, price, now)", takes)
+        self.assertNotIn("walletDeltaTx(", takes, "the merchant path must not pay a wallet directly")
         maintenance = (GO / "simulation" / "advanced_maintenance.go").read_text(encoding="utf-8")
-        self.assertIn("func payAuctionSeller(", maintenance)
-        self.assertIn("UPDATE npc_civilization_state SET wealth=MIN(9999,wealth+?)", maintenance)
-        self.assertIn("if seller := i64(a[\"seller_user_id\"]); seller > 0 {", maintenance)
+        pay = maintenance[maintenance.index("func payAuctionSeller("):]
+        pay = pay[:pay.index("\nfunc ")]
+        self.assertIn("game.PayLotSellerTx(", pay)
+        self.assertNotIn("UPDATE npc_civilization_state", pay, "one copy of the payout, not two that drift")
 
     def test_python_writes_no_lot_of_its_own(self):
         for source in (ECONOMY, CORE):

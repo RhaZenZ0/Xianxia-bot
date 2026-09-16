@@ -136,9 +136,15 @@ if [ "$SKIP_BACKUP" -ne 1 ]; then
     mkdir -p "$BACKUP_DIR"
     if stack_running; then
         echo "Creating transaction-safe SQLite backup through the Go engine..."
-        response=$(cd "$PROJECT_DIR" && docker compose exec -T xianxia-engine \
-            wget -q -O - --header='Content-Type: application/json' --post-data='{}' \
-            http://127.0.0.1:8081/v1/db/backups 2>/dev/null || true)
+        # The engine has required X-Xianxia-Engine-Token on every /v1/ call
+        # since 0.20.0, so the request is built inside the container with sh -c
+        # and the token expanded there. update.sh:616 was fixed this way in
+        # v0.20.9; this copy never was, so the documented safe reset could not
+        # take its safety backup against a running stack and aborted with
+        # "Could not create a safe SQLite backup" - the one path that exists to
+        # protect the world before wiping it.
+        response=$(cd "$PROJECT_DIR" && docker compose exec -T xianxia-engine sh -c \
+            'wget -q -O - --header="Content-Type: application/json" --header="X-Xianxia-Engine-Token: $ENGINE_AUTH_TOKEN" --post-data="{}" http://127.0.0.1:8081/v1/db/backups' 2>/dev/null || true)
         name=$(printf '%s' "$response" | sed -n 's/.*"name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
         [ -n "$name" ] || fail "Could not create a safe SQLite backup through the running engine. Fix that first, or pass --no-backup to proceed without one."
         BACKUP_PATH="$BACKUP_DIR/$name"
