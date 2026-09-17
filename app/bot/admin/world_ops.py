@@ -270,6 +270,8 @@ async def admin_grant_currency(interaction:discord.Interaction,member:discord.Me
     if not await require_admin(interaction):return
     if currency not in WORLD.currencies:
         await interaction.response.send_message("Unknown currency.",ephemeral=False);return
+    if not await DB.get_character(member.id):
+        await interaction.response.send_message("That member has no cultivation character.",ephemeral=False);return
     currency_result = dict(
         await ENGINE.action(
             "admin.player.grant_currency",

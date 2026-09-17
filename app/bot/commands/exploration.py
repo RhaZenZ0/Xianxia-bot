@@ -911,6 +911,10 @@ async def alchemy_forage(interaction: discord.Interaction) -> None:
         return
     resolved = dict(envelope.get("result") or {})
     result = SimpleNamespace(**resolved)
+    # The engine's roll, whole (die1, die2, modifier, tn, total, degree,
+    # probability): the flat d1/d2 beside it are not what `roll_line` reads,
+    # and printing them here would be presentation deciding a degree (rc.35).
+    roll = SimpleNamespace(**dict(resolved.get("roll") or {}))
     success = bool(resolved.get("success"))
     forage_progress = dict(resolved.get("profession_progress") or {})
     level = int(forage_progress.get("level", 0))
@@ -925,7 +929,7 @@ async def alchemy_forage(interaction: discord.Interaction) -> None:
     )
     if not success:
         await interaction.response.send_message(
-            f"🌿 **Forage — {forage_location}**\n{roll_line(result)}\n"
+            f"🌿 **Forage — {forage_location}**\n{roll_line(roll)}\n"
             f"Regional spirit resources: **{int(resolved.get('spirit_resources',0))}/100**.{bonus_bits} "
             "You find no usable harvest this time."
             f"\n🧺 Foraging: **{profession_rank(level)}** Lv.{level} "
@@ -941,7 +945,7 @@ async def alchemy_forage(interaction: discord.Interaction) -> None:
     makings = {str(k): int(v) for k, v in dict(resolved.get("materials_found") or {}).items()}
     makings_line = f"\n📜 Craft makings: **{WORLD.item_names(makings)}**." if makings else ""
     await interaction.response.send_message(
-        f"🌿 **Forage — {forage_location}**\n{roll_line(result)}\n"
+        f"🌿 **Forage — {forage_location}**\n{roll_line(roll)}\n"
         f"Regional spirit resources: **{int(resolved.get('spirit_resources',0))}/100**.{bonus_bits}\n"
         f"Harvested: **{WORLD.item_names(awarded)}**.{rare_line}{makings_line}\n"
         f"🧺 Foraging: **{profession_rank(level)}** Lv.{level} "

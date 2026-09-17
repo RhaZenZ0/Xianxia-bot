@@ -19,7 +19,12 @@ player with no plan would and holding that the reply is a result or a designed r
 hub's failure text. The engine harness gained every family a fresh pair of characters and the GM
 levers can reach, from storage to the dynasty a new life inherits, with every remaining lever's
 audit row checked; the sect's rooms, progression and what only the world makes are deferred to
-three named follow-ups. See CLAUDE.md, "The playtest touches everything".
+three named follow-ups. The sweep's first run found four handlers no source read had: no trade
+had ever left Discord (a `game_minute` the client refuses to send), the forage reply raised on
+every forage (the engine's roll was flattened without its degree), `/talk` at a grave called a
+switch operation through the authoritative client, and a GM's grant to a member with no
+character crashed instead of refusing. All four are fixed and held. See CLAUDE.md, "The playtest
+touches everything".
 
 **1.0.0** (rc.34) lets the head of the house teach and test the new cultivator.
 

@@ -847,6 +847,7 @@ func forageResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID i
 	}
 
 	result := map[string]any{
+		"roll":                roll, // the whole check, degree and odds included: what the reply prints
 		"d1":                  d1,
 		"d2":                  d2,
 		"modifier":            mod,

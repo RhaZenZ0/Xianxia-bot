@@ -61,7 +61,10 @@ async def _claim_grave_if_here(user_id: int, c: dict, npc: str, wt) -> str:
     already done it before calling here.
     """
     try:
-        envelope = await ENGINE.authoritative_action(
+        # A switch operation, not an allowlisted one: it takes the minute the
+        # bot read off the engine, the way quest.progress does. Through the
+        # authoritative client it raised before sending (rc.35).
+        found = await ENGINE.action(
             "npc.found",
             user_id,
             {"npc_name": npc, "location": str(c.get("location") or ""), "game_minute": wt.total_minutes},
@@ -69,7 +72,7 @@ async def _claim_grave_if_here(user_id: int, c: dict, npc: str, wt) -> str:
     except GameEngineError:
         log.exception("Could not read the grave of %s", npc)
         return ""
-    result = (envelope or {}).get("result") or {}
+    result = dict(found or {})
     if not result.get("grave"):
         return ""
     if result.get("already_claimed"):
@@ -199,12 +202,12 @@ async def talk(
     found_note = ""
     if str(npc_state.get("status") or "") == "missing":
         try:
-            found = await ENGINE.authoritative_action(
+            found = await ENGINE.action(
                 "npc.found",
                 interaction.user.id,
                 {"npc_name": npc, "location": str(c.get("location") or ""), "game_minute": wt.total_minutes},
             )
-            result = (found or {}).get("result") or {}
+            result = dict(found or {})
             if result.get("found"):
                 days = int(result.get("days_missing") or 0)
                 found_note = (

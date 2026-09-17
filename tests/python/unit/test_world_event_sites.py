@@ -184,7 +184,9 @@ class EventPanelTests(unittest.TestCase):
         # Persisted on the event now, with the catalogue as the fallback for
         # events spawned before the description was stored.
         self.assertIn('payload.get("description")', self.view)
-        self.assertIn("WORLD.unexpected_events()", self.view)
+        # A property, not a call: `World.unexpected_events` returns the list,
+        # and calling it raised on every event site read (rc.35).
+        self.assertIn("for candidate in WORLD.unexpected_events:", self.view)
 
     def test_the_panel_no_longer_leads_with_chrome(self):
         for chrome in (

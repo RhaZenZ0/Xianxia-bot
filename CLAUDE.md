@@ -557,6 +557,22 @@ and holds each harness to it with one explicit deferred set per harness, `DEFERR
   designed either way (a claim the wheel may not have opened, a raid that may not be won in thirty
   rounds) passes on the refusal text that names why, and says which.
 
+**What the first sweep found**, none of it visible to a source read, all of it fixed here with a
+test (`test_leaf_sweep_findings.py`): no trade had ever left `/trade offer`, `accept` or `decline`
+from Discord - the payloads carried `game_minute`, which the client refuses to send because the
+engine stamps the canonical minute on every authoritative action and refuses a caller's; the forage
+reply raised on every forage from the hub, because the engine's result flattened `d1`/`d2` and
+dropped the degree while `roll_line` reads `die1`/`die2`/`degree` (the result now carries the roll
+map whole); `/talk` at a grave or to a missing NPC called `npc.found` - a switch operation, not an
+allowlisted one - through the authoritative client, which raised before sending; the event scene
+called `WORLD.unexpected_events()`, a property; and a GM's currency grant to a member with no
+character printed the failure text instead of the refusal its siblings give. Two lessons about the
+harness itself: SimCord's settle timeout must stay at its default, because a bot-owned worker whose
+next wake falls inside the deadline counts as runnable and a longer deadline never settles (a slow
+leaf is waited out in short settles instead); and the typed explore's surprise chance is pinned to
+zero, because an open surprise blocks the road and failed the capital step on the dice one run in
+four.
+
 What is deferred, and to what: the sect's rooms and the homestead (contribution points and a rank,
 one PR), progression (perfection and a tribulation attempt need the stage filled with essence, the
 aptitudes a bloodline at progress 100, a personal world Space Law at 100%; one PR), and what only

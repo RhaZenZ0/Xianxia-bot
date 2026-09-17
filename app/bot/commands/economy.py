@@ -679,9 +679,11 @@ def _trade_line(offer:dict[str,Any])->str:
 async def trade_offer(interaction:discord.Interaction,player:discord.Member,give_item:str="",give_quantity:app_commands.Range[int,1,100]=1,give_stones:app_commands.Range[int,0,100000]=0,want_item:str="",want_quantity:app_commands.Range[int,1,100]=1,want_stones:app_commands.Range[int,0,100000]=0)->None:
     await interaction.response.defer(ephemeral=False)
     if not await require_character(interaction): return
-    wt=await current_world_time()
+    # No game_minute: the engine stamps the canonical one on every
+    # authoritative action and the client refuses to send one (rc.35 - the
+    # leaf sweep found that no trade had ever left this handler).
     payload={"to_user_id":int(player.id),"give_items":({give_item:int(give_quantity)} if give_item else {}),"give_stones":int(give_stones),
-             "want_items":({want_item:int(want_quantity)} if want_item else {}),"want_stones":int(want_stones),"game_minute":wt.total_minutes}
+             "want_items":({want_item:int(want_quantity)} if want_item else {}),"want_stones":int(want_stones)}
     try:
         envelope=await ENGINE.authoritative_action("trade.offer",interaction.user.id,payload,action_id=f"discord:{interaction.id}:trade.offer")
         result=dict(envelope.get("result") or {})
@@ -752,9 +754,8 @@ async def _trade_offer_autocomplete(interaction:discord.Interaction,current:str,
 async def trade_accept(interaction:discord.Interaction,offer:int)->None:
     await interaction.response.defer(ephemeral=False)
     if not await require_character(interaction): return
-    wt=await current_world_time()
     try:
-        envelope=await ENGINE.authoritative_action("trade.accept",interaction.user.id,{"offer_id":int(offer),"game_minute":wt.total_minutes},action_id=f"discord:{interaction.id}:trade.accept")
+        envelope=await ENGINE.authoritative_action("trade.accept",interaction.user.id,{"offer_id":int(offer)},action_id=f"discord:{interaction.id}:trade.accept")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
         await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
@@ -778,9 +779,8 @@ async def trade_accept_offer_autocomplete(interaction:discord.Interaction,curren
 async def trade_decline(interaction:discord.Interaction,offer:int)->None:
     await interaction.response.defer(ephemeral=False)
     if not await require_character(interaction): return
-    wt=await current_world_time()
     try:
-        envelope=await ENGINE.authoritative_action("trade.decline",interaction.user.id,{"offer_id":int(offer),"game_minute":wt.total_minutes},action_id=f"discord:{interaction.id}:trade.decline")
+        envelope=await ENGINE.authoritative_action("trade.decline",interaction.user.id,{"offer_id":int(offer)},action_id=f"discord:{interaction.id}:trade.decline")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
         await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return

@@ -120,3 +120,24 @@ func TestAFailedForageCarriesNothingHome(t *testing.T) {
 	}
 	t.Fatal("forty trips by a cultivator with no attributes at all never missed once")
 }
+
+// The Discord reply prints the check through the same line every other roll
+// uses (die1, die2, modifier, tn, total, degree, probability). The forage
+// result flattened d1/d2 and dropped the degree, so the reply raised on every
+// forage from the hub (v1.0.0-rc.35, found by the leaf sweep). The roll map
+// rides the result whole; the flat fields stay for the readers that use them.
+func TestTheForageResultCarriesTheRollTheReplyPrints(t *testing.T) {
+	result := forageOnce(t, batch4WorldPath(t), "Cloudspine Foothills", "Mortal World", 80)
+	roll, ok := result["roll"].(map[string]any)
+	if !ok {
+		t.Fatalf("forage result carries no roll map: %v", result)
+	}
+	for _, key := range []string{"die1", "die2", "modifier", "tn", "total", "margin", "success", "degree", "probability"} {
+		if _, present := roll[key]; !present {
+			t.Fatalf("the roll lacks %q: %v", key, roll)
+		}
+	}
+	if roll["die1"] != result["d1"] || roll["die2"] != result["d2"] || roll["total"] != result["total"] {
+		t.Fatalf("the roll and the flat fields disagree: %v vs d1=%v d2=%v total=%v", roll, result["d1"], result["d2"], result["total"])
+	}
+}

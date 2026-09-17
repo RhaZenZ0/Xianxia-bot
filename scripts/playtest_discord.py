@@ -71,6 +71,10 @@ def _configure(url: str, token: str, db_path: str) -> None:
         "NARRATOR_PROVIDER": "procedural", "HEALTH_PORT": str(HEALTH_PORT),
         "MESSAGE_CONTENT_INTENT": "true", "AUTO_NARRATE": "true",  # typed play listens in a private scene only with both
         "UPDATE_CHECK_ENABLED": "false", "QUEST_FORGE_AUTO": "false", "ROUTE_AUDIT_HOURS": "0",
+        # A surprise on the typed explore (28% by default) blocks the road
+        # until it is resolved, which would fail the capital step on the dice
+        # about one run in four; the engine playtest drives the surprises.
+        "UNEXPECTED_EVENT_CHANCE_PERCENT": "0",
         # The per-player action meter (about six a minute) is right for a
         # person and wrong for a harness that presses sixty buttons in one;
         # the meter itself is held by tests/python/contracts/test_narrator_budget.py.
@@ -223,17 +227,35 @@ class Panel:
             raise Failed(f"no {label!r} on the panel; it offers {self.labels()} and reads:\n{self.text()[:600]}")
         return await self.actor.click(self.message(), custom_id=custom_id)
 
-    async def goto(self, page_label: str, *, limit: int = 12) -> None:
-        """Step systems with the panel's own button until the page shows."""
+    async def goto(self, page_label: str, *, limit: int = 12, env: Any = None) -> None:
+        """Step systems with the panel's own button until the page shows. With
+        `env`, a slow step is waited out rather than failed."""
         for _ in range(limit):
             if self.page_title().endswith(page_label):
                 return
-            await self.actor.click(self.message(), label="Next system")
+            try:
+                await self.actor.click(self.message(), label="Next system")
+            except TimeoutError:
+                if env is None:
+                    raise
+                await settle_patiently(env)
         raise Failed(f"no page {page_label!r} within {limit} steps; the last was {self.page_title()!r}")
 
 
-async def open_hub(actor: Any, channel: Any, name: str) -> Panel:
-    result = await actor.slash(channel, name)
+async def open_hub(actor: Any, channel: Any, name: str, *, env: Any = None) -> Panel:
+    """Open a hub. With `env`, a slow open (the bot still refreshing the
+    panel's status when SimCord's settle gives up) is waited out and the panel
+    the bot drew is taken from the channel rather than opened twice."""
+    try:
+        result = await actor.slash(channel, name)
+    except TimeoutError:
+        if env is None:
+            raise
+        await settle_patiently(env)
+        newest = next((m for m in reversed(list(channel.history(viewer=actor))) if getattr(m, "components", None)), None)
+        if newest is None:
+            raise Failed(f"/{name} was slow and drew no panel")
+        return Panel(actor, channel, newest)
     if result.response is None:
         raise Failed(f"/{name} answered nothing (acknowledged={result.acknowledged}, deferred={result.deferred})")
     return Panel(actor, channel, result.response.message)
@@ -395,7 +417,7 @@ async def settle_patiently(env: Any, *, attempts: int = 8) -> None:
     that has kept the engine busy; the last attempt raises."""
     for attempt in range(1, attempts + 1):
         try:
-            await settle_patiently(env)
+            await env.settle()
             return
         except TimeoutError:
             if attempt == attempts:
@@ -451,8 +473,11 @@ async def press_leaf(env: Any, hubs: Any, panel: Panel, action: Any, *, member: 
     # panel, header and all; then the ephemeral reply, if there was one.
     fresh = "\n".join(ln for ln in after.splitlines() if ln not in before)
     reply = fresh + "\n" + result_text(result)
+    # Held against what this press drew, not the whole panel: a result block
+    # an earlier press left there would otherwise fail every leaf after it
+    # whose own reply was ephemeral.
     for failure in WIRING_FAILURE_TEXTS:
-        expect(failure not in reply and failure not in after, f"the hub's failure text after {how}:\n{reply[:600]}")
+        expect(failure not in reply, f"the hub's failure text after {how}:\n{reply[:600]}")
     expect(METER_TEXT not in reply, f"the action meter refused the sweep after {how}: raise TYPED_PLAY_PER_MINUTE")
     raised = list(env.errors)[raised_before:]
     expect(not raised, "; ".join(f"{type(e).__name__}: {e}" for e in raised)[:600])
@@ -799,8 +824,9 @@ async def run(url: str, token: str, db_path: str) -> Report:
                 panel = None
                 for attempt in (1, 2):
                     try:
-                        panel = await open_hub(actor, channels["begin-here"], definition.name)
-                        await panel.goto(page.label, limit=len(definition.pages) + 1)
+                        opened = await open_hub(actor, channels["begin-here"], definition.name, env=env)
+                        await opened.goto(page.label, limit=len(definition.pages) + 1, env=env)
+                        panel = opened
                         break
                     except Exception as exc:  # noqa: BLE001 - a playtest reports, it does not crash
                         if attempt == 2:
@@ -819,8 +845,8 @@ async def run(url: str, token: str, db_path: str) -> Report:
                     (pressed if status == "pressed" else locked)[action.path] = note
                     if not panel.page_title().endswith(page.label):
                         try:
-                            panel = await open_hub(actor, channels["begin-here"], definition.name)
-                            await panel.goto(page.label, limit=len(definition.pages) + 1)
+                            panel = await open_hub(actor, channels["begin-here"], definition.name, env=env)
+                            await panel.goto(page.label, limit=len(definition.pages) + 1, env=env)
                         except Exception as exc:  # noqa: BLE001 - reported on the next leaf's press
                             report.add("FAIL", f"reopen /{definition.name} → {page.label}", f"{type(exc).__name__}: {exc}")
 
