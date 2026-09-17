@@ -97,6 +97,38 @@ class DashboardTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("claims", dynasties)
         self.assertIn("conflicts", dynasties)
 
+    async def test_player_detail_carries_the_rows_the_editor_pre_fills_from(self):
+        """The Player Editor reads one endpoint and fills every lever from it,
+        so the endpoint returns the row each lever writes - empty where the
+        character has none, never absent - and the empty sheet for nobody."""
+        self.assertEqual(await self.store.player_detail(0), {})
+        self.assertTrue(await seed_character(
+            self.db, user_id=9, discord_name="tester-9", name="Tester Nine",
+            origin="Greenriver Town", path="Sword Cultivator", spiritual_root="Fire",
+            concept="editor test", location="Greenriver Town",
+            attributes={"body": 2, "agility": 2, "spirit": 2, "insight": 2, "will": 2, "presence": 2},
+            qi_max=10, vitality_max=20,
+        ))
+        async with self.db._connect() as db:
+            await db.execute("UPDATE currency_wallets SET balance=12 WHERE user_id=9 AND currency_id='low_spirit_stone'")
+            await db.execute(
+                "INSERT INTO spirit_beasts(user_id,name,species,created_at,updated_at) VALUES(9,'Ember','fox',0,0)")
+            await db.execute(
+                "INSERT INTO equipment_instances(user_id,item_id,slot,durability,max_durability,bound_at,updated_at) VALUES(9,'iron_sword','weapon',10,10,0,0)")
+            await db.commit()
+        detail = await self.store.player_detail(9)
+        for key in ("wallets", "root", "bloodlines", "physique", "tribulations", "perfection", "beasts", "equipment",
+                    "abode", "guests", "alchemy", "fate"):
+            with self.subTest(key=key):
+                self.assertIn(key, detail)
+        self.assertIn(("low_spirit_stone", 12), [(w["currency_id"], w["balance"]) for w in detail["wallets"]])
+        self.assertEqual([b["name"] for b in detail["beasts"]], ["Ember"])
+        self.assertEqual([(e["item_id"], e["slot"]) for e in detail["equipment"]], [("iron_sword", "weapon")])
+        self.assertIn("beast_id", detail["beasts"][0], "the lever needs the id, so the row carries it")
+        self.assertIn("equipment_id", detail["equipment"][0])
+        self.assertEqual(detail["abode"], {}, "no property is an empty row, not a missing key")
+        self.assertEqual(detail["bloodlines"], [])
+
     async def test_new_dashboard_api_routes_return_json(self):
         settings = DashboardSettings(self.path, "127.0.0.1", 0, "gm", "a-very-long-private-dashboard-token", admin_writes=False)
         dashboard = DashboardServer(settings)
@@ -300,6 +332,11 @@ class DashboardTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("player.set_bloodline", js)
         self.assertIn("player.set_physique", js)
         self.assertIn("player.set_tribulation", js)
+        # v1.0.0-rc.37: the realm card carries the body ladder, sent only as a pair.
+        self.assertIn('id="realmBodyIndex"', js)
+        self.assertIn('id="realmBodyPhase"', js)
+        self.assertIn("payload.body_realm_index=Number(bodyIndex);payload.body_phase=Number(bodyPhase)", js)
+        self.assertIn("(bodyIndex==='')!==(bodyPhase==='')", js)
         # Backup restore + debuff/condition clearing.
         self.assertIn("backup.restore", js)
         self.assertIn("player.clear_condition", js)
@@ -316,6 +353,42 @@ class DashboardTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("player.set_moderation", js)
         # v0.19.29: undo the most recent admin action.
         self.assertIn("audit.undo_last", js)
+
+    def test_the_player_editor_owns_every_per_player_lever(self):
+        """The Player Editor (v1.0.0-rc.37).
+
+        The Admin Console carried sixteen cards that began with a Player
+        select, each blind to what the character already had. They are one
+        view now, pre-filled from the rows each lever writes, and the console
+        keeps only the levers that act on the world or the server. Every
+        player.* action the controller maps is reachable from the editor and
+        none is drawn on the console any more, so a lever cannot quietly live
+        in both places or in neither.
+        """
+        from app.dashboard.contract import _javascript_async_function_segments
+        from app.dashboard.server import AdminDashboardController
+
+        html = (ROOT / "dashboard" / "index.html").read_text(encoding="utf-8")
+        js = (ROOT / "dashboard" / "app.js").read_text(encoding="utf-8")
+        segments = _javascript_async_function_segments(js)
+        editor, console = segments["loadPlayerEditor"], segments["loadAdmin"]
+        per_player = sorted(a for a in AdminDashboardController.ACTION_MAP if a.startswith("player."))
+        self.assertGreaterEqual(len(per_player), 24)
+        for action in per_player:
+            with self.subTest(action=action):
+                self.assertIn(f"'{action}'", editor, "the editor drives it")
+                self.assertNotIn(f"'{action}'", console, "the console no longer does")
+        self.assertIn("'/api/player?user_id='", editor)
+        self.assertIn("openPlayerEditor(", console, "the console launches the editor")
+        self.assertIn("data-edit-player", segments["showPlayer"], "the player drawer opens it")
+        self.assertIn('data-view="player_editor"', html)
+        self.assertIn("player_editor:loadPlayerEditor", js)
+        # A snowflake never goes through Number(): the editor keeps the id the
+        # server returned, and compares with sameId.
+        self.assertIn("EDIT_UID=String(uid??'')", js)
+        self.assertNotIn("Number(EDIT_UID)", js)
+        self.assertIn("user_id:uid", editor)
+        self.assertNotIn("user_id:Number(", editor)
 
 
 if __name__ == "__main__":
@@ -543,7 +616,9 @@ class NavigationGroupingTests(unittest.TestCase):
         # twenty-one that only read it. Narration routing joined them: it
         # cannot touch canonical state, but it is an audited engine write and
         # it decides what every player reads, so it belongs on this side.
-        self.assertEqual(groups["Admin"], ["discord", "narration", "admin"])
+        # The Player Editor (v1.0.0-rc.37) is where one character's levers
+        # went; it writes through the same audited engine actions.
+        self.assertEqual(groups["Admin"], ["discord", "narration", "player_editor", "admin"])
 
     def test_the_shell_carries_the_pieces_the_page_template_needs(self):
         for required in ('id="navFilter"', 'id="crumb"', 'id="railToggle"', 'id="worldClock"', 'id="drawer"'):

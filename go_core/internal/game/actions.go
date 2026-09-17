@@ -1332,6 +1332,26 @@ func adminSetRealm(conn *storage.Conn, adminUserID int64, raw json.RawMessage) (
 	if uid <= 0 || realmIndex < 0 || realmIndex > 31 || phase < 1 || phase > 9 {
 		return nil, errors.New("invalid user_id, realm_index (0-31), or phase (1-9)")
 	}
+	// The body ladder (v1.0.0-rc.37): optional, and the pair comes together.
+	// Nothing else moved body_realm_index/body_phase but the body breakthrough
+	// itself, so a GM could set a cultivator's qi realm and never their body's.
+	_, hasBodyRealm := p["body_realm_index"]
+	_, hasBodyPhase := p["body_phase"]
+	if hasBodyRealm != hasBodyPhase {
+		return nil, errors.New("body_realm_index and body_phase are set together")
+	}
+	var bodyRealmIndex, bodyPhase int64
+	if hasBodyRealm {
+		if bodyRealmIndex, err = requiredInt(p, "body_realm_index"); err != nil {
+			return nil, err
+		}
+		if bodyPhase, err = requiredInt(p, "body_phase"); err != nil {
+			return nil, err
+		}
+		if bodyRealmIndex < 0 || bodyRealmIndex > 31 || bodyPhase < 1 || bodyPhase > 9 {
+			return nil, errors.New("invalid body_realm_index (0-31) or body_phase (1-9)")
+		}
+	}
 	if err := begin(conn); err != nil {
 		return nil, err
 	}
@@ -1340,7 +1360,11 @@ func adminSetRealm(conn *storage.Conn, adminUserID int64, raw json.RawMessage) (
 			rollback(conn)
 		}
 	}()
-	res, err := conn.Execute(`SELECT name,realm_index,phase FROM characters WHERE user_id=?`, []any{uid})
+	columns := `name,realm_index,phase`
+	if hasBodyRealm {
+		columns += `,body_realm_index,body_phase`
+	}
+	res, err := conn.Execute(`SELECT `+columns+` FROM characters WHERE user_id=?`, []any{uid})
 	if err != nil {
 		return nil, err
 	}
@@ -1349,18 +1373,32 @@ func adminSetRealm(conn *storage.Conn, adminUserID int64, raw json.RawMessage) (
 		return nil, errors.New("character not found")
 	}
 	before := map[string]any{"realm_index": storage.ParseInt(row["realm_index"]), "phase": storage.ParseInt(row["phase"])}
+	after := map[string]any{"realm_index": realmIndex, "phase": phase}
 	now := float64(time.Now().UnixNano()) / 1e9
-	if _, err = conn.Execute(`UPDATE characters SET realm_index=?,phase=?,updated_at=? WHERE user_id=?`, []any{realmIndex, phase, now, uid}); err != nil {
+	if hasBodyRealm {
+		before["body_realm_index"] = storage.ParseInt(row["body_realm_index"])
+		before["body_phase"] = storage.ParseInt(row["body_phase"])
+		after["body_realm_index"] = bodyRealmIndex
+		after["body_phase"] = bodyPhase
+		_, err = conn.Execute(`UPDATE characters SET realm_index=?,phase=?,body_realm_index=?,body_phase=?,updated_at=? WHERE user_id=?`, []any{realmIndex, phase, bodyRealmIndex, bodyPhase, now, uid})
+	} else {
+		_, err = conn.Execute(`UPDATE characters SET realm_index=?,phase=?,updated_at=? WHERE user_id=?`, []any{realmIndex, phase, now, uid})
+	}
+	if err != nil {
 		return nil, err
 	}
-	after := map[string]any{"realm_index": realmIndex, "phase": phase}
 	if err := auditAdmin(conn, adminUserID, "admin.player.set_realm", fmt.Sprintf("user:%d", uid), before, after, fmt.Sprint(p["reason"])); err != nil {
 		return nil, err
 	}
 	if err := conn.Commit(); err != nil {
 		return nil, err
 	}
-	return map[string]any{"user_id": uid, "name": row["name"], "realm_index": realmIndex, "phase": phase}, nil
+	out := map[string]any{"user_id": uid, "name": row["name"], "realm_index": realmIndex, "phase": phase}
+	if hasBodyRealm {
+		out["body_realm_index"] = bodyRealmIndex
+		out["body_phase"] = bodyPhase
+	}
+	return out, nil
 }
 
 // adminSetResourceCaps lets a GM directly set vitality_max and/or qi_max.

@@ -1330,3 +1330,54 @@ func TestAdminClearConditionClearAllResolvesEveryActiveRowInOneAuditEntry(t *tes
 		t.Fatalf("expected an error clearing all when nothing is active")
 	}
 }
+
+// The fixture's characters table predates the body ladder; the tests that
+// set it add the two columns production carries.
+func addBodyLadderColumns(t *testing.T, path string) {
+	t.Helper()
+	conn, err := storage.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	for _, sql := range []string{
+		`ALTER TABLE characters ADD COLUMN body_realm_index INTEGER NOT NULL DEFAULT 0`,
+		`ALTER TABLE characters ADD COLUMN body_phase INTEGER NOT NULL DEFAULT 1`,
+	} {
+		if _, err := conn.Execute(sql, nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+// v1.0.0-rc.37: the lever sets the body ladder when asked, as a pair, within
+// the same bounds, and leaves it alone when not asked.
+func TestAdminSetRealmSetsTheBodyLadderWhenAsked(t *testing.T) {
+	path := setupAdminDB(t)
+	addBodyLadderColumns(t, path)
+	before := auditCount(t, path)
+	out := applyAdmin(t, path, "admin.player.set_realm", map[string]any{"user_id": 42, "realm_index": 1, "phase": 2, "body_realm_index": 3, "body_phase": 9, "reason": "the body path"})
+	for column, want := range map[string]int64{"realm_index": 1, "phase": 2, "body_realm_index": 3, "body_phase": 9} {
+		if got := storage.ParseInt(scalar(t, path, "SELECT "+column+" FROM characters WHERE user_id=42")); got != want {
+			t.Fatalf("%s=%d, want %d", column, got, want)
+		}
+	}
+	if result, ok := out.(map[string]any); !ok || i64(result["body_phase"]) != 9 {
+		t.Fatalf("the result does not carry the body ladder: %v", out)
+	}
+	if got := auditCount(t, path); got != before+1 {
+		t.Fatalf("audit count=%d, want %d", got, before+1)
+	}
+	applyAdmin(t, path, "admin.player.set_realm", map[string]any{"user_id": 42, "realm_index": 5, "phase": 5, "reason": "qi only"})
+	if got := storage.ParseInt(scalar(t, path, "SELECT body_phase FROM characters WHERE user_id=42")); got != 9 {
+		t.Fatalf("a qi-only call moved the body ladder: body_phase=%d", got)
+	}
+	raw, _ := json.Marshal(map[string]any{"user_id": 42, "realm_index": 1, "phase": 2, "body_phase": 9})
+	if _, err := Apply(path, ActionRequest{Operation: "admin.player.set_realm", Payload: raw}); err == nil {
+		t.Fatalf("expected an error for body_phase without body_realm_index")
+	}
+	raw, _ = json.Marshal(map[string]any{"user_id": 42, "realm_index": 1, "phase": 2, "body_realm_index": 0, "body_phase": 10})
+	if _, err := Apply(path, ActionRequest{Operation: "admin.player.set_realm", Payload: raw}); err == nil {
+		t.Fatalf("expected an error for body_phase out of the 1-9 bound")
+	}
+}

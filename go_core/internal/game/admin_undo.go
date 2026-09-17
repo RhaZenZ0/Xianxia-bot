@@ -88,7 +88,13 @@ var reversibleAdminActions = map[string]reverseFunc{
 			return nil, err
 		}
 		snap := pickSnapshot(before, after, redo)
-		return []sqlStmt{{`UPDATE characters SET realm_index=?,phase=? WHERE user_id=?`, []any{i64(snap["realm_index"]), i64(snap["phase"]), uid}}}, nil
+		stmts := []sqlStmt{{`UPDATE characters SET realm_index=?,phase=? WHERE user_id=?`, []any{i64(snap["realm_index"]), i64(snap["phase"]), uid}}}
+		// The body ladder rides the snapshot only when the lever set it
+		// (v1.0.0-rc.37); an older row restores the qi pair alone.
+		if _, ok := snap["body_realm_index"]; ok {
+			stmts = append(stmts, sqlStmt{`UPDATE characters SET body_realm_index=?,body_phase=? WHERE user_id=?`, []any{i64(snap["body_realm_index"]), i64(snap["body_phase"]), uid}})
+		}
+		return stmts, nil
 	},
 	"admin.player.teleport": func(before, after map[string]any, target string, redo bool) ([]sqlStmt, error) {
 		uid, err := parseTargetUserID(target)

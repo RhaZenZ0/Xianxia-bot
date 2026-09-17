@@ -922,7 +922,44 @@ class ReadOnlyDashboardStore:
                 "SELECT condition_id,condition_key,category,name,severity FROM character_conditions WHERE user_id=? AND state='active' ORDER BY severity DESC",
                 (user_id,),
             )
-            return {"player": row, "inventory": inventory, "cooldowns": cooldowns, "scene": scene or {}, "conditions": conditions}
+            # The Player Editor (v1.0.0-rc.37) pre-fills every per-player lever
+            # from the rows it edits, so the GM sees what is set before setting
+            # it. Each read is the row the corresponding admin.player.* action
+            # writes; the ids a lever needs (bloodline_id, beast_id,
+            # equipment_id, guest_user_id) come back beside the names.
+            one = user_id
+            wallets = await self._fetchall(db, "SELECT currency_id,balance FROM currency_wallets WHERE user_id=? ORDER BY currency_id", (one,))
+            root = await self._fetchone(db, "SELECT grade,purity,mutation,stability,refinement_progress,compatibility FROM character_spiritual_roots WHERE user_id=?", (one,))
+            bloodlines = await self._fetchall(
+                db,
+                "SELECT bloodline_id,name,affinity,purity,state,evolution_stage,progress,rejection,primary_lineage FROM character_bloodlines WHERE user_id=? ORDER BY primary_lineage DESC,id",
+                (one,),
+            )
+            physique = await self._fetchone(db, "SELECT physique_id,name,state,evolution_stage,progress,stability,instability FROM character_physiques WHERE user_id=?", (one,))
+            tribulations = await self._fetchall(db, "SELECT gate_realm_index,preparation,attempts,cleared,last_result FROM tribulation_state WHERE user_id=? ORDER BY gate_realm_index", (one,))
+            perfection = await self._fetchall(
+                db,
+                "SELECT 'cultivation' AS track,realm_index,active,completed,progress,training_progress,completed_quests FROM realm_perfection WHERE user_id=? "
+                "UNION ALL SELECT 'body' AS track,realm_index,active,completed,progress,training_progress,completed_quests FROM body_realm_perfection WHERE user_id=? "
+                "ORDER BY track,realm_index",
+                (one, one),
+            )
+            beasts = await self._fetchall(db, "SELECT beast_id,name,species,rank,loyalty,evolution_stage,active FROM spirit_beasts WHERE user_id=? ORDER BY active DESC,beast_id", (one,))
+            equipment = await self._fetchall(db, "SELECT equipment_id,item_id,slot,durability,max_durability,equipped FROM equipment_instances WHERE user_id=? ORDER BY equipped DESC,equipment_id", (one,))
+            abode = await self._fetchone(db, "SELECT location_key,name,base_location,grade FROM cave_abodes WHERE user_id=?", (one,))
+            guests = await self._fetchall(
+                db,
+                "SELECT a.guest_user_id,a.access_role,c.name FROM cave_abode_access a LEFT JOIN characters c ON c.user_id=a.guest_user_id WHERE a.owner_user_id=? ORDER BY c.name",
+                (one,),
+            )
+            alchemy = await self._fetchone(db, "SELECT pill_toxicity FROM alchemy_state WHERE user_id=?", (one,))
+            fate = await self._fetchone(db, "SELECT points,lifetime_earned,lifetime_spent FROM character_fate WHERE user_id=?", (one,))
+            return {
+                "player": row, "inventory": inventory, "cooldowns": cooldowns, "scene": scene or {}, "conditions": conditions,
+                "wallets": wallets, "root": root or {}, "bloodlines": bloodlines, "physique": physique or {},
+                "tribulations": tribulations, "perfection": perfection, "beasts": beasts, "equipment": equipment,
+                "abode": abode or {}, "guests": guests, "alchemy": alchemy or {}, "fate": fate or {},
+            }
 
     async def capabilities(self) -> dict[str, Any]:
         """Describe the dashboard/API contract and whether newer-system tables are present."""
@@ -2363,8 +2400,11 @@ class DashboardServer:
             if path == "/api/players":
                 await self._send_json(writer, 200, await self.store.players(limit=_qint(query, "limit", 200))); return
             if path == "/api/player":
+                # The Player Editor's registered endpoint. With no user_id it
+                # answers the empty sheet (a picker with nothing picked), not
+                # a 400: the view is well-formed before a player is chosen.
                 user_id = _qint(query, "user_id", 0)
-                await self._send_json(writer, 200 if user_id else 400, await self.store.player_detail(user_id) if user_id else {"error": "user_id_required"}); return
+                await self._send_json(writer, 200, await self.store.player_detail(user_id) if user_id else {"player": {}}); return
             if path == "/api/cultivation":
                 await self._send_json(writer, 200, await self.store.cultivation()); return
             if path == "/api/crafting":

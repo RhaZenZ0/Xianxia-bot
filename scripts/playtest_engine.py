@@ -44,27 +44,6 @@ GM = 1
 # fails a stale entry (deferred and driven, or no longer an operation). Each
 # block below is one later PR that empties it.
 DEFERRED_OPERATIONS: dict[str, str] = {
-    # PR 3: progression. Perfection and a tribulation attempt need the stage
-    # filled with essence (the fill rule is read before it is driven), the
-    # aptitudes a bloodline or physique at progress 100, a personal world
-    # Space Law at 100% through repeated law.comprehend.
-    "perfection.start": "PR 3: progression - needs the stage filled with essence at phase 9",
-    "perfection.quest": "PR 3: progression - needs the path started",
-    "perfection.trial": "PR 3: progression - needs every quest complete",
-    "perfection.body_start": "PR 3: progression - needs the body stage filled at phase 9",
-    "perfection.body_quest": "PR 3: progression - needs the body path started",
-    "perfection.body_trial": "PR 3: progression - needs every body quest complete",
-    "tribulation.prepare": "PR 3: progression - a world-crossing gate at realm 7 phase 9 with the world's currency",
-    "tribulation.attempt": "PR 3: progression - needs the stage filled at the gate",
-    "aptitude.temper": "PR 3: progression - a bloodline or physique set by the GM, then essence spent",
-    "aptitude.awaken": "PR 3: progression - a bloodline or physique at progress 100",
-    "aptitude.evolve": "PR 3: progression - an awakened bloodline or physique",
-    "aptitude.harmonize": "PR 3: progression - a bloodline's rejection brought down with essence",
-    "cultivation.body_breakthrough": "PR 3: progression - body essence filled through body_train first",
-    "personal_world.create": "PR 3: progression - Space Law at 100% and realm 30",
-    "personal_world.set_rule": "PR 3: progression - needs the world created",
-    "personal_world.enter": "PR 3: progression - needs the world created",
-    "personal_world.leave": "PR 3: progression - needs the world entered",
     # PR 4: what only the world makes. No GM lever writes a wild beast
     # encounter, a running world event and its nodes, a bounty pursuit or a
     # missing NPC; the simulation batches and the hunt and exploration rolls
@@ -1467,6 +1446,317 @@ async def run(url: str, token: str, db_path: str) -> Report:
         report.add("PASS" if not stored.get("effect_id") else "FAIL", "storage is a room, not an effect", str(stored.get("effect_id")))
     await step(report, "abode.leave", act("abode.leave", PLAYER, {}))
     await audited("admin.player.set_sect_rank", {"user_id": PLAYER, "rank_name": "Outer Disciple", "rank_level": 10, "reason": "playtest"}, name="admin.player.set_sect_rank back to Outer Disciple")
+
+    # -- progression (v1.0.0-rc.37)
+    # Perfection is walked on both ladders. The qi stage is filled by a lever
+    # (`cultivation.reward`) and the body stage by training, because nothing
+    # but `cultivation.body_train` writes `body_cultivation`; the body ladder
+    # itself is set by the realm lever's new pair. A perfection quest is a
+    # roll on an attribute no lever raises (attr+2 vs TN 13-18 on 2d10), so
+    # each is retried on a bounded loop, and the trial is driven when the
+    # dice allowed every quest and held locked when they did not - which of
+    # the two it was is reported. The tribulation's three waves, the body
+    # breakthrough and the aptitude rolls are reported the same way. Space
+    # Law is the one climb that is certain: a comprehend gains at least one
+    # point on any dice.
+    async def quietly(coro) -> dict[str, Any]:
+        """One call inside a bounded loop; the caller reports the loop once."""
+        try:
+            return dict(await coro or {})
+        except GameEngineError as exc:
+            return {"_refused": str(exc)}
+
+    async def walk_perfection(body: bool) -> None:
+        ladder = "body" if body else "qi"
+        prefix = "perfection.body_" if body else "perfection."
+        train_op = "cultivation.body_train" if body else "cultivation.train"
+        read_row = db.get_body_perfection if body else db.get_perfection
+
+        # The gate counts an operation as driven only where its name is a
+        # literal inside the call, so each ladder names its own three.
+        async def quest(payload: dict[str, Any]) -> dict[str, Any]:
+            return await (act("perfection.body_quest", PLAYER, payload) if body else act("perfection.quest", PLAYER, payload))
+
+        async def trial(payload: dict[str, Any]) -> dict[str, Any]:
+            return await (act("perfection.body_trial", PLAYER, payload) if body else act("perfection.trial", PLAYER, payload))
+
+        started = await step(report, f"{prefix}start", act("perfection.body_start", PLAYER, {}) if body else act("perfection.start", PLAYER, {}))
+        if started is None:
+            return
+        report.add("PASS" if started.get("started") and int(started.get("quest_count") or 0) == 7 and int(started.get("training_cap") or 0) == 20 else "FAIL",
+                   f"the {ladder} path is seven quests and twenty points of training",
+                   f"quest_count={started.get('quest_count')} training_cap={started.get('training_cap')}")
+        completed = 0
+        for _ in range(7):
+            prepared: dict[str, Any] = {}
+            for _ in range(8):
+                prepared = await quietly(quest({"mode": "prepare", "quest_cooldown_seconds": 0}))
+                if "_refused" in prepared or int(prepared.get("preparation") or 0) >= int(prepared.get("preparation_required") or 0):
+                    break
+            title = str(prepared.get("title") or f"quest {completed + 1}")
+            if "_refused" in prepared:
+                report.add("FAIL", f"{prefix}quest prepare: {title}", prepared["_refused"])
+                break
+            report.add("PASS", f"{prefix}quest prepare: {title}", f"{prepared.get('preparation')}/{prepared.get('preparation_required')} prepared")
+            passed, rolls, last = False, 0, {}
+            while rolls < 12 and not passed:
+                attempted = await quietly(quest({"mode": "attempt", "quest_cooldown_seconds": 0}))
+                if "_refused" in attempted:
+                    last = attempted
+                    break
+                rolls += 1
+                last = dict(attempted.get("roll") or {})
+                passed = bool(attempted.get("success"))
+            if "_refused" in last:
+                report.add("FAIL", f"{prefix}quest attempt: {title}", last["_refused"])
+                break
+            report.add("PASS", f"{prefix}quest attempt: {title}, the roll reported",
+                       f"{'passed' if passed else 'not passed'} in {rolls} roll(s); last {last.get('total')} vs TN {last.get('tn')} ({last.get('degree')})")
+            if not passed:
+                break
+            completed += 1
+        row = dict(await read_row(PLAYER, 0) or {})
+        report.add("PASS" if int(row.get("completed_quests") or 0) == completed else "FAIL",
+                   f"the {ladder} path's row counts the quests the dice allowed", f"completed_quests={row.get('completed_quests')} progress={row.get('progress')}")
+        sessions = 0
+        for _ in range(25):
+            if int(row.get("training_progress") or 0) >= 20:
+                break
+            await clear_cooldowns()
+            session = await quietly(act(train_op, PLAYER, {"cooldown_seconds": 1}))
+            if "_refused" in session:
+                report.add("FAIL", f"{train_op} at stage 9 while the {ladder} path is active", session["_refused"])
+                break
+            sessions += 1
+            row = dict(await read_row(PLAYER, 0) or {})
+        report.add("PASS" if int(row.get("training_progress") or 0) >= 20 else "FAIL",
+                   f"{train_op} fills the {ladder} path's twenty points of training", f"training_progress={row.get('training_progress')} after {sessions} session(s)")
+        if int(row.get("completed_quests") or 0) >= 7 and int(row.get("progress") or 0) >= 100:
+            tried = await step(report, f"{prefix}trial", trial({"trial_cooldown_seconds": 0}))
+            if tried is not None:
+                checks = "; ".join(f"{r.get('name')} {r.get('total')} vs {r.get('tn')}" for r in (tried.get("rolls") or []))
+                report.add("PASS" if len(tried.get("rolls") or []) == 3 else "FAIL", f"the {ladder} trial's three checks, reported",
+                           f"success={tried.get('success')} training_loss={tried.get('training_loss')}; {checks}")
+                row = dict(await read_row(PLAYER, 0) or {})
+                report.add("PASS" if bool(row.get("completed")) == bool(tried.get("success")) else "FAIL",
+                           f"the {ladder} realm is perfected exactly when the trial passed", f"completed={row.get('completed')} progress={row.get('progress')}")
+        else:
+            await step(report, f"{prefix}trial is locked until the dice allow every quest ({completed} of 7 passed)",
+                       trial({"trial_cooldown_seconds": 0}), expect_error="final trial is locked")
+        ended = await step(report, f"{prefix}abandon", act("perfection.body_abandon", PLAYER, {}) if body else act("perfection.abandon", PLAYER, {}))
+        if ended is not None:
+            report.add("PASS" if bool(ended.get("abandoned")) != bool(row.get("completed")) else "FAIL",
+                       f"an unfinished {ladder} path is abandoned, a perfected realm is kept", f"abandoned={ended.get('abandoned')} completed={row.get('completed')}")
+
+    both = await step(report, "stand at Stage 9 of the first realm on both ladders",
+                      gm("admin.player.set_realm", {"user_id": PLAYER, "realm_index": 0, "phase": 9, "body_realm_index": 0, "body_phase": 9, "reason": "playtest"}))
+    if both is not None:
+        report.add("PASS" if both.get("body_realm_index") is not None and int(both["body_realm_index"]) == 0 and int(both.get("body_phase") or 0) == 9 else "FAIL",
+                   "the realm lever sets the body ladder when asked", f"body={both.get('body_realm_index')}/{both.get('body_phase')}")
+    await step(report, "the lever refuses half a body ladder",
+               gm("admin.player.set_realm", {"user_id": PLAYER, "realm_index": 0, "phase": 9, "body_phase": 9, "reason": "playtest"}), expect_error="set together")
+    await step(report, "fill the qi stage", engine.action("cultivation.reward", PLAYER, {"cultivation": 400, "event_type": "playtest"}))
+    await walk_perfection(body=False)
+    filled, sessions = 0, 0
+    for _ in range(20):
+        await clear_cooldowns()
+        session = await quietly(act("cultivation.body_train", PLAYER, {"cooldown_seconds": 1}))
+        if "_refused" in session:
+            report.add("FAIL", "cultivation.body_train at body stage 9", session["_refused"])
+            break
+        sessions += 1
+        filled = int((await db.get_character(PLAYER) or {}).get("body_cultivation") or 0)
+        if filled >= 340:
+            break
+    report.add("PASS" if filled >= 340 else "FAIL", "cultivation.body_train fills the body stage, the one thing that writes body_cultivation",
+               f"body_cultivation={filled} after {sessions} session(s)")
+    await walk_perfection(body=True)
+    await step(report, "the body ladder back to its first stage, the essence kept",
+               gm("admin.player.set_realm", {"user_id": PLAYER, "realm_index": 0, "phase": 9, "body_realm_index": 0, "body_phase": 1, "reason": "playtest"}))
+    await step(report, "the dantian filled for the attempt", gm("admin.player.revive", {"user_id": PLAYER, "reason": "playtest"}))
+    broke = await step(report, "cultivation.body_breakthrough", act("cultivation.body_breakthrough", PLAYER, {"confirm": True}))
+    if broke is not None:
+        roll = dict(broke.get("roll") or {})
+        report.add("PASS" if str(broke.get("mode")) == "body" else "FAIL", "the body breakthrough's roll, reported",
+                   f"success={broke.get('success')} stage {broke.get('from_stage')}->{broke.get('to_stage')} total={roll.get('total')} tn={broke.get('tn')}")
+
+    await step(report, "stand at the Mortal Ascension gate: realm 7 stage 9", gm("admin.player.set_realm", {"user_id": PLAYER, "realm_index": 7, "phase": 9, "reason": "playtest"}))
+    await step(report, "fill the gate's stage, with essence to spare for the aptitudes", engine.action("cultivation.reward", PLAYER, {"cultivation": 80000, "event_type": "playtest"}))
+    await step(report, "thirty stones for the preparation", gm("admin.player.grant_currency", {"user_id": PLAYER, "currency_id": "low_spirit_stone", "amount": 30, "reason": "playtest"}))
+    for n in range(1, 6):
+        banked = await step(report, f"tribulation.prepare {n} of 5", act("tribulation.prepare", PLAYER, {"path": "qi"}))
+        if banked is not None:
+            report.add("PASS" if int(banked.get("preparation") or 0) == n and str(banked.get("currency")) == "low_spirit_stone" else "FAIL",
+                       f"point {n} is banked in the Mortal World's stone", f"preparation={banked.get('preparation')} currency={banked.get('currency')} gate={banked.get('gate_name')}")
+    await step(report, "a sixth preparation is refused", act("tribulation.prepare", PLAYER, {"path": "qi"}), expect_error="already capped")
+    for item in ("jade_life_herb", "heart_calming_pill"):
+        await step(report, f"grant {item} for a wave that fails", gm("admin.player.adjust_item", {"user_id": PLAYER, "item_id": item, "quantity": 2, "reason": "playtest"}))
+    faced = await step(report, "tribulation.attempt", act("tribulation.attempt", PLAYER, {"path": "qi"}))
+    if faced is not None:
+        waves = [dict(w) for w in (faced.get("waves") or [])]
+        report.add("PASS" if len(waves) == 3 and int(faced.get("preparation_used") or 0) == 5 and bool(faced.get("success")) == (int(faced.get("successes") or 0) >= 2) else "FAIL",
+                   "three waves with all five points, two of three to pass; the rolls reported",
+                   f"success={faced.get('success')} successes={faced.get('successes')}; " + "; ".join(f"{w.get('name')} {w.get('total')} vs {w.get('tn')}" for w in waves))
+        state = dict(await db.get_tribulation_state(PLAYER, 7) or {})
+        report.add("PASS" if state and int(state.get("preparation") or 0) == 0 and bool(state.get("cleared")) == bool(faced.get("success")) else "FAIL",
+                   "the attempt spends the preparation and records its result", f"preparation={state.get('preparation')} cleared={state.get('cleared')} attempts={state.get('attempts')}")
+        failed = [w for w in waves if not w.get("success")]
+        for wave in failed:
+            key = str(wave.get("condition_key"))
+            treated = await step(report, f"condition.treat the {key} the {wave.get('name')} left", act("condition.treat", PLAYER, {"condition": key}))
+            if treated is not None:
+                report.add("PASS", f"the treatment of {key}, reported",
+                           f"success={treated.get('success')} severity {treated.get('severity_before')}->{treated.get('severity_after')} resolved={treated.get('resolved')}")
+        if not failed:
+            report.add("PASS", "no wave failed, so nothing was left to treat", "the dice passed all three")
+    await audited("admin.player.set_tribulation", {"user_id": PLAYER, "gate_realm_index": 7, "mode": "reset", "reason": "playtest"}, name="admin.player.set_tribulation reset")
+
+    # The aptitudes, at realm 7 so a temper's share of the stage is paid from
+    # the essence the reward left. Every character has a root and a physique
+    # row; a bloodline row exists only if creation rolled one, and the lever
+    # edits a row that exists, so the bloodline leg reads which world it is in.
+    await step(report, "a Mortal root, so the next grade's floor is realm 0",
+               gm("admin.player.set_spiritual_root", {"user_id": PLAYER, "grade": "Mortal", "purity": 80, "reason": "playtest"}))
+    refined, tempers = 0, 0
+    for _ in range(20):
+        await clear_cooldowns()
+        tempered = await quietly(act("aptitude.temper", PLAYER, {"target": "root"}))
+        if "_refused" in tempered:
+            report.add("FAIL", "aptitude.temper root", tempered["_refused"])
+            break
+        tempers += 1
+        refined = int(((await db.get_aptitudes(PLAYER)).get("root") or {}).get("refinement_progress") or 0)
+        if refined >= 100:
+            break
+    report.add("PASS" if refined >= 100 else "FAIL", "aptitude.temper refines the root to 100%", f"refinement_progress={refined} after {tempers} tempering(s)")
+    await step(report, "a refined root cannot be tempered further", act("aptitude.temper", PLAYER, {"target": "root"}), expect_error="already 100%")
+    stability, harmonies = 0, 0
+    for _ in range(8):
+        await clear_cooldowns()
+        settled = await quietly(act("aptitude.harmonize", PLAYER, {"target": "root"}))
+        if "_refused" in settled:
+            report.add("FAIL", "aptitude.harmonize root", settled["_refused"])
+            break
+        harmonies += 1
+        stability = int(((await db.get_aptitudes(PLAYER)).get("root") or {}).get("stability") or 0)
+        if stability >= 35:
+            break
+    report.add("PASS" if harmonies > 0 and stability >= 35 else "FAIL", "aptitude.harmonize steadies the root to the evolve floor", f"stability={stability} after {harmonies} harmonising(s)")
+    await clear_cooldowns()
+    evolved = await step(report, "aptitude.evolve root", act("aptitude.evolve", PLAYER, {"target": "root"}))
+    if evolved is not None:
+        roll, outcome = dict(evolved.get("roll") or {}), dict(evolved.get("outcome") or {})
+        report.add("PASS" if (str(outcome.get("grade")) == "Common") == bool(roll.get("success")) else "FAIL", "the root's evolution roll, reported",
+                   f"success={roll.get('success')} total={roll.get('total')} tn={roll.get('tn')} grade={outcome.get('grade')} stability={outcome.get('stability')}")
+    aptitudes = await db.get_aptitudes(PLAYER)
+    blood = dict(aptitudes.get("bloodline") or {})
+    if blood:
+        blood_id = str(blood.get("bloodline_id"))
+        report.add("PASS", "this character was born with a bloodline", f"{blood_id} state={blood.get('state')}")
+        await audited("admin.player.set_bloodline", {"user_id": PLAYER, "bloodline_id": blood_id, "purity": 100, "evolution_stage": 0, "progress": 100, "reason": "playtest"})
+        await clear_cooldowns()
+        woke = await step(report, "aptitude.awaken bloodline", act("aptitude.awaken", PLAYER, {"target": "bloodline"}))
+        if woke is not None:
+            roll = dict(woke.get("roll") or {})
+            report.add("PASS" if (str(woke.get("state")) == "awakened") == bool(roll.get("success")) else "FAIL", "the awakening roll, reported",
+                       f"success={roll.get('success')} total={roll.get('total')} tn={roll.get('tn')} state={woke.get('state')}")
+        if woke is not None and str(woke.get("state")) == "awakened":
+            await audited("admin.player.set_bloodline", {"user_id": PLAYER, "bloodline_id": blood_id, "purity": 100, "evolution_stage": 1, "progress": 100, "reason": "playtest"},
+                          name="admin.player.set_bloodline ready to evolve")
+            await clear_cooldowns()
+            grown = await step(report, "aptitude.evolve bloodline", act("aptitude.evolve", PLAYER, {"target": "bloodline"}))
+            if grown is not None:
+                roll, outcome = dict(grown.get("roll") or {}), dict(grown.get("outcome") or {})
+                report.add("PASS", "the bloodline's evolution roll, reported",
+                           f"success={roll.get('success')} total={roll.get('total')} tn={roll.get('tn')} stage={outcome.get('stage')} rejection={outcome.get('rejection')}")
+        else:
+            await step(report, "aptitude.evolve bloodline waits on the awakening", act("aptitude.evolve", PLAYER, {"target": "bloodline"}), expect_error="awaken the bloodline before evolving it")
+        await clear_cooldowns()
+        settled = await step(report, "aptitude.harmonize bloodline", act("aptitude.harmonize", PLAYER, {"target": "bloodline"}))
+        if settled is not None:
+            report.add("PASS" if int(settled.get("amount") or 0) > 0 else "FAIL", "harmonising brings rejection down", f"amount={settled.get('amount')} cost={settled.get('cost')}")
+        await clear_cooldowns()
+        await either("aptitude.temper bloodline (refused at 100%, run after a reset)", act("aptitude.temper", PLAYER, {"target": "bloodline"}), "already 100%")
+    else:
+        report.add("PASS", "this character was born without a bloodline", "the four bloodline doors refuse by design")
+        for op in ("aptitude.temper", "aptitude.harmonize", "aptitude.awaken", "aptitude.evolve"):
+            await step(report, f"{op} bloodline with none", act(op, PLAYER, {"target": "bloodline"}), expect_error="do not carry")
+    physique = dict(aptitudes.get("physique") or {})
+    physique_id = str(physique.get("physique_id"))
+    special = physique_id != "ordinary_mortal_body"
+    report.add("PASS", "the body this character was born with", f"{physique_id} state={physique.get('state')}")
+    await audited("admin.player.set_physique", {"user_id": PLAYER, "evolution_stage": 0, "progress": 100, "stability": 60, "reason": "playtest"})
+    if special:
+        await clear_cooldowns()
+        await step(report, "aptitude.temper physique at 100% is refused", act("aptitude.temper", PLAYER, {"target": "physique"}), expect_error="already 100%")
+        await clear_cooldowns()
+        settled = await step(report, "aptitude.harmonize physique", act("aptitude.harmonize", PLAYER, {"target": "physique"}))
+        if settled is not None:
+            report.add("PASS" if int(settled.get("amount") or 0) > 0 else "FAIL", "harmonising brings instability down", f"amount={settled.get('amount')} cost={settled.get('cost')}")
+        await clear_cooldowns()
+        woke = await step(report, "aptitude.awaken physique", act("aptitude.awaken", PLAYER, {"target": "physique"}))
+        if woke is not None:
+            roll = dict(woke.get("roll") or {})
+            report.add("PASS" if (str(woke.get("state")) == "awakened") == bool(roll.get("success")) else "FAIL", "the physique's awakening roll, reported",
+                       f"success={roll.get('success')} total={roll.get('total')} tn={roll.get('tn')} state={woke.get('state')}")
+        if woke is not None and str(woke.get("state")) == "awakened":
+            # An awakening resets progress to 0 and the next evolution has its
+            # own floors (content: progress 100, a body realm, a stability),
+            # so the levers stage them the way the bloodline's were.
+            evolutions = list(dict(dict(world.get("physiques") or {}).get(physique_id) or {}).get("evolutions") or [])
+            floor = dict(evolutions[1]) if len(evolutions) > 1 else {}
+            await audited("admin.player.set_physique", {"user_id": PLAYER, "evolution_stage": 1, "progress": 100, "stability": max(60, int(floor.get("min_stability") or 0)), "reason": "playtest"},
+                          name="admin.player.set_physique ready to evolve")
+            await step(report, "the body ladder at the evolution's floor",
+                       gm("admin.player.set_realm", {"user_id": PLAYER, "realm_index": 7, "phase": 9, "body_realm_index": int(floor.get("min_body_realm") or 0), "body_phase": 1, "reason": "playtest"}))
+            await clear_cooldowns()
+            grown = await step(report, "aptitude.evolve physique", act("aptitude.evolve", PLAYER, {"target": "physique"}))
+            if grown is not None:
+                roll, outcome = dict(grown.get("roll") or {}), dict(grown.get("outcome") or {})
+                report.add("PASS", "the physique's evolution roll, reported",
+                           f"success={roll.get('success')} total={roll.get('total')} tn={roll.get('tn')} stage={outcome.get('stage')} stability={outcome.get('stability')}")
+        else:
+            await step(report, "aptitude.evolve physique waits on the awakening", act("aptitude.evolve", PLAYER, {"target": "physique"}), expect_error="awaken the physique before evolving it")
+    else:
+        for op, text in (("aptitude.temper", "special physique to temper"), ("aptitude.harmonize", "no special-physique instability"),
+                         ("aptitude.awaken", "dormant special physique"), ("aptitude.evolve", "dormant special physique")):
+            await step(report, f"{op} physique with an ordinary body", act(op, PLAYER, {"target": "physique"}), expect_error=text)
+
+    # A personal world: Space Law is supreme, so its floor is Nirvana (realm
+    # 11) and its cooldown a fixed two hours; every reading gains at least a
+    # point, so 100% is a bounded climb with the cooldown cleared between.
+    await step(report, "stand at Nirvana, the floor of a supreme Law", gm("admin.player.set_realm", {"user_id": PLAYER, "realm_index": 11, "phase": 1, "reason": "playtest"}))
+    comprehension, readings = 0, 0
+    for _ in range(110):
+        await clear_cooldowns()
+        read = await quietly(act("law.comprehend", PLAYER, {"law": "space", "spend_insight": False}))
+        if "_refused" in read:
+            report.add("FAIL", "law.comprehend space", read["_refused"])
+            break
+        readings += 1
+        comprehension = int(read.get("comprehension") or 0)
+        if comprehension >= 100:
+            break
+    report.add("PASS" if comprehension >= 100 else "FAIL", "law.comprehend climbs Space Law to Essence/Origin: at least a point on any dice",
+               f"comprehension={comprehension} after {readings} reading(s)")
+    await step(report, "personal_world.create below Dao Saint is refused", act("personal_world.create", PLAYER, {"name": "Playtest Pocket"}), expect_error="at least Dao Saint")
+    await step(report, "stand at Dao Saint", gm("admin.player.set_realm", {"user_id": PLAYER, "realm_index": 30, "phase": 1, "reason": "playtest"}))
+    pocket = f"personal_world:{PLAYER}"
+    made = await step(report, "personal_world.create", act("personal_world.create", PLAYER, {"name": "Playtest Pocket"}))
+    if made is not None:
+        report.add("PASS" if str(made.get("location_key")) == pocket and str(made.get("access_mode")) == "private" else "FAIL",
+                   "the world is keyed to its maker and private", f"location_key={made.get('location_key')} access={made.get('access_mode')}")
+    ruled = await step(report, "personal_world.set_rule", act("personal_world.set_rule", PLAYER, {"rule": "hospitality", "definition": "guests are fed"}))
+    if ruled is not None:
+        report.add("PASS" if dict(ruled.get("laws") or {}).get("hospitality") == "guests are fed" else "FAIL", "the rule is written into the world's laws", str(ruled.get("laws")))
+    await step(report, "personal_world.leave from outside is refused", act("personal_world.leave", PLAYER, {}), expect_error="not inside your personal world")
+    entered = await step(report, "personal_world.enter", act("personal_world.enter", PLAYER, {}))
+    if entered is not None:
+        report.add("PASS" if str(entered.get("location")) == pocket else "FAIL", "the maker stands inside", str(entered.get("location")))
+    left = await step(report, "personal_world.leave", act("personal_world.leave", PLAYER, {}))
+    if left is not None:
+        report.add("PASS" if str(left.get("location")) == town else "FAIL", "leaving lands at Greenriver Town", str(left.get("location")))
+    await step(report, "a second world is refused", act("personal_world.create", PLAYER, {"name": "Another Pocket"}), expect_error="already stabilized")
 
     # -- the household simulated, a child named, the supporter's gift
     simulated = await step(report, "family.simulate a season", act("family.simulate", PLAYER, {"family_id": int(fam.get("family_id") or 0)}))

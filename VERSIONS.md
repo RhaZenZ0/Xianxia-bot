@@ -6,6 +6,22 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.0** (rc.37) drives progression through the engine playtest.
+
+The second of rc.35's deferred blocks is empty: realm perfection on both ladders - the path started,
+its seven quests prepared and rolled on a bounded loop, the twenty points of training, the trial
+driven when the dice allowed every quest and held locked when they did not - the body breakthrough,
+the Mortal Ascension tribulation prepared five times and faced with its waves' conditions treated,
+the root refined, steadied and evolved, the bloodline and the physique on whichever path the birth
+allows, and a personal world created, ruled, entered and left after Space Law is climbed to
+Essence/Origin; seventeen operations. The body ladder had no lever, so `admin.player.set_realm`
+takes an optional `body_realm_index`/`body_phase` pair (both or neither), audited and undone with
+the qi pair. The GM dashboard gained a **Player Editor**: the sixteen per-player cards the Admin
+Console carried, each blind to the character chosen, are one view now, picked once and pre-filled
+from the rows each lever writes (`/api/player` returns them beside the sheet), while the console
+keeps the levers that act on the world or the server; the write path, the action map and the audit
+row are unchanged. See CLAUDE.md, "The playtest touches everything" and "Dashboard".
+
 **1.0.0** (rc.36) drives the sect and the homestead through the engine playtest.
 
 The first of rc.35's three deferred blocks is empty: the sect's residence, its contributions and
