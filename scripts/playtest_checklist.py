@@ -313,14 +313,18 @@ def build() -> str:
                 total += 1
             lines.append("")
     lines += ["## Loops beyond the hubs", "",
-              "Run `scripts/playtest_engine.py --launch` for the engine half (character creation, `$ I explore`, joining a sect and studying "
-              "the gift, commissions from Qiao completed, abandoned and failed, a live quest edited under each hold policy, a narration "
-              "route changed and read back, a timed mute and its undo, a live auction struck, a backup restored). Run "
-              "`scripts/playtest_discord.py --launch` for the half a player touches, driven through a simulated Discord (the bot "
-              "boots and syncs its commands, `/admin` refuses a player and binds the base channels, `/begin` through the form to the "
-              "household thread, every hub answers, the hidden household door and its locked line, an errand, `$ I explore` in the "
-              "journal, the shorthand, `/cooldowns`, the capital and the Hearth-Return Talisman home, Support and Contribute, Enter "
-              "from the town, the road, a panel expiring to Reopen). What only a live server can show:", "",
+              "Run `scripts/playtest_engine.py --launch` for the engine half: the roadmap's loops (character creation, `$ I explore`, "
+              "joining a sect and studying the gift, commissions from Qiao completed, abandoned and failed, a live quest edited under "
+              "each hold policy, a narration route changed and read back, a timed mute and its undo, a live auction struck, a backup "
+              "restored) and then every operation the engine answers, driven on a state the GM levers build - the ones it does not "
+              "drive are named in its `DEFERRED_OPERATIONS`, each with its reason. Run `scripts/playtest_discord.py --launch` for the "
+              "half a player touches, driven through a simulated Discord: the scripted loops (the bot boots and syncs its commands, "
+              "`/admin` refuses a player and binds the base channels, `/begin` through the form to the household thread, the hidden "
+              "household door and its locked line, an errand, `$ I explore` in the journal, the shorthand, `/cooldowns`, the capital "
+              "and the Hearth-Return Talisman home, Support and Contribute, the lesson, Enter from the town, the road, a panel "
+              "expiring to Reopen) and then every leaf on this board and on the admin hub, pressed once with each input step answered "
+              "generically, holding that the reply is a result or a designed refusal and never the hub's own failure text. "
+              "`tests/python/contracts/test_playtest_coverage.py` holds both harnesses to the code. What only a live server can show:", "",
               "| Loop | Live |", "|---|---|",
               "| `$ I explore` from a scene channel routes to /explore | [ ] |",
               "| `$ I travel to <known place>` and `$ I drink <carried item>` dispatch with the argument | [ ] |",

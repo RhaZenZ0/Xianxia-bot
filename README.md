@@ -650,8 +650,8 @@ make check              # lint + format-check + test-python + test-go, the pytho
 | `make tools` | installs `staticcheck` and `govulncheck` at the versions the Makefile pins (the only versions CI runs) |
 | `make audit` | `govulncheck ./...` — the one check that needs the network, which is why it is not in `lint` or `check` |
 | `python scripts/check_dashboard_implementation.py` | the dashboard drift and coverage gate |
-| `python scripts/playtest_engine.py --launch` | the engine half of the playtest: every roadmap loop driven through a scratch engine |
-| `python scripts/playtest_discord.py --launch` | the Discord half: the real bot booted against a simulated Discord (SimCord, a dev dependency) and driven through its slash commands, panels, pickers, modals and typed lines |
+| `python scripts/playtest_engine.py --launch` | the engine half of the playtest: every roadmap loop, then every operation the engine answers, driven through a scratch engine (the ones it defers are named in the script, each with its reason) |
+| `python scripts/playtest_discord.py --launch` | the Discord half: the real bot booted against a simulated Discord (SimCord, a dev dependency), driven through its slash commands, panels, pickers, modals and typed lines, then every leaf of every hub pressed once |
 | `python scripts/playtest_checklist.py` | regenerates `docs/playtest/v<version>.md` |
 | `python scripts/release_manifest.py --write` | regenerates `RELEASE_MANIFEST.sha256`; run it last before a release |
 

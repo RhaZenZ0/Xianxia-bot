@@ -6,6 +6,21 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.0** (rc.35) makes the playtest touch everything, and holds it there.
+
+The engine playtest drove 51 of 193 allowlisted operations and the Discord playtest pressed 9 of
+245 leaves, and nothing said which the harnesses had to drive, so a new operation or leaf was
+uncovered until somebody noticed. `tests/python/contracts/test_playtest_coverage.py` now enumerates
+the surface from the code - the allowlist maps and the dispatch switch in Go, the live hub
+definitions in Python - and holds each harness to it with one explicit deferred set per harness,
+each entry carrying its reason; a stale deferral fails the gate. The Discord harness gained a
+generic sweep that presses every leaf of every hub, admin included, answering each input step as a
+player with no plan would and holding that the reply is a result or a designed refusal, never the
+hub's failure text. The engine harness gained every family a fresh pair of characters and the GM
+levers can reach, from storage to the dynasty a new life inherits, with every remaining lever's
+audit row checked; the sect's rooms, progression and what only the world makes are deferred to
+three named follow-ups. See CLAUDE.md, "The playtest touches everything".
+
 **1.0.0** (rc.34) lets the head of the house teach and test the new cultivator.
 
 The beginner path ended at the door: nobody in the house had ever spoken to the child as a teacher,

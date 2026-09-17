@@ -38,13 +38,82 @@ BUYER = 900002
 GHOST = 900003
 GM = 1
 
+# Operations this harness does not drive, each with its reason.
+# `tests/python/contracts/test_playtest_coverage.py` holds every operation
+# the engine answers to a driver call in this file or to an entry here, and
+# fails a stale entry (deferred and driven, or no longer an operation). Each
+# block below is one later PR that empties it.
+DEFERRED_OPERATIONS: dict[str, str] = {
+    # PR 2: the sect and the homestead. A sect residence, its manor and its
+    # treasury need membership at rank (admin.player.set_sect) and
+    # contribution points that only sect.contribute builds; a homestead's
+    # founding rank rides the same lever.
+    "sect.abode.enter": "PR 2: the sect and the homestead - needs a sect_abodes row the sect assigns to a member",
+    "sect.abode.leave": "PR 2: the sect and the homestead - needs the residence entered first",
+    "sect.abode.upgrade": "PR 2: the sect and the homestead - needs contribution points built by sect.contribute",
+    "sect.shadow": "PR 2: the sect and the homestead - the hidden sect's initiation at karma -80",
+    "sect.recruitment.recommendation": "PR 2: the sect and the homestead - a recommendation roll, reported",
+    "sect.contribute": "PR 2: the sect and the homestead - items into the sect treasury for points",
+    "sect.redeem": "PR 2: the sect and the homestead - points back out of the treasury",
+    "sect.manor.establish": "PR 2: the sect and the homestead - rank 70 and a funded treasury",
+    "sect.manor.upgrade": "PR 2: the sect and the homestead - rank 50 and a funded treasury",
+    "discipleship.request": "PR 2: the sect and the homestead - two members of one sect at different realms",
+    "discipleship.resolve": "PR 2: the sect and the homestead - the master answers the request",
+    "discipleship.leave": "PR 2: the sect and the homestead - the disciple leaves the lineage",
+    "territory.claim": "PR 2: the sect and the homestead - a claim by a sect member",
+    "war.act": "PR 2: the sect and the homestead - a war needs a territory a second sect already holds",
+    "abode.establish": "PR 2: the sect and the homestead - a homestead's founding rank rides set_sect",
+    "abode.enter": "PR 2: the sect and the homestead - needs the property established",
+    "abode.visit": "PR 2: the sect and the homestead - the buyer visits on an invitation",
+    "abode.leave": "PR 2: the sect and the homestead - needs the property entered",
+    "abode.invite": "PR 2: the sect and the homestead - needs the property established",
+    "abode.revoke": "PR 2: the sect and the homestead - needs the invitation first",
+    "abode.upgrade": "PR 2: the sect and the homestead - a facility bought with stones",
+    "abode.focus": "PR 2: the sect and the homestead - needs a built facility to sit in",
+    "admin.player.set_abode_access": "PR 2: the sect and the homestead - the lever edits access to a property the owner must have",
+    # PR 3: progression. Perfection and a tribulation attempt need the stage
+    # filled with essence (the fill rule is read before it is driven), the
+    # aptitudes a bloodline or physique at progress 100, a personal world
+    # Space Law at 100% through repeated law.comprehend.
+    "perfection.start": "PR 3: progression - needs the stage filled with essence at phase 9",
+    "perfection.quest": "PR 3: progression - needs the path started",
+    "perfection.trial": "PR 3: progression - needs every quest complete",
+    "perfection.body_start": "PR 3: progression - needs the body stage filled at phase 9",
+    "perfection.body_quest": "PR 3: progression - needs the body path started",
+    "perfection.body_trial": "PR 3: progression - needs every body quest complete",
+    "tribulation.prepare": "PR 3: progression - a world-crossing gate at realm 7 phase 9 with the world's currency",
+    "tribulation.attempt": "PR 3: progression - needs the stage filled at the gate",
+    "aptitude.temper": "PR 3: progression - a bloodline or physique set by the GM, then essence spent",
+    "aptitude.awaken": "PR 3: progression - a bloodline or physique at progress 100",
+    "aptitude.evolve": "PR 3: progression - an awakened bloodline or physique",
+    "aptitude.harmonize": "PR 3: progression - a bloodline's rejection brought down with essence",
+    "cultivation.body_breakthrough": "PR 3: progression - body essence filled through body_train first",
+    "personal_world.create": "PR 3: progression - Space Law at 100% and realm 30",
+    "personal_world.set_rule": "PR 3: progression - needs the world created",
+    "personal_world.enter": "PR 3: progression - needs the world created",
+    "personal_world.leave": "PR 3: progression - needs the world entered",
+    # PR 4: what only the world makes. No GM lever writes a wild beast
+    # encounter, a running world event and its nodes, a bounty pursuit or a
+    # missing NPC; the simulation batches and the hunt and exploration rolls
+    # do, so PR 4 forces those in a bounded loop and holds the designed
+    # refusal when none appears.
+    "beast.tame": "PR 4: what only the world makes - a wild_beast_encounters row from the hunt or the exploration roll",
+    "beast.feed": "PR 4: what only the world makes - needs a tamed beast",
+    "beast.train": "PR 4: what only the world makes - needs a tamed beast",
+    "beast.evolve": "PR 4: what only the world makes - needs a tamed beast at loyalty",
+    "beast.active": "PR 4: what only the world makes - needs a tamed beast",
+    "admin.player.set_beast_stats": "PR 4: what only the world makes - edits a tamed beast's row",
+    "bounty_hunter.act": "PR 4: what only the world makes - a bounty_hunter_pursuits row from a crime chain",
+    "npc.found": "PR 4: what only the world makes - an NPC gone missing on the npc_life tick",
+}
+
 
 async def run(url: str, token: str, db_path: str) -> Report:
     os.environ["GAME_ENGINE_URL"] = url
     os.environ["ENGINE_AUTH_TOKEN"] = token
     from app.database import Database
     from app.database.remote import GoDatabaseTransport
-    from app.ops.game_engine import GameEngineClient
+    from app.ops.game_engine import GameEngineClient, GameEngineError
     from app.rules.quests import QUEST_DEFINITIONS, beginner_path_seed_rows, household_errand_seed_rows, static_quest_seed_rows
     from app.rules.game import World
 
@@ -66,8 +135,39 @@ async def run(url: str, token: str, db_path: str) -> Report:
     async def gm(op: str, payload: dict[str, Any]) -> Any:
         return await engine.action(op, GM, payload)
 
+    async def query(op: str, uid: int, payload: dict[str, Any]) -> Any:
+        """An authoritative read: no action id, the actor's own view."""
+        return await engine.action(op, uid, payload)
+
     async def clock() -> int:
         return int((await db.get_world_clock())["game_minute"])
+
+    async def either(name: str, coro, *designed: str) -> Any:
+        """A step whose refusal is designed either way: PASS on a result, PASS
+        on a refusal naming one of `designed`, FAIL on anything else."""
+        try:
+            result = await coro
+        except GameEngineError as exc:
+            if any(text in str(exc) for text in designed):
+                report.add("PASS", name, f"refused as designed: {exc}")
+            else:
+                report.add("FAIL", name, str(exc))
+            return None
+        except Exception as exc:  # noqa: BLE001 - a playtest reports, it does not crash
+            report.add("FAIL", name, f"{type(exc).__name__}: {exc}")
+            return None
+        report.add("PASS", name)
+        return result
+
+    async def audited(op: str, payload: dict[str, Any], *, name: str = "", action: str = "") -> Any:
+        """A GM lever: it runs, and the newest audit row names it (or the
+        action it was asked to record)."""
+        result = await step(report, name or op, gm(op, payload))
+        if result is not None:
+            rows = await db.get_admin_audit_log(1)
+            newest = str((rows or [{}])[0].get("action") or "")
+            report.add("PASS" if newest == (action or op) else "FAIL", f"{name or op} is audited", newest)
+        return result
 
     # ---- 0. the world ------------------------------------------------------
     await step(report, "seed the catalog", db.sync_world_catalog(world))
@@ -913,11 +1013,421 @@ async def run(url: str, token: str, db_path: str) -> Report:
     if backup:
         await step(report, "restore that backup", transport.restore_backup(str(backup.get("name"))))
 
+    # ---- 20b. every operation the engine answers (v1.0.0-rc.35) --------------
+    # From here to samsara the harness drives what the roadmap's loops never
+    # reached. `tests/python/contracts/test_playtest_coverage.py` holds every
+    # operation the engine answers to a driver call in this file or to a
+    # reason in DEFERRED_OPERATIONS. Each leg builds its state with a GM lever
+    # and asserts what is certain by the scenario or by construction; a roll
+    # is reported, never bounded. The realm the earlier sections left the
+    # player at is put back at the end, so samsara meets the character it
+    # always did.
+    town = "Greenriver Town"
+    sheet = await db.get_character(PLAYER) or {}
+    realm_before = (int(sheet.get("realm_index") or 0), int(sheet.get("phase") or 1))
+    for uid in (PLAYER, BUYER):
+        await step(report, f"{uid} stands in the town", gm("admin.player.teleport", {"user_id": uid, "location": town, "reason": "playtest"}))
+        await audited("admin.player.revive", {"user_id": uid, "reason": "playtest"}, name=f"admin.player.revive {uid}")
+    await audited("admin.player.force_end_scene", {"user_id": PLAYER, "reason": "playtest"})
+    for item_id, qty in (("spirit_herb", 12), ("spirit_iron", 5), ("spirit_iron_sword", 1), ("spatial_ring", 1), ("spatial_pouch", 1),
+                         ("minor_qi_gathering_array_disk", 1), ("recovery_pill", 3), ("nine_echo_spatial_token", 1)):
+        await step(report, f"grant {item_id} x{qty}", gm("admin.player.adjust_item", {"user_id": PLAYER, "item_id": item_id, "quantity": qty, "reason": "playtest"}))
+    await step(report, "grant 5000 stones", gm("admin.player.grant_currency", {"user_id": PLAYER, "currency_id": "low_spirit_stone", "amount": 5000, "reason": "playtest"}))
+    await step(report, "grant 100 high stones for a caravan's escort", gm("admin.player.grant_currency", {"user_id": PLAYER, "currency_id": "high_spirit_stone", "amount": 100, "reason": "playtest"}))
+
+    # -- reads: nothing to build
+    await step(report, "npc.status", query("npc.status", PLAYER, {"npc_name": "Elder Su Yan"}))
+    await step(report, "npc.at_location", query("npc.at_location", PLAYER, {"location": town}))
+    await step(report, "npc.lifespan", query("npc.lifespan", PLAYER, {"npc_name": "Elder Su Yan"}))
+    await step(report, "character.lifespan", query("character.lifespan", PLAYER, {}))
+    await step(report, "sense.status", query("sense.status", PLAYER, {}))
+    await step(report, "cooldown.status", query("cooldown.status", PLAYER, {}))
+    await step(report, "effects.current", query("effects.current", PLAYER, {}))
+    fam = await db.get_birth_family(PLAYER) or {}
+    await step(report, "clan.status", query("clan.status", PLAYER, {"family_id": int(fam.get("family_id") or 0)}))
+    await step(report, "simulation.state", query("simulation.state", PLAYER, {"system": "npc_life"}))
+    await step(report, "simulation.status", query("simulation.status", PLAYER, {}))
+    await step(report, "world.recent_actions", query("world.recent_actions", PLAYER, {"limit": 5}))
+    await step(report, "market.catalog", query("market.catalog", PLAYER, {}))
+    rows = await step(report, "market.rows", query("market.rows", PLAYER, {"location": town, "limit": 5}))
+    await step(report, "equipment.power", query("equipment.power", PLAYER, {}))
+    await step(report, "player_family.status", query("player_family.status", PLAYER, {}))
+    await step(report, "secret_realm.rotation", query("secret_realm.rotation", PLAYER, {}))
+    await step(report, "exploration.event.status with no event", query("exploration.event.status", PLAYER, {}))
+    await step(report, "sect.status", query("sect.status", PLAYER, {}))
+    await step(report, "sense.inspect the area", act("sense.inspect", PLAYER, {"mode": "area"}))
+    await step(report, "sense.conceal on", act("sense.conceal", PLAYER, {"active": True}))
+    await step(report, "sense.conceal off", act("sense.conceal", PLAYER, {"active": False}))
+    rolled = await step(report, "check.resolve body vs TN 10", act("check.resolve", PLAYER, {"attribute": "body", "tn": 10, "label": "playtest"}))
+    if rolled is not None:
+        report.add("PASS", "the check is a roll, reported", f"total={rolled.get('total')} success={rolled.get('success')}")
+    read = await step(report, "appraisal.read a carried herb", act("appraisal.read", PLAYER, {"item_id": "spirit_herb"}))
+    if read is not None:
+        report.add("PASS", "the reading is a roll, reported", f"{read.get('reading')}")
+
+    # -- the bridge: the four operations the bot calls on the engine's behalf
+    await step(report, "scene.transition to the street", engine.action("scene.transition", PLAYER, {"physical_location": town, "scene_type": "world", "scene_key": "", "scene_label": "the street", "metadata": {}}))
+    await step(report, "relationship.update", engine.action("relationship.update", PLAYER, {"npc_name": "Elder Su Yan", "trust": 1, "summary": "playtest"}))
+    await step(report, "cultivation.reward", engine.action("cultivation.reward", PLAYER, {"cultivation": 1, "spirit_stones": 1, "insight_xp": 1, "event_type": "playtest"}))
+
+    # -- storage
+    await step(report, "storage.deposit two herbs", act("storage.deposit", PLAYER, {"item_id": "spirit_herb", "quantity": 2}))
+    await step(report, "storage.withdraw one", act("storage.withdraw", PLAYER, {"item_id": "spirit_herb", "quantity": 1}))
+    ring = await step(report, "storage.upgrade to the Earth-Grade Spatial Ring", act("storage.upgrade", PLAYER, {"item_id": "spatial_ring"}))
+    if ring is not None:
+        report.add("PASS" if int(ring.get("slot_capacity") or 0) == 80 else "FAIL", "the ring holds eighty stacks", str(ring.get("slot_capacity")))
+    await step(report, "storage.upgrade never downgrades", act("storage.upgrade", PLAYER, {"item_id": "spatial_pouch"}), expect_error="would hold only")
+    await audited("admin.player.grant_storage", {"user_id": BUYER, "container_id": "playtest_ring", "name": "Playtest Ring", "grade": "Earth", "slot_capacity": 40, "living_space": False, "reason": "playtest"})
+
+    # -- equipment and artifacts
+    bound = await step(report, "equipment.bind the spirit iron sword", act("equipment.bind", PLAYER, {"item_id": "spirit_iron_sword"}))
+    equipment_id = int((bound or {}).get("equipment_id") or 0)
+    if equipment_id:
+        await step(report, "equipment.equip", act("equipment.equip", PLAYER, {"id": equipment_id}))
+        await step(report, "equipment.unequip", act("equipment.unequip", PLAYER, {"id": equipment_id}))
+        await step(report, "equipment.repair", act("equipment.repair", PLAYER, {"id": equipment_id}))
+        await audited("admin.player.remove_equipment", {"user_id": PLAYER, "equipment_id": equipment_id, "reason": "playtest"})
+    await step(report, "artifact.bond with a carried herb", act("artifact.bond", PLAYER, {"item_id": "spirit_herb"}))
+    await step(report, "artifact.awaken needs Bond 3", act("artifact.awaken", PLAYER, {"item_id": "spirit_herb", "spirit_name": "Playtest"}), expect_error="Bond 3")
+
+    # -- arrays
+    await step(report, "array.deploy a qi-gathering disk", act("array.deploy", PLAYER, {"item_id": "minor_qi_gathering_array_disk"}))
+    await step(report, "stand at realm 1 for the transit array", gm("admin.player.set_realm", {"user_id": PLAYER, "realm_index": 1, "phase": 1, "reason": "playtest"}))
+    crossed = await step(report, "array.use the Greenriver-Imperial transit array", act("array.use", PLAYER, {"array_id": "greenriver_imperial"}))
+    if crossed is not None:
+        report.add("PASS" if crossed.get("to") == "Azure Crown Imperial City" else "FAIL", "the array carries to the capital", str(crossed.get("to")))
+    await step(report, "back to the town", gm("admin.player.teleport", {"user_id": PLAYER, "location": town, "reason": "playtest"}))
+
+    # -- a method slip, the hills, a purge
+    slip = next((k for k, v in world["items"].items() if str(v.get("teaches_recipe") or "").strip()), "")
+    if slip:
+        await step(report, f"grant the slip {slip}", gm("admin.player.adjust_item", {"user_id": PLAYER, "item_id": slip, "quantity": 1, "reason": "playtest"}))
+        await step(report, "recipe.learn from the slip", act("recipe.learn", PLAYER, {"item_id": slip}))
+    else:
+        report.add("FAIL", "recipe.learn", "the catalogue carries no item that teaches a method")
+    await step(report, "the hills", gm("admin.player.teleport", {"user_id": PLAYER, "location": "Cloudspine Foothills", "reason": "playtest"}))
+    await step(report, "cooldowns cleared", gm("admin.player.reset_cooldowns", {"user_id": PLAYER, "reason": "playtest"}))
+    await step(report, "forage.resolve", act("forage.resolve", PLAYER, {}))
+    await step(report, "back to the town", gm("admin.player.teleport", {"user_id": PLAYER, "location": town, "reason": "playtest"}))
+    await audited("admin.player.set_pill_toxicity", {"user_id": PLAYER, "pill_toxicity": 40, "reason": "playtest"})
+    await step(report, "alchemy.purge", act("alchemy.purge", PLAYER, {}))
+
+    # -- a Law
+    await step(report, "stand at realm 6 for a Law", gm("admin.player.set_realm", {"user_id": PLAYER, "realm_index": 6, "phase": 1, "reason": "playtest"}))
+    await step(report, "cooldowns cleared", gm("admin.player.reset_cooldowns", {"user_id": PLAYER, "reason": "playtest"}))
+    grasped = await step(report, "law.comprehend the Sword", act("law.comprehend", PLAYER, {"law": "sword", "spend_insight": False}))
+    if grasped is not None:
+        report.add("PASS", "comprehension is a roll, reported", f"roll={grasped.get('roll')} comprehension={grasped.get('comprehension')}")
+    await step(report, "law.technique before its stage", act("law.technique", PLAYER, {"technique": "folded_step"}), expect_error="required")
+
+    # -- a fight, at a realm that cannot lose it
+    await step(report, "an overwhelming cultivator", gm("admin.player.set_realm", {"user_id": PLAYER, "realm_index": 7, "phase": 9, "reason": "playtest"}))
+    targets = await step(report, "combat.targets in the town", query("combat.targets", PLAYER, {"location": town}))
+    candidates = [r for r in list((targets or {}).get("targets") or (targets or {}).get("rows") or []) if isinstance(r, dict) and r.get("name")]
+    npcs = [r for r in candidates if str(r.get("kind") or r.get("type") or "npc") == "npc"] or candidates
+    opponent = str(min(npcs, key=lambda r: int(r.get("realm_index") or 0)).get("name")) if npcs else ""
+    if not opponent:
+        report.add("FAIL", "combat.start", f"nobody to challenge in {town}: {str(targets)[:200]}")
+    else:
+        battle = await step(report, f"combat.start against {opponent}", act("combat.start", PLAYER, {"kind": "challenge", "npc_name": opponent, "source": "playtest"}))
+        battle_id = int((battle or {}).get("battle_id") or 0)
+        if battle_id:
+            await step(report, "combat.recovery_item", act("combat.recovery_item", PLAYER, {"battle_id": battle_id, "item_id": "recovery_pill"}))
+            await step(report, "combat.technique refuses a technique nobody has", act("combat.technique", PLAYER, {"battle_id": battle_id, "technique": "no_such_technique"}), expect_error="unknown Law technique")
+            await step(report, "combat.apply_damage", engine.action("combat.apply_damage", PLAYER, {"battle_id": battle_id, "damage": 1}))
+            struck = await step(report, "manual.technique Cloud-Step Draw", act("manual.technique", PLAYER, {"technique_id": "azure_cloud_foundation_sword_canon_cloud_step_draw"}))
+            if struck is not None:
+                report.add("PASS", "the technique is a roll, reported", f"damage={struck.get('damage')} forbidden={struck.get('forbidden')}")
+            won, rounds = False, 0
+            try:
+                for _ in range(25):
+                    turn = await act("combat.turn", PLAYER, {"battle_id": battle_id, "style": "attack"})
+                    rounds += 1
+                    if int(turn.get("npc_hp") or 0) <= 0:
+                        won = True
+                        break
+                    if int(turn.get("player_hp") or 1) <= 0:
+                        break
+            except GameEngineError as exc:
+                report.add("FAIL", "combat.turn", str(exc))
+            report.add("PASS" if won else "FAIL", "combat.turn: an overwhelming cultivator wins inside twenty-five rounds", f"won={won} rounds={rounds}")
+            await step(report, "combat.finalize spare", act("combat.finalize", PLAYER, {"battle_id": battle_id, "outcome": "spare"}))
+        second = await step(report, "combat.start again for the GM's lever", act("combat.start", PLAYER, {"kind": "challenge", "npc_name": opponent, "source": "playtest"}))
+        if second is not None:
+            await audited("admin.player.clear_battle", {"user_id": PLAYER, "reason": "playtest"})
+    await either("admin.player.clear_condition", gm("admin.player.clear_condition", {"user_id": PLAYER, "clear_all": True, "reason": "playtest"}), "no active conditions")
+    await step(report, "condition.treat with nothing to treat", act("condition.treat", PLAYER, {"condition": "bruised"}), expect_error="active condition not found")
+
+    # -- a party, a formation, a raid
+    party = await step(report, "party.create", act("party.create", PLAYER, {"name": "Playtest Party"}))
+    party_id = int((party or {}).get("party_id") or 0)
+    if party_id:
+        await step(report, "party.join by the buyer", act("party.join", BUYER, {"party_id": party_id}))
+        formation = await step(report, "formation.create", act("formation.create", PLAYER, {"name": "Playtest Line"}))
+        formation_id = int((formation or {}).get("formation_id") or 0)
+        if formation_id:
+            await step(report, "formation.assign the player to the vanguard", act("formation.assign", PLAYER, {"formation_id": formation_id, "target_user_id": PLAYER, "position": "vanguard"}))
+            await step(report, "formation.assign the buyer to the core", act("formation.assign", PLAYER, {"formation_id": formation_id, "target_user_id": BUYER, "position": "core"}))
+            await step(report, "formation.activate", act("formation.activate", PLAYER, {"formation_id": formation_id, "stance": "balanced"}))
+            await step(report, "formation.stance", act("formation.stance", PLAYER, {"formation_id": formation_id, "stance": "aggressive"}))
+        await step(report, "party.leave by the buyer", act("party.leave", BUYER, {}))
+        boss = await step(report, "boss.start the Iron-Tusk Boar King", act("boss.start", PLAYER, {"template_key": "iron_tusk_boar_king"}))
+        encounter_id = int((boss or {}).get("encounter_id") or 0)
+        status = "active"
+        if encounter_id:
+            try:
+                for _ in range(30):
+                    acted = await act("boss.act", PLAYER, {"encounter_id": encounter_id, "style": "attack"})
+                    status = str(acted.get("status") or "active")
+                    if status != "active":
+                        break
+            except GameEngineError as exc:
+                report.add("FAIL", "boss.act", str(exc))
+            report.add("PASS", "boss.act: how the raid went, for the record", f"status={status}")
+            if status == "victory":
+                await step(report, "boss.claim", act("boss.claim", PLAYER, {"id": encounter_id}))
+            else:
+                await step(report, "boss.claim before a victory", act("boss.claim", PLAYER, {"id": encounter_id}), expect_error="no unclaimed reward")
+        await either("party.leave by the player", act("party.leave", PLAYER, {}), "during an active boss encounter")
+
+    # -- a duel, a partnership, a house
+    for uid in (PLAYER, BUYER):
+        await step(report, f"{uid} to the hills", gm("admin.player.teleport", {"user_id": uid, "location": "Cloudspine Foothills", "reason": "playtest"}))
+    challenge = await step(report, "pvp.challenge the buyer", act("pvp.challenge", PLAYER, {"target_user_id": BUYER, "stakes": "honour", "ttl_seconds": 600}))
+    challenge_id = int((challenge or {}).get("challenge_id") or 0)
+    if challenge_id:
+        match = await step(report, "pvp.respond accept", act("pvp.respond", BUYER, {"challenge_id": challenge_id, "accept": True}))
+        match_id = int((match or {}).get("match_id") or 0)
+        if match_id:
+            blow = await step(report, "pvp.act attack (the challenger's turn)", act("pvp.act", PLAYER, {"match_id": match_id, "style": "attack"}))
+            if blow is not None and not blow.get("finished"):
+                ended = await step(report, "pvp.act surrender", act("pvp.act", BUYER, {"match_id": match_id, "style": "surrender"}))
+                if ended is not None:
+                    report.add("PASS" if ended.get("finished") else "FAIL", "a surrender ends the duel", f"winner={ended.get('winner_user_id')}")
+            elif blow is not None:
+                report.add("PASS", "one blow ended the duel", f"winner={blow.get('winner_user_id')}")
+    proposal = await step(report, "dao.propose to the buyer", act("dao.propose", PLAYER, {"partner_user_id": BUYER}))
+    partnership_id = int((proposal or {}).get("partnership_id") or (proposal or {}).get("id") or 0)
+    if partnership_id:
+        await step(report, "dao.respond accept", act("dao.respond", BUYER, {"partnership_id": partnership_id, "accept": True}))
+        await step(report, "dao.dual_cultivate side by side", act("dao.dual_cultivate", PLAYER, {}))
+        await step(report, "dao.sever", act("dao.sever", PLAYER, {}))
+    house = await step(report, "player_family.found", act("player_family.found", PLAYER, {"name": "House of Playtest"}))
+    if house is not None:
+        await step(report, "player_family.invite the buyer", act("player_family.invite", PLAYER, {"invitee_user_id": BUYER}))
+        await step(report, "player_family.respond accept", act("player_family.respond", BUYER, {"accept": True}))
+        child = await step(report, "player_family.child", act("player_family.child", PLAYER, {"child_name": "Playtest Child", "gender": "female"}))
+        if child is not None:
+            report.add("PASS", "the child's root is a roll, reported", f"{child.get('spiritual_root')}")
+        await step(report, "player_family.status with a house", query("player_family.status", PLAYER, {}))
+        await step(report, "player_family.leave by the buyer", act("player_family.leave", BUYER, {}))
+        await step(report, "player_family.leave by the founder", act("player_family.leave", PLAYER, {}))
+
+    # -- the markets: a trade declined, a stall, an underworld post
+    for uid in (PLAYER, BUYER):
+        await step(report, f"{uid} back to the town", gm("admin.player.teleport", {"user_id": uid, "location": town, "reason": "playtest"}))
+    for uid in (PLAYER, BUYER):
+        await step(report, f"{uid} to the inn", gm("admin.player.teleport", {"user_id": uid, "location": inn or capital, "reason": "playtest"}))
+    offer = await step(report, "trade.offer to decline", act("trade.offer", PLAYER, {"to_user_id": BUYER, "give_items": {"spirit_herb": 1}, "want_items": {"recovery_pill": 1}}))
+    if offer is not None:
+        await step(report, "trade.decline by the buyer", act("trade.decline", BUYER, {"offer_id": int(offer.get("offer_id") or 0)}))
+    for uid in (PLAYER, BUYER):
+        await step(report, f"{uid} back to the town", gm("admin.player.teleport", {"user_id": uid, "location": town, "reason": "playtest"}))
+    stock = sorted([r for r in list((rows or {}).get("rows") or (rows or {}).get("items") or []) if isinstance(r, dict) and r.get("item_id")],
+                   key=lambda r: int(r.get("buy_price") or r.get("unit_price") or 0))
+    if stock:
+        item = str(stock[0]["item_id"])
+        await step(report, "market.quote", query("market.quote", PLAYER, {"location": town, "item_id": item}))
+        await step(report, f"market.trade buy {item}", act("market.trade", PLAYER, {"item_id": item, "quantity": 1, "buy": True}))
+        await step(report, f"market.trade sell {item}", act("market.trade", PLAYER, {"item_id": item, "quantity": 1, "buy": False}))
+    else:
+        report.add("FAIL", "market.trade", f"no stall rows in {town}: {str(rows)[:200]}")
+    await audited("admin.player.karma", {"user_id": PLAYER, "delta": -60, "reason": "playtest"}, name="admin.player.karma down to the underworld")
+    posts = await db.list_active_black_markets(await clock())
+    post = next((p for p in posts if str(p.get("world_name")) == "Mortal World"), None)
+    if post is None:
+        report.add("FAIL", "black_market.trade", "no black-market post is open in the Mortal World after the forced batch")
+    else:
+        where = str(post.get("location"))
+        await step(report, f"to the underworld post at {where}", gm("admin.player.teleport", {"user_id": PLAYER, "location": where, "reason": "playtest"}))
+        market = await db.get_active_black_market(where, await clock()) or {}
+        goods = sorted([g for g in list(market.get("stock") or market.get("items") or []) if isinstance(g, dict) and int(g.get("quantity") or 0) > 0],
+                       key=lambda g: int(g.get("unit_price") or 0))
+        if not goods:
+            report.add("FAIL", "black_market.trade", f"the post at {where} has no stock: {sorted(market)}")
+        else:
+            bought = await step(report, f"black_market.trade buy {goods[0].get('item_id')}", act("black_market.trade", PLAYER, {"item_id": str(goods[0].get("item_id")), "quantity": 1, "buy": True}))
+            if bought is not None:
+                report.add("PASS", "detection is a roll, reported", f"detected={bought.get('detected')} heat={bought.get('heat')}")
+                crime = dict(bought.get("crime") or {})
+                if int(crime.get("crime_id") or 0):
+                    await either("crime.atone", act("crime.atone", PLAYER, {"crime_id": int(crime["crime_id"])}), "restitution requires", "return to")
+                else:
+                    await step(report, "crime.atone with no record", act("crime.atone", PLAYER, {"crime_id": 999999}), expect_error="does not exist")
+        await step(report, "back to the town", gm("admin.player.teleport", {"user_id": PLAYER, "location": town, "reason": "playtest"}))
+    await audited("admin.player.karma", {"user_id": PLAYER, "delta": 60, "reason": "playtest"}, name="admin.player.karma back up")
+
+    # -- a caravan and a seclusion, each waited out on the world clock
+    caravan = await step(report, "caravan.dispatch five herbs to Riverguard City", act("caravan.dispatch", PLAYER, {"destination": "Riverguard City", "item_id": "spirit_herb", "quantity": 5, "escort": 2}))
+    if caravan is not None:
+        await step(report, "the road is walked", gm("admin.world.advance_time", {"minutes": int(caravan.get("travel_minutes") or 0) + 30, "reason": "playtest"}))
+        settled = await step(report, "caravan.settle", act("caravan.settle", PLAYER, {}))
+        if settled is not None:
+            report.add("PASS", "interception is a roll, reported", str(settled.get("resolved"))[:160])
+    await step(report, "to the capital, a safe place to sit", gm("admin.player.teleport", {"user_id": PLAYER, "location": capital, "reason": "playtest"}))
+    started = await step(report, "seclusion.start a day of qi seclusion", act("seclusion.start", PLAYER, {"mode": "qi", "duration_game_minutes": 1440, "location": capital}))
+    if started is not None:
+        await step(report, "a day passes", gm("admin.world.advance_time", {"minutes": 1500, "reason": "playtest"}))
+        done = await step(report, "seclusion.settle", act("seclusion.settle", PLAYER, {}))
+        if done is not None:
+            report.add("PASS" if int(done.get("awarded_now") or 0) > 0 else "FAIL", "a day in seclusion pays", str(done.get("awarded_now")))
+
+    # -- a secret realm the GM opens, and a key that opens another
+    await step(report, "back to the first realm for the grotto", gm("admin.player.set_realm", {"user_id": PLAYER, "realm_index": 0, "phase": 1, "reason": "playtest"}))
+    await step(report, "to Moonfen Marsh, where the grotto opens", gm("admin.player.teleport", {"user_id": PLAYER, "location": "Moonfen Marsh", "reason": "playtest"}))
+    await audited("admin.world.spawn_realm", {"realm_id": "verdant_immortal_grotto", "title": "Verdant Immortal Grotto", "location": "Moonfen Marsh", "open_hours": 4, "reason": "playtest"})
+    entered = await step(report, "secret_realm.enter", act("secret_realm.enter", PLAYER, {"realm_id": "verdant_immortal_grotto", "cooldown_seconds": 0}))
+    if entered is not None:
+        rooms = 0
+        try:
+            for _ in range(12):
+                await act("secret_realm.explore", PLAYER, {"cooldown_seconds": 0})
+                rooms += 1
+        except GameEngineError as exc:
+            # The last room ends the run and the realm lets go of the player,
+            # so the ask after it is refused as "not inside"; a run that sealed
+            # or reached its end reads the same way.
+            ended = any(text in str(exc) for text in ("reached its end", "sealed", "not inside an active secret realm"))
+            report.add("PASS" if ended else "FAIL", "secret_realm.explore to the last room", f"{rooms} rooms, then: {exc}")
+        else:
+            report.add("PASS", "secret_realm.explore", f"{rooms} rooms explored")
+        await step(report, "secret_realm.leave", act("secret_realm.leave", PLAYER, {}))
+        if entered.get("event_key"):
+            await audited("admin.world_event.end", {"event_key": str(entered["event_key"]), "reason": "playtest"})
+    await step(report, "to the hills with the nine-echo token", gm("admin.player.teleport", {"user_id": PLAYER, "location": "Cloudspine Foothills", "reason": "playtest"}))
+    opened = await step(report, "spatial_key.use the Nine-Echo Spatial Token", act("spatial_key.use", PLAYER, {"item_id": "nine_echo_spatial_token"}))
+    if opened is not None and opened.get("event_key"):
+        await audited("admin.world_event.end", {"event_key": str(opened["event_key"]), "reason": "playtest"}, name="admin.world_event.end the sword grave")
+
+    # -- a surprise made certain, of each kind the content rolls
+    # `unexpected_event_chance_percent: 100` makes the roll for *a* surprise
+    # certain; *which* kind comes (personal, world_event, secret_realm) is
+    # the roll's. Each kind is driven the moment it comes and the loop goes
+    # on until the two with operations behind them have both come, or twenty
+    # explores have not - in which case the missing kind is reported, never
+    # failed (CLAUDE.md: never assert that a random thing happened). A
+    # personal event blocks further exploring until it is left, so it is
+    # worked and left at once; a world event is acted in, its site engaged and
+    # then closed by the GM; a rift is closed.
+    def _event_id(node: Any) -> str:
+        """The `event_id` wherever the surprise carries it (`id` is the
+        definition's, not the event's)."""
+        if isinstance(node, dict):
+            if node.get("event_id"):
+                return str(node["event_id"])
+            for value in node.values():
+                found = _event_id(value)
+                if found:
+                    return found
+        if isinstance(node, list):
+            for value in node:
+                found = _event_id(value)
+                if found:
+                    return found
+        return ""
+
+    came: dict[str, str] = {}
+    for _ in range(20):
+        if {"personal", "world_event"} <= set(came):
+            break
+        surprise_key = aid("exploration:event")
+        try:
+            await gm("admin.player.reset_cooldowns", {"user_id": PLAYER, "reason": "playtest"})
+            surprised = await act("exploration.explore", PLAYER, {
+                "cooldown_seconds": 0, "unexpected_events_enabled": True, "unexpected_event_chance_percent": 100, "event_key": surprise_key})
+        except GameEngineError as exc:
+            report.add("FAIL", "exploration.explore with a surprise certain", str(exc))
+            break
+        surprise = dict(surprised.get("surprise") or surprised.get("event") or {})
+        kind = str(surprised.get("kind") if str(surprised.get("kind")) == "event_active" else surprise.get("kind") or "")
+        if kind in ("personal", "event_active"):
+            event_id = _event_id(surprise) or surprise_key
+            if kind == "personal":
+                came.setdefault(kind, event_id)
+                await step(report, "exploration.event.status", query("exploration.event.status", PLAYER, {"event_id": event_id}))
+                acted = await step(report, "exploration.event.act observe", act("exploration.event.act", PLAYER, {"event_id": event_id, "action": "observe"}))
+                if acted is not None:
+                    report.add("PASS", "the event's roll, reported", f"success={acted.get('success')} outcome={acted.get('outcome')}")
+            await either("exploration.event.leave", act("exploration.event.leave", PLAYER, {"event_id": event_id}), "no longer active", "not found")
+        elif kind == "world_event":
+            came.setdefault(kind, surprise_key)
+            acted = await step(report, "world_event.act observe", act("world_event.act", PLAYER, {"event_key": surprise_key, "action_key": "observe"}))
+            if acted is not None:
+                report.add("PASS", "the event's roll, reported", f"success={acted.get('success')} state={acted.get('state')}")
+            nodes = [n for n in list(await db.list_world_event_nodes(surprise_key) or []) if isinstance(n, dict) and n.get("node_key")]
+            if nodes:
+                worked = await step(report, f"world_event.engage {nodes[0].get('node_key')}", act("world_event.engage", PLAYER, {"event_key": surprise_key, "node_key": str(nodes[0]["node_key"])}))
+                if worked is not None:
+                    report.add("PASS", "the node's roll, reported", f"success={worked.get('success')} remaining={worked.get('node_remaining')}")
+            else:
+                report.add("FAIL", "world_event.engage", f"the surprise {surprise.get('id')} spawned no site nodes")
+            await audited("admin.world_event.end", {"event_key": surprise_key, "reason": "playtest"}, name="admin.world_event.end the surprise")
+        elif kind == "secret_realm":
+            came.setdefault(kind, surprise_key)
+            await either("admin.world_event.end the rift", gm("admin.world_event.end", {"event_key": surprise_key, "reason": "playtest"}), "not found", "unknown")
+        else:
+            report.add("FAIL", "exploration.explore with a surprise certain", f"no surprise in the result: {sorted(surprised.keys())} kind={kind!r}")
+            break
+    for kind in ("personal", "world_event", "secret_realm"):
+        report.add("PASS", f"a {kind} surprise came" if kind in came else f"a {kind} surprise did not come in twenty explores (the dice, not the wiring)", came.get(kind, ""))
+
+    # -- the household simulated, a child named, the supporter's gift
+    simulated = await step(report, "family.simulate a season", act("family.simulate", PLAYER, {"family_id": int(fam.get("family_id") or 0)}))
+    if simulated is not None:
+        report.add("PASS", "what the season did to the house, for the record", str(simulated.get("history") or simulated.get("events") or "")[:160])
+    born = await step(report, "family.add_child", act("family.add_child", PLAYER, {"name": "Playtest Sibling", "gender": "male"}))
+    if born is not None:
+        report.add("PASS", "the child's root is a roll, reported", str(born.get("spiritual_root") or born.get("child") or "")[:120])
+    await step(report, "support.weekend", query("support.weekend", PLAYER, {}))
+    await step(report, "support.vote_status", query("support.vote_status", PLAYER, {}))
+    await step(report, "support.vote_claim", act("support.vote_claim", PLAYER, {}))
+    await step(report, "support.vote_claim again waits", act("support.vote_claim", PLAYER, {}), expect_error="cooldown active")
+
+    # -- the GM's remaining levers, each audited
+    await audited("admin.player.fate", {"user_id": BUYER, "delta": 5, "reason": "playtest"})
+    await audited("admin.player.set_resource_caps", {"user_id": BUYER, "qi_max": 60, "vitality_max": 60, "reason": "playtest"})
+    await audited("admin.player.set_spiritual_root", {"user_id": BUYER, "grade": "Heaven", "mutation": "", "purity": 80, "reason": "playtest"})
+    await either("admin.player.set_bloodline", gm("admin.player.set_bloodline", {"user_id": BUYER, "bloodline_id": "azure_wolf", "purity": 50, "evolution_stage": 0, "progress": 10, "reason": "playtest"}), "bloodline not found")
+    await audited("admin.player.set_physique", {"user_id": BUYER, "evolution_stage": 0, "progress": 10, "stability": 50, "reason": "playtest"})
+    await audited("admin.player.set_tribulation", {"user_id": BUYER, "gate_realm_index": 7, "mode": "clear", "reason": "playtest"})
+    await audited("admin.player.set_realm_perfection", {"user_id": BUYER, "track": "cultivation", "realm_index": 0, "progress": 100, "reason": "playtest"})
+    await step(report, "perfection.abandon is idempotent", act("perfection.abandon", BUYER, {}))
+    await step(report, "perfection.body_abandon is idempotent", act("perfection.body_abandon", BUYER, {}))
+    await audited("admin.player.set_sect", {"user_id": BUYER, "sect_name": "Azure Cloud Sect", "rank_name": "Outer Disciple", "rank_level": 10, "reason": "playtest"})
+    await audited("admin.player.set_sect_rank", {"user_id": BUYER, "rank_name": "Inner Disciple", "rank_level": 30, "reason": "playtest"})
+    await audited("admin.player.set_master", {"disciple_user_id": BUYER, "master_user_id": PLAYER, "reason": "playtest"})
+    await audited("admin.player.master_attention", {"disciple_user_id": BUYER, "delta": 5, "reason": "playtest"})
+    await audited("admin.player.set_master", {"disciple_user_id": BUYER, "master_user_id": PLAYER, "clear": True, "reason": "playtest"}, name="admin.player.set_master clear")
+    await audited("admin.player.set_sect", {"user_id": BUYER, "remove": True, "rank_level": 0, "reason": "playtest"}, name="admin.player.set_sect remove")
+    await audited("admin.npc.relocate", {"npc_name": "Elder Su Yan", "location": town, "reason": "playtest"})
+    await audited("admin.automation.set", {"system": "npc_life", "enabled": True, "reason": "playtest"})
+    await audited("admin.simulation.interval", {"system": "npc_life", "days": 7, "reason": "playtest"})
+    await audited("admin.commission.review", {"quest_key": str(world["commissions"][0]["quest_key"]), "status": "approved", "reason": "playtest"})
+    await either("admin.commission.retire", gm("admin.commission.retire", {"user_id": BUYER, "reason": "playtest"}), "holds no commission")
+    await audited("admin.audit", {"action": "playtest.note", "target": str(PLAYER), "before": {}, "after": {}, "reason": "playtest"}, action="playtest.note")
+    await audited("admin.bulk.grant_currency", {"currency_id": "low_spirit_stone", "amount": 1, "reason": "playtest"})
+    await audited("admin.bulk.reset_cooldowns", {"reason": "playtest"})
+    await step(report, "the realm the earlier sections left", gm("admin.player.set_realm", {"user_id": PLAYER, "realm_index": realm_before[0], "phase": realm_before[1], "reason": "playtest"}))
+    await step(report, "home to the town", gm("admin.player.teleport", {"user_id": PLAYER, "location": town, "reason": "playtest"}))
+
     # ---- 21. samsara, and what the hands remember (v1.0.0-rc.32) -------------
     # Last, because it ends the character. The trades this life practised go
     # into its record before the wipe, and a fresh rebirth remembers nothing
     # of them yet: awakened memory is 0, so the echo is 0 by construction.
     await step(report, "lifecycle.true_death", act("lifecycle.true_death", PLAYER, {"reason": "playtest", "max_wait_seconds": 1}))
+    cycle = await step(report, "lifecycle.samsara_status", query("lifecycle.samsara_status", PLAYER, {}))
+    if cycle is not None:
+        report.add("PASS", "the wheel is turning", f"ready={cycle.get('ready')} remaining={cycle.get('seconds_remaining')}")
     await step(report, "the wheel is hurried", gm("admin.player.force_reincarnation_ready", {"user_id": PLAYER, "reason": "playtest"}))
     reborn = await step(report, "lifecycle.reincarnate", act("lifecycle.reincarnate", PLAYER, {"name": "Second Wen", "gender": "female", "path": "Sword Cultivator"}))
     if reborn is not None:
@@ -948,6 +1458,48 @@ async def run(url: str, token: str, db_path: str) -> Report:
     else:
         report.add("PASS", "a fresh rebirth remembers nothing yet: craft_echo is 0",
                    f"skipped: the new household ({(reborn or {}).get('family_archetype')}) teaches no trade, so there is no taught method to craft with; the echo's zero case is held in craft_echo_test.go")
+
+    # ---- 21b. the dynasty a new life inherits ---------------------------------
+    # Reincarnation writes a samsara_dynasty_history row between the two
+    # houses; a living incarnation investigates it, works its leads, and may
+    # lay a claim. Whether a claim is open depends on the lineage the wheel
+    # dealt (blood continuity, a fallen house, a culprit), so the claim and
+    # its conflict hold "the claim, or the refusal that names why not" and
+    # report which; the record and its investigation are certain.
+    dossier = None
+    try:
+        for _ in range(6):
+            dossier = await act("family.lineage.investigate", PLAYER, {})
+    except GameEngineError as exc:
+        report.add("FAIL", "family.lineage.investigate", str(exc))
+    else:
+        report.add("PASS", "family.lineage.investigate to the last level", f"level={(dossier or {}).get('investigation_level')} status={(dossier or {}).get('lineage_status')}")
+    history_id = int((dossier or {}).get("history_id") or 0)
+    if history_id:
+        worked = 0
+        try:
+            for _ in range(8):
+                await act("family.lineage.quest", PLAYER, {"history_id": history_id})
+                worked += 1
+        except GameEngineError as exc:
+            report.add("PASS" if "no available investigation quest" in str(exc) else "FAIL", "family.lineage.quest until the leads run out", f"{worked} steps, then: {exc}")
+        else:
+            report.add("PASS", "family.lineage.quest", f"{worked} steps")
+        claim = await either("family.dynasty.claim inheritance", act("family.dynasty.claim", PLAYER, {"history_id": history_id, "claim_type": "inheritance"}),
+                             "blood inheritance is unavailable", "complete at least", "fully investigated")
+        claim_id = int((claim or {}).get("claim_id") or 0)
+        if claim_id and int((claim or {}).get("conflict_id") or 0):
+            await step(report, "family.dynasty.conflict negotiate", act("family.dynasty.conflict", PLAYER, {"claim_id": claim_id, "tactic": "negotiate"}))
+        else:
+            await step(report, "family.dynasty.conflict with no conflict", act("family.dynasty.conflict", PLAYER, {"claim_id": claim_id or 999999, "tactic": "negotiate"}), expect_error="no dynasty conflict exists")
+
+    # ---- 22. erasure -----------------------------------------------------------
+    # Last of all, because it is the one lever that leaves nothing behind: the
+    # ghost's row is gone afterwards, and the audit row says who did it.
+    erased = await audited("admin.player.erase", {"user_id": GHOST, "reason": "playtest"})
+    if erased is not None:
+        gone = await db.get_character(GHOST)
+        report.add("PASS" if gone is None else "FAIL", "the erased ghost has no character row", str(gone)[:80])
     return report
 
 

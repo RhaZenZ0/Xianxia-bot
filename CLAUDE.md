@@ -62,8 +62,8 @@ Other checks:
 
 ```bash
 python scripts/check_dashboard_implementation.py   # dashboard frontend/backend drift + coverage gate, part of the release gate
-python scripts/playtest_engine.py --launch         # the engine half of the playtest against a scratch engine
-python scripts/playtest_discord.py --launch        # the Discord half: the real bot under a simulated Discord (see below)
+python scripts/playtest_engine.py --launch         # the engine half of the playtest: every operation, against a scratch engine
+python scripts/playtest_discord.py --launch        # the Discord half: the real bot under a simulated Discord, every leaf pressed (see below)
 python -m compileall -q app                        # compile-check production Python
 python -m json.tool content/world.json >/dev/null  # validate world content JSON
 make lock                                          # regenerate requirements.lock (uv) after editing requirements.txt; the Dockerfile installs it under --require-hashes
@@ -516,6 +516,53 @@ edited the *original response* - so the placeholder became a second panel and th
 buttons `rebuild()` had already orphaned, dead until reopened. A modal now takes the direct
 `panel.edit` and the placeholder is deleted, the way a picker's step message always was;
 `test_gui_ii.py` holds it with a `modal_submit` source.
+
+### The playtest touches everything (v1.0.0-rc.35)
+
+Two harnesses run before a release, and until now nothing said what they had to drive. The engine
+half drove 51 of the 193 allowlisted operations and the Discord half pressed 9 of 245 leaves; the
+rest were proven by Go unit tests for their rules and by nothing for their wiring, and a new
+operation or leaf was uncovered until somebody noticed. `tests/python/contracts/test_playtest_coverage.py`
+is the gate that makes "everything" a fact rather than a claim. It enumerates the surface **from the
+code** - the two allowlist maps in `authoritative.go` plus the dispatch switch in `actions.go` (246
+operations), and `hubs.REGISTERED_HUBS` walked through `_leaf_actions` (299 leaves, admin included) -
+and holds each harness to it with one explicit deferred set per harness, `DEFERRED_OPERATIONS` and
+`DEFERRED_LEAVES`, read off the scripts by AST so neither harness is imported. Three rules:
+
+- **Driven means called.** The engine set is the first string argument of every `act`, `gm`, `query`
+  or `audited` call in `playtest_engine.py` - not a substring scan, so an operation named in a comment,
+  a step title or an `expect_error` is not driven. A deferral that is also driven, or that names an
+  operation the engine no longer has, fails the gate: the set can only shrink honestly.
+- **The Discord sweep is generic, so a new leaf is covered the day it is registered.** Section 8 of
+  `playtest_discord.py` walks the live definitions, opens each hub once per page, pages with the
+  panel's own "More actions" until the offset wraps (the visible row limit is recomputed on every
+  rebuild and drops while a result is shown), presses every leaf and answers each input step the way
+  a player with no plan would: a confirm confirmed, a modal filled with canned values chosen the way
+  `_resolve_input` will read them, a picker's first option, a second guild member with no character
+  for every member picker, so nothing mutes, bans or erases the character the rest of the run walks.
+  It holds one thing per leaf: **the reply is a result or a designed refusal** - never one of the three
+  fixed strings the bot prints when a handler raised (`WIRING_FAILURE_TEXTS`, held equal to the source
+  by the gate), never the action meter, never an exception in `env.errors`. A leaf the panel hides
+  must print its `🔒` lock line instead. The run's last step holds `pressed ∪ locked ∪ deferred == live`.
+- **The engine legs build state with GM levers and never assert on dice.** Sections 20b-22 of
+  `playtest_engine.py` drive every family a fresh pair of characters can reach - storage, equipment,
+  artifacts, arrays, a slip, the hills, a purge, a Law, a fight at realm 7/9 that cannot be lost, a
+  party and a raid, a duel ended by surrender, a Dao partnership, a house, the stalls, an underworld
+  post at karma -60, a caravan and a seclusion waited out on the world clock, a secret realm the GM
+  spawns and a key that opens another, a surprise made certain with
+  `unexpected_event_chance_percent: 100` and driven by kind as it comes (a personal event worked and
+  left, a world event acted in and its site engaged, a rift closed; which kinds came is reported),
+  every remaining GM lever with its audit row checked, the dynasty a new life inherits, and last the
+  erasure of the ghost. A roll is reported; a refusal that is
+  designed either way (a claim the wheel may not have opened, a raid that may not be won in thirty
+  rounds) passes on the refusal text that names why, and says which.
+
+What is deferred, and to what: the sect's rooms and the homestead (contribution points and a rank,
+one PR), progression (perfection and a tribulation attempt need the stage filled with essence, the
+aptitudes a bloodline at progress 100, a personal world Space Law at 100%; one PR), and what only
+the world makes (a wild beast encounter, a bounty pursuit, a missing NPC - no GM lever writes those
+rows, only the batches and the hunt roll; one PR that forces them in a bounded loop and holds the
+designed refusal when none appears).
 
 ### People this world makes for itself (`npc_registry`, schema 49)
 
