@@ -861,12 +861,18 @@ async def run(url: str, token: str, db_path: str) -> Report:
         # ---- 9. a panel goes quiet ------------------------------------------------
         async def quiet():
             panel = await open_hub(player, channels["begin-here"], "family")
-            await env.advance_time(901)
-            await env.settle()
+            try:
+                await env.advance_time(901)
+            except TimeoutError:
+                # The jump expires every periodic worker's sleep at once, and
+                # after a full sweep they have a busy engine to talk to; the
+                # settle inside advance_time gives up before they finish.
+                pass
+            await settle_patiently(env)
             text = panel.text()
             if "Reopen" in panel.labels():
                 reopened = await player.click(panel.message(), label="Reopen")
-                await env.settle()
+                await settle_patiently(env)
                 expect("Family" in panel.text() or (reopened.response is not None), "Reopen drew nothing")
                 return "expired to a Reopen button, and it reopened"
             try:
