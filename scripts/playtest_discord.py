@@ -253,16 +253,14 @@ async def answer_steps(actor: Any, result: Any, *, picks: dict[str, Any] | None 
     answered: set[str] = set()
     for _ in range(limit):
         if result.modal:
-            wanted = {label: value for label, value in fields.items()
-                      if label in modal_values(result, **{label: value}) or True}
-            known = {}
+            # Fill the fields this modal shows; a field it does not ask for
+            # (one with a default the hub kept) is simply not sent.
+            shown: set[str] = set()
             for node in _walk((result.modal or {}).get("components")):
-                if node.get("type") == 4:
-                    known[str(node.get("label") or "")] = True
-                inner = node.get("component") if node.get("type") == 18 else None
+                inner = node.get("component") if node.get("type") == 18 else node
                 if isinstance(inner, dict) and inner.get("type") == 4:
-                    known[str(node.get("label") or "")] = True
-            values = modal_values(result, **{label: value for label, value in wanted.items() if label in known})
+                    shown.add(str(node.get("label") or ""))
+            values = modal_values(result, **{label: value for label, value in fields.items() if label in shown})
             result = await actor.submit_modal(result, values)
             continue
         message = result.response.message if result.response is not None else None
