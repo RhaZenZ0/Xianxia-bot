@@ -315,7 +315,12 @@ def build() -> str:
     lines += ["## Loops beyond the hubs", "",
               "Run `scripts/playtest_engine.py --launch` for the engine half (character creation, `$ I explore`, joining a sect and studying "
               "the gift, commissions from Qiao completed, abandoned and failed, a live quest edited under each hold policy, a narration "
-              "route changed and read back, a timed mute and its undo, a live auction struck, a backup restored). The Discord half:", "",
+              "route changed and read back, a timed mute and its undo, a live auction struck, a backup restored). Run "
+              "`scripts/playtest_discord.py --launch` for the half a player touches, driven through a simulated Discord (the bot "
+              "boots and syncs its commands, `/admin` refuses a player and binds the base channels, `/begin` through the form to the "
+              "household thread, every hub answers, the hidden household door and its locked line, an errand, `$ I explore` in the "
+              "journal, the shorthand, `/cooldowns`, the capital and the Hearth-Return Talisman home, Support and Contribute, Enter "
+              "from the town, the road, a panel expiring to Reopen). What only a live server can show:", "",
               "| Loop | Live |", "|---|---|",
               "| `$ I explore` from a scene channel routes to /explore | [ ] |",
               "| `$ I travel to <known place>` and `$ I drink <carried item>` dispatch with the argument | [ ] |",

@@ -250,6 +250,7 @@ async def answer_steps(actor: Any, result: Any, *, picks: dict[str, Any] | None 
     value), until the action has run."""
     picks = dict(picks or {})
     fields = dict(fields or {})
+    answered: set[str] = set()
     for _ in range(limit):
         if result.modal:
             wanted = {label: value for label, value in fields.items()
@@ -266,14 +267,18 @@ async def answer_steps(actor: Any, result: Any, *, picks: dict[str, Any] | None 
             continue
         message = result.response.message if result.response is not None else None
         select = select_by_placeholder(message.components, "") if message is not None else None
-        if select is None:
+        if select is None or str(select.get("custom_id")) in answered:
+            # A picker answered once and still on screen is the deferred
+            # acknowledgement of the action it started, not another question.
             return result
+        answered.add(str(select.get("custom_id")))
         placeholder = str(select.get("placeholder") or "")
         answer = next((value for prefix, value in picks.items() if placeholder.startswith(prefix)), None)
         expect(answer is not None, f"nothing to answer the picker {placeholder!r} with; the step reads:\n{message_text(message)[:300]}")
         if isinstance(answer, str) and select.get("type") == 3:
             options = list(select.get("options") or [])
-            matching = [o for o in options if str(o.get("label") or "") == answer]
+            matching = [o for o in options if str(o.get("label") or "") == answer] or \
+                       [o for o in options if answer in str(o.get("label") or "")]
             expect(matching, f"no option {answer!r} on {placeholder!r}; it offers {[o.get('label') for o in options]}")
             result = await actor.select(message, [str(matching[0]["value"])], custom_id=str(select["custom_id"]))
         else:
@@ -417,6 +422,19 @@ async def run(url: str, token: str, db_path: str) -> Report:
             return panel
         panel = await step(report, "/family inside the household hides Enter and prints why", inside())
 
+        async def errand():
+            hearth = await open_hub(player, channels["begin-here"], "family")
+            await hearth.goto("Hearth")
+            handed = await hearth.press("Errand")
+            await env.settle()
+            text = result_text(handed) + "\n" + hearth.text()
+            expect("❌" not in text, text[:500])
+            expect("asks something of you: **" in text and "/quests" in text, "the errand was not handed over as a quest: " + text[:500])
+            return text.split("asks something of you: **", 1)[1].split("**", 1)[0]
+        errand_title = await step(report, "/family → Hearth → Errand hands over a household errand, one at a time", errand())
+        if errand_title:
+            report.add("PASS", "the errand", errand_title)
+
         town = None
 
         async def leave():
@@ -482,32 +500,24 @@ async def run(url: str, token: str, db_path: str) -> Report:
         if reason:
             report.add("PASS", "the locked line", reason)
 
-        async def teleport_home():
-            panel = await open_hub(gm, channels["bot-logs"], "admin")
-            await panel.goto("Players")
-            picked = await panel.press("Teleport")
-            message = picked.response.message if picked.response is not None else None
-            expect(message is not None, "Teleport asked for nobody")
-            select = select_by_placeholder(message.components, "")
-            expect(select is not None and select.get("type") == 5, "the first step should be a member picker: " + message_text(message)[:300])
-            done = await answer_steps(gm, picked, picks={"Choose member": player, "Choose location": town},
-                                      fields={"Reason": "playtest: home from the capital"})
+        async def talisman():
+            items = await open_hub(player, channels["begin-here"], "items")
+            await items.goto("Use Item")
+            used = await answer_steps(player, await items.press("Use"), picks={"Choose item": "Hearth-Return Talisman"})
             await env.settle()
-            text = result_text(done) + "\n" + panel.text()
-            expect(town in text and "❌" not in text and "Unknown" not in text, text[:500])
-        await step(report, "/admin → Players → Teleport (a member picker, a location picker, a modal) brings the player home", teleport_home())
+            text = result_text(used) + "\n" + items.text()
+            expect("standing inside" in text, text[:600])
+            expect("📜 Quest progress: **" in text, "no quest line followed the reply: " + text[:600])
+            return text.split("found you: **", 1)[1].split("**", 1)[0] if "found you: **" in text else ""
+        found_at = await step(report, "/items → Use Item → Use → Hearth-Return Talisman carries the player home and reports return_home after the reply", talisman())
+        if found_at:
+            report.add("PASS", "the talisman remembers where it found you", found_at)
 
-        async def back():
+        async def inside_again():
             family = await open_hub(player, channels["begin-here"], "family")
-            expect(section_button(family.message().components, "Enter") is not None, family.text()[:600])
-            entered = await family.press("Enter")
-            await env.settle()
-            text = result_text(entered) + "\n" + family.text()
-            expect("🏠 Entered" in text, text[:600])
-            expect("📜" in text and ("Quest progress" in text or "Quest complete" in text or "New quest" in text),
-                   "no quest line followed the reply: " + text[:600])
+            expect("🔒 Enter — you are already inside" in family.text(), family.text()[:600])
             return family
-        family = await step(report, "back in town, Enter is offered; pressing it comes home and reports return_home after the reply", back())
+        family = await step(report, "/family after the talisman shows the player inside", inside_again())
 
         async def hearth():
             expect(family is not None)
@@ -527,10 +537,25 @@ async def run(url: str, token: str, db_path: str) -> Report:
         if standing:
             report.add("PASS", "standing after the contribution", standing)
 
-        async def road():
+        async def back():
             expect(family is not None)
             await family.goto("Family")
             confirm = await family.press("Leave")
+            await player.click(confirm.response.message, label="Yes, Leave")
+            await env.settle()
+            street = await open_hub(player, channels["begin-here"], "family")
+            expect(section_button(street.message().components, "Enter") is not None, street.text()[:600])
+            entered = await street.press("Enter")
+            await env.settle()
+            text = result_text(entered) + "\n" + street.text()
+            expect("🏠 Entered" in text, text[:600])
+            expect(household is not None and household.mention in text, "the reply does not name the household thread: " + text[:400])
+            return street
+        street = await step(report, "from the town, /family offers Enter; pressing it comes home and names the household thread", back())
+
+        async def road():
+            expect(street is not None)
+            confirm = await street.press("Leave")
             await player.click(confirm.response.message, label="Yes, Leave")
             await env.settle()
             travel = await open_hub(player, channels["begin-here"], "travel")

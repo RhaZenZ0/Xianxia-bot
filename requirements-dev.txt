@@ -2,3 +2,7 @@
 
 pytest>=8.0,<9
 ruff>=0.9,<1
+# The Discord half of the playtest (scripts/playtest_discord.py) runs the bot against an
+# in-memory Discord. Test-only: nothing under app/ imports it, so it stays out of
+# requirements.txt and the hash-locked production install.
+simcord==2.0.1
