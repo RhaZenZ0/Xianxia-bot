@@ -875,8 +875,12 @@ async def run(url: str, token: str, db_path: str) -> Report:
                 await settle_patiently(env)
                 expect("Family" in panel.text() or (reopened.response is not None), "Reopen drew nothing")
                 return "expired to a Reopen button, and it reopened"
+            # Whichever leaf the page draws: after the sweep the player may
+            # stand outside the household, so Leave is not always there.
+            button = next((n for n in _walk(panel.message().components) if n.get("type") == 2 and n.get("custom_id")), None)
+            expect(button is not None, "the panel offers no button to press:\n" + text[:400])
             try:
-                await panel.press("Leave")
+                await player.click(panel.message(), custom_id=str(button["custom_id"]))
             except SetupError as exc:
                 return f"buttons disabled: {exc}"
             raise Failed("the panel still takes presses after its timeout:\n" + text[:400])
