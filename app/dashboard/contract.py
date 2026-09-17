@@ -54,6 +54,7 @@ DASHBOARD_VIEW_ENDPOINTS = {
     "ai_routing": "/api/ai_routing",
     "narration": "/api/narration",
     "admin": "/api/admin",
+    "player_editor": "/api/player",
 }
 
 # Tables belonging to newer gameplay systems that must be deliberately surfaced

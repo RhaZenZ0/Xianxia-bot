@@ -240,3 +240,12 @@ input,select,textarea{font:inherit}
   .topbar{padding:0 14px}
   .clockbox{font-size:11px;gap:10px}
 }
+
+/* The Player Editor (v1.0.0-rc.37): the picker sits in the page header beside
+   the density buttons, and the sheet strip reads like the player drawer. */
+.pheadacts select{background:#111720;border:1px solid var(--line);border-radius:8px;color:#e6ecf6;padding:6px 9px;font:inherit;font-size:12px;min-width:240px}
+.sheetstrip{display:flex;gap:5px;flex-wrap:wrap;margin:-4px 0 12px}
+.editor-note{color:var(--muted);font-size:11.5px;margin:0 0 12px}
+.control .tablewrap{max-height:220px}
+.control .pick{cursor:pointer}
+.control .pick:hover{color:#f4d98f}

@@ -16,8 +16,11 @@ the root refined, steadied and evolved, the bloodline and the physique on whiche
 allows, and a personal world created, ruled, entered and left after Space Law is climbed to
 Essence/Origin; seventeen operations. The body ladder had no lever, so `admin.player.set_realm`
 takes an optional `body_realm_index`/`body_phase` pair (both or neither), audited and undone with
-the qi pair, and the GM dashboard's realm card carries the two fields. See CLAUDE.md, "The playtest
-touches everything".
+the qi pair. The GM dashboard gained a **Player Editor**: the sixteen per-player cards the Admin
+Console carried, each blind to the character chosen, are one view now, picked once and pre-filled
+from the rows each lever writes (`/api/player` returns them beside the sheet), while the console
+keeps the levers that act on the world or the server; the write path, the action map and the audit
+row are unchanged. See CLAUDE.md, "The playtest touches everything" and "Dashboard".
 
 **1.0.0** (rc.36) drives the sect and the homestead through the engine playtest.
 

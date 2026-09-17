@@ -931,6 +931,21 @@ opens SQLite directly), and every state-changing GM action is written to `admin_
 reads the narration router's in-process chains, counters and audit verdicts through the bot control
 plane, and is read-only (no `admin_audit_log` row, and it sits under Systems, not Admin).
 
+**The Player Editor (v1.0.0-rc.37)** is where one character's levers live. The Admin Console had
+sixteen cards that each began with a Player select and knew nothing about the character chosen -
+a GM setting a realm typed 0/1 over whatever was there, and the bloodline card wanted an id the
+GM had to look up on another page. `player_editor` picks a player once (the picker sits in the
+page header, and the drawer on Player Activity opens it), reads `/api/player`, and draws every
+`player.*` action the controller maps, pre-filled from the row that action writes: `player_detail`
+returns the wallets, root, bloodlines, physique, tribulation gates, perfection rows, beasts,
+equipment, abode and its guests, pill toxicity and fate beside the sheet, so the ids a lever needs
+(`bloodline_id`, `beast_id`, `equipment_id`, `guest_user_id`) are picked, not typed. The console
+keeps what acts on the world or the server. Nothing about the write path changed: the same
+`/api/admin/action`, the same `ACTION_MAP`, the same audit row - the editor decides nothing, it only
+fills the form. `test_the_player_editor_owns_every_per_player_lever` holds that every mapped
+`player.*` action is driven from the editor and none from the console, and that a snowflake is
+never put through `Number()` on the way (`EDIT_UID` is the string the server returned).
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —
