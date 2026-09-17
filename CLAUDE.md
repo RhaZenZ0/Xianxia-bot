@@ -573,12 +573,26 @@ leaf is waited out in short settles instead); and the typed explore's surprise c
 zero, because an open surprise blocks the road and failed the capital step on the dice one run in
 four.
 
-What is deferred, and to what: the sect's rooms and the homestead (contribution points and a rank,
-one PR), progression (perfection and a tribulation attempt need the stage filled with essence, the
-aptitudes a bloodline at progress 100, a personal world Space Law at 100%; one PR), and what only
-the world makes (a wild beast encounter, a bounty pursuit, a missing NPC - no GM lever writes those
-rows, only the batches and the hunt roll; one PR that forces them in a bounded loop and holds the
-designed refusal when none appears).
+**The sect and the homestead (v1.0.0-rc.36)** emptied the first deferred block. The staging is worth
+knowing because three of its facts are not where a source read would look. A `sect_abodes` row is
+never written by the engine: `/sect abode` stages it through the repository's `ensure_sect_abode`,
+so the harness uses the same door, at the sect's `recruitment.location`. Contribution points come
+only from `sect.contribute` (`quantity × sect_value`, the items into `sect_treasury`), and the manor's
+establish (`spirit_iron` 30, `spirit_herb` 20, `beast_core` 10) and its upgrades eat that treasury;
+the residence's upgrade costs `40·L²` points under a rank cap and a realm floor. The hidden sect's
+initiation wants karma at or below `karma_initiation` (−200 in the content) and does not care about
+a public membership. A recommendation refuses anyone already in a public sect, so it is the second
+character's. A war starts the moment a second sect claims a territory the first holds (territory keys
+are location names), and `war.act` is one act per side on a wall-clock cooldown, so nothing waits.
+The homestead is the only buildable property type, founded at rank 40 in a normal town without an
+auction house; `abode.focus` grants an effect for four rooms and none for the rest, and the harness
+holds both. Every outcome that is a roll (the recommendation, the war's siege and morale) is reported.
+
+What is deferred, and to what: progression (perfection and a tribulation attempt need the stage filled
+with essence, the aptitudes a bloodline at progress 100, a personal world Space Law at 100%; one PR),
+and what only the world makes (a wild beast encounter, a bounty pursuit, a missing NPC - no GM lever
+writes those rows, only the batches and the hunt roll; one PR that forces them in a bounded loop and
+holds the designed refusal when none appears).
 
 ### People this world makes for itself (`npc_registry`, schema 49)
 

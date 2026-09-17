@@ -44,33 +44,6 @@ GM = 1
 # fails a stale entry (deferred and driven, or no longer an operation). Each
 # block below is one later PR that empties it.
 DEFERRED_OPERATIONS: dict[str, str] = {
-    # PR 2: the sect and the homestead. A sect residence, its manor and its
-    # treasury need membership at rank (admin.player.set_sect) and
-    # contribution points that only sect.contribute builds; a homestead's
-    # founding rank rides the same lever.
-    "sect.abode.enter": "PR 2: the sect and the homestead - needs a sect_abodes row the sect assigns to a member",
-    "sect.abode.leave": "PR 2: the sect and the homestead - needs the residence entered first",
-    "sect.abode.upgrade": "PR 2: the sect and the homestead - needs contribution points built by sect.contribute",
-    "sect.shadow": "PR 2: the sect and the homestead - the hidden sect's initiation at karma -80",
-    "sect.recruitment.recommendation": "PR 2: the sect and the homestead - a recommendation roll, reported",
-    "sect.contribute": "PR 2: the sect and the homestead - items into the sect treasury for points",
-    "sect.redeem": "PR 2: the sect and the homestead - points back out of the treasury",
-    "sect.manor.establish": "PR 2: the sect and the homestead - rank 70 and a funded treasury",
-    "sect.manor.upgrade": "PR 2: the sect and the homestead - rank 50 and a funded treasury",
-    "discipleship.request": "PR 2: the sect and the homestead - two members of one sect at different realms",
-    "discipleship.resolve": "PR 2: the sect and the homestead - the master answers the request",
-    "discipleship.leave": "PR 2: the sect and the homestead - the disciple leaves the lineage",
-    "territory.claim": "PR 2: the sect and the homestead - a claim by a sect member",
-    "war.act": "PR 2: the sect and the homestead - a war needs a territory a second sect already holds",
-    "abode.establish": "PR 2: the sect and the homestead - a homestead's founding rank rides set_sect",
-    "abode.enter": "PR 2: the sect and the homestead - needs the property established",
-    "abode.visit": "PR 2: the sect and the homestead - the buyer visits on an invitation",
-    "abode.leave": "PR 2: the sect and the homestead - needs the property entered",
-    "abode.invite": "PR 2: the sect and the homestead - needs the property established",
-    "abode.revoke": "PR 2: the sect and the homestead - needs the invitation first",
-    "abode.upgrade": "PR 2: the sect and the homestead - a facility bought with stones",
-    "abode.focus": "PR 2: the sect and the homestead - needs a built facility to sit in",
-    "admin.player.set_abode_access": "PR 2: the sect and the homestead - the lever edits access to a property the owner must have",
     # PR 3: progression. Perfection and a tribulation attempt need the stage
     # filled with essence (the fill rule is read before it is driven), the
     # aptitudes a bloodline or physique at progress 100, a personal world
@@ -1380,6 +1353,120 @@ async def run(url: str, token: str, db_path: str) -> Report:
             break
     for kind in ("personal", "world_event", "secret_realm"):
         report.add("PASS", f"a {kind} surprise came" if kind in came else f"a {kind} surprise did not come in twenty explores (the dice, not the wiring)", came.get(kind, ""))
+
+    # -- the sect and the homestead (v1.0.0-rc.36)
+    # PLAYER is an Outer Disciple of the Azure Cloud Sect since the trial;
+    # BUYER is in no sect and holds no lineage. The residence row is the one
+    # thing the engine never writes - `/sect abode` stages it through the
+    # repository - so the harness uses the same door. Points come only from
+    # contribution; the manor eats the treasury; the hidden sect wants karma
+    # at -200; a war starts when a second sect claims what the first holds.
+    sect = "Azure Cloud Sect"
+    gate = str(world["sects"][sect]["recruitment"]["location"])
+    for item_id, qty in (("spirit_herb", 60), ("spirit_iron", 40), ("beast_core", 20)):
+        await step(report, f"grant {item_id} x{qty} for the sect", gm("admin.player.adjust_item", {"user_id": PLAYER, "item_id": item_id, "quantity": qty, "reason": "playtest"}))
+    await step(report, "grant 1000 stones for the homestead", gm("admin.player.grant_currency", {"user_id": PLAYER, "currency_id": "low_spirit_stone", "amount": 1000, "reason": "playtest"}))
+    await step(report, "a master must outrank the disciple", gm("admin.player.set_realm", {"user_id": PLAYER, "realm_index": 1, "phase": 1, "reason": "playtest"}))
+    recommended = await step(report, "sect.recruitment.recommendation from the inquisitor", act("sect.recruitment.recommendation", BUYER, {"npc_name": "Inquisitor Shen Rui", "sect_name": sect}))
+    if recommended is not None:
+        report.add("PASS", "the recommendation is a roll, reported", f"success={recommended.get('success')} total={(recommended.get('roll') or {}).get('total')}")
+    await step(report, "the sect assigns a residence (the door /sect abode uses)", db.ensure_sect_abode(PLAYER, sect_name=sect, name="Playtest Residence", base_location=gate))
+    await step(report, "to the mountain gate", gm("admin.player.teleport", {"user_id": PLAYER, "location": gate, "reason": "playtest"}))
+    inside = await step(report, "sect.abode.enter", act("sect.abode.enter", PLAYER, {}))
+    if inside is not None:
+        report.add("PASS" if str(inside.get("location")) == f"sect_abode:{PLAYER}" else "FAIL", "the residence is entered", str(inside.get("location")))
+    for item_id, qty, points in (("spirit_herb", 60, 120), ("spirit_iron", 40, 120), ("beast_core", 20, 100)):
+        given = await step(report, f"sect.contribute {item_id} x{qty}", act("sect.contribute", PLAYER, {"item_id": item_id, "quantity": qty}))
+        if given is not None:
+            report.add("PASS" if int(given.get("points") or 0) == points else "FAIL", f"{qty} {item_id} are worth {points} points", str(given.get("points")))
+    # The residence comes with its cultivation chamber at level 1, and an
+    # Outer Disciple's cap is level 1, so the room built here is one that
+    # starts at 0.
+    built = await step(report, "sect.abode.upgrade the alchemy room", act("sect.abode.upgrade", PLAYER, {"facility": "alchemy"}))
+    if built is not None:
+        report.add("PASS" if int(built.get("level") or 0) == 1 and int(built.get("cost") or 0) == 40 else "FAIL", "level 1 costs forty points", f"level={built.get('level')} cost={built.get('cost')}")
+    await step(report, "sect.abode.upgrade past the rank's cap is refused", act("sect.abode.upgrade", PLAYER, {"facility": "cultivation"}), expect_error="or higher")
+    redeemed = await step(report, "sect.redeem a herb back", act("sect.redeem", PLAYER, {"item_id": "spirit_herb", "quantity": 1}))
+    if redeemed is not None:
+        report.add("PASS", "the treasury sells back at its price", f"unit_cost={redeemed.get('unit_cost')} remaining={redeemed.get('remaining_points')}")
+    left = await step(report, "sect.abode.leave", act("sect.abode.leave", PLAYER, {}))
+    if left is not None:
+        report.add("PASS" if str(left.get("location")) == gate else "FAIL", "the residence opens onto the gate", str(left.get("location")))
+    await audited("admin.player.set_sect_rank", {"user_id": PLAYER, "rank_name": "Sect Master", "rank_level": 70, "reason": "playtest"}, name="admin.player.set_sect_rank Sect Master")
+    await step(report, "back to the town", gm("admin.player.teleport", {"user_id": PLAYER, "location": town, "reason": "playtest"}))
+    manor = await step(report, "sect.manor.establish", act("sect.manor.establish", PLAYER, {"name": "Playtest Manor"}))
+    if manor is not None:
+        report.add("PASS" if str(manor.get("base_location")) == town else "FAIL", "the manor stands where it was founded", str(manor.get("base_location")))
+    raised = await step(report, "sect.manor.upgrade the qi array", act("sect.manor.upgrade", PLAYER, {"facility": "qi_array"}))
+    if raised is not None:
+        report.add("PASS" if int(raised.get("to_level") or 0) == 1 else "FAIL", "the qi array rises to level 1", f"{raised.get('from_level')}->{raised.get('to_level')} cost={raised.get('cost')}")
+    await step(report, "a second manor is refused", act("sect.manor.establish", PLAYER, {"name": "Playtest Manor Two"}), expect_error="already has a persistent manor")
+    watched = await step(report, "sect.shadow status", act("sect.shadow", PLAYER, {"mode": "status"}))
+    if watched is not None:
+        report.add("PASS" if not watched.get("membership") else "FAIL", "no initiate yet", f"branch={watched.get('branch')} karma={watched.get('karma')}")
+    # The seal wants karma at or below karma_initiation (-200 in the content);
+    # the delta is read off the status so the run's earlier deeds do not
+    # decide it, and the same amount is given back afterwards.
+    seal = int((watched or {}).get("karma_initiation") or -200)
+    descent = int((watched or {}).get("karma") or 0) - seal + 1
+    await audited("admin.player.karma", {"user_id": PLAYER, "delta": -descent, "reason": "playtest"}, name="admin.player.karma down to the seal")
+    initiated = await step(report, "sect.shadow initiate", act("sect.shadow", PLAYER, {"mode": "initiate"}))
+    if initiated is not None:
+        membership = dict(initiated.get("membership") or {})
+        report.add("PASS" if str(membership.get("status")) == "active" else "FAIL", "the shadow takes an initiate", f"status={membership.get('status')} manual={initiated.get('manual_id')}")
+    await step(report, "sect.shadow initiate twice", act("sect.shadow", PLAYER, {"mode": "initiate"}), expect_error="already an active")
+    await audited("admin.player.karma", {"user_id": PLAYER, "delta": descent, "reason": "playtest"}, name="admin.player.karma back from the seal")
+    await audited("admin.player.set_sect", {"user_id": BUYER, "sect_name": sect, "rank_name": "Outer Disciple", "rank_level": 10, "reason": "playtest"}, name="admin.player.set_sect the buyer into the Azure Cloud")
+    asked = await step(report, "discipleship.request", act("discipleship.request", BUYER, {"master_user_id": PLAYER}))
+    request_id = int((asked or {}).get("request_id") or 0)
+    if request_id:
+        accepted = await step(report, "discipleship.resolve accept", act("discipleship.resolve", PLAYER, {"request_id": request_id, "accept": True}))
+        if accepted is not None:
+            report.add("PASS" if str(accepted.get("status")) == "accepted" else "FAIL", "the master accepts", str(accepted.get("status")))
+        severed = await step(report, "discipleship.leave", act("discipleship.leave", BUYER, {}))
+        if severed is not None:
+            report.add("PASS" if severed.get("severed") else "FAIL", "the disciple leaves", str(severed.get("severed")))
+    claimed = await step(report, "territory.claim the hills", act("territory.claim", PLAYER, {"territory_key": "Cloudspine Foothills"}))
+    if claimed is not None:
+        report.add("PASS" if claimed.get("claimed") else "FAIL", "a neutral territory is claimed", str(claimed.get("controller_key")))
+    await audited("admin.player.set_sect", {"user_id": BUYER, "sect_name": "Crimson Furnace Sect", "rank_name": "Outer Disciple", "rank_level": 10, "reason": "playtest"}, name="admin.player.set_sect the buyer into the Crimson Furnace")
+    contested = await step(report, "territory.claim the hills for a second sect", act("territory.claim", BUYER, {"territory_key": "Cloudspine Foothills"}))
+    war_id = int((contested or {}).get("war_id") or 0)
+    if contested is not None:
+        report.add("PASS" if war_id and str(contested.get("attacker_key")) == "Crimson Furnace Sect" and str(contested.get("defender_key")) == sect else "FAIL",
+                   "a second claim starts a war", f"war={war_id} {contested.get('attacker_key')} vs {contested.get('defender_key')}")
+    if war_id:
+        for uid, tactic in ((BUYER, "assault"), (PLAYER, "fortify")):
+            acted = await step(report, f"war.act {tactic}", act("war.act", uid, {"war_id": war_id, "tactic": tactic}))
+            if acted is not None:
+                ops = dict(acted.get("operations") or {})
+                report.add("PASS", "the tactic's roll, reported", f"status={acted.get('status')} siege={ops.get('siege_progress')} morale={ops.get('attacker_morale')}/{ops.get('defender_morale')}")
+        await either("war.act again waits, or the war is over", act("war.act", PLAYER, {"war_id": war_id, "tactic": "repel"}), "still on cooldown", "active war not found")
+    await audited("admin.player.set_sect_rank", {"user_id": PLAYER, "rank_name": "Deacon", "rank_level": 40, "reason": "playtest"}, name="admin.player.set_sect_rank Deacon")
+    home = await step(report, "abode.establish a homestead", act("abode.establish", PLAYER, {"name": "Playtest Homestead", "property_type": "homestead"}))
+    if home is not None:
+        report.add("PASS" if str(home.get("base_location")) == town else "FAIL", "the homestead stands in the town", str(home.get("base_location")))
+    await step(report, "abode.invite the buyer", act("abode.invite", PLAYER, {"guest_user_id": BUYER}))
+    await step(report, "the buyer to the town", gm("admin.player.teleport", {"user_id": BUYER, "location": town, "reason": "playtest"}))
+    visiting = await step(report, "abode.visit by the buyer", act("abode.visit", BUYER, {"owner_user_id": PLAYER}))
+    if visiting is not None:
+        report.add("PASS" if str(visiting.get("location")) == f"abode:{PLAYER}" else "FAIL", "the guest is inside", str(visiting.get("location")))
+    await step(report, "abode.leave by the buyer", act("abode.leave", BUYER, {}))
+    await step(report, "abode.revoke the buyer", act("abode.revoke", PLAYER, {"guest_user_id": BUYER}))
+    await audited("admin.player.set_abode_access", {"owner_user_id": PLAYER, "guest_user_id": BUYER, "access_role": "guest", "reason": "playtest"})
+    await audited("admin.player.set_abode_access", {"owner_user_id": PLAYER, "guest_user_id": BUYER, "revoke": True, "reason": "playtest"}, name="admin.player.set_abode_access revoke")
+    furnished = await step(report, "abode.upgrade the alchemy room", act("abode.upgrade", PLAYER, {"facility": "alchemy"}))
+    if furnished is not None:
+        report.add("PASS" if int(furnished.get("level") or 0) == 1 and int(furnished.get("cost") or 0) == 100 else "FAIL", "level 1 costs a hundred stones", f"level={furnished.get('level')} cost={furnished.get('cost')}")
+    await step(report, "abode.enter", act("abode.enter", PLAYER, {}))
+    focused = await step(report, "abode.focus the cultivation chamber", act("abode.focus", PLAYER, {"facility": "cultivation"}))
+    if focused is not None:
+        report.add("PASS" if focused.get("effect_id") else "FAIL", "the chamber grants an effect", str(focused.get("effect_name")))
+    stored = await step(report, "abode.focus the storage", act("abode.focus", PLAYER, {"facility": "storage"}))
+    if stored is not None:
+        report.add("PASS" if not stored.get("effect_id") else "FAIL", "storage is a room, not an effect", str(stored.get("effect_id")))
+    await step(report, "abode.leave", act("abode.leave", PLAYER, {}))
+    await audited("admin.player.set_sect_rank", {"user_id": PLAYER, "rank_name": "Outer Disciple", "rank_level": 10, "reason": "playtest"}, name="admin.player.set_sect_rank back to Outer Disciple")
 
     # -- the household simulated, a child named, the supporter's gift
     simulated = await step(report, "family.simulate a season", act("family.simulate", PLAYER, {"family_id": int(fam.get("family_id") or 0)}))
