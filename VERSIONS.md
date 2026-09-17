@@ -6,6 +6,42 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.0** (rc.35) makes the playtest touch everything, and holds it there.
+
+The engine playtest drove 51 of 193 allowlisted operations and the Discord playtest pressed 9 of
+245 leaves, and nothing said which the harnesses had to drive, so a new operation or leaf was
+uncovered until somebody noticed. `tests/python/contracts/test_playtest_coverage.py` now enumerates
+the surface from the code - the allowlist maps and the dispatch switch in Go, the live hub
+definitions in Python - and holds each harness to it with one explicit deferred set per harness,
+each entry carrying its reason; a stale deferral fails the gate. The Discord harness gained a
+generic sweep that presses every leaf of every hub, admin included, answering each input step as a
+player with no plan would and holding that the reply is a result or a designed refusal, never the
+hub's failure text. The engine harness gained every family a fresh pair of characters and the GM
+levers can reach, from storage to the dynasty a new life inherits, with every remaining lever's
+audit row checked; the sect's rooms, progression and what only the world makes are deferred to
+three named follow-ups. The sweep's first run found four handlers no source read had: no trade
+had ever left Discord (a `game_minute` the client refuses to send), the forage reply raised on
+every forage (the engine's roll was flattened without its degree), `/talk` at a grave called a
+switch operation through the authoritative client, and a GM's grant to a member with no
+character crashed instead of refusing. All four are fixed and held. See CLAUDE.md, "The playtest
+touches everything".
+
+**1.0.0** (rc.34) lets the head of the house teach and test the new cultivator.
+
+The beginner path ended at the door: nobody in the house had ever spoken to the child as a teacher,
+and a fresh cultivator could craft only in the household's own trade, because the engine refuses any
+method they do not know and the other three trades were bought into from slips. The path now ends
+with a fifth stage, "The Last Lesson": at home, `/family → Hearth → Lesson` is the head of the house
+speaking, in words that are content, one entry per birth family. The test is one demonstration check
+on the attribute the family's trade lives on, and a failure costs one world day and nothing else.
+Passing qualifies the cultivator at level 0 in all four trades - a profession record in each, never
+lowered, and every trade's entry methods - hands over the house's own manual studied once, so its
+first technique is usable at once, tells the story of the house into its chronicle, leaves a keepsake,
+and raises standing. Once per life, kept in the event log against the soul's incarnation count, so
+samsara lets a new life take it again; and grandfathered at the door, so somebody who finished the
+road home before this release is handed the stage the moment they ask. `family_lesson` is a new
+objective type reported only on a pass; the wait shows on the cooldown card. No schema change.
+
 **1.0.0** (rc.33) runs the half of the playtest a player touches.
 
 `scripts/playtest_discord.py` boots the real bot inside SimCord, an in-memory Discord that runs

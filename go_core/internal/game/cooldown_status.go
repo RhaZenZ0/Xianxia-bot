@@ -85,7 +85,7 @@ var cooldownFamilies = []cooldownFamily{
 // no words for.
 var cooldownExternalFamilies = []string{
 	"road_transit", "seclusion", "sect_trial_retry", "secret_realm_run",
-	"reincarnation", "muted", "frozen",
+	"reincarnation", "muted", "frozen", "family_lesson_retry",
 }
 
 // The sect entrance trial may be retried after one world day (sect_actions.go).
@@ -328,6 +328,17 @@ func cooldownExternalWaits(conn *storage.Conn, userID int64, now float64) ([]map
 	if row := firstRowMap(res); row != nil {
 		if ends := i64(row["game_minute"]) + sectTrialRetryGameMinutes; ends > gameMinute {
 			out = append(out, fromGameMinute("sect_trial_retry", "sect_trial_retry", "", ends))
+		}
+	}
+
+	// The head of the house's lesson (v1.0.0-rc.34): a failed demonstration
+	// waits one world day, read off the attempt the lesson logged for this
+	// life. A pass leaves nothing to wait for.
+	if passed, fail, err := householdLessonRecordsTx(conn, userID, soulLifeTx(conn, userID)); err != nil {
+		return nil, err
+	} else if !passed && fail != nil {
+		if ends := fail.GameMinute + householdLessonRetryGameMinutes; ends > gameMinute {
+			out = append(out, fromGameMinute("family_lesson_retry", "family_lesson_retry", "", ends))
 		}
 	}
 

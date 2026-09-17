@@ -179,6 +179,8 @@ async def admin_revive(interaction: discord.Interaction, member: discord.Member,
 @registered_group_command(admin_player_group, name="clearbattle", description="Force-clear a player's active battle state")
 async def admin_clearbattle(interaction: discord.Interaction, member: discord.Member, reason: str = "GM recovery") -> None:
     if not await require_admin(interaction): return
+    if not await DB.get_character(member.id):
+        await interaction.response.send_message("That member has no cultivation character.", ephemeral=False); return
     clear_result = dict(
         await ENGINE.action(
             "admin.player.clear_battle",

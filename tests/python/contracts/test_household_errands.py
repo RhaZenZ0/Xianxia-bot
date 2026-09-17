@@ -109,11 +109,13 @@ class TheDoorsAreWhereTheyWork(unittest.TestCase):
         hubs = (BOT / "hubs.py").read_text(encoding="utf-8")
         self.assertEqual(hubs.count("self.page_actions(page)"), 3, "every panel draws through the filter")
 
-    def test_the_beginner_path_now_ends_at_home(self):
+    def test_the_beginner_path_comes_home_before_its_last_lesson(self):
+        # rc.32 made the road home the last stage; rc.34 puts the head's last
+        # lesson after it (test_household_lesson.py holds that end).
         stages = list(CONTENT["beginner_path"])
-        self.assertEqual(stages[-1]["quest_key"], "beginner_home")
-        self.assertEqual(stages[-2]["follow_on"], "beginner_home")
-        self.assertIn("return_home", [o["type"] for o in stages[-1]["objectives"]])
+        self.assertEqual(stages[-2]["quest_key"], "beginner_home")
+        self.assertEqual(stages[-3]["follow_on"], "beginner_home")
+        self.assertIn("return_home", [o["type"] for o in stages[-2]["objectives"]])
 
 
 class TheTalismansMakeTheRoundTrip(unittest.TestCase):

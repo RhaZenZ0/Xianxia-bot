@@ -62,8 +62,8 @@ Other checks:
 
 ```bash
 python scripts/check_dashboard_implementation.py   # dashboard frontend/backend drift + coverage gate, part of the release gate
-python scripts/playtest_engine.py --launch         # the engine half of the playtest against a scratch engine
-python scripts/playtest_discord.py --launch        # the Discord half: the real bot under a simulated Discord (see below)
+python scripts/playtest_engine.py --launch         # the engine half of the playtest: every operation, against a scratch engine
+python scripts/playtest_discord.py --launch        # the Discord half: the real bot under a simulated Discord, every leaf pressed (see below)
 python -m compileall -q app                        # compile-check production Python
 python -m json.tool content/world.json >/dev/null  # validate world content JSON
 make lock                                          # regenerate requirements.lock (uv) after editing requirements.txt; the Dockerfile installs it under --require-hashes
@@ -430,6 +430,57 @@ pass over `birth_family_npcs`, which no batch reads today), and the family simul
 only `history_json` rather than `world_history_events`, because starter households are shared and
 the visibility of a shared family's news is a decision, not a default.
 
+### The last lesson (`household_lesson.go`, v1.0.0-rc.34)
+
+The beginner path walked a new cultivator out of the household, through the town and the road, and
+home again — and then stopped. Nobody in the house had ever spoken to them as a teacher: the send-off
+hands over an heirloom, one trade's entry methods and a tutoring band, and the head of the family
+(`birth_families.head_title` and `head_name`) was a line in `/family → View` and nothing else. And a
+fresh cultivator could craft only in the household's own trade, because `craft.resolve` refuses any
+method they do not know and the other three trades were bought into from slips.
+
+`family.lesson` is the head of the house speaking to their child, at home, once per life:
+`/family → Hearth → Lesson`, the fifth and last stage of the path (`beginner_lesson`, reached through
+`beginner_home`'s `follow_on`). **The conversation is the action.** Every line the head speaks is
+content (`birth_family_lesson` in `world.json`, one entry per archetype: `lesson`, `test`, `pass`,
+`fail`, `story`, plus the house's `manual` and `keepsake`); Python prints and nothing is decided in
+presentation. The head is deliberately not a talkable NPC: `combatTargetsGo` already stands the head in
+the home city as a `family_head` target and `combat_aftermath.go` retires a killed one to "Vacant
+Ancestral Seat", and a registry row would have to follow both.
+
+- **The test** is one demonstration check on the attribute the family's trade lives on (Forging →
+  body, Inscription → will, Formation → spirit, Alchemy → insight; `householdLessonAttribute`), through
+  `canonicalAttribute` + `rollCheck` like a Scene Action: modifier = attribute + the trade's
+  `profession_progress.level` + `min(2, standing/10)`, against TN 10 (`householdLessonTN`), which a
+  fresh character clears about three times in four. **A failure costs one world day and nothing
+  else** (`householdLessonRetryGameMinutes` = 1440, the sect trial's own wait): the wait is read off
+  the attempt, the cooldown card lists it as `family_lesson_retry`, and `_explain_engine_error` says
+  it in hours.
+- **Passing qualifies the cultivator at level 0 in all four trades**: a `profession_progress` row in
+  each where there was none (never lowered — the tutoring rule) and every trade's entry methods
+  (`teachTradeMethodsTx`, the one helper the send-off now shares, source `family_lesson`), so `/craft`
+  works in any trade. Then **the technique of the house**: the family's manual (realm 0, never
+  Demonic — `manualForbidden` would cost a child karma on first study, and the engine refuses such
+  content outright; `test_household_lesson.py` holds it) goes into the inventory and its first-study
+  row is written, so its mastery-0 technique is usable at once. Then **the story and a keepsake**: the
+  house's own history into `history_json`, a per-trade keepsake item (`market_excluded`), and +5
+  standing.
+- **The record is the event log, per life.** `family.lesson` rows in `event_log` carry the attempt,
+  its game minute and `soul_legacy.incarnation_count` (1 in a first life); a pass is refused again only
+  in the life that earned it, so samsara — which wipes the trades and the methods — lets a new life
+  take the lesson again without deleting any log. No schema.
+- **Grandfathering happens at the door.** A boot migration cannot hand a *quest* over — the stage is
+  seeded by the bot after the engine starts, and `grantOrdinaryQuestTx` treats a missing definition as
+  "no" — so `catchUpBeginnerPathTx` runs when the lesson is passed: any stage whose predecessor is
+  completed and which was never given is handed over in the same transaction, and the reporter
+  completes and pays it. Somebody who finished "The Road Home" before rc.34 gets "The Last Lesson"
+  the moment they ask for it.
+
+`family_lesson` is an objective type reported only on a pass, after the reply.
+`household_lesson_test.go` lends the dice (`gamerng.UseRoller`) and holds every rule above; the two
+playtest harnesses assert only what is certain either way — the check is printed, and the second ask is
+refused, as "already taught" after a pass or as the wait after a fail.
+
 ### The Discord half of the playtest (`scripts/playtest_discord.py`, v1.0.0-rc.33)
 
 `scripts/playtest_engine.py` drives the roadmap's loops through the engine's HTTP API; everything a
@@ -465,6 +516,69 @@ edited the *original response* - so the placeholder became a second panel and th
 buttons `rebuild()` had already orphaned, dead until reopened. A modal now takes the direct
 `panel.edit` and the placeholder is deleted, the way a picker's step message always was;
 `test_gui_ii.py` holds it with a `modal_submit` source.
+
+### The playtest touches everything (v1.0.0-rc.35)
+
+Two harnesses run before a release, and until now nothing said what they had to drive. The engine
+half drove 51 of the 193 allowlisted operations and the Discord half pressed 9 of 245 leaves; the
+rest were proven by Go unit tests for their rules and by nothing for their wiring, and a new
+operation or leaf was uncovered until somebody noticed. `tests/python/contracts/test_playtest_coverage.py`
+is the gate that makes "everything" a fact rather than a claim. It enumerates the surface **from the
+code** - the two allowlist maps in `authoritative.go` plus the dispatch switch in `actions.go` (246
+operations), and `hubs.REGISTERED_HUBS` walked through `_leaf_actions` (298 leaves, admin included) -
+and holds each harness to it with one explicit deferred set per harness, `DEFERRED_OPERATIONS` and
+`DEFERRED_LEAVES`, read off the scripts by AST so neither harness is imported. Three rules:
+
+- **Driven means called.** The engine set is the first string argument of every `act`, `gm`, `query`
+  or `audited` call in `playtest_engine.py` - not a substring scan, so an operation named in a comment,
+  a step title or an `expect_error` is not driven. A deferral that is also driven, or that names an
+  operation the engine no longer has, fails the gate: the set can only shrink honestly.
+- **The Discord sweep is generic, so a new leaf is covered the day it is registered.** Section 8 of
+  `playtest_discord.py` walks the live definitions, opens each hub once per page, pages with the
+  panel's own "More actions" until the offset wraps (the visible row limit is recomputed on every
+  rebuild and drops while a result is shown), presses every leaf and answers each input step the way
+  a player with no plan would: a confirm confirmed, a modal filled with canned values chosen the way
+  `_resolve_input` will read them, a picker's first option, a second guild member with no character
+  for every member picker, so nothing mutes, bans or erases the character the rest of the run walks.
+  It holds one thing per leaf: **the reply is a result or a designed refusal** - never one of the three
+  fixed strings the bot prints when a handler raised (`WIRING_FAILURE_TEXTS`, held equal to the source
+  by the gate), never the action meter, never an exception in `env.errors`. A leaf the panel hides
+  must print its `🔒` lock line instead. The run's last step holds `pressed ∪ locked ∪ deferred == live`.
+- **The engine legs build state with GM levers and never assert on dice.** Sections 20b-22 of
+  `playtest_engine.py` drive every family a fresh pair of characters can reach - storage, equipment,
+  artifacts, arrays, a slip, the hills, a purge, a Law, a fight at realm 7/9 that cannot be lost, a
+  party and a raid, a duel ended by surrender, a Dao partnership, a house, the stalls, an underworld
+  post at karma -60, a caravan and a seclusion waited out on the world clock, a secret realm the GM
+  spawns and a key that opens another, a surprise made certain with
+  `unexpected_event_chance_percent: 100` and driven by kind as it comes (a personal event worked and
+  left, a world event acted in and its site engaged, a rift closed; which kinds came is reported),
+  every remaining GM lever with its audit row checked, the dynasty a new life inherits, and last the
+  erasure of the ghost. A roll is reported; a refusal that is
+  designed either way (a claim the wheel may not have opened, a raid that may not be won in thirty
+  rounds) passes on the refusal text that names why, and says which.
+
+**What the first sweep found**, none of it visible to a source read, all of it fixed here with a
+test (`test_leaf_sweep_findings.py`): no trade had ever left `/trade offer`, `accept` or `decline`
+from Discord - the payloads carried `game_minute`, which the client refuses to send because the
+engine stamps the canonical minute on every authoritative action and refuses a caller's; the forage
+reply raised on every forage from the hub, because the engine's result flattened `d1`/`d2` and
+dropped the degree while `roll_line` reads `die1`/`die2`/`degree` (the result now carries the roll
+map whole); `/talk` at a grave or to a missing NPC called `npc.found` - a switch operation, not an
+allowlisted one - through the authoritative client, which raised before sending; the event scene
+called `WORLD.unexpected_events()`, a property; and a GM's currency grant to a member with no
+character printed the failure text instead of the refusal its siblings give. Two lessons about the
+harness itself: SimCord's settle timeout must stay at its default, because a bot-owned worker whose
+next wake falls inside the deadline counts as runnable and a longer deadline never settles (a slow
+leaf is waited out in short settles instead); and the typed explore's surprise chance is pinned to
+zero, because an open surprise blocks the road and failed the capital step on the dice one run in
+four.
+
+What is deferred, and to what: the sect's rooms and the homestead (contribution points and a rank,
+one PR), progression (perfection and a tribulation attempt need the stage filled with essence, the
+aptitudes a bloodline at progress 100, a personal world Space Law at 100%; one PR), and what only
+the world makes (a wild beast encounter, a bounty pursuit, a missing NPC - no GM lever writes those
+rows, only the batches and the hunt roll; one PR that forces them in a bounded loop and holds the
+designed refusal when none appears).
 
 ### People this world makes for itself (`npc_registry`, schema 49)
 

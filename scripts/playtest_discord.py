@@ -30,6 +30,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import os
+import re
 import shutil
 import sys
 import tempfile
@@ -43,6 +44,21 @@ GUILD_ID = 900000000000000001
 HEALTH_PORT = 18182  # 1..65535 is enforced by the settings; the engine playtest's own port is 18089
 PLAYER_NAME = "Shen Rui"
 
+# Leaves the sweep (section 8) does not press, each with its reason.
+# `tests/python/contracts/test_playtest_coverage.py` holds every key to a
+# live hub path, so a renamed or removed leaf cannot leave a stale entry.
+DEFERRED_LEAVES: dict[str, str] = {}
+
+# What the bot prints when a handler raised: never a designed refusal, which
+# always names what is missing. The gate reads these off the source.
+WIRING_FAILURE_TEXTS = (
+    "❌ That action could not be completed. The game state was rechecked and no additional hub-side rule was applied.",
+    "❌ This interface hit an unexpected error. No extra hub-side game rule was applied.",
+    "Something went wrong. Check your current state (e.g. inventory, sheet) before retrying — this error does not guarantee nothing changed. An administrator can check the configured bot log channel.",
+)
+METER_TEXT = "⏳ Actions are limited to about"
+_ACTION_META = re.compile(r"actions (\d+)-(\d+) of (\d+)")
+
 
 def _configure(url: str, token: str, db_path: str) -> None:
     """Everything `Settings.from_env()` needs, set before the bot is imported.
@@ -55,6 +71,10 @@ def _configure(url: str, token: str, db_path: str) -> None:
         "NARRATOR_PROVIDER": "procedural", "HEALTH_PORT": str(HEALTH_PORT),
         "MESSAGE_CONTENT_INTENT": "true", "AUTO_NARRATE": "true",  # typed play listens in a private scene only with both
         "UPDATE_CHECK_ENABLED": "false", "QUEST_FORGE_AUTO": "false", "ROUTE_AUDIT_HOURS": "0",
+        # A surprise on the typed explore (28% by default) blocks the road
+        # until it is resolved, which would fail the capital step on the dice
+        # about one run in four; the engine playtest drives the surprises.
+        "UNEXPECTED_EVENT_CHANCE_PERCENT": "0",
         # The per-player action meter (about six a minute) is right for a
         # person and wrong for a harness that presses sixty buttons in one;
         # the meter itself is held by tests/python/contracts/test_narrator_budget.py.
@@ -207,17 +227,35 @@ class Panel:
             raise Failed(f"no {label!r} on the panel; it offers {self.labels()} and reads:\n{self.text()[:600]}")
         return await self.actor.click(self.message(), custom_id=custom_id)
 
-    async def goto(self, page_label: str, *, limit: int = 12) -> None:
-        """Step systems with the panel's own button until the page shows."""
+    async def goto(self, page_label: str, *, limit: int = 12, env: Any = None) -> None:
+        """Step systems with the panel's own button until the page shows. With
+        `env`, a slow step is waited out rather than failed."""
         for _ in range(limit):
             if self.page_title().endswith(page_label):
                 return
-            await self.actor.click(self.message(), label="Next system")
+            try:
+                await self.actor.click(self.message(), label="Next system")
+            except TimeoutError:
+                if env is None:
+                    raise
+                await settle_patiently(env)
         raise Failed(f"no page {page_label!r} within {limit} steps; the last was {self.page_title()!r}")
 
 
-async def open_hub(actor: Any, channel: Any, name: str) -> Panel:
-    result = await actor.slash(channel, name)
+async def open_hub(actor: Any, channel: Any, name: str, *, env: Any = None) -> Panel:
+    """Open a hub. With `env`, a slow open (the bot still refreshing the
+    panel's status when SimCord's settle gives up) is waited out and the panel
+    the bot drew is taken from the channel rather than opened twice."""
+    try:
+        result = await actor.slash(channel, name)
+    except TimeoutError:
+        if env is None:
+            raise
+        await settle_patiently(env)
+        newest = next((m for m in reversed(list(channel.history(viewer=actor))) if getattr(m, "components", None)), None)
+        if newest is None:
+            raise Failed(f"/{name} was slow and drew no panel")
+        return Panel(actor, channel, newest)
     if result.response is None:
         raise Failed(f"/{name} answered nothing (acknowledged={result.acknowledged}, deferred={result.deferred})")
     return Panel(actor, channel, result.response.message)
@@ -284,6 +322,169 @@ async def answer_steps(actor: Any, result: Any, *, picks: dict[str, Any] | None 
     raise Failed(f"the action still asks after {limit} steps")
 
 
+def _modal_inputs(result: Any) -> list[tuple[str, str]]:
+    """(label, custom_id) for every text input a modal shows, plain or
+    Label-wrapped."""
+    out = []
+    for node in _walk((result.modal or {}).get("components")):
+        inner = node.get("component") if node.get("type") == 18 else node
+        if isinstance(inner, dict) and inner.get("type") == 4:
+            out.append((str(node.get("label") or inner.get("label") or ""), str(inner.get("custom_id"))))
+    return out
+
+
+def canned_value(hubs: Any, spec: Any, *, member_id: int, channel_id: int) -> str:
+    """One value for a modal field, chosen the way `hubs._resolve_input` will
+    read it: a choice's own name, a range's minimum, a member or channel id,
+    `true` for a flag, `1` for a number, a word for anything free."""
+    if spec is None:
+        return "playtest"
+    if not spec.required and spec.default not in (None, ""):
+        return str(spec.default)
+    annotation = hubs._annotation_text(spec.annotation)
+    if spec.choices:
+        first = spec.choices[0]
+        return str(getattr(first, "name", first))
+    if "discord.Member" in annotation or annotation.endswith("Member") or "discord.User" in annotation:
+        return str(member_id)
+    if "discord.TextChannel" in annotation or "discord.Thread" in annotation or "discord.abc.GuildChannel" in annotation:
+        return str(channel_id)
+    ranged = hubs._RANGE_ANNOTATION.search(annotation)
+    if ranged:
+        return ranged.group(2)
+    lowered = annotation.replace(" ", "")
+    if annotation is int or annotation is float or lowered in {"int", "<class'int'>", "float", "<class'float'>"} or "int|None" in lowered or "float|None" in lowered:
+        return "1"
+    if hubs._is_bool_input(spec):
+        return "true"
+    return "playtest"
+
+
+async def answer_generically(hubs: Any, actor: Any, action: Any, result: Any, *, member: Any, channel: Any, limit: int = 8) -> tuple[Any, str]:
+    """Walk an action's input steps as a player with no plan would: a confirm
+    is confirmed, a modal is filled with canned values, a picker takes its
+    first option, a member picker the second member, a channel picker the
+    first channel, until the action has run or the hub has said there is
+    nothing to choose from. Returns the last result and how it was reached."""
+    specs = {spec.label: spec for spec in hubs._inputs_for(action)}
+    answered: set[str] = set()
+    how: list[str] = []
+    for _ in range(limit):
+        if result.modal:
+            values = {custom_id: canned_value(hubs, specs.get(label), member_id=int(member.id), channel_id=int(channel.id))
+                      for label, custom_id in _modal_inputs(result)}
+            how.append("modal")
+            result = await actor.submit_modal(result, values)
+            continue
+        message = result.response.message if result.response is not None else None
+        if message is None:
+            break
+        components = message.components
+        button = next((n for n in _walk(components) if n.get("type") == 2 and str(n.get("custom_id")) not in answered
+                       and (str(n.get("label") or "").startswith("Yes, ") or str(n.get("label") or "") == "Continue")), None)
+        if button is not None:
+            answered.add(str(button["custom_id"]))
+            how.append("confirm" if str(button.get("label") or "").startswith("Yes, ") else "continue")
+            result = await actor.click(message, custom_id=str(button["custom_id"]))
+            continue
+        select = select_by_placeholder(components, "")
+        if select is None or str(select.get("custom_id")) in answered:
+            break
+        answered.add(str(select["custom_id"]))
+        kind = int(select.get("type") or 3)
+        if kind == 3:
+            options = list(select.get("options") or [])
+            expect(options, f"an empty picker {select.get('placeholder')!r}")
+            how.append("pick")
+            result = await actor.select(message, [str(options[0]["value"])], custom_id=str(select["custom_id"]))
+        elif kind == 5:
+            how.append("member")
+            result = await actor.select(message, [member], custom_id=str(select["custom_id"]))
+        elif kind == 8:
+            how.append("channel")
+            result = await actor.select(message, [channel], custom_id=str(select["custom_id"]))
+        else:
+            raise Failed(f"a select of type {kind} the sweep cannot answer")
+    else:
+        raise Failed(f"the action still asks after {limit} steps ({'+'.join(how)})")
+    return result, "+".join(how) or "ran"
+
+
+async def settle_patiently(env: Any, *, attempts: int = 8) -> None:
+    """Wait for the bot's outstanding work in short settles rather than one
+    long one (see the note at `simcord.run`). A leaf that asks the engine for
+    the whole city's rumours can take longer than one settle under a sweep
+    that has kept the engine busy; the last attempt raises."""
+    for attempt in range(1, attempts + 1):
+        try:
+            await env.settle()
+            return
+        except TimeoutError:
+            if attempt == attempts:
+                raise
+
+
+async def find_leaf_button(panel: Panel, label: str, *, limit: int = 12) -> str | None:
+    """The custom_id of the row that names `label`, paging with the panel's
+    own "More actions" until the offset wraps. The visible row limit is
+    recomputed on every rebuild and drops while a result is shown, so a leaf
+    that fit on first load may need a page after the previous press."""
+    seen: set[int] = set()
+    for _ in range(limit):
+        custom_id = section_button(panel.message().components, label)
+        if custom_id is not None:
+            return custom_id
+        meta = _ACTION_META.search(panel.text())
+        offset = int(meta.group(1)) if meta else 0
+        if offset in seen or "More actions" not in panel.labels():
+            return None
+        seen.add(offset)
+        await panel.actor.click(panel.message(), label="More actions")
+    return None
+
+
+async def press_leaf(env: Any, hubs: Any, panel: Panel, action: Any, *, member: Any, channel: Any) -> tuple[str, str]:
+    """Press one leaf and hold the wiring: the reply is a result or a
+    designed refusal, never the hub's failure text, never the meter, never an
+    exception. A leaf the panel hides must print its lock line instead.
+    Returns ("pressed" | "locked", a one-line note)."""
+    custom_id = await find_leaf_button(panel, action.label)
+    if custom_id is None:
+        text = panel.text()
+        line = next((ln for ln in text.splitlines() if ln.startswith(f"🔒 {action.label}")), "")
+        expect(line, f"{action.label!r} is neither drawn nor locked on {panel.page_title()!r}; the page offers {panel.labels()} and reads:\n{text[:700]}")
+        return "locked", line
+    before = set(panel.text().splitlines())
+    raised_before = len(list(env.errors))
+    try:
+        result = await panel.actor.click(panel.message(), custom_id=custom_id)
+        result, how = await answer_generically(hubs, panel.actor, action, result, member=member, channel=channel)
+    except TimeoutError:
+        # The press was delivered and the bot is still on it: wait it out and
+        # read the panel; the ephemeral reply, if any, is lost to the record.
+        result, how = None, "slow"
+    await settle_patiently(env)
+    try:
+        after = panel.text()
+    except Failed:
+        after = ""
+    # What the press drew: the lines the panel gained (its result block) first,
+    # because a reply that edits the panel in place answers with the whole
+    # panel, header and all; then the ephemeral reply, if there was one.
+    fresh = "\n".join(ln for ln in after.splitlines() if ln not in before)
+    reply = fresh + "\n" + result_text(result)
+    # Held against what this press drew, not the whole panel: a result block
+    # an earlier press left there would otherwise fail every leaf after it
+    # whose own reply was ephemeral.
+    for failure in WIRING_FAILURE_TEXTS:
+        expect(failure not in reply, f"the hub's failure text after {how}:\n{reply[:600]}")
+    expect(METER_TEXT not in reply, f"the action meter refused the sweep after {how}: raise TYPED_PLAY_PER_MINUTE")
+    raised = list(env.errors)[raised_before:]
+    expect(not raised, "; ".join(f"{type(e).__name__}: {e}" for e in raised)[:600])
+    note = next((ln.strip() for ln in reply.splitlines() if ln.strip() and not ln.startswith(("## ", "### ", "-# "))), "(no reply)")
+    return "pressed", f"{how} → {note[:120]}"
+
+
 async def bot_replies_after(env: Any, channel: Any, own_message: Any, bot_id: int) -> list[Any]:
     await env.settle()
     return [m for m in channel.history() if int(m.id) > int(own_message.id) and int(m.author.id) == int(bot_id)]
@@ -318,17 +519,24 @@ async def run(url: str, token: str, db_path: str) -> Report:
     from app.bot.bot import bot
     from app.bot.runtime import SETTINGS
     from app.bot.services import GUILD
+    from app.bot import hubs as hub_registry  # `hubs` is section 4's step below
     from app.bot.surface import _HUB_COMMANDS
 
     logging.getLogger("httpx").setLevel(logging.WARNING)  # one line per engine round trip is not a report
     report = Report()
 
     async with simcord.run(bot, strict_sync=True, check_errors=False) as env:
+        # SimCord's settle timeout stays at its default (five seconds) on
+        # purpose: a bot-owned worker whose next wake falls inside the
+        # deadline counts as runnable, so a longer deadline swallows the
+        # periodic workers' sleeps and never settles at all. A slow leaf is
+        # waited out by `settle_patiently` - several short settles - instead.
         guild = env.create_guild("Xianxia Playtest", id=GUILD_ID)
         channels = {name: guild.create_text_channel(name) for name in BASE_CHANNEL_SPECS}
         admin_role = guild.create_role("Admin", permissions=discord.Permissions(administrator=True))
         gm = guild.add_member(env.create_user("GM"), roles=[admin_role])
         player = guild.add_member(env.create_user("Player One"))
+        other = guild.add_member(env.create_user("Player Two"))  # no character: every member picker's answer
         bot_id = int(bot.user.id)
 
         # ---- 1. boot -----------------------------------------------------------
@@ -357,7 +565,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
             chosen = await choose(gm, picked, "Choose action", label="Validate / bind existing base Xianxia channels")
             expect(chosen.modal, "the category name should be asked in a modal after the choice")
             done = await gm.submit_modal(chosen, modal_values(chosen, **{"Category Name": "📜 Xianxia RP"}))
-            await env.settle()
+            await settle_patiently(env)
             text = result_text(done) + "\n" + panel.text()
             for name in BASE_CHANNEL_SPECS:
                 expect(channels[name].mention in text or f"#{name}" in text, f"{name} not named in:\n{text[:800]}")
@@ -380,7 +588,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
             form = await player.click(message, label="Open Character Form")
             expect(form.modal, "Open Character Form should open the character modal")
             created = await player.submit_modal(form, modal_values(form, **{"Character name": PLAYER_NAME}))
-            await env.settle()
+            await settle_patiently(env)
             text = result_text(created)
             expect("First Step on the Dao" in text, text[:400])
             thread = _thread_named_for(channels["player-homes"], player)
@@ -424,7 +632,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
             hearth = await open_hub(player, channels["begin-here"], "family")
             await hearth.goto("Hearth")
             handed = await hearth.press("Errand")
-            await env.settle()
+            await settle_patiently(env)
             text = result_text(handed) + "\n" + hearth.text()
             expect("❌" not in text, text[:500])
             expect("asks something of you: **" in text and "/quests" in text, "the errand was not handed over as a quest: " + text[:500])
@@ -439,7 +647,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
             nonlocal town
             confirm = await panel.press("Leave")
             yes = await player.click(confirm.response.message, label="Yes, Leave")
-            await env.settle()
+            await settle_patiently(env)
             text = result_text(yes) + "\n" + panel.text()
             expect("🚪 Left" in text, text[:600])
             town = text.split("returned to **", 1)[1].split("**", 1)[0]
@@ -486,7 +694,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
             travel = await open_hub(player, channels["begin-here"], "travel")
             await travel.goto("Realm Capitals")
             gone = await answer_steps(player, await travel.press("Go"), picks={"Choose world": "Mortal World — Azure Crown Imperial City"})
-            await env.settle()
+            await settle_patiently(env)
             text = result_text(gone) + "\n" + travel.text()
             expect("arrives at" in text, "the capital road did not arrive: " + text[:400])
             family = await open_hub(player, channels["begin-here"], "family")
@@ -502,7 +710,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
             items = await open_hub(player, channels["begin-here"], "items")
             await items.goto("Use Item")
             used = await answer_steps(player, await items.press("Use"), picks={"Choose item": "Hearth-Return Talisman"})
-            await env.settle()
+            await settle_patiently(env)
             text = result_text(used) + "\n" + items.text()
             expect("standing inside" in text, text[:600])
             expect("📜 Quest progress: **" in text, "no quest line followed the reply: " + text[:600])
@@ -521,13 +729,13 @@ async def run(url: str, token: str, db_path: str) -> Report:
             expect(family is not None)
             await family.goto("Hearth")
             supported = await family.press("Support")
-            await env.settle()
+            await settle_patiently(env)
             text = result_text(supported) + "\n" + family.text()
             expect("❌" not in text, text[:400])
             contributed = await family.press("Contribute")
             expect(contributed.modal, "Contribute should ask the amount in a modal")
             done = await player.submit_modal(contributed, modal_values(contributed, Amount="1"))
-            await env.settle()
+            await settle_patiently(env)
             text = result_text(done) + "\n" + family.text()
             expect("go into" in text and "coffers" in text, text[:600])
             return text.split("Your standing:", 1)[1].splitlines()[0].strip() if "Your standing:" in text else ""
@@ -535,16 +743,34 @@ async def run(url: str, token: str, db_path: str) -> Report:
         if standing:
             report.add("PASS", "standing after the contribution", standing)
 
+        async def lesson():
+            expect(family is not None)
+            await family.goto("Hearth")
+            first = await family.press("Lesson")
+            await settle_patiently(env)
+            text = result_text(first) + "\n" + family.text()
+            expect("Check: **" in text and " vs TN " in text, "no check was printed: " + text[:600])
+            outcome = "pass" if "qualified at level 0" in text else "fail"
+            again = await family.press("Lesson")
+            await settle_patiently(env)
+            refusal = result_text(again) + "\n" + family.text()
+            expect("❌" in refusal, "a second ask was not refused: " + refusal[:400])
+            expect(("all this lesson holds" if outcome == "pass" else "ask again in") in refusal, refusal[:400])
+            return outcome
+        outcome = await step(report, "/family → Hearth → Lesson prints the head's check, and a second ask is refused either way", lesson())
+        if outcome:
+            report.add("PASS", "how the demonstration went (the dice, not the wiring)", outcome)
+
         async def back():
             expect(family is not None)
             await family.goto("Family")
             confirm = await family.press("Leave")
             await player.click(confirm.response.message, label="Yes, Leave")
-            await env.settle()
+            await settle_patiently(env)
             street = await open_hub(player, channels["begin-here"], "family")
             expect(section_button(street.message().components, "Enter") is not None, street.text()[:600])
             entered = await street.press("Enter")
-            await env.settle()
+            await settle_patiently(env)
             text = result_text(entered) + "\n" + street.text()
             expect("🏠 Entered" in text, text[:600])
             expect(household is not None and household.mention in text, "the reply does not name the household thread: " + text[:400])
@@ -555,7 +781,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
             expect(street is not None)
             confirm = await street.press("Leave")
             await player.click(confirm.response.message, label="Yes, Leave")
-            await env.settle()
+            await settle_patiently(env)
             travel = await open_hub(player, channels["begin-here"], "travel")
             gone = await travel.press("Go")
             picker = gone.response.message
@@ -564,7 +790,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
             elsewhere = [o for o in select["options"] if str(o.get("label")) != town]
             expect(elsewhere, f"only {town} is known; nowhere to walk")
             walked = await player.select(picker, [str(elsewhere[0]["value"])], custom_id=str(select["custom_id"]))
-            await env.settle()
+            await settle_patiently(env)
             text = result_text(walked) + "\n" + travel.text()
             expect("❌" not in text, text[:400])
             return " ".join(text.split())[:200]
@@ -572,7 +798,67 @@ async def run(url: str, token: str, db_path: str) -> Report:
         if note:
             report.add("PASS", "the road, for the record", note)
 
-        # ---- 8. a panel goes quiet ------------------------------------------------
+        # ---- 8. every leaf of every hub ------------------------------------------
+        # Everything above is scripted: a loop whose outcome matters, asserted
+        # on. This is generic: every leaf the hubs register, pressed once by a
+        # player with no plan, each input step answered with its first option,
+        # and one thing held for each - the reply is a result or a designed
+        # refusal, never the hub's own failure text and never an exception. A
+        # new leaf is covered the day it is registered. Admin goes last, under
+        # the GM, and every member picker is answered with a second member who
+        # has no character, so nothing here mutes, bans or erases the player
+        # the rest of the run walks. The panel is reopened per page so no
+        # view times out under a long sweep.
+        live = {action.path for definition in hub_registry.REGISTERED_HUBS for page in definition.pages for action in hub_registry._leaf_actions(page)}
+        pressed: dict[str, str] = {}
+        locked: dict[str, str] = {}
+        for definition in sorted(hub_registry.REGISTERED_HUBS, key=lambda d: d.name == "admin"):
+            actor = gm if definition.name == "admin" else player
+            for page in definition.pages:
+                leaves = [action for action in hub_registry._leaf_actions(page) if action.path not in DEFERRED_LEAVES]
+                for action in hub_registry._leaf_actions(page):
+                    if action.path in DEFERRED_LEAVES:
+                        report.add("SKIP", action.path, DEFERRED_LEAVES[action.path])
+                if not leaves:
+                    continue
+                panel = None
+                for attempt in (1, 2):
+                    try:
+                        opened = await open_hub(actor, channels["begin-here"], definition.name, env=env)
+                        await opened.goto(page.label, limit=len(definition.pages) + 1, env=env)
+                        panel = opened
+                        break
+                    except Exception as exc:  # noqa: BLE001 - a playtest reports, it does not crash
+                        if attempt == 2:
+                            report.add("FAIL", f"/{definition.name} → {page.label}", f"{type(exc).__name__}: {exc}")
+                        await settle_patiently(env)
+                if panel is None:
+                    continue
+                for action in leaves:
+                    name = f"{action.path}  ({definition.name} → {page.label})"
+                    try:
+                        status, note = await press_leaf(env, hub_registry, panel, action, member=other, channel=channels["begin-here"])
+                    except Exception as exc:  # noqa: BLE001 - a playtest reports, it does not crash
+                        report.add("FAIL", name, f"{type(exc).__name__}: {exc}")
+                        continue
+                    report.add("PASS", name, note)
+                    (pressed if status == "pressed" else locked)[action.path] = note
+                    if not panel.page_title().endswith(page.label):
+                        try:
+                            panel = await open_hub(actor, channels["begin-here"], definition.name, env=env)
+                            await panel.goto(page.label, limit=len(definition.pages) + 1, env=env)
+                        except Exception as exc:  # noqa: BLE001 - reported on the next leaf's press
+                            report.add("FAIL", f"reopen /{definition.name} → {page.label}", f"{type(exc).__name__}: {exc}")
+
+        async def covered():
+            missing = sorted(live - set(pressed) - set(locked) - set(DEFERRED_LEAVES))
+            expect(not missing, f"never pressed nor locked: {missing}")
+            return f"{len(pressed)} pressed, {len(locked)} locked, {len(DEFERRED_LEAVES)} deferred, of {len(live)} leaves"
+        note = await step(report, "every reachable leaf was pressed and every hidden one printed its lock line", covered())
+        if note:
+            report.add("PASS", "the sweep's count", note)
+
+        # ---- 9. a panel goes quiet ------------------------------------------------
         async def quiet():
             panel = await open_hub(player, channels["begin-here"], "family")
             await env.advance_time(901)
@@ -592,7 +878,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
         if note:
             report.add("PASS", "how it went quiet", note)
 
-        # ---- 9. nothing raised ----------------------------------------------------
+        # ---- 10. nothing raised ---------------------------------------------------
         async def clean():
             errors = list(env.errors)
             expect(not errors, "; ".join(f"{type(e).__name__}: {e}" for e in errors)[:800])

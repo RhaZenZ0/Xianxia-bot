@@ -207,6 +207,13 @@ def _explain_engine_error(exc: Exception) -> str:
         minutes = int(support.group("minutes"))
         days = max(1, -(-minutes // 1440))
         text = f"⏳ The household has given what it can for now — it can support you again in **{days} in-world day{'s' if days != 1 else ''}**."
+    # "the head will hear you again in 1300 in-world minutes" is the lesson's
+    # retry wait (v1.0.0-rc.34), game time like the support handout's.
+    lesson = re.search(r"the head will hear you again in (?P<minutes>\d+) in-world minutes", text)
+    if lesson:
+        minutes = int(lesson.group("minutes"))
+        hours = max(1, -(-minutes // 60))
+        text = f"⏳ The head of the house has said what there was to say today — ask again in **{hours} in-world hour{'s' if hours != 1 else ''}**."
     if "private residence or personal world" in text:
         # Spell these the way a player can actually reach them. The individual
         # gameplay commands are not registered with Discord - only the 16 hub

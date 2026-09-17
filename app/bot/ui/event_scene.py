@@ -330,7 +330,7 @@ class EventSceneView(discord.ui.View):
                 # Events spawned before the description was persisted still have
                 # their definition id, and the catalogue still has the prose.
                 definition=str(payload.get("definition_id") or "")
-                for candidate in WORLD.unexpected_events():
+                for candidate in WORLD.unexpected_events:
                     if str(candidate.get("id") or "")==definition:
                         description=str(candidate.get("description") or "").strip(); break
             objective=str(WORLD.event_site_objective(self.category) or "").strip()

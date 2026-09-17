@@ -225,6 +225,10 @@ OBJECTIVE_TYPES: dict[str, dict[str, Any]] = {
     # (v1.0.0-rc.32). Untargeted by construction: the household is the
     # player's own, and `birth_family:<id>` is not a catalogue location.
     "return_home": {"target": None, "label": "", "untargeted": "Return to your birth household"},
+    # Reported by `/family → Hearth → Lesson` only when the head's test is
+    # passed (v1.0.0-rc.34). Untargeted: the head of the house is the player's
+    # own, a generated name no catalogue could validate.
+    "family_lesson": {"target": None, "label": "", "untargeted": "Take the head of the house's last lesson and pass its test"},
 }
 SCENE_ACTION_KEYS = ("observe", "investigate", "influence", "stealth", "physical", "qi", "resolve", "aid")
 REWARD_KEYS = ("insight_xp", "spirit_stones", "items")
