@@ -83,6 +83,49 @@ class ResultPagesAndButtons(unittest.TestCase):
         self.assertEqual(hub_view.result_page, 0)
         self.assertEqual([a.path for a in hub_view.result_actions], ["/explore"])
 
+    def test_a_modal_result_edits_the_panel_and_deletes_the_placeholder(self):
+        """A modal opened from the panel submits with the panel as its message,
+        but its acknowledgement is a "thinking" placeholder. Editing the original
+        response put a second panel into the placeholder and left the real one
+        with buttons no view owned (v1.0.0-rc.33; found by the Discord playtest
+        on /family → Hearth → Contribute). The panel is edited directly and the
+        placeholder deleted, the way a picker's step message already was."""
+        import discord
+
+        _, hubs, _ = _modules()
+        calls = []
+
+        async def refresh_status(_):
+            return None
+
+        async def panel_edit(**kwargs):
+            calls.append(("panel.edit", sorted(kwargs)))
+            return "edited"
+
+        async def edit_original_response(**kwargs):
+            calls.append(("edit_original_response", sorted(kwargs)))
+            return "wrong message"
+
+        async def delete_original_response():
+            calls.append(("delete_original_response", []))
+
+        hub_view = SimpleNamespace(message=SimpleNamespace(id=1, edit=panel_edit), last_result="",
+                                   refresh_status=refresh_status, rebuild=lambda: None, is_layout_hub=True)
+        source = SimpleNamespace(
+            type=discord.InteractionType.modal_submit, message=SimpleNamespace(id=1),
+            response=SimpleNamespace(is_done=lambda: True), edit_original_response=edit_original_response,
+            delete_original_response=delete_original_response,
+        )
+        shown = asyncio.run(hubs._show_result_in_panel(source, hub_view, "🏠 **1 spirit stones** go into the coffers."))
+        self.assertEqual(shown, "edited")
+        self.assertEqual(calls, [("panel.edit", ["view"]), ("delete_original_response", [])])
+
+        # A button on the panel itself still edits through its own interaction.
+        calls.clear()
+        source.type = discord.InteractionType.component
+        asyncio.run(hubs._show_result_in_panel(source, hub_view, "✅ Done."))
+        self.assertEqual(calls, [("edit_original_response", ["view"])])
+
 
 class ThePanelBudget(unittest.TestCase):
     def test_every_page_with_a_paged_result_and_three_buttons_fits_discords_cap(self):

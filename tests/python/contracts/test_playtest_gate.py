@@ -5,7 +5,11 @@
 - the checklist under `docs/playtest/` is checked in for the current
   release and names every registered command;
 - the engine half of the playtest is a script in the tree that drives every
-  loop the roadmap names, and the two defects it found have regression tests.
+  loop the roadmap names, and the two defects it found have regression tests;
+- the Discord half (v1.0.0-rc.33) is a script beside it that boots the real
+  bot against a simulated Discord and drives the loops a player touches, sets
+  its environment before it imports the bot, and needs a dependency that never
+  reaches the production install.
 """
 from __future__ import annotations
 
@@ -20,6 +24,7 @@ LIMITATIONS = PROJECT_ROOT / "docs" / "KNOWN_LIMITATIONS.md"
 VERSION = (PROJECT_ROOT / "VERSION").read_text(encoding="utf-8").strip()
 CHECKLIST = PROJECT_ROOT / "docs" / "playtest" / f"v{VERSION}.md"
 ENGINE_SCRIPT = (PROJECT_ROOT / "scripts" / "playtest_engine.py").read_text(encoding="utf-8")
+DISCORD_SCRIPT = (PROJECT_ROOT / "scripts" / "playtest_discord.py").read_text(encoding="utf-8")
 
 
 class ThePunchListIsHonest(unittest.TestCase):
@@ -106,6 +111,40 @@ class TheEngineHalfIsAScriptInTheTree(unittest.TestCase):
     def test_it_never_targets_production_by_accident(self):
         self.assertIn("Never point it at the production database", ENGINE_SCRIPT)
         self.assertIn("--launch", ENGINE_SCRIPT)
+
+
+class TheDiscordHalfIsAScriptInTheTree(unittest.TestCase):
+    def test_it_drives_the_loops_the_checklist_names(self):
+        for marker in ("tree.get_commands", "**Administrator** permission", '"Basechannels"', 'slash(channels["begin-here"], "begin")',
+                       '"Open Character Form"', '"player-homes"', '"quests"', '"menu"', "🔒 Enter — you are already inside",
+                       '"Errand"', "typed_play_prefix", "typed_play_shorthand", '"cooldowns"', '"Realm Capitals"',
+                       "Hearth-Return Talisman", "📜 Quest progress", '"Support"', '"Contribute"', '"Enter"', "Yes, Leave",
+                       "Choose destination", "advance_time(901)", '"Reopen"', "env.errors"):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, DISCORD_SCRIPT)
+
+    def test_it_never_targets_production_by_accident(self):
+        self.assertIn("Never point it at the production database", DISCORD_SCRIPT)
+        self.assertIn("--launch", DISCORD_SCRIPT)
+
+    def test_it_sets_the_environment_before_it_imports_the_bot(self):
+        """`app/bot/runtime.py` builds the settings, the engine client and the
+        database at import, so the bot may only be imported inside `run()`,
+        after `_configure` has put the scratch engine into the environment."""
+        for line in DISCORD_SCRIPT.splitlines():
+            self.assertFalse(line.startswith(("from app", "import app")), f"a module-level bot import: {line!r}")
+        body = DISCORD_SCRIPT.split("async def run(", 1)[1]
+        self.assertLess(body.index("_configure(url, token, db_path)"), body.index("from app.bot import main"))
+
+    def test_simcord_is_a_dev_dependency_only(self):
+        dev = (PROJECT_ROOT / "requirements-dev.txt").read_text(encoding="utf-8")
+        self.assertIsNotNone(re.search(r"^simcord==\d", dev, re.M), "pinned, like everything else that is installed")
+        for name in ("requirements.txt", "requirements.lock"):
+            with self.subTest(file=name):
+                self.assertNotIn("simcord", (PROJECT_ROOT / name).read_text(encoding="utf-8"))
+        self.assertFalse(list((PROJECT_ROOT / "app").rglob("*.py")) and any(
+            "simcord" in path.read_text(encoding="utf-8") for path in (PROJECT_ROOT / "app").rglob("*.py")),
+            "nothing under app/ may import the simulated Discord")
 
 
 if __name__ == "__main__":

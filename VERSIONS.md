@@ -6,6 +6,28 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.0** (rc.33) runs the half of the playtest a player touches.
+
+`scripts/playtest_discord.py` boots the real bot inside SimCord, an in-memory Discord that runs
+discord.py's own machinery, against a scratch engine, and drives it only through what a player sees:
+the commands sync and every startup phase completes; `/admin` refuses a player and binds the eight
+base channels through a picker and a modal; `/begin` goes family, path, sex, form to a cultivator
+standing in a private household thread; every hub and `/menu` answer with a panel; `/family` inside
+hides Enter and prints why, hands over an errand, and Leave opens the expedition journal; `$ I
+explore` typed in the journal and the `x` shorthand from any channel dispatch; `/cooldowns` shows the
+live wait; from the capital the door is locked and the Hearth-Return Talisman carries the player
+home with the errand's `return_home` line after the reply; Support, Contribute, Enter from the town,
+the road; a panel expires to Reopen and reopens; and the bot raised nothing. Thirty-one steps, one
+line each, PASS or FAIL, beside the engine half. SimCord is a dev dependency only - nothing under
+`app/` imports it and the hash-locked install never carries it - and the harness stays a script,
+because the bot cannot boot without the Go engine that CI's python job does not have. Its first green
+run found what no source read had: a modal opened from a panel was acknowledged with a "thinking"
+placeholder, and the result was written into that placeholder as a second copy of the panel while the
+real panel kept buttons no view owned - dead until reopened, after every Contribute. The panel is
+edited directly now and the placeholder deleted. Two settings the harness has to raise are findings
+too: typed play in a private thread listens only with `AUTO_NARRATE`, and the per-player action
+meter is right for a person and wrong for a harness.
+
 **1.0.0** (rc.32) gives a soul back its hands, and a household its reasons.
 
 The craft echo: samsara used to wipe `profession_progress` before the new household tutored the new

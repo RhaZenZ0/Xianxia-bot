@@ -894,7 +894,20 @@ async def _show_result_in_panel(source: discord.Interaction, hub_view: Any, text
     hub_view.rebuild()
     panel = getattr(hub_view, "message", None)
     source_message = getattr(source, "message", None)
-    if source_message is not None and panel is not None and int(getattr(source_message, "id", 0)) == int(getattr(panel, "id", -1)):
+    # A modal opened from the panel submits with the panel as its message too,
+    # but its acknowledgement is the "thinking" placeholder, not the panel: so
+    # `edit_original_response` here put a second copy of the panel into the
+    # placeholder and left the real one showing buttons that no longer belonged
+    # to any view (rebuild() had cleared them) - one dead panel, one duplicate,
+    # after every modal (v1.0.0-rc.33; the Discord playtest found it on
+    # /family → Hearth → Contribute). A modal takes the direct edit below.
+    from_modal = getattr(source, "type", None) is discord.InteractionType.modal_submit
+    if (
+        not from_modal
+        and source_message is not None
+        and panel is not None
+        and int(getattr(source_message, "id", 0)) == int(getattr(panel, "id", -1))
+    ):
         if not source.response.is_done():
             return await source.response.edit_message(view=hub_view)
         return await source.edit_original_response(view=hub_view)

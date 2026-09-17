@@ -62,6 +62,8 @@ Other checks:
 
 ```bash
 python scripts/check_dashboard_implementation.py   # dashboard frontend/backend drift + coverage gate, part of the release gate
+python scripts/playtest_engine.py --launch         # the engine half of the playtest against a scratch engine
+python scripts/playtest_discord.py --launch        # the Discord half: the real bot under a simulated Discord (see below)
 python -m compileall -q app                        # compile-check production Python
 python -m json.tool content/world.json >/dev/null  # validate world content JSON
 make lock                                          # regenerate requirements.lock (uv) after editing requirements.txt; the Dockerfile installs it under --require-hashes
@@ -427,6 +429,42 @@ design. Two things are deferred, deliberately: relatives never age or die (that 
 pass over `birth_family_npcs`, which no batch reads today), and the family simulation still writes
 only `history_json` rather than `world_history_events`, because starter households are shared and
 the visibility of a shared family's news is a decision, not a default.
+
+### The Discord half of the playtest (`scripts/playtest_discord.py`, v1.0.0-rc.33)
+
+`scripts/playtest_engine.py` drives the roadmap's loops through the engine's HTTP API; everything a
+player actually touches - slash commands, the hub panels, their pickers and modals, private threads,
+typed lines - was a hand-ticked checklist that nothing ran. `playtest_discord.py` boots `app.bot`
+unmodified inside **SimCord** (`simcord==2.0.1`, MIT, only dependency `discord.py>=2.7.1`): an
+in-memory Discord that runs discord.py's real machinery, replacing exactly two seams - `bot.http` is a
+fake REST client over an in-memory model, and gateway events are fed straight into discord.py's own
+parsers, so `setup_hook` runs, `tree.sync(guild=GUILD)` registers into the fake, `on_ready` fires
+through normal dispatch, and a test actor fires `/family`, presses a panel's buttons, chooses from its
+selects, submits its modals and types `$ I explore`, then reads what came back. **Every loop goes
+through those surfaces**, never through a handler or a `DB` method: the point is the wiring the
+engine playtest cannot see. Nothing asserts on dice.
+
+Three rules hold it. **The environment is set before the bot is imported**: `app/bot/runtime.py`
+builds `SETTINGS`, `ENGINE` and `DB` at import and `bot.py` makes the singleton, so `_configure` puts
+the scratch engine, a numeric `GUILD_ID` (which `env.create_guild(id=…)` must repeat - `GUILD` is
+`discord.Object(id=SETTINGS.guild_id)`), a non-default `HEALTH_PORT`, `NARRATOR_PROVIDER=procedural`
+and the workers' off switches into `os.environ` first; `test_playtest_gate` holds that no module-level
+`app` import exists. **SimCord is a dev dependency only** (`requirements-dev.txt`, beside pytest and
+ruff): nothing under `app/` imports it, so `requirements.lock` and the Dockerfile's `--require-hashes`
+install never carry it, and the gate test holds all three. **It is a script, not CI**: the bot cannot
+boot without the Go engine and the CI `python` job has none, so like the engine half it is run
+before a release (`python scripts/playtest_discord.py --launch` builds and starts one).
+
+Two settings the harness raises are findings in their own right: typed play in a private thread
+listens only with `AUTO_NARRATE=true` and the message-content intent, and the per-player action meter
+(`TYPED_PLAY_BURST`/`TYPED_PLAY_PER_MINUTE`, about six a minute) refuses anything that presses sixty
+buttons in one - right for a person, and the harness says so. And its first green run found a bug no
+source read had: a modal opened from a panel (Contribute, a GM's category name) submits with the
+panel as its message, but is acknowledged with a "thinking" placeholder, and `_show_result_in_panel`
+edited the *original response* - so the placeholder became a second panel and the real one kept
+buttons `rebuild()` had already orphaned, dead until reopened. A modal now takes the direct
+`panel.edit` and the placeholder is deleted, the way a picker's step message always was;
+`test_gui_ii.py` holds it with a `modal_submit` source.
 
 ### People this world makes for itself (`npc_registry`, schema 49)
 
