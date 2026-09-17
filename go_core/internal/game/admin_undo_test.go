@@ -48,6 +48,22 @@ func TestAdminUndoLastSetRealmRestoresPriorRealmAndPhase(t *testing.T) {
 	}
 }
 
+func TestAdminUndoLastSetRealmRestoresTheBodyLadderItSet(t *testing.T) {
+	path := setupAdminDB(t)
+	addBodyLadderColumns(t, path)
+	applyAdmin(t, path, "admin.player.set_realm", map[string]any{"user_id": 42, "realm_index": 9, "phase": 4, "body_realm_index": 2, "body_phase": 7, "reason": "correction"})
+	undoLast(t, path)
+	if got := storage.ParseInt(scalar(t, path, "SELECT body_realm_index FROM characters WHERE user_id=42")); got != 0 {
+		t.Fatalf("body_realm_index=%d, want restored to the default 0", got)
+	}
+	if got := storage.ParseInt(scalar(t, path, "SELECT body_phase FROM characters WHERE user_id=42")); got != 1 {
+		t.Fatalf("body_phase=%d, want restored to the default 1", got)
+	}
+	if got := storage.ParseInt(scalar(t, path, "SELECT phase FROM characters WHERE user_id=42")); got != 3 {
+		t.Fatalf("phase=%d, want restored to seed value 3", got)
+	}
+}
+
 func TestAdminUndoLastTeleportRestoresPriorLocation(t *testing.T) {
 	path := setupAdminDB(t)
 	applyAdmin(t, path, "admin.player.teleport", map[string]any{"user_id": 42, "location": "Greenriver Town", "reason": "story move"})

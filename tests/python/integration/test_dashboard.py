@@ -300,6 +300,11 @@ class DashboardTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("player.set_bloodline", js)
         self.assertIn("player.set_physique", js)
         self.assertIn("player.set_tribulation", js)
+        # v1.0.0-rc.37: the realm card carries the body ladder, sent only as a pair.
+        self.assertIn('id="realmBodyIndex"', js)
+        self.assertIn('id="realmBodyPhase"', js)
+        self.assertIn("payload.body_realm_index=Number(bodyIndex);payload.body_phase=Number(bodyPhase)", js)
+        self.assertIn("(bodyIndex==='')!==(bodyPhase==='')", js)
         # Backup restore + debuff/condition clearing.
         self.assertIn("backup.restore", js)
         self.assertIn("player.clear_condition", js)

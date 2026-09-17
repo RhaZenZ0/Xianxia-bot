@@ -588,11 +588,38 @@ The homestead is the only buildable property type, founded at rank 40 in a norma
 auction house; `abode.focus` grants an effect for four rooms and none for the rest, and the harness
 holds both. Every outcome that is a roll (the recommendation, the war's siege and morale) is reported.
 
-What is deferred, and to what: progression (perfection and a tribulation attempt need the stage filled
-with essence, the aptitudes a bloodline at progress 100, a personal world Space Law at 100%; one PR),
-and what only the world makes (a wild beast encounter, a bounty pursuit, a missing NPC - no GM lever
-writes those rows, only the batches and the hunt roll; one PR that forces them in a bounded loop and
-holds the designed refusal when none appears).
+**Progression (v1.0.0-rc.37)** emptied the second. Four facts decide its shape, and none of them is
+where a source read would look. **The qi stage is filled by a lever and the body stage is not**:
+`cultivation.reward` adds to `characters.cultivation`, but nothing except `cultivation.body_train`
+writes `body_cultivation`, so the body path trains its stage full (about ten sessions at body 0/9,
+`cooldown_seconds: 1` because the floor is 300 only at or below zero) while the qi path is handed 400.
+The body ladder itself had no lever at all - `admin.player.set_realm` set the qi pair only - so it
+gained an optional `body_realm_index`/`body_phase` pair, refused one without the other, carried in the
+audit row and restored by the undo; the dashboard's realm card sends them only when both are filled.
+**A perfection quest is a roll no lever can fix**: `canonicalAttribute` carries effects, arrays, a
+root mutation and a bloodline, never the realm, so a quest is attr+2 (+1 when both ladders stand on
+the same stage) against TN 13-18 on 2d10. Each is prepared to its requirement, then attempted on a
+bounded loop; the preparation survives a failed roll. **The trial's gate is `completed_quests == 7
+and progress == 100`**, and `admin.player.set_realm_perfection` writes `progress` alone, so it cannot
+open it: the harness drives the trial when the dice allowed every quest and holds it locked when they
+did not, and says which. The last twenty of the hundred come only from training at stage 9 while the
+path is active (`perfectionTraining`, cap 20, one to three a session), on a stage that is already
+full - training refuses nothing there, it gains zero essence and still credits the path. `abandon`
+deletes only a row with `completed=0`, so a perfected realm is kept. **A tribulation attempt burns
+nothing but the preparation**: five points of the departure world's stone (`low_spirit_stone` at the
+Mortal gate), a sixth refused, three waves at TN 17-19 needing two, each failed wave a condition
+(`meridian_damage`, `heart_demon`, `soul_wound`) that `condition.treat` clears with the herb or pill
+`conditionDefinitionGo` names - the harness grants both first so a failed wave is treated rather than
+refused. The aptitude rows differ by birth: every character has a root and a physique row, a
+bloodline row only if creation rolled one, and `admin.player.set_bloodline` edits a row that exists,
+so the harness reads which world it is in and drives the real path or the four designed refusals.
+Space Law is supreme (floor Nirvana, realm 11; a fixed two-hour cooldown), and every `law.comprehend`
+gains at least a point, so 100% is a bounded climb with `reset_cooldowns` between; the world itself
+wants Dao Saint (realm 30), is keyed `personal_world:<user_id>`, and `leave` lands at Greenriver Town.
+
+What is deferred, and to what: what only the world makes (a wild beast encounter, a bounty pursuit,
+a missing NPC - no GM lever writes those rows, only the batches and the hunt roll; one PR that forces
+them in a bounded loop and holds the designed refusal when none appears).
 
 ### People this world makes for itself (`npc_registry`, schema 49)
 
