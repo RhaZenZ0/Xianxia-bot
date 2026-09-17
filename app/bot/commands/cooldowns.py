@@ -75,6 +75,7 @@ FAMILY_LABELS: dict[str, tuple[str, str, str]] = {
     "road_transit": ("🛣️", "On the road", "**/travel**"),
     "seclusion": ("🚪", "Closed-door seclusion", "**/cultivation → Cultivate → Status**"),
     "sect_trial_retry": ("🏯", "Sect entrance trial", "**/sect → Recruitment → Trial**"),
+    "family_lesson_retry": ("🏠", "The head of the house's lesson", "**/family → Hearth → Lesson**"),
     "secret_realm_run": ("🌀", "Secret realm seal", "**/realm → Secret Realms → Status**"),
     "reincarnation": ("🪷", "Samsara", "**/character → Samsara → Reincarnate**"),
     "muted": ("🤐", "Muted by a GM", ""),

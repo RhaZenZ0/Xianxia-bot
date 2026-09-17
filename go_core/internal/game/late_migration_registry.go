@@ -78,6 +78,8 @@ func applyLateMigrationAction(conn *storage.Conn, catalog worlddata.Catalog, use
 		return familyTutorActionGo(conn, catalog, userID, raw)
 	case "family.errand":
 		return familyErrandActionGo(conn, catalog, userID, raw)
+	case "family.lesson":
+		return familyLessonActionGo(conn, catalog, userID, raw)
 	case "seclusion.start":
 		return seclusionStartActionGo(conn, catalog, userID, raw)
 	case "seclusion.settle":

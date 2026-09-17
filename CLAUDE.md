@@ -430,6 +430,57 @@ pass over `birth_family_npcs`, which no batch reads today), and the family simul
 only `history_json` rather than `world_history_events`, because starter households are shared and
 the visibility of a shared family's news is a decision, not a default.
 
+### The last lesson (`household_lesson.go`, v1.0.0-rc.34)
+
+The beginner path walked a new cultivator out of the household, through the town and the road, and
+home again — and then stopped. Nobody in the house had ever spoken to them as a teacher: the send-off
+hands over an heirloom, one trade's entry methods and a tutoring band, and the head of the family
+(`birth_families.head_title` and `head_name`) was a line in `/family → View` and nothing else. And a
+fresh cultivator could craft only in the household's own trade, because `craft.resolve` refuses any
+method they do not know and the other three trades were bought into from slips.
+
+`family.lesson` is the head of the house speaking to their child, at home, once per life:
+`/family → Hearth → Lesson`, the fifth and last stage of the path (`beginner_lesson`, reached through
+`beginner_home`'s `follow_on`). **The conversation is the action.** Every line the head speaks is
+content (`birth_family_lesson` in `world.json`, one entry per archetype: `lesson`, `test`, `pass`,
+`fail`, `story`, plus the house's `manual` and `keepsake`); Python prints and nothing is decided in
+presentation. The head is deliberately not a talkable NPC: `combatTargetsGo` already stands the head in
+the home city as a `family_head` target and `combat_aftermath.go` retires a killed one to "Vacant
+Ancestral Seat", and a registry row would have to follow both.
+
+- **The test** is one demonstration check on the attribute the family's trade lives on (Forging →
+  body, Inscription → will, Formation → spirit, Alchemy → insight; `householdLessonAttribute`), through
+  `canonicalAttribute` + `rollCheck` like a Scene Action: modifier = attribute + the trade's
+  `profession_progress.level` + `min(2, standing/10)`, against TN 10 (`householdLessonTN`), which a
+  fresh character clears about three times in four. **A failure costs one world day and nothing
+  else** (`householdLessonRetryGameMinutes` = 1440, the sect trial's own wait): the wait is read off
+  the attempt, the cooldown card lists it as `family_lesson_retry`, and `_explain_engine_error` says
+  it in hours.
+- **Passing qualifies the cultivator at level 0 in all four trades**: a `profession_progress` row in
+  each where there was none (never lowered — the tutoring rule) and every trade's entry methods
+  (`teachTradeMethodsTx`, the one helper the send-off now shares, source `family_lesson`), so `/craft`
+  works in any trade. Then **the technique of the house**: the family's manual (realm 0, never
+  Demonic — `manualForbidden` would cost a child karma on first study, and the engine refuses such
+  content outright; `test_household_lesson.py` holds it) goes into the inventory and its first-study
+  row is written, so its mastery-0 technique is usable at once. Then **the story and a keepsake**: the
+  house's own history into `history_json`, a per-trade keepsake item (`market_excluded`), and +5
+  standing.
+- **The record is the event log, per life.** `family.lesson` rows in `event_log` carry the attempt,
+  its game minute and `soul_legacy.incarnation_count` (1 in a first life); a pass is refused again only
+  in the life that earned it, so samsara — which wipes the trades and the methods — lets a new life
+  take the lesson again without deleting any log. No schema.
+- **Grandfathering happens at the door.** A boot migration cannot hand a *quest* over — the stage is
+  seeded by the bot after the engine starts, and `grantOrdinaryQuestTx` treats a missing definition as
+  "no" — so `catchUpBeginnerPathTx` runs when the lesson is passed: any stage whose predecessor is
+  completed and which was never given is handed over in the same transaction, and the reporter
+  completes and pays it. Somebody who finished "The Road Home" before rc.34 gets "The Last Lesson"
+  the moment they ask for it.
+
+`family_lesson` is an objective type reported only on a pass, after the reply.
+`household_lesson_test.go` lends the dice (`gamerng.UseRoller`) and holds every rule above; the two
+playtest harnesses assert only what is certain either way — the check is printed, and the second ask is
+refused, as "already taught" after a pass or as the wait after a fail.
+
 ### The Discord half of the playtest (`scripts/playtest_discord.py`, v1.0.0-rc.33)
 
 `scripts/playtest_engine.py` drives the roadmap's loops through the engine's HTTP API; everything a

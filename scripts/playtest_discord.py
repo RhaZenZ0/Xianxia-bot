@@ -535,6 +535,24 @@ async def run(url: str, token: str, db_path: str) -> Report:
         if standing:
             report.add("PASS", "standing after the contribution", standing)
 
+        async def lesson():
+            expect(family is not None)
+            await family.goto("Hearth")
+            first = await family.press("Lesson")
+            await env.settle()
+            text = result_text(first) + "\n" + family.text()
+            expect("Check: **" in text and " vs TN " in text, "no check was printed: " + text[:600])
+            outcome = "pass" if "qualified at level 0" in text else "fail"
+            again = await family.press("Lesson")
+            await env.settle()
+            refusal = result_text(again) + "\n" + family.text()
+            expect("❌" in refusal, "a second ask was not refused: " + refusal[:400])
+            expect(("all this lesson holds" if outcome == "pass" else "ask again in") in refusal, refusal[:400])
+            return outcome
+        outcome = await step(report, "/family → Hearth → Lesson prints the head's check, and a second ask is refused either way", lesson())
+        if outcome:
+            report.add("PASS", "how the demonstration went (the dice, not the wiring)", outcome)
+
         async def back():
             expect(family is not None)
             await family.goto("Family")

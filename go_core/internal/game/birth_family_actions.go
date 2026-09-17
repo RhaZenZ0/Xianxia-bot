@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"sort"
 	"strings"
 	"time"
 
@@ -771,30 +770,10 @@ func teachHouseholdMethodsTx(conn *storage.Conn, catalog worlddata.Catalog, user
 	if trade == "" {
 		return nil
 	}
-	world := householdWorldTx(conn, catalog, familyID)
-	taught := map[string]bool{}
-	for name, recipe := range catalog.Recipes {
-		if recipe.Profession == trade && recipe.MinLevel <= 0 {
-			taught[name] = true
-		}
-	}
-	if local, ok := entryRecipeForWorld(catalog, trade, world); ok {
-		taught[local] = true
-	}
-	names := make([]string, 0, len(taught))
-	for name := range taught {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-	for _, name := range names {
-		if _, err := conn.Execute(
-			`INSERT INTO character_recipes(user_id,recipe,learned_game_minute,source,created_at)
-			 VALUES(?,?,?,'birth_family',?) ON CONFLICT(user_id,recipe) DO NOTHING`,
-			[]any{userID, name, maxI64(0, gameMinute), now}); err != nil {
-			return err
-		}
-	}
-	return nil
+	// One helper with the head's lesson (household_lesson.go, v1.0.0-rc.34),
+	// which teaches all four trades the same way.
+	_, err := teachTradeMethodsTx(conn, catalog, userID, trade, householdWorldTx(conn, catalog, familyID), "birth_family", gameMinute, now)
+	return err
 }
 
 // entryRecipeForWorld is the easiest method of a craft that a given world's own

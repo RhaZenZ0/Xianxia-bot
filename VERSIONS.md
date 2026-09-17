@@ -6,6 +6,22 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.0** (rc.34) lets the head of the house teach and test the new cultivator.
+
+The beginner path ended at the door: nobody in the house had ever spoken to the child as a teacher,
+and a fresh cultivator could craft only in the household's own trade, because the engine refuses any
+method they do not know and the other three trades were bought into from slips. The path now ends
+with a fifth stage, "The Last Lesson": at home, `/family → Hearth → Lesson` is the head of the house
+speaking, in words that are content, one entry per birth family. The test is one demonstration check
+on the attribute the family's trade lives on, and a failure costs one world day and nothing else.
+Passing qualifies the cultivator at level 0 in all four trades - a profession record in each, never
+lowered, and every trade's entry methods - hands over the house's own manual studied once, so its
+first technique is usable at once, tells the story of the house into its chronicle, leaves a keepsake,
+and raises standing. Once per life, kept in the event log against the soul's incarnation count, so
+samsara lets a new life take it again; and grandfathered at the door, so somebody who finished the
+road home before this release is handed the stage the moment they ask. `family_lesson` is a new
+objective type reported only on a pass; the wait shows on the cooldown card. No schema change.
+
 **1.0.0** (rc.33) runs the half of the playtest a player touches.
 
 `scripts/playtest_discord.py` boots the real bot inside SimCord, an in-memory Discord that runs

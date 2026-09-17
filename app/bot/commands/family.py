@@ -366,6 +366,54 @@ async def birth_family_errand(interaction:discord.Interaction)->None:
         ephemeral=False)
 
 
+@registered_group_command(family_group, name="lesson",description="Speak with the head of the house for your last lesson and its test (at home; once per life)")
+@serialized_user_action
+async def birth_family_lesson(interaction:discord.Interaction)->None:
+    await interaction.response.defer(ephemeral=False)
+    if not await require_character(interaction): return
+    wt=await current_world_time()
+    try:
+        envelope=await ENGINE.authoritative_action("family.lesson",interaction.user.id,{},action_id=f"discord:{interaction.id}:family.lesson")
+        result=dict(envelope.get("result") or {})
+    except GameEngineError as exc:
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return
+    lines=dict(result.get("lines") or {}); check=dict(result.get("check") or {})
+    head=" ".join(part for part in (str(result.get("head_title") or ""), str(result.get("head_name") or "")) if part).strip() or "The head of the house"
+    attribute=str(result.get("attribute") or "").title()
+    text=(f"🏠 **{head}** — *{lines.get('lesson','')}*\n*{lines.get('test','')}*"
+          f"\nCheck: **{attribute} {check.get('total','?')} vs TN {check.get('tn','?')}** — {check.get('degree','')}")
+    if result.get("outcome")!="pass":
+        # The engine's wait is in world minutes; 1440 is MINUTES_PER_DAY.
+        days=max(1,-(-int(result.get("retry_game_minutes",1440))//1440))
+        await interaction.followup.send(
+            text+f"\n*{lines.get('fail','')}*\n-# The head will hear you again in **{days} in-world day{'s' if days!=1 else ''}**.",
+            ephemeral=False)
+        return
+    trades=[]
+    for row in list(result.get("trades") or []):
+        row=dict(row); note=[]
+        if row.get("new_record"): note.append("new")
+        if int(row.get("new_methods",0) or 0)>0: note.append(f"{int(row['new_methods'])} method{'s' if int(row['new_methods'])!=1 else ''}")
+        trades.append(f"{row.get('profession','')}"+(f" ({', '.join(note)})" if note else ""))
+    manual=dict(result.get("manual") or {})
+    keepsake=str(result.get("keepsake") or "")
+    text+=f"\n*{lines.get('pass','')}*"
+    text+=f"\n🛠️ You stand **qualified at level 0** in every trade: {', '.join(trades) or 'Forging, Inscription, Formation, Alchemy'}."
+    text+=(f"\n📖 The house's manual, **{manual.get('name','')}**, is in your hands and studied once"
+           f"{'' if manual.get('first_study') else ' more'}; practise it with **/cultivation → Arts → Study**.")
+    if keepsake:
+        text+=f"\n🎁 Keepsake: **{WORLD.item_name(keepsake)}**."
+    if result.get("story"):
+        text+=f"\n📜 *{result.get('story')}*"
+    text+=f"\nYour standing: **{result.get('standing_band','')}** ({int(result.get('standing',0)):+d}, +{int(result.get('standing_gain',0))})."
+    await reply_long(interaction, text)
+    # The stage's objective is the pass, reported after the reply (v1.0.0-rc.34).
+    try:
+        await announce_quest_progress(interaction, await QUESTS.progress(interaction.user.id, "family_lesson", game_minute=wt.total_minutes))
+    except Exception:
+        log.exception("Quest progress update failed after the head's lesson")
+
+
 @registered_group_command(family_group, name="history",description="View recent rises, setbacks and political changes in your family")
 async def birth_family_history(interaction:discord.Interaction)->None:
     if not await require_character(interaction,allow_deceased=True):return

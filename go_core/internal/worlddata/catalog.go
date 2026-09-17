@@ -491,6 +491,21 @@ type HouseholdErrand struct {
 	Opening  string `json:"opening"`
 }
 
+// BirthFamilyLesson is the head of the house's last lesson and test
+// (v1.0.0-rc.34), keyed by archetype: the family's own manual (realm 0, never
+// forbidden - a child's first lesson costs no karma), the keepsake left in the
+// child's hands, and the five things the head says - the lesson, what the test
+// demands, the pass, the fail, and the story of the house.
+type BirthFamilyLesson struct {
+	Manual   string `json:"manual"`
+	Keepsake string `json:"keepsake"`
+	Lesson   string `json:"lesson"`
+	Test     string `json:"test"`
+	Pass     string `json:"pass"`
+	Fail     string `json:"fail"`
+	Story    string `json:"story"`
+}
+
 // BirthFamilySendoff is what a household puts in a child's hands on the day
 // they leave it (v1.0.0-rc.15). Every archetype has one and no two share an
 // item: which flying artifact a family owns *is* the family - a tomb-watch
@@ -736,6 +751,7 @@ type Catalog struct {
 	BirthFamilySendoff  map[string]BirthFamilySendoff  `json:"birth_family_sendoff"`
 	BeginnerPath        []BeginnerStage                `json:"beginner_path"`
 	HouseholdErrands    map[string][]HouseholdErrand   `json:"household_errands"`
+	BirthFamilyLessons  map[string]BirthFamilyLesson   `json:"birth_family_lesson"`
 	GeneratedTraits     GeneratedTraits                `json:"npc_generated_traits"`
 	NPCs                map[string]NPCDefinition       `json:"npcs"`
 	TechniqueSystem     TechniqueSystemDefinition      `json:"technique_system"`

@@ -388,7 +388,7 @@ _HUB_DEFINITIONS = (
                             "family clan", "family descendants", "family child")),
             _hub_page("family", "Hearth", "What the house gives to somebody standing in it (v1.0.0-rc.32): its support, its coffers, its teaching and its errands.",
                       key="family_hearth",
-                      only=("family support", "family contribute", "family tutor", "family errand")),
+                      only=("family support", "family contribute", "family tutor", "family errand", "family lesson")),
             _hub_page("family", "House", "The cultivation house you found with other players, as distinct from the household you were born into: its seat order, its invitations and its children.",
                       key="family_house",
                       only=("family house status", "family house found", "family house invite",
@@ -810,7 +810,7 @@ register_menu_facts(_menu_facts)
 # Named as the leaves are, without the slash a hint path carries: these are
 # matched against `HubAction.path`, never printed to a player.
 HOUSEHOLD_DOOR = "family enter"
-HOUSEHOLD_INDOOR_ACTIONS = ("family leave", "family support", "family contribute", "family tutor", "family errand")
+HOUSEHOLD_INDOOR_ACTIONS = ("family leave", "family support", "family contribute", "family tutor", "family errand", "family lesson")
 
 
 def _action_paths(reason: str, *names: str) -> dict[str, str]:

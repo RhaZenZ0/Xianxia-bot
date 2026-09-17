@@ -26017,6 +26017,34 @@
       "sect_value": 12,
       "base_price": 40,
       "teaches_recipe": "Waymark Talisman"
+    },
+    "first_hammer_token": {
+      "name": "First-Hammer Token",
+      "description": "A thumb-sized iron token struck on the household's own anvil the day a child of the house was judged fit to work it. It was never for sale, and the market knows it.",
+      "sect_value": 4,
+      "base_price": 12,
+      "market_excluded": true
+    },
+    "first_brush_seal": {
+      "name": "First-Brush Seal",
+      "description": "A small soapstone seal cut with the household's mark, the first thing a child of the house is trusted to stamp. It was never for sale, and the market knows it.",
+      "sect_value": 4,
+      "base_price": 12,
+      "market_excluded": true
+    },
+    "household_array_plate": {
+      "name": "Household Array Plate",
+      "description": "A palm-sized jade plate etched with the first array the house teaches, worn smooth by every hand that traced it. It was never for sale, and the market knows it.",
+      "sect_value": 4,
+      "base_price": 12,
+      "market_excluded": true
+    },
+    "old_cauldron_vial": {
+      "name": "Old-Cauldron Vial",
+      "description": "A stoppered vial of scrapings from the household's oldest cauldron, given to a child the day they are trusted to tend it. It was never for sale, and the market knows it.",
+      "sect_value": 4,
+      "base_price": 12,
+      "market_excluded": true
     }
   },
   "recipes": {
@@ -63953,6 +63981,125 @@
       "trade": "Formation"
     }
   },
+  "birth_family_lesson": {
+    "fallen_martial_clan": {
+      "manual": "azure_cloud_foundation_sword_canon",
+      "keepsake": "first_hammer_token",
+      "lesson": "Your uncle is not the head of this house; I am, whatever the wall says. Sit. A clan that has fallen still remembers how a thing is made, and you are going to make it remember through you.",
+      "test": "Take the cracked blade down and hold it out at arm's length, edge level, until I say stop. A smith's arm does not shake, whatever the smith is thinking.",
+      "pass": "Good. It did not move. Your grandfather held it the same way the night before it cracked, and he was not ashamed either.",
+      "fail": "It moved. Put it back on the wall and come again tomorrow; the wall has waited longer than a day.",
+      "story": "This house held the eastern gate for four generations, until a sect elder's disciple took offence at a word and the clan's best sword was broken across his knee. Nobody outside remembers the word. Everybody inside does."
+    },
+    "tomb_watch_clan": {
+      "manual": "jade_meridian_formation_canon",
+      "keepsake": "first_brush_seal",
+      "lesson": "The dead do not need us. That is the first thing to unlearn. They need the living to keep the wards straight, and a ward is only a line drawn by someone who did not flinch.",
+      "test": "Draw the sealing stroke on the slate, once, without lifting the brush. I am going to speak the names of the buried while you do it.",
+      "pass": "Straight. You heard the names and your hand stayed with the stroke. That is the whole of the work.",
+      "fail": "The line wandered when I said your grandmother's name. It will not, tomorrow. Come back then.",
+      "story": "The clan was given the tombs to watch because it was the only family that would take the work, and it has kept them for two hundred years against thieves who were sometimes its own cousins. The graves it has emptied itself are not spoken of, and are all accounted for."
+    },
+    "body_tempering_family": {
+      "manual": "advanced_orthodox_009_body_refiner",
+      "keepsake": "old_cauldron_vial",
+      "lesson": "Your father said step, so you stepped, and now you have walked far enough to know what a body costs. The pills that put it back are the other half of what this house does. Sit and look.",
+      "test": "Three herbs on the table, one of them wrong for the furnace. Tell me which, and tell me why, before the water boils.",
+      "pass": "The bitterroot. Yes. Because the furnace is hot and bitterroot turns to poison above a simmer. You looked before you spoke; keep doing that.",
+      "fail": "You chose the wrong one, and quickly. The water will boil again tomorrow.",
+      "story": "There was a year the whole household went hungry so the eldest son could be fed for a tempering that took a season. He died of it anyway, at the end of the season, standing up. The pills this house makes now are the ones it wishes it had made then."
+    },
+    "border_garrison_family": {
+      "manual": "advanced_orthodox_001_sword_cultivator",
+      "keepsake": "household_array_plate",
+      "lesson": "A garrison is an array with people in it. You have been standing in the array your whole life without seeing the lines; now you are going to see them.",
+      "test": "Close your eyes and tell me where the four watch-posts are from here, by the feel of the qi that runs between them, not by memory.",
+      "pass": "All four. And you turned toward the north post before you named it, which means you felt it and did not guess. Good.",
+      "fail": "Two of four, and one of those was memory. Sleep on it and come back tomorrow.",
+      "story": "The family held the border wall through three incursions and lost half its men in the second. The array that stands there now was laid out by a widow of this house with a stick in the mud, and the garrison has never let anyone move a stone of it."
+    },
+    "martial_household": {
+      "manual": "azure_cloud_foundation_sword_canon",
+      "keepsake": "first_hammer_token",
+      "lesson": "You have made one thing on the road that did not fall apart. I want to know whether that was luck. Sit down; the forge can wait a little longer.",
+      "test": "Hold the hammer straight out, head up, and count with me to twenty. Slowly.",
+      "pass": "Twenty. The hammer did not dip. That is the arm this house has always had, and it is yours now.",
+      "fail": "Fourteen. The rest of the way is a day's rest and an early morning. I will be here.",
+      "story": "Nobody in this house was ever famous, and that was deliberate. A martial household that is not famous is not challenged, and one that is not challenged gets to keep its children. Your great-grandmother put that rule on the wall, and it has cost us exactly one duel in sixty years, which we won."
+    },
+    "spear_guard_family": {
+      "manual": "advanced_orthodox_001_sword_cultivator",
+      "keepsake": "first_hammer_token",
+      "lesson": "A spear is only a bar of iron with an opinion. The opinion is what this house forges. Sit, and let me tell you what it is.",
+      "test": "Take the practice spear and hold it level by the very end, one-handed, while I walk once round the table.",
+      "pass": "Level all the way round. Your arm has the opinion now. The rest is heat and hammer.",
+      "fail": "It dipped when I passed behind you. Tomorrow you will know where I am without looking.",
+      "story": "The family took its name from a single night at the river ford, when eleven of its spears stopped a raiding column until the town's militia woke up. Nine of the eleven were buried the next morning, and the two who lived started this house on the pension."
+    },
+    "sword_hall_family": {
+      "manual": "advanced_orthodox_025_sword_cultivator",
+      "keepsake": "first_hammer_token",
+      "lesson": "The hall teaches the sword to strangers for money. It teaches its own children how a sword is born, which is harder and pays worse. Sit.",
+      "test": "Draw the practice sword and hold the guard position until the incense finishes. Do not adjust your grip once you have it.",
+      "pass": "The incense is out and the grip is the same. The hall would take you as a student; the house takes you as a smith.",
+      "fail": "You changed your grip twice. A day's rest, and we try the incense again.",
+      "story": "The hall was founded by a swordsman who lost his right hand and learned to forge with his left rather than stop touching swords. Every blade with the hall's mark on it still carries a nick in the fuller where he liked to rest his thumb."
+    },
+    "hidden_weapon_family": {
+      "manual": "frozen_moon_first_frost_sutra",
+      "keepsake": "first_brush_seal",
+      "lesson": "Everything this house makes is small, and everything small is inscribed, because a needle that is not inscribed is only a needle. Sit, and keep your hands where I can see them.",
+      "test": "Write the family mark on a grain of rice while I tell you, in detail, exactly what happens to people who sell our marks.",
+      "pass": "Legible, on a grain of rice, and you did not once look up. You will do.",
+      "fail": "Your hand stopped at the part about the river. Tomorrow you will hear it again, and it will not.",
+      "story": "The family has never been caught, which is not the same as never being suspected. Three generations ago it turned down a sect's offer of protection, and the sect elder who made it went home with a fan he did not remember accepting."
+    },
+    "weaponsmith_martial_family": {
+      "manual": "crimson_furnace_ember_tempering_record",
+      "keepsake": "first_hammer_token",
+      "lesson": "You left with a sword we proved on the anvil. I want to know if the anvil proved you. Sit, and put your hands on the table where I can see the burns.",
+      "test": "Lift the small anvil from the floor to the bench, set it down without a sound, and lift it back.",
+      "pass": "Not a sound either way. That bench has been set down on harder than that by softer arms than yours.",
+      "fail": "It rang. Tomorrow you lift it again, and it will not.",
+      "story": "The house's founder made swords for both sides of a sect war and was executed by the winners for it, and the family has taken no side in anything since. It makes the best plain blade in the province and puts nobody's crest on it."
+    },
+    "nether_market_house": {
+      "manual": "black_serpent_venom_fang_primer",
+      "keepsake": "first_brush_seal",
+      "lesson": "The market runs on paper. Contracts, seals, the little talismans that say a thing is what it claims to be. Half of them are honest. Sit, and learn to tell which half.",
+      "test": "Here are two seals, one true and one a copy. Put your thumb on the false one, and do not take your time about it.",
+      "pass": "That one. And you did not hesitate, which matters more than being right; a hesitating buyer is already robbed.",
+      "fail": "You chose the true one. So would most people, which is the point. Tomorrow.",
+      "story": "The house was a respectable ink-seller until a debt to the wrong people turned its back room into a market for things without receipts. It has been paying that debt in kind for eighty years, and has quietly become the only thing in the district the wrong people are afraid of."
+    },
+    "escort_martial_family": {
+      "manual": "thousand_beast_bond_scripture",
+      "keepsake": "household_array_plate",
+      "lesson": "An escort does not fight. An escort arranges things so that the fight does not happen, and that is a formation the same as any chalked on a floor. Sit.",
+      "test": "Feel for the ward-lines on the cargo skiff from here, and tell me which corner is weakest before I tell you which corner the last thief chose.",
+      "pass": "The stern-left. That is where he cut it, too. You felt it before I said; that is the sense this house lives on.",
+      "fail": "The bow. He went in at the stern. Tomorrow you will feel the difference.",
+      "story": "The family's first contract was a coffin, carried three hundred li to a village that had paid in advance and could not be told the road was closed. It arrived. Every contract since has been the same contract, with a different cargo."
+    },
+    "alchemy_family": {
+      "manual": "crimson_furnace_ember_tempering_record",
+      "keepsake": "old_cauldron_vial",
+      "lesson": "A hired tutor taught you the pills. I am going to teach you the thing a tutor cannot, which is when to throw a batch away. Sit. Watch the furnace, not me.",
+      "test": "The furnace has been running an hour. Tell me, from the colour of the flame alone, whether this batch lives or dies.",
+      "pass": "Dies - the flame went blue at the edge, and you saw it. Half the alchemists in the city would have bottled that.",
+      "fail": "You said it lives. It does not, and a customer would have found that out for you. Tomorrow.",
+      "story": "The house made its fortune on a fever cure and nearly lost it on the same cure, the year a batch went out untested and a child died of it. The family paid the funeral, closed for a season, and has thrown away one batch in ten ever since, on principle."
+    },
+    "noble_martial_clan": {
+      "manual": "advanced_orthodox_025_sword_cultivator",
+      "keepsake": "household_array_plate",
+      "lesson": "A master was retained to teach you the arrays. He was paid; I am not. The difference is that I will tell you what the arrays are for, which he was not permitted to. Sit.",
+      "test": "Trace the clan's gate-array in the air, and hold the spirit in it until the sand runs out. If the pattern frays, stop.",
+      "pass": "The sand is out and the pattern is whole. That array has held the gate for nine generations, and now it has been held by you.",
+      "fail": "It frayed at the third turn. That turn is where everyone frays. Tomorrow.",
+      "story": "The Qin sword was given to the clan's founder by an emperor who needed a family that would guard a gate without asking what was behind it. The clan has never asked. It is still not entirely sure it wants to know."
+    }
+  },
   "beginner_path": [
     {
       "quest_key": "beginner_household",
@@ -64077,6 +64224,25 @@
         "items": {
           "hearth_return_talisman": 1
         }
+      },
+      "follow_on": "beginner_lesson"
+    },
+    {
+      "quest_key": "beginner_lesson",
+      "title": "The Last Lesson",
+      "description": "The road has taught you what it could. Now the head of the house wants a word: stand in the household and ask for the last lesson with **/family → Hearth → Lesson**. There is a test in it, and failing only costs a day.",
+      "opening": "You are called in before you have finished putting your things down. The head of the house has cleared the table of everything but two cups, and one of them is for you.",
+      "objectives": [
+        {
+          "id": "lesson",
+          "type": "family_lesson",
+          "count": 1,
+          "label": "Take the head of the house's last lesson and pass its test - **/family → Hearth → Lesson**"
+        }
+      ],
+      "rewards": {
+        "insight_xp": 40,
+        "spirit_stones": 30
       },
       "follow_on": ""
     }

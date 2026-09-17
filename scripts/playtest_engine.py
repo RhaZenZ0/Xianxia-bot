@@ -192,6 +192,23 @@ async def run(url: str, token: str, db_path: str) -> Report:
     if sat is not None:
         report.add("PASS" if str(sat.get("place_name", "")).endswith("Household") and float(sat.get("place_mult", 1)) > 1 else "FAIL",
                    "the family's hall is a good place to sit", f"{sat.get('place_name')} x{sat.get('place_mult')}")
+    # The head's last lesson (v1.0.0-rc.34) is one demonstration check, so the
+    # outcome is reported and only what is certain either way is asserted: the
+    # check is named, a pass qualifies every trade, and a second ask is refused
+    # - as "already taught" after a pass, as the day's wait after a fail.
+    lesson = await step(report, "family.lesson at home", act("family.lesson", PLAYER, {}))
+    if lesson is not None:
+        check = dict(lesson.get("check") or {})
+        report.add("PASS" if {"total", "tn", "degree"} <= set(check) and lesson.get("outcome") in ("pass", "fail") else "FAIL",
+                   "the head names the check", f"{lesson.get('attribute')} {check.get('total')} vs TN {check.get('tn')} - {lesson.get('outcome')}")
+        if lesson.get("outcome") == "pass":
+            trades = {str(dict(t).get("profession")) for t in (lesson.get("trades") or [])}
+            manual = dict(lesson.get("manual") or {})
+            report.add("PASS" if trades == {"Forging", "Inscription", "Formation", "Alchemy"} and manual.get("item_id") and lesson.get("keepsake") else "FAIL",
+                       "a pass qualifies all four trades and hands over the house's manual and keepsake", f"{sorted(trades)} {manual.get('name')} {lesson.get('keepsake')}")
+            await step(report, "the lesson is given once per life", act("family.lesson", PLAYER, {}), expect_error="taught you all this lesson holds")
+        else:
+            await step(report, "a failed lesson waits a world day", act("family.lesson", PLAYER, {}), expect_error="hear you again in")
     await step(report, "family.household.leave", act("family.household.leave", PLAYER, {}))
     await step(report, "teleport back to Greenriver Town", gm("admin.player.teleport", {"user_id": PLAYER, "location": "Greenriver Town", "reason": "playtest"}))
 

@@ -86,6 +86,7 @@ def test_python_go_authority_boundary_only_delegates_migrated_mechanics():
         "birth_family_contribute": "family.contribute",  # v1.0.0-rc.32
         "birth_family_tutor": "family.tutor",  # v1.0.0-rc.32
         "birth_family_errand": "family.errand",  # v1.0.0-rc.32
+        "birth_family_lesson": "family.lesson",  # v1.0.0-rc.34
         "use_item_command": "item.use",  # v0.21.0
         "seclusion_start": "seclusion.start",  # v0.30.0: the engine derives the environment
         "equipment_status": "equipment.power",  # v0.30.0: the engine's figure, not a Python sum
