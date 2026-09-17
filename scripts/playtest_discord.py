@@ -861,16 +861,32 @@ async def run(url: str, token: str, db_path: str) -> Report:
         # ---- 9. a panel goes quiet ------------------------------------------------
         async def quiet():
             panel = await open_hub(player, channels["begin-here"], "family")
-            await env.advance_time(901)
-            await env.settle()
+            # The jump settles before it moves the clock and again after; a
+            # settle that gives up on the way in leaves the clock where it was,
+            # and one on the way out leaves the workers the jump woke still
+            # talking to a busy engine. So: quiet first, jump, and if the jump
+            # gave up, wait the workers out and jump once more (a second
+            # fifteen minutes changes nothing the step holds).
+            await settle_patiently(env)
+            for _ in range(2):
+                try:
+                    await env.advance_time(901)
+                    break
+                except TimeoutError:
+                    await settle_patiently(env)
+            await settle_patiently(env)
             text = panel.text()
             if "Reopen" in panel.labels():
                 reopened = await player.click(panel.message(), label="Reopen")
-                await env.settle()
+                await settle_patiently(env)
                 expect("Family" in panel.text() or (reopened.response is not None), "Reopen drew nothing")
                 return "expired to a Reopen button, and it reopened"
+            # Whichever leaf the page draws: after the sweep the player may
+            # stand outside the household, so Leave is not always there.
+            button = next((n for n in _walk(panel.message().components) if n.get("type") == 2 and n.get("custom_id")), None)
+            expect(button is not None, "the panel offers no button to press:\n" + text[:400])
             try:
-                await panel.press("Leave")
+                await player.click(panel.message(), custom_id=str(button["custom_id"]))
             except SetupError as exc:
                 return f"buttons disabled: {exc}"
             raise Failed("the panel still takes presses after its timeout:\n" + text[:400])

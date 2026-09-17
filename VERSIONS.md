@@ -6,6 +6,16 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.0** (rc.36) drives the sect and the homestead through the engine playtest.
+
+The first of rc.35's three deferred blocks is empty: the sect's residence, its contributions and
+redemptions, the manor and its first facility, the hidden sect's initiation at karma −200, a
+recommendation, a discipleship requested, accepted and left, a territory claimed and a war started by
+a second sect's claim, and the homestead founded, shared, furnished, sat in and left - twenty-two
+operations and one GM lever, each on a state the GM levers build, with the rolls reported. The one
+door the engine never opens itself, the sect's residence row, is staged through the same repository
+call `/sect abode` uses. See CLAUDE.md, "The playtest touches everything".
+
 **1.0.0** (rc.35) makes the playtest touch everything, and holds it there.
 
 The engine playtest drove 51 of 193 allowlisted operations and the Discord playtest pressed 9 of
