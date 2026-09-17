@@ -525,7 +525,7 @@ rest were proven by Go unit tests for their rules and by nothing for their wirin
 operation or leaf was uncovered until somebody noticed. `tests/python/contracts/test_playtest_coverage.py`
 is the gate that makes "everything" a fact rather than a claim. It enumerates the surface **from the
 code** - the two allowlist maps in `authoritative.go` plus the dispatch switch in `actions.go` (246
-operations), and `hubs.REGISTERED_HUBS` walked through `_leaf_actions` (299 leaves, admin included) -
+operations), and `hubs.REGISTERED_HUBS` walked through `_leaf_actions` (298 leaves, admin included) -
 and holds each harness to it with one explicit deferred set per harness, `DEFERRED_OPERATIONS` and
 `DEFERRED_LEAVES`, read off the scripts by AST so neither harness is imported. Three rules:
 
