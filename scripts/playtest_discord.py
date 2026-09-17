@@ -861,13 +861,19 @@ async def run(url: str, token: str, db_path: str) -> Report:
         # ---- 9. a panel goes quiet ------------------------------------------------
         async def quiet():
             panel = await open_hub(player, channels["begin-here"], "family")
-            try:
-                await env.advance_time(901)
-            except TimeoutError:
-                # The jump expires every periodic worker's sleep at once, and
-                # after a full sweep they have a busy engine to talk to; the
-                # settle inside advance_time gives up before they finish.
-                pass
+            # The jump settles before it moves the clock and again after; a
+            # settle that gives up on the way in leaves the clock where it was,
+            # and one on the way out leaves the workers the jump woke still
+            # talking to a busy engine. So: quiet first, jump, and if the jump
+            # gave up, wait the workers out and jump once more (a second
+            # fifteen minutes changes nothing the step holds).
+            await settle_patiently(env)
+            for _ in range(2):
+                try:
+                    await env.advance_time(901)
+                    break
+                except TimeoutError:
+                    await settle_patiently(env)
             await settle_patiently(env)
             text = panel.text()
             if "Reopen" in panel.labels():
