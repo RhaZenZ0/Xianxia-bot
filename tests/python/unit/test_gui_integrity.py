@@ -69,10 +69,12 @@ class GUIIntegrityTests(unittest.TestCase):
         )
         # Ten pages over seven groups since v1.0.0-rc.13: Server, Players and
         # Simulation were twelve, fifteen and twelve actions on a panel that
-        # shows eight, and the two one-action inspect pages became one. The
-        # count is not the claim - the claim below is that every group is
-        # wired and reachable, which is what a lost page would break.
-        self.assertEqual(panel.count("HubPage("), 10)
+        # shows eight, and the two one-action inspect pages became one. Eight
+        # since rc.37: Players, Grants and Moderation are one Player Edit head
+        # again, by request, paged by "More actions". The count is not the
+        # claim - the claim below is that every group is wired and reachable,
+        # which is what a lost page would break.
+        self.assertEqual(panel.count("HubPage("), 8)
         for group in expected_groups:
             self.assertIn(group, panel, group)
         counts = [
@@ -84,7 +86,8 @@ class GUIIntegrityTests(unittest.TestCase):
         # 42 through v0.20.5; +2 in v0.20.6 for the Quest Forge (world questforge, world quests).
         # 44 through v0.31.0; +7 in v0.32.0 (player forceendscene, mute, unmute, freeze, unfreeze, ban, unban).
         # +1 in v0.34.1 (server playtest, the board).
-        self.assertEqual(sum(counts), 52)
+        # +1 in v1.0.0-rc.37 (player setrealm, the realm lever with the body pair).
+        self.assertEqual(sum(counts), 53)
         self.assertLessEqual(max(counts), 25)
         # (from test_command_cleanup's twin of this test, folded in v0.20.3)
         self.assertIn('title="🛡️ Xianxia — Administrator Control Panel"', panel)

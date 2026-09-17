@@ -578,16 +578,14 @@ _ADMIN_HUB_DEFINITION = HubDefinition(
                       "admin server audit", "admin server ai_status", "admin server chat_digest",
                       "admin server playtest")),
         HubPage(key="world", label="World", description="Events, secret realms and canonical world time.", command=admin_world_group),
-        HubPage(key="player", label="Players", description="Inspect a cultivator and put one right: revive, teleport, clear a stuck battle or scene. And erase everything held about one, when they ask for it.", command=admin_player_group,
-                only=("admin player inspect", "admin player revive", "admin player teleport",
-                      "admin player clearbattle", "admin player forceendscene",
-                      "admin player erase")),
-        HubPage(key="grants", label="Grants", description="Give: items, currency, spatial storage, and karma adjustments.", command=admin_player_group,
-                only=("admin player grant", "admin player grantcurrency",
-                      "admin player grantstorage", "admin player karma")),
-        HubPage(key="moderation", label="Moderation", description="Withhold: ban, freeze and mute, each with its undo.", command=admin_player_group,
-                only=("admin player ban", "admin player unban", "admin player freeze",
-                      "admin player unfreeze", "admin player mute", "admin player unmute")),
+        # One head for one cultivator (v1.0.0-rc.37). rc.13 had split
+        # `/admin player` three ways - Players, Grants, Moderation - so that
+        # no page needed a Next button; the panel pages a long list with
+        # "More actions" now, and a GM asked for every lever on a player to be
+        # under one heading, the way the dashboard's Player Editor is. It is
+        # the one page allowed past the eight-row layout, and
+        # test_hub_pages.py names it as that exception.
+        HubPage(key="player", label="Player Edit", description="Everything that edits one cultivator: inspect, set the realm and the body ladder, teleport, revive, clear a stuck battle or scene; give items, currency, storage and karma; ban, freeze and mute with their undos; and erase everything held about one, when they ask for it.", command=admin_player_group),
         HubPage(key="sect", label="Sects", description="Membership, ranks and master/disciple administration.", command=admin_sect_group),
         # Two pages of one action each, both "show me the hidden state of a
         # thing" (rc.13).

@@ -20,7 +20,10 @@ the qi pair. The GM dashboard gained a **Player Editor**: the sixteen per-player
 Console carried, each blind to the character chosen, are one view now, picked once and pre-filled
 from the rows each lever writes (`/api/player` returns them beside the sheet), while the console
 keeps the levers that act on the world or the server; the write path, the action map and the audit
-row are unchanged. See CLAUDE.md, "The playtest touches everything" and "Dashboard".
+row are unchanged. The Discord `/admin` panel does the same: its Players, Grants and Moderation
+heads are one **Player Edit** head, paged by "More actions", and it gains `/admin player setrealm`,
+the realm lever with the same optional body pair. See CLAUDE.md, "The playtest touches everything"
+and "Dashboard".
 
 **1.0.0** (rc.36) drives the sect and the homestead through the engine playtest.
 

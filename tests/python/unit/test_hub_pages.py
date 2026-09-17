@@ -4,7 +4,9 @@ v1.0.0-rc.13 regrouped the hub surface: thirty-seven of eighty-five pages held
 a single action while seven others held more than the layout can render, so a
 page was as likely to waste a tap as to hide seventeen actions behind a Next
 button. Pages are now named after what a player is doing, and the large groups
-(`/sect` at twenty-five, `/admin player` at fifteen) are split with `only`.
+(`/sect` at twenty-five, `/admin player` at fifteen) are split with `only` -
+except that `/admin player` is one head again since rc.37, by request, paged
+by the panel's "More actions" (see LONG_PAGES below).
 
 `only` is the part that can go quietly wrong: a page that names the leaves it
 takes will silently drop any leaf nobody names, and silently show a leaf twice
@@ -78,15 +80,37 @@ class EveryLeafLandsOnExactlyOnePage(unittest.TestCase):
             self.assertEqual(sorted(keys), sorted(set(keys)), f"/{definition.name} repeats a page key")
 
 
+# The one page allowed past the eight-row layout (v1.0.0-rc.37): the admin
+# panel's Player Edit head gathers every lever on one cultivator, the way the
+# dashboard's Player Editor does, and the panel pages it with "More actions".
+# A second entry here is a decision, not a convenience.
+LONG_PAGES = {("admin", "player")}
+
+
 class NoPageOverflowsTheLayout(unittest.TestCase):
     def test_every_page_fits_the_rows_a_panel_can_render(self):
         surface, hubs = _modules()
         for definition in _definitions(surface, hubs):
             for page in definition.pages:
+                if (definition.name, page.key) in LONG_PAGES:
+                    continue
                 self.assertLessEqual(
                     len(hubs._leaf_actions(page)), hubs._LAYOUT_ACTION_LIMIT,
                     f"/{definition.name} -> {page.label} needs a Next button to show all its actions",
                 )
+
+    def test_the_player_edit_head_holds_every_lever_on_one_cultivator(self):
+        surface, hubs = _modules()
+        pages = {p.key: p for p in surface._ADMIN_HUB_DEFINITION.pages}
+        self.assertNotIn("grants", pages)
+        self.assertNotIn("moderation", pages)
+        paths = {a.path for a in hubs._leaf_actions(pages["player"])}
+        self.assertEqual(paths, {f"/{name}" for name in _reachable(pages["player"])},
+                         "the head takes the whole /admin player group, nothing filtered")
+        for expected in ("/admin player inspect", "/admin player setrealm", "/admin player teleport",
+                         "/admin player grant", "/admin player karma", "/admin player mute", "/admin player erase"):
+            self.assertIn(expected, paths)
+        self.assertGreater(len(paths), hubs._LAYOUT_ACTION_LIMIT, "it is the long page, paged by More actions")
 
     def test_a_page_is_not_a_single_action_wearing_a_page_costume(self):
         # Eight pages still hold one action, and each is a thing on its own:

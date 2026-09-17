@@ -946,6 +946,13 @@ fills the form. `test_the_player_editor_owns_every_per_player_lever` holds that 
 `player.*` action is driven from the editor and none from the console, and that a snowflake is
 never put through `Number()` on the way (`EDIT_UID` is the string the server returned).
 
+The Discord `/admin` panel has the same shape since rc.37: rc.13 had split `/admin player` into
+Players, Grants and Moderation so no page needed a Next button, and they are one **Player Edit**
+head again by request, the one page `test_hub_pages.py` allows past the eight-row layout (the
+panel pages it with "More actions"; `LONG_PAGES` names it and nothing else). It also gained
+`/admin player setrealm`, the only realm lever on the Discord side, with the same optional body
+pair; the engine writes its audit row, so the handler logs nothing of its own.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —

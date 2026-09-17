@@ -146,6 +146,45 @@ async def admin_teleport_location_autocomplete(interaction: discord.Interaction,
     return [app_commands.Choice(name=n[:100], value=n[:100]) for n in names]
 
 
+@registered_group_command(admin_player_group, name="setrealm", description="Set a player's realm and stage, and optionally the body ladder, bypassing breakthrough gating")
+async def admin_setrealm(
+    interaction: discord.Interaction,
+    member: discord.Member,
+    realm: app_commands.Range[int, 0, 31],
+    stage: app_commands.Range[int, 1, 9],
+    body_realm: int | None = None,
+    body_stage: int | None = None,
+    reason: str = "GM story correction",
+) -> None:
+    """The realm lever on the Discord side (v1.0.0-rc.37). The body pair is
+    optional and set together - the engine refuses one without the other, and
+    so does this, before asking - and the engine writes the audit row."""
+    if not await require_admin(interaction):
+        return
+    c = await DB.get_character(member.id)
+    if not c:
+        await interaction.response.send_message("That member has no cultivation character.", ephemeral=False); return
+    if (body_realm is None) != (body_stage is None):
+        await interaction.response.send_message("Body realm and body stage are set together: give both or neither.", ephemeral=False); return
+    payload: dict[str, Any] = {"user_id": member.id, "realm_index": int(realm), "phase": int(stage), "reason": reason[:200]}
+    if body_realm is not None and body_stage is not None:
+        payload["body_realm_index"] = int(body_realm)
+        payload["body_phase"] = int(body_stage)
+    try:
+        result = dict(await ENGINE.action("admin.player.set_realm", interaction.user.id, payload) or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"⚠️ The engine refused: {exc}", ephemeral=False); return
+    before = {key: c.get(key) for key in ("realm_index", "phase", "body_realm_index", "body_phase")}
+    after = {key: result.get(key, payload.get(key)) for key in ("realm_index", "phase", "body_realm_index", "body_phase")}
+    await audit_admin(
+        interaction, "player.set_realm", target=f"user:{member.id}", before=before, after=after, reason=reason, database_log=False,
+    )
+    ladder = f"realm **{int(realm)}/{int(stage)}**"
+    if body_realm is not None:
+        ladder += f", body **{int(body_realm)}/{int(body_stage or 1)}**"
+    await interaction.response.send_message(f"✅ {member.mention}: {ladder}, bypassing breakthrough gating.", ephemeral=False)
+
+
 @registered_group_command(admin_player_group, name="revive", description="Revive a dead character and cancel pending Samsara")
 async def admin_revive(interaction: discord.Interaction, member: discord.Member, reason: str = "GM intervention") -> None:
     if not await require_admin(interaction): return
