@@ -1623,25 +1623,34 @@ async def run(url: str, token: str, db_path: str) -> Report:
                    "the gate stands where the storm did and borrows the authored road",
                    f"{gate.get('name')} at {gate.get('location')} -> {gate.get('destination')} "
                    f"({gate.get('from_world')} -> {gate.get('to_world')}); anchored for {gate.get('cost')}, fare {gate.get('fare')}")
-        await step(report, "a second seam out of the same world is refused", act("ascension.gate", PLAYER, {}),
+        await step(report, "a second gate cannot stand on the first", act("ascension.gate", PLAYER, {}),
+                   expect_error="already stands here")
+        await step(report, "somewhere else in the same world", gm("admin.player.teleport", {"user_id": PLAYER, "location": "Azure Crown Imperial City", "reason": "playtest"}))
+        await step(report, "and a second seam out of the same world is refused too", act("ascension.gate", PLAYER, {}),
                    expect_error="already anchored your crossing")
+        await step(report, "back to the gate", gm("admin.player.teleport", {"user_id": PLAYER, "location": "Greenriver Town", "reason": "playtest"}))
         crossed = await step(report, "array.use through the gate a cultivator tore open",
                              act("array.use", PLAYER, {"array_id": gate.get("array_id")}))
+        exchange = {}
         if crossed is not None:
             exchange = dict(crossed.get("exchange") or {})
-            # 20,000 granted, less 2,000 anchored and 200 in fare, is 17,800
-            # Mortal stones: 178 spirit crystals at the ladder's hundred to
-            # one, with nothing left over.
+            # The purse is whatever the run has accumulated by here, so the
+            # arithmetic is checked against itself rather than against a
+            # number: the ladder's rung is a hundred, what was spent is
+            # exactly what converted, and what would not divide is less than
+            # one unit of the new money.
+            rate, spent = int(exchange.get("rate") or 0), int(exchange.get("spent") or 0)
+            converted, remainder = int(exchange.get("converted") or 0), int(exchange.get("remainder") or -1)
             report.add("PASS" if str(crossed.get("to")) == "Spirit Jade Capital" and crossed.get("raised") is True
-                       and int(exchange.get("converted") or 0) == 178 and int(exchange.get("rate") or 0) == 100 else "FAIL",
+                       and rate == 100 and spent == converted * rate and 0 <= remainder < rate else "FAIL",
                        "the crossing carries the player and converts the purse at the ladder",
                        f"to={crossed.get('to')} raised={crossed.get('raised')} "
-                       f"{exchange.get('spent')} {exchange.get('from_currency')} -> {exchange.get('converted')} "
-                       f"{exchange.get('to_currency')} at {exchange.get('rate')}:1, {exchange.get('remainder')} left behind")
+                       f"{spent} {exchange.get('from_currency')} -> {converted} "
+                       f"{exchange.get('to_currency')} at {rate}:1, {remainder} left behind")
         sheet = dict(await db.get_character(PLAYER) or {})
-        report.add("PASS" if int(sheet.get("spirit_stones") or 0) == 178 else "FAIL",
+        report.add("PASS" if int(sheet.get("spirit_stones") or 0) == int(exchange.get("converted") or -1) else "FAIL",
                    "the sheet reads in the money of the world arrived in",
-                   f"spirit_stones={sheet.get('spirit_stones')} at {sheet.get('location')}")
+                   f"spirit_stones={sheet.get('spirit_stones')} at {sheet.get('location')}, converted={exchange.get('converted')}")
         # And home again, which converts back at the same rung, so the rest of
         # the run is standing in the Mortal World with what it started with.
         await step(report, "home to the Mortal World, which converts back at the same rung",
