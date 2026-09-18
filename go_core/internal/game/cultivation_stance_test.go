@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"xianxia/core/internal/gamerng"
 	"xianxia/core/internal/storage"
 )
 
@@ -112,6 +113,11 @@ func TestForceStanceRisksAQiDeviationThatIsARealCondition(t *testing.T) {
 	world := batch4WorldPath(t)
 	batch4Exec(t, path, `UPDATE characters SET realm_index=1,phase=3,cultivation=0 WHERE user_id=42`)
 	batch4Result(t, batch4Apply(t, path, world, "cultivation.stance", 1, map[string]any{"stance": "force"}))
+	// The force stance risks a deviation on 15 of 100, so eighty sessions
+	// missed it about one run in 443,000. The dice are lent instead: the
+	// deviation is certain, and the loop is kept only so a change that made it
+	// stop firing still reports the same way.
+	defer gamerng.UseRoller(func(int) int { return 0 })()
 	deviated := false
 	for i := 0; i < 80 && !deviated; i++ {
 		batch4Exec(t, path, `UPDATE characters SET cultivation=0 WHERE user_id=42`)

@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"xianxia/core/internal/gamerng"
 	"xianxia/core/internal/storage"
 	"xianxia/core/internal/worlddata"
 )
@@ -148,13 +149,21 @@ func TestAnUntreatedDeviationDeepensAndAFullStageBanksNothing(t *testing.T) {
 	world := batch4WorldPath(t)
 	batch4Exec(t, path, `UPDATE characters SET realm_index=1,phase=3,cultivation=0,insight_xp=0 WHERE user_id=42`)
 	batch4Result(t, batch4Apply(t, path, world, "cultivation.stance", 1, map[string]any{"stance": "force"}))
+	// Lent dice. Forcing the stance risks a deviation on a roll, and this test
+	// is about what happens when it is *taken twice untreated*, not about it
+	// landing - so it used to train up to two hundred times waiting for two
+	// different severities. Every roll lands now and two sessions are the
+	// whole question.
+	defer gamerng.UseRoller(func(int) int { return 0 })()
 	seen := map[int64]bool{}
-	for i := 0; i < 200 && len(seen) < 2; i++ {
+	for i := 0; i < 2; i++ {
 		batch4Exec(t, path, `UPDATE characters SET cultivation=0 WHERE user_id=42`)
 		result := trainOnce(t, path, world, 300+i)
-		if dev, ok := result["deviation"].(map[string]any); ok && dev != nil {
-			seen[storage.ParseInt(dev["severity"])] = true
+		dev, _ := result["deviation"].(map[string]any)
+		if dev == nil {
+			t.Fatalf("session %d forced the stance and came away clean: %v", i+1, result)
 		}
+		seen[storage.ParseInt(dev["severity"])] = true
 	}
 	if !seen[1] || !seen[2] {
 		t.Fatalf("an untreated deviation must deepen; severities seen: %v", seen)

@@ -129,24 +129,31 @@ func runFinds(t *testing.T, path string, r *Runner, steps, gm int64) string {
 	return summary
 }
 
+// everyFinderFinds loads the dice, because the dice are not what any of these
+// tests is about. A finder turns something up 22% of the time, so thirty of
+// them coming up empty is one run in about 1,700 - and the assertion that
+// would catch it could only ever be "not zero", which is a weak thing to know.
+// With every finder finding, and finding the legal item rather than the
+// contraband, what the cap does becomes exact.
+//
+// The bound is what tells the two rolls apart: the find check is out of 100,
+// and anything else is the pick from the sorted item pool.
+func everyFinderFinds() func() {
+	return gamerng.UseRoller(func(n int) int {
+		if n == 100 {
+			return 0 // the find roll: everybody turns something up
+		}
+		return n - 1 // the item pick: the last of the sorted pool is the legal one
+	})
+}
+
 func TestGraveRobbersPutThingsUnderTheHammer(t *testing.T) {
 	path := findsDB(t)
 	r := findsRunner()
 	for i := 0; i < 30; i++ {
 		addFinder(t, path, fmt.Sprintf("Grave-Robber %02d", i), "Greenriver Town", "grave-robber", 0)
 	}
-	// Loaded dice, because the dice are not what this is about. A robber
-	// finds something 22% of the time and half of what this world holds is
-	// contraband no legal floor will take, so thirty of them came up empty
-	// about one run in fifty - and the assertion that caught it could only
-	// ever be "not zero", which is a weak thing to know. Every robber finds,
-	// and finds the legal treasure, so what the cap does is exact.
-	defer gamerng.UseRoller(func(n int) int {
-		if n == 100 {
-			return 0 // the find roll: everybody turns something up
-		}
-		return n - 1 // the item pick: the last of the sorted pool is the legal one
-	})()
+	defer everyFinderFinds()()
 	runFinds(t, path, r, 1, 1440)
 	lots := i64(simScalar(t, path, `SELECT COUNT(*) FROM auctions WHERE active=1`))
 	if lots != findCap {
@@ -198,9 +205,12 @@ func TestAScavengersLegendaryGoesUpUnappraised(t *testing.T) {
 	for i := 0; i < 30; i++ {
 		addFinder(t, path, fmt.Sprintf("Scavenger %02d", i), "Greenriver Town", "scavenger", 0)
 	}
+	defer everyFinderFinds()()
 	runFinds(t, path, r, 1, 1440)
-	if n := i64(simScalar(t, path, `SELECT COUNT(*) FROM auctions WHERE appraised=0 AND grade_band<>''`)); n == 0 {
-		t.Fatal("a realm-0 scavenger's legendary find went up fully identified")
+	// Every scavenger finds, so the floor fills to its cap and each lot is
+	// one a realm-0 finder could not read. "Not zero" was the weak version.
+	if n := i64(simScalar(t, path, `SELECT COUNT(*) FROM auctions WHERE appraised=0 AND grade_band<>''`)); n != findCap {
+		t.Fatalf("a realm-0 scavenger's legendary find went up fully identified: %d of %d lots unappraised", n, findCap)
 	}
 }
 
@@ -223,6 +233,7 @@ func TestContrabandGoesToTheNightMarketInstead(t *testing.T) {
 	for i := 0; i < 30; i++ {
 		addFinder(t, path, fmt.Sprintf("Digger %02d", i), "Greenriver Town", "tomb digger", 0)
 	}
+	defer everyFinderFinds()()
 	runFinds(t, path, r, 1, 1440)
 	if n := i64(simScalar(t, path, `SELECT COUNT(*) FROM auctions`)); n != 0 {
 		t.Fatalf("a forbidden scripture was listed on a legal floor: %d lots", n)

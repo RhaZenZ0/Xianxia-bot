@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"xianxia/core/internal/gamerng"
 	"xianxia/core/internal/storage"
 )
 
@@ -489,6 +490,12 @@ func TestForageResolveOwnsRegionalProfileRareLootAndRNG(t *testing.T) {
 		}
 	}
 
+	// Tens, so the forage certainly succeeds. The check is TN 8 against a
+	// modifier of 4, which fails on 2d10 of 2 or 3 - about one run in
+	// thirty-three, and this assertion is "the herb reached the inventory",
+	// which a failed forage is designed not to do.
+	defer gamerng.UseRoller(highDice)()
+
 	result := batch4Result(t, batch4Apply(t, path, world, "forage.resolve", 2, map[string]any{}))
 	if got := storage.ParseInt(result["spirit_resources"]); got != 90 {
 		t.Fatalf("spirit_resources=%d", got)
@@ -505,8 +512,8 @@ func TestForageResolveOwnsRegionalProfileRareLootAndRNG(t *testing.T) {
 	if got := storage.ParseInt(result["realm_index"]); got != 0 {
 		t.Fatalf("realm_index=%d", got)
 	}
-	if got := storage.ParseInt(actionScalar(t, path, "SELECT quantity FROM inventory WHERE user_id=42 AND item_id='spirit_herb'")); got < 1 {
-		t.Fatalf("spirit herb quantity=%d", got)
+	if got := storage.ParseInt(actionScalar(t, path, "SELECT quantity FROM inventory WHERE user_id=42 AND item_id='spirit_herb'")); got != 3 {
+		t.Fatalf("spirit herb quantity=%d, want the 3 that 90 spirit resources yield", got)
 	}
 	if got := storage.ParseInt(actionScalar(t, path, "SELECT COUNT(*) FROM authoritative_action_receipts WHERE operation='forage.resolve'")); got != 1 {
 		t.Fatalf("forage receipts=%d", got)

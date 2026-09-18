@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 
+	"xianxia/core/internal/gamerng"
 	"xianxia/core/internal/storage"
 	"xianxia/core/internal/worlddata"
 )
@@ -171,6 +172,10 @@ func TestACriminalTradeRobsAndTheMoneyActuallyMoves(t *testing.T) {
 	before := deedScalar(t, path, `SELECT wealth FROM npc_civilization_state WHERE npc_name='Bo the Knife'`) +
 		deedScalar(t, path, `SELECT wealth FROM npc_civilization_state WHERE npc_name='Merchant Yun'`)
 
+	// Lent dice: a criminal trade robs on 20 of 100, so sixty days missed it
+	// about one run in 650,000. What the test is about is that the money
+	// moves and the deed is recorded, neither of which is a matter of chance.
+	defer gamerng.UseRoller(func(int) int { return 0 })()
 	committed, _, _ := runCrimes(t, path, r, 60)
 	if committed == 0 {
 		t.Fatal("sixty days and a bandit never once robbed the rich merchant standing next to him")
@@ -233,8 +238,50 @@ func TestAGrudgeNeedsAWitnessAndAKillingIsAlwaysFound(t *testing.T) {
 	// thief, and without spending the *thief* is soon richer than all three -
 	// and nobody robs somebody with less than they have, so either way the
 	// scenario quietly stops after four rolls and proves nothing.
+	// Lent dice, one tick at a time. This test needs three different crimes -
+	// one with witnesses, one without, and a killing - and hoping three
+	// hundred days of 20% robberies produce all three is how the class this
+	// gate exists for reads. `npcCrimes` rolls in a fixed order per crime:
+	// whether it happens, what kind it is, whether anybody saw, and (when it
+	// is violent) whether it kills. The counter answers each in turn and the
+	// loop resets it, so a tick is a written scenario rather than a sample.
+	const (
+		seenTheft = iota
+		unseenTheft
+		aKillingNobodySaw
+	)
+	mode, call := seenTheft, 0
+	defer gamerng.UseRoller(func(n int) int {
+		call++
+		switch call {
+		case 1:
+			return 0 // under crimeChanceCriminal: the robbery happens
+		case 2:
+			if mode == aKillingNobodySaw {
+				return crimeViolentFrom
+			}
+			return 0 // neither violent nor smuggling: an ordinary theft
+		case 3:
+			if mode == seenTheft {
+				return 0 // the road was not as empty as it looked
+			}
+			return n - 1 // and nobody saw this one
+		default:
+			return 0 // under crimeFatal: the violence is fatal
+		}
+	})()
+
 	committed := int64(0)
 	for tick := 0; tick < 300; tick++ {
+		switch {
+		case tick < 150:
+			mode = seenTheft
+		case tick < 299:
+			mode = unseenTheft
+		default:
+			mode = aKillingNobodySaw
+		}
+		call = 0
 		topUp(t, path, "Bo the Knife", 2)
 		for _, name := range []string{"Merchant Yun", "Merchant Ge", "Merchant Pan"} {
 			topUp(t, path, name, 900)
@@ -242,12 +289,12 @@ func TestAGrudgeNeedsAWitnessAndAKillingIsAlwaysFound(t *testing.T) {
 		c, _, _ := runCrimesFrom(t, path, r, 1, int64(1000+tick))
 		committed += c
 	}
-	if committed == 0 {
-		t.Fatal("three hundred days without a single robbery on an empty road")
+	if committed != 300 {
+		t.Fatalf("three hundred days of certain robbery committed %d", committed)
 	}
 	hidden := deedScalar(t, path, `SELECT COUNT(*) FROM world_history_events WHERE visibility='hidden'`)
-	if hidden == 0 {
-		t.Fatal("nothing on an empty road ever went unseen")
+	if hidden != 149 {
+		t.Fatalf("%d of the 149 unwitnessed thefts went unrecorded as hidden", hidden)
 	}
 	// A grudge is held against a face. It exists exactly when a crime was
 	// seen - an unsolved robbery leaves the victim angry at nobody.
@@ -259,7 +306,12 @@ func TestAGrudgeNeedsAWitnessAndAKillingIsAlwaysFound(t *testing.T) {
 	if grudges != seenPairs {
 		t.Fatalf("%d victim(s) were robbed in front of witnesses and %d grudge(s) were held", seenPairs, grudges)
 	}
-	// A body is found whether or not the killer is named.
+	// A body is found whether or not the killer is named. The last day's
+	// robbery was fatal and nobody saw it, which is the one case where a
+	// hidden row would be the plausible mistake.
+	if got := deedScalar(t, path, `SELECT COUNT(*) FROM world_history_events WHERE event_type='npc_killing'`); got != 1 {
+		t.Fatalf("the last day's killing left %d record(s)", got)
+	}
 	if got := deedScalar(t, path, `SELECT COUNT(*) FROM world_history_events
         WHERE event_type='npc_killing' AND visibility<>'public'`); got != 0 {
 		t.Fatalf("%d killing(s) nobody ever noticed", got)
@@ -271,9 +323,25 @@ func TestTheDeadCommitNoFurtherCrimes(t *testing.T) {
 	r := deedsRunner()
 	addPerson(t, path, "Bo the Knife", "Lonely Rock", "bandit", 2, 80, 6)
 	addPerson(t, path, "Merchant Yun", "Lonely Rock", "merchant", 900, 40, 0)
-	runCrimes(t, path, r, 300)
-	if deedScalar(t, path, `SELECT COUNT(*) FROM npc_civilization_state WHERE status='dead'`) == 0 {
-		t.Skip("no killing happened in this run; nothing to check")
+	// This used to hope for a killing across three hundred days - a 20%
+	// robbery, a seventh of those violent, a fifth of those fatal - and skip
+	// itself when none came, which is the same fault as a flake wearing a
+	// quieter coat: most runs it proved nothing. The dice are lent, so the
+	// first day is the killing and the twenty-nine after it are the question.
+	call := 0
+	defer gamerng.UseRoller(func(int) int {
+		call++
+		if call == 2 {
+			return crimeViolentFrom // the robbery turns violent
+		}
+		return 0 // it happens, it is seen, and it kills
+	})()
+	for tick := 0; tick < 30; tick++ {
+		call = 0
+		runCrimesFrom(t, path, r, 1, int64(1000+tick))
+	}
+	if got := deedScalar(t, path, `SELECT COUNT(*) FROM npc_civilization_state WHERE status='dead'`); got != 1 {
+		t.Fatalf("a certain killing left %d dead", got)
 	}
 	// Whoever died, nothing after their death names them as the victim again.
 	if got := deedScalar(t, path, `SELECT COUNT(*) FROM world_history_events h
@@ -304,16 +372,29 @@ func TestOneTickNeverExceedsTheCrimeCap(t *testing.T) {
 	}
 }
 
+// everyHuntLands sends the hunter out every day and rolls the top of the d20,
+// so what the woods answer is the hunter's own realm against the quarry's TN
+// rather than the dice. Every other bound takes the first of its options.
+func everyHuntLands() func() {
+	return gamerng.UseRoller(func(n int) int {
+		if n == 20 {
+			return 19 // the hunt's own d20
+		}
+		return 0
+	})
+}
+
 func TestAHunterGoesOutAndTheWoodsAnswer(t *testing.T) {
+	defer everyHuntLands()()
 	path := deedsDB(t)
 	r := deedsRunner()
 	addPerson(t, path, "Hunter Gao", "Greenriver Town", "beast hunter", 10, 50, 6)
 	hunted, took, _ := runHunts(t, path, r, 200)
-	if hunted == 0 {
-		t.Fatal("two hundred days and the hunter never went out")
+	if hunted != 200 {
+		t.Fatalf("a hunter who goes out every day went out %d time(s) in two hundred", hunted)
 	}
-	if took == 0 {
-		t.Fatal("the hunter never once came back with anything")
+	if took != hunted {
+		t.Fatalf("%d hunts at the top of the die brought back %d", hunted, took)
 	}
 	// What they took reaches the same floor their finds already reach.
 	if got := deedScalar(t, path, `SELECT COUNT(*) FROM auctions WHERE seller_npc_name='Hunter Gao'`); got == 0 {
@@ -325,12 +406,16 @@ func TestAHunterGoesOutAndTheWoodsAnswer(t *testing.T) {
 }
 
 func TestAFailedHuntIsPaidForInBlood(t *testing.T) {
+	// Ones all the way down: the trapper goes out, rolls the bottom of the
+	// d20 against a quarry scaled to a realm above his own, and the beast is
+	// as deadly as the roll allows.
+	defer gamerng.UseRoller(func(int) int { return 0 })()
 	path := deedsDB(t)
 	r := deedsRunner()
 	// A mortal-realm hunter against beasts scaled to that realm loses often.
 	addPerson(t, path, "Hunter Gao", "Greenriver Town", "trapper", 10, 50, 0)
-	if hunted, _, _ := runHunts(t, path, r, 300); hunted == 0 {
-		t.Fatal("the trapper never went out at all")
+	if hunted, _, died := runHunts(t, path, r, 300); hunted != 1 || died != 1 {
+		t.Fatalf("the trapper went out %d time(s) and died %d time(s); the first hunt should have been the last", hunted, died)
 	}
 	hurt := deedScalar(t, path, `SELECT COUNT(*) FROM npc_life_state WHERE npc_name='Hunter Gao' AND (injury<>'' OR death_game_minute IS NOT NULL)`)
 	if hurt == 0 {

@@ -114,13 +114,24 @@ func scalar(t *testing.T, conn *storage.Conn, sql string, args ...any) int64 {
 func TestMarriedNPCsHaveChildren(t *testing.T) {
 	path := livesDB(t)
 	r := livesRunner()
+	// A surname per couple, because `freeChildName` builds a child's name from
+	// the parent's surname and one shared given-name pool: twenty couples all
+	// called Chen compete for the same names, and the run stops at five births
+	// having run out rather than at the cap. The name rule has its own test
+	// below; this one is about the cap.
 	for i := 0; i < 20; i++ {
-		a, b := fmt.Sprintf("Chen A%02d", i), fmt.Sprintf("Chen B%02d", i)
+		a, b := fmt.Sprintf("Chen%02d A", i), fmt.Sprintf("Chen%02d B", i)
 		addNPC(t, path, a, "Greenriver Town", "Greenriver Town", "Mortal World", "Farmer", 50, "Independent")
 		addNPC(t, path, b, "Greenriver Town", "Greenriver Town", "Mortal World", "Farmer", 50, "Independent")
 		addLife(t, path, a, map[string]any{"relationship_status": "married", "spouse_name": b, "health": 90})
 		addLife(t, path, b, map[string]any{"relationship_status": "married", "spouse_name": a, "health": 90})
 	}
+	// Every couple conceives, so the cap is what the assertion is about.
+	// Twenty couples at the scaled 48% chance came up empty about one run in
+	// half a million, and "not one child" could only ever be a weak claim.
+	// The three rolls all take a zero happily: the birth check, the root pick
+	// and the coin.
+	defer gamerng.UseRoller(func(int) int { return 0 })()
 	conn := livesConn(t, path)
 	born, err := r.npcChildbirth(conn, 4, 50000)
 	if err != nil {
@@ -129,8 +140,8 @@ func TestMarriedNPCsHaveChildren(t *testing.T) {
 	if err := conn.Commit(); err != nil {
 		t.Fatal(err)
 	}
-	if born == 0 {
-		t.Fatal("twenty healthy married couples and not one child")
+	if born != childbirthCap {
+		t.Fatalf("twenty healthy married couples produced %d child(ren), cap is %d", born, childbirthCap)
 	}
 	if got := scalar(t, conn, `SELECT COUNT(*) AS n FROM npc_descendants`); got != born {
 		t.Errorf("%d births reported, %d descendants recorded", born, got)
@@ -327,6 +338,7 @@ func TestMastersTakeDisciples(t *testing.T) {
 	if err := conn.Commit(); err != nil {
 		t.Fatal(err)
 	}
+	defer gamerng.UseRoller(func(int) int { return 0 })()
 	formed, err := r.npcDiscipleBonds(conn, 50000)
 	if err != nil {
 		t.Fatal(err)
@@ -334,8 +346,8 @@ func TestMastersTakeDisciples(t *testing.T) {
 	if err := conn.Commit(); err != nil {
 		t.Fatal(err)
 	}
-	if formed == 0 {
-		t.Fatal("an elder twelve realms above fifteen youths took none of them")
+	if formed != discipleCap {
+		t.Fatalf("an elder twelve realms above seventy youths took %d, cap is %d", formed, discipleCap)
 	}
 	if got := scalar(t, conn, `SELECT COUNT(*) AS n FROM npc_disciple_bonds WHERE status='active'`); got != formed {
 		t.Errorf("%d bonds reported, %d recorded", formed, got)
@@ -388,6 +400,20 @@ func TestAGrudgeIsEventuallyAnswered(t *testing.T) {
 		addLife(t, path, b, map[string]any{"health": 100})
 		seedRelation(t, path, a, b, 95)
 	}
+	// Both rolls here are out of 100 - the confrontation and then whether it
+	// is fatal - so the bound cannot tell them apart and the roller answers
+	// them in turn instead. Every grudge is answered; nobody dies, which
+	// keeps the grudges-came-down count equal to the fights and makes the cap
+	// the thing under test. The callback runs under the seam's own mutex, so
+	// the counter needs none of its own.
+	call := 0
+	defer gamerng.UseRoller(func(n int) int {
+		call++
+		if call%2 == 1 {
+			return 0 // the confrontation happens
+		}
+		return n - 1 // and it is not a killing
+	})()
 	conn := livesConn(t, path)
 	fought, killed, err := r.npcFeuds(conn, 50000)
 	if err != nil {
@@ -396,11 +422,11 @@ func TestAGrudgeIsEventuallyAnswered(t *testing.T) {
 	if err := conn.Commit(); err != nil {
 		t.Fatal(err)
 	}
-	if fought == 0 {
-		t.Fatal("thirty grudges at ninety-five and nobody ever came to blows")
+	if fought != feudCap {
+		t.Fatalf("thirty grudges at ninety-five produced %d confrontation(s), cap is %d", fought, feudCap)
 	}
-	if killed > fought {
-		t.Errorf("%d died out of %d confrontations", killed, fought)
+	if killed != 0 {
+		t.Errorf("the dice said no killing and %d died", killed)
 	}
 	settled := scalar(t, conn, `SELECT COUNT(*) AS n FROM npc_social_relations WHERE grudge<95`)
 	if settled != fought {

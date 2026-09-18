@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"xianxia/core/internal/gamerng"
 	"xianxia/core/internal/storage"
 )
 
@@ -268,16 +269,19 @@ func TestTheResidueEatsThePurityCeilingAndTearsChannels(t *testing.T) {
 			t.Fatal("nothing tears below the threshold")
 		}
 	}
-	// Above it, it happens - not every time, but it happens.
+	// Above it, it happens. The tear is a roll and this is about the
+	// threshold, not about the odds, so the dice are lent: one attempt at the
+	// cap must tear, and the forty below the threshold above must not have,
+	// which is the same pair of facts the two hundred hopeful attempts were
+	// reaching for.
+	defer gamerng.UseRoller(func(int) int { return 0 })()
 	deep := qiBody{QiType: deathQiType, MeridiansOpen: 40, Corruption: corruptionCap}
-	torn := false
-	for i := 0; i < 200 && !torn; i++ {
-		if torn, err = corruptionRupture(conn, catalog, 42, deep, 1); err != nil {
-			t.Fatal(err)
-		}
+	torn, err := corruptionRupture(conn, catalog, 42, deep, 1)
+	if err != nil {
+		t.Fatal(err)
 	}
 	if !torn {
-		t.Fatal("a residue that deep must eventually tear a channel")
+		t.Fatal("a residue at the cap did not tear a channel on a certain roll")
 	}
 }
 

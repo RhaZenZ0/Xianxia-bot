@@ -1106,6 +1106,23 @@ The Admin Console's NPC card (rc.38) carries **Lose** and **Bring back** beside 
   differently from another, and its answer is clamped into the die. It is test-only and a test in
   `gamerng` walks every non-test file in `go_core` to keep it that way. Where the outcome can be
   made certain by the *scenario* instead (overwhelming attributes, a stacked fixture), prefer that.
+- **And a gate now says so, because the rule above was prose for four releases and was broken three
+  times in them** (v1.0.0-rc.42). `TestOnlyTestsBorrowTheDice` only ever looked one way — production
+  must not borrow the dice — and the direction it cannot see is the expensive one.
+  `TestATestThatAssertsARollLandedLendsTheDice`, beside it in `gamerng`, walks `internal/simulation`
+  and `internal/game` by AST and asks two questions of every test: **can it reach a draw**, which is
+  a real call graph (the production functions that name `gamerng`, closed over same-package calls,
+  then extended through the package's own test helpers, so a test driving the tick through
+  `runHunts(t, path, r, 200)` counts), and **does it assert something happened**, which is a tally
+  coming back zero (`x == 0`, `len(x) == 0`, `x < 1`). A test that does both must lend the dice —
+  `UseRoller`, a helper that wraps it, or an assignment to one of the `game` package's `*Intn` seam
+  vars — or be named in `diceAllowed` with its reason, the shape `DEFERRED_OPERATIONS` and
+  `DROPPED_TABLES` already use here. It is a **shape detector, not a proof**: it cannot compute a
+  probability, and it deliberately ignores `!flag`, because in this tree a negation is almost always
+  a comma-ok `!ok` or a predicate about the fixture and admitting it produced eleven false positives
+  against one true one. The thirteen `diceAllowed` entries are all one of two kinds — a count of
+  content (`len(location.Roads)`, the authored manuals) or a floor in the production code that makes
+  the zero unreachable (`law.comprehend` clamps its gain to 1) — and each says which.
 
 ## Release delivery
 
