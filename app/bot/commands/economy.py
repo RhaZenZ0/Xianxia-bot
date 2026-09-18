@@ -69,6 +69,18 @@ async def use_item_command(interaction: discord.Interaction, item: str) -> None:
     use = item_def.get("use", {})
     array_key = str(item_def.get("array_deploy") or "")
     if not storage_upgrade and not use and not array_key:
+        # A method slip is used, but not here: reading one is `recipe.learn`,
+        # which writes a method rather than spending an effect. Saying "no
+        # implemented active use yet" to somebody holding a slip they just
+        # bought is how thirty-three of them sat unreadable (v1.0.0-rc.43).
+        if item_def.get("teaches_recipe"):
+            await respond(
+                interaction,
+                "📜 That is a method slip, and it is read rather than used: "
+                "**/craft → Profession → Learn**.",
+                ephemeral=False,
+            )
+            return
         await respond(interaction, "That item has no implemented active use yet.", ephemeral=False)
         return
 

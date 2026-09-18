@@ -26,7 +26,7 @@ from .remote import GoDatabaseTransport
 log = logging.getLogger("xianxia.database")
 
 
-SCHEMA_VERSION = 52
+SCHEMA_VERSION = 53
 # A readiness probe must validate more than the schema-version marker.  If the
 # SQLite file is removed or replaced while the bot is running, SQLite will
 # happily create a new empty file at the same path.  Checking these tables lets
@@ -2337,6 +2337,44 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
             """DROP TABLE IF EXISTS catalog_recipes""",
             """DROP TABLE IF EXISTS catalog_manuals""",
             """DROP TABLE IF EXISTS catalog_techniques""",
+        ),
+    ),
+    (
+        53,
+        "reconcile_the_purse_with_its_mirror",
+        (
+            # v1.0.0-rc.43: the purse becomes the one store, so no live
+            # character may lose money on the way.
+            #
+            # A player's stones live in `currency_wallets` (the purse) and in
+            # `characters.spirit_stones`, which is a mirror `walletDeltaTx`
+            # writes from the purse. Eleven places wrote one without the other
+            # - `trade.accept` moved stones between two players and named
+            # `currency_wallets` nowhere at all - so on any world where a trade
+            # was struck, a road toll paid, a grave found, a channel mended or
+            # the ghost rites bought, the two have drifted apart.
+            #
+            # Every reader goes through the purse now, so the drift has to be
+            # settled before it is read. It is settled UPWARDS, deliberately:
+            # neither store is the complete record (the mirror caught the
+            # trades and the tolls, the purse caught the shops and the fines),
+            # and of the two ways to be wrong, handing somebody stones they
+            # might not have earned is the one that does not take a fortune
+            # off a player who did nothing wrong.
+            #
+            # A character with no wallet row is given one at their mirror's
+            # value - the same shape as the rc.15 back-fill, which is why this
+            # is an upsert rather than a bare UPDATE.
+            """INSERT INTO currency_wallets(user_id,currency_id,balance)
+               SELECT user_id,'low_spirit_stone',MAX(0,spirit_stones) FROM characters WHERE true
+               ON CONFLICT(user_id,currency_id) DO UPDATE SET
+                   balance=MAX(currency_wallets.balance,excluded.balance)""",
+            # And the mirror is set from the purse, which is what every write
+            # through the one door does from here on.
+            """UPDATE characters SET spirit_stones=COALESCE((
+                   SELECT balance FROM currency_wallets w
+                   WHERE w.user_id=characters.user_id AND w.currency_id='low_spirit_stone'
+               ), spirit_stones)""",
         ),
     ),
 )

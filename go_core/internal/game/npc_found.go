@@ -178,8 +178,7 @@ func claimGraveResult(conn *storage.Conn, userID int64, name, location string, g
 		}
 	}
 	if stones > 0 {
-		if _, err := conn.Execute(`UPDATE characters SET spirit_stones=spirit_stones+?,updated_at=? WHERE user_id=?`,
-			[]any{stones, now, userID}); err != nil {
+		if _, err := walletDeltaTx(conn, userID, mirroredCurrency, stones, now); err != nil {
 			return nil, err
 		}
 	}

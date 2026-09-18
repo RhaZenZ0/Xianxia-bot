@@ -123,7 +123,7 @@ _PAGE_EMOJIS = {
     "condition": "🩹", "soul": "🕯️", "afterlife": "☸️", "reincarnate": "🌱",
     "breakthrough": "⬆️", "perfect": "💎", "tribulation": "⚡",
     "cultivate": "🧘", "seclusion": "🚪", "body": "🥋", "aptitude": "🧬", "law": "📖",
-    "manual": "📚", "conceal": "🌫️", "profession": "🛠️", "inventory": "🎒", "storage": "📦",
+    "manual": "📚", "conceal": "🌫️", "profession": "🛠️", "learn": "📜", "inventory": "🎒", "storage": "📦",
     "use": "🧪", "equipment": "🛡️", "artifact": "🔮", "provenance": "🔎", "npcinfo": "👤",
     "talk": "💬", "sense": "👁️", "world": "🌍", "explore": "🧭", "hunt": "🐾",
     "worldevents": "🌩️", "civilization": "🏘️", "scene": "🎭", "era": "🌌", "time": "🕰️",

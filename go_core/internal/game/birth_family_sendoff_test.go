@@ -133,6 +133,7 @@ func TestANewCultivatorLeavesHomeCarryingItAndFliesOnIt(t *testing.T) {
 	}
 
 	batch4Exec(t, path, `UPDATE characters SET spirit_stones=500,vitality=100,realm_index=0 WHERE user_id=42`)
+	syncPurse(t, path)
 	quiet := roadEncounterIntn
 	roadEncounterIntn = func(n int) (int, error) { return n - 1, nil }
 	defer func() { roadEncounterIntn = quiet }()

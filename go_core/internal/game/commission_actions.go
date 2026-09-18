@@ -419,14 +419,14 @@ func payCommissionRewardTx(conn *storage.Conn, userID int64, questKey string, re
 		return map[string]any{}, nil
 	}
 	now := nowSeconds()
-	if stones != 0 || insight != 0 {
-		if _, err := conn.Execute(`UPDATE characters SET spirit_stones=spirit_stones+?,insight_xp=insight_xp+?,updated_at=? WHERE user_id=?`,
-			[]any{stones, insight, now, userID}); err != nil {
+	if insight != 0 {
+		if _, err := conn.Execute(`UPDATE characters SET insight_xp=insight_xp+?,updated_at=? WHERE user_id=?`,
+			[]any{insight, now, userID}); err != nil {
 			return nil, err
 		}
 	}
 	if stones != 0 {
-		if _, err := walletDeltaTx(conn, userID, "low_spirit_stone", stones, now); err != nil {
+		if _, err := walletDeltaTx(conn, userID, mirroredCurrency, stones, now); err != nil {
 			return nil, err
 		}
 	}

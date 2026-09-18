@@ -63,6 +63,20 @@ func batch4WorldWithForageAptitudeBonus(t *testing.T) string {
 	return path
 }
 
+// syncPurse makes a fixture's money look the way production's does: the purse
+// (`currency_wallets`) is the store and `characters.spirit_stones` mirrors it.
+// A fixture that sets only the column models a state production cannot reach -
+// every character is given a wallet row at creation, and the rc.15 migration
+// back-filled one for every character that predates wallets - and that is
+// exactly the blind spot that let a trade desynchronise the two for releases
+// without a single test noticing (v1.0.0-rc.43).
+func syncPurse(t *testing.T, path string) {
+	t.Helper()
+	batch4Exec(t, path, `INSERT INTO currency_wallets(user_id,currency_id,balance)
+		SELECT user_id,'low_spirit_stone',spirit_stones FROM characters WHERE true
+		ON CONFLICT(user_id,currency_id) DO UPDATE SET balance=excluded.balance`)
+}
+
 func setupBatch4AuthorityDB(t *testing.T) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "batch4_authority.sqlite3")
@@ -76,6 +90,10 @@ func setupBatch4AuthorityDB(t *testing.T) string {
 CREATE TABLE characters(
     user_id INTEGER PRIMARY KEY,
     name TEXT NOT NULL,
+    -- The sheet's mirror of the purse. Production has carried this column since
+    -- before wallets existed and every character has it; this fixture did not,
+    -- so tests that needed it added it with their own ALTER (v1.0.0-rc.43).
+    spirit_stones INTEGER NOT NULL DEFAULT 0,
     gender TEXT NOT NULL DEFAULT 'neutral',
     path TEXT NOT NULL,
     spiritual_root TEXT NOT NULL,

@@ -40,7 +40,6 @@ ALTER TABLE cave_abodes ADD COLUMN beast_pen_level INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE cave_abodes ADD COLUMN merchant_level INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE cave_abodes ADD COLUMN created_at REAL NOT NULL DEFAULT 0;
 ALTER TABLE cave_abodes ADD COLUMN updated_at REAL NOT NULL DEFAULT 0;
-ALTER TABLE characters ADD COLUMN spirit_stones INTEGER NOT NULL DEFAULT 0;
 `); err != nil {
 		t.Fatal(err)
 	}

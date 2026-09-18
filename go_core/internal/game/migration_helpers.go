@@ -59,6 +59,20 @@ func walletBalanceTx(conn *storage.Conn, userID int64, currency string) (int64, 
 	return 0, nil
 }
 
+// mirroredCurrency is the one currency `characters.spirit_stones` follows.
+// That column is a *mirror* of the purse, not a second purse, and every write
+// to it belongs inside walletDeltaTx - see `TestThePurseHasOneDoor`.
+// (v1.0.0-rc.44 makes which currency it mirrors depend on the world the
+// character stands in; today every reward path credits the Mortal base.)
+const mirroredCurrency = "low_spirit_stone"
+
+// WalletDeltaTx is the one door, exported for the simulation package, which
+// kept its own byte-for-byte copy of it (`walletDeltaSim`) until rc.43 - the
+// same "four copies of one rule" the world clock was fixed for in rc.39.
+func WalletDeltaTx(conn *storage.Conn, userID int64, currency string, delta int64, now float64) (int64, error) {
+	return walletDeltaTx(conn, userID, currency, delta, now)
+}
+
 func walletDeltaTx(conn *storage.Conn, userID int64, currency string, delta int64, now float64) (int64, error) {
 	currency = strings.TrimSpace(currency)
 	if currency == "" {
@@ -79,7 +93,7 @@ func walletDeltaTx(conn *storage.Conn, userID int64, currency string, delta int6
 	if err != nil {
 		return balance, err
 	}
-	if currency == "low_spirit_stone" {
+	if currency == mirroredCurrency {
 		if _, err = conn.Execute(`UPDATE characters SET spirit_stones=?,updated_at=? WHERE user_id=?`, []any{next, now, userID}); err != nil {
 			return balance, err
 		}

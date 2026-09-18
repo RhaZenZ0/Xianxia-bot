@@ -6,6 +6,41 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.0** (rc.43) opens two doors nobody could reach, and gives money one door of its own.
+
+`/learn` was the only registered root command in the game that reached no player: forty-five roots,
+one orphan. The engine action is allowlisted and writes an event-ledger row, the command exists with
+its own autocomplete, and the content file authors thirty-three method slips - one per recipe - sold
+in sixty-eight of a hundred and twenty shops. It was in neither `_MIGRATED_ROOTS` nor the tree tuple,
+so it sat on no hub page and was never a slash command, and `/use` refuses a slip while the item
+picker filters it out of the list. A character created today reached about three of thirty-three
+recipes. `TheLearningStepTests` had proved the slip content exhaustively for twenty-three releases
+and its own docstring names "two new ways to ship something dead"; it was three, and the third was
+invisible from inside a file that only ever asks whether the content is right.
+
+Caravan dispatch charged `mid_spirit_stone` from realm 4 and `high_spirit_stone` from realm 7. Those
+two ids appeared at exactly the two lines that spent them - nothing has ever credited a tier above
+the base - so the leaf was dead from the fourth realm upward, and below it the charge was a *Mortal
+World* currency taken in all four worlds. It is the tier-1 money of the world the road departs from
+now, which is the rule the teleport arrays already had and this one missed by living in Go rather
+than in content.
+
+And money got one door. Stones live in `currency_wallets` and in `characters.spirit_stones`, which is
+a mirror of it; `walletDeltaTx` keeps the two in step, and eleven other places wrote one without the
+other. `trade.accept` moved stones between two players with two bare UPDATEs and named
+`currency_wallets` nowhere at all, so every trade desynchronised them and the next shop purchase
+overwrote the traded stones out of existence. Every writer goes through the one door now, the
+simulation package's byte-for-byte copy of it is gone, and schema 53 settles the drift on live worlds
+upwards - neither store is the complete record, and of the two ways to be wrong, handing somebody
+stones they might not have earned beats taking a fortune off a player who did nothing wrong.
+
+Three gates, each proven to fail: the registered-root sweep names `['learn']` against the tree as it
+stood, the caravan test fails on "not enough mid spirit stone" with the old escalation restored, and
+the trade test reports the purse still holding 100 while the sheet says 70. No fixture could have
+caught the money bug - most seeded the mirror and never made a wallet row, and the shared fixture's
+`characters` table did not carry the column at all - so the fixtures carry both stores now. See
+CLAUDE.md, "The slip nobody could read, and the road nobody could pay for".
+
 **1.0.0** (rc.42) stops the suite gambling, and gates the shape so it cannot start again.
 
 CLAUDE.md has forbidden "assert that a random thing happened, however many iterations you give it"
@@ -1777,6 +1812,14 @@ mechanical authority paths.
 - **Schema 27** added the v0.19.29 mute/freeze moderation columns on `characters`
   (`is_muted`, `is_frozen`, `moderation_reason`).
 - **Schema 28** added the Quest Forge definition table (`quest_definitions`).
+- **Schema 53** reconciled the purse with its mirror. A player's stones live in `currency_wallets`
+  and in `characters.spirit_stones`, and eleven writers moved one without the other - `trade.accept`
+  worst of all, moving stones between two players and naming `currency_wallets` nowhere. Every writer
+  goes through `walletDeltaTx` now, so the drift had to be settled before the purse became the one
+  thing read: the wallet is set to the greater of the two and the mirror is then set from the wallet.
+  Upwards deliberately - neither store is the complete record, and of the two ways to be wrong,
+  handing somebody stones they might not have earned beats taking a fortune off a player who did
+  nothing wrong. A character with no wallet row is given one, the same shape as the rc.15 back-fill.
 - **Schema 52** retired the five Python-written catalogue mirrors. `catalog_locations`,
   `catalog_npcs`, `catalog_recipes`, `catalog_manuals` and `catalog_techniques` were blob tables
   (`name`, `data_json`, `updated_at`) that boot rewrote at roughly 1,800 upserts a time, and schema 51

@@ -570,6 +570,14 @@ class TheLearningStepTests(unittest.TestCase):
     knowledge. Now a household teaches its own craft and everything else is a
     jade slip - which means two new ways to ship something dead: a recipe no
     slip teaches, and a slip no shop sells.
+
+    It was three (v1.0.0-rc.43). Everything below passed for twenty-three
+    releases while **no player could read a slip at all**: `/learn` was
+    registered and put on no hub page, so thirty-three slips sat priced on
+    sixty-eight counters with no door onto the command that spends them. Every
+    test here asks whether the content is right and none asks whether anything
+    reaches it, which is why the third way was invisible from inside this file.
+    The gate for it is `tests/python/unit/test_commands_reach_a_player.py`.
     """
 
     RECIPES = WORLD["recipes"]

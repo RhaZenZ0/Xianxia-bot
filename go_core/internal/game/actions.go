@@ -414,14 +414,14 @@ func grantQuestRewardTx(conn *storage.Conn, userID int64, questKey string, rewar
 		return map[string]any{}, nil
 	}
 	now := float64(time.Now().UnixNano()) / 1e9
-	if stones != 0 || insight != 0 {
-		if _, err := conn.Execute(`UPDATE characters SET spirit_stones=spirit_stones+?,insight_xp=insight_xp+?,updated_at=? WHERE user_id=?`,
-			[]any{stones, insight, now, userID}); err != nil {
+	if insight != 0 {
+		if _, err := conn.Execute(`UPDATE characters SET insight_xp=insight_xp+?,updated_at=? WHERE user_id=?`,
+			[]any{insight, now, userID}); err != nil {
 			return nil, err
 		}
 	}
 	if stones != 0 {
-		if _, err := walletDeltaTx(conn, userID, "low_spirit_stone", stones, now); err != nil {
+		if _, err := walletDeltaTx(conn, userID, mirroredCurrency, stones, now); err != nil {
 			return nil, err
 		}
 	}
@@ -696,11 +696,11 @@ func cultivationReward(conn *storage.Conn, userID int64, raw json.RawMessage) (a
 		}
 	}
 	now := float64(time.Now().UnixNano()) / 1e9
-	if _, err := conn.Execute(`UPDATE characters SET cultivation=cultivation+?,spirit_stones=spirit_stones+?,insight_xp=insight_xp+?,updated_at=? WHERE user_id=?`, []any{awarded, p.SpiritStones, p.InsightXP, now, userID}); err != nil {
+	if _, err := conn.Execute(`UPDATE characters SET cultivation=cultivation+?,insight_xp=insight_xp+?,updated_at=? WHERE user_id=?`, []any{awarded, p.InsightXP, now, userID}); err != nil {
 		return nil, err
 	}
 	if p.SpiritStones != 0 {
-		if _, err := conn.Execute(`INSERT INTO currency_wallets(user_id,currency_id,balance) VALUES(?,?,?) ON CONFLICT(user_id,currency_id) DO UPDATE SET balance=balance+excluded.balance`, []any{userID, "low_spirit_stone", p.SpiritStones}); err != nil {
+		if _, err := walletDeltaTx(conn, userID, mirroredCurrency, p.SpiritStones, now); err != nil {
 			return nil, err
 		}
 	}

@@ -98,6 +98,7 @@ func TestStage5RoadTravelUsesCanonicalClockDurationAndDanger(t *testing.T) {
 	current := "Riverguard City"
 	destination := catalog.Locations[current].Roads[0]
 	batch4Exec(t, path, `UPDATE characters SET location=?,vitality=100,spirit_stones=100 WHERE user_id=42`, current)
+	syncPurse(t, path)
 	batch4SetCanonicalGameMinute(t, path, 3000)
 
 	previous := roadEncounterIntn
@@ -184,6 +185,7 @@ func TestStage5RoadEncounterAddsDelayAndAppliesNonlethalDanger(t *testing.T) {
 	base := canonicalRoadTravelProfile(origin, dest, 0)
 
 	batch4Exec(t, path, `UPDATE characters SET location=?,vitality=12,spirit_stones=100 WHERE user_id=42`, current)
+	syncPurse(t, path)
 	batch4SetCanonicalGameMinute(t, path, 4000)
 
 	rolls := []int{0, 2}
@@ -275,6 +277,7 @@ func TestStage6MultiHopRoadTravelUsesShortestCanonicalRouteAndCost(t *testing.T)
 	}
 
 	batch4Exec(t, path, `UPDATE characters SET location=?,spirit_stones=1000,vitality=100 WHERE user_id=42`, origin)
+	syncPurse(t, path)
 	batch4Exec(t, path, `INSERT OR IGNORE INTO character_location_discoveries(user_id,location,discovery_kind,discovered_game_minute,created_at) VALUES(?,?, 'test',0,0)`, 42, destination)
 	batch4SetCanonicalGameMinute(t, path, 5000)
 
