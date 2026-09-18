@@ -74,6 +74,7 @@ from .commands import cooldowns as _commands_cooldowns  # noqa: F401  (registers
 from .commands import sense as _commands_sense  # noqa: F401  (registers its root commands on import)
 from .commands import support as _commands_support  # noqa: F401  (registers /tribute on import)
 from .commands.territory import caravan_group, party_group, party_status, territory_group, war_group, war_status
+from . import maintenance
 from .hubs import (
     LAYOUT_COMPONENTS_AVAILABLE,
     HubDefinition,
@@ -85,6 +86,7 @@ from .hubs import (
     register_menu_builder,
     register_menu_facts,
     register_hidden_actions,
+    register_maintenance_gate,
     send_hub,
 )
 from .locations import here_summary
@@ -574,7 +576,7 @@ _ADMIN_HUB_DEFINITION = HubDefinition(
                 only=("admin server setup", "admin server status", "admin server basechannels",
                       "admin server bind_channels", "admin server realmhubs")),
         HubPage(key="operations", label="Operations", description="Running it: backups, maintenance, telemetry, the audit log, narrator health and the playtest board.", command=admin_server_group,
-                only=("admin server backup", "admin server maintenance", "admin server observability",
+                only=("admin server backup", "admin server lockdown", "admin server maintenance", "admin server observability",
                       "admin server audit", "admin server ai_status", "admin server chat_digest",
                       "admin server playtest")),
         HubPage(key="world", label="World", description="Events, secret realms and canonical world time.", command=admin_world_group),
@@ -916,6 +918,19 @@ async def _hidden_actions(interaction: discord.Interaction) -> dict[str, str]:
 
 
 register_hidden_actions(_hidden_actions)
+
+
+async def _panel_maintenance_gate(user: "discord.abc.User", path: str) -> str | None:
+    """The hub panel's half of maintenance mode (v1.0.0-rc.41).
+
+    A panel lives fifteen minutes, so the world can close under one that is
+    already open; the check therefore belongs on the press. Registered here
+    because `hubs` sits below `runtime` and cannot reach `DB` itself.
+    """
+    return await maintenance.refuse(DB, user, command=path)
+
+
+register_maintenance_gate(_panel_maintenance_gate)
 
 
 register_hubs(*_HUB_DEFINITIONS, _ADMIN_HUB_DEFINITION)

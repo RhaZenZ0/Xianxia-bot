@@ -14,6 +14,7 @@ from typing import Any
 
 import discord
 import httpx
+from discord import app_commands
 from discord.ext import commands
 
 from ..database import SCHEMA_VERSION
@@ -33,7 +34,8 @@ from .admin.narration_control import (
 )
 from .channels import post_server_log
 from .character_state import _remember_freeform_npc_scene
-from .runtime import DB, ENGINE, SETTINGS, TYPED_PLAY_BUDGET, WORLD, _sync_realm_presence_roles, character_location_display, chunk_text, current_world_time, log
+from . import maintenance
+from .runtime import DB, ENGINE, SETTINGS, TYPED_PLAY_BUDGET, WORLD, _sync_realm_presence_roles, character_location_display, chunk_text, current_world_time, log, respond
 from ..ai.quest_forge import store_draft
 from ..rules.quests import QUEST_DEFINITIONS, beginner_path_seed_rows, household_errand_seed_rows, static_quest_seed_rows
 from .services import AI_ROUTER, ALERTS, GUILD, NARRATOR, NARRATOR_CONTEXT, QUEST_FORGE, SIM
@@ -95,6 +97,30 @@ def weekend_announcement(window: dict[str, Any], stored: str) -> tuple[str, str 
     return state, None
 
 
+class MaintenanceAwareTree(app_commands.CommandTree):
+    """The one gate every slash command passes (v1.0.0-rc.41).
+
+    discord.py calls `interaction_check` once per application command, before
+    the handler, which is the only place in this process that sees all ~250 of
+    them - including the read-only cards that never reach the engine and so
+    would otherwise answer happily out of a half-migrated database.
+
+    `serialized_user_action` was the tempting alternative and is the wrong one:
+    it wraps only the ~119 state-changing handlers, so `/sheet` and `/quests`
+    would have stayed open.
+    """
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        command = getattr(interaction, "command", None)
+        refusal = await maintenance.refuse(
+            DB, interaction.user, command=getattr(command, "qualified_name", "") or "",
+        )
+        if refusal is None:
+            return True
+        await respond(interaction, refusal, ephemeral=False)
+        return False
+
+
 class XianxiaBot(commands.Bot):
     def __init__(self) -> None:
         intents = discord.Intents.default()
@@ -104,6 +130,7 @@ class XianxiaBot(commands.Bot):
         super().__init__(
             command_prefix="!unused-",
             intents=intents,
+            tree_cls=MaintenanceAwareTree,
             # User-supplied character names/RP text must never be able to turn
             # stored/generated text into real Discord notifications.
             allowed_mentions=discord.AllowedMentions(
@@ -750,6 +777,23 @@ class XianxiaBot(commands.Bot):
         shorthand = parse_shorthand(message.content, SETTINGS.typed_play_shorthand)
         named = command_named(shorthand, commands=command_specs()) if shorthand is not None else None
         mentioned = self.user is not None and self.user in message.mentions
+
+        # The world is closed (v1.0.0-rc.41). This covers the two doors that
+        # never touch the command tree - a typed line and the shorthand heard
+        # in every channel - and it is placed after the cheap parse so an
+        # ordinary sentence in an ordinary channel still costs nothing, and
+        # before every database read below so a closed world is not answering
+        # queries it is in the middle of migrating.
+        addressing_the_game = (
+            shorthand is not None
+            or mentioned
+            or parse_prefixed(message.content, SETTINGS.typed_play_prefix) is not None
+        )
+        if addressing_the_game:
+            closed = await maintenance.refuse(DB, message.author)
+            if closed is not None:
+                await message.reply(closed, mention_author=False)
+                return
         parent_id = message.channel.parent_id if isinstance(message.channel, discord.Thread) else None
         hub_record = await DB.get_realm_hub_by_channel(message.guild.id, int(parent_id or message.channel.id))
         character = await DB.get_character(message.author.id)

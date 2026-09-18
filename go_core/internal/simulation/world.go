@@ -256,6 +256,20 @@ func (r *Runner) RunDue(req RunDueRequest) ([]Run, error) {
 		return nil, err
 	}
 	defer conn.Close()
+	// The world is closed (v1.0.0-rc.41). The scheduled tick is the one thing
+	// that writes without anybody asking it to - it ages NPCs, settles lots
+	// and runs the eight batches - so an update should not be racing it. It
+	// stands down while maintenance is on and picks up where it left off
+	// after, because every system schedules off `last_game_minute` rather
+	// than off wall-clock: nothing is skipped, it is deferred.
+	//
+	// `Force` is deliberately NOT gated: it is a GM lever, and a GM working
+	// on a closed world is the whole point of closing it.
+	if closed, _, _, err := game.MaintenanceState(conn); err != nil {
+		return nil, err
+	} else if closed {
+		return []Run{}, nil
+	}
 	gameMinute, err := game.CanonicalWorldGameMinute(conn)
 	if err != nil {
 		return nil, err

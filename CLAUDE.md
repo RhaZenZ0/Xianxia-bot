@@ -691,6 +691,47 @@ given. `Settings.world_time_scale` is gone, and
 `tests/python/contracts/test_world_clock_read_through.py` holds that no file under `app/` or
 `scripts/` so much as names `anchor_real_ts`.
 
+### The world closed for maintenance (`maintenance_mode`, v1.0.0-rc.41)
+
+An operator updating the server had no way to stop play while they did it. `/admin server
+maintenance` is cleanup, VACUUM and the content resync - it stops nobody - and the engine's
+`maintenanceBarrier` is a `sync.RWMutex` that makes a restore wait for in-flight writes and makes
+them wait for it. That barrier never *refuses* anybody: a request held there queues and then runs
+normally, which is right for a thirty-second restore and wrong for somebody swapping binaries under
+a live world. `/admin server lockdown` and the dashboard's Maintenance card are the refusal.
+
+**Where the gate sits is the design.** `applyAuthoritative` handles the ~150 player operations and
+every `admin.*` lever falls through to the switch in `ApplyWithWorld` instead, so a check there
+refuses players and *cannot* refuse a GM. That asymmetry is what makes the mode safe to have at all:
+closing the world can never lock the operator out of reopening it, and
+`TestAClosedWorldIsStillTheGMsToOpen` holds it.
+
+**The engine gate alone is not enough, and the reason is the same one moderation states about
+itself.** A read never reaches the authoritative path: `/sheet`, `/quests` and every other card
+answer out of the presentation layer's own SQL, so the engine would let them through mid-migration.
+The bot holds the matching gate at the four doors a player has - the command tree's
+`interaction_check` (every slash command, including the reads `serialized_user_action` never
+wrapped), `_invoke_action` (every hub button, select and modal, checked on the press because a panel
+outlives the world closing), `on_message` (the typed line and the shorthand heard in every channel)
+and `typed_play.dispatch` (a picker click, which is a button on a message and so never meets the
+command tree). `app/bot/maintenance.py` is the one rule all four call.
+
+Three things are deliberate. **The flag fails open** - an absent row, unreadable JSON or an
+unreachable database all mean the world is open, because a flag that gates all play must fail
+towards play; a world nobody can enter is also a world nobody can reach to unlock. **The bot caches
+it for three seconds**, so a panel's rapid clicks cost one read, and the Discord lever seeds that
+cache from the engine's own answer so the very next command obeys without waiting for the TTL; the
+dashboard needs no poke down the control channel for the same reason. **The scheduled tick stands
+down**: `RunDue` returns no runs while the world is closed, so an update is not racing a batch, and
+nothing is lost because every system schedules off `last_game_minute` rather than wall-clock - the
+work is deferred, not skipped. `Force` is deliberately not gated, because a GM working on a closed
+world is the point of closing it.
+
+The reason an operator types is shown to players verbatim and is bounded at 300 characters in the
+engine, not trusted from the payload. The Discord playtest drives this leaf explicitly rather than
+through the generic sweep, and `DEFERRED_LEAVES` says why: the sweep answers a boolean by enabling
+it, and this is the one leaf that would refuse every leaf pressed after it.
+
 ### People this world makes for itself (`npc_registry`, schema 49)
 
 Three populations, and until v1.0.0-rc.27 only one of them could be spoken to. `catalog_npcs` is a

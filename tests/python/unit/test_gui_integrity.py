@@ -88,7 +88,8 @@ class GUIIntegrityTests(unittest.TestCase):
         # +1 in v0.34.1 (server playtest, the board).
         # +1 in v1.0.0-rc.37 (player setrealm, the realm lever with the body pair).
         # +1 in v1.0.0-rc.38 (npc setmissing, the disappearance a GM can stage).
-        self.assertEqual(sum(counts), 54)
+        # +1 in v1.0.0-rc.41 (server lockdown, maintenance mode).
+        self.assertEqual(sum(counts), 55)
         self.assertLessEqual(max(counts), 25)
         # (from test_command_cleanup's twin of this test, folded in v0.20.3)
         self.assertIn('title="🛡️ Xianxia — Administrator Control Panel"', panel)

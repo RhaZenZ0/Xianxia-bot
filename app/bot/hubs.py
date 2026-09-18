@@ -462,6 +462,33 @@ def _hub_option_hint(action: "HubAction", spec: "HubInput") -> str:
     return _HUB_OPTION_HINTS.get((qualified, spec.name), "")
 
 
+_MAINTENANCE_GATE: Any = None
+
+
+def register_maintenance_gate(provider: Any) -> None:
+    """Register the check that refuses a panel press while the world is closed.
+
+    Registered from above rather than imported, for the same reason the option
+    providers are: `hubs` sits below `runtime` in the package tiers, so it
+    cannot reach the database handle itself. A hub with no gate registered
+    refuses nobody, which is the right default for a test that builds a panel
+    without a bot around it.
+    """
+    global _MAINTENANCE_GATE
+    _MAINTENANCE_GATE = provider
+
+
+async def _maintenance_refusal(user: Any, path: str) -> str | None:
+    if _MAINTENANCE_GATE is None:
+        return None
+    try:
+        return await _MAINTENANCE_GATE(user, path)
+    except Exception:
+        # A gate that cannot answer must not take the panel down with it.
+        log.exception("maintenance gate failed for %s", path)
+        return None
+
+
 def register_hub_option_provider(command: Any, parameter: str, provider: Any) -> None:
     """Register a live dropdown provider for a command parameter.
 
@@ -1156,6 +1183,16 @@ async def _invoke_action(
     action: HubAction,
     supplied: Mapping[str, Any],
 ) -> None:
+    # The world may have closed since this panel was drawn (v1.0.0-rc.41). A
+    # panel lives fifteen minutes, so the check belongs on the press and not
+    # on the open - the same reasoning the admin re-check above it follows.
+    refusal = await _maintenance_refusal(interaction.user, action.path)
+    if refusal is not None:
+        if not interaction.response.is_done():
+            await interaction.response.send_message(refusal, ephemeral=False)
+        else:
+            await interaction.followup.send(refusal, ephemeral=False)
+        return
     proxy = HubInteractionProxy(
         interaction, hub_view, command_override=action.command, supplied_options=supplied
     )

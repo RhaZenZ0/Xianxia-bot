@@ -6846,6 +6846,34 @@ class Database:
             return {}
         return {str(key): str(value or "") for key, value in stored.items()}
 
+    async def get_maintenance_mode(self) -> dict[str, Any]:
+        """Is the world closed for maintenance, and in whose words (rc.41).
+
+        The engine owns the flag and is the only writer
+        (`admin.server.maintenance_mode`). This is the presentation read: the
+        bot asks it to refuse at its own doors with the operator's reason,
+        rather than letting a player spend an interaction discovering the
+        engine's refusal - and so that a read-only card, which never reaches
+        the engine's authoritative path at all, is refused too.
+
+        Fail-open on every unreadable shape, exactly as the engine's own
+        reader does: a flag that gates all play must fail towards play.
+        """
+        async with self._connect() as db:
+            cur = await db.execute("SELECT value_json FROM world_state WHERE key='maintenance_mode'")
+            row = await cur.fetchone()
+        if not row:
+            return {"enabled": False, "reason": "", "since": 0.0}
+        try:
+            stored = json.loads(row[0])
+        except Exception:
+            return {"enabled": False, "reason": "", "since": 0.0}
+        return {
+            "enabled": bool(stored.get("enabled", False)),
+            "reason": str(stored.get("reason", "") or ""),
+            "since": float(stored.get("since", 0) or 0),
+        }
+
     async def get_automation_settings(self) -> dict[str, bool]:
         defaults = {
             "event_expiry": True,

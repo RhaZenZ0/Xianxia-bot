@@ -574,8 +574,8 @@ Decisions, AI Routing, the Player Editor (one character at a time: realm and bod
 sect, perfection, root, bloodline, physique, tribulation gates, teleport, currency, karma, fate,
 inventory, revive and recovery, cooldowns, conditions, moderation, beasts, equipment and abode
 access, every field pre-filled from the character's own rows), the Admin Console (time, forced
-simulation, intervals, automation switches, NPC relocation and an NPC lost or brought back, world
-events, bulk grants, backups,
+simulation, intervals, automation switches, maintenance mode, NPC relocation and an NPC lost or
+brought back, world events, bulk grants, backups,
 `PRAGMA optimize`, `VACUUM`, the audit log and its undo) and Narration Routes. `/api/capabilities`
 is the frontend/backend coverage contract, and CI fails on drift.
 

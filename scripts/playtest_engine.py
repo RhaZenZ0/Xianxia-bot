@@ -1966,6 +1966,25 @@ async def run(url: str, token: str, db_path: str) -> Report:
     await audited("admin.player.set_sect", {"user_id": BUYER, "remove": True, "rank_level": 0, "reason": "playtest"}, name="admin.player.set_sect remove")
     await audited("admin.npc.relocate", {"npc_name": "Elder Su Yan", "location": town, "reason": "playtest"})
     await audited("admin.automation.set", {"system": "npc_life", "enabled": True, "reason": "playtest"})
+
+    # -- the world closed for maintenance (v1.0.0-rc.41) ---------------------
+    # Driven here rather than anywhere earlier because it shuts every player
+    # door in the game: the leg proves the refusal, that a GM is unaffected,
+    # and that the scheduled tick stands down, then opens the world again
+    # before the sections after it run.
+    await audited("admin.server.maintenance_mode",
+                  {"enabled": True, "reason": "playtest lockdown"}, name="close the world")
+    await either("a player action is refused while the world is closed",
+                 act("cultivation.train", PLAYER, {}), "closed for maintenance", "playtest lockdown")
+    closed_runs = await step(report, "the scheduled tick stands down",
+                             engine.run_due_simulation(await clock(), {"npc_life": True}))
+    report.add("PASS" if closed_runs == [] else "FAIL",
+               "the closed world ran no systems", f"{len(closed_runs or [])} run(s)")
+    await step(report, "a GM lever still answers while the world is closed",
+               gm("admin.world.advance_time", {"minutes": 60, "reason": "playtest lockdown"}))
+    await audited("admin.server.maintenance_mode",
+                  {"enabled": False, "reason": "playtest"}, name="open the world again")
+    await step(report, "the player may act again", act("cultivation.train", PLAYER, {"cooldown_seconds": 0}))
     await audited("admin.simulation.interval", {"system": "npc_life", "days": 7, "reason": "playtest"})
     await audited("admin.commission.review", {"quest_key": str(world["commissions"][0]["quest_key"]), "status": "approved", "reason": "playtest"})
     await either("admin.commission.retire", gm("admin.commission.retire", {"user_id": BUYER, "reason": "playtest"}), "holds no commission")
