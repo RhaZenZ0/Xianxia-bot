@@ -94,7 +94,7 @@ func TestTheHouseholdGivesOnlyToSomebodyStandingInIt(t *testing.T) {
 			return familySupportActionGo(c, catalog, 42, payload(map[string]any{"cooldown_game_minutes": 100}))
 		},
 		"contribute": func(c *storage.Conn) (authoritativeMutation, error) {
-			return familyContributeActionGo(c, 42, payload(map[string]any{"amount": 10}))
+			return familyContributeActionGo(c, worlddata.Catalog{}, 42, payload(map[string]any{"amount": 10}))
 		},
 		"tutor": func(c *storage.Conn) (authoritativeMutation, error) {
 			return familyTutorActionGo(c, catalog, 42, payload(map[string]any{}))
@@ -121,13 +121,13 @@ func TestAContributionFillsTheCoffersAndTheLedger(t *testing.T) {
 	batch4Exec(t, path, `INSERT INTO currency_wallets(user_id,currency_id,balance) VALUES(42,'low_spirit_stone',300) ON CONFLICT(user_id,currency_id) DO UPDATE SET balance=300`)
 
 	_, err := householdApply(t, path, func(c *storage.Conn) (authoritativeMutation, error) {
-		return familyContributeActionGo(c, 42, payload(map[string]any{"amount": 500}))
+		return familyContributeActionGo(c, worlddata.Catalog{}, 42, payload(map[string]any{"amount": 500}))
 	})
 	if err == nil || !strings.Contains(err.Error(), "not enough") {
 		t.Fatalf("a contribution beyond the wallet: err=%v", err)
 	}
 	out, err := householdApply(t, path, func(c *storage.Conn) (authoritativeMutation, error) {
-		return familyContributeActionGo(c, 42, payload(map[string]any{"amount": 100}))
+		return familyContributeActionGo(c, worlddata.Catalog{}, 42, payload(map[string]any{"amount": 100}))
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -146,7 +146,7 @@ func TestAContributionFillsTheCoffersAndTheLedger(t *testing.T) {
 	// Wealth is capped at 100 however much comes in.
 	for i := 0; i < 2; i++ {
 		if _, err := householdApply(t, path, func(c *storage.Conn) (authoritativeMutation, error) {
-			return familyContributeActionGo(c, 42, payload(map[string]any{"amount": 100}))
+			return familyContributeActionGo(c, worlddata.Catalog{}, 42, payload(map[string]any{"amount": 100}))
 		}); err != nil {
 			t.Fatal(err)
 		}

@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"xianxia/core/internal/storage"
+	"xianxia/core/internal/worlddata"
 )
 
 // Escrow that must not outlive the body (v0.23.1, external review finding #1).
@@ -32,7 +33,7 @@ import (
 // character's own rows, which reincarnation then wipes; if the player never
 // reincarnates they sit with the corpse. The point is that the value leaves
 // escrow while it still belongs to the incarnation that put it there.
-func resolveIncarnationEscrowTx(conn *storage.Conn, userID int64, gameMinute int64, now float64) (map[string]any, error) {
+func resolveIncarnationEscrowTx(conn *storage.Conn, catalog worlddata.Catalog, userID int64, gameMinute int64, now float64) (map[string]any, error) {
 	out := map[string]any{
 		"auctions_cancelled": int64(0),
 		"bids_refunded":      int64(0),
@@ -44,7 +45,7 @@ func resolveIncarnationEscrowTx(conn *storage.Conn, userID int64, gameMinute int
 	// table is absent: a character who cannot die is a worse bug than one
 	// whose auction outlives them.
 	if tableExistsTx(conn, "auctions") {
-		cancelled, refunded, err := resolveDeadPlayersAuctionsTx(conn, userID, now)
+		cancelled, refunded, err := resolveDeadPlayersAuctionsTx(conn, catalog, userID, now)
 		if err != nil {
 			return nil, err
 		}
@@ -84,7 +85,7 @@ func resolveIncarnationEscrowTx(conn *storage.Conn, userID int64, gameMinute int
 }
 
 // resolveDeadPlayersAuctionsTx handles both sides of the auction house.
-func resolveDeadPlayersAuctionsTx(conn *storage.Conn, userID int64, now float64) (int64, int64, error) {
+func resolveDeadPlayersAuctionsTx(conn *storage.Conn, catalog worlddata.Catalog, userID int64, now float64) (int64, int64, error) {
 	// 1. Lots this character was selling. The seller is dead, so the sale
 	//    cannot complete: refund whoever is currently holding the high bid
 	//    (their money is in escrow) and return the goods to the corpse.
@@ -99,7 +100,7 @@ func resolveDeadPlayersAuctionsTx(conn *storage.Conn, userID int64, now float64)
 		a := rowMap(selling.Columns, row)
 		auctionID := storage.ParseInt(a["auction_id"])
 		if bidder := storage.ParseInt(a["current_bidder_user_id"]); bidder > 0 {
-			if _, err = walletDeltaTx(conn, bidder, fmt.Sprint(a["currency_id"]),
+			if _, err = walletDeltaTx(conn, catalog, bidder, fmt.Sprint(a["currency_id"]),
 				storage.ParseInt(a["current_bid"]), now); err != nil {
 				return 0, 0, err
 			}
@@ -134,7 +135,7 @@ func resolveDeadPlayersAuctionsTx(conn *storage.Conn, userID int64, now float64)
 		a := rowMap(bidding.Columns, row)
 		amount := storage.ParseInt(a["current_bid"])
 		if amount > 0 {
-			if _, err = walletDeltaTx(conn, userID, fmt.Sprint(a["currency_id"]), amount, now); err != nil {
+			if _, err = walletDeltaTx(conn, catalog, userID, fmt.Sprint(a["currency_id"]), amount, now); err != nil {
 				return 0, 0, err
 			}
 		}

@@ -352,7 +352,7 @@ func shopBuyAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, 
 	now := nowSeconds()
 	unit := max64(1, i64(line["price"]))
 	total := unit * p.Quantity
-	balance, err := walletDeltaTx(conn, userID, shop.Currency, -total, now)
+	balance, err := walletDeltaTx(conn, catalog, userID, shop.Currency, -total, now)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -411,7 +411,7 @@ func shopSellAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64,
 	}
 	now := nowSeconds()
 	total := unit * p.Quantity
-	balance, err := walletDeltaTx(conn, userID, shop.Currency, total, now)
+	balance, err := walletDeltaTx(conn, catalog, userID, shop.Currency, total, now)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}

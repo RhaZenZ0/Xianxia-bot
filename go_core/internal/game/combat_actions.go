@@ -592,7 +592,7 @@ func combatTurnAction(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 				out["injury"] = inj
 				out["player_hp"] = int64(1)
 			} else {
-				death, e := recordTrueDeathAuthoritative(conn, userID, trueDeathPayload{GameMinute: p.GameMinute, Reason: "battle:" + b.NPCName, MinutesPerYear: p.MinutesPerYear, BaseSamsaraYears: p.BaseSamsaraYears, MaxWaitSeconds: p.MaxWaitSeconds})
+				death, e := recordTrueDeathAuthoritative(conn, catalog, userID, trueDeathPayload{GameMinute: p.GameMinute, Reason: "battle:" + b.NPCName, MinutesPerYear: p.MinutesPerYear, BaseSamsaraYears: p.BaseSamsaraYears, MaxWaitSeconds: p.MaxWaitSeconds})
 				if e != nil {
 					return authoritativeMutation{}, e
 				}
@@ -811,7 +811,7 @@ func combatTechniqueAction(conn *storage.Conn, catalog worlddata.Catalog, userID
 				out["injury"] = inj
 				out["player_hp"] = int64(1)
 			} else {
-				death, e := recordTrueDeathAuthoritative(conn, userID, trueDeathPayload{GameMinute: p.GameMinute, Reason: "battle:" + b.NPCName, MinutesPerYear: p.MinutesPerYear, BaseSamsaraYears: p.BaseSamsaraYears, MaxWaitSeconds: p.MaxWaitSeconds})
+				death, e := recordTrueDeathAuthoritative(conn, catalog, userID, trueDeathPayload{GameMinute: p.GameMinute, Reason: "battle:" + b.NPCName, MinutesPerYear: p.MinutesPerYear, BaseSamsaraYears: p.BaseSamsaraYears, MaxWaitSeconds: p.MaxWaitSeconds})
 				if e != nil {
 					return authoritativeMutation{}, e
 				}

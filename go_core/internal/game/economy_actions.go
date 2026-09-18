@@ -316,14 +316,14 @@ func auctionBidAction(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 		return authoritativeMutation{}, fmt.Errorf("minimum bid is %d", minimum)
 	}
 	if old := i64(a["current_bidder_user_id"]); old > 0 {
-		if _, err = walletDeltaTx(conn, old, fmt.Sprint(a["currency_id"]), i64(a["current_bid"]), now); err != nil {
+		if _, err = walletDeltaTx(conn, catalog, old, fmt.Sprint(a["currency_id"]), i64(a["current_bid"]), now); err != nil {
 			return authoritativeMutation{}, err
 		}
 	} else if err := refundMerchantBidderTx(conn, catalog, a, p.GameMinute, now); err != nil {
 		// A merchant held the lot (v0.37.0): its purse gets the bid back.
 		return authoritativeMutation{}, err
 	}
-	bal, err := walletDeltaTx(conn, userID, fmt.Sprint(a["currency_id"]), -p.Amount, now)
+	bal, err := walletDeltaTx(conn, catalog, userID, fmt.Sprint(a["currency_id"]), -p.Amount, now)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -420,7 +420,7 @@ func blackMarketTradeAction(conn *storage.Conn, catalog worlddata.Catalog, userI
 			return authoritativeMutation{}, errors.New("trade total overflow")
 		}
 		total = unit * p.Quantity
-		balance, err = walletDeltaTx(conn, userID, currency, -total, now)
+		balance, err = walletDeltaTx(conn, catalog, userID, currency, -total, now)
 		if err != nil {
 			return authoritativeMutation{}, err
 		}
@@ -459,7 +459,7 @@ func blackMarketTradeAction(conn *storage.Conn, catalog worlddata.Catalog, userI
 		if err != nil {
 			return authoritativeMutation{}, err
 		}
-		balance, err = walletDeltaTx(conn, userID, currency, total, now)
+		balance, err = walletDeltaTx(conn, catalog, userID, currency, total, now)
 		if err != nil {
 			return authoritativeMutation{}, err
 		}
@@ -488,7 +488,7 @@ func blackMarketTradeAction(conn *storage.Conn, catalog worlddata.Catalog, userI
 	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "economy", EventType: "black_market.trade", EntityType: "black_market", EntityID: fmt.Sprint(post["world_name"]), GameMinute: p.GameMinute, Payload: out}}, nil
 }
 
-func marketTradeAction(conn *storage.Conn, _ worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
+func marketTradeAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	var p marketTradePayload
 	if err := json.Unmarshal(raw, &p); err != nil {
 		return authoritativeMutation{}, err
@@ -523,7 +523,7 @@ func marketTradeAction(conn *storage.Conn, _ worlddata.Catalog, userID int64, ra
 			return authoritativeMutation{}, errors.New("market does not have that many in stock")
 		}
 		total = unit * p.Quantity
-		bal, err = walletDeltaTx(conn, userID, currency, -total, now)
+		bal, err = walletDeltaTx(conn, catalog, userID, currency, -total, now)
 		if err != nil {
 			return authoritativeMutation{}, err
 		}
@@ -548,7 +548,7 @@ func marketTradeAction(conn *storage.Conn, _ worlddata.Catalog, userID int64, ra
 		if err != nil {
 			return authoritativeMutation{}, err
 		}
-		bal, err = walletDeltaTx(conn, userID, currency, total, now)
+		bal, err = walletDeltaTx(conn, catalog, userID, currency, total, now)
 		if err != nil {
 			return authoritativeMutation{}, err
 		}
@@ -586,7 +586,7 @@ func equipmentPowerGo(conn *storage.Conn, userID int64) (map[string]int64, error
 	return out, nil
 }
 
-func bountyHunterActionGo(conn *storage.Conn, _ worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
+func bountyHunterActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	var p hunterActionPayload
 	if err := json.Unmarshal(raw, &p); err != nil {
 		return authoritativeMutation{}, err

@@ -459,7 +459,7 @@ func crimeAtoneAction(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 	// walletDeltaTx refuses a debit beyond the balance, which is the guard the
 	// hand-written compare-and-set here used to provide - and unlike it, the
 	// one door keeps `characters.spirit_stones` in step with the purse.
-	balance, e = walletDeltaTx(conn, userID, currency, -fine, now)
+	balance, e = walletDeltaTx(conn, catalog, userID, currency, -fine, now)
 	if e != nil {
 		return authoritativeMutation{}, e
 	}

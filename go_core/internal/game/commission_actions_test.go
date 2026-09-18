@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"xianxia/core/internal/storage"
+	"xianxia/core/internal/worlddata"
 )
 
 func setupCommissionDB(t *testing.T) string {
@@ -323,7 +324,7 @@ func TestExpiryFailsPastDeadlineCommissionsOnceOnTheTick(t *testing.T) {
 	// The tick owns the transaction, exactly as advancedMaintenance does.
 	expire := func(gm int64) []DueCommission {
 		t.Helper()
-		expired, err := ExpireDueCommissions(conn, gm)
+		expired, err := ExpireDueCommissions(conn, worlddata.Catalog{}, gm)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -368,7 +369,7 @@ func TestADeadlinelessCommissionNeverExpires(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer conn.Close()
-	expired, err := ExpireDueCommissions(conn, 9_000_000)
+	expired, err := ExpireDueCommissions(conn, worlddata.Catalog{}, 9_000_000)
 	if err != nil {
 		t.Fatal(err)
 	}

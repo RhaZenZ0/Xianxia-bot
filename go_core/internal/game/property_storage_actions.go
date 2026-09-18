@@ -453,7 +453,7 @@ func abodeUpgradeActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID 
 	if currency == "" {
 		currency = "low_spirit_stone"
 	}
-	balance, e := walletDeltaTx(conn, userID, currency, -cost, nowSeconds())
+	balance, e := walletDeltaTx(conn, catalog, userID, currency, -cost, nowSeconds())
 	if e != nil {
 		return authoritativeMutation{}, errors.New("insufficient currency")
 	}
@@ -548,7 +548,7 @@ func teleportArrayActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID
 	if i64(ch["realm_index"]) < d.MinRealmIndex {
 		return authoritativeMutation{}, errors.New("your realm cannot withstand this transit")
 	}
-	balance, e := walletDeltaTx(conn, userID, d.Currency, -d.Cost, nowSeconds())
+	balance, e := walletDeltaTx(conn, catalog, userID, d.Currency, -d.Cost, nowSeconds())
 	if e != nil {
 		return authoritativeMutation{}, errors.New("you cannot pay the array activation cost")
 	}

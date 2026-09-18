@@ -50,6 +50,7 @@ CREATE TABLE currency_wallets(
     user_id INTEGER NOT NULL, currency_id TEXT NOT NULL, balance INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY(user_id,currency_id));
 CREATE TABLE characters(
+    location TEXT NOT NULL DEFAULT '',
     user_id INTEGER PRIMARY KEY, spirit_stones INTEGER NOT NULL DEFAULT 0,
     updated_at REAL NOT NULL DEFAULT 0);
 CREATE TABLE world_eras(

@@ -82,7 +82,7 @@ func sectReputationScore(conn *storage.Conn, userID int64, sect string) (int64, 
 	}
 	return i64(row["score"]), nil
 }
-func sectRecommendationActionGo(conn *storage.Conn, _ worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
+func sectRecommendationActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	var p sectRecommendationPayload
 	if e := json.Unmarshal(raw, &p); e != nil {
 		return authoritativeMutation{}, e
@@ -489,7 +489,7 @@ func sectEconomyActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID i
 	}
 	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "sect", EventType: op, EntityType: "sect", EntityID: sect, Payload: out}}, nil
 }
-func discipleshipActionGo(conn *storage.Conn, _ worlddata.Catalog, userID int64, raw json.RawMessage, op string) (authoritativeMutation, error) {
+func discipleshipActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage, op string) (authoritativeMutation, error) {
 	now := nowSeconds()
 	var out map[string]any
 	if op == "discipleship.request" {
@@ -642,7 +642,7 @@ func consumeSectTreasuryCostGo(conn *storage.Conn, sect string, cost map[string]
 	}
 	return nil
 }
-func sectManorActionGo(conn *storage.Conn, _ worlddata.Catalog, userID int64, raw json.RawMessage, op string) (authoritativeMutation, error) {
+func sectManorActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage, op string) (authoritativeMutation, error) {
 	var p sectManorPayload
 	if e := json.Unmarshal(raw, &p); e != nil {
 		return authoritativeMutation{}, e

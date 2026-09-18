@@ -11,7 +11,6 @@ import (
 
 	"xianxia/core/internal/game"
 	"xianxia/core/internal/storage"
-	"xianxia/core/internal/worlddata"
 )
 
 var bountyHunterTitles = []string{
@@ -82,8 +81,8 @@ func (r *Runner) eraModifiers(conn *storage.Conn) (map[string]float64, error) {
 // walletDeltaSim was a byte-for-byte copy of the engine's walletDeltaTx, purse
 // write and sheet mirror and all. Two copies of a money rule is how the two
 // stores drift; there is one now and this calls it (v1.0.0-rc.43).
-func walletDeltaSim(conn *storage.Conn, userID int64, currency string, delta int64) error {
-	_, err := game.WalletDeltaTx(conn, userID, currency, delta, nowFloat())
+func (r *Runner) walletDeltaSim(conn *storage.Conn, userID int64, currency string, delta int64) error {
+	_, err := game.WalletDeltaTx(conn, r.World, userID, currency, delta, nowFloat())
 	return err
 }
 
@@ -240,7 +239,7 @@ func (r *Runner) finalizeAuctions(conn *storage.Conn, gm int64) (int64, error) {
 			if _, err = conn.Execute(`INSERT INTO inventory(user_id,item_id,quantity) VALUES(?,?,?) ON CONFLICT(user_id,item_id) DO UPDATE SET quantity=inventory.quantity+excluded.quantity`, []any{winner, fmt.Sprint(a["item_id"]), i64(a["quantity"])}); err != nil {
 				return 0, err
 			}
-			if err = payAuctionSeller(conn, a, i64(a["current_bid"])); err != nil {
+			if err = r.payAuctionSeller(conn, a, i64(a["current_bid"])); err != nil {
 				return 0, err
 			}
 			if err = game.AuctionStruckProsperityTx(conn, r.World, a); err != nil {
@@ -307,11 +306,11 @@ func (r *Runner) finalizeAuctions(conn *storage.Conn, gm int64) (int64, error) {
 // refused every such row). `storage.ParseInt(nil)` is 0, so the guard below
 // reads a NULL exactly as it was always meant to read the sentinel. A finder
 // is paid into the only purse they have: their own `wealth`.
-func payAuctionSeller(conn *storage.Conn, a map[string]any, amount int64) error {
+func (r *Runner) payAuctionSeller(conn *storage.Conn, a map[string]any, amount int64) error {
 	// One helper for both settlement paths. The merchant path in `game` used
 	// to carry its own payout with no NPC branch at all, which is how an NPC
 	// lot a merchant won would have re-broken the pass schema 50 repaired.
-	return game.PayLotSellerTx(conn, a, amount, nowFloat())
+	return game.PayLotSellerTx(conn, r.World, a, amount, nowFloat())
 }
 
 func maxSim(a, b int64) int64 {
@@ -584,7 +583,7 @@ func (r *Runner) advanceCaravans(conn *storage.Conn, gm int64) (int64, error) {
 			outcome = "seized"
 		}
 		if final > 0 {
-			if err = payCaravanOwner(conn, r.World, c, currency, final); err != nil {
+			if err = r.payCaravanOwner(conn, c, currency, final); err != nil {
 				return 0, err
 			}
 		}
@@ -618,7 +617,7 @@ func (r *Runner) advanceCaravans(conn *storage.Conn, gm int64) (int64, error) {
 // caravan - and that was the fault, not the guard: the world produced no trade
 // of its own. Now that a merchant can send one, the branch has to pay one, and
 // it pays the way `payAuctionSeller` does, into the only purse an NPC has.
-func payCaravanOwner(conn *storage.Conn, catalog worlddata.Catalog, c map[string]any, currency string, amount int64) error {
+func (r *Runner) payCaravanOwner(conn *storage.Conn, c map[string]any, currency string, amount int64) error {
 	key := strings.TrimSpace(fmt.Sprint(c["owner_key"]))
 	if key == "" || amount <= 0 {
 		return nil
@@ -631,7 +630,7 @@ func payCaravanOwner(conn *storage.Conn, catalog worlddata.Catalog, c map[string
 			// wallet for a character that does not exist.
 			return nil
 		}
-		return walletDeltaSim(conn, uid, currency, amount)
+		return r.walletDeltaSim(conn, uid, currency, amount)
 	}
 	// A merchant's takings go two places, because it has two purses and both
 	// are read: `merchant_state.budget` is what it bids and buys with, and
@@ -639,7 +638,7 @@ func payCaravanOwner(conn *storage.Conn, catalog worlddata.Catalog, c map[string
 	if _, err := conn.Execute(`UPDATE merchant_state SET budget=budget+?,updated_at=? WHERE merchant=?`, []any{amount, nowFloat(), key}); err != nil {
 		return err
 	}
-	npc := game.NPCCaravanSenderName(catalog, key)
+	npc := game.NPCCaravanSenderName(r.World, key)
 	if npc == "" {
 		return nil
 	}
@@ -819,7 +818,7 @@ func (r *Runner) expireCommissions(conn *storage.Conn, gm int64) (int64, error) 
 	if firstMap(probe) == nil {
 		return 0, nil
 	}
-	expired, err := game.ExpireDueCommissions(conn, gm)
+	expired, err := game.ExpireDueCommissions(conn, r.World, gm)
 	if err != nil {
 		return 0, err
 	}

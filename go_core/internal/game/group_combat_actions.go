@@ -249,7 +249,7 @@ func formationBonusGo(conn *storage.Conn, partyID, userID int64) (map[string]int
 	out["support"] = int64(math.Round(float64(pos.Support) * scale))
 	return out, nil
 }
-func equipmentAction(conn *storage.Conn, _ worlddata.Catalog, userID int64, raw json.RawMessage, op string) (authoritativeMutation, error) {
+func equipmentAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage, op string) (authoritativeMutation, error) {
 	now := nowSeconds()
 	result := map[string]any{}
 	switch op {
@@ -337,7 +337,7 @@ func equipmentAction(conn *storage.Conn, _ worlddata.Catalog, userID int64, raw 
 	}
 	return authoritativeMutation{Result: result, Event: eventledger.Event{Domain: "equipment", EventType: op, EntityType: "character", EntityID: fmt.Sprint(userID), Payload: result}}, nil
 }
-func partyAction(conn *storage.Conn, _ worlddata.Catalog, userID int64, raw json.RawMessage, op string) (authoritativeMutation, error) {
+func partyAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage, op string) (authoritativeMutation, error) {
 	now := nowSeconds()
 	var result map[string]any
 	if op == "party.create" {
@@ -424,7 +424,7 @@ func partyAction(conn *storage.Conn, _ worlddata.Catalog, userID int64, raw json
 	}
 	return authoritativeMutation{Result: result, Event: eventledger.Event{Domain: "party", EventType: op, EntityType: "party", EntityID: fmt.Sprint(result["party_id"]), Payload: result}}, nil
 }
-func formationAction(conn *storage.Conn, _ worlddata.Catalog, userID int64, raw json.RawMessage, op string) (authoritativeMutation, error) {
+func formationAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage, op string) (authoritativeMutation, error) {
 	party, e := activePartyRow(conn, userID)
 	if e != nil {
 		return authoritativeMutation{}, e
@@ -523,7 +523,7 @@ func formationAction(conn *storage.Conn, _ worlddata.Catalog, userID int64, raw 
 	}
 	return authoritativeMutation{Result: result, Event: eventledger.Event{Domain: "party", EventType: op, EntityType: "formation", EntityID: fmt.Sprint(result["formation_id"]), Payload: result}}, nil
 }
-func bossStartActionGo(conn *storage.Conn, _ worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
+func bossStartActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	var p bossStartPayload
 	if e := json.Unmarshal(raw, &p); e != nil {
 		return authoritativeMutation{}, e
@@ -799,7 +799,7 @@ func bossActActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64
 	}
 	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "boss", EventType: "boss.act", EntityType: "boss_encounter", EntityID: fmt.Sprint(p.EncounterID), GameMinute: p.GameMinute, Payload: out}}, nil
 }
-func bossClaimActionGo(conn *storage.Conn, _ worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
+func bossClaimActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	var p idPayload
 	if e := json.Unmarshal(raw, &p); e != nil {
 		return authoritativeMutation{}, e
@@ -815,7 +815,7 @@ func bossClaimActionGo(conn *storage.Conn, _ worlddata.Catalog, userID int64, ra
 	now := nowSeconds()
 	amt := i64(row["currency_amount"])
 	if amt != 0 {
-		if _, e = walletDeltaTx(conn, userID, "low_spirit_stone", amt, now); e != nil {
+		if _, e = walletDeltaTx(conn, catalog, userID, "low_spirit_stone", amt, now); e != nil {
 			return authoritativeMutation{}, e
 		}
 	}

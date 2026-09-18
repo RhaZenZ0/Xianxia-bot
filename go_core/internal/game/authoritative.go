@@ -396,7 +396,16 @@ func applyAuthoritative(databasePath, worldPath string, req ActionRequest) (Acti
 	if err := checkMaintenanceTx(conn); err != nil {
 		return ActionResponse{}, err
 	}
-	oldAgeDeath, err := checkPlayerOldAgeDeathTx(conn, req.ActorID, actionGameMinute, time.Now())
+	// The catalogue, loaded once for the whole switch rather than per branch
+	// (v1.0.0-rc.44, when money became a question of which world you stand in).
+	// `worlddata.Load` is memoised on the file's stat, so this costs a map
+	// lookup after the first action of a boot. A caller with no world path gets
+	// the zero catalogue, which `worldBaseCurrency` reads as the Mortal
+	// fallback - exactly the currency every one of these paths used before it
+	// could ask.
+	catalog, _ := worlddata.Load(worldPath)
+
+	oldAgeDeath, err := checkPlayerOldAgeDeathTx(conn, catalog, req.ActorID, actionGameMinute, time.Now())
 	if err != nil {
 		return ActionResponse{}, err
 	}
@@ -414,8 +423,7 @@ func applyAuthoritative(databasePath, worldPath string, req ActionRequest) (Acti
 			if strings.TrimSpace(worldPath) == "" {
 				return ActionResponse{}, errors.New("world catalog path is required")
 			}
-			catalog, loadErr := worlddata.Load(worldPath)
-			if loadErr != nil {
+			if _, loadErr := worlddata.Load(worldPath); loadErr != nil {
 				return ActionResponse{}, loadErr
 			}
 			if req.Operation == "check.resolve" {
@@ -430,9 +438,9 @@ func applyAuthoritative(databasePath, worldPath string, req ActionRequest) (Acti
 		case "commission.accept":
 			mutation, err = commissionAcceptAction(conn, req.ActorID, req.Payload)
 		case "commission.resolve":
-			mutation, err = commissionResolveAction(conn, req.ActorID, req.Payload)
+			mutation, err = commissionResolveAction(conn, catalog, req.ActorID, req.Payload)
 		case "lifecycle.true_death":
-			mutation, err = trueDeathAction(conn, req.ActorID, req.Payload)
+			mutation, err = trueDeathAction(conn, catalog, req.ActorID, req.Payload)
 		case "combat.start":
 			mutation, err = combatStartAction(conn, req.ActorID, req.Payload)
 		case "character.family_options":
@@ -444,7 +452,7 @@ func applyAuthoritative(databasePath, worldPath string, req ActionRequest) (Acti
 		case "family.household.leave":
 			mutation, err = familyHouseholdLeaveAction(conn, req.ActorID, req.Payload)
 		case "family.contribute":
-			mutation, err = familyContributeActionGo(conn, req.ActorID, req.Payload)
+			mutation, err = familyContributeActionGo(conn, catalog, req.ActorID, req.Payload)
 		case "family.lineage.investigate":
 			mutation, err = lineageInvestigateAction(conn, req.ActorID, req.Payload)
 		case "family.lineage.quest":

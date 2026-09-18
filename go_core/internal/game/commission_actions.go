@@ -20,6 +20,7 @@ import (
 
 	"xianxia/core/internal/eventledger"
 	"xianxia/core/internal/storage"
+	"xianxia/core/internal/worlddata"
 )
 
 // The refusal cooldown after a failed or abandoned commission - an operator
@@ -404,7 +405,7 @@ func applyCommissionStandingTx(conn *storage.Conn, userID int64, npcName, outcom
 // payCommissionRewardTx grants the terms locked at accept. It is the same set
 // of writes cultivation.reward makes, done inside the caller's transaction so
 // paying and resolving cannot come apart.
-func payCommissionRewardTx(conn *storage.Conn, userID int64, questKey string, rewards map[string]any) (map[string]any, error) {
+func payCommissionRewardTx(conn *storage.Conn, catalog worlddata.Catalog, userID int64, questKey string, rewards map[string]any) (map[string]any, error) {
 	stones := i64(rewards["spirit_stones"])
 	insight := i64(rewards["insight_xp"])
 	items := map[string]int64{}
@@ -426,7 +427,7 @@ func payCommissionRewardTx(conn *storage.Conn, userID int64, questKey string, re
 		}
 	}
 	if stones != 0 {
-		if _, err := walletDeltaTx(conn, userID, mirroredCurrency, stones, now); err != nil {
+		if _, err := characterWalletDeltaTx(conn, catalog, userID, stones, now); err != nil {
 			return nil, err
 		}
 	}
@@ -456,7 +457,7 @@ func payCommissionRewardTx(conn *storage.Conn, userID int64, questKey string, re
 // resolveCommissionTx is the single place a commission leaves `active`. Every
 // producer of an outcome - the player abandoning, quest.progress completing it,
 // the tick expiring it, a GM retiring it - lands here.
-func resolveCommissionTx(conn *storage.Conn, userID int64, questKey, outcome string, gameMinute int64, charge bool) (map[string]any, error) {
+func resolveCommissionTx(conn *storage.Conn, catalog worlddata.Catalog, userID int64, questKey, outcome string, gameMinute int64, charge bool) (map[string]any, error) {
 	if _, ok := commissionOutcomes[outcome]; !ok {
 		return nil, fmt.Errorf("unknown commission outcome: %s", outcome)
 	}
@@ -484,7 +485,7 @@ func resolveCommissionTx(conn *storage.Conn, userID int64, questKey, outcome str
 		if termsErr != nil {
 			terms = def.Base
 		}
-		granted, err = payCommissionRewardTx(conn, userID, questKey, terms.Rewards)
+		granted, err = payCommissionRewardTx(conn, catalog, userID, questKey, terms.Rewards)
 		if err != nil {
 			return nil, err
 		}
@@ -534,7 +535,7 @@ func loadCommissionDefinitionForResolve(conn *storage.Conn, questKey string) (*c
 	return def, nil
 }
 
-func commissionResolveAction(conn *storage.Conn, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
+func commissionResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	var p commissionResolvePayload
 	if err := json.Unmarshal(raw, &p); err != nil {
 		return authoritativeMutation{}, err
@@ -560,7 +561,7 @@ func commissionResolveAction(conn *storage.Conn, userID int64, raw json.RawMessa
 	if p.AdminRetire {
 		outcome = "abandoned"
 	}
-	out, err := resolveCommissionTx(conn, userID, questKey, outcome, p.GameMinute, charge)
+	out, err := resolveCommissionTx(conn, catalog, userID, questKey, outcome, p.GameMinute, charge)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -582,7 +583,7 @@ type DueCommission struct {
 // passed. It is the only path that makes `failed` exist without anyone
 // pressing anything, and it runs in the engine so a restart cannot lose a
 // deadline. The caller owns the transaction.
-func ExpireDueCommissions(conn *storage.Conn, gameMinute int64) ([]DueCommission, error) {
+func ExpireDueCommissions(conn *storage.Conn, catalog worlddata.Catalog, gameMinute int64) ([]DueCommission, error) {
 	res, err := conn.Execute(`SELECT user_id,quest_key FROM character_quests
 		WHERE status='active' AND commission=1 AND deadline_game_minute IS NOT NULL AND deadline_game_minute<=?
 		ORDER BY user_id, quest_key`, []any{gameMinute})
@@ -595,7 +596,7 @@ func ExpireDueCommissions(conn *storage.Conn, gameMinute int64) ([]DueCommission
 	}
 	expired := make([]DueCommission, 0, len(due))
 	for _, item := range due {
-		if _, err := resolveCommissionTx(conn, item.UserID, item.QuestKey, "failed", gameMinute, true); err != nil {
+		if _, err := resolveCommissionTx(conn, catalog, item.UserID, item.QuestKey, "failed", gameMinute, true); err != nil {
 			return nil, err
 		}
 		expired = append(expired, item)
@@ -664,7 +665,7 @@ func adminQuestReview(conn *storage.Conn, adminUserID int64, raw json.RawMessage
 // them. There is no override that hands out a second commission: the only way
 // to free the slot is to end the one they have, and ending it as a GM costs
 // the player nothing.
-func adminCommissionRetire(conn *storage.Conn, adminUserID int64, raw json.RawMessage) (any, error) {
+func adminCommissionRetire(conn *storage.Conn, catalog worlddata.Catalog, adminUserID int64, raw json.RawMessage) (any, error) {
 	p, err := decodeMap(raw)
 	if err != nil {
 		return nil, err
@@ -698,7 +699,7 @@ func adminCommissionRetire(conn *storage.Conn, adminUserID int64, raw json.RawMe
 			return nil, errors.New("that player holds no commission")
 		}
 	}
-	out, err := resolveCommissionTx(conn, uid, questKey, "abandoned", gameMinute, false)
+	out, err := resolveCommissionTx(conn, catalog, uid, questKey, "abandoned", gameMinute, false)
 	if err != nil {
 		return nil, err
 	}

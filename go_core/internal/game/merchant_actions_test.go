@@ -504,7 +504,7 @@ func TestAMerchantHoldingTheHighBidWinsTheLot(t *testing.T) {
 //
 // Schema 50 let one of the world's own people put a lot on the floor with no
 // character behind it, and MerchantsBid bids on every open lot, so a merchant
-// will win one. merchantTakesLotTx then paid walletDeltaTx(conn, 0, ...): a
+// will win one. merchantTakesLotTx then paid walletDeltaTx(conn, catalog, 0, ...): a
 // currency_wallets row for user 0, foreign-keyed to characters and refused,
 // which ended the maintenance pass before its commit - and, since the lot
 // stays active with its ends_at in the past, on every tick after. The same

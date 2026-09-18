@@ -82,7 +82,7 @@ func resolveEscrow(t *testing.T, path string, userID int64) map[string]any {
 		t.Fatal(err)
 	}
 	defer conn.Close()
-	out, err := resolveIncarnationEscrowTx(conn, userID, 9000, 1234.5)
+	out, err := resolveIncarnationEscrowTx(conn, worlddata.Catalog{}, userID, 9000, 1234.5)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -255,7 +255,7 @@ func TestDyingWorksOnADatabaseWithNoEscrowTables(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer conn.Close()
-	out, err := resolveIncarnationEscrowTx(conn, 42, 9000, 1234.5)
+	out, err := resolveIncarnationEscrowTx(conn, worlddata.Catalog{}, 42, 9000, 1234.5)
 	if err != nil {
 		t.Fatalf("resolving escrow failed on a database without those tables: %v", err)
 	}

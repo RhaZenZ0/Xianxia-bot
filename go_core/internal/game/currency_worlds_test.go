@@ -3,6 +3,7 @@ package game
 import (
 	"testing"
 
+	"xianxia/core/internal/storage"
 	"xianxia/core/internal/worlddata"
 )
 
@@ -96,5 +97,62 @@ func TestNoTierAboveTheBaseIsEverCharged(t *testing.T) {
 		if def.Tier != 1 {
 			t.Errorf("%s is priced in %s, which is tier %d", world, base, def.Tier)
 		}
+	}
+}
+
+// Paid where you stand (v1.0.0-rc.44).
+//
+// Every price in the content file is its own world's tier-1 currency, and until
+// now almost every reward credited `low_spirit_stone` wherever it was earned -
+// so a cultivator above the Mortal World was paid in money the shops there do
+// not take. With the old constant restored this fails on the currency id.
+func TestARewardIsPaidInTheMoneyOfTheWorldItIsEarnedIn(t *testing.T) {
+	path := setupBatch4AuthorityDB(t)
+	world := batch4WorldPath(t)
+	batch4SetCanonicalGameMinute(t, path, 6000)
+
+	for _, where := range []struct{ location, currency string }{
+		{"Greenriver Town", "low_spirit_stone"},
+		{"Spirit Jade Capital", "low_spirit_crystal"},
+	} {
+		t.Run(where.location, func(t *testing.T) {
+			batch4Exec(t, path, `UPDATE characters SET location=? WHERE user_id=42`, where.location)
+			batch4Exec(t, path, `DELETE FROM currency_wallets WHERE user_id=42`)
+			batch4Exec(t, path, `UPDATE characters SET spirit_stones=0 WHERE user_id=42`)
+
+			conn, err := storage.Open(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			catalog, err := worlddata.Load(world)
+			if err != nil {
+				conn.Close()
+				t.Fatal(err)
+			}
+			if _, err := characterWalletDeltaTx(conn, catalog, 42, 40, nowSeconds()); err != nil {
+				conn.Close()
+				t.Fatal(err)
+			}
+			if err := conn.Commit(); err != nil {
+				conn.Close()
+				t.Fatal(err)
+			}
+			conn.Close()
+
+			held := storage.ParseInt(actionScalar(t, path,
+				`SELECT balance FROM currency_wallets WHERE user_id=42 AND currency_id=?`, where.currency))
+			if held != 40 {
+				t.Fatalf("standing in %s, 40 stones landed in %s as %d", where.location, where.currency, held)
+			}
+			rows := storage.ParseInt(actionScalar(t, path, `SELECT COUNT(*) FROM currency_wallets WHERE user_id=42`))
+			if rows != 1 {
+				t.Fatalf("%d wallet rows; the reward should be denominated once", rows)
+			}
+			// The sheet's one number follows the character, not the Mortal World.
+			if sheet := storage.ParseInt(actionScalar(t, path,
+				`SELECT spirit_stones FROM characters WHERE user_id=42`)); sheet != 40 {
+				t.Fatalf("the sheet says %d while the purse holds 40", sheet)
+			}
+		})
 	}
 }

@@ -10,6 +10,7 @@ import (
 	"xianxia/core/internal/eventledger"
 	lifespanmodel "xianxia/core/internal/lifespan"
 	"xianxia/core/internal/storage"
+	"xianxia/core/internal/worlddata"
 )
 
 const minutesPerYear int64 = lifespanmodel.MinutesPerYear
@@ -442,7 +443,7 @@ const oldAgeDeathMaxWaitSeconds int64 = 300
 // for a player-initiated lifecycle.true_death call to surface properly
 // instead of silently blocking whatever unrelated action triggered this
 // check).
-func checkPlayerOldAgeDeathTx(conn *storage.Conn, userID, currentGameMinute int64, now time.Time) (*authoritativeMutation, error) {
+func checkPlayerOldAgeDeathTx(conn *storage.Conn, catalog worlddata.Catalog, userID, currentGameMinute int64, now time.Time) (*authoritativeMutation, error) {
 	res, err := conn.Execute(
 		`SELECT life_status,realm_index,phase,body_realm_index,body_phase,natural_lifespan_years,
 		        life_extension_years,created_game_minute,age_at_creation_years
@@ -473,7 +474,7 @@ func checkPlayerOldAgeDeathTx(conn *storage.Conn, userID, currentGameMinute int6
 	if !lifespanmodel.OldAgeExpired(subject, clock.EffectiveGameMinute) {
 		return nil, nil
 	}
-	out, err := recordTrueDeathAuthoritative(conn, userID, trueDeathPayload{
+	out, err := recordTrueDeathAuthoritative(conn, catalog, userID, trueDeathPayload{
 		GameMinute:       clock.EffectiveGameMinute,
 		Reason:           "old_age",
 		MinutesPerYear:   minutesPerYear,

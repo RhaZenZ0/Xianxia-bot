@@ -245,7 +245,7 @@ func supportVoteClaimAction(conn *storage.Conn, catalog worlddata.Catalog, userI
 	// walletDeltaTx rather than a raw upsert: it guards the int64 overflow and
 	// mirrors low_spirit_stone into characters.spirit_stones, which the sheet
 	// and every price check read.
-	balance, err := walletDeltaTx(conn, userID, gift.Currency, gift.Amount, now)
+	balance, err := walletDeltaTx(conn, catalog, userID, gift.Currency, gift.Amount, now)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}

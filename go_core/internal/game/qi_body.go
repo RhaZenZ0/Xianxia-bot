@@ -468,14 +468,14 @@ func meridianHealAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 		return authoritativeMutation{}, fmt.Errorf("the channels need time between mendings: %d seconds", rem)
 	}
 	cost := int64(40) * maxI64(1, body.MeridiansDamaged)
-	held, err := walletBalanceTx(conn, userID, mirroredCurrency)
+	held, err := characterWalletBalanceTx(conn, catalog, userID)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
 	if held < cost {
 		return authoritativeMutation{}, fmt.Errorf("mending a channel costs %d spirit stones; you have %d", cost, held)
 	}
-	if _, err = walletDeltaTx(conn, userID, mirroredCurrency, -cost, now); err != nil {
+	if _, err = characterWalletDeltaTx(conn, catalog, userID, -cost, now); err != nil {
 		return authoritativeMutation{}, err
 	}
 	mended := ""

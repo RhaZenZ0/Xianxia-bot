@@ -47,7 +47,7 @@ type tradeParty struct {
 
 func tradeTablesExist(conn *storage.Conn) bool { return tableExistsTx(conn, "trade_offers") }
 
-func loadTradeParty(conn *storage.Conn, userID int64) (tradeParty, error) {
+func loadTradeParty(conn *storage.Conn, catalog worlddata.Catalog, userID int64) (tradeParty, error) {
 	res, err := conn.Execute(`SELECT user_id,name,location,life_status FROM characters WHERE user_id=?`, []any{userID})
 	if err != nil {
 		return tradeParty{}, err
@@ -60,7 +60,7 @@ func loadTradeParty(conn *storage.Conn, userID int64) (tradeParty, error) {
 	// and move it with two bare UPDATEs, touching `currency_wallets` nowhere -
 	// so every trade left the two disagreeing and the next wallet write
 	// silently overwrote one with the other (v1.0.0-rc.43).
-	stones, err := walletBalanceTx(conn, userID, mirroredCurrency)
+	stones, err := characterWalletBalanceTx(conn, catalog, userID)
 	if err != nil {
 		return tradeParty{}, err
 	}
@@ -216,11 +216,11 @@ func tradeOfferAction(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 	if len(give) == 0 && p.GiveStones == 0 && len(want) == 0 && p.WantStones == 0 {
 		return authoritativeMutation{}, errors.New("offer something or ask for something")
 	}
-	me, err := loadTradeParty(conn, userID)
+	me, err := loadTradeParty(conn, catalog, userID)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
-	other, err := loadTradeParty(conn, p.ToUserID)
+	other, err := loadTradeParty(conn, catalog, p.ToUserID)
 	if err != nil {
 		return authoritativeMutation{}, errors.New("the other cultivator has no character")
 	}
@@ -308,11 +308,11 @@ func tradeAcceptAction(conn *storage.Conn, catalog worlddata.Catalog, userID int
 		result["lapsed"] = true
 		return authoritativeMutation{Result: result, Event: eventledger.Event{Domain: "trade", EventType: "trade.expired", EntityType: "trade_offer", EntityID: fmt.Sprint(p.OfferID), SubjectType: "character", SubjectID: fmt.Sprint(userID), GameMinute: p.GameMinute, Payload: result}}, nil
 	}
-	from, err := loadTradeParty(conn, fromID)
+	from, err := loadTradeParty(conn, catalog, fromID)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
-	to, err := loadTradeParty(conn, userID)
+	to, err := loadTradeParty(conn, catalog, userID)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -350,10 +350,10 @@ func tradeAcceptAction(conn *storage.Conn, catalog worlddata.Catalog, userID int
 	if err := moveItemsTx(conn, userID, fromID, want, now); err != nil {
 		return authoritativeMutation{}, err
 	}
-	if _, err := walletDeltaTx(conn, fromID, mirroredCurrency, wantStones-giveStones, now); err != nil {
+	if _, err := characterWalletDeltaTx(conn, catalog, fromID, wantStones-giveStones, now); err != nil {
 		return authoritativeMutation{}, err
 	}
-	if _, err := walletDeltaTx(conn, userID, mirroredCurrency, giveStones-wantStones, now); err != nil {
+	if _, err := characterWalletDeltaTx(conn, catalog, userID, giveStones-wantStones, now); err != nil {
 		return authoritativeMutation{}, err
 	}
 	if _, err := conn.Execute(`UPDATE trade_offers SET status='accepted',resolved_at=?,updated_at=? WHERE offer_id=?`, []any{now, now, p.OfferID}); err != nil {
@@ -411,7 +411,7 @@ func tradeDeclineAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 // tradeStatusQuery lists the open offers the actor made and the open
 // offers made to them, with the inn they stand at.
 func tradeStatusQuery(conn *storage.Conn, catalog worlddata.Catalog, userID int64) (map[string]any, error) {
-	me, err := loadTradeParty(conn, userID)
+	me, err := loadTradeParty(conn, catalog, userID)
 	if err != nil {
 		return nil, err
 	}

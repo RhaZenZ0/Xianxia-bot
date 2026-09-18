@@ -74,7 +74,7 @@ func ensureWarOperationGo(conn *storage.Conn, warID, gm int64, now float64) erro
 	_, e := conn.Execute(`INSERT INTO territory_war_operations(war_id,siege_progress,attacker_morale,defender_morale,attacker_force,defender_force,last_tick_game_minute,winner_key,resolution,occupation_until_game_minute,updated_at) VALUES(?,0,100,100,0,0,?,'','',0,?) ON CONFLICT(war_id) DO NOTHING`, []any{warID, gm, now})
 	return e
 }
-func territoryClaimActionGo(conn *storage.Conn, _ worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
+func territoryClaimActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	var p territoryClaimPayload
 	if e := json.Unmarshal(raw, &p); e != nil {
 		return authoritativeMutation{}, e
@@ -129,7 +129,7 @@ func territoryClaimActionGo(conn *storage.Conn, _ worlddata.Catalog, userID int6
 	}
 	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "territory", EventType: "territory.claim", EntityType: "territory", EntityID: p.TerritoryKey, GameMinute: p.GameMinute, Payload: out}}, nil
 }
-func territoryWarActActionGo(conn *storage.Conn, _ worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
+func territoryWarActActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	var p warActPayload
 	if e := json.Unmarshal(raw, &p); e != nil {
 		return authoritativeMutation{}, e
@@ -349,7 +349,7 @@ func caravanDispatchActionGo(conn *storage.Conn, catalog worlddata.Catalog, user
 	operatingCost := escortCost + routeCost
 	now := nowSeconds()
 	if operatingCost > 0 {
-		if _, e = walletDeltaTx(conn, userID, currency, -operatingCost, now); e != nil {
+		if _, e = walletDeltaTx(conn, catalog, userID, currency, -operatingCost, now); e != nil {
 			return authoritativeMutation{}, e
 		}
 	}
@@ -429,7 +429,7 @@ func boolInt(v bool) int64 {
 	}
 	return 0
 }
-func caravanSettleActionGo(conn *storage.Conn, _ worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
+func caravanSettleActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	var p caravanSettlePayload
 	if e := json.Unmarshal(raw, &p); e != nil {
 		return authoritativeMutation{}, e
@@ -483,7 +483,7 @@ func caravanSettleActionGo(conn *storage.Conn, _ worlddata.Catalog, userID int64
 			outcome = "seized"
 		}
 		if final > 0 {
-			if _, e = walletDeltaTx(conn, userID, currency, final, now); e != nil {
+			if _, e = walletDeltaTx(conn, catalog, userID, currency, final, now); e != nil {
 				return authoritativeMutation{}, e
 			}
 		}

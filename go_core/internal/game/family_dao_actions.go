@@ -356,7 +356,7 @@ func familySupportActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID
 	}
 	_, _ = conn.Execute(`UPDATE character_birth_family SET last_support_game_minute=? WHERE user_id=?`, []any{p.GameMinute, userID})
 	if stones > 0 {
-		if _, e = walletDeltaTx(conn, userID, "low_spirit_stone", stones, now); e != nil {
+		if _, e = walletDeltaTx(conn, catalog, userID, "low_spirit_stone", stones, now); e != nil {
 			return authoritativeMutation{}, e
 		}
 	}

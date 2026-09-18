@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"xianxia/core/internal/storage"
+	"xianxia/core/internal/worlddata"
 )
 
 func nowSeconds() float64 { return float64(unixNanoNow()) / 1e9 }
@@ -59,21 +60,14 @@ func walletBalanceTx(conn *storage.Conn, userID int64, currency string) (int64, 
 	return 0, nil
 }
 
-// mirroredCurrency is the one currency `characters.spirit_stones` follows.
-// That column is a *mirror* of the purse, not a second purse, and every write
-// to it belongs inside walletDeltaTx - see `TestThePurseHasOneDoor`.
-// (v1.0.0-rc.44 makes which currency it mirrors depend on the world the
-// character stands in; today every reward path credits the Mortal base.)
-const mirroredCurrency = "low_spirit_stone"
-
 // WalletDeltaTx is the one door, exported for the simulation package, which
 // kept its own byte-for-byte copy of it (`walletDeltaSim`) until rc.43 - the
 // same "four copies of one rule" the world clock was fixed for in rc.39.
-func WalletDeltaTx(conn *storage.Conn, userID int64, currency string, delta int64, now float64) (int64, error) {
-	return walletDeltaTx(conn, userID, currency, delta, now)
+func WalletDeltaTx(conn *storage.Conn, catalog worlddata.Catalog, userID int64, currency string, delta int64, now float64) (int64, error) {
+	return walletDeltaTx(conn, catalog, userID, currency, delta, now)
 }
 
-func walletDeltaTx(conn *storage.Conn, userID int64, currency string, delta int64, now float64) (int64, error) {
+func walletDeltaTx(conn *storage.Conn, catalog worlddata.Catalog, userID int64, currency string, delta int64, now float64) (int64, error) {
 	currency = strings.TrimSpace(currency)
 	if currency == "" {
 		return 0, errors.New("currency_id is required")
@@ -93,7 +87,15 @@ func walletDeltaTx(conn *storage.Conn, userID int64, currency string, delta int6
 	if err != nil {
 		return balance, err
 	}
-	if currency == mirroredCurrency {
+	// The sheet shows one number, and it is the money of the world the
+	// character is standing in - not `low_spirit_stone` wherever they are
+	// (v1.0.0-rc.44). A failed lookup leaves the mirror alone rather than
+	// writing a number from the wrong world.
+	base, baseErr := characterBaseCurrencyTx(conn, catalog, userID)
+	if baseErr != nil {
+		return balance, baseErr
+	}
+	if currency == base {
 		if _, err = conn.Execute(`UPDATE characters SET spirit_stones=?,updated_at=? WHERE user_id=?`, []any{next, now, userID}); err != nil {
 			return balance, err
 		}

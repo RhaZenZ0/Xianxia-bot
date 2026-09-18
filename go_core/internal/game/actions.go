@@ -11,6 +11,7 @@ import (
 
 	"xianxia/core/internal/core"
 	"xianxia/core/internal/storage"
+	"xianxia/core/internal/worlddata"
 )
 
 type ActionRequest struct {
@@ -47,20 +48,23 @@ func ApplyWithWorld(databasePath, worldPath string, req ActionRequest) (ActionRe
 		return ActionResponse{}, err
 	}
 	defer conn.Close()
+	// One catalogue for the switch; see applyAuthoritative for why a failed
+	// load is not an error here.
+	catalog, _ := worlddata.Load(worldPath)
 	var result any
 	switch req.Operation {
 	case "relationship.update":
 		result, err = relationshipUpdate(conn, req.ActorID, req.Payload)
 	case "npc.found":
-		result, err = npcFound(conn, req.ActorID, req.Payload)
+		result, err = npcFound(conn, catalog, req.ActorID, req.Payload)
 	case "scene.transition":
 		result, err = sceneTransition(conn, req.ActorID, req.Payload)
 	case "quest.progress":
-		result, err = questProgress(conn, req.ActorID, req.Payload)
+		result, err = questProgress(conn, catalog, req.ActorID, req.Payload)
 	case "combat.apply_damage":
 		result, err = combatApplyDamage(conn, req.ActorID, req.Payload)
 	case "cultivation.reward":
-		result, err = cultivationReward(conn, req.ActorID, req.Payload)
+		result, err = cultivationReward(conn, catalog, req.ActorID, req.Payload)
 	case "admin.world.advance_time":
 		result, err = adminAdvanceTime(conn, req.ActorID, req.Payload)
 	case "admin.player.grant_currency":
@@ -92,7 +96,7 @@ func ApplyWithWorld(databasePath, worldPath string, req ActionRequest) (ActionRe
 	case "admin.commission.review":
 		result, err = adminQuestReview(conn, req.ActorID, req.Payload, "admin.commission.review")
 	case "admin.commission.retire":
-		result, err = adminCommissionRetire(conn, req.ActorID, req.Payload)
+		result, err = adminCommissionRetire(conn, catalog, req.ActorID, req.Payload)
 	// v0.24.0. The review action was always general - it changes the status of
 	// a quest_definitions row and never looked at whether the row had a giver -
 	// but it was named and audited as though commissions were the only thing
@@ -389,7 +393,7 @@ const (
 // quest was completed and never paid, and no retry could fix it: the next
 // progress report skips a quest that is no longer active. Completion and
 // payment are now one commit.
-func grantQuestRewardTx(conn *storage.Conn, userID int64, questKey string, rewards map[string]any) (map[string]any, error) {
+func grantQuestRewardTx(conn *storage.Conn, catalog worlddata.Catalog, userID int64, questKey string, rewards map[string]any) (map[string]any, error) {
 	stones := clamp(i64(rewards["spirit_stones"]), 0, questRewardMaxStones)
 	insight := clamp(i64(rewards["insight_xp"]), 0, questRewardMaxInsight)
 	items := map[string]int64{}
@@ -421,7 +425,7 @@ func grantQuestRewardTx(conn *storage.Conn, userID int64, questKey string, rewar
 		}
 	}
 	if stones != 0 {
-		if _, err := walletDeltaTx(conn, userID, mirroredCurrency, stones, now); err != nil {
+		if _, err := characterWalletDeltaTx(conn, catalog, userID, stones, now); err != nil {
 			return nil, err
 		}
 	}
@@ -448,7 +452,7 @@ func grantQuestRewardTx(conn *storage.Conn, userID int64, questKey string, rewar
 	return granted, nil
 }
 
-func questProgress(conn *storage.Conn, userID int64, raw json.RawMessage) (any, error) {
+func questProgress(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (any, error) {
 	var p questPayload
 	if err := json.Unmarshal(raw, &p); err != nil {
 		return nil, err
@@ -549,13 +553,13 @@ func questProgress(conn *storage.Conn, userID int64, raw json.RawMessage) (any, 
 	// so completion by progress and completion by any other route cannot
 	// drift apart. Python does not grant the reward for these.
 	if complete && isCommission {
-		resolved, resolveErr := resolveCommissionTx(conn, userID, p.QuestKey, "completed", gameMinute, true)
+		resolved, resolveErr := resolveCommissionTx(conn, catalog, userID, p.QuestKey, "completed", gameMinute, true)
 		if resolveErr != nil {
 			return nil, resolveErr
 		}
 		transition["commission"] = resolved
 	} else if complete {
-		granted, grantErr := grantQuestRewardTx(conn, userID, p.QuestKey, terms.Rewards)
+		granted, grantErr := grantQuestRewardTx(conn, catalog, userID, p.QuestKey, terms.Rewards)
 		if grantErr != nil {
 			return nil, grantErr
 		}
@@ -658,7 +662,7 @@ type cultivationPayload struct {
 	EventType      string           `json:"event_type"`
 }
 
-func cultivationReward(conn *storage.Conn, userID int64, raw json.RawMessage) (any, error) {
+func cultivationReward(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (any, error) {
 	var p cultivationPayload
 	if err := json.Unmarshal(raw, &p); err != nil {
 		return nil, err
@@ -700,7 +704,7 @@ func cultivationReward(conn *storage.Conn, userID int64, raw json.RawMessage) (a
 		return nil, err
 	}
 	if p.SpiritStones != 0 {
-		if _, err := walletDeltaTx(conn, userID, mirroredCurrency, p.SpiritStones, now); err != nil {
+		if _, err := characterWalletDeltaTx(conn, catalog, userID, p.SpiritStones, now); err != nil {
 			return nil, err
 		}
 	}
