@@ -221,6 +221,18 @@ var reversibleAdminActions = map[string]reverseFunc{
 		snap := pickSnapshot(before, after, redo)
 		return []sqlStmt{{`UPDATE npc_civilization_state SET current_location=? WHERE npc_name=?`, []any{fmt.Sprint(snap["location"]), name}}}, nil
 	},
+	// A disappearance the GM staged, or a return (v1.0.0-rc.38): the row
+	// goes back to the status and minute the snapshot holds. The history
+	// row stays; it is the record that something was staged.
+	"admin.npc.set_missing": func(before, after map[string]any, target string, redo bool) ([]sqlStmt, error) {
+		name, err := parseNPCTarget(target)
+		if err != nil {
+			return nil, err
+		}
+		snap := pickSnapshot(before, after, redo)
+		return []sqlStmt{{`UPDATE npc_civilization_state SET status=?,missing_since_game_minute=? WHERE npc_name=?`,
+			[]any{fmt.Sprint(snap["status"]), storage.ParseInt(snap["missing_since_game_minute"]), name}}}, nil
+	},
 	// Only the single-condition_id variant of admin.player.clear_condition is
 	// reversible - the clear_all variant shares this same action name but
 	// stores its before-snapshot as an array (one entry per condition it

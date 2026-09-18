@@ -589,7 +589,7 @@ _ADMIN_HUB_DEFINITION = HubDefinition(
         HubPage(key="sect", label="Sects", description="Membership, ranks and master/disciple administration.", command=admin_sect_group),
         # Two pages of one action each, both "show me the hidden state of a
         # thing" (rc.13).
-        HubPage(key="hidden", label="Hidden State", description="Inspect what players cannot see: a cultivator's NPC birth family, and a canonical NPC's GM-only state.",
+        HubPage(key="hidden", label="NPCs & Hidden State", description="Inspect what players cannot see - a cultivator's NPC birth family, a canonical NPC's GM-only state - and stage what the world would: lose an NPC where they stand, or bring one back.",
                 command=admin_family_group, extras=(admin_npc_group,)),
         HubPage(key="simulation", label="Simulation", description="Drive it: run a system, set an interval, and see what the automation switches are doing.", command=admin_sim_group,
                 only=("admin simulation status", "admin simulation run", "admin simulation interval",

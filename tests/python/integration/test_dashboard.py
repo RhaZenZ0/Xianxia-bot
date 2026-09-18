@@ -321,6 +321,10 @@ class DashboardTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("player.reset_cooldowns", js)
         self.assertIn("player.force_end_scene", js)
         self.assertIn("npc.relocate", js)
+        # v1.0.0-rc.38: the disappearance a GM can stage, and its undo.
+        self.assertIn("npc.set_missing", js)
+        self.assertIn("missing:true", js)
+        self.assertIn("missing:false", js)
         self.assertIn("world_event.end", js)
         self.assertIn("bulk.grant_currency", js)
         self.assertIn("bulk.reset_cooldowns", js)

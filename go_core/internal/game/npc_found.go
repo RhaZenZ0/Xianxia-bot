@@ -65,6 +65,20 @@ func npcFound(conn *storage.Conn, userID int64, raw json.RawMessage) (any, error
 		// does not quietly find them on their behalf.
 		return map[string]any{"found": false, "was_missing": true, "elsewhere": true}, nil
 	}
+	// The find is its own transaction (v1.0.0-rc.38). It was not: the storage
+	// connection begins one implicitly on the first write, the switch path
+	// closes the connection when the handler returns, and nothing between the
+	// two committed - so `/talk` told the player they had found somebody and
+	// the row stayed missing, with no history of the search. The engine
+	// playtest is what caught it, the day it could drive this at all.
+	if err := begin(conn); err != nil {
+		return nil, err
+	}
+	defer func() {
+		if conn.InTransaction() {
+			rollback(conn)
+		}
+	}()
 	now := float64(time.Now().UnixNano()) / 1e9
 	if _, err := conn.Execute(`UPDATE npc_civilization_state
         SET status='alive',missing_since_game_minute=0,activity='Found, and in no hurry to explain',
@@ -89,6 +103,9 @@ func npcFound(conn *storage.Conn, userID int64, raw json.RawMessage) (any, error
 		"npc", name, name,
 		&uid, name, []string{"npc_found", "search"}, p.GameMinute,
 		map[string]any{"days_missing": daysGone, "last_known_home": home}, now); err != nil {
+		return nil, err
+	}
+	if err := conn.Commit(); err != nil {
 		return nil, err
 	}
 	return map[string]any{
@@ -140,6 +157,14 @@ func claimGraveResult(conn *storage.Conn, userID int64, name, location string, g
 		return map[string]any{"grave": true, "claimed": false, "elsewhere": true}, nil
 	}
 	now := float64(time.Now().UnixNano()) / 1e9
+	if err := begin(conn); err != nil {
+		return nil, err
+	}
+	defer func() {
+		if conn.InTransaction() {
+			rollback(conn)
+		}
+	}()
 	if _, err := conn.Execute(`UPDATE npc_graves
         SET claimed_by_user_id=?,claimed_game_minute=?,updated_at=?
         WHERE npc_name=? AND claimed_game_minute IS NULL`,
@@ -171,6 +196,9 @@ func claimGraveResult(conn *storage.Conn, userID int64, name, location string, g
 		&uid, name, []string{"npc_grave_found", "search"}, gameMinute,
 		map[string]any{"days_missing": days, "home_location": home, "keepsake_item": item, "keepsake_stones": stones},
 		now); err != nil {
+		return nil, err
+	}
+	if err := conn.Commit(); err != nil {
 		return nil, err
 	}
 	return map[string]any{

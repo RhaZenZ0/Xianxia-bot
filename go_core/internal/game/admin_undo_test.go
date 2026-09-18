@@ -410,3 +410,16 @@ func TestAdminUndoLastRecordsUndoneAuditIDAndAction(t *testing.T) {
 		t.Fatalf("undo_last's own before_json=%s did not record the undone audit id/action", beforeJSON)
 	}
 }
+
+func TestAdminUndoLastSetMissingRestoresAlive(t *testing.T) {
+	path := setupAdminDB(t)
+	addMissingColumns(t, path)
+	applyAdmin(t, path, "admin.npc.set_missing", map[string]any{"npc_name": "Herbalist Mo", "missing": true, "reason": "a story"})
+	if got := fmt.Sprint(scalar(t, path, "SELECT status FROM npc_civilization_state WHERE npc_name='Herbalist Mo'")); got != "missing" {
+		t.Fatalf("status=%q, want missing", got)
+	}
+	undoLast(t, path)
+	if got := fmt.Sprint(scalar(t, path, "SELECT status||':'||missing_since_game_minute FROM npc_civilization_state WHERE npc_name='Herbalist Mo'")); got != "alive:0" {
+		t.Fatalf("row=%q, want alive:0 restored", got)
+	}
+}

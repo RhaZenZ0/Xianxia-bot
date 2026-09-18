@@ -1726,6 +1726,7 @@ class AdminDashboardController:
         "player.reset_cooldowns": "admin.player.reset_cooldowns",
         "player.force_end_scene": "admin.player.force_end_scene",
         "npc.relocate": "admin.npc.relocate",
+        "npc.set_missing": "admin.npc.set_missing",
         "world_event.end": "admin.world_event.end",
         "bulk.grant_currency": "admin.bulk.grant_currency",
         "bulk.reset_cooldowns": "admin.bulk.reset_cooldowns",

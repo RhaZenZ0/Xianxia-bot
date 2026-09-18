@@ -38,10 +38,10 @@ const (
 	// is not missing, they are at home.
 	missingChance = 3
 	missingCap    = 1
-	// Above the Forge's default bar of 80, which nothing in this package has
-	// ever cleared.
-	missingSignificance = 82
-	foundSignificance   = 58
+	// The disappearance row's significance lives in game
+	// (NPCMissingSignificance, 82): above the Forge's default bar of 80,
+	// which nothing else in this package has ever cleared, and shared with
+	// the GM's lever so a staged disappearance reads the same.
 	// Nobody frees themselves. That is the whole reason the search is worth
 	// asking for: if the missing wandered home by themselves the quest would
 	// be decoration, and the Forge would be drafting work that resolves
@@ -145,14 +145,14 @@ func (r *Runner) npcDisappearances(conn *storage.Conn, gm int64) (int64, int64, 
 	return vanished, died, nil
 }
 
-// recordMissing writes the row the Quest Forge reads.
+// recordMissing writes the row the Quest Forge reads - the same row the
+// GM's admin.npc.set_missing writes, through the same helper (v1.0.0-rc.38).
+// Best-effort, as every NPC history row here is: the disappearance itself
+// is already written, and a tick must not fail on an old database with no
+// history table.
 func (r *Runner) recordMissing(conn *storage.Conn, name, home, where, world string, gm int64, now float64) error {
 	_ = world
-	r.recordNPCHistory(conn, "npc_missing", fmt.Sprintf("npc_missing:%s:%d", name, gm),
-		name+" has not come home",
-		fmt.Sprintf("%s left %s and never arrived. The last anyone can place them is the road out of %s, and nobody at %s has seen them since.",
-			name, home, where, home),
-		home, name, missingSignificance, gm, now)
+	_ = game.RecordNPCMissingTx(conn, name, home, where, gm, now)
 	return nil
 }
 

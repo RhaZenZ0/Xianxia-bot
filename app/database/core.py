@@ -4663,6 +4663,19 @@ class Database:
             source_key=f"world_event_aftermath:{str(event_key)}",
         )
 
+    async def list_missing_npcs(self) -> list[dict[str, Any]]:
+        """Everybody the world has lost (v1.0.0-rc.38): where they actually are
+        (the row keeps it; the world does not know it), where they are from, and
+        since when. A read for the GM dashboard and the playtest; nothing here
+        decides anything."""
+        async with self._connect() as db:
+            db.row_factory = aiosqlite.Row
+            cur = await db.execute(
+                "SELECT npc_name,current_location,home_location,missing_since_game_minute FROM npc_civilization_state "
+                "WHERE status='missing' ORDER BY missing_since_game_minute,npc_name"
+            )
+            return [dict(row) for row in await cur.fetchall()]
+
     async def get_npc_life_state(self, npc_name: str) -> dict[str, Any] | None:
         """Small compatibility API for Discord event/player surfaces that need public NPC life state."""
         async with self._connect() as db:
