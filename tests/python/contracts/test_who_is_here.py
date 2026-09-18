@@ -148,13 +148,23 @@ class GoOwnsTheAnswer(unittest.TestCase):
 
 
 class BootDoesNotSpendTwoThousandRoundTrips(unittest.TestCase):
-    def test_the_catalogue_sync_goes_in_one_batch(self):
+    def test_the_territory_seed_goes_in_one_batch(self):
         core = (PROJECT_ROOT / "app" / "database" / "core.py").read_text(encoding="utf-8")
-        sync = body(core, "sync_world_catalog")
+        sync = body(core, "seed_world_territories")
         self.assertIn("_go_transport.batch(statements, transaction=True)", sync)
         # And the local-SQLite path still works, because tests and a
         # non-engine deployment both take it.
         self.assertIn("BEGIN IMMEDIATE", sync)
+
+    def test_it_no_longer_mirrors_the_content_file(self):
+        """v1.0.0-rc.40: the ~1,800 catalogue upserts are gone with their five
+        tables. The engine writes content_* from the file itself, so what is
+        left here is the part that was never a mirror - the territory map."""
+        core = (PROJECT_ROOT / "app" / "database" / "core.py").read_text(encoding="utf-8")
+        sync = body(core, "seed_world_territories")
+        for gone in ("catalog_npcs", "catalog_locations", "content_npcs", "content_locations"):
+            with self.subTest(table=gone):
+                self.assertNotIn(gone, sync)
 
     def test_the_statements_stay_in_the_method_the_authority_gate_reads(self):
         """`test_authority_boundary` reads the write allowlists off the method
@@ -162,8 +172,8 @@ class BootDoesNotSpendTwoThousandRoundTrips(unittest.TestCase):
         have meant widening an authority gate to accommodate a refactor that
         changes no authority, so they stay here."""
         core = (PROJECT_ROOT / "app" / "database" / "core.py").read_text(encoding="utf-8")
-        sync = body(core, "sync_world_catalog")
-        for table in ("catalog_npcs", "catalog_locations", "territory_state", "world_eras"):
+        sync = body(core, "seed_world_territories")
+        for table in ("territory_state", "world_eras"):
             with self.subTest(table=table):
                 self.assertIn(table, sync)
 
@@ -171,7 +181,7 @@ class BootDoesNotSpendTwoThousandRoundTrips(unittest.TestCase):
         """It is a read-then-write: batching it would mean sending an INSERT
         that must not run."""
         core = (PROJECT_ROOT / "app" / "database" / "core.py").read_text(encoding="utf-8")
-        sync = code(core, "sync_world_catalog")
+        sync = code(core, "seed_world_territories")
         self.assertLess(sync.index("batch(statements"), sync.index("world_eras"))
 
 

@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tests.support import install_aiosqlite_shim, PROJECT_ROOT
+from tests.support import install_aiosqlite_shim, seed_content_tables, PROJECT_ROOT
 install_aiosqlite_shim()
 
 from app.database import Database
@@ -53,13 +53,19 @@ class TechniqueCatalogTests(unittest.IsolatedAsyncioTestCase):
                     or int(technique.get("suppress_turns", 0)) > 0
                 )
 
-    async def test_catalog_sync_seeds_sqlite_territories_and_world_era(self):
-        await self.db.sync_world_catalog(self.world.data)
+    async def test_the_content_tables_hold_every_manual_and_technique(self):
+        # The engine fills content_* in production; pytest has no engine, so
+        # the fixture writes the same three columns every reader touches
+        # (v1.0.0-rc.40, when the catalog_* mirrors were retired).
+        await seed_content_tables(self.db, self.world.data)
         async with self.db._connect() as conn:
-            cur = await conn.execute("SELECT COUNT(*) FROM catalog_manuals")
+            cur = await conn.execute("SELECT COUNT(*) FROM content_manuals")
             self.assertEqual((await cur.fetchone())[0], 160)
-            cur = await conn.execute("SELECT COUNT(*) FROM catalog_techniques")
+            cur = await conn.execute("SELECT COUNT(*) FROM content_techniques")
             self.assertEqual((await cur.fetchone())[0], 564)
+
+    async def test_seeding_the_territory_map_gives_every_location_a_node_and_an_era(self):
+        await self.db.seed_world_territories(self.world.data)
         territories = await self.db.get_territories()
         self.assertEqual(len(territories), len(self.world.locations))
         era = await self.db.get_current_era()

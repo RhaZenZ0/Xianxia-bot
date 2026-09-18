@@ -86,8 +86,16 @@ func RegisterNPCTx(conn *storage.Conn, npc RegisteredNPC, gameMinute int64) (boo
 	// A name the content file already carries is not ours to take. The
 	// catalogue wins, always: two different people answering to one name is
 	// worse than a birth refused, and `/talk` resolves the catalogue first.
-	if tableExistsTx(conn, "catalog_npcs") {
-		clash, err := conn.Execute(`SELECT 1 FROM catalog_npcs WHERE name=?`, []any{name})
+	//
+	// This reads content_npcs since schema 52. It used to read catalog_npcs,
+	// behind a tableExistsTx guard that would have turned the mirror's removal
+	// into silence rather than an error - every clash check passing, and the
+	// world free to register somebody already in the content file. The guard
+	// stays (a database mid-migration has no content tables yet), which is
+	// why `TestARegisteredNameNeverShadowsTheContentFile` asserts the refusal
+	// against a real content_npcs row rather than trusting the branch.
+	if tableExistsTx(conn, "content_npcs") {
+		clash, err := conn.Execute(`SELECT 1 FROM content_npcs WHERE name=?`, []any{name})
 		if err != nil {
 			return false, err
 		}

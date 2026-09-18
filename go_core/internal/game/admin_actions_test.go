@@ -22,7 +22,7 @@ func setupAdminDB(t *testing.T) string {
 	schema := `
 CREATE TABLE characters(user_id INTEGER PRIMARY KEY,name TEXT,life_status TEXT,location TEXT,karma_score INTEGER,vitality INTEGER,vitality_max INTEGER,qi INTEGER,qi_max INTEGER,spirit_stones INTEGER,realm_index INTEGER,phase INTEGER,death_game_minute INTEGER,reincarnation_ready_game_minute INTEGER,updated_at REAL,is_muted INTEGER NOT NULL DEFAULT 0,is_frozen INTEGER NOT NULL DEFAULT 0,moderation_reason TEXT NOT NULL DEFAULT '',muted_until REAL NOT NULL DEFAULT 0,frozen_until REAL NOT NULL DEFAULT 0,is_banned INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE currency_wallets(user_id INTEGER,currency_id TEXT,balance INTEGER,PRIMARY KEY(user_id,currency_id));
-CREATE TABLE catalog_locations(name TEXT PRIMARY KEY,data_json TEXT,updated_at REAL);
+CREATE TABLE content_locations(name TEXT PRIMARY KEY,data_json TEXT,updated_at REAL);
 CREATE TABLE player_scene_state(user_id INTEGER PRIMARY KEY,physical_location TEXT,scene_type TEXT,scene_key TEXT,scene_label TEXT,channel_id INTEGER,metadata_json TEXT,updated_at REAL);
 CREATE TABLE reincarnation_state(user_id INTEGER PRIMARY KEY,active INTEGER,reincarnation_ready_at REAL NOT NULL DEFAULT 0,previous_name TEXT NOT NULL DEFAULT '');
 CREATE TABLE battles(battle_id INTEGER PRIMARY KEY,user_id INTEGER,status TEXT,updated_at REAL);
@@ -55,7 +55,7 @@ CREATE TABLE equipment_instances(equipment_id INTEGER PRIMARY KEY AUTOINCREMENT,
 CREATE TABLE cave_abodes(user_id INTEGER PRIMARY KEY,location_key TEXT NOT NULL UNIQUE,name TEXT NOT NULL,base_location TEXT NOT NULL,grade TEXT NOT NULL DEFAULT 'Mortal',cultivation_level INTEGER NOT NULL DEFAULT 1,alchemy_level INTEGER NOT NULL DEFAULT 0,forge_level INTEGER NOT NULL DEFAULT 0,formation_level INTEGER NOT NULL DEFAULT 0,defense_level INTEGER NOT NULL DEFAULT 0,thread_id INTEGER,thread_channel_id INTEGER,created_at REAL NOT NULL,updated_at REAL NOT NULL);
 CREATE TABLE cave_abode_access(owner_user_id INTEGER NOT NULL,guest_user_id INTEGER NOT NULL,access_role TEXT NOT NULL DEFAULT 'guest',created_at REAL NOT NULL,PRIMARY KEY(owner_user_id,guest_user_id));
 INSERT INTO characters VALUES(42,'Lin Test','dead','Old Place',5,0,20,0,30,10,2,3,100,200,0,0,0,'',0,0,0);
-INSERT INTO catalog_locations VALUES('Greenriver Town','{}',0);
+INSERT INTO content_locations VALUES('Greenriver Town','{}',0);
 INSERT INTO reincarnation_state VALUES(42,1,0,'Lin Previous');
 INSERT INTO battles VALUES(1,42,'active',0);
 INSERT INTO world_simulation_state VALUES('npc_life',0,10080,0,0);

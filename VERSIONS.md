@@ -6,6 +6,20 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.0** (rc.40) retires the catalogue mirrors: one table, one path.
+
+Schema 51 gave the engine `content_*`, written from `content/world.json` itself, and kept the five
+older Python-written `catalog_*` blobs beside them for one release so a rollback would find them
+intact. They are gone. Every catalogue reader - the definition lookups, the autocomplete search, the
+boot counts and the GM dashboard - names its `content_*` table directly, and `content_table_for`, the
+switch that picked a table by whether an engine was attached, goes with them. Boot stops rewriting
+about 1,800 rows of content that had not changed, and `sync_world_catalog` is `seed_world_territories`:
+it writes the territory map and the baseline era, which is what it did besides the mirroring, and the
+name no longer claims a catalogue it does not touch. The GM's "Sync world catalog" says the same
+truth. The one path the mirrors existed to serve - pytest, which has no engine to fill the new tables
+- is a fixture now rather than a second set of tables, because the engine is the only thing that may
+write `content_*` in production. See CLAUDE.md, "The content file as tables".
+
 **1.0.0** (rc.39) retires the last Python-side clock.
 
 `Database.get_world_clock` was the one copy of an engine rule left in the DB layer, named as open on
@@ -1719,6 +1733,19 @@ mechanical authority paths.
 - **Schema 27** added the v0.19.29 mute/freeze moderation columns on `characters`
   (`is_muted`, `is_frozen`, `moderation_reason`).
 - **Schema 28** added the Quest Forge definition table (`quest_definitions`).
+- **Schema 52** retired the five Python-written catalogue mirrors. `catalog_locations`,
+  `catalog_npcs`, `catalog_recipes`, `catalog_manuals` and `catalog_techniques` were blob tables
+  (`name`, `data_json`, `updated_at`) that boot rewrote at roughly 1,800 upserts a time, and schema 51
+  kept them one release so a rollback to 50 would find them intact. That window has passed: every
+  reader names its `content_*` table directly, the mode switch that picked between the two is gone,
+  and nothing references the mirrors by foreign key so the drop fires no cascade. Their historical
+  CREATE statements stay in migration 12's neighbourhood the way migration 44 left the unused core
+  ledger's - a historical migration is how an old database walks forward - and the baseline no longer
+  makes them at all. `sync_world_catalog`, their only writer, is `seed_world_territories` and does
+  what it always did besides the mirroring: a territory node per location, and the baseline era. The
+  no-engine path that the mirrors served is a test fixture now (`tests/support.seed_content_tables`),
+  because in production the engine is the only thing that may write `content_*`.
+
 - **Schema 51** put the content file into tables with columns. Nine derived `content_*` tables
   (`npcs`, `locations`, `items`, `recipes`, `sects`, `shops`, `merchants`, `manuals`, `techniques`) are
   written by the engine alone - `internal/contentsync` - from `content/world.json`, hash-gated, in one

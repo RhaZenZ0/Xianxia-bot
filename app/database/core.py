@@ -26,7 +26,7 @@ from .remote import GoDatabaseTransport
 log = logging.getLogger("xianxia.database")
 
 
-SCHEMA_VERSION = 51
+SCHEMA_VERSION = 52
 # A readiness probe must validate more than the schema-version marker.  If the
 # SQLite file is removed or replaced while the bot is running, SQLite will
 # happily create a new empty file at the same path.  Checking these tables lets
@@ -80,11 +80,6 @@ OPERATIONAL_REQUIRED_TABLES = frozenset(
         "caravan_events",
         "caravan_operations",
         "caravans",
-        "catalog_locations",
-        "catalog_manuals",
-        "catalog_npcs",
-        "catalog_recipes",
-        "catalog_techniques",
         "cave_abode_access",
         "cave_abodes",
         "channel_messages",
@@ -232,36 +227,6 @@ OPERATIONAL_REQUIRED_TABLES = frozenset(
         "world_state",
     }
 )
-# The five catalogue reads and the table each goes to when the engine owns the
-# database (schema 51). The two are the same content: catalog_* is written by
-# Python from its in-memory copy of world.json, content_* by the engine from
-# the file, and only the second is deleted from when an entry goes. Readers
-# name the catalog_* table; this picks.
-CONTENT_FOR_CATALOG = {
-    "catalog_locations": "content_locations",
-    "catalog_npcs": "content_npcs",
-    "catalog_recipes": "content_recipes",
-    "catalog_manuals": "content_manuals",
-    "catalog_techniques": "content_techniques",
-}
-
-
-def content_table_for(catalog_table: str, engine_backed: bool) -> str:
-    """The table a catalogue read goes to.
-
-    Engine-backed - which is production, always - it is the content_* table
-    the engine writes. On the local-SQLite path there is no engine to write
-    those, so it stays the catalog_* table `sync_world_catalog` fills; that
-    path is tests and one-off scripts. A mode switch rather than a per-row
-    fallback, so a production read is one query against one table and never a
-    quiet second look somewhere else. Shared by `Database` and the dashboard's
-    read-only store, which carries its own transport.
-    """
-    if catalog_table not in CONTENT_FOR_CATALOG:
-        raise ValueError("Unknown catalog")
-    return CONTENT_FOR_CATALOG[catalog_table] if engine_backed else catalog_table
-
-
 SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
     (
         1,
@@ -2344,6 +2309,36 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
             "CREATE INDEX IF NOT EXISTS idx_content_techniques_manual ON content_techniques(manual)",
         ),
     ),
+    (
+        52,
+        "retire_python_catalog_mirrors",
+        (
+            # v1.0.0-rc.40: the five Python-written mirrors go.
+            #
+            # Schema 51 gave the engine `content_*`, written from
+            # `content/world.json` itself, hash-gated, with deletes - and kept
+            # these five so a rollback to 50 would find them intact. That
+            # window has passed. Every reader names a `content_*` table now,
+            # so nothing queries these; `sync_world_catalog`, which was their
+            # only writer, is `seed_world_territories` and writes the map
+            # nodes it always did and no catalogue at all.
+            #
+            # Nothing references them by foreign key, so a plain drop fires no
+            # cascade - unlike the `auctions` rebuild in migration 50, which
+            # had to park its children first.
+            #
+            # The historical CREATE statements stay where they are, the way
+            # migration 44 left migration 12's: a database that made these
+            # tables walks forward by dropping them, and a fresh one creates
+            # them and drops them again, which is cheap and honest about the
+            # order things happened in.
+            """DROP TABLE IF EXISTS catalog_locations""",
+            """DROP TABLE IF EXISTS catalog_npcs""",
+            """DROP TABLE IF EXISTS catalog_recipes""",
+            """DROP TABLE IF EXISTS catalog_manuals""",
+            """DROP TABLE IF EXISTS catalog_techniques""",
+        ),
+    ),
 )
 
 
@@ -2791,23 +2786,8 @@ class Database:
                     FOREIGN KEY (user_id) REFERENCES characters(user_id) ON DELETE CASCADE
                 );
 
-                CREATE TABLE IF NOT EXISTS catalog_locations (
-                    name TEXT PRIMARY KEY,
-                    data_json TEXT NOT NULL,
-                    updated_at REAL NOT NULL
-                );
 
-                CREATE TABLE IF NOT EXISTS catalog_npcs (
-                    name TEXT PRIMARY KEY,
-                    data_json TEXT NOT NULL,
-                    updated_at REAL NOT NULL
-                );
 
-                CREATE TABLE IF NOT EXISTS catalog_recipes (
-                    name TEXT PRIMARY KEY,
-                    data_json TEXT NOT NULL,
-                    updated_at REAL NOT NULL
-                );
 
                 CREATE TABLE IF NOT EXISTS currency_wallets (
                     user_id INTEGER NOT NULL,
@@ -3498,13 +3478,6 @@ class Database:
                     FOREIGN KEY(user_id) REFERENCES characters(user_id) ON DELETE CASCADE
                 );
 
-                CREATE TABLE IF NOT EXISTS catalog_manuals (
-                    name TEXT PRIMARY KEY, data_json TEXT NOT NULL, updated_at REAL NOT NULL
-                );
-                CREATE TABLE IF NOT EXISTS catalog_techniques (
-                    name TEXT PRIMARY KEY, data_json TEXT NOT NULL, updated_at REAL NOT NULL
-                );
-
                 CREATE TABLE IF NOT EXISTS spirit_beasts (
                     beast_id INTEGER PRIMARY KEY AUTOINCREMENT,
                     user_id INTEGER NOT NULL, name TEXT NOT NULL, species TEXT NOT NULL,
@@ -3946,16 +3919,16 @@ class Database:
 
     async def catalog_counts(self) -> dict[str, int]:
         tables = {
-            "locations": "catalog_locations",
-            "npcs": "catalog_npcs",
-            "recipes": "catalog_recipes",
-            "manuals": "catalog_manuals",
-            "techniques": "catalog_techniques",
+            "locations": "content_locations",
+            "npcs": "content_npcs",
+            "recipes": "content_recipes",
+            "manuals": "content_manuals",
+            "techniques": "content_techniques",
         }
         out: dict[str, int] = {}
         async with self._connect() as db:
             for key, table in tables.items():
-                cur = await db.execute(f"SELECT COUNT(*) FROM {self.content_table(table)}")
+                cur = await db.execute(f"SELECT COUNT(*) FROM {table}")
                 out[key] = int((await cur.fetchone())[0])
         return out
 
@@ -5622,18 +5595,21 @@ class Database:
             await db.commit()
 
     # ------------------------------------------------------------------
-    # Normalized world catalog
+    # The map the content file implies: territory nodes and the baseline era
     # ------------------------------------------------------------------
-    async def sync_world_catalog(self, world_data: dict[str, Any]) -> None:
-        """Mirror the content file into the catalogue tables, in one request.
+    async def seed_world_territories(self, world_data: dict[str, Any]) -> None:
+        """Give every location a territory node, and the world its first era.
 
-        Every write here is built first and sent once. Against the shipped
-        content that is a little over two thousand statements - roughly 1,800
-        catalogue rows plus one territory node per location - and on the
-        Go-backed path each `db.execute` is its own HTTP POST, so boot spent
-        two thousand round trips rewriting content that had not changed since
-        the last boot. `/v1/db/batch` has existed on the transport since the Go
-        engine landed and nothing on this path used it.
+        This was `sync_world_catalog` until v1.0.0-rc.40, and it mirrored the
+        content file into five `catalog_*` blob tables on the way past: roughly
+        1,800 upserts at every boot, of content that had not changed since the
+        last one. The engine writes `content_*` from the file itself now, so
+        those upserts and their tables are gone and what is left is the part
+        that was never a mirror - a map node per location, derived from the
+        prose, and the era row.
+
+        Every write is still built first and sent once, because on the
+        Go-backed path each `db.execute` is its own HTTP POST.
 
         The statements stay in this method rather than in a helper on purpose:
         `test_authority_boundary` reads the write allowlists off the method
@@ -5642,19 +5618,6 @@ class Database:
         """
         now = time.time()
         statements: list[dict[str, Any]] = []
-        for table, mapping in (
-            ("catalog_locations", world_data.get("locations", {})),
-            ("catalog_npcs", world_data.get("npcs", {})),
-            ("catalog_recipes", world_data.get("recipes", {})),
-            ("catalog_manuals", world_data.get("technique_system", {}).get("manuals", {})),
-            ("catalog_techniques", world_data.get("technique_system", {}).get("techniques", {})),
-        ):
-            for name, data in dict(mapping or {}).items():
-                statements.append({
-                    "sql": f"""INSERT INTO {table}(name,data_json,updated_at) VALUES(?,?,?)
-                               ON CONFLICT(name) DO UPDATE SET data_json=excluded.data_json,updated_at=excluded.updated_at""",
-                    "params": (str(name), json.dumps(data, ensure_ascii=False), now),
-                })
         # Every normal location is also a persistent territory node. This
         # gives wars, resource control and caravans a canonical map without
         # requiring a destructive content migration.
@@ -5672,7 +5635,7 @@ class Database:
             # One request, one transaction, the same statements in the same
             # order. `transaction=True` is what keeps this equivalent to the
             # BEGIN IMMEDIATE it replaced: a boot interrupted half way through
-            # must not leave the catalogue half rewritten.
+            # must not leave the map half rewritten.
             await self._go_transport.batch(statements, transaction=True)
         else:
             async with self._connect() as db:
@@ -5693,10 +5656,6 @@ class Database:
                 )
             await db.commit()
 
-    def content_table(self, catalog_table: str) -> str:
-        """The table a catalogue read goes to - see `content_table_for`."""
-        return content_table_for(catalog_table, self._go_transport is not None)
-
     async def sync_content(self) -> dict[str, Any]:
         """Have the engine bring content_* up to content/world.json (schema 51).
 
@@ -5704,14 +5663,23 @@ class Database:
         db-init calls it the moment the migration has run and the bot at
         CATALOG_READY; together with the engine's own apply at start that
         guarantees the tables are full before any reader, in every boot order.
-        No engine is the local path, whose readers use catalog_*: not an error.
+        No engine is the local path - tests and one-off scripts, which seed the
+        same tables themselves (`tests/support.seed_content_tables`) because the
+        engine is the only thing that may write them in production. Not an error.
         """
         if self._go_transport is None:
-            return {"skipped": True, "reason": "no engine: the local path reads catalog_*"}
+            return {"skipped": True, "reason": "no engine: content_* is seeded by the caller"}
         return await self._go_transport.sync_content()
 
     async def _catalog_get(self, table: str, name: str) -> dict[str, Any] | None:
-        table = self.content_table(table)
+        """One entry of the content file, by name, out of its `content_*` table.
+
+        The engine writes those tables from the file itself (schema 51); this
+        reads the entry's own bytes back out of `data_json`. Until v1.0.0-rc.40
+        the table was picked by a mode switch, because a second set of tables
+        (`catalog_*`) held the same content for the local-SQLite path. There is
+        one table now, and one query against it.
+        """
         key = (table, str(name))
         cached = self._catalog_cache.get(key)
         if cached is not None:
@@ -5728,7 +5696,7 @@ class Database:
         return copy.deepcopy(value)
 
     async def get_location_definition(self, name: str) -> dict[str, Any] | None:
-        return await self._catalog_get("catalog_locations", name)
+        return await self._catalog_get("content_locations", name)
 
     async def get_npc_definition(self, name: str) -> dict[str, Any] | None:
         """Who this is, from the three places a person in this world can live.
@@ -5741,7 +5709,7 @@ class Database:
         table because an eight-hour militia captain must not join the permanent
         world, and who stop answering the moment the event closes.
         """
-        definition = await self._catalog_get("catalog_npcs", name)
+        definition = await self._catalog_get("content_npcs", name)
         if definition is not None:
             return definition
         registered = await self.get_registered_npc(name)
@@ -5821,13 +5789,12 @@ class Database:
             return [dict(r) for r in await cur.fetchall()]
 
     async def get_recipe_definition(self, name: str) -> dict[str, Any] | None:
-        return await self._catalog_get("catalog_recipes", name)
+        return await self._catalog_get("content_recipes", name)
 
     async def search_catalog(self, kind: str, query: str = "", limit: int = 25) -> list[str]:
-        table = {"location": "catalog_locations", "npc": "catalog_npcs", "recipe": "catalog_recipes", "manual": "catalog_manuals", "technique": "catalog_techniques"}.get(kind)
+        table = {"location": "content_locations", "npc": "content_npcs", "recipe": "content_recipes", "manual": "content_manuals", "technique": "content_techniques"}.get(kind)
         if table is None:
             return []
-        table = self.content_table(table)
         needle = f"%{query.strip()}%"
         async with self._connect() as db:
             cur = await db.execute(

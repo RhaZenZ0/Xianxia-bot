@@ -113,7 +113,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
         return result
 
     # ---- 0. the world ------------------------------------------------------
-    await step(report, "seed the catalog", db.sync_world_catalog(world))
+    await step(report, "seed the territory map", db.seed_world_territories(world))
     content = World(ROOT / "content" / "world.json")
     await step(report, "seed the commission pool, static quests, the beginner path and the household errands",
                db.sync_commission_pool(list(world.get("commissions") or []) + static_quest_seed_rows(QUEST_DEFINITIONS)

@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tests.support import install_aiosqlite_shim, PROJECT_ROOT, seed_character
+from tests.support import seed_content_tables, install_aiosqlite_shim, PROJECT_ROOT, seed_character
 install_aiosqlite_shim()
 
 from app.database import Database
@@ -34,7 +34,7 @@ class MemoryAndCanonRetrievalTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertTrue(ok)
         self.world = World(ROOT / "content" / "world.json")
-        await self.db.sync_world_catalog(self.world.data)
+        await seed_content_tables(self.db, self.world.data)
         await self.db.sync_rag_canon(self.world.data)
 
     async def asyncTearDown(self):
@@ -189,7 +189,7 @@ class WorldHistoryRetrievalTests(unittest.IsolatedAsyncioTestCase):
             )
             self.assertTrue(ok)
         self.world = World(ROOT / "content" / "world.json")
-        await self.db.sync_world_catalog(self.world.data)
+        await seed_content_tables(self.db, self.world.data)
         await self.db.sync_rag_canon(self.world.data)
         self.rag = MemoryRAGRetriever(db=self.db, world=self.world, query_cache_seconds=0, canon_cache_seconds=0)
 

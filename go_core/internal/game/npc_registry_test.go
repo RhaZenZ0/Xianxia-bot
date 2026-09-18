@@ -14,7 +14,7 @@ import (
 
 const registrySchema = `
 CREATE TABLE npc_registry(name TEXT PRIMARY KEY,origin TEXT NOT NULL DEFAULT 'gm',role TEXT NOT NULL DEFAULT '',realm TEXT NOT NULL DEFAULT '',personality TEXT NOT NULL DEFAULT '',speech TEXT NOT NULL DEFAULT '',want TEXT NOT NULL DEFAULT '',fear TEXT NOT NULL DEFAULT '',secret TEXT NOT NULL DEFAULT '',location TEXT NOT NULL DEFAULT '',sect_affiliation TEXT NOT NULL DEFAULT '',source_key TEXT NOT NULL DEFAULT '',created_game_minute INTEGER NOT NULL DEFAULT 0,created_at REAL NOT NULL,updated_at REAL NOT NULL);
-CREATE TABLE catalog_npcs(name TEXT PRIMARY KEY,data_json TEXT NOT NULL,updated_at REAL NOT NULL);
+CREATE TABLE content_npcs(name TEXT PRIMARY KEY,data_json TEXT NOT NULL,updated_at REAL NOT NULL);
 `
 
 func registryConn(t *testing.T) *storage.Conn {
@@ -74,7 +74,7 @@ func TestAPersonIsWrittenOnce(t *testing.T) {
 // would quietly shadow nothing.
 func TestTheContentFileKeepsItsNames(t *testing.T) {
 	conn := registryConn(t)
-	if _, err := conn.Execute(`INSERT INTO catalog_npcs(name,data_json,updated_at) VALUES('Elder Su Yan','{}',0)`, nil); err != nil {
+	if _, err := conn.Execute(`INSERT INTO content_npcs(name,data_json,updated_at) VALUES('Elder Su Yan','{}',0)`, nil); err != nil {
 		t.Fatal(err)
 	}
 	if err := conn.Commit(); err != nil {

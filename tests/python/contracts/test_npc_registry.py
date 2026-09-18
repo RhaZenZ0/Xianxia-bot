@@ -38,19 +38,26 @@ class TheSchemaIsThere(unittest.TestCase):
         self.assertIn("npcs_the_world_made_itself", CORE)
         self.assertIn("CREATE TABLE IF NOT EXISTS npc_registry", CORE)
 
-    def test_it_is_not_the_catalogue_mirror(self):
+    def test_it_is_not_derived_from_the_content_file(self):
         """The safety property. A rebuild from `content/world.json` is an
         unconditional DELETE over the derived tables; the registry must never
         be named in one, or a wrong predicate wipes the world's own people on
-        every boot, forever."""
-        sync = body(CORE, "sync_world_catalog")
-        self.assertNotIn("npc_registry", sync)
+        every boot, forever. Python's boot write is the territory map now
+        (v1.0.0-rc.40), and the engine's rebuild is `contentsync`; neither may
+        name the registry."""
+        self.assertNotIn("npc_registry", body(CORE, "seed_world_territories"))
+        contentsync = (PROJECT_ROOT / "go_core" / "internal" / "contentsync").rglob("*.go")
+        for path in contentsync:
+            if path.name.endswith("_test.go"):
+                continue
+            with self.subTest(file=path.name):
+                self.assertNotIn("npc_registry", path.read_text(encoding="utf-8"))
 
 
 class AllThreeKindsOfPersonResolve(unittest.TestCase):
     def test_the_resolver_tries_catalogue_then_registry_then_event_cast(self):
         resolver = body(CORE, "get_npc_definition")
-        catalogue = resolver.index("catalog_npcs")
+        catalogue = resolver.index("content_npcs")
         registry = resolver.index("get_registered_npc")
         event = resolver.index("get_event_npc_definition")
         self.assertLess(catalogue, registry, "the registry must not shadow the content file")

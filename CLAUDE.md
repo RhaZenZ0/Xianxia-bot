@@ -145,7 +145,7 @@ internal/server/        HTTP control/data plane
 ```
 
 Every Go SQLite connection uses `journal_mode=WAL`, `foreign_keys=ON`, `busy_timeout=10000`,
-`synchronous=NORMAL`. Current schema version is 51; historical migrations are kept so old databases
+`synchronous=NORMAL`. Current schema version is 52; historical migrations are kept so old databases
 can upgrade in place — see `VERSIONS.md` for the full schema/release history.
 
 ### The NPC life cycle (v1.0.0-rc.24)
@@ -808,22 +808,39 @@ again at `CATALOG_READY` before it counts, and the GM's `admin.content.reload` r
 on demand. Together those guarantee the tables are full before any reader in every boot order;
 `test_content_tables.py` asserts the ordering rather than hoping.
 
-**Readers switch by mode, not by fallback.** `content_table_for(catalog_table, engine_backed)` sends
-an engine-backed read — which is production, always — to `content_*`, and a local-SQLite read (tests,
-one-off scripts, where no engine fills the tables) to `catalog_*`. One query against one table; never
-a quiet second look. `_catalog_get`, `search_catalog`, `catalog_counts` and the dashboard's two
-catalogue reads all resolve through it. `catalog_*` is still written this release so a rollback finds
-it intact; it goes, with its readers and with `DROPPED_TABLES` entries for the migration drill, in a
-later one. Go's own rules keep reading the memoised in-memory catalogue — a table of what the engine
-already holds parsed would be a slower copy, not a source.
+**One table, one path (schema 52, v1.0.0-rc.40).** Schema 51 shipped a mode switch —
+`content_table_for(catalog_table, engine_backed)` — because pytest has no engine to fill `content_*`,
+so a local read stayed on the `catalog_*` blob it had always used. That was a deliberate one-release
+loan, and migration 52 calls it in: the five mirrors are dropped, the switch is deleted, and
+`_catalog_get`, `search_catalog`, `catalog_counts` and the dashboard's two catalogue reads name their
+`content_*` table outright. Go's own rules keep reading the memoised in-memory catalogue — a table of
+what the engine already holds parsed would be a slower copy, not a source.
+
+**The no-engine path is a fixture, not a second source.** The obvious way to keep pytest working
+would have been to let Python write `content_*` when no engine is attached — and that is exactly the
+rule those tables exist to enforce, so it is refused. The tables are *created* by Python's migration
+and *filled* only by the engine; a test that needs catalogue rows calls
+`tests/support.seed_content_tables`, which writes the three columns every reader touches (`name`,
+`data_json`, `updated_at`) and leaves the typed projection NULL, where the DDL already expects it.
+The projection has one definition, in Go, and `TestProjectionMatchesTheRawEntries` still owns it.
+`test_content_tables.py` holds the rest: no file under `app/` or `scripts/` may name a retired mirror
+outside the migration list, and each of the five has a `DROPPED_TABLES` entry so the migration drill
+proves the drop rather than shrugging at it.
+
+**What was left of the writer.** `sync_world_catalog` was ~1,800 catalogue upserts plus a territory
+node per location plus the baseline era. The upserts are gone with their tables, and the rest is
+`seed_world_territories` — the part that was never a mirror. The name matters: a method called
+`sync_world_catalog` that syncs no catalogue is the same class of lie as the GM maintenance action
+below, which used to report a resync it had not done.
 
 **The GM sync tells the truth now.** `/admin server maintenance → Sync world catalog` used to write
 `WORLD.data` — this process's copy, parsed at import — and report that it had resynced from
-`world.json`, which it had not. It re-reads the file on both sides: Python fills `catalog_*` from a
-fresh parse (the running `WORLD` is left alone — a hot swap of a dict 347 call sites read is not a
-maintenance action), the engine applies into `content_*` with an audit row in the same commit, and the
-message reports the content hash, whether anything changed, and that this bot's in-process
-presentation applies the edit at its next restart. `worlddata.Load` is memoised on the file's stat,
+`world.json`, which it had not. It re-reads the file on both sides: the engine applies into
+`content_*` with an audit row in the same commit — since rc.40 that is the whole catalogue — and
+Python's half reseeds the territory map from a fresh parse (the running `WORLD` is left alone — a hot
+swap of a dict 347 call sites read is not a maintenance action). The message reports the content
+hash, whether anything changed, and that this bot's in-process presentation applies the edit at its
+next restart. `worlddata.Load` is memoised on the file's stat,
 so the Go rules had already picked the edit up on their own.
 
 ### The readiness probe (`OPERATIONAL_REQUIRED_TABLES`)
