@@ -350,7 +350,7 @@ def _module_level_relative_imports(path):
 # noted (command modules read each other: law -> battle, exploration -> sect;
 # inspect_sim reads world_ops). The graph is also required to be acyclic.
 TIERS = (
-    ("registry.py", "scene_layout.py", "typed_play_router.py"),
+    ("registry.py", "scene_layout.py", "typed_play_router.py", "maintenance.py"),
     ("runtime.py", "hubs.py"),
     ("services.py", "typed_play.py"),
     ("formatting.py", "locations.py", "pickers.py"),
@@ -699,7 +699,7 @@ SURFACE = {
             "admin_player_group": ('karma', 'grantstorage', 'grantcurrency', 'grant', 'erase'),
             "admin_sect_group": ('setsect', 'removesect', 'setmaster', 'clearmaster', 'sectrank', 'masterattention'),
             "admin_world_group": ('advancetime', 'events', 'spawnrealm', 'closeevent', 'questforge', 'quests'),
-            "admin_server_group": ('maintenance',),
+            "admin_server_group": ('lockdown', 'maintenance'),
         },
     },
     "commands/abode.py": {

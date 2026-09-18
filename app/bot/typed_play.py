@@ -27,8 +27,9 @@ from typing import Any, Awaitable, Callable
 
 import discord
 
+from . import maintenance
 from .registry import ACTIONS, EVENT_HANDLERS
-from .runtime import SETTINGS, TYPED_PLAY_BUDGET, log
+from .runtime import DB, SETTINGS, TYPED_PLAY_BUDGET, log
 from .typed_play_router import Candidate, CommandParameter, CommandSpec, Route, VerbTable
 
 VERB_TABLE = VerbTable.load()
@@ -216,6 +217,14 @@ async def dispatch(interaction: Any, candidate: Candidate) -> None:
     :class:`MessageInteraction` (from a typed line). Either way the handler is
     the registered one; typed play adds nothing in between.
     """
+    # The one door to the handlers is also the one door a typed-play picker
+    # click comes back through (v1.0.0-rc.41). The command tree never sees a
+    # button on a message, so without this a player with a picker already open
+    # could still act after the world closed.
+    closed = await maintenance.refuse(DB, getattr(interaction, "user", None))
+    if closed is not None:
+        await interaction.response.send_message(closed)
+        return
     if candidate.kind == "root":
         name = str(candidate.payload["command"])
         # A root by name; a group leaf ("travel go", v0.33.0) by its qualified name.

@@ -47,7 +47,14 @@ PLAYER_NAME = "Shen Rui"
 # Leaves the sweep (section 8) does not press, each with its reason.
 # `tests/python/contracts/test_playtest_coverage.py` holds every key to a
 # live hub path, so a renamed or removed leaf cannot leave a stale entry.
-DEFERRED_LEAVES: dict[str, str] = {}
+DEFERRED_LEAVES: dict[str, str] = {
+    "/admin server lockdown": (
+        "maintenance mode: the sweep answers a bool by enabling it, and this "
+        "one closes the world to every player - it would refuse every leaf "
+        "pressed after it. Driven explicitly in section 4b instead, where the "
+        "refusal and the reopening are both asserted."
+    ),
+}
 
 # What the bot prints when a handler raised: never a designed refusal, which
 # always names what is missing. The gate reads these off the source.
@@ -603,6 +610,39 @@ async def run(url: str, token: str, db_path: str) -> Report:
             text = result_text(result)
             expect("Quest Journal" in text and "First Steps" in text, text[:400])
         await step(report, "/quests shows the beginner path's first stage", journal())
+
+        # ---- 4b. the world closed for maintenance (v1.0.0-rc.41) ---------------
+        # Not left to the generic sweep: pressing this leaf shuts every other
+        # door, so it is driven here, where the run can prove the refusal and
+        # then open the world again before anything else is pressed. The admin
+        # groups are hub leaves rather than slash subcommands, so it is pressed
+        # the way a GM would press it - on the panel.
+        async def lockdown():
+            async def flip(enabled: bool, reason: str) -> str:
+                panel = await open_hub(gm, channels["bot-logs"], "admin", env=env)
+                await panel.goto("Operations", env=env)
+                custom_id = await find_leaf_button(panel, "Lockdown")
+                expect(custom_id, f"no Lockdown leaf on {panel.page_title()!r}: {panel.labels()}")
+                result = await gm.click(panel.message(), custom_id=custom_id)
+                result = await answer_steps(
+                    gm, result,
+                    picks={"Choose enabled": "Yes" if enabled else "No"},
+                    fields={"Reason": reason},
+                )
+                return result_text(result)
+
+            closed = await flip(True, "playtest lockdown")
+            expect("closed" in closed.casefold(), closed[:300])
+            refused = await player.slash(channels["begin-here"], "quests")
+            text = result_text(refused)
+            expect("maintenance" in text.casefold(), f"a player was not refused while closed: {text[:300]}")
+            expect("playtest lockdown" in text, f"the operator's reason did not reach the player: {text[:300]}")
+            opened = await flip(False, "")
+            expect("open" in opened.casefold(), opened[:300])
+            back = await player.slash(channels["begin-here"], "quests")
+            expect("maintenance" not in result_text(back).casefold(), result_text(back)[:300])
+            return "closed, the player refused with the reason, reopened"
+        await step(report, "/admin → Operations → Lockdown closes the world and opens it again", lockdown())
 
         # ---- 4. every hub answers with a panel ----------------------------------
         async def hubs():

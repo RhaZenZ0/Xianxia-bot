@@ -77,6 +77,8 @@ func ApplyWithWorld(databasePath, worldPath string, req ActionRequest) (ActionRe
 		result, err = adminClearBattle(conn, req.ActorID, req.Payload)
 	case "admin.player.erase":
 		result, err = adminErasePlayer(conn, req.ActorID, req.Payload)
+	case "admin.server.maintenance_mode":
+		result, err = adminServerMaintenanceMode(conn, req.ActorID, req.Payload)
 	case "admin.automation.set":
 		result, err = adminAutomationSet(conn, req.ActorID, req.Payload)
 	case "admin.trade.void":

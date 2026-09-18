@@ -25,6 +25,7 @@ from ...rules.worldtime import from_game_minutes
 from ..formatting import human_duration
 from ..hubs import HubDynamicOption, register_hub_option_provider
 from ..pickers import auction_currency_autocomplete
+from .. import maintenance
 from ..registry import registered_group_command
 from ..runtime import DB, ENGINE, SETTINGS, WORLD, _explain_engine_error, current_world_time, log, reply_long
 from ..services import QUEST_FORGE, QUESTS, SIM
@@ -438,6 +439,61 @@ async def admin_advance_time(
     elif scale is not None:
         rate = f"\nRate: **{int(scale)} game minutes per real minute**."
     await interaction.response.send_message(f"🕰️ Advanced world time by **{minutes:,} minutes**.\nNow: **{wt.display}**{rate}",ephemeral=False)
+
+
+@registered_group_command(admin_server_group, name="lockdown",
+                         description="Close the world for maintenance, or open it again")
+async def admin_lockdown(
+    interaction: discord.Interaction,
+    enabled: bool,
+    reason: app_commands.Range[str, 0, 300] | None = None,
+) -> None:
+    """Bolt the doors while the server is updated (v1.0.0-rc.41).
+
+    Named `lockdown` rather than `maintenance` because `/admin server
+    maintenance` already exists and is a different thing entirely: cleanup,
+    VACUUM and the content resync, none of which stop anybody playing.
+
+    The reason is shown to players verbatim in every refusal, so it is worth
+    writing as a sentence they would want to read.
+    """
+    if not await require_admin(interaction):
+        return
+    before = await DB.get_maintenance_mode()
+    result = dict(
+        await ENGINE.action(
+            "admin.server.maintenance_mode",
+            interaction.user.id,
+            {"enabled": bool(enabled), "reason": str(reason or "")},
+        )
+        or {}
+    )
+    # The engine is the source of truth and has just written it; taking the
+    # result straight into this process's cache means the very next command
+    # is refused (or allowed) without waiting for a TTL to lapse.
+    maintenance.remember(result)
+    await audit_admin(
+        interaction,
+        "server.lockdown",
+        target="maintenance_mode",
+        before={"enabled": bool(before.get("enabled"))},
+        after={"enabled": bool(result.get("enabled"))},
+        database_log=False,
+    )
+    if result.get("enabled"):
+        note = f"\n> {result.get('reason')}" if result.get("reason") else ""
+        await interaction.response.send_message(
+            "🔧 **The world is closed.** Players are refused at every door — slash commands, "
+            "hub panels and typed lines — and the scheduled world tick has stood down. "
+            f"Administrators are unaffected.{note}",
+            ephemeral=False,
+        )
+        return
+    await interaction.response.send_message(
+        "✅ **The world is open again.** Players may act, and the world tick resumes "
+        "from where it stood down.",
+        ephemeral=False,
+    )
 
 
 MAINTENANCE_CHOICES=[

@@ -6,6 +6,20 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.0** (rc.41) closes the world while you update it.
+
+`/admin server lockdown` and a Maintenance card on the GM dashboard shut every player door and open
+them again. It is not the `maintenanceBarrier` the engine already had: that one makes a restore and
+in-flight writes wait for each other and never refuses anybody, which is right for thirty seconds
+and wrong for an update. The engine refuses every player operation at `applyAuthoritative`, where no
+`admin.*` lever passes - so a GM is never locked out of reopening the world - and the bot refuses at
+its own four doors, because a read like `/sheet` never reaches the engine at all and would otherwise
+answer out of a half-migrated database. The scheduled world tick stands down too and resumes where
+it left off, since every system schedules off the game clock rather than wall-clock. The reason the
+operator types is shown to players verbatim. The flag fails open on every unreadable shape, because
+a world nobody can enter is also a world nobody can reach to unlock. See CLAUDE.md, "The world
+closed for maintenance".
+
 **1.0.0** (rc.40) retires the catalogue mirrors: one table, one path.
 
 Schema 51 gave the engine `content_*`, written from `content/world.json` itself, and kept the five

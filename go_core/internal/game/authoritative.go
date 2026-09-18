@@ -387,6 +387,15 @@ func applyAuthoritative(databasePath, worldPath string, req ActionRequest) (Acti
 			return ActionResponse{}, err
 		}
 	}
+	// The world is closed (v1.0.0-rc.41). Ahead of the old-age check, because
+	// a world nobody may act in should not be quietly killing characters of
+	// old age while the operator swaps the binaries: maintenance stops the
+	// engine acting AS or ON the player through this path, full stop. Every
+	// admin.* lever falls through to the switch in ApplyWithWorld instead of
+	// coming here, so a GM can always open the world again.
+	if err := checkMaintenanceTx(conn); err != nil {
+		return ActionResponse{}, err
+	}
 	oldAgeDeath, err := checkPlayerOldAgeDeathTx(conn, req.ActorID, actionGameMinute, time.Now())
 	if err != nil {
 		return ActionResponse{}, err

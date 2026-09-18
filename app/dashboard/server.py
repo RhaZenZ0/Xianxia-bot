@@ -1718,6 +1718,10 @@ class AdminDashboardController:
         "player.revive": "admin.player.revive",
         "player.clear_battle": "admin.player.clear_battle",
         "automation.set": "admin.automation.set",
+        # v1.0.0-rc.41: close the world while the server is updated. The
+        # engine writes the flag and the audit row; the controller pokes the
+        # bot afterwards so its own door gate turns over at once.
+        "server.maintenance_mode": "admin.server.maintenance_mode",
         "simulation.interval": "admin.simulation.interval",
         "player.set_realm": "admin.player.set_realm",
         "player.set_resource_caps": "admin.player.set_resource_caps",
@@ -1887,6 +1891,17 @@ class AdminDashboardController:
                     automation = {k: bool(stored.get(k, v)) for k, v in automation.items()}
                 except Exception:
                     pass
+            maintenance_mode = {"enabled": False, "reason": ""}
+            row = await self.store._fetchone(db, "SELECT value_json FROM world_state WHERE key='maintenance_mode'")
+            if row:
+                try:
+                    stored = json.loads(str(row.get("value_json") or "{}"))
+                    maintenance_mode = {
+                        "enabled": bool(stored.get("enabled", False)),
+                        "reason": str(stored.get("reason", "") or ""),
+                    }
+                except Exception:
+                    pass
             clock = await self.store._world_clock(db)
             currencies = [str(r["currency_id"]) for r in await self.store._fetchall(db, "SELECT DISTINCT currency_id FROM currency_wallets ORDER BY currency_id")]
             # NPC names + active world events, so the NPC/world-state admin controls
@@ -1911,6 +1926,7 @@ class AdminDashboardController:
             "currencies": sorted(currencies),
             "simulations": simulations,
             "automation": automation,
+            "maintenance_mode": maintenance_mode,
             "audit": audit,
             "clock": clock,
             "npcs": npc_names,
