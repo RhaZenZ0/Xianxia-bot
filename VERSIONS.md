@@ -6,6 +6,36 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.0** (rc.42) stops the suite gambling, and gates the shape so it cannot start again.
+
+CLAUDE.md has forbidden "assert that a random thing happened, however many iterations you give it"
+since September, when a sect war at 12% and a grave-robber at 22% went red for no reason. That commit
+fixed those two and wrote the rule; it did not sweep the rest, and rc.41 paid for it again when a
+realm crossing at 0.82^30 - one run in 385 - turned a pull request red and cost a diagnosis before
+anybody could read the change it had stopped. Twenty-two tests are converted here: each either lends
+the dice (`gamerng.UseRoller`) or is made certain by its scenario, and each assertion is strengthened
+while it is open - "not zero" becomes the exact count the cap allows, a hunt that always lands is
+asserted to land two hundred times out of two hundred, and a failed forage is now tested with
+something to clear rather than with an empty plan.
+
+The guard is `TestATestThatAssertsARollLandedLendsTheDice`, beside `TestOnlyTestsBorrowTheDice` in
+`gamerng` and closing the direction that one cannot see. It asks two questions of every test in
+`internal/simulation` and `internal/game`: can it reach a draw - a real call graph over the functions
+that name `gamerng`, closed over same-package calls and extended through the package's own test
+helpers - and does it assert a tally came back zero. A test that does both must lend the dice or be
+named in `diceAllowed` with its reason. Run against the tree as it stood before the sweep it names
+fifteen of them.
+
+Two things the gate found that reading the code did not. The forage authority test
+(`TestForageResolveOwnsRegionalProfileRareLootAndRNG`) asserted that a herb reached the inventory
+after a TN 8 check at modifier 4 - a miss on 2d10 of 2 or 3, about **one run in thirty-three**, and by
+a wide margin the worst in the tree; it was not in the inventory this sweep was planned from, because
+that inventory came from grepping the simulation's own test files. And the test that says the dead
+commit no further crimes skipped itself whenever no killing happened, which is the same fault wearing
+a quieter coat: most runs it proved nothing. Both are certain now. The measured class was eleven tests
+by assertion phrasing and twenty-two by the time the call graph had been asked; the difference is why
+the rule is no longer prose alone. See CLAUDE.md, "Testing conventions".
+
 **1.0.0** (rc.41) closes the world while you update it.
 
 `/admin server lockdown` and a Maintenance card on the GM dashboard shut every player door and open

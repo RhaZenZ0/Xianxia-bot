@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"xianxia/core/internal/gamerng"
 	"xianxia/core/internal/storage"
 	"xianxia/core/internal/worlddata"
 )
@@ -81,9 +82,18 @@ func locationOf(t *testing.T, path, name string) string {
 	return fmt.Sprint(res.Rows[0][0])
 }
 
+// everyRollLands answers 0 to every bound, so every traveller sets out, every
+// rootless cultivator swears and every crumbling sect's disciple walks. What
+// the tick does after the roll is arithmetic, which turns "somebody moved"
+// into the exact count the cap allows.
+func everyRollLands() func() {
+	return gamerng.UseRoller(func(int) int { return 0 })
+}
+
 // Nothing autonomous had ever written current_location: every NPC stood where
 // they were born, for the life of the world.
 func TestNPCsActuallyTakeTheRoad(t *testing.T) {
+	defer everyRollLands()()
 	path := movementDB(t)
 	r := movementRunner()
 	for i := 0; i < 40; i++ {
@@ -102,8 +112,8 @@ func TestNPCsActuallyTakeTheRoad(t *testing.T) {
 	if err := conn.Commit(); err != nil {
 		t.Fatal(err)
 	}
-	if moved == 0 {
-		t.Fatal("forty peddlers over three days and not one of them left town")
+	if moved != travelMovedCap {
+		t.Fatalf("forty peddlers who all set out moved %d, want the cap of %d", moved, travelMovedCap)
 	}
 	away := 0
 	for i := 0; i < 40; i++ {
@@ -111,8 +121,8 @@ func TestNPCsActuallyTakeTheRoad(t *testing.T) {
 			away++
 		}
 	}
-	if away == 0 {
-		t.Error("npcTravel reported movement that did not reach the table")
+	if int64(away) != moved {
+		t.Errorf("npcTravel reported %d moves and %d of them reached the table", moved, away)
 	}
 }
 
@@ -189,6 +199,7 @@ func TestWhoTravelsDependsOnWhatTheyDo(t *testing.T) {
 // faction was chosen at bootstrap and frozen: no sect ever gained or lost a
 // member in the life of a world.
 func TestASectUnderRecruitmentPressureActuallyRecruits(t *testing.T) {
+	defer everyRollLands()()
 	path := movementDB(t)
 	r := movementRunner()
 	conn, err := storage.Open(path)
@@ -219,8 +230,8 @@ func TestASectUnderRecruitmentPressureActuallyRecruits(t *testing.T) {
 	if err := conn2.Commit(); err != nil {
 		t.Fatal(err)
 	}
-	if joined == 0 {
-		t.Fatal("a sect at 95 recruitment pressure with forty rootless cultivators took nobody")
+	if joined != sectChangeCap {
+		t.Fatalf("a sect at 95 recruitment pressure with forty willing cultivators took %d, want the cap of %d", joined, sectChangeCap)
 	}
 	if left != 0 {
 		t.Errorf("a sect at 80 cohesion lost %d members", left)
@@ -236,6 +247,7 @@ func TestASectUnderRecruitmentPressureActuallyRecruits(t *testing.T) {
 
 // A sect that has come apart loses people, and a healthy one does not.
 func TestASectThatHasComeApartLosesPeople(t *testing.T) {
+	defer everyRollLands()()
 	path := movementDB(t)
 	r := movementRunner()
 	conn, err := storage.Open(path)
@@ -266,8 +278,8 @@ func TestASectThatHasComeApartLosesPeople(t *testing.T) {
 	if err := conn2.Commit(); err != nil {
 		t.Fatal(err)
 	}
-	if left == 0 {
-		t.Fatal("a sect at 5 cohesion held every one of its forty disciples")
+	if left != sectChangeCap {
+		t.Fatalf("a sect at 5 cohesion lost %d of its forty disciples, want the cap of %d", left, sectChangeCap)
 	}
 	if joined != 0 {
 		t.Errorf("a sect at 10 recruitment pressure recruited %d", joined)

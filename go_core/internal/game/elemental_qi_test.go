@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"xianxia/core/internal/gamerng"
 	"xianxia/core/internal/storage"
 	"xianxia/core/internal/worlddata"
 )
@@ -160,6 +161,9 @@ func TestQiTheRootCannotStomachCanTurnOnItsOwn(t *testing.T) {
 	// Circulate, which risks nothing of its own: any deviation here is the
 	// element's doing.
 	batch4Apply(t, path, world, "cultivation.stance", 2, map[string]any{"stance": "circulate"})
+	// A clashing element turns on 8 of 100, so a hundred and twenty sessions
+	// missed it about one run in 22,000. Lent dice make the turn certain.
+	defer gamerng.UseRoller(func(int) int { return 0 })()
 	clashed := false
 	for seq := 0; seq < 120 && !clashed; seq++ {
 		batch4Exec(t, path, `UPDATE characters SET cultivation=0 WHERE user_id=42`)

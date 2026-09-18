@@ -3,8 +3,42 @@ package game
 import (
 	"testing"
 
+	"xianxia/core/internal/gamerng"
 	"xianxia/core/internal/storage"
+	"xianxia/core/internal/worlddata"
 )
+
+// everyMakingIsFound answers 0 to every bound: each material's find roll lands,
+// each yields the bottom of its range, and both dice of the check come up ones.
+// What is left is the gate - the region's richness against `min_resources` -
+// which is the half these tests are about.
+func everyMakingIsFound() func() {
+	return gamerng.UseRoller(func(int) int { return 0 })
+}
+
+// makingsWithin counts the entries the content file says a region this rich can
+// give up, so the expectation moves with the roster rather than with a literal
+// that a later content batch would quietly falsify.
+func makingsWithin(t *testing.T, world string, resources int64) int {
+	t.Helper()
+	catalog, err := worlddata.Load(world)
+	if err != nil {
+		t.Fatal(err)
+	}
+	within := 0
+	for id, spec := range catalog.ForageMaterials {
+		if _, ok := catalog.Items[id]; !ok {
+			continue
+		}
+		if spec.Chance > 0 && spec.Max > 0 && resources >= spec.MinResources {
+			within++
+		}
+	}
+	if within == 0 {
+		t.Fatal("no forage material in the content file is reachable at all")
+	}
+	return within
+}
 
 // The makings of the other three crafts (v1.0.0-rc.21).
 //
@@ -43,18 +77,17 @@ func TestAThinRegionHoldsNoneOfTheMakings(t *testing.T) {
 }
 
 func TestARichRegionGivesUpTheCraftMakings(t *testing.T) {
-	// A forager in a rich region brings back paper sooner or later. The roll
-	// is a roll, so this asks across independent trips rather than pinning one
-	// - at ~38% a trip, thirty misses in a row is about one run in a million.
+	// A forager in a rich region brings back the makings. This used to ask
+	// across thirty independent trips because the find is a roll - at ~38% a
+	// trip that is a miss about one run in a million, which is a bet the suite
+	// does not need to take. With the finds lent, one trip is the whole
+	// question: everything the region is rich enough to hold comes home.
+	defer everyMakingIsFound()()
 	world := batch4WorldPath(t)
-	seen := map[string]int64{}
-	for attempt := 0; attempt < 30 && len(seen) == 0; attempt++ {
-		for item, qty := range materialsOf(t, forageOnce(t, world, "Greenriver Town", "Mortal World", 100)) {
-			seen[item] = qty
-		}
-	}
-	if len(seen) == 0 {
-		t.Fatal("thirty trips through a region at full spirit resources found no craft makings at all")
+	want := makingsWithin(t, world, 100)
+	seen := materialsOf(t, forageOnce(t, world, "Greenriver Town", "Mortal World", 100))
+	if len(seen) != want {
+		t.Fatalf("a region at full spirit resources gave up %v, want all %d of the makings it holds", seen, want)
 	}
 	for item, qty := range seen {
 		if qty < 1 {
@@ -66,26 +99,23 @@ func TestARichRegionGivesUpTheCraftMakings(t *testing.T) {
 func TestWhatIsFoundIsWhatIsCarriedHome(t *testing.T) {
 	// The report and the bags have to agree: a `materials_found` naming a
 	// thing the inventory does not hold is the same lie as a silent gate.
+	defer everyMakingIsFound()()
 	world := batch4WorldPath(t)
-	for attempt := 0; attempt < 30; attempt++ {
-		path := setupBatch4AuthorityDB(t)
-		setupForageEffectAuthorityTables(t, path)
-		batch4Exec(t, path, `INSERT INTO civilization_regions(location,world_name,spirit_resources) VALUES('Greenriver Town','Mortal World',100)`)
-		result := batch4Result(t, batch4Apply(t, path, world, "forage.resolve", 1, map[string]any{}))
-		found := materialsOf(t, result)
-		if len(found) == 0 {
-			continue
-		}
-		for item, qty := range found {
-			held := storage.ParseInt(actionScalar(t, path,
-				`SELECT quantity FROM inventory WHERE user_id=42 AND item_id=?`, item))
-			if held != qty {
-				t.Fatalf("%s: reported %d, holding %d", item, qty, held)
-			}
-		}
-		return
+	path := setupBatch4AuthorityDB(t)
+	setupForageEffectAuthorityTables(t, path)
+	batch4Exec(t, path, `INSERT INTO civilization_regions(location,world_name,spirit_resources) VALUES('Greenriver Town','Mortal World',100)`)
+	result := batch4Result(t, batch4Apply(t, path, world, "forage.resolve", 1, map[string]any{}))
+	found := materialsOf(t, result)
+	if len(found) != makingsWithin(t, world, 100) {
+		t.Fatalf("one trip with every find lent reported %v", found)
 	}
-	t.Fatal("thirty trips found no makings to check the bags against")
+	for item, qty := range found {
+		held := storage.ParseInt(actionScalar(t, path,
+			`SELECT quantity FROM inventory WHERE user_id=42 AND item_id=?`, item))
+		if held != qty {
+			t.Fatalf("%s: reported %d, holding %d", item, qty, held)
+		}
+	}
 }
 
 func TestAFailedForageCarriesNothingHome(t *testing.T) {
@@ -96,29 +126,32 @@ func TestAFailedForageCarriesNothingHome(t *testing.T) {
 	// The fixture's cultivator has 100 in every attribute and so cannot fail a
 	// forage at all - which is why this zeroes them. A test that can only pass
 	// by never running is the fault this file exists to prevent.
+	//
+	// The same dice the two tests above lend make this one certain from the
+	// other side: the finds all land, so `materials_found` is genuinely full
+	// when the check is made, and both dice come up ones against a Celestial
+	// TN of 14 with a modifier of 4, so the check certainly misses. What is
+	// tested is the clearing, and it is now tested with something to clear.
+	defer everyMakingIsFound()()
 	world := batch4WorldPath(t)
-	for attempt := 0; attempt < 40; attempt++ {
-		path := setupBatch4AuthorityDB(t)
-		setupForageEffectAuthorityTables(t, path)
-		batch4Exec(t, path, `INSERT INTO civilization_regions(location,world_name,spirit_resources) VALUES('Froststar Border City','Celestial World',100)`)
-		batch4Exec(t, path, `UPDATE characters SET location='Froststar Border City',
-			attributes_json='{"body":0,"agility":0,"spirit":0,"insight":0,"will":0,"presence":0}' WHERE user_id=42`)
-		result := batch4Result(t, batch4Apply(t, path, world, "forage.resolve", 1, map[string]any{}))
-		if success, _ := result["success"].(bool); success {
-			continue
-		}
-		if found := materialsOf(t, result); len(found) != 0 {
-			t.Fatalf("a failed forage reported %v", found)
-		}
-		if loot, _ := result["loot"].(map[string]int64); len(loot) != 0 {
-			t.Fatalf("a failed forage carried %v", loot)
-		}
-		if got := storage.ParseInt(actionScalar(t, path, `SELECT COUNT(*) FROM inventory WHERE user_id=42`)); got != 0 {
-			t.Fatalf("a failed forage left %d rows in the bags", got)
-		}
-		return
+	path := setupBatch4AuthorityDB(t)
+	setupForageEffectAuthorityTables(t, path)
+	batch4Exec(t, path, `INSERT INTO civilization_regions(location,world_name,spirit_resources) VALUES('Froststar Border City','Celestial World',100)`)
+	batch4Exec(t, path, `UPDATE characters SET location='Froststar Border City',
+		attributes_json='{"body":0,"agility":0,"spirit":0,"insight":0,"will":0,"presence":0}' WHERE user_id=42`)
+	result := batch4Result(t, batch4Apply(t, path, world, "forage.resolve", 1, map[string]any{}))
+	if success, _ := result["success"].(bool); success {
+		t.Fatal("a cultivator with no attributes at all passed a Celestial forage on two ones")
 	}
-	t.Fatal("forty trips by a cultivator with no attributes at all never missed once")
+	if found := materialsOf(t, result); len(found) != 0 {
+		t.Fatalf("a failed forage reported %v", found)
+	}
+	if loot, _ := result["loot"].(map[string]int64); len(loot) != 0 {
+		t.Fatalf("a failed forage carried %v", loot)
+	}
+	if got := storage.ParseInt(actionScalar(t, path, `SELECT COUNT(*) FROM inventory WHERE user_id=42`)); got != 0 {
+		t.Fatalf("a failed forage left %d rows in the bags", got)
+	}
 }
 
 // The Discord reply prints the check through the same line every other roll

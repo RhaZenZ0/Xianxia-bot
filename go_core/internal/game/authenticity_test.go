@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 
+	"xianxia/core/internal/gamerng"
 	"xianxia/core/internal/storage"
 )
 
@@ -47,27 +48,38 @@ func TestAForgeryIsWorthWhatAForgeryIsWorth(t *testing.T) {
 }
 
 func TestTheUnderworldSellsSomeFakes(t *testing.T) {
+	// Every draw the span allows, rather than four hundred samples of it. The
+	// old version hoped to see a genuine article, which is one face of
+	// forty-six, so four hundred draws missed it about one run in 6,580. This
+	// walks the span instead: it proves the whole mapping from die to
+	// authenticity, not just that two bands turned up.
 	seenFake, seenReal := false, false
-	for i := 0; i < 400; i++ {
-		got, err := rollUnderworldAuthenticity()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if got < authenticityUnderworldFloor || got > authenticityGenuine {
-			t.Fatalf("out of range: %d", got)
-		}
-		if got < authenticityForgery {
-			seenFake = true
-		}
-		if got == authenticityGenuine {
-			seenReal = true
-		}
+	for n := 0; n < authenticityUnderworldSpan; n++ {
+		func() {
+			defer gamerng.UseRoller(func(int) int { return n })()
+			got, err := rollUnderworldAuthenticity()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if want := int64(authenticityUnderworldFloor + n); got != want {
+				t.Fatalf("die %d gave authenticity %d, want %d", n, got, want)
+			}
+			if got < authenticityUnderworldFloor || got > authenticityGenuine {
+				t.Fatalf("out of range: %d", got)
+			}
+			if got < authenticityForgery {
+				seenFake = true
+			}
+			if got == authenticityGenuine {
+				seenReal = true
+			}
+		}()
 	}
 	if !seenFake {
-		t.Fatal("four hundred broker deals and not one forgery")
+		t.Fatal("no face of the die is a forgery")
 	}
 	if !seenReal {
-		t.Fatal("the underworld never once sold the real thing")
+		t.Fatal("no face of the die is the real thing")
 	}
 }
 
