@@ -30342,6 +30342,82 @@
       "min_realm_index": 24
     }
   },
+  "world_crossing_system": {
+    "description": "What a survived world-crossing tribulation leaves behind. The heavens open over one named place, and the seam they tear there can be anchored into a permanent crossing - a gate that stands where the lightning fell instead of in the one capital the authored arrays depart from. It is public ground once it is up: anyone of the realm the crossing needs may pay its fare and step through, and so may the world's own people.",
+    "name_template": "{character}'s Ascension Gate",
+    "raise_cost_multiplier": 10,
+    "npc_crossing_chance_percent": 6,
+    "history_significance": 88,
+    "npc_history_significance": 45,
+    "quests": {
+      "Mortal World": {
+        "quest_key": "ascension_mortal_spirit",
+        "title": "The Seam Above You",
+        "description": "The lightning that judged you is gone and the sky where it stood is still thin. Anchor that seam into a crossing of your own, and walk through it into the Spiritual World.",
+        "objectives": [
+          {
+            "id": "gate",
+            "type": "ascension_gate",
+            "count": 1,
+            "label": "Anchor the seam where you survived it - **/ascend → Tribulation / Ascension → Gate**"
+          },
+          {
+            "id": "cross",
+            "type": "world_cross",
+            "count": 1,
+            "label": "Step through into the Spiritual World - **/travel → Teleportation Arrays → Use**"
+          }
+        ],
+        "rewards": {
+          "insight_xp": 120
+        }
+      },
+      "Spiritual World": {
+        "quest_key": "ascension_spirit_immortal",
+        "title": "Transcendence Leaves a Door",
+        "description": "Transcendence burned the seam open above you rather than closing it. Anchor it while it still holds, and cross into the Immortal World.",
+        "objectives": [
+          {
+            "id": "gate",
+            "type": "ascension_gate",
+            "count": 1,
+            "label": "Anchor the seam where you survived it - **/ascend → Tribulation / Ascension → Gate**"
+          },
+          {
+            "id": "cross",
+            "type": "world_cross",
+            "count": 1,
+            "label": "Step through into the Immortal World - **/travel → Teleportation Arrays → Use**"
+          }
+        ],
+        "rewards": {
+          "insight_xp": 200
+        }
+      },
+      "Immortal World": {
+        "quest_key": "ascension_immortal_celestial",
+        "title": "The Mandate Did Not Refuse",
+        "description": "The mandate of heaven was read over you and did not refuse. Anchor the seam it left behind, and step up into the Celestial World.",
+        "objectives": [
+          {
+            "id": "gate",
+            "type": "ascension_gate",
+            "count": 1,
+            "label": "Anchor the seam where you survived it - **/ascend → Tribulation / Ascension → Gate**"
+          },
+          {
+            "id": "cross",
+            "type": "world_cross",
+            "count": 1,
+            "label": "Step through into the Celestial World - **/travel → Teleportation Arrays → Use**"
+          }
+        ],
+        "rewards": {
+          "insight_xp": 320
+        }
+      }
+    }
+  },
   "narration_pool": {
     "tiers": [
       "Mortal World",

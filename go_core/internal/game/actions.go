@@ -74,7 +74,7 @@ func ApplyWithWorld(databasePath, worldPath string, req ActionRequest) (ActionRe
 	case "admin.player.fate":
 		result, err = adminFate(conn, req.ActorID, req.Payload)
 	case "admin.player.teleport":
-		result, err = adminTeleport(conn, req.ActorID, req.Payload)
+		result, err = adminTeleport(conn, catalog, req.ActorID, req.Payload)
 	case "admin.player.revive":
 		result, err = adminRevive(conn, req.ActorID, req.Payload)
 	case "admin.player.clear_battle":
@@ -1021,7 +1021,7 @@ func adminFate(conn *storage.Conn, adminUserID int64, raw json.RawMessage) (any,
 	return map[string]any{"user_id": uid, "name": row["name"], "points": after, "delta": delta}, nil
 }
 
-func adminTeleport(conn *storage.Conn, adminUserID int64, raw json.RawMessage) (any, error) {
+func adminTeleport(conn *storage.Conn, catalog worlddata.Catalog, adminUserID int64, raw json.RawMessage) (any, error) {
 	p, err := decodeMap(raw)
 	if err != nil {
 		return nil, err
@@ -1075,7 +1075,7 @@ func adminTeleport(conn *storage.Conn, adminUserID int64, raw json.RawMessage) (
 	}
 	before := fmt.Sprint(row["location"])
 	now := float64(time.Now().UnixNano()) / 1e9
-	if _, err = conn.Execute(`UPDATE characters SET location=?,updated_at=? WHERE user_id=?`, []any{loc, now, uid}); err != nil {
+	if _, err = moveCharacterTx(conn, catalog, uid, loc, now); err != nil {
 		return nil, err
 	}
 	_, _ = conn.Execute(`UPDATE player_scene_state SET physical_location=?,scene_type='world',scene_key='',scene_label=?,channel_id=NULL,metadata_json='{}',updated_at=? WHERE user_id=?`, []any{loc, loc, now, uid})

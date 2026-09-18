@@ -219,6 +219,31 @@ type CurrencyDefinition struct {
 	BaseRatio int64  `json:"base_ratio"`
 }
 
+// WorldCrossingSystem (v1.0.0-rc.44) is what a survived world-crossing
+// tribulation leaves behind: the seam it tore, which a cultivator may anchor
+// into a permanent crossing standing where the lightning fell rather than in
+// the one capital the authored arrays depart from.
+//
+// Everything about it is content. `Quests` is keyed by the world the gate
+// leads *out of*, so the quest a cleared tribulation hands over is the one
+// authored for that crossing; the engine reads only the key, because the
+// definition itself is seeded from this file the way the beginner path is.
+type WorldCrossingSystem struct {
+	Description            string                   `json:"description"`
+	NameTemplate           string                   `json:"name_template"`
+	RaiseCostMultiplier    int64                    `json:"raise_cost_multiplier"`
+	NPCCrossingChance      int64                    `json:"npc_crossing_chance_percent"`
+	HistorySignificance    int64                    `json:"history_significance"`
+	NPCHistorySignificance int64                    `json:"npc_history_significance"`
+	Quests                 map[string]CrossingQuest `json:"quests"`
+}
+
+// CrossingQuest is one authored ascension quest. Only the key is read here.
+type CrossingQuest struct {
+	QuestKey string `json:"quest_key"`
+	Title    string `json:"title"`
+}
+
 type TeleportArray struct {
 	Name          string `json:"name"`
 	From          string `json:"from"`
@@ -750,6 +775,7 @@ type Catalog struct {
 	Currencies          map[string]CurrencyDefinition  `json:"currencies"`
 	AuctionHouses       map[string]AuctionHouse        `json:"auction_houses"`
 	TeleportArrays      map[string]TeleportArray       `json:"teleport_arrays"`
+	WorldCrossing       WorldCrossingSystem            `json:"world_crossing_system"`
 	AbodeSystem         map[string]any                 `json:"abode_system"`
 	SectAbodeSystem     map[string]any                 `json:"sect_abode_system"`
 	SectSystem          map[string]any                 `json:"sect_system"`

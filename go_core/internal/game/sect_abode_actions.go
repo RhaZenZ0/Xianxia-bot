@@ -7,6 +7,7 @@ import (
 
 	"xianxia/core/internal/eventledger"
 	"xianxia/core/internal/storage"
+	"xianxia/core/internal/worlddata"
 )
 
 // Moving in and out of a sect abode (v0.23.0, the v0.21 Authority I backlog).
@@ -23,7 +24,7 @@ type sectAbodeMovePayload struct {
 	GameMinute int64 `json:"game_minute"`
 }
 
-func sectAbodeMoveAction(conn *storage.Conn, userID int64, raw json.RawMessage, mode string) (authoritativeMutation, error) {
+func sectAbodeMoveAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage, mode string) (authoritativeMutation, error) {
 	var p sectAbodeMovePayload
 	if err := json.Unmarshal(raw, &p); err != nil {
 		return authoritativeMutation{}, err
@@ -71,10 +72,7 @@ func sectAbodeMoveAction(conn *storage.Conn, userID int64, raw json.RawMessage, 
 		return authoritativeMutation{}, errors.New("unknown sect abode movement")
 	}
 
-	if _, err = conn.Execute(
-		`UPDATE characters SET location=?,updated_at=? WHERE user_id=?`,
-		[]any{destination, nowSeconds(), userID},
-	); err != nil {
+	if _, err = moveCharacterTx(conn, catalog, userID, destination, nowSeconds()); err != nil {
 		return authoritativeMutation{}, err
 	}
 	result := map[string]any{

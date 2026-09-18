@@ -316,7 +316,7 @@ func TestTheDoorOpensOnlyFromTheFamilysTown(t *testing.T) {
 	fid := householdFamily(t, path, 42, "Far Ridge")
 	enter := func() (map[string]any, error) {
 		return householdApply(t, path, func(c *storage.Conn) (authoritativeMutation, error) {
-			return familyHouseholdEnterAction(c, 42, payload(map[string]any{}))
+			return familyHouseholdEnterAction(c, worlddata.Catalog{}, 42, payload(map[string]any{}))
 		})
 	}
 	if _, err := enter(); err == nil || !strings.Contains(err.Error(), "travel there first") {
@@ -328,7 +328,7 @@ func TestTheDoorOpensOnlyFromTheFamilysTown(t *testing.T) {
 		t.Fatalf("entering from the town: %v err=%v", out, err)
 	}
 	left, err := householdApply(t, path, func(c *storage.Conn) (authoritativeMutation, error) {
-		return familyHouseholdLeaveAction(c, 42, payload(map[string]any{}))
+		return familyHouseholdLeaveAction(c, worlddata.Catalog{}, 42, payload(map[string]any{}))
 	})
 	if err != nil || left["location"] != "Greenriver Town" {
 		t.Fatalf("leaving on foot: %v err=%v", left, err)
@@ -396,7 +396,7 @@ func TestTheTwoTalismansMakeTheRoundTrip(t *testing.T) {
 	// Walking in leaves no mark, so the second waymark is refused unspent.
 	batch4Exec(t, path, `UPDATE characters SET location='Greenriver Town' WHERE user_id=42`)
 	if _, err := householdApply(t, path, func(c *storage.Conn) (authoritativeMutation, error) {
-		return familyHouseholdEnterAction(c, 42, payload(map[string]any{}))
+		return familyHouseholdEnterAction(c, worlddata.Catalog{}, 42, payload(map[string]any{}))
 	}); err != nil {
 		t.Fatal(err)
 	}

@@ -609,7 +609,7 @@ func ascendToNewWorld(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 	if hub == "" {
 		return "", nil
 	}
-	if _, err := conn.Execute(`UPDATE characters SET location=?,updated_at=? WHERE user_id=?`, []any{hub, now, userID}); err != nil {
+	if _, err := moveCharacterTx(conn, catalog, userID, hub, now); err != nil {
 		return "", err
 	}
 	_, _ = conn.Execute(

@@ -1581,7 +1581,7 @@ func explorationTravelAction(conn *storage.Conn, catalog worlddata.Catalog, user
 			leftBy = direction
 		}
 	}
-	if _, err = conn.Execute(`UPDATE characters SET location=?,updated_at=? WHERE user_id=?`, []any{arrivedAt, now, userID}); err != nil {
+	if _, err = moveCharacterTx(conn, catalog, userID, arrivedAt, now); err != nil {
 		return authoritativeMutation{}, err
 	}
 

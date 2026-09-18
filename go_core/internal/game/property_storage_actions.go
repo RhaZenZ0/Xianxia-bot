@@ -297,7 +297,7 @@ func abodeEstablishActionGo(conn *storage.Conn, catalog worlddata.Catalog, userI
 	return authoritativeMutation{Result: a, Event: eventledger.Event{Domain: "property", EventType: "abode.establish", EntityType: "abode", EntityID: key, GameMinute: p.GameMinute, Payload: a}}, nil
 }
 
-func abodeMoveActionGo(conn *storage.Conn, userID int64, raw json.RawMessage, mode string) (authoritativeMutation, error) {
+func abodeMoveActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage, mode string) (authoritativeMutation, error) {
 	var p locationActionPayload
 	if e := json.Unmarshal(raw, &p); e != nil {
 		return authoritativeMutation{}, e
@@ -360,14 +360,14 @@ func abodeMoveActionGo(conn *storage.Conn, userID int64, raw json.RawMessage, mo
 	if mode == "leave" {
 		dest = fmt.Sprint(a["base_location"])
 	}
-	if _, e = conn.Execute(`UPDATE characters SET location=?,updated_at=? WHERE user_id=?`, []any{dest, nowSeconds(), userID}); e != nil {
+	if _, e = moveCharacterTx(conn, catalog, userID, dest, nowSeconds()); e != nil {
 		return authoritativeMutation{}, e
 	}
 	out := map[string]any{"abode": a, "location": dest, "mode": mode}
 	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "property", EventType: "abode." + mode, EntityType: "character", EntityID: fmt.Sprint(userID), GameMinute: p.GameMinute, Payload: out}}, nil
 }
 
-func abodeGuestActionGo(conn *storage.Conn, userID int64, raw json.RawMessage, revoke bool) (authoritativeMutation, error) {
+func abodeGuestActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage, revoke bool) (authoritativeMutation, error) {
 	var p abodeGuestPayload
 	if e := json.Unmarshal(raw, &p); e != nil {
 		return authoritativeMutation{}, e
@@ -400,7 +400,7 @@ func abodeGuestActionGo(conn *storage.Conn, userID int64, raw json.RawMessage, r
 		}
 		g := firstRowMap(r)
 		if g != nil && fmt.Sprint(g["location"]) == fmt.Sprint(a["location_key"]) {
-			if _, e = conn.Execute(`UPDATE characters SET location=?,updated_at=? WHERE user_id=?`, []any{a["base_location"], nowSeconds(), p.GuestUserID}); e != nil {
+			if _, e = moveCharacterTx(conn, catalog, p.GuestUserID, fmt.Sprint(a["base_location"]), nowSeconds()); e != nil {
 				return authoritativeMutation{}, e
 			}
 			evicted = true
@@ -525,14 +525,35 @@ func abodeFocusActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID in
 	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "property", EventType: "abode.focus", EntityType: "abode", EntityID: fmt.Sprint(a["location_key"]), GameMinute: p.GameMinute, Payload: out}}, nil
 }
 
+// teleportArrayActionGo carries a cultivator through an anchored formation.
+//
+// Two kinds answer to it and they are deliberately one action: the eight
+// arrays `content/world.json` anchors, and the crossings players have torn
+// open with `ascension.gate` (v1.0.0-rc.44). The catalogue is looked in first,
+// so a raised gate can never shadow an authored one, and a raised gate borrows
+// the authored crossing's fare, terminus and realm floor - so whichever kind
+// a player steps through, the road costs the same and lands in the same place.
 func teleportArrayActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	var p teleportPayload
 	if e := json.Unmarshal(raw, &p); e != nil {
 		return authoritativeMutation{}, e
 	}
 	d, ok := catalog.TeleportArrays[p.ArrayID]
+	raised := raisedCrossing{}
 	if !ok {
-		return authoritativeMutation{}, errors.New("unknown teleportation array")
+		location := strings.TrimPrefix(p.ArrayID, crossingKeyPrefix)
+		if location == p.ArrayID {
+			return authoritativeMutation{}, errors.New("unknown teleportation array")
+		}
+		standing := false
+		var e error
+		if raised, standing, e = crossingAtTx(conn, catalog, location); e != nil {
+			return authoritativeMutation{}, e
+		} else if !standing {
+			return authoritativeMutation{}, errors.New("unknown teleportation array")
+		}
+		d = worlddata.TeleportArray{Name: raised.Name, From: raised.Location, To: raised.Destination,
+			Currency: raised.Currency, Cost: raised.Cost, MinRealmIndex: raised.MinRealmIndex}
 	}
 	r, e := conn.Execute(`SELECT location,realm_index FROM characters WHERE user_id=?`, []any{userID})
 	if e != nil {
@@ -552,10 +573,22 @@ func teleportArrayActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID
 	if e != nil {
 		return authoritativeMutation{}, errors.New("you cannot pay the array activation cost")
 	}
-	if _, e = conn.Execute(`UPDATE characters SET location=?,updated_at=? WHERE user_id=?`, []any{d.To, nowSeconds(), userID}); e != nil {
+	exchange, e := moveCharacterTx(conn, catalog, userID, d.To, nowSeconds())
+	if e != nil {
 		return authoritativeMutation{}, e
 	}
 	out := map[string]any{"array_id": p.ArrayID, "name": d.Name, "from": d.From, "to": d.To, "currency": d.Currency, "cost": d.Cost, "balance": balance}
+	if raised.Location != "" {
+		if _, e = conn.Execute(`UPDATE world_crossings SET player_uses=player_uses+1 WHERE location_key=?`, []any{raised.Location}); e != nil {
+			return authoritativeMutation{}, e
+		}
+		out["raised"] = true
+		out["opened_by_user_id"] = raised.OpenedBy
+	}
+	if exchange != nil {
+		out["exchange"] = exchange
+		out["balance"] = exchange["balance"]
+	}
 	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "travel", EventType: "array.use", EntityType: "character", EntityID: fmt.Sprint(userID), GameMinute: p.GameMinute, Payload: out}}, nil
 }
 
@@ -785,7 +818,7 @@ func personalWorldRuleActionGo(conn *storage.Conn, userID int64, raw json.RawMes
 	out := map[string]any{"location_key": w["location_key"], "name": w["name"], "stability": st, "laws": rules, "rule": p.Rule, "definition": p.Definition}
 	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "personal_world", EventType: "personal_world.set_rule", EntityType: "personal_world", EntityID: fmt.Sprint(w["location_key"]), GameMinute: p.GameMinute, Payload: out}}, nil
 }
-func personalWorldMoveActionGo(conn *storage.Conn, userID int64, raw json.RawMessage, leave bool) (authoritativeMutation, error) {
+func personalWorldMoveActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage, leave bool) (authoritativeMutation, error) {
 	var p struct {
 		GameMinute int64 `json:"game_minute"`
 	}
@@ -817,7 +850,7 @@ func personalWorldMoveActionGo(conn *storage.Conn, userID int64, raw json.RawMes
 		dest = "Greenriver Town"
 		et = "personal_world.leave"
 	}
-	if _, e = conn.Execute(`UPDATE characters SET location=?,updated_at=? WHERE user_id=?`, []any{dest, nowSeconds(), userID}); e != nil {
+	if _, e = moveCharacterTx(conn, catalog, userID, dest, nowSeconds()); e != nil {
 		return authoritativeMutation{}, e
 	}
 	out := map[string]any{"location": dest, "name": w["name"]}

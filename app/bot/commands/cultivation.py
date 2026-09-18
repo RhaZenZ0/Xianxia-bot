@@ -900,9 +900,48 @@ async def tribulation_attempt(interaction: discord.Interaction, path: app_comman
         )
         if int(result.get("fate_after", -1)) >= 0:
             lines.append(f"🌠 Heaven leaves providence in your wake: **Fate {int(result.get('fate_after',0))}/9**.")
+        if result.get("quest_granted"):
+            lines.append(
+                "🌀 The sky where the lightning stood is thin, and it will not stay that way: anchor the seam with "
+                "**/ascend → Tribulation / Ascension → Gate** and the crossing is yours — see **/quests**."
+            )
     else:
         lines.append("\n💥 **Tribulation failed.** Preparation is consumed. Heal persistent injuries and prepare before trying again.")
     await reply_long(interaction, "\n".join(lines), ephemeral=False)
+
+
+@registered_group_command(tribulation_group, name="gate", description="Anchor the seam a survived tribulation left into a permanent crossing here")
+@serialized_user_action
+async def tribulation_gate(interaction: discord.Interaction) -> None:
+    await interaction.response.defer(ephemeral=False)
+    if not await require_character(interaction):
+        return
+    wt = await current_world_time()
+    try:
+        envelope = await ENGINE.authoritative_action(
+            "ascension.gate", interaction.user.id, {},
+            action_id=f"discord:{interaction.id}:ascension.gate",
+        )
+    except GameEngineError as exc:
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
+        return
+    result = dict(envelope.get("result") or {})
+    currency = str(result.get("currency") or "")
+    await interaction.followup.send(
+        f"🌀 The seam over **{result.get('location','here')}** holds. The **{result.get('name','Ascension Gate')}** stands there now: "
+        f"a public crossing out of {result.get('from_world','this world')} into **{result.get('to_world','the world above')}**, "
+        f"setting travellers down at **{result.get('destination','the far side')}**.\n"
+        f"Anchoring it cost **{int(result.get('cost',0))} {WORLD.currency_name(currency)}** "
+        f"(remaining: **{int(result.get('balance',0))}**); the transit itself asks **{int(result.get('fare',0))}** of anyone who uses it. "
+        f"Step through with **/travel → Teleportation Arrays → Use**.",
+        ephemeral=False,
+    )
+    # The stage's objective is the anchored gate, reported after the reply.
+    try:
+        await announce_quest_progress(interaction, await QUESTS.progress(
+            interaction.user.id, "ascension_gate", game_minute=wt.total_minutes))
+    except Exception:
+        log.exception("Quest progress update failed after anchoring a crossing")
 
 
 

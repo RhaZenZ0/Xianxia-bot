@@ -56,7 +56,8 @@ async def run(url: str, token: str, db_path: str) -> Report:
     from app.database import Database
     from app.database.remote import GoDatabaseTransport
     from app.ops.game_engine import GameEngineClient, GameEngineError
-    from app.rules.quests import QUEST_DEFINITIONS, beginner_path_seed_rows, household_errand_seed_rows, static_quest_seed_rows
+    from app.rules.quests import (QUEST_DEFINITIONS, ascension_quest_seed_rows, beginner_path_seed_rows,
+                                  household_errand_seed_rows, static_quest_seed_rows)
     from app.rules.game import World
 
     world = json.loads((ROOT / "content" / "world.json").read_text(encoding="utf-8"))
@@ -117,7 +118,8 @@ async def run(url: str, token: str, db_path: str) -> Report:
     content = World(ROOT / "content" / "world.json")
     await step(report, "seed the commission pool, static quests, the beginner path and the household errands",
                db.sync_commission_pool(list(world.get("commissions") or []) + static_quest_seed_rows(QUEST_DEFINITIONS)
-                                       + beginner_path_seed_rows(content) + household_errand_seed_rows(content)))
+                                       + beginner_path_seed_rows(content) + household_errand_seed_rows(content)
+                                       + ascension_quest_seed_rows(content)))
     gm0 = await step(report, "world clock", clock())
     await step(report, "simulation bootstrap", engine.bootstrap_simulation(int(gm0 or 0)))
 
@@ -1600,6 +1602,52 @@ async def run(url: str, token: str, db_path: str) -> Report:
                            f"success={treated.get('success')} severity {treated.get('severity_before')}->{treated.get('severity_after')} resolved={treated.get('resolved')}")
         if not failed:
             report.add("PASS", "no wave failed, so nothing was left to treat", "the dice passed all three")
+    # The seam a survived tribulation leaves (v1.0.0-rc.44). The attempt above
+    # is three rolls and may have gone either way, so the gate is cleared with
+    # the lever rather than hoped for; everything after it is deterministic.
+    # The authored Mortal crossing (`imperial_spirit`) is 200 low spirit
+    # stones at realm 8, landing at Spirit Jade Capital, and a raised gate
+    # borrows all three - so anchoring is 2,000 and the transit is 200.
+    await step(report, "clear the Mortal gate outright, so the seam is certain",
+               gm("admin.player.set_tribulation", {"user_id": PLAYER, "gate_realm_index": 7, "mode": "clear", "reason": "playtest"}))
+    await step(report, "stand where the authored crossing's realm floor allows the transit",
+               gm("admin.player.set_realm", {"user_id": PLAYER, "realm_index": 8, "phase": 1, "reason": "playtest"}))
+    await step(report, "back to Greenriver Town, which is public Mortal ground",
+               gm("admin.player.teleport", {"user_id": PLAYER, "location": "Greenriver Town", "reason": "playtest"}))
+    await step(report, "twenty thousand stones, to anchor a seam and then walk through it",
+               gm("admin.player.grant_currency", {"user_id": PLAYER, "currency_id": "low_spirit_stone", "amount": 20000, "reason": "playtest"}))
+    gate = await step(report, "ascension.gate", act("ascension.gate", PLAYER, {}))
+    if gate is not None:
+        report.add("PASS" if str(gate.get("destination")) == "Spirit Jade Capital" and int(gate.get("fare") or 0) == 200
+                   and int(gate.get("min_realm_index") or 0) == 8 and int(gate.get("cost") or 0) == 2000 else "FAIL",
+                   "the gate stands where the storm did and borrows the authored road",
+                   f"{gate.get('name')} at {gate.get('location')} -> {gate.get('destination')} "
+                   f"({gate.get('from_world')} -> {gate.get('to_world')}); anchored for {gate.get('cost')}, fare {gate.get('fare')}")
+        await step(report, "a second seam out of the same world is refused", act("ascension.gate", PLAYER, {}),
+                   expect_error="already anchored your crossing")
+        crossed = await step(report, "array.use through the gate a cultivator tore open",
+                             act("array.use", PLAYER, {"array_id": gate.get("array_id")}))
+        if crossed is not None:
+            exchange = dict(crossed.get("exchange") or {})
+            # 20,000 granted, less 2,000 anchored and 200 in fare, is 17,800
+            # Mortal stones: 178 spirit crystals at the ladder's hundred to
+            # one, with nothing left over.
+            report.add("PASS" if str(crossed.get("to")) == "Spirit Jade Capital" and crossed.get("raised") is True
+                       and int(exchange.get("converted") or 0) == 178 and int(exchange.get("rate") or 0) == 100 else "FAIL",
+                       "the crossing carries the player and converts the purse at the ladder",
+                       f"to={crossed.get('to')} raised={crossed.get('raised')} "
+                       f"{exchange.get('spent')} {exchange.get('from_currency')} -> {exchange.get('converted')} "
+                       f"{exchange.get('to_currency')} at {exchange.get('rate')}:1, {exchange.get('remainder')} left behind")
+        sheet = dict(await db.get_character(PLAYER) or {})
+        report.add("PASS" if int(sheet.get("spirit_stones") or 0) == 178 else "FAIL",
+                   "the sheet reads in the money of the world arrived in",
+                   f"spirit_stones={sheet.get('spirit_stones')} at {sheet.get('location')}")
+        # And home again, which converts back at the same rung, so the rest of
+        # the run is standing in the Mortal World with what it started with.
+        await step(report, "home to the Mortal World, which converts back at the same rung",
+                   gm("admin.player.teleport", {"user_id": PLAYER, "location": "Greenriver Town", "reason": "playtest"}))
+    await step(report, "restore the realm the rest of the run expects",
+               gm("admin.player.set_realm", {"user_id": PLAYER, "realm_index": 7, "phase": 9, "reason": "playtest"}))
     await audited("admin.player.set_tribulation", {"user_id": PLAYER, "gate_realm_index": 7, "mode": "reset", "reason": "playtest"}, name="admin.player.set_tribulation reset")
 
     # The aptitudes, at realm 7 so a temper's share of the stage is paid from

@@ -106,7 +106,7 @@ func auctionEnterAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 		return authoritativeMutation{}, errors.New("no recognized auction-house entrance at current location")
 	}
 	now := nowSeconds()
-	if _, err = conn.Execute(`UPDATE characters SET location=?,updated_at=? WHERE user_id=?`, []any{house.Location, now, userID}); err != nil {
+	if _, err = moveCharacterTx(conn, catalog, userID, house.Location, now); err != nil {
 		return authoritativeMutation{}, err
 	}
 	out := map[string]any{"house_id": key, "name": house.Name, "location": house.Location, "outside": house.EntranceLocation}
@@ -129,7 +129,7 @@ func auctionLeaveAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 		return authoritativeMutation{}, errors.New("character is not inside a registered auction house")
 	}
 	now := nowSeconds()
-	if _, err = conn.Execute(`UPDATE characters SET location=?,updated_at=? WHERE user_id=?`, []any{house.EntranceLocation, now, userID}); err != nil {
+	if _, err = moveCharacterTx(conn, catalog, userID, house.EntranceLocation, now); err != nil {
 		return authoritativeMutation{}, err
 	}
 	out := map[string]any{"house_id": houseID, "name": house.Name, "outside": house.EntranceLocation, "incident": nil}

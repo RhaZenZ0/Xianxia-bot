@@ -6,6 +6,39 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.0** (rc.44) pays a cultivator in the money of the world they are standing in, converts what
+they carry when they leave it, and lets the storm that judged them leave a door behind.
+
+Which money a world uses was stated five times in code - four switches in Go and a tuple in Python -
+over a fact `content/world.json` already declares on all sixteen currencies. It is `worldBaseCurrency`
+now and nothing else, the same collapse rc.39 did to the world clock, and
+`test_one_world_currency_rule.py` is the gate: a production file naming three of the four base
+currencies is restating the mapping, and its allowlist is empty. On top of that one reader, every
+reward is denominated by where it was earned - until now a cultivator in the Spiritual World was
+paid in Mortal stones and charged in spirit crystals, which is the teleport arrays' old fault
+("payable only by somebody who had already arrived") spread across the whole upper-world economy.
+
+Nothing converted at the boundary, either. The content carries a `base_ratio` on every tier above
+the first - a hundred of the rung below - and a world is that same ladder seen from further up, so a
+crossing now divides by it going up and multiplies by it coming down. The remainder is left in the
+money it was already in rather than destroyed. `moveCharacterTx` is the one door out of a world and
+`TestAWorldIsLeftByOneDoor` holds it: fourteen statements wrote `characters.location` and thirteen of
+them could cross a world - the ascension breakthrough, an array, a GM's relocate, a Hearth-Return
+Talisman that carries you home from anywhere - so which half of a fortune survived would have
+depended on how you travelled.
+
+And clearing a world-crossing tribulation wrote `tribulation_state.cleared`, paid a reputation point
+and a fate point, and stopped: the heavens opened over one named place and left nothing there, while
+the only anchored way up was one authored array in one capital. `ascension.gate` anchors the seam
+where the lightning fell - a permanent crossing at your own location, into the world the gate you
+survived opens onto, borrowing the authored crossing's terminus, fare and realm floor so nobody can
+tear open a cheaper road than the world already has. It is public ground: `array.use` resolves it
+beside the authored eight, and the world's own people walk through it, which is the one road in the
+game that leaves a world (`WhereAnNPCCanWalk` refuses another world by construction, and content
+roads still do). The tribulation hands over the quest authored for that crossing, through the same
+`grantOrdinaryQuestTx` the beginner path uses - there is still no second quest mechanism, only a
+second thing that hands one over.
+
 **1.0.0** (rc.43) opens two doors nobody could reach, and gives money one door of its own.
 
 `/learn` was the only registered root command in the game that reached no player: forty-five roots,
@@ -1812,6 +1845,13 @@ mechanical authority paths.
 - **Schema 27** added the v0.19.29 mute/freeze moderation columns on `characters`
   (`is_muted`, `is_frozen`, `moderation_reason`).
 - **Schema 28** added the Quest Forge definition table (`quest_definitions`).
+- **Schema 54** raised `world_crossings`, where a survived world-crossing tribulation leaves its
+  mark. One row per gate a cultivator has anchored: where it stands, the two worlds it joins, the
+  terminus and fare it borrows from the authored crossing for that pair, and who tore it open.
+  Keyed on the location rather than on the opener, for the reason a robbed grave is keyed on its
+  claim minute - `opened_by_user_id` anonymises on erasure, so keying meaning to it would let an
+  erasure unmake a gate. The CREATE is the whole migration: no gate has ever stood anywhere, so
+  there is nothing to back-fill.
 - **Schema 53** reconciled the purse with its mirror. A player's stones live in `currency_wallets`
   and in `characters.spirit_stones`, and eleven writers moved one without the other - `trade.accept`
   worst of all, moving stones between two players and naming `currency_wallets` nowhere. Every writer

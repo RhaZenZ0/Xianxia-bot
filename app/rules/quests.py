@@ -144,6 +144,42 @@ def beginner_path_seed_rows(world: Any) -> list[dict[str, Any]]:
     return rows
 
 
+def ascension_quest_seed_rows(world: Any) -> list[dict[str, Any]]:
+    """The ascension quests from `content/world.json`, shaped for the same seeder.
+
+    `world_crossing_system.quests` is keyed by the world a crossing leads out
+    of, which is how the engine finds the one to hand over: a cleared
+    tribulation knows its own gate, and the gate knows the world it departs.
+    Everything else here is the beginner path's shape exactly - an ordinary
+    giver-less `quest_definitions` row, granted by `grantOrdinaryQuestTx`,
+    pinned and paid by the code every other quest uses. There is no second
+    quest mechanism, only a second thing that hands one over.
+    """
+    rows: list[dict[str, Any]] = []
+    quests = dict((getattr(world, "data", {}).get("world_crossing_system") or {}).get("quests") or {})
+    for departing in sorted(quests):
+        quest = dict(quests[departing] or {})
+        key = str(quest.get("quest_key") or "").strip()
+        if not key:
+            continue
+        rows.append({
+            "quest_key": key,
+            "title": str(quest.get("title", "")),
+            "description": str(quest.get("description", "")),
+            "source_type": "system",
+            "source_key": f"world_crossing:{departing}",
+            "objectives": list(quest.get("objectives", [])),
+            "rewards": dict(quest.get("rewards", {})),
+            "giver_npc": "",
+            "realm_band": "",
+            "tier": 1,
+            "deadline_game_minutes": 0,
+            "variants": [],
+            "seed": {"from_world": str(departing)},
+        })
+    return rows
+
+
 def static_quest_seed_rows(definitions: dict[str, dict] | None = None) -> list[dict[str, Any]]:
     """The static quests, shaped for `Database.sync_commission_pool`.
 
@@ -229,6 +265,14 @@ OBJECTIVE_TYPES: dict[str, dict[str, Any]] = {
     # passed (v1.0.0-rc.34). Untargeted: the head of the house is the player's
     # own, a generated name no catalogue could validate.
     "family_lesson": {"target": None, "label": "", "untargeted": "Take the head of the house's last lesson and pass its test"},
+    # The two halves of an ascension (v1.0.0-rc.44), reported by
+    # `/ascend -> Tribulation / Ascension -> Gate` and by `/travel ->
+    # Teleportation Arrays -> Use` when the transit changed world. Both are
+    # untargeted, and for the same reason: a crossing is anchored wherever the
+    # cultivator was standing when the lightning found them, so there is no
+    # location a draft could name in advance and be right about.
+    "ascension_gate": {"target": None, "label": "", "untargeted": "Anchor a crossing where you survived your tribulation"},
+    "world_cross": {"target": None, "label": "", "untargeted": "Cross into the world above"},
 }
 SCENE_ACTION_KEYS = ("observe", "investigate", "influence", "stealth", "physical", "qi", "resolve", "aid")
 REWARD_KEYS = ("insight_xp", "spirit_stones", "items")

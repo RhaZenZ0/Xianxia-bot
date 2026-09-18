@@ -219,6 +219,21 @@ class World:
     def currency_name(self, currency_id: str) -> str:
         return str(self.currencies.get(currency_id, {}).get("name", currency_id.replace("_", " ").title()))
 
+    def world_base_currency(self, world_name: str) -> str:
+        """The tier-1 currency of one world, read off the file that declares it.
+
+        The presentation-side twin of Go's `worldBaseCurrency` (v1.0.0-rc.44),
+        and written the same way for the same reason: sorted ids rather than a
+        dict order, so a world that somehow carried two tier-1 currencies would
+        at least name the same one twice. It is a lookup, never a rule - which
+        money a world uses is stated once, in `content/world.json`.
+        """
+        for key in sorted(self.currencies):
+            entry = self.currencies[key]
+            if str(entry.get("world") or "") == world_name and int(entry.get("tier") or 0) == 1:
+                return key
+        return "low_spirit_stone"
+
     def location_safe_zone(self, name: str) -> bool:
         return bool(self.locations.get(name, {}).get("safe_zone", False))
 

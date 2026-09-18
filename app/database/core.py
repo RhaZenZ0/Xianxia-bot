@@ -26,7 +26,7 @@ from .remote import GoDatabaseTransport
 log = logging.getLogger("xianxia.database")
 
 
-SCHEMA_VERSION = 53
+SCHEMA_VERSION = 54
 # A readiness probe must validate more than the schema-version marker.  If the
 # SQLite file is removed or replaced while the bot is running, SQLite will
 # happily create a new empty file at the same path.  Checking these tables lets
@@ -221,6 +221,7 @@ OPERATIONAL_REQUIRED_TABLES = frozenset(
         "world_event_nodes",
         "world_event_npcs",
         "world_event_participation",
+        "world_crossings",
         "world_events",
         "world_history_events",
         "world_simulation_state",
@@ -441,6 +442,29 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
                 FOREIGN KEY(owner_user_id) REFERENCES characters(user_id) ON DELETE SET NULL
             )""",
             """CREATE INDEX IF NOT EXISTS idx_deployed_arrays_expiry ON deployed_location_arrays(ends_game_minute)""",
+            # v1.0.0-rc.44: a crossing somebody tore open. Written only by
+            # `ascension.gate`, read by `array.use` beside the eight authored
+            # arrays and by the world simulation, which walks the world's own
+            # people through it. Keyed by where it stands, because a location
+            # holds one gate and because `opened_by_user_id` anonymises on
+            # erasure - the same reason a robbed grave is keyed on its claim
+            # minute rather than on who claimed it.
+            """CREATE TABLE IF NOT EXISTS world_crossings (
+                location_key TEXT PRIMARY KEY,
+                name TEXT NOT NULL DEFAULT '',
+                from_world TEXT NOT NULL,
+                to_world TEXT NOT NULL,
+                destination_location TEXT NOT NULL,
+                min_realm_index INTEGER NOT NULL DEFAULT 0,
+                cost INTEGER NOT NULL DEFAULT 0,
+                opened_by_user_id INTEGER,
+                opened_game_minute INTEGER NOT NULL DEFAULT 0,
+                player_uses INTEGER NOT NULL DEFAULT 0,
+                npc_uses INTEGER NOT NULL DEFAULT 0,
+                created_at REAL NOT NULL DEFAULT 0,
+                FOREIGN KEY(opened_by_user_id) REFERENCES characters(user_id) ON DELETE SET NULL
+            )""",
+            """CREATE INDEX IF NOT EXISTS idx_world_crossings_owner ON world_crossings(opened_by_user_id,from_world)""",
             """CREATE TABLE IF NOT EXISTS black_market_posts (
                 world_name TEXT PRIMARY KEY,
                 location TEXT NOT NULL,
@@ -2375,6 +2399,32 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
                    SELECT balance FROM currency_wallets w
                    WHERE w.user_id=characters.user_id AND w.currency_id='low_spirit_stone'
                ), spirit_stones)""",
+        ),
+    ),
+    (
+        54,
+        "raise_the_crossings_table",
+        (
+            # v1.0.0-rc.44: where a survived world-crossing tribulation leaves
+            # its mark. The CREATE is the whole migration - nothing is
+            # back-filled, because no gate has ever stood anywhere and the
+            # table starts empty by construction.
+            """CREATE TABLE IF NOT EXISTS world_crossings (
+                location_key TEXT PRIMARY KEY,
+                name TEXT NOT NULL DEFAULT '',
+                from_world TEXT NOT NULL,
+                to_world TEXT NOT NULL,
+                destination_location TEXT NOT NULL,
+                min_realm_index INTEGER NOT NULL DEFAULT 0,
+                cost INTEGER NOT NULL DEFAULT 0,
+                opened_by_user_id INTEGER,
+                opened_game_minute INTEGER NOT NULL DEFAULT 0,
+                player_uses INTEGER NOT NULL DEFAULT 0,
+                npc_uses INTEGER NOT NULL DEFAULT 0,
+                created_at REAL NOT NULL DEFAULT 0,
+                FOREIGN KEY(opened_by_user_id) REFERENCES characters(user_id) ON DELETE SET NULL
+            )""",
+            """CREATE INDEX IF NOT EXISTS idx_world_crossings_owner ON world_crossings(opened_by_user_id,from_world)""",
         ),
     ),
 )
@@ -4534,6 +4584,24 @@ class Database:
                    WHERE p.event_key=? ORDER BY p.contribution DESC,p.actions_taken DESC,p.updated_at ASC LIMIT ?""",
                 (str(event_key), max(1, min(100, int(limit)))),
             )
+            return [dict(r) for r in await cur.fetchall()]
+
+    async def list_world_crossings(self, location: str | None = None) -> list[dict[str, Any]]:
+        """The crossings players have anchored (v1.0.0-rc.44), or the one that
+        stands at `location`.
+
+        A read, so it is presentation's to do: `/array list` and its
+        autocomplete draw a raised gate beside the eight the content anchors,
+        and `array.use` is still the only thing that carries anybody through
+        one.
+        """
+        async with self._connect() as db:
+            db.row_factory = aiosqlite.Row
+            if location is None:
+                cur = await db.execute("SELECT * FROM world_crossings ORDER BY location_key")
+            else:
+                cur = await db.execute(
+                    "SELECT * FROM world_crossings WHERE location_key=? ORDER BY location_key", (str(location),))
             return [dict(r) for r in await cur.fetchall()]
 
     async def list_world_event_nodes(self, event_key: str) -> list[dict[str, Any]]:

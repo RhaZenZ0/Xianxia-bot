@@ -145,7 +145,7 @@ internal/server/        HTTP control/data plane
 ```
 
 Every Go SQLite connection uses `journal_mode=WAL`, `foreign_keys=ON`, `busy_timeout=10000`,
-`synchronous=NORMAL`. Current schema version is 53; historical migrations are kept so old databases
+`synchronous=NORMAL`. Current schema version is 54; historical migrations are kept so old databases
 can upgrade in place — see `VERSIONS.md` for the full schema/release history.
 
 ### The NPC life cycle (v1.0.0-rc.24)
@@ -816,6 +816,71 @@ to their shape by `TestTheStoneLadderIsWholeInEveryWorld` (four worlds × four t
 the ratio exact). No exchange between tiers is built: that is a mechanic rather than a parse, nothing
 needs it while every price in the content file is tier 1, and a helper with no caller would be the
 very thing this release exists to remove.
+
+### The money of the world you are standing in, and the door out of it (schema 54, v1.0.0-rc.44)
+
+Three faults at the world boundary, and they are one omission seen from three sides.
+
+**Which money a world uses was said five times.** `content/world.json` declares all sixteen
+currencies with the `world` each belongs to, and four switches in Go (`tribulationCurrency`,
+`simulation.worldCurrency`, an inline map in `lifecycle_actions.go`, another in `simulation/world.go`)
+plus a tuple in `app/dashboard/server.py` restated it. None could be wrong in an interesting way until
+a fifth world is added or a currency renamed, at which point four are silently stale. It is
+`worldBaseCurrency` now (exported as `game.WorldBaseCurrency` for the simulation package, and
+`_base_currencies()` / `World.world_base_currency` on the Python side) and
+`tests/python/contracts/test_one_world_currency_rule.py` is the gate: a production file naming three
+of the four base currencies is restating the mapping, and `RESTATES_THE_MAPPING` is empty.
+
+**Every reward paid in Mortal stones wherever it was earned.** `characterWalletDeltaTx` denominates a
+credit by the world the character stands in, so a cultivator in the Spiritual World is paid in spirit
+crystals — which is what the shops, the arrays and the black market up there have always charged. The
+sheet's mirror (`characters.spirit_stones`) follows the same rule: `walletDeltaTx` writes it only when
+the currency moved is the base currency of where they are, so the one number a sheet shows is local
+money.
+
+**And nothing converted when they crossed.** Each tier above the first carries a `base_ratio` — a
+hundred of the rung below — and a world is that same ladder seen from further up, so
+`crossWorldsPurseTx` divides by the rung going up and multiplies coming down. **The remainder stays in
+the money it was already in**: 12,345 Mortal stones become 123 spirit crystals and 45 stones that are
+still there when you go home. The credit is written even when it converts to zero, because that write
+is what re-points the sheet's mirror at the new world.
+
+**`moveCharacterTx` is the one door out of a world**, and `TestAWorldIsLeftByOneDoor` holds it the way
+`TestThePurseHasOneDoor` holds the purse. Fourteen statements wrote `characters.location` and thirteen
+could cross a world — the ascension breakthrough, an array, a GM's relocate, a personal world whose
+`leave` lands in Greenriver Town, a Hearth-Return Talisman that carries you home *from anywhere* — so
+without one door, which half of a fortune survived would depend on how you travelled. `admin_undo.go`
+is the one allowed exception: restoring a snapshot is not a journey, and the money it snapshotted was
+never converted.
+
+**The gate you tear open (`ascension.gate`, `world_crossings`).** Clearing a world-crossing tribulation
+wrote `tribulation_state.cleared`, paid +8 Heavenly Recognition and a fate point, and stopped — the
+heavens opened over one named place and left nothing there, while the only anchored road up was one
+authored array in one capital. `ascension.gate` anchors the seam where the lightning fell: a permanent
+crossing at the character's own location, into the world the gate they survived opens onto.
+
+- **It borrows the authored road.** `authoredCrossing(from, to)` gives the terminus, the fare and the
+  realm floor, so nobody can tear open a cheaper road than the world already has; anchoring costs that
+  fare times `raise_cost_multiplier` (10). The gate is refused inside a private place, somewhere the
+  catalogue does not carry, where one already stands, and a second time out of the same world — one
+  storm, one seam.
+- **It is an ordinary array from then on.** `array.use` looks in the catalogue first and then at
+  `crossing:<location>`, so a raised gate can never shadow an authored one, and both go through the same
+  fare, the same `moveCharacterTx` and the same conversion.
+- **The world's own people walk through it.** This is the only road in the game that leaves a world:
+  `WhereAnNPCCanWalk` refuses a destination in another world by construction and still does, because
+  content roads are content. `npcTravel` loads every open crossing **once per tick** (single figures of
+  gates against 574 people) and offers the far side at `npc_crossing_chance_percent`. A crosser's
+  `world_name` is deliberately unchanged, so the far side offers them no onward neighbours and the
+  existing going-home roll brings them back: a visit through the gate and out again.
+- **Keyed on `location_key`, never on who opened it** — `opened_by_user_id` anonymises on erasure
+  (`erasureAnonymise`), exactly as `npc_graves.claimed_by_user_id` does, so an erasure cannot unmake a
+  gate that other players and NPCs are using.
+- **The quest is content.** `world_crossing_system.quests` is keyed by the departing world; a cleared
+  tribulation hands the matching one over through `grantOrdinaryQuestTx`. There is still no second quest
+  mechanism — a giver would make it a commission and the grant refuses one — and its two objective types
+  (`ascension_gate`, `world_cross`) are reported after their commands answer, the rule
+  `test_quest_objective_reporters.py` holds.
 
 ### People this world makes for itself (`npc_registry`, schema 49)
 

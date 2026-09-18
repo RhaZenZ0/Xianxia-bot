@@ -95,21 +95,23 @@ func applyLateMigrationAction(conn *storage.Conn, catalog worlddata.Catalog, use
 	case "abode.establish":
 		return abodeEstablishActionGo(conn, catalog, userID, raw)
 	case "abode.enter":
-		return abodeMoveActionGo(conn, userID, raw, "enter")
+		return abodeMoveActionGo(conn, catalog, userID, raw, "enter")
 	case "abode.visit":
-		return abodeMoveActionGo(conn, userID, raw, "visit")
+		return abodeMoveActionGo(conn, catalog, userID, raw, "visit")
 	case "abode.leave":
-		return abodeMoveActionGo(conn, userID, raw, "leave")
+		return abodeMoveActionGo(conn, catalog, userID, raw, "leave")
 	case "abode.invite":
-		return abodeGuestActionGo(conn, userID, raw, false)
+		return abodeGuestActionGo(conn, catalog, userID, raw, false)
 	case "abode.revoke":
-		return abodeGuestActionGo(conn, userID, raw, true)
+		return abodeGuestActionGo(conn, catalog, userID, raw, true)
 	case "abode.upgrade":
 		return abodeUpgradeActionGo(conn, catalog, userID, raw)
 	case "abode.focus":
 		return abodeFocusActionGo(conn, catalog, userID, raw)
 	case "array.use":
 		return teleportArrayActionGo(conn, catalog, userID, raw)
+	case "ascension.gate":
+		return ascensionGateAction(conn, catalog, userID, raw)
 	case "array.deploy":
 		return deployArrayActionGo(conn, catalog, userID, raw)
 	case "spatial_key.use":
@@ -119,9 +121,9 @@ func applyLateMigrationAction(conn *storage.Conn, catalog worlddata.Catalog, use
 	case "personal_world.set_rule":
 		return personalWorldRuleActionGo(conn, userID, raw)
 	case "personal_world.enter":
-		return personalWorldMoveActionGo(conn, userID, raw, false)
+		return personalWorldMoveActionGo(conn, catalog, userID, raw, false)
 	case "personal_world.leave":
-		return personalWorldMoveActionGo(conn, userID, raw, true)
+		return personalWorldMoveActionGo(conn, catalog, userID, raw, true)
 	case "item.use":
 		return itemUseActionGo(conn, catalog, userID, raw)
 	case "sect.abode.upgrade":

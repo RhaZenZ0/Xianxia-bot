@@ -762,7 +762,7 @@ SURFACE = {
             "seclusion_group": ('start', 'status', 'end'),
             "body_group": ('sheet', 'cultivate', 'breakthrough'),
             "perfect_group": ('start', 'info', 'quest', 'clues', 'trial', 'abandon'),
-            "tribulation_group": ('status', 'prepare', 'attempt'),
+            "tribulation_group": ('status', 'prepare', 'attempt', 'gate'),
             "meridian_group": ('status', 'open', 'heal'),
             "dantian_group": ('status', 'refine'),
             "ghost_group": ('status', 'harvest', 'appease'),

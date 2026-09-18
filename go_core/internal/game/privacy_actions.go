@@ -61,7 +61,8 @@ var erasureSubjectColumns = map[string]bool{
 	"disciple_user_id":       true, "founded_by_user_id": true, "founder_user_id": true,
 	"from_user_id": true, "guest_user_id": true, "invitee_user_id": true,
 	"inviter_user_id": true, "leader_user_id": true, "master_user_id": true,
-	"owner_user_id": true, "parent_user_id": true, "player1_user_id": true,
+	"opened_by_user_id": true,
+	"owner_user_id":     true, "parent_user_id": true, "player1_user_id": true,
 	"player2_user_id": true, "related_user_id": true, "seller_user_id": true,
 	"target_user_id": true, "to_user_id": true, "turn_user_id": true,
 	"user_a": true, "user_b": true, "winner_user_id": true,
@@ -82,6 +83,10 @@ var erasureAnonymise = map[string]string{
 	"quest_definitions.owner_user_id":      "authored content other players are mid-way through",
 	"sect_manors.founded_by_user_id":       "a sect its remaining disciples still belong to",
 	"player_families.founder_user_id":      "a family that outlives whoever founded it (NOT NULL, so it takes the sentinel)",
+	"world_crossings.opened_by_user_id": "world canon - somebody tore the sky open over a named " +
+		"place and the road is still standing there, used by other players and by the world's own " +
+		"people. Only which cultivator did it is personal, so that is the part that goes; the gate " +
+		"itself is keyed on `location_key`, which is why an erasure cannot unmake one",
 	"npc_graves.claimed_by_user_id": "world canon - somebody was lost, died out there and was " +
 		"eventually found, and the grave goes on saying so. Only which cultivator reached it first " +
 		"is personal, so that is the part that goes; the grave stays emptied, because it was - " +

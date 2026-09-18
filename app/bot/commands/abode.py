@@ -15,8 +15,9 @@ from ...ops.game_engine import GameEngineError
 from ..formatting import player_property_emoji, player_property_facility_lines, player_property_unbuilt
 from ..pickers import usable_item_autocomplete
 from ..registry import registered_group_command, registered_root_command
-from ..runtime import _explain_engine_error, DB, ENGINE, WORLD, current_world_time, player_property_label, reply_long, require_character, serialized_user_action
-from ..services import GUILD, PLAYER_PROPERTY_FACILITY_KEYS, PLAYER_PROPERTY_FACILITY_LABELS
+from ..character_state import announce_quest_progress
+from ..runtime import _explain_engine_error, DB, ENGINE, WORLD, current_world_time, log, player_property_label, reply_long, require_character, serialized_user_action
+from ..services import GUILD, PLAYER_PROPERTY_FACILITY_KEYS, PLAYER_PROPERTY_FACILITY_LABELS, QUESTS
 from ..threads import ensure_abode_thread, open_expedition_thread_after_exit
 from ..ui.event_scene import spawn_event_thread
 
@@ -215,11 +216,34 @@ async def abode_focus(interaction:discord.Interaction,facility:app_commands.Choi
 array_group=app_commands.Group(name="array",description="Use public teleportation formations")
 
 
+async def _arrays_here(location:str)->list[dict]:
+    """Every formation anchored where the player stands: the eight content
+    anchors, and any crossing a cultivator has torn open here (v1.0.0-rc.44).
+
+    A raised gate is shaped like an authored array on purpose - the engine
+    resolves both through `array.use` and charges both the same fare - so
+    presentation does not need to know which it is drawing until it says so.
+    """
+    out=[dict(d,array_id=aid) for aid,d in WORLD.teleport_arrays.items() if d.get('from')==location]
+    try:
+        raised=await DB.list_world_crossings(location)
+    except Exception:
+        log.exception("Could not read the raised crossings at %s",location)
+        raised=[]
+    for row in raised:
+        out.append({"array_id":f"crossing:{row['location_key']}","name":str(row.get('name') or 'Ascension Gate'),
+                    "from":str(row['location_key']),"to":str(row.get('destination_location') or ''),
+                    "currency":WORLD.world_base_currency(str(row.get('from_world') or '')),
+                    "cost":int(row.get('cost') or 0),"min_realm_index":int(row.get('min_realm_index') or 0),
+                    "raised":True,"to_world":str(row.get('to_world') or '')})
+    return out
+
+
 @registered_group_command(array_group, name="list",description="List teleportation arrays available from your current location")
 async def array_list(interaction:discord.Interaction)->None:
     c=await require_character(interaction)
     if not c:return
-    anchored=[d for d in WORLD.teleport_arrays.values() if d.get('from')==c['location']]
+    anchored=await _arrays_here(str(c['location']))
     if not anchored: await interaction.response.send_message("No public teleportation array is anchored at this location.",ephemeral=False);return
     # An array your realm cannot withstand is listed as what it is rather
     # than offered and then refused by the engine.
@@ -227,6 +251,8 @@ async def array_list(interaction:discord.Interaction)->None:
     lines=[f"🌀 **Teleportation Arrays — {c['location']}**"]
     for d in anchored:
         line=f"• **{d['name']}** → {d['to']} • {d['cost']} {WORLD.currency_name(str(d['currency']))}"
+        if d.get('raised'):
+            line+=f" — *a crossing into {d.get('to_world','the world above')}, anchored by a cultivator*"
         if realm<int(d.get('min_realm_index') or 0):
             line+=f" — *sealed: needs {WORLD.realm_name(int(d.get('min_realm_index') or 0))}*"
         lines.append(line)
@@ -237,9 +263,9 @@ async def array_destination_autocomplete(interaction:discord.Interaction,current
     c=await DB.get_character(interaction.user.id); needle=current.casefold().strip(); out=[]
     if c:
         realm=int(c.get('realm_index') or 0)
-        for aid,d in WORLD.teleport_arrays.items():
-            if d.get('from')!=c['location'] or realm<int(d.get('min_realm_index') or 0): continue
-            if not needle or needle in str(d['to']).casefold() or needle in str(d['name']).casefold(): out.append(app_commands.Choice(name=f"{d['name']} → {d['to']}"[:100],value=aid[:100]))
+        for d in await _arrays_here(str(c['location'])):
+            if realm<int(d.get('min_realm_index') or 0): continue
+            if not needle or needle in str(d['to']).casefold() or needle in str(d['name']).casefold(): out.append(app_commands.Choice(name=f"{d['name']} → {d['to']}"[:100],value=str(d['array_id'])[:100]))
     return out[:25]
 
 
@@ -255,7 +281,29 @@ async def array_use(interaction:discord.Interaction,array:str)->None:
     except GameEngineError as exc:
         await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False);return
     spent=f" The transit takes **{r.get('cost')} {WORLD.currency_name(str(r.get('currency') or ''))}**." if r.get('cost') else ""
-    await interaction.followup.send(f"🌀 The formation ignites and folds the route beneath you. You arrive at **{r.get('to') or 'your destination'}**.{spent}",ephemeral=False)
+    text=f"🌀 The formation ignites and folds the route beneath you. You arrive at **{r.get('to') or 'your destination'}**.{spent}"
+    exchange=dict(r.get('exchange') or {})
+    if exchange:
+        # A crossing converts what you carry at the ladder the content
+        # already declares (v1.0.0-rc.44). The remainder is named rather than
+        # quietly kept, because it is money that still exists and is worth
+        # nothing where the player is now standing.
+        text+=(f"\n💱 Money does not travel between worlds: **{int(exchange.get('spent',0))} "
+               f"{WORLD.currency_name(str(exchange.get('from_currency') or ''))}** becomes **{int(exchange.get('converted',0))} "
+               f"{WORLD.currency_name(str(exchange.get('to_currency') or ''))}** at {int(exchange.get('rate',1))} to one.")
+        if int(exchange.get('remainder',0)):
+            text+=(f" **{int(exchange.get('remainder',0))}** would not divide and stays in the old money, "
+                   "waiting for you on the far side.")
+    await interaction.followup.send(text,ephemeral=False)
+    if exchange:
+        # Reported after the reply, and only when the transit actually changed
+        # world - an array between two cities of the same world is travel, not
+        # an ascension.
+        try:
+            await announce_quest_progress(interaction, await QUESTS.progress(
+                interaction.user.id, "world_cross", game_minute=wt.total_minutes))
+        except Exception:
+            log.exception("Quest progress update failed after a world crossing")
 
 
 @registered_root_command(name="spatialkey",description="Use a spatial key/token to open its linked secret dimension",guild=GUILD)
