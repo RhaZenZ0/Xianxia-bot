@@ -114,6 +114,8 @@ func ApplyWithWorld(databasePath, worldPath string, req ActionRequest) (ActionRe
 		result, err = adminForceEndScene(conn, req.ActorID, req.Payload)
 	case "admin.npc.relocate":
 		result, err = adminNpcRelocate(conn, req.ActorID, req.Payload)
+	case "admin.npc.set_missing":
+		result, err = adminNpcSetMissing(conn, req.ActorID, req.Payload)
 	case "admin.world_event.end":
 		result, err = adminEndWorldEvent(conn, req.ActorID, req.Payload)
 	case "admin.bulk.grant_currency":
@@ -163,8 +165,24 @@ func ApplyWithWorld(databasePath, worldPath string, req ActionRequest) (ActionRe
 	default:
 		err = fmt.Errorf("unsupported authoritative operation: %s", req.Operation)
 	}
+	// The switch path's own net (v1.0.0-rc.38). The storage connection begins
+	// a transaction implicitly on a handler's first write, and Close discards
+	// one that was never committed - so a handler that forgot to commit
+	// answered success over writes that vanished (`npc.found` did, for as
+	// long as it existed). A handler that returned an error over an open
+	// transaction is rolled back here; one that returned a result over an
+	// open transaction is committed here, so the answer and the database
+	// cannot disagree again.
 	if err != nil {
+		if conn.InTransaction() {
+			rollback(conn)
+		}
 		return ActionResponse{}, err
+	}
+	if conn.InTransaction() {
+		if err := conn.Commit(); err != nil {
+			return ActionResponse{}, err
+		}
 	}
 	return ActionResponse{Operation: req.Operation, Result: result}, nil
 }

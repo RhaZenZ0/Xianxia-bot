@@ -673,7 +673,7 @@ SURFACE = {
         "leaves": {
             "admin_player_group": ('inspect', 'teleport', 'setrealm', 'revive', 'clearbattle', 'forceendscene', 'mute', 'unmute', 'freeze', 'unfreeze', 'ban', 'unban'),
             "admin_family_group": ('familyinspect',),
-            "admin_npc_group": ('npcinspect',),
+            "admin_npc_group": ('npcinspect', 'setmissing'),
             "admin_sim_group": ('toggle', 'automation', 'status', 'run', 'interval', 'region', 'npc', 'sect', 'market', 'clan', 'actions', 'world'),
             "admin_server_group": ('backup', 'audit'),
         },

@@ -420,6 +420,32 @@ async def admin_npcinspect_autocomplete(interaction: discord.Interaction, curren
     names = await DB.search_catalog("npc", current, 25)
     return [app_commands.Choice(name=n[:100], value=n[:100]) for n in names]
 
+@registered_group_command(admin_npc_group, name="setmissing", description="Lose an NPC where they stand (the Forge may draft the search), or bring one the world lost back home")
+async def admin_npc_setmissing(interaction: discord.Interaction, npc: str, missing: bool = True, reason: str = "GM story") -> None:
+    """The disappearance a GM can stage (v1.0.0-rc.38): the same row and the
+    same public history entry the npc_life tick writes, through the engine,
+    which audits it. `missing=False` brings somebody home off-screen."""
+    if not await require_admin(interaction):
+        return
+    if not await DB.get_npc_definition(npc):
+        await interaction.response.send_message("Unknown NPC.", ephemeral=False); return
+    try:
+        result = dict(await ENGINE.action("admin.npc.set_missing", interaction.user.id, {"npc_name": npc, "missing": bool(missing), "reason": reason[:200]}) or {})
+    except GameEngineError as exc:
+        await interaction.response.send_message(f"⚠️ The engine refused: {exc}", ephemeral=False); return
+    await audit_admin(interaction, "npc.set_missing", target=f"npc:{npc}", after={"status": result.get("status")}, reason=reason, database_log=False)
+    if missing:
+        text = f"🕯️ **{npc}** has not come home. They stand where they stood, at **{result.get('location')}**; the town knows only that they left, and the Forge may draft the search."
+    else:
+        text = f"🏠 **{npc}** is home at **{result.get('home_location')}**, and says nothing of where they were."
+    await interaction.response.send_message(text, ephemeral=False)
+
+
+@admin_npc_setmissing.autocomplete("npc")
+async def admin_npc_setmissing_autocomplete(interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
+    return await admin_npcinspect_autocomplete(interaction, current)
+
+
 
 @registered_group_command(admin_sim_group, name="toggle", description="Enable/disable an automatic world system")
 @app_commands.choices(system=ADMIN_AUTOMATION_CHOICES)

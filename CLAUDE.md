@@ -617,9 +617,43 @@ Space Law is supreme (floor Nirvana, realm 11; a fixed two-hour cooldown), and e
 gains at least a point, so 100% is a bounded climb with `reset_cooldowns` between; the world itself
 wants Dao Saint (realm 30), is keyed `personal_world:<user_id>`, and `leave` lands at Greenriver Town.
 
-What is deferred, and to what: what only the world makes (a wild beast encounter, a bounty pursuit,
-a missing NPC - no GM lever writes those rows, only the batches and the hunt roll; one PR that forces
-them in a bounded loop and holds the designed refusal when none appears).
+**What only the world makes (v1.0.0-rc.38)** emptied the last, and `DEFERRED_OPERATIONS` is an
+empty dict on purpose. **A beast begins with the hunt roll and nothing else**: `wild_beast_encounters`
+is written only by `explorationHuntAction`, on margin 4 of 2d10 against a TN of 12–15 at realm 0,
+and no lever or payload flag forces one - but the hunt's cooldown is the one thing on the path that
+*is* payload-adjustable, so an encounter is a bounded loop of free hunts, the tame a second roll
+(spirit+presence+will/2 against the encounter's own `taming_tn`, on a fixed cooldown the GM clears),
+and the family is driven on whichever the dice allow, every roll reported; `feed`, `train`, `active`
+and `evolve` are certain once a beast exists (`evolve` is no roll: loyalty ≥ 60+10·stage, then
+−20), and `set_beast_stats` makes the first evolution certain. **A bounty is deterministic**: the only
+writer of `bounties` is `recordCrimeTx` (severity ≥ 3, evidence ≥ 50), black-market busts are severity
+2 and never reach it, and a forbidden technique used in a fight while `concealment_active` is 0 is
+witnessed with certainty - `blood_sea_palm` is severity 6 at evidence 77, a 300-stone bounty. The
+hunters' spawner (`spawnHunters`) is not a roll and not a forceable system: it runs on every due tick
+and fields a hunter for every open bounty, so the harness calls `run_due_simulation`, not `force`.
+`bounty_hunter.act` is a formula plus a stable hash, never `gamerng`. **A disappearance is the one
+thing that gained a lever.** Nothing but the `npc_life` tick lost an NPC (three in a hundred of the
+people away from home, at most one a tick), so `admin.npc.set_missing {npc_name, missing}` stages
+one: the tick's exact UPDATE and the tick's exact history row, through `game.RecordNPCMissingTx`,
+which the batch now calls too, so a staged disappearance reaches the Quest Forge at 82 the way a
+rolled one does and the two cannot drift. `missing:false` brings somebody home off-screen with a
+quieter `npc_returned` row at 40; the undo restores status and minute and leaves the row, a record
+that something was staged. It refuses the dead, the unknown and the already-missing; the dashboard's
+NPC card carries Lose and Bring back, and `/admin npc setmissing` is the Discord side. The harness
+tries the world's own way first (six forced ticks, reported either way), then the lever, and drives
+`npc.found` from the wrong place (`elsewhere`) and the right one.
+
+**What the leg found, the day it could drive `npc.found` at all**: the find answered `found: true`
+and persisted nothing. `storage.Conn` begins a transaction implicitly on a handler's first write
+(`maybeBeginImplicitLocked`), `npcFound` never committed, and the switch path in `ApplyWithWorld`
+closes the connection when the handler returns - so `/talk` told the player they had found somebody,
+the row stayed `missing`, and the search left no history; the grave claim on the same path handed
+over a keepsake it never wrote. `npc_found_test.go` had driven the function on one open connection
+and read back inside the same implicit transaction, which is exactly the shape that cannot see it.
+`TestAFindThroughTheSwitchPathPersists` goes through `Apply` and reads back on a fresh connection,
+fails with the production symptom when the handler's commit is removed, and the switch path now
+commits a result returned over an open transaction and rolls back an error, so the answer and the
+database cannot disagree again.
 
 ### People this world makes for itself (`npc_registry`, schema 49)
 
@@ -952,6 +986,10 @@ head again by request, the one page `test_hub_pages.py` allows past the eight-ro
 panel pages it with "More actions"; `LONG_PAGES` names it and nothing else). It also gained
 `/admin player setrealm`, the only realm lever on the Discord side, with the same optional body
 pair; the engine writes its audit row, so the handler logs nothing of its own.
+
+The Admin Console's NPC card (rc.38) carries **Lose** and **Bring back** beside Relocate:
+`admin.npc.set_missing`, the disappearance a GM can stage, audited and undoable like relocate. See
+"What only the world makes" above for why it writes the tick's own row.
 
 ## Testing conventions
 

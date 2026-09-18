@@ -44,19 +44,9 @@ GM = 1
 # fails a stale entry (deferred and driven, or no longer an operation). Each
 # block below is one later PR that empties it.
 DEFERRED_OPERATIONS: dict[str, str] = {
-    # PR 4: what only the world makes. No GM lever writes a wild beast
-    # encounter, a running world event and its nodes, a bounty pursuit or a
-    # missing NPC; the simulation batches and the hunt and exploration rolls
-    # do, so PR 4 forces those in a bounded loop and holds the designed
-    # refusal when none appears.
-    "beast.tame": "PR 4: what only the world makes - a wild_beast_encounters row from the hunt or the exploration roll",
-    "beast.feed": "PR 4: what only the world makes - needs a tamed beast",
-    "beast.train": "PR 4: what only the world makes - needs a tamed beast",
-    "beast.evolve": "PR 4: what only the world makes - needs a tamed beast at loyalty",
-    "beast.active": "PR 4: what only the world makes - needs a tamed beast",
-    "admin.player.set_beast_stats": "PR 4: what only the world makes - edits a tamed beast's row",
-    "bounty_hunter.act": "PR 4: what only the world makes - a bounty_hunter_pursuits row from a crime chain",
-    "npc.found": "PR 4: what only the world makes - an NPC gone missing on the npc_life tick",
+    # Empty since v1.0.0-rc.38, on purpose: every operation the engine
+    # answers is driven below. An entry here is a deferral with a reason, and
+    # the gate refuses one that is also driven or that names nothing.
 }
 
 
@@ -1757,6 +1747,193 @@ async def run(url: str, token: str, db_path: str) -> Report:
     if left is not None:
         report.add("PASS" if str(left.get("location")) == town else "FAIL", "leaving lands at Greenriver Town", str(left.get("location")))
     await step(report, "a second world is refused", act("personal_world.create", PLAYER, {"name": "Another Pocket"}), expect_error="already stabilized")
+
+    # -- what only the world makes (v1.0.0-rc.38)
+    # Three families whose first row no GM lever writes. A beast begins with
+    # the hunt roll and nothing else - the encounter needs margin 4 on 2d10,
+    # the tame is a second roll against the encounter's own TN - so both are
+    # bounded loops of free hunts and cleared cooldowns, every roll reported,
+    # and the family is driven on whichever the dice allow. A bounty is
+    # deterministic: a forbidden technique used in a fight while unconcealed
+    # is witnessed with certainty, and the hunters' spawner is not a roll and
+    # not a forceable system, so one due tick fields the pursuit. A
+    # disappearance is the one thing that gained a lever: the world's own
+    # way is tried first and reported either way, then admin.npc.set_missing
+    # stages one the way the tick does, and npc.found is driven from the
+    # wrong place and the right one.
+    hunting = next((n for n, l in sites.items() if l["road_site"] == "hunting_ground" and l["world"] == "Mortal World"), "")
+    await step(report, "a fresh cultivator on both ladders, for the beasts' base TNs",
+               gm("admin.player.set_realm", {"user_id": PLAYER, "realm_index": 0, "phase": 1, "body_realm_index": 0, "body_phase": 1, "reason": "playtest"}))
+    if hunting:
+        await step(report, "to the hunting ground", gm("admin.player.teleport", {"user_id": PLAYER, "location": hunting, "reason": "playtest"}))
+    tamed: dict[str, Any] = {}
+    hunts, tames = 0, 0
+    for _round in range(8):
+        encounter: dict[str, Any] = {}
+        for _ in range(6):
+            await clear_cooldowns()
+            hunted = await quietly(act("exploration.hunt", PLAYER, {"cooldown_seconds": 0}))
+            if "_refused" in hunted:
+                report.add("FAIL", "exploration.hunt for a beast", hunted["_refused"])
+                break
+            hunts += 1
+            open_encounters = [dict(e) for e in (await db.get_wild_beast_encounters(PLAYER, game_minute=await clock()) or [])]
+            if open_encounters:
+                encounter = open_encounters[0]
+                break
+        if not encounter:
+            break
+        await clear_cooldowns()
+        attempt = await quietly(act("beast.tame", PLAYER, {"encounter_id": int(encounter.get("encounter_id") or 0)}))
+        if "_refused" in attempt:
+            report.add("FAIL", "beast.tame", attempt["_refused"])
+            break
+        tames += 1
+        report.add("PASS", f"beast.tame {encounter.get('species')}, the roll reported",
+                   f"{attempt.get('status')}: {attempt.get('total')} vs TN {attempt.get('tn')} ({attempt.get('degree')})")
+        if str(attempt.get("status")) == "tamed":
+            tamed = dict(attempt.get("beast") or {})
+            break
+    report.add("PASS", "the hunt is the only door to a beast, so it is a bounded loop",
+               f"{hunts} hunt(s), {tames} taming(s), " + (f"bonded {tamed.get('species')}" if tamed else "no beast; the dice allowed none"))
+    beasts = [dict(b) for b in (await db.get_spirit_beasts(PLAYER) or [])]
+    if beasts:
+        beast_id = int(beasts[0].get("beast_id") or 0)
+        for item, qty in (("spirit_herb", 2), ("beast_core", 1)):
+            await step(report, f"grant {item} x{qty} to feed it", gm("admin.player.adjust_item", {"user_id": PLAYER, "item_id": item, "quantity": qty, "reason": "playtest"}))
+        fed = await step(report, "beast.feed spirit_herb", act("beast.feed", PLAYER, {"beast_id": beast_id, "food": "spirit_herb"}))
+        if fed is not None:
+            report.add("PASS" if int(fed.get("feed_gain") or 0) == 5 else "FAIL", "a herb is five points of loyalty", f"feed_gain={fed.get('feed_gain')} loyalty={fed.get('loyalty')}")
+        await clear_cooldowns()
+        fed = await step(report, "beast.feed beast_core", act("beast.feed", PLAYER, {"beast_id": beast_id, "food": "beast_core"}))
+        if fed is not None:
+            report.add("PASS" if int(fed.get("feed_gain") or 0) == 10 else "FAIL", "a core is ten", f"feed_gain={fed.get('feed_gain')}")
+        await clear_cooldowns()
+        await step(report, "beast.feed refuses rice", act("beast.feed", PLAYER, {"beast_id": beast_id, "food": "rice"}), expect_error="unsupported beast food")
+        trained = await step(report, "beast.train", act("beast.train", PLAYER, {"beast_id": beast_id}))
+        if trained is not None:
+            report.add("PASS" if int(trained.get("gain") or 0) >= 1 else "FAIL", "a session teaches something", f"gain={trained.get('gain')} pen={trained.get('beast_pen_level')}")
+        woken = await step(report, "beast.active", act("beast.active", PLAYER, {"beast_id": beast_id}))
+        if woken is not None:
+            report.add("PASS" if int(woken.get("active") or 0) == 1 else "FAIL", "the beast walks beside them", f"active={woken.get('active')}")
+        await audited("admin.player.set_beast_stats", {"user_id": PLAYER, "beast_id": beast_id, "loyalty": 100, "reason": "playtest"})
+        await step(report, "the lever wants a field", gm("admin.player.set_beast_stats", {"user_id": PLAYER, "beast_id": beast_id, "reason": "playtest"}), expect_error="loyalty or evolution_stage is required")
+        grown = await step(report, "beast.evolve at loyalty 100", act("beast.evolve", PLAYER, {"beast_id": beast_id}))
+        if grown is not None:
+            b = dict(grown.get("beast") or {})
+            report.add("PASS" if int(b.get("evolution_stage") or 0) == 1 and int(b.get("loyalty") or 0) == 80 else "FAIL", "evolution is certain past the threshold and costs twenty loyalty", f"stage={b.get('evolution_stage')} loyalty={b.get('loyalty')}")
+        await step(report, "beast.evolve again at 80", act("beast.evolve", PLAYER, {"beast_id": beast_id}))
+        await step(report, "a third evolution wants 80 and finds 60", act("beast.evolve", PLAYER, {"beast_id": beast_id}), expect_error="below evolution requirement")
+    else:
+        await step(report, "beast.feed with no beast", act("beast.feed", PLAYER, {"beast_id": 1, "food": "spirit_herb"}), expect_error="unknown contracted beast")
+        await step(report, "beast.train with no beast", act("beast.train", PLAYER, {"beast_id": 1}), expect_error="unknown contracted beast")
+        await step(report, "beast.evolve with no beast", act("beast.evolve", PLAYER, {"beast_id": 1}), expect_error="unknown contracted beast")
+        await step(report, "beast.active with no beast", act("beast.active", PLAYER, {"beast_id": 1}), expect_error="unknown contracted beast")
+        await step(report, "the lever with no beast", gm("admin.player.set_beast_stats", {"user_id": PLAYER, "beast_id": 1, "loyalty": 50, "reason": "playtest"}), expect_error="spirit beast not found")
+    await step(report, "beast.tame refuses an encounter that never was", act("beast.tame", PLAYER, {"encounter_id": 999999}), expect_error="missing or expired")
+
+    # The bounty: a forbidden palm, witnessed, in a fight that cannot be lost.
+    await step(report, "an overwhelming cultivator, again", gm("admin.player.set_realm", {"user_id": PLAYER, "realm_index": 7, "phase": 9, "reason": "playtest"}))
+    await step(report, "home to the town for witnesses", gm("admin.player.teleport", {"user_id": PLAYER, "location": town, "reason": "playtest"}))
+    await step(report, "the dantian filled for the fight", gm("admin.player.revive", {"user_id": PLAYER, "reason": "playtest"}))
+    await step(report, "sense.conceal off, so the palm is seen", act("sense.conceal", PLAYER, {"active": False}))
+    await step(report, "grant the Blood Sea Scripture", gm("admin.player.adjust_item", {"user_id": PLAYER, "item_id": "blood_sea_scripture_manual", "quantity": 1, "reason": "playtest"}))
+    studied = await step(report, "manual.study a Demonic manual", act("manual.study", PLAYER, {"manual_id": "blood_sea_scripture", "cooldown_seconds": 0}))
+    if studied is not None:
+        report.add("PASS" if studied.get("forbidden") else "FAIL", "the scripture is forbidden, and the first study costs a point of karma", f"first_study={studied.get('first_study')} karma={studied.get('karma_score')}")
+    targets = await step(report, "combat.targets for a witnessed fight", query("combat.targets", PLAYER, {"location": town}))
+    candidates = [r for r in list((targets or {}).get("targets") or (targets or {}).get("rows") or []) if isinstance(r, dict) and r.get("name")]
+    marks = [r for r in candidates if str(r.get("kind") or r.get("type") or "npc") == "npc"] or candidates
+    mark = str(min(marks, key=lambda r: int(r.get("realm_index") or 0)).get("name")) if marks else ""
+    pursuit: dict[str, Any] = {}
+    if mark:
+        fight = await step(report, f"combat.start against {mark}", act("combat.start", PLAYER, {"kind": "challenge", "npc_name": mark, "source": "playtest"}))
+        palm = await step(report, "manual.technique Blood Sea Palm, in the open", act("manual.technique", PLAYER, {"technique_id": "blood_sea_palm"})) if fight is not None else None
+        if palm is not None:
+            report.add("PASS" if palm.get("witnessed") and palm.get("forbidden") else "FAIL", "unconcealed, the palm is witnessed with certainty", f"witnessed={palm.get('witnessed')} exposure={palm.get('exposure')} crime={str(palm.get('crime'))[:80]}")
+            crimes = [dict(c) for c in (await db.get_crimes(PLAYER) or [])]
+            bounties = [dict(b) for b in (await db.get_bounties(PLAYER) or [])]
+            report.add("PASS" if any(str(c.get("crime_type")) == "forbidden_cultivation" for c in crimes) else "FAIL", "the crime is on the record", str([c.get("crime_type") for c in crimes])[:120])
+            report.add("PASS" if any(int(b.get("amount") or 0) == 300 for b in bounties) else "FAIL", "severity six at evidence seventy-seven is a three-hundred-stone bounty", str([b.get("amount") for b in bounties]))
+        await step(report, "the fight is cleared for the road", gm("admin.player.clear_battle", {"user_id": PLAYER, "reason": "playtest"}))
+        await step(report, "the tick fields a hunter for every open bounty", engine.run_due_simulation(await clock(), {}))
+        pursuit = dict(await db.get_bounty_hunter_pursuit(user_id=PLAYER) or {})
+        report.add("PASS" if str(pursuit.get("status")) == "tracking" and int(pursuit.get("hunter_power") or 0) > 0 else "FAIL", "the spawner is not a roll: one bounty, one hunter",
+                   f"{pursuit.get('hunter_name')} power={pursuit.get('hunter_power')} status={pursuit.get('status')} amount={pursuit.get('amount')}")
+    else:
+        report.add("FAIL", "combat.start for the bounty", f"nobody to challenge in {town}")
+    if pursuit.get("pursuit_id"):
+        pid = int(pursuit["pursuit_id"])
+        ran = await step(report, "bounty_hunter.act evade", act("bounty_hunter.act", PLAYER, {"pursuit_id": pid, "action": "evade"}))
+        if ran is not None:
+            report.add("PASS" if int(ran.get("escape_progress") or 0) > 0 else "FAIL", "evasion is a formula, not a roll; the trail reported",
+                       f"escape={ran.get('escape_progress')} pressure={ran.get('pressure')} status={ran.get('status')} trail={ran.get('trail_word')}")
+        fought = await either("bounty_hunter.act fight, or the evasion already ended it", act("bounty_hunter.act", PLAYER, {"pursuit_id": pid, "action": "fight"}), "active bounty hunter pursuit not found")
+        if fought is not None:
+            report.add("PASS", "the fight's result", f"escape={fought.get('escape_progress')} status={fought.get('status')}")
+        gave = await either("bounty_hunter.act surrender, or the pursuit was already over", act("bounty_hunter.act", PLAYER, {"pursuit_id": pid, "action": "surrender"}), "active bounty hunter pursuit not found")
+        if gave is not None:
+            resolved = [dict(b) for b in (await db.get_bounties(PLAYER, active_only=False) or [])]
+            report.add("PASS" if str(gave.get("status")) == "surrendered" and any(str(b.get("status")) == "resolved" for b in resolved) else "FAIL",
+                       "surrender resolves the bounty", f"status={gave.get('status')} bounties={[b.get('status') for b in resolved]}")
+    await step(report, "bounty_hunter.act refuses a pursuit that never was", act("bounty_hunter.act", PLAYER, {"pursuit_id": 999999, "action": "evade"}), expect_error="active bounty hunter pursuit not found")
+    await step(report, "bounty_hunter.act refuses a bribe", act("bounty_hunter.act", PLAYER, {"pursuit_id": 1, "action": "bribe"}), expect_error="invalid bounty hunter action")
+
+    # The missing NPC: the world's own way first, bounded and reported either
+    # way; then the lever, which writes the tick's own row.
+    for system, times in (("npc_civilization", 2), ("npc_life", 4)):
+        for _ in range(times):
+            forced = await quietly(engine.force_simulation(system, 3, await clock()))
+            if "_refused" in forced:
+                report.add("FAIL", f"force {system}", forced["_refused"])
+                break
+    lost = [dict(r) for r in (await db.list_missing_npcs() or [])]
+    report.add("PASS", "whether the world lost anyone on its own in six forced ticks, reported", f"{len(lost)} missing: {[r.get('npc_name') for r in lost][:4]}")
+    here = [dict(r) for r in ((await query("npc.at_location", PLAYER, {"location": town}) or {}).get("npcs") or [])]
+    alive_here = [str(r.get("npc_name")) for r in here if str(r.get("status") or "alive") == "alive" and str(r.get("npc_name")) not in {"Elder Su Yan"}]
+    if len(alive_here) < 3:
+        report.add("FAIL", "three people standing in the town to lose", str(alive_here))
+    else:
+        first, second, third = alive_here[:3]
+        staged = await audited("admin.npc.set_missing", {"npc_name": first, "missing": True, "reason": "playtest: a story"}, name=f"admin.npc.set_missing loses {first}")
+        if staged is not None:
+            status = dict(await query("npc.status", PLAYER, {"npc_name": first}) or {})
+            report.add("PASS" if str(status.get("status")) == "missing" and str(status.get("current_location")) == str(staged.get("location")) else "FAIL",
+                       "they are missing, and exactly where they stood", f"status={status.get('status')} at {status.get('current_location')}")
+            rows = [dict(r) for r in (await db.list_world_history(event_type="npc_missing", limit=3) or [])]
+            newest = next((r for r in rows if str(r.get("related_npc_name") or r.get("actor_name")) == first), {})
+            report.add("PASS" if int(newest.get("significance") or 0) == 82 and str(newest.get("visibility")) == "public" else "FAIL",
+                       "the row the Forge reads: public, at 82, from the lever as from the tick", f"significance={newest.get('significance')} visibility={newest.get('visibility')} location={newest.get('location')}")
+            if hunting:
+                await step(report, "away to the hunting ground", gm("admin.player.teleport", {"user_id": PLAYER, "location": hunting, "reason": "playtest"}))
+                elsewhere = await step(report, "npc.found from the wrong place", engine.action("npc.found", PLAYER, {"npc_name": first, "location": hunting, "game_minute": await clock()}))
+                if elsewhere is not None:
+                    report.add("PASS" if elsewhere.get("elsewhere") and elsewhere.get("was_missing") and not elsewhere.get("found") else "FAIL", "a search succeeds only where they are", str(elsewhere)[:160])
+            where = str(status.get("current_location") or town)
+            await step(report, "to where they actually are", gm("admin.player.teleport", {"user_id": PLAYER, "location": where, "reason": "playtest"}))
+            found = await step(report, "npc.found where they are", engine.action("npc.found", PLAYER, {"npc_name": first, "location": where, "game_minute": await clock()}))
+            if found is not None:
+                report.add("PASS" if found.get("found") and found.get("was_missing") else "FAIL", "found", f"days_missing={found.get('days_missing')} home={found.get('home_location')}")
+                after = dict(await query("npc.status", PLAYER, {"npc_name": first}) or {})
+                report.add("PASS" if str(after.get("status")) == "alive" else "FAIL", "and alive again", str(after.get("status")))
+                trace = [dict(r) for r in (await db.list_world_history(event_type="npc_found", limit=3) or [])]
+                report.add("PASS" if any(str(r.get("related_npc_name") or r.get("target_name")) == first for r in trace) else "FAIL", "the search is history", str([r.get("title") for r in trace])[:120])
+            await step(report, "npc.found on somebody who is not missing", engine.action("npc.found", PLAYER, {"npc_name": first, "location": where, "game_minute": await clock()}))
+        await audited("admin.npc.set_missing", {"npc_name": second, "missing": True, "reason": "playtest"}, name=f"admin.npc.set_missing loses {second}")
+        back = await audited("admin.npc.set_missing", {"npc_name": second, "missing": False, "reason": "playtest: found off-screen"}, name=f"admin.npc.set_missing returns {second}")
+        if back is not None:
+            report.add("PASS" if str(back.get("status")) == "alive" else "FAIL", "a return is the GM's, and quieter", str(back.get("status")))
+        await audited("admin.npc.set_missing", {"npc_name": third, "missing": True, "reason": "playtest"}, name=f"admin.npc.set_missing loses {third}")
+        undone = await step(report, "admin.audit.undo_last restores them", gm("admin.audit.undo_last", {"reason": "playtest"}))
+        if undone is not None:
+            restored = dict(await query("npc.status", PLAYER, {"npc_name": third}) or {})
+            report.add("PASS" if str(restored.get("status")) == "alive" and int(restored.get("missing_since_game_minute") or 0) == 0 else "FAIL", "undone: alive, and never missing", f"{restored.get('status')} since={restored.get('missing_since_game_minute')}")
+        await step(report, "the lever refuses to return somebody who is home", gm("admin.npc.set_missing", {"npc_name": second, "missing": False, "reason": "playtest"}), expect_error="not missing")
+    await step(report, "the lever refuses a name the world does not have", gm("admin.npc.set_missing", {"npc_name": "Nobody At All", "missing": True, "reason": "playtest"}), expect_error="npc not found")
+    graves = [dict(g) for g in (await db.list_graves_at(town) or [])]
+    if graves:
+        await step(report, "the lever refuses the dead", gm("admin.npc.set_missing", {"npc_name": str(graves[0].get("npc_name")), "missing": True, "reason": "playtest"}), expect_error="npc is dead")
+    await step(report, "home to the town", gm("admin.player.teleport", {"user_id": PLAYER, "location": town, "reason": "playtest"}))
 
     # -- the household simulated, a child named, the supporter's gift
     simulated = await step(report, "family.simulate a season", act("family.simulate", PLAYER, {"family_id": int(fam.get("family_id") or 0)}))

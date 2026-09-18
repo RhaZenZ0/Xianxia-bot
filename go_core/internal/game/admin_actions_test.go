@@ -1381,3 +1381,124 @@ func TestAdminSetRealmSetsTheBodyLadderWhenAsked(t *testing.T) {
 		t.Fatalf("expected an error for body_phase out of the 1-9 bound")
 	}
 }
+
+// addMissingColumns gives the admin fixture the columns a disappearance
+// writes (schema 47) and a real world_history_events, so the lever's history
+// row can be read back the way the Forge reads it.
+func addMissingColumns(t *testing.T, path string) {
+	t.Helper()
+	conn, err := storage.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	if err := conn.ExecScript(`
+ALTER TABLE npc_civilization_state ADD COLUMN status TEXT NOT NULL DEFAULT 'alive';
+ALTER TABLE npc_civilization_state ADD COLUMN missing_since_game_minute INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE npc_civilization_state ADD COLUMN activity TEXT NOT NULL DEFAULT '';
+ALTER TABLE npc_civilization_state ADD COLUMN last_game_minute INTEGER NOT NULL DEFAULT 0;
+CREATE TABLE world_history_events(history_id INTEGER PRIMARY KEY AUTOINCREMENT,source_key TEXT NOT NULL UNIQUE,event_type TEXT NOT NULL,title TEXT NOT NULL,summary TEXT NOT NULL,significance INTEGER NOT NULL DEFAULT 50,visibility TEXT NOT NULL DEFAULT 'public',location TEXT NOT NULL DEFAULT '',world_name TEXT NOT NULL DEFAULT '',faction TEXT NOT NULL DEFAULT '',actor_type TEXT NOT NULL DEFAULT '',actor_key TEXT NOT NULL DEFAULT '',actor_name TEXT NOT NULL DEFAULT '',target_type TEXT NOT NULL DEFAULT '',target_key TEXT NOT NULL DEFAULT '',target_name TEXT NOT NULL DEFAULT '',related_user_id INTEGER,related_npc_name TEXT NOT NULL DEFAULT '',tags TEXT NOT NULL DEFAULT '',game_minute INTEGER NOT NULL DEFAULT 0,metadata_json TEXT NOT NULL DEFAULT '{}',created_at REAL NOT NULL,updated_at REAL NOT NULL);
+INSERT INTO npc_civilization_state(npc_name,home_location,current_location,world_name,updated_at,status) VALUES('Herbalist Mo','Greenriver Town','Moonfen Marsh','Mortal Realm',0,'alive');
+INSERT INTO npc_civilization_state(npc_name,home_location,current_location,world_name,updated_at,status) VALUES('Old Bai','Greenriver Town','Greenriver Town','Mortal Realm',0,'dead');
+`); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestAdminSetMissingLosesAnNPCTheWayTheBatchDoes(t *testing.T) {
+	path := setupAdminDB(t)
+	addMissingColumns(t, path)
+	before := auditCount(t, path)
+	out := applyAdmin(t, path, "admin.npc.set_missing", map[string]any{"npc_name": "Herbalist Mo", "missing": true, "reason": "a story"})
+	result, _ := out.(map[string]any)
+	if fmt.Sprint(result["status"]) != "missing" || fmt.Sprint(result["location"]) != "Moonfen Marsh" {
+		t.Fatalf("result=%v", out)
+	}
+	if got := fmt.Sprint(scalar(t, path, "SELECT status FROM npc_civilization_state WHERE npc_name='Herbalist Mo'")); got != "missing" {
+		t.Fatalf("status=%q, want missing", got)
+	}
+	if got := storage.ParseInt(scalar(t, path, "SELECT missing_since_game_minute FROM npc_civilization_state WHERE npc_name='Herbalist Mo'")); got <= 0 {
+		t.Fatalf("missing_since_game_minute=%d, want the canonical minute", got)
+	}
+	if got := fmt.Sprint(scalar(t, path, "SELECT current_location FROM npc_civilization_state WHERE npc_name='Herbalist Mo'")); got != "Moonfen Marsh" {
+		t.Fatalf("current_location=%q: a missing person stays exactly where they are", got)
+	}
+	// The row the Forge reads: public, at the home town, above the bar.
+	if got := storage.ParseInt(scalar(t, path, "SELECT significance FROM world_history_events WHERE event_type='npc_missing' AND visibility='public' AND location='Greenriver Town'")); got != NPCMissingSignificance {
+		t.Fatalf("history significance=%d, want %d", got, NPCMissingSignificance)
+	}
+	if got := auditCount(t, path); got != before+1 {
+		t.Fatalf("audit count=%d, want %d", got, before+1)
+	}
+	if err := applyAdminErr(t, path, "admin.npc.set_missing", map[string]any{"npc_name": "Herbalist Mo", "missing": true}); err == nil || err.Error() != "npc is already missing" {
+		t.Fatalf("losing them twice: %v", err)
+	}
+}
+
+func TestAdminSetMissingRefusesTheDeadTheUnknownAndAHalfPayload(t *testing.T) {
+	path := setupAdminDB(t)
+	addMissingColumns(t, path)
+	for _, tc := range []struct {
+		payload map[string]any
+		want    string
+	}{
+		{map[string]any{"npc_name": "Old Bai", "missing": true}, "npc is dead"},
+		{map[string]any{"npc_name": "Nobody Here", "missing": true}, "npc not found"},
+		{map[string]any{"npc_name": "Herbalist Mo", "missing": false}, "npc is not missing"},
+		{map[string]any{"npc_name": "Herbalist Mo"}, "missing must be true (lose them) or false (bring them back)"},
+		{map[string]any{"missing": true}, "npc_name is required"},
+	} {
+		if err := applyAdminErr(t, path, "admin.npc.set_missing", tc.payload); err == nil || err.Error() != tc.want {
+			t.Fatalf("%v: got %v, want %q", tc.payload, err, tc.want)
+		}
+	}
+	if got := fmt.Sprint(scalar(t, path, "SELECT status FROM npc_civilization_state WHERE npc_name='Herbalist Mo'")); got != "alive" {
+		t.Fatalf("a refused lever changed the row: %q", got)
+	}
+}
+
+func TestAdminSetMissingBringsThemHomeWithAQuieterRow(t *testing.T) {
+	path := setupAdminDB(t)
+	addMissingColumns(t, path)
+	applyAdmin(t, path, "admin.npc.set_missing", map[string]any{"npc_name": "Herbalist Mo", "missing": true, "reason": "lost"})
+	out := applyAdmin(t, path, "admin.npc.set_missing", map[string]any{"npc_name": "Herbalist Mo", "missing": false, "reason": "found off-screen"})
+	result, _ := out.(map[string]any)
+	if fmt.Sprint(result["status"]) != "alive" {
+		t.Fatalf("result=%v", out)
+	}
+	if got := fmt.Sprint(scalar(t, path, "SELECT status||':'||missing_since_game_minute||':'||activity FROM npc_civilization_state WHERE npc_name='Herbalist Mo'")); got != "alive:0:Returned, and in no hurry to explain" {
+		t.Fatalf("row=%q", got)
+	}
+	if got := storage.ParseInt(scalar(t, path, "SELECT significance FROM world_history_events WHERE event_type='npc_returned'")); got != npcReturnedSignificance {
+		t.Fatalf("npc_returned significance=%d, want %d: a staged return is news, not a quest", got, npcReturnedSignificance)
+	}
+}
+
+// A find through the switch path used to persist nothing (v1.0.0-rc.38): the
+// storage connection begins a transaction implicitly on the first write,
+// npcFound never committed, and ApplyWithWorld closed the connection - so the
+// handler answered found:true while the row stayed missing and the search
+// left no history. The unit tests drove npcFound on one open connection and
+// read it back inside the same implicit transaction, which is why they never
+// saw it. This one goes through Apply and reads back on a fresh connection,
+// the way the server and the bot do.
+func TestAFindThroughTheSwitchPathPersists(t *testing.T) {
+	path := setupAdminDB(t)
+	addMissingColumns(t, path)
+	applyAdmin(t, path, "admin.npc.set_missing", map[string]any{"npc_name": "Herbalist Mo", "missing": true, "reason": "a story"})
+	raw, _ := json.Marshal(map[string]any{"npc_name": "Herbalist Mo", "location": "Moonfen Marsh", "game_minute": 5000})
+	out, err := Apply(path, ActionRequest{Operation: "npc.found", ActorID: 42, Payload: raw})
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, _ := out.Result.(map[string]any)
+	if result["found"] != true {
+		t.Fatalf("result=%v", out.Result)
+	}
+	if got := fmt.Sprint(scalar(t, path, "SELECT status FROM npc_civilization_state WHERE npc_name='Herbalist Mo'")); got != "alive" {
+		t.Fatalf("status=%q after a find that answered found:true; the write was not committed", got)
+	}
+	if got := storage.ParseInt(scalar(t, path, "SELECT COUNT(*) FROM world_history_events WHERE event_type='npc_found'")); got != 1 {
+		t.Fatalf("npc_found history rows=%d, want 1", got)
+	}
+}

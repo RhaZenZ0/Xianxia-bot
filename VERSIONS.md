@@ -6,6 +6,25 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.0** (rc.38) drives what only the world makes, and empties the deferred set.
+
+The last of rc.35's deferred blocks is empty and `DEFERRED_OPERATIONS` is an empty dict on purpose:
+a beast hunted, tamed, fed, trained, made active and evolved on a bounded loop of free hunts (the
+hunt roll is the only door to an encounter, and its cooldown is the one thing on that path a payload
+may clear); a bounty earned with certainty - a forbidden palm in a fight, unconcealed, is witnessed
+every time - and its hunter fielded by the due tick, then evaded, fought and surrendered to; and an
+NPC lost and found. A disappearance is the one thing that gained a lever: `admin.npc.set_missing`
+stages one the way the `npc_life` tick does, through one shared helper that writes the row the
+Quest Forge reads at 82, and brings somebody home off-screen with a quieter row. It is audited and
+undoable, on the dashboard's NPC card as Lose and Bring back and on Discord as
+`/admin npc setmissing`. `Database.list_missing_npcs` is the read. And the leg found a bug the day
+it could drive `npc.found`: the find answered found and persisted nothing, because the storage
+connection's implicit transaction was never committed before the switch path closed it - `/talk`
+told the player they had found somebody while the row stayed missing, and a grave claim handed over
+a keepsake it never wrote. The handler commits, the switch path now commits a result returned over an
+open transaction and rolls back an error, and a test drives it through `Apply` the way the server
+does. See CLAUDE.md, "The playtest touches everything".
+
 **1.0.0** (rc.37) drives progression through the engine playtest.
 
 The second of rc.35's deferred blocks is empty: realm perfection on both ladders - the path started,
