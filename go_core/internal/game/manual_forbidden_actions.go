@@ -456,15 +456,14 @@ func crimeAtoneAction(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 		return authoritativeMutation{}, fmt.Errorf("restitution requires %d %s", fine, currency)
 	}
 	now := float64(time.Now().UnixNano()) / 1e9
-	balance -= fine
-	res, e := conn.Execute(`UPDATE currency_wallets SET balance=? WHERE user_id=? AND currency_id=? AND balance>=?`, []any{balance, userID, currency, fine})
+	// walletDeltaTx refuses a debit beyond the balance, which is the guard the
+	// hand-written compare-and-set here used to provide - and unlike it, the
+	// one door keeps `characters.spirit_stones` in step with the purse.
+	balance, e = walletDeltaTx(conn, userID, currency, -fine, now)
 	if e != nil {
 		return authoritativeMutation{}, e
 	}
-	if res.RowsAffected != 1 {
-		return authoritativeMutation{}, errors.New("restitution balance changed before settlement")
-	}
-	res, e = conn.Execute(`UPDATE crime_records SET status='atoned',updated_at=? WHERE crime_id=? AND user_id=? AND status='open'`, []any{now, p.CrimeID, userID})
+	res, e := conn.Execute(`UPDATE crime_records SET status='atoned',updated_at=? WHERE crime_id=? AND user_id=? AND status='open'`, []any{now, p.CrimeID, userID})
 	if e != nil {
 		return authoritativeMutation{}, e
 	}

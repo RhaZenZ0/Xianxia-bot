@@ -31,12 +31,6 @@ func setupSupportVoteDB(t *testing.T) string {
 		t.Fatal(err)
 	}
 	defer conn.Close()
-	if err := conn.ExecScript(`ALTER TABLE characters ADD COLUMN spirit_stones INTEGER NOT NULL DEFAULT 0;`); err != nil {
-		t.Fatal(err)
-	}
-	if err := conn.Commit(); err != nil {
-		t.Fatal(err)
-	}
 	batch4SetCanonicalGameMinute(t, path, 5000)
 	return path
 }

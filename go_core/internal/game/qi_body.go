@@ -468,18 +468,14 @@ func meridianHealAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 		return authoritativeMutation{}, fmt.Errorf("the channels need time between mendings: %d seconds", rem)
 	}
 	cost := int64(40) * maxI64(1, body.MeridiansDamaged)
-	stones, err := conn.Execute(`SELECT spirit_stones FROM characters WHERE user_id=?`, []any{userID})
+	held, err := walletBalanceTx(conn, userID, mirroredCurrency)
 	if err != nil {
 		return authoritativeMutation{}, err
-	}
-	held := int64(0)
-	if row := firstRowMap(stones); row != nil {
-		held = i64(row["spirit_stones"])
 	}
 	if held < cost {
 		return authoritativeMutation{}, fmt.Errorf("mending a channel costs %d spirit stones; you have %d", cost, held)
 	}
-	if _, err = conn.Execute(`UPDATE characters SET spirit_stones=spirit_stones-?,updated_at=? WHERE user_id=?`, []any{cost, now, userID}); err != nil {
+	if _, err = walletDeltaTx(conn, userID, mirroredCurrency, -cost, now); err != nil {
 		return authoritativeMutation{}, err
 	}
 	mended := ""

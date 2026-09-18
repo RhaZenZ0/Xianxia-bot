@@ -218,6 +218,7 @@ func TestHarvestFillsTheDantianAndIncenseShedsTheResidue(t *testing.T) {
 		t.Fatalf("the rites are not free: %v", err)
 	}
 	batch4Exec(t, path, `UPDATE characters SET spirit_stones=5000 WHERE user_id=42`)
+	syncPurse(t, path)
 	before := storage.ParseInt(actionScalar(t, path, `SELECT corruption FROM character_qi_body WHERE user_id=42`))
 	shed := batch4Result(t, batch4Apply(t, path, world, "ghost.appease", 6, map[string]any{}))
 	if storage.ParseInt(shed["corruption_shed"]) <= 0 || storage.ParseInt(shed["corruption"]) >= before {

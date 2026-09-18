@@ -14,11 +14,16 @@ import (
 
 const graveSchema = `
 CREATE TABLE characters(user_id INTEGER PRIMARY KEY,name TEXT NOT NULL DEFAULT '',spirit_stones INTEGER NOT NULL DEFAULT 0,updated_at REAL NOT NULL DEFAULT 0);
+-- The purse, beside the sheet's mirror of it. Production gives every character
+-- a wallet row at creation; a fixture with only the column is a state the game
+-- cannot reach (v1.0.0-rc.43).
+CREATE TABLE currency_wallets(user_id INTEGER NOT NULL,currency_id TEXT NOT NULL,balance INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(user_id,currency_id));
 CREATE TABLE inventory(user_id INTEGER NOT NULL,item_id TEXT NOT NULL,quantity INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(user_id,item_id));
 CREATE TABLE npc_civilization_state(npc_name TEXT PRIMARY KEY,home_location TEXT,current_location TEXT,status TEXT,missing_since_game_minute INTEGER DEFAULT 0,updated_at REAL DEFAULT 0);
 CREATE TABLE npc_graves(npc_name TEXT PRIMARY KEY,location TEXT NOT NULL,world_name TEXT NOT NULL DEFAULT '',home_location TEXT NOT NULL DEFAULT '',died_game_minute INTEGER NOT NULL DEFAULT 0,days_missing INTEGER NOT NULL DEFAULT 0,keepsake_item TEXT NOT NULL DEFAULT '',keepsake_stones INTEGER NOT NULL DEFAULT 0,claimed_by_user_id INTEGER,claimed_game_minute INTEGER,created_at REAL NOT NULL,updated_at REAL NOT NULL);
 CREATE TABLE world_history_events(source_key TEXT PRIMARY KEY,event_type TEXT,title TEXT,summary TEXT,significance INTEGER,visibility TEXT,location TEXT,world_name TEXT,faction TEXT,actor_type TEXT,actor_key TEXT,actor_name TEXT,target_type TEXT,target_key TEXT,target_name TEXT,related_user_id INTEGER,related_npc_name TEXT,tags TEXT,game_minute INTEGER,metadata_json TEXT,created_at REAL,updated_at REAL);
 INSERT INTO characters(user_id,name,spirit_stones) VALUES(7,'Searcher',100),(8,'Latecomer',100);
+INSERT INTO currency_wallets(user_id,currency_id,balance) VALUES(7,'low_spirit_stone',100),(8,'low_spirit_stone',100);
 INSERT INTO npc_civilization_state VALUES('Lost Lu','Greenriver Town','Lonely Rock','dead',0,0);
 INSERT INTO npc_graves(npc_name,location,world_name,home_location,died_game_minute,days_missing,keepsake_item,keepsake_stones,created_at,updated_at)
   VALUES('Lost Lu','Lonely Rock','Mortal World','Greenriver Town',5000,231,'spirit_herb',37,0,0);

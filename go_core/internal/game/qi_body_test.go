@@ -246,6 +246,7 @@ func TestForcingAMeridianOpenSpendsInsightAndQi(t *testing.T) {
 	}
 	// Mending costs spirit stones and clears it.
 	batch4Exec(t, path, `UPDATE characters SET spirit_stones=500 WHERE user_id=42`)
+	syncPurse(t, path)
 	healed := batch4Result(t, batch4Apply(t, path, world, "meridian.heal", 6, map[string]any{}))
 	if healed["mended"] != "meridian" || storage.ParseInt(healed["meridians_damaged"]) != 0 {
 		t.Fatalf("heal: %v", healed)

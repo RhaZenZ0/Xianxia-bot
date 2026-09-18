@@ -114,6 +114,7 @@ func TestTravelStatusReflectsInTransitJourneyWithRealTimestamp(t *testing.T) {
 	// physical presence at Azure Crown Imperial City. Road travel costs
 	// spirit stones; fund the character so the journey isn't rejected.
 	batch4Exec(t, path, `UPDATE characters SET spirit_stones=1000 WHERE user_id=42`)
+	syncPurse(t, path)
 	road := batch4Result(t, batch4Apply(t, path, world, "exploration.travel", 3, map[string]any{
 		"destination": "Riverguard City",
 		"mode":        "known",

@@ -34,6 +34,7 @@ func TestARoadJourneyArrivesAtTheGateFacingTheRoad(t *testing.T) {
 		t.Skip("no realm-0 road between the two cities")
 	}
 	batch4Exec(t, path, `UPDATE characters SET location=?,spirit_stones=500,vitality=100 WHERE user_id=42`, origin)
+	syncPurse(t, path)
 	batch4SetCanonicalGameMinute(t, path, 3000)
 	previous := roadEncounterIntn
 	roadEncounterIntn = func(n int) (int, error) { return n - 1, nil }
@@ -88,6 +89,7 @@ func TestInsideTheWallsEverythingIsAWalkApart(t *testing.T) {
 	}
 	batch4SetCanonicalGameMinute(t, path, 4000)
 	batch4Exec(t, path, `UPDATE characters SET location=?,spirit_stones=500 WHERE user_id=42`, gate)
+	syncPurse(t, path)
 	// Gate -> district -> centre -> district, all instant, none needing discovery.
 	for i, dest := range []string{district, city, district} {
 		result := batch4Result(t, batch4Apply(t, path, world, "exploration.travel", 40+i, map[string]any{"destination": dest, "mode": "known"}))
@@ -134,6 +136,7 @@ func TestACityIsLeftByRoadFromAnyOfItsParts(t *testing.T) {
 	}
 	neighbour := catalog.Locations[city].Roads[0]
 	batch4Exec(t, path, `UPDATE characters SET location=?,spirit_stones=500,vitality=100 WHERE user_id=42`, district)
+	syncPurse(t, path)
 	batch4SetCanonicalGameMinute(t, path, 5000)
 	previous := roadEncounterIntn
 	roadEncounterIntn = func(n int) (int, error) { return n - 1, nil }

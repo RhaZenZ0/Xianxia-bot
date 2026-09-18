@@ -54,6 +54,7 @@ func TestATradeIsOfferedAtTheInnAndStruckWhenTheOtherSideAccepts(t *testing.T) {
 	path, inn := setupTradeDB(t)
 	world := batch4WorldPath(t)
 	batch4Exec(t, path, `UPDATE characters SET spirit_stones=100 WHERE user_id IN (42,43)`)
+	syncPurse(t, path)
 	batch4Exec(t, path, `INSERT INTO inventory(user_id,item_id,quantity) VALUES(42,'recovery_pill',3),(43,'spirit_iron',5)`)
 	offer := map[string]any{"to_user_id": 43, "give_items": map[string]int64{"recovery_pill": 2}, "give_stones": 10, "want_items": map[string]int64{"spirit_iron": 4}, "want_stones": 0, "game_minute": 1000}
 	// Not at the inn: refused.
@@ -124,6 +125,7 @@ func TestAnOfferLapsesIsDeclinedOrWithdrawnAndANewOneReplacesTheOld(t *testing.T
 	path, inn := setupTradeDB(t)
 	world := batch4WorldPath(t)
 	batch4Exec(t, path, `UPDATE characters SET location=?,spirit_stones=50 WHERE user_id IN (42,43)`, inn)
+	syncPurse(t, path)
 	batch4Exec(t, path, `INSERT INTO inventory(user_id,item_id,quantity) VALUES(42,'recovery_pill',3)`)
 	// Offering more than you hold is refused on the spot.
 	if _, err := tradeApply(t, path, world, "trade.offer", 42, 1, map[string]any{"to_user_id": 43, "give_items": map[string]int64{"recovery_pill": 9}, "game_minute": 1000}); err == nil || !strings.Contains(err.Error(), "do not carry enough") {

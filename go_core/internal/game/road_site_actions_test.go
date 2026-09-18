@@ -32,6 +32,7 @@ func TestWalkingARoadFindsTheShrineOnItAndTheHuntingGroundOneTimeInTwo(t *testin
 		t.Fatalf("the Greenriver-Riverguard road should carry one shrine, got %v", sites)
 	}
 	batch4Exec(t, path, `UPDATE characters SET spirit_stones=500,vitality=100 WHERE user_id=42`)
+	syncPurse(t, path)
 	batch4SetCanonicalGameMinute(t, path, 3000)
 	quiet := roadEncounterIntn
 	roadEncounterIntn = func(n int) (int, error) { return n - 1, nil }
@@ -73,6 +74,7 @@ func TestASiteIsHalfALegFromEitherEndAndLeadsNowhereElse(t *testing.T) {
 	catalog := districtCatalog(t)
 	shrine := roadSitesOnLeg(catalog, "Greenriver Town", "Riverguard City")[0]
 	batch4Exec(t, path, `UPDATE characters SET spirit_stones=500,vitality=100 WHERE user_id=42`)
+	syncPurse(t, path)
 	batch4SetCanonicalGameMinute(t, path, 3000)
 	quiet := roadEncounterIntn
 	roadEncounterIntn = func(n int) (int, error) { return n - 1, nil }
@@ -158,7 +160,9 @@ CREATE TABLE IF NOT EXISTS shop_stock(shop TEXT NOT NULL, item_id TEXT NOT NULL,
 		t.Fatalf("%s should be a waystation with a stall", waystation)
 	}
 	batch4Exec(t, path, `UPDATE characters SET location=?,spirit_stones=500 WHERE user_id=42`, waystation)
-	batch4Exec(t, path, `INSERT INTO currency_wallets(user_id,currency_id,balance) VALUES(42,?,200)`, catalog.Shops[catalog.Locations[waystation].Shop].Currency)
+	syncPurse(t, path)
+	batch4Exec(t, path, `INSERT INTO currency_wallets(user_id,currency_id,balance) VALUES(42,?,200)
+		ON CONFLICT(user_id,currency_id) DO UPDATE SET balance=excluded.balance`, catalog.Shops[catalog.Locations[waystation].Shop].Currency)
 	browse := shopQuery(t, path, world, "shop.browse")
 	if fmt.Sprint(browse["kind"]) != "waystation" || len(browse["stock"].([]map[string]any)) == 0 {
 		t.Fatalf("browse at the stall: %v", browse)

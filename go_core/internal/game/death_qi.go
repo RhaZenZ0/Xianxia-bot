@@ -354,7 +354,10 @@ func ghostAppeaseAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 	if purse < stones {
 		return authoritativeMutation{}, fmt.Errorf("the rites cost %d spirit stones; you have %d", stones, purse)
 	}
-	if _, err = conn.Execute(`UPDATE characters SET spirit_stones=spirit_stones-?,karma_score=MAX(-1000,MIN(1000,karma_score+1)),updated_at=? WHERE user_id=?`, []any{stones, now, userID}); err != nil {
+	if _, err = walletDeltaTx(conn, userID, mirroredCurrency, -stones, now); err != nil {
+		return authoritativeMutation{}, err
+	}
+	if _, err = conn.Execute(`UPDATE characters SET karma_score=MAX(-1000,MIN(1000,karma_score+1)),updated_at=? WHERE user_id=?`, []any{now, userID}); err != nil {
 		return authoritativeMutation{}, err
 	}
 	before := body.Corruption
@@ -429,12 +432,5 @@ func ghostStatusQuery(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 // surface quotes a price against - one query shape, so the two cannot come to
 // disagree about what "what you have" means.
 func ghostStoneCount(conn *storage.Conn, userID int64) (int64, error) {
-	res, err := conn.Execute(`SELECT spirit_stones FROM characters WHERE user_id=?`, []any{userID})
-	if err != nil {
-		return 0, err
-	}
-	if row := firstRowMap(res); row != nil {
-		return storage.ParseInt(row["spirit_stones"]), nil
-	}
-	return 0, nil
+	return walletBalanceTx(conn, userID, mirroredCurrency)
 }

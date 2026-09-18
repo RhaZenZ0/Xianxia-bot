@@ -217,8 +217,7 @@ func tribulationPrepareAction(conn *storage.Conn, _ worlddata.Catalog, userID in
 	if balance < 5 {
 		return authoritativeMutation{}, fmt.Errorf("preparation requires 5 %s", currency)
 	}
-	balance -= 5
-	_, err = conn.Execute(`UPDATE currency_wallets SET balance=? WHERE user_id=? AND currency_id=?`, []any{balance, userID, currency})
+	balance, err = walletDeltaTx(conn, userID, currency, -5, float64(time.Now().UnixNano())/1e9)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}

@@ -33,7 +33,6 @@ CREATE TABLE sect_membership(user_id INTEGER PRIMARY KEY,sect_name TEXT NOT NULL
 ALTER TABLE quest_definitions ADD COLUMN requires_sect TEXT NOT NULL DEFAULT '';
 ALTER TABLE quest_definitions ADD COLUMN reward_visibility TEXT NOT NULL DEFAULT 'shown';
 ALTER TABLE quest_definitions ADD COLUMN boast TEXT NOT NULL DEFAULT '';
-ALTER TABLE characters ADD COLUMN spirit_stones INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE characters ADD COLUMN insight_xp INTEGER NOT NULL DEFAULT 0;
 `); err != nil {
 		_ = conn.Close()

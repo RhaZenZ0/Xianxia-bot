@@ -145,7 +145,7 @@ internal/server/        HTTP control/data plane
 ```
 
 Every Go SQLite connection uses `journal_mode=WAL`, `foreign_keys=ON`, `busy_timeout=10000`,
-`synchronous=NORMAL`. Current schema version is 52; historical migrations are kept so old databases
+`synchronous=NORMAL`. Current schema version is 53; historical migrations are kept so old databases
 can upgrade in place — see `VERSIONS.md` for the full schema/release history.
 
 ### The NPC life cycle (v1.0.0-rc.24)
@@ -778,6 +778,36 @@ here because a caravan's currency lives in Go rather than in content:
 could only be paid by someone who had already arrived"*. `worldBaseCurrency` is that rule for the one
 price that is code: the road is paid for in the tier-1 money of the world it departs from, looked up
 off sorted ids so a map range cannot make it differ between runs.
+
+**One door for money (schema 53).** A player's stones live in two places:
+`currency_wallets`, the purse, and `characters.spirit_stones`, which is a *mirror* the sheet and a
+dozen readers use. `walletDeltaTx` is the one function that keeps them in step — it writes the purse
+and sets the mirror from the new balance. **Eleven other places wrote one of the two directly.**
+`trade.accept` was the worst: it moved stones between two players with two bare
+`UPDATE characters SET spirit_stones=spirit_stones-?+?` statements and named `currency_wallets`
+nowhere in the file — so every trade left the two disagreeing, and because the mirror is written
+*from* the purse, the next shop purchase silently overwrote the traded stones out of existence. Five
+spends and a reward moved the sheet without the purse (the road toll, the ghost rites, mending a
+channel, a find at a grave); two spends moved the purse without the sheet (tribulation preparation, a
+crime's restitution); and seven paths wrote both by hand, which held only as long as they started
+equal. The simulation package kept a byte-for-byte copy of the door as well (`walletDeltaSim`) — the
+same "four copies of one rule" the world clock was fixed for in rc.39 — and it calls the exported
+`game.WalletDeltaTx` now.
+
+**Nothing caught it because no fixture could.** Most seeded `characters.spirit_stones` and never made
+a `currency_wallets` row at all, and the shared `batch4` fixture's `characters` table did not even
+carry the `spirit_stones` column — tests that needed it added it with their own `ALTER`. A fixture
+that models one of two stores cannot fail the way production fails, which is the rule CLAUDE.md
+already states; `syncPurse` gives a fixture both, and `TestThePurseHasOneDoor` is the gate: a write to
+either store outside `walletDeltaTx` must be named in `purseWritersAllowed` with its reason. Five
+entries, each a deliberate absolute write — creation, the starting stones, an undo restoring its
+snapshot, and the GM's grant, which clamps at zero rather than refusing an overdraft.
+
+**Migration 53 settles the drift upwards, deliberately.** Neither store is the complete record — the
+mirror caught the trades and the tolls, the purse caught the shops and the fines — so the wallet is
+set to the greater of the two and the mirror is then set from the wallet. Of the two ways to be
+wrong, handing somebody stones they might not have earned is the one that does not take a fortune off
+a player who did nothing wrong.
 
 **The ladder is kept and deliberately not spent.** `CurrencyDefinition` parsed `name` and nothing
 else, so the file's own `world`, `tier` and `base_ratio` — what one unit is worth in tier-1 units:

@@ -60,6 +60,7 @@ func TestAFlyingArtifactCarriesADiscipleWhoCannotYetFly(t *testing.T) {
 	path := setupShopDB(t)
 	world := batch4WorldPath(t)
 	batch4Exec(t, path, `UPDATE characters SET spirit_stones=5000,vitality=100,realm_index=0 WHERE user_id=42`)
+	syncPurse(t, path)
 	quiet := roadEncounterIntn
 	roadEncounterIntn = func(n int) (int, error) { return n - 1, nil }
 	defer func() { roadEncounterIntn = quiet }()

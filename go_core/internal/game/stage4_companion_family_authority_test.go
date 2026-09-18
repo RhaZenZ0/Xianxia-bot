@@ -499,6 +499,7 @@ func TestFamilyRoadNeighborCanBeTravelledAndIsPersistentlyDiscovered(t *testing.
 	destination := roads[0]
 
 	batch4Exec(t, path, `UPDATE characters SET location=?,spirit_stones=100 WHERE user_id=42`, current)
+	syncPurse(t, path)
 	result := batch4Result(t, batch4Apply(t, path, world, "exploration.travel", 301, map[string]any{
 		"destination": destination,
 		"mode":        "known",

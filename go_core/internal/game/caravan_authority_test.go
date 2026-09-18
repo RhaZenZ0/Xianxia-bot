@@ -14,7 +14,6 @@ import (
 func caravanTables(t *testing.T, conn *storage.Conn) {
 	t.Helper()
 	if err := conn.ExecScript(`
-ALTER TABLE characters ADD COLUMN spirit_stones INTEGER NOT NULL DEFAULT 0;
 CREATE TABLE caravans(
 	caravan_id INTEGER PRIMARY KEY AUTOINCREMENT,
 	owner_type TEXT NOT NULL,

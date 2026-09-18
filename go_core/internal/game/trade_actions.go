@@ -48,7 +48,7 @@ type tradeParty struct {
 func tradeTablesExist(conn *storage.Conn) bool { return tableExistsTx(conn, "trade_offers") }
 
 func loadTradeParty(conn *storage.Conn, userID int64) (tradeParty, error) {
-	res, err := conn.Execute(`SELECT user_id,name,location,life_status,spirit_stones FROM characters WHERE user_id=?`, []any{userID})
+	res, err := conn.Execute(`SELECT user_id,name,location,life_status FROM characters WHERE user_id=?`, []any{userID})
 	if err != nil {
 		return tradeParty{}, err
 	}
@@ -56,7 +56,15 @@ func loadTradeParty(conn *storage.Conn, userID int64) (tradeParty, error) {
 	if row == nil {
 		return tradeParty{}, errors.New("character not found")
 	}
-	return tradeParty{UserID: i64(row["user_id"]), Name: fmt.Sprint(row["name"]), Location: fmt.Sprint(row["location"]), LifeStatus: fmt.Sprint(row["life_status"]), SpiritStones: i64(row["spirit_stones"])}, nil
+	// The purse, not the sheet. A trade used to read `characters.spirit_stones`
+	// and move it with two bare UPDATEs, touching `currency_wallets` nowhere -
+	// so every trade left the two disagreeing and the next wallet write
+	// silently overwrote one with the other (v1.0.0-rc.43).
+	stones, err := walletBalanceTx(conn, userID, mirroredCurrency)
+	if err != nil {
+		return tradeParty{}, err
+	}
+	return tradeParty{UserID: i64(row["user_id"]), Name: fmt.Sprint(row["name"]), Location: fmt.Sprint(row["location"]), LifeStatus: fmt.Sprint(row["life_status"]), SpiritStones: stones}, nil
 }
 
 // tradeInn is the inn both parties must share: a trade is struck at the
@@ -342,10 +350,10 @@ func tradeAcceptAction(conn *storage.Conn, catalog worlddata.Catalog, userID int
 	if err := moveItemsTx(conn, userID, fromID, want, now); err != nil {
 		return authoritativeMutation{}, err
 	}
-	if _, err := conn.Execute(`UPDATE characters SET spirit_stones=spirit_stones-?+?,updated_at=? WHERE user_id=?`, []any{giveStones, wantStones, now, fromID}); err != nil {
+	if _, err := walletDeltaTx(conn, fromID, mirroredCurrency, wantStones-giveStones, now); err != nil {
 		return authoritativeMutation{}, err
 	}
-	if _, err := conn.Execute(`UPDATE characters SET spirit_stones=spirit_stones-?+?,updated_at=? WHERE user_id=?`, []any{wantStones, giveStones, now, userID}); err != nil {
+	if _, err := walletDeltaTx(conn, userID, mirroredCurrency, giveStones-wantStones, now); err != nil {
 		return authoritativeMutation{}, err
 	}
 	if _, err := conn.Execute(`UPDATE trade_offers SET status='accepted',resolved_at=?,updated_at=? WHERE offer_id=?`, []any{now, now, p.OfferID}); err != nil {

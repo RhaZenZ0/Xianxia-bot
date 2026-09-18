@@ -26,7 +26,6 @@ func setupSupportStorageDB(t *testing.T) string {
 	// birth_families and character_birth_family come from the base fixture with
 	// only the columns its own tests need; these are the rest.
 	if err := conn.ExecScript(`
-ALTER TABLE characters ADD COLUMN spirit_stones INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE birth_families ADD COLUMN wealth INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE birth_families ADD COLUMN retainers INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE birth_families ADD COLUMN prestige INTEGER NOT NULL DEFAULT 0;

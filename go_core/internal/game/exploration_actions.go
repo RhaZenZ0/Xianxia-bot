@@ -95,11 +95,11 @@ func applyCanonicalRewardTx(conn *storage.Conn, catalog worlddata.Catalog, userI
 	if awarded > room {
 		awarded = room
 	}
-	if _, err = conn.Execute(`UPDATE characters SET cultivation=cultivation+?,spirit_stones=spirit_stones+?,insight_xp=insight_xp+?,updated_at=? WHERE user_id=?`, []any{awarded, reward.SpiritStones, reward.InsightXP, now, userID}); err != nil {
+	if _, err = conn.Execute(`UPDATE characters SET cultivation=cultivation+?,insight_xp=insight_xp+?,updated_at=? WHERE user_id=?`, []any{awarded, reward.InsightXP, now, userID}); err != nil {
 		return 0, err
 	}
 	if reward.SpiritStones != 0 {
-		if _, err = conn.Execute(`INSERT INTO currency_wallets(user_id,currency_id,balance) VALUES(?,?,?) ON CONFLICT(user_id,currency_id) DO UPDATE SET balance=balance+excluded.balance`, []any{userID, "low_spirit_stone", reward.SpiritStones}); err != nil {
+		if _, err = walletDeltaTx(conn, userID, mirroredCurrency, reward.SpiritStones, now); err != nil {
 			return 0, err
 		}
 	}
@@ -522,19 +522,14 @@ func chargeRoadTravelTx(conn *storage.Conn, userID, cost int64, now float64) err
 	if cost <= 0 {
 		return nil
 	}
-	res, err := conn.Execute(`SELECT spirit_stones FROM characters WHERE user_id=?`, []any{userID})
+	balance, err := walletBalanceTx(conn, userID, mirroredCurrency)
 	if err != nil {
 		return err
 	}
-	row := firstRowMap(res)
-	if row == nil {
-		return errors.New("character not found")
-	}
-	balance := storage.ParseInt(row["spirit_stones"])
 	if balance < cost {
 		return fmt.Errorf("road travel requires %d spirit stones; only %d available", cost, balance)
 	}
-	_, err = conn.Execute(`UPDATE characters SET spirit_stones=spirit_stones-?,updated_at=? WHERE user_id=?`, []any{cost, now, userID})
+	_, err = walletDeltaTx(conn, userID, mirroredCurrency, -cost, now)
 	return err
 }
 

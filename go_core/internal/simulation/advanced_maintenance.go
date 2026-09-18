@@ -79,25 +79,11 @@ func (r *Runner) eraModifiers(conn *storage.Conn) (map[string]float64, error) {
 	return out, nil
 }
 
+// walletDeltaSim was a byte-for-byte copy of the engine's walletDeltaTx, purse
+// write and sheet mirror and all. Two copies of a money rule is how the two
+// stores drift; there is one now and this calls it (v1.0.0-rc.43).
 func walletDeltaSim(conn *storage.Conn, userID int64, currency string, delta int64) error {
-	res, err := conn.Execute(`SELECT balance FROM currency_wallets WHERE user_id=? AND currency_id=?`, []any{userID, currency})
-	if err != nil {
-		return err
-	}
-	current := int64(0)
-	if row := firstMap(res); row != nil {
-		current = i64(row["balance"])
-	}
-	next := current + delta
-	if next < 0 {
-		return fmt.Errorf("insufficient %s", currency)
-	}
-	if _, err = conn.Execute(`INSERT INTO currency_wallets(user_id,currency_id,balance) VALUES(?,?,?) ON CONFLICT(user_id,currency_id) DO UPDATE SET balance=excluded.balance`, []any{userID, currency, next}); err != nil {
-		return err
-	}
-	if currency == "low_spirit_stone" {
-		_, err = conn.Execute(`UPDATE characters SET spirit_stones=?,updated_at=? WHERE user_id=?`, []any{next, nowFloat(), userID})
-	}
+	_, err := game.WalletDeltaTx(conn, userID, currency, delta, nowFloat())
 	return err
 }
 
