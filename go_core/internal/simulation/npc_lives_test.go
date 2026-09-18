@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 
+	"xianxia/core/internal/gamerng"
 	"xianxia/core/internal/storage"
 	"xianxia/core/internal/worlddata"
 )
@@ -229,6 +230,13 @@ func TestTheSectRankLadderEndsAtTheTop(t *testing.T) {
 // forever, so no NPC in the world ever crossed a realm. Wealth pays for it,
 // which is the first thing wealth has ever been for.
 func TestNPCsCrossRealmsAndPayForIt(t *testing.T) {
+	// The dice are lent, not hoped for. Thirty cultivators each roll once
+	// against `breakthroughChance` (18), so all thirty failing is 0.82^30 -
+	// about one run in 385, which is exactly the rate CI found and no number
+	// of cultivators drives to zero. What this test is about is that a
+	// crossing happens at all, is capped, and is paid for; none of that is
+	// about whether the roll landed, so the roll is answered.
+	defer gamerng.UseRoller(func(int) int { return 0 })()
 	path := livesDB(t)
 	r := livesRunner()
 	for i := 0; i < 30; i++ {

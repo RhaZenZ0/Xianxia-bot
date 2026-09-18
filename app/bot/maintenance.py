@@ -34,17 +34,24 @@ from typing import Any
 CACHE_SECONDS = 3.0
 
 _state: dict[str, Any] = {"enabled": False, "reason": "", "since": 0.0}
-_read_at: float = 0.0
+# None means "never read", not "read at time zero". A restart is the moment
+# this matters: `time.monotonic()` counts from the host's boot, so on a NAS
+# that has just come up it can be smaller than CACHE_SECONDS - and a numeric
+# zero here would make the first few seconds after the bot starts serve the
+# default (open) without ever asking the database. That is precisely the
+# window an operator who closed the world and then ran `update.sh` would be
+# standing in.
+_read_at: float | None = None
 
 
 def forget() -> None:
     """Drop the cache, so the next door reads the flag fresh.
 
-    Called by the Discord lever after it writes, and by the dashboard's poke
-    over the control channel, so an operator never waits on a TTL.
+    Called by the Discord lever after it writes, so an operator never waits on
+    a TTL, and by the tests between cases.
     """
     global _read_at
-    _read_at = 0.0
+    _read_at = None
 
 
 def remember(state: dict[str, Any]) -> None:
@@ -62,7 +69,7 @@ async def current(db: Any) -> dict[str, Any]:
     """The flag, from cache when it is fresh and from the database when not."""
     global _state, _read_at
     now = time.monotonic()
-    if now - _read_at < CACHE_SECONDS:
+    if _read_at is not None and now - _read_at < CACHE_SECONDS:
         return dict(_state)
     try:
         state = await db.get_maintenance_mode()

@@ -101,6 +101,23 @@ class TheFlagFailsTowardsPlay(unittest.TestCase):
         run(press_five())
         self.assertEqual(db.reads, 1, "a panel's rapid clicks must cost one read")
 
+    def test_a_freshly_started_bot_reads_before_it_answers(self):
+        """The restart is the moment this matters.
+
+        An operator closes the world, runs `update.sh`, and the bot comes back
+        up. `time.monotonic()` counts from the host's boot, so on a NAS that
+        has just come up it can be smaller than the cache window - and a cache
+        stamped with a numeric zero would serve the default (open) for the
+        first seconds without ever asking the database, in exactly the window
+        the operator is standing in. The sentinel is None, not 0.0.
+        """
+        maintenance.forget()
+        db = _DB(CLOSED)
+        with patch("time.monotonic", return_value=0.5):
+            refusal = run(maintenance.refuse(db, PLAYER))
+        self.assertIsNotNone(refusal, "a bot on a freshly booted host served a stale open world")
+        self.assertEqual(db.reads, 1)
+
     def test_the_lever_seeds_the_cache_so_the_next_command_obeys_at_once(self):
         maintenance.remember({"enabled": True, "reason": "just set", "since": 2.0})
         db = _DB(OPEN)
