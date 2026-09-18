@@ -157,7 +157,7 @@ _MIGRATED_ROOTS = {
     "city", "civilization", "conceal", "condition", "craft", "crime", "cultivate",
     "dantian", "daoheart", "duel", "effects", "equipment", "era", "explore", "family",
     "formation", "ghost", "grudges", "hunt", "hunter", "inheritances", "fate",
-    "innerworld", "inventory", "karma", "law", "lifespan", "manual", "market", "merchant", "shop", "trade", "blackmarket",
+    "innerworld", "inventory", "karma", "law", "learn", "lifespan", "manual", "market", "merchant", "shop", "trade", "blackmarket",
     "meridian", "npcinfo", "party", "perfect", "profession", "provenance", "reincarnate",
     "reputation", "rulers", "scene", "seclusion", "secretrealm", "sect", "sense",
     "sheet", "soul", "spatialkey", "specialeffects", "stance", "insight", "storage", "talk", "territory",
@@ -349,7 +349,7 @@ _HUB_DEFINITIONS = (
         pages=(
             _hub_page("alchemy", "Alchemy", "Refine pills, forage simulated herb resources, track toxicity and purge medicinal residue."),
             _hub_page("craft", "General Crafting", "Practice alchemy, forging, formation or talisman inscription from known recipes."),
-            _hub_page("profession", "Profession", "View crafting and support-profession mastery."),
+            _hub_page("profession", "Profession", "View crafting and support-profession mastery, and read a method slip into a method you keep.", "learn"),
         ),
     ),
     HubDefinition(

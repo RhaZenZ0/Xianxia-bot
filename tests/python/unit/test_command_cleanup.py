@@ -48,12 +48,17 @@ class CommandCleanupTests(unittest.TestCase):
         self.assertIn("_MIGRATED_ROOTS", source)
         migrated_source = bot_module_defining("_MIGRATED_ROOTS").read_text(encoding="utf-8")
         migrated_node = next(node for node in ast.parse(migrated_source).body if isinstance(node, ast.Assign) and any(isinstance(target, ast.Name) and target.id == "_MIGRATED_ROOTS" for target in node.targets))
-        # 81 since v1.0.0-rc.15: `/gender` is gone. Sex is chosen at creation,
-        # where `/begin` requires it, so the standalone setter was a second door
-        # onto a room the player had already furnished. (82 since rc.13, when
-        # `bodyperfect` merged into `perfect`, which takes the path as an
-        # argument.)
-        self.assertEqual(len(ast.literal_eval(migrated_node.value)), 81)
+        # 82 since v1.0.0-rc.43: `/learn` joined, which is the one direction
+        # this count has never moved in. Every other change here has been a
+        # removal - `/gender` at rc.15 (sex is chosen at creation, so the
+        # standalone setter was a second door onto a furnished room) and
+        # `bodyperfect` folding into `perfect` at rc.13 - and a set that only
+        # ever shrinks is a set nobody checks for absences. `/learn` was
+        # registered, implemented and priced, and was in neither this set nor
+        # the tree tuple, so no player could reach it; see
+        # `tests/python/unit/test_commands_reach_a_player.py`, which is the gate
+        # that makes an absence loud.
+        self.assertEqual(len(ast.literal_eval(migrated_node.value)), 82)
         self.assertNotIn("tree.remove_command", source)
         self.assertIn('"alchemy": alchemy_group', source)
         self.assertIn('_hub_page("alchemy", "Alchemy"', source)

@@ -333,13 +333,12 @@ func caravanDispatchActionGo(conn *storage.Conn, catalog worlddata.Catalog, user
 	if q < p.Quantity {
 		return authoritativeMutation{}, errors.New("not enough cargo")
 	}
-	currency := "low_spirit_stone"
-	if i64(c["realm_index"]) >= 4 {
-		currency = "mid_spirit_stone"
-	}
-	if i64(c["realm_index"]) >= 7 {
-		currency = "high_spirit_stone"
-	}
+	// The road is paid for in the money of the world it runs through
+	// (v1.0.0-rc.43). This used to be `low_spirit_stone` - a Mortal World
+	// currency, charged in all four worlds - escalated to `mid_` at realm 4 and
+	// `high_` at realm 7, which nothing has ever credited: dispatch was dead
+	// from realm 4 up. See worldBaseCurrency.
+	currency := worldBaseCurrency(catalog, catalog.Locations[origin].World)
 	plan, found := canonicalRoadRoute(catalog, origin, p.Destination, i64(c["realm_index"]))
 	if !found {
 		return authoritativeMutation{}, errors.New("no canonical road route connects the caravan destination")

@@ -201,8 +201,22 @@ type AuctionHouse struct {
 	ChannelName   string `json:"channel_name"`
 }
 
+// CurrencyDefinition is one of the sixteen currencies: four tiers in each of
+// the four worlds. Only `name` was parsed until v1.0.0-rc.43, so the file's own
+// statement of which world a currency belongs to - and what a tier is worth -
+// was dropped on the floor by the parser and read by nothing.
+//
+// `BaseRatio` is what one unit is worth in that world's tier-1 currency (100,
+// 10,000, 1,000,000; tier 1 itself carries none). Nothing spends it yet: an
+// exchange between tiers is a mechanic, not a parse, and it is deliberately not
+// built here. What the ratio does do is get held to its shape by
+// `TestTheStoneLadderIsWholeInEveryWorld`, so the day somebody builds the
+// counter the content underneath it is already true.
 type CurrencyDefinition struct {
-	Name string `json:"name"`
+	Name      string `json:"name"`
+	World     string `json:"world"`
+	Tier      int64  `json:"tier"`
+	BaseRatio int64  `json:"base_ratio"`
 }
 
 type TeleportArray struct {
