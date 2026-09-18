@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import json
+import time
 import tempfile
 import unittest
 from pathlib import Path
@@ -43,6 +44,38 @@ class DashboardTests(unittest.IsolatedAsyncioTestCase):
 
     async def asyncTearDown(self):
         self.tmp.cleanup()
+
+    async def test_the_clock_is_the_engines_when_there_is_one(self):
+        """The GM's clock is a read-through (v1.0.0-rc.39).
+
+        The dashboard used to keep its own copy of the anchor arithmetic. Every
+        test here runs without GAME_ENGINE_URL, so only the local-SQLite branch
+        was ever exercised - and that branch must derive nothing either.
+        """
+        class _ClockEngine:
+            async def world_clock(self):
+                return {"game_minute": 987654, "scale": 7}
+
+        self.store._engine = _ClockEngine()
+        clock = (await self.store.overview())["clock"]
+        self.assertEqual(clock["game_minute"], 987654)
+        self.assertEqual(clock["scale"], 7)
+        # And with no engine the stored anchor is reported as it stands, never
+        # advanced by the real time elapsed since it was written: an anchor at
+        # 4000 written an hour ago at scale 4 would read 4240 under the old
+        # arithmetic.
+        self.store._engine = None
+        async with self.db._connect() as write:
+            await write.execute(
+                "INSERT INTO world_state(key,value_json,updated_at) VALUES('world_clock',?,0)"
+                " ON CONFLICT(key) DO UPDATE SET value_json=excluded.value_json",
+                (json.dumps({"anchor_game_minute": 4000, "anchor_real_ts": time.time() - 3600, "scale": 4}),),
+            )
+            await write.commit()
+        async with self.store._connect() as db:
+            frozen = await self.store._world_clock(db)
+        self.assertEqual(frozen["game_minute"], 4000)
+        self.assertEqual(frozen["scale"], 4)
 
     async def test_overview_reads_schema_and_simulation(self):
         data = await self.store.overview()

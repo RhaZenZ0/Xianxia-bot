@@ -206,12 +206,15 @@ var authoritativeQueries = map[string]bool{
 	// v0.30.0: the world-status reads that app/simulation/world.py ran as raw
 	// SQL, plus the market prices and the equipment power Python still
 	// computed. Listed in world_status_queries.go.
-	"market.rows":          true,
-	"market.quote":         true,
-	"market.catalog":       true,
-	"combat.targets":       true,
-	"simulation.state":     true,
-	"simulation.status":    true,
+	"market.rows":       true,
+	"market.quote":      true,
+	"market.catalog":    true,
+	"combat.targets":    true,
+	"simulation.state":  true,
+	"simulation.status": true,
+	// v1.0.0-rc.39: the canonical clock itself, for the surfaces that used to
+	// do the anchor arithmetic in Python.
+	"world.clock":          true,
 	"world.recent_actions": true,
 	"civilization.status":  true,
 	"npc.status":           true,

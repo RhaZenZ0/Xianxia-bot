@@ -655,6 +655,42 @@ fails with the production symptom when the handler's commit is removed, and the 
 commits a result returned over an open transaction and rolls back an error, so the answer and the
 database cannot disagree again.
 
+### The last Python-side clock (`world.clock`, v1.0.0-rc.39)
+
+Go has owned the canonical game clock since v0.30.0 - and Python kept its own copy of the
+arithmetic anyway. `Database.get_world_clock` read the anchor out of `world_state`, computed the
+minute here, seeded a default row when there was none, and **re-anchored the row whenever the stored
+scale disagreed with the `scale` argument** - which every caller filled with
+`SETTINGS.world_time_scale`. So the dashboard's "New time scale" wrote a rate through the audited
+lever and the next `/time`, `/cultivate` or narration quietly wrote it back. `/admin world
+advancetime` did the same by construction: it sent `scale: SETTINGS.world_time_scale` on every call,
+including the ones that only wanted the clock moved.
+
+`world.clock` is the one door now: a world-status query returning `{game_minute, scale,
+anchor_game_minute, anchor_real_ts, real_ts, seeded}`. **It deliberately seeds nothing** - it reads
+through `loadCanonicalWorldClock`, the read-only loader, so a clock somebody merely looked at is not
+a clock that started, and `TestWorldClockIsReadOnlyAndSeedsNothing` counts the rows to hold it.
+`current_world_time` (~142 call sites, none of which changed), the bot's startup, the GM dashboard,
+`/time` and `scripts/playtest_engine.py`'s `clock()` all read through it, and
+`NarratorContextBuilder` takes the engine the way `WorldSimulator` does rather than a scale.
+
+The arithmetic itself was **four copies in Go and two in Python**; it is now
+`loadCanonicalWorldClock` (the SELECT, the decode, the two clamps) plus `worldClockGameMinute`
+(`anchor + elapsed_real_minutes × scale`, floored at 0), and nothing else. `adminAdvanceTime` is the
+one reader that still decodes the row leniently, because a row whose JSON is damaged must stay
+repairable by the only lever that can repair it; it shares the seed and the arithmetic.
+
+**`WORLD_TIME_SCALE` changed owners, and that is the fix nobody would have found by reading Python.**
+The engine's compose service takes an explicit `environment:` allowlist and no `env_file`, so the
+engine had never been able to see the key at all - Python's re-anchoring was the only thing that ever
+applied it, which is to say the bug was also the feature. Compose passes it now, and it is the
+`.env` baseline rather than the last word, exactly as the narration chain is: it seeds a **new**
+world's clock row and nothing else, and on a world that already has one the stored scale wins until
+the audited lever changes it. `/admin world advancetime` gained an optional `scale` sent only when
+given. `Settings.world_time_scale` is gone, and
+`tests/python/contracts/test_world_clock_read_through.py` holds that no file under `app/` or
+`scripts/` so much as names `anchor_real_ts`.
+
 ### People this world makes for itself (`npc_registry`, schema 49)
 
 Three populations, and until v1.0.0-rc.27 only one of them could be spoken to. `catalog_npcs` is a

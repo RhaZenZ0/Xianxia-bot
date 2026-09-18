@@ -17,6 +17,13 @@ services:
       DATABASE_PATH: "/data/xianxia.sqlite3"
       WORLD_DATA_PATH: "/app/content/world.json"
       ENGINE_AUTH_TOKEN: "${ENGINE_AUTH_TOKEN:-}"
+      # The world clock's rate (v1.0.0-rc.39). The engine owns the clock and
+      # seeds a new world's row from this; on a world that already has one the
+      # stored scale wins and only admin.world.advance_time changes it. This
+      # service takes an explicit allowlist rather than env_file, so a key it is
+      # not given is a key it cannot read - which is how Python ended up being
+      # the only thing that ever applied WORLD_TIME_SCALE.
+      WORLD_TIME_SCALE: "${WORLD_TIME_SCALE:-4}"
       # Backups (v0.32.0): retention, size cap and the optional key that
       # seals every backup. docs/CONFIGURATION.md, "Backups".
       XIANXIA_BACKUP_KEEP_DAILY: "${XIANXIA_BACKUP_KEEP_DAILY:-14}"

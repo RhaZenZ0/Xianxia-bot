@@ -6,7 +6,6 @@ import hmac
 import json
 import logging
 import os
-import time
 from dataclasses import dataclass
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -410,21 +409,26 @@ class ReadOnlyDashboardStore:
             return await self._scalar(db, "SELECT current_version FROM schema_version WHERE singleton=1")
 
     async def _world_clock(self, db: Any) -> dict[str, Any]:
-        row = await self._fetchone(db, "SELECT value_json FROM world_state WHERE key='world_clock'")
-        now = time.time()
-        if not row:
-            game_minute = 8 * 60
-            scale = 0
+        """The canonical clock, asked of the engine that owns it (v1.0.0-rc.39).
+
+        This was a third copy of the anchor arithmetic. Engine-backed - which
+        is production, always - it is one query. In local-SQLite mode (tests,
+        one-off scripts) the stored anchor is reported as it stands and nothing
+        is derived from it: a frozen minute is honest about having no engine,
+        where a computed one would be a fourth copy of the rule.
+        """
+        if self._engine is not None:
+            clock = await self._engine.world_clock()
+            game_minute = int(clock.get("game_minute", 8 * 60))
+            scale = max(0, int(clock.get("scale", 0)))
         else:
+            row = await self._fetchone(db, "SELECT value_json FROM world_state WHERE key='world_clock'")
             try:
-                state = json.loads(str(row.get("value_json") or "{}"))
+                state = json.loads(str((row or {}).get("value_json") or "{}"))
             except Exception:
                 state = {}
             scale = max(0, int(state.get("scale", 0)))
-            anchor_game = int(state.get("anchor_game_minute", 8 * 60))
-            anchor_real = float(state.get("anchor_real_ts", now))
-            elapsed = max(0.0, (now - anchor_real) / 60.0)
-            game_minute = int(anchor_game + elapsed * scale)
+            game_minute = int(state.get("anchor_game_minute", 8 * 60))
         wt = from_game_minutes(game_minute)
         return {
             "game_minute": game_minute,

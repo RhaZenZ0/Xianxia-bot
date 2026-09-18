@@ -82,7 +82,8 @@ async def run(url: str, token: str, db_path: str) -> Report:
         return await engine.action(op, uid, payload)
 
     async def clock() -> int:
-        return int((await db.get_world_clock())["game_minute"])
+        """The engine's own clock (v1.0.0-rc.39), the way every surface reads it."""
+        return int((await query("world.clock", 0, {}))["game_minute"])
 
     async def either(name: str, coro, *designed: str) -> Any:
         """A step whose refusal is designed either way: PASS on a result, PASS

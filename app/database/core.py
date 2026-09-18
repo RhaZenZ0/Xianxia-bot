@@ -5837,38 +5837,6 @@ class Database:
             return [str(r[0]) for r in await cur.fetchall()]
 
     # ------------------------------------------------------------------
-    # World clock
-    # ------------------------------------------------------------------
-    async def get_world_clock(self, *, scale: int = 4) -> dict[str, Any]:
-        now = time.time()
-        requested_scale = max(0, int(scale))
-        async with self._connect() as db:
-            db.row_factory = aiosqlite.Row
-            cur = await db.execute("SELECT value_json FROM world_state WHERE key='world_clock'")
-            row = await cur.fetchone()
-            if row:
-                state = json.loads(row[0])
-            else:
-                state = {"anchor_game_minute": 8 * 60, "anchor_real_ts": now, "scale": requested_scale}
-                await db.execute(
-                    "INSERT INTO world_state(key,value_json,updated_at) VALUES('world_clock',?,?)",
-                    (json.dumps(state), now),
-                )
-                await db.commit()
-            old_scale = max(0, int(state.get("scale", requested_scale)))
-            elapsed_real_minutes = max(0.0, (now - float(state.get("anchor_real_ts", now))) / 60.0)
-            game_minute = int(state.get("anchor_game_minute", 0) + elapsed_real_minutes * old_scale)
-            if old_scale != requested_scale:
-                state = {"anchor_game_minute": game_minute, "anchor_real_ts": now, "scale": requested_scale}
-                await db.execute(
-                    "UPDATE world_state SET value_json=?,updated_at=? WHERE key='world_clock'",
-                    (json.dumps(state), now),
-                )
-                await db.commit()
-            return {**state, "game_minute": game_minute}
-
-
-    # ------------------------------------------------------------------
     # Innate aptitudes: spiritual roots, bloodlines and physiques
 
     @staticmethod

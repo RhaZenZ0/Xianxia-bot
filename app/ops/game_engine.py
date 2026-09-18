@@ -79,6 +79,17 @@ class GameEngineClient:
             request["expected_version"] = int(expected_version)
         return await self._post("/v1/game/action", request)
 
+    async def world_clock(self) -> dict[str, Any]:
+        """The canonical world clock, as the engine computes it (v1.0.0-rc.39).
+
+        The one door to the time of day. Python used to keep two copies of the
+        anchor arithmetic - `Database.get_world_clock`, which also re-anchored
+        the row whenever the configured scale disagreed with the stored one,
+        and the dashboard's own read - so a rate a GM set on the dashboard was
+        undone by the next command that asked what time it was.
+        """
+        return dict(await self.action("world.clock", 0, {}) or {})
+
     async def bootstrap_simulation(self, game_minute: int) -> dict[str, Any]:
         return await self._post(
             "/v1/simulation/bootstrap",

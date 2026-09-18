@@ -253,7 +253,13 @@ of active cultivation, less with closed-door seclusion running beside it and
 less again in the higher worlds, whose qi density is content
 (`world_qi_density` in `content/world.json`). `UNEXPECTED_EVENT_CHANCE_PERCENT`
 is the chance an explore rolls an unexpected event. `WORLD_TIME_SCALE` is how
-many game minutes pass per real minute. `REINCARNATION_BASE_SAMSARA_YEARS` and
+many game minutes pass per real minute, 0 to 60. Since v1.0.0-rc.39 it is read
+by the **Go engine**, which owns the clock, and compose passes it in: it seeds
+the clock of a **new** world and nothing else. On a world that already has a
+clock the stored rate is the last word, and `/admin world advancetime` with a
+`scale` (or the dashboard's "New time scale") is the only thing that changes it
+— so editing this key on a running world has no effect, and it no longer
+silently undoes a rate a GM set. `REINCARNATION_BASE_SAMSARA_YEARS` and
 `REINCARNATION_MAX_WAIT_SECONDS` shape how long a dead character waits in
 samsara before rebirth.
 

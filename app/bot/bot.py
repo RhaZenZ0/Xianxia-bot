@@ -246,7 +246,7 @@ class XianxiaBot(commands.Bot):
                                                              **{f"rag_{k}": v for k, v in rag_counts.items()}})
 
             phase = "SIMULATION_READY"
-            wt_state = await DB.get_world_clock(scale=SETTINGS.world_time_scale)
+            wt_state = await ENGINE.world_clock()
             await SIM.initialize(int(wt_state["game_minute"]))
             await self._mark_startup_phase(
                 "SIMULATION_READY", {"game_minute": int(wt_state["game_minute"])}

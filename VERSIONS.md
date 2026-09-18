@@ -6,6 +6,24 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.0** (rc.39) retires the last Python-side clock.
+
+`Database.get_world_clock` was the one copy of an engine rule left in the DB layer, named as open on
+the roadmap since v0.30.0. It read the anchor out of `world_state`, did the arithmetic in Python -
+and **re-anchored the row whenever the stored scale disagreed with `WORLD_TIME_SCALE`**, which every
+caller passed. So a rate a GM set on the dashboard was silently undone by the next `/time`,
+`/cultivate` or narration, and `/admin world advancetime` sent the env scale on every call whether
+or not anybody had asked to change it. The engine answers `world.clock` now - a read-only query that
+deliberately seeds nothing, so a clock somebody merely looked at is not a clock that started - and
+`current_world_time`, the bot's startup, the narrator's context builder, the GM dashboard, `/time`
+and the engine playtest all read through it. Four copies of the arithmetic in Go became one
+(`loadCanonicalWorldClock` + `worldClockGameMinute`), and two in Python became none: the gate holds
+that no file under `app/` or `scripts/` so much as names `anchor_real_ts`. `WORLD_TIME_SCALE` is the
+engine's key now, passed through by compose, and it seeds a **new** world only - after that the
+stored scale is the last word, changed by the audited lever alone, which `/admin world advancetime`
+gained an optional `scale` for. `Settings.world_time_scale` is gone. See CLAUDE.md, "The last
+Python-side clock".
+
 **1.0.0** (rc.38) drives what only the world makes, and empties the deferred set.
 
 The last of rc.35's deferred blocks is empty and `DEFERRED_OPERATIONS` is an empty dict on purpose:

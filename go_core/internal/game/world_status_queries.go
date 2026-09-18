@@ -7,6 +7,7 @@ import (
 	"math"
 	"sort"
 	"strings"
+	"time"
 
 	"xianxia/core/internal/eventledger"
 	lifespanmodel "xianxia/core/internal/lifespan"
@@ -28,6 +29,7 @@ var worldStatusQueries = map[string]bool{
 	"combat.targets":       true,
 	"simulation.state":     true,
 	"simulation.status":    true,
+	"world.clock":          true,
 	"world.recent_actions": true,
 	"civilization.status":  true,
 	"npc.status":           true,
@@ -184,6 +186,26 @@ func applyWorldStatusQuery(conn *storage.Conn, worldPath string, req ActionReque
 			row["lag_game_minutes"] = max64(0, gameMinute-i64(row["last_game_minute"]))
 		}
 		return queryResponse(conn, req, map[string]any{"game_minute": gameMinute, "systems": rows}), nil
+	case "world.clock":
+		// The canonical clock, read-only (v1.0.0-rc.39). Python had two copies
+		// of this arithmetic - `Database.get_world_clock`, which also re-anchored
+		// the row whenever the configured scale disagreed with the stored one,
+		// and the dashboard's own read. Both ask here now. It deliberately
+		// never seeds a row: a clock somebody merely looked at must not be a
+		// clock that started.
+		now := float64(time.Now().UnixNano()) / 1e9
+		clock, seeded, err := loadCanonicalWorldClock(conn, now)
+		if err != nil {
+			return ActionResponse{}, err
+		}
+		return queryResponse(conn, req, map[string]any{
+			"game_minute":        worldClockGameMinute(clock, now),
+			"scale":              clock.Scale,
+			"anchor_game_minute": clock.AnchorGameMinute,
+			"anchor_real_ts":     clock.AnchorRealTS,
+			"real_ts":            now,
+			"seeded":             seeded,
+		}), nil
 	case "world.recent_actions":
 		limit := clamp(payload.integer("limit", 20), 1, 100)
 		res, err := conn.Execute(`SELECT * FROM world_action_events ORDER BY action_id DESC LIMIT ?`, []any{limit})
