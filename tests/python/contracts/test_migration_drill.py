@@ -42,6 +42,21 @@ DROPPED_TABLES: dict[str, str] = {
         "authoritative_action_receipts and domain_events."
     ),
     "core_state_versions": "migration 44: the other half of the same unused ledger.",
+    **{
+        table: (
+            "migration 52: a Python-written blob mirror of content/world.json, "
+            "replaced by the engine-written content_* table of schema 51, which "
+            "is filled from the file itself and deletes what the file no longer "
+            "carries. Kept one release so a rollback to 50 found it intact."
+        )
+        for table in (
+            "catalog_locations",
+            "catalog_npcs",
+            "catalog_recipes",
+            "catalog_manuals",
+            "catalog_techniques",
+        )
+    },
 }
 
 REBUILT_TABLES: dict[str, str] = {

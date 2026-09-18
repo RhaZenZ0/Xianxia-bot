@@ -586,10 +586,10 @@ BOOKKEEPING_METHODS = {
     "register_event_thread", "close_event_thread", "ensure_sect_abode", "update_expedition_location",
     "clear_discord_bindings",  # v0.21.2 teardown: forgets channel/message ids, touches no gameplay column
     # ops telemetry, startup, maintenance
-    "init", "sync_world_catalog", "sync_rag_canon", "record_startup_event", "record_operational_alert",
+    "init", "seed_world_territories", "sync_rag_canon", "record_startup_event", "record_operational_alert",
     # v0.22.0: seeds the authored commission pool from content/world.json into
     # quest_definitions at startup, insert-only. Content, not player state -
-    # the same class of write as sync_world_catalog beside it.
+    # the same class of write as seed_world_territories beside it.
     "sync_commission_pool",
     "flush_slow_query_log", "maintenance_cleanup", "log_admin_action",
     # cosmetic / GM review of drafts (no gameplay table)
@@ -686,7 +686,7 @@ PRESENTATION_WRITES: dict[str, set[str]] = {
     "init": {"battles", "character_bloodlines", "character_physiques", "character_spiritual_roots",
              "currency_wallets", "storage_containers"},
     "_run_schema_migrations": {"schema_migrations", "schema_version"},
-    "sync_world_catalog": {"territory_state", "world_eras"},
+    "seed_world_territories": {"territory_state", "world_eras"},
     "sync_commission_pool": {"quest_definitions"},
     "sync_rag_canon": {"rag_canon_documents"},
     # narration history, RAG memory and the world-history ledger

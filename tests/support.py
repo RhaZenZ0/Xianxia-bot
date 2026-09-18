@@ -314,6 +314,47 @@ def install_httpx_shim() -> None:
     sys.modules["httpx"] = shim
 
 
+CONTENT_SECTIONS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("content_locations", ("locations",)),
+    ("content_npcs", ("npcs",)),
+    ("content_recipes", ("recipes",)),
+    ("content_manuals", ("technique_system", "manuals")),
+    ("content_techniques", ("technique_system", "techniques")),
+)
+
+
+async def seed_content_tables(db, world_data: dict) -> None:
+    """Fill the five read `content_*` tables the way the engine would.
+
+    Production has exactly one writer for these: the Go engine, from
+    `content/world.json` itself (schema 51). Python may not write them, which
+    is why this is a fixture and not a method on `Database` - and why the five
+    `catalog_*` mirrors that used to serve the no-engine path were retired in
+    v1.0.0-rc.40 rather than kept as a second source.
+
+    pytest never runs an engine, so a test that reads a definition seeds the
+    tables here first. Only `name`, `data_json` and `updated_at` are written:
+    those are the three columns every catalogue reader touches, and the typed
+    columns beside them are a projection whose real definition lives in Go
+    (`contentsync.Sections`, held to the file by `TestProjectionMatchesTheRawEntries`).
+    Writing them here would be a second, weaker copy of that rule. They are
+    nullable by design, so leaving them NULL is what the DDL expects.
+    """
+    now = time.time()
+    async with db._connect() as conn:
+        for table, path in CONTENT_SECTIONS:
+            section: Any = world_data
+            for key in path:
+                section = dict(section or {}).get(key, {})
+            for name, data in dict(section or {}).items():
+                await conn.execute(
+                    f"""INSERT INTO {table}(name,data_json,updated_at) VALUES(?,?,?)
+                        ON CONFLICT(name) DO UPDATE SET data_json=excluded.data_json,updated_at=excluded.updated_at""",
+                    (str(name), json.dumps(data, ensure_ascii=False), now),
+                )
+        await conn.commit()
+
+
 async def seed_simulation_fixture(db, world_data: dict, game_minute: int = 0) -> None:
     """Seed read-model simulation rows for Python tests without gameplay authority."""
     systems = {

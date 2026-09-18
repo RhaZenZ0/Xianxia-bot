@@ -25,7 +25,7 @@ import unittest
 from pathlib import Path
 
 from app.database import OPERATIONAL_REQUIRED_TABLES
-from app.database.core import CONTENT_FOR_CATALOG, Database, content_table_for
+from app.database.core import SCHEMA_MIGRATIONS, Database
 from tests.support import PROJECT_ROOT
 
 GO = PROJECT_ROOT / "go_core" / "internal"
@@ -123,7 +123,7 @@ class TheTablesAreFullBeforeAnyoneReads(unittest.TestCase):
 
     def test_the_bot_syncs_before_it_counts(self):
         bot = (PROJECT_ROOT / "app" / "bot" / "bot.py").read_text(encoding="utf-8")
-        self.assertLess(bot.index("await DB.sync_world_catalog(WORLD.data)"), bot.index("await DB.sync_content()"))
+        self.assertLess(bot.index("await DB.seed_world_territories(WORLD.data)"), bot.index("await DB.sync_content()"))
         self.assertLess(bot.index("await DB.sync_content()"), bot.index("await DB.catalog_counts()"))
 
     def test_sync_content_is_one_post_to_the_sync_endpoint(self):
@@ -135,40 +135,97 @@ class TheTablesAreFullBeforeAnyoneReads(unittest.TestCase):
         self.assertIn(".post(", body)
 
 
-class ReadersFollowTheEngine(unittest.TestCase):
-    def test_engine_backed_reads_go_to_content_and_local_reads_stay_on_catalog(self):
-        for catalog, content in CONTENT_FOR_CATALOG.items():
-            with self.subTest(catalog=catalog):
-                self.assertEqual(content_table_for(catalog, True), content)
-                self.assertEqual(content_table_for(catalog, False), catalog)
-        with self.assertRaises(ValueError):
-            content_table_for("characters", True)
+RETIRED_MIRRORS = (
+    "catalog_locations",
+    "catalog_npcs",
+    "catalog_recipes",
+    "catalog_manuals",
+    "catalog_techniques",
+)
 
-    def test_the_database_switch_reads_the_transport(self):
-        # A real directory: Database.__init__ creates the parent, and a path
-        # under / is only creatable by root - which the first version of this
-        # test was, locally, and CI's runner is not.
-        with tempfile.TemporaryDirectory() as scratch:
-            db = Database(Path(scratch) / "switch.sqlite3")
-            self.assertIsNone(db._go_transport)
-            self.assertEqual(db.content_table("catalog_npcs"), "catalog_npcs")
-            db._go_transport = object()  # any engine-backed transport
-            self.assertEqual(db.content_table("catalog_npcs"), "content_npcs")
 
-    def test_every_catalogue_reader_resolves_through_the_switch(self):
-        tree = ast.parse(CORE)
-        for name in ("_catalog_get", "search_catalog", "catalog_counts"):
-            node = next(n for n in ast.walk(tree) if isinstance(n, ast.AsyncFunctionDef) and n.name == name)
-            calls = {c.func.attr for c in ast.walk(node) if isinstance(c, ast.Call) and isinstance(c.func, ast.Attribute)}
-            with self.subTest(reader=name):
-                self.assertIn("content_table", calls, f"{name} must pick its table through content_table()")
+class ThereIsOneCatalogueAndTheEngineWritesIt(unittest.TestCase):
+    """v1.0.0-rc.40: the five Python-written mirrors are gone.
 
-    def test_the_dashboard_uses_the_same_switch(self):
+    Schema 51 shipped `content_*` beside them and picked between the two with
+    `content_table_for(table, engine_backed)`, because pytest has no engine to
+    fill the new tables. Migration 52 drops the mirrors: production has one
+    writer and one reader path, and a local run seeds the same tables from the
+    fixture. These tests are the gate for the switch staying gone.
+    """
+
+    def test_no_running_code_names_a_retired_mirror(self):
+        """The names survive in exactly one place: the migration list.
+
+        A historical migration is how an old database walks forward, so the
+        CREATE statements that made these tables stay where they are and
+        migration 52's DROPs sit beside them - the same rule migration 44
+        followed for the unused core ledger. Everywhere else, naming one of
+        these tables now means reading a table that is not there.
+        """
+        offenders = []
+        for path in sorted((PROJECT_ROOT / "app").rglob("*.py")) + sorted((PROJECT_ROOT / "scripts").rglob("*.py")):
+            if "__pycache__" in path.parts:
+                continue
+            body = path.read_text(encoding="utf-8")
+            if path.name == "core.py":
+                head, _, rest = body.partition("SCHEMA_MIGRATIONS")
+                _, _, tail = rest.partition("\n)\n\n")  # the list's closing paren
+                body = head + tail
+            body = "\n".join(line for line in body.splitlines() if not line.lstrip().startswith("#"))
+            for table in RETIRED_MIRRORS:
+                if table in body:
+                    offenders.append(f"{path.relative_to(PROJECT_ROOT)}: {table}")
+        self.assertEqual(offenders, [], f"retired catalogue mirrors still referenced: {offenders}")
+
+    def test_the_switch_itself_is_gone(self):
+        self.assertNotIn("content_table_for", CORE)
+        self.assertNotIn("CONTENT_FOR_CATALOG", CORE)
         server = (PROJECT_ROOT / "app" / "dashboard" / "server.py").read_text(encoding="utf-8")
-        self.assertNotIn("FROM catalog_npcs", server)
-        self.assertNotIn("FROM catalog_locations", server)
-        self.assertIn("content_table('catalog_npcs')", server)
-        self.assertIn("content_table('catalog_locations')", server)
+        self.assertNotIn("content_table_for", server)
+        self.assertNotIn("def content_table", server)
+
+    def test_every_catalogue_reader_names_a_content_table(self):
+        tree = ast.parse(CORE)
+        wanted = {
+            "_catalog_get": "content_",
+            "search_catalog": "content_",
+            "catalog_counts": "content_",
+        }
+        for name, prefix in wanted.items():
+            node = next(n for n in ast.walk(tree) if isinstance(n, ast.AsyncFunctionDef) and n.name == name)
+            literals = {
+                c.value for c in ast.walk(node)
+                if isinstance(c, ast.Constant) and isinstance(c.value, str) and c.value.startswith("cat")
+            }
+            with self.subTest(reader=name):
+                self.assertEqual(literals, set(), f"{name} still names a catalog_* table")
+                self.assertNotIn("content_table(", ast.get_source_segment(CORE, node) or "")
+        # And the callers that pick the table for _catalog_get name content_*.
+        for getter in ("get_location_definition", "get_npc_definition", "get_recipe_definition"):
+            node = next(n for n in ast.walk(tree) if isinstance(n, ast.AsyncFunctionDef) and n.name == getter)
+            source = ast.get_source_segment(CORE, node) or ""
+            with self.subTest(getter=getter):
+                self.assertIn('"content_', source)
+
+    def test_the_dashboard_reads_the_content_tables_directly(self):
+        server = (PROJECT_ROOT / "app" / "dashboard" / "server.py").read_text(encoding="utf-8")
+        self.assertIn("FROM content_npcs", server)
+        self.assertIn("FROM content_locations", server)
+
+    def test_the_readiness_probe_no_longer_expects_them(self):
+        for table in RETIRED_MIRRORS:
+            self.assertNotIn(table, OPERATIONAL_REQUIRED_TABLES)
+
+    def test_migration_52_drops_each_of_them(self):
+        # The migration drill proves nothing else vanished with them, across
+        # every historical schema. This is the direct check that the drop is
+        # there at all, and that its name says what it does.
+        version, name, statements = next(m for m in SCHEMA_MIGRATIONS if m[0] == 52)
+        self.assertEqual((version, name), (52, "retire_python_catalog_mirrors"))
+        joined = "\n".join(statements)
+        for table in RETIRED_MIRRORS:
+            self.assertIn(f"DROP TABLE IF EXISTS {table}", joined)
 
 
 class TheGMSyncTellsTheTruth(unittest.TestCase):
@@ -177,7 +234,9 @@ class TheGMSyncTellsTheTruth(unittest.TestCase):
         branch = ops[ops.index('if action.value=="sync":'):]
         branch = branch[:branch.index('if action.value=="vacuum":')]
         self.assertIn("World(WORLD.content_path)", branch, "a fresh parse from disk, not the in-memory copy")
-        self.assertNotIn("sync_world_catalog(WORLD.data)", branch)
+        self.assertNotIn("sync_world_catalog", branch)
+        self.assertNotIn("catalog_*", branch, "the catalogue is the engine's alone since v1.0.0-rc.40")
+        self.assertIn("seed_world_territories(fresh.data)", branch)
         self.assertIn('"admin.content.reload"', branch)
         self.assertIn("next restart", branch, "it says what does not apply live")
 

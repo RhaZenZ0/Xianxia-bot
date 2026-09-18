@@ -1036,7 +1036,13 @@ func adminTeleport(conn *storage.Conn, adminUserID int64, raw json.RawMessage) (
 			rollback(conn)
 		}
 	}()
-	countRes, err := conn.Execute(`SELECT COUNT(*) AS n FROM catalog_locations`, nil)
+	// content_locations, not catalog_locations: the Python-written mirror was
+	// dropped in schema 52 and the engine writes this table itself
+	// (internal/contentsync). The count guard stays because a database whose
+	// content tables have not been filled yet must not refuse every
+	// destination - it means "no catalogue to check against", not "no such
+	// place".
+	countRes, err := conn.Execute(`SELECT COUNT(*) AS n FROM content_locations`, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -1045,7 +1051,7 @@ func adminTeleport(conn *storage.Conn, adminUserID int64, raw json.RawMessage) (
 		locationCount = storage.ParseInt(row["n"])
 	}
 	if locationCount > 0 {
-		valid, err := conn.Execute(`SELECT 1 FROM catalog_locations WHERE name=?`, []any{loc})
+		valid, err := conn.Execute(`SELECT 1 FROM content_locations WHERE name=?`, []any{loc})
 		if err != nil {
 			return nil, err
 		}

@@ -212,7 +212,7 @@ class XianxiaBot(commands.Bot):
             )
 
             phase = "CATALOG_READY"
-            await DB.sync_world_catalog(WORLD.data)
+            await DB.seed_world_territories(WORLD.data)
             # The engine fills content_* from the file (schema 51); asking
             # before the counts below are read is what makes CATALOG_READY
             # report the tables the readers actually use.

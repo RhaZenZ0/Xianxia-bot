@@ -41,7 +41,7 @@ CREATE TABLE player_families(family_id INTEGER PRIMARY KEY, name TEXT, founder_u
 CREATE TABLE quest_definitions(quest_id INTEGER PRIMARY KEY, title TEXT, owner_user_id INTEGER);
 CREATE TABLE admin_audit_log(audit_id INTEGER PRIMARY KEY AUTOINCREMENT, admin_user_id INTEGER NOT NULL,
     action TEXT, target TEXT, before_json TEXT, after_json TEXT, reason TEXT, created_at REAL);
-CREATE TABLE catalog_locations(location_key TEXT PRIMARY KEY, name TEXT);
+CREATE TABLE content_locations(location_key TEXT PRIMARY KEY, name TEXT);
 
 INSERT INTO characters(user_id,name) VALUES(42,'Li Wei'),(7,'Another Cultivator');
 INSERT INTO scene_history(channel_id,user_id,content) VALUES(1,42,'something the player typed'),(1,7,'somebody else');
@@ -51,7 +51,7 @@ INSERT INTO world_history_events(title,related_user_id) VALUES('A duel',42),('Un
 INSERT INTO player_families(name,founder_user_id) VALUES('The Li Clan',42);
 INSERT INTO quest_definitions(title,owner_user_id) VALUES('A drafted quest',42);
 INSERT INTO admin_audit_log(admin_user_id,action,target,created_at) VALUES(42,'admin.player.karma','user:7',1.0);
-INSERT INTO catalog_locations(location_key,name) VALUES('greenriver','Greenriver Town');
+INSERT INTO content_locations(location_key,name) VALUES('greenriver','Greenriver Town');
 `
 	if err := conn.ExecScript(schema); err != nil {
 		t.Fatal(err)
@@ -135,7 +135,7 @@ func TestErasureLeavesEveryOtherCultivatorAlone(t *testing.T) {
 	if got := erasureScalar(t, path, `SELECT COUNT(*) FROM trade_offers WHERE from_user_id=7 AND to_user_id=7`); got != 1 {
 		t.Errorf("a trade between two other people = %d rows, want 1", got)
 	}
-	if got := erasureScalar(t, path, `SELECT COUNT(*) FROM catalog_locations`); got != 1 {
+	if got := erasureScalar(t, path, `SELECT COUNT(*) FROM content_locations`); got != 1 {
 		t.Errorf("world content = %d rows, want 1 - erasure must not touch the catalogue", got)
 	}
 }
@@ -288,7 +288,7 @@ func TestErasureDiscoversItsTargetsFromTheSchema(t *testing.T) {
 	if _, ok := found["admin_audit_log.admin_user_id"]; ok {
 		t.Errorf("the audit log was offered up as an erasure target")
 	}
-	if _, ok := found["catalog_locations.location_key"]; ok {
+	if _, ok := found["content_locations.location_key"]; ok {
 		t.Errorf("a table with no user column became a target")
 	}
 	// A NOT NULL anonymise column has to be recognised as such, or the UPDATE
