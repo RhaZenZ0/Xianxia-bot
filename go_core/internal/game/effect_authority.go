@@ -3,6 +3,8 @@ package game
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -21,23 +23,88 @@ type canonicalWorldClock struct {
 	Scale            int64   `json:"scale"`
 }
 
+// The clock's seed, and the only place the world's starting rate is decided
+// (v1.0.0-rc.39). WORLD_TIME_SCALE used to be read by Python alone, and the
+// engine container was never given it - so the rate an operator set in .env
+// reached the world only because `Database.get_world_clock` re-anchored the
+// row behind the engine's back, which also silently undid a rate a GM had set
+// on the dashboard. The key is the engine's now, compose passes it through,
+// and it seeds a *new* world only: after that the stored scale is the last
+// word and `admin.world.advance_time` is the one thing that changes it.
+const (
+	defaultClockAnchorGameMinute = int64(8 * 60)
+	fallbackClockScale           = int64(4)
+	maxClockScale                = int64(60)
+)
+
+func clockScaleFromEnv() int64 {
+	raw := strings.TrimSpace(os.Getenv("WORLD_TIME_SCALE"))
+	if raw == "" {
+		return fallbackClockScale
+	}
+	scale, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil || scale < 0 || scale > maxClockScale {
+		return fallbackClockScale
+	}
+	return scale
+}
+
+func defaultWorldClock(now float64) canonicalWorldClock {
+	return canonicalWorldClock{
+		AnchorGameMinute: defaultClockAnchorGameMinute,
+		AnchorRealTS:     now,
+		Scale:            clockScaleFromEnv(),
+	}
+}
+
+// loadCanonicalWorldClock is the one read of the clock row: the SELECT, the
+// decode, and the two clamps. `seeded` is false when the world has no row yet,
+// which is what lets one caller insert the default and the read-only ones
+// leave the database alone.
+func loadCanonicalWorldClock(conn *storage.Conn, now float64) (canonicalWorldClock, bool, error) {
+	res, err := conn.Execute(`SELECT value_json FROM world_state WHERE key='world_clock'`, nil)
+	if err != nil {
+		return canonicalWorldClock{}, false, err
+	}
+	state := defaultWorldClock(now)
+	seeded := false
+	if row := firstRowMap(res); row != nil {
+		seeded = true
+		if err := json.Unmarshal([]byte(fmt.Sprint(row["value_json"])), &state); err != nil {
+			return canonicalWorldClock{}, true, fmt.Errorf("invalid canonical world clock: %w", err)
+		}
+	}
+	if state.Scale < 0 {
+		state.Scale = 0
+	}
+	if state.AnchorRealTS <= 0 {
+		state.AnchorRealTS = now
+	}
+	return state, seeded, nil
+}
+
+// worldClockGameMinute is the world clock's arithmetic, and the only copy of
+// it: the minute is the anchor plus the real minutes since the anchor, at the
+// stored rate. Scale 0 freezes the world at its anchor.
+func worldClockGameMinute(state canonicalWorldClock, now float64) int64 {
+	elapsedRealMinutes := (now - state.AnchorRealTS) / 60.0
+	if elapsedRealMinutes < 0 {
+		elapsedRealMinutes = 0
+	}
+	gameMinute := state.AnchorGameMinute + int64(elapsedRealMinutes*float64(state.Scale))
+	if gameMinute < 0 {
+		return 0
+	}
+	return gameMinute
+}
+
 func canonicalWorldGameMinute(conn *storage.Conn) (int64, error) {
 	now := float64(time.Now().UnixNano()) / 1e9
-	res, err := conn.Execute(`SELECT value_json FROM world_state WHERE key='world_clock'`, nil)
+	state, seeded, err := loadCanonicalWorldClock(conn, now)
 	if err != nil {
 		return 0, err
 	}
-
-	state := canonicalWorldClock{
-		AnchorGameMinute: 8 * 60,
-		AnchorRealTS:     now,
-		Scale:            4,
-	}
-	if row := firstRowMap(res); row != nil {
-		if err := json.Unmarshal([]byte(fmt.Sprint(row["value_json"])), &state); err != nil {
-			return 0, fmt.Errorf("invalid canonical world clock: %w", err)
-		}
-	} else {
+	if !seeded {
 		encoded, _ := json.Marshal(state)
 		if _, err := conn.Execute(
 			`INSERT INTO world_state(key,value_json,updated_at) VALUES('world_clock',?,?)`,
@@ -46,22 +113,7 @@ func canonicalWorldGameMinute(conn *storage.Conn) (int64, error) {
 			return 0, err
 		}
 	}
-
-	if state.Scale < 0 {
-		state.Scale = 0
-	}
-	if state.AnchorRealTS <= 0 {
-		state.AnchorRealTS = now
-	}
-	elapsedRealMinutes := (now - state.AnchorRealTS) / 60.0
-	if elapsedRealMinutes < 0 {
-		elapsedRealMinutes = 0
-	}
-	gameMinute := state.AnchorGameMinute + int64(elapsedRealMinutes*float64(state.Scale))
-	if gameMinute < 0 {
-		gameMinute = 0
-	}
-	return gameMinute, nil
+	return worldClockGameMinute(state, now), nil
 }
 
 // CanonicalWorldGameMinute is the world clock as the engine computes it, for
@@ -79,36 +131,11 @@ func CanonicalWorldGameMinute(conn *storage.Conn) (int64, error) {
 
 func readCanonicalWorldGameMinute(conn *storage.Conn) (int64, error) {
 	now := float64(time.Now().UnixNano()) / 1e9
-	res, err := conn.Execute(`SELECT value_json FROM world_state WHERE key='world_clock'`, nil)
+	state, _, err := loadCanonicalWorldClock(conn, now)
 	if err != nil {
 		return 0, err
 	}
-
-	state := canonicalWorldClock{
-		AnchorGameMinute: 8 * 60,
-		AnchorRealTS:     now,
-		Scale:            4,
-	}
-	if row := firstRowMap(res); row != nil {
-		if err := json.Unmarshal([]byte(fmt.Sprint(row["value_json"])), &state); err != nil {
-			return 0, fmt.Errorf("invalid canonical world clock: %w", err)
-		}
-	}
-	if state.Scale < 0 {
-		state.Scale = 0
-	}
-	if state.AnchorRealTS <= 0 {
-		state.AnchorRealTS = now
-	}
-	elapsedRealMinutes := (now - state.AnchorRealTS) / 60.0
-	if elapsedRealMinutes < 0 {
-		elapsedRealMinutes = 0
-	}
-	gameMinute := state.AnchorGameMinute + int64(elapsedRealMinutes*float64(state.Scale))
-	if gameMinute < 0 {
-		gameMinute = 0
-	}
-	return gameMinute, nil
+	return worldClockGameMinute(state, now), nil
 }
 
 // readCanonicalWorldClock is the read-only counterpart of canonicalWorldGameMinute:
@@ -117,28 +144,8 @@ func readCanonicalWorldGameMinute(conn *storage.Conn) (int64, error) {
 // so a caller can convert *any* absolute game-minute (like a travel arrival) to
 // a real-world Unix timestamp with the same anchor - not just "now".
 func readCanonicalWorldClock(conn *storage.Conn) (canonicalWorldClock, error) {
-	now := float64(time.Now().UnixNano()) / 1e9
-	res, err := conn.Execute(`SELECT value_json FROM world_state WHERE key='world_clock'`, nil)
-	if err != nil {
-		return canonicalWorldClock{}, err
-	}
-	state := canonicalWorldClock{
-		AnchorGameMinute: 8 * 60,
-		AnchorRealTS:     now,
-		Scale:            4,
-	}
-	if row := firstRowMap(res); row != nil {
-		if err := json.Unmarshal([]byte(fmt.Sprint(row["value_json"])), &state); err != nil {
-			return canonicalWorldClock{}, fmt.Errorf("invalid canonical world clock: %w", err)
-		}
-	}
-	if state.Scale < 0 {
-		state.Scale = 0
-	}
-	if state.AnchorRealTS <= 0 {
-		state.AnchorRealTS = now
-	}
-	return state, nil
+	state, _, err := loadCanonicalWorldClock(conn, float64(time.Now().UnixNano())/1e9)
+	return state, err
 }
 
 // realTimestampForGameMinute converts an absolute game-clock minute to a real

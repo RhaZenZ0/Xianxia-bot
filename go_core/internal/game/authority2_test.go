@@ -5,6 +5,7 @@ package game
 
 import (
 	"encoding/json"
+	"fmt"
 	"math"
 	"strings"
 	"testing"
@@ -452,5 +453,100 @@ func TestEquipmentPowerQueryIsTheEngineFigure(t *testing.T) {
 	}
 	if _, err := ApplyWithWorld(path, world, ActionRequest{APIVersion: authoritativeAPIVersion, Operation: "equipment.power", Payload: json.RawMessage(`{}`)}); err == nil {
 		t.Fatal("equipment.power needs an actor")
+	}
+}
+
+// --- world.clock (v1.0.0-rc.39) ---------------------------------------------
+
+func TestWorldClockIsReadOnlyAndSeedsNothing(t *testing.T) {
+	path := setupAuthority2DB(t)
+	world := batch4WorldPath(t)
+	t.Setenv("WORLD_TIME_SCALE", "0")
+
+	clock := authority2Query(t, path, world, "world.clock", 0, map[string]any{})
+	if clock["seeded"] != false {
+		t.Fatalf("seeded=%#v want false on a world with no clock row", clock["seeded"])
+	}
+	if got := storage.ParseInt(clock["game_minute"]); got != defaultClockAnchorGameMinute {
+		t.Fatalf("game_minute=%d want %d", got, defaultClockAnchorGameMinute)
+	}
+	// The whole point of the read-only helper: looking at the clock must not
+	// start it. A tick that seeded a row here would decide the world's epoch.
+	if rows := storage.ParseInt(scalar(t, path, `SELECT COUNT(*) FROM world_state WHERE key='world_clock'`)); rows != 0 {
+		t.Fatalf("world.clock inserted %d clock rows; it must insert none", rows)
+	}
+}
+
+func TestWorldClockAnswersTheStoredAnchorAndScale(t *testing.T) {
+	path := setupAuthority2DB(t)
+	world := batch4WorldPath(t)
+	// batch4SetCanonicalGameMinute writes scale 0, so the minute is the anchor
+	// exactly - no elapsed real time can drift the assertion.
+	batch4SetCanonicalGameMinute(t, path, 10000)
+
+	clock := authority2Query(t, path, world, "world.clock", 0, map[string]any{})
+	if clock["seeded"] != true {
+		t.Fatalf("seeded=%#v want true", clock["seeded"])
+	}
+	if got := storage.ParseInt(clock["game_minute"]); got != 10000 {
+		t.Fatalf("game_minute=%d want 10000", got)
+	}
+	if got := storage.ParseInt(clock["anchor_game_minute"]); got != 10000 {
+		t.Fatalf("anchor_game_minute=%d want 10000", got)
+	}
+	if got := storage.ParseInt(clock["scale"]); got != 0 {
+		t.Fatalf("scale=%d want 0", got)
+	}
+	if got := parseFloat(clock["real_ts"]); got <= 0 {
+		t.Fatalf("real_ts=%v want the engine's own now", clock["real_ts"])
+	}
+	// It reports what simulation.status measures its lag against: one clock.
+	status := authority2Query(t, path, world, "simulation.status", 0, map[string]any{})
+	if got := storage.ParseInt(status["game_minute"]); got != 10000 {
+		t.Fatalf("simulation.status game_minute=%d want 10000", got)
+	}
+}
+
+func TestTheWorldClockSeedTakesItsScaleFromTheEngineEnvironment(t *testing.T) {
+	// WORLD_TIME_SCALE is the engine's key now (v1.0.0-rc.39): it seeds a new
+	// world's clock and nothing else. Python used to own it, and re-anchored
+	// the row whenever the stored scale disagreed - which also undid a rate a
+	// GM had set through admin.world.advance_time.
+	for _, tc := range []struct {
+		env  string
+		want int64
+	}{
+		{"7", 7},
+		{"0", 0},
+		{"", fallbackClockScale},
+		{"not-a-number", fallbackClockScale},
+		{"-1", fallbackClockScale},
+		{"99", fallbackClockScale}, // outside 0..60, the bound .env documented
+	} {
+		t.Setenv("WORLD_TIME_SCALE", tc.env)
+		if got := clockScaleFromEnv(); got != tc.want {
+			t.Fatalf("WORLD_TIME_SCALE=%q gave scale %d, want %d", tc.env, got, tc.want)
+		}
+	}
+
+	// And the seed reaches the row the first caller writes.
+	path := setupAuthority2DB(t)
+	t.Setenv("WORLD_TIME_SCALE", "9")
+	conn, err := storage.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := canonicalWorldGameMinute(conn); err != nil {
+		conn.Close()
+		t.Fatal(err)
+	}
+	if err := conn.Commit(); err != nil {
+		conn.Close()
+		t.Fatal(err)
+	}
+	conn.Close()
+	raw := fmt.Sprint(scalar(t, path, `SELECT value_json FROM world_state WHERE key='world_clock'`))
+	if !strings.Contains(raw, `"scale":9`) {
+		t.Fatalf("seeded clock did not take the engine's scale: %s", raw)
 	}
 }

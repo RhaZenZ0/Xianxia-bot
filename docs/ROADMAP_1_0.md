@@ -43,7 +43,7 @@ same as spending fewer calls, which is still open below.
 
 | Bar | State at v0.28.0 |
 |---|---|
-| Authority | **Player side closed** (v0.23.0): `PLAYER_MUTATIONS` is empty and the gate asserts it stays so. **Derived inputs and the DB layer closed** (v0.30.0): the engine derives the seclusion environment; market pricing and every `app/simulation/world.py` read are engine queries; `app/database/core.py` writes only the thirty-eight presentation writers listed in `PRESENTATION_WRITES`; no rules are imported below `bot`/`ai`/`dashboard`; every `app/rules` function has a production caller. **Still open:** `get_world_clock` re-anchors `world_state` on a scale change (a second copy of the clock arithmetic), and `current_world_time` reads the anchor with Python arithmetic rather than asking the engine - the last Python-side clock. |
+| Authority | **Player side closed** (v0.23.0): `PLAYER_MUTATIONS` is empty and the gate asserts it stays so. **Derived inputs and the DB layer closed** (v0.30.0): the engine derives the seclusion environment; market pricing and every `app/simulation/world.py` read are engine queries; `app/database/core.py` writes only the thirty-eight presentation writers listed in `PRESENTATION_WRITES`; no rules are imported below `bot`/`ai`/`dashboard`; every `app/rules` function has a production caller. **Closed (v1.0.0-rc.39):** the last Python-side clock is gone - `get_world_clock` is deleted, `world.clock` is a read-only engine query, and every surface reads through it. |
 | Hardened | **Hardened I shipped (v0.29.0):** the engine refuses to run or answer without a token on both sides, the dashboard locks a guessing address and refuses cross-origin mutations, both listeners default to loopback outside Docker, requirements are hash-locked and images digest-pinned, CI runs `-race`. Also: input fence and typed-play budget (v0.21.1, v0.21.5), `admin.audit.undo_last`, the P0 and second external reviews (v0.22.2, v0.23.1). **Still open (Hardened II):** no moderation from Discord and no moderation expiry; backups have no retention. |
 | Gameplay | Catalog materialised (154 manuals); every location has encounters and sense hints; every NPC has narrator fields; the seven orphaned autocompletes are attached and `/battle challenge` has a picker. Every location has an NPC (the three samsara arrival grounds got keepers after v0.28.0). **Pickers closed (v0.33.0):** every id parameter has one, typed play fills `/travel` and `/use` from the line, `fate.adjust` is gone. **Open:** no `KNOWN_LIMITATIONS.md`, no playtest. |
 | The AI | **Closed as a bar (v0.31.0):** a call fires only for dialogue, an epic beat, or an explicit ask - `/explore` and `/hunt` read from the procedural pool and offer a *Narrate it* button (or the GM's `ai_routine_narration` flag); one per-player bucket meters every door; the pool has 84 variants across seven scene kinds and four world tiers; the ten-dollar switch picks the 50 or 1000 a day allowance from the dashboard; the AI Routing page shows calls by purpose and refusals by door. The AI Studio route (v0.26.0) remains the way past the ceiling for an operator with a key. |
@@ -144,9 +144,9 @@ requirements are hash-locked; CI runs `-race`.
 `tests/python/contracts/test_authority_boundary.py` and `authority2_test.go`.
 Every item below landed as written, with two things named rather than
 claimed: `test_equipment_stat_parity.py` never existed (the DB-layer copy it
-was said to hold together is simply gone), and the world clock is the one
+was said to hold together is simply gone), and the world clock was the one
 Python-side copy of an engine rule left in the DB layer - listed in
-`PRESENTATION_WRITES` with that reason, and in the table above as open.
+`PRESENTATION_WRITES` with that reason until v1.0.0-rc.39 retired it.
 Detail in `VERSIONS.md` under 0.30.0.*
 
 Where Python does not mutate but *computes the input* the engine then
@@ -460,7 +460,7 @@ drift for seven versions as happened between v0.21.6 and v0.28.0.
 | Authority I | v0.23.0 | shipped |
 | Commissions | v0.22.0 / v0.24.0 | shipped, less seeded invention |
 | v0.29 Hardened I | v0.29.0 | shipped |
-| v0.30 Authority II | v0.30.0 | shipped; the world clock read-through is the one named leftover |
+| v0.30 Authority II | v0.30.0 | shipped; its one named leftover, the world clock read-through, closed in v1.0.0-rc.39 |
 | v0.31 Narrator budget | v0.31.0 | shipped |
 | v0.32 Hardened II | v0.32.0 | shipped |
 | v0.33 Gameplay I | v0.33.0 | shipped |

@@ -576,7 +576,7 @@ BOOKKEEPING_METHODS = {
     # narration and memory
     "add_history", "add_rag_memory", "add_npc_player_memory", "set_npc_memory", "record_world_history_event",
     # reads whose bodies also expire stale rows
-    "get_active_world_events", "get_secret_realm_run", "get_social_state", "get_world_clock",
+    "get_active_world_events", "get_secret_realm_run", "get_social_state",
     "list_npc_player_memories",
     # Discord ids: channels, messages, threads
     "set_channel_message", "set_server_channels", "set_info_message_id", "set_bugs_channel_id", "set_realm_hub_channel",
@@ -723,11 +723,6 @@ PRESENTATION_WRITES: dict[str, set[str]] = {
     "get_active_world_events": {"world_events"},
     "get_secret_realm_run": {"secret_realm_runs"},
     "get_social_state": {"character_social_state"},
-    # The world clock: Python reads the anchor the engine owns and re-anchors
-    # only when the configured scale changes or no row exists yet. Still a
-    # second copy of the clock arithmetic - named here so it is not mistaken
-    # for a settled matter; it is on the roadmap's remaining-authority list.
-    "get_world_clock": {"world_state"},
     # cosmetic
     "set_address_style": {"characters"},
     # GM review of quest drafts (no gameplay table), the audit log, ops telemetry

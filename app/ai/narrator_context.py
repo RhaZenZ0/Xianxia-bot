@@ -116,7 +116,7 @@ class NarratorContextBuilder:
         db: Any,
         simulator: Any,
         world: Any,
-        world_time_scale: int = 4,
+        engine: Any = None,
         max_chars: int = 4000,
         epic_max_chars: int = 6500,
         rag_query_cache_seconds: float = 4.0,
@@ -125,7 +125,11 @@ class NarratorContextBuilder:
         self.db = db
         self.simulator = simulator
         self.world = world
-        self.world_time_scale = int(world_time_scale)
+        # The world clock is the engine's (v1.0.0-rc.39). Duck-typed and passed
+        # in rather than imported, the way WorldSimulator takes it: `ai` may
+        # import `ops`, but a builder that constructs its own client would be
+        # deciding this process's engine URL from a presentation layer.
+        self.engine = engine
         self.max_chars = max(2500, int(max_chars))
         self.epic_max_chars = max(self.max_chars, int(epic_max_chars))
         self.rag = MemoryRAGRetriever(
@@ -174,7 +178,9 @@ class NarratorContextBuilder:
         location = str(character.get("location") or "Unknown")
         profile = self._profile(scene_type, focus_npc=focus_npc)
 
-        clock = await self.db.get_world_clock(scale=self.world_time_scale)
+        if self.engine is None:
+            raise RuntimeError("NarratorContextBuilder requires the Go engine for the world clock")
+        clock = await self.engine.world_clock()
         game_minute = int(clock.get("game_minute", 0))
         wt = from_game_minutes(game_minute)
 

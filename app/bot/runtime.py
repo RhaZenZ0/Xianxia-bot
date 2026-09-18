@@ -344,8 +344,13 @@ async def reply_long(
     for chunk in chunks[1:]:
         await interaction.followup.send(chunk, ephemeral=ephemeral)
 async def current_world_time():
-    state = await DB.get_world_clock(scale=SETTINGS.world_time_scale)
-    return from_game_minutes(int(state["game_minute"]))
+    """What time it is, asked of the engine that owns the clock (v1.0.0-rc.39).
+
+    Not computed here: the anchor, the rate and the arithmetic are all Go's,
+    and this is the read-through every surface in the bot goes through.
+    """
+    clock = await ENGINE.world_clock()
+    return from_game_minutes(int(clock["game_minute"]))
 def _realm_access_role_name(world_name: str) -> str:
     return f"Xianxia • {world_name}"[:100]
 async def _sync_realm_access_roles(

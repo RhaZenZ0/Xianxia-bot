@@ -403,30 +403,41 @@ async def admin_grant(
 
 
 @registered_group_command(admin_world_group, name="advancetime",description="Advance the canonical in-world clock")
-async def admin_advance_time(interaction:discord.Interaction,minutes:app_commands.Range[int,1,525600])->None:
+async def admin_advance_time(
+    interaction: discord.Interaction,
+    minutes: app_commands.Range[int, 1, 525600],
+    scale: app_commands.Range[int, 0, 60] | None = None,
+) -> None:
+    """Move the clock, and only change its rate when asked to (v1.0.0-rc.39).
+
+    This used to send `SETTINGS.world_time_scale` on every call, so a GM who
+    had slowed or frozen the world on the dashboard had that undone by the next
+    unrelated `/admin world advancetime`. The engine leaves the stored scale
+    alone when the payload carries none; `scale: 0` freezes the world.
+    """
     if not await require_admin(interaction):return
-    time_result = dict(
-        await ENGINE.action(
-            "admin.world.advance_time",
-            interaction.user.id,
-            {
-                "minutes": int(minutes),
-                "scale": SETTINGS.world_time_scale,
-                "reason": "discord admin",
-            },
-        )
-        or {}
-    )
+    payload: dict[str, Any] = {"minutes": int(minutes), "reason": "discord admin"}
+    if scale is not None:
+        payload["scale"] = int(scale)
+    time_result = dict(await ENGINE.action("admin.world.advance_time", interaction.user.id, payload) or {})
     new_minute = int(time_result.get("game_minute", 0))
+    after: dict[str, Any] = {"minutes": int(minutes), "new_game_minute": new_minute}
+    if scale is not None:
+        after["scale"] = int(scale)
     await audit_admin(
         interaction,
         "world.advancetime",
         target="world_clock",
-        after={"minutes": int(minutes), "new_game_minute": new_minute},
+        after=after,
         database_log=False,
     )
     wt=from_game_minutes(new_minute)
-    await interaction.response.send_message(f"🕰️ Advanced world time by **{minutes:,} minutes**.\nNow: **{wt.display}**",ephemeral=False)
+    rate = ""
+    if scale == 0:
+        rate = "\nThe world clock is now **stopped**."
+    elif scale is not None:
+        rate = f"\nRate: **{int(scale)} game minutes per real minute**."
+    await interaction.response.send_message(f"🕰️ Advanced world time by **{minutes:,} minutes**.\nNow: **{wt.display}**{rate}",ephemeral=False)
 
 
 MAINTENANCE_CHOICES=[

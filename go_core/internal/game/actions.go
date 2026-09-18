@@ -791,37 +791,36 @@ func adminAdvanceTime(conn *storage.Conn, adminUserID int64, raw json.RawMessage
 	if err != nil {
 		return nil, err
 	}
-	defaultScale := int64(4)
+	// This is the one reader that decodes the row leniently rather than through
+	// loadCanonicalWorldClock: a row whose JSON is damaged must still be
+	// repairable by a GM advancing the clock, and a strict decode would refuse
+	// the only lever that can fix it. The seed and the arithmetic are shared.
+	seed := defaultWorldClock(now)
 	if requestedScale >= 0 {
-		defaultScale = requestedScale
+		seed.Scale = requestedScale
 	}
-	state := map[string]any{"anchor_game_minute": int64(480), "anchor_real_ts": now, "scale": defaultScale}
+	state := map[string]any{"anchor_game_minute": seed.AnchorGameMinute, "anchor_real_ts": seed.AnchorRealTS, "scale": seed.Scale}
 	if row := firstRowMap(res); row != nil {
 		if text, ok := row["value_json"].(string); ok {
 			_ = json.Unmarshal([]byte(text), &state)
 		}
 	}
-	anchor := storage.ParseInt(state["anchor_game_minute"])
-	storedScale := storage.ParseInt(state["scale"])
-	if storedScale < 0 {
-		storedScale = 0
+	stored := canonicalWorldClock{
+		AnchorGameMinute: storage.ParseInt(state["anchor_game_minute"]),
+		Scale:            storage.ParseInt(state["scale"]),
 	}
-	nextScale := storedScale
+	stored.AnchorRealTS, _ = state["anchor_real_ts"].(float64)
+	if stored.Scale < 0 {
+		stored.Scale = 0
+	}
+	if stored.AnchorRealTS <= 0 {
+		stored.AnchorRealTS = now
+	}
+	nextScale := stored.Scale
 	if requestedScale >= 0 {
 		nextScale = requestedScale
 	}
-	anchorReal, _ := state["anchor_real_ts"].(float64)
-	if anchorReal <= 0 {
-		anchorReal = now
-	}
-	elapsedRealMinutes := (now - anchorReal) / 60.0
-	if elapsedRealMinutes < 0 {
-		elapsedRealMinutes = 0
-	}
-	current := anchor + int64(elapsedRealMinutes*float64(storedScale))
-	if current < 0 {
-		current = 0
-	}
+	current := worldClockGameMinute(stored, now)
 	updated := current + minutes
 	if updated < 0 {
 		updated = 0

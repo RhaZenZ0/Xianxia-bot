@@ -35,9 +35,17 @@ database. Its findings are the first two entries.
   from the hub, error text actionable, narration or fallback fired: a person at the keyboard on
   the live server ticks these, hub by hub. The static columns and the engine loops are done here;
   the live pass is Mitchell's and the file keeps his ticks across regeneration.
-- **deferred (roadmap, Authority)** — *`get_world_clock` in Python re-anchors the clock the
-  engine owns when the configured scale changes.* Named on the roadmap's remaining-authority list
-  since v0.30.0; a read-through of the engine's clock is the fix, and it is not a gameplay defect.
+- **fixed (v1.0.0-rc.39)** — *`get_world_clock` in Python re-anchored the clock the engine owns
+  when the configured scale changed.* Named on the roadmap's remaining-authority list since v0.30.0.
+  The method is gone: `world.clock` is a read-only engine query and every surface reads through it,
+  `WORLD_TIME_SCALE` is the engine's key (compose passes it) and seeds a new world only, and
+  `/admin world advancetime` changes the rate only when asked to. It had one live consequence: a
+  rate a GM set on the dashboard was undone by the next command that asked the time.
+- **deferred (design, Authority)** — *The simulation's force and bootstrap requests still trust a
+  caller-supplied `game_minute`.* `RunDue` ignores one by design; `ForceRequest` and
+  `BootstrapRequest` do not. Every caller now sends the engine's own
+  minute back to it, so nothing exploits it today, but the asymmetry is real and closing it is a Go
+  change of its own.
 - **deferred (design)** — *Moderation is a nudge on the engine's dispatch layer, not anti-cheat.*
   A muted or frozen player is blocked from the ~150 authoritative ops; raw `/v1/db` writes the
   bot makes on their behalf and the simulation runner are not intercepted. Stated in

@@ -144,7 +144,6 @@ class Settings:
     perfect_trial_cooldown_minutes: int
     secret_realm_cooldown_minutes: int
     unexpected_event_chance_percent: int
-    world_time_scale: int
     reincarnation_base_samsara_years: int
     reincarnation_max_wait_seconds: int
     database_path: Path
@@ -369,10 +368,6 @@ class Settings:
         if not 0 <= chance <= 100:
             raise RuntimeError("UNEXPECTED_EVENT_CHANCE_PERCENT must be between 0 and 100")
 
-        world_time_scale = _as_int(os.getenv("WORLD_TIME_SCALE"), 4, name="WORLD_TIME_SCALE")
-        if not 0 <= world_time_scale <= 60:
-            raise RuntimeError("WORLD_TIME_SCALE must be between 0 and 60 game-minutes per real minute")
-
         reincarnation_base_samsara_years = _as_int(
             os.getenv("REINCARNATION_BASE_SAMSARA_YEARS"),
             320,
@@ -541,7 +536,6 @@ class Settings:
             auto_narrate_event_threads=_as_bool(os.getenv("AUTO_NARRATE_EVENT_THREADS"), False),
             event_thread_auto_archive_minutes=archive_minutes,
             unexpected_event_chance_percent=chance,
-            world_time_scale=world_time_scale,
             reincarnation_base_samsara_years=reincarnation_base_samsara_years,
             reincarnation_max_wait_seconds=reincarnation_max_wait_seconds,
             database_path=Path(os.getenv("DATABASE_PATH", "data/xianxia.sqlite3")),

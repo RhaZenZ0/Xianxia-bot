@@ -20,7 +20,6 @@ class FakeDB:
         self.snapshot_entries += 1
         yield None
 
-    async def get_world_clock(self, scale=4): return {"game_minute": 12345}
     async def get_location_definition(self, location): return {"world": "Mortal World", "description": "A misty river town.", "safe_zone": False}
     async def get_abode_by_location(self, location): return None
     async def get_personal_world_by_location(self, location): return None
@@ -41,6 +40,12 @@ class FakeDB:
     async def get_aptitudes(self, user_id): return {"bloodline": {"name": "Ember Vein"}, "physique": {"name": "Jade Bones"}}
     async def describe_lineage_context(self, user_id): return "Master: Elder Yun. One junior sibling."
     async def get_active_location_array(self, location, game_minute): return None
+
+
+class FakeEngine:
+    """The world clock is the engine's (v1.0.0-rc.39), so the builder asks it."""
+
+    async def world_clock(self): return {"game_minute": 12345, "scale": 4}
 
 
 class FakeSIM:
@@ -105,7 +110,7 @@ class NarratorContextTests(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_context_contains_relevant_state_but_not_hidden_npc_power(self):
-        builder = NarratorContextBuilder(db=FakeDB(), simulator=FakeSIM(), world=FakeWorld(), max_chars=7000)
+        builder = NarratorContextBuilder(db=FakeDB(), simulator=FakeSIM(), world=FakeWorld(), engine=FakeEngine(), max_chars=7000)
         ctx = await builder.build(CHARACTER, scene_type="exploration")
         self.assertIn("Greenriver Town", ctx.text)
         self.assertIn("Azure Sword Sect", ctx.text)

@@ -14,7 +14,7 @@ from discord import app_commands
 
 from ...ops.game_engine import GameEngineError
 from ...rules.sense import approximate_realm, ground_reading_line, hidden_npc_names
-from ...rules.worldtime import cultivation_cycle_summary
+from ...rules.worldtime import cultivation_cycle_summary, from_game_minutes
 from ..character_state import current_effect_modifiers
 from ..formatting import human_duration, roll_line
 from ..locations import _known_locations, _world_is_unlocked, current_npc_location, local_npc_autocomplete, npcs_present
@@ -459,7 +459,18 @@ async def worldevents(interaction: discord.Interaction) -> None:
 
 @registered_root_command(name="time", description="Show the canonical in-world cultivation calendar", guild=GUILD)
 async def world_time_command(interaction: discord.Interaction) -> None:
-    wt = await current_world_time()
+    # One read of the engine's clock, for both the date and the rate
+    # (v1.0.0-rc.39): the rate is the world's stored scale, not this process's
+    # .env - a GM who slowed the world down on the dashboard used to be
+    # contradicted by this line.
+    clock = await ENGINE.world_clock()
+    wt = from_game_minutes(int(clock.get("game_minute", 0)))
+    scale = max(0, int(clock.get("scale", 0)))
+    rate_line = (
+        "The world clock is **stopped**."
+        if scale == 0
+        else f"Automatic rate: **{scale} game minutes per real minute**."
+    )
     c = await DB.get_character(interaction.user.id)
     cycle = cultivation_cycle_summary(wt, c.get("spiritual_root") if c else None)
     age_line=""
@@ -468,7 +479,7 @@ async def world_time_command(interaction: discord.Interaction) -> None:
         age_line = (f"\nYour age: **{life.age_years:.1f} years** • lifespan: **Ageless**" if life.ageless else f"\nYour age: **{life.age_years:.1f} years** • lifespan ceiling: **{life.total_years} years**")
     await interaction.response.send_message(
         f"🕰️ **World Time**\n{wt.display}\n"
-        f"Automatic rate: **{SETTINGS.world_time_scale} game minutes per real minute**.{age_line}\n\n"
+        f"{rate_line}{age_line}\n\n"
         f"**Current Cultivation Flow**\n{cycle}",
         ephemeral=False,
     )
