@@ -442,7 +442,7 @@ func crimeAtoneAction(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 		}
 		world = catalog.Realms[idx].World
 	}
-	currency := tribulationCurrency(world)
+	currency := worldBaseCurrency(catalog, world)
 	wallet, e := conn.Execute(`SELECT balance FROM currency_wallets WHERE user_id=? AND currency_id=?`, []any{userID, currency})
 	if e != nil {
 		return authoritativeMutation{}, e

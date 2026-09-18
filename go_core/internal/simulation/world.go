@@ -703,7 +703,10 @@ func (r *Runner) blackMarkets(conn *storage.Conn, steps, gm int64) (string, erro
 		return "no eligible underworld goods exist in the content catalog", nil
 	}
 	worlds := []string{"Mortal World", "Spiritual World", "Immortal World", "Celestial World"}
-	currency := map[string]string{"Mortal World": "low_spirit_stone", "Spiritual World": "low_spirit_crystal", "Immortal World": "low_immortal_stone", "Celestial World": "low_celestial_crystal"}
+	currency := map[string]string{}
+	for _, w := range worlds {
+		currency[w] = game.WorldBaseCurrency(r.World, w)
+	}
 	rotated := 0
 	now := nowFloat()
 	for _, world := range worlds {

@@ -1014,10 +1014,7 @@ func reincarnateAction(conn *storage.Conn, catalog worlddata.Catalog, userID int
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
-	currency := map[string]string{"Mortal World": "low_spirit_stone", "Spiritual World": "low_spirit_crystal", "Immortal World": "low_immortal_stone", "Celestial World": "low_celestial_crystal"}[world]
-	if currency == "" {
-		currency = "low_spirit_stone"
-	}
+	currency := worldBaseCurrency(catalog, world)
 	spiritStones := int64(0)
 	if currency == "low_spirit_stone" {
 		spiritStones = 25

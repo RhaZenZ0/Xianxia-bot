@@ -27,6 +27,14 @@ import (
 // rather than a parse, and which nothing needs while every price is tier 1.
 const fallbackBaseCurrency = "low_spirit_stone"
 
+// WorldBaseCurrency is worldBaseCurrency for the simulation package, which
+// kept its own copy of the mapping (`worldCurrency`) - one of four in Go and a
+// fifth in Python, all four-way switches over the same content the file already
+// declares (v1.0.0-rc.44).
+func WorldBaseCurrency(catalog worlddata.Catalog, worldName string) string {
+	return worldBaseCurrency(catalog, worldName)
+}
+
 // worldBaseCurrency is the tier-1 currency of one world. The ids are sorted
 // rather than taken off a map range, because a Go map range is randomised and a
 // world that somehow carried two tier-1 currencies would otherwise charge a

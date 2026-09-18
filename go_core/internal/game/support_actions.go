@@ -186,7 +186,7 @@ func supportVoteGift(conn *storage.Conn, catalog worlddata.Catalog, c mechanicsC
 	}
 	gift := supportGift{
 		World:      world,
-		Currency:   tribulationCurrency(world),
+		Currency:   worldBaseCurrency(catalog, world),
 		Amount:     (supportVoteBaseReward + depth*supportVoteRewardStep) * multiplier,
 		Depth:      depth,
 		Weekend:    weekend,

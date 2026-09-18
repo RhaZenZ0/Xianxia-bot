@@ -52,6 +52,25 @@ from ..rules.quests import (
 log = logging.getLogger("xianxia.dashboard")
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+def _base_currencies() -> list[str]:
+    """Every world's tier-1 currency, off `content/world.json`.
+
+    Falls back to the Mortal stone alone rather than to a hardcoded four: an
+    unreadable content file is a fault to notice, not one to paper over with a
+    list that might already be wrong.
+    """
+    try:
+        world = json.loads((ROOT / "content" / "world.json").read_text(encoding="utf-8"))
+    except Exception:
+        return ["low_spirit_stone"]
+    found = sorted(
+        str(key)
+        for key, entry in (world.get("currencies") or {}).items()
+        if isinstance(entry, dict) and int(entry.get("tier") or 0) == 1
+    )
+    return found or ["low_spirit_stone"]
 STATIC_DIR = ROOT / "dashboard"
 
 # JavaScript numbers are IEEE-754 doubles, so integers above this lose precision.
@@ -1916,7 +1935,12 @@ class AdminDashboardController:
                     sects = sorted(str(name) for name in (world.get("sects") or {}).keys())
                 except Exception:
                     sects = []
-        for currency in ("low_spirit_stone", "low_spirit_crystal", "low_immortal_stone", "low_celestial_crystal"):
+        # The four worlds' base currencies, read off the content file that
+        # declares them rather than listed here. This was the fifth copy of one
+        # mapping - four in Go and this - and the Go ones are gone
+        # (v1.0.0-rc.44); a list kept here is a list that drifts the day a world
+        # is added.
+        for currency in _base_currencies():
             if currency not in currencies:
                 currencies.append(currency)
         return {

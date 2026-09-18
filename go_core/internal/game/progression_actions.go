@@ -151,18 +151,6 @@ func eligibleTribulation(c tribulationCharacter, requestedPath string) (tribulat
 		return tribulationGate{}, "", false
 	}
 }
-func tribulationCurrency(world string) string {
-	switch world {
-	case "Spiritual World":
-		return "low_spirit_crystal"
-	case "Immortal World":
-		return "low_immortal_stone"
-	case "Celestial World":
-		return "low_celestial_crystal"
-	default:
-		return "low_spirit_stone"
-	}
-}
 
 type tribulationPayload struct {
 	GameMinute int64  `json:"game_minute"`
@@ -182,7 +170,7 @@ func tribulationState(conn *storage.Conn, userID, realm int64) (prep, attempts i
 	}
 	return
 }
-func tribulationPrepareAction(conn *storage.Conn, _ worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
+func tribulationPrepareAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	var p tribulationPayload
 	if err := json.Unmarshal(raw, &p); err != nil {
 		return authoritativeMutation{}, err
@@ -205,7 +193,7 @@ func tribulationPrepareAction(conn *storage.Conn, _ worlddata.Catalog, userID in
 	if prep >= 5 {
 		return authoritativeMutation{}, errors.New("tribulation preparation is already capped")
 	}
-	currency := tribulationCurrency(gate.From)
+	currency := worldBaseCurrency(catalog, gate.From)
 	wr, err := conn.Execute(`SELECT balance FROM currency_wallets WHERE user_id=? AND currency_id=?`, []any{userID, currency})
 	if err != nil {
 		return authoritativeMutation{}, err
