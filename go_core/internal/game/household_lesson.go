@@ -60,10 +60,12 @@ const (
 // householdLessonTrades are the four crafts, in the order the head names them.
 var householdLessonTrades = []string{"Forging", "Inscription", "Formation", "Alchemy"}
 
-// householdLessonAttribute is what the head asks a child of each trade to show:
-// a smith's body, a scribe's steadiness, an array-setter's spirit, an
-// alchemist's eye.
-var householdLessonAttribute = map[string]string{
+// tradeAttribute is what a trade lives on: a smith's body, a scribe's
+// steadiness, an array-setter's spirit, an alchemist's eye. The head of the
+// house asks a child to show it (v1.0.0-rc.34) and a hall's keeper asks a
+// candidate to show it at examination (v1.0.0-rc.45) - one statement of the
+// rule, because two would be free to disagree about what forging is.
+var tradeAttribute = map[string]string{
 	"Forging":     "body",
 	"Inscription": "will",
 	"Formation":   "spirit",
@@ -220,7 +222,7 @@ func familyLessonActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID 
 		return authoritativeMutation{}, fmt.Errorf("this household has no lesson to give (%s)", archetype)
 	}
 	trade := householdTradeFor(catalog, archetype)
-	attr, ok := householdLessonAttribute[trade]
+	attr, ok := tradeAttribute[trade]
 	if trade == "" || !ok {
 		return authoritativeMutation{}, errors.New("this household has no trade to test you in")
 	}

@@ -112,6 +112,8 @@ func applyLateMigrationAction(conn *storage.Conn, catalog worlddata.Catalog, use
 		return teleportArrayActionGo(conn, catalog, userID, raw)
 	case "ascension.gate":
 		return ascensionGateAction(conn, catalog, userID, raw)
+	case "profession.exam":
+		return professionExamAction(conn, catalog, userID, raw)
 	case "array.deploy":
 		return deployArrayActionGo(conn, catalog, userID, raw)
 	case "spatial_key.use":

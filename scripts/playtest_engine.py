@@ -57,7 +57,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
     from app.database.remote import GoDatabaseTransport
     from app.ops.game_engine import GameEngineClient, GameEngineError
     from app.rules.quests import (QUEST_DEFINITIONS, ascension_quest_seed_rows, beginner_path_seed_rows,
-                                  household_errand_seed_rows, static_quest_seed_rows)
+                                  household_errand_seed_rows, profession_exam_seed_rows, static_quest_seed_rows)
     from app.rules.game import World
 
     world = json.loads((ROOT / "content" / "world.json").read_text(encoding="utf-8"))
@@ -119,7 +119,8 @@ async def run(url: str, token: str, db_path: str) -> Report:
     await step(report, "seed the commission pool, static quests, the beginner path and the household errands",
                db.sync_commission_pool(list(world.get("commissions") or []) + static_quest_seed_rows(QUEST_DEFINITIONS)
                                        + beginner_path_seed_rows(content) + household_errand_seed_rows(content)
-                                       + ascension_quest_seed_rows(content)))
+                                       + ascension_quest_seed_rows(content)
+                                       + profession_exam_seed_rows(content)))
     gm0 = await step(report, "world clock", clock())
     await step(report, "simulation bootstrap", engine.bootstrap_simulation(int(gm0 or 0)))
 
@@ -1050,6 +1051,56 @@ async def run(url: str, token: str, db_path: str) -> Report:
         await step(report, "recipe.learn from the slip", act("recipe.learn", PLAYER, {"item_id": slip}))
     else:
         report.add("FAIL", "recipe.learn", "the catalogue carries no item that teaches a method")
+    # -- the hall that examines the trade (v1.0.0-rc.45). The rank is set with
+    # the lever rather than crafted up to, and the hall is a Mortal World
+    # weaponsmith, because the fee is charged in the money of the world the
+    # candidate is standing in. The demonstration is a roll, so the leg reports
+    # it and asserts only what is certain either way: passing teaches exactly
+    # that rank's methods, failing teaches none and names the wait.
+    forge_hall = next((shop for shop in world["shops"].values()
+                       if shop.get("kind") == "weaponsmith" and shop.get("world") == "Mortal World"), {})
+    # There is no GM lever for a trade's rank - `profession_progress` is written
+    # only by working at it - so the rank is crafted up to on a bounded loop.
+    # That is the better shape anyway: crossing the rank is what hands the
+    # examination over, so this drives the offer as well as the sitting.
+    offered = ""
+    for _ in range(14):
+        row = dict(await db.get_profession_progress(PLAYER, "Forging") or {})
+        if int(row.get("level") or 0) >= 1:
+            break
+        await gm("admin.player.adjust_item", {"user_id": PLAYER, "item_id": "spirit_iron", "quantity": 3, "reason": "playtest"})
+        await gm("admin.player.adjust_item", {"user_id": PLAYER, "item_id": "beast_core", "quantity": 1, "reason": "playtest"})
+        await gm("admin.player.reset_cooldowns", {"user_id": PLAYER, "reason": "playtest"})
+        made = await act("craft.resolve", PLAYER, {"recipe": "Spirit-Iron Sword"})
+        offered = offered or str(dict(made).get("exam_offered") or "")
+    ranked = dict(await db.get_profession_progress(PLAYER, "Forging") or {})
+    report.add("PASS" if int(ranked.get("level") or 0) >= 1 else "FAIL",
+               "crafting carries the trade to Apprentice, and the rank offers its examination",
+               f"level={ranked.get('level')} xp={ranked.get('xp')} offered={offered or 'nothing'}")
+    await step(report, f"walk into {forge_hall.get('name','a weaponsmith')}",
+               gm("admin.player.teleport", {"user_id": PLAYER, "location": str(forge_hall.get("location") or town), "reason": "playtest"}))
+    await step(report, "a fee needs money", gm("admin.player.grant_currency", {"user_id": PLAYER, "currency_id": "low_spirit_stone", "amount": 500, "reason": "playtest"}))
+    sat = await step(report, "profession.exam at the hall of the trade", act("profession.exam", PLAYER, {"profession": "Forging"}))
+    if sat is not None:
+        roll = dict(sat.get("roll") or {})
+        taught = [str(name) for name in list(sat.get("recipes_taught") or [])]
+        expected = sorted(name for name, r in world["recipes"].items()
+                          if r.get("profession") == "Forging" and int(r.get("min_level") or 0) == int(sat.get("rank") or 0))
+        if sat.get("passed"):
+            ok = sorted(taught) == expected and str(sat.get("examiner") or "") == str(forge_hall.get("keeper") or "")
+            detail = f"passed; {forge_hall.get('keeper')} certifies {sat.get('rank_name')}; taught {taught}"
+        else:
+            ok = not taught and int(sat.get("retry_game_minutes") or 0) > 0
+            detail = f"failed; nothing taught, the hall waits {sat.get('retry_game_minutes')} game minutes"
+        report.add("PASS" if ok else "FAIL",
+                   "the hall's own keeper examines, and only a pass teaches the rank's methods",
+                   f"{detail}; roll total={roll.get('total')} vs tn={sat.get('tn')}")
+        # Sat again on the same day it is refused either way, and the refusal
+        # says which: already certified, or come back tomorrow.
+        await step(report, "a second sitting the same day is refused", act("profession.exam", PLAYER, {"profession": "Forging"}),
+                   expect_error="already hold" if sat.get("passed") else "look at you again")
+    await step(report, "back to the town", gm("admin.player.teleport", {"user_id": PLAYER, "location": town, "reason": "playtest"}))
+
     await step(report, "the hills", gm("admin.player.teleport", {"user_id": PLAYER, "location": "Cloudspine Foothills", "reason": "playtest"}))
     await step(report, "cooldowns cleared", gm("admin.player.reset_cooldowns", {"user_id": PLAYER, "reason": "playtest"}))
     await step(report, "forage.resolve", act("forage.resolve", PLAYER, {}))

@@ -219,6 +219,30 @@ type CurrencyDefinition struct {
 	BaseRatio int64  `json:"base_ratio"`
 }
 
+// ProfessionExam (v1.0.0-rc.45) is one rank's examination in one trade. The
+// hall that sells a trade's method slips is the hall that certifies it, so
+// `HallKind` names a shop kind (`weaponsmith`, `apothecary`, `talisman`,
+// `array`) and the examiner is that shop's own `keeper` - a catalogue NPC who
+// already stands there, rather than somebody invented for the occasion.
+//
+// Nothing here gates a level: `advanceProfessionTx` goes on raising a rank on
+// XP alone. What the examination is worth is the trade's recipes at that rank,
+// which are otherwise only bought a slip at a time.
+type ProfessionExam struct {
+	Rank        int64          `json:"rank"`
+	RankName    string         `json:"rank_name"`
+	QuestKey    string         `json:"quest_key"`
+	Title       string         `json:"title"`
+	Description string         `json:"description"`
+	Opening     string         `json:"opening"`
+	HallKind    string         `json:"hall_kind"`
+	Hall        string         `json:"hall"`
+	TN          int64          `json:"tn"`
+	Fee         int64          `json:"fee"`
+	Objectives  []any          `json:"objectives"`
+	Rewards     map[string]any `json:"rewards"`
+}
+
 // WorldCrossingSystem (v1.0.0-rc.44) is what a survived world-crossing
 // tribulation leaves behind: the seam it tore, which a cultivator may anchor
 // into a permanent crossing standing where the lightning fell rather than in
@@ -777,6 +801,7 @@ type Catalog struct {
 	AuctionHouses       map[string]AuctionHouse        `json:"auction_houses"`
 	TeleportArrays      map[string]TeleportArray       `json:"teleport_arrays"`
 	WorldCrossing       WorldCrossingSystem            `json:"world_crossing_system"`
+	ProfessionExams     map[string][]ProfessionExam    `json:"profession_exams"`
 	AbodeSystem         map[string]any                 `json:"abode_system"`
 	SectAbodeSystem     map[string]any                 `json:"sect_abode_system"`
 	SectSystem          map[string]any                 `json:"sect_system"`

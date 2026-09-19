@@ -15,11 +15,12 @@ from discord import app_commands
 from ...rules.effects import normalize_effect_payload
 from ...ops.game_engine import GameEngineError
 from ...rules.progression_systems import condition_definition, profession_rank, profession_xp_needed
-from ..character_state import current_effect_modifiers
+from ..character_state import announce_quest_progress, current_effect_modifiers
 from ..formatting import roll_line
 from ..registry import registered_group_command
+from ..services import QUESTS
 from ..status_cards import _ELEMENT_MARKS
-from ..runtime import _explain_engine_error, DB, ENGINE, WORLD, current_world_time, reply_long, require_character, respond, serialized_user_action
+from ..runtime import _explain_engine_error, DB, ENGINE, WORLD, current_world_time, log, reply_long, require_character, respond, serialized_user_action
 from .battle import _battle_panel, _execute_battle_law_technique
 
 
@@ -422,6 +423,63 @@ async def profession_status(interaction: discord.Interaction) -> None:
             f"XP **{xp}/{profession_xp_needed(level)}** • Successes {row.get('successes',0)} • Failures {row.get('failures',0)} • Quality {row.get('quality_points',0)}"
         )
     await reply_long(interaction, "\n".join(lines), ephemeral=False)
+
+
+PROFESSION_EXAM_CHOICES = [
+    app_commands.Choice(name=trade, value=trade)
+    for trade in sorted(dict(WORLD.data.get("profession_exams") or {}))
+]
+
+
+@registered_group_command(profession_group, name="exam",
+                          description="Sit your trade's examination at a hall of that trade")
+@app_commands.choices(profession=PROFESSION_EXAM_CHOICES)
+@serialized_user_action
+async def profession_exam(interaction: discord.Interaction, profession: app_commands.Choice[str]) -> None:
+    await interaction.response.defer(ephemeral=False)
+    if not await require_character(interaction):
+        return
+    wt = await current_world_time()
+    try:
+        envelope = await ENGINE.authoritative_action(
+            "profession.exam", interaction.user.id, {"profession": profession.value},
+            action_id=f"discord:{interaction.id}:profession.exam",
+        )
+    except GameEngineError as exc:
+        await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
+        return
+    result = dict(envelope.get("result") or {})
+    roll = SimpleNamespace(**dict(result.get("roll") or {}))
+    lines = [
+        f"🎓 **{result.get('title') or 'Examination'}** — the {result.get('rank_name','')} examination in "
+        f"**{result.get('profession','')}**, at **{result.get('shop') or result.get('location','')}**.",
+        f"*{result.get('opening','')}*",
+        f"\n**{result.get('examiner','The keeper')}** watches. {roll_line(roll)}",
+    ]
+    if result.get("fee"):
+        lines.append(f"The hall's fee is **{int(result.get('fee',0))} "
+                     f"{WORLD.currency_name(str(result.get('currency') or ''))}** (remaining: "
+                     f"**{int(result.get('balance',0))}**).")
+    if result.get("passed"):
+        taught = [str(name) for name in list(result.get("recipes_taught") or [])]
+        lines.append(f"\n✅ **Passed.** The hall enters you on its roll as a **{result.get('rank_name','')}** "
+                     f"of {result.get('profession','')} (+{int(result.get('standing_gain',0))} standing).")
+        if taught:
+            lines.append("📜 The keeper writes out what a cultivator of that rank is expected to know: "
+                         + ", ".join(f"**{name}**" for name in taught) + ".")
+        else:
+            lines.append("📜 You already knew every method of that rank; the certificate is the new part.")
+    else:
+        hours = max(1, int(result.get("retry_game_minutes", 1440)) // 60)
+        lines.append(f"\n❌ **Not this time.** The hall will look at you again in about **{hours} hours**.")
+    await reply_long(interaction, "\n".join(lines), ephemeral=False)
+    # The quest's objective is the pass, reported after the reply.
+    if result.get("passed"):
+        try:
+            await announce_quest_progress(interaction, await QUESTS.progress(
+                interaction.user.id, "profession_exam", game_minute=wt.total_minutes))
+        except Exception:
+            log.exception("Quest progress update failed after a trade examination")
 
 
 # ---------- Reputation / crime / witnesses / bounties / grudges ----------

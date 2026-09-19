@@ -145,7 +145,7 @@ internal/server/        HTTP control/data plane
 ```
 
 Every Go SQLite connection uses `journal_mode=WAL`, `foreign_keys=ON`, `busy_timeout=10000`,
-`synchronous=NORMAL`. Current schema version is 54; historical migrations are kept so old databases
+`synchronous=NORMAL`. Current schema version is 55; historical migrations are kept so old databases
 can upgrade in place — see `VERSIONS.md` for the full schema/release history.
 
 ### The NPC life cycle (v1.0.0-rc.24)
@@ -886,6 +886,60 @@ crossing at the character's own location, into the world the gate they survived 
   mechanism — a giver would make it a commission and the grant refuses one — and its two objective types
   (`ascension_gate`, `world_cross`) are reported after their commands answer, the rule
   `test_quest_objective_reporters.py` holds.
+
+### The quests nobody could be given, and the rank worth examining (schema 55, v1.0.0-rc.45)
+
+**The same fault, found and half fixed.** rc.26's own section above names it: `first_steps` was
+seeded into `quest_definitions` on every boot, listed in `/quests`, and handed to nobody, because the
+only writers of a `character_quests` row are `commissionAcceptAction` (which wants a `giver_npc` the
+static quests deliberately do not have) and `grantOrdinaryQuestTx`. It built `beginner_path` to fix
+that - for the beginner path. **`road_to_a_sect` was seeded by the same call and reached nobody for
+nineteen more releases** (the string appeared in exactly one place in the tree: its own definition),
+and `first_steps` was left seeded beside `beginner_household`, the stage that replaced it. `/city
+board` lists only commissions whose giver lives in the city, so neither had a Discord door either.
+
+- **The sect road is `beginner_lesson`'s `follow_on`**, which needs no new mechanism: `questFollowOnTx`
+  already hands over any giver-less definition, wherever it was seeded from. It lands where the odds
+  are worth taking - the trial rolls `body + realm×2 + phase/3` against `max(10, 15 - rep/25)`, so a
+  cultivator who has finished the first hour is a far better candidate than a newborn one.
+- **`sync_commission_pool` is insert-only on purpose**, so the content change reaches new worlds only.
+  That is what **migration 55** is for, and it re-points only a stage whose chain is still empty, so
+  a GM who chained it in the workbench is obeyed - the whole reason the chain lives in `seed_json`
+  rather than in the file. It also retires `first_steps`, except a row somebody is somehow holding:
+  retiring a definition must never take a quest out of a player's hands.
+- **`tests/python/unit/test_quests_reach_a_player.py` is the gate for the class**, the quest-side
+  twin of rc.43's `test_commands_reach_a_player.py`. Every seeded key must be reachable by a giver, a
+  roster that grants (beginner path, household errands, ascension, examinations) or another quest's
+  `follow_on`. `UNGRANTABLE_QUESTS` is empty and was empty the day it was written.
+
+**The examination (`profession_exam.go`).** A trade's rank rose on XP alone - `60 + level*40` a step,
+six silent steps from Novice to Saint - and nothing marked it. The hundred and twenty hall keepers
+who sell a trade's slips had no opinion of anybody, and `character_recipes` had exactly two writers,
+a bought slip and the household's one trade of entry methods, so twenty-six of the thirty-three
+recipes were a shop transaction and nothing else.
+
+- **It never blocks a level.** `advanceProfessionTx` is untouched and still raises a rank on XP, so
+  the feature is safe on a world already running: no live crafter loses a rank, nothing needs
+  grandfathering. The examination is what the rank is *worth*, and what it is worth is that rank's
+  recipes (`teachRankRecipesTx`, exactly the rank, idempotent).
+- **The examiner already existed.** All 120 shops carry a `keeper` and all 120 keepers are in
+  `world.npcs`, so `hall_kind` names a shop kind (`weaponsmith` → Forging, `apothecary` → Alchemy,
+  `talisman` → Inscription, `array` → Formation) and the keeper of the hall the candidate walked into
+  examines them. Inventing an examiner would have meant a registry row, a schedule and a location for
+  somebody the world already had.
+- **The offer is made where a rank can rise**, in `craftResolveAction` rather than inside
+  `advanceProfessionTx` - that helper has nine callers (beast taming, artifact refining, appraisal,
+  foraging) and only crafting has examinations, and only the craft holds the catalogue and the
+  canonical minute. A craft generous enough to cross two ranks offers the higher one, because the
+  action only ever sits the rank the candidate currently holds.
+- **The trade's attribute is said once.** `householdLessonAttribute` became `tradeAttribute`, read by
+  the head of the house and by the hall alike; the content block deliberately carries no `attribute`
+  field, because two statements of what forging is would be free to disagree.
+- **The record is the event log, per life**, exactly as the household lesson's is - so samsara, which
+  wipes `profession_progress` and `character_recipes`, lets a new life sit the same examination
+  without deleting any history. A failure costs the fee and one world day; the fee is charged in the
+  money of the world the hall stands in, which is the rc.44 rule and which the first version of
+  `profession_exam_test.go` learned by picking an Immortal World hall for a Mortal candidate.
 
 ### People this world makes for itself (`npc_registry`, schema 49)
 

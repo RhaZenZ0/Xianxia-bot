@@ -830,7 +830,7 @@ SURFACE = {
             "law_group": ('status', 'comprehend', 'technique'),
             "manual_group": ('list', 'study', 'practise', 'technique'),
             "condition_group": ('status', 'treat'),
-            "profession_group": ('status',),
+            "profession_group": ('status', 'exam'),
             "crime_group": ('status', 'atone'),
         },
     },

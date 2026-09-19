@@ -6,6 +6,31 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.0** (rc.45) gives two quests a door, and makes a trade's rank worth sitting an examination for.
+
+`road_to_a_sect` was the second `first_steps`. rc.26 found that fault - a quest seeded on every boot,
+listed in `/quests`, handed to nobody, because every writer of a `character_quests` row wanted a
+`giver_npc` the static quests deliberately do not have - and built the beginner path to fix it, for
+the beginner path. The other static quest went on reaching nobody for nineteen more releases, and
+`first_steps` itself was left seeded beside the stage that replaced it. So the fault was found,
+named, and half fixed. The sect road is `beginner_lesson`'s `follow_on` now, which needs no new
+mechanism at all, and it lands where the odds are worth taking: the trial rolls `body + realm×2 +
+phase/3` against TN 15, so a cultivator who has finished the first hour is a far better candidate
+than one who has just been born. `first_steps` is retired, and
+`tests/python/unit/test_quests_reach_a_player.py` is the gate for the class - every seeded key must
+be reachable by a giver, a roster that grants, or another quest's chain, and its allowlist is empty.
+
+A trade's rank rose on XP alone and nothing marked it: six silent steps from Novice to Saint, a
+hundred and twenty hall keepers with no opinion of anybody, and twenty-six of the thirty-three
+recipes reachable only by buying a slip. `profession.exam` is what a rank is worth. Crossing one
+hands over the examination the content authors for it; it is sat at a hall of that trade - a
+`weaponsmith` for Forging, an `apothecary` for Alchemy, a `talisman` hall for Inscription, an `array`
+workshop for Formation - and examined by that shop's own `keeper`, who is already a catalogue NPC
+standing there, so nobody had to be invented. Passing teaches that rank's methods, pays standing with
+the halls and costs a fee in the money of the world it is sat in; failing costs the fee and a world
+day. **It never blocks a level**: `advanceProfessionTx` is untouched, so no live crafter loses a rank
+they earned and nothing needs grandfathering.
+
 **1.0.0** (rc.44) pays a cultivator in the money of the world they are standing in, converts what
 they carry when they leave it, and lets the storm that judged them leave a door behind.
 
@@ -1846,6 +1871,15 @@ mechanical authority paths.
 - **Schema 27** added the v0.19.29 mute/freeze moderation columns on `characters`
   (`is_muted`, `is_frozen`, `moderation_reason`).
 - **Schema 28** added the Quest Forge definition table (`quest_definitions`).
+- **Schema 55** gave two orphan quests their doors. `road_to_a_sect` had been seeded on every boot
+  since v0.23.1 and the string appeared in exactly one place in the tree - its own definition - so
+  nothing could hand it over; it is `beginner_lesson`'s `follow_on` now, and because
+  `sync_commission_pool` is insert-only on purpose (a GM's edit survives every restart) the content
+  change reaches new worlds only, which is what this migration is for. Only a stage whose chain is
+  still empty is re-pointed, so a GM who already chained it is obeyed. `first_steps`, which rc.26
+  superseded with `beginner_household` without retiring, is dropped from the seeded catalogue and
+  the rows already written are marked retired - except one somebody is somehow holding, because
+  retiring a definition must never take a quest out of a player's hands.
 - **Schema 54** raised `world_crossings`, where a survived world-crossing tribulation leaves its
   mark. One row per gate a cultivator has anchored: where it stands, the two worlds it joins, the
   terminus and fare it borrows from the authored crossing for that pair, who tore it open, and the

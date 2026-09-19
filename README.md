@@ -635,7 +635,7 @@ report is safe to paste into an issue.
 - If narration goes flat after an image rebuild, check **/admin → Server → Ai Status** for a TLS
   banner first. If SQLite reports contention, verify only the engine opens the database.
 
-Keep the whole `data/` directory persistent across rebuilds. The current schema is **54**; every
+Keep the whole `data/` directory persistent across rebuilds. The current schema is **55**; every
 historical migration is kept so an old database upgrades in place.
 
 ## Development

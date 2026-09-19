@@ -6,19 +6,15 @@ from typing import Any
 # Definitions deliberately use a small generic objective vocabulary.  Future sect,
 # family and world-event quest generators can create the same shape without adding
 # bespoke database tables or Discord commands.
+# `first_steps` was here from before the Quest Forge until v1.0.0-rc.45, and no
+# player ever held it. rc.26 built the beginner path to fix exactly that fault
+# and authored `beginner_household` - the same three objective kinds with prose
+# and an opening - beside it rather than in place of it, so the orphan went on
+# being seeded into `quest_definitions` on every boot for nineteen more
+# releases. Two definitions for one moment, one of them reachable, is the fault
+# itself; it is retired rather than given a second door, and migration 55 marks
+# the rows that already exist so a live world stops listing it as approved.
 QUEST_DEFINITIONS: dict[str, dict] = {
-    "first_steps": {
-        "title": "First Steps Beneath Heaven",
-        "description": "Explore the world, speak to one persistent NPC, and make one deliberate Scene Action.",
-        "source_type": "system",
-        "source_key": "onboarding",
-        "objectives": [
-            {"id": "explore", "type": "explore", "count": 1, "label": "Complete an exploration"},
-            {"id": "talk", "type": "talk", "count": 1, "label": "Speak with a persistent NPC"},
-            {"id": "action", "type": "scene_action", "count": 1, "label": "Resolve a Scene Action"},
-        ],
-        "rewards": {"insight_xp": 25},
-    },
     "road_to_a_sect": {
         "title": "A Road Toward a Sect",
         "description": "Discover a sect route and earn or attempt formal recruitment.",
@@ -180,6 +176,41 @@ def ascension_quest_seed_rows(world: Any) -> list[dict[str, Any]]:
     return rows
 
 
+def profession_exam_seed_rows(world: Any) -> list[dict[str, Any]]:
+    """The trade examinations from `content/world.json`, shaped for the seeder.
+
+    `profession_exams` is keyed by trade, each entry one rank: the hall kind
+    that examines it, the target number, the fee, and the prose the keeper's
+    counter is described with. The engine finds the one to hand over from the
+    rank a craft just reached, and every one of them is an ordinary giver-less
+    quest - the hall offers an examination, it does not commission work.
+    """
+    rows: list[dict[str, Any]] = []
+    exams = dict((getattr(world, "data", {}) or {}).get("profession_exams") or {})
+    for trade in sorted(exams):
+        for exam in list(exams[trade] or []):
+            key = str(exam.get("quest_key") or "").strip()
+            if not key:
+                continue
+            rows.append({
+                "quest_key": key,
+                "title": str(exam.get("title", "")),
+                "description": str(exam.get("description", "")),
+                "source_type": "system",
+                "source_key": f"profession_exam:{trade}",
+                "objectives": list(exam.get("objectives", [])),
+                "rewards": dict(exam.get("rewards", {})),
+                "giver_npc": "",
+                "realm_band": "",
+                "tier": 1,
+                "deadline_game_minutes": 0,
+                "variants": [],
+                "seed": {"profession": str(trade), "rank": int(exam.get("rank") or 0),
+                         "opening": str(exam.get("opening") or "")},
+            })
+    return rows
+
+
 def static_quest_seed_rows(definitions: dict[str, dict] | None = None) -> list[dict[str, Any]]:
     """The static quests, shaped for `Database.sync_commission_pool`.
 
@@ -191,6 +222,13 @@ def static_quest_seed_rows(definitions: dict[str, dict] | None = None) -> list[d
 
     `giver_npc` is deliberately empty: these are not commissions, they occupy
     no commission slot and carry no deadline. The row exists to be found.
+
+    A row existing is not the same as a player being able to hold it, which is
+    what `road_to_a_sect` proved by sitting here unreachable from v0.23.1 to
+    v1.0.0-rc.45. It is handed over now as `beginner_lesson`'s `follow_on`, by
+    the chain every other ordinary quest uses, and
+    `tests/python/unit/test_quests_reach_a_player.py` is what stops the next
+    one being seeded with no door.
     """
     source = QUEST_DEFINITIONS if definitions is None else definitions
     rows: list[dict[str, Any]] = []
@@ -273,6 +311,11 @@ OBJECTIVE_TYPES: dict[str, dict[str, Any]] = {
     # location a draft could name in advance and be right about.
     "ascension_gate": {"target": None, "label": "", "untargeted": "Anchor a crossing where you survived your tribulation"},
     "world_cross": {"target": None, "label": "", "untargeted": "Cross into the world above"},
+    # Reported by `/craft -> Profession -> Exam` only on a pass (v1.0.0-rc.45).
+    # Untargeted: the examiner is whichever hall's keeper the candidate walked
+    # in on, one of a hundred and twenty, so there is no name a draft could
+    # fix in advance and be right about.
+    "profession_exam": {"target": None, "label": "", "untargeted": "Pass a hall's examination in your trade"},
 }
 SCENE_ACTION_KEYS = ("observe", "investigate", "influence", "stealth", "physical", "qi", "resolve", "aid")
 REWARD_KEYS = ("insight_xp", "spirit_stones", "items")

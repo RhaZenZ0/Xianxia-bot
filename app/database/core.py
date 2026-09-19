@@ -26,7 +26,7 @@ from .remote import GoDatabaseTransport
 log = logging.getLogger("xianxia.database")
 
 
-SCHEMA_VERSION = 54
+SCHEMA_VERSION = 55
 # A readiness probe must validate more than the schema-version marker.  If the
 # SQLite file is removed or replaced while the bot is running, SQLite will
 # happily create a new empty file at the same path.  Checking these tables lets
@@ -2427,6 +2427,47 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
                 FOREIGN KEY(opened_by_user_id) REFERENCES characters(user_id) ON DELETE SET NULL
             )""",
             """CREATE INDEX IF NOT EXISTS idx_world_crossings_owner ON world_crossings(opened_by_user_id,from_world)""",
+        ),
+    ),
+    (
+        55,
+        "point_the_last_beginner_stage_at_the_sect_road",
+        (
+            # v1.0.0-rc.45: two quests nobody could be given.
+            #
+            # `road_to_a_sect` has been seeded on every boot since v0.23.1 and
+            # the string appeared in exactly one place in the tree - its own
+            # definition. Every writer of a `character_quests` row is either a
+            # commission (which needs a `giver_npc` the static quests
+            # deliberately do not have) or `grantOrdinaryQuestTx`, and nothing
+            # named it; `/city board` lists only commissions whose giver lives
+            # in the city, so it had no Discord door either.
+            #
+            # It is `beginner_lesson`'s `follow_on` now, which needs no new
+            # mechanism - the chain already hands over any giver-less
+            # definition. But the chain is read off `quest_definitions.seed_json`
+            # and `sync_commission_pool` is insert-only on purpose (a GM's edit
+            # survives every restart), so the content change reaches new worlds
+            # only. This is the half that reaches the ones already running.
+            #
+            # Only a stage whose chain is still empty is re-pointed: a GM who
+            # has already chained it somewhere is obeyed, which is the whole
+            # reason the chain lives in the row rather than in the file.
+            """UPDATE quest_definitions
+                  SET seed_json='{"follow_on": "road_to_a_sect"}'
+                WHERE quest_key='beginner_lesson'
+                  AND seed_json IN ('', '{}', '{"follow_on": ""}')""",
+            # And `first_steps`, which rc.26 superseded with
+            # `beginner_household` - the same three objective kinds with prose -
+            # without retiring. Two definitions for one moment, one of them
+            # reachable, is the fault itself. It is dropped from the seeded
+            # catalogue, and the rows already written are marked so a live
+            # world stops carrying it as approved work. A row somebody is
+            # somehow holding is left alone: retiring a definition must never
+            # take a quest out of a player's hands.
+            """UPDATE quest_definitions SET status='retired'
+                WHERE quest_key='first_steps' AND status='approved'
+                  AND NOT EXISTS (SELECT 1 FROM character_quests WHERE quest_key='first_steps')""",
         ),
     ),
 )

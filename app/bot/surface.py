@@ -349,7 +349,7 @@ _HUB_DEFINITIONS = (
         pages=(
             _hub_page("alchemy", "Alchemy", "Refine pills, forage simulated herb resources, track toxicity and purge medicinal residue."),
             _hub_page("craft", "General Crafting", "Practice alchemy, forging, formation or talisman inscription from known recipes."),
-            _hub_page("profession", "Profession", "View crafting and support-profession mastery, and read a method slip into a method you keep.", "learn"),
+            _hub_page("profession", "Profession", "Your crafting and support-profession mastery: what rank you hold, the hall examination that certifies it, and reading a method slip into a method you keep.", "learn"),
         ),
     ),
     HubDefinition(
