@@ -277,9 +277,35 @@ func (r *Runner) npcCareers(conn *storage.Conn, gm int64) (int64, error) {
 // `phase` crept to nine and stopped there forever, because `realm_index` was
 // fixed at bootstrap. It is paid for in wealth, which is the first thing in
 // this simulation that wealth has ever been for.
+//
+// The ascension gate is the exception (v1.0.0-rc.44). Wealth and health carried
+// one of the world's own people across a world boundary exactly as they carried
+// them across an ordinary realm - so the tick walked NPCs out of the Mortal
+// World at realm 7 while a player standing at the same stage had to survive
+// three waves of heavenly lightning to do it. The heavens do not hold two
+// standards. An NPC is refused at a gate realm, and there is no
+// `tribulation.attempt` for them to answer with: a tribulation is three rolls
+// against a named character's attributes and an NPC has none of that.
+//
+// What opens it is a player going first. A cultivator who survives the storm
+// and anchors the seam where it fell has torn a passage out of that world, and
+// the people whose cultivation is near theirs follow them up it - the same
+// reach `game.NPCMayCross` applies to walking through the gate, applied here to
+// the breakthrough. Until somebody goes first, the top of the world is the top
+// of the world.
 func (r *Runner) npcBreakthroughs(conn *storage.Conn, gm int64) (int64, error) {
 	if !simTableExists(conn, "npc_life_state") {
 		return 0, nil
+	}
+	// The seams, loaded once for the same reason the travel step loads them
+	// once: single figures of gates against hundreds of people.
+	gates, err := game.OpenCrossings(conn)
+	if err != nil {
+		return 0, err
+	}
+	reach := r.World.WorldCrossing.NPCCrossingRealmReach
+	if reach <= 0 {
+		reach = defaultNPCCrossingRealmReach
 	}
 	res, err := conn.Execute(`SELECT c.npc_name,c.realm_index,c.wealth,c.current_location,c.ambition,l.health
         FROM npc_civilization_state c JOIN npc_life_state l ON l.npc_name=c.npc_name
@@ -304,6 +330,21 @@ func (r *Runner) npcBreakthroughs(conn *storage.Conn, gm int64) (int64, error) {
 		name, realm := fmt.Sprint(row[0]), i64(row[1])
 		location := fmt.Sprint(row[3])
 		if realm >= 31 {
+			continue
+		}
+		// The gate. Wealth buys an ordinary realm and buys nothing here, and
+		// most of the world stays under it: a seam is cut to one cultivator's
+		// measure, so the people near that measure follow and everybody else
+		// stands where they have always stood. Being stuck is said out loud
+		// rather than left as an absence - `activity` is what `/civilization`
+		// and the GM's NPC card read, so a world full of people waiting at the
+		// top of it looks like one.
+		if game.IsWorldCrossingRealm(realm) && !anySeamAdmits(gates, realm, reach) {
+			if _, err := conn.Execute(
+				`UPDATE npc_civilization_state SET activity='Stalled at the ascension gate',last_game_minute=?,updated_at=? WHERE npc_name=? AND activity<>'Stalled at the ascension gate'`,
+				[]any{gm, now, name}); err != nil {
+				return crossed, err
+			}
 			continue
 		}
 		realmName := fmt.Sprintf("realm %d", realm+1)
@@ -464,4 +505,27 @@ func (r *Runner) npcFeuds(conn *storage.Conn, gm int64) (int64, int64, error) {
 		fought++
 	}
 	return fought, killed, nil
+}
+
+// anySeamAdmits is whether any gate a player has torn was cut near enough to
+// this cultivation to carry somebody of it through the ascension gate.
+//
+// The seam need not be where they are standing: a passage out of a world is a
+// passage out of a world, and word of one reaches everybody in it. Where it
+// stands decides who can *walk* through it (`npcTravel`); what it was cut at
+// decides who may follow the cultivator who made it up past the gate.
+func anySeamAdmits(gates map[string]game.Crossing, realmIndex, reach int64) bool {
+	for _, gate := range gates {
+		if gate.Destination == "" {
+			continue
+		}
+		gap := realmIndex - gate.OpenedRealmIndex
+		if gap < 0 {
+			gap = -gap
+		}
+		if gap <= reach {
+			return true
+		}
+	}
+	return false
 }

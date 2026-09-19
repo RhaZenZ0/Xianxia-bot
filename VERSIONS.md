@@ -60,7 +60,10 @@ survived opens onto, borrowing the authored crossing's terminus, fare and realm 
 tear open a cheaper road than the world already has. It is public ground: `array.use` resolves it
 beside the authored eight, and the world's own people walk through it - the ones whose cultivation is
 near the cultivator who tore it, because a seam is cut to that measure and `npc_crossing_realm_reach`
-is how far either side of it still fits. It is the one road in the game that leaves a world
+is how far either side of it still fits. It opens the gate as well as the road: `npcBreakthroughs`
+had been carrying NPCs out of a world at realm 7 on wealth and health alone, which is a standard no
+player is held to, and that is refused now until a seam exists - after which the people near its
+measure follow, and the rest stay stalled at the gate where the world can see them. It is the one road in the game that leaves a world
 (`WhereAnNPCCanWalk` refuses another world by construction, and content roads still do). The tribulation hands over the quest authored for that crossing, through the same
 `grantOrdinaryQuestTx` the beginner path uses - there is still no second quest mechanism, only a
 second thing that hands one over.

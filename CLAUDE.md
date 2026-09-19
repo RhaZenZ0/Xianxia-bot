@@ -878,6 +878,16 @@ crossing at the character's own location, into the world the gate they survived 
   Ascension-realm cultivator once tore the sky open over their town. A crosser's `world_name` is
   deliberately unchanged, so the far side offers them no onward neighbours and the existing
   going-home roll brings them back: a visit through the gate and out again.
+- **A seam opens the gate for the world, not just the road.** `npcBreakthroughs` crossed an NPC out
+  of the Mortal World at realm 7 on wealth and health alone, so the tick walked the world's own
+  people through an ascension gate a player has to survive three waves of heavenly lightning to
+  pass - the heavens holding two standards. An NPC is refused at a gate realm now
+  (`game.IsWorldCrossingRealm`), and there is nothing for them to answer with, because a tribulation
+  is three rolls against a named character's attributes. What opens it is a player going first:
+  once a seam is anchored out of that world, the people within `npc_crossing_realm_reach` of the
+  cultivation it was cut at follow them up it, and **everybody else stays stuck** - their `activity`
+  says "Stalled at the ascension gate", because `/civilization` and the GM's NPC card read that
+  column and a world waiting at its own ceiling should look like one.
 - **Keyed on `location_key`, never on who opened it** — `opened_by_user_id` anonymises on erasure
   (`erasureAnonymise`), exactly as `npc_graves.claimed_by_user_id` does, so an erasure cannot unmake a
   gate that other players and NPCs are using.

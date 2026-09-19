@@ -474,3 +474,75 @@ func seedRelation(t *testing.T, path, a, b string, grudge int64) {
 		t.Fatal(err)
 	}
 }
+
+// The ascension gate holds the world's own people until a cultivator goes first
+// (v1.0.0-rc.44), and then only the ones cut near the seam's measure.
+//
+// Wealth and health bought an NPC across a world boundary exactly as they
+// bought an ordinary realm, so the tick walked people out of the Mortal World
+// at realm 7 while a player at the same stage had to survive three waves of
+// heavenly lightning. The dice are lent for the same reason the test above
+// lends them: the breakthrough is a roll, and none of what this holds is about
+// whether it landed.
+func TestTheAscensionGateHoldsNPCsUntilACultivatorGoesFirst(t *testing.T) {
+	defer gamerng.UseRoller(func(int) int { return 0 })()
+	path := livesDB(t)
+	r := livesRunner()
+	for _, name := range []string{"Elder Shu", "Porter Wen"} {
+		addNPC(t, path, name, "Greenriver Town", "Greenriver Town", "Mortal World", "Cultivator", 90, "Independent")
+		addLife(t, path, name, map[string]any{"health": 100})
+	}
+	conn := livesConn(t, path)
+	mustExec(t, conn, `CREATE TABLE IF NOT EXISTS world_crossings(location_key TEXT PRIMARY KEY,name TEXT NOT NULL DEFAULT '',from_world TEXT NOT NULL,to_world TEXT NOT NULL,destination_location TEXT NOT NULL,min_realm_index INTEGER NOT NULL DEFAULT 0,opened_realm_index INTEGER NOT NULL DEFAULT 0,cost INTEGER NOT NULL DEFAULT 0,opened_by_user_id INTEGER,opened_game_minute INTEGER NOT NULL DEFAULT 0,player_uses INTEGER NOT NULL DEFAULT 0,npc_uses INTEGER NOT NULL DEFAULT 0,created_at REAL NOT NULL DEFAULT 0)`)
+	// One standing at the last stage of the Mortal World, one three realms
+	// below it with the same purse and the same ambition.
+	mustExec(t, conn, `UPDATE npc_civilization_state SET phase=9,wealth=900,realm_index=7 WHERE npc_name='Elder Shu'`)
+	mustExec(t, conn, `UPDATE npc_civilization_state SET phase=9,wealth=900,realm_index=2 WHERE npc_name='Porter Wen'`)
+
+	// No seam anywhere: the ordinary realm is crossed and the gate is not.
+	if _, err := r.npcBreakthroughs(conn, 100); err != nil {
+		t.Fatal(err)
+	}
+	if realm := scalar(t, conn, `SELECT realm_index AS n FROM npc_civilization_state WHERE npc_name='Elder Shu'`); realm != 7 {
+		t.Fatalf("the gate let somebody through with no seam open: realm %d", realm)
+	}
+	if realm := scalar(t, conn, `SELECT realm_index AS n FROM npc_civilization_state WHERE npc_name='Porter Wen'`); realm != 3 {
+		t.Fatalf("an ordinary realm was refused: realm %d", realm)
+	}
+	// And being stuck is said out loud, because `activity` is what the world
+	// status and the GM's NPC card read.
+	if stalled := scalar(t, conn, `SELECT COUNT(*) AS n FROM npc_civilization_state WHERE npc_name='Elder Shu' AND activity='Stalled at the ascension gate'`); stalled != 1 {
+		t.Fatal("somebody held at the gate looks like somebody doing nothing")
+	}
+
+	// A cultivator tears a seam at realm 8 - within reach of the elder, and
+	// nowhere near a porter who later reaches a gate of their own.
+	mustExec(t, conn, `INSERT INTO world_crossings(location_key,name,from_world,to_world,destination_location,min_realm_index,opened_realm_index,cost,opened_game_minute,created_at)
+        VALUES('Greenriver Town','A Gate','Mortal World','Spiritual World','Spirit Jade Capital',8,8,200,0,0)`)
+	mustExec(t, conn, `UPDATE npc_civilization_state SET phase=9 WHERE npc_name='Elder Shu'`)
+	if _, err := r.npcBreakthroughs(conn, 200); err != nil {
+		t.Fatal(err)
+	}
+	if realm := scalar(t, conn, `SELECT realm_index AS n FROM npc_civilization_state WHERE npc_name='Elder Shu'`); realm != 8 {
+		t.Fatalf("the elder did not follow the cultivator up: realm %d", realm)
+	}
+
+	// Seven realms above the seam, the same seam carries nobody.
+	mustExec(t, conn, `UPDATE npc_civilization_state SET realm_index=15,phase=9,wealth=900 WHERE npc_name='Porter Wen'`)
+	if _, err := r.npcBreakthroughs(conn, 300); err != nil {
+		t.Fatal(err)
+	}
+	if realm := scalar(t, conn, `SELECT realm_index AS n FROM npc_civilization_state WHERE npc_name='Porter Wen'`); realm != 15 {
+		t.Fatalf("a seam cut seven realms away carried somebody: realm %d", realm)
+	}
+	if err := conn.Commit(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func mustExec(t *testing.T, conn *storage.Conn, sql string) {
+	t.Helper()
+	if _, err := conn.Execute(sql, nil); err != nil {
+		t.Fatal(err)
+	}
+}

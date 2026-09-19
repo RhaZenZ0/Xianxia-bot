@@ -374,6 +374,18 @@ func authoredCrossing(catalog worlddata.Catalog, fromWorld, toWorld string) (wor
 	return worlddata.TeleportArray{}, false
 }
 
+// IsWorldCrossingRealm is whether a realm sits at an ascension gate - the last
+// stage of a world, where the heavens are asked before anybody goes further.
+//
+// Exported for the simulation package, which needs it to know when one of the
+// world's own people has climbed as far as their world allows. The realms are
+// `tribulationGates`' own keys, so the engine and the tick cannot disagree
+// about where a world ends.
+func IsWorldCrossingRealm(realm int64) bool {
+	_, ok := tribulationGates[realm]
+	return ok
+}
+
 // ascensionGateOutOf is the world-crossing tribulation that leads out of a
 // world. Sorted, because the gates are a map and two gates out of one world
 // would otherwise be read differently on different runs.
