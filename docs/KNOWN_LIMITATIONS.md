@@ -31,10 +31,23 @@ database. Its findings are the first two entries.
 - **fixed (v0.33.1)** — *The Quest Forge's prompt listed forty-eight auction floors before the
   town a story is set in.* Floors and their stewards are off the capped lists; validation accepts
   them regardless.
-- **deferred (past 1.0)** — *The three live columns of the checklist are unticked.* Reachable
-  from the hub, error text actionable, narration or fallback fired: a person at the keyboard on
-  the live server ticks these, hub by hub. The static columns and the engine loops are done here;
-  the live pass is Mitchell's and the file keeps his ticks across regeneration.
+- **fixed (v1.0.0-rc.47)** — *The three live columns of the checklist asked a person for what a
+  machine now does.* Reachable from the hub, error text actionable, narration or fallback fired:
+  248 actions times three, seven hundred and forty-four boxes, written in v0.34.0 when nothing in
+  the tree could press a button. `scripts/playtest_discord.py` has pressed every leaf since rc.33
+  and `test_playtest_coverage.py` holds it to the live definitions, so the first column was asking
+  for work already done and the second for the wiring half of work already done. Not one box was
+  ever ticked, across twelve regenerations - and `merge_ticks` was carefully preserving them while
+  silently dropping the live-table ticks, the only ones that were ever a person's. The per-action
+  columns are one machine-filled `Swept` column now, read off the harness's own `DEFERRED_LEAVES`
+  so it cannot claim more than the sweep drives.
+- **deferred (past 1.0)** — *The live pass on the NAS is unticked.* What the sweep structurally
+  cannot reach: real Discord, a live AI route (it runs `NARRATOR_PROVIDER=procedural`), the auction
+  channels, `/vote`, a mute expiring on its own, `update.sh` against a real release - and whether a
+  refusal reads helpfully to a human, which is a judgement, made against the sweep's log rather
+  than against 248 empty boxes. Twenty-seven rows in `docs/playtest/v1.0.0.md` under **What only a
+  live server can show**; the pass is Mitchell's and the generator keeps his ticks across
+  regeneration, which since rc.47 it actually does.
 - **fixed (v1.0.0-rc.39)** — *`get_world_clock` in Python re-anchored the clock the engine owns
   when the configured scale changed.* Named on the roadmap's remaining-authority list since v0.30.0.
   The method is gone: `world.clock` is a read-only engine query and every surface reads through it,

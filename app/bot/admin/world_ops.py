@@ -822,7 +822,19 @@ async def admin_quests(interaction: discord.Interaction, retire: str = "") -> No
         return
     lines = []
     if approved:
-        lines.append("**Approved (live in /quests)**\n" + "\n".join(f"• `{r['quest_key']}` {r['title']}" for r in approved[:15]))
+        # "live in /quests" was true of every approved row until v1.0.0-rc.46,
+        # and is now true of a Forge draft and false of a roster's quest - the
+        # journal offers only what nothing hands over. A GM workbench that says
+        # the wrong one of those is how a GM concludes a feature is broken, so
+        # each row says which, and the offerable ones sort first: the fifteen
+        # shown were otherwise about to be sixty-odd seeded rows deep.
+        ordered = sorted(approved, key=lambda r: (QUESTS.handed_over(r), str(r["quest_key"])))
+        lines.append("**Approved**\n" + "\n".join(
+            f"• `{r['quest_key']}` {r['title']}" + (" — handed over by its roster" if QUESTS.handed_over(r) else "")
+            for r in ordered[:15]))
+        lines.append("-# Rows with no note are offered in **/quests**; the rest arrive when their "
+                     "roster hands them over (the beginner path, a household errand, an ascension, "
+                     "a trade's examination).")
     await interaction.response.send_message("\n".join(lines) or "No approved forged quests.", ephemeral=False)
     for row in drafts[:5]:
         await interaction.followup.send(embed=_quest_draft_embed(row), view=QuestDraftReviewView(row["quest_key"]), ephemeral=False)

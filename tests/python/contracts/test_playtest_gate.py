@@ -49,6 +49,110 @@ class ThePunchListIsHonest(unittest.TestCase):
         self.assertIn("trial_retries_cleared", actions)
 
 
+class TheChecklistSaysWhatTheSweepProved(unittest.TestCase):
+    """The checklist stopped asking a person for what a machine now does
+    (v1.0.0-rc.47).
+
+    It was written in v0.34.0, when nothing in the tree could press a button,
+    so every action carried three live checkboxes - reachable from the hub,
+    error text actionable, narration or fallback fired - for a pass on the
+    live server. `scripts/playtest_discord.py` has pressed every leaf since
+    rc.33 and `test_playtest_coverage.py` holds it to the live definitions, so
+    those boxes were asking for work already done: 248 actions times three,
+    seven hundred and forty-four of them, and **not one ever ticked** across
+    twelve regenerations.
+
+    The `Swept` column is the sweep's answer instead, and this is what keeps
+    it honest - it may claim only what `DEFERRED_LEAVES` leaves unclaimed.
+    """
+
+    def setUp(self):
+        self.text = CHECKLIST.read_text(encoding="utf-8")
+        # Selected by where they are, not by their shape. Selecting on the
+        # shape is how the first version of this class let the drill through:
+        # it took rows of four cells, so restoring the three old checkboxes
+        # made a row of six that the filter simply did not see, and a gate
+        # that cannot see the thing it forbids is decoration. The live tables
+        # below the heading are a person's and carry boxes by design.
+        above = self.text.split("## Loops beyond the hubs", 1)[0]
+        self.rows = [line for line in above.splitlines() if line.startswith("| `/")]
+
+    def test_every_action_row_carries_the_sweeps_verdict(self):
+        self.assertGreaterEqual(len(self.rows), 240, "the checklist lost its action rows")
+        for line in self.rows:
+            cells = [c.strip() for c in line.strip().strip("|").split("|")]
+            with self.subTest(row=cells[0]):
+                self.assertEqual(len(cells), 4, "an action row is Action | Params | Acked | Swept")
+                self.assertIn(cells[3], ("sim", "deferred"))
+
+    def test_no_action_row_asks_a_person_for_what_the_sweep_does(self):
+        # The regression this class exists for: a checkbox back on an action
+        # row means somebody re-added a column the sweep already fills.
+        offenders = [line.split("|")[1].strip() for line in self.rows if "[ ]" in line or "[x]" in line]
+        self.assertEqual(offenders, [], f"an action row carries a checkbox again: {offenders}")
+
+    def test_the_deferred_leaves_are_the_harness_own(self):
+        """Read off `playtest_discord.py`, never restated here or in the doc.
+
+        A deferral added to the harness and not regenerated into the checklist
+        would leave the file claiming the sweep drives a leaf it skips, which
+        is the one way this column can lie.
+        """
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location(
+            "playtest_checklist", PROJECT_ROOT / "scripts" / "playtest_checklist.py")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        deferred = module.deferred_leaves()
+        self.assertTrue(deferred, "the harness defers at least the lockdown leaf")
+        self.assertIn("### Deferred leaves", self.text, "the checklist stopped listing them")
+        section = self.text.split("### Deferred leaves", 1)[1]
+        listed = dict(re.findall(r"^- `(/[^`]+)` — (.+)$", section, re.M))
+        self.assertEqual(sorted(listed), sorted(deferred),
+                         "the checklist and the harness disagree on what the sweep skips - regenerate it")
+        for path, reason in deferred.items():
+            with self.subTest(path=path):
+                # Compared as the generator writes it, so a reflowed reason in
+                # the harness still matches.
+                self.assertEqual(listed[path], " ".join(str(reason).split()),
+                                 "listed without the harness's own reason")
+
+    def test_what_is_left_for_a_person_is_short_and_is_what_only_a_server_shows(self):
+        self.assertIn("### What only a live server can show", self.text)
+        boxes = self.text.count("[ ]") + self.text.count("[x]")
+        self.assertLess(boxes, 60, "the manual pass grew back into a list nobody walks")
+        # The two the sweep structurally cannot do, named so they are not lost
+        # with the columns that used to ask for them. Looked for in the table
+        # itself rather than anywhere in the file: the preamble explains both,
+        # so a whole-text search passes on the explanation while the row a
+        # person is meant to tick has quietly gone.
+        table = "\n".join(line for line in self.text.split("### What only a live server can show", 1)[1].splitlines()
+                          if line.startswith("| ") and line.rstrip().endswith("|"))
+        for row in ("NARRATOR_PROVIDER=procedural", "every refusal names what is missing"):
+            with self.subTest(row=row):
+                self.assertIn(row, table, "the live table lost the row only a real server can answer")
+
+    def test_a_tick_survives_regeneration(self):
+        """`merge_ticks` kept the per-action cells and dropped the loop rows.
+
+        It looked only at lines starting with `` | ` `` and only at rows of six
+        cells or more, so the live tables - the only ticks in the file that
+        were ever a person's - were lost on every regeneration. Nobody noticed
+        because nobody had ticked one.
+        """
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location(
+            "playtest_checklist", PROJECT_ROOT / "scripts" / "playtest_checklist.py")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        loop = "| `/menu` opens every hub; Admin only for an administrator | [ ] |"
+        self.assertIn(loop, self.text, "the loop this test ticks is no longer on the checklist")
+        merged = module.merge_ticks(self.text.replace(loop, loop.replace("[ ]", "[x]")), self.text)
+        self.assertIn(loop.replace("[ ]", "[x]"), merged)
+
+
 class TheChecklistIsOnFile(unittest.TestCase):
     def test_the_checklist_for_this_release_names_every_command(self):
         self.assertTrue(CHECKLIST.exists(), f"run scripts/playtest_checklist.py to write {CHECKLIST.name}")

@@ -34,6 +34,7 @@ from __future__ import annotations
 import json
 import unittest
 
+from app.ops.core_services import HANDED_OVER_BY_A_ROSTER, QuestService
 from app.rules.quests import (
     QUEST_DEFINITIONS,
     ascension_quest_seed_rows,
@@ -107,6 +108,84 @@ def _grantable_keys() -> set[str]:
                 grantable.add(follow_on)
     grantable.discard("")
     return grantable
+
+
+def _roster_rows() -> list[dict]:
+    """Every row the four rosters seed, plus the static quests a chain points at.
+
+    These are the quests something hands over at a moment it chooses. They are
+    the population `QuestService.available` must not offer, which is the other
+    half of this file's rule and the one v1.0.0-rc.46 added.
+    """
+    world = _world()
+    shim = type("W", (), {"data": world})()
+    rows = [*beginner_path_seed_rows(shim), *household_errand_seed_rows(shim),
+            *ascension_quest_seed_rows(shim), *profession_exam_seed_rows(shim)]
+    chained = {str(dict(r.get("seed") or {}).get("follow_on") or "").strip() for r in rows}
+    rows.extend(r for r in static_quest_seed_rows(QUEST_DEFINITIONS)
+                if str(r.get("quest_key") or "") in chained)
+    return rows
+
+
+class TheJournalOffersWhatNothingHandsOver(unittest.TestCase):
+    """The same fault as this file's, seen from the other side (v1.0.0-rc.46).
+
+    rc.45 gave five rosters the power to hand a quest over and left
+    `QuestService.available` - the journal's "Available" block and the accept
+    select built from the same list - offering every one of their quests from
+    minute one. The Discord playtest's first run after the merge is what saw
+    it: a character created seconds earlier was shown ten examinations, `The
+    Expert's Toxicity` among them, at Novice, holding no trade.
+
+    Accepting one is not cosmetic. `grantOrdinaryQuestTx` treats an
+    already-held quest as "no" and returns silently, so a quest taken here is
+    the thing that stops its roster ever offering it: the hall never says the
+    examination is open, `family.errand` skips an errand it thinks is already
+    out, and the beginner chain hands over a stage the player has been sitting
+    on since creation.
+    """
+
+    def test_the_roster_set_is_exactly_what_the_seeders_write(self):
+        families = {str(row.get("source_key") or "").split(":", 1)[0] for row in _roster_rows()}
+        self.assertEqual(sorted(families), sorted(HANDED_OVER_BY_A_ROSTER), (
+            "HANDED_OVER_BY_A_ROSTER names the rosters whose quests the journal must not offer, "
+            "and it has drifted from the seeders in app/rules/quests.py. A new roster belongs in "
+            "the frozenset; a retired one belongs out of it"))
+
+    def test_no_roster_quest_is_offered_from_the_journal(self):
+        offered = sorted(str(row["quest_key"]) for row in _roster_rows()
+                         if not QuestService.handed_over(row))
+        self.assertEqual(offered, [], (
+            "these quests exist to be handed over and the journal would also offer them, so a "
+            f"player can take one before its roster ever gets to: {offered}"))
+
+    def test_the_examination_the_sweep_found_is_named_outright(self):
+        # Named rather than left to the sweep above, because it is the one the
+        # playtest actually printed and because a regression here is silent:
+        # the journal simply starts listing twelve examinations again.
+        exams = profession_exam_seed_rows(type("W", (), {"data": _world()})())
+        self.assertEqual(len(exams), 12)
+        for row in exams:
+            with self.subTest(quest=row["quest_key"]):
+                self.assertTrue(QuestService.handed_over(row))
+        # And a forged draft, which no roster hands over, still is offered -
+        # the journal exists for exactly those.
+        self.assertFalse(QuestService.handed_over({"source_type": "forge", "source_key": "history:1"}))
+        self.assertFalse(QuestService.handed_over({}))
+
+    def test_every_seeded_quest_arrives_exactly_one_way(self):
+        seeded = _seeded_keys()
+        world = _world()
+        givers = {str(r.get("quest_key") or ""): str(r.get("giver_npc") or "").strip()
+                  for r in list(world.get("commissions") or [])}
+        handed = {str(r["quest_key"]) for r in _roster_rows() if QuestService.handed_over(r)}
+        for key in sorted(seeded):
+            with self.subTest(quest=key):
+                doors = [bool(givers.get(key)), key in handed]
+                self.assertLessEqual(sum(doors), 1, (
+                    f"{key} is both offered in person and handed over by a roster; a commission "
+                    "occupies the one-at-a-time slot and grantOrdinaryQuestTx refuses a giver, so "
+                    "one of the two doors does nothing"))
 
 
 class EverySeededQuestHasADoor(unittest.TestCase):
