@@ -878,6 +878,15 @@ crossing at the character's own location, into the world the gate they survived 
   Ascension-realm cultivator once tore the sky open over their town. A crosser's `world_name` is
   deliberately unchanged, so the far side offers them no onward neighbours and the existing
   going-home roll brings them back: a visit through the gate and out again.
+- **Not everybody can climb, and most who can stop early** (`npc_talent.go`). `npcBreakthroughs`
+  asked a candidate two questions - had they the wealth, had they the health - and both are things a
+  porter can have, so every one of the 574 people in the world was on the same ladder as the sect
+  elders with `realm >= 31` at the top of it. Talent is asked first now: a band off
+  `hash64(name, "talent")` weighted by what the profession implies, added to the origin realm the
+  *catalogue* gives them (not their current one, or the ceiling would rise every time somebody
+  crossed it). Most mundane lives draw nothing and never leave the realm they began in; a sect
+  disciple usually stops a few realms up; one in ten of them can go twelve. Nothing is stored -
+  same seed, same answer, forever - and somebody at their limit says so in `activity`.
 - **A seam opens the gate for the world, not just the road.** `npcBreakthroughs` crossed an NPC out
   of the Mortal World at realm 7 on wealth and health alone, so the tick walked the world's own
   people through an ascension gate a player has to survive three waves of heavenly lightning to

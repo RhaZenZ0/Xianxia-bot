@@ -307,7 +307,7 @@ func (r *Runner) npcBreakthroughs(conn *storage.Conn, gm int64) (int64, error) {
 	if reach <= 0 {
 		reach = defaultNPCCrossingRealmReach
 	}
-	res, err := conn.Execute(`SELECT c.npc_name,c.realm_index,c.wealth,c.current_location,c.ambition,l.health
+	res, err := conn.Execute(`SELECT c.npc_name,c.realm_index,c.wealth,c.current_location,c.ambition,l.health,c.profession
         FROM npc_civilization_state c JOIN npc_life_state l ON l.npc_name=c.npc_name
         WHERE c.status='alive' AND c.phase>=? AND c.wealth>=? AND l.health>=60
         ORDER BY c.ambition DESC,c.npc_name LIMIT 60`, []any{breakthroughAt, breakthroughCost})
@@ -330,6 +330,18 @@ func (r *Runner) npcBreakthroughs(conn *storage.Conn, gm int64) (int64, error) {
 		name, realm := fmt.Sprint(row[0]), i64(row[1])
 		location := fmt.Sprint(row[3])
 		if realm >= 31 {
+			continue
+		}
+		// Talent first, because it is the thing that decides most lives. Most
+		// of the world cannot climb at all and the rest stop somewhere; wealth
+		// and health were the only two questions asked before, and both are
+		// things a porter can have.
+		if ceiling := r.npcTalentCeiling(name, fmt.Sprint(row[6])); realm >= ceiling {
+			if _, err := conn.Execute(
+				`UPDATE npc_civilization_state SET activity='Has gone as far as their talent allows',last_game_minute=?,updated_at=? WHERE npc_name=? AND activity<>'Has gone as far as their talent allows'`,
+				[]any{gm, now, name}); err != nil {
+				return crossed, err
+			}
 			continue
 		}
 		// The gate. Wealth buys an ordinary realm and buys nothing here, and

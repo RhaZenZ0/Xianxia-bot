@@ -484,11 +484,17 @@ func seedRelation(t *testing.T, path, a, b string, grudge int64) {
 // heavenly lightning. The dice are lent for the same reason the test above
 // lends them: the breakthrough is a roll, and none of what this holds is about
 // whether it landed.
+//
+// The names are chosen, not arbitrary. Talent is drawn off `hash64(name)` and
+// is asked before the gate is, so an elder whose seed stops them at realm 1
+// would never reach the gate to be held by it: "Elder Tan" as a cultivator
+// draws the top band and can climb to 12, which is what puts them under the
+// gate at 7 with room above it.
 func TestTheAscensionGateHoldsNPCsUntilACultivatorGoesFirst(t *testing.T) {
 	defer gamerng.UseRoller(func(int) int { return 0 })()
 	path := livesDB(t)
 	r := livesRunner()
-	for _, name := range []string{"Elder Shu", "Porter Wen"} {
+	for _, name := range []string{"Elder Tan", "Porter Wen"} {
 		addNPC(t, path, name, "Greenriver Town", "Greenriver Town", "Mortal World", "Cultivator", 90, "Independent")
 		addLife(t, path, name, map[string]any{"health": 100})
 	}
@@ -496,14 +502,14 @@ func TestTheAscensionGateHoldsNPCsUntilACultivatorGoesFirst(t *testing.T) {
 	mustExec(t, conn, `CREATE TABLE IF NOT EXISTS world_crossings(location_key TEXT PRIMARY KEY,name TEXT NOT NULL DEFAULT '',from_world TEXT NOT NULL,to_world TEXT NOT NULL,destination_location TEXT NOT NULL,min_realm_index INTEGER NOT NULL DEFAULT 0,opened_realm_index INTEGER NOT NULL DEFAULT 0,cost INTEGER NOT NULL DEFAULT 0,opened_by_user_id INTEGER,opened_game_minute INTEGER NOT NULL DEFAULT 0,player_uses INTEGER NOT NULL DEFAULT 0,npc_uses INTEGER NOT NULL DEFAULT 0,created_at REAL NOT NULL DEFAULT 0)`)
 	// One standing at the last stage of the Mortal World, one three realms
 	// below it with the same purse and the same ambition.
-	mustExec(t, conn, `UPDATE npc_civilization_state SET phase=9,wealth=900,realm_index=7 WHERE npc_name='Elder Shu'`)
+	mustExec(t, conn, `UPDATE npc_civilization_state SET phase=9,wealth=900,realm_index=7 WHERE npc_name='Elder Tan'`)
 	mustExec(t, conn, `UPDATE npc_civilization_state SET phase=9,wealth=900,realm_index=2 WHERE npc_name='Porter Wen'`)
 
 	// No seam anywhere: the ordinary realm is crossed and the gate is not.
 	if _, err := r.npcBreakthroughs(conn, 100); err != nil {
 		t.Fatal(err)
 	}
-	if realm := scalar(t, conn, `SELECT realm_index AS n FROM npc_civilization_state WHERE npc_name='Elder Shu'`); realm != 7 {
+	if realm := scalar(t, conn, `SELECT realm_index AS n FROM npc_civilization_state WHERE npc_name='Elder Tan'`); realm != 7 {
 		t.Fatalf("the gate let somebody through with no seam open: realm %d", realm)
 	}
 	if realm := scalar(t, conn, `SELECT realm_index AS n FROM npc_civilization_state WHERE npc_name='Porter Wen'`); realm != 3 {
@@ -511,32 +517,69 @@ func TestTheAscensionGateHoldsNPCsUntilACultivatorGoesFirst(t *testing.T) {
 	}
 	// And being stuck is said out loud, because `activity` is what the world
 	// status and the GM's NPC card read.
-	if stalled := scalar(t, conn, `SELECT COUNT(*) AS n FROM npc_civilization_state WHERE npc_name='Elder Shu' AND activity='Stalled at the ascension gate'`); stalled != 1 {
+	if stalled := scalar(t, conn, `SELECT COUNT(*) AS n FROM npc_civilization_state WHERE npc_name='Elder Tan' AND activity='Stalled at the ascension gate'`); stalled != 1 {
 		t.Fatal("somebody held at the gate looks like somebody doing nothing")
 	}
 
-	// A cultivator tears a seam at realm 8 - within reach of the elder, and
-	// nowhere near a porter who later reaches a gate of their own.
+	// A cultivator tears a seam at realm 8, within reach of the elder.
 	mustExec(t, conn, `INSERT INTO world_crossings(location_key,name,from_world,to_world,destination_location,min_realm_index,opened_realm_index,cost,opened_game_minute,created_at)
         VALUES('Greenriver Town','A Gate','Mortal World','Spiritual World','Spirit Jade Capital',8,8,200,0,0)`)
-	mustExec(t, conn, `UPDATE npc_civilization_state SET phase=9 WHERE npc_name='Elder Shu'`)
+	mustExec(t, conn, `UPDATE npc_civilization_state SET phase=9 WHERE npc_name='Elder Tan'`)
 	if _, err := r.npcBreakthroughs(conn, 200); err != nil {
 		t.Fatal(err)
 	}
-	if realm := scalar(t, conn, `SELECT realm_index AS n FROM npc_civilization_state WHERE npc_name='Elder Shu'`); realm != 8 {
+	if realm := scalar(t, conn, `SELECT realm_index AS n FROM npc_civilization_state WHERE npc_name='Elder Tan'`); realm != 8 {
 		t.Fatalf("the elder did not follow the cultivator up: realm %d", realm)
-	}
-
-	// Seven realms above the seam, the same seam carries nobody.
-	mustExec(t, conn, `UPDATE npc_civilization_state SET realm_index=15,phase=9,wealth=900 WHERE npc_name='Porter Wen'`)
-	if _, err := r.npcBreakthroughs(conn, 300); err != nil {
-		t.Fatal(err)
-	}
-	if realm := scalar(t, conn, `SELECT realm_index AS n FROM npc_civilization_state WHERE npc_name='Porter Wen'`); realm != 15 {
-		t.Fatalf("a seam cut seven realms away carried somebody: realm %d", realm)
 	}
 	if err := conn.Commit(); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// Most of the world cannot cultivate, and the ones who can mostly stop early.
+// Before this, wealth and health were the only two questions asked, and both
+// are things a porter can have - so every one of the five hundred and
+// seventy-four people in the world was on the same ladder as the sect elders.
+func TestTalentIsTheCeilingMostLivesNeverLeave(t *testing.T) {
+	defer gamerng.UseRoller(func(int) int { return 0 })()
+	path := livesDB(t)
+	r := livesRunner()
+	// "Porter Li" draws the bottom band on mundane work: no headroom at all.
+	addNPC(t, path, "Porter Li", "Greenriver Town", "Greenriver Town", "Mortal World", "Porter", 99, "Independent")
+	addLife(t, path, "Porter Li", map[string]any{"health": 100})
+	conn := livesConn(t, path)
+	mustExec(t, conn, `UPDATE npc_civilization_state SET phase=9,wealth=900,realm_index=0 WHERE npc_name='Porter Li'`)
+	if ceiling := r.npcTalentCeiling("Porter Li", "Porter"); ceiling != 0 {
+		t.Fatalf("a porter with no talent has a ceiling of %d", ceiling)
+	}
+	for i := 0; i < 5; i++ {
+		if _, err := r.npcBreakthroughs(conn, int64(100+i)); err != nil {
+			t.Fatal(err)
+		}
+		mustExec(t, conn, `UPDATE npc_civilization_state SET phase=9 WHERE npc_name='Porter Li'`)
+	}
+	if realm := scalar(t, conn, `SELECT realm_index AS n FROM npc_civilization_state WHERE npc_name='Porter Li'`); realm != 0 {
+		t.Fatalf("a purse carried somebody with no talent to realm %d", realm)
+	}
+	if stalled := scalar(t, conn, `SELECT COUNT(*) AS n FROM npc_civilization_state WHERE npc_name='Porter Li' AND activity='Has gone as far as their talent allows'`); stalled != 1 {
+		t.Fatal("a life that goes no further should say so")
+	}
+	if err := conn.Commit(); err != nil {
+		t.Fatal(err)
+	}
+
+	// The same seed, asked twice, answers the same - a ceiling that moved
+	// would not be one.
+	for _, name := range []string{"Porter Li", "Elder Tan", "Shopkeeper Mu"} {
+		first := npcTalentBand(name, "Cultivator")
+		if again := npcTalentBand(name, "Cultivator"); again != first {
+			t.Fatalf("%s drew %d and then %d", name, first, again)
+		}
+	}
+	// And the work somebody does is part of it: the same person, apprenticed
+	// to a sect rather than carrying sacks, is not held to a porter's ceiling.
+	if npcTalentBand("Porter Wen", "Cultivator") <= npcTalentBand("Porter Wen", "Porter") {
+		t.Fatal("a cultivator's work implies no more talent than a porter's")
 	}
 }
 

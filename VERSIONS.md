@@ -63,7 +63,12 @@ near the cultivator who tore it, because a seam is cut to that measure and `npc_
 is how far either side of it still fits. It opens the gate as well as the road: `npcBreakthroughs`
 had been carrying NPCs out of a world at realm 7 on wealth and health alone, which is a standard no
 player is held to, and that is refused now until a seam exists - after which the people near its
-measure follow, and the rest stay stalled at the gate where the world can see them. It is the one road in the game that leaves a world
+measure follow, and the rest stay stalled at the gate where the world can see them. Talent is asked
+before any of that: wealth and health were the only two questions, and both are things a porter can
+have, so the whole world was on one ladder with realm 31 at the top. A band drawn off
+`hash64(name, "talent")` and weighted by the work somebody does, added to the realm the catalogue
+started them at, is the ceiling most lives never leave - and the ones who leave it are the ones worth
+writing about. It is the one road in the game that leaves a world
 (`WhereAnNPCCanWalk` refuses another world by construction, and content roads still do). The tribulation hands over the quest authored for that crossing, through the same
 `grantOrdinaryQuestTx` the beginner path uses - there is still no second quest mechanism, only a
 second thing that hands one over.

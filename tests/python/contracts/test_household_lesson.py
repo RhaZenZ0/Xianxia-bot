@@ -64,10 +64,23 @@ class EveryHouseHasALessonToGive(unittest.TestCase):
 
 class TheStageEndsThePath(unittest.TestCase):
     def test_the_path_ends_at_the_lesson_after_home(self):
+        """The lesson is the last stage, and where it points is the first hour's
+        last word.
+
+        It pointed at nothing until v1.0.0-rc.45, which was true of the path and
+        wrong about the world: `road_to_a_sect` sat seeded and reachable by
+        nobody while the only chain that could have handed it over ended
+        deliberately one stage short. The lesson is still the last *stage* - what
+        it may not be is the last thing that ever happens to a new cultivator.
+        """
         self.assertEqual(STAGES[-1]["quest_key"], "beginner_lesson")
         self.assertEqual(STAGES[-2]["quest_key"], "beginner_home")
         self.assertEqual(STAGES[-2]["follow_on"], "beginner_lesson")
-        self.assertEqual(STAGES[-1]["follow_on"], "")
+        self.assertEqual(STAGES[-1]["follow_on"], "road_to_a_sect",
+                         "the first hour ends by pointing at a sect, where the trial's odds are "
+                         "finally worth taking")
+        self.assertNotIn("road_to_a_sect", [str(stage["quest_key"]) for stage in STAGES],
+                         "the sect road is a static quest, not a sixth stage")
 
     def test_the_stage_is_a_quest_the_forge_would_accept(self):
         definition, errors = validate_quest_definition(STAGES[-1], WORLD, BUDGET)

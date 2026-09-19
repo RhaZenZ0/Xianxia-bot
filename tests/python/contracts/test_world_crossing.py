@@ -121,7 +121,8 @@ class TheTableIsTheEnginesToWrite(unittest.TestCase):
     def test_the_readiness_probe_knows_the_table(self):
         core = (PROJECT_ROOT / "app" / "database" / "core.py").read_text(encoding="utf-8")
         self.assertIn('"world_crossings",', core)
-        self.assertIn("SCHEMA_VERSION = 54", core)
+        self.assertGreaterEqual(int(core.split("SCHEMA_VERSION = ")[1].split("\n")[0]), 54,
+                                "the crossings table arrived at schema 54 and must still be reachable")
 
     def test_the_content_block_parses_as_the_engine_reads_it(self):
         raw = json.loads((PROJECT_ROOT / "content" / "world.json").read_text(encoding="utf-8"))

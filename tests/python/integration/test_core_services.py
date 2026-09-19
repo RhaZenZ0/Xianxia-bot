@@ -129,7 +129,7 @@ class CoreServiceTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(relationship["trust"], 12)
 
-        await self.quests.accept(7001, "first_steps", action_id="test:accept")
+        await self.quests.accept(7001, "road_to_a_sect", action_id="test:accept")
         changed = await self.quests.progress(7001, "explore", game_minute=110)
         self.assertEqual(changed, [])
 
