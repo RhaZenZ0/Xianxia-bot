@@ -287,10 +287,21 @@ is on the named exemption list".
 *Shipped as far as a machine can take it. `scripts/playtest_engine.py` drives
 every loop named below through the engine and found two defects, both fixed
 (a commission could never be turned in; Reset Cooldowns missed the trial
-retry). `docs/playtest/v0.34.0.md` lists all 218 actions with the static
-columns filled; its three live columns are the pass on the live server and
-are Mitchell's to tick. `docs/KNOWN_LIMITATIONS.md` is the punch list. Gate:
+retry). `docs/KNOWN_LIMITATIONS.md` is the punch list. Gate:
 `tests/python/contracts/test_playtest_gate.py`.*
+
+*How far a machine can take it moved twice after this milestone, and the
+checklist did not move with it. `scripts/playtest_discord.py` (rc.33) boots
+the real bot under a simulated Discord and presses every leaf the hubs
+register, and `test_playtest_coverage.py` (rc.35) holds both harnesses to
+the live surface, so a new operation or leaf is covered the day it exists.
+The checklist went on carrying its three live checkboxes per action for
+another fourteen releases — 744 of them by rc.46, asking a person for what
+the sweep now does, and **not one ever ticked**. At **rc.47** they are one
+machine-filled `Swept` column, read off the harness's own `DEFERRED_LEAVES`;
+the manual pass is the 27 rows a real server is needed for, and
+`TheChecklistSaysWhatTheSweepProved` fails if a checkbox returns to an action
+row or a deferral goes unlisted.*
 
 *v0.34.1 gave the live half its instrument: the `#playtest` board, one
 message per hub page that testers mark ✅ ❌ 💡 and reply under, tallied by
@@ -464,7 +475,7 @@ drift for seven versions as happened between v0.21.6 and v0.28.0.
 | v0.31 Narrator budget | v0.31.0 | shipped |
 | v0.32 Hardened II | v0.32.0 | shipped |
 | v0.33 Gameplay I | v0.33.0 | shipped |
-| v0.34 Playtest | v0.34.2 | shipped; the engine loops run, the checklist is on file, and the `#playtest` board collects the live pass; travelling merchants shipped beside it |
+| v0.34 Playtest | v0.34.2 | shipped; the engine loops run, the checklist is on file, and the `#playtest` board collects the live pass; travelling merchants shipped beside it. Both harnesses drive the whole surface since rc.35, and at rc.47 the checklist says so: one machine column per action, 27 rows left for a person |
 | v1.0.0-rc | v1.0.0-rc.1 | the machine bars met: migration drill, docs held by tests; the NAS drills and the quiet fortnight are the operator's |
 | v1.0.0 | | |
 | Content track | v0.39.0 | started early: shops (v0.35.0), gates and districts (v0.36.0), merchants that bid (v0.37.0), city life (v0.38.0) - boards, envoys, rumours, inns, prosperity; the roads, sects and goods for every world, eight realms on rotation, typed play with two arguments and trade at the inn (v0.39.0) |

@@ -960,6 +960,43 @@ recipes were a shop transaction and nothing else.
   money of the world the hall stands in, which is the rc.44 rule and which the first version of
   `profession_exam_test.go` learned by picking an Immortal World hall for a Mortal candidate.
 
+### The checklist says what the sweep proved (v1.0.0-rc.47)
+
+`docs/playtest/v1.0.0.md` is generated from the tree, and until now every one of its 248 actions
+carried three live checkboxes — *reachable from the hub*, *error text actionable*, *narration or
+fallback fired*. They were right in v0.34.0, when nothing in the repo could press a button. Then
+rc.33 built `playtest_discord.py`, which presses every leaf the hubs register, and rc.35 built
+`test_playtest_coverage.py`, which holds it to the live definitions so a new leaf is covered the
+day it is registered — and the checklist went on asking a person for the first column outright and
+for the wiring half of the second, for fourteen more releases. **Seven hundred and forty-four
+boxes, not one ever ticked**, across twelve regenerations.
+
+- **One machine column.** *Swept* is `sim` or `deferred`, and it is read off the harness's own
+  `DEFERRED_LEAVES` by AST — the same read the coverage gate makes — so the column can never claim
+  more than the sweep drives. The deferrals are listed under the hubs with the harness's own reason,
+  and `TheChecklistSaysWhatTheSweepProved` holds the two equal: a deferral added to the harness and
+  not regenerated into the file fails, because that is the one way this column can lie.
+- **What a person is left is 27 rows**, under *What only a live server can show*: real Discord, the
+  auction channels, `/vote`, a mute expiring on its own, `update.sh` against a real release — and
+  the two the sweep *structurally* cannot do, named so they were not lost with the columns that
+  used to ask for them. It cannot reach a live AI route (it runs `NARRATOR_PROVIDER=procedural`),
+  and it cannot judge whether a refusal *reads* helpfully to a human — which is now one row against
+  the sweep's log, an artifact that exists, rather than 248 empty boxes nobody walks.
+- **`merge_ticks` was preserving the wrong half.** It looked only at lines starting with `` | ` ``
+  and only at rows of six cells or more, so it carefully carried the per-action boxes across every
+  regeneration and silently dropped the live-table ticks — the only ticks in the file that were ever
+  a person's. It keys on the shape of a two-cell row with a checkbox now. Nobody had noticed because
+  nobody had ticked one, which is the same fact that retired the columns.
+
+**The gate had the same blind spot the code did, and the drill is what found it.** The first version
+of `TheChecklistSaysWhatTheSweepProved` selected action rows by their shape — four cells — so
+restoring the three old checkboxes made a row of six that the filter did not see, and the drill
+passed when it should have failed. It selects by *where a row is* (above `## Loops beyond the hubs`)
+and then asserts the shape. Same for the live table: `NARRATOR_PROVIDER=procedural` also appears in
+the preamble that explains it, so a whole-file search passed while the row a person ticks was gone —
+it is searched for inside the table now. A gate that cannot see the thing it forbids is decoration,
+and only running it against the broken tree says which kind you have.
+
 ### The journal offers what nothing hands over (v1.0.0-rc.46)
 
 rc.45's own fault, seen from the other side. It gave five rosters the power to hand a quest over and

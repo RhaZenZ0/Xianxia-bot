@@ -6,6 +6,33 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.0** (rc.47) makes the playtest checklist say what the Discord sim proved, instead of asking a
+person for it.
+
+Every one of the checklist's 248 actions carried three live checkboxes - reachable from the hub,
+error text actionable, narration or fallback fired. They were right in v0.34.0, when nothing in the
+repo could press a button. rc.33 built `playtest_discord.py`, which presses every leaf the hubs
+register; rc.35 built `test_playtest_coverage.py`, which holds it to the live definitions so a new
+leaf is covered the day it is registered. The checklist went on asking for the first column outright
+and the wiring half of the second for fourteen more releases: seven hundred and forty-four boxes,
+and **not one ever ticked** across twelve regenerations.
+
+They are one machine-filled `Swept` column now, read off the harness's own `DEFERRED_LEAVES` by AST
+- the same read the coverage gate makes - so it can never claim more than the sweep drives, and a
+deferral added to the harness and not regenerated into the file fails the gate. What is left for a
+person is twenty-seven rows a real server is needed for, including the two the sweep *structurally*
+cannot do: it runs `NARRATOR_PROVIDER=procedural`, so it can never reach a live AI route, and it
+cannot judge whether a refusal *reads* helpfully to a human - one row against the sweep's log, which
+is an artifact that exists, rather than 248 empty boxes nobody walks.
+
+`merge_ticks` turned out to be preserving the wrong half: it looked only at rows of six cells or
+more, so it carried the per-action boxes across every regeneration and silently dropped the
+live-table ticks, the only ones in the file that were ever a person's. Nobody had noticed, because
+nobody had ticked one - the same fact that retired the columns. And the new gate had the same blind
+spot the code did: its first version selected action rows by their shape, so restoring the three old
+checkboxes made a row it could not see, and the drill passed when it should have failed. Running a
+gate against the broken tree is what says whether it is a gate or decoration.
+
 **1.0.0** (rc.46) stops the quest journal offering the quests that exist to be handed to you.
 
 rc.45 gave five rosters the power to hand a quest over - the beginner path stage by stage, a
