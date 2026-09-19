@@ -6,6 +6,50 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.0** (rc.53) settles where a secret realm's band belongs, and stops the shallow ones crowding
+out the deep.
+
+rc.52 deferred an item that read *"the nine `secret_realm` unexpected events still carry no realm
+band"*. **The premise was wrong on two counts.** There are twelve of them, not nine - three
+(`ancient_ruin_appears`, `spatial_rift`, `forbidden_zone_opens`) do not start with `secret_`. And
+they need no band: `eligibleUnexpectedEvents` has a second branch for `kind: "secret_realm"` that
+reads the **realm's** own `min_realm_index` and `location`, so a realm-0 cultivator has never been
+able to draw the Hollow Throne Vault. Putting `min_realm_index` on the events would have been a
+second statement of a rule the realm already owns, free to drift from it - the fault rc.39 removed
+for the world clock and rc.44 for the world currencies. `test_beginner_world_events.py` now holds
+that no secret-realm event carries one.
+
+**What was actually open was that nothing drove that branch.** rc.49's `beginner_events_test.go`
+fixture is all `world_event`, so deleting any of the three conditions failed no test - and the whole
+point of rc.49 was that a grep cannot see a disabled condition. Three behavioural tests drive it
+now, each drilled by disabling its condition. One of those drills is worth knowing: **`!ok` is
+belt-and-braces rather than the guard.** A missing realm yields the zero value, whose `Location` is
+`""`, and no character stands at `""` - so the entrance check already excludes a typo'd
+`secret_realm_id`, and disabling `!ok` alone leaves the test passing. Both have to go. The test says
+so rather than implying otherwise.
+
+**Every realm now opens as often as every other.** The draw only offers a realm to somebody standing
+at its entrance, so the weights compete per realm rather than globally - and they were lopsided:
+seven of the twelve events opened the three Mortal-floor realms, which are also the only three that
+sell a key, at 4/5/4 weight, while every realm from floor 2 up had one event at 2. **Deep realms were
+harder to reach and opened half as often.** Each realm totals 3 now; a realm with several fictions
+(three open the Stygian tomb) keeps them and splits the weight, because that is variety rather than
+three times the chance. Total draw weight moves 124 -> 125, so the surprise rate is unchanged.
+
+**And a realm fades once you have outgrown the world it stands in** - Mortal realms at 7, Spiritual
+at 15, Immortal at 23, and the Celestial one never, because nothing is above it. rc.50's own
+reasoning is why this matters now: a realm's rooms are walked again on every run, and `rare_items`
+put a 12,000 peach in a floor-2 realm and a 40,000 ring in a floor-16 one, so without a ceiling a Dao
+Saint farms the Salt King's Barrow for peaches for ever - the "guaranteed, repeatable payout" rc.50
+exists to avoid. It gates the **draw** only: a key still opens its realm and a GM can still spawn
+one, the same asymmetry rc.49 drew between being handed something and walking into it. One
+consequence worth stating plainly: the Salt King's Barrow sells no key, so above realm 7 the peach
+is reachable only by a GM - which is consistent with rc.50 calling fifty years "enormous low down and
+worthless high up", but it is a narrowing.
+
+The ceiling is computed from the realm's floor in the gate rather than read off the events, so the
+content cannot quietly disagree with the rule it is supposed to follow.
+
 **1.0.0** (rc.52) gives each world its own news, and says so in every channel.
 
 `world-events` carried all four worlds. A Demon Invasion in the Celestial World and a caravan over

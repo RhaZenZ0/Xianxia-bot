@@ -1322,6 +1322,44 @@ passed. A grep cannot see a disabled condition. `beginner_events_test.go` hands 
 severity-10 event and asserts it is not offered, and fails with the whole map when the condition is
 disabled; Python keeps only the one thing it can honestly check, that the Go half still exists.
 
+### Where a secret realm's band belongs (v1.0.0-rc.53)
+
+`eligibleUnexpectedEvents` has a **second branch** for `kind: "secret_realm"`, and it is the reason
+none of the twelve such events carries a `min_realm_index`:
+
+```go
+if e.Kind == "secret_realm" {
+    realm, ok := catalog.SecretRealms[e.SecretRealmID]
+    if !ok || realm.Location != c.Location || c.RealmIndex < realm.MinRealmIndex { continue }
+}
+```
+
+The floor and the place are read off the **realm**, so a band on the event would be a second
+statement of a rule the realm already owns — the fault rc.39 removed for the world clock and rc.44
+for the world currencies. rc.49 banded the eighteen `world_event` entries and scoped its gate to
+`kind == "world_event"` deliberately; this is the other half of that decision, written down.
+
+**Nothing drove the branch until rc.53.** rc.49's fixture is all `world_event`, so any of the three
+conditions could be deleted with the suite green — in the file whose whole lesson is that a grep
+cannot see a disabled condition. Three tests drive it now, each drilled. **`!ok` turned out to be
+belt-and-braces**: a missing realm yields the zero value, whose `Location` is `""`, and nobody stands
+at `""`, so the entrance check already excludes a typo'd id and disabling `!ok` alone leaves the test
+passing. A typo is still worth a gate, because it is silently undrawable for ever rather than an
+error anywhere — the class `/learn` and the peach were.
+
+**The weights compete per realm, not globally**, because the draw only offers a realm to somebody at
+its entrance. They were lopsided: seven of the twelve events opened the three Mortal-floor realms —
+the only three that sell a key — at 4/5/4, while every realm from floor 2 up had one event at 2, so
+the deep realms were harder to reach *and* opened half as often. Each realm totals 3 now, split among
+its fictions where it has several.
+
+**A realm fades once you have outgrown its world** (7 / 15 / 23, none for the Celestial). rc.50 is
+why: rooms are walked again on every run and `rare_items` put a 12,000 peach at floor 2 and a 40,000
+ring at floor 16, so an uncapped low realm is the repeatable payout rc.50 exists to avoid. It gates
+the draw only — a key and a GM spawn still work, the rc.49 asymmetry. The Salt King's Barrow sells no
+key, so above realm 7 the peach needs a GM; that follows from rc.50 calling fifty years worthless
+high up, and it is a narrowing worth knowing about.
+
 ### The peach that nothing grew (`rare_items`, v1.0.0-rc.50)
 
 `hundred_year_peach` was the one item of 287 that the world could not produce: no shop sold it, no

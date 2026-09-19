@@ -27344,7 +27344,8 @@
       "kind": "secret_realm",
       "weight": 2,
       "secret_realm_id": "verdant_immortal_grotto",
-      "description": "Space folds around the scent of ancient medicine. A hidden grotto is opening."
+      "description": "Space folds around the scent of ancient medicine. A hidden grotto is opening.",
+      "max_realm_index": 7
     },
     {
       "id": "secret_sword",
@@ -27353,7 +27354,8 @@
       "kind": "secret_realm",
       "weight": 2,
       "secret_realm_id": "sword_grave_nine_echoes",
-      "description": "Nine sword cries sound from nowhere, and a broken stone gate appears between the cliffs."
+      "description": "Nine sword cries sound from nowhere, and a broken stone gate appears between the cliffs.",
+      "max_realm_index": 7
     },
     {
       "id": "secret_stygian",
@@ -27362,16 +27364,18 @@
       "kind": "secret_realm",
       "weight": 1,
       "secret_realm_id": "stygian_lantern_tomb",
-      "description": "Blue corpse-fire appears beneath old graves. A tomb that should not exist is becoming reachable."
+      "description": "Blue corpse-fire appears beneath old graves. A tomb that should not exist is becoming reachable.",
+      "max_realm_index": 7
     },
     {
       "id": "ancient_ruin_appears",
       "title": "Ancient Ruin Appears",
       "category": "Ancient Ruin",
       "kind": "secret_realm",
-      "weight": 3,
+      "weight": 1,
       "secret_realm_id": "sword_grave_nine_echoes",
-      "description": "A hidden palace of broken pagodas rises from the cliffs, exposing a gate into an ancient sword grave."
+      "description": "A hidden palace of broken pagodas rises from the cliffs, exposing a gate into an ancient sword grave.",
+      "max_realm_index": 7
     },
     {
       "id": "heavenly_treasure_descends",
@@ -27494,9 +27498,10 @@
       "title": "Secret Inheritance Revealed",
       "category": "Inheritance",
       "kind": "secret_realm",
-      "weight": 2,
+      "weight": 1,
       "secret_realm_id": "verdant_immortal_grotto",
-      "description": "A collapsed tomb reveals an ancient jade furnace and a trial-path leading toward a sealed inheritance chamber."
+      "description": "A collapsed tomb reveals an ancient jade furnace and a trial-path leading toward a sealed inheritance chamber.",
+      "max_realm_index": 7
     },
     {
       "id": "lightning_tribulation_nearby",
@@ -27665,9 +27670,10 @@
       "title": "Spatial Rift",
       "category": "Spatial Rift",
       "kind": "secret_realm",
-      "weight": 2,
+      "weight": 1,
       "secret_realm_id": "stygian_lantern_tomb",
-      "description": "A crack in reality begins swallowing loose objects, beasts, and pieces of nearby structures. Blue lantern-light flickers beyond the tear."
+      "description": "A crack in reality begins swallowing loose objects, beasts, and pieces of nearby structures. Blue lantern-light flickers beyond the tear.",
+      "max_realm_index": 7
     },
     {
       "id": "bloodline_awakening_omen",
@@ -28113,7 +28119,8 @@
       "kind": "secret_realm",
       "weight": 1,
       "secret_realm_id": "stygian_lantern_tomb",
-      "description": "A prohibition seal that endured for thousands of years breaks. Corpse-lanterns reveal a route into the forbidden tomb below."
+      "description": "A prohibition seal that endured for thousands of years breaks. Corpse-lanterns reveal a route into the forbidden tomb below.",
+      "max_realm_index": 7
     },
     {
       "id": "reincarnated_expert_awakens",
@@ -28233,43 +28240,47 @@
       "title": "Salt King's Barrow Opens",
       "category": "Ancient Ruin",
       "kind": "secret_realm",
-      "weight": 2,
+      "weight": 3,
       "secret_realm_id": "salt_kings_barrow",
-      "description": "The ground under the ruin shifts and Salt King's Barrow is reachable for a while."
+      "description": "The ground under the ruin shifts and Salt King's Barrow is reachable for a while.",
+      "max_realm_index": 7
     },
     {
       "id": "secret_broken_pagoda_sutra_hall",
       "title": "Broken Pagoda Sutra Hall Opens",
       "category": "Ancient Ruin",
       "kind": "secret_realm",
-      "weight": 2,
+      "weight": 3,
       "secret_realm_id": "broken_pagoda_sutra_hall",
-      "description": "The ground under the ruin shifts and Broken Pagoda Sutra Hall is reachable for a while."
+      "description": "The ground under the ruin shifts and Broken Pagoda Sutra Hall is reachable for a while.",
+      "max_realm_index": 15
     },
     {
       "id": "secret_toppled_stele_sword_field",
       "title": "Toppled Stele Sword Field Opens",
       "category": "Ancient Ruin",
       "kind": "secret_realm",
-      "weight": 2,
+      "weight": 3,
       "secret_realm_id": "toppled_stele_sword_field",
-      "description": "The ground under the ruin shifts and Toppled Stele Sword Field is reachable for a while."
+      "description": "The ground under the ruin shifts and Toppled Stele Sword Field is reachable for a while.",
+      "max_realm_index": 15
     },
     {
       "id": "secret_weeping_wall_sanctum",
       "title": "Weeping Wall Sanctum Opens",
       "category": "Ancient Ruin",
       "kind": "secret_realm",
-      "weight": 2,
+      "weight": 3,
       "secret_realm_id": "weeping_wall_sanctum",
-      "description": "The ground under the ruin shifts and Weeping Wall Sanctum is reachable for a while."
+      "description": "The ground under the ruin shifts and Weeping Wall Sanctum is reachable for a while.",
+      "max_realm_index": 23
     },
     {
       "id": "secret_hollow_throne_vault",
       "title": "Hollow Throne Vault Opens",
       "category": "Ancient Ruin",
       "kind": "secret_realm",
-      "weight": 2,
+      "weight": 3,
       "secret_realm_id": "hollow_throne_vault",
       "description": "The ground under the ruin shifts and Hollow Throne Vault is reachable for a while."
     },
