@@ -90,23 +90,28 @@ class GameEngineClient:
         """
         return dict(await self.action("world.clock", 0, {}) or {})
 
-    async def bootstrap_simulation(self, game_minute: int) -> dict[str, Any]:
-        return await self._post(
-            "/v1/simulation/bootstrap",
-            {"game_minute": int(game_minute)},
-        )
+    # None of the three sends a minute (v1.0.0-rc.48). The engine derives the
+    # canonical one inside Go for all of them - `RunDue` has since v0.22.2,
+    # `Force` and `Bootstrap` since rc.48 - so a minute here would be a number
+    # the caller computes, ships over HTTP and watches the engine throw away.
+    # The wire still accepts the field, so an older bot mid-upgrade keeps
+    # working; nothing in this tree sends it, and
+    # `tests/python/contracts/test_simulation_minute.py` is what holds that.
 
-    async def run_due_simulation(self, game_minute: int, automation: dict[str, bool]) -> list[dict[str, Any]]:
+    async def bootstrap_simulation(self) -> dict[str, Any]:
+        return await self._post("/v1/simulation/bootstrap", {})
+
+    async def run_due_simulation(self, automation: dict[str, bool]) -> list[dict[str, Any]]:
         data = await self._post(
             "/v1/simulation/run-due",
-            {"game_minute": int(game_minute), "automation": {str(k): bool(v) for k, v in automation.items()}},
+            {"automation": {str(k): bool(v) for k, v in automation.items()}},
         )
         return [dict(row) for row in data.get("runs", [])]
 
-    async def force_simulation(self, system: str, steps: int, game_minute: int) -> dict[str, Any]:
+    async def force_simulation(self, system: str, steps: int) -> dict[str, Any]:
         return await self._post(
             "/v1/simulation/force",
-            {"system": str(system), "steps": int(steps), "game_minute": int(game_minute)},
+            {"system": str(system), "steps": int(steps)},
         )
 
     async def live(self) -> dict[str, Any]:

@@ -122,7 +122,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
                                        + ascension_quest_seed_rows(content)
                                        + profession_exam_seed_rows(content)))
     gm0 = await step(report, "world clock", clock())
-    await step(report, "simulation bootstrap", engine.bootstrap_simulation(int(gm0 or 0)))
+    await step(report, "simulation bootstrap", engine.bootstrap_simulation())
 
     # ---- 0b. the content file as tables (schema 51) ------------------------
     # The engine writes content_* from world.json, hash-gated. db-init already
@@ -328,7 +328,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
     marsh = await step(report, "commission.accept (the marsh consignment)", act("commission.accept", PLAYER, {"quest_key": "commission_qiao_marsh_consignment", "variant_index": 0}))
     deadline = int((marsh or {}).get("deadline_game_minutes") or 0)
     await step(report, "advance time past the deadline", gm("admin.world.advance_time", {"minutes": max(deadline, 60) + 60, "reason": "playtest"}))
-    await step(report, "the tick fails the overdue commission", engine.run_due_simulation(await clock(), {"maintenance_cleanup": True}))
+    await step(report, "the tick fails the overdue commission", engine.run_due_simulation({"maintenance_cleanup": True}))
     rows = {r["quest_key"]: r for r in await db.list_character_quests(PLAYER)}
     status = str((rows.get("commission_qiao_marsh_consignment") or {}).get("status"))
     report.add("PASS" if status == "failed" else "FAIL", "the overdue commission is failed by the tick", f"status={status}")
@@ -387,7 +387,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
     if lot_id:
         await step(report, "auction.bid", act("auction.bid", BUYER, {"auction_id": lot_id, "amount": 25}))
         await asyncio.sleep(6)
-        await step(report, "the tick settles the lot", engine.run_due_simulation(await clock(), {"auction_settlement": True}))
+        await step(report, "the tick settles the lot", engine.run_due_simulation({"auction_settlement": True}))
         settled = await db.get_auction(lot_id)
         report.add("PASS" if settled and not int(settled.get("active") or 0) and int(settled.get("current_bidder_user_id") or 0) == BUYER else "FAIL",
                    "the lot is struck to the bidder", f"row={ {k: settled.get(k) for k in ('active', 'current_bid', 'current_bidder_user_id')} if settled else None}")
@@ -465,7 +465,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
     unsold_id = int((unsold or {}).get("auction_id") or 0)
     if unsold_id:
         await asyncio.sleep(3)
-        await step(report, "the tick settles the unsold lot", engine.run_due_simulation(await clock(), {"auction_settlement": True, "merchants": True}))
+        await step(report, "the tick settles the unsold lot", engine.run_due_simulation({"auction_settlement": True, "merchants": True}))
         settled = await db.get_auction(unsold_id)
         buyer = str((settled or {}).get("merchant_buyer") or "")
         report.add("PASS" if buyer else "FAIL", "a merchant takes the unsold lot", f"merchant_buyer={buyer!r}")
@@ -507,7 +507,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
     valued_id = int((valued or {}).get("auction_id") or 0)
     if valued_id:
         before = {str(r.get("merchant")): int(r.get("budget") or 0) for r in list((await engine.action("merchant.status", PLAYER, {}) or {}).get("merchants") or [])}
-        await step(report, "the tick lets the merchants bid", engine.run_due_simulation(await clock(), {"auction_settlement": True, "merchants": True}))
+        await step(report, "the tick lets the merchants bid", engine.run_due_simulation({"auction_settlement": True, "merchants": True}))
         lot_row = await db.get_auction(valued_id) or {}
         holder = str(lot_row.get("merchant_bidder") or "")
         report.add("PASS" if holder and int(lot_row.get("current_bid") or 0) >= 3 and not lot_row.get("current_bidder_user_id") else "FAIL",
@@ -638,7 +638,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
             report.add("PASS" if voided and str(voided.get("status")) == "voided" else "FAIL", "the offer is voided", f"status={(voided or {}).get('status')}")
             await step(report, "a voided offer cannot be accepted", act("trade.accept", BUYER, {"offer_id": int(voidable["offer_id"])}), expect_error="voided")
     # The rotation opens a realm on the tick.
-    await step(report, "the rotation opens the first realm", engine.run_due_simulation(await clock(), {"maintenance_cleanup": True, "secret_realms": True}))
+    await step(report, "the rotation opens the first realm", engine.run_due_simulation({"maintenance_cleanup": True, "secret_realms": True}))
     open_realms = await step(report, "active world events", db.get_active_world_events())
     if open_realms is not None:
         names = [str(r.get("title")) for r in open_realms if str(r.get("event_type")) == "secret_realm"]
@@ -947,7 +947,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
     systems = ("npc_civilization", "npc_life", "dynamic_economy", "black_markets",
                "npc_consignments", "sect_politics", "clan_dynamics", "autonomous_world_events")
     for system in systems:
-        forced = await step(report, f"force {system}", engine.force_simulation(system, 3, await clock()))
+        forced = await step(report, f"force {system}", engine.force_simulation(system, 3))
         if forced is not None:
             report.add("PASS", f"{system} survives its own writes", str(forced.get("summary") or ""))
 
@@ -1965,7 +1965,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
             report.add("PASS" if any(str(c.get("crime_type")) == "forbidden_cultivation" for c in crimes) else "FAIL", "the crime is on the record", str([c.get("crime_type") for c in crimes])[:120])
             report.add("PASS" if any(int(b.get("amount") or 0) == 300 for b in bounties) else "FAIL", "severity six at evidence seventy-seven is a three-hundred-stone bounty", str([b.get("amount") for b in bounties]))
         await step(report, "the fight is cleared for the road", gm("admin.player.clear_battle", {"user_id": PLAYER, "reason": "playtest"}))
-        await step(report, "the tick fields a hunter for every open bounty", engine.run_due_simulation(await clock(), {}))
+        await step(report, "the tick fields a hunter for every open bounty", engine.run_due_simulation({}))
         pursuit = dict(await db.get_bounty_hunter_pursuit(user_id=PLAYER) or {})
         report.add("PASS" if str(pursuit.get("status")) == "tracking" and int(pursuit.get("hunter_power") or 0) > 0 else "FAIL", "the spawner is not a roll: one bounty, one hunter",
                    f"{pursuit.get('hunter_name')} power={pursuit.get('hunter_power')} status={pursuit.get('status')} amount={pursuit.get('amount')}")
@@ -1992,7 +1992,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
     # way; then the lever, which writes the tick's own row.
     for system, times in (("npc_civilization", 2), ("npc_life", 4)):
         for _ in range(times):
-            forced = await quietly(engine.force_simulation(system, 3, await clock()))
+            forced = await quietly(engine.force_simulation(system, 3))
             if "_refused" in forced:
                 report.add("FAIL", f"force {system}", forced["_refused"])
                 break
@@ -2085,7 +2085,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
     await either("a player action is refused while the world is closed",
                  act("cultivation.train", PLAYER, {}), "closed for maintenance", "playtest lockdown")
     closed_runs = await step(report, "the scheduled tick stands down",
-                             engine.run_due_simulation(await clock(), {"npc_life": True}))
+                             engine.run_due_simulation({"npc_life": True}))
     report.add("PASS" if closed_runs == [] else "FAIL",
                "the closed world ran no systems", f"{len(closed_runs or [])} run(s)")
     await step(report, "a GM lever still answers while the world is closed",

@@ -36,6 +36,7 @@ from ..channels import (
     _resolve_text_channel,
     configured_info_channel,
     ensure_auction_house_channels,
+    ensure_world_event_channels,
     ensure_realm_hub_channels,
     post_server_log,
 )
@@ -217,6 +218,21 @@ async def clear_managed_channel_messages(guild: discord.Guild) -> dict[str, Any]
             log.exception("Could not delete realm hub #%s for fresh-start wipe", channel.name)
             skipped.append(f"realm:{world}")
 
+    # v1.0.0-rc.52: the four per-world events channels, by the same rule the
+    # capitals follow - name-based rebinding in the reprovision below means the
+    # stale ids these deletes leave behind self-heal without extra bookkeeping.
+    for row in await DB.get_world_event_channels(guild.id):
+        world = str(row["world_name"])
+        channel = guild.get_channel(int(row["channel_id"]))
+        if not isinstance(channel, discord.TextChannel):
+            continue
+        try:
+            await channel.delete(reason="Xianxia RP fresh-start channel wipe")
+            cleared.append(f"world-events:{world}")
+        except (discord.Forbidden, discord.HTTPException):
+            log.exception("Could not delete world-events #%s for fresh-start wipe", channel.name)
+            skipped.append(f"world-events:{world}")
+
     bugs_channel_id = cfg.get("bugs_channel_id")
     bugs_channel = guild.get_channel(int(bugs_channel_id)) if bugs_channel_id else None
     if isinstance(bugs_channel, discord.ForumChannel):
@@ -247,9 +263,11 @@ async def teardown_managed_discord_layout(guild: discord.Guild) -> dict[str, Any
     The inverse of Full Setup. In order: every thread the database tracks
     (expedition journals, household threads, sect/cave abodes, event scenes,
     battle threads - the same set Reset World deletes), then every *bound*
-    channel (the seven base channels, every realm-capital hub, the #bugs
-    forum), then the two Xianxia categories if - and only if - they are empty
-    afterwards. Then the ids the database held for all of it are cleared
+    channel (the seven base channels, every realm-capital hub, every live
+    auction channel, every per-world events channel, the #bugs forum), then
+    the four Xianxia categories if -
+    and only if - they are empty afterwards. Then the ids the database held for
+    all of it are cleared
     (`Database.clear_discord_bindings`), so the dashboard reads "missing", not
     "stale", and Full Setup rebuilds from nothing.
 
@@ -303,13 +321,24 @@ async def teardown_managed_discord_layout(guild: discord.Guild) -> dict[str, Any
         threads_deleted += 1
         threads_by_kind[str(record["kind"])] = threads_by_kind.get(str(record["kind"]), 0) + 1
 
-    # 2. Bound channels: base, realm hubs, #bugs. Only what a binding names.
+    # 2. Bound channels: base, realm hubs, auction houses, world events, #bugs.
+    #    Only what a binding names.
     cfg = await DB.get_server_config(guild.id)
     targets: list[tuple[str, discord.abc.GuildChannel | None]] = []
     for key, channel_id in _base_channel_bindings(cfg).items():
         targets.append((key, guild.get_channel(int(channel_id)) if channel_id else None))
     for row in await DB.get_realm_hub_channels(guild.id):
         targets.append((f"realm:{row['world_name']}", guild.get_channel(int(row["channel_id"]))))
+    # v1.0.0-rc.51: `clear_discord_bindings` has always DELETEd from
+    # `auction_house_channels`, so teardown forgot these and left them standing -
+    # and because the nine of them sat in SERVER_REALM_CATEGORY, that category
+    # could never be emptied and so was never once deleted. Forty-eight houses
+    # share nine channels; the `seen_ids` guard below is what makes that one
+    # delete apiece.
+    for row in await DB.get_auction_house_channels(guild.id):
+        targets.append((f"auction:{row['house_id']}", guild.get_channel(int(row["channel_id"]))))
+    for row in await DB.get_world_event_channels(guild.id):
+        targets.append((f"world-events:{row['world_name']}", guild.get_channel(int(row["channel_id"]))))
     bugs_channel_id = cfg.get("bugs_channel_id")
     targets.append(("bugs", guild.get_channel(int(bugs_channel_id)) if bugs_channel_id else None))
 
@@ -334,10 +363,10 @@ async def teardown_managed_discord_layout(guild: discord.Guild) -> dict[str, Any
             log.exception("Teardown could not delete %s (#%s)", key, getattr(channel, "name", "?"))
             failed.append(key)
 
-    # 3. The two Xianxia categories, only if nothing else is left inside.
+    # 3. The four Xianxia categories, only if nothing else is left inside.
     categories_deleted: list[str] = []
     categories_kept: list[str] = []
-    for name in (SERVER_BASE_CATEGORY, SERVER_REALM_CATEGORY):
+    for name in (SERVER_BASE_CATEGORY, SERVER_REALM_CATEGORY, SERVER_AUCTION_CATEGORY, SERVER_EVENT_CATEGORY):
         category = next((item for item in guild.categories if item.name == name), None)
         if category is None:
             continue
@@ -436,6 +465,20 @@ SERVER_BASE_CATEGORY = "📜 Xianxia RP"
 
 
 SERVER_REALM_CATEGORY = "🌌 Realm Capitals"
+
+
+# v1.0.0-rc.51: the nine auction channels (five grand houses, four shared local
+# floors) used to sit in SERVER_REALM_CATEGORY, which is named for four realm
+# capitals and held thirteen channels. Their own category is not decoration -
+# it is what lets teardown below ever empty either one.
+SERVER_AUCTION_CATEGORY = "🏮 Auction Houses"
+
+
+# v1.0.0-rc.52: one world-events channel per world. `world-events` stays as the
+# global feed - the weekend gift, a GM's world-reset notice and the dashboard's
+# test post have no world and never will - and it is in SERVER_BASE_CATEGORY
+# with the other base channels, so this category holds the four and nothing else.
+SERVER_EVENT_CATEGORY = "\U0001f320 World Events"
 
 
 def _server_permission_report(guild: discord.Guild) -> tuple[list[str], list[str]]:
@@ -574,7 +617,8 @@ async def _run_complete_server_setup(
 ) -> tuple[dict[str, Any], list[dict[str, Any]], str | None]:
     base_result = await ensure_base_xianxia_channels(guild, category_name=SERVER_BASE_CATEGORY, create_missing=create_missing)
     realm_rows = await ensure_realm_hub_channels(guild, category_name=SERVER_REALM_CATEGORY, create_missing=create_missing)
-    await ensure_auction_house_channels(guild, category_name=SERVER_REALM_CATEGORY, create_missing=create_missing)
+    await ensure_auction_house_channels(guild, category_name=SERVER_AUCTION_CATEGORY, create_missing=create_missing)
+    await ensure_world_event_channels(guild, category_name=SERVER_EVENT_CATEGORY, create_missing=create_missing)
     _bugs_channel, bugs_warning = await ensure_bugs_forum_channel(guild, category_name=SERVER_BASE_CATEGORY, create_missing=create_missing)
     return base_result, realm_rows, bugs_warning
 
@@ -610,6 +654,29 @@ async def _dashboard_discord_snapshot(client: commands.Bot, guild: discord.Guild
             "channel_id": channel.id if isinstance(channel, discord.TextChannel) else None,
             "channel_name": channel.name if isinstance(channel, discord.TextChannel) else None,
             "role_id": role.id if role else None,
+            "role_name": role.name if role else None,
+            "hidden": bool(visibility.get("hidden")),
+            "ready": isinstance(channel, discord.TextChannel) and role is not None and bool(visibility.get("hidden")),
+        })
+
+    # v1.0.0-rc.52: one news channel per world, gated by the realm *access*
+    # role (reached that world) rather than the presence role (standing in its
+    # capital), so `ready` asks about the access role, not the capital's.
+    event_rows = {str(row["world_name"]): row for row in await DB.get_world_event_channels(guild.id)}
+    world_event_feeds: list[dict[str, Any]] = []
+    for world, hub in REALM_HUBS.items():
+        row = event_rows.get(world)
+        channel = guild.get_channel(int(row["channel_id"])) if row else None
+        role = discord.utils.get(guild.roles, name=_realm_access_role_name(world))
+        visibility = (
+            realm_hub_visibility(channel, role, guild.default_role)
+            if isinstance(channel, discord.TextChannel) else {"hidden": False}
+        )
+        world_event_feeds.append({
+            "world": world,
+            "channel_name": channel.name if isinstance(channel, discord.TextChannel) else None,
+            "channel_id": channel.id if isinstance(channel, discord.TextChannel) else None,
+            "expected_name": str(hub.get("events_channel_name") or ""),
             "role_name": role.name if role else None,
             "hidden": bool(visibility.get("hidden")),
             "ready": isinstance(channel, discord.TextChannel) and role is not None and bool(visibility.get("hidden")),
@@ -717,6 +784,7 @@ async def _dashboard_discord_snapshot(client: commands.Bot, guild: discord.Guild
     ]
     ready_base = sum(1 for row in base_channels if row["status"] == "ready")
     ready_realms = sum(1 for row in realm_hubs if row["ready"])
+    ready_feeds = sum(1 for row in world_event_feeds if row["ready"])
     warnings = [row["label"] for row in permissions if row["required"] and not row["ok"]]
     if blocked_roles:
         warnings.append("Bot role must be moved above: " + ", ".join(blocked_roles))
@@ -736,6 +804,9 @@ async def _dashboard_discord_snapshot(client: commands.Bot, guild: discord.Guild
         "base_ready": ready_base,
         "base_total": len(base_channels),
         "realm_hubs": realm_hubs,
+        "world_event_feeds": world_event_feeds,
+        "world_events_ready": ready_feeds,
+        "world_events_total": len(world_event_feeds),
         "auction_halls": auction_halls,
         "realm_ready": ready_realms,
         "realm_total": len(realm_hubs),
@@ -744,7 +815,8 @@ async def _dashboard_discord_snapshot(client: commands.Bot, guild: discord.Guild
         "channel_messages": channel_messages,
         "bugs": bugs,
         "registered_commands": len(client.tree.get_commands(guild=GUILD)),
-        "setup_ready": ready_base == len(base_channels) and ready_realms == len(realm_hubs) and not warnings,
+        "setup_ready": (ready_base == len(base_channels) and ready_realms == len(realm_hubs)
+                        and ready_feeds == len(world_event_feeds) and not warnings),
     }
 
 
@@ -1146,7 +1218,8 @@ async def admin_realm_hubs(interaction: discord.Interaction, action: app_command
         return
     if action.value == "refresh":
         await ensure_realm_hub_channels(guild, category_name=category_name)
-        await ensure_auction_house_channels(guild, category_name=category_name)
+        await ensure_auction_house_channels(guild, category_name=SERVER_AUCTION_CATEGORY)
+        await ensure_world_event_channels(guild, category_name=SERVER_EVENT_CATEGORY)
     existing = {str(row["world_name"]): row for row in await DB.get_realm_hub_channels(guild.id)}
     lines = [
         "🏙️ **Realm-Capital Meeting Channels**",

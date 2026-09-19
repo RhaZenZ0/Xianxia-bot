@@ -10,8 +10,8 @@ class RecordingSimulationEngine:
     def __init__(self):
         self.calls = []
 
-    async def run_due_simulation(self, game_minute, automation):
-        self.calls.append(("run_due", game_minute, dict(automation)))
+    async def run_due_simulation(self, automation):
+        self.calls.append(("run_due", dict(automation)))
         return [{
             "system": "npc_life",
             "due_steps": 3,
@@ -20,8 +20,8 @@ class RecordingSimulationEngine:
             "events": [{"kind": "test"}],
         }]
 
-    async def force_simulation(self, system, steps, game_minute):
-        self.calls.append(("force", system, steps, game_minute))
+    async def force_simulation(self, system, steps):
+        self.calls.append(("force", system, steps))
         return {
             "system": system,
             "due_steps": steps,
@@ -34,8 +34,8 @@ class SimulationBoundaryTests(unittest.IsolatedAsyncioTestCase):
     async def test_run_due_delegates_to_go_engine(self):
         engine = RecordingSimulationEngine()
         sim = WorldSimulator(None, {}, engine=engine)
-        runs = await sim.run_due(4321, {"npc_life": True})
-        self.assertEqual(engine.calls, [("run_due", 4321, {"npc_life": True})])
+        runs = await sim.run_due({"npc_life": True})
+        self.assertEqual(engine.calls, [("run_due", {"npc_life": True})])
         self.assertEqual(runs[0].system, "npc_life")
         self.assertEqual(runs[0].summary, "go-owned simulation")
         self.assertEqual(runs[0].events, ({"kind": "test"},))
@@ -43,8 +43,8 @@ class SimulationBoundaryTests(unittest.IsolatedAsyncioTestCase):
     async def test_force_run_delegates_to_go_engine(self):
         engine = RecordingSimulationEngine()
         sim = WorldSimulator(None, {}, engine=engine)
-        run = await sim.force_run("dynamic_economy", 2, 5000)
-        self.assertEqual(engine.calls, [("force", "dynamic_economy", 2, 5000)])
+        run = await sim.force_run("dynamic_economy", 2)
+        self.assertEqual(engine.calls, [("force", "dynamic_economy", 2)])
         self.assertEqual(run.summary, "go-owned dynamic_economy")
 
     def test_engine_is_required(self):

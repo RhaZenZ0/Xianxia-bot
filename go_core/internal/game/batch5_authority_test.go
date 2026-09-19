@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"xianxia/core/internal/storage"
+	"xianxia/core/internal/worlddata"
 )
 
 func setupBatch5AuthorityDB(t *testing.T) string {
@@ -382,15 +383,58 @@ func TestBatch5AuthorityOperationNamesHaveNativeCoverage(t *testing.T) {
 	}
 }
 
+// forcePersonalUnexpectedEvent makes the next explore draw
+// `wounded_wandering_senior`, by finding where it sits in the list the draw
+// will actually build rather than by counting entries in `world.json`.
+//
+// It used to return a hardcoded 7, with the comment "after the first two world
+// events". That is a fixture coupled to the roster's order *and* its length:
+// v1.0.0-rc.49 added five events and index 7 silently became
+// `cursed_relic_whisper`, which the test noticed only because it happens to
+// assert on the id. Anything that reorders the file would have moved it again.
 func forcePersonalUnexpectedEvent(t *testing.T) {
 	t.Helper()
+	forceUnexpectedEvent(t, "wounded_wandering_senior")
+}
+
+// forceUnexpectedEvent pins the draw to one event by id, for the character
+// this package's fixtures use: user 42, realm 0, standing in Greenriver Town.
+// The eligibility filter is the real one, so a band that would exclude the
+// wanted event fails here loudly instead of selecting its neighbour.
+func forceUnexpectedEvent(t *testing.T, id string) {
+	t.Helper()
+	catalog, err := worlddata.Load(batch4WorldPath(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	eligible := eligibleUnexpectedEvents(catalog, mechanicsCharacter{RealmIndex: 0, Location: "Greenriver Town"})
+	// The pick is weighted, not indexed: `rollUnexpectedEvent` draws in
+	// [0, sum of weights) and walks the list subtracting each weight. So the
+	// value that selects an event is the weight of everything before it - the
+	// old hardcoded 7 happened to land on that sum, which is why adding five
+	// events moved it.
+	offset, total, found := 0, 0, false
+	for _, e := range eligible {
+		w := e.Weight
+		if w < 0 {
+			w = 0
+		}
+		if e.ID == id {
+			found = true
+			offset = total
+		}
+		total += w
+	}
+	if !found {
+		t.Fatalf("%q is not drawable by a realm-0 character in Greenriver Town; the fixture cannot force it", id)
+	}
 	original := unexpectedEventIntn
 	unexpectedEventIntn = func(n int) (int, error) {
 		if n == 100 {
 			return 0, nil
 		}
-		if n > 7 {
-			return 7, nil // after the first two world events, select wounded_wandering_senior
+		if n == total {
+			return offset, nil
 		}
 		return 0, nil
 	}

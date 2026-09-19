@@ -59,26 +59,29 @@ def _base_channel_bindings(cfg: dict[str, Any]) -> dict[str, Any]:
 def _xianxia_info_guide_text() -> str:
     return (
         f"📖 **Xianxia Realm Guide — v{RELEASE_VERSION}**\n"
-        "This channel is **read-only** and is **not** a game location. Use the guide menu below for detailed help.\n\n"
-        "🌱 **Start** — `/begin` in `#begin-here`\n"
-        "🧭 **Explore** — private expedition journal under `#expeditions`\n"
-        "🏯 **Sects** — discovery → recommendation → entrance trial → sect life\n"
-        "🏡 **Properties** — persistent private player/sect locations under `#player-homes`\n"
-        "🧑 **Dashboard** — `/me` for scene, cultivation, relationships and quests\n"
-        "📜 **Quests** — `/quests` for generic objective-driven story progress\n"
-        "🔒 Unknown locations, future worlds and higher-world NPCs remain hidden until legitimately unlocked."
+        "This channel is **read-only** and is **not** a game location. Pick a topic below for detail.\n\n"
+        "🌱 **Start** — `/begin` in `#begin-here`; your household gives you your first quest\n"
+        "🧭 **Everything** — `/menu` opens every hub from anywhere\n"
+        "🗺️ **Where you are** — `/world` for the place, the roads and what is happening\n"
+        "🧑 **Who you are** — `/character` for the sheet, afflictions, standing and soul\n"
+        "📜 **Quests** — `/quests`; most are handed to you by the people who give them\n"
+        "🌠 **News** — one events channel per world, under **World Events**\n"
+        "🔒 Unknown places, higher worlds and the NPCs in them stay hidden until you reach them."
     )
 
 
 XIANXIA_INFO_PAGES: dict[str, tuple[str, str]] = {
-    "getting_started": ("🌱 Getting Started", "Use `/begin` in `#begin-here`, then `/me` to see your current state. Exploration happens in your private expedition thread; main realm-capital channels remain shared social spaces."),
-    "character": ("🧬 Character & Cultivation", "Your family, spiritual root, cultivation path, realms, resources, Karma, Fate, Dao Heart and effects remain canonical game state. The AI router narrates results but cannot change mechanics."),
-    "exploration": ("🧭 Exploration & Scenes", "The scene engine separates **physical location** from **active scene**. Wilderness uses your expedition journal. Player properties and sect abodes use persistent private threads. Main cities remain shared channels."),
-    "sects": ("🏯 Sects", "Discover a sect route, speak with affiliated NPCs, earn recommendations, take a sect-specific trial, and join only after a canonical success. Membership can grant a private sect residence."),
-    "properties": ("🏡 Player-Owned Locations", "Properties are real database-backed locations with private threads, facilities and guest permissions. Guests must be invited and physically reach the entrance before gaining access."),
-    "relationships": ("🤝 NPC Relationships", "Persistent NPC state tracks trust, respect, fear, affection, debt, grudge and encounter history. Narration may describe those relationships but never owns the underlying numbers."),
-    "quests": ("📜 Quests", "The generic quest engine supports reusable objectives such as explore, talk, investigate, collect, craft, travel and sect milestones. `/quests` shows available and active quests."),
-    "admin": ("🧰 Server Administration", "Use `/admin → Server → Setup` for Setup Server, Repair Server, Check Permissions, Show Configuration, Sync Realm Roles and Rebuild Info Guide."),
+    "getting_started": ("🌱 Getting Started", "Run `/begin` in `#begin-here`. You are born into one of thirteen households: it teaches you a trade, hands you an heirloom, and gives you the first quest of a chain that walks you out of the door, through the town and the road, and home again. Follow it. `/menu` opens every hub from anywhere, and `/cooldowns` says what is ready and where each ready thing is done."),
+    "server_layout": ("🗺️ The Server", "Four categories. **📜 Xianxia RP** holds what everyone shares: `#begin-here`, `#event-scenes`, read-only anchors for your private threads, and `#world-events` for anything global. **🌠 World Events** holds one news channel per world. **🌌 Realm Capitals** holds one meeting city per world. **🏮 Auction Houses** holds the live lot feeds. A capital is visible only while you are standing in it; a world's news and its auction floor are visible once you have reached that world at all."),
+    "character": ("🧬 Character & Cultivation", "Your household, spiritual root, physique, path, realm, resources, karma, fate and Dao heart are canonical game state. Two ladders run in parallel — qi cultivation and body tempering — and Stage 9 of either opens the optional Perfection path. The AI narrates what has already happened; it cannot change a mechanic, grant a reward, or decide an outcome."),
+    "exploration": ("🧭 Exploration & Scenes", "**Where you stand** and **what scene you are in** are separate. Wilderness travel, exploration, foraging and hunting happen in your own private expedition thread under `#expeditions`. Properties and sect abodes use persistent private threads under `#player-homes`. A realm capital is a shared channel you can only see while you are in the city."),
+    "world_events": ("🌠 World Events", "The world produces events on its own, and players trigger them by exploring. Each is announced in **its own world's** news channel with a link to its scene thread, and each carries a **site**: a finite number of beasts, herbs, veins, relics and tasks that deplete as people work them. Travel to the place the notice names to take part. What you are *handed* is banded by realm — a new cultivator is not offered a Dragon — but anything the world spawns on its own, you can walk into."),
+    "sects": ("🏯 Sects", "Discover a route, speak with affiliated NPCs, earn a recommendation, pass a sect-specific trial, and join only on a canonical success. Membership brings contribution points, a rank, a private residence, and a side in whatever war the sect is in."),
+    "professions": ("⚒️ Crafts & Professions", "Four trades: Forging, Alchemy, Inscription, Formation. Your household teaches you one, and the head of the house can qualify you in all four, once, at home. Recipes come from method slips sold in the halls (`/learn`) and from passing a hall keeper's **examination** at the rank you currently hold. Gather with `/alchemy forage` and on the hunt rather than buying everything."),
+    "properties": ("🏡 Player-Owned Locations", "Properties are real database-backed locations with private threads, facilities and guest permissions. A guest must be invited **and** physically reach the entrance before they gain access. Your birth household is a place worth returning to: contribute to its treasury, be tutored again, run its errands, and cultivate at its hearth."),
+    "relationships": ("🤝 NPC Relationships", "Persistent NPC state tracks trust, respect, fear, affection, debt, grudge and encounter history. The world's people live on their own — they travel, court, marry, have children, feud, commit crimes, go missing and die — whether or not anybody is watching. Narration may describe a relationship; it never owns the numbers."),
+    "quests": ("📜 Quests", "Most quests are **handed to you**: by your household, by a hall keeper offering an examination, by a commission giver in a city, or by finishing the quest before. `/quests` shows what you hold, and what the Quest Forge has approved as open to anyone. Objectives advance off things you actually did — explore, talk, cultivate, travel, win a fight, craft, trade, gather, come home."),
+    "admin": ("🧰 Server Administration", "`/admin → Server → Setup` runs Setup Server, Repair Server, Check Permissions, Show Configuration, Sync Realm Roles and Rebuild Info Guide. Repair also creates any missing category or channel and moves existing ones into the category they belong in. Channel layout, the GM dashboard and every audited lever live in the web console."),
 }
 
 
@@ -122,6 +125,11 @@ class XianxiaInfoView(discord.ui.View):
 CHANNEL_MESSAGE_KEYS: tuple[str, ...] = (
     "world-events", "event-scenes", "player-homes", "bot-logs", "begin-here", "expeditions",
     "realm:Mortal World", "realm:Spiritual World", "realm:Immortal World", "realm:Celestial World",
+    # v1.0.0-rc.52: the per-world events channels, resolved through
+    # `world_event_channels` the way `realm:` keys resolve through
+    # `realm_hub_channels`. A prefixed key needed no new mechanism.
+    "world-events:Mortal World", "world-events:Spiritual World",
+    "world-events:Immortal World", "world-events:Celestial World",
 )
 
 
@@ -136,6 +144,10 @@ CHANNEL_MESSAGE_LABELS: dict[str, str] = {
     "realm:Spiritual World": "Spirit Jade Capital (Spiritual World)",
     "realm:Immortal World": "Nine-Heavens Immortal Court (Immortal World)",
     "realm:Celestial World": "Celestial Mandate Palace (Celestial World)",
+    "world-events:Mortal World": "#mortal-world-events",
+    "world-events:Spiritual World": "#spiritual-world-events",
+    "world-events:Immortal World": "#immortal-world-events",
+    "world-events:Celestial World": "#celestial-world-events",
 }
 
 
@@ -145,45 +157,51 @@ CHANNEL_MESSAGE_LABELS: dict[str, str] = {
 # message in place rather than posting a duplicate (mirrors ensure_xianxia_info_guide).
 DEFAULT_CHANNEL_MESSAGES: dict[str, str] = {
     "world-events": (
-        "🌍 **World Events**\n"
-        "Great happenings ripple out from here — dynastic wars, sect conflicts, tribulations that "
-        "split the sky, and the rise and fall of powers across every realm. The Xianxia bot posts "
-        "world-shaking news in this channel automatically; feel free to react and discuss what you "
-        "read, but roleplay itself belongs in your own scenes and threads, not here."
+        "\U0001f30d **World Events — the global feed**\n"
+        "Anything that touches every world at once lands here: the doubled-gift weekends, "
+        "server-wide notices, and a world reset when one comes. **News about one world goes to "
+        "that world's own channel** under **\U0001f320 World Events** — `#mortal-world-events`, "
+        "`#spiritual-world-events`, `#immortal-world-events`, `#celestial-world-events` — and you "
+        "see each of those once you have reached that world.\n"
+        "React and discuss freely; roleplay itself belongs in your scenes and threads, not here."
     ),
     "event-scenes": (
-        "🎭 **Event Scenes**\n"
-        "When the world calls for a shared, public scene — a market day, a tournament, a sect "
-        "gathering, a battle at the gates — the Xianxia bot opens a thread for it right here. Jump "
-        "into any open thread to roleplay the event live alongside other cultivators. Threads "
-        "archive automatically once their scene concludes."
+        "\U0001f3ad **Event Scenes**\n"
+        "When the world opens a shared, public scene — a market day, a tournament, a sect "
+        "gathering, a battle at the gates — the bot opens a thread for it right here, and the "
+        "announcement in the world's events channel links straight to it. Jump into any open "
+        "thread to play the event live. A scene's site holds a finite number of things to do, so "
+        "arriving early and arriving late are genuinely different; threads archive once the scene "
+        "concludes."
     ),
     "player-homes": (
-        "🏡 **Player Homes**\n"
-        "This channel is a **read-only anchor** for every player-owned and sect-owned location in "
-        "the world — cave abodes, manors, sect grounds and more. It doesn't carry roleplay itself; "
-        "instead, each property gets its own private thread the moment it's built, visible only to "
-        "its owner and invited guests. Look for your thread once you've claimed or built a home."
+        "\U0001f3e1 **Player Homes**\n"
+        "A **read-only anchor** for every player-owned and sect-owned place in the world — cave "
+        "abodes, manors, homesteads and sect residences. No roleplay happens in the channel "
+        "itself: each property gets its own private thread the moment it is built, visible to its "
+        "owner and to guests who have been invited *and* have physically reached the entrance. "
+        "Look for your thread once you have claimed or built a home."
     ),
     "bot-logs": (
-        "🛠️ **Bot Logs**\n"
-        "This is the Xianxia bot's private operations channel — administrator actions, errors, and "
-        "behind-the-scenes diagnostics land here. It's for staff only and has no bearing on the "
-        "story; check it if something in the game seems to be misbehaving."
+        "\U0001f6e0\ufe0f **Bot Logs**\n"
+        "The bot's private operations channel — administrator actions, failures and diagnostics. "
+        "Staff only, and it has no bearing on the story. Every GM action that changes the world is "
+        "also written to the audit log the dashboard reads, so this channel is the quick view, not "
+        "the record."
     ),
     "begin-here": (
-        "🌱 **Begin Here**\n"
-        "Every journey starts with a single step onto the cultivation path. Run `/begin` right in "
-        "this channel to create your character — choose your background, awaken your spiritual "
-        "root, and step into the world for the first time. Once you're in, check `#xianxia-info` "
-        "for a full guide, or dive straight into your starting scene."
+        "\U0001f331 **Begin Here**\n"
+        "Every journey starts with one step onto the cultivation path. Run `/begin` in this "
+        "channel to create your character — your birth household, your spiritual root, and the "
+        "trade your family keeps. You will be given your first quest by the people who raised you; "
+        "follow it. `/menu` opens every hub from anywhere, and `#xianxia-info` has the full guide."
     ),
     "expeditions": (
-        "🧭 **Expeditions**\n"
-        "This channel is a **read-only anchor** for private expedition journals. Wilderness "
-        "exploration, foraging, secret realms and wandering encounters all happen inside your own "
-        "personal expedition thread, not in this channel directly — the bot creates one for you "
-        "automatically the first time you venture out. Look for your thread here once you've set off."
+        "\U0001f9ed **Expeditions**\n"
+        "A **read-only anchor** for private expedition journals. Wilderness travel, exploration, "
+        "foraging, hunting, secret realms and wandering encounters all happen inside your own "
+        "thread, opened automatically the first time you venture out — so one cultivator's journey "
+        "never buries another's. Look for your thread here once you have set off."
     ),
     "realm:Mortal World": (
         "🏯 **Azure Crown Imperial City**\n"
@@ -215,6 +233,38 @@ DEFAULT_CHANNEL_MESSAGES: dict[str, str] = {
         "are issued and contested, and only the mightiest cultivators in existence are received. "
         "This channel is shared, open roleplay for those who have reached the Celestial World. Here, "
         "every word and every alliance can shift the balance of the world itself."
+    ),
+    "world-events:Mortal World": (
+        "\U0001f30f **Mortal World — news**\n"
+        "What the Mortal World does to itself, as it happens: disasters and invasions, sect and "
+        "clan wars, disappearances, discoveries, and the rise and fall of its powers. Each notice "
+        "links to the scene thread where you can take part — **travel to the place it names** and "
+        "you can work the site yourself. A scene holds a finite number of beasts, herbs, veins and "
+        "tasks, so getting there first is worth something.\n"
+        "You see this channel because you have reached the Mortal World. Discussion is welcome; "
+        "roleplay belongs in the scene thread."
+    ),
+    "world-events:Spiritual World": (
+        "\U0001f48e **Spiritual World — news**\n"
+        "Upheavals among the ascended sects and the ancient bloodline families, and every event "
+        "the Spiritual World opens up. Each notice links to its scene thread; travel to the place "
+        "it names to take part. Events here run at the severity this world carries — heavier than "
+        "the Mortal World's, and worth more to whoever reaches them.\n"
+        "You see this channel because you have broken through into the Spiritual World."
+    ),
+    "world-events:Immortal World": (
+        "\u26e9\ufe0f **Immortal World — news**\n"
+        "Immortal clans, law formations, and the events that shake the Nine-Heavens court. Each "
+        "notice links to its scene thread; travel to the place it names to take part. What opens "
+        "up here is immortal-grade, and so is what it costs to survive.\n"
+        "You see this channel because you have ascended into the Immortal World."
+    ),
+    "world-events:Celestial World": (
+        "\U0001f451 **Celestial World — news**\n"
+        "Sovereign courts, heavenly factions, and the events that move them. Each notice links to "
+        "its scene thread; travel to the place it names to take part. At this height an event can "
+        "shift the balance of the world itself.\n"
+        "You see this channel because you have reached the Celestial World."
     ),
 }
 
@@ -263,6 +313,13 @@ async def _resolve_channel_message_target(guild: discord.Guild, channel_key: str
     if channel_key.startswith("realm:"):
         world = channel_key.split(":", 1)[1]
         rows = {str(row["world_name"]): row for row in await DB.get_realm_hub_channels(guild.id)}
+        row = rows.get(world)
+        if not row:
+            return None
+        return await _resolve_text_channel(guild, row.get("channel_id"))
+    if channel_key.startswith("world-events:"):
+        world = channel_key.split(":", 1)[1]
+        rows = {str(row["world_name"]): row for row in await DB.get_world_event_channels(guild.id)}
         row = rows.get(world)
         if not row:
             return None

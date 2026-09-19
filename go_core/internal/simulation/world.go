@@ -164,9 +164,14 @@ type RunDueRequest struct {
 	Automation map[string]bool `json:"automation"`
 }
 type ForceRequest struct {
-	System     string `json:"system"`
-	Steps      int64  `json:"steps"`
-	GameMinute int64  `json:"game_minute"`
+	System string `json:"system"`
+	Steps  int64  `json:"steps"`
+	// GameMinute is accepted for wire compatibility and deliberately ignored,
+	// exactly as RunDueRequest's is (v1.0.0-rc.48). A GM chooses the system
+	// and how many steps to apply; what time it is was never theirs to say.
+	// The field stays on the wire so an older bot mid-upgrade still talks to
+	// a newer engine - it is the value that is refused, not the request.
+	GameMinute int64 `json:"game_minute"`
 }
 
 func NewRunner(databasePath, worldPath string) (*Runner, error) {
@@ -382,17 +387,27 @@ func (r *Runner) Force(req ForceRequest) (Run, error) {
 		return Run{}, err
 	}
 	defer conn.Close()
-	summary, events, err := r.runSystem(conn, req.System, req.Steps, req.GameMinute)
+	// The same door RunDue reads, for the same reason. Before rc.48 this took
+	// `req.GameMinute`, so a forced run stamped `world_simulation_state` and
+	// aged the world at whatever minute the caller sent - and every system
+	// under it reads that number as "now", which is how an NPC gets buried.
+	gameMinute, err := game.CanonicalWorldGameMinute(conn)
+	if err != nil {
+		return Run{}, err
+	}
+	summary, events, err := r.runSystem(conn, req.System, req.Steps, gameMinute)
 	if err != nil {
 		return Run{}, err
 	}
 	return Run{System: req.System, DueSteps: req.Steps, AppliedSteps: req.Steps, Summary: summary, Events: events}, nil
 }
 
-// runSystem is the GM Force path: apply N steps and stamp the anchor at a
-// caller-chosen minute, in its own transaction. RunDue does not use it - a
+// runSystem is the GM Force path: apply N steps and stamp the anchor at the
+// canonical world minute, in its own transaction. RunDue does not use it - a
 // scheduled tick has to decide how many steps are due under the same lock that
-// applies them, which runDueSystem does.
+// applies them, which runDueSystem does. The minute is derived by the caller
+// above rather than read here, because this runs inside the transaction and
+// the clock is a read the caller already has to make.
 func (r *Runner) runSystem(conn *storage.Conn, system string, steps, gameMinute int64) (string, []SpawnedWorldEvent, error) {
 	if err := conn.ExecScript("BEGIN IMMEDIATE;"); err != nil {
 		return "", nil, err

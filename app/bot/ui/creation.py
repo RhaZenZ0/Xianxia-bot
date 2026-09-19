@@ -102,7 +102,7 @@ class CharacterModal(discord.ui.Modal):
             )
             return
         try:
-            await ENGINE.bootstrap_simulation(wt.total_minutes)
+            await ENGINE.bootstrap_simulation()
         except Exception:
             log.exception("Could not initialize Go-owned simulation bootstrap after character creation")
 

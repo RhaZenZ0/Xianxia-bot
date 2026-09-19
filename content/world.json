@@ -26045,6 +26045,191 @@
       "sect_value": 4,
       "base_price": 12,
       "market_excluded": true
+    },
+    "last_lantern_wick": {
+      "name": "Last Lantern Wick",
+      "description": "A wick that has never been lit and will not take a flame; held in the dark it is warm.",
+      "sect_value": 520,
+      "auction_interest": "legendary",
+      "door_event_chance": 60,
+      "hunter_realm_bonus": 2,
+      "base_price": 4200
+    },
+    "ash_gate_hinge": {
+      "name": "Ash Gate Hinge",
+      "description": "A hinge pulled from a door that burned for a year; it is cool now and still smells of it.",
+      "sect_value": 520,
+      "auction_interest": "legendary",
+      "door_event_chance": 60,
+      "hunter_realm_bonus": 2,
+      "base_price": 4200
+    },
+    "cracked_altar_shard": {
+      "name": "Cracked Altar Shard",
+      "description": "A shard of altar stone with half a measuring mark on it; the other half is still on the altar.",
+      "sect_value": 520,
+      "auction_interest": "legendary",
+      "door_event_chance": 60,
+      "hunter_realm_bonus": 2,
+      "base_price": 4200
+    },
+    "buried_court_writ": {
+      "name": "Buried Court Writ",
+      "description": "A writ with the judgement left blank; the seal at the foot of it is real.",
+      "sect_value": 520,
+      "auction_interest": "legendary",
+      "door_event_chance": 60,
+      "hunter_realm_bonus": 2,
+      "base_price": 4200
+    },
+    "nine_pillar_cornerstone": {
+      "name": "Nine Pillar Cornerstone",
+      "description": "A cornerstone cut for a pillar that was never raised; the array marks on it are finished.",
+      "sect_value": 520,
+      "auction_interest": "legendary",
+      "door_event_chance": 60,
+      "hunter_realm_bonus": 2,
+      "base_price": 4200
+    },
+    "last_lantern_ember": {
+      "name": "Last Lantern Ember",
+      "description": "An ember off a wick that was never lit. It does not cool, and the dark around it stays the size of a room.",
+      "use": {
+        "effect_key": "last_lantern_ember",
+        "name": "Lantern-Keeper's Steadiness",
+        "duration_game_minutes": 0,
+        "effect": {
+          "description": "The lantern-keepers' steadiness stays with you: what waits in the dark waits, and you do not.",
+          "modifiers": [
+            {
+              "stat": "will",
+              "operation": "add",
+              "value": 1
+            }
+          ],
+          "tags": [
+            "treasure",
+            "secret_realm"
+          ]
+        }
+      },
+      "sect_value": 1875,
+      "auction_interest": "legendary",
+      "door_event_chance": 70,
+      "hunter_realm_bonus": 3,
+      "base_price": 15000
+    },
+    "ash_gate_cinder": {
+      "name": "Ash Gate Cinder",
+      "description": "A cinder from the gate that burned for a year. Held up, it throws the shadow of a door.",
+      "use": {
+        "effect_key": "ash_gate_cinder",
+        "name": "Warden at the Threshold",
+        "duration_game_minutes": 0,
+        "effect": {
+          "description": "You stand in a doorway the way the wardens did, and people stop in it.",
+          "modifiers": [
+            {
+              "stat": "presence",
+              "operation": "add",
+              "value": 1
+            }
+          ],
+          "tags": [
+            "treasure",
+            "secret_realm"
+          ]
+        }
+      },
+      "sect_value": 3250,
+      "auction_interest": "legendary",
+      "door_event_chance": 70,
+      "hunter_realm_bonus": 3,
+      "base_price": 26000
+    },
+    "cracked_altar_measure": {
+      "name": "Cracked Altar Measure",
+      "description": "The keepers' measuring mark, cut whole from the altar stone. What is short of it looks short.",
+      "use": {
+        "effect_key": "cracked_altar_measure",
+        "name": "The Keepers' Measure",
+        "duration_game_minutes": 0,
+        "effect": {
+          "description": "You weigh what is put in front of you against what it claims to be.",
+          "modifiers": [
+            {
+              "stat": "insight",
+              "operation": "add",
+              "value": 1
+            }
+          ],
+          "tags": [
+            "treasure",
+            "secret_realm"
+          ]
+        }
+      },
+      "sect_value": 3500,
+      "auction_interest": "legendary",
+      "door_event_chance": 70,
+      "hunter_realm_bonus": 3,
+      "base_price": 28000
+    },
+    "buried_court_verdict": {
+      "name": "Buried Court Verdict",
+      "description": "A verdict sealed but never delivered. The seal is intact and the finding inside is not yours to read.",
+      "use": {
+        "effect_key": "buried_court_verdict",
+        "name": "Unspoken Verdict",
+        "duration_game_minutes": 0,
+        "effect": {
+          "description": "Something of the assize sits behind you; the world answers a little more readily.",
+          "modifiers": [
+            {
+              "stat": "spirit",
+              "operation": "add",
+              "value": 1
+            }
+          ],
+          "tags": [
+            "treasure",
+            "secret_realm"
+          ]
+        }
+      },
+      "sect_value": 6500,
+      "auction_interest": "legendary",
+      "door_event_chance": 70,
+      "hunter_realm_bonus": 3,
+      "base_price": 52000
+    },
+    "nine_pillar_keystone": {
+      "name": "Nine Pillar Keystone",
+      "description": "The keystone the ninth pillar would have carried. It is heavier than it has any right to be.",
+      "use": {
+        "effect_key": "nine_pillar_keystone",
+        "name": "The Ninth Pillar's Share",
+        "duration_game_minutes": 0,
+        "effect": {
+          "description": "You carry a share of what eight pillars carried, and it no longer bends you.",
+          "modifiers": [
+            {
+              "stat": "will",
+              "operation": "add",
+              "value": 1
+            }
+          ],
+          "tags": [
+            "treasure",
+            "secret_realm"
+          ]
+        }
+      },
+      "sect_value": 7000,
+      "auction_interest": "legendary",
+      "door_event_chance": 70,
+      "hunter_realm_bonus": 3,
+      "base_price": 56000
     }
   },
   "recipes": {
@@ -26651,6 +26836,76 @@
         "insight_xp": 80
       },
       "item": "hollow_throne_seal"
+    },
+    "last_lantern_legacy": {
+      "name": "Last Lantern Legacy",
+      "description": "A soul inheritance of the lantern-keepers, who lit the wetland road for the dead and were the last thing many of them saw.",
+      "preferred_paths": [
+        "Soul Cultivator",
+        "Qi Refiner"
+      ],
+      "bonuses": {
+        "qi_max": 3,
+        "vitality_max": 2,
+        "insight_xp": 60
+      },
+      "item": "last_lantern_wick"
+    },
+    "ash_gate_legacy": {
+      "name": "Ash Gate Legacy",
+      "description": "A body inheritance of the gate-wardens, who stood in the fire so the road behind them stayed shut.",
+      "preferred_paths": [
+        "Body Refiner",
+        "Formation Adept"
+      ],
+      "bonuses": {
+        "qi_max": 3,
+        "vitality_max": 2,
+        "insight_xp": 60
+      },
+      "item": "ash_gate_hinge"
+    },
+    "cracked_altar_legacy": {
+      "name": "Cracked Altar Legacy",
+      "description": "An alchemical inheritance of the altar's keepers, who measured every offering and refused most of them.",
+      "preferred_paths": [
+        "Qi Refiner",
+        "Soul Cultivator"
+      ],
+      "bonuses": {
+        "qi_max": 3,
+        "vitality_max": 2,
+        "insight_xp": 60
+      },
+      "item": "cracked_altar_shard"
+    },
+    "buried_court_legacy": {
+      "name": "Buried Court Legacy",
+      "description": "A legacy of the buried assize, whose judges heard every petition and were themselves never heard.",
+      "preferred_paths": [
+        "Soul Cultivator",
+        "Formation Adept"
+      ],
+      "bonuses": {
+        "qi_max": 3,
+        "vitality_max": 2,
+        "insight_xp": 60
+      },
+      "item": "buried_court_writ"
+    },
+    "nine_pillar_legacy": {
+      "name": "Nine Pillar Legacy",
+      "description": "A formation inheritance of the vault's builders, whose array stood on nine pillars and held on eight.",
+      "preferred_paths": [
+        "Formation Adept",
+        "Qi Refiner"
+      ],
+      "bonuses": {
+        "qi_max": 3,
+        "vitality_max": 2,
+        "insight_xp": 60
+      },
+      "item": "nine_pillar_cornerstone"
     }
   },
   "secret_realms": {
@@ -26921,7 +27176,13 @@
           "cultivation": 20,
           "spirit_stones": 12,
           "insight_xp": 12,
-          "items": {}
+          "items": {},
+          "rare_items": {
+            "hundred_year_peach": {
+              "chance": 6,
+              "max": 1
+            }
+          }
         }
       ]
     },
@@ -27129,7 +27390,13 @@
           "cultivation": 36,
           "spirit_stones": 20,
           "insight_xp": 20,
-          "items": {}
+          "items": {},
+          "rare_items": {
+            "living_world_ring": {
+              "chance": 4,
+              "max": 1
+            }
+          }
         }
       ]
     },
@@ -27192,6 +27459,381 @@
           "items": {}
         }
       ]
+    },
+    "last_lantern_wake": {
+      "name": "Last Lantern Wake",
+      "location": "Last Lantern Ruin",
+      "min_realm_index": 10,
+      "open_hours": 10,
+      "inheritance_id": "last_lantern_legacy",
+      "description": "The wake the lantern-keepers never finished opens when the last of the nine lanterns gutters and does not go out; the mist comes in with you.",
+      "rooms": [
+        {
+          "name": "The Guttering Line",
+          "description": "Nine lanterns on nine posts, and the mist moves between them in the order they were lit.",
+          "attribute": "insight",
+          "tn": 16,
+          "preferred_paths": [
+            "Soul Cultivator"
+          ],
+          "cultivation": 16,
+          "spirit_stones": 8,
+          "insight_xp": 7,
+          "items": {
+            "moonveil_herb": 2
+          }
+        },
+        {
+          "name": "Hall of the Unclaimed",
+          "description": "The keepers laid out those nobody came for; the trial is to read a name without saying it.",
+          "attribute": "presence",
+          "tn": 18,
+          "preferred_paths": [
+            "Soul Cultivator"
+          ],
+          "cultivation": 20,
+          "spirit_stones": 10,
+          "insight_xp": 9,
+          "items": {
+            "moonveil_recovery_pill": 1
+          }
+        },
+        {
+          "name": "The Wetland Crossing",
+          "description": "Water that reflects a road that is not the one you are standing on.",
+          "attribute": "agility",
+          "tn": 20,
+          "preferred_paths": [
+            "Soul Cultivator",
+            "Qi Refiner"
+          ],
+          "cultivation": 24,
+          "spirit_stones": 12,
+          "insight_xp": 11,
+          "items": {
+            "spirit_condensation_pill": 1
+          }
+        },
+        {
+          "name": "The Last Lantern",
+          "description": "It is still burning. The trial is to leave it burning.",
+          "attribute": "will",
+          "tn": 22,
+          "preferred_paths": [
+            "Soul Cultivator"
+          ],
+          "cultivation": 30,
+          "spirit_stones": 16,
+          "insight_xp": 16,
+          "items": {},
+          "rare_items": {
+            "last_lantern_ember": {
+              "chance": 5,
+              "max": 1
+            }
+          }
+        }
+      ]
+    },
+    "ash_gate_threshold": {
+      "name": "Ash Gate Threshold",
+      "location": "Ash Gate Ruin",
+      "min_realm_index": 17,
+      "open_hours": 10,
+      "inheritance_id": "ash_gate_legacy",
+      "description": "The threshold behind the ash gate opens when the stone is warm to the touch; the gate burned once and has not finished burning.",
+      "rooms": [
+        {
+          "name": "The Warm Stone",
+          "description": "The threshold stone holds the heat of a fire nobody has fed in an age.",
+          "attribute": "body",
+          "tn": 19,
+          "preferred_paths": [
+            "Body Refiner"
+          ],
+          "cultivation": 22,
+          "spirit_stones": 12,
+          "insight_xp": 10,
+          "items": {
+            "immortal_gold_ore": 2
+          }
+        },
+        {
+          "name": "The Standing Wardens",
+          "description": "What is left of the wardens is still in the doorway, and still in formation.",
+          "attribute": "will",
+          "tn": 21,
+          "preferred_paths": [
+            "Body Refiner",
+            "Formation Adept"
+          ],
+          "cultivation": 26,
+          "spirit_stones": 14,
+          "insight_xp": 12,
+          "items": {
+            "golden_edge_talisman": 1
+          }
+        },
+        {
+          "name": "The Unfinished Burn",
+          "description": "Fire that has been going out for centuries and has not yet arrived at going out.",
+          "attribute": "spirit",
+          "tn": 23,
+          "preferred_paths": [
+            "Formation Adept"
+          ],
+          "cultivation": 30,
+          "spirit_stones": 16,
+          "insight_xp": 14,
+          "items": {
+            "dawnlotus_vitality_pill": 1
+          }
+        },
+        {
+          "name": "The Gate Itself",
+          "description": "The gate is open. The trial is to walk through it slowly.",
+          "attribute": "presence",
+          "tn": 25,
+          "preferred_paths": [
+            "Body Refiner"
+          ],
+          "cultivation": 36,
+          "spirit_stones": 20,
+          "insight_xp": 20,
+          "items": {},
+          "rare_items": {
+            "ash_gate_cinder": {
+              "chance": 5,
+              "max": 1
+            }
+          }
+        }
+      ]
+    },
+    "cracked_altar_sanctum": {
+      "name": "Cracked Altar Sanctum",
+      "location": "Cracked Altar Ruin",
+      "min_realm_index": 18,
+      "open_hours": 10,
+      "inheritance_id": "cracked_altar_legacy",
+      "description": "The sanctum under the cracked altar opens when the marsh water rises past the second step; what was offered here was never collected.",
+      "rooms": [
+        {
+          "name": "The Second Step",
+          "description": "The water is at the second step and the step is counting.",
+          "attribute": "insight",
+          "tn": 19,
+          "preferred_paths": [
+            "Qi Refiner"
+          ],
+          "cultivation": 22,
+          "spirit_stones": 12,
+          "insight_xp": 10,
+          "items": {
+            "dawnlotus_herb": 2
+          }
+        },
+        {
+          "name": "The Offering Shelves",
+          "description": "Every offering is still where it was set down, and none of it has spoiled.",
+          "attribute": "spirit",
+          "tn": 21,
+          "preferred_paths": [
+            "Qi Refiner",
+            "Soul Cultivator"
+          ],
+          "cultivation": 26,
+          "spirit_stones": 14,
+          "insight_xp": 12,
+          "items": {
+            "immortal_gold_ore": 1
+          }
+        },
+        {
+          "name": "The Refusal Room",
+          "description": "The keepers refused most of what was brought; the trial is to see why.",
+          "attribute": "will",
+          "tn": 23,
+          "preferred_paths": [
+            "Soul Cultivator"
+          ],
+          "cultivation": 30,
+          "spirit_stones": 16,
+          "insight_xp": 14,
+          "items": {
+            "dawnlotus_vitality_pill": 1
+          }
+        },
+        {
+          "name": "The Crack",
+          "description": "The altar is cracked from underneath. The trial is not to widen it.",
+          "attribute": "insight",
+          "tn": 25,
+          "preferred_paths": [
+            "Qi Refiner"
+          ],
+          "cultivation": 36,
+          "spirit_stones": 20,
+          "insight_xp": 20,
+          "items": {},
+          "rare_items": {
+            "cracked_altar_measure": {
+              "chance": 5,
+              "max": 1
+            }
+          }
+        }
+      ]
+    },
+    "buried_court_assize": {
+      "name": "Buried Court Assize",
+      "location": "Buried Court Ruin",
+      "min_realm_index": 25,
+      "open_hours": 12,
+      "inheritance_id": "buried_court_legacy",
+      "description": "The assize beneath the buried court opens when no petition has been heard above it for a hundred years; the court is still sitting.",
+      "rooms": [
+        {
+          "name": "The Petitioners' Stair",
+          "description": "The queue is still on the stair, and it has not moved.",
+          "attribute": "presence",
+          "tn": 22,
+          "preferred_paths": [
+            "Soul Cultivator"
+          ],
+          "cultivation": 28,
+          "spirit_stones": 16,
+          "insight_xp": 12,
+          "items": {
+            "starsteel_ore": 2
+          }
+        },
+        {
+          "name": "The Reading of the Roll",
+          "description": "A roll of names read aloud by nobody; the trial is to answer to none of them.",
+          "attribute": "will",
+          "tn": 24,
+          "preferred_paths": [
+            "Soul Cultivator"
+          ],
+          "cultivation": 32,
+          "spirit_stones": 18,
+          "insight_xp": 14,
+          "items": {
+            "starfall_talisman": 1
+          }
+        },
+        {
+          "name": "The Bench",
+          "description": "The judges are seated. They are waiting for the case, not the verdict.",
+          "attribute": "insight",
+          "tn": 26,
+          "preferred_paths": [
+            "Soul Cultivator",
+            "Formation Adept"
+          ],
+          "cultivation": 36,
+          "spirit_stones": 20,
+          "insight_xp": 16,
+          "items": {
+            "heavenpetal_elixir": 1
+          }
+        },
+        {
+          "name": "The Blank Judgement",
+          "description": "The judgement was never written. The trial is not to write it.",
+          "attribute": "spirit",
+          "tn": 28,
+          "preferred_paths": [
+            "Soul Cultivator"
+          ],
+          "cultivation": 44,
+          "spirit_stones": 26,
+          "insight_xp": 24,
+          "items": {},
+          "rare_items": {
+            "buried_court_verdict": {
+              "chance": 3,
+              "max": 1
+            }
+          }
+        }
+      ]
+    },
+    "nine_pillar_vault": {
+      "name": "Nine Pillar Vault",
+      "location": "Nine Pillar Ruin",
+      "min_realm_index": 26,
+      "open_hours": 12,
+      "inheritance_id": "nine_pillar_legacy",
+      "description": "The vault under the nine pillars opens when the river runs clear to the bed; eight pillars stand and the ninth has never been found.",
+      "rooms": [
+        {
+          "name": "The Clear Bed",
+          "description": "The river is clear to the bed and the bed is paved.",
+          "attribute": "agility",
+          "tn": 22,
+          "preferred_paths": [
+            "Formation Adept"
+          ],
+          "cultivation": 28,
+          "spirit_stones": 16,
+          "insight_xp": 12,
+          "items": {
+            "starsteel_ore": 2
+          }
+        },
+        {
+          "name": "The Eight That Stand",
+          "description": "Eight pillars carry what nine were cut for, and they have been carrying it a long time.",
+          "attribute": "body",
+          "tn": 24,
+          "preferred_paths": [
+            "Formation Adept",
+            "Qi Refiner"
+          ],
+          "cultivation": 32,
+          "spirit_stones": 18,
+          "insight_xp": 14,
+          "items": {
+            "starfall_talisman": 1
+          }
+        },
+        {
+          "name": "The Ninth Socket",
+          "description": "The socket for the ninth pillar is empty and the array still closes over it.",
+          "attribute": "insight",
+          "tn": 26,
+          "preferred_paths": [
+            "Formation Adept"
+          ],
+          "cultivation": 36,
+          "spirit_stones": 20,
+          "insight_xp": 16,
+          "items": {
+            "heavenpetal_elixir": 1
+          }
+        },
+        {
+          "name": "The Load",
+          "description": "The trial is to take the ninth pillar's share for a hundred breaths.",
+          "attribute": "will",
+          "tn": 28,
+          "preferred_paths": [
+            "Formation Adept"
+          ],
+          "cultivation": 44,
+          "spirit_stones": 26,
+          "insight_xp": 24,
+          "items": {},
+          "rare_items": {
+            "nine_pillar_keystone": {
+              "chance": 3,
+              "max": 1
+            }
+          }
+        }
+      ]
     }
   },
   "unexpected_events": [
@@ -27203,6 +27845,7 @@
       "weight": 4,
       "duration_hours": 2,
       "severity": 5,
+      "min_realm_index": 1,
       "description": "The local spiritual currents overturn without warning, making cultivation dangerous but unusually rich.",
       "consequence_text": "Spirit resources swell while unstable currents unsettle settlements and local markets.",
       "world_effect": {
@@ -27234,6 +27877,7 @@
       "weight": 3,
       "duration_hours": 3,
       "severity": 3,
+      "min_realm_index": 0,
       "description": "A rare medicinal plant matures early under a brief heaven-and-earth phenomenon.",
       "consequence_text": "Medicinal abundance draws gatherers, raises resource prosperity, and temporarily shifts herb demand.",
       "world_effect": {
@@ -27296,6 +27940,7 @@
       "weight": 3,
       "duration_hours": 2,
       "severity": 6,
+      "min_realm_index": 2,
       "description": "Spirit beasts flee through the region in numbers, suggesting something stronger is moving behind them.",
       "consequence_text": "Fleeing beasts strain roads and food stores while beast materials enter local trade.",
       "world_effect": {
@@ -27329,7 +27974,8 @@
       "kind": "secret_realm",
       "weight": 2,
       "secret_realm_id": "verdant_immortal_grotto",
-      "description": "Space folds around the scent of ancient medicine. A hidden grotto is opening."
+      "description": "Space folds around the scent of ancient medicine. A hidden grotto is opening.",
+      "max_realm_index": 7
     },
     {
       "id": "secret_sword",
@@ -27338,7 +27984,8 @@
       "kind": "secret_realm",
       "weight": 2,
       "secret_realm_id": "sword_grave_nine_echoes",
-      "description": "Nine sword cries sound from nowhere, and a broken stone gate appears between the cliffs."
+      "description": "Nine sword cries sound from nowhere, and a broken stone gate appears between the cliffs.",
+      "max_realm_index": 7
     },
     {
       "id": "secret_stygian",
@@ -27347,16 +27994,18 @@
       "kind": "secret_realm",
       "weight": 1,
       "secret_realm_id": "stygian_lantern_tomb",
-      "description": "Blue corpse-fire appears beneath old graves. A tomb that should not exist is becoming reachable."
+      "description": "Blue corpse-fire appears beneath old graves. A tomb that should not exist is becoming reachable.",
+      "max_realm_index": 7
     },
     {
       "id": "ancient_ruin_appears",
       "title": "Ancient Ruin Appears",
       "category": "Ancient Ruin",
       "kind": "secret_realm",
-      "weight": 3,
+      "weight": 1,
       "secret_realm_id": "sword_grave_nine_echoes",
-      "description": "A hidden palace of broken pagodas rises from the cliffs, exposing a gate into an ancient sword grave."
+      "description": "A hidden palace of broken pagodas rises from the cliffs, exposing a gate into an ancient sword grave.",
+      "max_realm_index": 7
     },
     {
       "id": "heavenly_treasure_descends",
@@ -27366,6 +28015,7 @@
       "weight": 2,
       "duration_hours": 4,
       "severity": 6,
+      "min_realm_index": 2,
       "description": "Golden clouds split as a sealed treasure falls from the heavens. Cultivators, clans, and hidden experts converge before anyone can identify it.",
       "consequence_text": "Spirit resources rise, but treasure-seekers destabilize the area and drive up demand.",
       "world_effect": {
@@ -27400,6 +28050,7 @@
       "weight": 4,
       "duration_hours": 6,
       "severity": 3,
+      "min_realm_index": 0,
       "worlds": [
         "Mortal World",
         "Spiritual World"
@@ -27439,6 +28090,7 @@
       "weight": 2,
       "duration_hours": 8,
       "severity": 9,
+      "min_realm_index": 4,
       "worlds": [
         "Mortal World",
         "Spiritual World"
@@ -27476,9 +28128,10 @@
       "title": "Secret Inheritance Revealed",
       "category": "Inheritance",
       "kind": "secret_realm",
-      "weight": 2,
+      "weight": 1,
       "secret_realm_id": "verdant_immortal_grotto",
-      "description": "A collapsed tomb reveals an ancient jade furnace and a trial-path leading toward a sealed inheritance chamber."
+      "description": "A collapsed tomb reveals an ancient jade furnace and a trial-path leading toward a sealed inheritance chamber.",
+      "max_realm_index": 7
     },
     {
       "id": "lightning_tribulation_nearby",
@@ -27488,6 +28141,7 @@
       "weight": 3,
       "duration_hours": 3,
       "severity": 7,
+      "min_realm_index": 3,
       "description": "A nearby breakthrough summons layered heavenly lightning. Every bolt scars the land and enriches the surviving spirit currents.",
       "consequence_text": "Security falls around the strike zone while damaged terrain becomes unusually rich in spiritual energy.",
       "world_effect": {
@@ -27520,6 +28174,7 @@
       "weight": 2,
       "duration_hours": 6,
       "severity": 7,
+      "min_realm_index": 3,
       "worlds": [
         "Mortal World",
         "Spiritual World"
@@ -27563,6 +28218,7 @@
       "weight": 5,
       "duration_hours": 3,
       "severity": 5,
+      "min_realm_index": 1,
       "locations": [
         "Golden Pavilion Auction House"
       ],
@@ -27644,9 +28300,10 @@
       "title": "Spatial Rift",
       "category": "Spatial Rift",
       "kind": "secret_realm",
-      "weight": 2,
+      "weight": 1,
       "secret_realm_id": "stygian_lantern_tomb",
-      "description": "A crack in reality begins swallowing loose objects, beasts, and pieces of nearby structures. Blue lantern-light flickers beyond the tear."
+      "description": "A crack in reality begins swallowing loose objects, beasts, and pieces of nearby structures. Blue lantern-light flickers beyond the tear.",
+      "max_realm_index": 7
     },
     {
       "id": "bloodline_awakening_omen",
@@ -27671,6 +28328,7 @@
       "weight": 4,
       "duration_hours": 8,
       "severity": 4,
+      "min_realm_index": 1,
       "worlds": [
         "Mortal World",
         "Spiritual World"
@@ -27731,6 +28389,7 @@
       "weight": 2,
       "duration_hours": 5,
       "severity": 6,
+      "min_realm_index": 2,
       "description": "A burning object crashes beyond the horizon. Within the crater may be an artifact, corpse, egg, sealed remnant, or imprisoned being.",
       "consequence_text": "The impact enriches spirit resources but damages security and draws treasure hunters.",
       "world_effect": {
@@ -27804,6 +28463,7 @@
       "weight": 1,
       "duration_hours": 12,
       "severity": 10,
+      "min_realm_index": 5,
       "worlds": [
         "Mortal World",
         "Spiritual World"
@@ -27851,6 +28511,7 @@
       "weight": 2,
       "duration_hours": 4,
       "severity": 5,
+      "min_realm_index": 1,
       "description": "Nine-colored clouds, golden lotuses, divine music, and impossible stars announce that someone nearby achieved an absurd breakthrough.",
       "consequence_text": "The phenomenon enriches local qi and attracts cultivators, merchants, and sect scouts.",
       "world_effect": {
@@ -27916,6 +28577,7 @@
       "weight": 1,
       "duration_hours": 3,
       "severity": 6,
+      "min_realm_index": 2,
       "description": "A damaged formation creates a pocket where hours outside feel like years of meditation inside, though memory and qi strain remain real.",
       "consequence_text": "The formation enriches local spatial qi; participants can claim a temporary cultivation afterglow once.",
       "world_effect": {
@@ -27960,6 +28622,7 @@
       "weight": 1,
       "duration_hours": 10,
       "severity": 9,
+      "min_realm_index": 4,
       "worlds": [
         "Mortal World",
         "Spiritual World"
@@ -27999,6 +28662,7 @@
       "weight": 1,
       "duration_hours": 8,
       "severity": 10,
+      "min_realm_index": 5,
       "description": "A true dragon descends through the clouds. Its intent is unreadable, its presence crushes weaker beasts, and it is very much not necessarily friendly.",
       "consequence_text": "The dragon's aura disrupts security and trade while awakening nearby spirit veins.",
       "world_effect": {
@@ -28051,6 +28715,7 @@
       "weight": 2,
       "duration_hours": 5,
       "severity": 4,
+      "min_realm_index": 1,
       "description": "A ridiculously talented young cultivator arrives, shatters local records, attracts every sect's attention, and immediately becomes everyone's political problem.",
       "consequence_text": "Sect recruitment and doctrine pressure rise as factions compete to claim or contain the prodigy.",
       "world_effect": {
@@ -28084,7 +28749,8 @@
       "kind": "secret_realm",
       "weight": 1,
       "secret_realm_id": "stygian_lantern_tomb",
-      "description": "A prohibition seal that endured for thousands of years breaks. Corpse-lanterns reveal a route into the forbidden tomb below."
+      "description": "A prohibition seal that endured for thousands of years breaks. Corpse-lanterns reveal a route into the forbidden tomb below.",
+      "max_realm_index": 7
     },
     {
       "id": "reincarnated_expert_awakens",
@@ -28167,6 +28833,7 @@
       "weight": 4,
       "duration_hours": 10,
       "severity": 2,
+      "min_realm_index": 0,
       "description": "Cultivators gather for trading, poetry, music, drinking, friendly competitions, matchmaking, and the statistically inevitable trouble.",
       "consequence_text": "The festival improves prosperity and security while increasing trade, demand, and sect recruitment.",
       "world_effect": {
@@ -28203,45 +28870,237 @@
       "title": "Salt King's Barrow Opens",
       "category": "Ancient Ruin",
       "kind": "secret_realm",
-      "weight": 2,
+      "weight": 3,
       "secret_realm_id": "salt_kings_barrow",
-      "description": "The ground under the ruin shifts and Salt King's Barrow is reachable for a while."
+      "description": "The ground under the ruin shifts and Salt King's Barrow is reachable for a while.",
+      "max_realm_index": 7
     },
     {
       "id": "secret_broken_pagoda_sutra_hall",
       "title": "Broken Pagoda Sutra Hall Opens",
       "category": "Ancient Ruin",
       "kind": "secret_realm",
-      "weight": 2,
+      "weight": 3,
       "secret_realm_id": "broken_pagoda_sutra_hall",
-      "description": "The ground under the ruin shifts and Broken Pagoda Sutra Hall is reachable for a while."
+      "description": "The ground under the ruin shifts and Broken Pagoda Sutra Hall is reachable for a while.",
+      "max_realm_index": 15
     },
     {
       "id": "secret_toppled_stele_sword_field",
       "title": "Toppled Stele Sword Field Opens",
       "category": "Ancient Ruin",
       "kind": "secret_realm",
-      "weight": 2,
+      "weight": 3,
       "secret_realm_id": "toppled_stele_sword_field",
-      "description": "The ground under the ruin shifts and Toppled Stele Sword Field is reachable for a while."
+      "description": "The ground under the ruin shifts and Toppled Stele Sword Field is reachable for a while.",
+      "max_realm_index": 15
     },
     {
       "id": "secret_weeping_wall_sanctum",
       "title": "Weeping Wall Sanctum Opens",
       "category": "Ancient Ruin",
       "kind": "secret_realm",
-      "weight": 2,
+      "weight": 3,
       "secret_realm_id": "weeping_wall_sanctum",
-      "description": "The ground under the ruin shifts and Weeping Wall Sanctum is reachable for a while."
+      "description": "The ground under the ruin shifts and Weeping Wall Sanctum is reachable for a while.",
+      "max_realm_index": 23
     },
     {
       "id": "secret_hollow_throne_vault",
       "title": "Hollow Throne Vault Opens",
       "category": "Ancient Ruin",
       "kind": "secret_realm",
-      "weight": 2,
+      "weight": 3,
       "secret_realm_id": "hollow_throne_vault",
       "description": "The ground under the ruin shifts and Hollow Throne Vault is reachable for a while."
+    },
+    {
+      "id": "spilled_caravan",
+      "title": "A Caravan Goes Over",
+      "category": "Local Trouble",
+      "kind": "world_event",
+      "weight": 4,
+      "duration_hours": 3,
+      "severity": 1,
+      "min_realm_index": 0,
+      "max_realm_index": 2,
+      "description": "A mule-cart has shed a wheel and half its load down the bank outside town, and the driver cannot lift any of it alone.",
+      "consequence_text": "Goods scattered on the road; the town's stalls are short until it is gathered up.",
+      "world_effect": {
+        "history": "A caravan went over outside the settlement and the load was recovered by hand.",
+        "region": {
+          "prosperity": 1,
+          "security": 0,
+          "spirit_resources": 0,
+          "unrest": -1
+        }
+      },
+      "player_reward": {
+        "cultivation": 4,
+        "spirit_stones": 3,
+        "insight_xp": 2,
+        "items": {}
+      }
+    },
+    {
+      "id": "terrace_break",
+      "title": "The Terraces Break",
+      "category": "Local Trouble",
+      "kind": "world_event",
+      "weight": 3,
+      "duration_hours": 4,
+      "severity": 2,
+      "min_realm_index": 0,
+      "max_realm_index": 2,
+      "description": "An irrigation channel above the spirit-rice terraces has given way a fortnight before harvest, and the water is going the wrong way.",
+      "consequence_text": "A season's rice hangs on how fast the channel is packed and turned.",
+      "world_effect": {
+        "history": "An irrigation break above the terraces was closed before the harvest was lost.",
+        "region": {
+          "prosperity": 1,
+          "security": 0,
+          "spirit_resources": 0,
+          "unrest": -1
+        }
+      },
+      "player_reward": {
+        "cultivation": 4,
+        "spirit_stones": 3,
+        "insight_xp": 2,
+        "items": {}
+      }
+    },
+    {
+      "id": "lantern_night",
+      "title": "Lantern Night",
+      "category": "Local Trouble",
+      "kind": "world_event",
+      "weight": 4,
+      "duration_hours": 6,
+      "severity": 1,
+      "min_realm_index": 0,
+      "max_realm_index": 2,
+      "description": "The settlement's lantern festival is tonight: paper, glue, a great many small jobs, and every family out in the street.",
+      "consequence_text": "Spirits lift, the stalls do a month's trade in an evening, and nothing is threatened by anything.",
+      "world_effect": {
+        "history": "The settlement held its lantern night and the streets were full until dawn.",
+        "region": {
+          "prosperity": 1,
+          "security": 0,
+          "spirit_resources": 0,
+          "unrest": -1
+        }
+      },
+      "player_reward": {
+        "cultivation": 4,
+        "spirit_stones": 3,
+        "insight_xp": 2,
+        "items": {}
+      }
+    },
+    {
+      "id": "granary_beast",
+      "title": "Something in the Granary",
+      "category": "Local Trouble",
+      "kind": "world_event",
+      "weight": 3,
+      "duration_hours": 3,
+      "severity": 2,
+      "min_realm_index": 0,
+      "max_realm_index": 2,
+      "description": "Something got into the grain stores in the night and is still in there, frightened and cornered and eating.",
+      "consequence_text": "The stores are open until somebody goes in after it.",
+      "world_effect": {
+        "history": "A stray spirit-beast was driven out of the granary before the stores were lost.",
+        "region": {
+          "prosperity": 1,
+          "security": 0,
+          "spirit_resources": 0,
+          "unrest": -1
+        }
+      },
+      "player_reward": {
+        "cultivation": 4,
+        "spirit_stones": 3,
+        "insight_xp": 2,
+        "items": {}
+      }
+    },
+    {
+      "id": "travelling_physician",
+      "title": "The Travelling Physician",
+      "category": "Local Trouble",
+      "kind": "world_event",
+      "weight": 3,
+      "duration_hours": 5,
+      "severity": 1,
+      "min_realm_index": 0,
+      "max_realm_index": 2,
+      "description": "A physician has set up under the awning by the well and is treating whoever comes, for nothing, until her herbs run out.",
+      "consequence_text": "The sick are seen; her satchel empties faster than she expected.",
+      "world_effect": {
+        "history": "A travelling physician held a free clinic at the settlement until her herbs ran out.",
+        "region": {
+          "prosperity": 1,
+          "security": 0,
+          "spirit_resources": 0,
+          "unrest": -1
+        }
+      },
+      "player_reward": {
+        "cultivation": 4,
+        "spirit_stones": 3,
+        "insight_xp": 2,
+        "items": {}
+      }
+    },
+    {
+      "id": "secret_last_lantern_wake",
+      "title": "Last Lantern Wake Opens",
+      "category": "Ancient Ruin",
+      "kind": "secret_realm",
+      "weight": 3,
+      "secret_realm_id": "last_lantern_wake",
+      "description": "The wake the lantern-keepers never finished opens when the last of the nine lanterns gutters and does not go out; the mist comes in with you.",
+      "max_realm_index": 15
+    },
+    {
+      "id": "secret_ash_gate_threshold",
+      "title": "Ash Gate Threshold Opens",
+      "category": "Ancient Ruin",
+      "kind": "secret_realm",
+      "weight": 3,
+      "secret_realm_id": "ash_gate_threshold",
+      "description": "The threshold behind the ash gate opens when the stone is warm to the touch; the gate burned once and has not finished burning.",
+      "max_realm_index": 23
+    },
+    {
+      "id": "secret_cracked_altar_sanctum",
+      "title": "Cracked Altar Sanctum Opens",
+      "category": "Ancient Ruin",
+      "kind": "secret_realm",
+      "weight": 3,
+      "secret_realm_id": "cracked_altar_sanctum",
+      "description": "The sanctum under the cracked altar opens when the marsh water rises past the second step; what was offered here was never collected.",
+      "max_realm_index": 23
+    },
+    {
+      "id": "secret_buried_court_assize",
+      "title": "Buried Court Assize Opens",
+      "category": "Ancient Ruin",
+      "kind": "secret_realm",
+      "weight": 3,
+      "secret_realm_id": "buried_court_assize",
+      "description": "The assize beneath the buried court opens when no petition has been heard above it for a hundred years; the court is still sitting."
+    },
+    {
+      "id": "secret_nine_pillar_vault",
+      "title": "Nine Pillar Vault Opens",
+      "category": "Ancient Ruin",
+      "kind": "secret_realm",
+      "weight": 3,
+      "secret_realm_id": "nine_pillar_vault",
+      "description": "The vault under the nine pillars opens when the river runs clear to the bed; eight pillars stand and the ninth has never been found."
     }
   ],
   "body_realms": [
@@ -63888,6 +64747,123 @@
             "want": "Find who opened the crate.",
             "fear": "That it was one of his own.",
             "descriptor": "A guard captain checking the cellar door hinges, jaw set."
+          }
+        ]
+      },
+      "Local Trouble": {
+        "objective": "Somebody's ordinary week has gone wrong. Help, or do not.",
+        "nodes": [
+          {
+            "key": "lend_a_hand",
+            "type": "task",
+            "name": "Lend a Hand",
+            "descriptor": "No technique required. Somebody has to carry the other end.",
+            "count": [
+              2,
+              5
+            ],
+            "rank_bonus": 0,
+            "tn": 10,
+            "attribute": "body",
+            "item": "",
+            "item_qty": 0,
+            "cultivation": 3,
+            "spirit_stones": 2,
+            "contribution": 1
+          },
+          {
+            "key": "ask_around",
+            "type": "task",
+            "name": "Ask Around",
+            "descriptor": "Everyone here knows a piece of it and nobody has put them together.",
+            "count": [
+              2,
+              4
+            ],
+            "rank_bonus": 0,
+            "tn": 11,
+            "attribute": "insight",
+            "item": "",
+            "item_qty": 0,
+            "cultivation": 3,
+            "spirit_stones": 1,
+            "contribution": 2
+          },
+          {
+            "key": "trampled_herb",
+            "type": "herb",
+            "name": "Trampled Spirit-Herb",
+            "descriptor": "Knocked flat in the commotion. Still worth lifting.",
+            "count": [
+              1,
+              4
+            ],
+            "rank_bonus": 0,
+            "tn": 11,
+            "attribute": "insight",
+            "item": "@herb",
+            "item_qty": 1,
+            "cultivation": 2,
+            "spirit_stones": 0,
+            "contribution": 1
+          },
+          {
+            "key": "spilled_ore",
+            "type": "ore",
+            "name": "Spilled Ore",
+            "descriptor": "Off the back of a cart and down the bank, a handful at a time.",
+            "count": [
+              1,
+              3
+            ],
+            "rank_bonus": 0,
+            "tn": 12,
+            "attribute": "body",
+            "item": "@ore",
+            "item_qty": 1,
+            "cultivation": 2,
+            "spirit_stones": 1,
+            "contribution": 1
+          },
+          {
+            "key": "stray_beast",
+            "type": "beast",
+            "name": "Stray Spirit-Beast",
+            "descriptor": "Frightened, cornered, and the size of a large dog. It is not a tribulation.",
+            "count": [
+              1,
+              2
+            ],
+            "rank_bonus": 0,
+            "tn": 12,
+            "attribute": "body",
+            "item": "@core",
+            "item_qty": 1,
+            "cultivation": 4,
+            "spirit_stones": 2,
+            "contribution": 2
+          }
+        ],
+        "npcs": [
+          {
+            "key": "headman",
+            "title": "Village Headman",
+            "role": "Knows what is wrong and has nobody spare to fix it",
+            "personality": "Tired, practical, embarrassed to be asking a cultivator for anything.",
+            "speech": "Plain, apologetic, gets to the point once he trusts you.",
+            "want": "The week back the way it was.",
+            "fear": "Asking too much of somebody who could level the place.",
+            "descriptor": "A man in good plain clothes doing a job three people should be doing."
+          },
+          {
+            "key": "child",
+            "title": "Local Child",
+            "role": "Saw the whole thing and will tell anyone who stands still",
+            "personality": "Fearless, over-helpful, entirely certain of details that are wrong.",
+            "speech": "Fast, breathless, mostly accurate.",
+            "want": "To be the one who found the cultivator.",
+            "fear": "Being sent home before the interesting part.",
+            "descriptor": "A child keeping pace with you and narrating."
           }
         ]
       }

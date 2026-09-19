@@ -504,9 +504,8 @@ async def admin_simulation_status(interaction: discord.Interaction) -> None:
 @app_commands.choices(system=SIMULATION_SYSTEM_CHOICES)
 async def admin_simulation_run(interaction: discord.Interaction, system: app_commands.Choice[str], steps: app_commands.Range[int,1,120]=1) -> None:
     if not await require_admin(interaction): return
-    wt=await current_world_time()
     await interaction.response.defer(ephemeral=False)
-    run=await SIM.force_run(system.value,int(steps),wt.total_minutes)
+    run=await SIM.force_run(system.value,int(steps))
     await audit_admin(interaction,"simulation.run",target=system.value,after={"steps":int(steps),"summary":run.summary})
     await interaction.followup.send(f"⚙️ **{system.name}** forced for **{int(steps)}** step(s).\n{run.summary}",ephemeral=False)
 

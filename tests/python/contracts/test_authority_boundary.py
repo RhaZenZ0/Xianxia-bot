@@ -426,7 +426,12 @@ def test_python_gameplay_purge_is_a_one_way_authority_boundary():
     engine_class = next(node for node in engine_tree.body if isinstance(node, ast.ClassDef) and node.name == "GameEngineClient")
     bootstrap = next(node for node in engine_class.body if isinstance(node, ast.AsyncFunctionDef) and node.name == "bootstrap_simulation")
     bootstrap_source = ast.get_source_segment(engine_source, bootstrap) or ""
-    assert '"game_minute"' in bootstrap_source
+    # The bootstrap payload carries no world content - Go reads `world.json`
+    # itself - and since v1.0.0-rc.48 no minute either: the engine derives the
+    # canonical one. This line asserted the opposite until rc.48, which is the
+    # third place in the tree that held "Go owns the time" and its contradiction
+    # at once; `tests/python/contracts/test_simulation_minute.py` is the gate.
+    assert '"game_minute"' not in bootstrap_source
     assert '"npcs"' not in bootstrap_source
     assert '"sects"' not in bootstrap_source
 
@@ -581,6 +586,7 @@ BOOKKEEPING_METHODS = {
     # Discord ids: channels, messages, threads
     "set_channel_message", "set_server_channels", "set_info_message_id", "set_bugs_channel_id", "set_realm_hub_channel",
     "set_auction_house_channel", "remember_auction_lot_message", "forget_auction_lot_message",  # v0.33.1 live auction cards
+    "set_world_event_channel",  # v1.0.0-rc.52 one world-events channel per world
     "set_playtest_item", "clear_playtest_items",  # v0.34.1 the playtest board's message ids
     "set_expedition_thread", "set_birth_family_household_thread", "set_sect_abode_thread", "set_abode_thread",
     "register_event_thread", "close_event_thread", "ensure_sect_abode", "update_expedition_location",
@@ -701,7 +707,7 @@ PRESENTATION_WRITES: dict[str, set[str]] = {
     "set_server_channels": {"server_config"},
     "set_info_message_id": {"server_config"},
     "set_bugs_channel_id": {"server_config"},
-    "clear_discord_bindings": {"auction_house_channels", "auction_lot_messages", "channel_messages", "playtest_items", "realm_hub_channels", "server_config"},
+    "clear_discord_bindings": {"auction_house_channels", "auction_lot_messages", "channel_messages", "playtest_items", "realm_hub_channels", "server_config", "world_event_channels"},
     "set_playtest_item": {"playtest_items"},
     "clear_playtest_items": {"playtest_items"},
     "set_channel_message": {"channel_messages"},
@@ -709,6 +715,7 @@ PRESENTATION_WRITES: dict[str, set[str]] = {
     # v0.33.1: the live-auction channel per house and the card per open lot -
     # Discord ids only; the lot itself is the auctions row the engine owns.
     "set_auction_house_channel": {"auction_house_channels"},
+    "set_world_event_channel": {"world_event_channels"},
     "remember_auction_lot_message": {"auction_lot_messages"},
     "forget_auction_lot_message": {"auction_lot_messages"},
     "set_expedition_thread": {"expedition_threads"},

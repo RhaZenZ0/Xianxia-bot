@@ -6,6 +6,263 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.0** (rc.54) gives the upper worlds somewhere to go, and something to bring back.
+
+Eight secret realms covered thirty-two realms of cultivation, and they were not spread evenly: the
+Mortal World had four, the Spiritual two, and the Immortal and Celestial Worlds **one each**. One
+place served all eight realms of Immortal cultivation. Five new realms make it four, three, three,
+three - and **not one new location was written**, because the world already had the ground: every
+world carries three `road_site: "ruin"` legs and only one or two had anything under them. Last
+Lantern Ruin, Ash Gate Ruin, Cracked Altar Ruin, Buried Court Ruin and Nine Pillar Ruin were
+authored places with nothing in them, which is the shape `/learn` (rc.43), the quest journal
+(rc.46), the event bands (rc.49) and the peach (rc.50) all had.
+
+Each realm is built from what its ruin already says. The TN and reward ladders are read off the
+realms each world already had (Spiritual 16-22, Immortal 19-25, Celestial 22-28, +2 a room), the
+room drops are existing tier items, and the floors mirror the Mortal spread so the rc.53 ceiling
+leaves a wide window. One inheritance and one opening event apiece, at the flat weight rc.53 set.
+
+**And what you bring back is kept.** `ItemUse.DurationGameMinutes` has meant "0 does not expire"
+since v0.21.0 - the writer stores NULL and every reader is `ends_game_minute IS NULL OR
+ends_game_minute > ?` - and **no item in the catalogue had ever set it**: every effect the game
+shipped ran 120 to 360 minutes. Each new realm's last room can yield one treasure granting **+1 to
+the attribute that room's own trial tested**, permanently, so what the realm asked of you is what it
+leaves you better at. One point, not three, because it never wears off, and it feeds
+`canonicalAttribute`, which is the basis of every scene check, craft roll and trial in the game.
+
+They are rare finds in rc.50's sense, in the last room, ordered against the two already placed - the
+peach at 12,000 for 6% and the ring at 40,000 for 4% - so the dearer find is the rarer one, which
+rc.53's gate holds. All five are `auction_interest: legendary` with a door risk, so a player who
+would rather sell one than drink it feeds the system rc.50 first lit.
+
+`permanent_treasure_test.go` drives a use and reads the row back a world-year later; its drill is the
+trap the field invites - a writer that stores `0` instead of NULL reads as expired the instant it is
+drunk, and the test fails with `ends_game_minute is 1000, not NULL`. The content gate holds the
+shape: permanent, one modifier, +1, an attribute the engine actually rolls, and matching the trial.
+**The gate caught its own author** - the realm script wrote `max_realm_index: null` on the two
+Celestial events instead of omitting the key, and rc.53's ceiling test failed on it.
+
+**1.0.0** (rc.53) settles where a secret realm's band belongs, and stops the shallow ones crowding
+out the deep.
+
+rc.52 deferred an item that read *"the nine `secret_realm` unexpected events still carry no realm
+band"*. **The premise was wrong on two counts.** There are twelve of them, not nine - three
+(`ancient_ruin_appears`, `spatial_rift`, `forbidden_zone_opens`) do not start with `secret_`. And
+they need no band: `eligibleUnexpectedEvents` has a second branch for `kind: "secret_realm"` that
+reads the **realm's** own `min_realm_index` and `location`, so a realm-0 cultivator has never been
+able to draw the Hollow Throne Vault. Putting `min_realm_index` on the events would have been a
+second statement of a rule the realm already owns, free to drift from it - the fault rc.39 removed
+for the world clock and rc.44 for the world currencies. `test_beginner_world_events.py` now holds
+that no secret-realm event carries one.
+
+**What was actually open was that nothing drove that branch.** rc.49's `beginner_events_test.go`
+fixture is all `world_event`, so deleting any of the three conditions failed no test - and the whole
+point of rc.49 was that a grep cannot see a disabled condition. Three behavioural tests drive it
+now, each drilled by disabling its condition. One of those drills is worth knowing: **`!ok` is
+belt-and-braces rather than the guard.** A missing realm yields the zero value, whose `Location` is
+`""`, and no character stands at `""` - so the entrance check already excludes a typo'd
+`secret_realm_id`, and disabling `!ok` alone leaves the test passing. Both have to go. The test says
+so rather than implying otherwise.
+
+**Every realm now opens as often as every other.** The draw only offers a realm to somebody standing
+at its entrance, so the weights compete per realm rather than globally - and they were lopsided:
+seven of the twelve events opened the three Mortal-floor realms, which are also the only three that
+sell a key, at 4/5/4 weight, while every realm from floor 2 up had one event at 2. **Deep realms were
+harder to reach and opened half as often.** Each realm totals 3 now; a realm with several fictions
+(three open the Stygian tomb) keeps them and splits the weight, because that is variety rather than
+three times the chance. Total draw weight moves 124 -> 125, so the surprise rate is unchanged.
+
+**And a realm fades once you have outgrown the world it stands in** - Mortal realms at 7, Spiritual
+at 15, Immortal at 23, and the Celestial one never, because nothing is above it. rc.50's own
+reasoning is why this matters now: a realm's rooms are walked again on every run, and `rare_items`
+put a 12,000 peach in a floor-2 realm and a 40,000 ring in a floor-16 one, so without a ceiling a Dao
+Saint farms the Salt King's Barrow for peaches for ever - the "guaranteed, repeatable payout" rc.50
+exists to avoid. It gates the **draw** only: a key still opens its realm and a GM can still spawn
+one, the same asymmetry rc.49 drew between being handed something and walking into it. One
+consequence worth stating plainly: the Salt King's Barrow sells no key, so above realm 7 the peach
+is reachable only by a GM - which is consistent with rc.50 calling fifty years "enormous low down and
+worthless high up", but it is a narrowing.
+
+The ceiling is computed from the realm's floor in the gate rather than read off the events, so the
+content cannot quietly disagree with the rule it is supposed to follow.
+
+**1.0.0** (rc.52) gives each world its own news, and says so in every channel.
+
+`world-events` carried all four worlds. A Demon Invasion in the Celestial World and a caravan over
+the bank in a Mortal village landed in one feed, in front of everybody, whatever they could reach -
+while the capitals have been split per world since schema 4 and the auction floors since schema 35.
+**🌠 World Events** is the fourth category, holding `#mortal-world-events`,
+`#spiritual-world-events`, `#immortal-world-events` and `#celestial-world-events`, each gated by the
+realm **access** role (you have reached that world) rather than the presence role (you are standing
+in its capital this minute), which is the same rule the auction floors use and deliberately not the
+capitals'.
+
+**The data was there the whole time, and half the wire with it.** `world_events.location` is
+`NOT NULL` on every row, and `_event_scene_location` - the resolver that turns an event key into a
+place - already existed and was **already called by both announcement writers**, about fifty lines
+*after* each had posted. Moving that call above the send is the entire routing change. And
+`event_threads.announcement_channel_id` is written at announcement time, so the "event closed"
+notice lands wherever the announcement went and **needed no change at all**.
+
+**The global channel stays, and that is the design.** Four writers have no world and never will -
+the weekend gift, a GM's world-reset notice, the dashboard's test post and the channel's own blurb -
+and `world-events`' own spec string already said *"Global cultivation-world announcements"*. It is
+also the fallback, which is what makes the change incapable of breaking a writer: the worst case is
+the channel an announcement already used. **The fallback is "no world", never "Mortal World"** - a
+private residence, an inner world, an abode or a literal `Unknown` is not in the location catalogue,
+and the `or "Mortal World"` default every other site in the tree uses would have filed somebody's
+household news as that world's public news.
+
+**Every channel's text was rewritten, and the `#xianxia-info` guide with it.** The blurbs still
+described the v0.19 server; the guide said *"main realm-capital channels remain shared social
+spaces"*, which stopped being true in v0.21.6. The guide is eleven topics now, three of them new -
+**The Server** (what the four categories are and which are gated by what), **World Events** (a scene
+has a finite site, so arriving first is worth something) and **Crafts & Professions** (slips,
+examinations, and that your household teaches one trade and the head of the house can qualify you in
+all four). The four new per-world channels get their own GM-editable message slots, resolved through
+`world_event_channels` exactly as the `realm:` slots resolve through `realm_hub_channels`.
+
+**The GM dashboard** gains a World Events card and table beside Realm Capitals and Auction Houses -
+channel, access role, gated or visible, ready - and they **count toward `setup_ready`**, unlike the
+auction halls, which are reported but excluded: a missing auction channel costs a lot card, a
+missing events channel loses a world's news outright.
+
+**And both harnesses can now reach a `create_category` call**, which rc.51 recorded as deferred.
+Every provisioning helper defaults to `create_missing=False` and the one caller that passes True is
+the GM dashboard's Full Setup, so no slash command and no hub button could reach it - the
+categories, the four capitals, the nine auction channels and these four feeds were provisioned by
+code no test had ever run. The resolution is that the bot's **control plane is a surface**, it is
+just not a Discord one: section 2b of `scripts/playtest_discord.py` posts `{"action": "setup"}` to
+`POST /control/discord` with `X-Xianxia-Control`, exactly as the dashboard does, then holds that the
+four categories exist, that each capital and each world feed sits in the right one, that nine
+auction channels were made, and that a second Repair over the same layout creates nothing new.
+
+**A fourth gate this session passed its own drill**, and it is worth knowing which kind. The first
+version of the harness check asserted the substring `_control("setup")`; commenting the call out
+left the string in place and the gate passed. It reads *call expressions* by AST now, so a commented
+or deleted call both fail. The router's gate had the same shape from the other side - its docstring
+quotes the `or "Mortal World"` default it exists to refuse, so a whole-body search matched the
+explanation and failed on correct code; it reads the function's statements without its docstring.
+
+**1.0.0** (rc.51) gives the ring a home and the auctions a room of their own.
+
+`living_world_ring` was the second orphan rc.50's sweep found, the moment it stopped counting test
+files as sources: the top of the storage ladder - Immortal grade, 500 slots, the only container
+carrying `living_space` - worth 40,000, with a `door_event_chance` of 75 that had never fired for
+want of a ring to auction, and named in exactly one place in the tree, `support_storage_test.go`.
+It went into `SOURCELESS_ITEMS` because which realm it belonged in is a content decision. It is the
+**Weeping Wall Sanctum** now: the Immortal World's keyless realm (`min_realm_index: 16`, opening on
+one weight-2 event, 1.6% of a draw), in `The Array's Heart`, TN 25, the last room, which granted
+nothing before - and the item's own `storage_upgrade.grade` is `"Immortal"`, so the catalogue named
+the world it belonged to all along. A `rare_items` entry at **chance 4**, rarer than the peach's 6
+because the peach is consumed and the ring is permanent and tradeable. No Go change: rc.50's
+mechanism was built, tested and shipped. `SOURCELESS_ITEMS` is empty again, and emptied by placing
+the entry rather than deleting it.
+
+**The auction channels have a category of their own.** Content authors 48 auction houses collapsing
+onto **nine** channels (five grand houses, four shared per-world local floors), and all nine were
+created in `🌌 Realm Capitals` - a category named for four channels and holding thirteen.
+They are `🏮 Auction Houses` now, and two halves had to come with it or the split would have
+been cosmetic.
+
+**An existing server is moved, not merely rebound.** `category=` is read only on creation, so a
+channel `ensure_auction_house_channels` resolved by id or by name kept whatever parent it already
+had - without a re-parent step the change would reach a fresh guild and no other. It is behind
+`can_create` (Discord layout is dashboard-owned; the `/admin` slash path still only binds) and
+issued once per channel, because forty-eight houses share nine of them and `category_id` is read
+from a cache the edit updates by gateway event.
+
+**And teardown deletes them, which it never has.** `clear_discord_bindings` has always
+`DELETE`d from `auction_house_channels`, while `teardown_managed_discord_layout` built its targets
+from the base bindings, the realm hubs and `#bugs` - so Teardown forgot the bindings and left the
+nine channels standing, and because they sat inside it, `🌌 Realm Capitals` could never be
+emptied and **was never once deleted by the action whose whole job is to delete it**. Half the wire
+had been there since v0.33.1. The gate that could not see this was the teardown contract test, which
+asked only that the three sources it already knew about were named; `test_every_category_setup_makes_is_a_category_teardown_can_empty`
+counts instead - every `SERVER_*CATEGORY` constant must be one teardown walks, and every provisioning
+table must be one it deletes from.
+
+**1.0.0** (rc.50) grows the one item in the catalogue that nothing could produce.
+
+`hundred_year_peach` was one of 287 items and the only one no shop sold, no recipe made, no realm
+room held, no event granted and no production file named. Fifty years of lifespan, 12,000 base
+price, `auction_interest: legendary`, `door_event_chance: 65` - and both halves already worked, which
+is the part worth keeping. `item_use_actions.go` grants the fifty years, and `advanced_maintenance.go`
+reads `door_event_chance` to write an `auction_door_risks` row when a legendary lot is struck, so
+that system had never fired either: you cannot auction a fruit that does not exist. One missing wire
+kept two authored systems dark, the shape `/learn`, the quest journal and the event bands all had.
+
+It needed a chance rather than just a placement. A realm's rooms are walked again on every run -
+`secret_realm_runs` keeps one row per user and entering resets `room_index` to 0 - and three of the
+eight realms have a key on sale at 448 to 672 stones, which are also the three low-floor realms. So a
+room's `items` is a guaranteed repeatable payout. `rare_items` is what a room *might* hold, in
+`forage_materials`' own shape, merged into the room's single reward so a find cannot be paid twice.
+
+It grows in the Salt King's Throne, the last room of a keyless barrow that opens when the marsh
+floods - floor 2, because fifty years is enormous low down and nothing high up, and salt preserves.
+
+The sweep that proves no item is sourceless found a second orphan the moment it stopped counting
+test files: its first version had no `--exclude=*_test.go`, so the peach looked sourced by the very
+test written to prove it had none. With tests excluded, `living_world_ring` surfaced - the top of the
+storage ladder, 40,000, named only in a Go test. It is recorded in `SOURCELESS_ITEMS` with that
+reason rather than quietly placed.
+
+**1.0.0** (rc.49) gives the first hour world events it can actually take part in.
+
+`UnexpectedEvent` has carried `min_realm_index` and `max_realm_index` since the roster was written,
+and `eligibleUnexpectedEvents` has filtered on both - so the filter ran on every draw and excluded
+nobody, because all forty-four events left both unset. A cultivator three minutes old, with
+attributes of 1 to 3, drew from the same pool as a Nascent Soul elder: fifteen of the eighteen world
+events are severity 4 or higher, and `A Dragon Appears` was as drawable at Body Tempering as the
+village festival. The mechanism was built, complete and correct, and no content used it - the same
+fault as `/learn` and the quest journal, three releases running, and the fix is content because the
+code was never the problem.
+
+Two halves, because either alone is worse than nothing. A floor by severity, one rule stated once:
+severity 3 and under from the start, 10 only from Soul Formation. And a band worth drawing from,
+because gating the old roster alone would have shown a beginner the same three events forever -
+`Local Trouble` is five village-scale events (a caravan over the bank, an irrigation break before
+harvest, lantern night, something in the granary, a physician's free clinic) whose site is TN 10-12,
+which a fresh character clears 55 to 79 percent of the time. They carry a ceiling as well as a floor,
+so they fade once a cultivator could end them by standing still.
+
+The floor gates the player-triggered draw only. The autonomous batch still puts a Demon Invasion
+wherever the world wants one and a beginner can walk into it: being caught in something is not the
+same as being handed it.
+
+One thing worth keeping, and it is the second release running it has come up: the gate's mechanism
+check was a source grep, and the drill passed when it should have failed. Asserting the draw's body
+contains `c.RealmIndex < e.MinRealmIndex` survives that line becoming `if false && ...`. The
+behavioural half is in Go now, where the function can be called.
+
+**1.0.0** (rc.48) stops the engine taking a caller's word for what time it is - the last thing one
+could still tell it, and the open Authority item on the punch list.
+
+`RunDueRequest.GameMinute` has been accepted-and-ignored since the v0.22.2 review, with the reason
+written on the field: *"a scheduled tick must not be able to tell the world what time it is."*
+`ForceRequest` and `BootstrapRequest` carried the same field and used it for twenty-six more
+releases, and `runSystem`'s own comment said it stamped the anchor "at a caller-chosen minute" two
+hundred lines below the field that said the opposite. One rule, two answers, both written down.
+
+The number is not a label. Every system under it reads it as *now*: it is the age an NPC is measured
+against, the birth minute stamped on ~88 households, the anchor each system carries, the founding of
+every clan. A caller a year out does not mis-title a run, it buries people. Nothing exploited it -
+every caller read the engine's own minute and sent it straight back, which is exactly why it survived
+twenty-six releases: the fault is invisible until the first caller that does not.
+
+Both derive `game.CanonicalWorldGameMinute` now, the door `RunDue` already read. The wire keeps the
+field on all three so an older bot mid-upgrade is not an outage - it is the value that is ignored,
+not the request - while the three Python client methods take no minute and nine call sites stopped
+computing one to ship and have discarded. Two gates, because neither half can see the other: the Go
+one sends a wild minute and fails on the old code with `Force stamped 9999999`, and the Python one
+holds that nothing in the tree sends one, reading the client's signatures by AST.
+
+Worth keeping: the assertion that encoded the fault sat two tests below its opposite.
+`test_game_engine.py` has held since v0.22.2 that an authoritative action rejects a client
+`game_minute` ("Go owns current world time"), and directly under it
+`test_simulation_endpoints_keep_explicit_scheduler_time` asserted `payload["game_minute"] == 12345`.
+A file can hold a rule and its contradiction a dozen lines apart and stay green for a very long time.
+
 **1.0.0** (rc.47) makes the playtest checklist say what the Discord sim proved, instead of asking a
 person for it.
 
@@ -1932,6 +2189,15 @@ mechanical authority paths.
 - **Schema 27** added the v0.19.29 mute/freeze moderation columns on `characters`
   (`is_muted`, `is_frozen`, `moderation_reason`).
 - **Schema 28** added the Quest Forge definition table (`quest_definitions`).
+- **Schema 56** gave each world its own news channel. `world_event_channels` is one row per guild
+  per world - the channel, its category, and nothing else, because an events channel belongs to a
+  world rather than to a place in it. It is `realm_hub_channels`' shape minus `location`, and it
+  keeps the `UNIQUE(guild_id,channel_id)` the capitals carry and the auction table deliberately
+  drops: there one channel serves forty-eight houses, here one channel is exactly one world. The
+  `world-events` base channel is not retired - the weekend gift, a GM's world-reset notice and the
+  dashboard's test post have no world and never will, so it stays as the global feed and as the
+  fallback for any place the location catalogue does not carry.
+
 - **Schema 55** gave two orphan quests their doors. `road_to_a_sect` had been seeded on every boot
   since v0.23.1 and the string appeared in exactly one place in the tree - its own definition - so
   nothing could hand it over; it is `beginner_lesson`'s `follow_on` now, and because

@@ -11,6 +11,25 @@ database. Its findings are the first two entries.
 
 ## Findings
 
+- **fixed (v1.0.0-rc.52)** — *Nothing in either harness reached a `create_category` call.*
+  Every provisioning helper defaults to `create_missing=False` and the one caller that passes True
+  is the GM dashboard's Full Setup, so no slash command and no hub button could reach it — the
+  categories, the four realm capitals, the nine auction channels and (now) the four per-world
+  events channels were provisioned by code no test had ever run. rc.51 recorded it as deferred
+  because the Discord sweep's own rule is that a loop goes through a surface rather than a handler.
+  The resolution is that the bot's **control plane is a surface** — it is just not a Discord one:
+  section 2b of `scripts/playtest_discord.py` posts `{"action": "setup"}` to
+  `POST /control/discord` with `X-Xianxia-Control`, exactly as the dashboard does, then asserts the
+  four categories exist, each capital and each world feed sits in the right one, nine auction
+  channels were made, and a second Repair over the same layout creates nothing new.
+- **fixed (v1.0.0-rc.51)** — *Teardown never deleted an auction channel, so it never deleted the
+  capitals' category either.* `clear_discord_bindings` has `DELETE`d from `auction_house_channels`
+  since v0.33.1, while `teardown_managed_discord_layout` built its targets from the base bindings,
+  the realm hubs and `#bugs` and named no auction channel — so the nine of them were left standing
+  with their bindings forgotten, and because they sat inside it, `🌌 Realm Capitals` always had
+  "9 other channel(s) inside" and was never once deleted. Found while giving the auctions a
+  category of their own, which would have inherited the same fault.
+
 - **fixed (v0.36.1)** — *Greenriver Town had no roads.* The starting town sat outside the road
   graph, so it had no gates (v0.36.0), could only be reached by direct travel, and a fresh
   character's first road journey was the capital's rather than their own town's. It now has roads
@@ -54,11 +73,18 @@ database. Its findings are the first two entries.
   `WORLD_TIME_SCALE` is the engine's key (compose passes it) and seeds a new world only, and
   `/admin world advancetime` changes the rate only when asked to. It had one live consequence: a
   rate a GM set on the dashboard was undone by the next command that asked the time.
-- **deferred (design, Authority)** — *The simulation's force and bootstrap requests still trust a
-  caller-supplied `game_minute`.* `RunDue` ignores one by design; `ForceRequest` and
-  `BootstrapRequest` do not. Every caller now sends the engine's own
-  minute back to it, so nothing exploits it today, but the asymmetry is real and closing it is a Go
-  change of its own.
+- **fixed (v1.0.0-rc.48)** — *The simulation's force and bootstrap requests trusted a
+  caller-supplied `game_minute`.* `RunDue` ignored one by design since the v0.22.2 review, with the
+  reason written on the field — *"a scheduled tick must not be able to tell the world what time it
+  is"* — while `ForceRequest` and `BootstrapRequest` carried the same field and used it, for
+  twenty-six more releases. `runSystem`'s own comment said it stamped the anchor "at a caller-chosen
+  minute", two hundred lines under the field that said the opposite. Both derive
+  `game.CanonicalWorldGameMinute` now, the one door `RunDue` already read. The wire still accepts the
+  field so an older bot mid-upgrade keeps working; the three Python client methods no longer take one,
+  and nine call sites stopped computing a minute the engine throws away. `caller_minute_test.go` sends
+  a wild minute and asserts the canonical one landed (it fails with `Force stamped 9999999` against
+  the old code), and `test_simulation_minute.py` holds the Python side — where the assertion that
+  encoded the fault lived, two tests below one refusing a forged minute on `/v1/game/action`.
 - **deferred (design)** — *Moderation is a nudge on the engine's dispatch layer, not anti-cheat.*
   A muted or frozen player is blocked from the ~150 authoritative ops; raw `/v1/db` writes the
   bot makes on their behalf and the simulation runner are not intercepted. Stated in

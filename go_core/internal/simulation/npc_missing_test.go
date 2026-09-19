@@ -187,7 +187,8 @@ INSERT OR REPLACE INTO world_simulation_state VALUES('npc_life',0,10080,0,0);`);
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := runner.Force(ForceRequest{System: "npc_life", Steps: 1, GameMinute: past}); err != nil {
+	setSimulationGameMinute(t, path, past)
+	if _, err := runner.Force(ForceRequest{System: "npc_life", Steps: 1}); err != nil {
 		t.Fatal(err)
 	}
 	if got := storage.ParseInt(simScalar(t, path, `SELECT health FROM npc_life_state WHERE npc_name='Lost Lu'`)); got > hurt {
