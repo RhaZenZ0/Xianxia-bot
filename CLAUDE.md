@@ -1322,6 +1322,49 @@ passed. A grep cannot see a disabled condition. `beginner_events_test.go` hands 
 severity-10 event and asserts it is not offered, and fails with the whole map when the condition is
 disabled; Python keeps only the one thing it can honestly check, that the Go half still exists.
 
+### The peach that nothing grew (`rare_items`, v1.0.0-rc.50)
+
+`hundred_year_peach` was the one item of 287 that the world could not produce: no shop sold it, no
+recipe made it, no realm room held it, no event granted it, and no production file named it. It is
+authored complete and expensive — `use.lifespan_years: 50`, `base_price: 12000`,
+`auction_interest: legendary`, `door_event_chance: 65` — and **both halves already worked**.
+`item_use_actions.go` grants the fifty years; `advanced_maintenance.go` reads `door_event_chance` to
+write an `auction_door_risks` row when a legendary lot is struck. That second system had therefore
+never fired either: you cannot auction a fruit that does not exist. One missing wire kept two
+authored systems dark, the shape `/learn` (rc.43), the quest journal (rc.46) and the event bands
+(rc.49) all had.
+
+The lifespan ladder said where it belonged — `jade_life_herb` (5 years) is a secret-realm room
+reward, `longevity_pill` (10) is an apothecary line, and the 50-year fruit was nothing.
+
+**Why a chance and not just a placement.** A realm's rooms are walked again on every run:
+`secret_realm_runs` keeps one row per *user* and `enter` does `ON CONFLICT(user_id) DO UPDATE SET …
+room_index=0`. Nothing records that a realm was looted. And three of the eight realms have a key on
+sale (448–672 stones, array shops at Ashenwall and Stoneback) — which are also the three low-floor
+realms. So anything in a room's `items` is a guaranteed, repeatable payout, right for two spirit
+herbs and wrong for a thing the world should have few of.
+
+`rare_items` is what a room *might* hold, borrowing `ForageMaterial`'s shape (`chance`, `max`, minus
+the richness floor a realm has no equivalent of) so the tree has one idea of what a find chance looks
+like. It is merged into the room's own payout before the single `applyCanonicalRewardTx` call, so a
+find cannot be paid twice or half-paid, and a miss is silent — a rare find that announced its own
+absence would tell a player the roll had happened, which is most of knowing it exists.
+
+**The home is the Salt King's Throne**, `salt_kings_barrow`'s last room at TN 18, which granted
+nothing before. Keyless, opening on one weight-2 event — *"a barrow beneath the salt ruin that opens
+when the marsh floods"*, about 1.8% of a realm-2 character's draws. Floor 2, because fifty years is
+enormous low down and worthless high up, so every deeper keyless realm (8/9/16/24) is the wrong
+audience. And **salt preserves**: "salt-preserved soldiers stand in ranks" is the reason a whole
+hundred-year fruit is still sound in there.
+
+**The sweep found a second orphan the moment it stopped counting tests as sources.**
+`test_every_item_has_a_source.py` greps production Go and Python for every item id, and its first
+version had no `--exclude=*_test.go` — so the peach looked sourced *by the very test written to prove
+it had none*. With tests excluded, `living_world_ring` surfaced: the top of the storage ladder
+(Immortal grade, 500 slots, the only `living_space`), 40,000, `door_event_chance: 75`, named only in
+`support_storage_test.go`. It is in `SOURCELESS_ITEMS` with that reason rather than quietly placed —
+where it belongs is a content decision.
+
 ### World events and their sites
 
 A world event is a row in `world_events` (category, severity, location, expiry) plus a **site**:

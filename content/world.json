@@ -26921,7 +26921,13 @@
           "cultivation": 20,
           "spirit_stones": 12,
           "insight_xp": 12,
-          "items": {}
+          "items": {},
+          "rare_items": {
+            "hundred_year_peach": {
+              "chance": 6,
+              "max": 1
+            }
+          }
         }
       ]
     },

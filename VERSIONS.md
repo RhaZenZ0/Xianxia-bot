@@ -6,6 +6,31 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.0** (rc.50) grows the one item in the catalogue that nothing could produce.
+
+`hundred_year_peach` was one of 287 items and the only one no shop sold, no recipe made, no realm
+room held, no event granted and no production file named. Fifty years of lifespan, 12,000 base
+price, `auction_interest: legendary`, `door_event_chance: 65` - and both halves already worked, which
+is the part worth keeping. `item_use_actions.go` grants the fifty years, and `advanced_maintenance.go`
+reads `door_event_chance` to write an `auction_door_risks` row when a legendary lot is struck, so
+that system had never fired either: you cannot auction a fruit that does not exist. One missing wire
+kept two authored systems dark, the shape `/learn`, the quest journal and the event bands all had.
+
+It needed a chance rather than just a placement. A realm's rooms are walked again on every run -
+`secret_realm_runs` keeps one row per user and entering resets `room_index` to 0 - and three of the
+eight realms have a key on sale at 448 to 672 stones, which are also the three low-floor realms. So a
+room's `items` is a guaranteed repeatable payout. `rare_items` is what a room *might* hold, in
+`forage_materials`' own shape, merged into the room's single reward so a find cannot be paid twice.
+
+It grows in the Salt King's Throne, the last room of a keyless barrow that opens when the marsh
+floods - floor 2, because fifty years is enormous low down and nothing high up, and salt preserves.
+
+The sweep that proves no item is sourceless found a second orphan the moment it stopped counting
+test files: its first version had no `--exclude=*_test.go`, so the peach looked sourced by the very
+test written to prove it had none. With tests excluded, `living_world_ring` surfaced - the top of the
+storage ladder, 40,000, named only in a Go test. It is recorded in `SOURCELESS_ITEMS` with that
+reason rather than quietly placed.
+
 **1.0.0** (rc.49) gives the first hour world events it can actually take part in.
 
 `UnexpectedEvent` has carried `min_realm_index` and `max_realm_index` since the roster was written,
