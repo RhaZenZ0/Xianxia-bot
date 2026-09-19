@@ -30,10 +30,13 @@ from __future__ import annotations
 import argparse
 import asyncio
 import os
+import json
 import re
 import shutil
 import sys
 import tempfile
+import urllib.error
+import urllib.request
 from pathlib import Path
 from typing import Any
 
@@ -42,6 +45,7 @@ from playtest_common import Report, bootstrap, launch_engine, step, stop_engine 
 
 GUILD_ID = 900000000000000001
 HEALTH_PORT = 18182  # 1..65535 is enforced by the settings; the engine playtest's own port is 18089
+CONTROL_TOKEN = "simcord-playtest-control"  # the GM dashboard's shared secret with the bot
 PLAYER_NAME = "Shen Rui"
 
 # Leaves the sweep (section 8) does not press, each with its reason.
@@ -76,6 +80,9 @@ def _configure(url: str, token: str, db_path: str) -> None:
         "DISCORD_TOKEN": "simcord-playtest-token", "GUILD_ID": str(GUILD_ID),
         "GAME_ENGINE_URL": url, "ENGINE_AUTH_TOKEN": token, "DATABASE_PATH": db_path,
         "NARRATOR_PROVIDER": "procedural", "HEALTH_PORT": str(HEALTH_PORT),
+        # The bot hosts the GM dashboard's control plane on the health port;
+        # without a token `HealthServer` answers 404 and section 2b cannot run.
+        "BOT_CONTROL_TOKEN": CONTROL_TOKEN,
         "MESSAGE_CONTENT_INTENT": "true", "AUTO_NARRATE": "true",  # typed play listens in a private scene only with both
         "UPDATE_CHECK_ENABLED": "false", "QUEST_FORGE_AUTO": "false", "ROUTE_AUDIT_HOURS": "0",
         # A surprise on the typed explore (28% by default) blocks the road
@@ -523,6 +530,15 @@ async def run(url: str, token: str, db_path: str) -> Report:
 
     from app.bot import main as _main  # noqa: F401 - registers the surface on the bot at import
     from app.bot.admin.channel_messages import BASE_CHANNEL_SPECS
+    from app.bot.admin.server_setup import (
+        SERVER_AUCTION_CATEGORY,
+        SERVER_BASE_CATEGORY,
+        SERVER_EVENT_CATEGORY,
+        SERVER_REALM_CATEGORY,
+    )
+    from app.bot.runtime import DB
+    from app.bot.runtime import _realm_access_role_name
+    from app.rules.realm_hubs import REALM_HUBS, realm_presence_role_name
     from app.bot.bot import bot
     from app.bot.runtime import SETTINGS
     from app.bot.services import GUILD
@@ -540,6 +556,15 @@ async def run(url: str, token: str, db_path: str) -> Report:
         # waited out by `settle_patiently` - several short settles - instead.
         guild = env.create_guild("Xianxia Playtest", id=GUILD_ID)
         channels = {name: guild.create_text_channel(name) for name in BASE_CHANNEL_SPECS}
+        # `#bugs` is a forum channel with `available_tags`, which simcord 2.0.1 does
+        # not implement on channel create - and because that comes back as its own
+        # `UnsupportedField` rather than a `discord.HTTPException`, the warning path
+        # in `ensure_bugs_forum_channel` (which handles a real server without
+        # Community enabled) never catches it and Full Setup below dies on it. So
+        # the harness stages the channel: setup then *finds* it by name and never
+        # calls `create_forum`. This is the one thing in the layout the fake cannot
+        # model, and staging it is what keeps the rest of the path drivable.
+        guild.create_forum_channel("bugs")
         admin_role = guild.create_role("Admin", permissions=discord.Permissions(administrator=True))
         gm = guild.add_member(env.create_user("GM"), roles=[admin_role])
         player = guild.add_member(env.create_user("Player One"))
@@ -579,6 +604,112 @@ async def run(url: str, token: str, db_path: str) -> Report:
             expect("Missing" not in text and "Could not" not in text, text[:800])
             return text
         await step(report, "/admin → Server → Basechannels → bind connects the eight base channels", bind_channels())
+
+        # ---- 2b. the layout the dashboard owns ---------------------------------
+        # Every provisioning helper defaults to `create_missing=False`, and the ONE
+        # caller that passes True is the GM dashboard's Full Setup - so no slash
+        # command and no hub button can reach `guild.create_category`, and until
+        # v1.0.0-rc.52 nothing in either harness did either: the categories, the four
+        # realm capitals, the nine auction channels and the four per-world events
+        # channels were provisioned by code no test had ever run.
+        #
+        # This drives it over the bot's **own control plane** - the same HTTP wire the
+        # dashboard posts to (`POST /control/discord`, `X-Xianxia-Control`), on the
+        # health port `_configure` set - rather than by calling the handler. The
+        # harness's rule is that a loop goes through a surface; the control plane is a
+        # surface, it is simply not a Discord one.
+        async def _control(action: str) -> dict[str, Any]:
+            body = json.dumps({"action": action, "payload": {"reason": "playtest"}}).encode("utf-8")
+            request = urllib.request.Request(
+                f"http://127.0.0.1:{HEALTH_PORT}/control/discord", data=body, method="POST",
+                headers={"Content-Type": "application/json", "X-Xianxia-Control": CONTROL_TOKEN},
+            )
+            def post() -> dict[str, Any]:
+                # A refusal carries its reason in the body; urlopen raises on 4xx,
+                # so without this a step reports "HTTP Error 403" and nothing about
+                # what was actually refused.
+                try:
+                    return dict(json.loads(urllib.request.urlopen(request, timeout=30).read().decode("utf-8")))
+                except urllib.error.HTTPError as exc:
+                    return {"ok": False, "status": exc.code, "body": exc.read().decode("utf-8", "replace")[:600]}
+            answer = await asyncio.to_thread(post)
+            expect(answer.get("ok"), str(answer)[:600])
+            await settle_patiently(env)
+            return answer
+
+        def _raise_the_bot_role() -> None:
+            """The one precondition a live server has to meet before Full Setup.
+
+            Its last act is reconciling the realm roles, and that refuses outright
+            - "Move the bot role above the generated realm roles before syncing" -
+            when the bot's own role sits below the roles it just created; the
+            endpoint reports that as a 403. SimCord gives the bot a managed role at
+            position 1, like a fresh invite. Both the backend model and discord.py's
+            cached Role have to move: `guild.me.top_role` reads the cache, and the
+            backend is what a later fetch would return.
+            """
+            for role in env.backend.guilds[guild.id].roles.values():
+                if role.managed:
+                    role.position = 500
+            live = bot.get_guild(guild.id)
+            for role in (live.roles if live else []):
+                if role.managed:
+                    role.position = 500
+
+        async def full_setup():
+            _raise_the_bot_role()
+            await _control("setup")
+            live = bot.get_guild(guild.id)
+            expect(live is not None, "the bot has no cached guild to read its layout from")
+            categories = {c.name for c in live.categories}
+            wanted = (SERVER_BASE_CATEGORY, SERVER_REALM_CATEGORY, SERVER_AUCTION_CATEGORY, SERVER_EVENT_CATEGORY)
+            for name in wanted:
+                expect(name in categories, f"{name!r} was not created; have {sorted(categories)}")
+            made = {c.name: c for c in live.text_channels}
+            for world, hub in REALM_HUBS.items():
+                capital, feed = str(hub["channel_name"]), str(hub["events_channel_name"])
+                expect(capital in made, f"no capital channel for {world}")
+                expect(feed in made, f"no events channel for {world}")
+                expect(getattr(made[capital].category, "name", None) == SERVER_REALM_CATEGORY,
+                       f"#{capital} sits in {getattr(made[capital].category, 'name', None)!r}")
+                expect(getattr(made[feed].category, "name", None) == SERVER_EVENT_CATEGORY,
+                       f"#{feed} sits in {getattr(made[feed].category, 'name', None)!r}")
+            auctions = sorted(c.name for c in live.text_channels
+                              if getattr(c.category, "name", None) == SERVER_AUCTION_CATEGORY)
+            expect(len(auctions) == 9, f"{len(auctions)} auction channels, expected 9: {auctions}")
+            rows = {str(r["world_name"]) for r in await DB.get_world_event_channels(guild.id)}
+            expect(rows == set(REALM_HUBS), f"bound worlds {sorted(rows)}")
+
+            # The gate actually closed, not merely "no exception". SimCord gives
+            # the bot every permission except administrator, so a channel
+            # overwrite applies to it too - which is how the first run of this
+            # step found that the bot denied @everyone before allowing itself,
+            # was refused 403 on every call after, and left each capital denied
+            # to @everyone with no allow for anybody.
+            by_name = made
+            for world, hub in REALM_HUBS.items():
+                for name, role_name in ((str(hub["channel_name"]), realm_presence_role_name(world)),
+                                        (str(hub["events_channel_name"]), _realm_access_role_name(world))):
+                    overwrites = by_name[name].overwrites or {}
+                    expect(getattr(overwrites.get(live.default_role), "view_channel", None) is False,
+                           f"#{name} does not deny @everyone")
+                    role = discord.utils.get(live.roles, name=role_name)
+                    expect(role is not None and getattr(overwrites.get(role), "view_channel", None) is True,
+                           f"#{name} never allowed {role_name} - the bot was probably locked out mid-gate")
+            return f"{len(wanted)} categories, 4 capitals, 4 world feeds, {len(auctions)} auction channels, all gated"
+        built = await step(report, "the dashboard's Full Setup creates every category and per-world channel", full_setup())
+        if built:
+            report.add("PASS", "what Full Setup built", built)
+
+        async def setup_is_idempotent():
+            def layout() -> set[int]:
+                live = bot.get_guild(guild.id)
+                return {c.id for c in live.categories} | {c.id for c in live.text_channels}
+            before = layout()
+            await _control("repair")
+            after = layout()
+            expect(after == before, f"Repair made {len(after - before)} new channel(s)/category(ies)")
+        await step(report, "Repair over the same layout makes nothing new", setup_is_idempotent())
 
         # ---- 3. a cultivator ---------------------------------------------------
         async def begin():

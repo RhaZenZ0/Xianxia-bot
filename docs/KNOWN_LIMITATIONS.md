@@ -11,16 +11,17 @@ database. Its findings are the first two entries.
 
 ## Findings
 
-- **deferred (v1.0.0-rc.51)** — *Nothing in either harness reaches a `create_category` call.*
-  `ensure_auction_house_channels` gained a third category and a re-parent for channels that already
-  exist, and SimCord models all of it (`create_category`, `parent_id` on create and on PATCH). The
-  Discord sweep still cannot drive it: the only caller that passes `create_missing=True` is the
-  dashboard's Setup/Repair, and the sweep's own rule is that every loop goes through a Discord
-  surface and never through a handler — `basechannels → bind` is bind-only by design, so no leaf
-  it can press creates anything. Held by contract tests instead
-  (`test_live_auctions.py`, `test_discord_teardown.py`), which is honest about what it proves.
-  Closing it means either a GM-facing Discord leaf that provisions, or a harness that drives the
-  dashboard control plane — both are decisions rather than fixes.
+- **fixed (v1.0.0-rc.52)** — *Nothing in either harness reached a `create_category` call.*
+  Every provisioning helper defaults to `create_missing=False` and the one caller that passes True
+  is the GM dashboard's Full Setup, so no slash command and no hub button could reach it — the
+  categories, the four realm capitals, the nine auction channels and (now) the four per-world
+  events channels were provisioned by code no test had ever run. rc.51 recorded it as deferred
+  because the Discord sweep's own rule is that a loop goes through a surface rather than a handler.
+  The resolution is that the bot's **control plane is a surface** — it is just not a Discord one:
+  section 2b of `scripts/playtest_discord.py` posts `{"action": "setup"}` to
+  `POST /control/discord` with `X-Xianxia-Control`, exactly as the dashboard does, then asserts the
+  four categories exist, each capital and each world feed sits in the right one, nine auction
+  channels were made, and a second Repair over the same layout creates nothing new.
 - **fixed (v1.0.0-rc.51)** — *Teardown never deleted an auction channel, so it never deleted the
   capitals' category either.* `clear_discord_bindings` has `DELETE`d from `auction_house_channels`
   since v0.33.1, while `teardown_managed_discord_layout` built its targets from the base bindings,

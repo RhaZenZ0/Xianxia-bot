@@ -6,6 +6,64 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.0** (rc.52) gives each world its own news, and says so in every channel.
+
+`world-events` carried all four worlds. A Demon Invasion in the Celestial World and a caravan over
+the bank in a Mortal village landed in one feed, in front of everybody, whatever they could reach -
+while the capitals have been split per world since schema 4 and the auction floors since schema 35.
+**🌠 World Events** is the fourth category, holding `#mortal-world-events`,
+`#spiritual-world-events`, `#immortal-world-events` and `#celestial-world-events`, each gated by the
+realm **access** role (you have reached that world) rather than the presence role (you are standing
+in its capital this minute), which is the same rule the auction floors use and deliberately not the
+capitals'.
+
+**The data was there the whole time, and half the wire with it.** `world_events.location` is
+`NOT NULL` on every row, and `_event_scene_location` - the resolver that turns an event key into a
+place - already existed and was **already called by both announcement writers**, about fifty lines
+*after* each had posted. Moving that call above the send is the entire routing change. And
+`event_threads.announcement_channel_id` is written at announcement time, so the "event closed"
+notice lands wherever the announcement went and **needed no change at all**.
+
+**The global channel stays, and that is the design.** Four writers have no world and never will -
+the weekend gift, a GM's world-reset notice, the dashboard's test post and the channel's own blurb -
+and `world-events`' own spec string already said *"Global cultivation-world announcements"*. It is
+also the fallback, which is what makes the change incapable of breaking a writer: the worst case is
+the channel an announcement already used. **The fallback is "no world", never "Mortal World"** - a
+private residence, an inner world, an abode or a literal `Unknown` is not in the location catalogue,
+and the `or "Mortal World"` default every other site in the tree uses would have filed somebody's
+household news as that world's public news.
+
+**Every channel's text was rewritten, and the `#xianxia-info` guide with it.** The blurbs still
+described the v0.19 server; the guide said *"main realm-capital channels remain shared social
+spaces"*, which stopped being true in v0.21.6. The guide is eleven topics now, three of them new -
+**The Server** (what the four categories are and which are gated by what), **World Events** (a scene
+has a finite site, so arriving first is worth something) and **Crafts & Professions** (slips,
+examinations, and that your household teaches one trade and the head of the house can qualify you in
+all four). The four new per-world channels get their own GM-editable message slots, resolved through
+`world_event_channels` exactly as the `realm:` slots resolve through `realm_hub_channels`.
+
+**The GM dashboard** gains a World Events card and table beside Realm Capitals and Auction Houses -
+channel, access role, gated or visible, ready - and they **count toward `setup_ready`**, unlike the
+auction halls, which are reported but excluded: a missing auction channel costs a lot card, a
+missing events channel loses a world's news outright.
+
+**And both harnesses can now reach a `create_category` call**, which rc.51 recorded as deferred.
+Every provisioning helper defaults to `create_missing=False` and the one caller that passes True is
+the GM dashboard's Full Setup, so no slash command and no hub button could reach it - the
+categories, the four capitals, the nine auction channels and these four feeds were provisioned by
+code no test had ever run. The resolution is that the bot's **control plane is a surface**, it is
+just not a Discord one: section 2b of `scripts/playtest_discord.py` posts `{"action": "setup"}` to
+`POST /control/discord` with `X-Xianxia-Control`, exactly as the dashboard does, then holds that the
+four categories exist, that each capital and each world feed sits in the right one, that nine
+auction channels were made, and that a second Repair over the same layout creates nothing new.
+
+**A fourth gate this session passed its own drill**, and it is worth knowing which kind. The first
+version of the harness check asserted the substring `_control("setup")`; commenting the call out
+left the string in place and the gate passed. It reads *call expressions* by AST now, so a commented
+or deleted call both fail. The router's gate had the same shape from the other side - its docstring
+quotes the `or "Mortal World"` default it exists to refuse, so a whole-body search matched the
+explanation and failed on correct code; it reads the function's statements without its docstring.
+
 **1.0.0** (rc.51) gives the ring a home and the auctions a room of their own.
 
 `living_world_ring` was the second orphan rc.50's sweep found, the moment it stopped counting test
@@ -2051,6 +2109,15 @@ mechanical authority paths.
 - **Schema 27** added the v0.19.29 mute/freeze moderation columns on `characters`
   (`is_muted`, `is_frozen`, `moderation_reason`).
 - **Schema 28** added the Quest Forge definition table (`quest_definitions`).
+- **Schema 56** gave each world its own news channel. `world_event_channels` is one row per guild
+  per world - the channel, its category, and nothing else, because an events channel belongs to a
+  world rather than to a place in it. It is `realm_hub_channels`' shape minus `location`, and it
+  keeps the `UNIQUE(guild_id,channel_id)` the capitals carry and the auction table deliberately
+  drops: there one channel serves forty-eight houses, here one channel is exactly one world. The
+  `world-events` base channel is not retired - the weekend gift, a GM's world-reset notice and the
+  dashboard's test post have no world and never will, so it stays as the global feed and as the
+  fallback for any place the location catalogue does not carry.
+
 - **Schema 55** gave two orphan quests their doors. `road_to_a_sect` had been seeded on every boot
   since v0.23.1 and the string appeared in exactly one place in the tree - its own definition - so
   nothing could hand it over; it is `beginner_lesson`'s `follow_on` now, and because

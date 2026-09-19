@@ -18,7 +18,7 @@ from typing import Any
 import discord
 
 from ...ops.game_engine import GameEngineError
-from ..channels import _event_archive_minutes, _report_game_ui_error, _resolve_text_channel, event_channels
+from ..channels import _event_archive_minutes, _report_game_ui_error, _resolve_text_channel, event_channels, world_event_channel
 from ..registry import EVENT_HANDLERS, VIEW_RESTORERS
 from ..runtime import DB, ENGINE, SETTINGS, WORLD, _explain_engine_error, character_location_display, current_world_time, log, reply_long
 from ..services import COMBAT, SIM
@@ -667,10 +667,18 @@ async def spawn_event_thread(
     interaction: discord.Interaction, *, title: str, announcement: str, event_type: str,
     expires_at: float, event_key: str | None = None
 ) -> discord.Thread | None:
-    announcement_channel, scene_channel = await event_channels(interaction)
+    # The global feed this returns is no longer where a located event goes; the
+    # scene channel is still one per server, so it is what this call is for.
+    _global_feed, scene_channel = await event_channels(interaction)
     if scene_channel is None:
         log.warning("No usable event-scenes channel found for event: %s", title)
         return None
+    # v1.0.0-rc.52: where it happened decides which world's channel hears about
+    # it. The resolve used to sit fifty lines below, after the announcement had
+    # already been posted - the location was in `world_events` the whole time,
+    # it was just fetched too late to be able to route anything.
+    event_location = await _event_scene_location(event_key, fallback_user_id=interaction.user.id)
+    announcement_channel = await world_event_channel(interaction.guild, event_location)
 
     # Create the scene in the dedicated scene channel first so the announcement can link to it.
     try:
@@ -746,7 +754,6 @@ async def spawn_event_thread(
             return None
 
     try:
-        event_location = await _event_scene_location(event_key, fallback_user_id=interaction.user.id)
         event_category, event_severity = await _event_scene_profile(event_key, event_type)
         event_view = EventSceneView(
             title=title, event_type=event_type, expires_at=expires_at, location=event_location,
@@ -767,10 +774,12 @@ async def spawn_system_event_thread(
     guild: discord.Guild, *, title: str, announcement: str, event_type: str, expires_at: float, event_key: str
 ) -> discord.Thread | None:
     config = await DB.get_server_config(guild.id)
-    announcement_channel = await _resolve_text_channel(guild, config.get("announcement_channel_id"))
     scene_channel = await _resolve_text_channel(guild, config.get("event_scene_channel_id"))
     if scene_channel is None:
         return None
+    # v1.0.0-rc.52, as above: the place first, then the world's channel.
+    event_location = await _event_scene_location(event_key)
+    announcement_channel = await world_event_channel(guild, event_location)
     # A realm the rotation brought round says so: it was not produced by the
     # world's own upheaval, it is an entrance that came open on schedule.
     realm = str(event_type) == "secret_realm"
@@ -797,7 +806,6 @@ async def spawn_system_event_thread(
         announcement_message_id=announcement_message.id if announcement_message else None,triggered_by=None,expires_at=expires_at,
     )
     try:
-        event_location = await _event_scene_location(event_key)
         event_category, event_severity = await _event_scene_profile(event_key, event_type)
         event_view = EventSceneView(
             title=title, event_type=event_type, expires_at=expires_at, location=event_location,

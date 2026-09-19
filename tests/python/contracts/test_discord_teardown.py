@@ -6,9 +6,9 @@ What is promised, and held here:
 1. The action needs a typed confirmation (`DELETE`), distinct from Fresh
    Start's `CLEAR` and Reset World's `RESET`, and it is audited.
 2. It deletes only what a binding names - threads the database tracks, the
-   bound base channels, the realm hubs, the live auction channels, #bugs -
-   and the three Xianxia categories only when nothing else is left in them.
-   It recreates nothing.
+   bound base channels, the realm hubs, the live auction channels, the
+   per-world events channels, #bugs - and the four Xianxia categories only
+   when nothing else is left in them. It recreates nothing.
 3. The ids are cleared last, and clearing them touches no gameplay column:
    GM-authored channel message text survives, thread rows are left for their
    owners to recover from, and nothing outside the guild is affected.
@@ -72,6 +72,7 @@ class TeardownActionContractTests(unittest.TestCase):
         self.assertIn("_base_channel_bindings(cfg).items()", source)
         self.assertIn("DB.get_realm_hub_channels(guild.id)", source)
         self.assertIn("DB.get_auction_house_channels(guild.id)", source)
+        self.assertIn("DB.get_world_event_channels(guild.id)", source)
         self.assertIn('cfg.get("bugs_channel_id")', source)
         # Never by name, never by category membership, never guild.text_channels.
         self.assertNotIn("guild.text_channels", source)
@@ -103,7 +104,8 @@ class TeardownActionContractTests(unittest.TestCase):
             "left on the server for ever"))
         # And every provisioning helper that fills one must have its rows deleted here.
         for provider in ("_base_channel_bindings(cfg)", "DB.get_realm_hub_channels(guild.id)",
-                         "DB.get_auction_house_channels(guild.id)", 'cfg.get("bugs_channel_id")'):
+                         "DB.get_auction_house_channels(guild.id)", "DB.get_world_event_channels(guild.id)",
+                         'cfg.get("bugs_channel_id")'):
             self.assertIn(provider, source, f"teardown never deletes what {provider} names")
 
     def test_nothing_is_recreated(self):
@@ -166,7 +168,7 @@ class ClearBindingsDatabaseTests(unittest.IsolatedAsyncioTestCase):
 
             counts = await db.clear_discord_bindings(1)
 
-            self.assertEqual(counts, {"server_config": 1, "realm_hubs": 2, "auction_houses": 0, "channel_messages": 1})
+            self.assertEqual(counts, {"server_config": 1, "realm_hubs": 2, "auction_houses": 0, "world_events": 0, "channel_messages": 1})
             cfg = await db.get_server_config(1)
             for column in ("announcement_channel_id", "event_scene_channel_id", "home_scene_channel_id", "log_channel_id",
                            "begin_channel_id", "info_channel_id", "exploration_channel_id", "info_message_id", "bugs_channel_id"):
@@ -186,12 +188,12 @@ class ClearBindingsDatabaseTests(unittest.IsolatedAsyncioTestCase):
         with tempfile.TemporaryDirectory() as tmp:
             db = Database(Path(tmp) / "teardown.sqlite3")
             await db.init()
-            self.assertEqual(await db.clear_discord_bindings(7), {"server_config": 0, "realm_hubs": 0, "auction_houses": 0, "channel_messages": 0})
+            self.assertEqual(await db.clear_discord_bindings(7), {"server_config": 0, "realm_hubs": 0, "auction_houses": 0, "world_events": 0, "channel_messages": 0})
             await db.set_server_channels(7, announcement_channel_id=1, event_scene_channel_id=2)
             first = await db.clear_discord_bindings(7)
             second = await db.clear_discord_bindings(7)
             self.assertEqual(first["server_config"], 1)
-            self.assertEqual(second, {"server_config": 1, "realm_hubs": 0, "auction_houses": 0, "channel_messages": 0})  # the row exists; nothing else to forget
+            self.assertEqual(second, {"server_config": 1, "realm_hubs": 0, "auction_houses": 0, "world_events": 0, "channel_messages": 0})  # the row exists; nothing else to forget
 
 
 if __name__ == "__main__":

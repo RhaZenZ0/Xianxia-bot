@@ -145,7 +145,7 @@ internal/server/        HTTP control/data plane
 ```
 
 Every Go SQLite connection uses `journal_mode=WAL`, `foreign_keys=ON`, `busy_timeout=10000`,
-`synchronous=NORMAL`. Current schema version is 55; historical migrations are kept so old databases
+`synchronous=NORMAL`. Current schema version is 56; historical migrations are kept so old databases
 can upgrade in place — see `VERSIONS.md` for the full schema/release history.
 
 ### The NPC life cycle (v1.0.0-rc.24)
@@ -1411,6 +1411,68 @@ forbids is invisible to it, which is the rc.47 finding again.
 `SERVER_*CATEGORY` constant in the file must be one the teardown loop walks (read off the source,
 not copied), and every provisioning table must be one it deletes from. A fourth category or a fifth
 provisioning helper fails it the day it is added.
+
+### A world's news is that world's (v1.0.0-rc.52, schema 56)
+
+`world-events` carried all four. A Demon Invasion in the Celestial World and a caravan over the bank
+in a Mortal village landed in one feed, in front of everybody, whatever they could reach — while the
+capitals have been split per world since schema 4 and the auction floors since schema 35.
+`SERVER_EVENT_CATEGORY` (`🌠 World Events`) is the fourth category, and `world_event_channels` is
+`realm_hub_channels`' shape minus `location`, because an events channel belongs to a world rather
+than to a place in it. Gated by the realm **access** role, deliberately not the presence role: a
+world's news is for everyone who has reached that world, not only whoever stands in its capital this
+minute.
+
+**The data was there the whole time, and half the wire with it.** `world_events.location` is
+`NOT NULL` on every row, and `_event_scene_location` — the resolver that turns an event key into a
+place — already existed and was **already called by both announcement writers**, about fifty lines
+*after* each had posted. Moving that call above the send is the whole routing change. And
+`event_threads.announcement_channel_id` is written at announcement time, so the "event closed"
+notice lands wherever the announcement went and **needed no change at all**.
+
+**The global channel stays, and that is the design, not a leftover.** Four writers have no world and
+never will — the weekend gift, a GM's world-reset notice, the dashboard's test post, and the
+channel's own blurb — and `BASE_CHANNEL_SPECS`' string for it already said *"Global
+cultivation-world announcements"*. It is also the fallback, which is what makes this incapable of
+breaking a writer: the worst case is the channel an announcement already used.
+
+**`world_of_location` returns None rather than "Mortal World", and that is the one line worth
+reading twice.** Every other site in the tree resolves a world with `or "Mortal World"`
+(`discovery.py:30`, `channels.py`'s auction lookup). A private residence (`birth_family:<id>`), an
+inner world (`personal_world:<uid>`), an abode, or the literal `Unknown` two writers can still
+produce is not in `WORLD.locations` — so that default would file somebody's household news as that
+world's public news. "No world" routes to the global feed, which is where all of it went before.
+
+**Every channel's text was rewritten and `#xianxia-info` with it**, because the blurbs described the
+v0.19 server and the guide said *"main realm-capital channels remain shared social spaces"*, which
+stopped being true in v0.21.6. The guide is eleven topics, three new: **The Server** (the four
+categories and which is gated by what), **World Events** (a scene's site is finite, so arriving
+first is worth something) and **Crafts & Professions**. The four new channels get GM-editable
+message slots resolved through `world_event_channels`, exactly as the `realm:` slots resolve through
+`realm_hub_channels` — a prefixed key needed no new mechanism.
+
+**The dashboard's World Events table counts toward `setup_ready`**, unlike `auction_halls`, which is
+reported but excluded and has no stat card. A missing auction channel costs a lot card; a missing
+events channel loses a world's news outright, so this takes the capitals' side of that asymmetry
+deliberately.
+
+**Both harnesses reach a `create_category` call now**, which rc.51 recorded as deferred. Every
+provisioning helper defaults to `create_missing=False` and the one caller passing True is the GM
+dashboard's Full Setup, so no slash command and no hub button could reach it — the categories, the
+four capitals, the nine auction channels and these four feeds were provisioned by code no test had
+ever run. **The bot's control plane is a surface, it is just not a Discord one**: section 2b of
+`playtest_discord.py` posts `{"action": "setup"}` to `POST /control/discord` with
+`X-Xianxia-Control`, exactly as the dashboard does, and holds that the four categories exist, that
+each capital and each world feed sits in the right one, that nine auction channels were made, and
+that a second Repair creates nothing new.
+
+**A fourth gate this session passed its own drill, from both directions.** The harness check first
+asserted the substring `_control("setup")` — commenting the call out left the string in place and it
+passed, which is rc.49's disabled-condition finding in Python; it reads *call expressions* by AST
+now. And the router's gate failed on *correct* code, because `world_of_location`'s docstring quotes
+the `or "Mortal World"` default it exists to refuse; it reads the function's statements without its
+docstring. A gate that cannot tell prose from code, or a call from a comment, is decoration — and
+only running it against the broken tree says which kind you have.
 
 ### World events and their sites
 
