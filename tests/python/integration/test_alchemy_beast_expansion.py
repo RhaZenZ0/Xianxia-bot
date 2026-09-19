@@ -11,10 +11,10 @@ from app.simulation import WorldSimulator
 
 ROOT = PROJECT_ROOT
 class _NoopSimulationEngine:
-    async def bootstrap_simulation(self, game_minute: int):
+    async def bootstrap_simulation(self):
         return {"npc_moods_initialized": 0, "clan_branches_created": 0, "retainer_groups_created": 0, "clan_relations_created": 0}
 
-    async def force_simulation(self, system, steps, game_minute):
+    async def force_simulation(self, system, steps):
         return {"system": system, "due_steps": steps, "applied_steps": steps, "summary": "test seed"}
 
 

@@ -691,6 +691,55 @@ given. `Settings.world_time_scale` is gone, and
 `tests/python/contracts/test_world_clock_read_through.py` holds that no file under `app/` or
 `scripts/` so much as names `anchor_real_ts`.
 
+### What time it is was never the caller's to say (v1.0.0-rc.48)
+
+rc.39 took the world clock's arithmetic away from Python. This is the last thing a caller could
+still *tell* the engine about time, and it is the one `docs/KNOWN_LIMITATIONS.md` had carried as a
+deferred Authority item, sized there as "a Go change of its own".
+
+`RunDueRequest.GameMinute` has been accepted-and-ignored since the v0.22.2 review, with the reason
+written on the field: **"a scheduled tick must not be able to tell the world what time it is."**
+`ForceRequest` and `BootstrapRequest` carried the same field and *used* it, for twenty-six more
+releases — and `runSystem`'s own doc comment, two hundred lines below that field, said it stamped
+the anchor "at a **caller-chosen** minute". One rule, two answers, both written down.
+
+**What the number does is why it matters.** It is not a label on a log line: every system under
+`applySystem` reads it as *now*. It is the minute an NPC's age is measured against, the birth minute
+`seedHouseholds` stamps on ~88 households, the anchor `world_simulation_state.last_game_minute`
+carries, and the founding of every clan. A caller sending a number a year out does not mis-title a
+run — it buries people.
+
+Both derive `game.CanonicalWorldGameMinute` now, the one door `RunDue` already reads.
+
+- **The wire field stays, on all three, deliberately.** An older bot mid-upgrade still POSTs
+  `game_minute`, and a request *refused* for carrying one would turn a rolling deploy into an
+  outage. It is the value that is ignored, not the request, and `TestTheWireStillAcceptsAMinuteItIgnores`
+  holds that — including a negative one and `1<<60`.
+- **Python stopped computing it.** The three client methods take no minute, and nine call sites
+  stopped deriving one to ship and have discarded. `WorldSimulator.initialize` still *takes* a
+  `game_minute` and that is correct: it is a **read**, asking which black markets are open, and it
+  no longer passes one on.
+- **Two gates, because neither half can see the other.** `caller_minute_test.go` sends a wild minute
+  and asserts the canonical one landed — against the old code it fails with `Force stamped 9999999`
+  and `Bootstrap anchored at -4000000`, the production symptom exactly.
+  `tests/python/contracts/test_simulation_minute.py` holds that nothing in `app/` or `scripts/` sends
+  one, reading the client's *signatures* by AST so a parameter cannot creep back, and holds the wire
+  field and the Go gate still present.
+
+**The assertion that encoded the fault was two tests below the one that refuses it.**
+`test_game_engine.py` has held since v0.22.2 that `authoritative_action` rejects a client
+`game_minute` ("Go owns current world time") — and directly under it sat
+`test_simulation_endpoints_keep_explicit_scheduler_time`, asserting `payload["game_minute"] == 12345`.
+A file can hold a rule and its opposite a dozen lines apart and stay green for twenty-six releases;
+that is worth knowing before trusting that a rule is enforced because a test near it says so.
+
+**The fixtures needed the clock, and that is the rule this repo already states.** Two bootstrap
+fixtures had no `world_state` table, so the canonical read failed on them — production always has it
+(Python's migration makes it before the engine is ever asked to bootstrap), so the fixture was the
+thing that could not fail the way production fails. The ten test call sites that used to pass a
+minute now pin the clock with `setSimulationGameMinute`, a helper written for `RunDue`'s own fix and
+sitting unused by these paths ever since.
+
 ### The world closed for maintenance (`maintenance_mode`, v1.0.0-rc.41)
 
 An operator updating the server had no way to stop play while they did it. `/admin server

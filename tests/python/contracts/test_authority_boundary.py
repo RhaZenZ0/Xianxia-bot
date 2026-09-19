@@ -426,7 +426,12 @@ def test_python_gameplay_purge_is_a_one_way_authority_boundary():
     engine_class = next(node for node in engine_tree.body if isinstance(node, ast.ClassDef) and node.name == "GameEngineClient")
     bootstrap = next(node for node in engine_class.body if isinstance(node, ast.AsyncFunctionDef) and node.name == "bootstrap_simulation")
     bootstrap_source = ast.get_source_segment(engine_source, bootstrap) or ""
-    assert '"game_minute"' in bootstrap_source
+    # The bootstrap payload carries no world content - Go reads `world.json`
+    # itself - and since v1.0.0-rc.48 no minute either: the engine derives the
+    # canonical one. This line asserted the opposite until rc.48, which is the
+    # third place in the tree that held "Go owns the time" and its contradiction
+    # at once; `tests/python/contracts/test_simulation_minute.py` is the gate.
+    assert '"game_minute"' not in bootstrap_source
     assert '"npcs"' not in bootstrap_source
     assert '"sects"' not in bootstrap_source
 

@@ -6,6 +6,34 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.0** (rc.48) stops the engine taking a caller's word for what time it is - the last thing one
+could still tell it, and the open Authority item on the punch list.
+
+`RunDueRequest.GameMinute` has been accepted-and-ignored since the v0.22.2 review, with the reason
+written on the field: *"a scheduled tick must not be able to tell the world what time it is."*
+`ForceRequest` and `BootstrapRequest` carried the same field and used it for twenty-six more
+releases, and `runSystem`'s own comment said it stamped the anchor "at a caller-chosen minute" two
+hundred lines below the field that said the opposite. One rule, two answers, both written down.
+
+The number is not a label. Every system under it reads it as *now*: it is the age an NPC is measured
+against, the birth minute stamped on ~88 households, the anchor each system carries, the founding of
+every clan. A caller a year out does not mis-title a run, it buries people. Nothing exploited it -
+every caller read the engine's own minute and sent it straight back, which is exactly why it survived
+twenty-six releases: the fault is invisible until the first caller that does not.
+
+Both derive `game.CanonicalWorldGameMinute` now, the door `RunDue` already read. The wire keeps the
+field on all three so an older bot mid-upgrade is not an outage - it is the value that is ignored,
+not the request - while the three Python client methods take no minute and nine call sites stopped
+computing one to ship and have discarded. Two gates, because neither half can see the other: the Go
+one sends a wild minute and fails on the old code with `Force stamped 9999999`, and the Python one
+holds that nothing in the tree sends one, reading the client's signatures by AST.
+
+Worth keeping: the assertion that encoded the fault sat two tests below its opposite.
+`test_game_engine.py` has held since v0.22.2 that an authoritative action rejects a client
+`game_minute` ("Go owns current world time"), and directly under it
+`test_simulation_endpoints_keep_explicit_scheduler_time` asserted `payload["game_minute"] == 12345`.
+A file can hold a rule and its contradiction a dozen lines apart and stay green for a very long time.
+
 **1.0.0** (rc.47) makes the playtest checklist say what the Discord sim proved, instead of asking a
 person for it.
 

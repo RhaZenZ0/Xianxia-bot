@@ -66,17 +66,22 @@ class WorldSimulator:
     # Mutations: delegated to the engine.
     # ------------------------------------------------------------------
     async def initialize(self, game_minute: int) -> None:
-        """Bootstrap simulation state through the authoritative Go engine."""
-        engine = self._require_engine()
-        await engine.bootstrap_simulation(int(game_minute))
-        if not await self.db.list_active_black_markets(int(game_minute)):
-            await engine.force_simulation("black_markets", 1, int(game_minute))
+        """Bootstrap simulation state through the authoritative Go engine.
 
-    async def run_due(self, game_minute: int, automation: dict[str, bool]) -> list[SimulationRun]:
+        `game_minute` is still taken, and is still only a *read*: it asks which
+        black markets are open right now. The engine is told nothing about the
+        time (v1.0.0-rc.48) - it reads the canonical clock itself.
+        """
+        engine = self._require_engine()
+        await engine.bootstrap_simulation()
+        if not await self.db.list_active_black_markets(int(game_minute)):
+            await engine.force_simulation("black_markets", 1)
+
+    async def run_due(self, automation: dict[str, bool]) -> list[SimulationRun]:
         """Delegate scheduled simulation exclusively to the authoritative Go engine."""
         if self.engine is None:
             raise RuntimeError("WorldSimulator requires the Go engine for simulation mutations")
-        rows = await self.engine.run_due_simulation(int(game_minute), automation)
+        rows = await self.engine.run_due_simulation(automation)
         return [
             SimulationRun(
                 str(row.get("system", "")),
@@ -88,7 +93,7 @@ class WorldSimulator:
             for row in rows
         ]
 
-    async def force_run(self, system: str, steps: int, game_minute: int) -> SimulationRun:
+    async def force_run(self, system: str, steps: int) -> SimulationRun:
         """Delegate forced simulation exclusively to the authoritative Go engine."""
         if self.engine is None:
             raise RuntimeError("WorldSimulator requires the Go engine for simulation mutations")
@@ -96,10 +101,10 @@ class WorldSimulator:
         if system == "all":
             summaries: list[str] = []
             for key in SIMULATION_SYSTEMS:
-                row = await self.engine.force_simulation(key, applied, int(game_minute))
+                row = await self.engine.force_simulation(key, applied)
                 summaries.append(f"{key}: {row.get('summary', '')}")
             return SimulationRun("all", applied, applied, " | ".join(summaries))
-        row = await self.engine.force_simulation(str(system), applied, int(game_minute))
+        row = await self.engine.force_simulation(str(system), applied)
         return SimulationRun(
             str(row.get("system", system)),
             int(row.get("due_steps", steps)),

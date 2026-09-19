@@ -108,7 +108,8 @@ INSERT INTO npc_civilization_state(npc_name,home_location,current_location,world
 INSERT INTO npc_life_state(npc_name,birth_game_minute,age_at_creation_years,natural_lifespan_years,health,injury,injury_severity,sect_rank,career_progress,relationship_status,spouse_name,children_count,last_social_game_minute,last_cultivation_game_minute,death_game_minute,cause_of_death,updated_at) VALUES('Old Master',0,90,70,100,'',0,'Independent Cultivator',0,'single','',0,0,0,NULL,'',0);
 `)
 	runner, _ := NewRunner(path, "")
-	run, err := runner.Force(ForceRequest{System: "npc_life", Steps: 1, GameMinute: 7 * minutesPerDay})
+	setSimulationGameMinute(t, path, 7*minutesPerDay)
+	run, err := runner.Force(ForceRequest{System: "npc_life", Steps: 1})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -134,7 +135,8 @@ INSERT INTO npc_civilization_state(npc_name,home_location,current_location,world
 INSERT INTO npc_life_state(npc_name,birth_game_minute,age_at_creation_years,natural_lifespan_years,health,injury,injury_severity,sect_rank,career_progress,relationship_status,spouse_name,children_count,last_social_game_minute,last_cultivation_game_minute,death_game_minute,cause_of_death,updated_at) VALUES('Nascent Elder',0,1000,75,100,'',0,'Independent Cultivator',0,'single','',0,0,0,NULL,'',0);
 `)
 	runner, _ := NewRunner(path, "")
-	run, err := runner.Force(ForceRequest{System: "npc_life", Steps: 1, GameMinute: 7 * minutesPerDay})
+	setSimulationGameMinute(t, path, 7*minutesPerDay)
+	run, err := runner.Force(ForceRequest{System: "npc_life", Steps: 1})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -166,7 +168,8 @@ INSERT INTO npc_life_state(npc_name,birth_game_minute,age_at_creation_years,natu
 	// hunting for a game minute whose hash happens to agree.
 	seedCourtship(t, path, "A", "B", courtshipMarryAt-courtshipGain)
 	runner, _ := NewRunner(path, "")
-	if _, err := runner.Force(ForceRequest{System: "npc_life", Steps: 120, GameMinute: 4321}); err != nil {
+	setSimulationGameMinute(t, path, 4321)
+	if _, err := runner.Force(ForceRequest{System: "npc_life", Steps: 120}); err != nil {
 		t.Fatal(err)
 	}
 	if got := simScalar(t, path, "SELECT spouse_name FROM npc_life_state WHERE npc_name='A'"); got != "B" {
@@ -211,7 +214,8 @@ INSERT INTO economy_markets VALUES('Greenriver Town','herb',10,50,1.0,0,0);
 INSERT INTO economy_markets VALUES('Greenriver Town','ore',20,40,1.0,0,0);
 `)
 	runner, _ := NewRunner(path, "")
-	if _, err := runner.Force(ForceRequest{System: "dynamic_economy", Steps: 4, GameMinute: 1440}); err != nil {
+	setSimulationGameMinute(t, path, 1440)
+	if _, err := runner.Force(ForceRequest{System: "dynamic_economy", Steps: 4}); err != nil {
 		t.Fatal(err)
 	}
 	if got := storage.ParseInt(simScalar(t, path, "SELECT COUNT(*) FROM economy_markets WHERE last_game_minute=1440")); got != 2 {
@@ -240,7 +244,8 @@ INSERT INTO birth_families VALUES(1,'Han Family','Han',3,'Han Rui',2,3,10,'activ
 	if err != nil {
 		t.Fatal(err)
 	}
-	result, err := runner.Bootstrap(BootstrapRequest{GameMinute: 777})
+	setSimulationGameMinute(t, path, 777)
+	result, err := runner.Bootstrap(BootstrapRequest{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -260,7 +265,8 @@ INSERT INTO birth_families VALUES(1,'Han Family','Han',3,'Han Rui',2,3,10,'activ
 		t.Fatalf("relations=%d", got)
 	}
 
-	second, err := runner.Bootstrap(BootstrapRequest{GameMinute: 778})
+	setSimulationGameMinute(t, path, 778)
+	second, err := runner.Bootstrap(BootstrapRequest{})
 	if err != nil {
 		t.Fatal(err)
 	}
