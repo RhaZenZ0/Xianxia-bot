@@ -18,6 +18,11 @@ what counts as a source: anything that names the id at all, anywhere outside
 the `items` block, or in code. A false negative here would be an item some
 path grants in a way this file cannot see; a false *positive* - an orphan that
 slips through - is the expensive direction, and naming a source is cheap.
+
+It found a second orphan the moment it stopped counting test files as sources -
+`living_world_ring`, the top of the storage ladder, named only in
+`support_storage_test.go`. rc.51 gives it the Weeping Wall Sanctum, and
+`SOURCELESS_ITEMS` is empty again.
 """
 from __future__ import annotations
 
@@ -35,19 +40,10 @@ ITEMS = WORLD["items"]
 ELSEWHERE = json.dumps({k: v for k, v in WORLD.items() if k != "items"})
 
 # An item that has no source, with the reason it is allowed none *for now*.
-# One entry, and it is not a decision that anything is fine: the sweep found a
-# second orphan the moment it stopped counting test files as sources, and where
-# that one belongs is a content call rather than something to settle in a test.
-SOURCELESS_ITEMS: dict[str, str] = {
-    "living_world_ring": (
-        "Found by this sweep at rc.50 and not yet placed. It is the top of the storage ladder - "
-        "Immortal grade, 500 slots, the only container with `living_space` - worth 40,000, with a "
-        "`door_event_chance` of 75 that has never fired for want of a ring to auction. Named only "
-        "in `support_storage_test.go`, which is a test, not a way to obtain one. It wants a home "
-        "of the same kind the peach got (a deep keyless realm's last room, at a low chance), and "
-        "which realm is a content decision, not a test's to make."
-    ),
-}
+# Empty, and it was emptied by placing the one entry it ever held rather than by
+# deleting it: an entry here is a new decision, never a backlog inherited from
+# rc.50's.
+SOURCELESS_ITEMS: dict[str, str] = {}
 
 
 def _named_in_code() -> set[str]:
@@ -93,22 +89,60 @@ class EveryItemCanBeObtained(unittest.TestCase):
                 self.assertGreaterEqual(len(reason.strip()), 20,
                                         f"SOURCELESS_ITEMS[{item!r}] needs a reason worth reading")
 
+    def _only_room_holding(self, item: str) -> tuple[str, dict]:
+        rooms = [(rid, room) for rid, realm in WORLD["secret_realms"].items()
+                 for room in realm.get("rooms") or []
+                 if item in (room.get("rare_items") or {})]
+        self.assertEqual(len(rooms), 1, f"{item} is found in {len(rooms)} places, not one: {rooms}")
+        return rooms[0]
+
+    def _the_realm_takes_no_key(self, realm_id: str) -> None:
+        # A realm is walked again on every run (`secret_realm_runs` is one row
+        # per user and entering resets `room_index`), so a key on sale would
+        # make a rare find a purchase, forever.
+        keyed = {d["spatial_key"]["secret_realm_id"]
+                 for d in ITEMS.values() if d.get("spatial_key")}
+        self.assertNotIn(realm_id, keyed, f"{realm_id} sells a key, so its rare find is buyable")
+
     def test_the_peach_grows_somewhere(self):
         """Named outright, because it is the one this file exists for and a
         regression is silent: the item stays in the catalogue and nothing errors."""
-        rooms = [(rid, room) for rid, realm in WORLD["secret_realms"].items()
-                 for room in realm.get("rooms") or []
-                 if "hundred_year_peach" in (room.get("rare_items") or {})]
-        self.assertEqual(len(rooms), 1, f"the peach grows in {len(rooms)} places, not one: {rooms}")
-        realm_id, room = rooms[0]
+        realm_id, room = self._only_room_holding("hundred_year_peach")
         realm = WORLD["secret_realms"][realm_id]
-        keyed = {d["spatial_key"]["secret_realm_id"]
-                 for d in ITEMS.values() if d.get("spatial_key")}
-        # A realm is walked again on every run, so a key on sale would make a
-        # fifty-year fruit a 448-stone purchase, forever.
-        self.assertNotIn(realm_id, keyed, "the peach grows in a realm whose key is on sale")
+        self._the_realm_takes_no_key(realm_id)
         self.assertIs(room, realm["rooms"][-1], "it should be the last room, behind every other")
         self.assertEqual(room["tn"], max(r["tn"] for r in realm["rooms"]))
+        # Fifty years is enormous low down and worthless high up.
+        self.assertLess(int(realm["min_realm_index"]), 8, "the peach belongs in the Mortal World")
+
+    def test_the_ring_is_found_in_the_immortal_world(self):
+        """rc.51, and named for the same reason: the ring is the top of the
+        storage ladder and the only container carrying `living_space`, so a
+        placement quietly lost is a 40,000 treasure nothing can produce again."""
+        realm_id, room = self._only_room_holding("living_world_ring")
+        realm = WORLD["secret_realms"][realm_id]
+        self._the_realm_takes_no_key(realm_id)
+        self.assertIs(room, realm["rooms"][-1], "it should be the last room, behind every other")
+        self.assertEqual(room["tn"], max(r["tn"] for r in realm["rooms"]))
+        # The item's own `storage_upgrade.grade` names the world it belongs to,
+        # and the Immortal World is realms 16-23 of the thirty-two.
+        self.assertEqual(ITEMS["living_world_ring"]["storage_upgrade"]["grade"], "Immortal")
+        self.assertTrue(16 <= int(realm["min_realm_index"]) <= 23,
+                        f"{realm_id} opens at realm {realm['min_realm_index']}, not the Immortal World")
+
+    def test_a_rare_find_is_rarer_the_more_it_is_worth(self):
+        """Not a formula, a floor: the two placed finds are ordered by price, so
+        a third dropped in at the peach's chance with the ring's price fails."""
+        chances = {}
+        for realm in WORLD["secret_realms"].values():
+            for room in realm.get("rooms") or []:
+                for item, spec in (room.get("rare_items") or {}).items():
+                    chances[item] = int(spec["chance"])
+        by_price = sorted(chances, key=lambda i: int(ITEMS[i].get("base_price") or 0))
+        for cheaper, dearer in zip(by_price, by_price[1:]):
+            self.assertGreaterEqual(chances[cheaper], chances[dearer], (
+                f"{dearer} is worth more than {cheaper} and is no rarer "
+                f"({chances[dearer]}% against {chances[cheaper]}%)"))
 
 
 class ARareFindIsShapedLikeTheRosterItCopies(unittest.TestCase):

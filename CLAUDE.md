@@ -1362,8 +1362,55 @@ hundred-year fruit is still sound in there.
 version had no `--exclude=*_test.go` — so the peach looked sourced *by the very test written to prove
 it had none*. With tests excluded, `living_world_ring` surfaced: the top of the storage ladder
 (Immortal grade, 500 slots, the only `living_space`), 40,000, `door_event_chance: 75`, named only in
-`support_storage_test.go`. It is in `SOURCELESS_ITEMS` with that reason rather than quietly placed —
-where it belongs is a content decision.
+`support_storage_test.go`. It went into `SOURCELESS_ITEMS` with that reason rather than being
+quietly placed — where it belongs was a content decision.
+
+**v1.0.0-rc.51 makes it, and `SOURCELESS_ITEMS` is empty again** — emptied by placing the one entry
+it ever held, so an entry there is a new decision rather than a backlog inherited from rc.50's. The
+ring is found in **The Array's Heart**, `weeping_wall_sanctum`'s last room at TN 25, which granted
+nothing before. The item named the world itself: its `storage_upgrade.grade` is `"Immortal"`, and
+that realm is the Immortal World's (`min_realm_index: 16`), keyless, opening on one weight-2 event —
+1.6% of a draw. **Chance 4, against the peach's 6**, and that ordering is a gate of its own now
+(`test_a_rare_find_is_rarer_the_more_it_is_worth`): the peach is consumed and the ring is permanent
+and tradeable at 40,000, so the dearer find must be the rarer one. No Go changed — the mechanism was
+built, tested and shipped a release earlier, and all that was ever missing was where.
+
+### A room of their own, and the door that never closed (v1.0.0-rc.51)
+
+`content/world.json` authors **48 auction houses** that collapse onto **nine channels** — five grand
+houses with a channel each and forty-three local floors sharing one per world, because
+`auction_house_channel_name` reads the `channel_name` content gives them and many share it. All nine
+were created in `SERVER_REALM_CATEGORY`, the category named for the four realm capitals, which
+therefore held thirteen channels of which the capitals were the minority. `SERVER_AUCTION_CATEGORY`
+(`🏮 Auction Houses`) is the third category, and `auction_house_channels.category_id` already
+existed and was already written, so **no schema**.
+
+Two halves come with it, and without either the split is cosmetic.
+
+- **An existing server is moved, not merely rebound.** `ensure_auction_house_channels` resolves a
+  channel by binding, then by name, and only ever passed `category=` to `create_text_channel` — so a
+  channel that already existed kept whatever parent it had, and the change would have reached a fresh
+  guild and no other. That is the failure mode of `/learn` (rc.43), the quest journal (rc.46), the
+  event bands (rc.49) and the peach (rc.50) wearing a different hat. The re-parent sits behind
+  `can_create`, because Discord layout is dashboard-owned and the `/admin` slash path still only
+  binds, and it is issued **once per channel** (`moved`), because forty-eight houses share nine of
+  them and `channel.category_id` is read from a cache the edit updates by gateway event.
+- **Teardown deletes them, which it never has.** `clear_discord_bindings` has always `DELETE`d from
+  `auction_house_channels`; `teardown_managed_discord_layout` built its targets from the base
+  bindings, the realm hubs and `#bugs` and **named no auction channel at all**. So Teardown forgot
+  the bindings and left nine channels standing — and because they sat inside it, `🌌 Realm
+  Capitals` could never be emptied and was never once deleted by the action whose whole job is to
+  delete it. Half the wire had been there since v0.33.1. The `seen_ids` guard already in the delete
+  loop is what makes nine bindings on four shared channels one delete apiece; it was written for
+  exactly this and had never had a case.
+
+**The gate that could not see it is the lesson.** `test_the_helper_touches_only_what_a_binding_names`
+asserted that the three sources it already knew about were named — a test shaped so that the thing it
+forbids is invisible to it, which is the rc.47 finding again.
+`test_every_category_setup_makes_is_a_category_teardown_can_empty` counts instead: every
+`SERVER_*CATEGORY` constant in the file must be one the teardown loop walks (read off the source,
+not copied), and every provisioning table must be one it deletes from. A fourth category or a fifth
+provisioning helper fails it the day it is added.
 
 ### World events and their sites
 

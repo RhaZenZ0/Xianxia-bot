@@ -27135,7 +27135,13 @@
           "cultivation": 36,
           "spirit_stones": 20,
           "insight_xp": 20,
-          "items": {}
+          "items": {},
+          "rare_items": {
+            "living_world_ring": {
+              "chance": 4,
+              "max": 1
+            }
+          }
         }
       ]
     },

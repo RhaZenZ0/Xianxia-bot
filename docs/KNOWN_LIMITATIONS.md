@@ -11,6 +11,24 @@ database. Its findings are the first two entries.
 
 ## Findings
 
+- **deferred (v1.0.0-rc.51)** — *Nothing in either harness reaches a `create_category` call.*
+  `ensure_auction_house_channels` gained a third category and a re-parent for channels that already
+  exist, and SimCord models all of it (`create_category`, `parent_id` on create and on PATCH). The
+  Discord sweep still cannot drive it: the only caller that passes `create_missing=True` is the
+  dashboard's Setup/Repair, and the sweep's own rule is that every loop goes through a Discord
+  surface and never through a handler — `basechannels → bind` is bind-only by design, so no leaf
+  it can press creates anything. Held by contract tests instead
+  (`test_live_auctions.py`, `test_discord_teardown.py`), which is honest about what it proves.
+  Closing it means either a GM-facing Discord leaf that provisions, or a harness that drives the
+  dashboard control plane — both are decisions rather than fixes.
+- **fixed (v1.0.0-rc.51)** — *Teardown never deleted an auction channel, so it never deleted the
+  capitals' category either.* `clear_discord_bindings` has `DELETE`d from `auction_house_channels`
+  since v0.33.1, while `teardown_managed_discord_layout` built its targets from the base bindings,
+  the realm hubs and `#bugs` and named no auction channel — so the nine of them were left standing
+  with their bindings forgotten, and because they sat inside it, `🌌 Realm Capitals` always had
+  "9 other channel(s) inside" and was never once deleted. Found while giving the auctions a
+  category of their own, which would have inherited the same fault.
+
 - **fixed (v0.36.1)** — *Greenriver Town had no roads.* The starting town sat outside the road
   graph, so it had no gates (v0.36.0), could only be reached by direct travel, and a fresh
   character's first road journey was the capital's rather than their own town's. It now has roads

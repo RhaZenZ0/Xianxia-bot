@@ -6,8 +6,9 @@ What is promised, and held here:
 1. The action needs a typed confirmation (`DELETE`), distinct from Fresh
    Start's `CLEAR` and Reset World's `RESET`, and it is audited.
 2. It deletes only what a binding names - threads the database tracks, the
-   bound base channels, the realm hubs, #bugs - and the two Xianxia
-   categories only when nothing else is left in them. It recreates nothing.
+   bound base channels, the realm hubs, the live auction channels, #bugs -
+   and the three Xianxia categories only when nothing else is left in them.
+   It recreates nothing.
 3. The ids are cleared last, and clearing them touches no gameplay column:
    GM-authored channel message text survives, thread rows are left for their
    owners to recover from, and nothing outside the guild is affected.
@@ -66,9 +67,11 @@ class TeardownActionContractTests(unittest.TestCase):
 
     def test_the_helper_touches_only_what_a_binding_names(self):
         source = bot_function_source("teardown_managed_discord_layout")
-        # Base channels come from the bindings, hubs from their table, bugs from config.
+        # Base channels come from the bindings, hubs and auction houses from
+        # their tables, bugs from config.
         self.assertIn("_base_channel_bindings(cfg).items()", source)
         self.assertIn("DB.get_realm_hub_channels(guild.id)", source)
+        self.assertIn("DB.get_auction_house_channels(guild.id)", source)
         self.assertIn('cfg.get("bugs_channel_id")', source)
         # Never by name, never by category membership, never guild.text_channels.
         self.assertNotIn("guild.text_channels", source)
@@ -80,6 +83,28 @@ class TeardownActionContractTests(unittest.TestCase):
         self.assertIn("remaining = [c for c in category.channels if c.id not in seen_ids]", source)
         self.assertIn("if remaining:", source)
         self.assertIn("categories_kept.append", source)
+
+    def test_every_category_setup_makes_is_a_category_teardown_can_empty(self):
+        """v1.0.0-rc.51, and the reason it is here: `clear_discord_bindings` had
+        always DELETEd from `auction_house_channels` while teardown deleted no
+        auction *channel*, so the nine of them stayed inside the capitals'
+        category and `\U0001f30c Realm Capitals` could never be emptied - it was
+        never once deleted by the action whose whole job is to delete it. The
+        gate that could not see that was the one above, which only checked that
+        the sources it already knew about were named. This one counts."""
+        source = bot_function_source("teardown_managed_discord_layout")
+        constants = set(re.findall(r"^(SERVER_\w*CATEGORY)\s*=", SETUP, re.M))
+        self.assertGreaterEqual(len(constants), 3, "a category constant disappeared")
+        loop = re.search(r"for name in \(([^)]*)\):", source)
+        self.assertIsNotNone(loop, "teardown no longer walks the categories")
+        walked = {name.strip() for name in loop.group(1).split(",") if name.strip()}
+        self.assertEqual(walked, constants, (
+            "every category Setup creates must be one teardown tries to delete, or it is "
+            "left on the server for ever"))
+        # And every provisioning helper that fills one must have its rows deleted here.
+        for provider in ("_base_channel_bindings(cfg)", "DB.get_realm_hub_channels(guild.id)",
+                         "DB.get_auction_house_channels(guild.id)", 'cfg.get("bugs_channel_id")'):
+            self.assertIn(provider, source, f"teardown never deletes what {provider} names")
 
     def test_nothing_is_recreated(self):
         source = bot_function_source("teardown_managed_discord_layout")

@@ -190,16 +190,23 @@ def auction_house_channel_name(house_id: str, house: dict[str, Any]) -> str:
 
 
 async def ensure_auction_house_channels(
-    guild: discord.Guild, *, category_name: str = "🌌 Realm Capitals", create_missing: bool = False,
+    guild: discord.Guild, *, category_name: str = "🏮 Auction Houses", create_missing: bool = False,
 ) -> list[dict[str, Any]]:
     """Bind existing live-auction channels and, when create_missing, create any
     that are missing (v0.33.1). A grand house (a capital's) has a channel of
     its own; the local floors of a world share one, named in content - so a
     world of twelve cities is one channel, not twelve. Every house is bound to
-    the channel its content names, beside the realm capitals, visible to the
-    cultivators who can reach that world - the same access role that gates it
-    - and to nobody else. Like the capitals, the /admin slash path only binds;
-    the dashboard's Setup/Repair is what creates.
+    the channel its content names, visible to the cultivators who can reach
+    that world - the same access role that gates it - and to nobody else. Like
+    the capitals, the /admin slash path only binds; the dashboard's
+    Setup/Repair is what creates.
+
+    v1.0.0-rc.51: these nine channels used to be created beside the four realm
+    capitals, in the category named for them. They have their own now - and a
+    channel that already exists is *re-parented*, not merely rebound, because
+    `category=` is only read on creation, so without that a deployed server
+    would keep its auction channels under the capitals for ever and the change
+    would reach a fresh guild only.
     """
     existing = {str(row["house_id"]): row for row in await DB.get_auction_house_channels(guild.id)}
     category = next((item for item in guild.categories if item.name == category_name), None)
@@ -212,6 +219,10 @@ async def ensure_auction_house_channels(
         except discord.HTTPException:
             log.exception("Could not create category %s", category_name)
 
+    # Forty-eight houses share nine channels, and `channel.category_id` is read
+    # from the cache, which a gateway event updates after the edit returns - so
+    # without this the move would be re-issued for every house sharing a floor.
+    moved: set[int] = set()
     for house_id, house in WORLD.auction_houses.items():
         name = auction_house_channel_name(house_id, house)
         interior = WORLD.locations.get(str(house.get("location"))) or {}
@@ -233,6 +244,12 @@ async def ensure_auction_house_channels(
                 log.exception("Could not create auction channel #%s", name)
         if channel is None:
             continue
+        if can_create and category is not None and channel.id not in moved and channel.category_id != category.id:
+            moved.add(channel.id)
+            try:
+                await channel.edit(category=category, reason="Xianxia RP auction-house setup")
+            except discord.HTTPException:
+                log.exception("Could not move #%s into %s", channel.name, category_name)
         if can_create and access_roles.get(world) is not None:
             await ensure_realm_hub_overwrites(guild, channel, access_roles.get(world))
         await DB.set_auction_house_channel(

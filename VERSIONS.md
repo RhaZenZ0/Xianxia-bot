@@ -6,6 +6,44 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.0** (rc.51) gives the ring a home and the auctions a room of their own.
+
+`living_world_ring` was the second orphan rc.50's sweep found, the moment it stopped counting test
+files as sources: the top of the storage ladder - Immortal grade, 500 slots, the only container
+carrying `living_space` - worth 40,000, with a `door_event_chance` of 75 that had never fired for
+want of a ring to auction, and named in exactly one place in the tree, `support_storage_test.go`.
+It went into `SOURCELESS_ITEMS` because which realm it belonged in is a content decision. It is the
+**Weeping Wall Sanctum** now: the Immortal World's keyless realm (`min_realm_index: 16`, opening on
+one weight-2 event, 1.6% of a draw), in `The Array's Heart`, TN 25, the last room, which granted
+nothing before - and the item's own `storage_upgrade.grade` is `"Immortal"`, so the catalogue named
+the world it belonged to all along. A `rare_items` entry at **chance 4**, rarer than the peach's 6
+because the peach is consumed and the ring is permanent and tradeable. No Go change: rc.50's
+mechanism was built, tested and shipped. `SOURCELESS_ITEMS` is empty again, and emptied by placing
+the entry rather than deleting it.
+
+**The auction channels have a category of their own.** Content authors 48 auction houses collapsing
+onto **nine** channels (five grand houses, four shared per-world local floors), and all nine were
+created in `🌌 Realm Capitals` - a category named for four channels and holding thirteen.
+They are `🏮 Auction Houses` now, and two halves had to come with it or the split would have
+been cosmetic.
+
+**An existing server is moved, not merely rebound.** `category=` is read only on creation, so a
+channel `ensure_auction_house_channels` resolved by id or by name kept whatever parent it already
+had - without a re-parent step the change would reach a fresh guild and no other. It is behind
+`can_create` (Discord layout is dashboard-owned; the `/admin` slash path still only binds) and
+issued once per channel, because forty-eight houses share nine of them and `category_id` is read
+from a cache the edit updates by gateway event.
+
+**And teardown deletes them, which it never has.** `clear_discord_bindings` has always
+`DELETE`d from `auction_house_channels`, while `teardown_managed_discord_layout` built its targets
+from the base bindings, the realm hubs and `#bugs` - so Teardown forgot the bindings and left the
+nine channels standing, and because they sat inside it, `🌌 Realm Capitals` could never be
+emptied and **was never once deleted by the action whose whole job is to delete it**. Half the wire
+had been there since v0.33.1. The gate that could not see this was the teardown contract test, which
+asked only that the three sources it already knew about were named; `test_every_category_setup_makes_is_a_category_teardown_can_empty`
+counts instead - every `SERVER_*CATEGORY` constant must be one teardown walks, and every provisioning
+table must be one it deletes from.
+
 **1.0.0** (rc.50) grows the one item in the catalogue that nothing could produce.
 
 `hundred_year_peach` was one of 287 items and the only one no shop sold, no recipe made, no realm
