@@ -145,7 +145,7 @@ internal/server/        HTTP control/data plane
 ```
 
 Every Go SQLite connection uses `journal_mode=WAL`, `foreign_keys=ON`, `busy_timeout=10000`,
-`synchronous=NORMAL`. Current schema version is 53; historical migrations are kept so old databases
+`synchronous=NORMAL`. Current schema version is 55; historical migrations are kept so old databases
 can upgrade in place — see `VERSIONS.md` for the full schema/release history.
 
 ### The NPC life cycle (v1.0.0-rc.24)
@@ -816,6 +816,149 @@ to their shape by `TestTheStoneLadderIsWholeInEveryWorld` (four worlds × four t
 the ratio exact). No exchange between tiers is built: that is a mechanic rather than a parse, nothing
 needs it while every price in the content file is tier 1, and a helper with no caller would be the
 very thing this release exists to remove.
+
+### The money of the world you are standing in, and the door out of it (schema 54, v1.0.0-rc.44)
+
+Three faults at the world boundary, and they are one omission seen from three sides.
+
+**Which money a world uses was said five times.** `content/world.json` declares all sixteen
+currencies with the `world` each belongs to, and four switches in Go (`tribulationCurrency`,
+`simulation.worldCurrency`, an inline map in `lifecycle_actions.go`, another in `simulation/world.go`)
+plus a tuple in `app/dashboard/server.py` restated it. None could be wrong in an interesting way until
+a fifth world is added or a currency renamed, at which point four are silently stale. It is
+`worldBaseCurrency` now (exported as `game.WorldBaseCurrency` for the simulation package, and
+`_base_currencies()` / `World.world_base_currency` on the Python side) and
+`tests/python/contracts/test_one_world_currency_rule.py` is the gate: a production file naming three
+of the four base currencies is restating the mapping, and `RESTATES_THE_MAPPING` is empty.
+
+**Every reward paid in Mortal stones wherever it was earned.** `characterWalletDeltaTx` denominates a
+credit by the world the character stands in, so a cultivator in the Spiritual World is paid in spirit
+crystals — which is what the shops, the arrays and the black market up there have always charged. The
+sheet's mirror (`characters.spirit_stones`) follows the same rule: `walletDeltaTx` writes it only when
+the currency moved is the base currency of where they are, so the one number a sheet shows is local
+money.
+
+**And nothing converted when they crossed.** Each tier above the first carries a `base_ratio` — a
+hundred of the rung below — and a world is that same ladder seen from further up, so
+`crossWorldsPurseTx` divides by the rung going up and multiplies coming down. **The remainder stays in
+the money it was already in**: 12,345 Mortal stones become 123 spirit crystals and 45 stones that are
+still there when you go home. The credit is written even when it converts to zero, because that write
+is what re-points the sheet's mirror at the new world.
+
+**`moveCharacterTx` is the one door out of a world**, and `TestAWorldIsLeftByOneDoor` holds it the way
+`TestThePurseHasOneDoor` holds the purse. Fourteen statements wrote `characters.location` and thirteen
+could cross a world — the ascension breakthrough, an array, a GM's relocate, a personal world whose
+`leave` lands in Greenriver Town, a Hearth-Return Talisman that carries you home *from anywhere* — so
+without one door, which half of a fortune survived would depend on how you travelled. `admin_undo.go`
+is the one allowed exception: restoring a snapshot is not a journey, and the money it snapshotted was
+never converted.
+
+**The gate you tear open (`ascension.gate`, `world_crossings`).** Clearing a world-crossing tribulation
+wrote `tribulation_state.cleared`, paid +8 Heavenly Recognition and a fate point, and stopped — the
+heavens opened over one named place and left nothing there, while the only anchored road up was one
+authored array in one capital. `ascension.gate` anchors the seam where the lightning fell: a permanent
+crossing at the character's own location, into the world the gate they survived opens onto.
+
+- **It borrows the authored road.** `authoredCrossing(from, to)` gives the terminus, the fare and the
+  realm floor, so nobody can tear open a cheaper road than the world already has; anchoring costs that
+  fare times `raise_cost_multiplier` (10). The gate is refused inside a private place, somewhere the
+  catalogue does not carry, where one already stands, and a second time out of the same world — one
+  storm, one seam.
+- **It is an ordinary array from then on.** `array.use` looks in the catalogue first and then at
+  `crossing:<location>`, so a raised gate can never shadow an authored one, and both go through the same
+  fare, the same `moveCharacterTx` and the same conversion.
+- **The world's own people walk through it — the ones cut to its measure.** This is the only road in
+  the game that leaves a world: `WhereAnNPCCanWalk` refuses a destination in another world by
+  construction and still does, because content roads are content. `npcTravel` loads every open
+  crossing **once per tick** (single figures of gates against 574 people) and offers the far side at
+  `npc_crossing_chance_percent` — but only to somebody `game.NPCMayCross` admits. A seam is cut to the
+  cultivation of whoever survived the storm that made it (`opened_realm_index` on the row), and
+  `npc_crossing_realm_reach` (2) is how many realms either side of them still fit, on top of the
+  authored road's own floor. A village smith does not walk into the Spiritual World because an
+  Ascension-realm cultivator once tore the sky open over their town. A crosser's `world_name` is
+  deliberately unchanged, so the far side offers them no onward neighbours and the existing
+  going-home roll brings them back: a visit through the gate and out again.
+- **Not everybody can climb, and most who can stop early** (`npc_talent.go`). `npcBreakthroughs`
+  asked a candidate two questions - had they the wealth, had they the health - and both are things a
+  porter can have, so every one of the 574 people in the world was on the same ladder as the sect
+  elders with `realm >= 31` at the top of it. Talent is asked first now: a band off
+  `hash64(name, "talent")` weighted by what the profession implies, added to the origin realm the
+  *catalogue* gives them (not their current one, or the ceiling would rise every time somebody
+  crossed it). Most mundane lives draw nothing and never leave the realm they began in; a sect
+  disciple usually stops a few realms up; one in ten of them can go twelve. Nothing is stored -
+  same seed, same answer, forever - and somebody at their limit says so in `activity`.
+- **A seam opens the gate for the world, not just the road.** `npcBreakthroughs` crossed an NPC out
+  of the Mortal World at realm 7 on wealth and health alone, so the tick walked the world's own
+  people through an ascension gate a player has to survive three waves of heavenly lightning to
+  pass - the heavens holding two standards. An NPC is refused at a gate realm now
+  (`game.IsWorldCrossingRealm`), and there is nothing for them to answer with, because a tribulation
+  is three rolls against a named character's attributes. What opens it is a player going first:
+  once a seam is anchored out of that world, the people within `npc_crossing_realm_reach` of the
+  cultivation it was cut at follow them up it, and **everybody else stays stuck** - their `activity`
+  says "Stalled at the ascension gate", because `/civilization` and the GM's NPC card read that
+  column and a world waiting at its own ceiling should look like one.
+- **Keyed on `location_key`, never on who opened it** — `opened_by_user_id` anonymises on erasure
+  (`erasureAnonymise`), exactly as `npc_graves.claimed_by_user_id` does, so an erasure cannot unmake a
+  gate that other players and NPCs are using.
+- **The quest is content.** `world_crossing_system.quests` is keyed by the departing world; a cleared
+  tribulation hands the matching one over through `grantOrdinaryQuestTx`. There is still no second quest
+  mechanism — a giver would make it a commission and the grant refuses one — and its two objective types
+  (`ascension_gate`, `world_cross`) are reported after their commands answer, the rule
+  `test_quest_objective_reporters.py` holds.
+
+### The quests nobody could be given, and the rank worth examining (schema 55, v1.0.0-rc.45)
+
+**The same fault, found and half fixed.** rc.26's own section above names it: `first_steps` was
+seeded into `quest_definitions` on every boot, listed in `/quests`, and handed to nobody, because the
+only writers of a `character_quests` row are `commissionAcceptAction` (which wants a `giver_npc` the
+static quests deliberately do not have) and `grantOrdinaryQuestTx`. It built `beginner_path` to fix
+that - for the beginner path. **`road_to_a_sect` was seeded by the same call and reached nobody for
+nineteen more releases** (the string appeared in exactly one place in the tree: its own definition),
+and `first_steps` was left seeded beside `beginner_household`, the stage that replaced it. `/city
+board` lists only commissions whose giver lives in the city, so neither had a Discord door either.
+
+- **The sect road is `beginner_lesson`'s `follow_on`**, which needs no new mechanism: `questFollowOnTx`
+  already hands over any giver-less definition, wherever it was seeded from. It lands where the odds
+  are worth taking - the trial rolls `body + realm×2 + phase/3` against `max(10, 15 - rep/25)`, so a
+  cultivator who has finished the first hour is a far better candidate than a newborn one.
+- **`sync_commission_pool` is insert-only on purpose**, so the content change reaches new worlds only.
+  That is what **migration 55** is for, and it re-points only a stage whose chain is still empty, so
+  a GM who chained it in the workbench is obeyed - the whole reason the chain lives in `seed_json`
+  rather than in the file. It also retires `first_steps`, except a row somebody is somehow holding:
+  retiring a definition must never take a quest out of a player's hands.
+- **`tests/python/unit/test_quests_reach_a_player.py` is the gate for the class**, the quest-side
+  twin of rc.43's `test_commands_reach_a_player.py`. Every seeded key must be reachable by a giver, a
+  roster that grants (beginner path, household errands, ascension, examinations) or another quest's
+  `follow_on`. `UNGRANTABLE_QUESTS` is empty and was empty the day it was written.
+
+**The examination (`profession_exam.go`).** A trade's rank rose on XP alone - `60 + level*40` a step,
+six silent steps from Novice to Saint - and nothing marked it. The hundred and twenty hall keepers
+who sell a trade's slips had no opinion of anybody, and `character_recipes` had exactly two writers,
+a bought slip and the household's one trade of entry methods, so twenty-six of the thirty-three
+recipes were a shop transaction and nothing else.
+
+- **It never blocks a level.** `advanceProfessionTx` is untouched and still raises a rank on XP, so
+  the feature is safe on a world already running: no live crafter loses a rank, nothing needs
+  grandfathering. The examination is what the rank is *worth*, and what it is worth is that rank's
+  recipes (`teachRankRecipesTx`, exactly the rank, idempotent).
+- **The examiner already existed.** All 120 shops carry a `keeper` and all 120 keepers are in
+  `world.npcs`, so `hall_kind` names a shop kind (`weaponsmith` → Forging, `apothecary` → Alchemy,
+  `talisman` → Inscription, `array` → Formation) and the keeper of the hall the candidate walked into
+  examines them. Inventing an examiner would have meant a registry row, a schedule and a location for
+  somebody the world already had.
+- **The offer is made where a rank can rise**, in `craftResolveAction` rather than inside
+  `advanceProfessionTx` - that helper has nine callers (beast taming, artifact refining, appraisal,
+  foraging) and only crafting has examinations, and only the craft holds the catalogue and the
+  canonical minute. A craft generous enough to cross two ranks offers the higher one, because the
+  action only ever sits the rank the candidate currently holds.
+- **The trade's attribute is said once.** `householdLessonAttribute` became `tradeAttribute`, read by
+  the head of the house and by the hall alike; the content block deliberately carries no `attribute`
+  field, because two statements of what forging is would be free to disagree.
+- **The record is the event log, per life**, exactly as the household lesson's is - so samsara, which
+  wipes `profession_progress` and `character_recipes`, lets a new life sit the same examination
+  without deleting any history. A failure costs the fee and one world day; the fee is charged in the
+  money of the world the hall stands in, which is the rc.44 rule and which the first version of
+  `profession_exam_test.go` learned by picking an Immortal World hall for a Mortal candidate.
 
 ### People this world makes for itself (`npc_registry`, schema 49)
 

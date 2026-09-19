@@ -427,9 +427,30 @@ func craftResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 		xp = 12 + xpbonus
 	}
 	now := float64(time.Now().UnixNano()) / 1e9
+	// The rank before the craft, so a rank reached by this one can be told
+	// from a rank the candidate walked in holding (v1.0.0-rc.45).
+	rankBefore, err := professionLevelTx(conn, userID, profession)
+	if err != nil {
+		return authoritativeMutation{}, err
+	}
 	prog, err := advanceProfessionTx(conn, userID, profession, success, xp, qpoints, now)
 	if err != nil {
 		return authoritativeMutation{}, err
+	}
+	// `advanceProfessionTx` is deliberately untouched and still raises a rank
+	// on XP alone - the examination is what the rank is worth, never a toll on
+	// reaching it. The offer is made here rather than in the advance because
+	// this is the only caller whose trade has examinations at all, and the
+	// only one holding the catalogue and the canonical minute.
+	//
+	// A craft generous enough to cross two ranks offers the higher one: the
+	// examination certifies what the candidate now is, and the action itself
+	// only ever sits the rank they currently hold.
+	examOffered := ""
+	if rankAfter := i64(prog["level"]); rankAfter > rankBefore {
+		if examOffered, err = offerProfessionExamTx(conn, catalog, userID, profession, rankAfter, gameMinute); err != nil {
+			return authoritativeMutation{}, err
+		}
 	}
 
 	if strings.EqualFold(profession, "Alchemy") {
@@ -518,6 +539,7 @@ func craftResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 			return map[string]int64{}
 		}(),
 		"profession_progress":  prog,
+		"exam_offered":         examOffered,
 		"profession_bonus":     level,
 		"output_multiplier":    mult,
 		"location":             location,

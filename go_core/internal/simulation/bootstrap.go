@@ -6,6 +6,7 @@ import (
 	"math"
 	"strings"
 
+	"xianxia/core/internal/game"
 	"xianxia/core/internal/gamerng"
 	lifespanmodel "xianxia/core/internal/lifespan"
 	"xianxia/core/internal/storage"
@@ -90,17 +91,12 @@ func marketWorldFactor(world string) float64 {
 	}
 }
 
-func worldCurrency(world string) string {
-	switch world {
-	case "Spiritual World":
-		return "low_spirit_crystal"
-	case "Immortal World":
-		return "low_immortal_stone"
-	case "Celestial World":
-		return "low_celestial_crystal"
-	default:
-		return "low_spirit_stone"
-	}
+// worldCurrency is the tier-1 money of a world, which is content the file
+// already declares - `game.WorldBaseCurrency` reads it. This was a four-way
+// switch, one of five copies of the same mapping across the two languages
+// (v1.0.0-rc.44).
+func (r *Runner) worldCurrency(world string) string {
+	return game.WorldBaseCurrency(r.World, world)
 }
 
 func bootstrapRank(profile NPC, faction string, realmIndex, influence int64) string {
@@ -376,7 +372,7 @@ VALUES(?,?,?,?,?,?) ON CONFLICT(sect_a,sect_b) DO NOTHING`, []any{a, b, score, "
 			demand := max64(5, int64(40+math.Min(80, float64(base)/4)))
 			res, err := conn.Execute(`INSERT INTO economy_markets(location,item_id,world_name,currency_id,base_price,supply,demand,price_index,last_game_minute,updated_at)
 VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(location,item_id) DO NOTHING`,
-				[]any{location, itemID, world, worldCurrency(world), basePrice, supply, demand, 1.0, gameMinute, now})
+				[]any{location, itemID, world, r.worldCurrency(world), basePrice, supply, demand, 1.0, gameMinute, now})
 			if err != nil {
 				return err
 			}

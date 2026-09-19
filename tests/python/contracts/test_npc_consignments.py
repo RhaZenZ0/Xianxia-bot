@@ -65,10 +65,10 @@ class TheEngineOwnsTheFinding(unittest.TestCase):
         self.assertIn("if seller := i64(auction[\"seller_user_id\"]); seller > 0 {", merchant)
         takes = merchant[merchant.index("func merchantTakesLotTx("):]
         takes = takes[:takes.index("\nfunc ")]
-        self.assertIn("PayLotSellerTx(conn, auction, price, now)", takes)
+        self.assertIn("PayLotSellerTx(conn, catalog, auction, price, now)", takes)
         self.assertNotIn("walletDeltaTx(", takes, "the merchant path must not pay a wallet directly")
         maintenance = (GO / "simulation" / "advanced_maintenance.go").read_text(encoding="utf-8")
-        pay = maintenance[maintenance.index("func payAuctionSeller("):]
+        pay = maintenance[maintenance.index("func (r *Runner) payAuctionSeller("):]
         pay = pay[:pay.index("\nfunc ")]
         self.assertIn("game.PayLotSellerTx(", pay)
         self.assertNotIn("UPDATE npc_civilization_state", pay, "one copy of the payout, not two that drift")

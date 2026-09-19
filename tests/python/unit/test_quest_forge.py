@@ -163,7 +163,8 @@ class ValidatorTests(unittest.TestCase):
         self.assertEqual(
             set(OBJECTIVE_TYPES),
             {"explore", "talk", "scene_action", "sect_discovery", "sect_trial",
-             "cultivate", "travel", "combat_win", "craft", "trade", "gather", "return_home", "family_lesson"},
+             "cultivate", "travel", "combat_win", "craft", "trade", "gather", "return_home", "family_lesson",
+             "ascension_gate", "world_cross", "profession_exam"},
         )
 
     def test_the_procedural_draft_always_validates(self):
@@ -389,7 +390,7 @@ class ServiceAndStorageTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(await self.db.set_quest_definition_status(row["quest_key"], "approved", reviewed_by=7))
         catalog = await self.service.catalog(refresh=True)
         self.assertIn(row["quest_key"], catalog)
-        self.assertIn("first_steps", catalog)  # static quests stay
+        self.assertIn("road_to_a_sect", catalog)  # static quests stay
         # A second draft with the same title gets a distinct key.
         second = await store_draft(self.db, ForgeResult(definition=definition, model="fake/model"), story="again", origin="gm_prompt", created_by=7)
         self.assertEqual(second["quest_key"], "forge_the_reed_gate_whisper_2")
@@ -443,7 +444,7 @@ class ServiceAndStorageTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(set(progress_call[2]), {"quest_key", "objective_type", "amount", "target"})
 
     async def test_a_quest_with_nothing_to_grant_makes_no_reward_call(self):
-        await self.service.accept(3, "first_steps", action_id="test:accept:3")
+        await self.service.accept(3, "road_to_a_sect", action_id="test:accept:3")
         engine_calls_before = len(self.engine.calls)
         # first_steps needs explore + talk + scene_action; one report touches, does not complete
         changed = await self.service.progress(3, "explore")
@@ -455,10 +456,10 @@ class ServiceAndStorageTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(ValueError):
             await self.service.accept(1, "forge_nope", action_id="test:accept:1")
         definition, _ = validate_quest_definition({**GOOD, "title": "First Steps Beneath Heaven"}, WORLD, BUDGET)
-        definition = {**definition, "quest_key": "first_steps"}
+        definition = {**definition, "quest_key": "road_to_a_sect"}
         await self.db.save_quest_definition(definition, status="approved")
         catalog = await self.service.catalog(refresh=True)
-        self.assertEqual(catalog["first_steps"]["source_type"], "system")
+        self.assertEqual(catalog["road_to_a_sect"]["source_type"], "system")
 
 
 def _progress_payload_keys(service_source: str) -> set[str]:

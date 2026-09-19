@@ -141,7 +141,7 @@ func artifactRow(conn *storage.Conn, userID int64, item string) (map[string]any,
 	return firstRowMap(r), nil
 }
 
-func beastTameAction(conn *storage.Conn, _ worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
+func beastTameAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	if err := validateCompanionPayload(raw, "encounter_id"); err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -270,7 +270,7 @@ func beastTameAction(conn *storage.Conn, _ worlddata.Catalog, userID int64, raw 
 	}, nil
 }
 
-func beastFeedAction(conn *storage.Conn, _ worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
+func beastFeedAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	if err := validateCompanionPayload(raw, "beast_id", "food"); err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -342,7 +342,7 @@ func beastFeedAction(conn *storage.Conn, _ worlddata.Catalog, userID int64, raw 
 	}, nil
 }
 
-func beastTrainAction(conn *storage.Conn, _ worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
+func beastTrainAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	if err := validateCompanionPayload(raw, "beast_id"); err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -413,7 +413,7 @@ func beastTrainAction(conn *storage.Conn, _ worlddata.Catalog, userID int64, raw
 	}, nil
 }
 
-func beastEvolveAction(conn *storage.Conn, _ worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
+func beastEvolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	if err := validateCompanionPayload(raw, "beast_id"); err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -471,7 +471,7 @@ func beastEvolveAction(conn *storage.Conn, _ worlddata.Catalog, userID int64, ra
 	}, nil
 }
 
-func beastActiveAction(conn *storage.Conn, _ worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
+func beastActiveAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	if err := validateCompanionPayload(raw, "beast_id"); err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -603,7 +603,7 @@ func artifactBondAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 	}, nil
 }
 
-func artifactAwakenAction(conn *storage.Conn, _ worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
+func artifactAwakenAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	if err := validateCompanionPayload(raw, "item_id", "spirit_name"); err != nil {
 		return authoritativeMutation{}, err
 	}

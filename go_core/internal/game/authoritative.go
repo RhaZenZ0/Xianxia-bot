@@ -172,6 +172,8 @@ var authoritativeMutations = map[string]bool{
 	"abode.upgrade":                   true,
 	"abode.focus":                     true,
 	"array.use":                       true,
+	"ascension.gate":                  true,
+	"profession.exam":                 true,
 	"array.deploy":                    true,
 	"item.use":                        true,
 	"spatial_key.use":                 true,
@@ -396,7 +398,16 @@ func applyAuthoritative(databasePath, worldPath string, req ActionRequest) (Acti
 	if err := checkMaintenanceTx(conn); err != nil {
 		return ActionResponse{}, err
 	}
-	oldAgeDeath, err := checkPlayerOldAgeDeathTx(conn, req.ActorID, actionGameMinute, time.Now())
+	// The catalogue, loaded once for the whole switch rather than per branch
+	// (v1.0.0-rc.44, when money became a question of which world you stand in).
+	// `worlddata.Load` is memoised on the file's stat, so this costs a map
+	// lookup after the first action of a boot. A caller with no world path gets
+	// the zero catalogue, which `worldBaseCurrency` reads as the Mortal
+	// fallback - exactly the currency every one of these paths used before it
+	// could ask.
+	catalog, _ := worlddata.Load(worldPath)
+
+	oldAgeDeath, err := checkPlayerOldAgeDeathTx(conn, catalog, req.ActorID, actionGameMinute, time.Now())
 	if err != nil {
 		return ActionResponse{}, err
 	}
@@ -414,8 +425,7 @@ func applyAuthoritative(databasePath, worldPath string, req ActionRequest) (Acti
 			if strings.TrimSpace(worldPath) == "" {
 				return ActionResponse{}, errors.New("world catalog path is required")
 			}
-			catalog, loadErr := worlddata.Load(worldPath)
-			if loadErr != nil {
+			if _, loadErr := worlddata.Load(worldPath); loadErr != nil {
 				return ActionResponse{}, loadErr
 			}
 			if req.Operation == "check.resolve" {
@@ -424,15 +434,15 @@ func applyAuthoritative(databasePath, worldPath string, req ActionRequest) (Acti
 				mutation, err = resolveSceneAction(conn, catalog, req.ActorID, req.Payload)
 			}
 		case "sect.abode.enter":
-			mutation, err = sectAbodeMoveAction(conn, req.ActorID, req.Payload, "enter")
+			mutation, err = sectAbodeMoveAction(conn, catalog, req.ActorID, req.Payload, "enter")
 		case "sect.abode.leave":
-			mutation, err = sectAbodeMoveAction(conn, req.ActorID, req.Payload, "leave")
+			mutation, err = sectAbodeMoveAction(conn, catalog, req.ActorID, req.Payload, "leave")
 		case "commission.accept":
 			mutation, err = commissionAcceptAction(conn, req.ActorID, req.Payload)
 		case "commission.resolve":
-			mutation, err = commissionResolveAction(conn, req.ActorID, req.Payload)
+			mutation, err = commissionResolveAction(conn, catalog, req.ActorID, req.Payload)
 		case "lifecycle.true_death":
-			mutation, err = trueDeathAction(conn, req.ActorID, req.Payload)
+			mutation, err = trueDeathAction(conn, catalog, req.ActorID, req.Payload)
 		case "combat.start":
 			mutation, err = combatStartAction(conn, req.ActorID, req.Payload)
 		case "character.family_options":
@@ -440,11 +450,11 @@ func applyAuthoritative(databasePath, worldPath string, req ActionRequest) (Acti
 		case "character.create":
 			mutation, err = createCharacterAuthoritative(conn, worldPath, req.ActorID, req.Payload)
 		case "family.household.enter":
-			mutation, err = familyHouseholdEnterAction(conn, req.ActorID, req.Payload)
+			mutation, err = familyHouseholdEnterAction(conn, catalog, req.ActorID, req.Payload)
 		case "family.household.leave":
-			mutation, err = familyHouseholdLeaveAction(conn, req.ActorID, req.Payload)
+			mutation, err = familyHouseholdLeaveAction(conn, catalog, req.ActorID, req.Payload)
 		case "family.contribute":
-			mutation, err = familyContributeActionGo(conn, req.ActorID, req.Payload)
+			mutation, err = familyContributeActionGo(conn, catalog, req.ActorID, req.Payload)
 		case "family.lineage.investigate":
 			mutation, err = lineageInvestigateAction(conn, req.ActorID, req.Payload)
 		case "family.lineage.quest":
@@ -453,7 +463,7 @@ func applyAuthoritative(databasePath, worldPath string, req ActionRequest) (Acti
 			mutation, err = dynastyClaimAction(conn, req.ActorID, req.Payload)
 		case "family.dynasty.conflict":
 			mutation, err = dynastyConflictAction(conn, req.ActorID, req.Payload)
-		case "auction.enter", "auction.leave", "auction.sell", "auction.bid", "black_market.trade", "market.trade", "bounty_hunter.act", "equipment.bind", "equipment.equip", "equipment.unequip", "equipment.repair", "party.create", "party.join", "party.leave", "formation.create", "formation.assign", "formation.activate", "formation.stance", "boss.start", "boss.act", "boss.claim", "territory.claim", "war.act", "caravan.dispatch", "caravan.settle", "sect.recruitment.recommendation", "sect.recruitment.trial", "sect.contribute", "sect.redeem", "discipleship.request", "discipleship.resolve", "discipleship.leave", "sect.manor.establish", "sect.manor.upgrade", "family.simulate", "family.support", "family.add_child", "family.tutor", "family.errand", "family.lesson", "seclusion.start", "seclusion.settle", "dao.propose", "dao.respond", "dao.sever", "dao.dual_cultivate", "storage.deposit", "storage.withdraw", "storage.upgrade", "abode.establish", "abode.enter", "abode.visit", "abode.leave", "abode.invite", "abode.revoke", "abode.upgrade", "abode.focus", "array.use", "array.deploy", "spatial_key.use", "personal_world.create", "personal_world.set_rule", "personal_world.enter", "personal_world.leave", "item.use", "sect.abode.upgrade", "merchant.buy", "shop.buy", "shop.sell", "trade.offer", "trade.accept", "trade.decline", "appraisal.read":
+		case "auction.enter", "auction.leave", "auction.sell", "auction.bid", "black_market.trade", "market.trade", "bounty_hunter.act", "equipment.bind", "equipment.equip", "equipment.unequip", "equipment.repair", "party.create", "party.join", "party.leave", "formation.create", "formation.assign", "formation.activate", "formation.stance", "boss.start", "boss.act", "boss.claim", "territory.claim", "war.act", "caravan.dispatch", "caravan.settle", "sect.recruitment.recommendation", "sect.recruitment.trial", "sect.contribute", "sect.redeem", "discipleship.request", "discipleship.resolve", "discipleship.leave", "sect.manor.establish", "sect.manor.upgrade", "family.simulate", "family.support", "family.add_child", "family.tutor", "family.errand", "family.lesson", "seclusion.start", "seclusion.settle", "dao.propose", "dao.respond", "dao.sever", "dao.dual_cultivate", "storage.deposit", "storage.withdraw", "storage.upgrade", "abode.establish", "abode.enter", "abode.visit", "abode.leave", "abode.invite", "abode.revoke", "abode.upgrade", "abode.focus", "array.use", "ascension.gate", "profession.exam", "array.deploy", "spatial_key.use", "personal_world.create", "personal_world.set_rule", "personal_world.enter", "personal_world.leave", "item.use", "sect.abode.upgrade", "merchant.buy", "shop.buy", "shop.sell", "trade.offer", "trade.accept", "trade.decline", "appraisal.read":
 			if strings.TrimSpace(worldPath) == "" {
 				return ActionResponse{}, errors.New("world catalog path is required")
 			}

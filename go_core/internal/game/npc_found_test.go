@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"xianxia/core/internal/storage"
+	"xianxia/core/internal/worlddata"
 )
 
 // Finding somebody, or finding where they stopped (v1.0.0-rc.24, schema 48).
@@ -13,7 +14,9 @@ import (
 // assertion here holds on every run.
 
 const graveSchema = `
-CREATE TABLE characters(user_id INTEGER PRIMARY KEY,name TEXT NOT NULL DEFAULT '',spirit_stones INTEGER NOT NULL DEFAULT 0,updated_at REAL NOT NULL DEFAULT 0);
+-- Production's characters row always has a location, and since rc.44 the money
+-- it is paid in is the money of that location's world.
+CREATE TABLE characters(user_id INTEGER PRIMARY KEY,name TEXT NOT NULL DEFAULT '',location TEXT NOT NULL DEFAULT '',spirit_stones INTEGER NOT NULL DEFAULT 0,updated_at REAL NOT NULL DEFAULT 0);
 -- The purse, beside the sheet's mirror of it. Production gives every character
 -- a wallet row at creation; a fixture with only the column is a state the game
 -- cannot reach (v1.0.0-rc.43).
@@ -48,7 +51,7 @@ func claim(t *testing.T, conn *storage.Conn, userID int64, npc, location string)
 	if err != nil {
 		t.Fatal(err)
 	}
-	out, err := npcFound(conn, userID, raw)
+	out, err := npcFound(conn, worlddata.Catalog{}, userID, raw)
 	if err != nil {
 		t.Fatal(err)
 	}

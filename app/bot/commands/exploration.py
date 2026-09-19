@@ -691,10 +691,17 @@ async def _run_crafting(interaction: discord.Interaction, recipe: str) -> None:
         )
         if value
     ]
+    # A rank reached is a hall opening its roll (v1.0.0-rc.45). Said here
+    # because the quest is handed over silently otherwise, and a crafter who is
+    # not told has no reason to look in /quests.
+    exam_line = ""
+    if resolved.get("exam_offered"):
+        exam_line = (f"\n🎓 The {profession} halls will examine you at this rank: "
+                     f"**/craft → Profession → Exam**, at a hall of the trade. See **/quests**.")
     await interaction.response.send_message(
         f"**{profession}: {recipe}**\n{roll_line(result)}\n"
         + "".join(bonus_lines)
-        + f"{outcome}{quality_line}{mastery_line}"
+        + f"{outcome}{quality_line}{mastery_line}{exam_line}"
     )
     # Only a craft that produced something counts. A failed refinement spends
     # the ingredients and is a real part of the trade, but "craft a Recovery

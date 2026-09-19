@@ -9,6 +9,7 @@ import (
 
 	"xianxia/core/internal/eventledger"
 	"xianxia/core/internal/storage"
+	"xianxia/core/internal/worlddata"
 )
 
 func birthFamilyHouseholdLocation(familyID int64) string {
@@ -19,7 +20,7 @@ func birthFamilyHouseholdLocation(familyID int64) string {
 // `returnLocation` is where a Hearth-Return Talisman found them: remembered
 // on the scene as the mark a Waymark Talisman returns to. Walking in from
 // the town stores nothing, and leaving on foot is always the street.
-func enterHouseholdTx(conn *storage.Conn, userID int64, returnLocation string) (map[string]any, error) {
+func enterHouseholdTx(conn *storage.Conn, catalog worlddata.Catalog, userID int64, returnLocation string) (map[string]any, error) {
 	res, err := conn.Execute(`SELECT c.name,c.life_status,c.location,cbf.family_id,f.family_name,f.location FROM characters c JOIN character_birth_family cbf ON cbf.user_id=c.user_id JOIN birth_families f ON f.family_id=cbf.family_id WHERE c.user_id=?`, []any{userID})
 	if err != nil {
 		return nil, err
@@ -39,7 +40,7 @@ func enterHouseholdTx(conn *storage.Conn, userID int64, returnLocation string) (
 	}
 	locationKey := birthFamilyHouseholdLocation(familyID)
 	now := float64(time.Now().UnixNano()) / 1e9
-	if _, err = conn.Execute(`UPDATE characters SET location=?,updated_at=? WHERE user_id=?`, []any{locationKey, now, userID}); err != nil {
+	if _, err = moveCharacterTx(conn, catalog, userID, locationKey, now); err != nil {
 		return nil, err
 	}
 	meta := map[string]any{"family_id": familyID, "family_name": familyName, "base_location": baseLocation}
@@ -69,7 +70,7 @@ func enterHouseholdTx(conn *storage.Conn, userID int64, returnLocation string) (
 // in the family's own town (v1.0.0-rc.32 - it used to be a teleport from
 // anywhere), or already inside. From anywhere else the way home is the road,
 // or a Hearth-Return Talisman.
-func familyHouseholdEnterAction(conn *storage.Conn, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
+func familyHouseholdEnterAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	var p struct {
 		GameMinute int64 `json:"game_minute"`
 	}
@@ -90,7 +91,7 @@ func familyHouseholdEnterAction(conn *storage.Conn, userID int64, raw json.RawMe
 	if here != town && here != birthFamilyHouseholdLocation(familyID) {
 		return authoritativeMutation{}, fmt.Errorf("the %s household stands in %s and you are in %s — travel there first, or use a Hearth-Return Talisman", strings.TrimSpace(fmt.Sprint(r[2])), town, here)
 	}
-	entered, err := enterHouseholdTx(conn, userID, "")
+	entered, err := enterHouseholdTx(conn, catalog, userID, "")
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -100,7 +101,7 @@ func familyHouseholdEnterAction(conn *storage.Conn, userID int64, raw json.RawMe
 	return authoritativeMutation{Result: result, Event: eventledger.Event{Domain: "family", EventType: "birth_household_entered", EntityType: "birth_family", EntityID: fmt.Sprint(result["family_id"]), SubjectType: "character", SubjectID: fmt.Sprint(userID), GameMinute: p.GameMinute, Payload: result}}, nil
 }
 
-func familyHouseholdLeaveAction(conn *storage.Conn, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
+func familyHouseholdLeaveAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	var p struct {
 		GameMinute int64 `json:"game_minute"`
 	}
@@ -123,7 +124,7 @@ func familyHouseholdLeaveAction(conn *storage.Conn, userID int64, raw json.RawMe
 		return authoritativeMutation{}, errors.New("character is not inside their birth household")
 	}
 	now := float64(time.Now().UnixNano()) / 1e9
-	if _, err = conn.Execute(`UPDATE characters SET location=?,updated_at=? WHERE user_id=?`, []any{baseLocation, now, userID}); err != nil {
+	if _, err = moveCharacterTx(conn, catalog, userID, baseLocation, now); err != nil {
 		return authoritativeMutation{}, err
 	}
 	if _, err = conn.Execute(`INSERT INTO player_scene_state(user_id,physical_location,scene_type,scene_key,scene_label,channel_id,metadata_json,updated_at) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET physical_location=excluded.physical_location,scene_type='world',scene_key='',scene_label=excluded.scene_label,channel_id=NULL,metadata_json='{}',updated_at=excluded.updated_at`, []any{userID, baseLocation, "world", "", baseLocation, nil, "{}", now}); err != nil {
@@ -136,7 +137,7 @@ func familyHouseholdLeaveAction(conn *storage.Conn, userID int64, raw json.RawMe
 // returnToWaymarkTx is the Waymark Talisman's half of the round trip: from
 // inside the household, back to wherever the Hearth-Return Talisman found
 // you. Somebody who walked in has no mark, and the road back is the door.
-func returnToWaymarkTx(conn *storage.Conn, userID int64) (map[string]any, error) {
+func returnToWaymarkTx(conn *storage.Conn, catalog worlddata.Catalog, userID int64) (map[string]any, error) {
 	res, err := conn.Execute(`SELECT c.location,cbf.family_id,f.family_name,f.location,COALESCE(s.metadata_json,'{}') FROM characters c JOIN character_birth_family cbf ON cbf.user_id=c.user_id JOIN birth_families f ON f.family_id=cbf.family_id LEFT JOIN player_scene_state s ON s.user_id=c.user_id WHERE c.user_id=?`, []any{userID})
 	if err != nil {
 		return nil, err
@@ -159,7 +160,7 @@ func returnToWaymarkTx(conn *storage.Conn, userID int64) (map[string]any, error)
 		return nil, errors.New("there is no mark to return to: you walked here, and the road back is the door (/family → Leave)")
 	}
 	now := float64(time.Now().UnixNano()) / 1e9
-	if _, err = conn.Execute(`UPDATE characters SET location=?,updated_at=? WHERE user_id=?`, []any{mark, now, userID}); err != nil {
+	if _, err = moveCharacterTx(conn, catalog, userID, mark, now); err != nil {
 		return nil, err
 	}
 	if _, err = conn.Execute(`INSERT INTO player_scene_state(user_id,physical_location,scene_type,scene_key,scene_label,channel_id,metadata_json,updated_at) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET physical_location=excluded.physical_location,scene_type='world',scene_key='',scene_label=excluded.scene_label,channel_id=NULL,metadata_json='{}',updated_at=excluded.updated_at`, []any{userID, mark, "world", "", mark, nil, "{}", now}); err != nil {

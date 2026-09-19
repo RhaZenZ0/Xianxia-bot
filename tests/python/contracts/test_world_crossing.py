@@ -1,94 +1,133 @@
-"""v1.0.0-rc.15: crossing between the worlds.
+"""The crossing a tribulation leaves behind (v1.0.0-rc.44).
 
-The hardest journey in the genre had three doors and two of them were shut.
-Ascension (飞升) cleared its tribulation, passed its gate, wrote its history
-row - and left the cultivator standing exactly where they had been. The
-teleportation arrays charged the destination world's currency, which no
-reward path grants and no exchange converts, so they could only be paid by
-someone who had already arrived; and they ran one way only. Go owns the
-crossing; this side asserts the Python boundary and the content.
+Clearing a world-crossing tribulation wrote `tribulation_state.cleared`, paid
+a reputation point and a fate point, and stopped. Nothing said what the
+clearance was *for*, and the only anchored way into the world above was one
+authored array standing in one capital - so a cultivator who survived the
+heavens at a waystation in the hills was told, implicitly, to walk.
+
+`ascension.gate` anchors the seam where the lightning fell, and the quest that
+names it is content: `world_crossing_system.quests`, keyed by the world the
+crossing leads out of. This file holds the Python half of that - the content is
+whole, the seeder makes ordinary giver-less quests out of it, and the bot
+actually seeds them. The engine half (the fare, the terminus, the refusals, the
+conversion) is `world_crossing_test.go`, where the rules live.
 """
 from __future__ import annotations
 
-import ast
 import json
 import unittest
 
+from app.rules.game import World
+from app.rules.quests import OBJECTIVE_TYPES, ascension_quest_seed_rows
 from tests.support import PROJECT_ROOT
 
-BOT = PROJECT_ROOT / "app" / "bot"
-CULTIVATION = (BOT / "commands" / "cultivation.py").read_text(encoding="utf-8")
-ABODE = (BOT / "commands" / "abode.py").read_text(encoding="utf-8")
-LOCATIONS = (BOT / "locations.py").read_text(encoding="utf-8")
-GO = PROJECT_ROOT / "go_core" / "internal"
-WORLD = json.loads((PROJECT_ROOT / "content" / "world.json").read_text(encoding="utf-8"))
+WORLD = World(PROJECT_ROOT / "content" / "world.json")
+CROSSING = dict(WORLD.data.get("world_crossing_system") or {})
+# The three world-crossing tribulations, by the world each one departs. Kept
+# here rather than imported so a gate quietly disappearing from the engine
+# fails this rather than silently shrinking the expectation.
+DEPARTING_WORLDS = ("Mortal World", "Spiritual World", "Immortal World")
 
 
-def _body(source: str, name: str) -> str:
-    tree = ast.parse(source)
-    node = next(n for n in ast.walk(tree) if isinstance(n, (ast.AsyncFunctionDef, ast.FunctionDef, ast.ClassDef)) and n.name == name)
-    return ast.get_source_segment(source, node)
+class TheCrossingContentIsWhole(unittest.TestCase):
+    def test_every_world_a_tribulation_leads_out_of_has_a_quest(self):
+        quests = dict(CROSSING.get("quests") or {})
+        self.assertEqual(sorted(quests), sorted(DEPARTING_WORLDS))
+        keys = [str(q.get("quest_key") or "") for q in quests.values()]
+        self.assertEqual(len(set(keys)), len(keys), f"two crossings share a quest key: {keys}")
+        for key in keys:
+            self.assertTrue(key, "a crossing quest with no key is a quest nothing can hand over")
+
+    def test_the_objectives_are_the_two_halves_of_an_ascension(self):
+        for departing, quest in dict(CROSSING.get("quests") or {}).items():
+            with self.subTest(world=departing):
+                objectives = list(quest.get("objectives") or [])
+                self.assertEqual([str(o.get("type")) for o in objectives], ["ascension_gate", "world_cross"],
+                                 "anchor the seam, then step through it - in that order")
+                for objective in objectives:
+                    self.assertIn(str(objective.get("type")), OBJECTIVE_TYPES)
+                    # A label that names no door is the thing rc.26 built
+                    # `next_objective_label` to stop: it confirms something
+                    # counted and leaves the player where they were.
+                    self.assertIn("**/", str(objective.get("label") or ""),
+                                  "an objective label names the hub path that advances it")
+
+    def test_the_knobs_are_present_and_sane(self):
+        self.assertGreaterEqual(int(CROSSING.get("raise_cost_multiplier") or 0), 1,
+                                "anchoring a seam costs more than a transit through it")
+        self.assertIn("{character}", str(CROSSING.get("name_template") or ""))
+        chance = int(CROSSING.get("npc_crossing_chance_percent") or 0)
+        self.assertTrue(0 < chance <= 100, f"the NPC crossing chance is {chance}")
+        # The raising is significant enough for the Quest Forge (whose floor is
+        # 80) and one traveller afterwards deliberately is not: the crossing is
+        # the event, not everybody who uses it.
+        self.assertGreaterEqual(int(CROSSING.get("history_significance") or 0), 80)
+        self.assertLess(int(CROSSING.get("npc_history_significance") or 0), 80)
 
 
-class TheEngineCarriesTheAscendant(unittest.TestCase):
-    def test_the_crossing_sets_them_down_in_the_new_world(self):
-        cultivation = (GO / "game" / "cultivation_actions.go").read_text(encoding="utf-8")
-        for needle in (
-            "func ascendToNewWorld(",
-            "arrived, err := ascendToNewWorld(conn, catalog, userID, newWorld, p.GameMinute, now)",
-            'result["ascended_to_location"] = arrived',
-            # The gate itself is untouched: an uncleared tribulation still refuses.
-            "world-crossing tribulation must be cleared before this breakthrough",
-        ):
-            self.assertIn(needle, cultivation, needle)
-        self.assertIn("func realmHubOf(", (GO / "game" / "exploration_actions.go").read_text(encoding="utf-8"))
+class TheSeederMakesOrdinaryQuests(unittest.TestCase):
+    def test_a_crossing_quest_is_a_giverless_quest_definition_row(self):
+        rows = ascension_quest_seed_rows(WORLD)
+        self.assertEqual(len(rows), len(DEPARTING_WORLDS))
+        for row in rows:
+            with self.subTest(quest=row["quest_key"]):
+                # A giver would make it a commission: the one-at-a-time slot, a
+                # deadline, offered in person. `grantOrdinaryQuestTx` refuses
+                # one by design, so a giver here costs the player the quest.
+                self.assertEqual(row["giver_npc"], "")
+                self.assertEqual(row["deadline_game_minutes"], 0)
+                self.assertEqual(row["source_type"], "system")
+                self.assertTrue(row["source_key"].startswith("world_crossing:"))
+                self.assertTrue(row["title"] and row["description"])
+                self.assertIn(row["seed"]["from_world"], DEPARTING_WORLDS)
 
-    def test_the_reply_says_where_they_came_down(self):
-        self.assertIn('result.get("ascended_to_location")', CULTIVATION)
-        self.assertIn("The heavens take you.", CULTIVATION)
-
-
-class EitherLadderOpensAWorld(unittest.TestCase):
-    """The world-crossing tribulation is gated on qi *or* body, so a body
-    cultivator who crosses must not find the world shut against them."""
-
-    def test_the_engine_measures_a_place_against_both_ladders(self):
-        aptitude = (GO / "game" / "aptitude_actions.go").read_text(encoding="utf-8")
-        self.assertIn("func (c mechanicsCharacter) accessRealmIndex() int64 {", aptitude)
-        exploration = (GO / "game" / "exploration_actions.go").read_text(encoding="utf-8")
-        for needle in (
-            "if c.accessRealmIndex() < dest.MinRealmIndex {",
-            "if c.accessRealmIndex() < worldMinRealm(catalog, dest.World) {",
-            "if loc.RealmHub && c.accessRealmIndex() >= worldMinRealm(catalog, loc.World) {",
-        ):
-            self.assertIn(needle, exploration, needle)
-
-    def test_python_mirrors_the_same_rule(self):
-        self.assertIn("def access_realm_index(character: dict[str, Any]) -> int:", LOCATIONS)
-        rule = _body(LOCATIONS, "access_realm_index")
-        self.assertIn('character.get("body_realm_index", 0)', rule)
-        self.assertIn("max(", rule)
-        unlocked = _body(LOCATIONS, "_world_is_unlocked")
-        self.assertIn("access_realm_index(character)", unlocked)
+    def test_the_bot_and_the_engine_playtest_both_seed_them(self):
+        # The same assertion `test_household_errands.py` makes, and for the
+        # same reason: a seeder nothing calls is a quest nobody can be given,
+        # which is precisely the fault this release exists to stop repeating.
+        bot = (PROJECT_ROOT / "app" / "bot" / "bot.py").read_text(encoding="utf-8")
+        self.assertIn("ascension_quest_seed_rows(WORLD)", bot)
+        playtest = (PROJECT_ROOT / "scripts" / "playtest_engine.py").read_text(encoding="utf-8")
+        self.assertIn("ascension_quest_seed_rows(content)", playtest)
 
 
-class TheArraysAreUsable(unittest.TestCase):
-    def test_the_picker_and_the_listing_respect_the_realm_seal(self):
-        listing = _body(ABODE, "array_list")
-        self.assertIn("min_realm_index", listing)
-        self.assertIn("sealed", listing)
-        picker = _body(ABODE, "array_destination_autocomplete")
-        self.assertIn("min_realm_index", picker)
+class TheTableIsTheEnginesToWrite(unittest.TestCase):
+    def test_python_reads_world_crossings_and_never_writes_one(self):
+        """A gate is authoritative state, so `ascension.gate` is its only writer.
 
-    def test_the_arrival_names_the_destination(self):
-        # The reply read `location`/`destination`, which the engine never
-        # returns, so it always said "your destination".
-        use = _body(ABODE, "array_use")
-        self.assertIn("r.get('to')", use)
-        self.assertNotIn("r.get('location'", use)
-        array_go = (GO / "game" / "property_storage_actions.go").read_text(encoding="utf-8")
-        self.assertIn('"to": d.To', array_go)
+        Presentation draws raised gates beside the authored arrays, which needs
+        a read; what it must never do is write one, because a crossing that
+        Python could create would be a road the engine did not price, gate on a
+        realm, or charge for.
+        """
+        offenders = []
+        for path in sorted((PROJECT_ROOT / "app").rglob("*.py")):
+            if "__pycache__" in path.parts:
+                continue
+            text = path.read_text(encoding="utf-8", errors="ignore")
+            if "world_crossings" not in text:
+                continue
+            for statement in ("INSERT INTO world_crossings", "UPDATE world_crossings", "DELETE FROM world_crossings"):
+                if statement in text and path.name != "core.py":
+                    offenders.append(f"{path.relative_to(PROJECT_ROOT)}: {statement}")
+            if path.name == "core.py":
+                # The migration and the DDL live there; a write does not.
+                for statement in ("INSERT INTO world_crossings", "UPDATE world_crossings", "DELETE FROM world_crossings"):
+                    if statement in text:
+                        offenders.append(f"{path.relative_to(PROJECT_ROOT)}: {statement}")
+        self.assertEqual(offenders, [], f"Python writes a crossing: {offenders}")
+
+    def test_the_readiness_probe_knows_the_table(self):
+        core = (PROJECT_ROOT / "app" / "database" / "core.py").read_text(encoding="utf-8")
+        self.assertIn('"world_crossings",', core)
+        self.assertGreaterEqual(int(core.split("SCHEMA_VERSION = ")[1].split("\n")[0]), 54,
+                                "the crossings table arrived at schema 54 and must still be reachable")
+
+    def test_the_content_block_parses_as_the_engine_reads_it(self):
+        raw = json.loads((PROJECT_ROOT / "content" / "world.json").read_text(encoding="utf-8"))
+        self.assertIn("world_crossing_system", raw)
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     unittest.main()

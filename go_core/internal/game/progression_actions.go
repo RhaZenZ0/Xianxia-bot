@@ -151,18 +151,6 @@ func eligibleTribulation(c tribulationCharacter, requestedPath string) (tribulat
 		return tribulationGate{}, "", false
 	}
 }
-func tribulationCurrency(world string) string {
-	switch world {
-	case "Spiritual World":
-		return "low_spirit_crystal"
-	case "Immortal World":
-		return "low_immortal_stone"
-	case "Celestial World":
-		return "low_celestial_crystal"
-	default:
-		return "low_spirit_stone"
-	}
-}
 
 type tribulationPayload struct {
 	GameMinute int64  `json:"game_minute"`
@@ -182,7 +170,7 @@ func tribulationState(conn *storage.Conn, userID, realm int64) (prep, attempts i
 	}
 	return
 }
-func tribulationPrepareAction(conn *storage.Conn, _ worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
+func tribulationPrepareAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	var p tribulationPayload
 	if err := json.Unmarshal(raw, &p); err != nil {
 		return authoritativeMutation{}, err
@@ -205,7 +193,7 @@ func tribulationPrepareAction(conn *storage.Conn, _ worlddata.Catalog, userID in
 	if prep >= 5 {
 		return authoritativeMutation{}, errors.New("tribulation preparation is already capped")
 	}
-	currency := tribulationCurrency(gate.From)
+	currency := worldBaseCurrency(catalog, gate.From)
 	wr, err := conn.Execute(`SELECT balance FROM currency_wallets WHERE user_id=? AND currency_id=?`, []any{userID, currency})
 	if err != nil {
 		return authoritativeMutation{}, err
@@ -217,7 +205,7 @@ func tribulationPrepareAction(conn *storage.Conn, _ worlddata.Catalog, userID in
 	if balance < 5 {
 		return authoritativeMutation{}, fmt.Errorf("preparation requires 5 %s", currency)
 	}
-	balance, err = walletDeltaTx(conn, userID, currency, -5, float64(time.Now().UnixNano())/1e9)
+	balance, err = walletDeltaTx(conn, catalog, userID, currency, -5, float64(time.Now().UnixNano())/1e9)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -342,6 +330,7 @@ func tribulationAttemptAction(conn *storage.Conn, catalog worlddata.Catalog, use
 		return authoritativeMutation{}, err
 	}
 	fate := int64(-1)
+	questKey := ""
 	if success {
 		if err = adjustReputationGo(conn, userID, "Heavenly Recognition", 8, "cleared:"+gate.Name); err != nil {
 			return authoritativeMutation{}, err
@@ -350,7 +339,24 @@ func tribulationAttemptAction(conn *storage.Conn, catalog worlddata.Catalog, use
 		if err != nil {
 			return authoritativeMutation{}, err
 		}
+		// What survives a tribulation is now told what it is for
+		// (v1.0.0-rc.44). Clearing the gate wrote `cleared`, paid a
+		// reputation point and a fate point, and left the player holding a
+		// permission with nothing naming the door it opens. The quest is
+		// authored per departing world in `world_crossing_system.quests` and
+		// handed over the way every giver-less quest is; a world with no
+		// authored quest simply hands nothing over, which is a content
+		// decision rather than a fault.
+		if authored, ok := catalog.WorldCrossing.Quests[gate.From]; ok {
+			granted, gerr := grantOrdinaryQuestTx(conn, userID, strings.TrimSpace(authored.QuestKey), p.GameMinute)
+			if gerr != nil {
+				return authoritativeMutation{}, gerr
+			}
+			if granted {
+				questKey = strings.TrimSpace(authored.QuestKey)
+			}
+		}
 	}
-	result := map[string]any{"gate_realm_index": gate.Realm, "gate_name": gate.Name, "path": path, "from_world": gate.From, "to_world": gate.To, "preparation_used": prep, "waves": waves, "success": success, "successes": successes, "attempts": attempts, "fate_after": fate}
+	result := map[string]any{"gate_realm_index": gate.Realm, "gate_name": gate.Name, "path": path, "from_world": gate.From, "to_world": gate.To, "preparation_used": prep, "waves": waves, "success": success, "successes": successes, "attempts": attempts, "fate_after": fate, "quest_granted": questKey}
 	return authoritativeMutation{Result: result, Event: eventledger.Event{Domain: "tribulation", EventType: "tribulation_attempted", EntityType: "character", EntityID: fmt.Sprint(userID), GameMinute: p.GameMinute, Payload: result}}, nil
 }

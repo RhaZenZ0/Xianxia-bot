@@ -186,7 +186,7 @@ func supportVoteGift(conn *storage.Conn, catalog worlddata.Catalog, c mechanicsC
 	}
 	gift := supportGift{
 		World:      world,
-		Currency:   tribulationCurrency(world),
+		Currency:   worldBaseCurrency(catalog, world),
 		Amount:     (supportVoteBaseReward + depth*supportVoteRewardStep) * multiplier,
 		Depth:      depth,
 		Weekend:    weekend,
@@ -245,7 +245,7 @@ func supportVoteClaimAction(conn *storage.Conn, catalog worlddata.Catalog, userI
 	// walletDeltaTx rather than a raw upsert: it guards the int64 overflow and
 	// mirrors low_spirit_stone into characters.spirit_stones, which the sheet
 	// and every price check read.
-	balance, err := walletDeltaTx(conn, userID, gift.Currency, gift.Amount, now)
+	balance, err := walletDeltaTx(conn, catalog, userID, gift.Currency, gift.Amount, now)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}

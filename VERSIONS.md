@@ -6,6 +6,73 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.0** (rc.45) gives two quests a door, and makes a trade's rank worth sitting an examination for.
+
+`road_to_a_sect` was the second `first_steps`. rc.26 found that fault - a quest seeded on every boot,
+listed in `/quests`, handed to nobody, because every writer of a `character_quests` row wanted a
+`giver_npc` the static quests deliberately do not have - and built the beginner path to fix it, for
+the beginner path. The other static quest went on reaching nobody for nineteen more releases, and
+`first_steps` itself was left seeded beside the stage that replaced it. So the fault was found,
+named, and half fixed. The sect road is `beginner_lesson`'s `follow_on` now, which needs no new
+mechanism at all, and it lands where the odds are worth taking: the trial rolls `body + realm×2 +
+phase/3` against TN 15, so a cultivator who has finished the first hour is a far better candidate
+than one who has just been born. `first_steps` is retired, and
+`tests/python/unit/test_quests_reach_a_player.py` is the gate for the class - every seeded key must
+be reachable by a giver, a roster that grants, or another quest's chain, and its allowlist is empty.
+
+A trade's rank rose on XP alone and nothing marked it: six silent steps from Novice to Saint, a
+hundred and twenty hall keepers with no opinion of anybody, and twenty-six of the thirty-three
+recipes reachable only by buying a slip. `profession.exam` is what a rank is worth. Crossing one
+hands over the examination the content authors for it; it is sat at a hall of that trade - a
+`weaponsmith` for Forging, an `apothecary` for Alchemy, a `talisman` hall for Inscription, an `array`
+workshop for Formation - and examined by that shop's own `keeper`, who is already a catalogue NPC
+standing there, so nobody had to be invented. Passing teaches that rank's methods, pays standing with
+the halls and costs a fee in the money of the world it is sat in; failing costs the fee and a world
+day. **It never blocks a level**: `advanceProfessionTx` is untouched, so no live crafter loses a rank
+they earned and nothing needs grandfathering.
+
+**1.0.0** (rc.44) pays a cultivator in the money of the world they are standing in, converts what
+they carry when they leave it, and lets the storm that judged them leave a door behind.
+
+Which money a world uses was stated five times in code - four switches in Go and a tuple in Python -
+over a fact `content/world.json` already declares on all sixteen currencies. It is `worldBaseCurrency`
+now and nothing else, the same collapse rc.39 did to the world clock, and
+`test_one_world_currency_rule.py` is the gate: a production file naming three of the four base
+currencies is restating the mapping, and its allowlist is empty. On top of that one reader, every
+reward is denominated by where it was earned - until now a cultivator in the Spiritual World was
+paid in Mortal stones and charged in spirit crystals, which is the teleport arrays' old fault
+("payable only by somebody who had already arrived") spread across the whole upper-world economy.
+
+Nothing converted at the boundary, either. The content carries a `base_ratio` on every tier above
+the first - a hundred of the rung below - and a world is that same ladder seen from further up, so a
+crossing now divides by it going up and multiplies by it coming down. The remainder is left in the
+money it was already in rather than destroyed. `moveCharacterTx` is the one door out of a world and
+`TestAWorldIsLeftByOneDoor` holds it: fourteen statements wrote `characters.location` and thirteen of
+them could cross a world - the ascension breakthrough, an array, a GM's relocate, a Hearth-Return
+Talisman that carries you home from anywhere - so which half of a fortune survived would have
+depended on how you travelled.
+
+And clearing a world-crossing tribulation wrote `tribulation_state.cleared`, paid a reputation point
+and a fate point, and stopped: the heavens opened over one named place and left nothing there, while
+the only anchored way up was one authored array in one capital. `ascension.gate` anchors the seam
+where the lightning fell - a permanent crossing at your own location, into the world the gate you
+survived opens onto, borrowing the authored crossing's terminus, fare and realm floor so nobody can
+tear open a cheaper road than the world already has. It is public ground: `array.use` resolves it
+beside the authored eight, and the world's own people walk through it - the ones whose cultivation is
+near the cultivator who tore it, because a seam is cut to that measure and `npc_crossing_realm_reach`
+is how far either side of it still fits. It opens the gate as well as the road: `npcBreakthroughs`
+had been carrying NPCs out of a world at realm 7 on wealth and health alone, which is a standard no
+player is held to, and that is refused now until a seam exists - after which the people near its
+measure follow, and the rest stay stalled at the gate where the world can see them. Talent is asked
+before any of that: wealth and health were the only two questions, and both are things a porter can
+have, so the whole world was on one ladder with realm 31 at the top. A band drawn off
+`hash64(name, "talent")` and weighted by the work somebody does, added to the realm the catalogue
+started them at, is the ceiling most lives never leave - and the ones who leave it are the ones worth
+writing about. It is the one road in the game that leaves a world
+(`WhereAnNPCCanWalk` refuses another world by construction, and content roads still do). The tribulation hands over the quest authored for that crossing, through the same
+`grantOrdinaryQuestTx` the beginner path uses - there is still no second quest mechanism, only a
+second thing that hands one over.
+
 **1.0.0** (rc.43) opens two doors nobody could reach, and gives money one door of its own.
 
 `/learn` was the only registered root command in the game that reached no player: forty-five roots,
@@ -1812,6 +1879,24 @@ mechanical authority paths.
 - **Schema 27** added the v0.19.29 mute/freeze moderation columns on `characters`
   (`is_muted`, `is_frozen`, `moderation_reason`).
 - **Schema 28** added the Quest Forge definition table (`quest_definitions`).
+- **Schema 55** gave two orphan quests their doors. `road_to_a_sect` had been seeded on every boot
+  since v0.23.1 and the string appeared in exactly one place in the tree - its own definition - so
+  nothing could hand it over; it is `beginner_lesson`'s `follow_on` now, and because
+  `sync_commission_pool` is insert-only on purpose (a GM's edit survives every restart) the content
+  change reaches new worlds only, which is what this migration is for. Only a stage whose chain is
+  still empty is re-pointed, so a GM who already chained it is obeyed. `first_steps`, which rc.26
+  superseded with `beginner_household` without retiring, is dropped from the seeded catalogue and
+  the rows already written are marked retired - except one somebody is somehow holding, because
+  retiring a definition must never take a quest out of a player's hands.
+- **Schema 54** raised `world_crossings`, where a survived world-crossing tribulation leaves its
+  mark. One row per gate a cultivator has anchored: where it stands, the two worlds it joins, the
+  terminus and fare it borrows from the authored crossing for that pair, who tore it open, and the
+  cultivation they tore it at - which is what decides which of the world's own people can follow
+  them through.
+  Keyed on the location rather than on the opener, for the reason a robbed grave is keyed on its
+  claim minute - `opened_by_user_id` anonymises on erasure, so keying meaning to it would let an
+  erasure unmake a gate. The CREATE is the whole migration: no gate has ever stood anywhere, so
+  there is nothing to back-fill.
 - **Schema 53** reconciled the purse with its mirror. A player's stones live in `currency_wallets`
   and in `characters.spirit_stones`, and eleven writers moved one without the other - `trade.accept`
   worst of all, moving stones between two players and naming `currency_wallets` nowhere. Every writer

@@ -342,7 +342,7 @@ func pickMerchantForLot(conn *storage.Conn, catalog worlddata.Catalog, city, cur
 // simulation's settlement has always used. `i64(NULL)` is 0, so the guard is
 // the `seller > 0` every reader already carries.
 //
-// Until this existed `merchantTakesLotTx` paid `walletDeltaTx(conn, 0, ...)`
+// Until this existed `merchantTakesLotTx` paid `walletDeltaTx(conn, catalog, 0, ...)`
 // unconditionally: schema 50 let an NPC lot reach the floor, `MerchantsBid`
 // bids on every open lot, and the first one a merchant won or bought would
 // have written `currency_wallets(user_id=0)`, been refused by that foreign
@@ -350,9 +350,9 @@ func pickMerchantForLot(conn *storage.Conn, catalog worlddata.Catalog, city, cur
 // thereafter, since the lot stays active with its `ends_at` in the past. The
 // same failure the schema fixed, moved one step downstream. Both settlement
 // paths call this so they cannot drift apart again.
-func PayLotSellerTx(conn *storage.Conn, auction map[string]any, amount int64, now float64) error {
+func PayLotSellerTx(conn *storage.Conn, catalog worlddata.Catalog, auction map[string]any, amount int64, now float64) error {
 	if seller := i64(auction["seller_user_id"]); seller > 0 {
-		_, err := walletDeltaTx(conn, seller, strings.TrimSpace(fmt.Sprint(auction["currency_id"])), amount, now)
+		_, err := walletDeltaTx(conn, catalog, seller, strings.TrimSpace(fmt.Sprint(auction["currency_id"])), amount, now)
 		return err
 	}
 	npc := ""
@@ -375,7 +375,7 @@ func merchantTakesLotTx(conn *storage.Conn, catalog worlddata.Catalog, key strin
 	m := catalog.Merchants[key]
 	quantity := max64(1, i64(auction["quantity"]))
 	itemID := fmt.Sprint(auction["item_id"])
-	if err := PayLotSellerTx(conn, auction, price, now); err != nil {
+	if err := PayLotSellerTx(conn, catalog, auction, price, now); err != nil {
 		return err
 	}
 	if !alreadyPaid {
@@ -543,7 +543,7 @@ func MerchantsBid(conn *storage.Conn, catalog worlddata.Catalog, gm int64) (int6
 		}
 		// Refund whoever held the lot: a player's escrow or a rival's purse.
 		if old := i64(a["current_bidder_user_id"]); old > 0 {
-			if _, err := walletDeltaTx(conn, old, currency, current, now); err != nil {
+			if _, err := walletDeltaTx(conn, catalog, old, currency, current, now); err != nil {
 				return placed, err
 			}
 		} else if standing != "" {
@@ -821,7 +821,7 @@ func merchantBuyAction(conn *storage.Conn, catalog worlddata.Catalog, userID int
 	}
 	unit := max64(1, i64(line["price"]))
 	total := unit * p.Quantity
-	balance, err := walletDeltaTx(conn, userID, m.Currency, -total, now)
+	balance, err := walletDeltaTx(conn, catalog, userID, m.Currency, -total, now)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}

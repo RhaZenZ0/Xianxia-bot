@@ -245,7 +245,7 @@ func soulLegacy(c lifeSnapshot, maxLaw, perfect int64) (map[string]any, error) {
 	return map[string]any{"memory_seed": memory, "talent_echo": talent, "law_echo": law, "insight_echo": insight, "legacy_points": points, "karmic_fortune": fortune, "special_trait": trait}, nil
 }
 
-func recordTrueDeathAuthoritative(conn *storage.Conn, userID int64, p trueDeathPayload) (map[string]any, error) {
+func recordTrueDeathAuthoritative(conn *storage.Conn, catalog worlddata.Catalog, userID int64, p trueDeathPayload) (map[string]any, error) {
 	c, err := loadLifeSnapshot(conn, userID)
 	if err != nil {
 		return nil, err
@@ -329,7 +329,7 @@ func recordTrueDeathAuthoritative(conn *storage.Conn, userID int64, p trueDeathP
 	// Escrow keyed by the persistent user id - auctions, bids, caravans, a
 	// seclusion in progress - is resolved here, in the same transaction as the
 	// death. See death_escrow.go for why it happens now and not at settlement.
-	escrow, err := resolveIncarnationEscrowTx(conn, userID, p.GameMinute, now)
+	escrow, err := resolveIncarnationEscrowTx(conn, catalog, userID, p.GameMinute, now)
 	if err != nil {
 		return nil, err
 	}
@@ -343,12 +343,12 @@ func recordTrueDeathAuthoritative(conn *storage.Conn, userID int64, p trueDeathP
 	return out, nil
 }
 
-func trueDeathAction(conn *storage.Conn, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
+func trueDeathAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	var p trueDeathPayload
 	if err := json.Unmarshal(raw, &p); err != nil {
 		return authoritativeMutation{}, err
 	}
-	out, err := recordTrueDeathAuthoritative(conn, userID, p)
+	out, err := recordTrueDeathAuthoritative(conn, catalog, userID, p)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -1014,10 +1014,7 @@ func reincarnateAction(conn *storage.Conn, catalog worlddata.Catalog, userID int
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
-	currency := map[string]string{"Mortal World": "low_spirit_stone", "Spiritual World": "low_spirit_crystal", "Immortal World": "low_immortal_stone", "Celestial World": "low_celestial_crystal"}[world]
-	if currency == "" {
-		currency = "low_spirit_stone"
-	}
+	currency := worldBaseCurrency(catalog, world)
 	spiritStones := int64(0)
 	if currency == "low_spirit_stone" {
 		spiritStones = 25

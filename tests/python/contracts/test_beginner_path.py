@@ -23,6 +23,7 @@ from app.rules.game import World
 from app.rules.quests import (
     MAX_OBJECTIVES,
     OBJECTIVE_TYPES,
+    QUEST_DEFINITIONS,
     beginner_path_seed_rows,
     next_objective_label,
     validate_quest_definition,
@@ -84,23 +85,40 @@ class TheContentIsAQuestTheForgeWouldAccept(unittest.TestCase):
 
 
 class TheChainLeadsSomewhere(unittest.TestCase):
-    def test_every_follow_on_names_a_real_stage_and_the_last_names_nothing(self):
+    def test_every_follow_on_names_something_that_can_be_handed_over(self):
+        """A chain pointing at nothing strands the player where it stops.
+
+        Until v1.0.0-rc.45 this also held that the last stage chained to
+        nothing, which was true of the path and false about the fault it was
+        built to fix: `road_to_a_sect` sat seeded and unreachable for nineteen
+        releases while the path it should have followed ended deliberately.
+        The last stage may leave the path now - what it may not do is name
+        something nobody could be given, so an onward chain has to name a
+        giver-less definition the bot actually seeds.
+        """
         keys = [str(s["quest_key"]) for s in STAGES]
         self.assertEqual(len(set(keys)), len(keys), "two stages share a quest key")
+        onward = {key for key in QUEST_DEFINITIONS if not QUEST_DEFINITIONS[key].get("giver_npc")}
         for index, stage in enumerate(STAGES):
             follow_on = str(stage.get("follow_on") or "")
             with self.subTest(stage=stage["quest_key"]):
+                self.assertNotEqual(follow_on, stage["quest_key"], "a stage chained to itself")
                 if index == len(STAGES) - 1:
-                    self.assertEqual(follow_on, "", "the last stage must end the path")
+                    if follow_on:
+                        self.assertIn(follow_on, onward,
+                                      "the path leaves itself for a quest nothing seeds, or one with a "
+                                      "giver - and `grantOrdinaryQuestTx` refuses a giver by design")
                 else:
                     self.assertIn(follow_on, keys, "a chain pointing at nothing strands the player there")
-                    self.assertNotEqual(follow_on, stage["quest_key"])
 
     def test_following_the_chain_reaches_every_stage_exactly_once(self):
         by_key = {str(s["quest_key"]): s for s in STAGES}
         seen: list[str] = []
         key = str(STAGES[0]["quest_key"])
-        while key:
+        # The walk stops where the path does: a chain that leaves for a static
+        # quest is followed as far as the path's own stages and no further,
+        # which is what makes "every stage exactly once" still mean that.
+        while key in by_key:
             self.assertNotIn(key, seen, "the beginner path loops")
             seen.append(key)
             key = str(by_key[key].get("follow_on") or "")

@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"xianxia/core/internal/storage"
+	"xianxia/core/internal/worlddata"
 )
 
 type npcFoundPayload struct {
@@ -29,7 +30,7 @@ type npcFoundPayload struct {
 	GameMinute int64  `json:"game_minute"`
 }
 
-func npcFound(conn *storage.Conn, userID int64, raw json.RawMessage) (any, error) {
+func npcFound(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (any, error) {
 	var p npcFoundPayload
 	if err := json.Unmarshal(raw, &p); err != nil {
 		return nil, err
@@ -58,7 +59,7 @@ func npcFound(conn *storage.Conn, userID int64, raw json.RawMessage) (any, error
 		// Not missing, but possibly buried. A search that arrives too late
 		// still arrives: the grave is the answer, and it is one that can be
 		// carried back.
-		return claimGraveResult(conn, userID, name, p.Location, p.GameMinute)
+		return claimGraveResult(conn, catalog, userID, name, p.Location, p.GameMinute)
 	}
 	if !strings.EqualFold(current, strings.TrimSpace(p.Location)) {
 		// Somebody looking in the wrong place learns nothing, and the world
@@ -123,7 +124,7 @@ const foundBySearchSignificance = 68
 // the grave was dug rather than invented now - and marks the grave visited, so
 // the answer is carried back by the first person to reach it and not by
 // everybody afterwards.
-func claimGraveResult(conn *storage.Conn, userID int64, name, location string, gameMinute int64) (any, error) {
+func claimGraveResult(conn *storage.Conn, catalog worlddata.Catalog, userID int64, name, location string, gameMinute int64) (any, error) {
 	miss := map[string]any{"found": false, "was_missing": false}
 	if !tableExistsTx(conn, "npc_graves") {
 		return miss, nil
@@ -178,7 +179,7 @@ func claimGraveResult(conn *storage.Conn, userID int64, name, location string, g
 		}
 	}
 	if stones > 0 {
-		if _, err := walletDeltaTx(conn, userID, mirroredCurrency, stones, now); err != nil {
+		if _, err := characterWalletDeltaTx(conn, catalog, userID, stones, now); err != nil {
 			return nil, err
 		}
 	}

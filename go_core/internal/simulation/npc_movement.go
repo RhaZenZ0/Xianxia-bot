@@ -39,6 +39,12 @@ const (
 	// A world where four hundred people relocate overnight is not a living
 	// world, it is a stampede.
 	travelMovedCap = 40
+	// The chance, per tick, that an NPC standing where a raised crossing
+	// stands is the one who walks through it, when the content does not say.
+	defaultNPCCrossingChance = 6
+	// How many realms either side of the cultivator who tore a seam still fit
+	// through it, when the content does not say.
+	defaultNPCCrossingRealmReach = 2
 )
 
 func travelChanceFor(profession string) int64 {
@@ -88,6 +94,22 @@ func (r *Runner) npcTravel(conn *storage.Conn, steps, gm int64) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
+	// The gates players have torn open (v1.0.0-rc.44). Loaded once, not once
+	// per NPC: there are single figures of these against five hundred and
+	// seventy-four people, and the whole point of a batched tick is that the
+	// second number never becomes a query count.
+	gates, err := game.OpenCrossings(conn)
+	if err != nil {
+		return 0, err
+	}
+	crossingChance := r.World.WorldCrossing.NPCCrossingChance
+	if crossingChance <= 0 {
+		crossingChance = defaultNPCCrossingChance
+	}
+	crossingReach := r.World.WorldCrossing.NPCCrossingRealmReach
+	if crossingReach <= 0 {
+		crossingReach = defaultNPCCrossingRealmReach
+	}
 	now := nowFloat()
 	moved := int64(0)
 	for _, row := range res.Rows {
@@ -119,7 +141,32 @@ func (r *Runner) npcTravel(conn *storage.Conn, steps, gm int64) (int64, error) {
 		}
 
 		destination := ""
-		if current != home {
+		crossed := game.Crossing{}
+		// A raised crossing is a road, and it is the only road in the game
+		// that leaves a world - `WhereAnNPCCanWalk` refuses a destination in
+		// another world by construction, which is right for content roads and
+		// is exactly what a torn seam is an exception to.
+		//
+		// It is not a road for everybody standing on it. A seam is cut to the
+		// measure of the cultivator who survived the storm that made it
+		// (`game.NPCMayCross`), so the people who can follow them through are
+		// the ones whose own cultivation is near theirs - never the village
+		// smith who happened to be in the town that day.
+		//
+		// Somebody who does step through is a visitor: their `world_name` is
+		// unchanged, so the far side offers them no onward neighbours and the
+		// going-home roll brings them back. That is a journey through the gate
+		// and out again, which is what a gate is for.
+		if gate, standing := gates[current]; standing && game.NPCMayCross(gate, realmIndex, crossingReach) {
+			crossRoll, err := gamerng.Intn(100)
+			if err != nil {
+				return moved, err
+			}
+			if int64(crossRoll) < crossingChance {
+				destination, crossed = gate.Destination, gate
+			}
+		}
+		if destination == "" && current != home {
 			homeRoll, err := gamerng.Intn(100)
 			if err != nil {
 				return moved, err
@@ -146,10 +193,18 @@ func (r *Runner) npcTravel(conn *storage.Conn, steps, gm int64) (int64, error) {
 		if destination == home {
 			activity = "Returning home"
 		}
+		if crossed.Location != "" {
+			activity = "Crossing over"
+		}
 		if _, err := conn.Execute(
 			`UPDATE npc_civilization_state SET current_location=?,activity=?,last_game_minute=?,updated_at=? WHERE npc_name=?`,
 			[]any{destination, activity, gm, now, name}); err != nil {
 			return moved, err
+		}
+		if crossed.Location != "" {
+			if err := game.RecordNPCCrossingTx(conn, r.World, name, crossed.Name, crossed.Location, crossed.Destination, crossed.ToWorld, gm, now); err != nil {
+				return moved, err
+			}
 		}
 		moved++
 	}

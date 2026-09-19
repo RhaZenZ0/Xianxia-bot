@@ -99,7 +99,7 @@ func applyCanonicalRewardTx(conn *storage.Conn, catalog worlddata.Catalog, userI
 		return 0, err
 	}
 	if reward.SpiritStones != 0 {
-		if _, err = walletDeltaTx(conn, userID, mirroredCurrency, reward.SpiritStones, now); err != nil {
+		if _, err = characterWalletDeltaTx(conn, catalog, userID, reward.SpiritStones, now); err != nil {
 			return 0, err
 		}
 	}
@@ -518,18 +518,18 @@ func canonicalRoadRouteRiding(catalog worlddata.Catalog, origin, destination str
 	return plan, len(plan.Legs) > 0
 }
 
-func chargeRoadTravelTx(conn *storage.Conn, userID, cost int64, now float64) error {
+func chargeRoadTravelTx(conn *storage.Conn, catalog worlddata.Catalog, userID, cost int64, now float64) error {
 	if cost <= 0 {
 		return nil
 	}
-	balance, err := walletBalanceTx(conn, userID, mirroredCurrency)
+	balance, err := characterWalletBalanceTx(conn, catalog, userID)
 	if err != nil {
 		return err
 	}
 	if balance < cost {
 		return fmt.Errorf("road travel requires %d spirit stones; only %d available", cost, balance)
 	}
-	_, err = walletDeltaTx(conn, userID, mirroredCurrency, -cost, now)
+	_, err = characterWalletDeltaTx(conn, catalog, userID, -cost, now)
 	return err
 }
 
@@ -1538,7 +1538,7 @@ func explorationTravelAction(conn *storage.Conn, catalog worlddata.Catalog, user
 				travelModeName = plan.Legs[0].Profile.Mode
 				travelMount = plan.Legs[0].Profile.Mount
 			}
-			if err := chargeRoadTravelTx(conn, userID, travelCost, now); err != nil {
+			if err := chargeRoadTravelTx(conn, catalog, userID, travelCost, now); err != nil {
 				return authoritativeMutation{}, err
 			}
 			elapsed := int64(0)
@@ -1581,7 +1581,7 @@ func explorationTravelAction(conn *storage.Conn, catalog worlddata.Catalog, user
 			leftBy = direction
 		}
 	}
-	if _, err = conn.Execute(`UPDATE characters SET location=?,updated_at=? WHERE user_id=?`, []any{arrivedAt, now, userID}); err != nil {
+	if _, err = moveCharacterTx(conn, catalog, userID, arrivedAt, now); err != nil {
 		return authoritativeMutation{}, err
 	}
 

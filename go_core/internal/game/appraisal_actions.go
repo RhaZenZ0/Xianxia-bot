@@ -164,7 +164,7 @@ func appraisalAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64
 			currency = "low_spirit_stone"
 		}
 		fee := appraisalFee(item)
-		balance, err := walletDeltaTx(conn, userID, currency, -fee, now)
+		balance, err := walletDeltaTx(conn, catalog, userID, currency, -fee, now)
 		if err != nil {
 			return authoritativeMutation{}, fmt.Errorf("the appraisal costs %d and you cannot cover it", fee)
 		}

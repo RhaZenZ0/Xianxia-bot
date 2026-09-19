@@ -30342,6 +30342,83 @@
       "min_realm_index": 24
     }
   },
+  "world_crossing_system": {
+    "description": "What a survived world-crossing tribulation leaves behind. The heavens open over one named place, and the seam they tear there can be anchored into a permanent crossing - a gate that stands where the lightning fell instead of in the one capital the authored arrays depart from. It is public ground once it is up: anyone of the realm the crossing needs may pay its fare and step through, and so may the world's own people.",
+    "name_template": "{character}'s Ascension Gate",
+    "raise_cost_multiplier": 10,
+    "npc_crossing_chance_percent": 6,
+    "npc_crossing_realm_reach": 2,
+    "history_significance": 88,
+    "npc_history_significance": 45,
+    "quests": {
+      "Mortal World": {
+        "quest_key": "ascension_mortal_spirit",
+        "title": "The Seam Above You",
+        "description": "The lightning that judged you is gone and the sky where it stood is still thin. Anchor that seam into a crossing of your own, and walk through it into the Spiritual World.",
+        "objectives": [
+          {
+            "id": "gate",
+            "type": "ascension_gate",
+            "count": 1,
+            "label": "Anchor the seam where you survived it - **/ascend → Tribulation / Ascension → Gate**"
+          },
+          {
+            "id": "cross",
+            "type": "world_cross",
+            "count": 1,
+            "label": "Step through into the Spiritual World - **/travel → Teleportation Arrays → Use**"
+          }
+        ],
+        "rewards": {
+          "insight_xp": 120
+        }
+      },
+      "Spiritual World": {
+        "quest_key": "ascension_spirit_immortal",
+        "title": "Transcendence Leaves a Door",
+        "description": "Transcendence burned the seam open above you rather than closing it. Anchor it while it still holds, and cross into the Immortal World.",
+        "objectives": [
+          {
+            "id": "gate",
+            "type": "ascension_gate",
+            "count": 1,
+            "label": "Anchor the seam where you survived it - **/ascend → Tribulation / Ascension → Gate**"
+          },
+          {
+            "id": "cross",
+            "type": "world_cross",
+            "count": 1,
+            "label": "Step through into the Immortal World - **/travel → Teleportation Arrays → Use**"
+          }
+        ],
+        "rewards": {
+          "insight_xp": 200
+        }
+      },
+      "Immortal World": {
+        "quest_key": "ascension_immortal_celestial",
+        "title": "The Mandate Did Not Refuse",
+        "description": "The mandate of heaven was read over you and did not refuse. Anchor the seam it left behind, and step up into the Celestial World.",
+        "objectives": [
+          {
+            "id": "gate",
+            "type": "ascension_gate",
+            "count": 1,
+            "label": "Anchor the seam where you survived it - **/ascend → Tribulation / Ascension → Gate**"
+          },
+          {
+            "id": "cross",
+            "type": "world_cross",
+            "count": 1,
+            "label": "Step through into the Celestial World - **/travel → Teleportation Arrays → Use**"
+          }
+        ],
+        "rewards": {
+          "insight_xp": 320
+        }
+      }
+    }
+  },
   "narration_pool": {
     "tiers": [
       "Mortal World",
@@ -64100,6 +64177,292 @@
       "story": "The Qin sword was given to the clan's founder by an emperor who needed a family that would guard a gate without asking what was behind it. The clan has never asked. It is still not entirely sure it wants to know."
     }
   },
+  "profession_exams": {
+    "Forging": [
+      {
+        "rank": 1,
+        "rank_name": "Apprentice",
+        "quest_key": "exam_forging_apprentice",
+        "title": "The Apprentice's Billet",
+        "description": "A smith who has not been watched at the anvil is a smith nobody will vouch for. Take a billet to a weaponsmith's hall and work it under the keeper's eye.",
+        "opening": "The keeper clears a space at the second anvil, sets a billet down on it, and goes back to their own work without another word. The watching has already started.",
+        "hall_kind": "weaponsmith",
+        "hall": "smithy",
+        "tn": 11,
+        "fee": 40,
+        "objectives": [
+          {
+            "id": "sit",
+            "type": "profession_exam",
+            "count": 1,
+            "label": "Sit the Apprentice examination in Forging - **/craft → Profession → Exam**"
+          }
+        ],
+        "rewards": {
+          "insight_xp": 30
+        }
+      },
+      {
+        "rank": 2,
+        "rank_name": "Journeyman",
+        "quest_key": "exam_forging_journeyman",
+        "title": "The Journeyman's Edge",
+        "description": "Anyone can make a blade that looks like one. Stand at a weaponsmith's hall and put an edge on steel while the keeper decides whether it is work or decoration.",
+        "opening": "The billet is better metal this time, and the keeper does not leave. They stand where they can see your hands and nothing else.",
+        "hall_kind": "weaponsmith",
+        "hall": "smithy",
+        "tn": 13,
+        "fee": 120,
+        "objectives": [
+          {
+            "id": "sit",
+            "type": "profession_exam",
+            "count": 1,
+            "label": "Sit the Journeyman examination in Forging - **/craft → Profession → Exam**"
+          }
+        ],
+        "rewards": {
+          "insight_xp": 60
+        }
+      },
+      {
+        "rank": 3,
+        "rank_name": "Expert",
+        "quest_key": "exam_forging_expert",
+        "title": "The Expert's Folding",
+        "description": "A hall does not certify its own competition lightly. Fold and temper at a weaponsmith's counter until the keeper admits the work is beyond them or is not.",
+        "opening": "There is no billet waiting. The keeper asks what you intend to make, listens, and then says: show me.",
+        "hall_kind": "weaponsmith",
+        "hall": "smithy",
+        "tn": 15,
+        "fee": 300,
+        "objectives": [
+          {
+            "id": "sit",
+            "type": "profession_exam",
+            "count": 1,
+            "label": "Sit the Expert examination in Forging - **/craft → Profession → Exam**"
+          }
+        ],
+        "rewards": {
+          "insight_xp": 110
+        }
+      }
+    ],
+    "Alchemy": [
+      {
+        "rank": 1,
+        "rank_name": "Apprentice",
+        "quest_key": "exam_alchemy_apprentice",
+        "title": "The Apprentice's Decoction",
+        "description": "A pill hall will not take your word for what you can brew. Stand at an apothecary's counter and raise one decoction while the keeper watches the flame.",
+        "opening": "The keeper sets out a cracked furnace, the one they give everybody, and a measure of herbs that will forgive exactly one mistake.",
+        "hall_kind": "apothecary",
+        "hall": "apothecary",
+        "tn": 11,
+        "fee": 40,
+        "objectives": [
+          {
+            "id": "sit",
+            "type": "profession_exam",
+            "count": 1,
+            "label": "Sit the Apprentice examination in Alchemy - **/craft → Profession → Exam**"
+          }
+        ],
+        "rewards": {
+          "insight_xp": 30
+        }
+      },
+      {
+        "rank": 2,
+        "rank_name": "Journeyman",
+        "quest_key": "exam_alchemy_journeyman",
+        "title": "The Journeyman's Furnace",
+        "description": "Heat is the whole art and nobody can be told it. Work an apothecary's own furnace under its keeper until the pill comes out whole.",
+        "opening": "They open the good furnace for you. That is either respect or a trap, and you will not know which until the flame takes.",
+        "hall_kind": "apothecary",
+        "hall": "apothecary",
+        "tn": 13,
+        "fee": 120,
+        "objectives": [
+          {
+            "id": "sit",
+            "type": "profession_exam",
+            "count": 1,
+            "label": "Sit the Journeyman examination in Alchemy - **/craft → Profession → Exam**"
+          }
+        ],
+        "rewards": {
+          "insight_xp": 60
+        }
+      },
+      {
+        "rank": 3,
+        "rank_name": "Expert",
+        "quest_key": "exam_alchemy_expert",
+        "title": "The Expert's Toxicity",
+        "description": "An expert is somebody whose pills do not poison the person who swallows them. Sit the third examination at an apothecary's counter.",
+        "opening": "The keeper asks you first what happens to somebody who takes two of what you are about to make. Then they hand you the herbs.",
+        "hall_kind": "apothecary",
+        "hall": "apothecary",
+        "tn": 15,
+        "fee": 300,
+        "objectives": [
+          {
+            "id": "sit",
+            "type": "profession_exam",
+            "count": 1,
+            "label": "Sit the Expert examination in Alchemy - **/craft → Profession → Exam**"
+          }
+        ],
+        "rewards": {
+          "insight_xp": 110
+        }
+      }
+    ],
+    "Inscription": [
+      {
+        "rank": 1,
+        "rank_name": "Apprentice",
+        "quest_key": "exam_inscription_apprentice",
+        "title": "The Apprentice's Stroke",
+        "description": "Ink does not forgive a shaking hand. Draw one talisman through, start to finish, at a talisman hall while its keeper reads the strokes.",
+        "opening": "The paper is cheap and the ink is not. The keeper counts out exactly enough of both.",
+        "hall_kind": "talisman",
+        "hall": "talisman hall",
+        "tn": 11,
+        "fee": 40,
+        "objectives": [
+          {
+            "id": "sit",
+            "type": "profession_exam",
+            "count": 1,
+            "label": "Sit the Apprentice examination in Inscription - **/craft → Profession → Exam**"
+          }
+        ],
+        "rewards": {
+          "insight_xp": 30
+        }
+      },
+      {
+        "rank": 2,
+        "rank_name": "Journeyman",
+        "quest_key": "exam_inscription_journeyman",
+        "title": "The Journeyman's Sequence",
+        "description": "One stroke is a stroke; a sequence is a talisman. Sit the second examination at a talisman hall counter.",
+        "opening": "The keeper names a sequence you have not drawn before and watches to see whether you ask them to repeat it.",
+        "hall_kind": "talisman",
+        "hall": "talisman hall",
+        "tn": 13,
+        "fee": 120,
+        "objectives": [
+          {
+            "id": "sit",
+            "type": "profession_exam",
+            "count": 1,
+            "label": "Sit the Journeyman examination in Inscription - **/craft → Profession → Exam**"
+          }
+        ],
+        "rewards": {
+          "insight_xp": 60
+        }
+      },
+      {
+        "rank": 3,
+        "rank_name": "Expert",
+        "quest_key": "exam_inscription_expert",
+        "title": "The Expert's Seal",
+        "description": "A seal binds or it does not, and a hall's reputation rides on the difference. Sit the third examination at a talisman hall.",
+        "opening": "They clear the whole counter. Whatever you draw here, they will be selling under their own name afterwards.",
+        "hall_kind": "talisman",
+        "hall": "talisman hall",
+        "tn": 15,
+        "fee": 300,
+        "objectives": [
+          {
+            "id": "sit",
+            "type": "profession_exam",
+            "count": 1,
+            "label": "Sit the Expert examination in Inscription - **/craft → Profession → Exam**"
+          }
+        ],
+        "rewards": {
+          "insight_xp": 110
+        }
+      }
+    ],
+    "Formation": [
+      {
+        "rank": 1,
+        "rank_name": "Apprentice",
+        "quest_key": "exam_formation_apprentice",
+        "title": "The Apprentice's Flags",
+        "description": "A formation misplaced by a handspan is a formation that does nothing. Set your flags at an array workshop while the keeper paces the lines.",
+        "opening": "The workshop floor is marked with a hundred old chalk lines. The keeper wipes one section clean and points at it.",
+        "hall_kind": "array",
+        "hall": "array workshop",
+        "tn": 11,
+        "fee": 40,
+        "objectives": [
+          {
+            "id": "sit",
+            "type": "profession_exam",
+            "count": 1,
+            "label": "Sit the Apprentice examination in Formation - **/craft → Profession → Exam**"
+          }
+        ],
+        "rewards": {
+          "insight_xp": 30
+        }
+      },
+      {
+        "rank": 2,
+        "rank_name": "Journeyman",
+        "quest_key": "exam_formation_journeyman",
+        "title": "The Journeyman's Node",
+        "description": "Anyone can lay flags. A journeyman knows which one carries the load. Sit the second examination at an array workshop.",
+        "opening": "The keeper lays out a disk with one node deliberately wrong and asks you to raise it anyway.",
+        "hall_kind": "array",
+        "hall": "array workshop",
+        "tn": 13,
+        "fee": 120,
+        "objectives": [
+          {
+            "id": "sit",
+            "type": "profession_exam",
+            "count": 1,
+            "label": "Sit the Journeyman examination in Formation - **/craft → Profession → Exam**"
+          }
+        ],
+        "rewards": {
+          "insight_xp": 60
+        }
+      },
+      {
+        "rank": 3,
+        "rank_name": "Expert",
+        "quest_key": "exam_formation_expert",
+        "title": "The Expert's Array",
+        "description": "An expert raises something that holds with the keeper leaning on it. Sit the third examination at an array workshop.",
+        "opening": "There is no instruction at all. The keeper sits down on a crate at the edge of the floor and waits.",
+        "hall_kind": "array",
+        "hall": "array workshop",
+        "tn": 15,
+        "fee": 300,
+        "objectives": [
+          {
+            "id": "sit",
+            "type": "profession_exam",
+            "count": 1,
+            "label": "Sit the Expert examination in Formation - **/craft → Profession → Exam**"
+          }
+        ],
+        "rewards": {
+          "insight_xp": 110
+        }
+      }
+    ]
+  },
   "beginner_path": [
     {
       "quest_key": "beginner_household",
@@ -64244,7 +64607,7 @@
         "insight_xp": 40,
         "spirit_stones": 30
       },
-      "follow_on": ""
+      "follow_on": "road_to_a_sect"
     }
   ],
   "household_errands": {

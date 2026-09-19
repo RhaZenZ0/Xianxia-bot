@@ -158,7 +158,7 @@ type familyContributePayload struct {
 // household's coffers. The treasury remembers every stone; wealth rises a
 // fifth as fast and influence a twenty-fifth, both capped at 100; and the
 // house remembers who gave.
-func familyContributeActionGo(conn *storage.Conn, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
+func familyContributeActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	var p familyContributePayload
 	if e := json.Unmarshal(raw, &p); e != nil {
 		return authoritativeMutation{}, e
@@ -171,7 +171,7 @@ func familyContributeActionGo(conn *storage.Conn, userID int64, raw json.RawMess
 		return authoritativeMutation{}, err
 	}
 	now := nowSeconds()
-	balance, err := walletDeltaTx(conn, userID, "low_spirit_stone", -p.Amount, now)
+	balance, err := walletDeltaTx(conn, catalog, userID, "low_spirit_stone", -p.Amount, now)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}

@@ -197,7 +197,7 @@ func itemUseActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64
 		if len(here.Rows) == 0 {
 			return authoritativeMutation{}, errors.New("character not found")
 		}
-		if homeward, e = enterHouseholdTx(conn, userID, fmt.Sprint(here.Rows[0][0])); e != nil {
+		if homeward, e = enterHouseholdTx(conn, catalog, userID, fmt.Sprint(here.Rows[0][0])); e != nil {
 			return authoritativeMutation{}, e
 		}
 	}
@@ -206,7 +206,7 @@ func itemUseActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64
 	var waymark map[string]any
 	if item.Use.Waymark {
 		var e error
-		if waymark, e = returnToWaymarkTx(conn, userID); e != nil {
+		if waymark, e = returnToWaymarkTx(conn, catalog, userID); e != nil {
 			return authoritativeMutation{}, e
 		}
 	}

@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"xianxia/core/internal/game"
 	"xianxia/core/internal/gamerng"
 	"xianxia/core/internal/storage"
 	"xianxia/core/internal/worlddata"
@@ -370,5 +371,123 @@ func TestTheRealWorldIsWalkable(t *testing.T) {
 	}
 	if circuits == 0 {
 		t.Error("no NPC carries a circuit - the field is not reaching Go from world.json")
+	}
+}
+
+// A gate a cultivator tore open is the one road in the game that leaves a
+// world, and the world's own people use it (v1.0.0-rc.44).
+//
+// The dice are lent because both halves are rolls - whether this NPC sets out
+// at all, and whether they are the one who steps through - and a test that
+// waited for a six-percent chance to land is exactly the shape rc.42 spent a
+// release removing.
+const crossingSchema = `
+CREATE TABLE world_crossings(location_key TEXT PRIMARY KEY,name TEXT NOT NULL DEFAULT '',from_world TEXT NOT NULL,to_world TEXT NOT NULL,destination_location TEXT NOT NULL,min_realm_index INTEGER NOT NULL DEFAULT 0,opened_realm_index INTEGER NOT NULL DEFAULT 0,cost INTEGER NOT NULL DEFAULT 0,opened_by_user_id INTEGER,opened_game_minute INTEGER NOT NULL DEFAULT 0,player_uses INTEGER NOT NULL DEFAULT 0,npc_uses INTEGER NOT NULL DEFAULT 0,created_at REAL NOT NULL DEFAULT 0);
+CREATE TABLE world_history_events(source_key TEXT PRIMARY KEY,event_type TEXT NOT NULL,title TEXT NOT NULL,summary TEXT NOT NULL,significance INTEGER NOT NULL DEFAULT 1,visibility TEXT NOT NULL DEFAULT 'public',location TEXT NOT NULL DEFAULT '',world_name TEXT NOT NULL DEFAULT '',faction TEXT NOT NULL DEFAULT '',actor_type TEXT NOT NULL DEFAULT '',actor_key TEXT NOT NULL DEFAULT '',actor_name TEXT NOT NULL DEFAULT '',target_type TEXT NOT NULL DEFAULT '',target_key TEXT NOT NULL DEFAULT '',target_name TEXT NOT NULL DEFAULT '',related_user_id INTEGER,related_npc_name TEXT NOT NULL DEFAULT '',tags TEXT NOT NULL DEFAULT '',game_minute INTEGER NOT NULL DEFAULT 0,metadata_json TEXT NOT NULL DEFAULT '{}',created_at REAL NOT NULL DEFAULT 0,updated_at REAL NOT NULL DEFAULT 0);
+`
+
+func TestTheGateIsUnlockedForTheWorldsOwnPeople(t *testing.T) {
+	defer everyRollLands()()
+	path := setupSimulationDB(t, npcMovementSchema+crossingSchema)
+	r := movementRunner()
+	addNPC(t, path, "Bao the Carter", "Greenriver Town", "Greenriver Town",
+		"Mortal World", "Travelling Peddler", 50, "Independent")
+	conn, err := storage.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+
+	// Nothing stands at Greenriver yet, so the only road out is Riverguard.
+	if _, err := r.npcTravel(conn, 1, 100); err != nil {
+		t.Fatal(err)
+	}
+	if got := locationOf(t, path, "Bao the Carter"); got == "Skyroad Immortal City" {
+		t.Fatalf("a carter walked into the Immortal World with no gate: %s", got)
+	}
+
+	// Torn by a cultivator at realm 8. The carter is a mortal at realm 0, and
+	// a seam cut to an Ascension-realm measure is not a road for them however
+	// long they stand under it.
+	if _, err := conn.Execute(`INSERT INTO world_crossings(location_key,name,from_world,to_world,destination_location,min_realm_index,opened_realm_index,cost,opened_game_minute,created_at)
+        VALUES('Greenriver Town','Lin Test''s Ascension Gate','Mortal World','Immortal World','Skyroad Immortal City',0,8,200,0,0)`, nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := conn.Execute(`UPDATE npc_civilization_state SET current_location='Greenriver Town' WHERE npc_name='Bao the Carter'`, nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.npcTravel(conn, 1, 200); err != nil {
+		t.Fatal(err)
+	}
+	if got := locationOf(t, path, "Bao the Carter"); got == "Skyroad Immortal City" {
+		t.Fatal("a mortal carter walked through an Ascension-realm seam")
+	}
+
+	// Raise the carter to within the seam's reach and they can follow.
+	if _, err := conn.Execute(`UPDATE npc_civilization_state SET current_location='Greenriver Town',realm_index=7 WHERE npc_name='Bao the Carter'`, nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.npcTravel(conn, 1, 300); err != nil {
+		t.Fatal(err)
+	}
+	if err := conn.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	if got := locationOf(t, path, "Bao the Carter"); got != "Skyroad Immortal City" {
+		t.Fatalf("the carter did not step through the gate: %s", got)
+	}
+	if uses := simScalarInt(t, path, `SELECT npc_uses FROM world_crossings WHERE location_key='Greenriver Town'`); uses != 1 {
+		t.Fatalf("the gate counted %d crossings", uses)
+	}
+	// The world can see it, and it is well under the Quest Forge's 80: the
+	// crossing is the significant event, not each traveller after it.
+	if significance := simScalarInt(t, path, `SELECT significance FROM world_history_events WHERE event_type='world_crossing_used'`); significance != game.DefaultNPCHistorySignificance || significance >= 80 {
+		t.Fatalf("significance=%d", significance)
+	}
+}
+
+func simScalarInt(t *testing.T, path, query string) int64 {
+	t.Helper()
+	conn, err := storage.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	res, err := conn.Execute(query, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Rows) == 0 || len(res.Rows[0]) == 0 {
+		t.Fatalf("no row for %s", query)
+	}
+	return i64(res.Rows[0][0])
+}
+
+// The reach, stated once and held here rather than inferred from a tick.
+func TestOnlyCultivationNearTheSeamFitsThroughIt(t *testing.T) {
+	gate := game.Crossing{Destination: "Skyroad Immortal City", MinRealmIndex: 4, OpenedRealmIndex: 8}
+	for _, tc := range []struct {
+		name  string
+		realm int64
+		reach int64
+		want  bool
+	}{
+		{"the cultivator's own measure", 8, 2, true},
+		{"two realms under, still within reach", 6, 2, true},
+		{"two realms over, still within reach", 10, 2, true},
+		{"three under is too far below the seam", 5, 2, false},
+		{"three over is too far above it", 11, 2, false},
+		{"and the road's own floor still refuses", 3, 9, false},
+		{"a reach of nothing admits only the opener", 7, 0, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := game.NPCMayCross(gate, tc.realm, tc.reach); got != tc.want {
+				t.Fatalf("realm %d, reach %d: %v", tc.realm, tc.reach, got)
+			}
+		})
+	}
+	// A row with no far side is not a road, whatever the realms say.
+	if game.NPCMayCross(game.Crossing{OpenedRealmIndex: 8}, 8, 2) {
+		t.Fatal("a crossing with no destination admitted somebody")
 	}
 }

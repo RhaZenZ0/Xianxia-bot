@@ -349,7 +349,7 @@ _HUB_DEFINITIONS = (
         pages=(
             _hub_page("alchemy", "Alchemy", "Refine pills, forage simulated herb resources, track toxicity and purge medicinal residue."),
             _hub_page("craft", "General Crafting", "Practice alchemy, forging, formation or talisman inscription from known recipes."),
-            _hub_page("profession", "Profession", "View crafting and support-profession mastery, and read a method slip into a method you keep.", "learn"),
+            _hub_page("profession", "Profession", "Your crafting and support-profession mastery: what rank you hold, the hall examination that certifies it, and reading a method slip into a method you keep.", "learn"),
         ),
     ),
     HubDefinition(
@@ -848,6 +848,11 @@ PROGRESSION_GATES: dict[str, tuple[str, ...]] = {
     # gate -> the leaves hidden while the gate is shut
     "law": ("law comprehend", "law technique"),
     "tribulation": ("tribulation prepare", "tribulation attempt"),
+    # The seam is anchored after the storm, not during it (v1.0.0-rc.44), so
+    # this is a different gate from the one above: `tribulation` is shut
+    # everywhere except at a world-crossing stage, and `ascension_gate` is
+    # shut until one has actually been survived.
+    "ascension_gate": ("tribulation gate",),
     "perfection": ("perfect start",),
     "sect_member": ("sect roster", "sect politics", "sect address", "sect family", "sect shadow",
                     "sect manor establish", "sect manor upgrade", "sect abode", "sect treasury", "sect contribute", "sect redeem",
@@ -876,6 +881,18 @@ async def _progression_hidden_actions(interaction: discord.Interaction) -> dict[
         shut["law"] = f"a Law needs {WORLD.realm_name(LAW_MIN_REALM_INDEX)}; you stand at {WORLD.realm_name(realm)}"
     if realm not in ASCENSION_GATES:
         shut["tribulation"] = "only at a world-crossing gate (realms " + ", ".join(str(r) for r in sorted(ASCENSION_GATES)) + ")"
+    here = str(c.get("location") or "")
+    standing_in = str((WORLD.locations.get(here) or {}).get("world") or "")
+    departing = [index for index, gate in ASCENSION_GATES.items() if gate["from_world"] == standing_in]
+    cleared = False
+    for index in departing:
+        if int((await DB.get_tribulation_state(uid, index) or {}).get("cleared") or 0):
+            cleared = True
+            break
+    if not cleared:
+        shut["ascension_gate"] = (
+            f"no tribulation out of {standing_in or 'this world'} has been survived here yet"
+            if departing else "no world-crossing tribulation leads out of this world")
     if phase != 9:
         shut["perfection"] = "Perfection begins at stage 9"
     if not await DB.get_sect_membership(uid):

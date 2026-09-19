@@ -347,14 +347,14 @@ func ghostAppeaseAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 		stones = 25
 	}
 	stones = stones * (1 + body.Corruption/25)
-	purse, err := ghostStoneCount(conn, userID)
+	purse, err := ghostStoneCount(conn, catalog, userID)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
 	if purse < stones {
 		return authoritativeMutation{}, fmt.Errorf("the rites cost %d spirit stones; you have %d", stones, purse)
 	}
-	if _, err = walletDeltaTx(conn, userID, mirroredCurrency, -stones, now); err != nil {
+	if _, err = characterWalletDeltaTx(conn, catalog, userID, -stones, now); err != nil {
 		return authoritativeMutation{}, err
 	}
 	if _, err = conn.Execute(`UPDATE characters SET karma_score=MAX(-1000,MIN(1000,karma_score+1)),updated_at=? WHERE user_id=?`, []any{now, userID}); err != nil {
@@ -431,6 +431,6 @@ func ghostStatusQuery(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 // ghostStoneCount is the purse read the appease rite needs, and the one the
 // surface quotes a price against - one query shape, so the two cannot come to
 // disagree about what "what you have" means.
-func ghostStoneCount(conn *storage.Conn, userID int64) (int64, error) {
-	return walletBalanceTx(conn, userID, mirroredCurrency)
+func ghostStoneCount(conn *storage.Conn, catalog worlddata.Catalog, userID int64) (int64, error) {
+	return characterWalletBalanceTx(conn, catalog, userID)
 }
