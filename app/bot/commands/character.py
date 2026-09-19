@@ -486,6 +486,15 @@ async def quests_command(interaction: discord.Interaction) -> None:
         lines.append("\nNo active quests.")
     if available:
         lines.append("\n**Available**\n" + "\n".join(f"• {q['title']}" for q in available[:10]))
+    else:
+        # Since v1.0.0-rc.46 the journal offers only what nothing hands over,
+        # which for most players is nothing - so it says where quests do come
+        # from rather than leaving the page with one word on it. Same idea as
+        # `next_objective_label`: a journal that confirms and points nowhere is
+        # the thing the beginner path was built to stop.
+        lines.append("\n-# Nothing to accept here. Quests come to you: a commission from the "
+                     "person who wants it done, an errand from your household, an examination "
+                     "from your trade's hall, and the next step of a path from the one you just finished.")
     if held:
         lines.append("\n-# Commissions come from the people who give them. "
                      "Abandoning one costs the same standing as failing it.")

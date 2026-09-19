@@ -960,6 +960,41 @@ recipes were a shop transaction and nothing else.
   money of the world the hall stands in, which is the rc.44 rule and which the first version of
   `profession_exam_test.go` learned by picking an Immortal World hall for a Mortal candidate.
 
+### The journal offers what nothing hands over (v1.0.0-rc.46)
+
+rc.45's own fault, seen from the other side. It gave five rosters the power to hand a quest over and
+left `QuestService.available` — the `/quests` "Available" block, the `/character → Quests` page, and
+the accept select built from the same list — offering every one of their quests from minute one. The
+first Discord sweep after the merge printed the proof: a character seconds old, shown ten
+examinations, `The Expert's Toxicity` among them, at Novice, holding no trade.
+
+**Accepting one is what stops its roster ever offering it.** `grantOrdinaryQuestTx` reads an
+already-held quest as `(false, nil)` — a "no", not an error — so `offerProfessionExamTx` returns the
+empty string, `exam_offered` is absent from the craft result, and the hall never says the examination
+is open. `family.errand` hands over "the next unheld one", so a player could take all twelve from the
+journal and empty the errand system; the beginner chain hands over a stage that has been sitting in
+the journal since creation.
+
+The rule is one frozenset of `source_key` **families** — the part before the first colon, which is
+the shape the seeders in `app/rules/quests.py` already write (`household_errand:<trade>`,
+`profession_exam:<trade>`, `world_crossing:<world>`, plus the bare `beginner_path` and
+`sect_recruitment`) — stated once as `HANDED_OVER_BY_A_ROSTER` beside `visible_to`, in `ops` rather
+than in `rules` because the layering puts those two side by side and neither may import the other.
+`test_quests_reach_a_player.py` holds the frozenset **equal** to what the seeders write, so a sixth
+roster fails the gate rather than quietly putting its quests back on the list, and it holds that no
+seeded quest arrives two ways at once (a giver and a roster would be two doors, one of which
+`grantOrdinaryQuestTx` refuses by design).
+
+What is left under "Available" for most players is the Quest Forge's approved drafts and nothing
+else, so where the journal used to print a list it now names where quests do come from. Nothing but
+presentation changed: no engine action, no schema, no content.
+
+**The harness had a stale assertion of its own**, and it is worth knowing which kind. The `/quests`
+step looked for "First Steps" — `first_steps`, which was never held by anybody and only ever appeared
+*under "Available"* — so rc.45 retiring that orphan broke the one step that reads the page. It reads
+`beginner_household`'s real title now ("Before the Door"), which is a quest the player actually
+holds, and it holds the finding: no roster's quest may appear under "Available".
+
 ### People this world makes for itself (`npc_registry`, schema 49)
 
 Three populations, and until v1.0.0-rc.27 only one of them could be spoken to. `catalog_npcs` is a

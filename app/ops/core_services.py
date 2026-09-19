@@ -200,6 +200,22 @@ class NPCRelationshipService:
         return "Uncertain"
 
 
+# The rosters that hand a quest over, by the family of `source_key` their
+# seeder in `app/rules/quests.py` writes. A quest belonging to one of these is
+# never offered from the journal: it arrives when the roster decides it does,
+# which is the whole of what each roster is for. Stated once here rather than
+# as a rule per roster, and `tests/python/unit/test_quests_reach_a_player.py`
+# holds it equal to the seeders, so a sixth roster fails the gate rather than
+# quietly putting its quests back on the list.
+HANDED_OVER_BY_A_ROSTER = frozenset({
+    "beginner_path",     # granted at creation, then stage by stage as each completes
+    "household_errand",  # `family.errand`, at home, one at a time
+    "world_crossing",    # handed over by a cleared world-crossing tribulation
+    "profession_exam",   # offered by the craft that reached the rank
+    "sect_recruitment",  # `beginner_lesson`'s follow_on, where the trial's odds are worth taking
+})
+
+
 class QuestService:
     """Generic quest/objective engine shared by sect, NPC, family and world content.
 
@@ -371,17 +387,43 @@ class QuestService:
         owner = definition.get("owner_user_id")
         return owner in (None, "") or int(owner) == int(user_id)
 
+    @staticmethod
+    def handed_over(definition: dict[str, Any]) -> bool:
+        """Does some roster exist whose whole job is to give this quest out?
+
+        `source_key` is written by the seeder that put the row there, and the
+        family - the part before the first colon - names the roster. Every one
+        of those hands its quests over at a moment it chooses: the beginner
+        path at creation and then stage by stage, an errand by `family.errand`
+        one at a time at home, an ascension quest by a cleared tribulation, an
+        examination by the craft that reached the rank, and the sect road as
+        the last beginner stage's `follow_on`.
+        """
+        return str(definition.get("source_key") or "").split(":", 1)[0] in HANDED_OVER_BY_A_ROSTER
+
     async def visible_catalog(self, user_id: int) -> dict[str, dict[str, Any]]:
         return {k: v for k, v in (await self.catalog()).items() if self.visible_to(v, int(user_id))}
 
     async def available(self, user_id: int) -> list[dict[str, Any]]:
-        """Quests the player may accept from the journal. Commissions are not
-        among them: a commission is something a giver offers you in person, so
-        it is reachable through him and through nothing else."""
+        """Quests the player may accept from the journal.
+
+        Two kinds are not among them, for the same reason. A commission is
+        something a giver offers you in person, so it is reachable through him
+        and through nothing else. And a quest some roster hands over is reached
+        through that roster - the journal offers what nothing hands over.
+
+        The second half is v1.0.0-rc.46, and it is rc.45's own fault seen from
+        the other side: rc.45 gave five rosters the power to hand a quest over
+        and left this list offering all of their quests from minute one. So a
+        character created today was shown ten examinations - `The Expert's
+        Toxicity` at Novice, with no trade and no rank - and could accept them,
+        and `grantOrdinaryQuestTx` treats an already-held quest as "no", so
+        taking one here is what stops the hall ever offering it.
+        """
         existing = {str(r["quest_key"]): r for r in await self.db.list_character_quests(int(user_id))}
         result = []
         for key, definition in (await self.visible_catalog(int(user_id))).items():
-            if key in existing or str(definition.get("giver_npc") or ""):
+            if key in existing or str(definition.get("giver_npc") or "") or self.handed_over(definition):
                 continue
             result.append({"quest_key": key, **definition})
         return result

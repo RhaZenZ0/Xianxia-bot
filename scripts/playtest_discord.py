@@ -608,8 +608,23 @@ async def run(url: str, token: str, db_path: str) -> Report:
         async def journal():
             result = await player.slash(channels["begin-here"], "quests")
             text = result_text(result)
-            expect("Quest Journal" in text and "First Steps" in text, text[:400])
-        await step(report, "/quests shows the beginner path's first stage", journal())
+            # "Before the Door" is `beginner_household`, the stage `grantBeginnerPathTx`
+            # hands over in the transaction that made the character. Until
+            # v1.0.0-rc.45 this looked for "First Steps" instead - the retired
+            # orphan, which was never held and only ever sat under "Available".
+            expect("Quest Journal" in text and "Before the Door" in text, text[:400])
+            # And nothing a roster hands over is on that list. This is what the
+            # first sweep after rc.45 printed: ten examinations offered to a
+            # character seconds old, `The Expert's Toxicity` among them, and an
+            # accept select built from the same list - and accepting one is
+            # what stops its hall ever offering it, because
+            # `grantOrdinaryQuestTx` reads an already-held quest as "no".
+            offered = text.split("**Available**", 1)[1] if "**Available**" in text else ""
+            for handed in ("Expert", "Journeyman", "Apprentice", "Out of the Gate",
+                           "Iron for the Hearth", "A Road Toward a Sect"):
+                expect(handed not in offered,
+                       f"the journal offers {handed!r}, which a roster exists to hand over: {offered[:200]}")
+        await step(report, "/quests shows the beginner path's first stage and offers no roster quest", journal())
 
         # ---- 4b. the world closed for maintenance (v1.0.0-rc.41) ---------------
         # Not left to the generic sweep: pressing this leaf shuts every other

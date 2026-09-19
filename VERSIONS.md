@@ -6,6 +6,32 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.0** (rc.46) stops the quest journal offering the quests that exist to be handed to you.
+
+rc.45 gave five rosters the power to hand a quest over - the beginner path stage by stage, a
+household errand one at a time at home, an ascension quest off a cleared tribulation, a trade's
+examination off the craft that reached the rank, and the sect road as the last beginner stage's
+`follow_on` - and left `QuestService.available` offering every one of their quests from minute one.
+So the first Discord sweep after the merge printed a journal to a character seconds old that listed
+ten examinations, `The Expert's Toxicity` among them, at Novice, holding no trade, with an accept
+select built from the same list.
+
+Accepting one is not cosmetic. `grantOrdinaryQuestTx` reads an already-held quest as "no" and returns
+without error, so a quest taken from the journal is the thing that stops its roster ever offering it:
+the hall never says the examination is open, `family.errand` skips an errand it believes is already
+out, and the beginner chain hands over a stage the player has been sitting on since creation. The
+journal offers what nothing hands over - for most players the Quest Forge's approved drafts and
+nothing else - and where it used to print a list it now says where the rest come from, so the page
+still points somewhere.
+
+The rule is one frozenset of `source_key` families beside `visible_to`, and the gate holds it equal
+to the seeders in `app/rules/quests.py`, so a sixth roster fails
+`tests/python/unit/test_quests_reach_a_player.py` rather than quietly putting its quests back on the
+list. Nothing but presentation changed - no engine action, no schema, no content. The Discord
+harness is what found it, and it had a stale assertion of its own: it looked for "First Steps" in
+the journal, which was never a held quest and only ever sat under "Available", so rc.45's retirement
+of that orphan broke the one step that reads the page.
+
 **1.0.0** (rc.45) gives two quests a door, and makes a trade's rank worth sitting an examination for.
 
 `road_to_a_sect` was the second `first_steps`. rc.26 found that fault - a quest seeded on every boot,
