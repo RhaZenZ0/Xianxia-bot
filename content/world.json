@@ -30347,6 +30347,7 @@
     "name_template": "{character}'s Ascension Gate",
     "raise_cost_multiplier": 10,
     "npc_crossing_chance_percent": 6,
+    "npc_crossing_realm_reach": 2,
     "history_significance": 88,
     "npc_history_significance": 45,
     "quests": {

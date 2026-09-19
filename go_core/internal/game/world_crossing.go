@@ -31,9 +31,12 @@ package game
 // `array.use` beside the authored eight, pays the same fare in the same money,
 // converts through the same door - and, because it is ground the world can
 // stand on rather than a private teleport, the world's own people walk through
-// it too (`npcTravel`). The world boundary in `WhereAnNPCCanWalk` stays exactly
-// where it was: content roads still never leave a world. Only a gate somebody
-// tore open does.
+// it too (`npcTravel`) - but only the ones whose cultivation is near the
+// cultivator who tore it. A seam is cut to the measure of whoever survived the
+// storm that made it, and somebody far below that has no business in it; the
+// row carries `opened_realm_index` for exactly that comparison. The world
+// boundary in `WhereAnNPCCanWalk` stays exactly where it was: content roads
+// still never leave a world. Only a gate somebody tore open does.
 
 import (
 	"encoding/json"
@@ -238,6 +241,32 @@ type Crossing struct {
 	ToWorld       string
 	Name          string
 	MinRealmIndex int64
+	// OpenedRealmIndex is the cultivation of whoever tore the seam. An NPC
+	// walks through only if their own is near it - see `NPCMayCross`.
+	OpenedRealmIndex int64
+}
+
+// NPCMayCross is whether one of the world's own people can use a raised gate.
+//
+// Two conditions, and the second is the one that makes a gate personal. The
+// authored crossing's realm floor is what the road itself demands of anybody,
+// player or not. Beyond that, a seam is cut to the measure of the cultivator
+// who survived the storm that made it: `reach` is how many realms either side
+// of them still fits through. A village smith does not walk into the Spiritual
+// World because an Ascension-realm cultivator once tore the sky open over their
+// town.
+func NPCMayCross(crossing Crossing, realmIndex, reach int64) bool {
+	if crossing.Destination == "" || realmIndex < crossing.MinRealmIndex {
+		return false
+	}
+	if reach < 0 {
+		reach = 0
+	}
+	gap := realmIndex - crossing.OpenedRealmIndex
+	if gap < 0 {
+		gap = -gap
+	}
+	return gap <= reach
 }
 
 // OpenCrossings is every raised gate in the world, keyed by where it stands.
@@ -250,19 +279,21 @@ func OpenCrossings(conn *storage.Conn) (map[string]Crossing, error) {
 		return nil, nil
 	}
 	res, err := conn.Execute(
-		`SELECT location_key,destination_location,to_world,name,min_realm_index FROM world_crossings ORDER BY location_key`, nil)
+		`SELECT location_key,destination_location,to_world,name,min_realm_index,opened_realm_index
+		   FROM world_crossings ORDER BY location_key`, nil)
 	if err != nil {
 		return nil, err
 	}
 	out := map[string]Crossing{}
 	for _, row := range res.Rows {
-		if len(row) < 5 {
+		if len(row) < 6 {
 			continue
 		}
 		location := fmt.Sprint(row[0])
 		out[location] = Crossing{
 			Location: location, Destination: fmt.Sprint(row[1]), ToWorld: fmt.Sprint(row[2]),
 			Name: fmt.Sprint(row[3]), MinRealmIndex: storage.ParseInt(row[4]),
+			OpenedRealmIndex: storage.ParseInt(row[5]),
 		}
 	}
 	return out, nil
@@ -432,9 +463,13 @@ func ascensionGateAction(conn *storage.Conn, catalog worlddata.Catalog, userID i
 	}
 	name = strings.ReplaceAll(name, "{character}", c.Name)
 	now := nowSeconds()
-	if _, err = conn.Execute(`INSERT INTO world_crossings(location_key,name,from_world,to_world,destination_location,min_realm_index,cost,opened_by_user_id,opened_game_minute,player_uses,npc_uses,created_at)
-        VALUES(?,?,?,?,?,?,?,?,?,0,0,?)`,
-		[]any{c.Location, name, loc.World, gate.To, array.To, array.MinRealmIndex, array.Cost, userID, p.GameMinute, now}); err != nil {
+	// The cultivation the seam was cut at. Whoever tore it decides who else
+	// fits through it, and on either ladder: a body cultivator who survived the
+	// storm tore it at the realm that carried them (`accessRealmIndex`).
+	openedAt := c.accessRealmIndex()
+	if _, err = conn.Execute(`INSERT INTO world_crossings(location_key,name,from_world,to_world,destination_location,min_realm_index,opened_realm_index,cost,opened_by_user_id,opened_game_minute,player_uses,npc_uses,created_at)
+        VALUES(?,?,?,?,?,?,?,?,?,?,0,0,?)`,
+		[]any{c.Location, name, loc.World, gate.To, array.To, array.MinRealmIndex, openedAt, array.Cost, userID, p.GameMinute, now}); err != nil {
 		return authoritativeMutation{}, err
 	}
 	significance := catalog.WorldCrossing.HistorySignificance
@@ -454,7 +489,8 @@ func ascensionGateAction(conn *storage.Conn, catalog worlddata.Catalog, userID i
 	out := map[string]any{
 		"location": c.Location, "name": name, "from_world": loc.World, "to_world": gate.To,
 		"destination": array.To, "min_realm_index": array.MinRealmIndex, "fare": array.Cost,
-		"currency": currency, "cost": cost, "balance": balance, "array_id": crossingKey(c.Location),
+		"opened_realm_index": openedAt,
+		"currency":           currency, "cost": cost, "balance": balance, "array_id": crossingKey(c.Location),
 	}
 	return authoritativeMutation{Result: out, Event: eventledger.Event{
 		Domain: "travel", EventType: "ascension.gate", EntityType: "character",

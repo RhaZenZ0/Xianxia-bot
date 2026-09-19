@@ -42,6 +42,9 @@ const (
 	// The chance, per tick, that an NPC standing where a raised crossing
 	// stands is the one who walks through it, when the content does not say.
 	defaultNPCCrossingChance = 6
+	// How many realms either side of the cultivator who tore a seam still fit
+	// through it, when the content does not say.
+	defaultNPCCrossingRealmReach = 2
 )
 
 func travelChanceFor(profession string) int64 {
@@ -103,6 +106,10 @@ func (r *Runner) npcTravel(conn *storage.Conn, steps, gm int64) (int64, error) {
 	if crossingChance <= 0 {
 		crossingChance = defaultNPCCrossingChance
 	}
+	crossingReach := r.World.WorldCrossing.NPCCrossingRealmReach
+	if crossingReach <= 0 {
+		crossingReach = defaultNPCCrossingRealmReach
+	}
 	now := nowFloat()
 	moved := int64(0)
 	for _, row := range res.Rows {
@@ -138,12 +145,19 @@ func (r *Runner) npcTravel(conn *storage.Conn, steps, gm int64) (int64, error) {
 		// A raised crossing is a road, and it is the only road in the game
 		// that leaves a world - `WhereAnNPCCanWalk` refuses a destination in
 		// another world by construction, which is right for content roads and
-		// is exactly what a torn seam is an exception to. Somebody who steps
-		// through is a visitor: their `world_name` is unchanged, so the far
-		// side offers them no onward neighbours and the going-home roll brings
-		// them back. That is a journey through the gate and out again, which
-		// is what a gate is for.
-		if gate, standing := gates[current]; standing && realmIndex >= gate.MinRealmIndex && gate.Destination != "" {
+		// is exactly what a torn seam is an exception to.
+		//
+		// It is not a road for everybody standing on it. A seam is cut to the
+		// measure of the cultivator who survived the storm that made it
+		// (`game.NPCMayCross`), so the people who can follow them through are
+		// the ones whose own cultivation is near theirs - never the village
+		// smith who happened to be in the town that day.
+		//
+		// Somebody who does step through is a visitor: their `world_name` is
+		// unchanged, so the far side offers them no onward neighbours and the
+		// going-home roll brings them back. That is a journey through the gate
+		// and out again, which is what a gate is for.
+		if gate, standing := gates[current]; standing && game.NPCMayCross(gate, realmIndex, crossingReach) {
 			crossRoll, err := gamerng.Intn(100)
 			if err != nil {
 				return moved, err

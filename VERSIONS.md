@@ -33,9 +33,10 @@ the only anchored way up was one authored array in one capital. `ascension.gate`
 where the lightning fell - a permanent crossing at your own location, into the world the gate you
 survived opens onto, borrowing the authored crossing's terminus, fare and realm floor so nobody can
 tear open a cheaper road than the world already has. It is public ground: `array.use` resolves it
-beside the authored eight, and the world's own people walk through it, which is the one road in the
-game that leaves a world (`WhereAnNPCCanWalk` refuses another world by construction, and content
-roads still do). The tribulation hands over the quest authored for that crossing, through the same
+beside the authored eight, and the world's own people walk through it - the ones whose cultivation is
+near the cultivator who tore it, because a seam is cut to that measure and `npc_crossing_realm_reach`
+is how far either side of it still fits. It is the one road in the game that leaves a world
+(`WhereAnNPCCanWalk` refuses another world by construction, and content roads still do). The tribulation hands over the quest authored for that crossing, through the same
 `grantOrdinaryQuestTx` the beginner path uses - there is still no second quest mechanism, only a
 second thing that hands one over.
 
@@ -1847,7 +1848,9 @@ mechanical authority paths.
 - **Schema 28** added the Quest Forge definition table (`quest_definitions`).
 - **Schema 54** raised `world_crossings`, where a survived world-crossing tribulation leaves its
   mark. One row per gate a cultivator has anchored: where it stands, the two worlds it joins, the
-  terminus and fare it borrows from the authored crossing for that pair, and who tore it open.
+  terminus and fare it borrows from the authored crossing for that pair, who tore it open, and the
+  cultivation they tore it at - which is what decides which of the world's own people can follow
+  them through.
   Keyed on the location rather than on the opener, for the reason a robbed grave is keyed on its
   claim minute - `opened_by_user_id` anonymises on erasure, so keying meaning to it would let an
   erasure unmake a gate. The CREATE is the whole migration: no gate has ever stood anywhere, so

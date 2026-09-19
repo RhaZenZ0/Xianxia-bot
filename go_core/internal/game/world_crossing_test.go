@@ -300,6 +300,13 @@ func TestTheGateStandsWhereTheLightningFellAndBorrowsTheAuthoredRoad(t *testing.
 	if out["name"] != "Lin Test's Ascension Gate" {
 		t.Fatalf("the gate is named after whoever tore it: %+v", out)
 	}
+	// And cut to their measure, which is what decides who else fits through.
+	if i64(out["opened_realm_index"]) != 8 {
+		t.Fatalf("the seam records the cultivation it was cut at: %+v", out)
+	}
+	if realm := i64(actionScalar(t, path, `SELECT opened_realm_index FROM world_crossings WHERE location_key='Greenriver Town'`)); realm != 8 {
+		t.Fatalf("stored opened_realm_index=%d", realm)
+	}
 	// It is public: written where the world can see it, at a significance the
 	// Quest Forge can reach.
 	if significance := i64(actionScalar(t, path, `SELECT significance FROM world_history_events WHERE source_key='crossing_raised:Greenriver Town'`)); significance != 88 {

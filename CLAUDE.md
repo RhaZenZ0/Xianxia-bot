@@ -867,12 +867,17 @@ crossing at the character's own location, into the world the gate they survived 
 - **It is an ordinary array from then on.** `array.use` looks in the catalogue first and then at
   `crossing:<location>`, so a raised gate can never shadow an authored one, and both go through the same
   fare, the same `moveCharacterTx` and the same conversion.
-- **The world's own people walk through it.** This is the only road in the game that leaves a world:
-  `WhereAnNPCCanWalk` refuses a destination in another world by construction and still does, because
-  content roads are content. `npcTravel` loads every open crossing **once per tick** (single figures of
-  gates against 574 people) and offers the far side at `npc_crossing_chance_percent`. A crosser's
-  `world_name` is deliberately unchanged, so the far side offers them no onward neighbours and the
-  existing going-home roll brings them back: a visit through the gate and out again.
+- **The world's own people walk through it — the ones cut to its measure.** This is the only road in
+  the game that leaves a world: `WhereAnNPCCanWalk` refuses a destination in another world by
+  construction and still does, because content roads are content. `npcTravel` loads every open
+  crossing **once per tick** (single figures of gates against 574 people) and offers the far side at
+  `npc_crossing_chance_percent` — but only to somebody `game.NPCMayCross` admits. A seam is cut to the
+  cultivation of whoever survived the storm that made it (`opened_realm_index` on the row), and
+  `npc_crossing_realm_reach` (2) is how many realms either side of them still fit, on top of the
+  authored road's own floor. A village smith does not walk into the Spiritual World because an
+  Ascension-realm cultivator once tore the sky open over their town. A crosser's `world_name` is
+  deliberately unchanged, so the far side offers them no onward neighbours and the existing
+  going-home roll brings them back: a visit through the gate and out again.
 - **Keyed on `location_key`, never on who opened it** — `opened_by_user_id` anonymises on erasure
   (`erasureAnonymise`), exactly as `npc_graves.claimed_by_user_id` does, so an erasure cannot unmake a
   gate that other players and NPCs are using.

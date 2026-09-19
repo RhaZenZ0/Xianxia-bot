@@ -233,6 +233,7 @@ type WorldCrossingSystem struct {
 	NameTemplate           string                   `json:"name_template"`
 	RaiseCostMultiplier    int64                    `json:"raise_cost_multiplier"`
 	NPCCrossingChance      int64                    `json:"npc_crossing_chance_percent"`
+	NPCCrossingRealmReach  int64                    `json:"npc_crossing_realm_reach"`
 	HistorySignificance    int64                    `json:"history_significance"`
 	NPCHistorySignificance int64                    `json:"npc_history_significance"`
 	Quests                 map[string]CrossingQuest `json:"quests"`
