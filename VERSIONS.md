@@ -6,6 +6,42 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.0** (rc.54) gives the upper worlds somewhere to go, and something to bring back.
+
+Eight secret realms covered thirty-two realms of cultivation, and they were not spread evenly: the
+Mortal World had four, the Spiritual two, and the Immortal and Celestial Worlds **one each**. One
+place served all eight realms of Immortal cultivation. Five new realms make it four, three, three,
+three - and **not one new location was written**, because the world already had the ground: every
+world carries three `road_site: "ruin"` legs and only one or two had anything under them. Last
+Lantern Ruin, Ash Gate Ruin, Cracked Altar Ruin, Buried Court Ruin and Nine Pillar Ruin were
+authored places with nothing in them, which is the shape `/learn` (rc.43), the quest journal
+(rc.46), the event bands (rc.49) and the peach (rc.50) all had.
+
+Each realm is built from what its ruin already says. The TN and reward ladders are read off the
+realms each world already had (Spiritual 16-22, Immortal 19-25, Celestial 22-28, +2 a room), the
+room drops are existing tier items, and the floors mirror the Mortal spread so the rc.53 ceiling
+leaves a wide window. One inheritance and one opening event apiece, at the flat weight rc.53 set.
+
+**And what you bring back is kept.** `ItemUse.DurationGameMinutes` has meant "0 does not expire"
+since v0.21.0 - the writer stores NULL and every reader is `ends_game_minute IS NULL OR
+ends_game_minute > ?` - and **no item in the catalogue had ever set it**: every effect the game
+shipped ran 120 to 360 minutes. Each new realm's last room can yield one treasure granting **+1 to
+the attribute that room's own trial tested**, permanently, so what the realm asked of you is what it
+leaves you better at. One point, not three, because it never wears off, and it feeds
+`canonicalAttribute`, which is the basis of every scene check, craft roll and trial in the game.
+
+They are rare finds in rc.50's sense, in the last room, ordered against the two already placed - the
+peach at 12,000 for 6% and the ring at 40,000 for 4% - so the dearer find is the rarer one, which
+rc.53's gate holds. All five are `auction_interest: legendary` with a door risk, so a player who
+would rather sell one than drink it feeds the system rc.50 first lit.
+
+`permanent_treasure_test.go` drives a use and reads the row back a world-year later; its drill is the
+trap the field invites - a writer that stores `0` instead of NULL reads as expired the instant it is
+drunk, and the test fails with `ends_game_minute is 1000, not NULL`. The content gate holds the
+shape: permanent, one modifier, +1, an attribute the engine actually rolls, and matching the trial.
+**The gate caught its own author** - the realm script wrote `max_realm_index: null` on the two
+Celestial events instead of omitting the key, and rc.53's ceiling test failed on it.
+
 **1.0.0** (rc.53) settles where a secret realm's band belongs, and stops the shallow ones crowding
 out the deep.
 

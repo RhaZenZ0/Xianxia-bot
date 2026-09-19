@@ -182,5 +182,60 @@ class ARareFindIsShapedLikeTheRosterItCopies(unittest.TestCase):
         self.assertIn("secret_realm.explore", source, "the gate stopped driving the real action")
 
 
+class ARealmsTreasureIsKept(unittest.TestCase):
+    """v1.0.0-rc.54. The five upper-world realms each hold one find in their last
+    room that grants **+1 to the attribute that room's own trial tests**, for
+    good. `duration_game_minutes: 0` means "does not expire" - the writer stores
+    NULL and every reader is `ends_game_minute IS NULL OR ends_game_minute > ?` -
+    and until now **no item in the catalogue set it**: every effect the game
+    shipped ran 120 to 360 minutes. The behavioural half is
+    `permanent_treasure_test.go`, which drives a use and reads the row back a
+    world-year later; this holds the shape of the content it reads.
+    """
+
+    def _treasures(self):
+        for realm_id, realm in WORLD["secret_realms"].items():
+            for item, spec in (realm["rooms"][-1].get("rare_items") or {}).items():
+                use = ITEMS[item].get("use") or {}
+                if use.get("effect"):
+                    yield realm_id, realm, item, spec, use
+
+    def test_there_are_treasures_to_check(self):
+        self.assertGreaterEqual(len(list(self._treasures())), 5, "the realm treasures went missing")
+
+    def test_each_is_permanent_rather_than_a_long_pill(self):
+        for realm_id, _realm, item, _spec, use in self._treasures():
+            with self.subTest(realm=realm_id, item=item):
+                self.assertEqual(int(use.get("duration_game_minutes") or 0), 0,
+                                 "a treasure that expires is a pill with a better price")
+
+    def test_each_grants_one_point_of_the_attribute_its_trial_tested(self):
+        """Stated once, so the prize and the trial cannot drift: what the last
+        room asked of you is what the realm leaves you better at."""
+        for realm_id, realm, item, _spec, use in self._treasures():
+            with self.subTest(realm=realm_id, item=item):
+                mods = use["effect"].get("modifiers") or []
+                self.assertEqual(len(mods), 1, "one modifier, so the prize reads in one line")
+                mod = mods[0]
+                self.assertEqual(mod["stat"], realm["rooms"][-1]["attribute"])
+                self.assertEqual(mod["operation"], "add")
+                self.assertEqual(mod["value"], 1, "permanent, so it is one point and not three")
+
+    def test_the_attribute_is_one_the_engine_actually_rolls(self):
+        """A modifier on an invented stat is decoration: `applyStatModifiers` is
+        reached with a canonical attribute name and with nothing else."""
+        canonical = {"body", "agility", "spirit", "will", "insight", "presence"}
+        for realm_id, _realm, item, _spec, use in self._treasures():
+            with self.subTest(realm=realm_id, item=item):
+                self.assertIn(use["effect"]["modifiers"][0]["stat"], canonical)
+
+    def test_each_is_worth_taking_to_an_auction(self):
+        for realm_id, _realm, item, _spec, _use in self._treasures():
+            with self.subTest(realm=realm_id, item=item):
+                self.assertEqual(ITEMS[item].get("auction_interest"), "legendary")
+                self.assertGreater(int(ITEMS[item].get("door_event_chance") or 0), 0,
+                                   "a legendary lot with no door risk never fires the system that reads it")
+
+
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()

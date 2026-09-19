@@ -1322,6 +1322,36 @@ passed. A grep cannot see a disabled condition. `beginner_events_test.go` hands 
 severity-10 event and asserts it is not offered, and fails with the whole map when the condition is
 disabled; Python keeps only the one thing it can honestly check, that the Go half still exists.
 
+### Somewhere to go above the Mortal World (v1.0.0-rc.54)
+
+Eight realms covered thirty-two realms of cultivation, four of them in the Mortal World and **one
+each in the Immortal and Celestial**. Five new ones make it 4/3/3/3, and **no new location was
+written**: every world carries three `road_site: "ruin"` legs and only one or two had anything under
+them, so Last Lantern, Ash Gate, Cracked Altar, Buried Court and Nine Pillar were authored ground
+with nothing on it. The ladders are read off each world's existing realms rather than invented
+(Spiritual 16-22, Immortal 19-25, Celestial 22-28, +2 a room), the drops are existing tier items,
+and the floors mirror the Mortal spread so rc.53's ceiling leaves a wide window.
+
+**The treasures are the first permanent effects in the game.**
+`ItemUse.DurationGameMinutes` has meant "0 does not expire" since v0.21.0 - the writer leaves `ends`
+nil so the column is NULL, and every reader is `ends_game_minute IS NULL OR ends_game_minute > ?` -
+and no item had ever set it. Each new realm's last room can yield one find granting **+1 to the
+attribute that room's own trial tested**, for good: what the realm asked of you is what it leaves you
+better at, stated once so the prize and the trial cannot drift. One point rather than three, because
+it never wears off, and it lands in `canonicalAttribute`, the basis of every scene check, craft roll
+and trial.
+
+They sit in the rc.50 `rare_items` slot, ordered against the peach (12,000 → 6%) and the ring
+(40,000 → 4%) so the dearer is the rarer, and all five are legendary with a door risk, so selling
+one rather than drinking it feeds the auction-door system.
+
+**The trap the field invites is worth knowing**: a writer that stored `0` rather than NULL would make
+every treasure expire the instant it was used, and nothing would error.
+`permanent_treasure_test.go` drives a real use, asserts the column is NULL, and reads the modifier
+back a world-year later; its drill fails with `ends_game_minute is 1000, not NULL`. And the content
+gate caught its own author - the authoring script wrote `max_realm_index: null` on the two Celestial
+events instead of omitting the key, and rc.53's ceiling test refused it.
+
 ### Where a secret realm's band belongs (v1.0.0-rc.53)
 
 `eligibleUnexpectedEvents` has a **second branch** for `kind: "secret_realm"`, and it is the reason
