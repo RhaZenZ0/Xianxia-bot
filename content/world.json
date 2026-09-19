@@ -27203,6 +27203,7 @@
       "weight": 4,
       "duration_hours": 2,
       "severity": 5,
+      "min_realm_index": 1,
       "description": "The local spiritual currents overturn without warning, making cultivation dangerous but unusually rich.",
       "consequence_text": "Spirit resources swell while unstable currents unsettle settlements and local markets.",
       "world_effect": {
@@ -27234,6 +27235,7 @@
       "weight": 3,
       "duration_hours": 3,
       "severity": 3,
+      "min_realm_index": 0,
       "description": "A rare medicinal plant matures early under a brief heaven-and-earth phenomenon.",
       "consequence_text": "Medicinal abundance draws gatherers, raises resource prosperity, and temporarily shifts herb demand.",
       "world_effect": {
@@ -27296,6 +27298,7 @@
       "weight": 3,
       "duration_hours": 2,
       "severity": 6,
+      "min_realm_index": 2,
       "description": "Spirit beasts flee through the region in numbers, suggesting something stronger is moving behind them.",
       "consequence_text": "Fleeing beasts strain roads and food stores while beast materials enter local trade.",
       "world_effect": {
@@ -27366,6 +27369,7 @@
       "weight": 2,
       "duration_hours": 4,
       "severity": 6,
+      "min_realm_index": 2,
       "description": "Golden clouds split as a sealed treasure falls from the heavens. Cultivators, clans, and hidden experts converge before anyone can identify it.",
       "consequence_text": "Spirit resources rise, but treasure-seekers destabilize the area and drive up demand.",
       "world_effect": {
@@ -27400,6 +27404,7 @@
       "weight": 4,
       "duration_hours": 6,
       "severity": 3,
+      "min_realm_index": 0,
       "worlds": [
         "Mortal World",
         "Spiritual World"
@@ -27439,6 +27444,7 @@
       "weight": 2,
       "duration_hours": 8,
       "severity": 9,
+      "min_realm_index": 4,
       "worlds": [
         "Mortal World",
         "Spiritual World"
@@ -27488,6 +27494,7 @@
       "weight": 3,
       "duration_hours": 3,
       "severity": 7,
+      "min_realm_index": 3,
       "description": "A nearby breakthrough summons layered heavenly lightning. Every bolt scars the land and enriches the surviving spirit currents.",
       "consequence_text": "Security falls around the strike zone while damaged terrain becomes unusually rich in spiritual energy.",
       "world_effect": {
@@ -27520,6 +27527,7 @@
       "weight": 2,
       "duration_hours": 6,
       "severity": 7,
+      "min_realm_index": 3,
       "worlds": [
         "Mortal World",
         "Spiritual World"
@@ -27563,6 +27571,7 @@
       "weight": 5,
       "duration_hours": 3,
       "severity": 5,
+      "min_realm_index": 1,
       "locations": [
         "Golden Pavilion Auction House"
       ],
@@ -27671,6 +27680,7 @@
       "weight": 4,
       "duration_hours": 8,
       "severity": 4,
+      "min_realm_index": 1,
       "worlds": [
         "Mortal World",
         "Spiritual World"
@@ -27731,6 +27741,7 @@
       "weight": 2,
       "duration_hours": 5,
       "severity": 6,
+      "min_realm_index": 2,
       "description": "A burning object crashes beyond the horizon. Within the crater may be an artifact, corpse, egg, sealed remnant, or imprisoned being.",
       "consequence_text": "The impact enriches spirit resources but damages security and draws treasure hunters.",
       "world_effect": {
@@ -27804,6 +27815,7 @@
       "weight": 1,
       "duration_hours": 12,
       "severity": 10,
+      "min_realm_index": 5,
       "worlds": [
         "Mortal World",
         "Spiritual World"
@@ -27851,6 +27863,7 @@
       "weight": 2,
       "duration_hours": 4,
       "severity": 5,
+      "min_realm_index": 1,
       "description": "Nine-colored clouds, golden lotuses, divine music, and impossible stars announce that someone nearby achieved an absurd breakthrough.",
       "consequence_text": "The phenomenon enriches local qi and attracts cultivators, merchants, and sect scouts.",
       "world_effect": {
@@ -27916,6 +27929,7 @@
       "weight": 1,
       "duration_hours": 3,
       "severity": 6,
+      "min_realm_index": 2,
       "description": "A damaged formation creates a pocket where hours outside feel like years of meditation inside, though memory and qi strain remain real.",
       "consequence_text": "The formation enriches local spatial qi; participants can claim a temporary cultivation afterglow once.",
       "world_effect": {
@@ -27960,6 +27974,7 @@
       "weight": 1,
       "duration_hours": 10,
       "severity": 9,
+      "min_realm_index": 4,
       "worlds": [
         "Mortal World",
         "Spiritual World"
@@ -27999,6 +28014,7 @@
       "weight": 1,
       "duration_hours": 8,
       "severity": 10,
+      "min_realm_index": 5,
       "description": "A true dragon descends through the clouds. Its intent is unreadable, its presence crushes weaker beasts, and it is very much not necessarily friendly.",
       "consequence_text": "The dragon's aura disrupts security and trade while awakening nearby spirit veins.",
       "world_effect": {
@@ -28051,6 +28067,7 @@
       "weight": 2,
       "duration_hours": 5,
       "severity": 4,
+      "min_realm_index": 1,
       "description": "A ridiculously talented young cultivator arrives, shatters local records, attracts every sect's attention, and immediately becomes everyone's political problem.",
       "consequence_text": "Sect recruitment and doctrine pressure rise as factions compete to claim or contain the prodigy.",
       "world_effect": {
@@ -28167,6 +28184,7 @@
       "weight": 4,
       "duration_hours": 10,
       "severity": 2,
+      "min_realm_index": 0,
       "description": "Cultivators gather for trading, poetry, music, drinking, friendly competitions, matchmaking, and the statistically inevitable trouble.",
       "consequence_text": "The festival improves prosperity and security while increasing trade, demand, and sect recruitment.",
       "world_effect": {
@@ -28242,6 +28260,146 @@
       "weight": 2,
       "secret_realm_id": "hollow_throne_vault",
       "description": "The ground under the ruin shifts and Hollow Throne Vault is reachable for a while."
+    },
+    {
+      "id": "spilled_caravan",
+      "title": "A Caravan Goes Over",
+      "category": "Local Trouble",
+      "kind": "world_event",
+      "weight": 4,
+      "duration_hours": 3,
+      "severity": 1,
+      "min_realm_index": 0,
+      "max_realm_index": 2,
+      "description": "A mule-cart has shed a wheel and half its load down the bank outside town, and the driver cannot lift any of it alone.",
+      "consequence_text": "Goods scattered on the road; the town's stalls are short until it is gathered up.",
+      "world_effect": {
+        "history": "A caravan went over outside the settlement and the load was recovered by hand.",
+        "region": {
+          "prosperity": 1,
+          "security": 0,
+          "spirit_resources": 0,
+          "unrest": -1
+        }
+      },
+      "player_reward": {
+        "cultivation": 4,
+        "spirit_stones": 3,
+        "insight_xp": 2,
+        "items": {}
+      }
+    },
+    {
+      "id": "terrace_break",
+      "title": "The Terraces Break",
+      "category": "Local Trouble",
+      "kind": "world_event",
+      "weight": 3,
+      "duration_hours": 4,
+      "severity": 2,
+      "min_realm_index": 0,
+      "max_realm_index": 2,
+      "description": "An irrigation channel above the spirit-rice terraces has given way a fortnight before harvest, and the water is going the wrong way.",
+      "consequence_text": "A season's rice hangs on how fast the channel is packed and turned.",
+      "world_effect": {
+        "history": "An irrigation break above the terraces was closed before the harvest was lost.",
+        "region": {
+          "prosperity": 1,
+          "security": 0,
+          "spirit_resources": 0,
+          "unrest": -1
+        }
+      },
+      "player_reward": {
+        "cultivation": 4,
+        "spirit_stones": 3,
+        "insight_xp": 2,
+        "items": {}
+      }
+    },
+    {
+      "id": "lantern_night",
+      "title": "Lantern Night",
+      "category": "Local Trouble",
+      "kind": "world_event",
+      "weight": 4,
+      "duration_hours": 6,
+      "severity": 1,
+      "min_realm_index": 0,
+      "max_realm_index": 2,
+      "description": "The settlement's lantern festival is tonight: paper, glue, a great many small jobs, and every family out in the street.",
+      "consequence_text": "Spirits lift, the stalls do a month's trade in an evening, and nothing is threatened by anything.",
+      "world_effect": {
+        "history": "The settlement held its lantern night and the streets were full until dawn.",
+        "region": {
+          "prosperity": 1,
+          "security": 0,
+          "spirit_resources": 0,
+          "unrest": -1
+        }
+      },
+      "player_reward": {
+        "cultivation": 4,
+        "spirit_stones": 3,
+        "insight_xp": 2,
+        "items": {}
+      }
+    },
+    {
+      "id": "granary_beast",
+      "title": "Something in the Granary",
+      "category": "Local Trouble",
+      "kind": "world_event",
+      "weight": 3,
+      "duration_hours": 3,
+      "severity": 2,
+      "min_realm_index": 0,
+      "max_realm_index": 2,
+      "description": "Something got into the grain stores in the night and is still in there, frightened and cornered and eating.",
+      "consequence_text": "The stores are open until somebody goes in after it.",
+      "world_effect": {
+        "history": "A stray spirit-beast was driven out of the granary before the stores were lost.",
+        "region": {
+          "prosperity": 1,
+          "security": 0,
+          "spirit_resources": 0,
+          "unrest": -1
+        }
+      },
+      "player_reward": {
+        "cultivation": 4,
+        "spirit_stones": 3,
+        "insight_xp": 2,
+        "items": {}
+      }
+    },
+    {
+      "id": "travelling_physician",
+      "title": "The Travelling Physician",
+      "category": "Local Trouble",
+      "kind": "world_event",
+      "weight": 3,
+      "duration_hours": 5,
+      "severity": 1,
+      "min_realm_index": 0,
+      "max_realm_index": 2,
+      "description": "A physician has set up under the awning by the well and is treating whoever comes, for nothing, until her herbs run out.",
+      "consequence_text": "The sick are seen; her satchel empties faster than she expected.",
+      "world_effect": {
+        "history": "A travelling physician held a free clinic at the settlement until her herbs ran out.",
+        "region": {
+          "prosperity": 1,
+          "security": 0,
+          "spirit_resources": 0,
+          "unrest": -1
+        }
+      },
+      "player_reward": {
+        "cultivation": 4,
+        "spirit_stones": 3,
+        "insight_xp": 2,
+        "items": {}
+      }
     }
   ],
   "body_realms": [
@@ -63888,6 +64046,123 @@
             "want": "Find who opened the crate.",
             "fear": "That it was one of his own.",
             "descriptor": "A guard captain checking the cellar door hinges, jaw set."
+          }
+        ]
+      },
+      "Local Trouble": {
+        "objective": "Somebody's ordinary week has gone wrong. Help, or do not.",
+        "nodes": [
+          {
+            "key": "lend_a_hand",
+            "type": "task",
+            "name": "Lend a Hand",
+            "descriptor": "No technique required. Somebody has to carry the other end.",
+            "count": [
+              2,
+              5
+            ],
+            "rank_bonus": 0,
+            "tn": 10,
+            "attribute": "body",
+            "item": "",
+            "item_qty": 0,
+            "cultivation": 3,
+            "spirit_stones": 2,
+            "contribution": 1
+          },
+          {
+            "key": "ask_around",
+            "type": "task",
+            "name": "Ask Around",
+            "descriptor": "Everyone here knows a piece of it and nobody has put them together.",
+            "count": [
+              2,
+              4
+            ],
+            "rank_bonus": 0,
+            "tn": 11,
+            "attribute": "insight",
+            "item": "",
+            "item_qty": 0,
+            "cultivation": 3,
+            "spirit_stones": 1,
+            "contribution": 2
+          },
+          {
+            "key": "trampled_herb",
+            "type": "herb",
+            "name": "Trampled Spirit-Herb",
+            "descriptor": "Knocked flat in the commotion. Still worth lifting.",
+            "count": [
+              1,
+              4
+            ],
+            "rank_bonus": 0,
+            "tn": 11,
+            "attribute": "insight",
+            "item": "@herb",
+            "item_qty": 1,
+            "cultivation": 2,
+            "spirit_stones": 0,
+            "contribution": 1
+          },
+          {
+            "key": "spilled_ore",
+            "type": "ore",
+            "name": "Spilled Ore",
+            "descriptor": "Off the back of a cart and down the bank, a handful at a time.",
+            "count": [
+              1,
+              3
+            ],
+            "rank_bonus": 0,
+            "tn": 12,
+            "attribute": "body",
+            "item": "@ore",
+            "item_qty": 1,
+            "cultivation": 2,
+            "spirit_stones": 1,
+            "contribution": 1
+          },
+          {
+            "key": "stray_beast",
+            "type": "beast",
+            "name": "Stray Spirit-Beast",
+            "descriptor": "Frightened, cornered, and the size of a large dog. It is not a tribulation.",
+            "count": [
+              1,
+              2
+            ],
+            "rank_bonus": 0,
+            "tn": 12,
+            "attribute": "body",
+            "item": "@core",
+            "item_qty": 1,
+            "cultivation": 4,
+            "spirit_stones": 2,
+            "contribution": 2
+          }
+        ],
+        "npcs": [
+          {
+            "key": "headman",
+            "title": "Village Headman",
+            "role": "Knows what is wrong and has nobody spare to fix it",
+            "personality": "Tired, practical, embarrassed to be asking a cultivator for anything.",
+            "speech": "Plain, apologetic, gets to the point once he trusts you.",
+            "want": "The week back the way it was.",
+            "fear": "Asking too much of somebody who could level the place.",
+            "descriptor": "A man in good plain clothes doing a job three people should be doing."
+          },
+          {
+            "key": "child",
+            "title": "Local Child",
+            "role": "Saw the whole thing and will tell anyone who stands still",
+            "personality": "Fearless, over-helpful, entirely certain of details that are wrong.",
+            "speech": "Fast, breathless, mostly accurate.",
+            "want": "To be the one who found the cultivator.",
+            "fear": "Being sent home before the interesting part.",
+            "descriptor": "A child keeping pace with you and narrating."
           }
         ]
       }

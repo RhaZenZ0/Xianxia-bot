@@ -1289,6 +1289,39 @@ RAG and the world really does not know who did it. A killing is always `public` 
 the summary is what says whether the culprit is named. Making NPC crime prosecutable would be a
 schema change and is a separate decision — do not add it casually.
 
+### What the first hour is allowed to meet (v1.0.0-rc.49)
+
+`UnexpectedEvent` has carried `min_realm_index` and `max_realm_index` since the roster was written,
+and `eligibleUnexpectedEvents` has filtered on both — so the filter ran on every draw and **excluded
+nobody**, because all forty-four events left both unset. A cultivator three minutes old, with
+attributes of 1 to 3, drew from the same pool as a Nascent Soul elder: fifteen of the eighteen world
+events are severity 4 or higher, and `A Dragon Appears` was as drawable at Body Tempering as the
+village festival. The mechanism was built, complete and correct, and no content used it — the same
+fault as `/learn` and the quest journal, and the fix is content because the code was never the
+problem.
+
+**A floor, by severity.** How bad a thing is decides how far along you have to be for it to turn up
+in front of you: severity ≤3 from realm 0, 4–5 from 1, 6 from 2, 7–8 from 3, 9 from 4, 10 from 5.
+One rule, stated once, and `test_beginner_world_events.py` holds every event's floor against it.
+
+**A band to draw from, because gating alone leaves three.** `Local Trouble` is five village-scale
+events — a caravan over the bank, an irrigation break before harvest, lantern night, something in the
+granary, a travelling physician's free clinic — at severity 1–2 with `max_realm_index: 2`, so they
+fade once a cultivator could end them by standing still. Their site's nodes are TN 10–12 against the
+`tn + max(0, severity-2)/2` the engage roll uses, which a fresh character clears 55–79% of the time;
+the gate computes that from the content rather than trusting the numbers look small.
+
+**The floor gates the player-triggered draw only.** The autonomous batch still puts a Demon Invasion
+wherever the world wants one, and a beginner can walk into it — being caught in something is not the
+same as being handed it. That asymmetry is the design, not an oversight.
+
+**The mechanism check had to be behavioural, and the drill is what proved it.** The Python gate first
+asserted that `eligibleUnexpectedEvents`'s body contained `c.RealmIndex < e.MinRealmIndex`; changing
+that line to `if false && c.RealmIndex < e.MinRealmIndex` left the substring in place and the check
+passed. A grep cannot see a disabled condition. `beginner_events_test.go` hands a realm-0 character a
+severity-10 event and asserts it is not offered, and fails with the whole map when the condition is
+disabled; Python keeps only the one thing it can honestly check, that the Go half still exists.
+
 ### World events and their sites
 
 A world event is a row in `world_events` (category, severity, location, expiry) plus a **site**:

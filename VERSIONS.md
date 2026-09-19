@@ -6,6 +6,34 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.0** (rc.49) gives the first hour world events it can actually take part in.
+
+`UnexpectedEvent` has carried `min_realm_index` and `max_realm_index` since the roster was written,
+and `eligibleUnexpectedEvents` has filtered on both - so the filter ran on every draw and excluded
+nobody, because all forty-four events left both unset. A cultivator three minutes old, with
+attributes of 1 to 3, drew from the same pool as a Nascent Soul elder: fifteen of the eighteen world
+events are severity 4 or higher, and `A Dragon Appears` was as drawable at Body Tempering as the
+village festival. The mechanism was built, complete and correct, and no content used it - the same
+fault as `/learn` and the quest journal, three releases running, and the fix is content because the
+code was never the problem.
+
+Two halves, because either alone is worse than nothing. A floor by severity, one rule stated once:
+severity 3 and under from the start, 10 only from Soul Formation. And a band worth drawing from,
+because gating the old roster alone would have shown a beginner the same three events forever -
+`Local Trouble` is five village-scale events (a caravan over the bank, an irrigation break before
+harvest, lantern night, something in the granary, a physician's free clinic) whose site is TN 10-12,
+which a fresh character clears 55 to 79 percent of the time. They carry a ceiling as well as a floor,
+so they fade once a cultivator could end them by standing still.
+
+The floor gates the player-triggered draw only. The autonomous batch still puts a Demon Invasion
+wherever the world wants one and a beginner can walk into it: being caught in something is not the
+same as being handed it.
+
+One thing worth keeping, and it is the second release running it has come up: the gate's mechanism
+check was a source grep, and the drill passed when it should have failed. Asserting the draw's body
+contains `c.RealmIndex < e.MinRealmIndex` survives that line becoming `if false && ...`. The
+behavioural half is in Go now, where the function can be called.
+
 **1.0.0** (rc.48) stops the engine taking a caller's word for what time it is - the last thing one
 could still tell it, and the open Authority item on the punch list.
 
