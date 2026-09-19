@@ -110,25 +110,15 @@ func elementRelationDefinition(catalog worlddata.Catalog, key string) worlddata.
 	return worlddata.ElementRelation{Mult: 1, Label: key}
 }
 
-// rootGradeRank is where a spiritual root's grade sits in the content's ladder.
-func rootGradeRank(catalog worlddata.Catalog, grade string) int {
-	for rank, definition := range catalog.SpiritualRootSystem.Grades {
-		if definition.Name == grade {
-			return rank
-		}
-	}
-	return 0
-}
-
-// rootAbsorptionBonus is what the root itself is worth, whatever it is
-// absorbing: a better grade and a purer root take in more of anything.
-func rootAbsorptionBonus(catalog worlddata.Catalog, root SpiritualRootState) float64 {
-	system := catalog.ElementalQi
-	bonus := 1.0
-	bonus += system.GradeBonusPerRank * float64(rootGradeRank(catalog, root.Grade))
-	bonus += system.PurityBonusAtFull * float64(clampI64(int64(root.Purity), 0, 100)) / 100.0
-	return bonus
-}
+// What the root itself is worth used to be computed here too, as
+// `rootAbsorptionBonus`: a grade term at 0.02 a rung plus a purity term, folded
+// into the relation's multiplier. Both were the root's business rather than the
+// cycle's, and the grade term was a second, flatter statement of a ladder
+// `spiritual_root_system` already authored. Since v1.0.0-rc.55 they are
+// `rootWorthMultiplier`, a term of the session in its own right, and what is
+// left here is the relation and nothing else - so `element_mult` is exactly 1
+// when a root is indifferent to what it draws, which is what the surface has
+// always claimed by declining to print a line for it.
 
 // elementalAbsorption is the whole of it for one cultivator and one method:
 // the relation their root has with its element, what that is worth, and what
@@ -157,7 +147,7 @@ func absorptionFor(catalog worlddata.Catalog, root SpiritualRootState, manualEle
 		out.Relation, out.Label, out.Note, out.Surcharge = relationNeutral, elementRelationDefinition(catalog, relationNeutral).Label, "", 0
 		return out
 	}
-	out.Mult = round4(definition.Mult * rootAbsorptionBonus(catalog, root))
+	out.Mult = round4(definition.Mult)
 	if len(root.Elements) > 0 {
 		out.RootPhase = elementPhase(catalog, root.Elements[0])
 	}

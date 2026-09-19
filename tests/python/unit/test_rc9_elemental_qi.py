@@ -88,8 +88,14 @@ class TheCatalogueCarriesTheElements(unittest.TestCase):
         self.assertGreater(relations["clashing"]["deviation_surcharge_percent"], 0)
         for key in ("resonant", "generative", "neutral", "drained"):
             self.assertEqual(relations[key].get("deviation_surcharge_percent", 0), 0, key)
-        self.assertGreater(system["grade_bonus_per_rank"], 0)
-        self.assertGreater(system["purity_bonus_at_full"], 0)
+        # What the root itself is worth left this system at v1.0.0-rc.55: a
+        # grade term that restated a ladder `spiritual_root_system` already
+        # authored, and a purity term that was never the cycle's business.
+        # This system is the relation between a root's elements and a method's,
+        # and nothing else. test_root_grade_is_worth_something.py owns the rest.
+        self.assertNotIn("grade_bonus_per_rank", system)
+        self.assertNotIn("purity_bonus_at_full", system)
+        self.assertGreater(WORLD["spiritual_root_system"]["purity_bonus_at_full"], 0)
 
 
 class TheEngineReadsThem(unittest.TestCase):
@@ -101,8 +107,18 @@ class TheEngineReadsThem(unittest.TestCase):
         # below. A name a test keeps alive is not the same as a rule the
         # engine owns, which is the thing this is here to assert.
         for symbol in ("func elementPhase(", "func elementRelation(",
-                       "func bestElementRelation(", "func rootAbsorptionBonus(", "func absorptionFor("):
+                       "func bestElementRelation(", "func absorptionFor("):
             self.assertIn(symbol, GO_ELEMENTS, symbol)
+        # rootAbsorptionBonus was on this list until v1.0.0-rc.55 and is gone
+        # with the two terms it summed. The multiplier absorptionFor hands back
+        # is the relation's own figure now, which is what lets the surface go
+        # on declining to print a line for an indifferent element.
+        # The declaration, not the word: the file still names it in the
+        # paragraph explaining where it went, and that history is worth
+        # keeping. What must be gone is the function.
+        self.assertNotIn("func rootAbsorptionBonus(", GO_ELEMENTS)
+        self.assertNotIn("rootAbsorptionBonus(catalog", GO_ELEMENTS)
+        self.assertIn("out.Mult = round4(definition.Mult)", GO_ELEMENTS)
         self.assertIn("relationResonant   = \"resonant\"", GO_ELEMENTS)
         self.assertIn("relationClashing   = \"clashing\"", GO_ELEMENTS)
 
@@ -110,7 +126,10 @@ class TheEngineReadsThem(unittest.TestCase):
         self.assertIn("absorption := absorptionFor(catalog, bundle.Root, manualElement)", GO_ACTIONS)
         self.assertIn("elementMult := absorption.Mult", GO_ACTIONS)
         self.assertIn("if body {\n\t\telementMult = 1\n\t}", GO_ACTIONS)
-        self.assertIn("* manualMult * elementMult))", GO_ACTIONS)
+        # v1.0.0-rc.55 appended the root's own worth to the product, on both
+        # paths - the body carve-out above is about elements, and a grade is
+        # not an element.
+        self.assertIn("* manualMult * elementMult * rootMult))", GO_ACTIONS)
         # A clash can turn on its own, whatever the stance.
         self.assertIn('"cultivation", "element_clash", p.GameMinute', GO_ACTIONS)
         self.assertIn("absorption.Surcharge > 0", GO_ACTIONS)

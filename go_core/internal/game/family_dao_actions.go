@@ -553,14 +553,22 @@ func seclusionStartActionGo(conn *storage.Conn, catalog worlddata.Catalog, userI
 	if e != nil {
 		return authoritativeMutation{}, e
 	}
-	projected := seclusionDailyGainGo(catalog, c, p.Mode, environmentMult, soulCultivationMultGo(conn, userID))
+	carried := loadSeclusionCarried(conn, catalog, userID, p.GameMinute, p.Mode)
+	projected := seclusionDailyGainGo(catalog, c, p.Mode, environmentMult, soulCultivationMultGo(conn, userID), carried.product())
 	end := p.GameMinute + p.DurationGameMinutes
 	now := nowSeconds()
 	_, e = conn.Execute(`INSERT INTO seclusion_sessions(user_id,mode,started_game_minute,ends_game_minute,last_settled_game_minute,start_location,environment_mult,accumulated_gain,status,ended_reason,created_at,updated_at) VALUES(?,?,?,?,?,?,?,0,'active','',?,?) ON CONFLICT(user_id) DO UPDATE SET mode=excluded.mode,started_game_minute=excluded.started_game_minute,ends_game_minute=excluded.ends_game_minute,last_settled_game_minute=excluded.last_settled_game_minute,start_location=excluded.start_location,environment_mult=excluded.environment_mult,accumulated_gain=0,status='active',ended_reason='',created_at=excluded.created_at,updated_at=excluded.updated_at`, []any{userID, p.Mode, p.GameMinute, end, p.GameMinute, p.Location, environmentMult, now, now})
 	if e != nil {
 		return authoritativeMutation{}, e
 	}
-	out := map[string]any{"mode": p.Mode, "started_game_minute": p.GameMinute, "ends_game_minute": end, "last_settled_game_minute": p.GameMinute, "start_location": p.Location, "environment_mult": environmentMult, "environment": environment, "projected_daily_gain": projected, "status": "active"}
+	out := map[string]any{"mode": p.Mode, "started_game_minute": p.GameMinute, "ends_game_minute": end, "last_settled_game_minute": p.GameMinute, "start_location": p.Location, "environment_mult": environmentMult, "environment": environment, "projected_daily_gain": projected, "status": "active",
+		// v1.0.0-rc.55: what the retreat will carry, named so the projection
+		// can be explained rather than merely stated.
+		"carried_mult": carried.product(), "effect_mult": carried.Effect,
+		"era_name": carried.EraName, "era_mult": carried.Era,
+		"manual_name": carried.ManualName, "manual_grade": carried.ManualGrade, "manual_mult": carried.Manual,
+		"element": carried.ElementName, "element_relation": carried.ElementRelation, "element_mult": carried.Element,
+		"root_grade": carried.RootGrade, "root_mult": carried.Root}
 	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "cultivation", EventType: "seclusion.start", EntityType: "character", EntityID: fmt.Sprint(userID), GameMinute: p.GameMinute, Payload: out}}, nil
 }
 func seclusionSettleActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
@@ -593,7 +601,8 @@ func seclusionSettleActionGo(conn *storage.Conn, catalog worlddata.Catalog, user
 	days := max64(0, (target-last)/p.MinutesPerDay)
 	mode := fmt.Sprint(s["mode"])
 	env, _ := strconvFloat(s["environment_mult"])
-	daily := seclusionDailyGainGo(catalog, c, mode, env, soulCultivationMultGo(conn, userID))
+	carried := loadSeclusionCarried(conn, catalog, userID, p.GameMinute, mode)
+	daily := seclusionDailyGainGo(catalog, c, mode, env, soulCultivationMultGo(conn, userID), carried.product())
 	attempted := daily * days
 	awarded := int64(0)
 	field := "cultivation"
@@ -646,7 +655,15 @@ func seclusionSettleActionGo(conn *storage.Conn, catalog worlddata.Catalog, user
 	if e != nil {
 		return authoritativeMutation{}, e
 	}
-	out := map[string]any{"mode": mode, "awarded_now": awarded, "settled_days_now": days, "daily_gain": daily, "last_settled_game_minute": settled, "ends_game_minute": end, "status": status, "ended_reason": reason}
+	out := map[string]any{"mode": mode, "awarded_now": awarded, "settled_days_now": days, "daily_gain": daily, "last_settled_game_minute": settled, "ends_game_minute": end, "status": status, "ended_reason": reason,
+		// v1.0.0-rc.55: what the retreat carried, read at the moment it is
+		// paid rather than at the moment it began - the era can turn and a
+		// method can be changed while the door is shut.
+		"carried_mult": carried.product(), "effect_mult": carried.Effect,
+		"era_name": carried.EraName, "era_mult": carried.Era,
+		"manual_name": carried.ManualName, "manual_grade": carried.ManualGrade, "manual_mult": carried.Manual,
+		"element": carried.ElementName, "element_relation": carried.ElementRelation, "element_mult": carried.Element,
+		"root_grade": carried.RootGrade, "root_mult": carried.Root}
 	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "cultivation", EventType: "seclusion.settle", EntityType: "character", EntityID: fmt.Sprint(userID), GameMinute: p.GameMinute, Payload: out}}, nil
 }
 func strconvFloat(v any) (float64, error) {

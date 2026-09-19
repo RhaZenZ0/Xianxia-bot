@@ -171,7 +171,19 @@ func multiplicativeEffectJSONStat(raw, stat string) float64 {
 // session, rather than a flat number off the character sheet: the old rate
 // paid about ten essence a day at every realm, which was a day's work at Body
 // Tempering and a rounding error at Nascent Soul.
-func seclusionDailyGainGo(catalog worlddata.Catalog, character map[string]any, mode string, environmentMult, soulMult float64) int64 {
+// carriedMult (v1.0.0-rc.55) is everything that holds for the whole retreat -
+// active effects, the era, the method practised and what the root makes of its
+// qi, and what the root itself is worth. This function called itself "the one
+// copy of the background-cultivation rate" while applying six of the ten terms
+// a hand-sat session applies, so a cultivator gathered at one rate sitting down
+// and another behind a closed door, and nothing said which was right.
+//
+// What is still left out is left out on a rule: a retreat carries what holds
+// for its whole length. The hour of the day averages out across days, a qi
+// storm is momentary, and seclusion has no stance. The manor array stays out
+// because environmentMult is already this function's statement of where the
+// cultivator sat, and stacking the manor on top would price the site twice.
+func seclusionDailyGainGo(catalog worlddata.Catalog, character map[string]any, mode string, environmentMult, soulMult, carriedMult float64) int64 {
 	pace, worldMult := characterStagePace(catalog, character, mode)
 	attrs := decodeJSONMap(character["attributes_json"])
 	attribute := i64(attrs["will"])
@@ -179,6 +191,9 @@ func seclusionDailyGainGo(catalog worlddata.Catalog, character map[string]any, m
 		attribute = i64(attrs["body"])
 	}
 	env := math.Max(seclusionMultFloor, math.Min(seclusionMultCeiling, environmentMult))
-	daily := float64(pace) * seclusionSessionsPerDay * attributeQuality(attribute) * env * soulMult * worldMult
+	if carriedMult <= 0 {
+		carriedMult = 1
+	}
+	daily := float64(pace) * seclusionSessionsPerDay * attributeQuality(attribute) * env * soulMult * worldMult * carriedMult
 	return max64(1, int64(math.Round(daily*seclusionDailyShare/0.6)))
 }

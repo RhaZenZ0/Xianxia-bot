@@ -48,6 +48,11 @@ type RootSystem struct {
 	Grades         []RootGrade             `json:"grades"`
 	Mutations      map[string]RootMutation `json:"mutations"`
 	PathAffinities map[string][]string     `json:"path_affinities"`
+	// PurityBonusAtFull (v1.0.0-rc.55) is what a perfectly pure root adds to
+	// the grade's own multiplier. It lived under `elemental_qi_system` until
+	// rc.55, which is a system about the five phases and what a method's qi
+	// is to a root - purity is neither. It is the root's, so it is here.
+	PurityBonusAtFull float64 `json:"purity_bonus_at_full"`
 }
 
 type Evolution struct {
@@ -789,14 +794,12 @@ type ElementRelation struct {
 }
 
 type ElementalQiSystem struct {
-	Description       string                     `json:"description"`
-	Phases            []string                   `json:"phases"`
-	Generates         map[string]string          `json:"generates"`
-	Overcomes         map[string]string          `json:"overcomes"`
-	PhaseOf           map[string]string          `json:"phase_of"`
-	Relations         map[string]ElementRelation `json:"relations"`
-	GradeBonusPerRank float64                    `json:"grade_bonus_per_rank"`
-	PurityBonusAtFull float64                    `json:"purity_bonus_at_full"`
+	Description string                     `json:"description"`
+	Phases      []string                   `json:"phases"`
+	Generates   map[string]string          `json:"generates"`
+	Overcomes   map[string]string          `json:"overcomes"`
+	PhaseOf     map[string]string          `json:"phase_of"`
+	Relations   map[string]ElementRelation `json:"relations"`
 }
 
 type Catalog struct {

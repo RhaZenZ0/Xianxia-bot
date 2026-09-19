@@ -45,7 +45,6 @@ class AptitudeRuleTests(unittest.TestCase):
         }
         effects = aptitude_effects(
             bundle,
-            path="Body Refiner",
             root_system=self.world.spiritual_root_system,
             bloodline_definitions=self.world.bloodlines,
             physique_definitions=self.world.physiques,

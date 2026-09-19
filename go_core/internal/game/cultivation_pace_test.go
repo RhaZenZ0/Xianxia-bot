@@ -198,9 +198,9 @@ func TestSeclusionIsPacedLikeTheStageItFills(t *testing.T) {
 		"realm_index": int64(0), "phase": int64(1), "body_realm_index": int64(0), "body_phase": int64(1),
 		"attributes_json": `{"will":3,"body":3,"insight":2}`,
 	}
-	low := seclusionDailyGainGo(catalog, character, "qi", 1.0, 1.0)
+	low := seclusionDailyGainGo(catalog, character, "qi", 1.0, 1.0, 1.0)
 	character["realm_index"], character["phase"] = int64(6), int64(9)
-	high := seclusionDailyGainGo(catalog, character, "qi", 1.0, 1.0)
+	high := seclusionDailyGainGo(catalog, character, "qi", 1.0, 1.0, 1.0)
 	if low < 1 || high <= low*5 {
 		t.Fatalf("seclusion must scale with the stage: %d -> %d", low, high)
 	}

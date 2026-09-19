@@ -6,6 +6,72 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.0** (rc.55) makes a spiritual root's grade worth what the content always said it was, and
+gives a retreat the multipliers a session has.
+
+`spiritual_root_system.grades` is six rungs and every one has carried two mechanical numbers since
+it was written - a `cultivation_mult` from Mortal's 0.88 to Immortal's 1.34, and a
+`breakthrough_bonus` from -1 to +3. Both were parsed into `worlddata.RootGrade` and **read by
+nothing**: `BreakthroughBonus` appeared exactly once in the whole engine, its own declaration.
+`RootGrade` has eight fields, and the six that decide how a root is *made* - the roll band, the
+element chances, the mutation chance, the realm a grade may evolve at - were all read. The only two
+that decide what having it is *worth* were the two that were not. On a 2d10 breakthrough at TN 13
+the content says 28% for a Mortal root and 64% for an Immortal one; every grade was 36%. And this
+was not only a creation roll: `aptitude.evolve` lets a player climb that ladder a rung at a time,
+paying stability for a failure and risking a forced mutation, and the whole payoff of the climb was
+those two numbers.
+
+What the grade was worth instead was one flatter restatement in another system - a per-rung term of
+0.02 kept under `elemental_qi_system`, folded into the **element** multiplier. So the authored 1.52x
+spread was live as 1.10x under another system's name, and two things followed that no reading of the
+content file would show. It was hidden: `/cultivate` prints the element line only when the relation
+is not indifferent, so for most cultivators the one thing their root did was applied and never
+shown. And it switched off when no method was practised, because `absorptionFor` returns early on an
+empty element, before the root term - no method, no root bonus at all. Elemental qi is the relation
+between a root's *elements* and a *method's*, which is exactly why what a root is worth on its own
+never belonged in it. `rootWorthMultiplier` is the one statement now, purity moved to the root
+system with it, and `element_mult` is the relation and nothing else - so an indifferent element
+really is x1.00 and the surface hides nothing.
+
+A grade the ladder does not carry is worth 1, never the bottom rung. `gradeIndex` answers 0 for a
+name it does not know, and `admin.player.set_spiritual_root` writes that column with no check
+against the ladder, so the careless reading hands an unknown grade Mortal's 0.88 and -1 - the
+`seller_user_id=0` lesson, that a fallback which looks like a value is not a sentinel. The real case
+was in this repo's own fixtures, where the canonical character was seeded `'Heavenly'`, a name no
+rung has, for releases - harmless only because nothing read a grade for anything.
+
+Python stopped inventing. `aptitude_effects` multiplied the grade by invented purity, mixed-element,
+compatibility and stability factors and published the product - and every one of its eight callers
+discards the aggregate and the rows never reach `active_effects`, so that arithmetic was the only
+statement of the rule in the tree and it reached no mechanic. The honest bar is not "stated once" but
+**one authored number, two readers that agree**, and the gate holds them equal at every rung and
+purity. Its `path` argument, unread the moment the invented compatibility factor went, is gone with
+it - a release about fields nothing reads does not get to leave one behind.
+
+Seclusion is the same question answered twice. `seclusionDailyGainGo` calls itself "the one copy of
+the background-cultivation rate" and applied six of the ten terms a hand-sat session applies,
+ignoring the effect multiplier, the era, the method practised and what the root makes of its qi - so
+a cultivator gathered at one rate sitting down and another behind a closed door. It carries all five
+now, through a loader that never fails, on one parameter so the start projection and the settle
+payment cannot drift. What is still left out is left out on a rule: a retreat carries what holds for
+its whole length, so the hour of the day averages away, a qi storm is momentary, and the manor array
+stays out because `environment_mult` already says where the cultivator sat. Its duration and its
+lockout are deliberately not here: `duration_game_minutes` is floored at 1 and bounded by nothing,
+the 1-365 day picker is presentation-only, and the start message already promises the player that
+"any state-changing command will remain locked" while the engine blocks exactly one thing behind a
+closed door. A lockout, a cap and the finer settlement a cap needs are one feature, and a different
+finding from what a day is worth.
+
+`spiritual_root_worth_test.go` drives real sessions and a real breakthrough rather than reading the
+source, because a grep cannot see a disabled condition, and
+`test_root_grade_is_worth_something.py` holds the content and the display twin. Four drills against
+broken trees - the term removed from the session, the bonus removed from the roll, the root's worth
+put back inside the element multiplier so it is paid twice, and the off-ladder grade returned to the
+fixture - each failing with the message it exists to print, among them *"an Immortal root and a
+Mortal root both gathered 85 - the grade on the sheet does nothing"*. The gate caught its own author
+twice, refusing a comment that named the retired key and one that named the deleted function; both
+now forbid the declaration rather than the word. No schema change.
+
 **1.0.0** (rc.54) gives the upper worlds somewhere to go, and something to bring back.
 
 Eight secret realms covered thirty-two realms of cultivation, and they were not spread evenly: the

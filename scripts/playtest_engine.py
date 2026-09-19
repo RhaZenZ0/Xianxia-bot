@@ -736,7 +736,10 @@ async def run(url: str, token: str, db_path: str) -> Report:
         session_pace = int(result.get("pace") or pace)
         lo, hi = session_pace * quality * 0.9, session_pace * quality * 1.1
         chain = 1.0
-        for key in ("time_mult", "effect_mult", "soul_mult", "era_mult", "stance_mult", "world_mult", "manual_mult", "element_mult"):
+        # root_mult joined the chain at v1.0.0-rc.55: what the grade rolled at
+        # creation is worth, which until then was folded into element_mult at a
+        # flatter rate and so was already counted here without being named.
+        for key in ("time_mult", "effect_mult", "soul_mult", "era_mult", "stance_mult", "world_mult", "manual_mult", "element_mult", "root_mult"):
             chain *= float(result.get(key) or 1.0)
         through = (base + int(result.get("resonance_bonus") or 0)) * chain
         through = through * float(result.get("place_mult") or 1.0) * float(result.get("manor_mult") or 1.0)
@@ -749,6 +752,11 @@ async def run(url: str, token: str, db_path: str) -> Report:
     start = int(sheet.get("cultivation") or 0)
     paced = await step(report, "cultivation.train pays about the pace", meditate())
     if paced:
+        # The root is rolled at creation, so which one this run drew is
+        # reported rather than asserted - what it is worth is held exactly by
+        # spiritual_root_worth_test.go.
+        report.add("PASS", "the session carries what the root is worth",
+                   f"{paced.get('root_grade') or 'unknown'} root x{float(paced.get('root_mult') or 1.0):.3f}")
         ok, why = session_is_the_engines_own_arithmetic(paced, cost - start)
         report.add("PASS" if ok else "FAIL", "the session pays its pace through the engine's own multipliers", why)
         report.add("PASS" if float(paced.get("world_mult") or 0) == 1.0 and paced.get("world_name") == "Mortal World" else "FAIL",

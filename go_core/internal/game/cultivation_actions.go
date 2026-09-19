@@ -322,7 +322,14 @@ func cultivationTrain(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 	if body {
 		elementMult = 1
 	}
-	attempted := int64(math.Round(float64(base+resonance) * timeMult * effectMult * soulMult * eraMult * stance.GainMult * worldMult * manualMult * elementMult))
+	// What the root itself is worth (v1.0.0-rc.55): the grade's own multiplier,
+	// deepened by purity. Outside the body guard on purpose - that carve-out is
+	// about elements and qi-path weather, and a grade is neither. The body path
+	// already takes soul, era, world and place, and `breakthroughModifier` adds
+	// the grade's other half on both branches, so excluding it here would split
+	// the root against itself.
+	rootMult := rootWorthMultiplier(catalog, bundle.Root)
+	attempted := int64(math.Round(float64(base+resonance) * timeMult * effectMult * soulMult * eraMult * stance.GainMult * worldMult * manualMult * elementMult * rootMult))
 
 	// The ground, and what the sect built on it. The manor array and a qi
 	// storm are qi-path weather; the ground itself counts for both paths.
@@ -451,7 +458,7 @@ func cultivationTrain(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 		return authoritativeMutation{}, err
 	}
 	total := current + gain
-	payload := map[string]any{"mode": map[bool]string{true: "body", false: "qi"}[body], "gain": gain, "attempted_gain": attempted, "total": total, "cost": cost, "base_gain": base, "pace": pace, "sessions_per_stage": sessionsForStage(realm), "attribute": attr, "attribute_value": attrValue, "attribute_quality": round4(quality), "resonance_bonus": resonance, "period": tm.Period, "season": tm.Season, "time_mult": timeMult, "root_resonance": tm.RootResonance, "effect_mult": effectMult, "soul_mult": soulMult, "era_name": eraName, "era_mult": eraMult, "world_name": worldName, "world_mult": worldMult, "manor_name": manorName, "manor_mult": manorMult, "storm_bonus": storm, "perfection_gain": pg, "ready": total >= cost, "stance": stance.Key, "stance_label": stance.Label, "stance_mult": stance.GainMult, "insight_xp_gain": insightGain, "deviation": deviation, "place_name": placeName, "place_mult": placeMult, "place_quality": placeQuality(placeMult), "stage_full": room == 0, "manual_name": manualName, "manual_grade": manualGrade, "manual_mult": manualMult, "manual_chosen": manualChosen, "qi_type": firstNonempty(ghostBody.QiType, spiritQiType), "corruption": ghostBody.Corruption, "corruption_gain": corruptionGain, "ghost_form_name": ghostFormAt(catalog, ghostBody.GhostForm).Name, "form_risen": formRisen, "ghost_rupture": ghostRupture, "element": absorption.Element, "element_relation": absorption.Relation, "element_label": absorption.Label, "element_note": absorption.Note, "element_mult": elementMult, "element_clash": elementClash}
+	payload := map[string]any{"mode": map[bool]string{true: "body", false: "qi"}[body], "gain": gain, "attempted_gain": attempted, "total": total, "cost": cost, "base_gain": base, "pace": pace, "sessions_per_stage": sessionsForStage(realm), "attribute": attr, "attribute_value": attrValue, "attribute_quality": round4(quality), "resonance_bonus": resonance, "period": tm.Period, "season": tm.Season, "time_mult": timeMult, "root_resonance": tm.RootResonance, "effect_mult": effectMult, "soul_mult": soulMult, "era_name": eraName, "era_mult": eraMult, "world_name": worldName, "world_mult": worldMult, "manor_name": manorName, "manor_mult": manorMult, "storm_bonus": storm, "perfection_gain": pg, "ready": total >= cost, "stance": stance.Key, "stance_label": stance.Label, "stance_mult": stance.GainMult, "insight_xp_gain": insightGain, "deviation": deviation, "place_name": placeName, "place_mult": placeMult, "place_quality": placeQuality(placeMult), "stage_full": room == 0, "manual_name": manualName, "manual_grade": manualGrade, "manual_mult": manualMult, "manual_chosen": manualChosen, "qi_type": firstNonempty(ghostBody.QiType, spiritQiType), "corruption": ghostBody.Corruption, "corruption_gain": corruptionGain, "ghost_form_name": ghostFormAt(catalog, ghostBody.GhostForm).Name, "form_risen": formRisen, "ghost_rupture": ghostRupture, "element": absorption.Element, "element_relation": absorption.Relation, "element_label": absorption.Label, "element_note": absorption.Note, "element_mult": elementMult, "element_clash": elementClash, "root_grade": bundle.Root.Grade, "root_mult": rootMult}
 	legacy, _ := json.Marshal(payload)
 	_, _ = conn.Execute(`INSERT INTO event_log(user_id,event_type,payload_json,created_at) VALUES(?,?,?,?)`, []any{userID, eventType, string(legacy), now})
 	return authoritativeMutation{Result: payload, Event: eventledger.Event{Domain: "cultivation", EventType: eventType, EntityType: "character", EntityID: fmt.Sprint(userID), GameMinute: p.GameMinute, Payload: payload}}, nil

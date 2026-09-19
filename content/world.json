@@ -617,6 +617,7 @@
     "Chaos"
   ],
   "spiritual_root_system": {
+    "purity_bonus_at_full": 0.1,
     "elements": [
       "Fire",
       "Water",
@@ -63600,9 +63601,7 @@
         "deviation_surcharge_percent": 8,
         "note": "This qi overcomes your root. It fights you going in, and it can turn."
       }
-    },
-    "grade_bonus_per_rank": 0.02,
-    "purity_bonus_at_full": 0.1
+    }
   },
   "patron_gift": {
     "by_profession": {
