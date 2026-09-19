@@ -2,6 +2,11 @@ from __future__ import annotations
 
 from typing import Any
 
+# The four worlds, and the one place they are enumerated. Every per-world loop
+# in the tree reads this: the access and presence roles, the capital channels,
+# which world an auction floor belongs to, and - since v1.0.0-rc.52 - the
+# per-world world-events channels. A fifth world is one entry here, not five
+# edits in five files.
 REALM_HUBS: dict[str, dict[str, Any]] = {
     "Mortal World": {
         "location": "Azure Crown Imperial City",
@@ -9,6 +14,11 @@ REALM_HUBS: dict[str, dict[str, Any]] = {
         "display_name": "Azure Crown Imperial City",
         "topic": "Mortal World meeting city — markets, sect envoys, clans, duels of reputation, and public roleplay.",
         "min_realm_index": 0,
+        "events_channel_name": "mortal-world-events",
+        "events_topic": (
+            "Mortal World news — "
+            "what the living world did to itself: disasters, invasions, sect wars, discoveries and the rise and fall of its powers. Visible to anyone who has reached this world."
+        ),
     },
     "Spiritual World": {
         "location": "Spirit Jade Capital",
@@ -16,6 +26,11 @@ REALM_HUBS: dict[str, dict[str, Any]] = {
         "display_name": "Spirit Jade Capital",
         "topic": "Spiritual World meeting city — ascended sects, ancient families, jade markets, and public roleplay.",
         "min_realm_index": 8,
+        "events_channel_name": "spiritual-world-events",
+        "events_topic": (
+            "Spiritual World news — "
+            "upheavals among the ascended sects and ancient families, and every event the world opens up here. Visible to anyone who has reached this world."
+        ),
     },
     "Immortal World": {
         "location": "Nine-Heavens Immortal Court",
@@ -23,6 +38,11 @@ REALM_HUBS: dict[str, dict[str, Any]] = {
         "display_name": "Nine-Heavens Immortal Court",
         "topic": "Immortal World meeting court — immortal clans, law formations, trade, politics, and public roleplay.",
         "min_realm_index": 16,
+        "events_channel_name": "immortal-world-events",
+        "events_topic": (
+            "Immortal World news — "
+            "immortal clans, law formations and the events that shake the court. Visible to anyone who has reached this world."
+        ),
     },
     "Celestial World": {
         "location": "Celestial Mandate Palace",
@@ -30,6 +50,11 @@ REALM_HUBS: dict[str, dict[str, Any]] = {
         "display_name": "Celestial Mandate Palace",
         "topic": "Celestial World meeting palace — sovereign courts, heavenly factions, high trade, and public roleplay.",
         "min_realm_index": 24,
+        "events_channel_name": "celestial-world-events",
+        "events_topic": (
+            "Celestial World news — "
+            "sovereign courts, heavenly factions and the events that move them. Visible to anyone who has reached this world."
+        ),
     },
 }
 

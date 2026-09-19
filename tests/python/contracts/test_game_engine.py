@@ -57,18 +57,39 @@ class GameEngineClientTests(unittest.IsolatedAsyncioTestCase):
             )
         self.assertFalse(self.requests)
 
-    async def test_simulation_endpoints_keep_explicit_scheduler_time(self):
-        await self.client.run_due_simulation(12345, {"npc_life": True})
-        payload = __import__("json").loads(self.requests[-1].content)
-        self.assertEqual(payload["game_minute"], 12345)
+    async def test_no_simulation_endpoint_sends_a_minute(self):
+        """The rule the test above holds for an authoritative action, held here
+        for the other three doors (v1.0.0-rc.48).
+
+        This assertion used to be its own opposite - `assertEqual(payload
+        ["game_minute"], 12345)`, under the name
+        `test_simulation_endpoints_keep_explicit_scheduler_time` - two tests
+        below one that refuses a forged minute on `/v1/game/action`. The engine
+        derives the canonical minute for all three simulation endpoints now, so
+        a minute in these payloads is a number the caller computes, ships and
+        watches the engine discard.
+        """
+        import inspect
+        import json
+
+        await self.client.run_due_simulation({"npc_life": True})
+        await self.client.force_simulation("economy", 2)
+        for request in self.requests[-2:]:
+            with self.subTest(path=request.url.path):
+                self.assertNotIn("game_minute", json.loads(request.content))
+        # Bootstrap has no route on this stub, so it is held at the source: the
+        # one line that builds its payload sends an empty body.
+        source = inspect.getsource(self.client.bootstrap_simulation)
+        self.assertIn('"/v1/simulation/bootstrap", {}', source)
+        self.assertNotIn("game_minute", source)
 
     async def test_run_due_simulation_is_one_coarse_grained_call(self):
-        result = await self.client.run_due_simulation(12345, {"npc_life": True, "economy": True})
+        result = await self.client.run_due_simulation({"npc_life": True, "economy": True})
         self.assertEqual(result, [{"system": "npc_life", "updated": 12}])
         self.assertEqual(self.requests[-1].url.path, "/v1/simulation/run-due")
 
     async def test_force_simulation_returns_engine_batch_result(self):
-        result = await self.client.force_simulation("economy", 2, 200)
+        result = await self.client.force_simulation("economy", 2)
         self.assertEqual(result["updated"], 5)
 
     async def test_live_and_database_status_report_go_engine(self):

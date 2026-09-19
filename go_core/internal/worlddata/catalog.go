@@ -511,6 +511,24 @@ type SecretRealmRoom struct {
 	SpiritStones   int64            `json:"spirit_stones"`
 	InsightXP      int64            `json:"insight_xp"`
 	Items          map[string]int64 `json:"items"`
+	// RareItems is what the room *might* hold, as opposed to what it holds
+	// (v1.0.0-rc.50). A realm's rooms are walked again on every run -
+	// `secret_realm_runs` keeps one row per user and resets `room_index` to 0
+	// on entry - so anything in `Items` is a guaranteed repeat payout, which
+	// is right for two spirit herbs and wrong for a thing the world should
+	// have few of. The shape is `ForageMaterial`'s, minus the richness floor
+	// a realm has no equivalent of, so the tree has one idea of what a find
+	// chance looks like.
+	RareItems map[string]RareFind `json:"rare_items"`
+}
+
+// RareFind is a chance in a hundred to find something, and the most one find
+// can be. It is the roster shape `ForageMaterial` already uses; a zero or
+// negative Chance or Max means the entry is simply never found, which is how
+// content disables one without deleting it.
+type RareFind struct {
+	Chance int64 `json:"chance"`
+	Max    int64 `json:"max"`
 }
 
 type SecretRealm struct {

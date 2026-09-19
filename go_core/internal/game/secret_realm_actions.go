@@ -4,10 +4,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
 	"xianxia/core/internal/eventledger"
+	"xianxia/core/internal/gamerng"
 	"xianxia/core/internal/storage"
 	"xianxia/core/internal/worlddata"
 )
@@ -194,6 +196,61 @@ func grantInheritanceTx(conn *storage.Conn, userID int64, realmID string, inheri
 	return map[string]any{"gained": true, "inheritance_id": inheritanceID, "name": inheritance.Name, "description": inheritance.Description, "bonuses": inheritance.Bonuses, "item": inheritance.Item}, nil
 }
 
+// secretRealmRareIntn is the dice for a room's rare find, behind the seam the
+// rest of this package uses so a test can lend them (gamerng is crypto/rand
+// with no seed; see CLAUDE.md on never asserting that a random thing happened).
+var secretRealmRareIntn = gamerng.Intn
+
+// rollRareRoomItems is what the room might hold on top of what it holds.
+//
+// The guard is the one `forageResolveAction` uses and for the same reason:
+// content naming an item the catalogue does not carry must never write an
+// inventory row for a thing that does not exist. A miss is silent - the room
+// pays its ordinary items either way - because a rare find that announced its
+// own absence would tell a player the roll had happened, which is most of
+// knowing it exists.
+func rollRareRoomItems(catalog worlddata.Catalog, room worlddata.SecretRealmRoom) (map[string]int64, error) {
+	if len(room.RareItems) == 0 {
+		return nil, nil
+	}
+	found := map[string]int64{}
+	// Sorted, so a map range cannot make two runs of the same seed differ.
+	ids := make([]string, 0, len(room.RareItems))
+	for id := range room.RareItems {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	for _, id := range ids {
+		spec := room.RareItems[id]
+		if _, ok := catalog.Items[id]; !ok {
+			continue
+		}
+		if spec.Chance <= 0 || spec.Max <= 0 {
+			continue
+		}
+		roll, err := secretRealmRareIntn(100)
+		if err != nil {
+			return nil, err
+		}
+		if int64(roll) >= minI64(100, spec.Chance) {
+			continue
+		}
+		qty := int64(1)
+		if spec.Max > 1 {
+			extra, err := secretRealmRareIntn(int(spec.Max))
+			if err != nil {
+				return nil, err
+			}
+			qty = int64(extra) + 1
+		}
+		found[id] = qty
+	}
+	if len(found) == 0 {
+		return nil, nil
+	}
+	return found, nil
+}
+
 func secretRealmExploreAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	var p secretRealmPayload
 	if err := json.Unmarshal(raw, &p); err != nil {
@@ -259,7 +316,24 @@ func secretRealmExploreAction(conn *storage.Conn, catalog worlddata.Catalog, use
 	}
 	result := map[string]any{"realm_id": rid, "realm_name": realm.Name, "room_index": idx, "room": room, "roll": roll, "success": roll["success"], "danger_before": danger}
 	if roll["success"].(bool) {
-		awarded, err := applyCanonicalRewardTx(conn, catalog, userID, c, canonicalReward{Cultivation: room.Cultivation, SpiritStones: room.SpiritStones, InsightXP: room.InsightXP, Items: room.Items}, "secret_realm_room", now)
+		// Merged into the room's own payout rather than granted beside it, so
+		// the item lands by the one path and a rare find cannot be paid twice
+		// or half-paid if the second write failed.
+		rare, err := rollRareRoomItems(catalog, room)
+		if err != nil {
+			return authoritativeMutation{}, err
+		}
+		paid := room.Items
+		if len(rare) > 0 {
+			paid = make(map[string]int64, len(room.Items)+len(rare))
+			for id, qty := range room.Items {
+				paid[id] = qty
+			}
+			for id, qty := range rare {
+				paid[id] += qty
+			}
+		}
+		awarded, err := applyCanonicalRewardTx(conn, catalog, userID, c, canonicalReward{Cultivation: room.Cultivation, SpiritStones: room.SpiritStones, InsightXP: room.InsightXP, Items: paid}, "secret_realm_room", now)
 		if err != nil {
 			return authoritativeMutation{}, err
 		}
@@ -271,7 +345,10 @@ func secretRealmExploreAction(conn *storage.Conn, catalog worlddata.Catalog, use
 		result["cultivation_awarded"] = awarded
 		result["spirit_stones"] = room.SpiritStones
 		result["insight_xp"] = room.InsightXP
-		result["items"] = room.Items
+		result["items"] = paid
+		if len(rare) > 0 {
+			result["rare_items"] = rare
+		}
 		result["danger"] = newDanger
 		result["final_room"] = final
 		if final {

@@ -659,7 +659,7 @@ class XianxiaBot(commands.Bot):
                             await self.close_event_scene(record)
                     wt = await current_world_time()
                     # Autonomous world-event selection, activation, RNG and persistent consequences are Go-owned.
-                    simulation_runs = await SIM.run_due(wt.total_minutes, automation)
+                    simulation_runs = await SIM.run_due(automation)
                     # The tick is what settles auctions (finalizeAuctions in
                     # Go); the live cards follow it here, every cycle, so a
                     # struck lot reads as struck within a tick of the gavel.

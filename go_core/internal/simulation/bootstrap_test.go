@@ -25,7 +25,12 @@ func TestBootstrapOwnsSimulationAndClanSeedWrites(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := conn.ExecScript(`
+	// `world_state` carries the canonical clock, which Bootstrap reads for the
+	// minute it stamps every household, anchor and clan with (v1.0.0-rc.48).
+	// Production always has it - Python's migration makes it before the engine
+	// is ever asked to bootstrap - so a fixture without it is a fixture that
+	// cannot fail the way production fails.
+	if err := conn.ExecScript(simulationClockSchema + `
 CREATE TABLE world_simulation_state(system TEXT PRIMARY KEY,last_game_minute INTEGER,interval_game_minutes INTEGER,last_run_real REAL,runs INTEGER);
 CREATE TABLE civilization_regions(location TEXT PRIMARY KEY,world_name TEXT,population INTEGER,prosperity INTEGER,security INTEGER,spirit_resources INTEGER,food_supply INTEGER,migration_pressure INTEGER,unrest INTEGER,last_game_minute INTEGER,updated_at REAL);
 CREATE TABLE npc_civilization_state(npc_name TEXT PRIMARY KEY,home_location TEXT,current_location TEXT,world_name TEXT,profession TEXT,faction TEXT,wealth INTEGER,influence INTEGER,ambition INTEGER,realm_index INTEGER,phase INTEGER,status TEXT,activity TEXT,missing_since_game_minute INTEGER DEFAULT 0,last_game_minute INTEGER,updated_at REAL);
@@ -57,7 +62,8 @@ VALUES(1,'Han Clan','Han',2,'Han Patriarch',3,2,12,'active');
 	if err != nil {
 		t.Fatal(err)
 	}
-	result, err := runner.Bootstrap(BootstrapRequest{GameMinute: 100})
+	setSimulationGameMinute(t, path, 100)
+	result, err := runner.Bootstrap(BootstrapRequest{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -94,7 +100,12 @@ func TestBootstrapSkipsHiddenSectsAndKeepsManualsOffTheMarket(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := conn.ExecScript(`
+	// `world_state` carries the canonical clock, which Bootstrap reads for the
+	// minute it stamps every household, anchor and clan with (v1.0.0-rc.48).
+	// Production always has it - Python's migration makes it before the engine
+	// is ever asked to bootstrap - so a fixture without it is a fixture that
+	// cannot fail the way production fails.
+	if err := conn.ExecScript(simulationClockSchema + `
 CREATE TABLE world_simulation_state(system TEXT PRIMARY KEY,last_game_minute INTEGER,interval_game_minutes INTEGER,last_run_real REAL,runs INTEGER);
 CREATE TABLE civilization_regions(location TEXT PRIMARY KEY,world_name TEXT,population INTEGER,prosperity INTEGER,security INTEGER,spirit_resources INTEGER,food_supply INTEGER,migration_pressure INTEGER,unrest INTEGER,last_game_minute INTEGER,updated_at REAL);
 CREATE TABLE npc_civilization_state(npc_name TEXT PRIMARY KEY,home_location TEXT,current_location TEXT,world_name TEXT,profession TEXT,faction TEXT,wealth INTEGER,influence INTEGER,ambition INTEGER,realm_index INTEGER,phase INTEGER,status TEXT,activity TEXT,missing_since_game_minute INTEGER DEFAULT 0,last_game_minute INTEGER,updated_at REAL);
@@ -154,7 +165,8 @@ CREATE TABLE world_history_events(
 	if manualItems == 0 {
 		t.Fatal("the materialised catalog carries no manual items at all")
 	}
-	if _, err := runner.Bootstrap(BootstrapRequest{GameMinute: 100}); err != nil {
+	setSimulationGameMinute(t, path, 100)
+	if _, err := runner.Bootstrap(BootstrapRequest{}); err != nil {
 		t.Fatal(err)
 	}
 	if got := storage.ParseInt(simScalar(t, path, `SELECT COUNT(*) FROM sect_politics_state WHERE sect_name='Heaven-Devouring Demon Sect'`)); got != 0 {

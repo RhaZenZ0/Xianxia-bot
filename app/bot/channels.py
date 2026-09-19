@@ -114,12 +114,27 @@ async def ensure_realm_hub_overwrites(
     if state["hidden"] and member_ok and me_view is True and not stale:
         return "hidden"
     try:
+        # The bot allows *itself* first, and the order is the fix (v1.0.0-rc.52).
+        # A channel overwrite applies to the bot like anyone else unless it is
+        # Administrator, so denying @everyone View Channel first takes the bot's
+        # own access to the channel away - and every set_permissions call after
+        # it is refused 403 Missing Access. The channel is then left denied to
+        # @everyone with no allow for the presence role: invisible to the very
+        # players it exists for, while `realm_hub_visibility` reports it as
+        # "VISIBLE TO ALL" because the role allow it looks for was never
+        # written. Two wrong answers from one ordering.
+        #
+        # Nothing caught it because every server this ran on gave the bot
+        # Administrator, which skips channel overwrites entirely. The Discord
+        # harness found it the first time it was allowed to reach this path
+        # (v1.0.0-rc.52 drives Full Setup over the control plane), because
+        # SimCord deliberately grants the bot everything *except* administrator.
+        if guild.me is not None and me_view is not True:
+            await channel.set_permissions(guild.me, view_channel=True, send_messages=True, manage_messages=True, read_message_history=True, reason="Xianxia realm-capital visibility gate")
         if state["everyone_view"] is not False:
             await channel.set_permissions(guild.default_role, view_channel=False, reason="Xianxia realm-capital visibility gate")
         if not member_ok:
             await channel.set_permissions(role, reason="Xianxia realm-capital visibility gate", **REALM_HUB_MEMBER_PERMISSIONS)
-        if guild.me is not None and me_view is not True:
-            await channel.set_permissions(guild.me, view_channel=True, send_messages=True, manage_messages=True, read_message_history=True, reason="Xianxia realm-capital visibility gate")
         for old in stale:
             await channel.set_permissions(old, overwrite=None, reason="Xianxia: capitals are gated by presence, not by realm")
     except (discord.Forbidden, discord.HTTPException):
@@ -190,16 +205,23 @@ def auction_house_channel_name(house_id: str, house: dict[str, Any]) -> str:
 
 
 async def ensure_auction_house_channels(
-    guild: discord.Guild, *, category_name: str = "🌌 Realm Capitals", create_missing: bool = False,
+    guild: discord.Guild, *, category_name: str = "🏮 Auction Houses", create_missing: bool = False,
 ) -> list[dict[str, Any]]:
     """Bind existing live-auction channels and, when create_missing, create any
     that are missing (v0.33.1). A grand house (a capital's) has a channel of
     its own; the local floors of a world share one, named in content - so a
     world of twelve cities is one channel, not twelve. Every house is bound to
-    the channel its content names, beside the realm capitals, visible to the
-    cultivators who can reach that world - the same access role that gates it
-    - and to nobody else. Like the capitals, the /admin slash path only binds;
-    the dashboard's Setup/Repair is what creates.
+    the channel its content names, visible to the cultivators who can reach
+    that world - the same access role that gates it - and to nobody else. Like
+    the capitals, the /admin slash path only binds; the dashboard's
+    Setup/Repair is what creates.
+
+    v1.0.0-rc.51: these nine channels used to be created beside the four realm
+    capitals, in the category named for them. They have their own now - and a
+    channel that already exists is *re-parented*, not merely rebound, because
+    `category=` is only read on creation, so without that a deployed server
+    would keep its auction channels under the capitals for ever and the change
+    would reach a fresh guild only.
     """
     existing = {str(row["house_id"]): row for row in await DB.get_auction_house_channels(guild.id)}
     category = next((item for item in guild.categories if item.name == category_name), None)
@@ -212,6 +234,10 @@ async def ensure_auction_house_channels(
         except discord.HTTPException:
             log.exception("Could not create category %s", category_name)
 
+    # Forty-eight houses share nine channels, and `channel.category_id` is read
+    # from the cache, which a gateway event updates after the edit returns - so
+    # without this the move would be re-issued for every house sharing a floor.
+    moved: set[int] = set()
     for house_id, house in WORLD.auction_houses.items():
         name = auction_house_channel_name(house_id, house)
         interior = WORLD.locations.get(str(house.get("location"))) or {}
@@ -233,6 +259,12 @@ async def ensure_auction_house_channels(
                 log.exception("Could not create auction channel #%s", name)
         if channel is None:
             continue
+        if can_create and category is not None and channel.id not in moved and channel.category_id != category.id:
+            moved.add(channel.id)
+            try:
+                await channel.edit(category=category, reason="Xianxia RP auction-house setup")
+            except discord.HTTPException:
+                log.exception("Could not move #%s into %s", channel.name, category_name)
         if can_create and access_roles.get(world) is not None:
             await ensure_realm_hub_overwrites(guild, channel, access_roles.get(world))
         await DB.set_auction_house_channel(
@@ -240,6 +272,108 @@ async def ensure_auction_house_channels(
             category_id=channel.category_id if channel.category_id is not None else (category.id if category else None),
         )
     return await DB.get_auction_house_channels(guild.id)
+
+
+async def ensure_world_event_channels(
+    guild: discord.Guild, *, category_name: str = "\U0001f320 World Events", create_missing: bool = False,
+) -> list[dict[str, Any]]:
+    """One world-events channel per world (v1.0.0-rc.52), created beside the
+    capitals and the auction floors and gated the same way the floors are.
+
+    `world-events` carried all four worlds: a Demon Invasion in the Celestial
+    World and a caravan over the bank in a Mortal village in one feed, in front
+    of everybody, whatever they could reach. The base channel stays - it is the
+    *global* feed now, and the fallback for anything with no world (see
+    `world_event_channel` below) - and a located event goes to its own world's.
+
+    Gated by the realm **access** role, not the presence role: a world's news is
+    for everyone who has reached that world, not only whoever happens to be
+    standing in its capital this minute. Like the capitals and the floors, the
+    /admin slash path only binds; the dashboard's Setup/Repair is what creates,
+    and a channel that already exists somewhere else is re-parented rather than
+    merely rebound.
+    """
+    existing = {str(row["world_name"]): row for row in await DB.get_world_event_channels(guild.id)}
+    category = next((item for item in guild.categories if item.name == category_name), None)
+    me = guild.me
+    can_create = create_missing and bool(me) and me.guild_permissions.manage_channels
+    access_roles = await _ensure_realm_access_roles(guild) if can_create else {}
+    if can_create and category is None:
+        try:
+            category = await guild.create_category(category_name, reason="Xianxia RP world-events setup")
+        except discord.HTTPException:
+            log.exception("Could not create category %s", category_name)
+
+    for world, hub in REALM_HUBS.items():
+        name = str(hub["events_channel_name"])
+        row = existing.get(world)
+        channel = guild.get_channel(int(row["channel_id"])) if row else None
+        if not isinstance(channel, discord.TextChannel):
+            channel = next((item for item in guild.text_channels if item.name == name), None)
+        if channel is None and can_create:
+            try:
+                channel = await guild.create_text_channel(
+                    name, category=category, topic=str(hub.get("events_topic") or "")[:1024],
+                    reason="Xianxia RP world-events setup",
+                )
+            except discord.HTTPException:
+                log.exception("Could not create world-events channel #%s", name)
+        if channel is None:
+            continue
+        if can_create and category is not None and channel.category_id != category.id:
+            try:
+                await channel.edit(category=category, reason="Xianxia RP world-events setup")
+            except discord.HTTPException:
+                log.exception("Could not move #%s into %s", channel.name, category_name)
+        if can_create and access_roles.get(world) is not None:
+            await ensure_realm_hub_overwrites(guild, channel, access_roles.get(world))
+        await DB.set_world_event_channel(
+            guild_id=guild.id, world_name=world, channel_id=channel.id,
+            category_id=channel.category_id if channel.category_id is not None else (category.id if category else None),
+        )
+    return await DB.get_world_event_channels(guild.id)
+
+
+def world_of_location(location: str | None) -> str | None:
+    """Which of the four worlds a place belongs to, or None when nothing knows.
+
+    Deliberately **not** the `or "Mortal World"` default the rest of the tree
+    uses. A private residence (`birth_family:<id>`), an inner world
+    (`personal_world:<uid>`), an abode or a literal "Unknown" is not in the
+    location catalogue, and defaulting those to the Mortal World would file
+    somebody's household news as that world's public news. Here the honest
+    answer is "no world", which routes to the global feed.
+    """
+    key = str(location or "").strip()
+    if not key:
+        return None
+    world = str((WORLD.locations.get(key) or {}).get("world") or "").strip()
+    return world if world in REALM_HUBS else None
+
+
+async def world_event_channel(
+    guild: discord.Guild | None, location: str | None,
+) -> discord.TextChannel | None:
+    """The channel an announcement about `location` belongs in.
+
+    Its world's channel when the catalogue places it in one and that channel is
+    bound; otherwise the global `world-events` channel, which is what every
+    announcement used before v1.0.0-rc.52 and what the world-less ones - the
+    weekend gift, a GM's world-reset notice, the dashboard's test post - still
+    use. So the worst case is the channel this already went to.
+    """
+    if guild is None:
+        return None
+    world = world_of_location(location)
+    if world is not None:
+        for row in await DB.get_world_event_channels(guild.id):
+            if str(row["world_name"]) == world:
+                channel = await _resolve_text_channel(guild, row["channel_id"])
+                if channel is not None:
+                    return channel
+                break
+    config = await DB.get_server_config(guild.id)
+    return await _resolve_text_channel(guild, config.get("announcement_channel_id"))
 
 
 async def event_channels(interaction: discord.Interaction) -> tuple[discord.TextChannel | None, discord.TextChannel | None]:

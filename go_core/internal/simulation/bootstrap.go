@@ -14,6 +14,13 @@ import (
 )
 
 type BootstrapRequest struct {
+	// GameMinute is accepted for wire compatibility and deliberately ignored
+	// (v1.0.0-rc.48), the same rule RunDue and Force hold. A bootstrap writes
+	// the birth minute of every household, the anchor of every simulation
+	// system and the founding of every clan, so a caller's number here is the
+	// age of the whole world - and `loadCanonicalWorldClock` answers on an
+	// unseeded world too, from the default anchor, which is exactly the case
+	// a first bootstrap is.
 	GameMinute int64 `json:"game_minute"`
 }
 
@@ -167,19 +174,24 @@ func (r *Runner) Bootstrap(req BootstrapRequest) (BootstrapResult, error) {
 		}
 	}()
 
-	out := BootstrapResult{}
-	if err = r.bootstrapCoreState(conn, req.GameMinute, &out); err != nil {
+	gameMinute, err := game.CanonicalWorldGameMinute(conn)
+	if err != nil {
 		return BootstrapResult{}, err
 	}
-	if out.NPCMoodsInitialized, err = r.bootstrapNPCMoods(conn, req.GameMinute); err != nil {
+
+	out := BootstrapResult{}
+	if err = r.bootstrapCoreState(conn, gameMinute, &out); err != nil {
+		return BootstrapResult{}, err
+	}
+	if out.NPCMoodsInitialized, err = r.bootstrapNPCMoods(conn, gameMinute); err != nil {
 		return BootstrapResult{}, err
 	}
 	// After the NPCs exist and before the clans, because a household is
 	// something the world already had rather than something it derives.
-	if err = r.seedHouseholds(conn, req.GameMinute, &out); err != nil {
+	if err = r.seedHouseholds(conn, gameMinute, &out); err != nil {
 		return BootstrapResult{}, err
 	}
-	if err = r.bootstrapClans(conn, req.GameMinute, &out); err != nil {
+	if err = r.bootstrapClans(conn, gameMinute, &out); err != nil {
 		return BootstrapResult{}, err
 	}
 	if err = conn.Commit(); err != nil {

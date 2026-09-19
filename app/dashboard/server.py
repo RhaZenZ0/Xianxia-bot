@@ -1987,9 +1987,7 @@ class AdminDashboardController:
         if action == "simulation.force":
             system = str(payload.get("system") or "").strip()
             steps = max(1, min(120, int(payload.get("steps") or 1)))
-            async with self.store._connect() as db:
-                clock = await self.store._world_clock(db)
-            result = await self.engine.force_simulation(system, steps, int(clock["game_minute"]))
+            result = await self.engine.force_simulation(system, steps)
             await self._audit(action="dashboard.simulation.force", target=system, after={"steps": steps, "result": result}, reason=reason)
             return {"ok": True, "action": action, "result": result}
         if action == "backup.create":

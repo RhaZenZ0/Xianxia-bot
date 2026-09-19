@@ -351,7 +351,8 @@ func seededWorld(t *testing.T) (string, BootstrapResult) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	out, err := runner.Bootstrap(BootstrapRequest{GameMinute: 100})
+	setSimulationGameMinute(t, path, 100)
+	out, err := runner.Bootstrap(BootstrapRequest{})
 	if err != nil {
 		t.Fatal(err)
 	}

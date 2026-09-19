@@ -26,7 +26,7 @@ from .remote import GoDatabaseTransport
 log = logging.getLogger("xianxia.database")
 
 
-SCHEMA_VERSION = 55
+SCHEMA_VERSION = 56
 # A readiness probe must validate more than the schema-version marker.  If the
 # SQLite file is removed or replaced while the bot is running, SQLite will
 # happily create a new empty file at the same path.  Checking these tables lets
@@ -218,6 +218,7 @@ OPERATIONAL_REQUIRED_TABLES = frozenset(
         "world_era_events",
         "world_eras",
         "world_event_actions",
+        "world_event_channels",
         "world_event_nodes",
         "world_event_npcs",
         "world_event_participation",
@@ -2468,6 +2469,38 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
             """UPDATE quest_definitions SET status='retired'
                 WHERE quest_key='first_steps' AND status='approved'
                   AND NOT EXISTS (SELECT 1 FROM character_quests WHERE quest_key='first_steps')""",
+        ),
+    ),
+    (
+        56,
+        "one_world_events_channel_per_world",
+        (
+            # v1.0.0-rc.52: a world's news goes to that world's channel.
+            #
+            # `world-events` was one base channel carrying all four worlds, while
+            # the capitals (schema 4) and the auction floors (schema 35) have been
+            # split per world for releases. The shape here is `realm_hub_channels`
+            # minus `location` - an events channel belongs to a world, not to a
+            # place - and it keeps the `UNIQUE(guild_id,channel_id)` the capitals
+            # have and the auction table deliberately drops, because there one
+            # channel really does serve forty-eight houses and here one channel is
+            # exactly one world.
+            #
+            # The base channel is not retired: the weekend gift, a GM's world-reset
+            # announcement and the dashboard's test post have no world and never
+            # will, so it stays as the global feed and as the fallback for anything
+            # whose location the catalogue does not carry.
+            """CREATE TABLE IF NOT EXISTS world_event_channels (
+                guild_id INTEGER NOT NULL,
+                world_name TEXT NOT NULL,
+                channel_id INTEGER NOT NULL,
+                category_id INTEGER,
+                created_at REAL NOT NULL,
+                updated_at REAL NOT NULL,
+                PRIMARY KEY(guild_id,world_name),
+                UNIQUE(guild_id,channel_id)
+            )""",
+            """CREATE INDEX IF NOT EXISTS idx_world_event_channel ON world_event_channels(guild_id,channel_id)""",
         ),
     ),
 )
@@ -4916,6 +4949,8 @@ class Database:
             hub_rows = int(cur.rowcount or 0)
             cur = await db.execute("DELETE FROM auction_house_channels WHERE guild_id=?", (int(guild_id),))
             auction_rows = int(cur.rowcount or 0)
+            cur = await db.execute("DELETE FROM world_event_channels WHERE guild_id=?", (int(guild_id),))
+            world_event_rows = int(cur.rowcount or 0)
             await db.execute("DELETE FROM auction_lot_messages WHERE guild_id=?", (int(guild_id),))
             await db.execute("DELETE FROM playtest_items WHERE guild_id=?", (int(guild_id),))
             cur = await db.execute(
@@ -4924,7 +4959,8 @@ class Database:
             )
             message_rows = int(cur.rowcount or 0)
             await db.commit()
-        return {"server_config": config_rows, "realm_hubs": hub_rows, "auction_houses": auction_rows, "channel_messages": message_rows}
+        return {"server_config": config_rows, "realm_hubs": hub_rows, "auction_houses": auction_rows,
+                "world_events": world_event_rows, "channel_messages": message_rows}
 
     async def get_expedition_thread(self, guild_id: int, user_id: int) -> dict[str, Any] | None:
         async with self._connect() as db:
@@ -6237,6 +6273,25 @@ class Database:
         async with self._connect() as db:
             db.row_factory = aiosqlite.Row
             cur = await db.execute("SELECT * FROM auction_house_channels WHERE guild_id=? ORDER BY house_id", (int(guild_id),))
+            return [dict(row) for row in await cur.fetchall()]
+
+    async def set_world_event_channel(self, *, guild_id: int, world_name: str, channel_id: int, category_id: int | None) -> None:
+        """One world-events channel per world (schema 56). No `location`: the
+        channel belongs to the world, not to a place in it."""
+        now = time.time()
+        async with self._connect() as db:
+            await db.execute(
+                """INSERT INTO world_event_channels(guild_id,world_name,channel_id,category_id,created_at,updated_at)
+                   VALUES(?,?,?,?,?,?) ON CONFLICT(guild_id,world_name) DO UPDATE SET
+                   channel_id=excluded.channel_id,category_id=excluded.category_id,updated_at=excluded.updated_at""",
+                (int(guild_id), str(world_name), int(channel_id), int(category_id) if category_id else None, now, now),
+            )
+            await db.commit()
+
+    async def get_world_event_channels(self, guild_id: int) -> list[dict[str, Any]]:
+        async with self._connect() as db:
+            db.row_factory = aiosqlite.Row
+            cur = await db.execute("SELECT * FROM world_event_channels WHERE guild_id=? ORDER BY world_name", (int(guild_id),))
             return [dict(row) for row in await cur.fetchall()]
 
     async def get_auction(self, auction_id: int) -> dict[str, Any] | None:

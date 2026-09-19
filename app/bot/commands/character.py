@@ -950,7 +950,7 @@ async def reincarnate(interaction:discord.Interaction,name:str,path:str,gender:a
     if result.get("special_trait"):
         lines.append(f"🌌 Samsara Trait: **{result['special_trait']}**")
     try:
-        await ENGINE.bootstrap_simulation(wt.total_minutes)
+        await ENGINE.bootstrap_simulation()
     except Exception:
         log.exception("Could not initialize Go-owned simulation bootstrap after reincarnation")
     await interaction.response.send_message("\n".join(lines))

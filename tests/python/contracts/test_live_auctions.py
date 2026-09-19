@@ -68,10 +68,39 @@ class TheFeedFollowsTheLot(unittest.TestCase):
 class TheChannelsAreDashboardOwned(unittest.TestCase):
     def test_setup_creates_and_the_slash_path_binds(self):
         complete = _body(SETUP, "_run_complete_server_setup")
-        self.assertIn("ensure_auction_house_channels(guild, category_name=SERVER_REALM_CATEGORY, create_missing=create_missing)", complete)
+        self.assertIn("ensure_auction_house_channels(guild, category_name=SERVER_AUCTION_CATEGORY, create_missing=create_missing)", complete)
         realmhubs = _body(SETUP, "admin_realm_hubs")
-        self.assertIn("ensure_auction_house_channels(guild, category_name=category_name)", realmhubs)
+        # v1.0.0-rc.51: this path used to forward the *realm-hub* category
+        # parameter to the auctions, so a GM typing a category name into
+        # `/admin server realmhubs` re-bound the auction rows to it.
+        self.assertIn("ensure_auction_house_channels(guild, category_name=SERVER_AUCTION_CATEGORY)", realmhubs)
         self.assertNotIn("create_missing=True", realmhubs)
+
+    def test_the_auctions_have_a_category_of_their_own(self):
+        """Nine channels (five grand houses, four shared local floors) against
+        four realm capitals: sharing one category made the capitals the
+        minority in the category named after them."""
+        self.assertIn('SERVER_AUCTION_CATEGORY = "', SETUP)
+        auction_calls = [line for line in SETUP.splitlines() if "ensure_auction_house_channels(" in line]
+        self.assertTrue(auction_calls, "nothing provisions the auction channels any more")
+        for line in auction_calls:
+            self.assertNotIn("SERVER_REALM_CATEGORY", line, "an auction channel is still made a capital's")
+            self.assertNotIn("category_name=category_name", line, "a GM's typed category still re-homes the auctions")
+        ensure = _body(CHANNELS, "ensure_auction_house_channels")
+        self.assertNotIn("Realm Capitals", ensure, "the helper's own default still names the capitals")
+
+    def test_an_existing_channel_is_moved_not_merely_rebound(self):
+        """`category=` is read only on creation, so without this a deployed
+        server keeps its auction channels under the capitals for ever and the
+        split reaches a fresh guild only. Behind `can_create`, because Discord
+        layout is dashboard-owned; once per channel, because forty-eight houses
+        share nine of them and `category_id` is read from a cache the edit
+        updates by gateway event."""
+        ensure = _body(CHANNELS, "ensure_auction_house_channels")
+        self.assertIn(
+            "if can_create and category is not None and channel.id not in moved "
+            "and channel.category_id != category.id:", ensure)
+        self.assertIn("await channel.edit(category=category", ensure)
 
     def test_one_channel_per_house_gated_by_the_worlds_access_role(self):
         ensure = _body(CHANNELS, "ensure_auction_house_channels")
