@@ -148,30 +148,6 @@ Every Go SQLite connection uses `journal_mode=WAL`, `foreign_keys=ON`, `busy_tim
 `synchronous=NORMAL`. Current schema version is 58; historical migrations are kept so old databases
 can upgrade in place — see `VERSIONS.md` for the full schema/release history.
 
-### The NPC life cycle (v1.0.0-rc.24)
-
-`npc_romance.go` replaced a pairing that walked one globally sorted list of singles two at a time and
-kept a pair only if both landed on the same `current_location`. Against the shipped catalogue that
-is fifteen usable pairs out of two hundred and forty, at six percent — four weddings a month in a
-world of 574 people, and so almost no couples for `npcChildbirth` to work with. The cause is
-geography: 477 places hold those people and **392 are the only person standing where they stand**.
-Courting now reaches one step, through `game.WhereAnNPCCanWalk` (district↔city), which drops that
-392 to 56. A courtship gains affinity while the pair stay in reach and cools when the roads separate
-them; realm and age must agree *proportionally* (sixty years is a lifetime to a mortal and nothing to
-a Nascent Soul elder); kin and standing grudges are excluded. **There is deliberately no gender
-rule — not one of the 574 catalogue NPCs carries a gender field, so a rule would be inventing
-content rather than reading it.** Two sects on speaking terms also marry their weightiest unattached
-members to each other, which is the first thing that has ever *made* a `marriage_pact` rather than
-describing one at bootstrap.
-
-`bootstrap_households.go` gives a new world a past: ~88 households, ~176 married, ~104 children and
-~29 people near the end of the span their realm allows, all keyed off `hash64` so the same content
-makes the same world twice.
-
-`ReleaseNPCBondsTx` (in `game`, so all three death paths can reach it) widows the survivor. Nothing
-had ever set `relationship_status` back from `'married'`, so a widow stayed married to a corpse,
-could never be courted again, and went on bearing his children.
-
 ### NPCs who go missing (`npc_missing.go`, schema 47)
 
 Somebody away from home can vanish. `status` carries `'missing'` beside `'alive'` and `'dead'`, so
@@ -281,6 +257,343 @@ reporter names a type the vocabulary does not have, or if one speaks before its 
 or a beast off the hunt roster, and only the first is in `world.npcs`, so there is no roster a draft
 could be validated against. The reports carry the name anyway, for the day there is one.
 
+### People this world makes for itself (`npc_registry`, schema 49)
+
+Three populations, and until v1.0.0-rc.27 only one of them could be spoken to. `catalog_npcs` is a
+mirror of `content/world.json`, rewritten from the file at every boot. `birth_family_npcs` is a
+starter household's relatives. `npc_descendants` is children born to two NPCs — and
+`generated_as_npc` on it had existed since the life cycle was written, read by **nothing**, written
+twice as a hardcoded `0`, because there was nowhere to promote a child *into*.
+
+`npc_registry` is that somewhere: authored state, written at runtime, carried in backups, and never
+touched by a rebuild from the content file. **It is deliberately a second table rather than an
+`origin='catalogue'` row in the mirror** — a rebuild is an unconditional `DELETE` over the derived
+table, and the registry is never named in that statement, so no wrong predicate can wipe the world's
+own people on every boot. A name the content file already carries is never taken; the catalogue
+wins, because two people answering to one name is worse than a birth refused.
+
+`origin` is `descendant` / `birth_family` / `event` / `gm`, each with a different lifetime. It is
+GM-facing and `get_registered_npc` strips it before the row can reach a narrator prompt.
+
+- **Coming of age** (`npc_maturation.go`) — at `maturityYears` (18, the same age a played character
+  starts at) a descendant gets prose from `npc_generated_traits`, a registry row, and rows in both
+  simulation tables, so every batch reading `WHERE status='alive'` starts offering them. From then
+  they are an ordinary NPC: courtable, sendable, eventually buried. An orphan is left for a later
+  tick rather than given an invented town.
+- **Relatives** — registered by `registerHouseholdRelativesTx`, called from
+  `grantBirthFamilySendoffTx`, which is the one helper all three doors into a household use, ahead
+  of its early returns because a household with no heirloom still has a family in it.
+- **The prose is content** (`npc_generated_traits` in `world.json`), picked by `hash64` of the name
+  *per field* — one index across all five pools would weld fear to personality and make the world's
+  own people read as a handful of archetypes.
+
+Three readers had drifted from the gate they sit behind, and all three are fixed here.
+`DB.get_npc_definition` now resolves catalogue → registry → running event's cast.
+`narrator.py` was a bare `self.world.npcs[npc_name]` plus six bare field subscripts while the gate
+upstream already fell back to the event cast, so a militia captain passed the gate and `KeyError`'d
+— `/talk`'s `except Exception` turned that into *"the narrator service failed to answer."* It takes
+a duck-typed `npc_resolver` now, injected because `test_app_layout.py` puts `ai` below `database`,
+exactly as `NarratorContextBuilder` already did. And `/sense` refused with *"Unknown NPC."* anybody
+outside the content file while its own picker offered them.
+
+`current_npc_location` answers the registry when there is no simulation row. That matters because
+`None` means "nothing knows where they are", which every caller reads as *do not filter by
+location* — so without it somebody else's uncle would be talkable from across the world.
+
+### The content file as tables (`content_*`, `internal/contentsync`, schema 51)
+
+Nine derived tables — `content_npcs`, `content_locations`, `content_items`, `content_recipes`,
+`content_sects`, `content_shops`, `content_merchants`, `content_manuals`, `content_techniques` —
+mirror `content/world.json` with real, indexed columns. **The engine alone writes them**, from the
+file itself, hash-gated (`world_state['content_version']`), in one transaction, with deletes: the
+Python-written `catalog_*` blobs only ever upserted, so a renamed NPC lived in `catalog_npcs`
+forever.
+
+**Every row is the entry's raw bytes plus a projection.** `data_json` is the exact JSON of that entry
+as it sits in the file, and the typed columns beside it are read off it by `contentsync.Sections` —
+`Text`, `Integer`, or a presence `Flag` for the fields whose value is a structure (`circuit`,
+`hidden_master`). An absent key is `NULL`, never `''`. This is deliberately not the struct-widening
+the plan first called for, which it named "silent when wrong": a field missed in a Go struct is an
+empty column and nothing errors. Keeping the file's own bytes makes the blob complete by
+construction, and `TestProjectionMatchesTheRawEntries` holds every projected column against the real
+2.5 MB — the count of non-NULL cells must equal the count of entries carrying the key.
+
+**Three doors, one apply, and the order is the point.** The tables are filled by the engine but
+created by Python's migration, which in the compose stack runs *after* the engine is healthy — so
+the engine's guarded apply at `server.New` finds no tables on a first boot and does nothing. db-init
+(`app.database.bootstrap`) calls `POST /v1/content/sync` the moment `init()` has run, the bot calls it
+again at `CATALOG_READY` before it counts, and the GM's `admin.content.reload` runs the same apply
+on demand. Together those guarantee the tables are full before any reader in every boot order;
+`test_content_tables.py` asserts the ordering rather than hoping.
+
+**One table, one path (schema 52, v1.0.0-rc.40).** Schema 51 shipped a mode switch —
+`content_table_for(catalog_table, engine_backed)` — because pytest has no engine to fill `content_*`,
+so a local read stayed on the `catalog_*` blob it had always used. That was a deliberate one-release
+loan, and migration 52 calls it in: the five mirrors are dropped, the switch is deleted, and
+`_catalog_get`, `search_catalog`, `catalog_counts` and the dashboard's two catalogue reads name their
+`content_*` table outright. Go's own rules keep reading the memoised in-memory catalogue — a table of
+what the engine already holds parsed would be a slower copy, not a source.
+
+**The no-engine path is a fixture, not a second source.** The obvious way to keep pytest working
+would have been to let Python write `content_*` when no engine is attached — and that is exactly the
+rule those tables exist to enforce, so it is refused. The tables are *created* by Python's migration
+and *filled* only by the engine; a test that needs catalogue rows calls
+`tests/support.seed_content_tables`, which writes the three columns every reader touches (`name`,
+`data_json`, `updated_at`) and leaves the typed projection NULL, where the DDL already expects it.
+The projection has one definition, in Go, and `TestProjectionMatchesTheRawEntries` still owns it.
+`test_content_tables.py` holds the rest: no file under `app/` or `scripts/` may name a retired mirror
+outside the migration list, and each of the five has a `DROPPED_TABLES` entry so the migration drill
+proves the drop rather than shrugging at it.
+
+**What was left of the writer.** `sync_world_catalog` was ~1,800 catalogue upserts plus a territory
+node per location plus the baseline era. The upserts are gone with their tables, and the rest is
+`seed_world_territories` — the part that was never a mirror. The name matters: a method called
+`sync_world_catalog` that syncs no catalogue is the same class of lie as the GM maintenance action
+below, which used to report a resync it had not done.
+
+**The GM sync tells the truth now.** `/admin server maintenance → Sync world catalog` used to write
+`WORLD.data` — this process's copy, parsed at import — and report that it had resynced from
+`world.json`, which it had not. It re-reads the file on both sides: the engine applies into
+`content_*` with an audit row in the same commit — since rc.40 that is the whole catalogue — and
+Python's half reseeds the territory map from a fresh parse (the running `WORLD` is left alone — a hot
+swap of a dict 347 call sites read is not a maintenance action). The message reports the content
+hash, whether anything changed, and that this bot's in-process presentation applies the edit at its
+next restart. `worlddata.Load` is memoised on the file's stat,
+so the Go rules had already picked the edit up on their own.
+
+### The readiness probe (`OPERATIONAL_REQUIRED_TABLES`)
+
+`operational_health` exists to tell a healthy versioned database from the empty file SQLite will
+create if the real one is removed or replaced while the bot is running. It does that by checking
+that a set of tables is present — and since v1.0.0-rc.28 that set is **exact**: every table a fresh
+bootstrap makes, all 169 of them.
+
+It used to be a sample of twenty-seven written for v0.20.7 and never revisited. By schema 49 it
+still named two catalogue mirrors nothing reads for their content and omitted
+`npc_civilization_state`, `inventory`, `character_quests`, `battles` and everything added in
+twenty-nine releases. **A sample cannot be kept honest, because nothing says which tables belong in
+it.** An exact set can: `test_startup_health` holds it against a real bootstrap rather than against
+another list, so adding a table without listing it fails there. That test is the whole mechanism —
+the literal is only reviewable because the test makes it true.
+
+FTS5 virtual tables and their shadow tables are deliberately excluded: they are made by
+`CREATE VIRTUAL TABLE` and rebuilt from their base tables, so their absence is a different fault.
+
+### RAG / memory (`app/ai/rag`)
+
+Deterministic and SQLite-first (FTS5), not embedding/vector-based. Retrieval never creates game
+truth — it surfaces known canonical information only, permission-filtered before scoring:
+
+```text
+live structured SQL -> permission-filtered FTS5 candidates -> deterministic scoring
+  -> small scene-specific context packet -> narrator
+```
+
+Raw player text is tokenized/sanitized before building FTS5 queries (never passed straight to
+`MATCH`). The corpus deliberately excludes NPC secrets, unrevealed schedules, undiscovered
+locations/manuals, raw DB dumps, and GM-only state.
+
+### Structured world history
+
+`world_history_events` records what mechanically happened (deaths, battles, succession, discoveries,
+etc.), separate from current structured state (what's true now — always wins over history). Rows
+carry visibility levels `public` / `participant` / `faction` / `hidden`; hidden rows never reach
+narrator RAG, and a focused NPC does not inherit the player's participant-only knowledge.
+
+### World events and their sites
+
+A world event is a row in `world_events` (category, severity, location, expiry) plus a **site**:
+the concrete, finite things inside it, in `world_event_nodes` (schema 42). Before the site existed an
+event was an empty room - the action menu rolled 2d10 and moved four integers, the only reward in a
+whole scene was one first-participation claim, "Gather Resources" granted no item, and the Battle
+button fought an anonymous "hostile manifestation".
+
+Nodes come in five kinds - `beast`, `herb`, `ore`, `relic`, `task` - and each carries a `total` and a
+`remaining` that depletes as players work it, so a scene can be cleared out and a late arrival can
+see that it was. The roster is content, not code: `event_sites` in `content/world.json` holds one
+template per event category (plus a `default` for categories nobody wrote), each node's count a
+`[min,max]` pair scaled by event severity. Material rewards are written `@herb`/`@ore`/`@core` and
+resolved against the world tier the event landed in, so one template stays correct from the Mortal
+World to the Celestial.
+
+`forage_materials` (v1.0.0-rc.21) is the sibling roster, and the reason the two are separate is that
+these are tier-flat: `talisman_paper`, `spirit_ink` and `array_disk_blank` serve a Mortal scribe and
+a Celestial one alike, so they carry a find chance and a `min_resources` floor rather than a per-world
+material. `forageResolveAction` rolls them beside the tiered herb. Before it existed, shops were their
+only source, so Alchemy and Forging could be gathered into and Inscription and Formation could only
+be bought into - `EveryCraftCanBeGatheredIntoTests` is what holds that shut.
+
+Go owns all of it. `SpawnWorldEventNodes` is called from every world-event spawn path - the
+player-triggered exploration event and the native autonomous simulation batch - so no event can reach
+a player empty; it is idempotent per event key. `world_event.engage` resolves one attempt against one
+node (attribute check vs the node's TN, and on success a guarded `remaining>0` decrement plus the real
+item, cultivation and spirit stones), and an event battle names a real beast from the roster, with the
+node key riding the combat `source` as `event:<key>|node:<node>` so the kill depletes it. Python only
+reads the site (`DB.list_world_event_nodes`, `DB.world_event_site_progress`) and draws it.
+
+An event also brings a **cast** (`world_event_npcs`, schema 43) - the militia captain to report to,
+the visiting elder to impress, the auctioneer whose floor it is - written per category beside the
+nodes and named at spawn from a shared pool, walked forward until the name is free so two live
+events never field the same officer. They are deliberately *not* added to the permanent NPC
+catalogue: an eight-hour captain must not be aged, married and buried by `npc_life`. Instead
+`DB.get_npc_definition` falls back to the cast of a *running* event, which is all `/talk` needs, and
+`NarratorContext._public_npc` does the same so a cast member reaches the narrator with their role,
+manner and stated want rather than as an anonymous local cultivator. Because both lookups filter on
+the event still being active, the rows need no cleanup - they simply stop answering when it closes.
+
+### Narration routing
+
+Two chains, "routine" (ordinary scenes) and "epic" (breakthroughs, sect trials, major events), each
+walking primary model -> fallback model -> `openrouter/free` -> procedural narration on failure.
+
+Reasoning is disabled per-request (`OPENROUTER_DISABLE_REASONING=true`) and `OPENROUTER_REQUIRE_FREE`
+rejects paid model IDs. Rate limiting is fail-fast (no queuing) and shared with the admin
+`chat_digest` monitor, so an unbounded transcript can starve narration — see `MONITOR_*` env knobs.
+
+Optionally (v0.26.0) a direct Google AI Studio route (`aistudio/<model>`, `app/ai/google_route.py`)
+leads both chains when `GOOGLE_AI_STUDIO_API_KEY` is set. It is the one route that does not go
+through OpenRouter, so it deliberately does not spend `AITaskRouter.limiter` - OpenRouter's daily
+free budget - and `OPENROUTER_REQUIRE_FREE` does not apply to it. It is still narration-only and
+still passes through `_validate_generated_text`, so it is not trusted more than any other route.
+`google-genai` is an optional, lazily imported dependency: absent or incompatible, the route is left
+out of the chain and `ai_status` reports why.
+
+Every `ROUTE_AUDIT_HOURS` (v0.27.0, default 24, `0` off) `audit_routes()` pings each configured route
+with the cheapest call the API takes — one character in, `max_tokens=1`, reply discarded unread — and
+retires the ones that answer `401`/`403`/`404`. A `400` is not a verdict but a family of causes, so
+`_classify_bad_request` isolates one variable per confirmation: first an ordinary token budget with
+`REASONING_OFF` still attached (success means the 400 was the one-token probe hitting a provider
+minimum), then the same call with the `reasoning` object removed (success means the parameter was
+the cause, and only that retires). A 400 that survives both is not parameter-caused and is recorded,
+not acted on; the verdict is stored per route as `probe_400_class` for the panel. `429`s and
+timeouts never retire anything; that is what the per-route cooldown is for. The audit spends the shared budget it uses, stands down below half the daily
+allowance, and retires nothing when *every* route fails at once (a local fault, not an empty
+catalogue). The AI Studio route is never retired whatever it answers — it is the operator's own key
+on its own quota, outside the shared budget. It proves reachability only — a scratchpadding model passes it, so
+`_validate_generated_text` remains the sole judge of whether a reply is usable prose.
+
+Since v0.31.0 a live call is made for three reasons only: an NPC answering a player (`dialogue`),
+an epic beat (`epic`), or an explicit ask (`narrate_it` - the typed-play picker's *Narrate it*, the
+button under an exploration or hunt result, an @mention, or the GM's `ai_routine_narration`
+automation flag). `narrate_exploration` and `narrate_hunt_result` are procedural by default and
+take `upgrade=True` for the explicit path; every `_generate` call names its purpose and the router
+counts purposes for the AI Routing page. The procedural floor is content: `narration_pool` in
+`content/world.json` (eleven scene kinds by four world tiers - seven scenes and the four road-site
+explorations since v1.0.0-rc.2), chosen deterministically by
+`app/rules/narration_pool.py`. One per-player bucket (`TYPED_PLAY_BURST` / `TYPED_PLAY_PER_MINUTE`)
+meters every door - typed lines, shorthand commands (`x explore`, v1.0.0, the one door heard in
+every channel of the guild), `serialized_user_action` (slash and hub), Narrate-it - and reports
+per door. `tests/python/contracts/test_narrator_budget.py` holds all of it.
+
+### Narration routes in the dashboard
+
+The GM dashboard's **Narration Routes** panel also carries the ten-dollar switch (v0.31.0):
+OpenRouter's free allowance is 50 requests a day under ten dollars of credit and 1000 above, so
+`credits_topped_up` is stored beside the slots by the same engine write and applied through
+`set_slots`; `OPENROUTER_CREDITS_TOPPED_UP` is the `.env` baseline. The panel picks the five chain slots
+(`routine_model`, `routine_fallback_model`, `epic_model`, `epic_fallback_model`,
+`dynamic_free_model`) from OpenRouter's live free catalogue rather than from a list kept in this
+repo — a list kept here is how `z-ai/glm-5.2:free` and `minimax/minimax-m3:free` both shipped as
+defaults that no longer existed. The AI Studio lead is not settable: it exists only when the
+operator has put their own Google key in the environment.
+
+Three processes, and the order is the point. The browser posts to the dashboard; the dashboard
+writes through the engine (`admin.narration.set_chain` → `world_state['narration_chain']` +
+`admin_audit_log`, no schema change — it follows `admin.automation.set`); then it pokes the bot
+over the existing `/control/discord` channel (`narration.apply`) to re-read and apply it live.
+The engine write is what makes a choice durable and audited, so it happens first and independently
+— an unreachable bot means "stored, applies at next restart", not a failure. The bot also applies
+the stored chain at startup, so `.env` is the baseline rather than the last word.
+
+`AITaskRouter` keeps the slots as slots (not only as assembled chains) so `set_slots()` can rebuild
+in place; `OPENROUTER_REQUIRE_FREE` still applies, every slot is validated before any is assigned,
+and a newly chosen route has its probe verdict cleared so it does not inherit the previous
+occupant's retirement.
+
+### Dashboard (`app/dashboard`, `dashboard/`)
+
+Authenticated GM control plane; production reads go through Go-owned query sessions (dashboard never
+opens SQLite directly), and every state-changing GM action is written to `admin_audit_log`.
+`/api/capabilities` is the frontend/backend coverage contract checked by
+`scripts/check_dashboard_implementation.py` and CI. One view is not backed by SQLite: `ai_routing`
+reads the narration router's in-process chains, counters and audit verdicts through the bot control
+plane, and is read-only (no `admin_audit_log` row, and it sits under Systems, not Admin).
+
+**The Player Editor (v1.0.0-rc.37)** is where one character's levers live. The Admin Console had
+sixteen cards that each began with a Player select and knew nothing about the character chosen -
+a GM setting a realm typed 0/1 over whatever was there, and the bloodline card wanted an id the
+GM had to look up on another page. `player_editor` picks a player once (the picker sits in the
+page header, and the drawer on Player Activity opens it), reads `/api/player`, and draws every
+`player.*` action the controller maps, pre-filled from the row that action writes: `player_detail`
+returns the wallets, root, bloodlines, physique, tribulation gates, perfection rows, beasts,
+equipment, abode and its guests, pill toxicity and fate beside the sheet, so the ids a lever needs
+(`bloodline_id`, `beast_id`, `equipment_id`, `guest_user_id`) are picked, not typed. The console
+keeps what acts on the world or the server. Nothing about the write path changed: the same
+`/api/admin/action`, the same `ACTION_MAP`, the same audit row - the editor decides nothing, it only
+fills the form. `test_the_player_editor_owns_every_per_player_lever` holds that every mapped
+`player.*` action is driven from the editor and none from the console, and that a snowflake is
+never put through `Number()` on the way (`EDIT_UID` is the string the server returned).
+
+The Discord `/admin` panel has the same shape since rc.37: rc.13 had split `/admin player` into
+Players, Grants and Moderation so no page needed a Next button, and they are one **Player Edit**
+head again by request, the one page `test_hub_pages.py` allows past the eight-row layout (the
+panel pages it with "More actions"; `LONG_PAGES` names it and nothing else). It also gained
+`/admin player setrealm`, the only realm lever on the Discord side, with the same optional body
+pair; the engine writes its audit row, so the handler logs nothing of its own.
+
+The Admin Console's NPC card (rc.38) carries **Lose** and **Bring back** beside Relocate:
+`admin.npc.set_missing`, the disappearance a GM can stage, audited and undoable like relocate. See
+"What only the world makes" above for why it writes the tick's own row.
+
+
+## What each release found
+
+Each section below is one release's finding, in the order they were found. They are kept because the
+recurring fault in this codebase was never a broken mechanic - it was a finished mechanic with one
+wire missing, and the only reliable defence has been writing down what the last one looked like.
+Read them as the reasons behind the rules above, not as a changelog: `VERSIONS.md` is the changelog.
+
+### The NPC life cycle (v1.0.0-rc.24)
+
+`npc_romance.go` replaced a pairing that walked one globally sorted list of singles two at a time and
+kept a pair only if both landed on the same `current_location`. Against the shipped catalogue that
+is fifteen usable pairs out of two hundred and forty, at six percent — four weddings a month in a
+world of 574 people, and so almost no couples for `npcChildbirth` to work with. The cause is
+geography: 477 places hold those people and **392 are the only person standing where they stand**.
+Courting now reaches one step, through `game.WhereAnNPCCanWalk` (district↔city), which drops that
+392 to 56. A courtship gains affinity while the pair stay in reach and cools when the roads separate
+them; realm and age must agree *proportionally* (sixty years is a lifetime to a mortal and nothing to
+a Nascent Soul elder); kin and standing grudges are excluded. **There is deliberately no gender
+rule — not one of the 574 catalogue NPCs carries a gender field, so a rule would be inventing
+content rather than reading it.** Two sects on speaking terms also marry their weightiest unattached
+members to each other, which is the first thing that has ever *made* a `marriage_pact` rather than
+describing one at bootstrap.
+
+`bootstrap_households.go` gives a new world a past: ~88 households, ~176 married, ~104 children and
+~29 people near the end of the span their realm allows, all keyed off `hash64` so the same content
+makes the same world twice.
+
+`ReleaseNPCBondsTx` (in `game`, so all three death paths can reach it) widows the survivor. Nothing
+had ever set `relationship_status` back from `'married'`, so a widow stayed married to a corpse,
+could never be courted again, and went on bearing his children.
+
+### What NPCs do on their own (`npc_deeds.go`, v1.0.0-rc.24)
+
+A step of the `npc_life` batch, after the feuds: a criminal trade (or anyone ambitious enough and
+poor enough) robs, beats or smuggles; a hunting trade goes out after a beast from the same roster
+`/hunt` uses (`game.RollHuntQuarry`). Everything writes a column that already existed — wealth and
+`activity` on `npc_civilization_state`, health and injury on `npc_life_state`, grudges in
+`npc_social_relations`, contraband in `black_market_stock`, lots in `auctions`, the record in
+`world_history_events`.
+
+**NPCs never get a `crime_records` row.** That table is FK'd to `characters` and is the player's:
+an NPC row there would mean a bounty nobody can collect and a capture nothing can perform. The
+visibility ladder above carries NPC crime instead — a crime with a witness is `public` and leaves a
+named grudge that `npcFeuds` later settles; one without is `hidden`, so it never reaches narrator
+RAG and the world really does not know who did it. A killing is always `public` (a body is found);
+the summary is what says whether the culprit is named. Making NPC crime prosecutable would be a
+schema change and is a separate decision — do not add it casually.
+
 ### The path a new cultivator is put on (`beginner_path`, v1.0.0-rc.26)
 
 `first_steps` — "First Steps Beneath Heaven" — has been in `app/rules/quests.py` since before the
@@ -313,6 +626,54 @@ Four rules hold it:
 
 "Fires once" is the `(user_id, quest_key)` primary key — the row is the memory, which is what makes
 the grant safe to call from creation, a dao-family rebirth and a samsara return alike.
+
+### What it costs to draw a scene (v1.0.0-rc.28)
+
+Three things on the content path cost far more than they look, and all three are on the hot path.
+
+**"Who is standing here" was 574 engine round trips.** Every surface that draws it — `/action`'s
+target picker, `/scene status`, `/world`, `/world → City → Look` — walked the whole NPC catalogue
+calling `npc.status` per name, inside an `await`, so serially. `npcs_present(location, period)` in
+`app/bot/locations.py` is the one resolver now.
+
+**What bounds it is asking content first, and that is easy to get wrong in a way no source check can
+see.** One `npc.at_location` query gets everybody the engine has standing here; the obvious next
+step — fall through to `current_npc_location` for everybody the query did not return — is the old
+cost with a new shape, because the people it did not return are the five hundred and fifty-eight who
+are demonstrably somewhere else. So the in-process catalogue rules them out before anybody is
+resolved: only an NPC content places here this period can still be in doubt, and only those cost a
+round trip. Measured against the shipped catalogue, one open is `npc.at_location` ×1 and
+`npc.status` ×1. Content can be wrong in exactly one direction — it does not know about autonomous
+travel — and that direction is covered by the first query, because somebody the simulation walked
+here has a row saying so.
+
+It keeps the same order of precedence `current_npc_location` does, and it has to: circuit first, then
+the simulation, then the schedule. A picker that offers somebody `/talk` then refuses them is worse
+than either being wrong alone — and the schedule is the half the engine cannot know, because it is
+content: a row at its NPC's *home* is a routine, not a whereabouts, so the fourteen catalogue NPCs
+whose day takes them out of their home town were offered in the wrong room at twenty (place, period)
+pairs until the override was applied here too. A missing person is exempt: they keep no routine
+(schema 47) and their row is the whole truth. `npc.at_location` is deliberately narrow —
+`npc.status` carries relationships, disciple bonds and the life row, and loading all of that for
+everybody in a city to decide whether to list them is what made the old shape slow twice over.
+
+`test_who_is_here.py` measures both of those with a counting fake rather than reading the source,
+because the source reads correctly in both the fast and the slow version — the round trips are one
+level down, inside `current_npc_location`.
+
+**`worlddata.Load` re-parsed 2.5 MB per action.** Fifteen of its seventeen call sites are in
+`authoritative.go`, inside the request path. It is memoised on `(path, mtime, size)` — not on the
+path alone, so an operator editing content on a live NAS still does not need a restart. Size is in
+the key beside the timestamp because some filesystems keep mtime at one-second resolution, and two
+edits inside the same second that change the length would otherwise serve the older parse.
+
+**Boot spent ~2,000 HTTP round trips rewriting unchanged content.** On the Go-backed path each
+`db.execute` is one POST, and `sync_world_catalog` made about 1,800 catalogue upserts plus one
+territory node per location, one at a time. They go in a single `/v1/db/batch` request now — an
+endpoint that had existed on the transport since the Go engine landed with nothing on this path
+using it. The statements stay inside `sync_world_catalog` rather than in a helper because
+`test_authority_boundary` reads the write allowlists off the method that contains the SQL, and
+moving them out would mean widening an authority gate for a refactor that changes no authority.
 
 ### What the household teaches, and how well (Tradition + Tutoring, v1.0.0-rc.31)
 
@@ -430,6 +791,42 @@ pass over `birth_family_npcs`, which no batch reads today), and the family simul
 only `history_json` rather than `world_history_events`, because starter households are shared and
 the visibility of a shared family's news is a decision, not a default.
 
+### The Discord half of the playtest (`scripts/playtest_discord.py`, v1.0.0-rc.33)
+
+`scripts/playtest_engine.py` drives the roadmap's loops through the engine's HTTP API; everything a
+player actually touches - slash commands, the hub panels, their pickers and modals, private threads,
+typed lines - was a hand-ticked checklist that nothing ran. `playtest_discord.py` boots `app.bot`
+unmodified inside **SimCord** (`simcord==2.0.1`, MIT, only dependency `discord.py>=2.7.1`): an
+in-memory Discord that runs discord.py's real machinery, replacing exactly two seams - `bot.http` is a
+fake REST client over an in-memory model, and gateway events are fed straight into discord.py's own
+parsers, so `setup_hook` runs, `tree.sync(guild=GUILD)` registers into the fake, `on_ready` fires
+through normal dispatch, and a test actor fires `/family`, presses a panel's buttons, chooses from its
+selects, submits its modals and types `$ I explore`, then reads what came back. **Every loop goes
+through those surfaces**, never through a handler or a `DB` method: the point is the wiring the
+engine playtest cannot see. Nothing asserts on dice.
+
+Three rules hold it. **The environment is set before the bot is imported**: `app/bot/runtime.py`
+builds `SETTINGS`, `ENGINE` and `DB` at import and `bot.py` makes the singleton, so `_configure` puts
+the scratch engine, a numeric `GUILD_ID` (which `env.create_guild(id=…)` must repeat - `GUILD` is
+`discord.Object(id=SETTINGS.guild_id)`), a non-default `HEALTH_PORT`, `NARRATOR_PROVIDER=procedural`
+and the workers' off switches into `os.environ` first; `test_playtest_gate` holds that no module-level
+`app` import exists. **SimCord is a dev dependency only** (`requirements-dev.txt`, beside pytest and
+ruff): nothing under `app/` imports it, so `requirements.lock` and the Dockerfile's `--require-hashes`
+install never carry it, and the gate test holds all three. **It is a script, not CI**: the bot cannot
+boot without the Go engine and the CI `python` job has none, so like the engine half it is run
+before a release (`python scripts/playtest_discord.py --launch` builds and starts one).
+
+Two settings the harness raises are findings in their own right: typed play in a private thread
+listens only with `AUTO_NARRATE=true` and the message-content intent, and the per-player action meter
+(`TYPED_PLAY_BURST`/`TYPED_PLAY_PER_MINUTE`, about six a minute) refuses anything that presses sixty
+buttons in one - right for a person, and the harness says so. And its first green run found a bug no
+source read had: a modal opened from a panel (Contribute, a GM's category name) submits with the
+panel as its message, but is acknowledged with a "thinking" placeholder, and `_show_result_in_panel`
+edited the *original response* - so the placeholder became a second panel and the real one kept
+buttons `rebuild()` had already orphaned, dead until reopened. A modal now takes the direct
+`panel.edit` and the placeholder is deleted, the way a picker's step message always was;
+`test_gui_ii.py` holds it with a `modal_submit` source.
+
 ### The last lesson (`household_lesson.go`, v1.0.0-rc.34)
 
 The beginner path walked a new cultivator out of the household, through the town and the road, and
@@ -480,42 +877,6 @@ Ancestral Seat", and a registry row would have to follow both.
 `household_lesson_test.go` lends the dice (`gamerng.UseRoller`) and holds every rule above; the two
 playtest harnesses assert only what is certain either way — the check is printed, and the second ask is
 refused, as "already taught" after a pass or as the wait after a fail.
-
-### The Discord half of the playtest (`scripts/playtest_discord.py`, v1.0.0-rc.33)
-
-`scripts/playtest_engine.py` drives the roadmap's loops through the engine's HTTP API; everything a
-player actually touches - slash commands, the hub panels, their pickers and modals, private threads,
-typed lines - was a hand-ticked checklist that nothing ran. `playtest_discord.py` boots `app.bot`
-unmodified inside **SimCord** (`simcord==2.0.1`, MIT, only dependency `discord.py>=2.7.1`): an
-in-memory Discord that runs discord.py's real machinery, replacing exactly two seams - `bot.http` is a
-fake REST client over an in-memory model, and gateway events are fed straight into discord.py's own
-parsers, so `setup_hook` runs, `tree.sync(guild=GUILD)` registers into the fake, `on_ready` fires
-through normal dispatch, and a test actor fires `/family`, presses a panel's buttons, chooses from its
-selects, submits its modals and types `$ I explore`, then reads what came back. **Every loop goes
-through those surfaces**, never through a handler or a `DB` method: the point is the wiring the
-engine playtest cannot see. Nothing asserts on dice.
-
-Three rules hold it. **The environment is set before the bot is imported**: `app/bot/runtime.py`
-builds `SETTINGS`, `ENGINE` and `DB` at import and `bot.py` makes the singleton, so `_configure` puts
-the scratch engine, a numeric `GUILD_ID` (which `env.create_guild(id=…)` must repeat - `GUILD` is
-`discord.Object(id=SETTINGS.guild_id)`), a non-default `HEALTH_PORT`, `NARRATOR_PROVIDER=procedural`
-and the workers' off switches into `os.environ` first; `test_playtest_gate` holds that no module-level
-`app` import exists. **SimCord is a dev dependency only** (`requirements-dev.txt`, beside pytest and
-ruff): nothing under `app/` imports it, so `requirements.lock` and the Dockerfile's `--require-hashes`
-install never carry it, and the gate test holds all three. **It is a script, not CI**: the bot cannot
-boot without the Go engine and the CI `python` job has none, so like the engine half it is run
-before a release (`python scripts/playtest_discord.py --launch` builds and starts one).
-
-Two settings the harness raises are findings in their own right: typed play in a private thread
-listens only with `AUTO_NARRATE=true` and the message-content intent, and the per-player action meter
-(`TYPED_PLAY_BURST`/`TYPED_PLAY_PER_MINUTE`, about six a minute) refuses anything that presses sixty
-buttons in one - right for a person, and the harness says so. And its first green run found a bug no
-source read had: a modal opened from a panel (Contribute, a GM's category name) submits with the
-panel as its message, but is acknowledged with a "thinking" placeholder, and `_show_result_in_panel`
-edited the *original response* - so the placeholder became a second panel and the real one kept
-buttons `rebuild()` had already orphaned, dead until reopened. A modal now takes the direct
-`panel.edit` and the placeholder is deleted, the way a picker's step message always was;
-`test_gui_ii.py` holds it with a `modal_submit` source.
 
 ### The playtest touches everything (v1.0.0-rc.35)
 
@@ -690,55 +1051,6 @@ the audited lever changes it. `/admin world advancetime` gained an optional `sca
 given. `Settings.world_time_scale` is gone, and
 `tests/python/contracts/test_world_clock_read_through.py` holds that no file under `app/` or
 `scripts/` so much as names `anchor_real_ts`.
-
-### What time it is was never the caller's to say (v1.0.0-rc.48)
-
-rc.39 took the world clock's arithmetic away from Python. This is the last thing a caller could
-still *tell* the engine about time, and it is the one `docs/KNOWN_LIMITATIONS.md` had carried as a
-deferred Authority item, sized there as "a Go change of its own".
-
-`RunDueRequest.GameMinute` has been accepted-and-ignored since the v0.22.2 review, with the reason
-written on the field: **"a scheduled tick must not be able to tell the world what time it is."**
-`ForceRequest` and `BootstrapRequest` carried the same field and *used* it, for twenty-six more
-releases — and `runSystem`'s own doc comment, two hundred lines below that field, said it stamped
-the anchor "at a **caller-chosen** minute". One rule, two answers, both written down.
-
-**What the number does is why it matters.** It is not a label on a log line: every system under
-`applySystem` reads it as *now*. It is the minute an NPC's age is measured against, the birth minute
-`seedHouseholds` stamps on ~88 households, the anchor `world_simulation_state.last_game_minute`
-carries, and the founding of every clan. A caller sending a number a year out does not mis-title a
-run — it buries people.
-
-Both derive `game.CanonicalWorldGameMinute` now, the one door `RunDue` already reads.
-
-- **The wire field stays, on all three, deliberately.** An older bot mid-upgrade still POSTs
-  `game_minute`, and a request *refused* for carrying one would turn a rolling deploy into an
-  outage. It is the value that is ignored, not the request, and `TestTheWireStillAcceptsAMinuteItIgnores`
-  holds that — including a negative one and `1<<60`.
-- **Python stopped computing it.** The three client methods take no minute, and nine call sites
-  stopped deriving one to ship and have discarded. `WorldSimulator.initialize` still *takes* a
-  `game_minute` and that is correct: it is a **read**, asking which black markets are open, and it
-  no longer passes one on.
-- **Two gates, because neither half can see the other.** `caller_minute_test.go` sends a wild minute
-  and asserts the canonical one landed — against the old code it fails with `Force stamped 9999999`
-  and `Bootstrap anchored at -4000000`, the production symptom exactly.
-  `tests/python/contracts/test_simulation_minute.py` holds that nothing in `app/` or `scripts/` sends
-  one, reading the client's *signatures* by AST so a parameter cannot creep back, and holds the wire
-  field and the Go gate still present.
-
-**The assertion that encoded the fault was two tests below the one that refuses it.**
-`test_game_engine.py` has held since v0.22.2 that `authoritative_action` rejects a client
-`game_minute` ("Go owns current world time") — and directly under it sat
-`test_simulation_endpoints_keep_explicit_scheduler_time`, asserting `payload["game_minute"] == 12345`.
-A file can hold a rule and its opposite a dozen lines apart and stay green for twenty-six releases;
-that is worth knowing before trusting that a rule is enforced because a test near it says so.
-
-**The fixtures needed the clock, and that is the rule this repo already states.** Two bootstrap
-fixtures had no `world_state` table, so the canonical read failed on them — production always has it
-(Python's migration makes it before the engine is ever asked to bootstrap), so the fixture was the
-thing that could not fail the way production fails. The ten test call sites that used to pass a
-minute now pin the clock with `setSimulationGameMinute`, a helper written for `RunDue`'s own fix and
-sitting unused by these paths ever since.
 
 ### The world closed for maintenance (`maintenance_mode`, v1.0.0-rc.41)
 
@@ -1011,6 +1323,41 @@ recipes were a shop transaction and nothing else.
   money of the world the hall stands in, which is the rc.44 rule and which the first version of
   `profession_exam_test.go` learned by picking an Immortal World hall for a Mortal candidate.
 
+### The journal offers what nothing hands over (v1.0.0-rc.46)
+
+rc.45's own fault, seen from the other side. It gave five rosters the power to hand a quest over and
+left `QuestService.available` — the `/quests` "Available" block, the `/character → Quests` page, and
+the accept select built from the same list — offering every one of their quests from minute one. The
+first Discord sweep after the merge printed the proof: a character seconds old, shown ten
+examinations, `The Expert's Toxicity` among them, at Novice, holding no trade.
+
+**Accepting one is what stops its roster ever offering it.** `grantOrdinaryQuestTx` reads an
+already-held quest as `(false, nil)` — a "no", not an error — so `offerProfessionExamTx` returns the
+empty string, `exam_offered` is absent from the craft result, and the hall never says the examination
+is open. `family.errand` hands over "the next unheld one", so a player could take all twelve from the
+journal and empty the errand system; the beginner chain hands over a stage that has been sitting in
+the journal since creation.
+
+The rule is one frozenset of `source_key` **families** — the part before the first colon, which is
+the shape the seeders in `app/rules/quests.py` already write (`household_errand:<trade>`,
+`profession_exam:<trade>`, `world_crossing:<world>`, plus the bare `beginner_path` and
+`sect_recruitment`) — stated once as `HANDED_OVER_BY_A_ROSTER` beside `visible_to`, in `ops` rather
+than in `rules` because the layering puts those two side by side and neither may import the other.
+`test_quests_reach_a_player.py` holds the frozenset **equal** to what the seeders write, so a sixth
+roster fails the gate rather than quietly putting its quests back on the list, and it holds that no
+seeded quest arrives two ways at once (a giver and a roster would be two doors, one of which
+`grantOrdinaryQuestTx` refuses by design).
+
+What is left under "Available" for most players is the Quest Forge's approved drafts and nothing
+else, so where the journal used to print a list it now names where quests do come from. Nothing but
+presentation changed: no engine action, no schema, no content.
+
+**The harness had a stale assertion of its own**, and it is worth knowing which kind. The `/quests`
+step looked for "First Steps" — `first_steps`, which was never held by anybody and only ever appeared
+*under "Available"* — so rc.45 retiring that orphan broke the one step that reads the page. It reads
+`beginner_household`'s real title now ("Before the Door"), which is a quest the player actually
+holds, and it holds the finding: no roster's quest may appear under "Available".
+
 ### The checklist says what the sweep proved (v1.0.0-rc.47)
 
 `docs/playtest/v1.0.0.md` is generated from the tree, and until now every one of its 248 actions
@@ -1048,248 +1395,54 @@ the preamble that explains it, so a whole-file search passed while the row a per
 it is searched for inside the table now. A gate that cannot see the thing it forbids is decoration,
 and only running it against the broken tree says which kind you have.
 
-### The journal offers what nothing hands over (v1.0.0-rc.46)
+### What time it is was never the caller's to say (v1.0.0-rc.48)
 
-rc.45's own fault, seen from the other side. It gave five rosters the power to hand a quest over and
-left `QuestService.available` — the `/quests` "Available" block, the `/character → Quests` page, and
-the accept select built from the same list — offering every one of their quests from minute one. The
-first Discord sweep after the merge printed the proof: a character seconds old, shown ten
-examinations, `The Expert's Toxicity` among them, at Novice, holding no trade.
+rc.39 took the world clock's arithmetic away from Python. This is the last thing a caller could
+still *tell* the engine about time, and it is the one `docs/KNOWN_LIMITATIONS.md` had carried as a
+deferred Authority item, sized there as "a Go change of its own".
 
-**Accepting one is what stops its roster ever offering it.** `grantOrdinaryQuestTx` reads an
-already-held quest as `(false, nil)` — a "no", not an error — so `offerProfessionExamTx` returns the
-empty string, `exam_offered` is absent from the craft result, and the hall never says the examination
-is open. `family.errand` hands over "the next unheld one", so a player could take all twelve from the
-journal and empty the errand system; the beginner chain hands over a stage that has been sitting in
-the journal since creation.
+`RunDueRequest.GameMinute` has been accepted-and-ignored since the v0.22.2 review, with the reason
+written on the field: **"a scheduled tick must not be able to tell the world what time it is."**
+`ForceRequest` and `BootstrapRequest` carried the same field and *used* it, for twenty-six more
+releases — and `runSystem`'s own doc comment, two hundred lines below that field, said it stamped
+the anchor "at a **caller-chosen** minute". One rule, two answers, both written down.
 
-The rule is one frozenset of `source_key` **families** — the part before the first colon, which is
-the shape the seeders in `app/rules/quests.py` already write (`household_errand:<trade>`,
-`profession_exam:<trade>`, `world_crossing:<world>`, plus the bare `beginner_path` and
-`sect_recruitment`) — stated once as `HANDED_OVER_BY_A_ROSTER` beside `visible_to`, in `ops` rather
-than in `rules` because the layering puts those two side by side and neither may import the other.
-`test_quests_reach_a_player.py` holds the frozenset **equal** to what the seeders write, so a sixth
-roster fails the gate rather than quietly putting its quests back on the list, and it holds that no
-seeded quest arrives two ways at once (a giver and a roster would be two doors, one of which
-`grantOrdinaryQuestTx` refuses by design).
+**What the number does is why it matters.** It is not a label on a log line: every system under
+`applySystem` reads it as *now*. It is the minute an NPC's age is measured against, the birth minute
+`seedHouseholds` stamps on ~88 households, the anchor `world_simulation_state.last_game_minute`
+carries, and the founding of every clan. A caller sending a number a year out does not mis-title a
+run — it buries people.
 
-What is left under "Available" for most players is the Quest Forge's approved drafts and nothing
-else, so where the journal used to print a list it now names where quests do come from. Nothing but
-presentation changed: no engine action, no schema, no content.
+Both derive `game.CanonicalWorldGameMinute` now, the one door `RunDue` already reads.
 
-**The harness had a stale assertion of its own**, and it is worth knowing which kind. The `/quests`
-step looked for "First Steps" — `first_steps`, which was never held by anybody and only ever appeared
-*under "Available"* — so rc.45 retiring that orphan broke the one step that reads the page. It reads
-`beginner_household`'s real title now ("Before the Door"), which is a quest the player actually
-holds, and it holds the finding: no roster's quest may appear under "Available".
+- **The wire field stays, on all three, deliberately.** An older bot mid-upgrade still POSTs
+  `game_minute`, and a request *refused* for carrying one would turn a rolling deploy into an
+  outage. It is the value that is ignored, not the request, and `TestTheWireStillAcceptsAMinuteItIgnores`
+  holds that — including a negative one and `1<<60`.
+- **Python stopped computing it.** The three client methods take no minute, and nine call sites
+  stopped deriving one to ship and have discarded. `WorldSimulator.initialize` still *takes* a
+  `game_minute` and that is correct: it is a **read**, asking which black markets are open, and it
+  no longer passes one on.
+- **Two gates, because neither half can see the other.** `caller_minute_test.go` sends a wild minute
+  and asserts the canonical one landed — against the old code it fails with `Force stamped 9999999`
+  and `Bootstrap anchored at -4000000`, the production symptom exactly.
+  `tests/python/contracts/test_simulation_minute.py` holds that nothing in `app/` or `scripts/` sends
+  one, reading the client's *signatures* by AST so a parameter cannot creep back, and holds the wire
+  field and the Go gate still present.
 
-### People this world makes for itself (`npc_registry`, schema 49)
+**The assertion that encoded the fault was two tests below the one that refuses it.**
+`test_game_engine.py` has held since v0.22.2 that `authoritative_action` rejects a client
+`game_minute` ("Go owns current world time") — and directly under it sat
+`test_simulation_endpoints_keep_explicit_scheduler_time`, asserting `payload["game_minute"] == 12345`.
+A file can hold a rule and its opposite a dozen lines apart and stay green for twenty-six releases;
+that is worth knowing before trusting that a rule is enforced because a test near it says so.
 
-Three populations, and until v1.0.0-rc.27 only one of them could be spoken to. `catalog_npcs` is a
-mirror of `content/world.json`, rewritten from the file at every boot. `birth_family_npcs` is a
-starter household's relatives. `npc_descendants` is children born to two NPCs — and
-`generated_as_npc` on it had existed since the life cycle was written, read by **nothing**, written
-twice as a hardcoded `0`, because there was nowhere to promote a child *into*.
-
-`npc_registry` is that somewhere: authored state, written at runtime, carried in backups, and never
-touched by a rebuild from the content file. **It is deliberately a second table rather than an
-`origin='catalogue'` row in the mirror** — a rebuild is an unconditional `DELETE` over the derived
-table, and the registry is never named in that statement, so no wrong predicate can wipe the world's
-own people on every boot. A name the content file already carries is never taken; the catalogue
-wins, because two people answering to one name is worse than a birth refused.
-
-`origin` is `descendant` / `birth_family` / `event` / `gm`, each with a different lifetime. It is
-GM-facing and `get_registered_npc` strips it before the row can reach a narrator prompt.
-
-- **Coming of age** (`npc_maturation.go`) — at `maturityYears` (18, the same age a played character
-  starts at) a descendant gets prose from `npc_generated_traits`, a registry row, and rows in both
-  simulation tables, so every batch reading `WHERE status='alive'` starts offering them. From then
-  they are an ordinary NPC: courtable, sendable, eventually buried. An orphan is left for a later
-  tick rather than given an invented town.
-- **Relatives** — registered by `registerHouseholdRelativesTx`, called from
-  `grantBirthFamilySendoffTx`, which is the one helper all three doors into a household use, ahead
-  of its early returns because a household with no heirloom still has a family in it.
-- **The prose is content** (`npc_generated_traits` in `world.json`), picked by `hash64` of the name
-  *per field* — one index across all five pools would weld fear to personality and make the world's
-  own people read as a handful of archetypes.
-
-Three readers had drifted from the gate they sit behind, and all three are fixed here.
-`DB.get_npc_definition` now resolves catalogue → registry → running event's cast.
-`narrator.py` was a bare `self.world.npcs[npc_name]` plus six bare field subscripts while the gate
-upstream already fell back to the event cast, so a militia captain passed the gate and `KeyError`'d
-— `/talk`'s `except Exception` turned that into *"the narrator service failed to answer."* It takes
-a duck-typed `npc_resolver` now, injected because `test_app_layout.py` puts `ai` below `database`,
-exactly as `NarratorContextBuilder` already did. And `/sense` refused with *"Unknown NPC."* anybody
-outside the content file while its own picker offered them.
-
-`current_npc_location` answers the registry when there is no simulation row. That matters because
-`None` means "nothing knows where they are", which every caller reads as *do not filter by
-location* — so without it somebody else's uncle would be talkable from across the world.
-
-### What it costs to draw a scene (v1.0.0-rc.28)
-
-Three things on the content path cost far more than they look, and all three are on the hot path.
-
-**"Who is standing here" was 574 engine round trips.** Every surface that draws it — `/action`'s
-target picker, `/scene status`, `/world`, `/world → City → Look` — walked the whole NPC catalogue
-calling `npc.status` per name, inside an `await`, so serially. `npcs_present(location, period)` in
-`app/bot/locations.py` is the one resolver now.
-
-**What bounds it is asking content first, and that is easy to get wrong in a way no source check can
-see.** One `npc.at_location` query gets everybody the engine has standing here; the obvious next
-step — fall through to `current_npc_location` for everybody the query did not return — is the old
-cost with a new shape, because the people it did not return are the five hundred and fifty-eight who
-are demonstrably somewhere else. So the in-process catalogue rules them out before anybody is
-resolved: only an NPC content places here this period can still be in doubt, and only those cost a
-round trip. Measured against the shipped catalogue, one open is `npc.at_location` ×1 and
-`npc.status` ×1. Content can be wrong in exactly one direction — it does not know about autonomous
-travel — and that direction is covered by the first query, because somebody the simulation walked
-here has a row saying so.
-
-It keeps the same order of precedence `current_npc_location` does, and it has to: circuit first, then
-the simulation, then the schedule. A picker that offers somebody `/talk` then refuses them is worse
-than either being wrong alone — and the schedule is the half the engine cannot know, because it is
-content: a row at its NPC's *home* is a routine, not a whereabouts, so the fourteen catalogue NPCs
-whose day takes them out of their home town were offered in the wrong room at twenty (place, period)
-pairs until the override was applied here too. A missing person is exempt: they keep no routine
-(schema 47) and their row is the whole truth. `npc.at_location` is deliberately narrow —
-`npc.status` carries relationships, disciple bonds and the life row, and loading all of that for
-everybody in a city to decide whether to list them is what made the old shape slow twice over.
-
-`test_who_is_here.py` measures both of those with a counting fake rather than reading the source,
-because the source reads correctly in both the fast and the slow version — the round trips are one
-level down, inside `current_npc_location`.
-
-**`worlddata.Load` re-parsed 2.5 MB per action.** Fifteen of its seventeen call sites are in
-`authoritative.go`, inside the request path. It is memoised on `(path, mtime, size)` — not on the
-path alone, so an operator editing content on a live NAS still does not need a restart. Size is in
-the key beside the timestamp because some filesystems keep mtime at one-second resolution, and two
-edits inside the same second that change the length would otherwise serve the older parse.
-
-**Boot spent ~2,000 HTTP round trips rewriting unchanged content.** On the Go-backed path each
-`db.execute` is one POST, and `sync_world_catalog` made about 1,800 catalogue upserts plus one
-territory node per location, one at a time. They go in a single `/v1/db/batch` request now — an
-endpoint that had existed on the transport since the Go engine landed with nothing on this path
-using it. The statements stay inside `sync_world_catalog` rather than in a helper because
-`test_authority_boundary` reads the write allowlists off the method that contains the SQL, and
-moving them out would mean widening an authority gate for a refactor that changes no authority.
-
-### The content file as tables (`content_*`, `internal/contentsync`, schema 51)
-
-Nine derived tables — `content_npcs`, `content_locations`, `content_items`, `content_recipes`,
-`content_sects`, `content_shops`, `content_merchants`, `content_manuals`, `content_techniques` —
-mirror `content/world.json` with real, indexed columns. **The engine alone writes them**, from the
-file itself, hash-gated (`world_state['content_version']`), in one transaction, with deletes: the
-Python-written `catalog_*` blobs only ever upserted, so a renamed NPC lived in `catalog_npcs`
-forever.
-
-**Every row is the entry's raw bytes plus a projection.** `data_json` is the exact JSON of that entry
-as it sits in the file, and the typed columns beside it are read off it by `contentsync.Sections` —
-`Text`, `Integer`, or a presence `Flag` for the fields whose value is a structure (`circuit`,
-`hidden_master`). An absent key is `NULL`, never `''`. This is deliberately not the struct-widening
-the plan first called for, which it named "silent when wrong": a field missed in a Go struct is an
-empty column and nothing errors. Keeping the file's own bytes makes the blob complete by
-construction, and `TestProjectionMatchesTheRawEntries` holds every projected column against the real
-2.5 MB — the count of non-NULL cells must equal the count of entries carrying the key.
-
-**Three doors, one apply, and the order is the point.** The tables are filled by the engine but
-created by Python's migration, which in the compose stack runs *after* the engine is healthy — so
-the engine's guarded apply at `server.New` finds no tables on a first boot and does nothing. db-init
-(`app.database.bootstrap`) calls `POST /v1/content/sync` the moment `init()` has run, the bot calls it
-again at `CATALOG_READY` before it counts, and the GM's `admin.content.reload` runs the same apply
-on demand. Together those guarantee the tables are full before any reader in every boot order;
-`test_content_tables.py` asserts the ordering rather than hoping.
-
-**One table, one path (schema 52, v1.0.0-rc.40).** Schema 51 shipped a mode switch —
-`content_table_for(catalog_table, engine_backed)` — because pytest has no engine to fill `content_*`,
-so a local read stayed on the `catalog_*` blob it had always used. That was a deliberate one-release
-loan, and migration 52 calls it in: the five mirrors are dropped, the switch is deleted, and
-`_catalog_get`, `search_catalog`, `catalog_counts` and the dashboard's two catalogue reads name their
-`content_*` table outright. Go's own rules keep reading the memoised in-memory catalogue — a table of
-what the engine already holds parsed would be a slower copy, not a source.
-
-**The no-engine path is a fixture, not a second source.** The obvious way to keep pytest working
-would have been to let Python write `content_*` when no engine is attached — and that is exactly the
-rule those tables exist to enforce, so it is refused. The tables are *created* by Python's migration
-and *filled* only by the engine; a test that needs catalogue rows calls
-`tests/support.seed_content_tables`, which writes the three columns every reader touches (`name`,
-`data_json`, `updated_at`) and leaves the typed projection NULL, where the DDL already expects it.
-The projection has one definition, in Go, and `TestProjectionMatchesTheRawEntries` still owns it.
-`test_content_tables.py` holds the rest: no file under `app/` or `scripts/` may name a retired mirror
-outside the migration list, and each of the five has a `DROPPED_TABLES` entry so the migration drill
-proves the drop rather than shrugging at it.
-
-**What was left of the writer.** `sync_world_catalog` was ~1,800 catalogue upserts plus a territory
-node per location plus the baseline era. The upserts are gone with their tables, and the rest is
-`seed_world_territories` — the part that was never a mirror. The name matters: a method called
-`sync_world_catalog` that syncs no catalogue is the same class of lie as the GM maintenance action
-below, which used to report a resync it had not done.
-
-**The GM sync tells the truth now.** `/admin server maintenance → Sync world catalog` used to write
-`WORLD.data` — this process's copy, parsed at import — and report that it had resynced from
-`world.json`, which it had not. It re-reads the file on both sides: the engine applies into
-`content_*` with an audit row in the same commit — since rc.40 that is the whole catalogue — and
-Python's half reseeds the territory map from a fresh parse (the running `WORLD` is left alone — a hot
-swap of a dict 347 call sites read is not a maintenance action). The message reports the content
-hash, whether anything changed, and that this bot's in-process presentation applies the edit at its
-next restart. `worlddata.Load` is memoised on the file's stat,
-so the Go rules had already picked the edit up on their own.
-
-### The readiness probe (`OPERATIONAL_REQUIRED_TABLES`)
-
-`operational_health` exists to tell a healthy versioned database from the empty file SQLite will
-create if the real one is removed or replaced while the bot is running. It does that by checking
-that a set of tables is present — and since v1.0.0-rc.28 that set is **exact**: every table a fresh
-bootstrap makes, all 169 of them.
-
-It used to be a sample of twenty-seven written for v0.20.7 and never revisited. By schema 49 it
-still named two catalogue mirrors nothing reads for their content and omitted
-`npc_civilization_state`, `inventory`, `character_quests`, `battles` and everything added in
-twenty-nine releases. **A sample cannot be kept honest, because nothing says which tables belong in
-it.** An exact set can: `test_startup_health` holds it against a real bootstrap rather than against
-another list, so adding a table without listing it fails there. That test is the whole mechanism —
-the literal is only reviewable because the test makes it true.
-
-FTS5 virtual tables and their shadow tables are deliberately excluded: they are made by
-`CREATE VIRTUAL TABLE` and rebuilt from their base tables, so their absence is a different fault.
-
-### RAG / memory (`app/ai/rag`)
-
-Deterministic and SQLite-first (FTS5), not embedding/vector-based. Retrieval never creates game
-truth — it surfaces known canonical information only, permission-filtered before scoring:
-
-```text
-live structured SQL -> permission-filtered FTS5 candidates -> deterministic scoring
-  -> small scene-specific context packet -> narrator
-```
-
-Raw player text is tokenized/sanitized before building FTS5 queries (never passed straight to
-`MATCH`). The corpus deliberately excludes NPC secrets, unrevealed schedules, undiscovered
-locations/manuals, raw DB dumps, and GM-only state.
-
-### Structured world history
-
-`world_history_events` records what mechanically happened (deaths, battles, succession, discoveries,
-etc.), separate from current structured state (what's true now — always wins over history). Rows
-carry visibility levels `public` / `participant` / `faction` / `hidden`; hidden rows never reach
-narrator RAG, and a focused NPC does not inherit the player's participant-only knowledge.
-
-### What NPCs do on their own (`npc_deeds.go`, v1.0.0-rc.24)
-
-A step of the `npc_life` batch, after the feuds: a criminal trade (or anyone ambitious enough and
-poor enough) robs, beats or smuggles; a hunting trade goes out after a beast from the same roster
-`/hunt` uses (`game.RollHuntQuarry`). Everything writes a column that already existed — wealth and
-`activity` on `npc_civilization_state`, health and injury on `npc_life_state`, grudges in
-`npc_social_relations`, contraband in `black_market_stock`, lots in `auctions`, the record in
-`world_history_events`.
-
-**NPCs never get a `crime_records` row.** That table is FK'd to `characters` and is the player's:
-an NPC row there would mean a bounty nobody can collect and a capture nothing can perform. The
-visibility ladder above carries NPC crime instead — a crime with a witness is `public` and leaves a
-named grudge that `npcFeuds` later settles; one without is `hidden`, so it never reaches narrator
-RAG and the world really does not know who did it. A killing is always `public` (a body is found);
-the summary is what says whether the culprit is named. Making NPC crime prosecutable would be a
-schema change and is a separate decision — do not add it casually.
+**The fixtures needed the clock, and that is the rule this repo already states.** Two bootstrap
+fixtures had no `world_state` table, so the canonical read failed on them — production always has it
+(Python's migration makes it before the engine is ever asked to bootstrap), so the fixture was the
+thing that could not fail the way production fails. The ten test call sites that used to pass a
+minute now pin the clock with `setSimulationGameMinute`, a helper written for `RunDue`'s own fix and
+sitting unused by these paths ever since.
 
 ### What the first hour is allowed to meet (v1.0.0-rc.49)
 
@@ -1323,6 +1476,226 @@ that line to `if false && c.RealmIndex < e.MinRealmIndex` left the substring in 
 passed. A grep cannot see a disabled condition. `beginner_events_test.go` hands a realm-0 character a
 severity-10 event and asserts it is not offered, and fails with the whole map when the condition is
 disabled; Python keeps only the one thing it can honestly check, that the Go half still exists.
+
+### The peach that nothing grew (`rare_items`, v1.0.0-rc.50)
+
+`hundred_year_peach` was the one item of 287 that the world could not produce: no shop sold it, no
+recipe made it, no realm room held it, no event granted it, and no production file named it. It is
+authored complete and expensive — `use.lifespan_years: 50`, `base_price: 12000`,
+`auction_interest: legendary`, `door_event_chance: 65` — and **both halves already worked**.
+`item_use_actions.go` grants the fifty years; `advanced_maintenance.go` reads `door_event_chance` to
+write an `auction_door_risks` row when a legendary lot is struck. That second system had therefore
+never fired either: you cannot auction a fruit that does not exist. One missing wire kept two
+authored systems dark, the shape `/learn` (rc.43), the quest journal (rc.46) and the event bands
+(rc.49) all had.
+
+The lifespan ladder said where it belonged — `jade_life_herb` (5 years) is a secret-realm room
+reward, `longevity_pill` (10) is an apothecary line, and the 50-year fruit was nothing.
+
+**Why a chance and not just a placement.** A realm's rooms are walked again on every run:
+`secret_realm_runs` keeps one row per *user* and `enter` does `ON CONFLICT(user_id) DO UPDATE SET …
+room_index=0`. Nothing records that a realm was looted. And three of the eight realms have a key on
+sale (448–672 stones, array shops at Ashenwall and Stoneback) — which are also the three low-floor
+realms. So anything in a room's `items` is a guaranteed, repeatable payout, right for two spirit
+herbs and wrong for a thing the world should have few of.
+
+`rare_items` is what a room *might* hold, borrowing `ForageMaterial`'s shape (`chance`, `max`, minus
+the richness floor a realm has no equivalent of) so the tree has one idea of what a find chance looks
+like. It is merged into the room's own payout before the single `applyCanonicalRewardTx` call, so a
+find cannot be paid twice or half-paid, and a miss is silent — a rare find that announced its own
+absence would tell a player the roll had happened, which is most of knowing it exists.
+
+**The home is the Salt King's Throne**, `salt_kings_barrow`'s last room at TN 18, which granted
+nothing before. Keyless, opening on one weight-2 event — *"a barrow beneath the salt ruin that opens
+when the marsh floods"*, about 1.8% of a realm-2 character's draws. Floor 2, because fifty years is
+enormous low down and worthless high up, so every deeper keyless realm (8/9/16/24) is the wrong
+audience. And **salt preserves**: "salt-preserved soldiers stand in ranks" is the reason a whole
+hundred-year fruit is still sound in there.
+
+**The sweep found a second orphan the moment it stopped counting tests as sources.**
+`test_every_item_has_a_source.py` greps production Go and Python for every item id, and its first
+version had no `--exclude=*_test.go` — so the peach looked sourced *by the very test written to prove
+it had none*. With tests excluded, `living_world_ring` surfaced: the top of the storage ladder
+(Immortal grade, 500 slots, the only `living_space`), 40,000, `door_event_chance: 75`, named only in
+`support_storage_test.go`. It went into `SOURCELESS_ITEMS` with that reason rather than being
+quietly placed — where it belongs was a content decision.
+
+**v1.0.0-rc.51 makes it, and `SOURCELESS_ITEMS` is empty again** — emptied by placing the one entry
+it ever held, so an entry there is a new decision rather than a backlog inherited from rc.50's. The
+ring is found in **The Array's Heart**, `weeping_wall_sanctum`'s last room at TN 25, which granted
+nothing before. The item named the world itself: its `storage_upgrade.grade` is `"Immortal"`, and
+that realm is the Immortal World's (`min_realm_index: 16`), keyless, opening on one weight-2 event —
+1.6% of a draw. **Chance 4, against the peach's 6**, and that ordering is a gate of its own now
+(`test_a_rare_find_is_rarer_the_more_it_is_worth`): the peach is consumed and the ring is permanent
+and tradeable at 40,000, so the dearer find must be the rarer one. No Go changed — the mechanism was
+built, tested and shipped a release earlier, and all that was ever missing was where.
+
+### A room of their own, and the door that never closed (v1.0.0-rc.51)
+
+`content/world.json` authors **48 auction houses** that collapse onto **nine channels** — five grand
+houses with a channel each and forty-three local floors sharing one per world, because
+`auction_house_channel_name` reads the `channel_name` content gives them and many share it. All nine
+were created in `SERVER_REALM_CATEGORY`, the category named for the four realm capitals, which
+therefore held thirteen channels of which the capitals were the minority. `SERVER_AUCTION_CATEGORY`
+(`🏮 Auction Houses`) is the third category, and `auction_house_channels.category_id` already
+existed and was already written, so **no schema**.
+
+Two halves come with it, and without either the split is cosmetic.
+
+- **An existing server is moved, not merely rebound.** `ensure_auction_house_channels` resolves a
+  channel by binding, then by name, and only ever passed `category=` to `create_text_channel` — so a
+  channel that already existed kept whatever parent it had, and the change would have reached a fresh
+  guild and no other. That is the failure mode of `/learn` (rc.43), the quest journal (rc.46), the
+  event bands (rc.49) and the peach (rc.50) wearing a different hat. The re-parent sits behind
+  `can_create`, because Discord layout is dashboard-owned and the `/admin` slash path still only
+  binds, and it is issued **once per channel** (`moved`), because forty-eight houses share nine of
+  them and `channel.category_id` is read from a cache the edit updates by gateway event.
+- **Teardown deletes them, which it never has.** `clear_discord_bindings` has always `DELETE`d from
+  `auction_house_channels`; `teardown_managed_discord_layout` built its targets from the base
+  bindings, the realm hubs and `#bugs` and **named no auction channel at all**. So Teardown forgot
+  the bindings and left nine channels standing — and because they sat inside it, `🌌 Realm
+  Capitals` could never be emptied and was never once deleted by the action whose whole job is to
+  delete it. Half the wire had been there since v0.33.1. The `seen_ids` guard already in the delete
+  loop is what makes nine bindings on four shared channels one delete apiece; it was written for
+  exactly this and had never had a case.
+
+**The gate that could not see it is the lesson.** `test_the_helper_touches_only_what_a_binding_names`
+asserted that the three sources it already knew about were named — a test shaped so that the thing it
+forbids is invisible to it, which is the rc.47 finding again.
+`test_every_category_setup_makes_is_a_category_teardown_can_empty` counts instead: every
+`SERVER_*CATEGORY` constant in the file must be one the teardown loop walks (read off the source,
+not copied), and every provisioning table must be one it deletes from. A fourth category or a fifth
+provisioning helper fails it the day it is added.
+
+### A world's news is that world's (v1.0.0-rc.52, schema 56)
+
+`world-events` carried all four. A Demon Invasion in the Celestial World and a caravan over the bank
+in a Mortal village landed in one feed, in front of everybody, whatever they could reach — while the
+capitals have been split per world since schema 4 and the auction floors since schema 35.
+`SERVER_EVENT_CATEGORY` (`🌠 World Events`) is the fourth category, and `world_event_channels` is
+`realm_hub_channels`' shape minus `location`, because an events channel belongs to a world rather
+than to a place in it. Gated by the realm **access** role, deliberately not the presence role: a
+world's news is for everyone who has reached that world, not only whoever stands in its capital this
+minute.
+
+**The data was there the whole time, and half the wire with it.** `world_events.location` is
+`NOT NULL` on every row, and `_event_scene_location` — the resolver that turns an event key into a
+place — already existed and was **already called by both announcement writers**, about fifty lines
+*after* each had posted. Moving that call above the send is the whole routing change. And
+`event_threads.announcement_channel_id` is written at announcement time, so the "event closed"
+notice lands wherever the announcement went and **needed no change at all**.
+
+**The global channel stays, and that is the design, not a leftover.** Four writers have no world and
+never will — the weekend gift, a GM's world-reset notice, the dashboard's test post, and the
+channel's own blurb — and `BASE_CHANNEL_SPECS`' string for it already said *"Global
+cultivation-world announcements"*. It is also the fallback, which is what makes this incapable of
+breaking a writer: the worst case is the channel an announcement already used.
+
+**`world_of_location` returns None rather than "Mortal World", and that is the one line worth
+reading twice.** Every other site in the tree resolves a world with `or "Mortal World"`
+(`discovery.py:30`, `channels.py`'s auction lookup). A private residence (`birth_family:<id>`), an
+inner world (`personal_world:<uid>`), an abode, or the literal `Unknown` two writers can still
+produce is not in `WORLD.locations` — so that default would file somebody's household news as that
+world's public news. "No world" routes to the global feed, which is where all of it went before.
+
+**Every channel's text was rewritten and `#xianxia-info` with it**, because the blurbs described the
+v0.19 server and the guide said *"main realm-capital channels remain shared social spaces"*, which
+stopped being true in v0.21.6. The guide is eleven topics, three new: **The Server** (the four
+categories and which is gated by what), **World Events** (a scene's site is finite, so arriving
+first is worth something) and **Crafts & Professions**. The four new channels get GM-editable
+message slots resolved through `world_event_channels`, exactly as the `realm:` slots resolve through
+`realm_hub_channels` — a prefixed key needed no new mechanism.
+
+**The dashboard's World Events table counts toward `setup_ready`**, unlike `auction_halls`, which is
+reported but excluded and has no stat card. A missing auction channel costs a lot card; a missing
+events channel loses a world's news outright, so this takes the capitals' side of that asymmetry
+deliberately.
+
+**Both harnesses reach a `create_category` call now**, which rc.51 recorded as deferred. Every
+provisioning helper defaults to `create_missing=False` and the one caller passing True is the GM
+dashboard's Full Setup, so no slash command and no hub button could reach it — the categories, the
+four capitals, the nine auction channels and these four feeds were provisioned by code no test had
+ever run. **The bot's control plane is a surface, it is just not a Discord one**: section 2b of
+`playtest_discord.py` posts `{"action": "setup"}` to `POST /control/discord` with
+`X-Xianxia-Control`, exactly as the dashboard does, and holds that the four categories exist, that
+each capital and each world feed sits in the right one, that nine auction channels were made, and
+that a second Repair creates nothing new.
+
+**A fourth gate this session passed its own drill, from both directions.** The harness check first
+asserted the substring `_control("setup")` — commenting the call out left the string in place and it
+passed, which is rc.49's disabled-condition finding in Python; it reads *call expressions* by AST
+now. And the router's gate failed on *correct* code, because `world_of_location`'s docstring quotes
+the `or "Mortal World"` default it exists to refuse; it reads the function's statements without its
+docstring. A gate that cannot tell prose from code, or a call from a comment, is decoration — and
+only running it against the broken tree says which kind you have.
+
+### Where a secret realm's band belongs (v1.0.0-rc.53)
+
+`eligibleUnexpectedEvents` has a **second branch** for `kind: "secret_realm"`, and it is the reason
+none of the twelve such events carries a `min_realm_index`:
+
+```go
+if e.Kind == "secret_realm" {
+    realm, ok := catalog.SecretRealms[e.SecretRealmID]
+    if !ok || realm.Location != c.Location || c.RealmIndex < realm.MinRealmIndex { continue }
+}
+```
+
+The floor and the place are read off the **realm**, so a band on the event would be a second
+statement of a rule the realm already owns — the fault rc.39 removed for the world clock and rc.44
+for the world currencies. rc.49 banded the eighteen `world_event` entries and scoped its gate to
+`kind == "world_event"` deliberately; this is the other half of that decision, written down.
+
+**Nothing drove the branch until rc.53.** rc.49's fixture is all `world_event`, so any of the three
+conditions could be deleted with the suite green — in the file whose whole lesson is that a grep
+cannot see a disabled condition. Three tests drive it now, each drilled. **`!ok` turned out to be
+belt-and-braces**: a missing realm yields the zero value, whose `Location` is `""`, and nobody stands
+at `""`, so the entrance check already excludes a typo'd id and disabling `!ok` alone leaves the test
+passing. A typo is still worth a gate, because it is silently undrawable for ever rather than an
+error anywhere — the class `/learn` and the peach were.
+
+**The weights compete per realm, not globally**, because the draw only offers a realm to somebody at
+its entrance. They were lopsided: seven of the twelve events opened the three Mortal-floor realms —
+the only three that sell a key — at 4/5/4, while every realm from floor 2 up had one event at 2, so
+the deep realms were harder to reach *and* opened half as often. Each realm totals 3 now, split among
+its fictions where it has several.
+
+**A realm fades once you have outgrown its world** (7 / 15 / 23, none for the Celestial). rc.50 is
+why: rooms are walked again on every run and `rare_items` put a 12,000 peach at floor 2 and a 40,000
+ring at floor 16, so an uncapped low realm is the repeatable payout rc.50 exists to avoid. It gates
+the draw only — a key and a GM spawn still work, the rc.49 asymmetry. The Salt King's Barrow sells no
+key, so above realm 7 the peach needs a GM; that follows from rc.50 calling fifty years worthless
+high up, and it is a narrowing worth knowing about.
+
+### Somewhere to go above the Mortal World (v1.0.0-rc.54)
+
+Eight realms covered thirty-two realms of cultivation, four of them in the Mortal World and **one
+each in the Immortal and Celestial**. Five new ones make it 4/3/3/3, and **no new location was
+written**: every world carries three `road_site: "ruin"` legs and only one or two had anything under
+them, so Last Lantern, Ash Gate, Cracked Altar, Buried Court and Nine Pillar were authored ground
+with nothing on it. The ladders are read off each world's existing realms rather than invented
+(Spiritual 16-22, Immortal 19-25, Celestial 22-28, +2 a room), the drops are existing tier items,
+and the floors mirror the Mortal spread so rc.53's ceiling leaves a wide window.
+
+**The treasures are the first permanent effects in the game.**
+`ItemUse.DurationGameMinutes` has meant "0 does not expire" since v0.21.0 - the writer leaves `ends`
+nil so the column is NULL, and every reader is `ends_game_minute IS NULL OR ends_game_minute > ?` -
+and no item had ever set it. Each new realm's last room can yield one find granting **+1 to the
+attribute that room's own trial tested**, for good: what the realm asked of you is what it leaves you
+better at, stated once so the prize and the trial cannot drift. One point rather than three, because
+it never wears off, and it lands in `canonicalAttribute`, the basis of every scene check, craft roll
+and trial.
+
+They sit in the rc.50 `rare_items` slot, ordered against the peach (12,000 → 6%) and the ring
+(40,000 → 4%) so the dearer is the rarer, and all five are legendary with a door risk, so selling
+one rather than drinking it feeds the auction-door system.
+
+**The trap the field invites is worth knowing**: a writer that stored `0` rather than NULL would make
+every treasure expire the instant it was used, and nothing would error.
+`permanent_treasure_test.go` drives a real use, asserts the column is NULL, and reads the modifier
+back a world-year later; its drill fails with `ends_game_minute is 1000, not NULL`. And the content
+gate caught its own author - the authoring script wrote `max_realm_index: null` on the two Celestial
+events instead of omitting the key, and rc.53's ceiling test refused it.
 
 ### What a spiritual root is worth (v1.0.0-rc.55)
 
@@ -1884,371 +2257,6 @@ Six tests drive the function now, against a fake `DB` and a fake channel, and th
 sentence the rule is written in. A reader is asserted before it is trusted (rc.57), and a gate that
 cannot see the thing it forbids is decoration (rc.47) — and only running it against the broken tree
 says which kind you have.
-
-### Somewhere to go above the Mortal World (v1.0.0-rc.54)
-
-Eight realms covered thirty-two realms of cultivation, four of them in the Mortal World and **one
-each in the Immortal and Celestial**. Five new ones make it 4/3/3/3, and **no new location was
-written**: every world carries three `road_site: "ruin"` legs and only one or two had anything under
-them, so Last Lantern, Ash Gate, Cracked Altar, Buried Court and Nine Pillar were authored ground
-with nothing on it. The ladders are read off each world's existing realms rather than invented
-(Spiritual 16-22, Immortal 19-25, Celestial 22-28, +2 a room), the drops are existing tier items,
-and the floors mirror the Mortal spread so rc.53's ceiling leaves a wide window.
-
-**The treasures are the first permanent effects in the game.**
-`ItemUse.DurationGameMinutes` has meant "0 does not expire" since v0.21.0 - the writer leaves `ends`
-nil so the column is NULL, and every reader is `ends_game_minute IS NULL OR ends_game_minute > ?` -
-and no item had ever set it. Each new realm's last room can yield one find granting **+1 to the
-attribute that room's own trial tested**, for good: what the realm asked of you is what it leaves you
-better at, stated once so the prize and the trial cannot drift. One point rather than three, because
-it never wears off, and it lands in `canonicalAttribute`, the basis of every scene check, craft roll
-and trial.
-
-They sit in the rc.50 `rare_items` slot, ordered against the peach (12,000 → 6%) and the ring
-(40,000 → 4%) so the dearer is the rarer, and all five are legendary with a door risk, so selling
-one rather than drinking it feeds the auction-door system.
-
-**The trap the field invites is worth knowing**: a writer that stored `0` rather than NULL would make
-every treasure expire the instant it was used, and nothing would error.
-`permanent_treasure_test.go` drives a real use, asserts the column is NULL, and reads the modifier
-back a world-year later; its drill fails with `ends_game_minute is 1000, not NULL`. And the content
-gate caught its own author - the authoring script wrote `max_realm_index: null` on the two Celestial
-events instead of omitting the key, and rc.53's ceiling test refused it.
-
-### Where a secret realm's band belongs (v1.0.0-rc.53)
-
-`eligibleUnexpectedEvents` has a **second branch** for `kind: "secret_realm"`, and it is the reason
-none of the twelve such events carries a `min_realm_index`:
-
-```go
-if e.Kind == "secret_realm" {
-    realm, ok := catalog.SecretRealms[e.SecretRealmID]
-    if !ok || realm.Location != c.Location || c.RealmIndex < realm.MinRealmIndex { continue }
-}
-```
-
-The floor and the place are read off the **realm**, so a band on the event would be a second
-statement of a rule the realm already owns — the fault rc.39 removed for the world clock and rc.44
-for the world currencies. rc.49 banded the eighteen `world_event` entries and scoped its gate to
-`kind == "world_event"` deliberately; this is the other half of that decision, written down.
-
-**Nothing drove the branch until rc.53.** rc.49's fixture is all `world_event`, so any of the three
-conditions could be deleted with the suite green — in the file whose whole lesson is that a grep
-cannot see a disabled condition. Three tests drive it now, each drilled. **`!ok` turned out to be
-belt-and-braces**: a missing realm yields the zero value, whose `Location` is `""`, and nobody stands
-at `""`, so the entrance check already excludes a typo'd id and disabling `!ok` alone leaves the test
-passing. A typo is still worth a gate, because it is silently undrawable for ever rather than an
-error anywhere — the class `/learn` and the peach were.
-
-**The weights compete per realm, not globally**, because the draw only offers a realm to somebody at
-its entrance. They were lopsided: seven of the twelve events opened the three Mortal-floor realms —
-the only three that sell a key — at 4/5/4, while every realm from floor 2 up had one event at 2, so
-the deep realms were harder to reach *and* opened half as often. Each realm totals 3 now, split among
-its fictions where it has several.
-
-**A realm fades once you have outgrown its world** (7 / 15 / 23, none for the Celestial). rc.50 is
-why: rooms are walked again on every run and `rare_items` put a 12,000 peach at floor 2 and a 40,000
-ring at floor 16, so an uncapped low realm is the repeatable payout rc.50 exists to avoid. It gates
-the draw only — a key and a GM spawn still work, the rc.49 asymmetry. The Salt King's Barrow sells no
-key, so above realm 7 the peach needs a GM; that follows from rc.50 calling fifty years worthless
-high up, and it is a narrowing worth knowing about.
-
-### The peach that nothing grew (`rare_items`, v1.0.0-rc.50)
-
-`hundred_year_peach` was the one item of 287 that the world could not produce: no shop sold it, no
-recipe made it, no realm room held it, no event granted it, and no production file named it. It is
-authored complete and expensive — `use.lifespan_years: 50`, `base_price: 12000`,
-`auction_interest: legendary`, `door_event_chance: 65` — and **both halves already worked**.
-`item_use_actions.go` grants the fifty years; `advanced_maintenance.go` reads `door_event_chance` to
-write an `auction_door_risks` row when a legendary lot is struck. That second system had therefore
-never fired either: you cannot auction a fruit that does not exist. One missing wire kept two
-authored systems dark, the shape `/learn` (rc.43), the quest journal (rc.46) and the event bands
-(rc.49) all had.
-
-The lifespan ladder said where it belonged — `jade_life_herb` (5 years) is a secret-realm room
-reward, `longevity_pill` (10) is an apothecary line, and the 50-year fruit was nothing.
-
-**Why a chance and not just a placement.** A realm's rooms are walked again on every run:
-`secret_realm_runs` keeps one row per *user* and `enter` does `ON CONFLICT(user_id) DO UPDATE SET …
-room_index=0`. Nothing records that a realm was looted. And three of the eight realms have a key on
-sale (448–672 stones, array shops at Ashenwall and Stoneback) — which are also the three low-floor
-realms. So anything in a room's `items` is a guaranteed, repeatable payout, right for two spirit
-herbs and wrong for a thing the world should have few of.
-
-`rare_items` is what a room *might* hold, borrowing `ForageMaterial`'s shape (`chance`, `max`, minus
-the richness floor a realm has no equivalent of) so the tree has one idea of what a find chance looks
-like. It is merged into the room's own payout before the single `applyCanonicalRewardTx` call, so a
-find cannot be paid twice or half-paid, and a miss is silent — a rare find that announced its own
-absence would tell a player the roll had happened, which is most of knowing it exists.
-
-**The home is the Salt King's Throne**, `salt_kings_barrow`'s last room at TN 18, which granted
-nothing before. Keyless, opening on one weight-2 event — *"a barrow beneath the salt ruin that opens
-when the marsh floods"*, about 1.8% of a realm-2 character's draws. Floor 2, because fifty years is
-enormous low down and worthless high up, so every deeper keyless realm (8/9/16/24) is the wrong
-audience. And **salt preserves**: "salt-preserved soldiers stand in ranks" is the reason a whole
-hundred-year fruit is still sound in there.
-
-**The sweep found a second orphan the moment it stopped counting tests as sources.**
-`test_every_item_has_a_source.py` greps production Go and Python for every item id, and its first
-version had no `--exclude=*_test.go` — so the peach looked sourced *by the very test written to prove
-it had none*. With tests excluded, `living_world_ring` surfaced: the top of the storage ladder
-(Immortal grade, 500 slots, the only `living_space`), 40,000, `door_event_chance: 75`, named only in
-`support_storage_test.go`. It went into `SOURCELESS_ITEMS` with that reason rather than being
-quietly placed — where it belongs was a content decision.
-
-**v1.0.0-rc.51 makes it, and `SOURCELESS_ITEMS` is empty again** — emptied by placing the one entry
-it ever held, so an entry there is a new decision rather than a backlog inherited from rc.50's. The
-ring is found in **The Array's Heart**, `weeping_wall_sanctum`'s last room at TN 25, which granted
-nothing before. The item named the world itself: its `storage_upgrade.grade` is `"Immortal"`, and
-that realm is the Immortal World's (`min_realm_index: 16`), keyless, opening on one weight-2 event —
-1.6% of a draw. **Chance 4, against the peach's 6**, and that ordering is a gate of its own now
-(`test_a_rare_find_is_rarer_the_more_it_is_worth`): the peach is consumed and the ring is permanent
-and tradeable at 40,000, so the dearer find must be the rarer one. No Go changed — the mechanism was
-built, tested and shipped a release earlier, and all that was ever missing was where.
-
-### A room of their own, and the door that never closed (v1.0.0-rc.51)
-
-`content/world.json` authors **48 auction houses** that collapse onto **nine channels** — five grand
-houses with a channel each and forty-three local floors sharing one per world, because
-`auction_house_channel_name` reads the `channel_name` content gives them and many share it. All nine
-were created in `SERVER_REALM_CATEGORY`, the category named for the four realm capitals, which
-therefore held thirteen channels of which the capitals were the minority. `SERVER_AUCTION_CATEGORY`
-(`🏮 Auction Houses`) is the third category, and `auction_house_channels.category_id` already
-existed and was already written, so **no schema**.
-
-Two halves come with it, and without either the split is cosmetic.
-
-- **An existing server is moved, not merely rebound.** `ensure_auction_house_channels` resolves a
-  channel by binding, then by name, and only ever passed `category=` to `create_text_channel` — so a
-  channel that already existed kept whatever parent it had, and the change would have reached a fresh
-  guild and no other. That is the failure mode of `/learn` (rc.43), the quest journal (rc.46), the
-  event bands (rc.49) and the peach (rc.50) wearing a different hat. The re-parent sits behind
-  `can_create`, because Discord layout is dashboard-owned and the `/admin` slash path still only
-  binds, and it is issued **once per channel** (`moved`), because forty-eight houses share nine of
-  them and `channel.category_id` is read from a cache the edit updates by gateway event.
-- **Teardown deletes them, which it never has.** `clear_discord_bindings` has always `DELETE`d from
-  `auction_house_channels`; `teardown_managed_discord_layout` built its targets from the base
-  bindings, the realm hubs and `#bugs` and **named no auction channel at all**. So Teardown forgot
-  the bindings and left nine channels standing — and because they sat inside it, `🌌 Realm
-  Capitals` could never be emptied and was never once deleted by the action whose whole job is to
-  delete it. Half the wire had been there since v0.33.1. The `seen_ids` guard already in the delete
-  loop is what makes nine bindings on four shared channels one delete apiece; it was written for
-  exactly this and had never had a case.
-
-**The gate that could not see it is the lesson.** `test_the_helper_touches_only_what_a_binding_names`
-asserted that the three sources it already knew about were named — a test shaped so that the thing it
-forbids is invisible to it, which is the rc.47 finding again.
-`test_every_category_setup_makes_is_a_category_teardown_can_empty` counts instead: every
-`SERVER_*CATEGORY` constant in the file must be one the teardown loop walks (read off the source,
-not copied), and every provisioning table must be one it deletes from. A fourth category or a fifth
-provisioning helper fails it the day it is added.
-
-### A world's news is that world's (v1.0.0-rc.52, schema 56)
-
-`world-events` carried all four. A Demon Invasion in the Celestial World and a caravan over the bank
-in a Mortal village landed in one feed, in front of everybody, whatever they could reach — while the
-capitals have been split per world since schema 4 and the auction floors since schema 35.
-`SERVER_EVENT_CATEGORY` (`🌠 World Events`) is the fourth category, and `world_event_channels` is
-`realm_hub_channels`' shape minus `location`, because an events channel belongs to a world rather
-than to a place in it. Gated by the realm **access** role, deliberately not the presence role: a
-world's news is for everyone who has reached that world, not only whoever stands in its capital this
-minute.
-
-**The data was there the whole time, and half the wire with it.** `world_events.location` is
-`NOT NULL` on every row, and `_event_scene_location` — the resolver that turns an event key into a
-place — already existed and was **already called by both announcement writers**, about fifty lines
-*after* each had posted. Moving that call above the send is the whole routing change. And
-`event_threads.announcement_channel_id` is written at announcement time, so the "event closed"
-notice lands wherever the announcement went and **needed no change at all**.
-
-**The global channel stays, and that is the design, not a leftover.** Four writers have no world and
-never will — the weekend gift, a GM's world-reset notice, the dashboard's test post, and the
-channel's own blurb — and `BASE_CHANNEL_SPECS`' string for it already said *"Global
-cultivation-world announcements"*. It is also the fallback, which is what makes this incapable of
-breaking a writer: the worst case is the channel an announcement already used.
-
-**`world_of_location` returns None rather than "Mortal World", and that is the one line worth
-reading twice.** Every other site in the tree resolves a world with `or "Mortal World"`
-(`discovery.py:30`, `channels.py`'s auction lookup). A private residence (`birth_family:<id>`), an
-inner world (`personal_world:<uid>`), an abode, or the literal `Unknown` two writers can still
-produce is not in `WORLD.locations` — so that default would file somebody's household news as that
-world's public news. "No world" routes to the global feed, which is where all of it went before.
-
-**Every channel's text was rewritten and `#xianxia-info` with it**, because the blurbs described the
-v0.19 server and the guide said *"main realm-capital channels remain shared social spaces"*, which
-stopped being true in v0.21.6. The guide is eleven topics, three new: **The Server** (the four
-categories and which is gated by what), **World Events** (a scene's site is finite, so arriving
-first is worth something) and **Crafts & Professions**. The four new channels get GM-editable
-message slots resolved through `world_event_channels`, exactly as the `realm:` slots resolve through
-`realm_hub_channels` — a prefixed key needed no new mechanism.
-
-**The dashboard's World Events table counts toward `setup_ready`**, unlike `auction_halls`, which is
-reported but excluded and has no stat card. A missing auction channel costs a lot card; a missing
-events channel loses a world's news outright, so this takes the capitals' side of that asymmetry
-deliberately.
-
-**Both harnesses reach a `create_category` call now**, which rc.51 recorded as deferred. Every
-provisioning helper defaults to `create_missing=False` and the one caller passing True is the GM
-dashboard's Full Setup, so no slash command and no hub button could reach it — the categories, the
-four capitals, the nine auction channels and these four feeds were provisioned by code no test had
-ever run. **The bot's control plane is a surface, it is just not a Discord one**: section 2b of
-`playtest_discord.py` posts `{"action": "setup"}` to `POST /control/discord` with
-`X-Xianxia-Control`, exactly as the dashboard does, and holds that the four categories exist, that
-each capital and each world feed sits in the right one, that nine auction channels were made, and
-that a second Repair creates nothing new.
-
-**A fourth gate this session passed its own drill, from both directions.** The harness check first
-asserted the substring `_control("setup")` — commenting the call out left the string in place and it
-passed, which is rc.49's disabled-condition finding in Python; it reads *call expressions* by AST
-now. And the router's gate failed on *correct* code, because `world_of_location`'s docstring quotes
-the `or "Mortal World"` default it exists to refuse; it reads the function's statements without its
-docstring. A gate that cannot tell prose from code, or a call from a comment, is decoration — and
-only running it against the broken tree says which kind you have.
-
-### World events and their sites
-
-A world event is a row in `world_events` (category, severity, location, expiry) plus a **site**:
-the concrete, finite things inside it, in `world_event_nodes` (schema 42). Before the site existed an
-event was an empty room - the action menu rolled 2d10 and moved four integers, the only reward in a
-whole scene was one first-participation claim, "Gather Resources" granted no item, and the Battle
-button fought an anonymous "hostile manifestation".
-
-Nodes come in five kinds - `beast`, `herb`, `ore`, `relic`, `task` - and each carries a `total` and a
-`remaining` that depletes as players work it, so a scene can be cleared out and a late arrival can
-see that it was. The roster is content, not code: `event_sites` in `content/world.json` holds one
-template per event category (plus a `default` for categories nobody wrote), each node's count a
-`[min,max]` pair scaled by event severity. Material rewards are written `@herb`/`@ore`/`@core` and
-resolved against the world tier the event landed in, so one template stays correct from the Mortal
-World to the Celestial.
-
-`forage_materials` (v1.0.0-rc.21) is the sibling roster, and the reason the two are separate is that
-these are tier-flat: `talisman_paper`, `spirit_ink` and `array_disk_blank` serve a Mortal scribe and
-a Celestial one alike, so they carry a find chance and a `min_resources` floor rather than a per-world
-material. `forageResolveAction` rolls them beside the tiered herb. Before it existed, shops were their
-only source, so Alchemy and Forging could be gathered into and Inscription and Formation could only
-be bought into - `EveryCraftCanBeGatheredIntoTests` is what holds that shut.
-
-Go owns all of it. `SpawnWorldEventNodes` is called from every world-event spawn path - the
-player-triggered exploration event and the native autonomous simulation batch - so no event can reach
-a player empty; it is idempotent per event key. `world_event.engage` resolves one attempt against one
-node (attribute check vs the node's TN, and on success a guarded `remaining>0` decrement plus the real
-item, cultivation and spirit stones), and an event battle names a real beast from the roster, with the
-node key riding the combat `source` as `event:<key>|node:<node>` so the kill depletes it. Python only
-reads the site (`DB.list_world_event_nodes`, `DB.world_event_site_progress`) and draws it.
-
-An event also brings a **cast** (`world_event_npcs`, schema 43) - the militia captain to report to,
-the visiting elder to impress, the auctioneer whose floor it is - written per category beside the
-nodes and named at spawn from a shared pool, walked forward until the name is free so two live
-events never field the same officer. They are deliberately *not* added to the permanent NPC
-catalogue: an eight-hour captain must not be aged, married and buried by `npc_life`. Instead
-`DB.get_npc_definition` falls back to the cast of a *running* event, which is all `/talk` needs, and
-`NarratorContext._public_npc` does the same so a cast member reaches the narrator with their role,
-manner and stated want rather than as an anonymous local cultivator. Because both lookups filter on
-the event still being active, the rows need no cleanup - they simply stop answering when it closes.
-
-### Narration routing
-
-Two chains, "routine" (ordinary scenes) and "epic" (breakthroughs, sect trials, major events), each
-walking primary model -> fallback model -> `openrouter/free` -> procedural narration on failure.
-
-Reasoning is disabled per-request (`OPENROUTER_DISABLE_REASONING=true`) and `OPENROUTER_REQUIRE_FREE`
-rejects paid model IDs. Rate limiting is fail-fast (no queuing) and shared with the admin
-`chat_digest` monitor, so an unbounded transcript can starve narration — see `MONITOR_*` env knobs.
-
-Optionally (v0.26.0) a direct Google AI Studio route (`aistudio/<model>`, `app/ai/google_route.py`)
-leads both chains when `GOOGLE_AI_STUDIO_API_KEY` is set. It is the one route that does not go
-through OpenRouter, so it deliberately does not spend `AITaskRouter.limiter` - OpenRouter's daily
-free budget - and `OPENROUTER_REQUIRE_FREE` does not apply to it. It is still narration-only and
-still passes through `_validate_generated_text`, so it is not trusted more than any other route.
-`google-genai` is an optional, lazily imported dependency: absent or incompatible, the route is left
-out of the chain and `ai_status` reports why.
-
-Every `ROUTE_AUDIT_HOURS` (v0.27.0, default 24, `0` off) `audit_routes()` pings each configured route
-with the cheapest call the API takes — one character in, `max_tokens=1`, reply discarded unread — and
-retires the ones that answer `401`/`403`/`404`. A `400` is not a verdict but a family of causes, so
-`_classify_bad_request` isolates one variable per confirmation: first an ordinary token budget with
-`REASONING_OFF` still attached (success means the 400 was the one-token probe hitting a provider
-minimum), then the same call with the `reasoning` object removed (success means the parameter was
-the cause, and only that retires). A 400 that survives both is not parameter-caused and is recorded,
-not acted on; the verdict is stored per route as `probe_400_class` for the panel. `429`s and
-timeouts never retire anything; that is what the per-route cooldown is for. The audit spends the shared budget it uses, stands down below half the daily
-allowance, and retires nothing when *every* route fails at once (a local fault, not an empty
-catalogue). The AI Studio route is never retired whatever it answers — it is the operator's own key
-on its own quota, outside the shared budget. It proves reachability only — a scratchpadding model passes it, so
-`_validate_generated_text` remains the sole judge of whether a reply is usable prose.
-
-Since v0.31.0 a live call is made for three reasons only: an NPC answering a player (`dialogue`),
-an epic beat (`epic`), or an explicit ask (`narrate_it` - the typed-play picker's *Narrate it*, the
-button under an exploration or hunt result, an @mention, or the GM's `ai_routine_narration`
-automation flag). `narrate_exploration` and `narrate_hunt_result` are procedural by default and
-take `upgrade=True` for the explicit path; every `_generate` call names its purpose and the router
-counts purposes for the AI Routing page. The procedural floor is content: `narration_pool` in
-`content/world.json` (eleven scene kinds by four world tiers - seven scenes and the four road-site
-explorations since v1.0.0-rc.2), chosen deterministically by
-`app/rules/narration_pool.py`. One per-player bucket (`TYPED_PLAY_BURST` / `TYPED_PLAY_PER_MINUTE`)
-meters every door - typed lines, shorthand commands (`x explore`, v1.0.0, the one door heard in
-every channel of the guild), `serialized_user_action` (slash and hub), Narrate-it - and reports
-per door. `tests/python/contracts/test_narrator_budget.py` holds all of it.
-
-### Narration routes in the dashboard
-
-The GM dashboard's **Narration Routes** panel also carries the ten-dollar switch (v0.31.0):
-OpenRouter's free allowance is 50 requests a day under ten dollars of credit and 1000 above, so
-`credits_topped_up` is stored beside the slots by the same engine write and applied through
-`set_slots`; `OPENROUTER_CREDITS_TOPPED_UP` is the `.env` baseline. The panel picks the five chain slots
-(`routine_model`, `routine_fallback_model`, `epic_model`, `epic_fallback_model`,
-`dynamic_free_model`) from OpenRouter's live free catalogue rather than from a list kept in this
-repo — a list kept here is how `z-ai/glm-5.2:free` and `minimax/minimax-m3:free` both shipped as
-defaults that no longer existed. The AI Studio lead is not settable: it exists only when the
-operator has put their own Google key in the environment.
-
-Three processes, and the order is the point. The browser posts to the dashboard; the dashboard
-writes through the engine (`admin.narration.set_chain` → `world_state['narration_chain']` +
-`admin_audit_log`, no schema change — it follows `admin.automation.set`); then it pokes the bot
-over the existing `/control/discord` channel (`narration.apply`) to re-read and apply it live.
-The engine write is what makes a choice durable and audited, so it happens first and independently
-— an unreachable bot means "stored, applies at next restart", not a failure. The bot also applies
-the stored chain at startup, so `.env` is the baseline rather than the last word.
-
-`AITaskRouter` keeps the slots as slots (not only as assembled chains) so `set_slots()` can rebuild
-in place; `OPENROUTER_REQUIRE_FREE` still applies, every slot is validated before any is assigned,
-and a newly chosen route has its probe verdict cleared so it does not inherit the previous
-occupant's retirement.
-
-### Dashboard (`app/dashboard`, `dashboard/`)
-
-Authenticated GM control plane; production reads go through Go-owned query sessions (dashboard never
-opens SQLite directly), and every state-changing GM action is written to `admin_audit_log`.
-`/api/capabilities` is the frontend/backend coverage contract checked by
-`scripts/check_dashboard_implementation.py` and CI. One view is not backed by SQLite: `ai_routing`
-reads the narration router's in-process chains, counters and audit verdicts through the bot control
-plane, and is read-only (no `admin_audit_log` row, and it sits under Systems, not Admin).
-
-**The Player Editor (v1.0.0-rc.37)** is where one character's levers live. The Admin Console had
-sixteen cards that each began with a Player select and knew nothing about the character chosen -
-a GM setting a realm typed 0/1 over whatever was there, and the bloodline card wanted an id the
-GM had to look up on another page. `player_editor` picks a player once (the picker sits in the
-page header, and the drawer on Player Activity opens it), reads `/api/player`, and draws every
-`player.*` action the controller maps, pre-filled from the row that action writes: `player_detail`
-returns the wallets, root, bloodlines, physique, tribulation gates, perfection rows, beasts,
-equipment, abode and its guests, pill toxicity and fate beside the sheet, so the ids a lever needs
-(`bloodline_id`, `beast_id`, `equipment_id`, `guest_user_id`) are picked, not typed. The console
-keeps what acts on the world or the server. Nothing about the write path changed: the same
-`/api/admin/action`, the same `ACTION_MAP`, the same audit row - the editor decides nothing, it only
-fills the form. `test_the_player_editor_owns_every_per_player_lever` holds that every mapped
-`player.*` action is driven from the editor and none from the console, and that a snowflake is
-never put through `Number()` on the way (`EDIT_UID` is the string the server returned).
-
-The Discord `/admin` panel has the same shape since rc.37: rc.13 had split `/admin player` into
-Players, Grants and Moderation so no page needed a Next button, and they are one **Player Edit**
-head again by request, the one page `test_hub_pages.py` allows past the eight-row layout (the
-panel pages it with "More actions"; `LONG_PAGES` names it and nothing else). It also gained
-`/admin player setrealm`, the only realm lever on the Discord side, with the same optional body
-pair; the engine writes its audit row, so the handler logs nothing of its own.
-
-The Admin Console's NPC card (rc.38) carries **Lose** and **Bring back** beside Relocate:
-`admin.npc.set_missing`, the disappearance a GM can stage, audited and undoable like relocate. See
-"What only the world makes" above for why it writes the tick's own row.
 
 ## Testing conventions
 

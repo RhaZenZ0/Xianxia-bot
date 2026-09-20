@@ -1,7 +1,7 @@
 # Commissions and typed play — design (shipped)
 
 Written at v0.21.0 (2026-09-06), against the tree as it is. Intended path:
-`docs/COMMISSIONS_DESIGN.md`, beside `docs/ROADMAP_1_0.md`. Every path and
+`docs/history/COMMISSIONS_DESIGN.md`, beside `docs/history/ROADMAP_1_0.md`. Every path and
 line below was checked against the v0.21.0 archive; if the file moves, the
 claim about it may not.
 
@@ -417,7 +417,7 @@ handler and no write. It is an input method.
   needs both fields before the voice call reads well.
 - Any giver's location must have `sense_hints` and non-empty `encounters`
   if commissions send players there. Seven locations lack the first, ten
-  the second (`docs/ROADMAP_1_0.md`, v0.25).
+  the second (`docs/history/ROADMAP_1_0.md`, v0.25).
 - A giver table: NPC → locations, event types, realm bands, tier ceiling.
   Three givers is plenty to start.
 

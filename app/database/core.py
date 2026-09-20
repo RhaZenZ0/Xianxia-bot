@@ -1569,7 +1569,7 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
         29,
         "commissions",
         (
-            # Commissions (v0.22.0, docs/COMMISSIONS_DESIGN.md): a quest a giver
+            # Commissions (v0.22.0, docs/history/COMMISSIONS_DESIGN.md): a quest a giver
             # NPC offers in character, held one at a time, ending completed /
             # failed / abandoned. Nothing here is a new quest pipeline - a
             # commission is a quest_definitions row with a giver, and the

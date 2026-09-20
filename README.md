@@ -17,13 +17,13 @@ describes what the engine has already decided, and the game keeps running when t
 
 - `VERSIONS.md` — the changelog, release by release, with the schema history.
 - `docs/CONFIGURATION.md` — every `.env` key explained; `.env.example` is the keys and defaults only.
-- `docs/ROADMAP_1_0.md` — what is left before 1.0 and the test that gates each milestone.
 - `docs/KNOWN_LIMITATIONS.md` — the punch list, every entry fixed or deferred with a reason.
 - `docs/playtest/` — the live-server checklist for the current release.
 - `docs/TERMS.md` / `docs/PRIVACY.md` — what players agree to, and what the bot holds about them.
   The Discord Developer Portal wants a URL for each; these two files are those URLs.
-- `docs/COMMISSIONS_DESIGN.md` — the design of commissions and typed play.
 - `docs/history/` — the record of how the tree got here; nothing in it describes the current release.
+  The roadmap to 1.0, the professions audit and the commissions design closed with v1.0.0 and moved
+  there; live code still cites them at their new paths, the way the `main.py` split plan is cited.
 
 ---
 

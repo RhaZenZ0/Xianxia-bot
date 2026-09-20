@@ -232,18 +232,76 @@ class TheAnnouncementHappensOnce(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(channel.sent, [])
         self.assertEqual(db.writes, [])
 
-    async def test_a_long_entry_arrives_as_several_messages_headed_once(self):
+    async def test_a_long_entry_still_arrives_as_one_short_message(self):
+        """The point of the short post. rc.59 shipped this posting the entry
+        whole - 3,801 characters across three messages for rc.58 - which is
+        written for an operator reading `VERSIONS.md`, not for somebody
+        glancing at a channel."""
         channel = FakeTextChannel()
         db = FakeDB({"announced_release": "1.0.0-rc.58", "updates_channel_id": 7})
-        long_notes = "\n\n".join(f"Paragraph {i}. " + "word " * 300 for i in range(4))
+        long_notes = "**1.0.0** (rc.60) does one thing. " + "\n\n".join(
+            f"Paragraph {i}. " + "word " * 300 for i in range(4))
         with self._patched(db) as stack:
             stack.enter_context(patch.object(self.notes, "release_notes_for", lambda v, **k: long_notes))
             await self.notes.announce_release_if_new(FakeGuild(channel))
-        self.assertGreater(len(channel.sent), 1)
-        self.assertEqual([c for c in channel.sent if c.startswith("## ")], channel.sent[:1],
-                         "the header belongs on the first message and nowhere else")
-        for message in channel.sent:
-            self.assertLessEqual(len(message), 2000, "Discord refuses a message over 2000 characters")
+        self.assertEqual(len(channel.sent), 1, "a whole entry reached the channel again")
+        post = channel.sent[0]
+        self.assertLess(len(post), 400, post)
+        self.assertIn("does one thing.", post)
+        self.assertNotIn("Paragraph 1", post, "the body of the entry does not belong in the channel")
+        self.assertIn("Full notes:", post)
+
+
+class TheHeadlineIsDerivedNeverAuthored(unittest.TestCase):
+    """One sentence, taken off the entry that already exists.
+
+    A second short blurb per release would be a second statement of the same
+    thing, free to drift - the `sync_world_catalog` fault. Every entry in the
+    changelog opens the same way, a version stamp then a verb, which is the
+    structure this reads.
+    """
+
+    def setUp(self):
+        self.notes = _module()
+
+    def test_the_stamp_comes_off_and_the_sentence_survives(self):
+        entry = "**1.0.0** (rc.59) makes the server readable, and gives a release\nsomewhere to announce itself.\n\nThe rest."
+        self.assertEqual(
+            self.notes.release_headline(entry),
+            "makes the server readable, and gives a release somewhere to announce itself.")
+
+    def test_a_version_without_an_rc_reads_the_same_way(self):
+        entry = "**1.0.0** is the first release with no suffix on its tag.\n\nMore."
+        self.assertEqual(self.notes.release_headline(entry),
+                         "is the first release with no suffix on its tag.")
+
+    def test_it_does_not_break_the_sentence_on_a_version_number(self):
+        """`rc.59` and `1.0.0` both carry full stops. A naive split on '.'
+        would end the headline at 'makes rc.' and print a fragment."""
+        entry = "**1.0.0** (rc.57) makes rc.56 installable. It could not bootstrap a fresh database.\n\nMore."
+        self.assertEqual(self.notes.release_headline(entry), "makes rc.56 installable.")
+
+    def test_the_post_names_the_release_and_links_the_notes(self):
+        post = self.notes.release_post("1.0.0", "**1.0.0** does a thing.\n\nAt length.")
+        self.assertIn("**Xianxia RP v1.0.0** does a thing.", post)
+        self.assertIn("/releases/tag/v1.0.0>", post)
+        self.assertNotIn("At length", post)
+
+    def test_every_shipped_entry_yields_a_headline_that_fits_one_message(self):
+        """Against the real changelog and the archived rcs, not a fixture."""
+        import re
+        from tests.support import PROJECT_ROOT
+        text = (PROJECT_ROOT / "VERSIONS.md").read_text(encoding="utf-8")
+        text += (PROJECT_ROOT / "docs" / "history" / "CHANGELOG_1_0_0_RCS.md").read_text(encoding="utf-8")
+        entries = [e for e in re.split(r"(?m)^(?=\*\*1\.0\.0\*\*)", text)[1:]]
+        self.assertGreater(len(entries), 50, "the changelog and its archive should both be found")
+        for entry in entries:
+            stamp = entry.splitlines()[0][:40]
+            with self.subTest(entry=stamp):
+                head = self.notes.release_headline(entry)
+                self.assertTrue(head.endswith("."), f"{stamp}: headline is not a sentence: {head!r}")
+                self.assertLess(len(head), 400, stamp)
+                self.assertFalse(head.startswith("**"), f"{stamp}: the stamp survived")
 
 
 if __name__ == "__main__":

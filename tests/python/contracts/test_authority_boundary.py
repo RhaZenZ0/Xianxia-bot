@@ -543,7 +543,7 @@ def test_sect_recruitment_does_not_send_caller_computed_rolls():
 
 
 # ---------------------------------------------------------------------------
-# v0.21 gate (docs/ROADMAP_1_0.md, "Authority I"): every DB mutator call site
+# v0.21 gate (docs/history/ROADMAP_1_0.md, "Authority I"): every DB mutator call site
 # reachable from app/bot/ and app/ops/ is listed here. PLAYER_MUTATIONS is the
 # milestone's backlog - each entry names the engine action that replaces it,
 # and the milestone closes when the dict is empty. BOOKKEEPING_METHODS are the
@@ -684,7 +684,7 @@ def test_the_v0_21_backlog_stays_closed():
 
 
 # ---------------------------------------------------------------------------
-# v0.30 gate (docs/ROADMAP_1_0.md, "Authority II"): the DB layer itself, not
+# v0.30 gate (docs/history/ROADMAP_1_0.md, "Authority II"): the DB layer itself, not
 # only its callers. Every method of app/database that writes is listed here
 # with the tables it may touch and the reason it is Python's to write. A
 # write to any other table, or a new writer, fails; a listed writer that no

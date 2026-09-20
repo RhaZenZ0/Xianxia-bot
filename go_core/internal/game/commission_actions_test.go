@@ -1,6 +1,6 @@
 package game
 
-// The v0.22.0 gate from docs/COMMISSIONS_DESIGN.md: commission.accept refuses
+// The v0.22.0 gate from docs/history/COMMISSIONS_DESIGN.md: commission.accept refuses
 // on a held commission and on cooldown and stores the deadline and variant;
 // commission.resolve makes failed and abandoned identical in consequence and
 // pays only what was locked at accept; the tick expiry produces `failed`
