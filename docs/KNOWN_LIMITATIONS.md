@@ -11,6 +11,38 @@ database. Its findings are the first two entries.
 
 ## Findings
 
+- **deferred (planned)** — *No gate holds a parsed content field to having a reader, and the class
+  keeps producing findings.* v1.0.0-rc.55 found `RootGrade.CultivationMult` and
+  `RootGrade.BreakthroughBonus` parsed and read by nothing — the grade decided how a cultivator was
+  made and nothing about what they were — and it was found by hand. rc.58 then built exactly this
+  gate one level down, for modifier *stats* (`modifier_vocabulary_test.go`, which requires each to be
+  **fetched** by a rule rather than merely named). Nobody built it for the fields themselves. A sweep
+  of `worlddata` finds 439 parsed fields across 63 structs, of which **seven** are never read through
+  a selector anywhere in production Go; four of those are legitimately read by Python for display
+  (`advantage`, `drawback`, `objective`, `channel_name`), which is the distinction a gate has to
+  make and the reason a naive one would be noise. The three that survive are the two entries below.
+  The gate wants the rc.58 shape — an argument position or a selector, not a substring — and an
+  allowlist naming each field a *presentation* layer reads, with which file reads it.
+- **deferred (planned)** — *Seven cultivation paths each name a skill, and the name reaches nothing.*
+  `worlddata.Path.Skill` is parsed from `paths.<name>.skill` — Sword, Spiritual Arts, Martial Arts,
+  Soul Arts, Beastcraft, Formations, Ghost Arts — and is read by no rule, no card and no Python
+  reader. Each of the seven strings occurs **exactly once in the whole 2.5 MB content file**: its own
+  declaration. So they do not name a manual, a technique, a profession or any roster the game has;
+  they are a vocabulary with nothing behind it, which is `/learn`'s shape (rc.43) with no mechanism
+  waiting at the other end rather than one. Deciding what a path's skill *is* — a display line on
+  `/sheet`, a bonus, or a field to delete — is content design, not a wiring fix, which is why this is
+  recorded rather than quietly wired.
+- **deferred (planned)** — *Both of an auction house's door fields are read by nothing.*
+  `protected_interior` and `door_rule` are set on **all 48** authored houses and neither is read in
+  Go or Python. The door half of that fiction does work: `advanced_maintenance.go` writes an
+  `auction_door_risks` row when a legendary lot is struck, and `auction.leave` consumes it and can
+  stand a hunter at `house.EntranceLocation` — outside, which is the point. What is unread is the
+  *inside* half. Two things keep this small and are worth stating rather than discovering: `door_rule`
+  is unanimously `true`, so reading it would change nothing until a house sets it false; and nothing
+  today can attack a player who has not consented — `/battle challenge` targets NPCs and a duel needs
+  `respond` — so `protected_interior` may be protecting against a mechanic the game does not have.
+  Either wire them or retire them; leaving a switch in content that code ignores is the decoration
+  this file exists to name.
 - **deferred (planned)** — *Nothing can grant a physique, not even a GM.* `admin.player.set_physique`
   writes `evolution_stage`, `progress` and `stability` and nothing else (`actions.go:2212`), and the
   only statements that ever write `physique_id` are character creation and samsara —
