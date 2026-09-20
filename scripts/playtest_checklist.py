@@ -380,8 +380,14 @@ def build() -> str:
         lines.append("")
     lines += ["### What only a live server can show", "",
               "Real Discord, real network, real routes, real money. The two harnesses cover everything else, so this "
-              "is the whole of the manual pass — walk it once per rc on the NAS and tick as you go; the generator "
-              "keeps these ticks when it rewrites the file.", "",
+              "is the whole of the manual pass — walk it once per release on the NAS and tick as you go; the "
+              "generator keeps these ticks when it rewrites the file, and carries them when the version is "
+              "bumped.", "",
+              "**A tick carries the release it was walked on.** Write a bare `[x]` and the next regeneration "
+              "stamps it — the person ticks, the generator dates it. So `[x] v1.0.0` on a 1.0.1 checklist is a "
+              "row nobody has walked since 1.0.0, and re-walking it is writing `[x]` over the stamp. Carrying a "
+              "tick forward unstamped would claim a pass that never happened, which is the one thing a "
+              "checklist must not do.", "",
               "| Loop | Live |", "|---|---|",
               "| the Discord sweep's log reads end to end: every refusal names what is missing, in words a player can act on | [ ] |",
               "| a live AI route narrates a scene (the sweep runs `NARRATOR_PROVIDER=procedural` and can never reach one) | [ ] |",
@@ -443,7 +449,8 @@ def build() -> str:
     return "\n".join(lines)
 
 
-TICK = re.compile(r"^\[[ xX]\]$")
+TICK = re.compile(r"^\[[ xX]\](?:\s+v\d+(?:\.\d+)*)?$")
+CHECKLIST_NAME = re.compile(r"^v(\d+(?:\.\d+)*)\.md$")
 
 
 def _tickable(line: str) -> tuple[str, str] | None:
@@ -456,6 +463,10 @@ def _tickable(line: str) -> tuple[str, str] | None:
     the loop rows - the only ticks in the file that are a person's - were
     silently dropped on every regeneration. Nobody noticed because nobody had
     ticked one, which is the same reason the per-action boxes went.
+
+    A tick may carry the release it was walked on (`[x] v1.0.0`), which is
+    what lets one survive a version bump without claiming a pass that never
+    happened - see `_stamp`.
     """
     if not line.startswith("| ") or not line.endswith(" |"):
         return None
@@ -465,22 +476,74 @@ def _tickable(line: str) -> tuple[str, str] | None:
     return None
 
 
-def merge_ticks(old: str, new: str) -> str:
-    """Keep the live-table ticks from the checked-in file for loops that remain."""
+def _stamp(tick: str, release: str) -> str:
+    """Give a bare `[x]` the release it was walked on; leave a stamped one alone.
+
+    The person ticks, the generator stamps. A bare tick is one somebody wrote
+    since the last regeneration, so it belongs to the release being generated;
+    a stamped one keeps the release it already names, so carrying it forward
+    is not a claim that the new release was walked.
+
+    An unticked box never carries a stamp - there is nothing to date.
+
+    The stamp is read as the text *after* the box, not as "does this cell
+    contain a space". The first version asked the latter, and it was right
+    only by accident: `[ ]` contains a space too, so an empty box was treated
+    as already stamped and left alone, which happens to be the correct answer
+    for the wrong reason. Its drill passed, which is how it was found.
+    """
+    box, _, walked = tick.partition("]")
+    if not box[1:].strip():
+        return "[ ]"
+    return tick if walked.strip() else f"[x] v{release}"
+
+
+def merge_ticks(old: str, new: str, release: str) -> str:
+    """Keep the live-table ticks from a previous checklist, for loops that remain.
+
+    `old` is the file this one supersedes: the same release's, when the
+    generator is re-run after a command change, or the previous release's,
+    when the version has been bumped and `docs/playtest/v<new>.md` does not
+    exist yet. Both are the same operation - a tick is a person's work and
+    outlives the file it was written in.
+    """
     ticks = dict(filter(None, (_tickable(line) for line in old.splitlines())))
     out = []
     for line in new.splitlines():
         found = _tickable(line)
         if found and found[0] in ticks:
-            line = f"| {found[0]} | {ticks[found[0]]} |"
+            line = f"| {found[0]} | {_stamp(ticks[found[0]], release)} |"
         out.append(line)
     return "\n".join(out) + "\n"
 
 
-def main() -> int:
+def _superseded(target: Path) -> Path | None:
+    """The newest other checklist in `docs/playtest/`, whose ticks `target` inherits.
+
+    Sorted on the version as a tuple of integers rather than as a string,
+    because `v1.0.10` is newer than `v1.0.9` and sorts before it as text.
+    """
+    newest: tuple[tuple[int, ...], Path] | None = None
+    for path in target.parent.glob("v*.md"):
+        if path == target:
+            continue
+        match = CHECKLIST_NAME.match(path.name)
+        if not match:
+            continue
+        key = tuple(int(part) for part in match.group(1).split("."))
+        if newest is None or key > newest[0]:
+            newest = (key, path)
+    return None if newest is None else newest[1]
+
+
+def main(argv: list[str] | None = None) -> int:
+    # `argv` is taken rather than read off `sys.argv` so a test can drive this
+    # function itself. Asserting that `merge_ticks` carries a tick says nothing
+    # about whether `main` ever hands it the previous release's file, and that
+    # wire is the one that was missing.
     parser = argparse.ArgumentParser()
     parser.add_argument("--check", action="store_true")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     target = ROOT / "docs" / "playtest" / f"v{version()}.md"
     fresh = build()
     if args.check:
@@ -493,9 +556,18 @@ def main() -> int:
         for row in missing:
             print("not on the checklist:", row)
         return 1 if missing else 0
-    old = target.read_text(encoding="utf-8") if target.exists() else ""
-    target.write_text(merge_ticks(old, fresh) if old else fresh + "\n", encoding="utf-8")
+    superseded = None if target.exists() else _superseded(target)
+    source = target if target.exists() else superseded
+    old = source.read_text(encoding="utf-8") if source is not None else ""
+    target.write_text(merge_ticks(old, fresh, version()) if old else fresh + "\n", encoding="utf-8")
     print(f"wrote {target}")
+    if superseded is not None:
+        # One checklist, not one per release. Its only human content is the
+        # ticks, and those have just been carried into `target` carrying the
+        # release each was walked on, so what is left behind is a generated
+        # copy of the tree at an older version - which git already keeps.
+        superseded.unlink()
+        print(f"carried the live pass from {superseded.name} and removed it")
     return 0
 
 

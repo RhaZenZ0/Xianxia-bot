@@ -11,6 +11,32 @@ database. Its findings are the first two entries.
 
 ## Findings
 
+- **deferred (planned)** — *🗺️ Cultivation World is open to somebody who has never played, and no
+  role says otherwise.* `#player-homes` and `#expeditions` sit in that category, read-only since
+  v1.0.0-rc.59 but visible to everyone, so a newcomer's sidebar advertises rooms they cannot use
+  directly above the `#begin-here` they are meant to go to — while every other player-facing category
+  is gated (Realm Capitals by the presence role, the four World Events feeds by the realm-access
+  role, Admin by administrator). The deeper half is that **no "has a character" role exists at all**:
+  `_sync_realm_access_roles` and `_sync_realm_presence_roles` both run from `require_character` and so
+  only ever fire for somebody who already has one, which means nothing in the server can be gated on
+  having played. The plan is one generated role (`Xianxia • Cultivator`), granted from the same
+  `require_character` sync block and from `/begin`, revoked at `admin_erase` (which cannot ride
+  `require_character` — after erasure that call never fires again), and backfilled through
+  `_sync_all_realm_access_roles`, the sweep Full Setup and `/admin server sync_roles` already call.
+  Four traps are known and none is optional: the bot must allow **itself** before denying `@everyone`
+  or it 403s itself out of the channel (rc.52); the overwrite has to reach channels that already
+  exist, not only ones the run creates (rc.59, same file); both anchors carry `private_thread`s whose
+  members still need to see the parent, so the grant must precede thread creation; and
+  `realm_presence_role_name` already falls back to `world_name`, so a fifth hub with no `display_name`
+  would collide with `_realm_access_role_name` and silently merge two gates — adding a third name to
+  that family is the moment to gate it.
+- **fixed (v1.0.1)** — *The release after a live pass would have deleted it.* The checklist is named
+  after `RELEASE_VERSION`, so the filename held still across all fifty-nine release candidates of
+  1.0.0 and `merge_ticks` carried every tick; on the first bump that renames it the target does not
+  exist, `old` is empty, and a fresh checklist is written with every box blank. The ticks are
+  inherited from the newest older checklist now, dated with the release each was walked on so
+  carrying one is not a claim that the new release was walked, and the superseded file is removed
+  because `docs/playtest/` is one checklist.
 - **fixed (v1.0.1)** — *No clan alliance had ever been formed at runtime, in any world.*
   `martial_clan_relations` was seeded once per household behind a `COUNT(*)==0` guard, with an
   **invented** partner — a surname off a list, `partner_family_id` left NULL although the column is

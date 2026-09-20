@@ -2323,6 +2323,52 @@ Nothing ends a relation, deliberately: `active` is written 1 by every INSERT, re
 and set to 0 by nothing at all, and what a broken alliance leaves behind — a rivalry, or simply
 nothing — is a decision rather than a default.
 
+### The pass the next release would have spent (v1.0.1)
+
+`docs/playtest/v<version>.md` is named after `RELEASE_VERSION`, which strips the `-rc.N` suffix — so
+across all **fifty-nine** release candidates of 1.0.0 the filename never changed, `merge_ticks` was
+handed the file it was about to overwrite, and every tick was carried. v1.0.0 → v1.0.1 is the first
+bump in this project's history that renames it, and there `target.exists()` is false, `old` is the
+empty string, and the freshly generated checklist is written with every box blank. **The first real
+live pass this repo has ever had would have been deleted by the release that followed it**, silently,
+by the generator, on a tree where everything was green.
+
+It is the shape rc.47 already found in the same function — `merge_ticks` carefully preserving the
+per-action boxes and dropping the loop rows — one level up: not the wrong rows carried, but the
+right rows carried only while the filename happens to hold still. Nobody had met it in twelve
+regenerations because nothing had ever been ticked, and nobody met it in twelve more because the
+name could not change inside a version.
+
+`_superseded` is the newest other checklist in the directory, and `main` inherits its ticks when the
+target does not exist yet. The superseded file is then removed: `docs/playtest/` is one checklist,
+its only human content is the ticks, and those have just been carried — what would be left behind is
+a generated copy of an older tree, which git already keeps.
+
+**A carried tick is dated, and that is the half that keeps it honest.** Moving `[x]` forward
+unstamped would say the new release was walked when it was not, which is the one thing a checklist
+must not do. So the **person ticks and the generator dates it**: a bare `[x]` belongs to the release
+being written, a stamped one keeps the release it already names. `[x] v1.0.0` on a 1.0.1 checklist
+is a row nobody has walked since 1.0.0, and re-walking it is writing `[x]` over the stamp — one
+character, no version to type.
+
+**Versions sort as integers**, because `v1.0.10` is newer than `v1.0.9` and sorts before it as text.
+
+Three things about the gate are worth more than the fix.
+
+- **`main` takes its `argv` now, so the test can drive `main` rather than its helpers.** Asserting
+  that `merge_ticks` *can* carry a tick says nothing about whether `main` ever hands it the previous
+  release's file, and that wire is precisely what was missing. This is rc.59's `test_release_notes.py`
+  lesson applied before the fact rather than after it.
+- **The drill found a fault in the fix.** `_stamp`'s first version asked whether the cell contained a
+  space to decide "already stamped" — and `[ ]` contains a space, so an empty box was left alone: the
+  right answer for the wrong reason. Disabling the empty-box branch changed nothing and the drill
+  **passed**, which is the rc.47 shape inside the gate written for it. It reads the text *after* the
+  box now, and the re-drill fails with *"an unwalked row was dated as though it had been"*.
+- **The other four drills print the finding.** Making `main` ignore the superseded file gives
+  *"the live pass was blanked by the release that followed it"*; leaving the file behind gives
+  `['v1.0.0.md', 'v1.0.1.md'] != ['v1.0.1.md']`; sorting the versions as text inherits from
+  `v1.0.9` over `v1.0.10`.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —
