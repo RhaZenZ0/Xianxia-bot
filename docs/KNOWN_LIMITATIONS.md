@@ -11,6 +11,26 @@ database. Its findings are the first two entries.
 
 ## Findings
 
+- **deferred (planned)** — *Nothing can grant a physique, not even a GM.* `admin.player.set_physique`
+  writes `evolution_stage`, `progress` and `stability` and nothing else (`actions.go:2212`), and the
+  only statements that ever write `physique_id` are character creation and samsara —
+  `aptitude.awaken` and `aptitude.evolve` both pass the loaded bundle back through `savePhysique`, so
+  they move the state and the stage and never the identity. This is **not** dead content: all eight
+  non-ordinary physiques are drawable at creation, because `generatePhysique` gives every one weight
+  at least 1 and favoured paths and roots only raise it. So it is a missing lever rather than a
+  `/learn`-class fault — a GM cannot hand somebody `nine_yang_solar_body`, cannot correct one rolled
+  wrong, and cannot stage one for a playtest. Adding it means `physique_id` and `name` on the
+  payload, the catalogue check that `aptitude_actions.go:203` already makes, and `physique_id` in
+  the undo snapshot, which today carries only the three numbers it can restore.
+- **deferred (planned)** — *`admin.player.set_spiritual_root` writes a grade the ladder may not
+  carry.* The lever upserts `grade`, `purity` and `mutation` with no check against
+  `spiritual_root_system.grades` (`actions.go:2119`), and `gradeIndex` answers 0 for a name it does
+  not know — so a typo'd grade is silently worth the bottom rung's `cultivation_mult` and
+  `breakthrough_bonus` rather than erroring. v1.0.0-rc.55 found and wrote down exactly this shape
+  ("a fallback that looks like a value is not a sentinel") and gated the *fixtures* with
+  `TestEveryFixtureRootStandsOnTheLadder`; the lever that a GM actually types into was left
+  ungated, so the one writer a human drives is the one nothing holds. The fix is the same check the
+  ladder already makes, at the lever.
 - **deferred (planned)** — *🗺️ Cultivation World is open to somebody who has never played, and no
   role says otherwise.* `#player-homes` and `#expeditions` sit in that category, read-only since
   v1.0.0-rc.59 but visible to everyone, so a newcomer's sidebar advertises rooms they cannot use
