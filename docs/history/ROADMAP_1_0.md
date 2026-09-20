@@ -96,7 +96,7 @@ schema 30), the Quests workbench that edits them (v0.24.0, schema 32, with
 pinned terms so an edit cannot rewrite an accepted deal). Step 5 of the
 design — seeded invention, where a giver invents a personal commission from
 RAG reads — is **deliberately unbuilt** and moves to the content track
-below. `docs/COMMISSIONS_DESIGN.md` is the design; its "where it sits"
+below. `docs/history/COMMISSIONS_DESIGN.md` is the design; its "where it sits"
 section refers to the old numbering and should be marked shipped at rc.*
 
 ### v0.29 — Hardened I: the doors *(was v0.25)* — **shipped v0.29.0**
@@ -340,7 +340,7 @@ Release candidates go to the **beta channel** only.
   and the engine image (`DEVELOPMENT.md` no longer exists; the README's
   Development section is it); `VERSIONS.md` is one paragraph per minor with
   the full entries in `docs/history/CHANGELOG_0_18_TO_0_40.md`;
-  `docs/COMMISSIONS_DESIGN.md` is marked shipped.
+  `docs/history/COMMISSIONS_DESIGN.md` is marked shipped.
 - ~~`gofmt` clean; `make check` green from a fresh clone.~~ Held by CI on
   every push since v0.29.1.
 - Two weeks on the NAS at rc without a P1. *(operator)*
@@ -477,5 +477,5 @@ drift for seven versions as happened between v0.21.6 and v0.28.0.
 | v0.33 Gameplay I | v0.33.0 | shipped |
 | v0.34 Playtest | v0.34.2 | shipped; the engine loops run, the checklist is on file, and the `#playtest` board collects the live pass; travelling merchants shipped beside it. Both harnesses drive the whole surface since rc.35, and at rc.47 the checklist says so: one machine column per action, 27 rows left for a person |
 | v1.0.0-rc | v1.0.0-rc.1 | the machine bars met: migration drill, docs held by tests; the NAS drills and the quiet fortnight are the operator's |
-| v1.0.0 | | |
+| v1.0.0 | v1.0.0 | cut from rc.59's tree, fifty-nine candidates on. Both harnesses drive every operation the engine allows and every leaf the hubs register; what 1.0 does not cover is `docs/KNOWN_LIMITATIONS.md`. This file closed with it |
 | Content track | v0.39.0 | started early: shops (v0.35.0), gates and districts (v0.36.0), merchants that bid (v0.37.0), city life (v0.38.0) - boards, envoys, rumours, inns, prosperity; the roads, sects and goods for every world, eight realms on rotation, typed play with two arguments and trade at the inn (v0.39.0) |

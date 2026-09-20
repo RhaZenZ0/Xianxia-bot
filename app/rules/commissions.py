@@ -7,7 +7,7 @@ in `go_core/internal/game/commission_actions.go`; this module never computes
 them, it only says which commission a giver would raise next and how to write
 it down.
 
-The selection ladder (docs/COMMISSIONS_DESIGN.md, "Selection at offer time")
+The selection ladder (docs/history/COMMISSIONS_DESIGN.md, "Selection at offer time")
 runs before any model call, so a Steward who has nothing to give costs nothing
 to ask.
 """

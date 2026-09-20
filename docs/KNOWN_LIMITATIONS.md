@@ -1,6 +1,6 @@
 # Known limitations — the punch list
 
-The v0.34 playtest's findings (`docs/ROADMAP_1_0.md`, Gameplay-complete II). Every entry is
+The v0.34 playtest's findings (`docs/history/ROADMAP_1_0.md`, Gameplay-complete II). Every entry is
 either **fixed** in the release named, or **deferred** past 1.0 with the reason. Nothing is left
 open without one of those two words; `tests/python/contracts/test_playtest_gate.py` holds the
 file to that. Add to it from the live pass (`docs/playtest/`) as findings come in.

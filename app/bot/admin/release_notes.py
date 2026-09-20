@@ -7,7 +7,14 @@ ever shown them to anybody. A GM who upgraded had to go and read the file, and
 the rc.21-to-rc.57 notes had to be pasted by hand into `#world-events`, the
 in-fiction global feed a world-reset notice uses.
 
-`#updates` is where they go, and the bot posts them itself. Three rules hold it:
+`#updates` is where they go, and the bot posts them itself - as **one short
+message**, not the entry whole. rc.59 shipped this posting the whole thing,
+which for rc.58 was 3,801 characters across three messages: that is written
+for an operator reading `VERSIONS.md`, not for somebody glancing at a channel.
+What the channel gets is the entry's opening sentence and a link to the rest,
+and the sentence is **derived, never authored twice** - see `release_headline`.
+
+Three rules hold the posting itself:
 
 - **The row is the memory.** `server_config.announced_release` is the release
   this guild has already been told about, so the announcement is idempotent
@@ -28,7 +35,7 @@ from pathlib import Path
 import discord
 
 from ...version import INSTALLED_VERSION, RELEASE_VERSION
-from ..runtime import DB, log
+from ..runtime import DB, SETTINGS, log
 
 VERSIONS_FILE = Path(__file__).resolve().parents[3] / "VERSIONS.md"
 
@@ -102,6 +109,38 @@ def chunk_for_discord(text: str, limit: int = MESSAGE_LIMIT) -> list[str]:
     return [chunk for chunk in chunks if chunk.strip()]
 
 
+def release_headline(entry: str) -> str:
+    """The entry's opening sentence, with its `**1.0.0** (rc.N)` stamp removed.
+
+    Every entry in the changelog is written the same way - a version stamp,
+    then a verb: *"**1.0.0** (rc.59) makes the server readable, and gives a
+    release somewhere to announce itself."* The stamp is the subject of that
+    sentence, which is what lets `release_post` set the release's name in bold
+    and have the rest read exactly as written. **This is derived, never
+    authored twice**: a second short blurb per release would be a second
+    statement of the same thing, free to drift from the changelog the way
+    `sync_world_catalog` drifted from the catalogue it claimed to sync.
+    """
+    paragraph = entry.split("\n\n")[0].replace("\n", " ").strip()
+    body = re.sub(r"^\*\*[\d.]+\*\*\s*(?:\(rc\.\d+\)\s*)?", "", paragraph)
+    # A sentence ends at a full stop after a word, a digit or a closing
+    # backtick/paren - never at the dot inside `rc.59` or `1.0.0`.
+    end = re.search(r"(?<=[a-z0-9)`])\.(?=\s|$)", body)
+    return body[: end.start() + 1] if end else body
+
+
+def release_post(version: str, entry: str) -> str:
+    """What `#updates` actually gets: one short message, not the whole entry.
+
+    rc.59 shipped this posting the changelog entry whole - 3,801 characters
+    across three messages for rc.58 - which is written for an operator reading
+    `VERSIONS.md`, not for somebody glancing at a channel. The full notes are
+    one click away in the release itself.
+    """
+    link = f"https://github.com/{SETTINGS.update_repository}/releases/tag/v{version}"
+    return f"📣 **Xianxia RP v{version}** {release_headline(entry)}\n-# Full notes: <{link}>"
+
+
 async def announce_release_if_new(guild: discord.Guild) -> str | None:
     """Post this release's notes in `#updates` if the guild has not seen them.
 
@@ -134,10 +173,12 @@ async def announce_release_if_new(guild: discord.Guild) -> str | None:
         log.warning("No changelog entry for %s; not announcing", running)
         return None
 
-    header = f"## 📣 v{running}\n"
     try:
-        for index, chunk in enumerate(chunk_for_discord(notes)):
-            await channel.send(f"{header}{chunk}" if index == 0 else chunk)
+        # `chunk_for_discord` still guards the send: a headline is one short
+        # message in every entry written so far, but nothing structural stops
+        # somebody writing a first sentence longer than Discord will accept.
+        for chunk in chunk_for_discord(release_post(running, notes)):
+            await channel.send(chunk)
     except (discord.Forbidden, discord.HTTPException):
         log.exception("Could not post release notes for %s in #%s", running, channel.name)
         return None

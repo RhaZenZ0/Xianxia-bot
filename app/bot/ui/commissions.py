@@ -1,5 +1,5 @@
 """The commission surface: the offer card, its accept buttons, and the abandon
-confirmation (v0.22.0, docs/COMMISSIONS_DESIGN.md).
+confirmation (v0.22.0, docs/history/COMMISSIONS_DESIGN.md).
 
 Two rules shape everything in this module.
 

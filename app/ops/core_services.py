@@ -430,7 +430,7 @@ class QuestService:
 
 
 class CommissionService:
-    """The giver's side of a commission (v0.22.0, docs/COMMISSIONS_DESIGN.md).
+    """The giver's side of a commission (v0.22.0, docs/history/COMMISSIONS_DESIGN.md).
 
     Reads engine facts, runs the pure ladder in app/rules/commissions.py, and
     calls one of two engine actions. It decides nothing: which commission is

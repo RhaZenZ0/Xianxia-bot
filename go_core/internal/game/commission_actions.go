@@ -1,6 +1,6 @@
 package game
 
-// Commissions (v0.22.0, docs/COMMISSIONS_DESIGN.md).
+// Commissions (v0.22.0, docs/history/COMMISSIONS_DESIGN.md).
 //
 // A commission is a quest a giver NPC offers in character. Three things about
 // it are engine facts and live here, not in Python and never in a model: a
@@ -24,7 +24,7 @@ import (
 )
 
 // The refusal cooldown after a failed or abandoned commission - an operator
-// decision (docs/COMMISSIONS_DESIGN.md), in game time: 1440 minutes is one
+// decision (docs/history/COMMISSIONS_DESIGN.md), in game time: 1440 minutes is one
 // world-day. Deadlines are not here; each commission carries its own, per set
 // of terms, because "how long do I have" is part of the offer.
 const commissionCooldownMinutes = 2 * 1440
