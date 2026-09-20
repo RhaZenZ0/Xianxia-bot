@@ -415,12 +415,30 @@ def build() -> str:
               "| a reply printing a hub path (`**/world -> Act -> Explore**`) still offers it as a button | [ ] |",
               "| `/craft` makes an alchemy recipe (`/alchemy refine` is gone and nothing is unreachable) | [ ] |",
               "",
-              "### Upgrading the deployment", "",
+              "### The server layout (v1.0.0-rc.59)", "",
+              "Four of these reach a server somebody is already running rather than a fresh guild, "
+              "which is the half a fresh-guild test can never see: the category split, the re-parent "
+              "and the read-only lock each had to move or lock a channel that already existed, and "
+              "until rc.59 none of them did. Walk them on a guild with history, not on a new one.", "",
               "| Loop | Live |", "|---|---|",
-              "| `sudo ./update.sh --fetch --channel beta` offers the newest rc, not \"already the newest\" | [ ] |",
-              "| it installs it: a release stamped with RELEASE_TAG passes both VERSION checks | [ ] |",
+              "| Full Setup (or Repair) leaves eight categories, in order: Start Here, Announcements, Realm Capitals, World Events, Auction Houses, Cultivation World, Feedback, Admin | [ ] |",
+              "| channels that already existed have moved into their new categories, not only the ones the run created | [ ] |",
+              "| an ordinary member cannot post in #xianxia-info, #expeditions, #player-homes or #updates, including ones that predate the release | [ ] |",
+              "| no new #event-scenes is created; an event's scene anchors in its world's own feed, and an existing one keeps the blurb saying it is retired | [ ] |",
+              "| #updates is silent on a guild whose marker was NULL, and the release after this one posts there once | [ ] |",
+              "",
+              "### Upgrading the deployment", "",
+              "Which channel depends on the tag: a version with no `-` in it is published as GitHub's "
+              "latest rather than a prerelease, so 1.0.0 and every patch after it is on **stable** and "
+              "the release candidates were on `beta`. Walk the channel the release you are installing "
+              "actually went out on.", "",
+              "| Loop | Live |", "|---|---|",
+              "| `sudo ./update.sh --check --channel stable` names the newest release, not \"already the newest\" | [ ] |",
+              "| `sudo ./update.sh --fetch --channel stable` installs it, verifying the archive against its `.sha256` sidecar | [ ] |",
+              "| a release stamped with RELEASE_TAG passes both VERSION checks | [ ] |",
               "| the post-install manifest check passes, skipping the deferred updater | [ ] |",
               "| `./migrate_env.sh --dry-run` runs on the NAS with no missing command | [ ] |",
+              "| the bot comes up on the schema the release ships (a duplicate column here is v1.0.0-rc.57's fault returning) | [ ] |",
               "", f"_{total} actions across {len(_hubs(sources))} hubs._", ""]
     return "\n".join(lines)
 

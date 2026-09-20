@@ -534,14 +534,15 @@ VALUES(?,?,?,?,?,?,?,?,?,?)`, []any{familyID, surname + " " + role, surname + " 
 			}
 			partner := clanPartnerSurnames[partnerIndex] + " Martial Clan"
 			relation := clanRelationTypes[relationIndex]
-			score := map[string]int64{"alliance": 45, "marriage_pact": 35, "trade_pact": 25, "rivalry": -30, "blood_feud": -65}[relation]
+			score := clanRelationOpeningScore[relation]
 			if _, e = conn.Execute(`INSERT INTO martial_clan_relations(family_id,partner_family_id,partner_name,relation_type,relation_score,active,started_game_minute,updated_at)
 VALUES(?,?,?,?,?,?,?,?)`, []any{familyID, nil, partner, relation, score, 1, gameMinute, now}); e != nil {
 				return e
 			}
 			out.ClanRelationsCreated++
 			if relation == "alliance" || relation == "marriage_pact" || relation == "trade_pact" || relation == "blood_feud" {
-				if e = recordClanBootstrapHistory(conn, fam, partner, relation, score, gameMinute, now); e != nil {
+				name := firstNonemptyText(fmt.Sprint(fam["family_name"]), firstNonemptyText(fmt.Sprint(fam["surname"]), "Clan")+" Clan")
+				if e = recordClanRelationHistory(conn, familyID, name, partner, relation, score, gameMinute, now); e != nil {
 					return e
 				}
 			}
@@ -557,9 +558,13 @@ func firstNonemptyText(value, fallback string) string {
 	return fallback
 }
 
-func recordClanBootstrapHistory(conn *storage.Conn, fam map[string]any, partner, relation string, score, gameMinute int64, now float64) error {
-	familyID := i64(fam["family_id"])
-	familyName := firstNonemptyText(fmt.Sprint(fam["family_name"]), firstNonemptyText(fmt.Sprint(fam["surname"]), "Clan")+" Clan")
+// recordClanRelationHistory writes the world's memory of one treaty. It was
+// `recordClanBootstrapHistory` until v1.0.1, when `clanDiplomacy` began making
+// relations at runtime: a helper named for the one caller it happened to have
+// is the same class of lie as a `sync_world_catalog` that syncs no catalogue,
+// and two copies of this INSERT would be free to disagree about what the
+// martial world remembers.
+func recordClanRelationHistory(conn *storage.Conn, familyID int64, familyName, partner, relation string, score, gameMinute int64, now float64) error {
 	label := strings.ReplaceAll(relation, "_", " ")
 	eventType := "alliance"
 	significance := int64(68)

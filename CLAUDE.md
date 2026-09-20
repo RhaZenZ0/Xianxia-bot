@@ -2258,6 +2258,71 @@ sentence the rule is written in. A reader is asserted before it is trusted (rc.5
 cannot see the thing it forbids is decoration (rc.47) — and only running it against the broken tree
 says which kind you have.
 
+### The partner who was nobody (`clan_diplomacy.go`, v1.0.1)
+
+`martial_clan_relations.partner_family_id` is foreign-keyed to `birth_families` and nullable, and the
+one statement that had ever inserted a row wrote it `nil`. Not as an oversight — because the partner
+it named was **invented**: `clanPartnerSurnames[roll] + " Martial Clan"`, a house with no members, no
+town, no wealth and no opinion about anything. So each household held exactly one relation, with
+somebody who does not exist, seeded once behind a `COUNT(*)==0` guard, and the only thing that could
+ever happen to it was the ±1 a tick that `clans` applies. **Four households meant four relations on
+the day the world opened and four relations for ever after**, which is how it was reported.
+
+The whole of what could create a row at runtime was `combat_aftermath.go:172`, and it writes
+`blood_feud` only, when a player kills a family head. So in every world that has ever run, **no
+alliance, marriage pact or trade pact has been formed since bootstrap.**
+
+**The comment naming the fault is in the tree, and it fixed the neighbouring table.**
+`npc_romance.go:88` says *"Bootstrap has always written clan `marriage_pact` rows and nothing has
+ever made one since, so the idea existed in this world and only ever described its own past"* — and
+`npcPoliticalMarriages`, directly beneath it, writes **`sect_relations`**, as an `UPDATE`, re-typing
+a pair bootstrap already wrote. That half has worked since rc.24. The clan half it is named after was
+never built. Same shape as `/learn` (rc.43) and the peach (rc.50), reached from the other side: not
+a mechanism nothing points at, but a fault someone wrote down and then fixed one table over.
+
+**The gate is the world, not the street, and that is the decision worth knowing.** Every one of the
+thirteen archetypes has exactly one city per world (`birthFamilyHomelands`), so a same-location rule
+would let a house treat only with houses of its own archetype, and a one-road-step rule would hand
+each archetype a fixed set of partners it could never grow out of — rc.24's geography fault in a new
+hat, where 392 people could never marry anybody because of where they stood. A clan does not walk
+anywhere; it sends somebody, and the roads between two cities of one world already exist. So the
+world is the gate and being within one step is a **bonus to the roll** (`clanNeighbourBonus`), read
+through the runner's own `neighbours` wrapper so there is still one idea of reach in the tree.
+
+Four more rules hold it.
+
+- **Written from both sides or not at all.** Every reader is `WHERE family_id=?` — `/family clan`,
+  `world_status_queries.go`, the standing term in `family.support` — so a single row is a treaty one
+  of the two houses has never heard of.
+- **A blood feud is not signed here.** It comes from a body, and `combat_aftermath` owns it.
+  `TestABloodFeudIsNotSignedHere` walks the whole plausible input space rather than trusting the
+  `switch` reads right.
+- **A missing opening score is a refusal, not a zero.** `clanRelationOpeningScore[relation]` answers
+  0 for a key it does not carry, and 0 is not a sentinel here: `family.support` counts
+  `relation_score>0`, and nothing in the game re-types a row, so a treaty opened at 0 is worthless
+  for ever. The `seller_user_id=0` lesson. Bootstrap reads the same map, so an ancestral pact and a
+  fresh one cannot silently be worth different amounts; what tells them apart is
+  `started_game_minute`, the only thing about a relation's age the table has ever carried.
+- **The invented partners are left where they are**, and so is `recordClanRelationHistory` — renamed
+  from `recordClanBootstrapHistory`, because a helper named for the one caller it happened to have is
+  the `sync_world_catalog` lie again. On a world with one household the invented partner is the only
+  relation there can be, which is also why a lone house signing nothing is a test rather than a bug.
+
+**`trade_pact` was in the `ELSE`.** The drift `CASE` named `alliance`, `marriage_pact`, `blood_feud`
+and `rivalry` — four of the five seeded types — so a trade pact sat at exactly its opening 25 from
+the day the world started. One word, and the test that holds it fails with *"a trade pact is worth
+25 after a tick, want 26 — it is in the ELSE again"*.
+
+**The fixture is the reason this is a new test file.** `bootstrap_test.go` declares
+`martial_clan_relations` with **no foreign keys at all** and a `birth_families` missing every column
+diplomacy reads, so it accepts exactly what production refuses — the `npc_consignments` lesson, in
+the file next door. `clanDiplomacySchema` carries both keys, and `storage.Open` sets
+`foreign_keys=ON`, so a partner id pointing at nobody is refused by SQLite rather than stored.
+
+Nothing ends a relation, deliberately: `active` is written 1 by every INSERT, read by every SELECT
+and set to 0 by nothing at all, and what a broken alliance leaves behind — a rivalry, or simply
+nothing — is a decision rather than a default.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —

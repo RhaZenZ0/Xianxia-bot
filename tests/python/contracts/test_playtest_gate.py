@@ -147,10 +147,17 @@ class TheChecklistSaysWhatTheSweepProved(unittest.TestCase):
             "playtest_checklist", PROJECT_ROOT / "scripts" / "playtest_checklist.py")
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
-        loop = "| `/menu` opens every hub; Admin only for an administrator | [ ] |"
+        loop = "| `/menu` opens every hub; Admin only for an administrator |"
         self.assertIn(loop, self.text, "the loop this test ticks is no longer on the checklist")
-        merged = module.merge_ticks(self.text.replace(loop, loop.replace("[ ]", "[x]")), self.text)
-        self.assertIn(loop.replace("[ ]", "[x]"), merged)
+        # Drive the merge from a ticked old file to a blank fresh one, rather
+        # than reading the checked-in state: since v1.0.0 the live pass is
+        # walked and every row of it is `[x]`, and a test that assumed `[ ]`
+        # would have started passing vacuously the day somebody ticked it.
+        ticked, blank = f"{loop} [x] |", f"{loop} [ ] |"
+        old = self.text.replace(blank, ticked)
+        self.assertIn(ticked, old, "the tick this test carries was never written")
+        merged = module.merge_ticks(old, self.text.replace(ticked, blank))
+        self.assertIn(ticked, merged)
 
 
 class TheChecklistIsOnFile(unittest.TestCase):
