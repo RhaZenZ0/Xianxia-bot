@@ -21,7 +21,6 @@ import (
 const (
 	seclusionMultFloor   = 0.5
 	seclusionMultCeiling = 1.75
-	seclusionDailyShare  = 0.60 // around 60% of an active cultivation day
 	manorFacilityMaxGo   = 5
 )
 
@@ -162,10 +161,14 @@ func multiplicativeEffectJSONStat(raw, stat string) float64 {
 	return product
 }
 
-// seclusionDailyGainGo is the one copy of the background-cultivation rate:
-// seclusion.settle pays it per completed day and seclusion.start reports it
-// as the projection. Slower than active cultivation on purpose - it runs
-// while the player is offline and asks nothing of them.
+// seclusionDailyGainGo is the one copy of the background-cultivation rate,
+// quoted per game day: `seclusion.settle` spends it per completed game hour
+// through seclusionGainForSpan and `seclusion.start` reports it as the
+// projection. It is *faster* than active cultivation since v1.0.0-rc.56 - the
+// doors are shut, a secluded cultivator can do nothing else, and that is the
+// trade. It used to call itself "slower on purpose ... it runs while the
+// player is offline and asks nothing of them", which was true while the
+// lockout was half a gate and stopped being true when it became one.
 //
 // Since v1.0.0-rc.5 it is a share of the stage being filled, like a hand-sat
 // session, rather than a flat number off the character sheet: the old rate
@@ -183,7 +186,11 @@ func multiplicativeEffectJSONStat(raw, stat string) float64 {
 // storm is momentary, and seclusion has no stance. The manor array stays out
 // because environmentMult is already this function's statement of where the
 // cultivator sat, and stacking the manor on top would price the site twice.
-func seclusionDailyGainGo(catalog worlddata.Catalog, character map[string]any, mode string, environmentMult, soulMult, carriedMult float64) int64 {
+//
+// `scale` is the world clock's rate, which is not a multiplier on the gain
+// but the thing that decides how much wall-clock a game day is - see
+// seclusionSessionsPerGameDay, which is why the rate is a share at last.
+func seclusionDailyGainGo(catalog worlddata.Catalog, character map[string]any, mode string, environmentMult, soulMult, carriedMult float64, scale int64) int64 {
 	pace, worldMult := characterStagePace(catalog, character, mode)
 	attrs := decodeJSONMap(character["attributes_json"])
 	attribute := i64(attrs["will"])
@@ -194,6 +201,113 @@ func seclusionDailyGainGo(catalog worlddata.Catalog, character map[string]any, m
 	if carriedMult <= 0 {
 		carriedMult = 1
 	}
-	daily := float64(pace) * seclusionSessionsPerDay * attributeQuality(attribute) * env * soulMult * worldMult * carriedMult
-	return max64(1, int64(math.Round(daily*seclusionDailyShare/0.6)))
+	daily := float64(pace) * seclusionSessionsPerGameDay(scale) * attributeQuality(attribute) * env * soulMult * worldMult * carriedMult
+	return max64(1, int64(math.Round(daily)))
+}
+
+// seclusionSessionsPerGameDay is how many hand-sat sessions a game day behind
+// a closed door is worth, and it is the whole of what v1.0.0-rc.56 changed
+// about the rate. Active play fits one session per cultivate cooldown of real
+// time; a game day is `gameMinutesPerDay / scale` real minutes; so the count
+// follows from those two and the share, and the share therefore holds at
+// every world time scale rather than at the one it was measured on.
+func seclusionSessionsPerGameDay(scale int64) float64 {
+	rate := float64(scale)
+	if rate <= 0 {
+		// A stopped world clock is a supported state, and with one no game
+		// minute ever passes - so a retreat measured in them never advances
+		// and this rate is never actually spent. It is still read, by the
+		// projection `seclusion.start` prints, and dividing by zero there
+		// would print an infinity. The world's own baseline rate answers
+		// instead, which is the number the projection would have shown the
+		// moment the clock was started again.
+		rate = float64(fallbackClockScale)
+	}
+	cooldownMinutes := float64(cooldownSecondsFor(cooldownCultivate)) / 60
+	if cooldownMinutes < 1 {
+		cooldownMinutes = 1
+	}
+	realMinutesInAGameDay := float64(gameMinutesPerDay) / rate
+	return seclusionShareOfActive * realMinutesInAGameDay / cooldownMinutes
+}
+
+// How long a retreat may last, and the unit it is paid in (v1.0.0-rc.56).
+//
+// `duration_game_minutes` was floored at 1 and bounded by nothing. The only
+// limit in the game was `days: Range[int, 1, 365]` on the slash command - and
+// a bound that lives in the client is not a bound, the same fault the action
+// cooldowns had in fourteen places. Any other caller could seclude for a
+// millennium, which is also a lockout of a millennium once the doors are
+// actually shut.
+const (
+	// Two real hours. A retreat is a session of play a cultivator commits to,
+	// not a way to be absent from the game for a week.
+	seclusionMaxRealMinutes = int64(120)
+	// And it is paid per completed game hour. The day it replaces cannot
+	// work: two real hours at the shipped time scale is 480 game minutes, a
+	// third of a day, so a retreat run to its cap would have paid nothing at
+	// all under whole-day accounting.
+	seclusionSettleUnitGameMinutes = int64(60)
+)
+
+// seclusionRealMinutes is how long the caller asked for, in real minutes,
+// refused rather than clamped when it is over the cap.
+//
+// House style splits on intent: a number where landing near it is fine is
+// clamped, and one where the player must know they got something else is a
+// sentence. A player who asked for a year and was silently given two hours
+// would be told twice over that they had what they asked for.
+func seclusionRealMinutes(p seclusionStartPayload, clock canonicalWorldClock) (int64, error) {
+	minutes := p.DurationRealMinutes
+	if minutes <= 0 && p.DurationGameMinutes > 0 {
+		// A client from before this release asks in game minutes. Converting
+		// at the world's rate is what makes the refusal below honest for it
+		// too: ten world-days at the shipped scale really is sixty real
+		// hours, and it should be told the cap rather than handed two hours
+		// it did not ask for.
+		scale := clock.Scale
+		if scale <= 0 {
+			scale = fallbackClockScale
+		}
+		minutes = (p.DurationGameMinutes + scale - 1) / scale
+	}
+	if minutes <= 0 {
+		// Nothing asked for is the longest allowed: every door in the game
+		// sends a length, so a caller that sends none wants the retreat, not
+		// a retreat that ends the instant it begins (which is what the old
+		// floor of one minute gave them).
+		minutes = seclusionMaxRealMinutes
+	}
+	if minutes > seclusionMaxRealMinutes {
+		return 0, fmt.Errorf("a retreat lasts at most %d hours; you asked for %.1f. Seclusion pays %.0f%% of what the same time spent cultivating by hand would",
+			seclusionMaxRealMinutes/60, float64(minutes)/60, seclusionShareOfActive*100)
+	}
+	return minutes, nil
+}
+
+// seclusionRealDeadline reads the stored real deadline. A NULL - a retreat
+// started before schema 57 - is not a deadline of zero: it means this retreat
+// keeps the game-minute end it was given, because a new rule must never
+// shorten something a player already committed to.
+func seclusionRealDeadline(session map[string]any) (float64, bool) {
+	raw, present := session["ends_real_ts"]
+	if !present || raw == nil {
+		return 0, false
+	}
+	ts, err := strconvFloat(raw)
+	if err != nil || ts <= 0 {
+		return 0, false
+	}
+	return ts, true
+}
+
+// seclusionGainForSpan turns the daily rate into what a span of game minutes
+// is worth. One statement, so the projection the start prints and the payment
+// the settle makes cannot answer differently - the fault this release removed
+// from the rate itself.
+func seclusionGainForSpan(dailyGain, gameMinutes int64) int64 {
+	if dailyGain <= 0 || gameMinutes <= 0 {
+		return 0
+	}
+	return int64(math.Round(float64(dailyGain) * float64(gameMinutes) / float64(gameMinutesPerDay)))
 }

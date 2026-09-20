@@ -14,9 +14,8 @@ import (
 )
 
 type manualStudyPayload struct {
-	ManualID        string `json:"manual_id"`
-	CooldownSeconds int64  `json:"cooldown_seconds"`
-	GameMinute      int64  `json:"game_minute"`
+	ManualID   string `json:"manual_id"`
+	GameMinute int64  `json:"game_minute"`
 }
 type manualTechniquePayload struct {
 	TechniqueID string `json:"technique_id"`
@@ -98,9 +97,6 @@ func manualStudyAction(conn *storage.Conn, catalog worlddata.Catalog, userID int
 		return authoritativeMutation{}, fmt.Errorf("realm %d is below manual requirement %d", c.RealmIndex, m.MinRealmIndex)
 	}
 	now := float64(time.Now().UnixNano()) / 1e9
-	if p.CooldownSeconds <= 0 {
-		p.CooldownSeconds = 2700
-	}
 	key := "manual:" + p.ManualID
 	if rem, e := cooldownRemaining(conn, userID, key, now); e != nil {
 		return authoritativeMutation{}, e
@@ -151,7 +147,7 @@ func manualStudyAction(conn *storage.Conn, catalog worlddata.Catalog, userID int
 			return authoritativeMutation{}, e
 		}
 	}
-	if e = setCooldown(conn, userID, key, p.CooldownSeconds, now); e != nil {
+	if e = setCooldown(conn, userID, key, cooldownSecondsFor(cooldownForbidden), now); e != nil {
 		return authoritativeMutation{}, e
 	}
 	result := map[string]any{"manual_id": p.ManualID, "first_study": first, "state": row, "forbidden": manualForbidden(m), "karma_score": karma}

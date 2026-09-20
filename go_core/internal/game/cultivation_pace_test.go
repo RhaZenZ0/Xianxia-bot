@@ -15,7 +15,7 @@ import (
 func trainOnce(t *testing.T, path, world string, seq int) map[string]any {
 	t.Helper()
 	batch4Exec(t, path, `DELETE FROM cooldowns WHERE user_id=42`)
-	return batch4Result(t, batch4Apply(t, path, world, "cultivation.train", seq, map[string]any{"cooldown_seconds": 1, "game_minute": 600}))
+	return batch4Result(t, batch4Apply(t, path, world, "cultivation.train", seq, map[string]any{"game_minute": 600}))
 }
 
 func TestTheClimbTightensWithEachRealmAndEasesOnAscension(t *testing.T) {
@@ -196,17 +196,25 @@ func TestSeclusionIsPacedLikeTheStageItFills(t *testing.T) {
 	}
 	character := map[string]any{
 		"realm_index": int64(0), "phase": int64(1), "body_realm_index": int64(0), "body_phase": int64(1),
-		"attributes_json": `{"will":3,"body":3,"insight":2}`,
-	}
-	low := seclusionDailyGainGo(catalog, character, "qi", 1.0, 1.0, 1.0)
+		"attributes_json": `{"will":3,"body":3,"insight":2}`}
+	low := seclusionDailyGainGo(catalog, character, "qi", 1.0, 1.0, 1.0, fallbackClockScale)
 	character["realm_index"], character["phase"] = int64(6), int64(9)
-	high := seclusionDailyGainGo(catalog, character, "qi", 1.0, 1.0, 1.0)
+	high := seclusionDailyGainGo(catalog, character, "qi", 1.0, 1.0, 1.0, fallbackClockScale)
 	if low < 1 || high <= low*5 {
 		t.Fatalf("seclusion must scale with the stage: %d -> %d", low, high)
 	}
-	// It stays slower than sitting down for the sessions by hand.
+	// What a game day of it is worth against the pace of one hand-sat
+	// session, which is the comparison this file is about. Until v1.0.0-rc.56
+	// the bound here was "slower than sitting down for them by hand", written
+	// as `<= stagePace*2` - a number that only held because the count it
+	// bounded, 1.2 sessions a game day, happened to be 60% of active play at
+	// the shipped time scale and was 120% of it at twice that. The rule is a
+	// share now, held across every scale in seclusion_rate_test.go; what
+	// belongs here is only that a day of it is several sessions' worth and
+	// not an order of magnitude of them.
 	cost, _ := phaseCost(catalog.Realms, 6, 9)
-	if float64(high) > float64(stagePace(cost, 6))*2 {
-		t.Fatalf("seclusion pays %d a day against a pace of %d", high, stagePace(cost, 6))
+	pace := float64(stagePace(cost, 6))
+	if sessions := float64(high) / pace; sessions < 1 || sessions > 5 {
+		t.Fatalf("a game day of seclusion pays %d, which is %.2f sessions of pace %.0f", high, sessions, pace)
 	}
 }

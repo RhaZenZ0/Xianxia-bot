@@ -78,6 +78,18 @@ async def run(url: str, token: str, db_path: str) -> Report:
     async def gm(op: str, payload: dict[str, Any]) -> Any:
         return await engine.action(op, GM, payload)
 
+    async def act_free(op: str, uid: int, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        """An action with its wait cleared first.
+
+        Until v1.0.0-rc.56 the harness drove its loops by sending
+        `cooldown_seconds: 0` in the payload - which worked because fourteen
+        actions read their own wait off the request, the very hole that release
+        closes. The engine owns the waits now, so the harness asks the GM to
+        clear them, which is what a GM lever is for.
+        """
+        await gm("admin.player.reset_cooldowns", {"user_id": uid, "reason": "playtest"})
+        return await act(op, uid, payload or {})
+
     async def query(op: str, uid: int, payload: dict[str, Any]) -> Any:
         """An authoritative read: no action id, the actor's own view."""
         return await engine.action(op, uid, payload)
@@ -234,7 +246,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
     walked = await step(report, "the door opens from the family's town", act("family.household.enter", PLAYER, {}))
     if walked is not None:
         report.add("PASS" if walked.get("location") == household and not walked.get("return_location") else "FAIL", "walking in leaves no mark", f"{walked}")
-    sat = await step(report, "cultivation.train at the hearth", act("cultivation.train", PLAYER, {"cooldown_seconds": 0}))
+    sat = await step(report, "cultivation.train at the hearth", act_free("cultivation.train", PLAYER, {}))
     if sat is not None:
         report.add("PASS" if str(sat.get("place_name", "")).endswith("Household") and float(sat.get("place_mult", 1)) > 1 else "FAIL",
                    "the family's hall is a good place to sit", f"{sat.get('place_name')} x{sat.get('place_mult')}")
@@ -260,7 +272,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
 
     # ---- 2. $ I explore ----------------------------------------------------
     explored = await step(report, "exploration.explore", act("exploration.explore", PLAYER, {
-        "cooldown_seconds": 0, "unexpected_event_chance_percent": 0, "event_key": aid("exploration:event")}))
+        "unexpected_event_chance_percent": 0, "event_key": aid("exploration:event")}))
     if explored is not None and not (explored.get("narration") or explored.get("summary") or explored.get("encounter") or explored):
         report.add("FAIL", "exploration.explore", "empty result")
 
@@ -298,7 +310,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
         manual = dict(trial.get("granted_manual") or {})
         if manual:
             report.add("PASS", "the sect's gift", f"{manual.get('name')} ({manual.get('manual_id')})")
-            await step(report, "manual.study the gift", act("manual.study", PLAYER, {"manual_id": str(manual.get("manual_id")), "cooldown_seconds": 0}))
+            await step(report, "manual.study the gift", act_free("manual.study", PLAYER, {"manual_id": str(manual.get("manual_id"))}))
         else:
             report.add("FAIL", "the sect's gift", "the trial passed but no manual was granted")
     await step(report, "back to realm 0 stage 1", gm("admin.player.set_realm", {"user_id": PLAYER, "realm_index": 0, "phase": 1, "reason": "playtest"}))
@@ -425,7 +437,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
     total_shops = int((here or {}).get("total") or 0)
     found = None
     for _ in range(12):
-        walked = await act("exploration.explore", PLAYER, {"cooldown_seconds": 0, "unexpected_event_chance_percent": 0, "event_key": aid("exploration:event")})
+        walked = await act_free("exploration.explore", PLAYER, {"unexpected_event_chance_percent": 0, "event_key": aid("exploration:event")})
         if isinstance(walked.get("discovered_shop"), dict):
             found = dict(walked["discovered_shop"])
             break
@@ -597,7 +609,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
         if hop is not None:
             report.add("PASS" if str(hop.get("site_kind")) == "shrine" and str(hop.get("arrived_at")) == shrine else "FAIL", "arrival at the shrine", f"{hop.get('arrived_at')} ({hop.get('site_kind')})")
             await step(report, "advance time to arrive", gm("admin.world.advance_time", {"minutes": int(hop.get("travel_minutes") or 0) + 5, "reason": "playtest"}))
-        await step(report, "the shrine refuses the hunt", act("exploration.hunt", PLAYER, {"cooldown_seconds": 0}), expect_error="shrine")
+        await step(report, "the shrine refuses the hunt", act_free("exploration.hunt", PLAYER, {}), expect_error="shrine")
         await step(report, "from the shrine the road leads only to its ends", act("exploration.travel", PLAYER, {"destination": "Azure Crown Imperial City", "mode": "known"}), expect_error="leads back to")
         back = await step(report, "exploration.travel shrine -> Greenriver Town", act("exploration.travel", PLAYER, {"destination": "Greenriver Town", "mode": "known"}))
         await step(report, "advance time to arrive", gm("admin.world.advance_time", {"minutes": int((back or {}).get("travel_minutes") or 0) + 5, "reason": "playtest"}))
@@ -605,7 +617,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
     if ground:
         await step(report, "teleport to a hunting ground", gm("admin.player.teleport", {"user_id": PLAYER, "location": ground, "reason": "playtest"}))
         await step(report, "reset cooldowns", gm("admin.player.reset_cooldowns", {"user_id": PLAYER, "reason": "playtest"}))
-        hunt = await step(report, "exploration.hunt on the hunting ground", act("exploration.hunt", PLAYER, {"cooldown_seconds": 0}))
+        hunt = await step(report, "exploration.hunt on the hunting ground", act_free("exploration.hunt", PLAYER, {}))
         if hunt is not None:
             report.add("PASS" if int(hunt.get("site_bonus") or 0) > 0 else "FAIL", "the hunting ground's edge", f"site_bonus={hunt.get('site_bonus')}")
     waystation = next((n for n, l in sites.items() if l["road_site"] == "waystation" and l["world"] == "Mortal World"), "")
@@ -678,7 +690,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
     # banks nothing, which would make the Refine check below read as a failure.
     await step(report, "stand at a stage with room in it", gm("admin.player.set_realm", {"user_id": PLAYER, "realm_index": 0, "phase": 2, "reason": "playtest"}))
     await step(report, "cultivation.stance refine", act("cultivation.stance", PLAYER, {"stance": "refine"}))
-    trained = await step(report, "cultivation.train under Refine", act("cultivation.train", PLAYER, {"cooldown_seconds": 1}))
+    trained = await step(report, "cultivation.train under Refine", act_free("cultivation.train", PLAYER, {}))
     if trained is not None:
         report.add("PASS" if trained.get("stance") == "refine" and int(trained.get("insight_xp_gain") or 0) == 2 else "FAIL",
                    "Refine banks Insight XP", f"stance={trained.get('stance')} +{trained.get('insight_xp_gain')} XP, gain {trained.get('gain')}")
@@ -702,7 +714,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
         report.add("PASS" if float(at_shrine.get("place_mult") or 0) > 1.0 and at_shrine.get("place_name") else "FAIL",
                    "the shrine is richer ground than open country", f"{at_shrine.get('place_name')} x{at_shrine.get('place_mult')} ({at_shrine.get('place_quality')})")
         await step(report, "clear the meditation cooldown", gm("admin.player.reset_cooldowns", {"user_id": PLAYER, "reason": "playtest"}))
-        session = await step(report, "cultivation.train at the shrine", act("cultivation.train", PLAYER, {"cooldown_seconds": 1}))
+        session = await step(report, "cultivation.train at the shrine", act_free("cultivation.train", PLAYER, {}))
         if session is not None and not (float(session.get("place_mult") or 0) > 1.0):
             report.add("FAIL", "the session is worked at the shrine's rate", f"{session.get('place_mult')}")
     await step(report, "a moment nobody failed cannot be seized", act("cultivation.breakthrough", PLAYER, {"reroll": True}), expect_error="no moment to seize")
@@ -713,7 +725,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
 
     async def meditate() -> dict[str, Any]:
         await clear_cooldowns()
-        return dict(await act("cultivation.train", PLAYER, {"cooldown_seconds": 1}) or {})
+        return dict(await act_free("cultivation.train", PLAYER, {}) or {})
 
     # Stage 9 of the first realm: a stage with room in it, so the pace is
     # what the session pays rather than whatever the cap allows.
@@ -795,7 +807,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
     # before this release.
     gate = dict(await engine.action("cultivation.status", PLAYER, {}) or {})
     if int(gate.get("insight_xp") or 0) < int(gate.get("insight_cost") or 0):
-        await step(report, "earn the last of the gate insight", act("exploration.explore", PLAYER, {"cooldown_seconds": 0, "unexpected_event_chance_percent": 0, "event_key": aid("exploration:gate")}))
+        await step(report, "earn the last of the gate insight", act_free("exploration.explore", PLAYER, {"unexpected_event_chance_percent": 0, "event_key": aid("exploration:gate")}))
     if not gate.get("insight_banked"):
         await step(report, "bank the gate insight", act("cultivation.insight", PLAYER, {}))
     def will_of(character: dict[str, Any]) -> int:
@@ -824,7 +836,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
             report.add("PASS" if float(practised.get("manual_mult") or 0) > 1.0 and practised.get("manual_grade") else "FAIL",
                        "the method's grade speeds the gathering", f"{practised.get('manual_name')} ({practised.get('manual_grade')}) x{practised.get('manual_mult')}")
         await clear_cooldowns()
-        with_method = dict(await act("cultivation.train", PLAYER, {"cooldown_seconds": 1}) or {})
+        with_method = dict(await act_free("cultivation.train", PLAYER, {}) or {})
         report.add("PASS" if float(with_method.get("manual_mult") or 0) > 1.0 else "FAIL",
                    "the session is worked by the method", f"x{with_method.get('manual_mult')} ({with_method.get('manual_name')})")
     await step(report, "an unlearned method is refused", act("cultivation.manual", PLAYER, {"manual_id": "advanced_demonic_019_sword_cultivator"}), expect_error="not been learned")
@@ -844,11 +856,11 @@ async def run(url: str, token: str, db_path: str) -> Report:
                    "choosing a method names the qi it draws",
                    f"{practised.get('manual_name')} draws {practised.get('element')} — {practised.get('element_label')}")
         await clear_cooldowns()
-        worked = dict(await act("cultivation.train", PLAYER, {"cooldown_seconds": 1}) or {})
+        worked = dict(await act_free("cultivation.train", PLAYER, {}) or {})
         report.add("PASS" if float(worked.get("element_mult") or 0) > 0 and worked.get("element") else "FAIL",
                    "the session is worked by what the root can absorb",
                    f"{worked.get('element')} x{worked.get('element_mult')} ({worked.get('element_label')})")
-        body = dict(await act("cultivation.body_train", PLAYER, {"cooldown_seconds": 1}) or {})
+        body = dict(await act_free("cultivation.body_train", PLAYER, {}) or {})
         report.add("PASS" if float(body.get("element_mult") or 0) == 1.0 else "FAIL",
                    "the body path answers to no element", f"x{body.get('element_mult')}")
 
@@ -864,7 +876,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
         report.add("PASS" if int(body.get("qi_max") or 0) >= 120 and float(body.get("regen_per_game_minute") or 0) > 0 else "FAIL",
                    "the dantian is the realm's, not the old flat pool", f"{body.get('qi_max')} qi, +{body.get('regen_per_game_minute')}/game minute")
     await clear_cooldowns()
-    refined = await step(report, "qi.refine cleans what is held", act("qi.refine", PLAYER, {"cooldown_seconds": 1}))
+    refined = await step(report, "qi.refine cleans what is held", act_free("qi.refine", PLAYER, {}))
     if refined is not None:
         report.add("PASS" if int(refined.get("purity_gain") or 0) > 0 and int(refined.get("qi_spent") or 0) > 0 else "FAIL",
                    "refining trades qi for purity", f"+{refined.get('purity_gain')}% to {refined.get('purity')}% for {refined.get('qi_spent')} qi")
@@ -919,7 +931,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
                    f"{sheet.get('ground_name')} x{sheet.get('ground_mult')} at {sheet.get('period')} x{sheet.get('hour_mult')}")
         # A newborn cultivator's dantian is full, and a full one has nowhere to
         # put a harvest; refining is the cheapest way to make room for it.
-        await step(report, "make room in the ghost-born's dantian", act("qi.refine", GHOST, {"cooldown_seconds": 1}))
+        await step(report, "make room in the ghost-born's dantian", act_free("qi.refine", GHOST, {}))
         taken = await step(report, "ghost.harvest takes what the place held", act("ghost.harvest", GHOST, {}))
         if taken is not None:
             report.add("PASS" if int(taken.get("qi_gained") or 0) > 0 and int(taken.get("corruption_gain") or 0) > 0 else "FAIL",
@@ -1279,23 +1291,33 @@ async def run(url: str, token: str, db_path: str) -> Report:
         if settled is not None:
             report.add("PASS", "interception is a roll, reported", str(settled.get("resolved"))[:160])
     await step(report, "to the capital, a safe place to sit", gm("admin.player.teleport", {"user_id": PLAYER, "location": capital, "reason": "playtest"}))
-    started = await step(report, "seclusion.start a day of qi seclusion", act("seclusion.start", PLAYER, {"mode": "qi", "duration_game_minutes": 1440, "location": capital}))
+    # A retreat is two real hours at most since v1.0.0-rc.56, and it is paid
+    # per completed game hour - the world clock is advanced, not the wall one,
+    # so the retreat stays open and the settle pays what has accrued.
+    started = await step(report, "seclusion.start two hours of qi seclusion", act("seclusion.start", PLAYER, {"mode": "qi", "duration_real_minutes": 120, "location": capital}))
     if started is not None:
-        await step(report, "a day passes", gm("admin.world.advance_time", {"minutes": 1500, "reason": "playtest"}))
-        done = await step(report, "seclusion.settle", act("seclusion.settle", PLAYER, {}))
+        report.add("PASS", "the retreat projects what it will pay",
+                   f"{started.get('projected_total_gain')} over {started.get('duration_real_minutes')} real minutes")
+        await step(report, "a day of world time passes", gm("admin.world.advance_time", {"minutes": 1500, "reason": "playtest"}))
+        # Every other door is shut while it is open, and the way out is not.
+        await step(report, "the doors are shut to everything else",
+                   act("cultivation.train", PLAYER, {}), expect_error="closed-door")
+        done = await step(report, "seclusion.settle", act("seclusion.settle", PLAYER, {"force_end": True, "end_reason": "playtest"}))
         if done is not None:
-            report.add("PASS" if int(done.get("awarded_now") or 0) > 0 else "FAIL", "a day in seclusion pays", str(done.get("awarded_now")))
+            report.add("PASS" if int(done.get("awarded_now") or 0) > 0 else "FAIL", "seclusion pays by the game hour",
+                       f"{done.get('awarded_now')} over {done.get('settled_hours_now')} hours")
+        await step(report, "and the doors open again", act_free("cultivation.train", PLAYER, {}))
 
     # -- a secret realm the GM opens, and a key that opens another
     await step(report, "back to the first realm for the grotto", gm("admin.player.set_realm", {"user_id": PLAYER, "realm_index": 0, "phase": 1, "reason": "playtest"}))
     await step(report, "to Moonfen Marsh, where the grotto opens", gm("admin.player.teleport", {"user_id": PLAYER, "location": "Moonfen Marsh", "reason": "playtest"}))
     await audited("admin.world.spawn_realm", {"realm_id": "verdant_immortal_grotto", "title": "Verdant Immortal Grotto", "location": "Moonfen Marsh", "open_hours": 4, "reason": "playtest"})
-    entered = await step(report, "secret_realm.enter", act("secret_realm.enter", PLAYER, {"realm_id": "verdant_immortal_grotto", "cooldown_seconds": 0}))
+    entered = await step(report, "secret_realm.enter", act_free("secret_realm.enter", PLAYER, {"realm_id": "verdant_immortal_grotto"}))
     if entered is not None:
         rooms = 0
         try:
             for _ in range(12):
-                await act("secret_realm.explore", PLAYER, {"cooldown_seconds": 0})
+                await act_free("secret_realm.explore", PLAYER, {})
                 rooms += 1
         except GameEngineError as exc:
             # The last room ends the run and the realm lets go of the player,
@@ -1348,7 +1370,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
         try:
             await gm("admin.player.reset_cooldowns", {"user_id": PLAYER, "reason": "playtest"})
             surprised = await act("exploration.explore", PLAYER, {
-                "cooldown_seconds": 0, "unexpected_events_enabled": True, "unexpected_event_chance_percent": 100, "event_key": surprise_key})
+                "unexpected_events_enabled": True, "unexpected_event_chance_percent": 100, "event_key": surprise_key})
         except GameEngineError as exc:
             report.add("FAIL", "exploration.explore with a surprise certain", str(exc))
             break
@@ -1542,7 +1564,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
         for _ in range(7):
             prepared: dict[str, Any] = {}
             for _ in range(8):
-                prepared = await quietly(quest({"mode": "prepare", "quest_cooldown_seconds": 0}))
+                prepared = await quietly(quest({"mode": "prepare"}))
                 if "_refused" in prepared or int(prepared.get("preparation") or 0) >= int(prepared.get("preparation_required") or 0):
                     break
             title = str(prepared.get("title") or f"quest {completed + 1}")
@@ -1552,7 +1574,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
             report.add("PASS", f"{prefix}quest prepare: {title}", f"{prepared.get('preparation')}/{prepared.get('preparation_required')} prepared")
             passed, rolls, last = False, 0, {}
             while rolls < 12 and not passed:
-                attempted = await quietly(quest({"mode": "attempt", "quest_cooldown_seconds": 0}))
+                attempted = await quietly(quest({"mode": "attempt"}))
                 if "_refused" in attempted:
                     last = attempted
                     break
@@ -1575,7 +1597,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
             if int(row.get("training_progress") or 0) >= 20:
                 break
             await clear_cooldowns()
-            session = await quietly(act(train_op, PLAYER, {"cooldown_seconds": 1}))
+            session = await quietly(act_free(train_op, PLAYER, {}))
             if "_refused" in session:
                 report.add("FAIL", f"{train_op} at stage 9 while the {ladder} path is active", session["_refused"])
                 break
@@ -1584,7 +1606,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
         report.add("PASS" if int(row.get("training_progress") or 0) >= 20 else "FAIL",
                    f"{train_op} fills the {ladder} path's twenty points of training", f"training_progress={row.get('training_progress')} after {sessions} session(s)")
         if int(row.get("completed_quests") or 0) >= 7 and int(row.get("progress") or 0) >= 100:
-            tried = await step(report, f"{prefix}trial", trial({"trial_cooldown_seconds": 0}))
+            tried = await step(report, f"{prefix}trial", trial({}))
             if tried is not None:
                 checks = "; ".join(f"{r.get('name')} {r.get('total')} vs {r.get('tn')}" for r in (tried.get("rolls") or []))
                 report.add("PASS" if len(tried.get("rolls") or []) == 3 else "FAIL", f"the {ladder} trial's three checks, reported",
@@ -1594,7 +1616,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
                            f"the {ladder} realm is perfected exactly when the trial passed", f"completed={row.get('completed')} progress={row.get('progress')}")
         else:
             await step(report, f"{prefix}trial is locked until the dice allow every quest ({completed} of 7 passed)",
-                       trial({"trial_cooldown_seconds": 0}), expect_error="final trial is locked")
+                       trial({}), expect_error="final trial is locked")
         ended = await step(report, f"{prefix}abandon", act("perfection.body_abandon", PLAYER, {}) if body else act("perfection.abandon", PLAYER, {}))
         if ended is not None:
             report.add("PASS" if bool(ended.get("abandoned")) != bool(row.get("completed")) else "FAIL",
@@ -1612,7 +1634,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
     filled, sessions = 0, 0
     for _ in range(20):
         await clear_cooldowns()
-        session = await quietly(act("cultivation.body_train", PLAYER, {"cooldown_seconds": 1}))
+        session = await quietly(act_free("cultivation.body_train", PLAYER, {}))
         if "_refused" in session:
             report.add("FAIL", "cultivation.body_train at body stage 9", session["_refused"])
             break
@@ -1889,7 +1911,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
         encounter: dict[str, Any] = {}
         for _ in range(6):
             await clear_cooldowns()
-            hunted = await quietly(act("exploration.hunt", PLAYER, {"cooldown_seconds": 0}))
+            hunted = await quietly(act_free("exploration.hunt", PLAYER, {}))
             if "_refused" in hunted:
                 report.add("FAIL", "exploration.hunt for a beast", hunted["_refused"])
                 break
@@ -1955,7 +1977,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
     await step(report, "the dantian filled for the fight", gm("admin.player.revive", {"user_id": PLAYER, "reason": "playtest"}))
     await step(report, "sense.conceal off, so the palm is seen", act("sense.conceal", PLAYER, {"active": False}))
     await step(report, "grant the Blood Sea Scripture", gm("admin.player.adjust_item", {"user_id": PLAYER, "item_id": "blood_sea_scripture_manual", "quantity": 1, "reason": "playtest"}))
-    studied = await step(report, "manual.study a Demonic manual", act("manual.study", PLAYER, {"manual_id": "blood_sea_scripture", "cooldown_seconds": 0}))
+    studied = await step(report, "manual.study a Demonic manual", act_free("manual.study", PLAYER, {"manual_id": "blood_sea_scripture"}))
     if studied is not None:
         report.add("PASS" if studied.get("forbidden") else "FAIL", "the scripture is forbidden, and the first study costs a point of karma", f"first_study={studied.get('first_study')} karma={studied.get('karma_score')}")
     targets = await step(report, "combat.targets for a witnessed fight", query("combat.targets", PLAYER, {"location": town}))
@@ -2100,7 +2122,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
                gm("admin.world.advance_time", {"minutes": 60, "reason": "playtest lockdown"}))
     await audited("admin.server.maintenance_mode",
                   {"enabled": False, "reason": "playtest"}, name="open the world again")
-    await step(report, "the player may act again", act("cultivation.train", PLAYER, {"cooldown_seconds": 0}))
+    await step(report, "the player may act again", act_free("cultivation.train", PLAYER, {}))
     await audited("admin.simulation.interval", {"system": "npc_life", "days": 7, "reason": "playtest"})
     await audited("admin.commission.review", {"quest_key": str(world["commissions"][0]["quest_key"]), "status": "approved", "reason": "playtest"})
     await either("admin.commission.retire", gm("admin.commission.retire", {"user_id": BUYER, "reason": "playtest"}), "holds no commission")

@@ -174,8 +174,7 @@ func batch5Query(t *testing.T, path, world, op string, payload map[string]any) m
 		APIVersion: authoritativeAPIVersion,
 		Operation:  op,
 		ActorID:    42,
-		Payload:    raw,
-	})
+		Payload:    raw})
 	if err != nil {
 		t.Fatalf("%s: %v", op, err)
 	}
@@ -196,10 +195,8 @@ func TestBatch5ExploreOwnsRewardsCooldownReceiptAndLocationDiscovery(t *testing.
 
 	result := batch4Result(t, batch4Apply(t, path, world, "exploration.explore", 1, map[string]any{
 		"game_minute":                     600,
-		"cooldown_seconds":                0,
 		"unexpected_events_enabled":       false,
-		"unexpected_event_chance_percent": 0,
-	}))
+		"unexpected_event_chance_percent": 0}))
 	if result["location"] != "Greenriver Town" || storage.ParseInt(result["cultivation_awarded"]) <= 0 {
 		t.Fatalf("explore result=%v", result)
 	}
@@ -235,8 +232,7 @@ func TestBatch5TravelRequiresCanonicalDiscoveryAndPersistsLocation(t *testing.T)
 	travel := batch4Result(t, batch4Apply(t, path, world, "exploration.travel", 1, map[string]any{
 		"destination": "Cloudspine Foothills",
 		"mode":        "known",
-		"game_minute": 611,
-	}))
+		"game_minute": 611}))
 	if travel["from"] != "Greenriver Town" || travel["destination"] != "Cloudspine Foothills" {
 		t.Fatalf("travel=%v", travel)
 	}
@@ -247,8 +243,7 @@ func TestBatch5TravelRequiresCanonicalDiscoveryAndPersistsLocation(t *testing.T)
 	hub := batch4Result(t, batch4Apply(t, path, world, "exploration.travel", 2, map[string]any{
 		"destination": "Azure Crown Imperial City",
 		"mode":        "hub",
-		"game_minute": 612,
-	}))
+		"game_minute": 612}))
 	if hub["destination"] != "Azure Crown Imperial City" {
 		t.Fatalf("hub travel=%v", hub)
 	}
@@ -265,9 +260,7 @@ func TestBatch5HuntOwnsRollRewardsCooldownAndEncounterCreation(t *testing.T) {
 	world := batch4WorldPath(t)
 
 	result := batch4Result(t, batch4Apply(t, path, world, "exploration.hunt", 1, map[string]any{
-		"game_minute":      620,
-		"cooldown_seconds": 0,
-	}))
+		"game_minute": 620}))
 	if success, _ := result["success"].(bool); !success {
 		t.Fatalf("high-stat hunt should succeed: %v", result)
 	}
@@ -311,8 +304,7 @@ func TestBatch5SecretRealmLifecycleOwnsStatusRoomsInheritanceAndLeave(t *testing
 
 	entered := batch4Result(t, batch4Apply(t, path, world, "secret_realm.enter", 1, map[string]any{
 		"realm_id":    "sword_grave_nine_echoes",
-		"game_minute": 631,
-	}))
+		"game_minute": 631}))
 	if entered["entered"] != true || entered["realm_id"] != "sword_grave_nine_echoes" {
 		t.Fatalf("enter=%v", entered)
 	}
@@ -322,10 +314,9 @@ func TestBatch5SecretRealmLifecycleOwnsStatusRoomsInheritanceAndLeave(t *testing
 	}
 
 	for i := 0; i < 4; i++ {
+		clearCooldowns(t, path, 42)
 		room := batch4Result(t, batch4Apply(t, path, world, "secret_realm.explore", 10+i, map[string]any{
-			"game_minute":      633 + i,
-			"cooldown_seconds": 0,
-		}))
+			"game_minute": 633 + i}))
 		if success, _ := room["success"].(bool); !success {
 			t.Fatalf("room %d should succeed with high stats: %v", i, room)
 		}
@@ -351,8 +342,7 @@ func TestBatch5SecretRealmLifecycleOwnsStatusRoomsInheritanceAndLeave(t *testing
 
 	batch4Result(t, batch4Apply(t, path, world, "secret_realm.enter", 30, map[string]any{
 		"realm_id":    "sword_grave_nine_echoes",
-		"game_minute": 640,
-	}))
+		"game_minute": 640}))
 	left := batch4Result(t, batch4Apply(t, path, world, "secret_realm.leave", 31, map[string]any{"game_minute": 641}))
 	if left["left"] != true || left["realm_id"] != "sword_grave_nine_echoes" {
 		t.Fatalf("leave=%v", left)
@@ -375,8 +365,7 @@ func TestBatch5SecretRealmLifecycleOwnsStatusRoomsInheritanceAndLeave(t *testing
 func TestBatch5AuthorityOperationNamesHaveNativeCoverage(t *testing.T) {
 	for _, op := range []string{
 		"exploration.explore", "exploration.travel", "exploration.hunt",
-		"secret_realm.status", "secret_realm.enter", "secret_realm.explore", "secret_realm.leave",
-	} {
+		"secret_realm.status", "secret_realm.enter", "secret_realm.explore", "secret_realm.leave"} {
 		if !isAuthoritativeOperation(op) {
 			t.Errorf("%s is no longer registered as authoritative", op)
 		}
@@ -448,10 +437,8 @@ func TestBatch5ExploreStartsPersistentPersonalEventAndReopensIt(t *testing.T) {
 
 	started := batch4Result(t, batch4Apply(t, path, world, "exploration.explore", 90, map[string]any{
 		"game_minute":                     700,
-		"cooldown_seconds":                0,
 		"unexpected_event_chance_percent": 100,
-		"event_key":                       "evt:test:wounded:42",
-	}))
+		"event_key":                       "evt:test:wounded:42"}))
 	if started["kind"] != "event_started" {
 		t.Fatalf("kind=%v result=%v", started["kind"], started)
 	}
@@ -472,10 +459,8 @@ func TestBatch5ExploreStartsPersistentPersonalEventAndReopensIt(t *testing.T) {
 
 	reopened := batch4Result(t, batch4Apply(t, path, world, "exploration.explore", 91, map[string]any{
 		"game_minute":                     701,
-		"cooldown_seconds":                0,
 		"unexpected_events_enabled":       false,
-		"unexpected_event_chance_percent": 0,
-	}))
+		"unexpected_event_chance_percent": 0}))
 	if reopened["kind"] != "event_active" {
 		t.Fatalf("reopened=%v", reopened)
 	}
@@ -501,8 +486,7 @@ func TestBatch5ExploreStartsPersistentPersonalEventAndReopensIt(t *testing.T) {
 	resolved := batch4Result(t, batch4Apply(t, path, world, "exploration.event.act", 92, map[string]any{
 		"event_id":    "evt:test:wounded:42",
 		"action":      "help",
-		"game_minute": 702,
-	}))
+		"game_minute": 702}))
 	if ok, _ := resolved["resolved"].(bool); !ok {
 		t.Fatalf("resolved=%v", resolved)
 	}
@@ -524,18 +508,15 @@ func TestBatch5ExplorationEventLeaveEndsEventWithoutReward(t *testing.T) {
 
 	started := batch4Result(t, batch4Apply(t, path, world, "exploration.explore", 93, map[string]any{
 		"game_minute":                     710,
-		"cooldown_seconds":                0,
 		"unexpected_event_chance_percent": 100,
-		"event_key":                       "evt:test:leave:42",
-	}))
+		"event_key":                       "evt:test:leave:42"}))
 	if started["kind"] != "event_started" {
 		t.Fatalf("started=%v", started)
 	}
 	before := storage.ParseInt(actionScalar(t, path, "SELECT cultivation FROM characters WHERE user_id=42"))
 	left := batch4Result(t, batch4Apply(t, path, world, "exploration.event.leave", 94, map[string]any{
 		"event_id":    "evt:test:leave:42",
-		"game_minute": 711,
-	}))
+		"game_minute": 711}))
 	if ok, _ := left["resolved"].(bool); !ok || left["action"] != "leave" {
 		t.Fatalf("left=%v", left)
 	}

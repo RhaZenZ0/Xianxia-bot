@@ -49,9 +49,7 @@ func batch4WorldWithForageAptitudeBonus(t *testing.T) string {
 		"requires_any":  []string{"Fire"},
 		"favored_paths": []string{"Sword Cultivator"},
 		"modifiers": []map[string]any{
-			{"stat": "alchemy_bonus", "operation": "add", "value": 5},
-		},
-	}
+			{"stat": "alchemy_bonus", "operation": "add", "value": 5}}}
 	encoded, err := json.Marshal(payload)
 	if err != nil {
 		t.Fatal(err)
@@ -262,6 +260,17 @@ func clonePayloadWithoutGameMinute(payload map[string]any) map[string]any {
 	return out
 }
 
+// clearCooldowns lets a test drive the same action twice.
+//
+// Until v1.0.0-rc.56 a test did this by sending `cooldown_seconds: 0` in the
+// payload, which worked only because fourteen actions read their own wait off
+// the request - the hole that release closed. The engine owns the waits now,
+// so a test that wants to go round again says so, the way the GM lever does.
+func clearCooldowns(t *testing.T, path string, userID int64) {
+	t.Helper()
+	batch4Exec(t, path, `DELETE FROM cooldowns WHERE user_id=?`, userID)
+}
+
 func batch4Apply(t *testing.T, path, world, op string, seq int, payload map[string]any) ActionResponse {
 	t.Helper()
 	if rawMinute, ok := payload["game_minute"]; ok {
@@ -277,8 +286,7 @@ func batch4Apply(t *testing.T, path, world, op string, seq int, payload map[stri
 		ActionID:   fmt.Sprintf("batch4-%s-%d", op, seq),
 		Operation:  op,
 		ActorID:    42,
-		Payload:    raw,
-	})
+		Payload:    raw})
 	if err != nil {
 		t.Fatalf("%s: %v", op, err)
 	}
@@ -309,8 +317,7 @@ func TestBatch4PerfectionOperationsAreAuthoritative(t *testing.T) {
 		maxColumn string
 	}{
 		{"qi", "perfection.start", "perfection.quest", "perfection.trial", "perfection.abandon", "realm_perfection", "qi_max"},
-		{"body", "perfection.body_start", "perfection.body_quest", "perfection.body_trial", "perfection.body_abandon", "body_realm_perfection", "vitality_max"},
-	}
+		{"body", "perfection.body_start", "perfection.body_quest", "perfection.body_trial", "perfection.body_abandon", "body_realm_perfection", "vitality_max"}}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -320,12 +327,14 @@ func TestBatch4PerfectionOperationsAreAuthoritative(t *testing.T) {
 				t.Fatalf("start=%v", start)
 			}
 			for i := 0; i < 4; i++ {
-				prep := batch4Result(t, batch4Apply(t, path, world, tc.questOp, 10+i, map[string]any{"mode": "prepare", "game_minute": 101 + i, "quest_cooldown_seconds": 0}))
+				clearCooldowns(t, path, 42)
+				prep := batch4Result(t, batch4Apply(t, path, world, tc.questOp, 10+i, map[string]any{"mode": "prepare", "game_minute": 101 + i}))
 				if prep["mode"] != "prepare" {
 					t.Fatalf("prepare=%v", prep)
 				}
 			}
-			attempt := batch4Result(t, batch4Apply(t, path, world, tc.questOp, 20, map[string]any{"mode": "attempt", "game_minute": 110, "quest_cooldown_seconds": 0}))
+			clearCooldowns(t, path, 42)
+			attempt := batch4Result(t, batch4Apply(t, path, world, tc.questOp, 20, map[string]any{"mode": "attempt", "game_minute": 110}))
 			if success, _ := attempt["success"].(bool); !success {
 				t.Fatalf("high-stat quest should succeed: %v", attempt)
 			}
@@ -335,7 +344,7 @@ func TestBatch4PerfectionOperationsAreAuthoritative(t *testing.T) {
 
 			batch4Exec(t, path, "UPDATE "+tc.table+" SET active=1,completed=0,progress=100,training_progress=20,quest_index=7,quest_preparation=0,completed_quests=7 WHERE user_id=42 AND realm_index=0")
 			before := storage.ParseInt(actionScalar(t, path, "SELECT "+tc.maxColumn+" FROM characters WHERE user_id=42"))
-			trial := batch4Result(t, batch4Apply(t, path, world, tc.trialOp, 30, map[string]any{"game_minute": 120, "trial_cooldown_seconds": 0}))
+			trial := batch4Result(t, batch4Apply(t, path, world, tc.trialOp, 30, map[string]any{"game_minute": 120}))
 			if success, _ := trial["success"].(bool); !success {
 				t.Fatalf("high-stat trial should succeed: %v", trial)
 			}
@@ -473,8 +482,7 @@ func TestBatch4AuthorityOperationNamesHaveNativeCoverage(t *testing.T) {
 		"perfection.start", "perfection.quest", "perfection.trial", "perfection.abandon",
 		"perfection.body_start", "perfection.body_quest", "perfection.body_trial", "perfection.body_abandon",
 		"law.comprehend", "condition.treat", "sense.inspect", "sense.conceal", "sense.status",
-		"tribulation.prepare", "tribulation.attempt",
-	}
+		"tribulation.prepare", "tribulation.attempt"}
 	for _, op := range ops {
 		if !isAuthoritativeOperation(op) {
 			t.Errorf("%s is no longer registered as authoritative", op)
@@ -489,8 +497,7 @@ func TestForageResolveOwnsRegionalProfileRareLootAndRNG(t *testing.T) {
 	batch4Exec(t, path, "INSERT INTO civilization_regions(location,world_name,spirit_resources) VALUES('Greenriver Town','Mortal World',90)")
 
 	forged, _ := json.Marshal(map[string]any{
-		"loot": map[string]int64{"jade_life_herb": 999},
-	})
+		"loot": map[string]int64{"jade_life_herb": 999}})
 	if _, err := ApplyWithWorld(path, world, ActionRequest{APIVersion: authoritativeAPIVersion, ActionID: "forage-forged", Operation: "forage.resolve", ActorID: 42, Payload: forged}); err == nil || !strings.Contains(err.Error(), "client-supplied loot is forbidden") {
 		t.Fatalf("forged forage err=%v", err)
 	}
@@ -502,8 +509,7 @@ func TestForageResolveOwnsRegionalProfileRareLootAndRNG(t *testing.T) {
 			ActionID:   "forage-forbidden-" + field,
 			Operation:  "forage.resolve",
 			ActorID:    42,
-			Payload:    payload,
-		})
+			Payload:    payload})
 		if err == nil || !strings.Contains(err.Error(), "client-supplied "+field+" is forbidden") {
 			t.Fatalf("%s forged forage err=%v", field, err)
 		}
@@ -591,8 +597,7 @@ func TestForageResolveEnforcesCooldownInGo(t *testing.T) {
 		ActionID:   "forage-second-attempt",
 		Operation:  "forage.resolve",
 		ActorID:    42,
-		Payload:    payload,
-	})
+		Payload:    payload})
 	if err == nil || !strings.Contains(err.Error(), "forage cooldown active") {
 		t.Fatalf("cooldown err=%v", err)
 	}
@@ -660,8 +665,7 @@ func TestEffectsCurrentQueryPreviewsToxicityWithoutMutatingState(t *testing.T) {
 		APIVersion: authoritativeAPIVersion,
 		Operation:  "effects.current",
 		ActorID:    42,
-		Payload:    json.RawMessage(`{}`),
-	})
+		Payload:    json.RawMessage(`{}`)})
 	if err != nil {
 		t.Fatal(err)
 	}

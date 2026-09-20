@@ -77,8 +77,22 @@ class TheStageSetsThePace(unittest.TestCase):
 
     def test_seclusion_is_paced_by_the_same_stage(self):
         self.assertIn("pace, worldMult := characterStagePace(catalog, character, mode)", GO_SECLUSION)
-        self.assertIn("seclusionSessionsPerDay", GO_PACE)
         self.assertNotIn("base = 8 + i64(attrs[\"will\"])", GO_SECLUSION)
+
+    def test_the_retreats_rate_is_a_share_and_not_a_count(self):
+        """v1.0.0-rc.56: `seclusionSessionsPerDay = 1.2` was a count of
+        sessions, and a count only means a share of active play at one world
+        time scale - 60% at the shipped 4, 120% at 8. The share is stated once
+        and derived from the cooldown now. What holds here is only that the
+        count is gone and the share exists; whether the share actually holds
+        at a scale nobody measured it on is a behavioural question and
+        `seclusion_rate_test.go` is where it is asked."""
+        self.assertNotIn("seclusionSessionsPerDay", GO_PACE)
+        self.assertNotIn("seclusionSessionsPerDay", GO_SECLUSION)
+        self.assertIn("seclusionShareOfActive = 1.25", GO_PACE)
+        # The constant that was named for the rule and divided by its own
+        # value, so it applied nothing at all.
+        self.assertNotIn("seclusionDailyShare", GO_SECLUSION)
 
 
 class CultivatorsGrow(unittest.TestCase):

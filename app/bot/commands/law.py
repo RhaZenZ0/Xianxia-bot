@@ -216,7 +216,7 @@ async def manual_study(interaction:discord.Interaction,manual:str)->None:
     try:
         envelope=await ENGINE.authoritative_action(
             "manual.study",interaction.user.id,
-            {"manual_id":manual,"cooldown_seconds":45*60},
+            {"manual_id":manual},
             action_id=f"discord:{interaction.id}:manual.study",
         )
     except GameEngineError as exc:

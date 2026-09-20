@@ -156,7 +156,6 @@ async def secret_explore(interaction: discord.Interaction) -> None:
             "secret_realm.explore", interaction.user.id,
             {
                 
-                "cooldown_seconds": SETTINGS.secret_realm_cooldown_minutes * 60,
             },
             action_id=f"discord:{interaction.id}:secret_realm.explore",
         )

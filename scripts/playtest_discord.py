@@ -58,6 +58,13 @@ DEFERRED_LEAVES: dict[str, str] = {
         "pressed after it. Driven explicitly in section 4b instead, where the "
         "refusal and the reopening are both asserted."
     ),
+    "/seclusion start": (
+        "the closed-door lockout (v1.0.0-rc.56): a retreat refuses every "
+        "other command until the player emerges, so pressing this leaf mid-"
+        "sweep would refuse every leaf after it - the same shape as lockdown. "
+        "Driven explicitly in section 4c, which shuts the doors, proves a "
+        "player is refused, proves the way out is not, and emerges again."
+    ),
 }
 
 # What the bot prints when a handler raised: never a designed refusal, which
@@ -789,6 +796,50 @@ async def run(url: str, token: str, db_path: str) -> Report:
             expect("maintenance" not in result_text(back).casefold(), result_text(back)[:300])
             return "closed, the player refused with the reason, reopened"
         await step(report, "/admin → Operations → Lockdown closes the world and opens it again", lockdown())
+
+        # ---- 4c. the doors close behind a retreat (v1.0.0-rc.56) ---------------
+        # Not left to the generic sweep for lockdown's reason: a retreat
+        # refuses every other command until the player emerges. Here the run
+        # can prove the three things that matter - that it refuses, that the
+        # way out is never refused, and that the doors open again - before
+        # anything else is pressed.
+        async def closed_doors():
+            panel = await open_hub(player, channels["begin-here"], "cultivation", env=env)
+            await panel.goto("Cultivate", env=env)
+            custom_id = await find_leaf_button(panel, "Seclusion Start")
+            expect(custom_id, f"no Seclusion Start leaf on {panel.page_title()!r}: {panel.labels()}")
+            started = result_text(await answer_steps(
+                player, await player.click(panel.message(), custom_id=custom_id),
+                picks={"Choose mode": "Qi Cultivation"},
+                fields={"Minutes": "120"},
+            ))
+            expect("could not" not in started.casefold(), f"the retreat raised: {started[:300]}")
+            if "seclusion" not in started.casefold():
+                # The site has to allow a retreat; a refusal here is designed
+                # and says so, and there is nothing to prove about a lockout
+                # that never started.
+                return f"no retreat could be started here: {started[:160]}"
+            # `/me` is a read and stays open; `/tribute` acts and does not.
+            # Neither is a hub, so both reach the command tree's own check.
+            refused = result_text(await player.slash(channels["begin-here"], "tribute"))
+            expect("closed-door" in refused.casefold(),
+                   f"a secluded player was not refused: {refused[:300]}")
+            sheet = result_text(await player.slash(channels["begin-here"], "me"))
+            expect("closed-door" not in sheet.casefold(),
+                   f"the sheet was refused behind a closed door: {sheet[:300]}")
+            # The way out is a hub leaf, not a slash command: the panel opens
+            # (a read, and where the door is drawn) and End is pressed on it.
+            panel = await open_hub(player, channels["begin-here"], "cultivation", env=env)
+            await panel.goto("Cultivate", env=env)
+            end_id = await find_leaf_button(panel, "Seclusion End")
+            expect(end_id, f"no Seclusion End leaf on {panel.page_title()!r}: {panel.labels()}")
+            out = result_text(await player.click(panel.message(), custom_id=end_id))
+            expect("closed-door" not in out.casefold(), f"the way out was refused: {out[:300]}")
+            back = result_text(await player.slash(channels["begin-here"], "tribute"))
+            expect("closed-door" not in back.casefold(),
+                   f"still locked out after emerging: {back[:300]}")
+            return "shut, the player refused, the sheet and the way out open, emerged"
+        await step(report, "/cultivation → Cultivate → Seclusion shuts the doors and opens them again", closed_doors())
 
         # ---- 4. every hub answers with a panel ----------------------------------
         async def hubs():

@@ -145,7 +145,6 @@ async def aptitude_temper(interaction: discord.Interaction, target: app_commands
             {
                 "target": target.value,
                 
-                "cooldown_seconds": max(300, SETTINGS.cultivate_cooldown_minutes * 60),
             },
             action_id=f"discord:{interaction.id}:aptitude.temper:{target.value}",
         )
@@ -254,7 +253,6 @@ async def aptitude_harmonize(interaction: discord.Interaction, target: app_comma
             {
                 "target": target.value,
                 
-                "cooldown_seconds": max(300, SETTINGS.cultivate_cooldown_minutes * 60),
             },
             action_id=f"discord:{interaction.id}:aptitude.harmonize:{target.value}",
         )

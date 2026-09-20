@@ -263,7 +263,7 @@ func TestRefiningCleansTheQiAndCheapensEveryTechnique(t *testing.T) {
 	batch4Exec(t, path, `UPDATE characters SET realm_index=2,phase=4,qi=0,qi_max=0 WHERE user_id=42`)
 	batch4Exec(t, path, `UPDATE characters SET qi=28,qi_max=28 WHERE user_id=42`)
 
-	out := batch4Result(t, batch4Apply(t, path, world, "qi.refine", 1, map[string]any{"cooldown_seconds": 1}))
+	out := batch4Result(t, batch4Apply(t, path, world, "qi.refine", 1, map[string]any{}))
 	gain := storage.ParseInt(out["purity_gain"])
 	if gain < 2 || gain > 4 {
 		t.Fatalf("a refining session is worth two to four points: %d", gain)

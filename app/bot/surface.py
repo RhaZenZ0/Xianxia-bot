@@ -74,7 +74,7 @@ from .commands import cooldowns as _commands_cooldowns  # noqa: F401  (registers
 from .commands import sense as _commands_sense  # noqa: F401  (registers its root commands on import)
 from .commands import support as _commands_support  # noqa: F401  (registers /tribute on import)
 from .commands.territory import caravan_group, party_group, party_status, territory_group, war_group, war_status
-from . import maintenance
+from . import maintenance, seclusion
 from .hubs import (
     LAYOUT_COMPONENTS_AVAILABLE,
     HubDefinition,
@@ -86,7 +86,7 @@ from .hubs import (
     register_menu_builder,
     register_menu_facts,
     register_hidden_actions,
-    register_maintenance_gate,
+    register_panel_gate,
     send_hub,
 )
 from .locations import here_summary
@@ -937,17 +937,25 @@ async def _hidden_actions(interaction: discord.Interaction) -> dict[str, str]:
 register_hidden_actions(_hidden_actions)
 
 
-async def _panel_maintenance_gate(user: "discord.abc.User", path: str) -> str | None:
-    """The hub panel's half of maintenance mode (v1.0.0-rc.41).
+async def _panel_gate(user: "discord.abc.User", path: str) -> str | None:
+    """The hub panel's half of the two gates that refuse a press.
 
-    A panel lives fifteen minutes, so the world can close under one that is
-    already open; the check therefore belongs on the press. Registered here
-    because `hubs` sits below `runtime` and cannot reach `DB` itself.
+    Maintenance mode (v1.0.0-rc.41) and the closed-door lockout
+    (v1.0.0-rc.56). A panel lives fifteen minutes, so both can become true
+    under one that is already open; the check therefore belongs on the press
+    and not on the open. Registered here because `hubs` sits below `runtime`
+    and cannot reach `DB` itself.
     """
-    return await maintenance.refuse(DB, user, command=path)
+    refusal = await maintenance.refuse(DB, user, command=path)
+    if refusal is not None:
+        return refusal
+    # And the player's own doors (v1.0.0-rc.56), for the same reason: a panel
+    # drawn before the retreat began is still on screen when it starts, and
+    # `_invoke_action` checks on the press.
+    return await seclusion.refuse(DB, getattr(user, "id", 0), command=path)
 
 
-register_maintenance_gate(_panel_maintenance_gate)
+register_panel_gate(_panel_gate)
 
 
 register_hubs(*_HUB_DEFINITIONS, _ADMIN_HUB_DEFINITION)

@@ -23,13 +23,12 @@ type warActPayload struct {
 	GameMinute int64  `json:"game_minute"`
 }
 type caravanDispatchPayload struct {
-	Destination   string `json:"destination"`
-	ItemID        string `json:"item_id"`
-	Quantity      int64  `json:"quantity"`
-	Escort        int64  `json:"escort"`
-	Smuggle       bool   `json:"smuggle"`
-	GameMinute    int64  `json:"game_minute"`
-	MinutesPerDay int64  `json:"minutes_per_day"`
+	Destination string `json:"destination"`
+	ItemID      string `json:"item_id"`
+	Quantity    int64  `json:"quantity"`
+	Escort      int64  `json:"escort"`
+	Smuggle     bool   `json:"smuggle"`
+	GameMinute  int64  `json:"game_minute"`
 }
 type caravanSettlePayload struct {
 	GameMinute int64 `json:"game_minute"`
@@ -300,9 +299,6 @@ func caravanDispatchActionGo(conn *storage.Conn, catalog worlddata.Catalog, user
 	}
 	if p.Escort < 0 || p.Escort > 20 {
 		return authoritativeMutation{}, errors.New("caravan escort must be between 0 and 20")
-	}
-	if p.MinutesPerDay != 0 {
-		return authoritativeMutation{}, errors.New("client-supplied caravan duration is forbidden")
 	}
 	r, e := conn.Execute(`SELECT realm_index,location,attributes_json,life_status FROM characters WHERE user_id=?`, []any{userID})
 	if e != nil {

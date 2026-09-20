@@ -920,7 +920,10 @@ def test_v0_30_gate_derived_inputs_are_not_sent_to_the_engine():
     # sect manor array, deployed formation) is derived by the engine from
     # state it holds. forage.resolve closed the same way at v0.23 and this
     # holds it there.
-    assert _authoritative_action_payload_keys("seclusion_start") == {"mode", "duration_game_minutes", "location"}
+    # v1.0.0-rc.56: the duration is asked for in real minutes, because a
+    # retreat lasts at most two real hours and a bound expressed in game
+    # minutes would be re-sized by a GM changing the world's time scale.
+    assert _authoritative_action_payload_keys("seclusion_start") == {"mode", "duration_real_minutes", "location"}
     assert _authoritative_action_payload_keys("alchemy_forage") == set()
     body = _source("seclusion_start")
     for token in ('"environment_mult":', "seclusion_environment_multiplier", "manor_seclusion_multiplier",

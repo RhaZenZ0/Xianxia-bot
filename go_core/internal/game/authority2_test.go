@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"xianxia/core/internal/storage"
+	"xianxia/core/internal/worlddata"
 )
 
 func setupAuthority2DB(t *testing.T) string {
@@ -34,7 +35,7 @@ ALTER TABLE birth_families ADD COLUMN head_realm_index INTEGER NOT NULL DEFAULT 
 ALTER TABLE birth_families ADD COLUMN head_phase INTEGER NOT NULL DEFAULT 1;
 ALTER TABLE birth_families ADD COLUMN influence INTEGER NOT NULL DEFAULT 0;
 CREATE TABLE battles(battle_id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,status TEXT NOT NULL DEFAULT 'active');
-CREATE TABLE seclusion_sessions(user_id INTEGER PRIMARY KEY,mode TEXT NOT NULL,started_game_minute INTEGER NOT NULL,ends_game_minute INTEGER NOT NULL,last_settled_game_minute INTEGER NOT NULL,start_location TEXT NOT NULL DEFAULT '',environment_mult REAL NOT NULL DEFAULT 1.0,accumulated_gain INTEGER NOT NULL DEFAULT 0,status TEXT NOT NULL DEFAULT 'active',ended_reason TEXT NOT NULL DEFAULT '',created_at REAL NOT NULL DEFAULT 0,updated_at REAL NOT NULL DEFAULT 0);
+CREATE TABLE seclusion_sessions(user_id INTEGER PRIMARY KEY,mode TEXT NOT NULL,started_game_minute INTEGER NOT NULL,ends_game_minute INTEGER NOT NULL,last_settled_game_minute INTEGER NOT NULL,start_location TEXT NOT NULL DEFAULT '',environment_mult REAL NOT NULL DEFAULT 1.0,accumulated_gain INTEGER NOT NULL DEFAULT 0,status TEXT NOT NULL DEFAULT 'active',ended_reason TEXT NOT NULL DEFAULT '',ends_real_ts REAL,created_at REAL NOT NULL DEFAULT 0,updated_at REAL NOT NULL DEFAULT 0);
 CREATE TABLE sect_membership(user_id INTEGER PRIMARY KEY,sect_name TEXT NOT NULL,rank_name TEXT NOT NULL DEFAULT '',rank_level INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE sect_manors(sect_name TEXT PRIMARY KEY,name TEXT NOT NULL,base_location TEXT NOT NULL,qi_array_level INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE economy_markets(location TEXT NOT NULL,item_id TEXT NOT NULL,world_name TEXT NOT NULL DEFAULT 'Mortal World',currency_id TEXT NOT NULL DEFAULT 'low_grade_spirit_stone',base_price INTEGER NOT NULL DEFAULT 1,supply INTEGER NOT NULL DEFAULT 10,demand INTEGER NOT NULL DEFAULT 40,price_index REAL NOT NULL DEFAULT 1.0,last_game_minute INTEGER NOT NULL DEFAULT 0,updated_at REAL NOT NULL DEFAULT 0,PRIMARY KEY(location,item_id));
@@ -96,7 +97,7 @@ func TestSeclusionStartRefusesACallerSuppliedEnvironment(t *testing.T) {
 	path := setupAuthority2DB(t)
 	world := batch4WorldPath(t)
 	batch4Exec(t, path, `UPDATE characters SET location='Spirit Jade Capital' WHERE user_id=42`)
-	raw, _ := json.Marshal(map[string]any{"mode": "qi", "duration_game_minutes": 1440, "environment_mult": 1.75})
+	raw, _ := json.Marshal(map[string]any{"mode": "qi", "duration_real_minutes": 120, "environment_mult": 1.75})
 	_, err := ApplyWithWorld(path, world, ActionRequest{APIVersion: authoritativeAPIVersion, ActionID: "a2-seclusion-forged", Operation: "seclusion.start", ActorID: 42, Payload: raw})
 	if err == nil || !strings.Contains(err.Error(), "environment_mult is derived by the engine") {
 		t.Fatalf("forged environment accepted: %v", err)
@@ -111,7 +112,7 @@ func TestSeclusionStartRequiresAProtectedSite(t *testing.T) {
 	world := batch4WorldPath(t)
 	// Greenriver Town is not a safe zone, and the character owns no abode
 	// and belongs to no sect with a manor there.
-	raw, _ := json.Marshal(map[string]any{"mode": "qi", "duration_game_minutes": 1440})
+	raw, _ := json.Marshal(map[string]any{"mode": "qi", "duration_real_minutes": 120})
 	_, err := ApplyWithWorld(path, world, ActionRequest{APIVersion: authoritativeAPIVersion, ActionID: "a2-seclusion-exposed", Operation: "seclusion.start", ActorID: 42, Payload: raw})
 	if err == nil || !strings.Contains(err.Error(), "requires a protected/safe location") {
 		t.Fatalf("exposed seclusion accepted: %v", err)
@@ -171,7 +172,7 @@ func TestSeclusionStartDerivesTheEnvironmentFromState(t *testing.T) {
 			path := setupAuthority2DB(t)
 			world := batch4WorldPath(t)
 			tc.prepare(path)
-			result := batch4Result(t, batch4Apply(t, path, world, "seclusion.start", 1, map[string]any{"mode": tc.mode, "duration_game_minutes": 1440, "game_minute": 1000}))
+			result := batch4Result(t, batch4Apply(t, path, world, "seclusion.start", 1, map[string]any{"mode": tc.mode, "duration_real_minutes": 120, "game_minute": 1000}))
 			got := parseFloat(result["environment_mult"])
 			if !nearly(got, tc.mult) {
 				t.Fatalf("environment_mult=%v want %v (result %#v)", got, tc.mult, result["environment"])
@@ -198,14 +199,42 @@ func TestSeclusionProjectionMatchesWhatSettlePays(t *testing.T) {
 	world := batch4WorldPath(t)
 	batch4Exec(t, path, `UPDATE characters SET location='abode:42' WHERE user_id=42`)
 	batch4Exec(t, path, `INSERT INTO cave_abodes(user_id,location_key,base_location,name,property_type,cultivation_level) VALUES(42,'abode:42','Greenriver Town','Quiet Cave','cave_abode',2)`)
-	start := batch4Result(t, batch4Apply(t, path, world, "seclusion.start", 1, map[string]any{"mode": "qi", "duration_game_minutes": 3 * 1440, "game_minute": 1000}))
+	// An empty stage, so the phase cap does not bite and what is asserted
+	// below is the rate rather than the ceiling.
+	batch4Exec(t, path, `UPDATE characters SET cultivation=0 WHERE user_id=42`)
+	start := batch4Result(t, batch4Apply(t, path, world, "seclusion.start", 1, map[string]any{"mode": "qi", "duration_real_minutes": 120, "game_minute": 1000}))
 	projected := storage.ParseInt(start["projected_daily_gain"])
-	settle := batch4Result(t, batch4Apply(t, path, world, "seclusion.settle", 2, map[string]any{"minutes_per_day": 1440, "game_minute": 1000 + 2*1440}))
+	settle := batch4Result(t, batch4Apply(t, path, world, "seclusion.settle", 2, map[string]any{"game_minute": 1000 + 2*1440}))
 	if got := storage.ParseInt(settle["daily_gain"]); got != projected {
 		t.Fatalf("settle daily_gain=%d, start projected %d", got, projected)
 	}
-	if got := storage.ParseInt(settle["settled_days_now"]); got != 2 {
-		t.Fatalf("settled_days_now=%d want 2", got)
+	// Paid per completed game hour since v1.0.0-rc.56, not per completed game
+	// day. This assertion used to read `settled_days_now == 2` and it could
+	// not survive the cap: two real hours is a third of a game day at the
+	// shipped time scale, so a retreat run to its limit would have settled
+	// zero whole days and been paid nothing at all.
+	if got := storage.ParseInt(settle["settled_hours_now"]); got != 48 {
+		t.Fatalf("settled_hours_now=%d want 48", got)
+	}
+	// And the payment is the projection, spent over the span actually served
+	// and then held at the stage's own ceiling: one statement, so the number
+	// the start printed and the number the settle paid cannot drift. The
+	// ceiling is what actually binds here - two game days at this rate is
+	// more than the whole stage costs - so it is computed rather than
+	// assumed, and both halves are asserted.
+	catalog, err := worlddata.Load(world)
+	if err != nil {
+		t.Fatal(err)
+	}
+	realm := storage.ParseInt(actionScalar(t, path, `SELECT realm_index FROM characters WHERE user_id=42`))
+	phase := storage.ParseInt(actionScalar(t, path, `SELECT phase FROM characters WHERE user_id=42`))
+	span := seclusionGainForSpan(projected, 48*60)
+	room := phaseCapGo(catalog, realm, phase, false)
+	if span <= room {
+		t.Fatalf("the fixture no longer exercises the ceiling: %d over %d game hours against room of %d", span, 48, room)
+	}
+	if got := storage.ParseInt(settle["awarded_now"]); got != room {
+		t.Fatalf("awarded %d, want the stage's remaining %d (the span was worth %d)", got, room, span)
 	}
 }
 

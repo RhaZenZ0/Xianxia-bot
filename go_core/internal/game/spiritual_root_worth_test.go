@@ -80,7 +80,7 @@ func TestABetterRootGathersMoreOnBothPaths(t *testing.T) {
 		batch4Exec(t, path, `UPDATE character_spiritual_roots SET grade=?,purity=? WHERE user_id=42`, grade, purity)
 		batch4Exec(t, path, `UPDATE characters SET realm_index=1,phase=3,cultivation=0,body_cultivation=0 WHERE user_id=42`)
 		batch4Exec(t, path, `DELETE FROM cooldowns WHERE user_id=42`)
-		payload := map[string]any{"cooldown_seconds": 1, "game_minute": 600}
+		payload := map[string]any{"game_minute": 600}
 		if body {
 			payload["mode"] = "body"
 		}
@@ -208,7 +208,7 @@ func TestARetreatCarriesWhatTheRootIsWorth(t *testing.T) {
 		batch4Exec(t, path, `UPDATE character_spiritual_roots SET grade=?,purity=? WHERE user_id=42`, grade, purity)
 		batch4Exec(t, path, `DELETE FROM seclusion_sessions WHERE user_id=42`)
 		start := batch4Result(t, batch4Apply(t, path, world, "seclusion.start", seq,
-			map[string]any{"mode": "qi", "duration_game_minutes": 3 * 1440, "game_minute": 1000}))
+			map[string]any{"mode": "qi", "duration_real_minutes": 120, "game_minute": 1000}))
 		return storage.ParseInt(start["projected_daily_gain"]), toFloat(start["root_mult"])
 	}
 

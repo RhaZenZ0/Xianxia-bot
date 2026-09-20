@@ -95,6 +95,7 @@ CREATE TABLE seclusion_sessions(
     accumulated_gain INTEGER NOT NULL DEFAULT 0,
     status TEXT NOT NULL DEFAULT 'active',
     ended_reason TEXT NOT NULL DEFAULT '',
+    ends_real_ts REAL,
     created_at REAL NOT NULL,
     updated_at REAL NOT NULL);
 CREATE TABLE caravans(caravan_id INTEGER PRIMARY KEY AUTOINCREMENT, owner_type TEXT NOT NULL DEFAULT 'npc',

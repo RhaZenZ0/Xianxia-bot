@@ -14,9 +14,8 @@ import (
 )
 
 type cultivationActionPayload struct {
-	GameMinute      int64 `json:"game_minute"`
-	CooldownSeconds int64 `json:"cooldown_seconds"`
-	Confirm         bool  `json:"confirm"`
+	GameMinute int64 `json:"game_minute"`
+	Confirm    bool  `json:"confirm"`
 	// Reroll (v1.0.0-rc.4): seize the moment after a failed breakthrough at
 	// this stage - one more roll for Insight XP, once a stage, qi path only.
 	Reroll bool `json:"reroll"`
@@ -450,10 +449,7 @@ func cultivationTrain(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 			}
 		}
 	}
-	cool := p.CooldownSeconds
-	if cool <= 0 {
-		cool = 300
-	}
+	cool := cooldownSecondsFor(cooldownCultivate)
 	if err = setCooldown(conn, userID, key, cool, now); err != nil {
 		return authoritativeMutation{}, err
 	}

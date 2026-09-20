@@ -29,10 +29,13 @@ ENGINE_SCRIPT = PROJECT_ROOT / "scripts" / "playtest_engine.py"
 DISCORD_SCRIPT = PROJECT_ROOT / "scripts" / "playtest_discord.py"
 OPERATION = re.compile(r"^[a-z_]+(?:\.[a-z_]+)+$")
 # The op strings `scripts/playtest_engine.py` hands to the engine go through
-# these callables and nothing else: `act` (an authoritative mutation), `gm`
-# (a GM lever), `audited` (a GM lever whose audit row is then checked),
-# `query` (an authoritative read) and the client's own two.
-DRIVERS = {"act", "gm", "audited", "query", "action", "authoritative_action"}
+# these callables and nothing else: `act` (an authoritative mutation),
+# `act_free` (the same with the wait cleared first, v1.0.0-rc.56 - the engine
+# owns the cooldowns now, so the harness asks the GM to clear them instead of
+# sending `cooldown_seconds: 0`), `gm` (a GM lever), `audited` (a GM lever
+# whose audit row is then checked), `query` (an authoritative read) and the
+# client's own two.
+DRIVERS = {"act", "act_free", "gm", "audited", "query", "action", "authoritative_action"}
 
 
 def _map_literal(source: str, name: str) -> set[str]:

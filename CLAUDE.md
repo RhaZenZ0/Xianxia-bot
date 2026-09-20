@@ -145,7 +145,7 @@ internal/server/        HTTP control/data plane
 ```
 
 Every Go SQLite connection uses `journal_mode=WAL`, `foreign_keys=ON`, `busy_timeout=10000`,
-`synchronous=NORMAL`. Current schema version is 56; historical migrations are kept so old databases
+`synchronous=NORMAL`. Current schema version is 57; historical migrations are kept so old databases
 can upgrade in place — see `VERSIONS.md` for the full schema/release history.
 
 ### The NPC life cycle (v1.0.0-rc.24)
@@ -763,7 +763,9 @@ The bot holds the matching gate at the four doors a player has - the command tre
 wrapped), `_invoke_action` (every hub button, select and modal, checked on the press because a panel
 outlives the world closing), `on_message` (the typed line and the shorthand heard in every channel)
 and `typed_play.dispatch` (a picker click, which is a button on a message and so never meets the
-command tree). `app/bot/maintenance.py` is the one rule all four call.
+command tree). `app/bot/maintenance.py` is the one rule all four call — and since v1.0.0-rc.56
+each of those four doors calls a second, `app/bot/seclusion.py`, which is why the tree class and
+the panel gate are named for gating rather than for maintenance.
 
 Three things are deliberate. **The flag fails open** - an absent row, unreadable JSON or an
 unreachable database all mean the world is open, because a flag that gates all play must fail
@@ -1404,18 +1406,154 @@ manor array is the one arguable case and stays out because `environment_mult` is
 function's statement of where the cultivator sat, and stacking the manor on it would price the site
 twice.
 
-Not in this release, deliberately: seclusion's **duration and its lockout**. There is no engine cap
-at all today — `duration_game_minutes` is floored at 1 and bounded by nothing, and the 1–365 day
-`Range` on the slash command is presentation-only, so any non-Discord caller can seclude for a
-millennium. And the lockout is **already promised and not enforced**: `/cultivation → Seclusion →
-Start` tells the player in as many words that *"any state-changing command will remain locked until
-you use /cultivation → Cultivate → End"*, while the engine blocks exactly one thing behind a closed
-door — a Hearth-Return talisman. A lockout, a cap and the finer settlement a cap needs are one
-feature (the cap exists to bound the lockout) and a different finding from what a day is worth. When
-it comes, the engine half is `checkPlayerModerationTx`'s shape — one check at `applyAuthoritative`,
-with `admin.*` falling through to the switch so a GM is never locked out — and the bot half is the
-four doors `app/bot/maintenance.py` already holds, because a read never reaches the authoritative
-path.
+Deferred out of rc.55 and delivered in rc.56 below: seclusion's **duration and its lockout**.
+(**rc.55's own version of this paragraph said the lockout was "already promised and not enforced",
+and that overstated it**: the engine enforced nothing, but Python held half a gate in
+`serialized_user_action`. The whole of that half is written up in the next section, because what it
+covered and what it missed is the finding.)
+
+### What the doors are worth, and how long they stay shut (v1.0.0-rc.56)
+
+rc.55 gave a retreat the multipliers a hand-sat session has and deliberately left its duration and
+its lockout alone. Pulling on those two uncovered four more faults in the same system, and they are
+one feature: the cap exists to bound the lockout, the settlement unit exists because of the cap, and
+the rate can only be stated once the cooldown it is a share of belongs to the engine.
+
+They also share one shape, which is worth naming before the six paragraphs that follow. Each is a
+**number or a bound that the caller supplied and the engine accepted** — the wait between actions,
+the length of a retreat, the minutes in a day — and rc.48 already wrote the rule down for the
+clock: *a bound that lives in the client is not a bound*. The rate is the same fault turned inward:
+a constant named for a rule, spent in a way that applied nothing, while the rule really lived in a
+second constant that only meant what it said at one setting of a third.
+
+**The wait was the caller's, in fourteen places.** `cultivation.train` read `cooldown_seconds` off
+the request payload with a `<= 0 → 300` fallback, and thirteen other actions did the same — **seven
+of them with no floor at all**, so a caller sending `0` served no wait whatsoever. The value lived in
+`app/ops/config.py` and was mailed to the engine on every request. That is `rejectCallerGameMinute`'s
+fault in a second place, and rc.48 already wrote the rule down for the clock: *a bound that lives in
+the client is not a bound*. Both harnesses proved it was reachable — they sent `cooldown_seconds: 1`
+to drive their loops, a legitimate use of an illegitimate door, and they ask
+`admin.player.reset_cooldowns` now. `actionCooldowns` in `cooldown_rules.go` is the one statement,
+read through `cooldownSecondsFor`, with the six `*_COOLDOWN_MINUTES` keys as the `.env` baseline
+exactly as `WORLD_TIME_SCALE` is since rc.39 — **and compose had to be given them**, because the
+engine service takes an explicit `environment:` allowlist and a key it is not given is a key it
+cannot read. An action this table forgets waits an hour rather than nothing: a fallback that looks
+like a value is not a sentinel, which is the `seller_user_id=0` lesson. `minutes_per_day` joined
+`callerOwnedNothing` for the same reason — a unit of account is the same kind of number as a wait —
+and the caravan's own copy of that refusal (v0.28.0) went with it.
+
+**The rate was stated in the constant that did nothing.** `seclusionDailyShare = 0.60` is *named*
+for the rule — "around 60% of an active cultivation day" — and was spent as
+`daily * seclusionDailyShare / 0.6`, which is **exactly 1.0**. The rule really lived in an
+uncommented `seclusionSessionsPerDay = 1.2` one file away, and **a count of sessions only means a
+share of active play at one world time scale**: at the shipped `WORLD_TIME_SCALE=4` it happened to be
+60%, at 2 it was 30%, and at 8 it was **120%** — an operator who sped their world up made
+closed-door cultivation strictly better than playing, while it asked nothing of the player, and
+nothing anywhere said so. `seclusionShareOfActive = 1.25` is the share now, and
+`seclusionSessionsPerGameDay` derives the count from the cooldown it is a share *of*, so it holds at
+every scale. A **premium**, not a discount: the doors are shut, and that is the trade.
+
+**There were two settles, paying different rates.** `advanceSeclusions` in the simulation package was
+a second implementation with a **pre-rc.5 flat rate** (`8 + will + insight/2 + realm/2`, times a
+hardcoded `.60`), its own `minutesPerDay`, its own `.5`/`1.75` clamps, and none of the multipliers
+rc.55 added — so which rate a retreat was paid at depended on whether the background sweep reached it
+before the player came back. It had **zero tests**, which is how the two drifted twenty releases
+apart. `game.SettleSeclusionTx` is the one settle now (`game.WalletDeltaTx` is the precedent for the
+simulation package calling into `game` for a rule it must not copy), and `soulMultSim` and
+`phaseCapSim` went with it — they existed only for the copy.
+
+**There was no cap, and the one that existed was the client's.** `duration_game_minutes` was floored
+at 1 and bounded by nothing; the only limit in the game was `days: Range[int, 1, 365]` on the slash
+command. A retreat lasts **two real hours** now, and the deadline is a **real** one
+(`ends_real_ts`, schema 57): stored in game minutes, a GM changing the world's rate would silently
+re-size every retreat already under way. What a rate change *does* move is how many game minutes that
+wall-clock covers, which is what a rate change means. It is **refused, not clamped** — house style
+splits on intent, and a player who asked for a year and was silently given two hours would be told
+twice over that they had what they asked for. A stale client's `duration_game_minutes` is still read,
+converted at the world's rate and then held to the same cap, so a rolling deploy is not an outage and
+the refusal is honest for it too. A NULL `ends_real_ts` is a retreat started before the column
+existed: it keeps the length it was given, because a new rule must never shorten something a player
+already committed to.
+
+**Which forced the settlement unit.** Gain was paid per completed world-*day*. Two real hours at the
+shipped scale is 480 game minutes — a third of a day — so **a retreat run to its own cap would have
+paid exactly nothing**. It is per completed game **hour** now, through
+`seclusionGainForSpan`, the one statement the start's projection and the settle's payment both use.
+The two behaviours the day-based code documented are re-derived rather than ported: the remainder is
+carried mid-flight and discarded at completion, and completion keys off the clock rather than off the
+accounting (v0.23.1 — unit-accounting can never reach an end that is not a whole number of units).
+
+**And the lockout the panel had promised since v0.30.0.** *"Any state-changing command will remain
+locked until you use /cultivation → Cultivate → End"* — while the engine blocked exactly one thing
+behind a closed door, a Hearth-Return talisman, and Python held **half a gate** in
+`runtime.py`'s `serialized_user_action`. It is worth reading what that half was, because each part of
+it is a different way for a gate to be decoration: it covered only the ~141 handlers wearing that
+decorator, so **every read passed**; its exemption was a **function-name prefix**,
+`func.__name__.startswith("seclusion_")`, which nothing structural held; a **hub press** was already
+deferred by `_acknowledge_hub_action` before the wrapper ran; **typed play and free narration never
+reached it at all**; and it **settled first and checked second**, so the engine action ran ahead of
+its own refusal.
+
+`checkPlayerSeclusionTx` is the engine half, one check in `applyAuthoritative` in
+`checkPlayerModerationTx`'s shape, and `app/bot/seclusion.py` is the other, at the four doors
+`app/bot/maintenance.py` already holds — because a read never reaches the authoritative path. Three
+rules hold it:
+
+- **It self-clears, unconditionally.** A gate that refuses every action, on state that only an
+  action can clear, is a deadlock. The engine gate settles, pays and completes an expired retreat and
+  *then* lets the action through, the way `ensureRoadTransitReadyTx` clears a finished journey. It
+  **must not** depend on the `background_seclusion` automation flag — a GM switching that off would
+  otherwise lock every secluded player out for good — which is why the flag-gated sweep cannot be the
+  only end.
+- **The way out is always open.** `seclusion.settle` is the one exempt operation, so
+  `/cultivation → Cultivate → End` works whatever else is refused, including for a retreat
+  grandfathered from before schema 57 whose deadline is a game minute a frozen clock may never reach.
+- **The leading slash is load-bearing.** `_invoke_action` passes a hub leaf's `path`, which always
+  starts with one, and the command tree passes a bare `qualified_name` — and they collide: `/craft`
+  is the leaf that resolves a craft roll *and* `craft` is a hub whose panel is a read. Normalising
+  the slash away would have opened every leaf whose name matches a hub. A hub's panel opens (it is
+  where the way out is drawn, so refusing it would hide the only door) and each leaf inside it is
+  checked again on the press. What stays open is an explicit list of names held equal to the live
+  hub definitions and to the tree tuple, because *which* doors stay open is a decision — the old
+  gate's exemption was which decorator a handler happened to wear, which is nobody's decision and is
+  exactly how every read got through.
+- **An administrator is not exempt, but `/admin` is.** Maintenance exempts the person, because they
+  are how the world reopens; a retreat is the player's own state, so a GM in seclusion is in
+  seclusion and what stays open is the `/admin` tree. Every `admin.*` lever falls through to the
+  switch in `ApplyWithWorld` rather than reaching this gate, so that half is free by construction —
+  the same asymmetry maintenance relies on.
+
+**And the promise named a button that does not exist.** The panel has said *"use /cultivation →
+Cultivate → End"* since v0.30.0; the leaf is labelled **Seclusion End** (`/seclusion end`, beside
+`Seclusion Start` and `Seclusion Status`). Nobody noticed in twenty-six releases because nothing was
+ever locked, so nobody followed the instruction under pressure. Every player-facing copy of it —
+the start reply, the status card, the engine's own refusal and the new cultivation-card line — names
+the real leaf now.
+
+**Two gates renamed, because one of them had become a lie.** `_panel_maintenance_gate`,
+`register_maintenance_gate`, `_maintenance_refusal` and `MaintenanceAwareTree` each now carry two
+rules, and a gate named for one of them is the same class of lie as a `sync_world_catalog` that
+syncs no catalogue. They are `_panel_gate`, `register_panel_gate`, `_panel_refusal` and
+`GatedCommandTree`, each with the old name in its docstring.
+
+**No hidden-actions provider, deliberately.** `_household_hidden_actions` and
+`_progression_hidden_actions` hide a door the engine would refuse outright; this would hide ~290 of
+them and print ~290 lock lines, which is a worse panel than a refusal on the press. Maintenance
+mode, which is the same kind of whole-player state, hides nothing for the same reason. What the
+cultivation card gained instead is a **Seclusion field** — it rendered nothing about a retreat at
+all, so a secluded cultivator saw the ordinary sheet and no sign that every other command was about
+to refuse them, which was survivable while the lockout was half a gate and is not now.
+
+**The gates, and what each drill prints.** `seclusion_rate_test.go` drives the share at scales 2, 4,
+8, 12 and 60 and asserts 125% at each — the one thing `1.2` could never be asked; its drill restores
+the constant and prints *"a retreat is worth 0.3000 of active play"* at scale 2 and *"1.8000"* at 12,
+which is the finding in the test's own output. `seclusion_cap_test.go` holds the refusal, the stored
+real deadline, that a scale change does not move it, and that a **stopped clock** still admits a
+retreat (scale 0 is a supported state, and a cap computed in game minutes would be `120 × 0 = 0` and
+refuse everybody). `seclusion_lockout_test.go`'s two load-bearing tests are not "is a secluded player
+refused" but **can one ever get out** — on the deadline and before it. `seclusion_one_settle_test.go`
+holds that the sweep reaches `game.SettleSeclusionTx` and **does no arithmetic of its own**, read by
+AST: a rate is made of numbers, so a function with none cannot have one.
 
 ### Somewhere to go above the Mortal World (v1.0.0-rc.54)
 

@@ -120,9 +120,13 @@ func TestStage6CaravanDispatchRejectsOutOfRangeMechanicalInputs(t *testing.T) {
 			want:    "escort must be between 0 and 20",
 		},
 		{
+			// Refused centrally since v1.0.0-rc.56, beside the waits and the
+			// caller's game_minute: how long a day is is a unit of account,
+			// the same kind of number as a wait, and the caravan's own copy
+			// of the check went when seclusion needed the same refusal.
 			name:    "caller duration",
 			payload: map[string]any{"destination": "Riverguard City", "item_id": "spirit_herb", "quantity": 1, "escort": 0, "minutes_per_day": 1},
-			want:    "client-supplied caravan duration is forbidden",
+			want:    "client-supplied minutes_per_day is forbidden",
 		},
 	}
 

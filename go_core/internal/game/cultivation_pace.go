@@ -32,9 +32,22 @@ const (
 	// Added to the sessions a stage takes, per realm: five quarters.
 	cultivationSessionsPerRealmNumerator   = 5
 	cultivationSessionsPerRealmDenominator = 4
-	// A day of closed-door cultivation is worth this many sessions, before the
-	// environment multiplier - less than sitting down for them by hand.
-	seclusionSessionsPerDay = 1.2
+	// What a retreat behind a closed door is worth (v1.0.0-rc.56): a share of
+	// what the same wall-clock spent cultivating by hand would pay. A premium
+	// rather than a discount, because the door is shut - a secluded cultivator
+	// can do nothing else, and that is the trade.
+	//
+	// It is a share, derived from the cooldown it is a share *of*, and not a
+	// count of sessions. The 1.2 it replaces was a count, and a count only
+	// means a share at one world time scale: at the shipped 4 it happened to
+	// be 60% of active play, at 2 it was 30%, and at 8 it was 120% - seclusion
+	// beating playing while asking nothing of the player. Nothing anywhere
+	// said so, and the constant that was *named* for the rule,
+	// seclusionDailyShare, was divided by its own value and did nothing at all.
+	seclusionShareOfActive = 1.25
+	// A day of the world's clock. The unit the rate above is quoted in, and
+	// the one `minutes_per_day` used to be able to tell the engine.
+	gameMinutesPerDay = int64(1440)
 	// The floor under a session, so the first stages are never a trickle.
 	cultivationPaceFloor = 8
 	// An attribute point is worth this much of a session.

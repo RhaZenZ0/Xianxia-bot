@@ -136,9 +136,9 @@ class EveryDoorIsGated(unittest.TestCase):
 
     def test_every_slash_command_passes_the_tree_check(self):
         bot = (BOT / "bot.py").read_text(encoding="utf-8")
-        self.assertIn("class MaintenanceAwareTree(app_commands.CommandTree)", bot)
+        self.assertIn("class GatedCommandTree(app_commands.CommandTree)", bot)
         self.assertIn("async def interaction_check", bot)
-        self.assertIn("tree_cls=MaintenanceAwareTree", bot)
+        self.assertIn("tree_cls=GatedCommandTree", bot)
 
     def test_the_hub_panel_checks_on_the_press(self):
         hubs = (BOT / "hubs.py").read_text(encoding="utf-8")
@@ -146,9 +146,9 @@ class EveryDoorIsGated(unittest.TestCase):
         invoke = next(n for n in ast.walk(tree)
                       if isinstance(n, ast.AsyncFunctionDef) and n.name == "_invoke_action")
         source = ast.get_source_segment(hubs, invoke) or ""
-        self.assertIn("_maintenance_refusal", source)
+        self.assertIn("_panel_refusal", source)
         # Before the handler runs, not after it has already acted.
-        self.assertLess(source.index("_maintenance_refusal"), source.index("action.handler("))
+        self.assertLess(source.index("_panel_refusal"), source.index("action.handler("))
 
     def test_the_typed_line_and_the_shorthand_are_gated(self):
         bot = (BOT / "bot.py").read_text(encoding="utf-8")
@@ -164,7 +164,7 @@ class EveryDoorIsGated(unittest.TestCase):
         """`hubs` sits below `runtime`, so it cannot reach DB itself; the
         surface registers the gate the way it registers hidden actions."""
         surface = (BOT / "surface.py").read_text(encoding="utf-8")
-        self.assertIn("register_maintenance_gate(_panel_maintenance_gate)", surface)
+        self.assertIn("register_panel_gate(_panel_gate)", surface)
 
 
 if __name__ == "__main__":  # pragma: no cover

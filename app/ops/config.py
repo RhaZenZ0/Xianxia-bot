@@ -137,12 +137,6 @@ class Settings:
     auto_narrate: bool
     auto_narrate_event_threads: bool
     event_thread_auto_archive_minutes: int
-    cultivate_cooldown_minutes: int
-    explore_cooldown_minutes: int
-    hunt_cooldown_minutes: int
-    perfect_quest_cooldown_minutes: int
-    perfect_trial_cooldown_minutes: int
-    secret_realm_cooldown_minutes: int
     unexpected_event_chance_percent: int
     reincarnation_base_samsara_years: int
     reincarnation_max_wait_seconds: int
@@ -455,17 +449,13 @@ class Settings:
                 "python3 -c \"import secrets; print(secrets.token_urlsafe(32))\""
             )
 
-        cooldowns = {
-            "cultivate_cooldown_minutes": _as_int(os.getenv("CULTIVATE_COOLDOWN_MINUTES"), 180, name="CULTIVATE_COOLDOWN_MINUTES"),
-            "explore_cooldown_minutes": _as_int(os.getenv("EXPLORE_COOLDOWN_MINUTES"), 20, name="EXPLORE_COOLDOWN_MINUTES"),
-            "hunt_cooldown_minutes": _as_int(os.getenv("HUNT_COOLDOWN_MINUTES"), 30, name="HUNT_COOLDOWN_MINUTES"),
-            "perfect_quest_cooldown_minutes": _as_int(os.getenv("PERFECT_QUEST_COOLDOWN_MINUTES"), 60, name="PERFECT_QUEST_COOLDOWN_MINUTES"),
-            "perfect_trial_cooldown_minutes": _as_int(os.getenv("PERFECT_TRIAL_COOLDOWN_MINUTES"), 360, name="PERFECT_TRIAL_COOLDOWN_MINUTES"),
-            "secret_realm_cooldown_minutes": _as_int(os.getenv("SECRET_REALM_COOLDOWN_MINUTES"), 15, name="SECRET_REALM_COOLDOWN_MINUTES"),
-        }
-        for field_name, value in cooldowns.items():
-            if value < 0:
-                raise RuntimeError(f"{field_name.upper()} cannot be negative")
+        # The six action cooldowns were validated here until v1.0.0-rc.56 and
+        # sent to the engine in every request payload. They are the engine's
+        # own now (`actionCooldowns` in go_core/internal/game/cooldown_rules.go),
+        # read from the same `.env` keys through compose, because a bound that
+        # lives in the client is not a bound. The AI-route and monitor
+        # cooldowns below are a different thing and stay: they meter
+        # OpenRouter, not a player.
 
         update_channel = (os.getenv("UPDATE_CHANNEL") or "stable").strip().lower()
         if update_channel not in ("stable", "beta"):
@@ -569,5 +559,4 @@ class Settings:
             typed_play_burst=typed_play_burst,
             typed_play_per_minute=typed_play_per_minute,
             typed_play_hint=_as_bool(os.getenv("TYPED_PLAY_HINT"), True),
-            **cooldowns,
         )

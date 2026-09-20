@@ -462,11 +462,16 @@ def _hub_option_hint(action: "HubAction", spec: "HubInput") -> str:
     return _HUB_OPTION_HINTS.get((qualified, spec.name), "")
 
 
-_MAINTENANCE_GATE: Any = None
+_PANEL_GATE: Any = None
 
 
-def register_maintenance_gate(provider: Any) -> None:
-    """Register the check that refuses a panel press while the world is closed.
+def register_panel_gate(provider: Any) -> None:
+    """Register the check that refuses a panel press.
+
+    One provider, two rules behind it since v1.0.0-rc.56: the world is closed
+    for maintenance, or the player is behind their own closed door. It was
+    `register_maintenance_gate` while there was only one, and a gate that
+    refuses two things must not be named for one of them.
 
     Registered from above rather than imported, for the same reason the option
     providers are: `hubs` sits below `runtime` in the package tiers, so it
@@ -474,15 +479,15 @@ def register_maintenance_gate(provider: Any) -> None:
     refuses nobody, which is the right default for a test that builds a panel
     without a bot around it.
     """
-    global _MAINTENANCE_GATE
-    _MAINTENANCE_GATE = provider
+    global _PANEL_GATE
+    _PANEL_GATE = provider
 
 
-async def _maintenance_refusal(user: Any, path: str) -> str | None:
-    if _MAINTENANCE_GATE is None:
+async def _panel_refusal(user: Any, path: str) -> str | None:
+    if _PANEL_GATE is None:
         return None
     try:
-        return await _MAINTENANCE_GATE(user, path)
+        return await _PANEL_GATE(user, path)
     except Exception:
         # A gate that cannot answer must not take the panel down with it.
         log.exception("maintenance gate failed for %s", path)
@@ -1186,7 +1191,7 @@ async def _invoke_action(
     # The world may have closed since this panel was drawn (v1.0.0-rc.41). A
     # panel lives fifteen minutes, so the check belongs on the press and not
     # on the open - the same reasoning the admin re-check above it follows.
-    refusal = await _maintenance_refusal(interaction.user, action.path)
+    refusal = await _panel_refusal(interaction.user, action.path)
     if refusal is not None:
         if not interaction.response.is_done():
             await interaction.response.send_message(refusal, ephemeral=False)

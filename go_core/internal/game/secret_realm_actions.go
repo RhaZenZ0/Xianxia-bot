@@ -15,9 +15,8 @@ import (
 )
 
 type secretRealmPayload struct {
-	RealmID         string `json:"realm_id"`
-	GameMinute      int64  `json:"game_minute"`
-	CooldownSeconds int64  `json:"cooldown_seconds"`
+	RealmID    string `json:"realm_id"`
+	GameMinute int64  `json:"game_minute"`
 }
 
 func normalizeSecretRealm(catalog worlddata.Catalog, raw string) (string, bool) {
@@ -311,7 +310,7 @@ func secretRealmExploreAction(conn *storage.Conn, catalog worlddata.Catalog, use
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
-	if err = setCooldown(conn, userID, "secret_realm", p.CooldownSeconds, now); err != nil {
+	if err = setCooldown(conn, userID, "secret_realm", cooldownSecondsFor(cooldownSecretRealm), now); err != nil {
 		return authoritativeMutation{}, err
 	}
 	result := map[string]any{"realm_id": rid, "realm_name": realm.Name, "room_index": idx, "room": room, "roll": roll, "success": roll["success"], "danger_before": danger}

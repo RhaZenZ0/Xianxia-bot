@@ -77,7 +77,7 @@ func TestExploringACityFindsItsShopsOneAtATime(t *testing.T) {
 	if storage.ParseInt(here["found"]) != 0 || storage.ParseInt(here["total"]) != int64(len(keys)) {
 		t.Fatalf("before exploring: %v", here)
 	}
-	result := batch4Result(t, batch4Apply(t, path, world, "exploration.explore", 1, map[string]any{"game_minute": 600, "cooldown_seconds": 0, "unexpected_events_enabled": false, "unexpected_event_chance_percent": 0}))
+	result := batch4Result(t, batch4Apply(t, path, world, "exploration.explore", 1, map[string]any{"game_minute": 600, "unexpected_events_enabled": false, "unexpected_event_chance_percent": 0}))
 	found, _ := result["discovered_shop"].(map[string]any)
 	if found == nil || fmt.Sprint(found["shop"]) != keys[0] {
 		t.Fatalf("discovered_shop=%v want %s", result["discovered_shop"], keys[0])
@@ -86,7 +86,8 @@ func TestExploringACityFindsItsShopsOneAtATime(t *testing.T) {
 		t.Fatalf("discovery kind=%q", got)
 	}
 	// The next walk finds the next one, never the same twice.
-	result = batch4Result(t, batch4Apply(t, path, world, "exploration.explore", 2, map[string]any{"game_minute": 700, "cooldown_seconds": 0, "unexpected_events_enabled": false, "unexpected_event_chance_percent": 0}))
+	clearCooldowns(t, path, 42)
+	result = batch4Result(t, batch4Apply(t, path, world, "exploration.explore", 2, map[string]any{"game_minute": 700, "unexpected_events_enabled": false, "unexpected_event_chance_percent": 0}))
 	found, _ = result["discovered_shop"].(map[string]any)
 	if found == nil || fmt.Sprint(found["shop"]) != keys[1] {
 		t.Fatalf("second discovered_shop=%v want %s", result["discovered_shop"], keys[1])

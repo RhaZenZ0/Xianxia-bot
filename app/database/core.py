@@ -26,7 +26,7 @@ from .remote import GoDatabaseTransport
 log = logging.getLogger("xianxia.database")
 
 
-SCHEMA_VERSION = 56
+SCHEMA_VERSION = 57
 # A readiness probe must validate more than the schema-version marker.  If the
 # SQLite file is removed or replaced while the bot is running, SQLite will
 # happily create a new empty file at the same path.  Checking these tables lets
@@ -2503,6 +2503,36 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
             """CREATE INDEX IF NOT EXISTS idx_world_event_channel ON world_event_channels(guild_id,channel_id)""",
         ),
     ),
+    (
+        57,
+        "seclusion_ends_on_a_real_clock",
+        (
+            # v1.0.0-rc.56: a retreat lasts at most two real hours, and
+            # the deadline is a real one.
+            #
+            # `duration_game_minutes` was floored at 1 and bounded by
+            # nothing - the only limit in the game was
+            # `days: Range[int, 1, 365]` on the slash command, which is
+            # presentation and which any other caller could simply not
+            # have. A bound that lives in the client is not a bound, the
+            # same fault the action cooldowns had.
+            #
+            # It is stored in real seconds rather than game minutes
+            # because a GM may change the world's time scale, and a
+            # deadline expressed in game minutes would silently re-size
+            # every retreat already under way. What a scale change does
+            # move is how many game minutes that wall-clock covers -
+            # which is what a rate change means.
+            #
+            # No backfill: a retreat in flight at the upgrade has a NULL
+            # here and keeps the length it was started with, because a
+            # new rule must never shorten something a player already
+            # committed to. `seclusion_sessions` is created in the base
+            # script rather than in this tuple, so an existing world
+            # needs the ALTER.
+            """ALTER TABLE seclusion_sessions ADD COLUMN ends_real_ts REAL""",
+        ),
+    ),
 )
 
 
@@ -3209,6 +3239,13 @@ class Database:
                     accumulated_gain INTEGER NOT NULL DEFAULT 0,
                     status TEXT NOT NULL DEFAULT 'active',
                     ended_reason TEXT NOT NULL DEFAULT '',
+                    -- The retreat's real deadline (schema 57, v1.0.0-rc.56). A
+                    -- retreat lasts at most two real hours, and the bound has to
+                    -- be a real one: stored in game minutes, a GM changing the
+                    -- world's time scale would re-size every retreat already
+                    -- under way. NULL is a retreat started before this column
+                    -- existed, which keeps the length it was started with.
+                    ends_real_ts REAL,
                     created_at REAL NOT NULL,
                     updated_at REAL NOT NULL,
                     FOREIGN KEY(user_id) REFERENCES characters(user_id) ON DELETE CASCADE

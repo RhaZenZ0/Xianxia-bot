@@ -350,7 +350,7 @@ def _module_level_relative_imports(path):
 # noted (command modules read each other: law -> battle, exploration -> sect;
 # inspect_sim reads world_ops). The graph is also required to be acyclic.
 TIERS = (
-    ("registry.py", "scene_layout.py", "typed_play_router.py", "maintenance.py"),
+    ("registry.py", "scene_layout.py", "typed_play_router.py", "maintenance.py", "seclusion.py"),
     ("runtime.py", "hubs.py"),
     ("services.py", "typed_play.py"),
     ("formatting.py", "locations.py", "pickers.py"),
@@ -527,6 +527,14 @@ KNOWN_DUPLICATES = {
     "LAYOUT_COMPONENTS_AVAILABLE": {"hubs.py", "scene_layout.py"},
     "_LAYOUT_COMPONENT_NAMES": {"hubs.py", "scene_layout.py"},
     "law_technique_autocomplete": {"commands/boss.py", "commands/law.py"},  # stage-4 copy, predates the split
+    # v1.0.0-rc.56: `seclusion.py` is `maintenance.py`'s shape deliberately -
+    # one rule, called at the same four doors, answering None or the refusal
+    # to print. The two names are the interface those doors call, so sharing
+    # them is the point; what would be a copy is the body, and the bodies have
+    # nothing in common (a world-wide cached flag against one player's own
+    # uncached row).
+    "refuse": {"maintenance.py", "seclusion.py"},
+    "refusal_text": {"maintenance.py", "seclusion.py"},
 }
 
 # The shared names the rest of the package reads by module. Each was moved
