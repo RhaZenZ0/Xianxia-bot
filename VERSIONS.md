@@ -6,6 +6,20 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.1** gives the martial clans somebody real to deal with. `martial_clan_relations.partner_family_id`
+is foreign-keyed to `birth_families` and nullable, and the one statement that had ever inserted a row
+wrote it `nil` - because the partner it named was invented off a list of surnames: a house with no
+members, no town, no wealth and no opinion. So a world held one relation per household, with somebody
+who does not exist, from the day it opened, and the only thing that could ever happen to it was the
+plus or minus one a tick the `clan_dynamics` batch applies. Four households meant four relations for
+ever. `clanDiplomacy` is a step of that batch: two real households in one world, neither already
+dealing with the other, sign what their wealth, weight and alignment imply - a trade pact, an
+alliance, a marriage pact, or a rivalry where the gap is too wide - written from both sides, at an
+opening score both bootstrap and diplomacy now read from one map, with the treaty recorded once in
+`world_history_events`. A blood feud is still `combat_aftermath`'s alone, because a feud comes from a
+body. `trade_pact` was also the one seeded type the drift CASE did not name, so it had sat at exactly
+25 since the world started; it warms like everything else a house signs. No schema.
+
 **1.0.0** is the first release with no suffix on its tag, and it is rc.59's tree unchanged: no code,
 content or schema moved between the two, so an operator already running rc.59 has nothing to install.
 

@@ -11,6 +11,21 @@ database. Its findings are the first two entries.
 
 ## Findings
 
+- **fixed (v1.0.1)** — *No clan alliance had ever been formed at runtime, in any world.*
+  `martial_clan_relations` was seeded once per household behind a `COUNT(*)==0` guard, with an
+  **invented** partner — a surname off a list, `partner_family_id` left NULL although the column is
+  foreign-keyed to `birth_families` — and the only statement that could insert another was
+  `combat_aftermath.go`, which writes `blood_feud` alone. The `clan_dynamics` batch nudged existing
+  scores ±1 and created nothing. So four households meant four relations on the day the world opened
+  and four for ever after. `clanDiplomacy` is the step that forms one between two real households,
+  written from both sides; `npcPoliticalMarriages` had done the same for `sect_relations` since
+  rc.24, in the file whose own comment names the clan fault it did not fix.
+- **deferred (design)** — *Nothing ends a clan relation.* `martial_clan_relations.active` is written
+  1 by every INSERT, read by every SELECT, and set to 0 by nothing in the tree. So an alliance warms
+  toward 100 and a rivalry cools toward −100 and neither can ever become the other, because no rule
+  re-types a row either. What a broken alliance leaves behind — a rivalry, or simply nothing — is a
+  decision about the fiction rather than a default, and adding a dissolution without making it would
+  be picking one silently.
 - **fixed (v1.0.0-rc.52)** — *Nothing in either harness reached a `create_category` call.*
   Every provisioning helper defaults to `create_missing=False` and the one caller that passes True
   is the GM dashboard's Full Setup, so no slash command and no hub button could reach it — the

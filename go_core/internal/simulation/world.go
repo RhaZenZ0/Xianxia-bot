@@ -687,7 +687,10 @@ func (r *Runner) clans(conn *storage.Conn, steps, gm int64) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	_, err = conn.Execute(`UPDATE martial_clan_relations SET relation_score=MAX(-100,MIN(100,relation_score+CASE relation_type WHEN 'alliance' THEN 1 WHEN 'marriage_pact' THEN 1 WHEN 'blood_feud' THEN -1 WHEN 'rivalry' THEN -1 ELSE 0 END)),updated_at=? WHERE active=1`, []any{now})
+	// `trade_pact` was the one seeded type this CASE did not name, so it fell
+	// into the ELSE and sat at exactly its opening 25 from the day the world
+	// started (v1.0.1). It warms like the other two things a house signs.
+	_, err = conn.Execute(`UPDATE martial_clan_relations SET relation_score=MAX(-100,MIN(100,relation_score+CASE relation_type WHEN 'alliance' THEN 1 WHEN 'marriage_pact' THEN 1 WHEN 'trade_pact' THEN 1 WHEN 'blood_feud' THEN -1 WHEN 'rivalry' THEN -1 ELSE 0 END)),updated_at=? WHERE active=1`, []any{now})
 	if err != nil {
 		return "", err
 	}
@@ -697,8 +700,14 @@ func (r *Runner) clans(conn *storage.Conn, steps, gm int64) (string, error) {
 			count = i64(row["n"])
 		}
 	}
-	_ = gm
-	return fmt.Sprintf("batch-advanced %d martial clans", count), nil
+	// Houses that have never dealt with each other sign something (v1.0.1),
+	// after the tick's own drift, so a treaty lands at its opening score
+	// rather than one point off it.
+	signed, err := r.clanDiplomacy(conn, gm)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("batch-advanced %d martial clans; %d new relations signed", count, signed), nil
 }
 
 func (r *Runner) blackMarkets(conn *storage.Conn, steps, gm int64) (string, error) {
