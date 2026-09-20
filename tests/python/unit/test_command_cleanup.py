@@ -205,18 +205,37 @@ class CommandCleanupTests(unittest.TestCase):
 
         self.assertIn("ephemeral=True", bot_function_source("begin"))
 
-    def test_stage7_dashboard_owned_channels_do_not_rewrite_existing_permissions(self):
-        """Setup/repair never touches permissions on a channel that already exists -
-        set_permissions() is never called at all. The one PermissionOverwrite use is
-        the read-only overwrite applied at creation time for READ_ONLY_BASE_CHANNELS
-        (world-events, bot-logs, xianxia-info), and only fires for a channel the bot
-        is itself creating (create_missing + Manage Channels), never for one that was
-        merely bound to an existing channel.
+    def test_stage7_dashboard_owned_channels_only_change_what_the_dashboard_asked_for(self):
+        """Repair re-applies the read-only lock, and only ever behind
+        `can_create` (rewritten in v1.0.0-rc.59).
+
+        This test used to assert `set_permissions(` was **never** called, and
+        that is what it was written for in stage 7: Setup must not stamp on a
+        GM's own permissions. But the effect was that `READ_ONLY_BASE_CHANNELS`
+        was consumed at exactly one place - the `overwrites=` argument of
+        `create_text_channel` - so `#xianxia-info`, `#expeditions` and
+        `#player-homes` were read-only only where the bot had created them, and
+        writable on every server where a GM had bound an existing channel.
+
+        The rule it was defending is still here and is what is checked now: the
+        lock is applied only for a channel this codebase declares read-only,
+        only behind `can_create`, and nothing else about a channel's
+        permissions is touched. `test_the_layout_reaches_an_existing_server.py`
+        holds the other half - that the lock is applied outside the
+        `channel is None` branch at all.
         """
         setup_block = bot_function_source("ensure_base_xianxia_channels")
-        self.assertNotIn("set_permissions(", setup_block)
-        self.assertEqual(setup_block.count("PermissionOverwrite("), 1)
         self.assertIn("if name in READ_ONLY_BASE_CHANNELS else {}", setup_block)
+        for line in setup_block.splitlines():
+            if "set_permissions(" not in line:
+                continue
+            self.assertIn("guild.default_role", setup_block,
+                          "the lock must apply to @everyone and nobody else")
+        self.assertEqual(setup_block.count("set_permissions("), 1,
+                         "one lock, in one place")
+        # Still never a blanket permission rewrite: no overwrite object is
+        # built for a channel that already exists.
+        self.assertEqual(setup_block.count("PermissionOverwrite("), 1)
 
     def test_reusable_hub_framework_enforces_owner_and_uses_registered_handlers(self):
         source = HUBS.read_text(encoding="utf-8")

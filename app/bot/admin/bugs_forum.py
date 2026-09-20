@@ -116,8 +116,8 @@ async def ensure_bugs_forum_channel(
     warning: str | None = None
     me = guild.me
     can_create = create_missing and bool(me) and me.guild_permissions.manage_channels
+    category = next((item for item in guild.categories if item.name == category_name), None)
     if channel is None and can_create:
-        category = next((item for item in guild.categories if item.name == category_name), None)
         try:
             channel = await guild.create_forum(
                 BUGS_CHANNEL_NAME, category=category, topic=DEFAULT_BUGS_GUIDELINES[:1024],
@@ -132,6 +132,16 @@ async def ensure_bugs_forum_channel(
             )
     elif channel is None:
         warning = f"Missing **#{BUGS_CHANNEL_NAME}**. Create it as a forum channel from the admin dashboard; the bot will not provision channels."
+
+    # The re-parent every other family got in v1.0.0-rc.59: the category was
+    # resolved inside the create branch, so a `#bugs` forum that already
+    # existed stayed wherever it was - and rc.59 moves it from 📜 Xianxia RP
+    # to 🛠️ Feedback, which without this would reach a fresh guild alone.
+    if channel is not None and can_create and category is not None and channel.category_id != category.id:
+        try:
+            await channel.edit(category=category, reason="Xianxia RP bug-report forum setup")
+        except discord.HTTPException:
+            log.exception("Could not move #%s into %s", BUGS_CHANNEL_NAME, category_name)
 
     if channel is not None:
         await DB.set_bugs_channel_id(guild.id, channel.id)

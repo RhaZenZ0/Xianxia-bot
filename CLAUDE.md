@@ -145,7 +145,7 @@ internal/server/        HTTP control/data plane
 ```
 
 Every Go SQLite connection uses `journal_mode=WAL`, `foreign_keys=ON`, `busy_timeout=10000`,
-`synchronous=NORMAL`. Current schema version is 57; historical migrations are kept so old databases
+`synchronous=NORMAL`. Current schema version is 58; historical migrations are kept so old databases
 can upgrade in place — see `VERSIONS.md` for the full schema/release history.
 
 ### The NPC life cycle (v1.0.0-rc.24)
@@ -1605,6 +1605,286 @@ it vacuous. Three drills: restore the column and it names `seclusion_sessions.en
 the guard and it names the transport, restore the bad split and the self-check fails first.
 
 
+### The numbers that reach no rule (v1.0.0-rc.58)
+
+`active_effects` modifiers are a vocabulary **nothing was holding**. Any string may be written as a
+`stat`; `loadEffectModifiers` sums it into `mods`; and no gate ever asked whether a rule reads it
+back. Content authored twenty distinct stats and production Go wrote twelve. **Seven reached no
+rule.** That is the mirror of the scar `property_storage_actions.go` has carried since rc.19, where
+`formation_bonus` was *"a stat no rule could ever grant"* — here it was a stat every rule could
+grant and none read.
+
+**Two of the seven were near-miss names, and the tree shows why.** `sense_actions.go` reads *both*
+`c.SensePrecisionBonus` — the real `characters` column, at `:33` and `:144` — and
+`senseExtraModifier(…, "sense_precision")`, the modifier, at `:168`. Two channels, one suffix apart,
+in one function. `special_effects.space_domain` authored `sense_power_bonus` and this package's own
+`conditionEffectGo` authored `sense_precision_bonus`, both reaching for the column name. They are
+provably mistakes rather than decisions: content spells `sense_precision` correctly twelve times
+across mutations, bloodlines and physiques, and `senseExtraModifier` is called with exactly three
+literals, none carrying the suffix. The consequence was that a **Soul Wound had never dulled
+anybody's spiritual sense** — the one thing a soul injury is for.
+
+**The other five were never wired**, and what it cost a player is that the item's own description
+was the promise. `/specialeffects` prints name, category, severity and remaining — never the
+modifiers — so nothing ever showed the numbers were dead. `heart_calming_pill`, the treatment item
+for three of the four conditions and the thing `family.support` hands out, says *"Settles the mind,
+aids insight and suppresses heart-demon disturbances"*: one of three was real. `purging_phoenix_pill`'s
+`use` effect was **entirely dead**, both modifiers unread, so its whole stated function was
+unimplemented.
+
+`escape_bonus` rides the flee roll now (`combat_actions.go`, the one site — pvp has an unconditional
+`surrender` and group combat has no escape). `heart_demon_resistance` rides the **Heart Tribulation
+wave**, the wave the heart demon comes from, at `resistance/heartDemonResistanceScale` — 25 on the
+pill is +2 on a 2d10 check, a real share of the wave a cultivator most often loses and not a way to
+buy the gate. `detox_power` and `fire_resistance` are the purge, below. And `insight_gain` needed a
+door first.
+
+**Insight XP had eight writers.** A multiplier applied at one of eight is rc.56's two settles and
+rc.43's two stores. `grantInsightXPTx` is the one door; six grant sites route through it, and
+`TestInsightXPHasOneDoor` holds the rest to a named reason — the GM lever, the master's reward paid
+out of a *disciple's* breakthrough, the four spends (a multiplier must never touch a debit) and the
+two absolute writes at creation and samsara. It **derives the canonical minute itself** rather than
+taking one: four of the six sites have no game minute in scope, and threading one through four
+signatures to reach a clock the engine owns is the caller stating what the engine already knows
+(rc.48). Neither the clock nor the multiplier can refuse a reward — an unreadable clock means no
+multiplier, the way `loadSeclusionCarried` answers 1 — and a positive grant never rounds to zero,
+because the one thing a bonus must never do is take a reward away.
+
+### The capstone that named an effect nobody wrote (v1.0.0-rc.58)
+
+`law_system.techniques.world_collapse` declared `"effect": "world_collapse"` at `requires_stage: 5`
+and `min_realm_index: 30` — the deepest thing on the game's ladder — and `special_effects` carried
+seven entries, none of them that one. `law_technique_actions.go:104` refuses an effect the catalogue
+does not carry, quite correctly. So a realm-30 Dao Saint, with Space Law at Essence/Origin and a
+stabilized personal world, pressed the capstone and was told *"law technique world_collapse names an
+unknown effect"*. Twelve releases.
+
+**Why the Go test missed it: the fixture rewrote the link.** `lawTechniqueCatalog()` declared its
+*own* `world_collapse` with `Effect: "spatial_step_echo"` — an effect the fixture provides — at
+`RequiresStage: 2, MinRealmIndex: 3` instead of 5/30. `TestWorldCollapseNeedsAPersonalWorld`
+therefore asserted the capstone **succeeds**, against a technique the fixture invented. That is the
+`npc_consignments` lesson arriving through the front door: a fixture that cannot fail the way
+production fails is not testing production. The fixture keeps the mechanism tests — pinning a stage
+gate to production content would break it on every content edit — but its keys are `fixture_step`
+and `fixture_echo` now, so nothing in it can be mistaken for a shipped id, and every rule about a
+*named* production technique moved to `special_effects_content_test.go`, which drives the shipped
+catalogue.
+
+**Why the playtest missed it: it walked past.** `playtest_engine.py` climbs Space Law to
+comprehension 100, stands at Dao Saint realm 30 and creates a personal world — **every precondition,
+in consecutive lines** — and never pressed it. Its only `law.technique` call expected a refusal, and
+rc.35's coverage rule counts an operation as driven when it is a driver call's first string
+argument. That rule is exactly right for catching an operation nothing calls and not enough for one
+called only into a designed refusal, so **driven now means resolved**: `REFUSAL_ONLY_OPERATIONS` in
+`test_playtest_coverage.py` is the new allowlist, and it is **not empty on the day it was written**
+— unlike `SOURCELESS_ITEMS`, `UNGRANTABLE_QUESTS` and `ALLOWED_UNREACHABLE` — because tightening a
+loose rule reveals the backlog the loose wording created. Two entries: `artifact.awaken` wants Bond
+3 and no lever sets it; `meridian.heal` wants a rupture nothing can stage. Its drill is the finding
+itself: revert the capstone step and the gate reports `law.technique`.
+
+The effect is authored as a Domain of severity 6, strictly above `space_domain` on every stat it
+shares and a superset of them, using only stats a rule reads — including `escape_bonus +4`, the
+positive counterpart of `spatial_lockdown`'s −5, so that stat is no longer one only a debuff could
+write. Inside a world you folded yourself, leaving is your decision.
+
+**And the engine never refused a control technique out of battle.** `combat.technique` resolves
+`spatial_lockdown` as suppression turns and `spatial_strangulation` as damage, and writes **no
+effect row at all** — so `lawTechniqueAction` is the engine's only writer of a law effect, and it
+writes on the *user*. Nothing stopped a cultivator applying `agility −3, escape_bonus −5` to
+themselves for two hours with no target anywhere in the world; the only guard was
+`app/bot/commands/law.py`, which is rc.48's rule in a third place: **a bound that lives in the
+client is not a bound**. It was latent only because `escape_bonus` was dead, so wiring the stat is
+what armed it, which is why the refusal ships in the same release. The engine reads
+`special_effects.<id>.category` against `lawControlCategory`; `World.law_technique_targets_another`
+asks the same field, so the panel's set of ids is gone and
+`test_control_techniques_are_the_contents.py` holds that no production file keeps another. The two
+control effects are still never applied to anybody — a battle opponent is a name on `battles`, not a
+row anything can modify, and there are no PvP techniques — so `combat.technique` at least *names*
+what landed now. Applying them is a mechanic, not a wiring, and is deferred with that reason.
+
+**One door for the catalogue.** There were two `catalog.SpecialEffects[...]` lookups and they gave
+different answers to "unknown": the law path took the comma-ok and refused; the abode path indexed
+the map bare, got a nil value, wrote the literal `null` into `effect_json`, and **succeeded applying
+nothing** — the same sentence `property_storage_actions.go`'s own comment already has to write about
+rc.19, reached by a different cause. `specialEffectPayload` is the one door and
+`TestTheSpecialEffectsCatalogueHasOneDoor` holds it in `TestThePurseHasOneDoor`'s shape.
+
+### The flame the pill always warned about (`alchemy.purge`, v1.0.0-rc.58)
+
+There is no fire or elemental harm anywhere in production Go. But two pieces of content describe the
+same unbuilt mechanic and **both name a condition the engine already has**:
+`items.purging_phoenix_pill` — *"dangerous without cooling medicine"*, and, on its effect, *"without
+cooling support it may scorch meridians"* — and `physiques.nine_yang_solar_body.drawback`, *"Excess
+yang scorches the meridians."* `meridian_damage` is real: defined in `conditionDefinitionGo`,
+treated with `jade_life_herb`, written by `applyCombatCondition`. Meanwhile `alchemy.purge` had **no
+risk at all** — it spent qi and removed toxicity and that was the entire action.
+
+So the mechanic is built from what the content specifies rather than invented, and both orphan stats
+land in the one action they belong to. `detox_power` raises `alchemyPurgeAmount`: the pill's authored
+40 is +10 toxicity burned off, which roughly doubles a mid cultivator's purge and is what it costs 26
+stones for. Above `pillToxicitySaturated` — 40, which was the bare literal in the two readers of the
+shared penalty row and is stated once now — the purge rolls a **scorch**, `body/2 + will/2 +
+fire_resistance/5` against `8 + (toxicity−40)/6`, and a failure applies `meridian_damage` at severity
+1, or 2 on a margin of −5 or worse, the tribulation's own shape.
+
+Measured at body 8 / will 8, the scorch chance is **1% at toxicity 60, 10% at 80 and 36% at 100**
+without the pill, and 0% / 3% / 21% with it. A light purge is exactly as free as it has always been —
+below saturation there is no roll — and a heavy one is genuinely dangerous, which is what the item
+has said for its whole life. The harsh corner is self-selecting: the only way to toxicity 100 is
+refining a great many pills, which is an alchemist, who can make the pill that halves it.
+
+`nine_yang_solar_body` gains `fire_resistance −5`, the one line of new authored content in the
+release. Its `drawback` prose has always said this and the modifier it carried (`sense_precision −1`)
+said neither half of it; and a resistance stat with only positive writers collapses the roll to *did
+you drink the pill*, which is a switch rather than a risk. The cost is bounded — a voluntary action,
+on an hour's cooldown, only above saturation, and −5/5 is −1 on the roll.
+
+**The gates, and what each drill prints.** `modifier_vocabulary_test.go` walks the vocabulary from
+both sides — the content file as raw JSON, so a block no Go struct parses still counts, and
+production Go's own composite literals by AST — and requires every stat to be *fetched* by a rule.
+**Fetched, not named**, and the tree is why: `sense_precision_bonus` occurs three times in production
+Go, once as a modifier and twice as the `characters` column inside SQL strings. A substring search
+finds all three and calls the stat read; so does a scan for the identifier. Only an argument
+position, a `mods.Add[…]` key, `craftEffectStat`'s return, or a name in `canonicalAttribute`'s own
+`allowed` map can distinguish them. `unreadModifierStats` is empty. Its drills restore each typo and
+it names them (`sense_power_bonus (written by content/world.json)`,
+`sense_precision_bonus (written by combat_actions.go)`); removing the flee term names
+`escape_bonus`; disabling `applyStatModifiers`' stat comparison — the rc.49 shape a grep cannot see —
+names six at once.
+
+**Its own drill found the last fault in it.** Pointing the content path at nothing made the whole
+test **SKIP**, green and useless, because the walk copied `shippedCatalog`'s defensive `t.Skipf`.
+The content file is in the repository and always present, so a read that fails means the gate cannot
+do its job — it is a `t.Fatalf` now. A gate that can go quiet instead of red is the decoration rc.47
+and rc.52 each caught, and only running it against a broken tree says which kind you have.
+
+### A server you can read at a glance (v1.0.0-rc.59)
+
+Four categories, and one of them held all eight base channels plus the `#bugs` forum, which had
+nothing to do with each other: `#begin-here` where a new player starts, `#world-events` for global
+notices, `#player-homes` and `#expeditions` (read-only thread anchors nobody posts in), `#bot-logs`
+for the operator, `#playtest` and `#bugs` for feedback. And **categories
+were never positioned** — no `position=`, no `.edit(position=`, no `.move(` anywhere under `app/` —
+so their order was the call order of `_run_complete_server_setup`, appended at the bottom of the
+guild by Discord. Nothing in the tree said what the order should be, which means
+nothing could be wrong about it and nothing could be right either.
+
+Eight now, in one stated order (`CATEGORY_ORDER`): 🚪 Start Here, 📣 Announcements, 🌌 Realm
+Capitals, 🌠 World Events, 🏮 Auction Houses, 🗺️ Cultivation World, 🛠️ Feedback, 🔒 Admin. The
+newcomer's path, then what is announced, then the world itself — where you go, its news, its
+markets — then your own threads, then feedback, then the operator's.
+
+**The finding is the half that would have reached nobody.** `ensure_base_xianxia_channels` computed
+its category *and* its read-only overwrite only inside `if channel is None and can_create:`. A
+channel that already existed — pre-existing, name-matched, or bound by a GM — got neither, ever. So
+three things were true at once and none of them was visible from a source read:
+
+- A category split written the obvious way would reach a fresh guild and **no server anybody is
+  running**. That is `/learn` (rc.43), the quest journal (rc.46), the event bands (rc.49), the peach
+  (rc.50) and the auction channels (rc.51) wearing a sixth hat — and rc.51 is the same bug in the
+  same file, found once and fixed for one helper out of five.
+- `#xianxia-info`, `#expeditions` and `#player-homes` were read-only **only where the bot had made
+  them**. `READ_ONLY_BASE_CHANNELS` was consumed at exactly one place in the tree: the `overwrites=`
+  argument of `create_text_channel`.
+- `ensure_base_xianxia_channels` returned `"repaired": []` as a **hardcoded empty list**, which
+  propagated into the audit row and the slash reply — a field that had shown nothing since the
+  function was written, because there was nothing it could show.
+
+`ensure_realm_hub_channels` and `ensure_bugs_forum_channel` had the same hole.
+`test_the_layout_reaches_an_existing_server.py` holds all five helpers now: each must compare
+`channel.category_id != category.id` and issue `channel.edit(category=`, behind `can_create`
+because Discord layout is the dashboard's to own. Its allowlist is empty. The read-only half is read
+by **AST rather than substring** — the set's name appearing in the function proves nothing about
+*where*, and where was the entire bug — and the gate asserts a reference to it exists outside the
+`channel is None` branch. `channel_messages.py`'s own guide text has claimed since rc.52 that Repair
+"moves existing ones into the category they belong in"; it is true now.
+
+**The category that must not be deleted.** `SERVER_BASE_CATEGORY` (📜 Xianxia RP) is created by
+nothing and is deliberately still declared, still in the teardown tuple, and carries a comment
+saying why. `test_discord_teardown.py` asserts the constant set **equals** the teardown tuple — right
+for rc.51's bug, where a category Setup made was not one teardown could empty. Read the other way it
+is a trap: a category Setup *stops* making is one every existing server still has, and set-equality
+pushes you to delete the constant, which would orphan the category on every server in existence.
+`CREATED_CATEGORIES` is what Setup makes; the tuple is what teardown can remove; they are
+deliberately not the same set, and `test_category_order.py` holds both halves.
+
+**`BASE_CHANNEL_SPECS` learned where each channel belongs.** It was `name -> topic`, with the
+category a single argument every base channel shared. It is a `BaseChannel(topic, category)` now —
+one statement per channel, not a parallel dict free to drift. The `category` is a **bucket key**
+rather than a name, because the names are `SERVER_*CATEGORY` in `server_setup.py`, which imports
+`channel_messages.py` and so cannot be imported back; `BASE_CATEGORY_NAMES` is the one place the
+bucket meets the string, and it lives where the teardown gate can see it. `/admin server
+basechannels` lost its `category_name` argument in the same move: one name could no longer mean
+anything, and a parameter that does nothing is the class of thing this release exists to remove.
+
+**`#updates`, and the bot posts its own release notes.** Every release's notes were already written
+in the form a player can read — `VERSIONS.md`'s changelog, one entry per release, already held to
+the stamped version by `test_release_version.py` — and nothing had ever shown them to anybody. A GM
+who upgraded had to go and read the file. `app/bot/admin/release_notes.py` parses the entry for
+`INSTALLED_VERSION` and posts it into `#updates` at `on_ready`, chunked under Discord's 2,000
+characters (rc.58's entry is 3,801). Three rules keep it from being annoying, and the first is the
+one that makes it safe: **the row is the memory.** `server_config.announced_release` is the release
+this guild has been told about, so the post is idempotent across restarts by construction rather
+than by a flag somebody has to reset — the same thing `(user_id, quest_key)` does for the beginner
+path. A guild whose marker is NULL **records the running release and says nothing**, because a
+server being set up today does not want forty paragraphs of history. And an unbound `#updates` is
+not an error and does not advance the marker, so binding it a week later still gets the notes.
+
+A base channel is column-per-channel, not generic — **ten** places, from a `server_config` column
+and a migration through four edits inside one `set_server_channels` to a form field in
+`dashboard/app.js`. `#playtest`, the eighth channel, got a test naming itself nine times, which
+proves that channel is wired and says nothing about the next one.
+`test_every_base_channel_is_registered.py` walks `BASE_CHANNEL_SPECS` instead, so the tenth channel
+cannot be half-wired.
+
+**The tenth place is the one this release found by being the ninth channel.** `#updates` shipped in
+the first draft created, locked, bound — and **blank**, because `DEFAULT_CHANNEL_MESSAGES` had no
+entry for it and `resolve_channel_message_content` answers `""` for a key it does not carry. That
+answer is correct: it is also how a GM turns a message off, which is the one distinction v0.33.1 went
+to trouble to preserve. So a channel nobody wrote a blurb for is indistinguishable from one somebody
+deliberately emptied, nothing errors, and nothing is posted. Two channels are exempt because
+something else fills them — `#xianxia-info` gets the guide view, `#playtest` its own board — and each
+says which, in the gate.
+
+**`#event-scenes` is retired**, and this is the one place the release removes something. rc.52 split
+an event's *announcement* per world and left its *scene* hanging in a shared channel, so one event
+used two channels for no reason anybody could state. `event_scene_parent` is the one door:
+the world's own feed, which `world_event_channel` already falls back to the global feed for, so the
+worst case is the channel the announcement was going to anyway. It leaves `BASE_CHANNEL_SPECS`, so
+nothing creates or requires one — and **stays in `_base_channel_bindings`**, because teardown builds
+its targets from that dict and a server that already has the channel must still be able to lose it.
+That is the same rule as the retired category, one level down. The cost is stated rather than
+discovered: the per-world feeds are gated by the realm **access** role, so a scene in a world a
+player has not reached is now invisible to them, which is in `docs/KNOWN_LIMITATIONS.md`.
+
+**The gates, and what each drill prints.** Deleting the base re-parent prints
+`ensure_base_xianxia_channels: compares=False moves=False`; restoring create-only read-only prints
+*"so a channel the bot did not create is never made read-only"*; removing `SERVER_BASE_CATEGORY`
+from the teardown tuple fails **two** gates at once; dropping `updates_channel_id` from
+`clear_discord_bindings` prints *"updates (updates_channel_id): clear_discord_bindings does not
+name it"*; and the three release-notes rules each fail with their own sentence — *"a restart
+announced the same release twice"*, a fresh install that posted, and *"the marker advanced with
+nowhere to post"*.
+
+**Three of the drills caught the gates rather than the code, and they are one lesson.** The
+base-channel registration gate first sliced its blocks on indentation from a header string — and a
+multi-line `def` defeats that, because the closing `) -> None:` sits at the function's own indent,
+so every block ended one line in and every check passed vacuously. It reads functions by AST now.
+Then its self-check asserted the persist-block reader had found `updates_channel_id` — which
+`_base_channel_bindings` also contains, so pointing the reader at the wrong function *still passed*.
+It asserts `_bound_id(` instead, a string only the right function can hold.
+
+**And the third is the plainest one in the release.** `test_release_notes.py`'s own docstring said
+it held *"the three rules that keep it from being annoying"*, and it tested the changelog parser and
+the Discord chunker and **never called `announce_release_if_new` at all** — so deleting the marker
+write, which is the one line that makes the announcement happen once, left the suite green.
+Idempotence had been asserted in prose, in two places, and driven in none: exactly the shape of the
+thing this release exists to fix, written into the gate written for it, and only the drill said so.
+Six tests drive the function now, against a fake `DB` and a fake channel, and the drill fails on the
+sentence the rule is written in. A reader is asserted before it is trusted (rc.57), and a gate that
+cannot see the thing it forbids is decoration (rc.47) — and only running it against the broken tree
+says which kind you have.
+
 ### Somewhere to go above the Mortal World (v1.0.0-rc.54)
 
 Eight realms covered thirty-two realms of cultivation, four of them in the Mortal World and **one
@@ -1991,6 +2271,21 @@ The Admin Console's NPC card (rc.38) carries **Lose** and **Bring back** beside 
   differently from another, and its answer is clamped into the die. It is test-only and a test in
   `gamerng` walks every non-test file in `go_core` to keep it that way. Where the outcome can be
   made certain by the *scenario* instead (overwhelming attributes, a stacked fixture), prefer that.
+- **A name is not a reader.** A gate that asks "does production mention this string" cannot tell a
+  modifier from a database column, and this tree has both under nearly the same name:
+  `sense_precision_bonus` occurs three times in production Go, once as a modifier and twice as the
+  `characters` column inside a SQL string, while the modifier vocabulary wants the bare
+  `sense_precision`. A substring search called the stat read; so did a scan for the identifier; and
+  a Soul Wound had never dulled anybody's sense for it (v1.0.0-rc.58). Ask instead whether the
+  string appears **where a value is consumed** - an argument position of a named reader, a key on
+  the resolved bundle, a stat-chooser's return - which a column in a SQL string cannot satisfy.
+  This is rc.52's "read calls by AST, not by substring" one level down: the AST has to distinguish
+  *which* use, not merely that the identifier is present.
+- **A gate that can go quiet is decoration too, and only its own drill says so.**
+  `modifier_vocabulary_test.go` copied `shippedCatalog`'s defensive `t.Skipf` for an unreadable
+  content file, so pointing its path at nothing made the whole test SKIP - green, silent and
+  useless. The content file is in the repository and always present, so a read that fails means the
+  gate cannot do its job: it is a `t.Fatalf`. Drill the reader, not only the rule.
 - **And a gate now says so, because the rule above was prose for four releases and was broken three
   times in them** (v1.0.0-rc.42). `TestOnlyTestsBorrowTheDice` only ever looked one way — production
   must not borrow the dice — and the direction it cannot see is the expensive one.

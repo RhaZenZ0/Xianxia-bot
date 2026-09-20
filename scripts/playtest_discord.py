@@ -538,6 +538,8 @@ async def run(url: str, token: str, db_path: str) -> Report:
     from app.bot import main as _main  # noqa: F401 - registers the surface on the bot at import
     from app.bot.admin.channel_messages import BASE_CHANNEL_SPECS
     from app.bot.admin.server_setup import (
+        BASE_CATEGORY_NAMES,
+        CATEGORY_ORDER,
         SERVER_AUCTION_CATEGORY,
         SERVER_BASE_CATEGORY,
         SERVER_EVENT_CATEGORY,
@@ -601,16 +603,16 @@ async def run(url: str, token: str, db_path: str) -> Report:
             panel = await open_hub(gm, channels["bot-logs"], "admin")
             expect(panel.page_title().endswith("Server"), panel.page_title())
             picked = await panel.press("Basechannels")
+            # No modal since v1.0.0-rc.59: the command used to ask for one
+            # category name, and base channels sit in five now.
             chosen = await choose(gm, picked, "Choose action", label="Validate / bind existing base Xianxia channels")
-            expect(chosen.modal, "the category name should be asked in a modal after the choice")
-            done = await gm.submit_modal(chosen, modal_values(chosen, **{"Category Name": "📜 Xianxia RP"}))
             await settle_patiently(env)
-            text = result_text(done) + "\n" + panel.text()
+            text = result_text(chosen) + "\n" + panel.text()
             for name in BASE_CHANNEL_SPECS:
                 expect(channels[name].mention in text or f"#{name}" in text, f"{name} not named in:\n{text[:800]}")
             expect("Missing" not in text and "Could not" not in text, text[:800])
             return text
-        await step(report, "/admin → Server → Basechannels → bind connects the eight base channels", bind_channels())
+        await step(report, "/admin → Server → Basechannels → bind connects every base channel", bind_channels())
 
         # ---- 2b. the layout the dashboard owns ---------------------------------
         # Every provisioning helper defaults to `create_missing=False`, and the ONE
@@ -669,10 +671,23 @@ async def run(url: str, token: str, db_path: str) -> Report:
             live = bot.get_guild(guild.id)
             expect(live is not None, "the bot has no cached guild to read its layout from")
             categories = {c.name for c in live.categories}
-            wanted = (SERVER_BASE_CATEGORY, SERVER_REALM_CATEGORY, SERVER_AUCTION_CATEGORY, SERVER_EVENT_CATEGORY)
+            made = {c.name: c for c in live.text_channels}
+            # Read off CATEGORY_ORDER, so a category added later is asserted
+            # the day it is declared. SERVER_BASE_CATEGORY is deliberately not
+            # in it: v1.0.0-rc.59 retired it, and Setup must *not* make one.
+            wanted = CATEGORY_ORDER
             for name in wanted:
                 expect(name in categories, f"{name!r} was not created; have {sorted(categories)}")
-            made = {c.name: c for c in live.text_channels}
+            expect(SERVER_BASE_CATEGORY not in categories,
+                   f"the retired {SERVER_BASE_CATEGORY!r} was created; have {sorted(categories)}")
+            ordered = {c.name: c.position for c in live.categories if c.name in set(wanted)}
+            expect(list(sorted(ordered, key=ordered.get)) == list(wanted),
+                   f"categories are out of order: {sorted(ordered.items(), key=lambda kv: kv[1])}")
+            for channel_name, spec in BASE_CHANNEL_SPECS.items():
+                sits_in = getattr(made.get(channel_name), "category", None)
+                expect(getattr(sits_in, "name", None) == BASE_CATEGORY_NAMES[spec.category],
+                       f"#{channel_name} sits in {getattr(sits_in, 'name', None)!r}, "
+                       f"not {BASE_CATEGORY_NAMES[spec.category]!r}")
             for world, hub in REALM_HUBS.items():
                 capital, feed = str(hub["channel_name"]), str(hub["events_channel_name"])
                 expect(capital in made, f"no capital channel for {world}")
@@ -703,7 +718,8 @@ async def run(url: str, token: str, db_path: str) -> Report:
                     role = discord.utils.get(live.roles, name=role_name)
                     expect(role is not None and getattr(overwrites.get(role), "view_channel", None) is True,
                            f"#{name} never allowed {role_name} - the bot was probably locked out mid-gate")
-            return f"{len(wanted)} categories, 4 capitals, 4 world feeds, {len(auctions)} auction channels, all gated"
+            return (f"{len(wanted)} categories in order, every base channel in its own, "
+                    f"4 capitals, 4 world feeds, {len(auctions)} auction channels, all gated")
         built = await step(report, "the dashboard's Full Setup creates every category and per-world channel", full_setup())
         if built:
             report.add("PASS", "what Full Setup built", built)

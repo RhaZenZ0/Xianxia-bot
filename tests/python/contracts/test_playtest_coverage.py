@@ -38,6 +38,21 @@ OPERATION = re.compile(r"^[a-z_]+(?:\.[a-z_]+)+$")
 DRIVERS = {"act", "act_free", "gm", "audited", "query", "action", "authoritative_action"}
 
 
+#: An operation the engine harness can only drive into a designed refusal,
+#: with the reason. See `test_every_operation_is_resolved_or_says_why_not`
+#: for why this one is not empty.
+REFUSAL_ONLY_OPERATIONS: dict[str, str] = {
+    "artifact.awaken": (
+        "an artifact spirit wants Bond 3, and bond rises only through `artifact.bond` on a "
+        "wall-clock cooldown with no GM lever to set it - so a success is a wait, not a step"
+    ),
+    "meridian.heal": (
+        "mending wants a ruptured meridian, and the only writer of one is a failed forced "
+        "breakthrough under the Force stance; no lever ruptures one on demand"
+    ),
+}
+
+
 def _map_literal(source: str, name: str) -> set[str]:
     """Every `"op": true,` entry of one `var name = map[string]bool{...}`."""
     head = source.index(f"var {name} = map[string]bool{{")
@@ -90,6 +105,55 @@ def driven_operations() -> set[str]:
     return driven
 
 
+def resolved_operations() -> set[str]:
+    """The operations the harness drives to something other than a refusal
+    (v1.0.0-rc.58).
+
+    rc.35 defined "driven" as "named as the first string argument of a driver
+    call", which is exactly right for catching an operation nothing calls. It
+    is not enough for catching one that is only ever called into a designed
+    refusal: `law.technique` read as covered off a single
+    `expect_error="required"` step while the engine hard-errored on the one
+    technique that could reach a success, for twenty-five releases.
+
+    A driver call is *resolved* unless it sits inside a call carrying
+    `expect_error` - which is where the keyword lives, since the harness
+    writes `step(report, title, act(...), expect_error=...)`. The first
+    version of this walked every call node and marked the inner `act(...)`
+    resolved on its own account, so every operation looked resolved and the
+    gate passed on anything. It marks the enclosing call's driver arguments
+    now, which is the only way round that is not a guess.
+    """
+    tree = ast.parse(ENGINE_SCRIPT.read_text(encoding="utf-8"))
+
+    def operation_of(call: ast.Call) -> str:
+        if not call.args:
+            return ""
+        first = call.args[0]
+        if not (isinstance(first, ast.Constant) and isinstance(first.value, str)):
+            return ""
+        func = call.func
+        name = func.id if isinstance(func, ast.Name) else func.attr if isinstance(func, ast.Attribute) else ""
+        return first.value if name in DRIVERS and OPERATION.match(first.value) else ""
+
+    refused: set[int] = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        if not any(kw.arg == "expect_error" for kw in node.keywords):
+            continue
+        for child in ast.walk(node):
+            if isinstance(child, ast.Call) and child is not node and operation_of(child):
+                refused.add(id(child))
+
+    resolved: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call) and id(node) not in refused:
+            if op := operation_of(node):
+                resolved.add(op)
+    return resolved
+
+
 def live_leaves() -> set[str]:
     """Every action path a hub can reach, admin included: the walk the
     checklist gate uses (`test_playtest_gate`), which leaves admin off the
@@ -117,6 +181,41 @@ class TheEngineHalfDrivesEveryOperation(unittest.TestCase):
         deferred = module_constant(ENGINE_SCRIPT, "DEFERRED_OPERATIONS")
         uncovered = engine_operations() - driven_operations() - set(deferred)
         self.assertEqual(sorted(uncovered), [], "the engine playtest drives none of these, and DEFERRED_OPERATIONS does not say why")
+
+    def test_every_operation_is_resolved_or_says_why_not(self):
+        """Driven means resolved, not merely called.
+
+        `REFUSAL_ONLY_OPERATIONS` is **not** empty on the day it is written,
+        unlike `SOURCELESS_ITEMS`, `UNGRANTABLE_QUESTS`, `ALLOWED_UNREACHABLE`
+        and `DEFERRED_OPERATIONS`. Tightening rc.35's rule reveals a backlog
+        rc.35's own wording created, and pretending otherwise would mean
+        leaving the rule loose. Each entry says why the harness cannot reach a
+        success.
+        """
+        deferred = module_constant(ENGINE_SCRIPT, "DEFERRED_OPERATIONS")
+        unresolved = (engine_operations() - resolved_operations()
+                      - set(deferred) - set(REFUSAL_ONLY_OPERATIONS))
+        self.assertEqual(sorted(unresolved), [],
+                         "these are driven only into designed refusals, and nothing says why")
+
+    def test_no_refusal_only_entry_is_stale(self):
+        resolved = resolved_operations()
+        ops = engine_operations()
+        self.assertEqual(sorted(set(REFUSAL_ONLY_OPERATIONS) - ops), [],
+                         "listed as refusal-only but not an operation the engine has")
+        self.assertEqual(sorted(set(REFUSAL_ONLY_OPERATIONS) & resolved), [],
+                         "listed as refusal-only and driven to a success: the entry is stale")
+        for op, reason in REFUSAL_ONLY_OPERATIONS.items():
+            with self.subTest(op=op):
+                self.assertGreaterEqual(len(str(reason).strip()), 20, "an entry carries its reason")
+
+    def test_the_resolved_read_still_sees_the_harness(self):
+        """A reader that silently finds nothing makes every assertion above it
+        vacuous, and the refusal set is the half that would go quiet."""
+        resolved = resolved_operations()
+        self.assertGreaterEqual(len(resolved), 150, "the resolved read has stopped seeing the harness")
+        for known in ("cultivation.train", "law.technique", "alchemy.purge"):
+            self.assertIn(known, resolved, f"{known} is driven to a success and the read missed it")
 
     def test_no_deferral_is_stale(self):
         deferred = module_constant(ENGINE_SCRIPT, "DEFERRED_OPERATIONS")

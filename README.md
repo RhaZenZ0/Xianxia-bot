@@ -142,9 +142,12 @@ sudo ./stop.sh                                            # removes containers, 
 ### 3. Set up the Discord server
 
 Open the GM dashboard at `http://<NAS LAN address>:8090`, go to **Discord Setup** and run
-**Full Setup**. It creates or repairs the base channels, the realm-capital channels gated behind
-presence roles, the live-auction channels, `#bugs`, `#playtest` and the `#xianxia-info` guide, and it
-is idempotent. See [Discord server setup](#discord-server-setup).
+**Full Setup**. It creates or repairs eight categories in a stated order — 🚪 Start Here,
+📣 Announcements, 🌌 Realm Capitals, 🌠 World Events, 🏮 Auction Houses, 🗺️ Cultivation World,
+🛠️ Feedback, 🔒 Admin — the base channels inside them, the realm-capital channels gated behind
+presence roles, the live-auction channels, `#bugs`, `#playtest`, `#updates` and the `#xianxia-info`
+guide. It is idempotent, and since v1.0.0-rc.59 it also **moves** a channel it finds in the wrong
+category rather than only placing a new one. See [Discord server setup](#discord-server-setup).
 
 ### Reset the world
 
@@ -635,7 +638,7 @@ report is safe to paste into an issue.
 - If narration goes flat after an image rebuild, check **/admin → Server → Ai Status** for a TLS
   banner first. If SQLite reports contention, verify only the engine opens the database.
 
-Keep the whole `data/` directory persistent across rebuilds. The current schema is **57**; every
+Keep the whole `data/` directory persistent across rebuilds. The current schema is **58**; every
 historical migration is kept so an old database upgrades in place.
 
 ## Development

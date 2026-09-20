@@ -1595,6 +1595,11 @@
           "stat": "sense_precision",
           "operation": "add",
           "value": -1
+        },
+        {
+          "stat": "fire_resistance",
+          "operation": "add",
+          "value": -5
         }
       ],
       "evolutions": [
@@ -31061,9 +31066,43 @@
           "value": 4
         },
         {
-          "stat": "sense_power_bonus",
+          "stat": "sense_power",
           "operation": "add",
           "value": 5
+        }
+      ]
+    },
+    "world_collapse": {
+      "name": "World Collapse",
+      "category": "Domain",
+      "description": "A stabilized personal world folded down against the space it stands in. Inside the seam, distance, direction and the way out all answer to the cultivator who made it.",
+      "tags": [
+        "law",
+        "space",
+        "domain",
+        "world"
+      ],
+      "severity": 6,
+      "modifiers": [
+        {
+          "stat": "combat_bonus",
+          "operation": "add",
+          "value": 6
+        },
+        {
+          "stat": "sense_power",
+          "operation": "add",
+          "value": 8
+        },
+        {
+          "stat": "sense_precision",
+          "operation": "add",
+          "value": 4
+        },
+        {
+          "stat": "escape_bonus",
+          "operation": "add",
+          "value": 4
         }
       ]
     },

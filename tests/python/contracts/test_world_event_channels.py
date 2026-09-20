@@ -160,9 +160,18 @@ class TheWorldLessAnnouncementsStayGlobal(unittest.TestCase):
         self.assertGreaterEqual(SETUP.count('cfg.get("announcement_channel_id")'), 2)
 
     def test_the_base_channel_is_not_retired(self):
+        """`#world-events` is a base channel and stays one.
+
+        v1.0.0-rc.59 retired `#event-scenes` and made retirement a thing this
+        codebase can express, so the rule is now checkable rather than quoted:
+        the global feed must be provisioned and bound, and must not be in the
+        retired set. It used to pin a prefix of the channel's topic string,
+        which rc.59 rewrote - a test of the prose, not of the rule.
+        """
         messages = (PROJECT_ROOT / "app" / "bot" / "admin" / "channel_messages.py").read_text(encoding="utf-8")
-        self.assertIn('"world-events": "Global cultivation-world announcements', messages)
+        self.assertIn('"world-events": BaseChannel(', messages)
         self.assertIn('"world-events": cfg.get("announcement_channel_id")', messages)
+        self.assertNotIn('"world-events"', messages.split("RETIRED_BASE_CHANNELS = {")[1].split("}")[0])
 
 
 class TheChannelsAreDashboardOwnedAndTornDown(unittest.TestCase):

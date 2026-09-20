@@ -53,6 +53,11 @@ from .bugs_forum import (
     missing_bugs_forum_tags,
 )
 from .channel_messages import (
+    CATEGORY_ADMIN,
+    CATEGORY_ANNOUNCE,
+    CATEGORY_FEEDBACK,
+    CATEGORY_START,
+    CATEGORY_WORLD,
     BASE_CHANNEL_SETUP_CHOICES,
     BASE_CHANNEL_SPECS,
     CHANNEL_MESSAGE_DEFAULT,
@@ -366,7 +371,10 @@ async def teardown_managed_discord_layout(guild: discord.Guild) -> dict[str, Any
     # 3. The four Xianxia categories, only if nothing else is left inside.
     categories_deleted: list[str] = []
     categories_kept: list[str] = []
-    for name in (SERVER_BASE_CATEGORY, SERVER_REALM_CATEGORY, SERVER_AUCTION_CATEGORY, SERVER_EVENT_CATEGORY):
+    # All nine, including the retired SERVER_BASE_CATEGORY: a category Setup no
+    # longer creates is still on every server that ran an older release, and
+    # teardown is the only thing that can remove it (v1.0.0-rc.59).
+    for name in (SERVER_BASE_CATEGORY, SERVER_START_CATEGORY, SERVER_ANNOUNCE_CATEGORY, SERVER_WORLD_CATEGORY, SERVER_FEEDBACK_CATEGORY, SERVER_ADMIN_CATEGORY, SERVER_REALM_CATEGORY, SERVER_AUCTION_CATEGORY, SERVER_EVENT_CATEGORY):
         category = next((item for item in guild.categories if item.name == name), None)
         if category is None:
             continue
@@ -407,8 +415,11 @@ async def teardown_managed_discord_layout(guild: discord.Guild) -> dict[str, Any
 async def admin_base_channels(
     interaction: discord.Interaction,
     action: app_commands.Choice[str],
-    category_name: str = "📜 Xianxia RP",
 ) -> None:
+    # The `category_name` argument is gone (v1.0.0-rc.59). Base channels sit in
+    # five categories now, one per `BaseChannel.category`, so a single name was
+    # a parameter that could no longer mean anything - and a parameter that
+    # does nothing is the class of thing this release exists to remove.
     if not await require_admin(interaction):
         return
     guild = interaction.guild
@@ -430,14 +441,14 @@ async def admin_base_channels(
 
     await interaction.response.defer(ephemeral=False)
     try:
-        result = await ensure_base_xianxia_channels(guild, category_name=category_name)
+        result = await ensure_base_xianxia_channels(guild, categories=BASE_CATEGORY_NAMES)
     except (discord.Forbidden, discord.HTTPException) as exc:
         await interaction.followup.send(f"❌ Could not validate the configured base Discord layout: {exc}", ephemeral=False)
         return
     await audit_admin(
         interaction, "server.basechannels", target=f"guild:{guild.id}",
         after={
-            "category_id": result["category"].id if result["category"] else None,
+            "category_ids": {bucket: cat.id for bucket, cat in result["categories"].items()},
             "created": result["created"],
             "repaired": result["repaired"],
         },
@@ -461,7 +472,37 @@ SERVER_SETUP_CHOICES = [
 ]
 
 
+# v1.0.0-rc.59 retired this one. It is deliberately still here, and deleting it
+# is the mistake this comment exists to prevent.
+#
+# The teardown gate (`test_discord_teardown.py`) asserts that the set of
+# `SERVER_*CATEGORY` constants *equals* the tuple teardown walks - written for
+# rc.51, where a category Setup created was not one teardown could empty. Read
+# the other way round it is a trap: a category Setup *stops* creating is one
+# every existing server still has, so removing the constant would leave
+# 📜 Xianxia RP standing on every server in existence, empty and undeletable by
+# the action whose whole job is to delete it. Nothing creates it; teardown must
+# still name it. `CREATED_CATEGORIES` below is the set that is made.
 SERVER_BASE_CATEGORY = "📜 Xianxia RP"
+
+
+# The five v1.0.0-rc.59 categories. Until then every base channel shared
+# SERVER_BASE_CATEGORY, so `#begin-here`, `#world-events`, `#player-homes` and
+# `#playtest` sat in one undifferentiated list in whatever order Discord
+# happened to create them.
+SERVER_START_CATEGORY = "🚪 Start Here"
+
+
+SERVER_ANNOUNCE_CATEGORY = "📣 Announcements"
+
+
+SERVER_WORLD_CATEGORY = "🗺️ Cultivation World"
+
+
+SERVER_FEEDBACK_CATEGORY = "🛠️ Feedback"
+
+
+SERVER_ADMIN_CATEGORY = "🔒 Admin"
 
 
 SERVER_REALM_CATEGORY = "🌌 Realm Capitals"
@@ -479,6 +520,44 @@ SERVER_AUCTION_CATEGORY = "🏮 Auction Houses"
 # test post have no world and never will - and it is in SERVER_BASE_CATEGORY
 # with the other base channels, so this category holds the four and nothing else.
 SERVER_EVENT_CATEGORY = "\U0001f320 World Events"
+
+
+# The order a member reads down the channel list, and the only statement of it
+# (v1.0.0-rc.59). Categories were never positioned - no `position=`, no
+# `.edit(position=`, no `.move(` anywhere under `app/` - so their order was the
+# call order of `_run_complete_server_setup`, appended at the bottom of the
+# guild by Discord.
+#
+# The newcomer's path first, then what is announced, then the world itself
+# (where you go, its news, its markets), then your own threads, then feedback,
+# then the operator's.
+CATEGORY_ORDER = (
+    SERVER_START_CATEGORY,
+    SERVER_ANNOUNCE_CATEGORY,
+    SERVER_REALM_CATEGORY,
+    SERVER_EVENT_CATEGORY,
+    SERVER_AUCTION_CATEGORY,
+    SERVER_WORLD_CATEGORY,
+    SERVER_FEEDBACK_CATEGORY,
+    SERVER_ADMIN_CATEGORY,
+)
+
+
+# Every category Setup makes. `SERVER_BASE_CATEGORY` is deliberately absent -
+# see its comment above.
+CREATED_CATEGORIES = frozenset(CATEGORY_ORDER)
+
+
+# Which category each `BaseChannel.category` bucket names. `channel_messages.py`
+# states the bucket, this states the name - the string is written once, here,
+# where the teardown gate can also see it.
+BASE_CATEGORY_NAMES = {
+    CATEGORY_START: SERVER_START_CATEGORY,
+    CATEGORY_ANNOUNCE: SERVER_ANNOUNCE_CATEGORY,
+    CATEGORY_WORLD: SERVER_WORLD_CATEGORY,
+    CATEGORY_FEEDBACK: SERVER_FEEDBACK_CATEGORY,
+    CATEGORY_ADMIN: SERVER_ADMIN_CATEGORY,
+}
 
 
 def _server_permission_report(guild: discord.Guild) -> tuple[list[str], list[str]]:
@@ -615,12 +694,45 @@ async def _sync_all_realm_access_roles(guild: discord.Guild) -> dict[str, int]:
 async def _run_complete_server_setup(
     guild: discord.Guild, *, create_missing: bool = False,
 ) -> tuple[dict[str, Any], list[dict[str, Any]], str | None]:
-    base_result = await ensure_base_xianxia_channels(guild, category_name=SERVER_BASE_CATEGORY, create_missing=create_missing)
+    base_result = await ensure_base_xianxia_channels(guild, categories=BASE_CATEGORY_NAMES, create_missing=create_missing)
     realm_rows = await ensure_realm_hub_channels(guild, category_name=SERVER_REALM_CATEGORY, create_missing=create_missing)
     await ensure_auction_house_channels(guild, category_name=SERVER_AUCTION_CATEGORY, create_missing=create_missing)
     await ensure_world_event_channels(guild, category_name=SERVER_EVENT_CATEGORY, create_missing=create_missing)
-    _bugs_channel, bugs_warning = await ensure_bugs_forum_channel(guild, category_name=SERVER_BASE_CATEGORY, create_missing=create_missing)
+    _bugs_channel, bugs_warning = await ensure_bugs_forum_channel(guild, category_name=SERVER_FEEDBACK_CATEGORY, create_missing=create_missing)
+    await ensure_category_order(guild, create_missing=create_missing)
     return base_result, realm_rows, bugs_warning
+
+
+async def ensure_category_order(guild: discord.Guild, *, create_missing: bool = False) -> list[str]:
+    """Put the categories in the order `CATEGORY_ORDER` states (v1.0.0-rc.59).
+
+    Nothing had ever positioned a category: no `position=`, no
+    `.edit(position=`, no `.move(` anywhere under `app/`. They landed in the
+    call order of the `ensure_*` helpers above, appended at the bottom of the
+    guild by Discord - so the order a member reads down the channel list was an
+    accident of which helper ran first, and no file said what it should be.
+
+    One edit per category that is out of place, and only ever behind
+    `create_missing`, because Discord layout is the dashboard's to own. A
+    category the guild does not have is skipped rather than created: creating
+    is the `ensure_*` helpers' job and doing it twice would make a category for
+    a family of channels that does not exist here.
+    """
+    me = guild.me
+    if not (create_missing and me and me.guild_permissions.manage_channels):
+        return []
+    by_name = {category.name: category for category in guild.categories}
+    moved: list[str] = []
+    for position, name in enumerate(CATEGORY_ORDER):
+        category = by_name.get(name)
+        if category is None or category.position == position:
+            continue
+        try:
+            await category.edit(position=position, reason="Xianxia RP category order")
+            moved.append(name)
+        except discord.HTTPException:
+            log.exception("Could not position category %s", name)
+    return moved
 
 
 async def _dashboard_discord_snapshot(client: commands.Bot, guild: discord.Guild) -> dict[str, Any]:
@@ -913,7 +1025,7 @@ async def dashboard_discord_control(client: commands.Bot, action: str, payload: 
     if action == "set_bugs_guidelines":
         text = str(payload.get("guidelines") or "").strip() or DEFAULT_BUGS_GUIDELINES
         await DB.set_channel_message(guild.id, BUGS_GUIDELINES_KEY, content=text, message_id=None)
-        channel, warning = await ensure_bugs_forum_channel(guild, category_name=SERVER_BASE_CATEGORY, create_missing=False)
+        channel, warning = await ensure_bugs_forum_channel(guild, category_name=SERVER_FEEDBACK_CATEGORY, create_missing=False)
         result = {"channel_id": channel.id if channel else None, "warning": warning}
         await _audit_dashboard_discord(action, guild, after={"channel_id": result["channel_id"]}, reason=reason)
         return {"ok": True, "action": action, "result": result, "status": await _dashboard_discord_snapshot(client, guild)}
@@ -943,6 +1055,7 @@ async def dashboard_discord_control(client: commands.Bot, action: str, payload: 
             "info_channel_id": "info",
             "exploration_channel_id": "exploration",
             "playtest_channel_id": "playtest",
+            "updates_channel_id": "updates",
         }
         values: dict[str, int | None] = {}
         for db_key, payload_key in mapping.items():
@@ -958,8 +1071,11 @@ async def dashboard_discord_control(client: commands.Bot, action: str, payload: 
             if not isinstance(channel, discord.TextChannel):
                 raise ValueError(f"Selected {payload_key} channel is not a text channel in {guild.name}")
             values[db_key] = channel_id
-        if not values.get("announcement_channel_id") or not values.get("event_scene_channel_id"):
-            raise ValueError("World-events and event-scenes channels must be selected before saving bindings")
+        # `#world-events` alone since v1.0.0-rc.59: `#event-scenes` is retired,
+        # and requiring a channel nothing creates any more would make saving
+        # bindings impossible on a fresh server.
+        if not values.get("announcement_channel_id"):
+            raise ValueError("A world-events channel must be selected before saving bindings")
         await DB.set_server_channels(guild.id, **values)
         await _audit_dashboard_discord(action, guild, after=values, reason=reason)
         return {"ok": True, "action": action, "result": values, "status": await _dashboard_discord_snapshot(client, guild)}
@@ -1178,7 +1294,7 @@ async def admin_setup_server(
     await audit_admin(
         interaction, audit_action, target=f"guild:{guild.id}",
         after={
-            "base_category_id": base_result["category"].id if base_result["category"] else None,
+            "base_category_ids": {bucket: cat.id for bucket, cat in base_result["categories"].items()},
             "base_created": base_result["created"],
             "base_repaired": base_result["repaired"],
             "realm_hubs": {str(row["world_name"]): int(row["channel_id"]) for row in realm_rows},

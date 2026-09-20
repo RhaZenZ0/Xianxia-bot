@@ -232,7 +232,8 @@ async def ensure_sect_abode_thread_for(
             pass
         return thread
     cfg = await DB.get_server_config(guild.id)
-    parent = await _resolve_text_channel(guild, cfg.get("home_scene_channel_id") or cfg.get("event_scene_channel_id"))
+    parent = await _resolve_text_channel(guild, cfg.get("home_scene_channel_id") or cfg.get("event_scene_channel_id")
+        or cfg.get("announcement_channel_id"))
     if parent is None:
         return None
     try:

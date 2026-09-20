@@ -13,7 +13,7 @@ code instead. That is the one cycle in this region.
 """
 from __future__ import annotations
 
-from typing import Any, Mapping
+from typing import Any, Mapping, NamedTuple
 
 import discord
 from discord import app_commands
@@ -28,19 +28,73 @@ BASE_CHANNEL_SETUP_CHOICES = [
 ]
 
 
-BASE_CHANNEL_SPECS = {
-    "world-events": "Global cultivation-world announcements, disasters, invasions and major events.",
-    "event-scenes": "Event scene anchors and public roleplay threads created by the Xianxia bot.",
-    "player-homes": "Read-only anchor for persistent private player-owned location and sect-residence threads.",
-    "bot-logs": "Private operational and administrator-action logs for the Xianxia bot.",
-    "begin-here": "New cultivators begin here with /begin before entering the wider cultivation world.",
-    "xianxia-info": "Read-only game guide, onboarding and system information maintained by the Xianxia bot.",
-    "expeditions": "Read-only anchor for private player expedition threads; normal roleplay happens inside the private threads, not this channel.",
-    "playtest": "The playtest board: one post per hub page. React ✅ if it works, ❌ if it fails, 💡 if you want it changed - and say what in a reply.",
+# The buckets a base channel can sit in. `server_setup.py` owns the category
+# *names* and hands them in; these are only the keys both sides agree on.
+CATEGORY_START = "start"
+CATEGORY_ANNOUNCE = "announce"
+CATEGORY_WORLD = "world"
+CATEGORY_FEEDBACK = "feedback"
+CATEGORY_ADMIN = "admin"
+
+
+class BaseChannel(NamedTuple):
+    """What a base channel is for, and which category it belongs in
+    (v1.0.0-rc.59).
+
+    The category used to be one argument to `ensure_base_xianxia_channels`
+    and every base channel shared it. It is per channel now, and it lives
+    *here*, beside the topic, rather than in a parallel dict - two statements
+    of where a channel belongs are two statements free to disagree.
+
+    `category` is a bucket key, not the category's name. The names are
+    `SERVER_*CATEGORY` in `server_setup.py`, which imports this module and so
+    cannot be imported back (the cycle this file's own docstring describes);
+    the caller passes the mapping in. The string is therefore stated once,
+    where teardown can also see it.
+    """
+
+    topic: str
+    category: str
+
+
+BASE_CHANNEL_SPECS: dict[str, BaseChannel] = {
+    "begin-here": BaseChannel(
+        "New cultivators begin here with /begin before entering the wider cultivation world.",
+        CATEGORY_START),
+    "xianxia-info": BaseChannel(
+        "Read-only game guide, onboarding and system information maintained by the Xianxia bot.",
+        CATEGORY_START),
+    "world-events": BaseChannel(
+        "Global cultivation-world announcements that belong to no single world. Each world's own news is in 🌠 World Events.",
+        CATEGORY_ANNOUNCE),
+    "updates": BaseChannel(
+        "Read-only release notes. The bot posts each release's changelog here as it arrives; the full history is in VERSIONS.md.",
+        CATEGORY_ANNOUNCE),
+    "player-homes": BaseChannel(
+        "Read-only anchor for persistent private player-owned location and sect-residence threads.",
+        CATEGORY_WORLD),
+    "expeditions": BaseChannel(
+        "Read-only anchor for private player expedition threads; normal roleplay happens inside the private threads, not this channel.",
+        CATEGORY_WORLD),
+    "playtest": BaseChannel(
+        "The playtest board: one post per hub page. React ✅ if it works, ❌ if it fails, 💡 if you want it changed - and say what in a reply.",
+        CATEGORY_FEEDBACK),
+    "bot-logs": BaseChannel(
+        "Private operational and administrator-action logs for the Xianxia bot.",
+        CATEGORY_ADMIN),
 }
 
 
-READ_ONLY_BASE_CHANNELS = {"xianxia-info", "expeditions", "player-homes"}
+# `#event-scenes` was the ninth and is retired (v1.0.0-rc.59): an event's
+# roleplay thread anchors in its own world's feed now, which is where rc.52
+# already sent the announcement. It is absent from the specs above, so nothing
+# creates one or requires one - and deliberately still present in
+# `_base_channel_bindings` below, because teardown builds its targets from that
+# dict and a server that already has the channel must still be able to lose it.
+RETIRED_BASE_CHANNELS = {"event-scenes"}
+
+
+READ_ONLY_BASE_CHANNELS = {"xianxia-info", "expeditions", "player-homes", "updates"}
 
 
 def _base_channel_bindings(cfg: dict[str, Any]) -> dict[str, Any]:
@@ -53,6 +107,7 @@ def _base_channel_bindings(cfg: dict[str, Any]) -> dict[str, Any]:
         "xianxia-info": cfg.get("info_channel_id"),
         "expeditions": cfg.get("exploration_channel_id"),
         "playtest": cfg.get("playtest_channel_id"),
+        "updates": cfg.get("updates_channel_id"),
     }
 
 
@@ -65,14 +120,14 @@ def _xianxia_info_guide_text() -> str:
         "🗺️ **Where you are** — `/world` for the place, the roads and what is happening\n"
         "🧑 **Who you are** — `/character` for the sheet, afflictions, standing and soul\n"
         "📜 **Quests** — `/quests`; most are handed to you by the people who give them\n"
-        "🌠 **News** — one events channel per world, under **World Events**\n"
+              "🌠 **News** — one events channel per world, under **World Events**; events open their scenes there too\n"
         "🔒 Unknown places, higher worlds and the NPCs in them stay hidden until you reach them."
     )
 
 
 XIANXIA_INFO_PAGES: dict[str, tuple[str, str]] = {
     "getting_started": ("🌱 Getting Started", "Run `/begin` in `#begin-here`. You are born into one of thirteen households: it teaches you a trade, hands you an heirloom, and gives you the first quest of a chain that walks you out of the door, through the town and the road, and home again. Follow it. `/menu` opens every hub from anywhere, and `/cooldowns` says what is ready and where each ready thing is done."),
-    "server_layout": ("🗺️ The Server", "Four categories. **📜 Xianxia RP** holds what everyone shares: `#begin-here`, `#event-scenes`, read-only anchors for your private threads, and `#world-events` for anything global. **🌠 World Events** holds one news channel per world. **🌌 Realm Capitals** holds one meeting city per world. **🏮 Auction Houses** holds the live lot feeds. A capital is visible only while you are standing in it; a world's news and its auction floor are visible once you have reached that world at all."),
+    "server_layout": ("🗺️ The Server", "Eight categories, in the order you read them. **🚪 Start Here** is `#begin-here` and this guide. **📣 Announcements** is `#world-events` for anything global and `#updates` for what changed in the last release. **🌌 Realm Capitals** holds one meeting city per world. **🌠 World Events** holds one news channel per world, and an event's scene and its thread now open in the same place. **🏮 Auction Houses** holds the live lot feeds. **🗺️ Cultivation World** holds the read-only anchors your private threads hang from. **🛠️ Feedback** is `#playtest` and `#bugs`. **🔒 Admin** is the operator's. A capital is visible only while you are standing in it; a world's news, its scenes and its auction floor are visible once you have reached that world at all."),
     "character": ("🧬 Character & Cultivation", "Your household, spiritual root, physique, path, realm, resources, karma, fate and Dao heart are canonical game state. Two ladders run in parallel — qi cultivation and body tempering — and Stage 9 of either opens the optional Perfection path. The AI narrates what has already happened; it cannot change a mechanic, grant a reward, or decide an outcome."),
     "exploration": ("🧭 Exploration & Scenes", "**Where you stand** and **what scene you are in** are separate. Wilderness travel, exploration, foraging and hunting happen in your own private expedition thread under `#expeditions`. Properties and sect abodes use persistent private threads under `#player-homes`. A realm capital is a shared channel you can only see while you are in the city."),
     "world_events": ("🌠 World Events", "The world produces events on its own, and players trigger them by exploring. Each is announced in **its own world's** news channel with a link to its scene thread, and each carries a **site**: a finite number of beasts, herbs, veins, relics and tasks that deplete as people work them. Travel to the place the notice names to take part. What you are *handed* is banded by realm — a new cultivator is not offered a Dragon — but anything the world spawns on its own, you can walk into."),
@@ -165,14 +220,20 @@ DEFAULT_CHANNEL_MESSAGES: dict[str, str] = {
         "see each of those once you have reached that world.\n"
         "React and discuss freely; roleplay itself belongs in your scenes and threads, not here."
     ),
+    "updates": (
+        "\U0001f4e3 **Updates \u2014 what changed**\n"
+        "The bot posts each release's notes here the first time it boots on that release, "
+        "straight out of `VERSIONS.md`. It never posts the same release twice, and a server set "
+        "up today starts from the next one rather than the whole history.\n"
+        "Read-only. Questions and bug reports belong in \U0001f6e0\ufe0f **Feedback**."
+    ),
     "event-scenes": (
-        "\U0001f3ad **Event Scenes**\n"
-        "When the world opens a shared, public scene — a market day, a tournament, a sect "
-        "gathering, a battle at the gates — the bot opens a thread for it right here, and the "
-        "announcement in the world's events channel links straight to it. Jump into any open "
-        "thread to play the event live. A scene's site holds a finite number of things to do, so "
-        "arriving early and arriving late are genuinely different; threads archive once the scene "
-        "concludes."
+        "\U0001f3ad **Event Scenes \u2014 retired**\n"
+        "An event's scene and its roleplay thread now open in **that world's own channel** under "
+        "\U0001f320 **World Events**, where its announcement already went \u2014 one place per "
+        "event instead of two. Nothing opens here any more.\n"
+        "The channel is kept because this server already had it: Teardown removes it, and a new "
+        "server is never given one."
     ),
     "player-homes": (
         "\U0001f3e1 **Player Homes**\n"
@@ -412,7 +473,7 @@ async def ensure_xianxia_info_guide(guild: discord.Guild, channel: discord.TextC
 
 
 async def ensure_base_xianxia_channels(
-    guild: discord.Guild, *, category_name: str = "📜 Xianxia RP", create_missing: bool = False,
+    guild: discord.Guild, *, categories: Mapping[str, str], create_missing: bool = False,
 ) -> dict[str, Any]:
     """Validate, bind and (when create_missing) create the base Xianxia channels.
 
@@ -423,23 +484,49 @@ async def ensure_base_xianxia_channels(
     created - has its binding persisted immediately (mirroring
     ensure_realm_hub_channels), so the dashboard's own status readout reflects it
     without a separate manual "Save Channel Bindings" click.
+
+    **It repairs an existing channel now (v1.0.0-rc.59), and that is the whole
+    finding.** Until this release the category and the read-only overwrite were
+    computed only inside `if channel is None and can_create:` - so a channel
+    that already existed, whether pre-existing, name-matched or bound by a GM,
+    got neither, ever. `#xianxia-info`, `#expeditions` and `#player-homes` were
+    read-only only on a server where the bot had created them; the guide text a
+    few hundred lines above claimed Repair "moves existing ones into the
+    category they belong in", which was true of auction channels (rc.51) and
+    world feeds (rc.52) and false here; and `repaired` was returned as a
+    hardcoded empty list, so the audit row and the slash reply had shown an
+    empty field since the function was written. A layout change written that
+    way reaches a fresh guild and no server anybody is running.
+
+    `categories` maps a `BaseChannel.category` bucket to the category's name.
+    It is passed in rather than read here because the names are
+    `SERVER_*CATEGORY` in `server_setup.py`, which imports this module.
     """
     cfg = await DB.get_server_config(guild.id)
     bindings = _base_channel_bindings(cfg)
-    category = next((item for item in guild.categories if item.name == category_name), None)
     channels: dict[str, discord.TextChannel] = {}
     created: list[str] = []
+    repaired: list[str] = []
     warnings: list[str] = []
     me = guild.me
     can_create = create_missing and bool(me) and me.guild_permissions.manage_channels
+    resolved_categories: dict[str, discord.CategoryChannel | None] = {}
 
-    if can_create and category is None:
-        try:
-            category = await guild.create_category(category_name, reason="Xianxia RP base channel setup")
-        except discord.HTTPException:
-            log.exception("Could not create base category %s", category_name)
+    async def _category(bucket: str) -> discord.CategoryChannel | None:
+        if bucket in resolved_categories:
+            return resolved_categories[bucket]
+        wanted = categories.get(bucket)
+        found = next((item for item in guild.categories if item.name == wanted), None) if wanted else None
+        if found is None and wanted and can_create:
+            try:
+                found = await guild.create_category(wanted, reason="Xianxia RP base channel setup")
+            except discord.HTTPException:
+                log.exception("Could not create base category %s", wanted)
+        resolved_categories[bucket] = found
+        return found
 
-    for name in BASE_CHANNEL_SPECS:
+    for name, spec in BASE_CHANNEL_SPECS.items():
+        category = await _category(spec.category)
         configured = await _resolve_text_channel(guild, bindings.get(name))
         channel = configured or next((item for item in guild.text_channels if item.name == name), None)
         if channel is None and can_create:
@@ -449,7 +536,7 @@ async def ensure_base_xianxia_channels(
                     if name in READ_ONLY_BASE_CHANNELS else {}
                 )
                 channel = await guild.create_text_channel(
-                    name, category=category, topic=BASE_CHANNEL_SPECS[name][:1024],
+                    name, category=category, topic=spec.topic[:1024],
                     overwrites=overwrites, reason="Xianxia RP base channel setup",
                 )
                 created.append(name)
@@ -465,8 +552,30 @@ async def ensure_base_xianxia_channels(
             )
             continue
         channels[name] = channel
+        if name in created or not can_create:
+            continue
+        # rc.51's shape, applied to the family that never had it. No `moved`
+        # set is needed: one channel per key here, where forty-eight auction
+        # houses share nine floors.
+        if category is not None and channel.category_id != category.id:
+            try:
+                await channel.edit(category=category, reason="Xianxia RP base channel setup")
+                repaired.append(name)
+            except discord.HTTPException:
+                log.exception("Could not move #%s into %s", name, category.name)
+        if name in READ_ONLY_BASE_CHANNELS:
+            try:
+                await channel.set_permissions(
+                    guild.default_role, send_messages=False, reason="Xianxia RP base channel setup")
+                if name not in repaired:
+                    repaired.append(name)
+            except discord.HTTPException:
+                log.exception("Could not re-lock #%s", name)
 
-    if channels.get("world-events") and channels.get("event-scenes"):
+    # `#world-events` alone (v1.0.0-rc.59). This used to want `#event-scenes`
+    # too, and persisted *nothing at all* without it - so retiring that channel
+    # would have silently stopped every binding being saved.
+    if channels.get("world-events"):
         def _bound_id(key: str) -> int | None:
             resolved = channels.get(key)
             return resolved.id if resolved is not None else bindings.get(key)
@@ -474,17 +583,21 @@ async def ensure_base_xianxia_channels(
         await DB.set_server_channels(
             guild.id,
             announcement_channel_id=channels["world-events"].id,
-            event_scene_channel_id=channels["event-scenes"].id,
+            # Retired, and deliberately still written: a server that bound one
+            # before rc.59 keeps the binding, so teardown can still delete the
+            # channel and `_event_scene_parent` can still fall back to it.
+            event_scene_channel_id=_bound_id("event-scenes"),
             home_scene_channel_id=_bound_id("player-homes"),
             log_channel_id=_bound_id("bot-logs"),
             begin_channel_id=_bound_id("begin-here"),
             info_channel_id=_bound_id("xianxia-info"),
             exploration_channel_id=_bound_id("expeditions"),
             playtest_channel_id=_bound_id("playtest"),
+            updates_channel_id=_bound_id("updates"),
         )
-    elif channels or bindings.get("world-events") or bindings.get("event-scenes"):
+    elif channels or bindings.get("world-events"):
         warnings.append(
-            "Could not save channel bindings: both **#world-events** and **#event-scenes** must exist first."
+            "Could not save channel bindings: **#world-events** must exist first."
         )
 
     info_channel = channels.get("xianxia-info")
@@ -492,10 +605,12 @@ async def ensure_base_xianxia_channels(
         await ensure_xianxia_info_guide(guild, info_channel)
 
     return {
-        "category": category,
+        "categories": {bucket: cat for bucket, cat in resolved_categories.items() if cat is not None},
         "channels": channels,
         "created": created,
-        "repaired": [],
+        # Was a hardcoded `[]` until v1.0.0-rc.59, which is why the audit row
+        # and the slash reply have always shown an empty Repaired field.
+        "repaired": repaired,
         "warnings": warnings,
         "dashboard_owned": True,
     }

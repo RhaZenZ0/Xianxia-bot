@@ -3,6 +3,7 @@ package game
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"strconv"
 	"strings"
@@ -15,6 +16,14 @@ import (
 const (
 	pillToxicityDecayMinutes = int64(12 * 60)
 	pillToxicityDecayAmount  = int64(1)
+
+	// pillToxicitySaturated is the toxicity at which the meridians are
+	// carrying more medicine than they can hold: the shared penalty effect
+	// appears here, and from here a purge can scorch. It was the bare literal
+	// 40 in both readers below and nowhere else, which was fine while it meant
+	// one thing and is not now that `alchemy.purge` hangs a risk on it
+	// (v1.0.0-rc.58).
+	pillToxicitySaturated = int64(40)
 )
 
 type canonicalWorldClock struct {
@@ -188,7 +197,7 @@ func previewPillToxicity(conn *storage.Conn, userID, gameMinute int64) (int64, e
 }
 
 func pillToxicityEffectView(userID, toxicity, gameMinute int64) (map[string]any, error) {
-	if toxicity < 40 {
+	if toxicity < pillToxicitySaturated {
 		return nil, nil
 	}
 	raw, err := medicineToxicityEffectJSON(toxicity)
@@ -309,7 +318,7 @@ func settlePillToxicityEffectTx(conn *storage.Conn, userID, gameMinute int64) (i
 		}
 	}
 
-	if toxicity < 40 {
+	if toxicity < pillToxicitySaturated {
 		if _, err := conn.Execute(
 			`DELETE FROM active_effects
 			 WHERE user_id=? AND effect_key='pill_toxicity'
@@ -522,4 +531,98 @@ func additiveWorldModifiersStat(modifiers []worlddata.Modifier, stat string) flo
 		}
 	}
 	return total
+}
+
+// specialEffectPayload is the one lookup of `special_effects` (v1.0.0-rc.58).
+//
+// There were two, and they gave different answers to the same question. The
+// law path took the comma-ok and refused an id the catalogue does not carry.
+// The abode path took the bare index, so an unknown id yielded a nil map,
+// `json.Marshal` wrote the literal `null` into `active_effects.effect_json`,
+// the name fell back to the facility's own, and `abode.focus` *succeeded
+// applying nothing* - which is the rc.19 fault the comment a few lines above
+// that index already records, arriving a second time through another door.
+//
+// It is the `seller_user_id=0` lesson once more: the zero value of a map
+// index looks like a value and is not a sentinel.
+func specialEffectPayload(catalog worlddata.Catalog, effectID string) (map[string]any, string, error) {
+	effect, known := catalog.SpecialEffects[effectID]
+	if !known {
+		return nil, "", fmt.Errorf("special effect %q is not in the catalogue", effectID)
+	}
+	return effect, strings.TrimSpace(fmt.Sprint(effect["name"])), nil
+}
+
+// multiplicativeEffectStat is canonicalAdditiveEffectBonus's `mul` twin, and
+// it deliberately never fails: a reward must not become refusable because a
+// row is missing, the way loadSeclusionCarried already answers 1 for every
+// term it cannot read.
+func multiplicativeEffectStat(conn *storage.Conn, userID, gameMinute int64, stat string) float64 {
+	product := 1.0
+	res, err := conn.Execute(
+		`SELECT effect_json,stacks FROM active_effects
+		 WHERE user_id=? AND starts_game_minute<=?
+		   AND (ends_game_minute IS NULL OR ends_game_minute>?)`,
+		[]any{userID, gameMinute, gameMinute},
+	)
+	if err != nil {
+		return 1
+	}
+	for _, row := range res.Rows {
+		var payload effectPayload
+		if json.Unmarshal([]byte(fmt.Sprint(row[0])), &payload) != nil {
+			continue
+		}
+		stacks := maxI64(1, storage.ParseInt(row[1]))
+		for _, modifier := range payload.Modifiers {
+			if strings.TrimSpace(modifier.Stat) != stat {
+				continue
+			}
+			if strings.EqualFold(strings.TrimSpace(modifier.Operation), "mul") {
+				product *= math.Pow(modifier.Value, float64(stacks))
+			}
+		}
+	}
+	return product
+}
+
+// grantInsightXPTx is the one door an insight-XP reward goes through
+// (v1.0.0-rc.58).
+//
+// `items.heart_calming_pill` has carried `insight_gain x1.15` since it was
+// authored - the "aids insight" of "Settles the mind, aids insight and
+// suppresses heart-demon disturbances" - and eight statements added
+// insight_xp without ever asking. A rate applied at one of eight places is
+// the fault rc.56 took out of seclusion and rc.43 took out of the purse, so
+// this is the same answer: one function, and `TestInsightXPHasOneDoor` holds
+// every other writer to a named reason.
+//
+// It reads the canonical minute itself rather than taking one, which is
+// rc.48's rule and also the practical answer: four of the six grant sites
+// have no game minute in scope, and threading one through four signatures to
+// reach a clock the engine owns would be the caller stating something the
+// engine already knows.
+//
+// Neither the clock nor the multiplier can refuse a reward. A grant that
+// became refusable because a row was missing would be a worse fault than the
+// one this fixes, so an unreadable clock simply means no multiplier - the way
+// loadSeclusionCarried answers 1 for every term it cannot read. And a
+// positive grant never rounds away to nothing: a multiplier is a bonus, and
+// the one thing a bonus must never do is take a reward off a player.
+func grantInsightXPTx(conn *storage.Conn, userID, base int64, now float64) (int64, error) {
+	if base <= 0 {
+		return 0, nil
+	}
+	granted := base
+	if gameMinute, err := canonicalWorldGameMinute(conn); err == nil {
+		granted = int64(math.Round(float64(base) * multiplicativeEffectStat(conn, userID, gameMinute, "insight_gain")))
+		if granted < 1 {
+			granted = 1
+		}
+	}
+	_, err := conn.Execute(
+		`UPDATE characters SET insight_xp=insight_xp+?,updated_at=? WHERE user_id=?`,
+		[]any{granted, now, userID},
+	)
+	return granted, err
 }

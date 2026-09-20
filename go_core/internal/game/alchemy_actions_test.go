@@ -257,14 +257,20 @@ func TestThePurgeFormulasMatchTheCommandTheyReplaced(t *testing.T) {
 			t.Fatalf("qi cost at toxicity %d = %d, want %d", tc.toxicity, got, tc.want)
 		}
 	}
-	for _, tc := range []struct{ toxicity, will, spirit, want int64 }{
-		{100, 0, 0, 8},
-		{100, 10, 10, 16},
-		{100, 100, 100, 91},
-		{5, 100, 100, 5}, // never more than what is there
+	// The v0.22.5 transcription is unchanged at detox 0, which is the point:
+	// `detox_power` is a new term on top of it (v1.0.0-rc.58), not a rebalance
+	// of it. The Purging Phoenix Pill's authored 40 is the +10 row.
+	for _, tc := range []struct{ toxicity, will, spirit, detox, want int64 }{
+		{100, 0, 0, 0, 8},
+		{100, 10, 10, 0, 16},
+		{100, 100, 100, 0, 91},
+		{5, 100, 100, 0, 5}, // never more than what is there
+		{100, 0, 0, 40, 18}, // the pill: 8 + 40/4
+		{100, 10, 10, 40, 26},
+		{5, 0, 0, 40, 5}, // still never more than what is there
 	} {
-		if got := alchemyPurgeAmount(tc.toxicity, tc.will, tc.spirit); got != tc.want {
-			t.Fatalf("purge(%d,%d,%d)=%d, want %d", tc.toxicity, tc.will, tc.spirit, got, tc.want)
+		if got := alchemyPurgeAmount(tc.toxicity, tc.will, tc.spirit, tc.detox); got != tc.want {
+			t.Fatalf("purge(%d,%d,%d,detox %d)=%d, want %d", tc.toxicity, tc.will, tc.spirit, tc.detox, got, tc.want)
 		}
 	}
 }

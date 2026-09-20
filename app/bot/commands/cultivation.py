@@ -935,6 +935,15 @@ async def tribulation_attempt(interaction: discord.Interaction, path: app_comman
         return
     result = dict(envelope.get("result") or {})
     lines = [f"⚡ **{result.get('gate_name','Heavenly Tribulation')}** • Preparation **{int(result.get('preparation_used',0))}/5**"]
+    # The Heart Calming Pill's own number, finally visible (v1.0.0-rc.58). It
+    # rode the Heart Tribulation wave's modifier and was read by nothing until
+    # this release; a player who drank one before the storm should be able to
+    # see that it counted.
+    if int(result.get("heart_demon_resistance", 0)) > 0:
+        lines.append(
+            f"🫖 A settled mind steadies the Heart Tribulation: **{int(result.get('heart_demon_resistance', 0))}** "
+            "heart-demon resistance."
+        )
     for wave in result.get("waves", []):
         roll = SimpleNamespace(**dict(wave))
         lines.append(f"\n**{wave.get('name','Tribulation Wave')}:** {roll_line(roll)}")

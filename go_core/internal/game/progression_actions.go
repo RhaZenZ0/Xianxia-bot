@@ -12,6 +12,13 @@ import (
 	"xianxia/core/internal/worlddata"
 )
 
+// heartDemonResistanceScale turns `heart_demon_resistance` - a 0-100 sort of
+// number, authored as 25 on the Heart Calming Pill - into a term on a 2d10
+// check. Ten, so the pill is worth +2 against a TN in the high teens: enough
+// to matter on the one wave of three a cultivator most often loses, and not
+// enough to buy the gate.
+const heartDemonResistanceScale = int64(10)
+
 type conditionTreatPayload struct {
 	Condition  string `json:"condition"`
 	GameMinute int64  `json:"game_minute"`
@@ -276,6 +283,18 @@ func tribulationAttemptAction(conn *storage.Conn, catalog worlddata.Catalog, use
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
+	// The Heart Calming Pill has said since it was authored that it
+	// "suppresses heart-demon disturbances", and the number saying so was read
+	// by nothing until v1.0.0-rc.58. The Heart Tribulation is where the heart
+	// demon comes from - a failed wave applies `heart_demon` a few lines below
+	// - so this is where a settled mind is worth something. Divided by
+	// heartDemonResistanceScale because the content authors 25 against a 2d10
+	// check: the pill is +2 on a TN in the high teens, a real share of a wave
+	// a cultivator is allowed to fail one of, and not a free pass.
+	heartCalm, err := canonicalAdditiveEffectBonus(conn, catalog, userID, "", p.GameMinute, "heart_demon_resistance")
+	if err != nil {
+		return authoritativeMutation{}, err
+	}
 	karmaMod := c.Karma / 25
 	if karmaMod < -4 {
 		karmaMod = -4
@@ -288,7 +307,7 @@ func tribulationAttemptAction(conn *storage.Conn, catalog worlddata.Catalog, use
 		Name         string
 		Modifier, TN int64
 		Condition    string
-	}{{"Heavenly Lightning", maxI64(body, will) + prep, base, "meridian_damage"}, {"Heart Tribulation", will + insight/2 + prep, base + 1, "heart_demon"}, {"Void & Karma Rejection", spirit + will/2 + prep + karmaMod, base + 2, "soul_wound"}}
+	}{{"Heavenly Lightning", maxI64(body, will) + prep, base, "meridian_damage"}, {"Heart Tribulation", will + insight/2 + prep + heartCalm/heartDemonResistanceScale, base + 1, "heart_demon"}, {"Void & Karma Rejection", spirit + will/2 + prep + karmaMod, base + 2, "soul_wound"}}
 	waves := []map[string]any{}
 	successes := int64(0)
 	for _, d := range defs {
@@ -357,6 +376,6 @@ func tribulationAttemptAction(conn *storage.Conn, catalog worlddata.Catalog, use
 			}
 		}
 	}
-	result := map[string]any{"gate_realm_index": gate.Realm, "gate_name": gate.Name, "path": path, "from_world": gate.From, "to_world": gate.To, "preparation_used": prep, "waves": waves, "success": success, "successes": successes, "attempts": attempts, "fate_after": fate, "quest_granted": questKey}
+	result := map[string]any{"gate_realm_index": gate.Realm, "gate_name": gate.Name, "path": path, "from_world": gate.From, "to_world": gate.To, "preparation_used": prep, "waves": waves, "success": success, "successes": successes, "attempts": attempts, "fate_after": fate, "quest_granted": questKey, "heart_demon_resistance": heartCalm}
 	return authoritativeMutation{Result: result, Event: eventledger.Event{Domain: "tribulation", EventType: "tribulation_attempted", EntityType: "character", EntityID: fmt.Sprint(userID), GameMinute: p.GameMinute, Payload: result}}, nil
 }

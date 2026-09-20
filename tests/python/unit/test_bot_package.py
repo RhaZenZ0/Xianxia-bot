@@ -356,7 +356,7 @@ TIERS = (
     ("formatting.py", "locations.py", "pickers.py"),
     ("discovery.py", "character_state.py", "channels.py", "status_cards.py"),
     ("threads.py", "auction_feed.py"),
-    ("admin/core.py",),
+    ("admin/core.py", "admin/release_notes.py"),
     ("admin/channel_messages.py", "admin/bugs_forum.py", "ui/event_scene.py", "ui/creation.py", "ui/commissions.py"),
     ("admin/quest_control.py", "admin/narration_control.py", "admin/server_setup.py", "admin/playtest_board.py"),
     ("bot.py",),

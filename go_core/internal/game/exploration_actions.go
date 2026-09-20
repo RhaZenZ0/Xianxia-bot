@@ -67,23 +67,27 @@ func rewardFromMap(v map[string]any) canonicalReward {
 	}
 }
 
-func applyCanonicalRewardTx(conn *storage.Conn, catalog worlddata.Catalog, userID int64, c mechanicsCharacter, reward canonicalReward, eventType string, now float64) (int64, error) {
+// Returns the cultivation awarded and the insight actually granted. The
+// second is not always `reward.InsightXP`: since v1.0.0-rc.58 insight goes
+// through `grantInsightXPTx`, which applies `insight_gain`, so a caller
+// reporting the base would under-report what it just paid.
+func applyCanonicalRewardTx(conn *storage.Conn, catalog worlddata.Catalog, userID int64, c mechanicsCharacter, reward canonicalReward, eventType string, now float64) (int64, int64, error) {
 	awarded := reward.Cultivation
 	if awarded < 0 {
 		awarded = 0
 	}
 	cap, err := phaseCost(catalog.Realms, c.RealmIndex, c.Phase)
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
 	var currentCultivation int64
 	currentRes, err := conn.Execute(`SELECT cultivation FROM characters WHERE user_id=?`, []any{userID})
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
 	currentRow := firstRowMap(currentRes)
 	if currentRow == nil {
-		return 0, fmt.Errorf("character not found")
+		return 0, 0, fmt.Errorf("character not found")
 	}
 	currentCultivation = mapInt64(currentRow["cultivation"])
 	room := cap - currentCultivation
@@ -93,12 +97,18 @@ func applyCanonicalRewardTx(conn *storage.Conn, catalog worlddata.Catalog, userI
 	if awarded > room {
 		awarded = room
 	}
-	if _, err = conn.Execute(`UPDATE characters SET cultivation=cultivation+?,insight_xp=insight_xp+?,updated_at=? WHERE user_id=?`, []any{awarded, reward.InsightXP, now, userID}); err != nil {
-		return 0, err
+	if _, err = conn.Execute(`UPDATE characters SET cultivation=cultivation+?,updated_at=? WHERE user_id=?`, []any{awarded, now, userID}); err != nil {
+		return 0, 0, err
+	}
+	// Insight through its one door (v1.0.0-rc.58), which is why the combined
+	// UPDATE above is split: cultivation is a flat award and insight is not.
+	insightGranted, err := grantInsightXPTx(conn, userID, reward.InsightXP, now)
+	if err != nil {
+		return 0, 0, err
 	}
 	if reward.SpiritStones != 0 {
 		if _, err = characterWalletDeltaTx(conn, catalog, userID, reward.SpiritStones, now); err != nil {
-			return 0, err
+			return 0, 0, err
 		}
 	}
 	for item, qty := range reward.Items {
@@ -106,14 +116,14 @@ func applyCanonicalRewardTx(conn *storage.Conn, catalog worlddata.Catalog, userI
 			continue
 		}
 		if _, err = conn.Execute(`INSERT INTO inventory(user_id,item_id,quantity) VALUES(?,?,?) ON CONFLICT(user_id,item_id) DO UPDATE SET quantity=quantity+excluded.quantity`, []any{userID, item, qty}); err != nil {
-			return 0, err
+			return 0, 0, err
 		}
 	}
-	payload, _ := json.Marshal(map[string]any{"cultivation": awarded, "spirit_stones": reward.SpiritStones, "insight_xp": reward.InsightXP, "items": reward.Items})
+	payload, _ := json.Marshal(map[string]any{"cultivation": awarded, "spirit_stones": reward.SpiritStones, "insight_xp": insightGranted, "items": reward.Items})
 	if _, err = conn.Execute(`INSERT INTO event_log(user_id,event_type,payload_json,created_at) VALUES(?,?,?,?)`, []any{userID, eventType, string(payload), now}); err != nil {
-		return 0, err
+		return 0, 0, err
 	}
-	return awarded, nil
+	return awarded, insightGranted, nil
 }
 
 func stringInList(xs []string, needle string) bool {
@@ -1078,13 +1088,13 @@ func applyEventParticipationTx(conn *storage.Conn, catalog worlddata.Catalog, us
 	out := map[string]any{}
 	rw := rewardFromMap(reward)
 	if rw.Cultivation != 0 || rw.SpiritStones != 0 || rw.InsightXP != 0 || len(rw.Items) > 0 {
-		awarded, err := applyCanonicalRewardTx(conn, catalog, userID, c, rw, eventType, now)
+		awarded, insightGranted, err := applyCanonicalRewardTx(conn, catalog, userID, c, rw, eventType, now)
 		if err != nil {
 			return nil, err
 		}
 		out["cultivation_awarded"] = awarded
 		out["spirit_stones"] = rw.SpiritStones
-		out["insight_xp"] = rw.InsightXP
+		out["insight_xp"] = insightGranted
 		out["items"] = rw.Items
 		c.Cultivation += awarded
 	}
@@ -1333,7 +1343,7 @@ func explorationExploreAction(conn *storage.Conn, catalog worlddata.Catalog, use
 	case "shrine":
 		reward.InsightXP += 3
 	}
-	awarded, err := applyCanonicalRewardTx(conn, catalog, userID, c, reward, "explore_discovery", now)
+	awarded, insightGranted, err := applyCanonicalRewardTx(conn, catalog, userID, c, reward, "explore_discovery", now)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -1382,7 +1392,7 @@ func explorationExploreAction(conn *storage.Conn, catalog worlddata.Catalog, use
 	if discovered != "" && catalog.Locations[discovered].RoadSite != "" {
 		discoveredSite = roadSiteView(catalog, discovered)
 	}
-	result := map[string]any{"kind": kind, "location": c.Location, "encounter": encounter, "cultivation_awarded": awarded, "spirit_stones": reward.SpiritStones, "items": reward.Items, "insight_xp": reward.InsightXP, "shared_claims": shared, "discovered_location": discovered, "discovered_site": discoveredSite, "discovered_shop": discoveredShop, "site_kind": loc.RoadSite, "surprise": surpriseOut, "event": surpriseOut}
+	result := map[string]any{"kind": kind, "location": c.Location, "encounter": encounter, "cultivation_awarded": awarded, "spirit_stones": reward.SpiritStones, "items": reward.Items, "insight_xp": insightGranted, "shared_claims": shared, "discovered_location": discovered, "discovered_site": discoveredSite, "discovered_shop": discoveredShop, "site_kind": loc.RoadSite, "surprise": surpriseOut, "event": surpriseOut}
 	return authoritativeMutation{Result: result, Event: eventledger.Event{Domain: "exploration", EventType: "exploration_resolved", EntityType: "character", EntityID: fmt.Sprint(userID), GameMinute: p.GameMinute, Payload: result}}, nil
 }
 
@@ -1858,7 +1868,7 @@ func explorationHuntAction(conn *storage.Conn, catalog worlddata.Catalog, userID
 	var bonded map[string]any
 	var wild map[string]any
 	if roll["success"].(bool) {
-		awarded, err = applyCanonicalRewardTx(conn, catalog, userID, c, canonicalReward{Cultivation: beast.Cultivation, SpiritStones: beast.Stones, Items: beast.Loot}, "hunt_success", now)
+		awarded, _, err = applyCanonicalRewardTx(conn, catalog, userID, c, canonicalReward{Cultivation: beast.Cultivation, SpiritStones: beast.Stones, Items: beast.Loot}, "hunt_success", now)
 		if err != nil {
 			return authoritativeMutation{}, err
 		}

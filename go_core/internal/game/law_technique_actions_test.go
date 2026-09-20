@@ -26,13 +26,13 @@ func lawTechniqueCatalog() worlddata.Catalog {
 				{Index: 2, Name: "Grasped", Min: 40},
 			},
 			Techniques: map[string]worlddata.LawTechnique{
-				"spatial_step": {
-					Name: "Spatial Step", Law: "space",
-					RequiresStage: 2, MinRealmIndex: 3, Effect: "spatial_step_echo",
+				"fixture_step": {
+					Name: "Fixture Step", Law: "space",
+					RequiresStage: 2, MinRealmIndex: 3, Effect: "fixture_echo",
 				},
-				"world_collapse": {
-					Name: "World Collapse", Law: "space",
-					RequiresStage: 2, MinRealmIndex: 3, Effect: "spatial_step_echo",
+				"fixture_unknown_effect": {
+					Name: "Fixture Unknown", Law: "space",
+					RequiresStage: 1, MinRealmIndex: 0, Effect: "no_such_effect",
 				},
 				"quiet_law": {
 					Name: "Quiet Law", Law: "space", RequiresStage: 1, MinRealmIndex: 0,
@@ -40,8 +40,8 @@ func lawTechniqueCatalog() worlddata.Catalog {
 			},
 		},
 		SpecialEffects: map[string]map[string]any{
-			"spatial_step_echo": {
-				"name":      "Spatial Step Echo",
+			"fixture_echo": {
+				"name":      "Fixture Echo",
 				"category":  "Law",
 				"modifiers": []any{map[string]any{"stat": "agility", "operation": "add", "value": 3}},
 			},
@@ -70,6 +70,17 @@ UPDATE characters SET realm_index=4 WHERE user_id=42;
 
 func lawTechniqueApply(t *testing.T, path, technique string) (authoritativeMutation, error) {
 	t.Helper()
+	return lawTechniqueApplyWith(t, path, lawTechniqueCatalog(), technique)
+}
+
+// lawTechniqueApplyWith is the same door with a catalogue of the caller's
+// choosing, so `special_effects_content_test.go` can drive the *shipped*
+// content through it. The fixture above keeps the mechanism tests - a stage
+// gate pinned to production content would break on every content edit - but a
+// rule about a named production technique has to be tested against production
+// content, which is the finding v1.0.0-rc.58 exists for.
+func lawTechniqueApplyWith(t *testing.T, path string, catalog worlddata.Catalog, technique string) (authoritativeMutation, error) {
+	t.Helper()
 	conn, err := storage.Open(path)
 	if err != nil {
 		t.Fatal(err)
@@ -79,7 +90,7 @@ func lawTechniqueApply(t *testing.T, path, technique string) (authoritativeMutat
 	if err != nil {
 		t.Fatal(err)
 	}
-	mut, actionErr := lawTechniqueAction(conn, lawTechniqueCatalog(), 42, raw)
+	mut, actionErr := lawTechniqueAction(conn, catalog, 42, raw)
 	// storage.Conn opens an implicit transaction on the first write, so a
 	// direct call has to commit before another connection can see anything.
 	// In production applyAuthoritative owns that commit.
@@ -112,12 +123,12 @@ func lawEffectRows(t *testing.T, path string) int64 {
 
 func TestAQualifiedLawTechniqueAppliesItsEffectForTwoHours(t *testing.T) {
 	path := setupLawTechniqueDB(t)
-	mut, err := lawTechniqueApply(t, path, "spatial_step")
+	mut, err := lawTechniqueApply(t, path, "fixture_step")
 	if err != nil {
 		t.Fatal(err)
 	}
 	result := mut.Result.(map[string]any)
-	if fmt.Sprint(result["effect_name"]) != "Spatial Step Echo" {
+	if fmt.Sprint(result["effect_name"]) != "Fixture Echo" {
 		t.Fatalf("effect_name=%v", result["effect_name"])
 	}
 	if got := storage.ParseInt(result["ends_game_minute"]); got != 4000+120 {
@@ -132,7 +143,7 @@ func TestATechniqueBelowItsLawStageIsRefused(t *testing.T) {
 	path := setupLawTechniqueDB(t)
 	// comprehension 50 is stage 2; drop it to stage 1.
 	batch4Exec(t, path, `UPDATE law_progress SET comprehension=15 WHERE user_id=42 AND law_id='space'`)
-	if _, err := lawTechniqueApply(t, path, "spatial_step"); err == nil {
+	if _, err := lawTechniqueApply(t, path, "fixture_step"); err == nil {
 		t.Fatal("a technique was used below its required law stage")
 	}
 	if got := lawEffectRows(t, path); got != 0 {
@@ -143,7 +154,7 @@ func TestATechniqueBelowItsLawStageIsRefused(t *testing.T) {
 func TestATechniqueAboveTheCharactersRealmIsRefused(t *testing.T) {
 	path := setupLawTechniqueDB(t)
 	batch4Exec(t, path, `UPDATE characters SET realm_index=1 WHERE user_id=42`)
-	if _, err := lawTechniqueApply(t, path, "spatial_step"); err == nil {
+	if _, err := lawTechniqueApply(t, path, "fixture_step"); err == nil {
 		t.Fatal("a technique was used below its required realm")
 	}
 	if got := lawEffectRows(t, path); got != 0 {
@@ -151,16 +162,15 @@ func TestATechniqueAboveTheCharactersRealmIsRefused(t *testing.T) {
 	}
 }
 
-func TestWorldCollapseNeedsAPersonalWorld(t *testing.T) {
-	path := setupLawTechniqueDB(t)
-	if _, err := lawTechniqueApply(t, path, "world_collapse"); err == nil {
-		t.Fatal("world collapse ran without a personal world")
-	}
-	batch4Exec(t, path, `INSERT INTO personal_worlds(user_id,stability) VALUES(42,100)`)
-	if _, err := lawTechniqueApply(t, path, "world_collapse"); err != nil {
-		t.Fatalf("world collapse was refused with a personal world present: %v", err)
-	}
-}
+// `TestWorldCollapseNeedsAPersonalWorld` used to sit here, and it is the
+// reason v1.0.0-rc.58 exists. `world_collapse` is keyed on its literal id in
+// `lawTechniqueAction`, so it is a rule about a *shipped* technique - but this
+// fixture declared its own, with an effect the fixture provides, at
+// RequiresStage 2 / MinRealmIndex 3 instead of production's 5 / 30. The test
+// asserted the capstone succeeds; production hard-errored on an effect nobody
+// had written, for twelve releases. It lives in
+// `special_effects_content_test.go` now, against the shipped catalogue, with
+// both halves of the personal-world gate.
 
 func TestATechniqueDuringABattleIsSentToTheBattlePanel(t *testing.T) {
 	// The command had this branch: with a battle open the technique resolves
@@ -168,7 +178,7 @@ func TestATechniqueDuringABattleIsSentToTheBattlePanel(t *testing.T) {
 	// path mid-duel would be a free buff and a lost turn.
 	path := setupLawTechniqueDB(t)
 	batch4Exec(t, path, `INSERT INTO battles(user_id,status,updated_at) VALUES(42,'active',0)`)
-	_, err := lawTechniqueApply(t, path, "spatial_step")
+	_, err := lawTechniqueApply(t, path, "fixture_step")
 	if err == nil {
 		t.Fatal("a self-buff was applied during an active battle")
 	}
@@ -206,13 +216,30 @@ func TestAnUnknownTechniqueIsRefused(t *testing.T) {
 
 func TestReusingATechniqueRefreshesRatherThanStacking(t *testing.T) {
 	path := setupLawTechniqueDB(t)
-	if _, err := lawTechniqueApply(t, path, "spatial_step"); err != nil {
+	if _, err := lawTechniqueApply(t, path, "fixture_step"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := lawTechniqueApply(t, path, "spatial_step"); err != nil {
+	if _, err := lawTechniqueApply(t, path, "fixture_step"); err != nil {
 		t.Fatal(err)
 	}
 	if got := lawEffectRows(t, path); got != 1 {
 		t.Fatalf("law effect rows=%d; the effect stacked instead of refreshing", got)
+	}
+}
+
+// The refusal that made the capstone visible, tested for its own sake: before
+// v1.0.0-rc.58 this branch had no test at all, and it is the one that fired in
+// production for twelve releases.
+func TestAnEffectTheCatalogueDoesNotCarryIsRefused(t *testing.T) {
+	path := setupLawTechniqueDB(t)
+	_, err := lawTechniqueApply(t, path, "fixture_unknown_effect")
+	if err == nil {
+		t.Fatal("a technique naming an effect nobody wrote was applied")
+	}
+	if !strings.Contains(err.Error(), "unknown effect") {
+		t.Fatalf("refused for the wrong reason: %v", err)
+	}
+	if got := lawEffectRows(t, path); got != 0 {
+		t.Fatalf("law effect rows=%d after a refusal", got)
 	}
 }
