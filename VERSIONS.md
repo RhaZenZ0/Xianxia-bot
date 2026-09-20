@@ -20,6 +20,14 @@ opening score both bootstrap and diplomacy now read from one map, with the treat
 body. `trade_pact` was also the one seeded type the drift CASE did not name, so it had sat at exactly
 25 since the world started; it warms like everything else a house signs. No schema.
 
+It also stops the next release spending the live pass. `docs/playtest/v<version>.md` is named after
+`RELEASE_VERSION`, so across fifty-nine release candidates the filename never moved and every tick
+was carried; 1.0.0 -> 1.0.1 is the first bump that renames it, and there the generator wrote a fresh
+checklist with every box blank. The ticks are inherited from the newest older checklist now, and
+each carries the release it was walked on - the person writes `[x]`, the generator dates it - so a
+row walked on 1.0.0 and not re-walked reads `[x] v1.0.0` rather than claiming a pass that never
+happened.
+
 **1.0.0** is the first release with no suffix on its tag, and it is rc.59's tree unchanged: no code,
 content or schema moved between the two, so an operator already running rc.59 has nothing to install.
 

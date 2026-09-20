@@ -15,6 +15,8 @@ from __future__ import annotations
 
 import re
 import subprocess
+import pathlib
+import shutil
 import sys
 import unittest
 
@@ -141,23 +143,114 @@ class TheChecklistSaysWhatTheSweepProved(unittest.TestCase):
         were ever a person's - were lost on every regeneration. Nobody noticed
         because nobody had ticked one.
         """
-        import importlib.util
-
-        spec = importlib.util.spec_from_file_location(
-            "playtest_checklist", PROJECT_ROOT / "scripts" / "playtest_checklist.py")
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
+        module = _checklist_module()
         loop = "| `/menu` opens every hub; Admin only for an administrator |"
         self.assertIn(loop, self.text, "the loop this test ticks is no longer on the checklist")
         # Drive the merge from a ticked old file to a blank fresh one, rather
         # than reading the checked-in state: since v1.0.0 the live pass is
         # walked and every row of it is `[x]`, and a test that assumed `[ ]`
         # would have started passing vacuously the day somebody ticked it.
-        ticked, blank = f"{loop} [x] |", f"{loop} [ ] |"
-        old = self.text.replace(blank, ticked)
-        self.assertIn(ticked, old, "the tick this test carries was never written")
-        merged = module.merge_ticks(old, self.text.replace(ticked, blank))
-        self.assertIn(ticked, merged)
+        blank = f"{loop} [ ] |"
+        old = f"| Loop | Live |\n|---|---|\n{loop} [x] |\n"
+        merged = module.merge_ticks(old, blank, "9.9.9")
+        self.assertIn(f"{loop} [x] v9.9.9 |", merged,
+                      "a tick was lost, or the generator did not date it")
+
+
+def _checklist_module():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "playtest_checklist", PROJECT_ROOT / "scripts" / "playtest_checklist.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+class TheLivePassOutlivesTheReleaseItWasWalkedOn(unittest.TestCase):
+    """The live pass is a person's work; a version bump must not spend it.
+
+    `docs/playtest/v<version>.md` is named after `RELEASE_VERSION`, which
+    strips the `-rc.N` suffix - so across all fifty-nine release candidates of
+    1.0.0 the filename never changed and `merge_ticks` carried every tick.
+    v1.0.0 -> v1.0.1 is the first bump in this project's history that renames
+    the file, and until now that meant the target did not exist, `old` was the
+    empty string, and the freshly generated checklist was written with every
+    box blank. The first real live pass would have been deleted by the release
+    that followed it.
+    """
+
+    LOOP = "| `/menu` opens every hub; Admin only for an administrator |"
+
+    def _tree(self, files: dict[str, str]):
+        import tempfile
+
+        root = pathlib.Path(tempfile.mkdtemp())
+        (root / "docs" / "playtest").mkdir(parents=True)
+        for name, text in files.items():
+            (root / "docs" / "playtest" / name).write_text(text, encoding="utf-8")
+        self.addCleanup(shutil.rmtree, root, True)
+        return root
+
+    def _run(self, root, release: str, fresh: str) -> pathlib.Path:
+        """Drive the generator's own `main`, not its helpers.
+
+        Asserting that `merge_ticks` can carry a tick says nothing about
+        whether `main` ever hands it the previous release's file - which is
+        precisely the wire that was missing. `build` and `version` are stubbed
+        because the real ones walk the whole bot; everything under test -
+        `_superseded`, `merge_ticks`, `_stamp` and main's own plumbing - is
+        the shipped code.
+        """
+        module = _checklist_module()
+        module.ROOT = root
+        module.version = lambda: release
+        module.build = lambda: fresh
+        self.assertEqual(module.main([]), 0)
+        return root / "docs" / "playtest" / f"v{release}.md"
+
+    def _fresh(self) -> str:
+        return f"| Loop | Live |\n|---|---|\n{self.LOOP} [ ] |\n"
+
+    def test_a_tick_survives_a_release_bump(self):
+        root = self._tree({"v1.0.0.md": f"| Loop | Live |\n|---|---|\n{self.LOOP} [x] v1.0.0 |\n"})
+        written = self._run(root, "1.0.1", self._fresh())
+        self.assertIn(f"{self.LOOP} [x] v1.0.0 |", written.read_text(encoding="utf-8"),
+                      "the live pass was blanked by the release that followed it")
+
+    def test_a_carried_tick_says_which_release_walked_it(self):
+        """Carrying a tick unstamped would claim a pass that never happened."""
+        root = self._tree({"v1.0.0.md": f"| Loop | Live |\n|---|---|\n{self.LOOP} [x] v1.0.0 |\n"})
+        written = self._run(root, "1.0.1", self._fresh()).read_text(encoding="utf-8")
+        self.assertNotIn(f"{self.LOOP} [x] |", written,
+                         "a tick carried across a bump must keep the release it was walked on")
+
+    def test_a_bare_tick_is_dated_with_the_release_being_written(self):
+        """The person ticks, the generator dates it - so re-walking is one `[x]`."""
+        root = self._tree({"v1.0.1.md": f"| Loop | Live |\n|---|---|\n{self.LOOP} [x] |\n"})
+        written = self._run(root, "1.0.1", self._fresh()).read_text(encoding="utf-8")
+        self.assertIn(f"{self.LOOP} [x] v1.0.1 |", written)
+
+    def test_an_unticked_box_is_never_dated(self):
+        root = self._tree({"v1.0.0.md": self._fresh()})
+        written = self._run(root, "1.0.1", self._fresh()).read_text(encoding="utf-8")
+        self.assertIn(f"{self.LOOP} [ ] |", written, "an unwalked row was dated as though it had been")
+
+    def test_the_superseded_checklist_is_not_left_behind(self):
+        root = self._tree({"v1.0.0.md": f"| Loop | Live |\n|---|---|\n{self.LOOP} [x] v1.0.0 |\n"})
+        self._run(root, "1.0.1", self._fresh())
+        names = sorted(p.name for p in (root / "docs" / "playtest").glob("v*.md"))
+        self.assertEqual(names, ["v1.0.1.md"], "docs/playtest/ is one checklist, not one per release")
+
+    def test_the_newest_checklist_is_the_one_inherited_from(self):
+        """Sorted as integers: `v1.0.10` is newer than `v1.0.9` and sorts before it as text."""
+        root = self._tree({
+            "v1.0.9.md": f"| Loop | Live |\n|---|---|\n{self.LOOP} [x] v1.0.9 |\n",
+            "v1.0.10.md": f"| Loop | Live |\n|---|---|\n{self.LOOP} [x] v1.0.10 |\n",
+        })
+        written = self._run(root, "1.0.11", self._fresh()).read_text(encoding="utf-8")
+        self.assertIn(f"{self.LOOP} [x] v1.0.10 |", written,
+                      "the ticks were inherited from an older checklist than the newest one")
 
 
 class TheChecklistIsOnFile(unittest.TestCase):
