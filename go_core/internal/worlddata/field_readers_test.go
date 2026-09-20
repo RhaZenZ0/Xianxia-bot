@@ -77,42 +77,50 @@ var unreadContentFields = map[string]string{
 // keyed `Struct.Field`.
 func parsedContentFields(t *testing.T) map[string]string {
 	t.Helper()
-	fset := token.NewFileSet()
-	pkgs, err := parser.ParseDir(fset, ".", func(fi os.FileInfo) bool {
-		return !strings.HasSuffix(fi.Name(), "_test.go")
-	}, 0)
+	// Each file is parsed on its own rather than through `parser.ParseDir`,
+	// which is deprecated as of Go 1.25 and which staticcheck refuses
+	// (SA1019). It also matches `selectorsReadInProduction` below, so both
+	// halves of this gate read the tree the same way.
+	entries, err := os.ReadDir(".")
 	if err != nil {
-		t.Fatalf("parsing worlddata: %v", err)
+		t.Fatalf("reading worlddata: %v", err)
 	}
 	out := map[string]string{}
-	for _, pkg := range pkgs {
-		for path, file := range pkg.Files {
-			ast.Inspect(file, func(n ast.Node) bool {
-				spec, ok := n.(*ast.TypeSpec)
-				if !ok {
-					return true
-				}
-				st, ok := spec.Type.(*ast.StructType)
-				if !ok {
-					return true
-				}
-				for _, f := range st.Fields.List {
-					if f.Tag == nil {
-						continue
-					}
-					tag := reflect.StructTag(strings.Trim(f.Tag.Value, "`"))
-					if name, ok := tag.Lookup("json"); !ok || name == "-" || name == "" {
-						continue
-					}
-					for _, ident := range f.Names {
-						if ident.IsExported() {
-							out[spec.Name.Name+"."+ident.Name] = filepath.Base(path)
-						}
-					}
-				}
-				return true
-			})
+	for _, entry := range entries {
+		name := entry.Name()
+		if entry.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
+			continue
 		}
+		fset := token.NewFileSet()
+		file, perr := parser.ParseFile(fset, name, nil, 0)
+		if perr != nil {
+			t.Fatalf("parsing %s: %v", name, perr)
+		}
+		ast.Inspect(file, func(n ast.Node) bool {
+			spec, ok := n.(*ast.TypeSpec)
+			if !ok {
+				return true
+			}
+			st, ok := spec.Type.(*ast.StructType)
+			if !ok {
+				return true
+			}
+			for _, f := range st.Fields.List {
+				if f.Tag == nil {
+					continue
+				}
+				tag := reflect.StructTag(strings.Trim(f.Tag.Value, "`"))
+				if jsonName, ok := tag.Lookup("json"); !ok || jsonName == "-" || jsonName == "" {
+					continue
+				}
+				for _, ident := range f.Names {
+					if ident.IsExported() {
+						out[spec.Name.Name+"."+ident.Name] = name
+					}
+				}
+			}
+			return true
+		})
 	}
 	if len(out) < 300 {
 		// A reader that silently finds nothing makes every assertion after it

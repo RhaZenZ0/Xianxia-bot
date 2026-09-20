@@ -2474,6 +2474,14 @@ file spends its length naming.
   content (`len(location.Roads)`, the authored manuals) or a floor in the production code that makes
   the zero unreachable (`law.comprehend` clamps its gain to 1) — and each says which.
 
+- **A success string is not an exit code, and `make check` has two that look alike.** The first
+  thing `make check` runs is `ruff`, which prints **"All checks passed!"** when it is clean - a
+  sentence that appears nowhere in the Makefile and says nothing about the eight commands after it.
+  Piping the run through `grep` to read that line reports a green suite while `lint` is failing at
+  staticcheck four lines later, which is how v1.0.1's own field gate reached CI with an `SA1019`
+  on `go/parser.ParseDir` in it. Capture `$?` from `make check` itself; a pipeline's status is the
+  last command's, so `make check | grep ...` returns grep's.
+
 ## Release delivery
 
 - A release is handed over as the zip — `xianxia_rp_v<version>.zip` — and its `.zip.sha256`
