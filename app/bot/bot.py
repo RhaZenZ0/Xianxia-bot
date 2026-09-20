@@ -25,6 +25,7 @@ from ..ai.narrator import canonical_location_reply, is_current_location_question
 from ..rules.npc_memory import classify_memory, exchange_memory_summary, public_mood_hint
 from ..version import INSTALLED_VERSION, RELEASE_VERSION
 from .admin.channel_messages import XianxiaInfoView
+from .admin.release_notes import announce_release_if_new
 from .admin.server_setup import dashboard_discord_control
 from .admin.quest_control import dashboard_quest_control, owns as quest_control_owns
 from .admin.narration_control import (
@@ -743,6 +744,24 @@ class XianxiaBot(commands.Bot):
             getattr(self.user, "id", "?"),
             NARRATOR.provider_label if NARRATOR.enabled else "disabled",
         )
+        await self._announce_release()
+
+    async def _announce_release(self) -> None:
+        """Post this release's notes in #updates, once per guild per release.
+
+        Here rather than in `setup_hook` because it needs the guild objects,
+        and after DISCORD_READY because nothing about it is load-bearing: a
+        failure must not keep the bot from coming up, which is why the whole
+        thing is inside one try.
+        """
+        for guild in list(self.guilds):
+            try:
+                announced = await announce_release_if_new(guild)
+            except Exception:
+                log.exception("Release announcement failed for guild %s", guild.id)
+                continue
+            if announced:
+                log.info("Announced release %s in guild %s", announced, guild.id)
 
     async def on_disconnect(self) -> None:
         self.health_state.clear_phase("DISCORD_READY", reason="gateway disconnected")

@@ -223,7 +223,12 @@ class TheDiscordHalfIsAScriptInTheTree(unittest.TestCase):
                        '"Open Character Form"', '"player-homes"', '"quests"', '"menu"', "🔒 Enter — you are already inside",
                        '"Errand"', "typed_play_prefix", "typed_play_shorthand", '"cooldowns"', '"Realm Capitals"',
                        "Hearth-Return Talisman", "📜 Quest progress", '"Support"', '"Contribute"', '"Enter"', "Yes, Leave",
-                       "Choose destination", "advance_time(901)", '"Reopen"', "env.errors"):
+                       "Choose destination", "advance_time(901)", '"Reopen"', "env.errors",
+                       # v1.0.0-rc.59: the layout half. The sweep is what proves the
+                       # re-parent reaches a server that already exists, so the three
+                       # assertions that read it are pinned here by name.
+                       "CATEGORY_ORDER", "categories are out of order", "BASE_CATEGORY_NAMES[spec.category]",
+                       "the retired"):
             with self.subTest(marker=marker):
                 self.assertIn(marker, DISCORD_SCRIPT)
 

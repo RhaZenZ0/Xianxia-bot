@@ -26,7 +26,7 @@ from .remote import GoDatabaseTransport, RemoteDatabaseError
 log = logging.getLogger("xianxia.database")
 
 
-SCHEMA_VERSION = 57
+SCHEMA_VERSION = 58
 # A readiness probe must validate more than the schema-version marker.  If the
 # SQLite file is removed or replaced while the bot is running, SQLite will
 # happily create a new empty file at the same path.  Checking these tables lets
@@ -2533,6 +2533,21 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
             """ALTER TABLE seclusion_sessions ADD COLUMN ends_real_ts REAL""",
         ),
     ),
+    (
+        58,
+        "the_updates_channel_and_what_it_has_announced",
+        (
+            # v1.0.0-rc.59: a ninth base channel, `#updates`, and the memory of
+            # which release this guild has already been told about.
+            #
+            # Neither column is in the base DDL, and that is the rule rc.57
+            # exists for: a column a migration adds is the migration's alone,
+            # or a fresh install dies on `duplicate column name` while every
+            # upgrade works.
+            "ALTER TABLE server_config ADD COLUMN updates_channel_id INTEGER",
+            "ALTER TABLE server_config ADD COLUMN announced_release TEXT",
+        ),
+    ),
 )
 
 
@@ -4899,18 +4914,22 @@ class Database:
             return dict(row) if row else {}
 
     async def set_server_channels(
-        self, guild_id: int, *, announcement_channel_id: int, event_scene_channel_id: int,
+        self, guild_id: int, *, announcement_channel_id: int,
+        # Retired in v1.0.0-rc.59 and still accepted: a server that bound
+        # one before then keeps it, so teardown can still delete the channel.
+        event_scene_channel_id: int | None = None,
         home_scene_channel_id: int | None = None, log_channel_id: int | None = None,
         begin_channel_id: int | None = None, info_channel_id: int | None = None,
         exploration_channel_id: int | None = None, playtest_channel_id: int | None = None,
+        updates_channel_id: int | None = None,
     ) -> None:
         now = time.time()
         async with self._connect() as db:
             await db.execute(
                 """INSERT INTO server_config(
                        guild_id,announcement_channel_id,event_scene_channel_id,home_scene_channel_id,
-                       log_channel_id,begin_channel_id,info_channel_id,exploration_channel_id,playtest_channel_id,updated_at
-                   ) VALUES(?,?,?,?,?,?,?,?,?,?)
+                       log_channel_id,begin_channel_id,info_channel_id,exploration_channel_id,playtest_channel_id,updates_channel_id,updated_at
+                   ) VALUES(?,?,?,?,?,?,?,?,?,?,?)
                    ON CONFLICT(guild_id) DO UPDATE SET
                        announcement_channel_id=excluded.announcement_channel_id,
                        event_scene_channel_id=excluded.event_scene_channel_id,
@@ -4920,10 +4939,12 @@ class Database:
                        info_channel_id=COALESCE(excluded.info_channel_id,server_config.info_channel_id),
                        exploration_channel_id=COALESCE(excluded.exploration_channel_id,server_config.exploration_channel_id),
                        playtest_channel_id=COALESCE(excluded.playtest_channel_id,server_config.playtest_channel_id),
+                       updates_channel_id=COALESCE(excluded.updates_channel_id,server_config.updates_channel_id),
                        updated_at=excluded.updated_at""",
                 (
                     guild_id, announcement_channel_id, event_scene_channel_id, home_scene_channel_id,
-                    log_channel_id, begin_channel_id, info_channel_id, exploration_channel_id, playtest_channel_id, now,
+                    log_channel_id, begin_channel_id, info_channel_id, exploration_channel_id, playtest_channel_id,
+                    updates_channel_id, now,
                 ),
             )
             await db.commit()
@@ -4969,6 +4990,22 @@ class Database:
             )
             await db.commit()
 
+    async def set_announced_release(self, guild_id: int, version: str) -> None:
+        """Remember which release this guild has been told about (v1.0.0-rc.59).
+
+        The row is the memory: `announce_release_if_new` compares against it
+        rather than against a flag, so restarting the bot cannot repost and
+        nothing has to be reset by hand.
+        """
+        async with self._connect() as db:
+            await db.execute(
+                """INSERT INTO server_config(guild_id,announced_release,updated_at) VALUES(?,?,?)
+                   ON CONFLICT(guild_id) DO UPDATE SET
+                       announced_release=excluded.announced_release, updated_at=excluded.updated_at""",
+                (int(guild_id), str(version), time.time()),
+            )
+            await db.commit()
+
     async def clear_discord_bindings(self, guild_id: int) -> dict[str, int]:
         """Forget every Discord channel and message id the bot holds for a guild.
 
@@ -4986,7 +5023,8 @@ class Database:
                 """UPDATE server_config SET
                        announcement_channel_id=NULL, event_scene_channel_id=NULL, home_scene_channel_id=NULL,
                        log_channel_id=NULL, begin_channel_id=NULL, info_channel_id=NULL, exploration_channel_id=NULL,
-                       info_message_id=NULL, bugs_channel_id=NULL, playtest_channel_id=NULL, updated_at=?
+                       info_message_id=NULL, bugs_channel_id=NULL, playtest_channel_id=NULL,
+                       updates_channel_id=NULL, announced_release=NULL, updated_at=?
                    WHERE guild_id=?""",
                 (time.time(), int(guild_id)),
             )

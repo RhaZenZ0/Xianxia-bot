@@ -185,6 +185,15 @@ async def ensure_realm_hub_channels(
                 log.exception("Could not create realm-capital channel #%s", hub["channel_name"])
         if channel is None:
             continue
+        # The re-parent rc.51 gave the auction floors and rc.52 the world
+        # feeds, arriving here in v1.0.0-rc.59: a capital that already existed
+        # was bound where it lay and stayed there for ever, so the category
+        # split could never have reached a server anybody was running.
+        if can_create and category is not None and channel.category_id != category.id:
+            try:
+                await channel.edit(category=category, reason="Xianxia RP realm-capital setup")
+            except discord.HTTPException:
+                log.exception("Could not move #%s into %s", channel.name, category_name)
         if can_create:
             stale = [r for w, r in access_roles.items() if w == world]
             await ensure_realm_hub_overwrites(guild, channel, roles.get(world), stale_roles=stale)
@@ -376,6 +385,32 @@ async def world_event_channel(
     return await _resolve_text_channel(guild, config.get("announcement_channel_id"))
 
 
+async def event_scene_parent(
+    guild: discord.Guild | None, location: str | None,
+) -> discord.TextChannel | None:
+    """Where an event's scene message and its roleplay thread are anchored
+    (v1.0.0-rc.59).
+
+    It is the world's own feed now - the channel rc.52 already sent the
+    announcement to. Until this release an event used two channels: the
+    announcement went to its world's feed and the thread was anchored in
+    `#event-scenes`, a ninth base channel whose whole job was to be somewhere
+    for the thread to hang. `#event-scenes` is retired, and a server that still
+    has one bound is the fallback here so nothing breaks mid-upgrade.
+
+    `world_event_channel` already falls back to the global feed, so the only
+    way to reach the retired channel is a server with neither a world feed nor
+    an announcement channel bound - which is a server that has not been set up.
+    """
+    channel = await world_event_channel(guild, location)
+    if channel is not None:
+        return channel
+    if guild is None:
+        return None
+    config = await DB.get_server_config(guild.id)
+    return await _resolve_text_channel(guild, config.get("event_scene_channel_id"))
+
+
 async def event_channels(interaction: discord.Interaction) -> tuple[discord.TextChannel | None, discord.TextChannel | None]:
     guild = interaction.guild
     if guild is None:
@@ -395,7 +430,8 @@ async def home_scene_channel(interaction: discord.Interaction) -> discord.TextCh
     if guild is None:
         return None
     config = await DB.get_server_config(guild.id)
-    channel_id = config.get("home_scene_channel_id") or config.get("event_scene_channel_id")
+    channel_id = (config.get("home_scene_channel_id") or config.get("event_scene_channel_id")
+                  or config.get("announcement_channel_id"))
     return await _resolve_text_channel(guild, channel_id)
 
 

@@ -100,7 +100,7 @@ class SchemaMigrationTests(unittest.IsolatedAsyncioTestCase):
                 "SELECT name FROM schema_migrations WHERE version=?", (SCHEMA_VERSION,)
             ).fetchone()[0]
         self.assertEqual(version, SCHEMA_VERSION)
-        self.assertEqual(migration, "seclusion_ends_on_a_real_clock")
+        self.assertEqual(migration, "the_updates_channel_and_what_it_has_announced")
         with closing(sqlite3.connect(self.path)) as conn:
             objects = {row[0]: row[1] for row in conn.execute(
                 "SELECT name,type FROM sqlite_master WHERE name IN (?,?,?,?,?,?,?,?,?,?)",

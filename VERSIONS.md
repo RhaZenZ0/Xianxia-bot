@@ -6,6 +6,80 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.0** (rc.59) makes the server readable, and gives a release somewhere to announce itself.
+
+The bot provisions four categories, one of which - 📜 Xianxia RP - held all eight base channels and
+the `#bugs` forum, which have nothing to do with each other: where a new player starts, the global
+announcement feed, two thread anchors nobody reads, the operator's log and the two feedback
+channels, in one undifferentiated list. Nothing anywhere stated what order the categories should be
+in, so their order was the call order of `_run_complete_server_setup`, appended at the bottom of the
+guild by Discord. There are eight
+ordered categories now - **🚪 Start Here, 📣 Announcements, 🌌 Realm Capitals, 🌠 World Events,
+🏮 Auction Houses, 🗺️ Cultivation World, 🛠️ Feedback, 🔒 Admin** - which is the path a player
+walks: where you begin, then the news, then the world and its markets, then your own threads, then
+feedback, then the GM's own room.
+
+**The finding underneath is the one this repo has already named five times.**
+`ensure_base_xianxia_channels` computed its category and its read-only overwrite *only inside*
+`if channel is None and can_create:`. A channel that already existed - pre-existing, name-matched,
+or bound by a GM - got neither. So a layout change written the obvious way would have reached a
+fresh guild and **no server in existence**, and `#xianxia-info`, `#expeditions` and `#player-homes`
+were only read-only where the bot itself had created them. `ensure_realm_hub_channels` was the same,
+which is why 🌌 Realm Capitals could never repair itself either. rc.51 fixed exactly this for the
+auction floors and the fix never reached the family beside them; the guide text in
+`#xianxia-info` had been promising since rc.51 that Repair "moves existing ones into the category
+they belong in", which was true for two helpers out of five. `repaired` was a hardcoded `[]` that
+propagated into the audit log and the slash reply as a permanently empty field. All five helpers
+re-parent and re-lock now, and `test_the_layout_reaches_an_existing_server.py` holds every one of
+them by AST with an empty allowlist.
+
+**`SERVER_BASE_CATEGORY` stays, and nothing creates it** - which is rc.51's teardown gate read
+backwards. That gate asserts the teardown tuple *equals* the category constants, because a category
+Setup makes must be one teardown can empty; the converse is now live, and a category Setup **stops**
+making is one every existing server still has. Deleting the constant would orphan 📜 Xianxia RP on
+every server in the world. It stays declared, stays in the teardown tuple - which is what the rc.51
+gate already requires of every constant - and is in neither `CREATED_CATEGORIES` nor
+`CATEGORY_ORDER`, because positioning a category that should be being emptied is positioning
+nothing. `test_category_order.py` holds that split.
+
+**`#updates` is the ninth base channel ever wired - the eighth live one, since `#event-scenes` is
+retired in the same release - and the bot posts its own release notes into it.** Every
+release's notes were already written, in the form a player can read, in `VERSIONS.md` - and nothing
+had ever shown them to anybody; the rc.21-to-rc.57 notes had to be pasted by hand into
+`#world-events`, the in-fiction feed a world-reset notice uses. `server_config.announced_release` is
+the release this guild has already been told about, so the announcement is idempotent across
+restarts by construction. A guild whose marker is NULL is a fresh install and is told nothing, an
+unbound channel is not an error and does not advance the marker, and a paragraph over Discord's
+2,000-character limit is split at the seams a reader already sees.
+
+Wiring a base channel is **ten** places, not one, and the ninth channel found the tenth: `#updates`
+shipped in the first draft created, locked, bound and **blank**, because `DEFAULT_CHANNEL_MESSAGES`
+had no entry and a missing key resolves to `""` - which is also, correctly, how a GM turns a message
+off, so an unwritten blurb and a deliberately cleared one are the same answer and neither errors.
+`test_every_base_channel_is_registered.py` walks `BASE_CHANNEL_SPECS` against all ten places, so the
+next channel cannot be half-wired the way this one was.
+
+**`#event-scenes` is retired.** Since rc.52 an event's announcement went to its own world's feed
+while its roleplay thread anchored in a single global channel - two channels for one event. The
+scene anchors in that world's feed now, which is where the announcement already is. The column and
+the binding stay, because retiring a channel must not drop a GM's existing binding and teardown is
+derived from them. The trade is stated rather than discovered: those feeds are gated by the realm
+**access** role, so a scene is now invisible to anyone who has not reached that world, and that is
+in `docs/KNOWN_LIMITATIONS.md`.
+
+**Three of the drills caught the gates rather than the code**, which is the rc.47 and rc.52 lesson
+arriving again. The registration gate's first reader ran past the end of its function and its second
+stopped at a multi-line signature - both found by the gate's own self-check, which asserts a known
+binding comes back before it trusts an absence; it reads functions by AST now. Its next version
+passed against the broken tree, because it searched for `updates_channel_id`, which
+`_base_channel_bindings` also contains. And the plainest one: `test_release_notes.py`'s own
+docstring claimed it held all three announcement rules, and it tested the parser and the chunker and
+never called `announce_release_if_new` - so deleting the marker write, the one line that makes the
+post happen once, left the suite green. Idempotence was asserted in prose twice and driven nowhere,
+which is the shape of the thing this release exists to fix, written into the gate written for it.
+Six tests drive the function now. A gate that cannot see the thing it forbids is decoration, and
+only running it against the broken tree says which kind you have.
+
 **1.0.0** (rc.58) wires the numbers that reached no rule, and gives the Law of Space its capstone.
 
 `active_effects` modifiers are a vocabulary nothing was holding: any string may be written as a
@@ -2104,10 +2178,13 @@ mechanical authority paths.
 
 ## Release status — v1.0.0
 
-- Current release: v1.0.0 (rc.58): the modifier vocabulary nothing was holding - seven authored stats
+- Current release: v1.0.0 (rc.59): eight ordered categories a player can read top to bottom, the
+  re-parent that makes a layout change reach a server that already exists, and `#updates`, where the
+  bot announces its own release notes. Tagged `v1.0.0-rc.59` on the beta channel; the NAS drills and
+  two quiet weeks make it `v1.0.0`.
+- v1.0.0 (rc.58): the modifier vocabulary nothing was holding - seven authored stats
   that reached no rule, the Law of Space capstone that named an effect nobody wrote, and the purge's
-  flame its own content had always described. Tagged `v1.0.0-rc.58` on the beta channel; the NAS
-  drills and two quiet weeks make it `v1.0.0`.
+  flame its own content had always described.
   (This line stood at rc.16 for forty-two releases. `test_release_version.py` only ever asserted the
   `v1.0.0` prefix, so nothing caught it, and it is the line an operator reads.)
 - v1.0.0 (rc.15): the spiritual sense reads the ground it is standing on, the two middle readings it
@@ -2367,6 +2444,15 @@ mechanical authority paths.
 - **Schema 27** added the v0.19.29 mute/freeze moderation columns on `characters`
   (`is_muted`, `is_frozen`, `moderation_reason`).
 - **Schema 28** added the Quest Forge definition table (`quest_definitions`).
+- **Schema 58** gave a server somewhere to be told what changed. `server_config.updates_channel_id`
+  is the ninth base channel, `#updates`, and `announced_release` is the release this guild has
+  already been told about - so the bot's own announcement is idempotent across restarts by
+  construction rather than by a flag somebody has to remember to reset. The row is the memory, which
+  is what `(user_id, quest_key)` does for the beginner path. A guild whose marker is NULL is a fresh
+  install: it records the running release and says nothing, because a server being set up today does
+  not want forty paragraphs of history. Both join the `NULL` list in `clear_discord_bindings`, so a
+  torn-down server is a new one and is told nothing either. Neither column is in the base DDL - the
+  rule rc.57 exists for.
 - **Schema 57** put a retreat's deadline on a real clock. `seclusion_sessions.ends_real_ts` is the
   wall-clock moment the doors open, beside the `ends_game_minute` that was the only end before it.
   A retreat lasts at most two real hours now, and a bound expressed in game minutes could not hold

@@ -19,9 +19,10 @@ database. Its findings are the first two entries.
   because the Discord sweep's own rule is that a loop goes through a surface rather than a handler.
   The resolution is that the bot's **control plane is a surface** — it is just not a Discord one:
   section 2b of `scripts/playtest_discord.py` posts `{"action": "setup"}` to
-  `POST /control/discord` with `X-Xianxia-Control`, exactly as the dashboard does, then asserts the
-  four categories exist, each capital and each world feed sits in the right one, nine auction
-  channels were made, and a second Repair over the same layout creates nothing new.
+  `POST /control/discord` with `X-Xianxia-Control`, exactly as the dashboard does, then asserts that
+  every category exists and stands in its stated order, that each capital and each world feed sits in
+  the right one, that nine auction channels were made, and that a second Repair over the same layout
+  creates nothing new.
 - **fixed (v1.0.0-rc.51)** — *Teardown never deleted an auction channel, so it never deleted the
   capitals' category either.* `clear_discord_bindings` has `DELETE`d from `auction_house_channels`
   since v0.33.1, while `teardown_managed_discord_layout` built its targets from the base bindings,
@@ -105,6 +106,22 @@ database. Its findings are the first two entries.
   prose says "excess yang scorches the meridians" and v1.0.0-rc.58 gave it `fire_resistance -5`, so
   it bites on `alchemy.purge` and nowhere else. A physique that scorches on its own schedule needs a
   simulation pass over a body nothing currently ticks, which is a different change.
+- **fixed (v1.0.0-rc.59)** — *A category or a read-only lock reached a fresh guild and no other.*
+  Three of the five helpers that place a channel in a category computed it only inside
+  `if channel is None and can_create:`, so a channel that already existed — pre-existing,
+  name-matched, or bound by a GM — was bound where it lay and stayed there. The same line held
+  `READ_ONLY_BASE_CHANNELS`, so `#xianxia-info`, `#expeditions` and `#player-homes` were read-only
+  only where the bot had created them, and `ensure_base_xianxia_channels` returned `"repaired": []`
+  as a hardcoded empty list into an audit row that had therefore never carried anything. rc.51 had
+  already found and fixed this for the auction floors and rc.52 for the world feeds; the other
+  three never got it. `test_the_layout_reaches_an_existing_server.py` now holds all five, with an
+  empty allowlist.
+- **deferred (design)** — *An event scene is only visible to somebody who has reached that world.*
+  v1.0.0-rc.59 anchors an event's scene and its thread in that world's own feed, which is where
+  rc.52 already sent the announcement, and retires `#event-scenes`. Those feeds are gated by the
+  realm **access** role, so a scene in a world a player has not reached is now invisible to them
+  where the shared channel was not. That is the trade the change makes rather than an oversight:
+  an event is somewhere, and a cultivator who cannot reach the somewhere could not have joined it.
 - **deferred (design)** — *Moderation is a nudge on the engine's dispatch layer, not anti-cheat.*
   A muted or frozen player is blocked from the ~150 authoritative ops; raw `/v1/db` writes the
   bot makes on their behalf and the simulation runner are not intercepted. Stated in

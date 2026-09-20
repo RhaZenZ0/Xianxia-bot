@@ -29,14 +29,20 @@ def _body(source: str, name: str) -> str:
 
 class TheChannelIsABaseChannel(unittest.TestCase):
     def test_it_is_specified_bound_and_saved_like_the_others(self):
-        self.assertIn('"playtest":', MESSAGES.split("BASE_CHANNEL_SPECS = {")[1].split("}")[0])
+        """The nine registration points moved to
+        `test_every_base_channel_is_registered.py` in v1.0.0-rc.59.
+
+        This test named `playtest` nine times, which proves that channel is
+        wired and says nothing about the next one - and `#updates` was the
+        next one. The generic gate walks `BASE_CHANNEL_SPECS` instead, so this
+        keeps only what is specific to the board: that the channel exists and
+        is read-writable, unlike the three anchors.
+        """
+        self.assertIn('"playtest": BaseChannel(', MESSAGES)
         self.assertIn('"playtest": cfg.get("playtest_channel_id")', MESSAGES)
-        self.assertIn('playtest_channel_id=_bound_id("playtest")', MESSAGES)
-        self.assertIn('"playtest_channel_id": "playtest"', SETUP)
-        self.assertIn("playtest_channel_id=COALESCE(excluded.playtest_channel_id,server_config.playtest_channel_id)", CORE)
-        app_js = (PROJECT_ROOT / "dashboard" / "app.js").read_text(encoding="utf-8")
-        self.assertIn("bind('bindPlaytest','Playtest board','playtest')", app_js)
-        self.assertIn("playtest:bindPlaytest.value", app_js)
+        read_only = MESSAGES.split("READ_ONLY_BASE_CHANNELS = {")[1].split("}")[0]
+        self.assertNotIn('"playtest"', read_only,
+                         "players react and reply on the board; it cannot be read-only")
 
     def test_teardown_forgets_it(self):
         clear = _body(CORE, "clear_discord_bindings")

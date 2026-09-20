@@ -145,7 +145,7 @@ internal/server/        HTTP control/data plane
 ```
 
 Every Go SQLite connection uses `journal_mode=WAL`, `foreign_keys=ON`, `busy_timeout=10000`,
-`synchronous=NORMAL`. Current schema version is 57; historical migrations are kept so old databases
+`synchronous=NORMAL`. Current schema version is 58; historical migrations are kept so old databases
 can upgrade in place — see `VERSIONS.md` for the full schema/release history.
 
 ### The NPC life cycle (v1.0.0-rc.24)
@@ -1757,6 +1757,133 @@ test **SKIP**, green and useless, because the walk copied `shippedCatalog`'s def
 The content file is in the repository and always present, so a read that fails means the gate cannot
 do its job — it is a `t.Fatalf` now. A gate that can go quiet instead of red is the decoration rc.47
 and rc.52 each caught, and only running it against a broken tree says which kind you have.
+
+### A server you can read at a glance (v1.0.0-rc.59)
+
+Four categories, and one of them held all eight base channels plus the `#bugs` forum, which had
+nothing to do with each other: `#begin-here` where a new player starts, `#world-events` for global
+notices, `#player-homes` and `#expeditions` (read-only thread anchors nobody posts in), `#bot-logs`
+for the operator, `#playtest` and `#bugs` for feedback. And **categories
+were never positioned** — no `position=`, no `.edit(position=`, no `.move(` anywhere under `app/` —
+so their order was the call order of `_run_complete_server_setup`, appended at the bottom of the
+guild by Discord. Nothing in the tree said what the order should be, which means
+nothing could be wrong about it and nothing could be right either.
+
+Eight now, in one stated order (`CATEGORY_ORDER`): 🚪 Start Here, 📣 Announcements, 🌌 Realm
+Capitals, 🌠 World Events, 🏮 Auction Houses, 🗺️ Cultivation World, 🛠️ Feedback, 🔒 Admin. The
+newcomer's path, then what is announced, then the world itself — where you go, its news, its
+markets — then your own threads, then feedback, then the operator's.
+
+**The finding is the half that would have reached nobody.** `ensure_base_xianxia_channels` computed
+its category *and* its read-only overwrite only inside `if channel is None and can_create:`. A
+channel that already existed — pre-existing, name-matched, or bound by a GM — got neither, ever. So
+three things were true at once and none of them was visible from a source read:
+
+- A category split written the obvious way would reach a fresh guild and **no server anybody is
+  running**. That is `/learn` (rc.43), the quest journal (rc.46), the event bands (rc.49), the peach
+  (rc.50) and the auction channels (rc.51) wearing a sixth hat — and rc.51 is the same bug in the
+  same file, found once and fixed for one helper out of five.
+- `#xianxia-info`, `#expeditions` and `#player-homes` were read-only **only where the bot had made
+  them**. `READ_ONLY_BASE_CHANNELS` was consumed at exactly one place in the tree: the `overwrites=`
+  argument of `create_text_channel`.
+- `ensure_base_xianxia_channels` returned `"repaired": []` as a **hardcoded empty list**, which
+  propagated into the audit row and the slash reply — a field that had shown nothing since the
+  function was written, because there was nothing it could show.
+
+`ensure_realm_hub_channels` and `ensure_bugs_forum_channel` had the same hole.
+`test_the_layout_reaches_an_existing_server.py` holds all five helpers now: each must compare
+`channel.category_id != category.id` and issue `channel.edit(category=`, behind `can_create`
+because Discord layout is the dashboard's to own. Its allowlist is empty. The read-only half is read
+by **AST rather than substring** — the set's name appearing in the function proves nothing about
+*where*, and where was the entire bug — and the gate asserts a reference to it exists outside the
+`channel is None` branch. `channel_messages.py`'s own guide text has claimed since rc.52 that Repair
+"moves existing ones into the category they belong in"; it is true now.
+
+**The category that must not be deleted.** `SERVER_BASE_CATEGORY` (📜 Xianxia RP) is created by
+nothing and is deliberately still declared, still in the teardown tuple, and carries a comment
+saying why. `test_discord_teardown.py` asserts the constant set **equals** the teardown tuple — right
+for rc.51's bug, where a category Setup made was not one teardown could empty. Read the other way it
+is a trap: a category Setup *stops* making is one every existing server still has, and set-equality
+pushes you to delete the constant, which would orphan the category on every server in existence.
+`CREATED_CATEGORIES` is what Setup makes; the tuple is what teardown can remove; they are
+deliberately not the same set, and `test_category_order.py` holds both halves.
+
+**`BASE_CHANNEL_SPECS` learned where each channel belongs.** It was `name -> topic`, with the
+category a single argument every base channel shared. It is a `BaseChannel(topic, category)` now —
+one statement per channel, not a parallel dict free to drift. The `category` is a **bucket key**
+rather than a name, because the names are `SERVER_*CATEGORY` in `server_setup.py`, which imports
+`channel_messages.py` and so cannot be imported back; `BASE_CATEGORY_NAMES` is the one place the
+bucket meets the string, and it lives where the teardown gate can see it. `/admin server
+basechannels` lost its `category_name` argument in the same move: one name could no longer mean
+anything, and a parameter that does nothing is the class of thing this release exists to remove.
+
+**`#updates`, and the bot posts its own release notes.** Every release's notes were already written
+in the form a player can read — `VERSIONS.md`'s changelog, one entry per release, already held to
+the stamped version by `test_release_version.py` — and nothing had ever shown them to anybody. A GM
+who upgraded had to go and read the file. `app/bot/admin/release_notes.py` parses the entry for
+`INSTALLED_VERSION` and posts it into `#updates` at `on_ready`, chunked under Discord's 2,000
+characters (rc.58's entry is 3,801). Three rules keep it from being annoying, and the first is the
+one that makes it safe: **the row is the memory.** `server_config.announced_release` is the release
+this guild has been told about, so the post is idempotent across restarts by construction rather
+than by a flag somebody has to reset — the same thing `(user_id, quest_key)` does for the beginner
+path. A guild whose marker is NULL **records the running release and says nothing**, because a
+server being set up today does not want forty paragraphs of history. And an unbound `#updates` is
+not an error and does not advance the marker, so binding it a week later still gets the notes.
+
+A base channel is column-per-channel, not generic — **ten** places, from a `server_config` column
+and a migration through four edits inside one `set_server_channels` to a form field in
+`dashboard/app.js`. `#playtest`, the eighth channel, got a test naming itself nine times, which
+proves that channel is wired and says nothing about the next one.
+`test_every_base_channel_is_registered.py` walks `BASE_CHANNEL_SPECS` instead, so the tenth channel
+cannot be half-wired.
+
+**The tenth place is the one this release found by being the ninth channel.** `#updates` shipped in
+the first draft created, locked, bound — and **blank**, because `DEFAULT_CHANNEL_MESSAGES` had no
+entry for it and `resolve_channel_message_content` answers `""` for a key it does not carry. That
+answer is correct: it is also how a GM turns a message off, which is the one distinction v0.33.1 went
+to trouble to preserve. So a channel nobody wrote a blurb for is indistinguishable from one somebody
+deliberately emptied, nothing errors, and nothing is posted. Two channels are exempt because
+something else fills them — `#xianxia-info` gets the guide view, `#playtest` its own board — and each
+says which, in the gate.
+
+**`#event-scenes` is retired**, and this is the one place the release removes something. rc.52 split
+an event's *announcement* per world and left its *scene* hanging in a shared channel, so one event
+used two channels for no reason anybody could state. `event_scene_parent` is the one door:
+the world's own feed, which `world_event_channel` already falls back to the global feed for, so the
+worst case is the channel the announcement was going to anyway. It leaves `BASE_CHANNEL_SPECS`, so
+nothing creates or requires one — and **stays in `_base_channel_bindings`**, because teardown builds
+its targets from that dict and a server that already has the channel must still be able to lose it.
+That is the same rule as the retired category, one level down. The cost is stated rather than
+discovered: the per-world feeds are gated by the realm **access** role, so a scene in a world a
+player has not reached is now invisible to them, which is in `docs/KNOWN_LIMITATIONS.md`.
+
+**The gates, and what each drill prints.** Deleting the base re-parent prints
+`ensure_base_xianxia_channels: compares=False moves=False`; restoring create-only read-only prints
+*"so a channel the bot did not create is never made read-only"*; removing `SERVER_BASE_CATEGORY`
+from the teardown tuple fails **two** gates at once; dropping `updates_channel_id` from
+`clear_discord_bindings` prints *"updates (updates_channel_id): clear_discord_bindings does not
+name it"*; and the three release-notes rules each fail with their own sentence — *"a restart
+announced the same release twice"*, a fresh install that posted, and *"the marker advanced with
+nowhere to post"*.
+
+**Three of the drills caught the gates rather than the code, and they are one lesson.** The
+base-channel registration gate first sliced its blocks on indentation from a header string — and a
+multi-line `def` defeats that, because the closing `) -> None:` sits at the function's own indent,
+so every block ended one line in and every check passed vacuously. It reads functions by AST now.
+Then its self-check asserted the persist-block reader had found `updates_channel_id` — which
+`_base_channel_bindings` also contains, so pointing the reader at the wrong function *still passed*.
+It asserts `_bound_id(` instead, a string only the right function can hold.
+
+**And the third is the plainest one in the release.** `test_release_notes.py`'s own docstring said
+it held *"the three rules that keep it from being annoying"*, and it tested the changelog parser and
+the Discord chunker and **never called `announce_release_if_new` at all** — so deleting the marker
+write, which is the one line that makes the announcement happen once, left the suite green.
+Idempotence had been asserted in prose, in two places, and driven in none: exactly the shape of the
+thing this release exists to fix, written into the gate written for it, and only the drill said so.
+Six tests drive the function now, against a fake `DB` and a fake channel, and the drill fails on the
+sentence the rule is written in. A reader is asserted before it is trusted (rc.57), and a gate that
+cannot see the thing it forbids is decoration (rc.47) — and only running it against the broken tree
+says which kind you have.
 
 ### Somewhere to go above the Mortal World (v1.0.0-rc.54)
 
