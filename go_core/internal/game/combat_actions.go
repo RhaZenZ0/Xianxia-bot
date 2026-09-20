@@ -201,7 +201,13 @@ func conditionEffectGo(key string, severity int64) map[string]any {
 	case "foundation_crack":
 		mods = []map[string]any{{"stat": "breakthrough_bonus", "operation": "add", "value": -(severity * 2)}, {"stat": "cultivation_gain", "operation": "mul", "value": math.Max(0.50, 1.0-float64(severity)*0.08)}}
 	case "soul_wound":
-		mods = []map[string]any{{"stat": "insight", "operation": "add", "value": -severity}, {"stat": "spirit", "operation": "add", "value": -severity}, {"stat": "sense_precision_bonus", "operation": "add", "value": -(severity * 2)}}
+		// `sense_precision`, not `sense_precision_bonus` (v1.0.0-rc.58). The
+		// suffix names the `characters` column, which `sense_actions.go` reads
+		// at :33 and :144; the modifier vocabulary `senseExtraModifier` reads
+		// at :168 is the bare word, and content spells it that way twelve
+		// times over. So a Soul Wound - the one condition whose whole point is
+		// a dulled spiritual sense - had never dulled anybody's.
+		mods = []map[string]any{{"stat": "insight", "operation": "add", "value": -severity}, {"stat": "spirit", "operation": "add", "value": -severity}, {"stat": "sense_precision", "operation": "add", "value": -(severity * 2)}}
 	case "poison":
 		mods = []map[string]any{{"stat": "body", "operation": "add", "value": -severity}, {"stat": "agility", "operation": "add", "value": -maxI64(1, severity/2)}}
 	case "qi_deviation":
@@ -442,6 +448,12 @@ func combatTurnAction(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 	}
 	resonance := dualCheckBonus(c)
 	lawBonus := int64(math.Round(mods.Add["combat_bonus"]))
+	// The flee roll is the only place in the game that decides whether a
+	// cultivator can leave, and `escape_bonus` - authored on
+	// `special_effects.spatial_lockdown` since it was written, under a
+	// description saying in as many words that movement, flight and escape
+	// are suppressed - was read by nothing until v1.0.0-rc.58.
+	escapeBonus := int64(math.Round(mods.Add["escape_bonus"]))
 	comp, e := combatCompanionBonus(conn, userID)
 	if e != nil {
 		return authoritativeMutation{}, e
@@ -459,12 +471,13 @@ func combatTurnAction(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 	}
 	defenseBonus := def
 	if style == "flee" {
-		mod := mods.value(c.Attributes["agility"], "agility") + realm*2 + stage/3 + resonance + lawBonus + comp + eag
+		mod := mods.value(c.Attributes["agility"], "agility") + realm*2 + stage/3 + resonance + lawBonus + comp + eag + escapeBonus
 		r, e := roll2d10(mod, 11+b.NPCRealm*2+b.NPCStage/3)
 		if e != nil {
 			return authoritativeMutation{}, e
 		}
 		out["player_roll"] = r
+		out["escape_bonus"] = escapeBonus
 		if bval(r, "success") {
 			if e = damageEquipmentGo(conn, userID, 1); e != nil {
 				return authoritativeMutation{}, e
@@ -679,6 +692,19 @@ func combatTechniqueAction(conn *storage.Conn, catalog worlddata.Catalog, userID
 		return authoritativeMutation{}, e
 	}
 	out := map[string]any{"battle_id": b.BattleID, "technique": p.Technique, "technique_name": t.Name, "roll": roll, "npc_hp": b.NPCHP}
+	// Name what landed (v1.0.0-rc.58). This path resolves a control technique
+	// against the opponent and deliberately writes no `active_effects` row -
+	// a battle opponent is a name on `battles`, not a row anything can modify
+	// - so `special_effects.spatial_lockdown` and `.spatial_strangulation`
+	// reached a player through nothing at all. Carrying the effect's own name
+	// and description is what a panel needs to say which one it was.
+	if t.Effect != "" {
+		if effect, effectName, lookupErr := specialEffectPayload(catalog, t.Effect); lookupErr == nil {
+			out["effect_id"] = t.Effect
+			out["effect_name"] = effectName
+			out["effect_description"] = strings.TrimSpace(fmt.Sprint(effect["description"]))
+		}
+	}
 	if bval(roll, "success") {
 		margin := i64(roll["margin"])
 		turns := int64(1)
@@ -921,8 +947,7 @@ func combatFinalizeAction(conn *storage.Conn, catalog worlddata.Catalog, userID 
 	if e != nil {
 		return authoritativeMutation{}, e
 	}
-	reward := 5 + b.NPCRealm
-	_, e = conn.Execute(`UPDATE characters SET insight_xp=insight_xp+?,updated_at=? WHERE user_id=?`, []any{reward, now, userID})
+	reward, e := grantInsightXPTx(conn, userID, 5+b.NPCRealm, now)
 	if e != nil {
 		return authoritativeMutation{}, e
 	}
@@ -1009,7 +1034,7 @@ func combatFinalizeAction(conn *storage.Conn, catalog worlddata.Catalog, userID 
 						if loadErr != nil {
 							return authoritativeMutation{}, loadErr
 						}
-						awarded, rewardErr := applyCanonicalRewardTx(conn, catalog, userID, c, reward, "world_event_site_beast", now)
+						awarded, _, rewardErr := applyCanonicalRewardTx(conn, catalog, userID, c, reward, "world_event_site_beast", now)
 						if rewardErr != nil {
 							return authoritativeMutation{}, rewardErr
 						}

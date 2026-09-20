@@ -343,7 +343,7 @@ func worldEventEngageAction(conn *storage.Conn, catalog worlddata.Catalog, userI
 			reward.Items[node.ItemID] = node.ItemQty
 		}
 		if reward.Cultivation != 0 || reward.SpiritStones != 0 || len(reward.Items) > 0 {
-			awarded, e := applyCanonicalRewardTx(conn, catalog, userID, c, reward, "world_event_site_"+node.NodeType, now)
+			awarded, _, e := applyCanonicalRewardTx(conn, catalog, userID, c, reward, "world_event_site_"+node.NodeType, now)
 			if e != nil {
 				return authoritativeMutation{}, e
 			}

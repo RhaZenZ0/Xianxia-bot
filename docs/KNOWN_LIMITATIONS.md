@@ -85,6 +85,26 @@ database. Its findings are the first two entries.
   a wild minute and asserts the canonical one landed (it fails with `Force stamped 9999999` against
   the old code), and `test_simulation_minute.py` holds the Python side — where the assertion that
   encoded the fault lived, two tests below one refusing a forged minute on `/v1/game/action`.
+- **fixed (v1.0.0-rc.58)** — *An authored modifier stat could reach no rule, and nothing said so.*
+  `active_effects` modifiers were a vocabulary with no gate: content authored twenty stats and
+  production Go wrote twelve, and seven reached nothing. Two were the `characters` column name
+  written into a modifier slot — `sense_power_bonus` on `space_domain`, `sense_precision_bonus` in
+  the engine's own Soul Wound — which is why the gate has to read an argument position and a map
+  key rather than a name: that identifier occurs three times in production Go, twice as a column
+  inside a SQL string. `modifier_vocabulary_test.go` holds the vocabulary from both sides with an
+  empty allowlist, and its own drill found the last fault in it — pointing the content path at
+  nothing made the whole test SKIP, green and useless, so a read that fails is a `t.Fatalf` now.
+- **deferred (design)** — *A Law control effect's modifiers are never applied to anybody.*
+  `special_effects.spatial_lockdown` and `.spatial_strangulation` carry modifiers describing a
+  *target*, and `combat.technique` resolves both mechanically (suppression turns, damage) while
+  writing no `active_effects` row — a battle opponent is a name on `battles`, not a row anything
+  can modify, and there are no PvP techniques. So the modifiers describe something the engine has
+  nowhere to put. `combat.technique` names the effect that landed now, so the content reaches a
+  player as prose; applying it is a mechanic rather than a wiring, and wants its own change.
+- **deferred (design)** — *`nine_yang_solar_body` scorches only through the purge.* Its drawback
+  prose says "excess yang scorches the meridians" and v1.0.0-rc.58 gave it `fire_resistance -5`, so
+  it bites on `alchemy.purge` and nowhere else. A physique that scorches on its own schedule needs a
+  simulation pass over a body nothing currently ticks, which is a different change.
 - **deferred (design)** — *Moderation is a nudge on the engine's dispatch layer, not anti-cheat.*
   A muted or frozen player is blocked from the ~150 authoritative ops; raw `/v1/db` writes the
   bot makes on their behalf and the simulation runner are not intercepted. Stated in

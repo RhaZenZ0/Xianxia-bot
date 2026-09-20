@@ -25,6 +25,12 @@ import (
 // transcribed from the command it replaces.
 const lawTechniqueEffectMinutes = int64(120)
 
+// lawControlCategory is the content's own word for an effect cast at somebody
+// else - `special_effects.<id>.category`. It is the one statement of which
+// techniques need a target: `app/rules/game.py` asks the same question of the
+// same field rather than keeping a list of ids beside this one.
+const lawControlCategory = "Law Control"
+
 type lawTechniquePayload struct {
 	Technique  string `json:"technique"`
 	GameMinute int64  `json:"game_minute"`
@@ -101,10 +107,32 @@ func lawTechniqueAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 		"effect_id":   technique.Effect,
 	}
 	if technique.Effect != "" {
-		effect, known := catalog.SpecialEffects[technique.Effect]
-		if !known {
+		effect, effectName, lookupErr := specialEffectPayload(catalog, technique.Effect)
+		if lookupErr != nil {
 			return authoritativeMutation{}, fmt.Errorf("law technique %s names an unknown effect %q", key, technique.Effect)
 		}
+
+		// A control technique is cast at somebody, and there is nobody here.
+		//
+		// `combat.technique` resolves those against the opponent - suppression
+		// for the lockdown, damage for the strangulation - and writes no
+		// effect row at all. This path writes one on the *user*, so a control
+		// technique taken out of a battle applied its own debuff (agility -3
+		// and escape_bonus -5, for two hours) to the cultivator who used it,
+		// with no target anywhere in the world.
+		//
+		// `app/bot/commands/law.py` has refused that since v0.23.0 and the
+		// engine never did, which is rc.48's rule in a third place: a bound
+		// that lives in the client is not a bound. The category is read off
+		// the content rather than matched against a list of ids here, so the
+		// panel and the engine cannot disagree about which techniques those
+		// are (`World.law_technique_targets_another` asks the same question).
+		if strings.TrimSpace(fmt.Sprint(effect["category"])) == lawControlCategory {
+			return authoritativeMutation{}, fmt.Errorf(
+				"%s is a control technique and needs a target; use it through the battle panel",
+				technique.Name)
+		}
+
 		payload := map[string]any{}
 		for field, value := range effect {
 			payload[field] = value
@@ -115,7 +143,7 @@ func lawTechniqueAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 		if err != nil {
 			return authoritativeMutation{}, err
 		}
-		name := strings.TrimSpace(fmt.Sprint(effect["name"]))
+		name := effectName
 		if name == "" {
 			name = technique.Name
 		}

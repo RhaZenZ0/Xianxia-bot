@@ -180,7 +180,11 @@ func grantInheritanceTx(conn *storage.Conn, userID int64, realmID string, inheri
 	qi := inheritance.Bonuses["qi_max"]
 	vit := inheritance.Bonuses["vitality_max"]
 	insight := inheritance.Bonuses["insight_xp"]
-	if _, err = conn.Execute(`UPDATE characters SET qi_max=qi_max+?,qi=qi+?,vitality_max=vitality_max+?,vitality=vitality+?,insight_xp=insight_xp+?,updated_at=? WHERE user_id=?`, []any{qi, qi, vit, vit, insight, now, userID}); err != nil {
+	if _, err = conn.Execute(`UPDATE characters SET qi_max=qi_max+?,qi=qi+?,vitality_max=vitality_max+?,vitality=vitality+?,updated_at=? WHERE user_id=?`, []any{qi, qi, vit, vit, now, userID}); err != nil {
+		return nil, err
+	}
+	// Insight through its one door (v1.0.0-rc.58); the pools stay flat.
+	if insight, err = grantInsightXPTx(conn, userID, insight, now); err != nil {
 		return nil, err
 	}
 	if inheritance.Item != "" {
@@ -332,7 +336,7 @@ func secretRealmExploreAction(conn *storage.Conn, catalog worlddata.Catalog, use
 				paid[id] += qty
 			}
 		}
-		awarded, err := applyCanonicalRewardTx(conn, catalog, userID, c, canonicalReward{Cultivation: room.Cultivation, SpiritStones: room.SpiritStones, InsightXP: room.InsightXP, Items: paid}, "secret_realm_room", now)
+		awarded, insightGranted, err := applyCanonicalRewardTx(conn, catalog, userID, c, canonicalReward{Cultivation: room.Cultivation, SpiritStones: room.SpiritStones, InsightXP: room.InsightXP, Items: paid}, "secret_realm_room", now)
 		if err != nil {
 			return authoritativeMutation{}, err
 		}
@@ -343,7 +347,7 @@ func secretRealmExploreAction(conn *storage.Conn, catalog worlddata.Catalog, use
 		final := idx == int64(len(realm.Rooms)-1)
 		result["cultivation_awarded"] = awarded
 		result["spirit_stones"] = room.SpiritStones
-		result["insight_xp"] = room.InsightXP
+		result["insight_xp"] = insightGranted
 		result["items"] = paid
 		if len(rare) > 0 {
 			result["rare_items"] = rare

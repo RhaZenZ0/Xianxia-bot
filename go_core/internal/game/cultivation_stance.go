@@ -486,10 +486,11 @@ func cultivationStatusQuery(conn *storage.Conn, catalog worlddata.Catalog, userI
 func applyStanceToTraining(conn *storage.Conn, userID int64, stance cultivationStanceDefinition, gameMinute int64, now float64) (insightXP int64, deviation map[string]any, err error) {
 	switch stance.Key {
 	case stanceRefine:
-		if _, err := conn.Execute(`UPDATE characters SET insight_xp=insight_xp+?,updated_at=? WHERE user_id=?`, []any{int64(refineInsightXPPerSession), now, userID}); err != nil {
+		granted, err := grantInsightXPTx(conn, userID, int64(refineInsightXPPerSession), now)
+		if err != nil {
 			return 0, nil, err
 		}
-		return refineInsightXPPerSession, nil, nil
+		return granted, nil, nil
 	case stanceForce:
 		roll, err := gamerng.Intn(100)
 		if err != nil {

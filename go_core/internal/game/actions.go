@@ -419,8 +419,8 @@ func grantQuestRewardTx(conn *storage.Conn, catalog worlddata.Catalog, userID in
 	}
 	now := float64(time.Now().UnixNano()) / 1e9
 	if insight != 0 {
-		if _, err := conn.Execute(`UPDATE characters SET insight_xp=insight_xp+?,updated_at=? WHERE user_id=?`,
-			[]any{insight, now, userID}); err != nil {
+		var err error
+		if insight, err = grantInsightXPTx(conn, userID, insight, now); err != nil {
 			return nil, err
 		}
 	}

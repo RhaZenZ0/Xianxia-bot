@@ -8,6 +8,11 @@ from typing import Any, Protocol
 
 from .advanced_catalog import augment_advanced_catalog
 
+# The content's word for an effect cast at somebody else. The engine states it
+# once as `lawControlCategory`; this is the same string read from the same
+# field, not a second list of which techniques those are (v1.0.0-rc.58).
+CONTROL_EFFECT_CATEGORY = "Law Control"
+
 
 class D10Source(Protocol):
     """Injected randomness boundary used by parity and replay tests."""
@@ -209,6 +214,22 @@ class World:
     def law_technique(self, technique_id: str) -> dict[str, Any] | None:
         data = self.law_system.get("techniques", {}).get(technique_id)
         return dict(data) if data else None
+
+    def law_technique_targets_another(self, technique_id: str) -> bool:
+        """Whether a Law technique is cast at somebody else (v1.0.0-rc.58).
+
+        `special_effects.<id>.category` is the content's own word for it, and
+        it is the only statement: the engine refuses one out of a battle by
+        reading the same field (`lawControlCategory` in
+        `go_core/internal/game/law_technique_actions.go`), so the panel and
+        the engine cannot disagree about which techniques those are.
+        `app/bot/commands/law.py` used to carry a set of ids instead, and until
+        rc.58 that set was also the only thing in the tree stopping a cultivator
+        applying a control debuff to themselves out of a battle.
+        """
+        technique = self.law_system.get("techniques", {}).get(str(technique_id)) or {}
+        effect = self.special_effects.get(str(technique.get("effect", ""))) or {}
+        return str(effect.get("category", "")) == CONTROL_EFFECT_CATEGORY
 
     def item_name(self, item_id: str) -> str:
         return str(self.items.get(item_id, {}).get("name", item_id.replace("_", " ").title()))

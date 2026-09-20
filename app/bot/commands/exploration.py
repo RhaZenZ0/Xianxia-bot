@@ -1005,11 +1005,29 @@ async def alchemy_purge(interaction: discord.Interaction) -> None:
         await interaction.followup.send(alchemy_purge_refusal(str(exc)), ephemeral=False)
         return
     result = dict(envelope.get("result") or {})
-    await interaction.followup.send(
+    lines = [
         f"🫧 You circulate **{int(result.get('qi_cost', 0))} Qi** through the meridians and purge "
         f"**{int(result.get('purged', 0))}** toxicity. "
-        f"Pill toxicity is now **{int(result.get('pill_toxicity', 0))}/100**.", ephemeral=False,
-    )
+        f"Pill toxicity is now **{int(result.get('pill_toxicity', 0))}/100**."
+    ]
+    if int(result.get("detox_power", 0)) > 0:
+        lines.append(f"💊 Purging medicine carried you **+{int(result.get('detox_power', 0))} detox power**.")
+    # The flame the Purging Phoenix Pill has always warned about (v1.0.0-rc.58).
+    # It is only rolled above saturation, so a light purge prints nothing extra
+    # and stays the action it has always been. Nothing is decided here - the
+    # engine has already applied the condition if there is one.
+    scorch = result.get("scorch_roll")
+    if isinstance(scorch, dict):
+        lines.append(f"🔥 Holding the medicinal flame: {roll_line(SimpleNamespace(**scorch))}")
+        scorched = result.get("scorched")
+        if isinstance(scorched, dict):
+            lines.append(
+                f"🩸 The flame scorches your meridians — **{scorched.get('name', 'Meridian Damage')}** "
+                f"(severity {int(scorched.get('severity', 1))}). `/condition treat` with a **Jade Life Herb** mends it."
+            )
+        else:
+            lines.append("🌿 The flame stays where you put it.")
+    await interaction.followup.send("\n".join(lines), ephemeral=False)
 
 
 realmhub_group = app_commands.Group(name="realmhub", description="Meet other cultivators in the central city of each realm world")

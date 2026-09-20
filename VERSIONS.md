@@ -6,6 +6,53 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.0** (rc.58) wires the numbers that reached no rule, and gives the Law of Space its capstone.
+
+`active_effects` modifiers are a vocabulary nothing was holding: any string may be written as a
+`stat`, `loadEffectModifiers` sums it into `mods`, and no gate ever asked whether a rule reads it
+back. Content authored twenty distinct stats and production Go wrote twelve, and **seven reached no
+rule at all**. Two were near-miss names - `space_domain` authored `sense_power_bonus` and Go's own
+`conditionEffectGo` authored `sense_precision_bonus`, both reaching for the `characters` column
+where the reader wants the bare word, which `sense_actions.go` reads a dozen lines apart in one
+function. So a Soul Wound had never dulled anybody's spiritual sense. The other five were never
+wired: `escape_bonus` rides the flee roll now, `heart_demon_resistance` the Heart Tribulation wave
+it is named for, `detox_power` and `fire_resistance` the purge, and `insight_gain` needed insight XP
+to have one door first - it had eight writers, which is rc.56's two settles and rc.43's two stores
+again. What it cost a player was invisible, because `/specialeffects` prints an effect's name and
+never its modifiers: the item's own description was the promise, and the Heart Calming Pill's
+"settles the mind, aids insight and suppresses heart-demon disturbances" was one of three.
+
+**The realm-30 Space Law capstone hard-errored.** `world_collapse` named
+`special_effects.world_collapse`, which was not there, and the engine refuses an effect the
+catalogue does not carry - correctly. The Go test that exists to prove the capstone works declared
+its *own* `world_collapse` in its own fixture, with an effect the fixture provides, at a quarter of
+the realm and stage production asks for; it asserted the capstone succeeds while production
+answered with an error, for twelve releases. That is the `npc_consignments` lesson through the front
+door. The playtest walked past it: it climbs Space Law to Essence/Origin, stands at Dao Saint and
+creates a personal world in consecutive lines, and its only `law.technique` call expected a refusal
+- which rc.35's rule counted as driven. **Driven means resolved now**, and the new allowlist is
+deliberately not empty, because tightening a loose rule reveals the backlog the loose wording
+created.
+
+**The engine had never refused a control technique out of battle**, either. It writes the effect
+row on the *user*, so nothing but a check in `law.py` stopped a cultivator applying `agility -3,
+escape_bonus -5` to themselves with no target in the world - rc.48's rule in a third place, latent
+only because the stat was dead, which is why the refusal ships in the same release as the wiring.
+And the two `special_effects` lookups gave different answers to "unknown": one refused, the other
+indexed the map bare and wrote the literal `null` into an effect row, succeeding while applying
+nothing - the same sentence that file's own comment already has to write about rc.19.
+
+**`alchemy.purge` grew the risk its content has always described.** The Purging Phoenix Pill says
+"without cooling support it may scorch meridians" and the Nine-Yang body's drawback says the same
+thing; `meridian_damage` is a condition the engine already has; and the purge had no risk at all. It
+is built from what the content specifies rather than invented: a light purge is still free, and
+above saturation the flame is a roll that `fire_resistance` resists, about 1% at toxicity 60 and 36%
+at 100 without the pill. `detox_power` roughly doubles what a purge burns off, which is what the
+pill costs 26 stones for.
+
+Also here: `app/rules/inscription.py` is gone - a dead Python copy of two of the six deployable
+arrays Go carries, with modifier stats of its own and not one caller anywhere. No schema change.
+
 **1.0.0** (rc.57) makes rc.56 installable. It could not bootstrap a fresh database:
 `seclusion_sessions.ends_real_ts` was declared both in the base schema script and in migration 57's
 `ALTER TABLE ... ADD COLUMN`, and the base script runs first, so a new world created the table with
@@ -2057,10 +2104,12 @@ mechanical authority paths.
 
 ## Release status — v1.0.0
 
-- Current release: v1.0.0 (rc.16): the shorthand — `x explore` runs `/explore`, resolved against the
-  registered command table and heard in every channel of the guild, silent on a line that names no
-  command. Tagged `v1.0.0-rc.16` on the beta channel; the NAS drills and two quiet weeks make it
-  `v1.0.0`.
+- Current release: v1.0.0 (rc.58): the modifier vocabulary nothing was holding - seven authored stats
+  that reached no rule, the Law of Space capstone that named an effect nobody wrote, and the purge's
+  flame its own content had always described. Tagged `v1.0.0-rc.58` on the beta channel; the NAS
+  drills and two quiet weeks make it `v1.0.0`.
+  (This line stood at rc.16 for forty-two releases. `test_release_version.py` only ever asserted the
+  `v1.0.0` prefix, so nothing caught it, and it is the line an operator reads.)
 - v1.0.0 (rc.15): the spiritual sense reads the ground it is standing on, the two middle readings it
   could give become reachable, and it stops asking the world for minute zero.
 - v1.0.0 (rc.14): a broken call in `/sense` repaired, and every attribute the command surface reads

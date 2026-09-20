@@ -92,6 +92,11 @@ CREATE TABLE characters(
     -- before wallets existed and every character has it; this fixture did not,
     -- so tests that needed it added it with their own ALTER (v1.0.0-rc.43).
     spirit_stones INTEGER NOT NULL DEFAULT 0,
+    -- Insight XP, for the same reason and with the same history: production
+    -- has always had it, this fixture did not, and v1.0.0-rc.58 gave insight
+    -- one door whose whole job is to write it. A fixture missing a column the
+    -- rule under test writes cannot fail the way production fails.
+    insight_xp INTEGER NOT NULL DEFAULT 0,
     gender TEXT NOT NULL DEFAULT 'neutral',
     path TEXT NOT NULL,
     spiritual_root TEXT NOT NULL,

@@ -1243,3 +1243,90 @@ class ForageMaterialsAreReadTests(unittest.TestCase):
         catalog = (PROJECT_ROOT / "go_core" / "internal" / "worlddata" / "catalog.go").read_text(encoding="utf-8")
         self.assertIn('json:"forage_materials"', catalog)
         self.assertIn("type ForageMaterial struct", catalog)
+
+
+class SpecialEffectContentTests(unittest.TestCase):
+    """An effect a technique names must exist, and must grant something real
+    (v1.0.0-rc.58).
+
+    `law_system.techniques.world_collapse` named `special_effects.world_collapse`,
+    which was not there, for twelve releases - so the realm-30 Space Law
+    capstone answered with an engine error to a cultivator standing at Dao
+    Saint, at Essence/Origin, with a stabilized personal world. The engine's
+    refusal was correct; the content was what was wrong.
+
+    The behavioural half is Go's (`special_effects_content_test.go` drives the
+    shipped catalogue through `lawTechniqueAction`). This is the cheap twin,
+    in the fast suite, plus the one thing only Python can check here: the
+    near-miss names that caused the other half of the finding.
+    """
+
+    #: `characters` carries these four columns, and the modifier vocabulary
+    #: does not. `space_domain` authored `sense_power_bonus` and Go's own
+    #: `conditionEffectGo` authored `sense_precision_bonus`, in both cases
+    #: reaching for the column name where the reader wants the bare word -
+    #: `senseExtraModifier` is called with exactly `sense_power`,
+    #: `sense_precision` and `sense_range`.
+    COLUMN_NAMES_THAT_ARE_NOT_MODIFIERS = (
+        "sense_power_bonus", "sense_precision_bonus", "sense_range_bonus", "concealment_bonus",
+    )
+
+    def test_every_law_techniques_effect_resolves(self):
+        effects = WORLD["special_effects"]
+        techniques = WORLD["law_system"]["techniques"]
+        self.assertGreaterEqual(len(techniques), 5, "the technique roster all but disappeared")
+        self.assertGreaterEqual(len(effects), 8, "the effect catalogue all but disappeared")
+        for key, technique in techniques.items():
+            effect_id = str(technique.get("effect", "")).strip()
+            if not effect_id:
+                continue  # `folded_step` grants nothing, deliberately.
+            with self.subTest(technique=key):
+                self.assertIn(effect_id, effects,
+                              f"{key} names effect {effect_id!r}, which special_effects does not carry")
+
+    def test_every_special_effect_grants_something(self):
+        for key, effect in WORLD["special_effects"].items():
+            with self.subTest(effect=key):
+                self.assertTrue(str(effect.get("name", "")).strip(), f"{key} has no name")
+                self.assertTrue(str(effect.get("category", "")).strip(), f"{key} has no category")
+                self.assertGreaterEqual(len(str(effect.get("description", ""))), 20,
+                                        f"{key} has no description worth printing")
+                self.assertGreaterEqual(int(effect.get("severity", 0)), 1, f"{key} has no severity")
+                self.assertTrue(effect.get("modifiers"), f"{key} grants nothing")
+
+    def test_no_effect_spells_a_stat_with_a_characters_column_name(self):
+        """The gate on the exact mistake, read against the real DDL rather than
+        against a list retyped here."""
+        ddl = (PROJECT_ROOT / "app" / "database" / "core.py").read_text(encoding="utf-8")
+        for column in self.COLUMN_NAMES_THAT_ARE_NOT_MODIFIERS:
+            self.assertIn(column, ddl, f"{column} is not a characters column any more; retire this rule")
+
+        offenders = []
+
+        def walk(node, path):
+            if isinstance(node, dict):
+                if "stat" in node and "operation" in node:
+                    if str(node["stat"]) in self.COLUMN_NAMES_THAT_ARE_NOT_MODIFIERS:
+                        offenders.append(f"{path} -> {node['stat']}")
+                for key, value in node.items():
+                    walk(value, f"{path}.{key}")
+            elif isinstance(node, list):
+                for index, value in enumerate(node):
+                    walk(value, f"{path}[{index}]")
+
+        walk(WORLD, "")
+        self.assertEqual(offenders, [],
+                         "a modifier is spelled with a `characters` column name; the reader wants the bare word")
+
+    def test_the_capstone_is_strictly_above_the_domain_below_it(self):
+        effects = WORLD["special_effects"]
+        below, above = effects["space_domain"], effects["world_collapse"]
+        self.assertGreater(int(above["severity"]), int(below["severity"]))
+
+        def stats(effect):
+            return {m["stat"]: m["value"] for m in effect["modifiers"]}
+
+        low, high = stats(below), stats(above)
+        self.assertLessEqual(set(low), set(high), "the capstone drops something the domain below it grants")
+        for stat, value in low.items():
+            self.assertGreater(high[stat], value, f"the capstone grants {stat} no more than space_domain does")

@@ -109,7 +109,7 @@ async def law_technique_command(interaction:discord.Interaction,technique:str)->
         pw=await DB.get_personal_world(interaction.user.id)
         if not pw: await respond(interaction, "World Collapse requires a stabilized personal world.",ephemeral=False);return
     battle=await DB.get_active_battle(interaction.user.id)
-    if technique in {'spatial_lockdown','spatial_strangulation'} and not battle:
+    if WORLD.law_technique_targets_another(technique) and not battle:
         await respond(interaction, "That control technique currently requires an active battle target.",ephemeral=False);return
     if battle:
         result=await _execute_battle_law_technique(interaction,battle,technique)

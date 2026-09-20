@@ -32,6 +32,29 @@ const (
 	alchemyPurgeCooldownSeconds = int64(60 * 60)
 	alchemyPurgeMinQiCost       = int64(4)
 	alchemyPurgeMaxQiCost       = int64(12)
+
+	// The flame the Purging Phoenix Pill has always described (v1.0.0-rc.58).
+	//
+	// `items.purging_phoenix_pill` says "dangerous without cooling medicine"
+	// and, on its effect, "without cooling support it may scorch meridians";
+	// `physiques.nine_yang_solar_body` says "excess yang scorches the
+	// meridians". Two pieces of content naming one mechanic the engine did
+	// not have, and both naming `meridian_damage`, which it does - so this is
+	// built from what the content already specifies rather than invented.
+	//
+	// Until now `alchemy.purge` had no risk at all: it spent qi and removed
+	// toxicity and that was the entire action. A light purge still does
+	// exactly that; the risk starts only once the meridians are saturated.
+	alchemyScorchBaseTN      = int64(8)
+	alchemyScorchHeatPerTN   = int64(6)
+	alchemyScorchResistScale = int64(5)
+	alchemyScorchSevereBand  = int64(-5)
+
+	// alchemyDetoxScale turns `detox_power` - a 0-100 sort of number, authored
+	// as 40 on the pill - into extra toxicity burned off. Four, so the pill is
+	// worth +10, which roughly doubles a mid cultivator's purge and is what it
+	// costs 26 stones for.
+	alchemyDetoxScale = int64(4)
 )
 
 type alchemyPurgePayload struct {
@@ -43,9 +66,35 @@ func alchemyPurgeQiCost(toxicity int64) int64 {
 	return minI64(alchemyPurgeMaxQiCost, maxI64(alchemyPurgeMinQiCost, toxicity/8))
 }
 
-// alchemyPurgeAmount is `min(current, 8 + will//2 + spirit//3)`.
-func alchemyPurgeAmount(toxicity, will, spirit int64) int64 {
-	return minI64(toxicity, 8+will/2+spirit/3)
+// alchemyPurgeAmount is `min(current, 8 + will//2 + spirit//3)` from the old
+// command, plus whatever purging medicine the cultivator is carrying
+// (v1.0.0-rc.58). `detox_power` is the number the Purging Phoenix Pill has
+// always granted and nothing has ever read.
+func alchemyPurgeAmount(toxicity, will, spirit, detox int64) int64 {
+	return minI64(toxicity, 8+will/2+spirit/3+detox/alchemyDetoxScale)
+}
+
+// alchemyScorchTN is how hard the flame is to hold: nothing at all below
+// saturation, then one point harder every six above it.
+//
+// It reads the toxicity *carried*, never the amount purged - a cultivator who
+// drank a pill to burn off more must not be punished for the pill that is
+// also their cooling.
+func alchemyScorchTN(toxicity int64) int64 {
+	return alchemyScorchBaseTN + (toxicity-pillToxicitySaturated)/alchemyScorchHeatPerTN
+}
+
+// alchemyScorchModifier is what holds the flame: the body it runs through, the
+// will directing it, and the cooling they brought.
+//
+// The attributes are canonical here while `alchemyPurgeAmount`'s are stored,
+// and the asymmetry is deliberate. The amount is a v0.23.0 transcription this
+// file's own header says must not be rebalanced without its own change; the
+// scorch is a new rule with nothing to preserve, and it is already reaching
+// into `active_effects` for `fire_resistance`, so reading the cultivator as
+// they actually are is the only consistent choice.
+func alchemyScorchModifier(body, will, fireResistance int64) int64 {
+	return body/2 + will/2 + fireResistance/alchemyScorchResistScale
 }
 
 func alchemyPurgeAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
@@ -96,11 +145,17 @@ func alchemyPurgeAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 	}
 
 	attrs := decodeJSONMap(character["attributes_json"])
-	purged := alchemyPurgeAmount(toxicity, storage.ParseInt(attrs["will"]), storage.ParseInt(attrs["spirit"]))
+	detox, err := canonicalAdditiveEffectBonus(conn, catalog, userID, "", p.GameMinute, "detox_power")
+	if err != nil {
+		return authoritativeMutation{}, err
+	}
+	purged := alchemyPurgeAmount(toxicity, storage.ParseInt(attrs["will"]), storage.ParseInt(attrs["spirit"]), detox)
 	if purged < 0 {
 		purged = 0
 	}
 	remainingToxicity := maxI64(0, toxicity-purged)
+	var scorchRoll, scorchedCondition map[string]any
+	fireResisted := int64(0)
 
 	if _, err = conn.Execute(
 		`UPDATE characters SET qi=qi-?,updated_at=? WHERE user_id=?`,
@@ -115,13 +170,49 @@ func alchemyPurgeAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 		return authoritativeMutation{}, err
 	}
 	// Settling again is what keeps the shared effect row honest: crossing back
-	// under 40 has to delete it, and staying above has to rewrite the band.
+	// under `pillToxicitySaturated` has to delete it, and staying above has to
+	// rewrite the band.
 	settled, err := settlePillToxicityEffectTx(conn, userID, p.GameMinute)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
 	if err = setCooldown(conn, userID, "alchemy_purge", alchemyPurgeCooldownSeconds, now); err != nil {
 		return authoritativeMutation{}, err
+	}
+
+	// The flame, once the meridians are saturated. It is rolled after the
+	// purge has been written, because what it costs is a condition and not the
+	// purge: a scorched cultivator still burned off what they burned off.
+	if toxicity > pillToxicitySaturated {
+		body, berr := canonicalAttribute(conn, catalog, userID, p.GameMinute, "body")
+		if berr != nil {
+			return authoritativeMutation{}, berr
+		}
+		will, werr := canonicalAttribute(conn, catalog, userID, p.GameMinute, "will")
+		if werr != nil {
+			return authoritativeMutation{}, werr
+		}
+		fireResistance, ferr := canonicalAdditiveEffectBonus(conn, catalog, userID, "", p.GameMinute, "fire_resistance")
+		if ferr != nil {
+			return authoritativeMutation{}, ferr
+		}
+		scorch, serr := rollCheck(alchemyScorchModifier(body, will, fireResistance), alchemyScorchTN(toxicity))
+		if serr != nil {
+			return authoritativeMutation{}, serr
+		}
+		scorchRoll = scorch
+		fireResisted = fireResistance
+		if !scorch["success"].(bool) {
+			severity := int64(1)
+			if i64(scorch["margin"]) <= alchemyScorchSevereBand {
+				severity = 2
+			}
+			scorched, cerr := applyCombatCondition(conn, userID, "meridian_damage", severity, "alchemy", "purge", p.GameMinute)
+			if cerr != nil {
+				return authoritativeMutation{}, cerr
+			}
+			scorchedCondition = scorched
+		}
 	}
 
 	result := map[string]any{
@@ -132,6 +223,15 @@ func alchemyPurgeAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 		"pill_toxicity":  settled,
 		"before":         toxicity,
 		"cooldown_ready": now + float64(alchemyPurgeCooldownSeconds),
+		"detox_power":    detox,
+	}
+	if scorchRoll != nil {
+		result["scorch_roll"] = scorchRoll
+		result["fire_resistance"] = fireResisted
+		result["scorch_tn"] = alchemyScorchTN(toxicity)
+	}
+	if scorchedCondition != nil {
+		result["scorched"] = scorchedCondition
 	}
 	return authoritativeMutation{
 		Result: result,

@@ -466,6 +466,25 @@ func abodeUpgradeActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID 
 	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "property", EventType: "abode.upgrade", EntityType: "abode", EntityID: fmt.Sprint(a["location_key"]), GameMinute: p.GameMinute, Payload: out}}, nil
 }
 
+// abodeFacilityEffects is which `special_effects` entry each buildable
+// facility grants. It is a package-level map rather than a literal inside
+// `abode.focus` so the content gate can walk it: this and `content/world.json`
+// are the only two places in the tree that name a special-effect id.
+//
+// "formation" was missing from it (v1.0.0-rc.19) while being a perfectly
+// valid facility in `abode_system.facilities`, so it passed every check and
+// then fell through to "" - the action succeeded and applied nothing. That is
+// also why `craftEffectStat`'s "formation_bonus" was a stat no rule could
+// ever grant, leaving Formation and Inscription crafts structurally at
+// effect_bonus 0 while Alchemy and Forging got +2. The other five facilities
+// grant no effect by design (v1.0.0-rc.36).
+var abodeFacilityEffects = map[string]string{
+	"cultivation": "abode_cultivation_focus",
+	"alchemy":     "alchemy_inspiration",
+	"forge":       "forge_inspiration",
+	"formation":   "formation_inspiration",
+}
+
 func abodeFocusActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	var p abodeFacilityPayload
 	if e := json.Unmarshal(raw, &p); e != nil {
@@ -501,18 +520,23 @@ func abodeFocusActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID in
 	if lvl <= 0 {
 		return authoritativeMutation{}, errors.New("that facility has not been built yet")
 	}
-	// "formation" was missing here (v1.0.0-rc.19) while being a perfectly valid
-	// facility in `abode_system.facilities`, so it passed every check above and
-	// then fell through this map to "" - the action succeeded and applied
-	// nothing. That is also why `craftEffectStat`'s "formation_bonus" was a stat
-	// no rule could ever grant, leaving Formation and Inscription crafts
-	// structurally at effect_bonus 0 while Alchemy and Forging got +2.
-	effectID := map[string]string{"cultivation": "abode_cultivation_focus", "alchemy": "alchemy_inspiration", "forge": "forge_inspiration", "formation": "formation_inspiration"}[p.Facility]
+	effectID := abodeFacilityEffects[p.Facility]
 	out := map[string]any{"facility": p.Facility, "level": lvl, "effect_id": effectID}
 	if effectID != "" {
-		effect := catalog.SpecialEffects[effectID]
+		// Through the one door, and refusing (v1.0.0-rc.58). This was a bare
+		// map index: an id the catalogue does not carry yielded a nil map,
+		// `json.Marshal` wrote the literal `null`, the name fell back to the
+		// facility's own, and the focus *succeeded applying nothing* - the
+		// same sentence the comment above already has to write about rc.19,
+		// reached this time by a GM renaming an effect rather than by a
+		// facility missing from the map.
+		effect, effectName, lookupErr := specialEffectPayload(catalog, effectID)
+		if lookupErr != nil {
+			return authoritativeMutation{}, fmt.Errorf(
+				"the %s facility names effect %q, which the catalogue does not carry", p.Facility, effectID)
+		}
 		enc, _ := json.Marshal(effect)
-		name := fmt.Sprint(effect["name"])
+		name := effectName
 		if name == "" {
 			name = p.Facility
 		}

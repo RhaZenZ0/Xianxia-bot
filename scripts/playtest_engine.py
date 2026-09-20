@@ -1125,8 +1125,31 @@ async def run(url: str, token: str, db_path: str) -> Report:
     await step(report, "cooldowns cleared", gm("admin.player.reset_cooldowns", {"user_id": PLAYER, "reason": "playtest"}))
     await step(report, "forage.resolve", act("forage.resolve", PLAYER, {}))
     await step(report, "back to the town", gm("admin.player.teleport", {"user_id": PLAYER, "location": town, "reason": "playtest"}))
+    # 80, not 40: the purge's flame only exists above `pillToxicitySaturated`
+    # (v1.0.0-rc.58), and at exactly 40 there is no roll to drive. A light
+    # purge stays exactly as free as it has always been, which is the point -
+    # so the leg below drives both sides of that line.
     await audited("admin.player.set_pill_toxicity", {"user_id": PLAYER, "pill_toxicity": 40, "reason": "playtest"})
-    await step(report, "alchemy.purge", act("alchemy.purge", PLAYER, {}))
+    light = await step(report, "alchemy.purge below saturation costs nothing but qi", act("alchemy.purge", PLAYER, {}))
+    if light is not None:
+        report.add("PASS" if light.get("scorch_roll") is None else "FAIL",
+                   "a light purge is not a roll", f"purged={light.get('purged')} scorch={light.get('scorch_roll')}")
+    await step(report, "cooldowns cleared", gm("admin.player.reset_cooldowns", {"user_id": PLAYER, "reason": "playtest"}))
+    # Qi back to full first: `alchemyPurgeQiCost` scales with the toxicity
+    # carried, so the heavy purge below costs about twice the light one and the
+    # light one has just been paid for. That is the action's own pricing, not
+    # anything this leg changed - and a scratch cultivator has one pool.
+    await step(report, "qi restored before the heavy purge", gm("admin.player.revive", {"user_id": PLAYER, "reason": "playtest"}))
+    await audited("admin.player.set_pill_toxicity", {"user_id": PLAYER, "pill_toxicity": 80, "reason": "playtest"})
+    heavy = await step(report, "alchemy.purge above saturation", act("alchemy.purge", PLAYER, {}))
+    if heavy is not None:
+        # The scorch is a roll and is reported either way; what is certain is
+        # that it happened and that `detox_power` was asked for.
+        report.add("PASS" if heavy.get("scorch_roll") is not None else "FAIL",
+                   "a heavy purge rolls the flame the pill warns about",
+                   f"purged={heavy.get('purged')} tn={heavy.get('scorch_tn')} "
+                   f"roll={heavy.get('scorch_roll')} scorched={bool(heavy.get('scorched'))} "
+                   f"detox={heavy.get('detox_power')} fire_resistance={heavy.get('fire_resistance')}")
 
     # -- a Law
     await step(report, "stand at realm 6 for a Law", gm("admin.player.set_realm", {"user_id": PLAYER, "realm_index": 6, "phase": 1, "reason": "playtest"}))
@@ -1893,6 +1916,47 @@ async def run(url: str, token: str, db_path: str) -> Report:
     if left is not None:
         report.add("PASS" if str(left.get("location")) == town else "FAIL", "leaving lands at Greenriver Town", str(left.get("location")))
     await step(report, "a second world is refused", act("personal_world.create", PLAYER, {"name": "Another Pocket"}), expect_error="already stabilized")
+
+    # The Law capstone, driven to a *success* (v1.0.0-rc.58). This is the one
+    # point in the run where all three of its requirements stand at once -
+    # realm 30, Space Law at Essence/Origin, and a stabilized personal world -
+    # and the harness had walked past it for twenty-five releases while the
+    # engine hard-errored on it, because `law.technique` read as covered off a
+    # single call that only ever expected a refusal.
+    await step(report, "law.technique out of battle refuses a control technique",
+               act("law.technique", PLAYER, {"technique": "spatial_lockdown"}), expect_error="needs a target")
+    collapsed = await step(report, "law.technique world_collapse, the realm-30 capstone",
+                           act("law.technique", PLAYER, {"technique": "world_collapse"}))
+    if collapsed is not None:
+        named = str(collapsed.get("effect_name") or "")
+        report.add("PASS" if collapsed.get("effect_id") == "world_collapse" and named else "FAIL",
+                   "the capstone manifests as a named self-buff",
+                   f"effect={collapsed.get('effect_id')} name={named} ends={collapsed.get('ends_game_minute')}")
+
+    # And the other half of the Law: `combat.technique` resolves a control
+    # technique against an opponent and writes no effect row at all, so until
+    # v1.0.0-rc.58 the two authored control effects reached a player through
+    # nothing. The result names what landed now. This is also the one place in
+    # the run where a cultivator qualifies for one: stage 5, realm 30.
+    targets = await step(report, "combat.targets for the Law leg", query("combat.targets", PLAYER, {"location": town}))
+    rows = [r for r in list((targets or {}).get("targets") or (targets or {}).get("rows") or [])
+            if isinstance(r, dict) and r.get("name")]
+    if not rows:
+        report.add("SKIP", "combat.technique with a qualified Law", f"nobody to challenge in {town}")
+    else:
+        foe = str(min(rows, key=lambda r: int(r.get("realm_index") or 0)).get("name"))
+        duel = await step(report, f"combat.start against {foe} for the Law", act("combat.start", PLAYER, {"kind": "challenge", "npc_name": foe, "source": "playtest"}))
+        duel_id = int((duel or {}).get("battle_id") or 0)
+        if duel_id:
+            crushed = await step(report, "combat.technique spatial_strangulation",
+                                 act("combat.technique", PLAYER, {"battle_id": duel_id, "technique": "spatial_strangulation"}))
+            if crushed is not None:
+                report.add("PASS" if crushed.get("effect_id") == "spatial_strangulation" else "FAIL",
+                           "the battle names the effect that landed",
+                           f"effect={crushed.get('effect_id')} name={crushed.get('effect_name')} "
+                           f"roll={crushed.get('roll')} damage={crushed.get('damage_dealt')}")
+            await quietly(act("combat.flee", PLAYER, {"battle_id": duel_id}))
+            await quietly(act("combat.turn", PLAYER, {"battle_id": duel_id, "style": "flee"}))
 
     # -- what only the world makes (v1.0.0-rc.38)
     # Three families whose first row no GM lever writes. A beast begins with
