@@ -11,6 +11,23 @@ database. Its findings are the first two entries.
 
 ## Findings
 
+- **deferred (planned)** — *A household's manual is never the household's.* `family.lesson` hands
+  over the family's manual at the head of the house's own lesson, beside its story and its keepsake,
+  and the tier is already right and already enforced: all nine are `min_realm_index: 0` and the
+  engine refuses a Demonic one outright (rc.34 — `manualForbidden` would cost a child karma on first
+  study). What is wrong is whose text it is. Six of the nine belong to a **sect** — a fallen martial
+  clan hands out the Azure Cloud Sect's outer-disciple canon — and the other three are
+  `advanced_orthodox_NNN_<path>`, taught to five households including the **noble martial clan**, the
+  wealthiest house in the game, which gets a numbered id rather than a named heirloom text. The grade
+  splits on exactly that line, five `Mortal` against four `Spirit`.
+  **And the catalogue is why, which is the part worth knowing before trying to fix it in the
+  lesson.** Of 160 manuals, **142 are generated-shaped** (`advanced_demonic_001_sword_cultivator` and
+  its siblings) and only 18 are authored; of those 18, twelve carry a `sect` and the remaining six
+  are *all* Demonic (`blood_sea_scripture`, `soul_devouring_codex`, …). So there is **no authored,
+  non-sect, non-forbidden manual anywhere in the game** — a household teaching its own tradition has
+  nothing in content to teach. This is content design (nine tier-0 family manuals, one per household
+  tradition, each with its techniques), not a wiring fix, which is why it is recorded rather than
+  quietly patched by re-pointing the lesson at a different borrowed text.
 - **fixed (v1.0.1)** — *No gate held a parsed content field to having a reader, and the class
   kept producing findings.* v1.0.0-rc.55 found `RootGrade.CultivationMult` and
   `RootGrade.BreakthroughBonus` parsed and read by nothing — the grade decided how a cultivator was
