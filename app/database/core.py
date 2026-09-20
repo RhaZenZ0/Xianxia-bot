@@ -21,7 +21,7 @@ except ModuleNotFoundError:  # Production remote-DB mode does not import a SQLit
         Row = sqlite3.Row
     aiosqlite = _AioSQLiteRemoteOnly()  # type: ignore[assignment]
 
-from .remote import GoDatabaseTransport
+from .remote import GoDatabaseTransport, RemoteDatabaseError
 
 log = logging.getLogger("xianxia.database")
 
@@ -3239,13 +3239,15 @@ class Database:
                     accumulated_gain INTEGER NOT NULL DEFAULT 0,
                     status TEXT NOT NULL DEFAULT 'active',
                     ended_reason TEXT NOT NULL DEFAULT '',
-                    -- The retreat's real deadline (schema 57, v1.0.0-rc.56). A
-                    -- retreat lasts at most two real hours, and the bound has to
-                    -- be a real one: stored in game minutes, a GM changing the
-                    -- world's time scale would re-size every retreat already
-                    -- under way. NULL is a retreat started before this column
-                    -- existed, which keeps the length it was started with.
-                    ends_real_ts REAL,
+                    -- `ends_real_ts` (schema 57) is deliberately NOT here: a
+                    -- column a migration adds is the migration's alone. This
+                    -- script runs on every boot, before the migrations, so a
+                    -- column named in both makes migration 57's ALTER fail with
+                    -- "duplicate column name" on a *fresh* database - which is
+                    -- how v1.0.0-rc.56 shipped unable to bootstrap one. All 59
+                    -- ADD COLUMN migrations before it follow this rule, and
+                    -- `test_a_migrations_column_is_the_migrations_alone` now
+                    -- holds it.
                     created_at REAL NOT NULL,
                     updated_at REAL NOT NULL,
                     FOREIGN KEY(user_id) REFERENCES characters(user_id) ON DELETE CASCADE
@@ -4061,11 +4063,18 @@ class Database:
                     for statement in statements:
                         try:
                             await db.execute(statement)
-                        except sqlite3.OperationalError as exc:
+                        except (sqlite3.OperationalError, RemoteDatabaseError) as exc:
                             # Schema markers can be restored/backdated after a partial migration or
                             # recovery while the physical column is already present. SQLite has no
                             # portable ALTER TABLE ... ADD COLUMN IF NOT EXISTS, so treat this one
                             # idempotent condition as already applied and keep the migration atomic.
+                            #
+                            # Both error types, because the two transports raise different ones and
+                            # only one of them is production (v1.0.0-rc.57). Local aiosqlite raises
+                            # sqlite3.OperationalError, which is what pytest exercises; the Go remote
+                            # transport wraps the same SQLite message in a RemoteDatabaseError, and
+                            # that is the path db-init and the bot actually take. Named alone, this
+                            # guard was live in every test and dead in every deployment.
                             if statement.lstrip().upper().startswith("ALTER TABLE") and "duplicate column name" in str(exc).casefold():
                                 continue
                             raise

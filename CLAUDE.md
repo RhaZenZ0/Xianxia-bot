@@ -1555,6 +1555,56 @@ refused" but **can one ever get out** — on the deadline and before it. `seclus
 holds that the sweep reaches `game.SettleSeclusionTx` and **does no arithmetic of its own**, read by
 AST: a rate is made of numbers, so a function with none cannot have one.
 
+### The column that was written twice (v1.0.0-rc.57)
+
+rc.56 could not bootstrap a fresh database. `seclusion_sessions.ends_real_ts` was added in **two**
+places - the base `executescript` DDL in `Database.init`, and migration 57's
+`ALTER TABLE ... ADD COLUMN`. The base script runs on every boot, *before* the migrations, so on a
+new world it created the table already carrying the column and migration 57 then died on
+`duplicate column name`. **Upgrading worked and installing did not**, which is the opposite of the
+usual way round: on an existing world the `CREATE TABLE IF NOT EXISTS` is a no-op and the ALTER has
+something to do.
+
+The convention it broke is unanimous and was never written down: **all 59 `ADD COLUMN` migrations
+before it name a column the base DDL does not.** A column a migration adds is the migration's alone.
+
+**Why the whole suite passed anyway is the finding.** The migration runner *has* a guard for a
+duplicate-column ALTER - SQLite has no `ADD COLUMN IF NOT EXISTS`, so one is needed for the
+recovery case its comment describes. It named `sqlite3.OperationalError`, which is what local
+aiosqlite raises, and **every pytest fixture uses the local transport**. Production reaches SQLite
+through the Go engine, which wraps the identical SQLite message in a `RemoteDatabaseError`. The
+guard was live in every test and dead in every deployment. `test_startup_health.py` bootstraps a
+fresh database and passed, over the transport that cannot fail the way production fails - this
+repo's own rule, found this time inside the migration runner itself. It catches both types now,
+which is the recovery case actually working rather than a licence: the convention is the rule and
+`test_a_migrations_column_is_its_own.py` is what holds it.
+
+**The playtest is what found it**, on the first run anybody had ever given rc.56 - which is the whole
+argument for the two harnesses. It also found the second half: `walk_perfection`'s quest and trial
+loops still called `act` where rc.56 closed the door they depended on. A quest is prepared up to
+eight times in a row against a real hour of `PERFECT_QUEST_COOLDOWN_MINUTES`, and the loop used to
+send its own `quest_cooldown_seconds`; it asks the GM lever through `act_free` now, like every other
+bounded loop in that file. Twenty-seven call sites were converted in rc.56 and these two were missed,
+because nothing ran them.
+
+**The Discord half found a third one, in rc.56's own new step.** Section 4c pressed *Seclusion End*
+and then asserted `"closed-door" not in` the reply - and a leaf press redraws the panel, whose
+cultivation card grew a **Seclusion** field in that same release reading *"closed-door, every other
+command is locked"*. The step failed on its own feature. Asserting the **absence** of a string is the
+fragile shape whenever anything else may legitimately emit it; it asserts *"emerge from seclusion"*
+is present now, which cannot collide.
+
+**And the gate's own first version passed against the broken tree**, which is worth more than the fix.
+It split the module at `CORE[:start]` on `SCHEMA_MIGRATIONS` - but that tuple is declared at line 232
+and `Database.init`'s DDL is 2,500 lines *below* it, so `base` was the import block and the check saw
+no tables at all. A second version searched for the column name across the whole file and reported
+six clashes that were not clashes, because `tier` and `location` are columns on plenty of other
+tables. It reads the columns of *that table's* `CREATE TABLE` now, and asserts a known column comes
+back before it trusts the answer - a reader that silently finds nothing makes every assertion after
+it vacuous. Three drills: restore the column and it names `seclusion_sessions.ends_real_ts`, narrow
+the guard and it names the transport, restore the bad split and the self-check fails first.
+
+
 ### Somewhere to go above the Mortal World (v1.0.0-rc.54)
 
 Eight realms covered thirty-two realms of cultivation, four of them in the Mortal World and **one
