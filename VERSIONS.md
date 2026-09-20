@@ -6,6 +6,50 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.0** (rc.56) shuts the doors a retreat has always promised to shut, bounds how long they stay
+shut, and takes the numbers that decide both away from the caller.
+
+Four faults, and they are one feature. **The wait between actions was the caller's, in fourteen
+places.** `cultivation.train` read `cooldown_seconds` off the request payload with a `<= 0 -> 300`
+fallback, and thirteen other actions did the same - seven of them with no floor at all, so a caller
+sending `0` served no wait whatsoever. The value lived in `app/ops/config.py` and was mailed to the
+engine on every request, which is exactly the fault `rejectCallerGameMinute` exists to refuse: a
+bound that lives in the client is not a bound. Both playtest harnesses proved it was reachable -
+they sent `cooldown_seconds: 1` to drive their loops - and they ask the GM lever to clear the waits
+now. The engine owns them, in one table, with the six `*_COOLDOWN_MINUTES` keys as the `.env`
+baseline the way `WORLD_TIME_SCALE` has been since rc.39; compose had to be given them, because the
+engine service takes an explicit allowlist and a key it is not given is a key it cannot read. An
+action the table forgets waits an hour rather than nothing. `minutes_per_day` was refused with them:
+a unit of account is the same kind of number as a wait.
+
+**What a retreat is worth was stated in a constant that did nothing.** `seclusionDailyShare = 0.60`
+is named for the rule - "around 60% of an active cultivation day" - and was spent as
+`daily * seclusionDailyShare / 0.6`, which is exactly 1.0. The rule really lived in an uncommented
+`seclusionSessionsPerDay = 1.2` one file away, and a count of sessions only means a share of active
+play at one world time scale: at the shipped 4 it happened to be 60%, at 2 it was 30%, and at 8 it
+was 120% - an operator who sped their world up made closed-door cultivation strictly better than
+playing, while it asked nothing of the player, and nothing anywhere said so. The share is stated
+once now and the rate derived from the cooldown it is a share of, so it holds at every scale. It is
+125%: a premium, because the doors are shut and that is the trade.
+
+**There were two settles, paying different rates.** The background sweep carried a second
+implementation with a pre-rc.5 flat rate, its own day, its own clamps and none of the multipliers
+rc.55 added - so which rate a retreat was paid at depended on whether the sweep reached it before
+the player came back. It had no tests at all, which is how the two drifted twenty releases apart.
+There is one settle now, in the package that owns the rule.
+
+**And there was no cap, so there could be no lockout.** `duration_game_minutes` was floored at 1 and
+bounded by nothing; the only limit in the game was a `1-365` range on a slash command, which any
+other caller simply did not have. A retreat is two real hours at most now, refused rather than
+clamped when more is asked for, on a real deadline (schema 57). That forced the settlement unit: two
+real hours is a third of a game day, so under the old whole-day accounting a retreat run to its own
+cap would have paid exactly nothing - it is paid per completed game hour. And with a bounded retreat
+the lockout the panel has promised since v0.30.0 is finally safe to enforce. The engine refuses the
+authoritative path; the bot holds the four doors a player has, because a read never reaches it. Two
+rules make it safe: the gate settles and ends an expired retreat rather than refusing on it, so a
+lockout on state only an action can clear is never a deadlock, and `seclusion.settle` is always
+exempt, so the way out is never shut.
+
 **1.0.0** (rc.55) makes a spiritual root's grade worth what the content always said it was, and
 gives a retreat the multipliers a session has.
 
@@ -2255,6 +2299,15 @@ mechanical authority paths.
 - **Schema 27** added the v0.19.29 mute/freeze moderation columns on `characters`
   (`is_muted`, `is_frozen`, `moderation_reason`).
 - **Schema 28** added the Quest Forge definition table (`quest_definitions`).
+- **Schema 57** put a retreat's deadline on a real clock. `seclusion_sessions.ends_real_ts` is the
+  wall-clock moment the doors open, beside the `ends_game_minute` that was the only end before it.
+  A retreat lasts at most two real hours now, and a bound expressed in game minutes could not hold
+  it: a GM changing the world's time scale would silently re-size every retreat already under way,
+  while what a rate change should move is how many game minutes that same wall-clock covers.
+  `ends_game_minute` stays, recomputed from the real deadline on every settle so the index and the
+  cards see the same end the payment used. There is no backfill: a retreat in flight at the upgrade
+  has a NULL here and keeps the length it was started with, because a new rule must never shorten
+  something a player already committed to.
 - **Schema 56** gave each world its own news channel. `world_event_channels` is one row per guild
   per world - the channel, its category, and nothing else, because an events channel belongs to a
   world rather than to a place in it. It is `realm_hub_channels`' shape minus `location`, and it

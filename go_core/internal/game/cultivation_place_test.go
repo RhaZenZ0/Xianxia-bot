@@ -36,7 +36,7 @@ func TestTheGroundShapesASessionAndTheSheetSaysSo(t *testing.T) {
 	if status["place_name"] != "the shrine" || status["place_quality"] != "good" {
 		t.Fatalf("shrine status: place=%v quality=%v", status["place_name"], status["place_quality"])
 	}
-	trained := batch4Result(t, batch4Apply(t, path, world, "cultivation.train", 1, map[string]any{"cooldown_seconds": 0, "game_minute": 600}))
+	trained := batch4Result(t, batch4Apply(t, path, world, "cultivation.train", 1, map[string]any{"game_minute": 600}))
 	if m, _ := trained["place_mult"].(float64); m != placeShrineMult || trained["place_name"] != "the shrine" {
 		t.Fatalf("shrine training: %v %v", trained["place_name"], trained["place_mult"])
 	}

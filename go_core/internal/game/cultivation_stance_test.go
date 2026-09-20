@@ -62,8 +62,7 @@ func cultivationQuery(t *testing.T, path, world, op string, actor int64) map[str
 
 func TestBreakthroughOddsCountTheHundredPairsOfTwoTens(t *testing.T) {
 	cases := []struct{ modifier, tn, want int64 }{
-		{0, 2, 100}, {0, 12, 45}, {0, 20, 1}, {0, 21, 0}, {5, 12, 85}, {-3, 12, 21}, {100, 30, 100},
-	}
+		{0, 2, 100}, {0, 12, 45}, {0, 20, 1}, {0, 21, 0}, {5, 12, 85}, {-3, 12, 21}, {100, 30, 100}}
 	for _, c := range cases {
 		if got := breakthroughOdds(c.modifier, c.tn); got != c.want {
 			t.Errorf("odds(%d, %d)=%d want %d", c.modifier, c.tn, got, c.want)
@@ -87,7 +86,7 @@ func TestTheStanceShapesTrainingAndRefineBanksInsight(t *testing.T) {
 	if set["stance"] != "refine" || set["previous"] != "circulate" || set["changed"] != true {
 		t.Fatalf("stance set: %v", set)
 	}
-	trained := batch4Result(t, batch4Apply(t, path, world, "cultivation.train", 3, map[string]any{"cooldown_seconds": 0, "game_minute": 600}))
+	trained := batch4Result(t, batch4Apply(t, path, world, "cultivation.train", 3, map[string]any{"game_minute": 600}))
 	if trained["stance"] != "refine" || storage.ParseInt(trained["insight_xp_gain"]) != refineInsightXPPerSession {
 		t.Fatalf("refine training: %v", trained)
 	}
@@ -122,7 +121,7 @@ func TestForceStanceRisksAQiDeviationThatIsARealCondition(t *testing.T) {
 	for i := 0; i < 80 && !deviated; i++ {
 		batch4Exec(t, path, `UPDATE characters SET cultivation=0 WHERE user_id=42`)
 		batch4Exec(t, path, `DELETE FROM cooldowns WHERE user_id=42`)
-		trained := batch4Result(t, batch4Apply(t, path, world, "cultivation.train", 10+i, map[string]any{"cooldown_seconds": 0, "game_minute": 600}))
+		trained := batch4Result(t, batch4Apply(t, path, world, "cultivation.train", 10+i, map[string]any{"game_minute": 600}))
 		if m, _ := trained["stance_mult"].(float64); m != 1.3 {
 			t.Fatalf("force multiplier: %v", trained["stance_mult"])
 		}

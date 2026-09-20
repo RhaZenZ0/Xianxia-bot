@@ -242,6 +242,25 @@ var stage5CanonicalTimeNativeOperations = map[string]bool{
 	"artifact.awaken": true,
 }
 
+// callerOwnedNothing is every payload field the engine derives and a caller
+// may not state. `game_minute` has been here since the v0.22.2 review - what
+// time it is was never the caller's to say - and v1.0.0-rc.56 added the waits
+// for the same reason: fourteen actions took their own cooldown off the
+// payload, seven of them with no floor at all, so a caller sending 0 served no
+// wait. Both are now read from the engine's own state (the canonical clock,
+// and `actionCooldowns`).
+var callerOwnedNothing = []string{
+	"game_minute",
+	"cooldown_seconds",
+	"quest_cooldown_seconds",
+	"trial_cooldown_seconds",
+	// How long a day is. The caravan refused it on its own since v0.28.0
+	// ("client-supplied caravan duration is forbidden") and seclusion did
+	// not; a unit of account is the same kind of number as a wait, so it is
+	// refused here for both and the caravan's own check is gone.
+	"minutes_per_day",
+}
+
 func rejectCallerGameMinute(raw json.RawMessage) error {
 	if len(raw) == 0 || string(raw) == "null" {
 		return nil
@@ -250,8 +269,10 @@ func rejectCallerGameMinute(raw json.RawMessage) error {
 	if err := json.Unmarshal(raw, &payload); err != nil {
 		return err
 	}
-	if _, ok := payload["game_minute"]; ok {
-		return errors.New("client-supplied game_minute is forbidden")
+	for _, field := range callerOwnedNothing {
+		if _, ok := payload[field]; ok {
+			return fmt.Errorf("client-supplied %s is forbidden", field)
+		}
 	}
 	return nil
 }
@@ -413,6 +434,15 @@ func applyAuthoritative(databasePath, worldPath string, req ActionRequest) (Acti
 	}
 	if oldAgeDeath == nil {
 		if err := checkPlayerModerationTx(conn, req.ActorID, req.Operation); err != nil {
+			return ActionResponse{}, err
+		}
+		// The doors are shut (v1.0.0-rc.56). After the old-age check, because
+		// a retreat does not stop a lifetime running out, and after
+		// moderation, because a muted cultivator's refusal is the one they
+		// should hear first. It settles and ends an expired retreat rather
+		// than refusing on it - see seclusion_lockout.go for why that is
+		// load-bearing.
+		if err := checkPlayerSeclusionTx(conn, catalog, req.ActorID, actionGameMinute, req.Operation); err != nil {
 			return ActionResponse{}, err
 		}
 	}

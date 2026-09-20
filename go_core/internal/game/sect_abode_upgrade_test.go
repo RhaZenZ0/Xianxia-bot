@@ -136,7 +136,7 @@ func TestSeclusionInsideTheSectResidenceUsesItsChamber(t *testing.T) {
 	batch4Exec(t, path, `UPDATE characters SET location='sect_abode:42' WHERE user_id=42`)
 	// The manor stands at the residence's seat, so its array reaches inside.
 	batch4Exec(t, path, `INSERT INTO sect_manors(sect_name,name,base_location,qi_array_level) VALUES('Azure Cloud Sect','Azure Hall','Cloudspine Foothills',1)`)
-	result := batch4Result(t, batch4Apply(t, path, world, "seclusion.start", 1, map[string]any{"mode": "qi", "duration_game_minutes": 1440, "game_minute": 1000}))
+	result := batch4Result(t, batch4Apply(t, path, world, "seclusion.start", 1, map[string]any{"mode": "qi", "duration_real_minutes": 120, "game_minute": 1000}))
 	if got := parseFloat(result["environment_mult"]); !nearly(got, 1.20*1.08) {
 		t.Fatalf("environment_mult=%v want %v", got, 1.20*1.08)
 	}

@@ -16,7 +16,6 @@ import (
 
 type explorationPayload struct {
 	GameMinute              int64  `json:"game_minute"`
-	CooldownSeconds         int64  `json:"cooldown_seconds"`
 	UnexpectedEventsEnabled *bool  `json:"unexpected_events_enabled,omitempty"`
 	UnexpectedEventChance   int    `json:"unexpected_event_chance_percent"`
 	EventKey                string `json:"event_key"`
@@ -29,8 +28,7 @@ type travelPayload struct {
 }
 
 type huntPayload struct {
-	GameMinute      int64 `json:"game_minute"`
-	CooldownSeconds int64 `json:"cooldown_seconds"`
+	GameMinute int64 `json:"game_minute"`
 }
 
 type canonicalReward struct {
@@ -1373,7 +1371,7 @@ func explorationExploreAction(conn *storage.Conn, catalog worlddata.Catalog, use
 			return authoritativeMutation{}, err
 		}
 	}
-	if err = setCooldown(conn, userID, "explore", p.CooldownSeconds, now); err != nil {
+	if err = setCooldown(conn, userID, "explore", cooldownSecondsFor(cooldownExplore), now); err != nil {
 		return authoritativeMutation{}, err
 	}
 	kind := "exploration"
@@ -1853,7 +1851,7 @@ func explorationHuntAction(conn *storage.Conn, catalog worlddata.Catalog, userID
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
-	if err = setCooldown(conn, userID, "hunt", p.CooldownSeconds, now); err != nil {
+	if err = setCooldown(conn, userID, "hunt", cooldownSecondsFor(cooldownHunt), now); err != nil {
 		return authoritativeMutation{}, err
 	}
 	awarded := int64(0)

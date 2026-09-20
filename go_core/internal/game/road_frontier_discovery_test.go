@@ -29,8 +29,7 @@ func TestExploreDiscoveryStaysOnTheRoadFrontierNotAnywhereInTheWorld(t *testing.
 	firstRingFrontier := map[string]bool{
 		"Ashenwall City":         true,
 		"Jadewood Medicine City": true,
-		"Riverguard City":        true,
-	}
+		"Riverguard City":        true}
 	// A city that's several road-hops away from the starting frontier and
 	// was never a neighbor of Greenriver Town or Azure Crown Imperial City -
 	// exactly the kind of "random distant city" the old code could surface
@@ -59,10 +58,8 @@ func TestExploreDiscoveryStaysOnTheRoadFrontierNotAnywhereInTheWorld(t *testing.
 
 	result := batch4Result(t, batch4Apply(t, path, world, "exploration.explore", 1, map[string]any{
 		"game_minute":                     600,
-		"cooldown_seconds":                0,
 		"unexpected_events_enabled":       false,
-		"unexpected_event_chance_percent": 0,
-	}))
+		"unexpected_event_chance_percent": 0}))
 	loc := fmt.Sprint(result["discovered_location"])
 	if loc == "" || loc == "<nil>" {
 		t.Fatalf("expected the very first exploration to discover a first-ring frontier city, got none")
@@ -113,12 +110,11 @@ func TestExploreDiscoveryExpandsTheFrontierAsCitiesAreCharted(t *testing.T) {
 	secondRingOnly := "Four-Roads Caravan City"
 	found := false
 	for i := 0; i < 8; i++ {
+		clearCooldowns(t, path, 42)
 		result := batch4Result(t, batch4Apply(t, path, world, "exploration.explore", i+1, map[string]any{
 			"game_minute":                     700 + i,
-			"cooldown_seconds":                0,
 			"unexpected_events_enabled":       false,
-			"unexpected_event_chance_percent": 0,
-		}))
+			"unexpected_event_chance_percent": 0}))
 		loc := fmt.Sprint(result["discovered_location"])
 		if loc == secondRingOnly {
 			found = true

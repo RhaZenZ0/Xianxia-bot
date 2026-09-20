@@ -15,9 +15,8 @@ import (
 )
 
 type aptitudeActionPayload struct {
-	Target          string `json:"target"`
-	GameMinute      int64  `json:"game_minute"`
-	CooldownSeconds int64  `json:"cooldown_seconds"`
+	Target     string `json:"target"`
+	GameMinute int64  `json:"game_minute"`
 }
 
 type mechanicsCharacter struct {
@@ -400,10 +399,7 @@ func aptitudeTemper(conn *storage.Conn, catalog worlddata.Catalog, userID int64,
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
-	cool := p.CooldownSeconds
-	if cool < 300 {
-		cool = 300
-	}
+	cool := cooldownSecondsFor(cooldownAptitude)
 	if err = setCooldown(conn, userID, key, cool, now); err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -487,10 +483,7 @@ func aptitudeHarmonize(conn *storage.Conn, catalog worlddata.Catalog, userID int
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
-	cool := p.CooldownSeconds
-	if cool < 300 {
-		cool = 300
-	}
+	cool := cooldownSecondsFor(cooldownAptitude)
 	if err = setCooldown(conn, userID, key, cool, now); err != nil {
 		return authoritativeMutation{}, err
 	}

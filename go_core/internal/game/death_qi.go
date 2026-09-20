@@ -227,8 +227,7 @@ func corruptionRupture(conn *storage.Conn, catalog worlddata.Catalog, userID int
 // ---------------------------------------------------------------------------
 
 type ghostActionPayload struct {
-	GameMinute      int64 `json:"game_minute"`
-	CooldownSeconds int64 `json:"cooldown_seconds"`
+	GameMinute int64 `json:"game_minute"`
 }
 
 // requireGhostCultivator refuses every ghost action to a cultivator who was
@@ -290,10 +289,7 @@ func ghostHarvestAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 	if _, err = conn.Execute(`UPDATE characters SET karma_score=MAX(-1000,MIN(1000,karma_score-2)),updated_at=? WHERE user_id=?`, []any{now, userID}); err != nil {
 		return authoritativeMutation{}, err
 	}
-	cool := p.CooldownSeconds
-	if cool <= 0 {
-		cool = 900
-	}
+	cool := cooldownSecondsFor(cooldownGhostHarvest)
 	if err = setCooldown(conn, userID, "ghost_harvest", cool, now); err != nil {
 		return authoritativeMutation{}, err
 	}
@@ -367,10 +363,7 @@ func ghostAppeaseAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 	if err = saveQiBody(conn, userID, body, now); err != nil {
 		return authoritativeMutation{}, err
 	}
-	cool := p.CooldownSeconds
-	if cool <= 0 {
-		cool = 3600
-	}
+	cool := cooldownSecondsFor(cooldownGhostAppease)
 	if err = setCooldown(conn, userID, "ghost_appease", cool, now); err != nil {
 		return authoritativeMutation{}, err
 	}

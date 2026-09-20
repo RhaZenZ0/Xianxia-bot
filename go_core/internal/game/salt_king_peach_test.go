@@ -29,21 +29,21 @@ import (
 // exactly how the first version of this test failed, with "2 then 2".
 func saltKingRun(t *testing.T, path, world string, base int) map[string]any {
 	t.Helper()
+	clearCooldowns(t, path, 42)
 	now := float64(time.Now().UnixNano()) / 1e9
 	batch4Exec(t, path, "DELETE FROM world_events WHERE dedupe_key='secret_realm:salt_kings_barrow'")
 	batch4Exec(t, path, "INSERT INTO world_events(event_key,dedupe_key,event_type,title,location,payload_json,active,starts_at,ends_at,thread_id) VALUES(?,?,?,?,?,?,1,?,?,?)",
 		"peach-open", "secret_realm:salt_kings_barrow", "secret_realm", "Salt King's Barrow",
 		"Salt King's Ruin", `{"realm_id":"salt_kings_barrow"}`, now-10, now+3600, 424242)
 	if entered := batch4Result(t, batch4Apply(t, path, world, "secret_realm.enter", base, map[string]any{
-		"realm_id": "salt_kings_barrow", "game_minute": 700,
-	})); entered["entered"] != true {
+		"realm_id": "salt_kings_barrow", "game_minute": 700})); entered["entered"] != true {
 		t.Fatalf("enter=%v", entered)
 	}
 	var last map[string]any
 	for i := 0; i < 4; i++ {
+		clearCooldowns(t, path, 42)
 		last = batch4Result(t, batch4Apply(t, path, world, "secret_realm.explore", base+1+i, map[string]any{
-			"game_minute": 701 + i, "cooldown_seconds": 0,
-		}))
+			"game_minute": 701 + i}))
 		if success, _ := last["success"].(bool); !success {
 			t.Fatalf("room %d should succeed with the fixture's stats: %v", i, last)
 		}

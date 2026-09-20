@@ -44,8 +44,7 @@ CREATE TABLE IF NOT EXISTS item_provenance(provenance_id INTEGER PRIMARY KEY AUT
 func sitTrial(t *testing.T, path, world, sect, location string, seq int) map[string]any {
 	t.Helper()
 	out := batch4Apply(t, path, world, "sect.recruitment.trial", seq, map[string]any{
-		"sect_name": sect, "examiner": "Gate Elder Jian Mu", "location": location, "trial_name": "Entrance",
-	})
+		"sect_name": sect, "examiner": "Gate Elder Jian Mu", "location": location, "trial_name": "Entrance"})
 	return batch4Result(t, out)
 }
 
@@ -87,7 +86,7 @@ func TestSectTrialPassGrantsTheEntryManual(t *testing.T) {
 	// And it is learnable at once: the same catalog the trial drew from is
 	// the one manual.study reads, and a tier-0 manual needs no growing into.
 	batch4SetCanonicalGameMinute(t, path, 10)
-	study := batch4Apply(t, path, world, "manual.study", 2, map[string]any{"manual_id": manualID, "cooldown_seconds": 1})
+	study := batch4Apply(t, path, world, "manual.study", 2, map[string]any{"manual_id": manualID})
 	if got := fmt.Sprint(batch4Result(t, study)["first_study"]); got != "true" {
 		t.Fatalf("study result=%v", batch4Result(t, study))
 	}

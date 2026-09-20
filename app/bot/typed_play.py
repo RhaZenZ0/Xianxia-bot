@@ -27,7 +27,7 @@ from typing import Any, Awaitable, Callable
 
 import discord
 
-from . import maintenance
+from . import maintenance, seclusion
 from .registry import ACTIONS, EVENT_HANDLERS
 from .runtime import DB, SETTINGS, TYPED_PLAY_BUDGET, log
 from .typed_play_router import Candidate, CommandParameter, CommandSpec, Route, VerbTable
@@ -222,6 +222,9 @@ async def dispatch(interaction: Any, candidate: Candidate) -> None:
     # button on a message, so without this a player with a picker already open
     # could still act after the world closed.
     closed = await maintenance.refuse(DB, getattr(interaction, "user", None))
+    if closed is None:
+        user = getattr(interaction, "user", None)
+        closed = await seclusion.refuse(DB, getattr(user, "id", 0))
     if closed is not None:
         await interaction.response.send_message(closed)
         return

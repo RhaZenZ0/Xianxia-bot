@@ -12,6 +12,7 @@ import discord
 from ..ops.game_engine import GameEngineError
 from .hubs import HubStatusField
 from .locations import here_summary
+from . import seclusion
 from .runtime import DB, ENGINE, WORLD, character_location_display, log
 
 
@@ -148,7 +149,7 @@ async def cultivation_status_fields(interaction: discord.Interaction, *, fallbac
     severity = int(status.get("deviation_severity", 0) or 0)
     if severity:
         stance_line += f"\n⚠️ Qi deviation **{severity}/5** — treat it under **/character → Afflictions**"
-    return [
+    fields = [
         HubStatusField("☯️ Realm", realm_line),
         HubStatusField("🧭 Stance", stance_line),
         HubStatusField("🎲 Breakthrough", odds_line, inline=False),
@@ -156,6 +157,40 @@ async def cultivation_status_fields(interaction: discord.Interaction, *, fallbac
         HubStatusField("💪 Body", body_line),
         HubStatusField("🫀 Qi Body", _qi_body_value(status), inline=False),
     ]
+    # The doors, if they are shut (v1.0.0-rc.56). The card rendered nothing
+    # about seclusion at all, so a secluded cultivator saw the ordinary sheet
+    # and no sign that every other command was about to refuse them - which
+    # was survivable while the lockout was half a gate and is not now.
+    retreat = await _seclusion_line(interaction)
+    if retreat:
+        fields.insert(0, HubStatusField("🚪 Seclusion", retreat, inline=False))
+    return fields
+
+
+async def _seclusion_line(interaction: discord.Interaction) -> str:
+    """The open retreat, in the clock it actually runs on, or "" for none.
+
+    A failed read says nothing rather than taking the card down with it: the
+    sheet is what a player checks when something is wrong.
+    """
+    try:
+        state = await seclusion.active_session(DB, interaction.user.id)
+    except Exception:
+        log.exception("seclusion line unavailable")
+        return ""
+    if not state or str(state.get("status")) != "active":
+        return ""
+    mode = str(state.get("mode") or "qi").upper()
+    line = f"**{mode}** • closed-door, every other command is locked"
+    ends = state.get("ends_real_ts")
+    if ends:
+        left = max(0, int((float(ends) - time.time()) // 60))
+        line += (f"\n-# doors open in about **{left // 60}h {left % 60}m**" if left >= 60
+                 else f"\n-# doors open in about **{max(1, left)} minutes**")
+    gained = int(state.get("accumulated_gain", 0) or 0)
+    line += f" • **{gained:,}** essence settled so far"
+    line += "\n-# **/cultivation → Cultivate → Seclusion End** to emerge early"
+    return line
 
 
 async def menu_facts_line(interaction: discord.Interaction) -> str:

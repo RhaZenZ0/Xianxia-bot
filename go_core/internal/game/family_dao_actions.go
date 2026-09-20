@@ -28,16 +28,22 @@ type familyChildPayload struct {
 	GameMinute int64  `json:"game_minute"`
 }
 type seclusionStartPayload struct {
-	Mode                string `json:"mode"`
-	GameMinute          int64  `json:"game_minute"`
+	Mode       string `json:"mode"`
+	GameMinute int64  `json:"game_minute"`
+	// How long the retreat lasts, in real minutes, capped at
+	// seclusionMaxRealMinutes (v1.0.0-rc.56). `duration_game_minutes` is the
+	// field a client before that release sent; it is still read, converted at
+	// the world's rate, so a rolling deploy does not become an outage - but a
+	// stale client asking for ten world-days is asking for sixty real hours
+	// and is told the cap rather than quietly given two.
+	DurationRealMinutes int64  `json:"duration_real_minutes"`
 	DurationGameMinutes int64  `json:"duration_game_minutes"`
 	Location            string `json:"location"`
 }
 type seclusionSettlePayload struct {
-	GameMinute    int64  `json:"game_minute"`
-	MinutesPerDay int64  `json:"minutes_per_day"`
-	ForceEnd      bool   `json:"force_end"`
-	EndReason     string `json:"end_reason"`
+	GameMinute int64  `json:"game_minute"`
+	ForceEnd   bool   `json:"force_end"`
+	EndReason  string `json:"end_reason"`
 }
 type daoProposePayload struct {
 	PartnerUserID int64 `json:"partner_user_id"`
@@ -47,8 +53,7 @@ type daoRespondPayload struct {
 	Accept        bool  `json:"accept"`
 }
 type daoDualPayload struct {
-	GameMinute      int64 `json:"game_minute"`
-	CooldownSeconds int64 `json:"cooldown_seconds"`
+	GameMinute int64 `json:"game_minute"`
 }
 
 func birthFamilyForUserGo(conn *storage.Conn, userID int64) (map[string]any, error) {
@@ -518,8 +523,10 @@ func seclusionStartActionGo(conn *storage.Conn, catalog worlddata.Catalog, userI
 	if p.Mode != "qi" && p.Mode != "body" {
 		return authoritativeMutation{}, errors.New("seclusion mode must be qi or body")
 	}
-	if p.DurationGameMinutes <= 0 {
-		p.DurationGameMinutes = 1
+	clock, _ := readCanonicalWorldClock(conn)
+	realMinutes, e := seclusionRealMinutes(p, clock)
+	if e != nil {
+		return authoritativeMutation{}, e
 	}
 	// phase and body_phase are read because the projection is a share of the
 	// stage being filled since v1.0.0-rc.5; without them the start reported a
@@ -554,14 +561,24 @@ func seclusionStartActionGo(conn *storage.Conn, catalog worlddata.Catalog, userI
 		return authoritativeMutation{}, e
 	}
 	carried := loadSeclusionCarried(conn, catalog, userID, p.GameMinute, p.Mode)
-	projected := seclusionDailyGainGo(catalog, c, p.Mode, environmentMult, soulCultivationMultGo(conn, userID), carried.product())
-	end := p.GameMinute + p.DurationGameMinutes
+	// The world's own rate, read the way rc.55's carried multipliers are: at
+	// this moment rather than once, because a GM may change it mid-retreat and
+	// the start's projection and the settle's payment must each be computed
+	// against what holds when they run.
+	projected := seclusionDailyGainGo(catalog, c, p.Mode, environmentMult, soulCultivationMultGo(conn, userID), carried.product(), clock.Scale)
+	// A retreat is a couple of hours now, so what it will actually pay is the
+	// number worth printing; the daily rate it is a slice of is kept beside it
+	// because it is what every existing reader asks for.
+	durationGameMinutes := realMinutes * maxI64(1, clock.Scale)
+	end := p.GameMinute + durationGameMinutes
+	endsReal := nowSeconds() + float64(realMinutes)*60
+	total := seclusionGainForSpan(projected, durationGameMinutes)
 	now := nowSeconds()
-	_, e = conn.Execute(`INSERT INTO seclusion_sessions(user_id,mode,started_game_minute,ends_game_minute,last_settled_game_minute,start_location,environment_mult,accumulated_gain,status,ended_reason,created_at,updated_at) VALUES(?,?,?,?,?,?,?,0,'active','',?,?) ON CONFLICT(user_id) DO UPDATE SET mode=excluded.mode,started_game_minute=excluded.started_game_minute,ends_game_minute=excluded.ends_game_minute,last_settled_game_minute=excluded.last_settled_game_minute,start_location=excluded.start_location,environment_mult=excluded.environment_mult,accumulated_gain=0,status='active',ended_reason='',created_at=excluded.created_at,updated_at=excluded.updated_at`, []any{userID, p.Mode, p.GameMinute, end, p.GameMinute, p.Location, environmentMult, now, now})
+	_, e = conn.Execute(`INSERT INTO seclusion_sessions(user_id,mode,started_game_minute,ends_game_minute,ends_real_ts,last_settled_game_minute,start_location,environment_mult,accumulated_gain,status,ended_reason,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,0,'active','',?,?) ON CONFLICT(user_id) DO UPDATE SET mode=excluded.mode,started_game_minute=excluded.started_game_minute,ends_game_minute=excluded.ends_game_minute,ends_real_ts=excluded.ends_real_ts,last_settled_game_minute=excluded.last_settled_game_minute,start_location=excluded.start_location,environment_mult=excluded.environment_mult,accumulated_gain=0,status='active',ended_reason='',created_at=excluded.created_at,updated_at=excluded.updated_at`, []any{userID, p.Mode, p.GameMinute, end, endsReal, p.GameMinute, p.Location, environmentMult, now, now})
 	if e != nil {
 		return authoritativeMutation{}, e
 	}
-	out := map[string]any{"mode": p.Mode, "started_game_minute": p.GameMinute, "ends_game_minute": end, "last_settled_game_minute": p.GameMinute, "start_location": p.Location, "environment_mult": environmentMult, "environment": environment, "projected_daily_gain": projected, "status": "active",
+	out := map[string]any{"mode": p.Mode, "started_game_minute": p.GameMinute, "ends_game_minute": end, "ends_real_ts": endsReal, "duration_real_minutes": realMinutes, "last_settled_game_minute": p.GameMinute, "start_location": p.Location, "environment_mult": environmentMult, "environment": environment, "projected_daily_gain": projected, "projected_total_gain": total, "status": "active",
 		// v1.0.0-rc.55: what the retreat will carry, named so the projection
 		// can be explained rather than merely stated.
 		"carried_mult": carried.product(), "effect_mult": carried.Effect,
@@ -576,34 +593,74 @@ func seclusionSettleActionGo(conn *storage.Conn, catalog worlddata.Catalog, user
 	if e := json.Unmarshal(raw, &p); e != nil {
 		return authoritativeMutation{}, e
 	}
-	if p.MinutesPerDay <= 0 {
-		p.MinutesPerDay = 1440
-	}
-	r, e := conn.Execute(`SELECT * FROM seclusion_sessions WHERE user_id=? AND status='active'`, []any{userID})
+	// `game_minute` is stamped on the payload by stage5CanonicalizeMutationPayload
+	// before this handler is reached; the caller is refused for sending one.
+	out, settled, e := SettleSeclusionTx(conn, catalog, userID, p.GameMinute, p.ForceEnd, p.EndReason)
 	if e != nil {
 		return authoritativeMutation{}, e
+	}
+	if !settled {
+		return authoritativeMutation{}, errors.New("no active seclusion")
+	}
+	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "cultivation", EventType: "seclusion.settle", EntityType: "character", EntityID: fmt.Sprint(userID), GameMinute: p.GameMinute, Payload: out}}, nil
+}
+
+// SettleSeclusionTx is the one settle (v1.0.0-rc.56).
+//
+// There were two: this one, and a byte-for-byte-different copy in
+// `simulation.advanceSeclusions` carrying a pre-rc.5 flat rate
+// (`8 + will + insight/2 + realm/2`, times a hardcoded .60), its own
+// minutes-per-day, its own clamps, and none of the multipliers a retreat
+// carries. Which rate a retreat was paid at depended on whether the
+// background sweep reached it before the player came back, and the copy had
+// no tests at all. `game.WalletDeltaTx` is the precedent for the simulation
+// package calling into `game` for a rule it must not keep a second copy of.
+//
+// It reports whether there was a retreat to settle, so the sweep can skip a
+// character with none and the action can refuse one.
+func SettleSeclusionTx(conn *storage.Conn, catalog worlddata.Catalog, userID, gameMinute int64, forceEnd bool, endReason string) (map[string]any, bool, error) {
+	p := seclusionSettlePayload{GameMinute: gameMinute, ForceEnd: forceEnd, EndReason: endReason}
+	r, e := conn.Execute(`SELECT * FROM seclusion_sessions WHERE user_id=? AND status='active'`, []any{userID})
+	if e != nil {
+		return nil, false, e
 	}
 	s := firstRowMap(r)
 	if s == nil {
-		return authoritativeMutation{}, errors.New("no active seclusion")
+		return nil, false, nil
 	}
 	r, e = conn.Execute(`SELECT life_status,realm_index,phase,body_realm_index,body_phase,cultivation,body_cultivation,attributes_json FROM characters WHERE user_id=?`, []any{userID})
 	if e != nil {
-		return authoritativeMutation{}, e
+		return nil, false, e
 	}
 	c := firstRowMap(r)
 	if c == nil {
-		return authoritativeMutation{}, errors.New("character not found")
+		return nil, false, errors.New("character not found")
 	}
 	last := i64(s["last_settled_game_minute"])
+	clock, _ := readCanonicalWorldClock(conn)
+	// Where the retreat ends. The stored `ends_real_ts` is the authority
+	// (schema 57): a GM changing the world's time scale must not re-size a
+	// retreat already under way, and a deadline in game minutes would. It is
+	// read back through the clock's own arithmetic at every settle, so what a
+	// scale change *does* move is how many game minutes that wall-clock
+	// covers - which is what a rate change means. A NULL is a retreat started
+	// before the column existed: it keeps the game-minute end it was given.
 	end := i64(s["ends_game_minute"])
+	endsReal, realDeadline := seclusionRealDeadline(s)
+	if realDeadline {
+		end = worldClockGameMinute(clock, endsReal)
+	}
 	target := min64(p.GameMinute, end)
-	days := max64(0, (target-last)/p.MinutesPerDay)
+	// Paid per completed game hour rather than per completed game day
+	// (v1.0.0-rc.56). A retreat is at most two real hours, which at the
+	// shipped time scale is a third of a day - under the old whole-day
+	// accounting a retreat run to its cap would have paid exactly nothing.
+	hours := max64(0, (target-last)/seclusionSettleUnitGameMinutes)
 	mode := fmt.Sprint(s["mode"])
 	env, _ := strconvFloat(s["environment_mult"])
 	carried := loadSeclusionCarried(conn, catalog, userID, p.GameMinute, mode)
-	daily := seclusionDailyGainGo(catalog, c, mode, env, soulCultivationMultGo(conn, userID), carried.product())
-	attempted := daily * days
+	daily := seclusionDailyGainGo(catalog, c, mode, env, soulCultivationMultGo(conn, userID), carried.product(), clock.Scale)
+	attempted := seclusionGainForSpan(daily, hours*seclusionSettleUnitGameMinutes)
 	awarded := int64(0)
 	field := "cultivation"
 	current := i64(c["cultivation"])
@@ -614,7 +671,7 @@ func seclusionSettleActionGo(conn *storage.Conn, catalog worlddata.Catalog, user
 		cap = phaseCapGo(catalog, i64(c["body_realm_index"]), i64(c["body_phase"]), true)
 	}
 	awarded = min64(attempted, max64(0, cap-current))
-	settled := last + days*p.MinutesPerDay
+	settled := last + hours*seclusionSettleUnitGameMinutes
 	// Completion is the clock reaching the end, not the whole-day accounting
 	// reaching it (v0.23.1). `settled` only ever advances in whole days, so a
 	// session whose duration is not a multiple of a day - 1500 minutes against
@@ -625,6 +682,12 @@ func seclusionSettleActionGo(conn *storage.Conn, catalog worlddata.Catalog, user
 	// The leftover part-day pays nothing, which is what the UI already says:
 	// cultivation is awarded per whole day of seclusion.
 	completed := p.GameMinute >= end
+	if realDeadline {
+		// The wall clock decides, not the game clock: a frozen world would
+		// otherwise hold a retreat open for ever, and a world sped up would
+		// end one before its two hours were served.
+		completed = nowSeconds() >= endsReal
+	}
 	if completed {
 		// Close the books at the end so a resumed session cannot re-count the
 		// part-day it was never paid for.
@@ -642,7 +705,7 @@ func seclusionSettleActionGo(conn *storage.Conn, catalog worlddata.Catalog, user
 	if awarded > 0 {
 		q := fmt.Sprintf("UPDATE characters SET %s=%s+?,updated_at=? WHERE user_id=?", field, field)
 		if _, e = conn.Execute(q, []any{awarded, now, userID}); e != nil {
-			return authoritativeMutation{}, e
+			return nil, false, e
 		}
 	}
 	status := "active"
@@ -651,11 +714,13 @@ func seclusionSettleActionGo(conn *storage.Conn, catalog worlddata.Catalog, user
 		status = "completed"
 		reason = p.EndReason
 	}
-	_, e = conn.Execute(`UPDATE seclusion_sessions SET last_settled_game_minute=?,accumulated_gain=accumulated_gain+?,status=?,ended_reason=?,updated_at=? WHERE user_id=?`, []any{settled, awarded, status, reason, now, userID})
+	// `ends_game_minute` follows the real deadline, so the index, the status
+	// card and anything else reading it see the same end the settle used.
+	_, e = conn.Execute(`UPDATE seclusion_sessions SET last_settled_game_minute=?,ends_game_minute=?,accumulated_gain=accumulated_gain+?,status=?,ended_reason=?,updated_at=? WHERE user_id=?`, []any{settled, end, awarded, status, reason, now, userID})
 	if e != nil {
-		return authoritativeMutation{}, e
+		return nil, false, e
 	}
-	out := map[string]any{"mode": mode, "awarded_now": awarded, "settled_days_now": days, "daily_gain": daily, "last_settled_game_minute": settled, "ends_game_minute": end, "status": status, "ended_reason": reason,
+	out := map[string]any{"mode": mode, "awarded_now": awarded, "settled_hours_now": hours, "daily_gain": daily, "ends_real_ts": endsReal, "last_settled_game_minute": settled, "ends_game_minute": end, "status": status, "ended_reason": reason,
 		// v1.0.0-rc.55: what the retreat carried, read at the moment it is
 		// paid rather than at the moment it began - the era can turn and a
 		// method can be changed while the door is shut.
@@ -664,7 +729,7 @@ func seclusionSettleActionGo(conn *storage.Conn, catalog worlddata.Catalog, user
 		"manual_name": carried.ManualName, "manual_grade": carried.ManualGrade, "manual_mult": carried.Manual,
 		"element": carried.ElementName, "element_relation": carried.ElementRelation, "element_mult": carried.Element,
 		"root_grade": carried.RootGrade, "root_mult": carried.Root}
-	return authoritativeMutation{Result: out, Event: eventledger.Event{Domain: "cultivation", EventType: "seclusion.settle", EntityType: "character", EntityID: fmt.Sprint(userID), GameMinute: p.GameMinute, Payload: out}}, nil
+	return out, true, nil
 }
 func strconvFloat(v any) (float64, error) {
 	var f float64
@@ -786,9 +851,6 @@ func daoPartnershipActionGo(conn *storage.Conn, catalog worlddata.Catalog, userI
 		if e := json.Unmarshal(raw, &p); e != nil {
 			return authoritativeMutation{}, e
 		}
-		if p.CooldownSeconds <= 0 {
-			p.CooldownSeconds = 1800
-		}
 		r, e := conn.Execute(`SELECT * FROM dao_partnerships WHERE status='active' AND (user_a=? OR user_b=?) LIMIT 1`, []any{userID, userID})
 		if e != nil {
 			return authoritativeMutation{}, e
@@ -843,7 +905,7 @@ func daoPartnershipActionGo(conn *storage.Conn, catalog worlddata.Catalog, userI
 			if e != nil {
 				return authoritativeMutation{}, e
 			}
-			_, _ = conn.Execute(`INSERT INTO cooldowns(user_id,action,available_at) VALUES(?,'dao_dual_cultivation',?) ON CONFLICT(user_id,action) DO UPDATE SET available_at=excluded.available_at`, []any{uid, now + float64(max64(60, p.CooldownSeconds))})
+			_, _ = conn.Execute(`INSERT INTO cooldowns(user_id,action,available_at) VALUES(?,'dao_dual_cultivation',?) ON CONFLICT(user_id,action) DO UPDATE SET available_at=excluded.available_at`, []any{uid, now + float64(cooldownSecondsFor(cooldownDaoDual))})
 		}
 		_, e = conn.Execute(`UPDATE dao_partnerships SET resonance=?,dual_sessions=dual_sessions+1,updated_at=? WHERE partnership_id=?`, []any{newRes, now, i64(bond["partnership_id"])})
 		if e != nil {

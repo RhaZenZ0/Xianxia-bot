@@ -15,7 +15,6 @@ from discord import app_commands
 
 from ...ops.game_engine import GameEngineError
 from ...rules.progression_systems import ascension_gate
-from ...simulation import MINUTES_PER_DAY
 from ..character_state import announce_quest_progress, current_effect_modifiers
 from ..formatting import roll_line
 from ..status_cards import _ELEMENT_MARKS
@@ -49,7 +48,7 @@ async def cultivate(interaction: discord.Interaction) -> None:
         envelope = await ENGINE.authoritative_action(
             "cultivation.train",
             interaction.user.id,
-            {"cooldown_seconds": SETTINGS.cultivate_cooldown_minutes * 60},
+            {},
             action_id=f"discord:{interaction.id}:cultivation.train",
         )
     except GameEngineError as exc:
@@ -199,19 +198,58 @@ seclusion_group = app_commands.Group(
 )
 
 
+# How long a retreat may last, in real minutes. The engine owns the bound
+# (`seclusionMaxRealMinutes`) and refuses anything over it with a sentence
+# naming the cap - this is the picker's shape, not the rule. Until
+# v1.0.0-rc.56 the only limit in the game was `days: Range[int, 1, 365]` on
+# this very command, which is presentation and which no other caller had.
+SECLUSION_MAX_REAL_MINUTES = 120
+
+
+def _real_minutes_label(minutes: int) -> str:
+    if minutes >= 60 and minutes % 60 == 0:
+        return f"{minutes // 60} real hour{'s' if minutes >= 120 else ''}"
+    if minutes > 60:
+        return f"{minutes // 60}h {minutes % 60}m real time"
+    return f"{minutes} real minutes"
+
+
+def _seclusion_real_remaining(state: dict) -> str:
+    """The wall-clock the retreat actually runs on (schema 57).
+
+    `ends_game_minute` is what the world clock will read when the doors open,
+    and it moves if a GM changes the world's rate; `ends_real_ts` is the
+    deadline itself and does not. A retreat started before that column existed
+    has none, and says nothing rather than guessing.
+    """
+    ends = state.get("ends_real_ts")
+    if not ends or str(state.get("status")) != "active":
+        return ""
+    left = float(ends) - time.time()
+    if left <= 0:
+        return " • the doors are due to open"
+    return f" • **{_real_minutes_label(max(1, int(left // 60)))}** of real time"
+
+
 SECLUSION_MODE_CHOICES = [
     app_commands.Choice(name="Qi Cultivation", value="qi"),
     app_commands.Choice(name="Body Cultivation", value="body"),
 ]
 
 
-@registered_group_command(seclusion_group, name="start", description="Enter closed-door cultivation for a number of world-days")
+@registered_group_command(seclusion_group, name="start", description="Enter closed-door cultivation, for up to two real hours")
 @app_commands.choices(mode=SECLUSION_MODE_CHOICES)
 @serialized_user_action
 async def seclusion_start(
     interaction: discord.Interaction,
     mode: app_commands.Choice[str],
-    days: app_commands.Range[int, 1, 365] = 7,
+    # The literal is deliberate and cannot be the constant: `@serialized_user_action`
+    # wraps the handler, so discord.py resolves this annotation against
+    # `runtime.py`'s globals rather than this module's, and a name here is a
+    # NameError at import. `test_seclusion_cap.py` holds the two equal to the
+    # engine's own `seclusionMaxRealMinutes`, which is the real bound - this is
+    # only the picker's shape.
+    minutes: app_commands.Range[int, 10, 120] = SECLUSION_MAX_REAL_MINUTES,
 ) -> None:
     await interaction.response.defer(ephemeral=False)
     c = await require_character(interaction)
@@ -224,7 +262,7 @@ async def seclusion_start(
     try:
         envelope = await ENGINE.authoritative_action(
             "seclusion.start", interaction.user.id,
-            {"mode": mode.value, "duration_game_minutes": int(days) * MINUTES_PER_DAY,
+            {"mode": mode.value, "duration_real_minutes": int(minutes),
              "location": str(c.get("location", ""))},
             action_id=f"discord:{interaction.id}:seclusion.start",
         )
@@ -250,12 +288,13 @@ async def seclusion_start(
     await interaction.followup.send(
         f"🔒 **Closed-Door Seclusion Begun**\n"
         f"Path: **{'Qi' if mode.value == 'qi' else 'Body'} Cultivation**\n"
-        f"Duration: **{int(days)} world-days**\n"
+        f"Duration: **{_real_minutes_label(int(minutes))}** (about **{int(state.get('ends_game_minute', 0)) - int(state.get('started_game_minute', 0))} world-minutes** at the world's current pace)\n"
         f"Location: **{await character_location_display(c)}** ({env_label})\n"
         f"Environment efficiency: **x{env_mult:.2f}**\n"
-        f"Projected background gain: about **{daily} essence per completed world-day**.\n\n"
+        f"Projected gain: about **{int(state.get('projected_total_gain', 0))} essence** over the whole retreat"
+        f" (a rate of **{daily} per completed world-day**, settled every completed world-hour).\n\n"
         "Progress is settled automatically while the bot is online and catches up after restarts. "
-        "Seclusion never auto-breaks through a stage. Any state-changing command will remain locked until you use **/cultivation → Cultivate → End** or the planned seclusion completes."
+        "Seclusion never auto-breaks through a stage. Any state-changing command will remain locked until you use **/cultivation → Cultivate → Seclusion End** or the planned seclusion completes."
     )
 
 
@@ -281,11 +320,11 @@ async def seclusion_status(interaction: discord.Interaction) -> None:
         f"State: **{str(state.get('status','unknown')).title()}**\n"
         f"Mode: **{str(state.get('mode','qi')).upper()}**\n"
         f"Location: **{start_location_display}**\n"
-        f"Elapsed: **{elapsed / MINUTES_PER_DAY:.1f} world-days**\n"
-        f"Remaining: **{remaining / MINUTES_PER_DAY:.1f} world-days**\n"
+        f"Elapsed: **{elapsed / 60:.1f} world-hours**\n"
+        f"Remaining: **{remaining / 60:.1f} world-hours**{_seclusion_real_remaining(state)}\n"
         f"Cultivation awarded: **{int(state.get('accumulated_gain',0))}**\n"
         f"Environment: **x{float(state.get('environment_mult',1.0)):.2f}**\n"
-        + ("Use **/cultivation → Cultivate → End** to emerge early." if str(state.get("status")) == "active" else f"Ended: **{state.get('ended_reason') or 'completed'}**"),
+        + ("Use **/cultivation → Cultivate → Seclusion End** to emerge early." if str(state.get("status")) == "active" else f"Ended: **{state.get('ended_reason') or 'completed'}**"),
         ephemeral=False,
     )
 
@@ -304,7 +343,7 @@ async def seclusion_end(interaction: discord.Interaction) -> None:
     try:
         await ENGINE.authoritative_action(
             "seclusion.settle", interaction.user.id,
-            {"minutes_per_day": MINUTES_PER_DAY, "force_end": True, "end_reason": "emerged early"},
+            {"force_end": True, "end_reason": "emerged early"},
             action_id=f"discord:{interaction.id}:seclusion.end",
         )
     except GameEngineError as exc:
@@ -460,7 +499,7 @@ async def body_cultivate(interaction: discord.Interaction) -> None:
         envelope = await ENGINE.authoritative_action(
             "cultivation.body_train",
             interaction.user.id,
-            {"cooldown_seconds": SETTINGS.cultivate_cooldown_minutes * 60},
+            {},
             action_id=f"discord:{interaction.id}:cultivation.body_train",
         )
     except GameEngineError as exc:
@@ -707,7 +746,7 @@ async def perfect_quest(interaction: discord.Interaction, path: app_commands.Cho
         envelope = await ENGINE.authoritative_action(
             spec.action("quest"), interaction.user.id,
             {"mode": action.value,
-             "quest_cooldown_seconds": SETTINGS.perfect_quest_cooldown_minutes * 60},
+},
             action_id=f"discord:{interaction.id}:{spec.action('quest')}:{action.value}",
         )
     except GameEngineError as exc:
@@ -762,7 +801,7 @@ async def perfect_trial(interaction: discord.Interaction, path: app_commands.Cho
     try:
         envelope = await ENGINE.authoritative_action(
             spec.action("trial"), interaction.user.id,
-            {"trial_cooldown_seconds": SETTINGS.perfect_trial_cooldown_minutes * 60},
+            {},
             action_id=f"discord:{interaction.id}:{spec.action('trial')}",
         )
     except GameEngineError as exc:
@@ -1025,7 +1064,7 @@ async def dantian_refine(interaction: discord.Interaction) -> None:
         return
     try:
         envelope = await ENGINE.authoritative_action(
-            "qi.refine", interaction.user.id, {"cooldown_seconds": 30 * 60},
+            "qi.refine", interaction.user.id, {},
             action_id=f"discord:{interaction.id}:qi.refine",
         )
     except GameEngineError as exc:

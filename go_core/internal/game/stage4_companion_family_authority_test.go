@@ -90,8 +90,7 @@ func stage4ApplyError(t *testing.T, path, world, operation string, seq int, payl
 		ActionID:   fmt.Sprintf("stage4-error-%s-%d", strings.ReplaceAll(operation, ".", "-"), seq),
 		Operation:  operation,
 		ActorID:    42,
-		Payload:    raw,
-	})
+		Payload:    raw})
 	return err
 }
 
@@ -107,8 +106,7 @@ func TestStage4CompanionActionsRejectCallerMechanicalInputs(t *testing.T) {
 		{"beast.evolve", map[string]any{"beast_id": 1}, []string{"game_minute", "location", "cooldown_seconds", "loyalty", "evolution_stage", "rank", "unexpected"}},
 		{"beast.active", map[string]any{"beast_id": 1}, []string{"game_minute", "location", "active", "cooldown_seconds", "unexpected"}},
 		{"artifact.bond", map[string]any{"item_id": "spirit_iron"}, []string{"game_minute", "location", "cooldown_seconds", "context_bonus", "bond_level", "resonance", "unexpected"}},
-		{"artifact.awaken", map[string]any{"item_id": "spirit_iron", "spirit_name": "Ash"}, []string{"game_minute", "location", "bond_level", "resonance", "awakened", "unexpected"}},
-	}
+		{"artifact.awaken", map[string]any{"item_id": "spirit_iron", "spirit_name": "Ash"}, []string{"game_minute", "location", "bond_level", "resonance", "awakened", "unexpected"}}}
 
 	for _, tc := range tests {
 		t.Run(tc.operation, func(t *testing.T) {
@@ -348,8 +346,7 @@ func TestStage45AllCompanionMutationsRejectDeadActors(t *testing.T) {
 		{"beast.evolve", map[string]any{"beast_id": 1}},
 		{"beast.active", map[string]any{"beast_id": 1}},
 		{"artifact.bond", map[string]any{"item_id": "spirit_iron"}},
-		{"artifact.awaken", map[string]any{"item_id": "spirit_iron", "spirit_name": "Ash"}},
-	}
+		{"artifact.awaken", map[string]any{"item_id": "spirit_iron", "spirit_name": "Ash"}}}
 
 	for index, tc := range tests {
 		t.Run(tc.operation, func(t *testing.T) {
@@ -380,8 +377,7 @@ func TestStage45FeedReturnsCanonicalContextAndDoesNotAcceptCallerTime(t *testing
 
 	result := batch4Result(t, batch4Apply(t, path, world, "beast.feed", 90, map[string]any{
 		"beast_id": 1,
-		"food":     "spirit_herb",
-	}))
+		"food":     "spirit_herb"}))
 	if got := storage.ParseInt(result["game_minute"]); got != 2222 {
 		t.Fatalf("game_minute=%d want 2222", got)
 	}
@@ -399,8 +395,7 @@ func TestStage45ArtifactAwakenIsOneWay(t *testing.T) {
 	) VALUES(42,'spirit_iron',3,25,0,'','dormant',0,0)`)
 
 	result := batch4Result(t, batch4Apply(t, path, world, "artifact.awaken", 95, map[string]any{
-		"item_id": "spirit_iron", "spirit_name": "Ash",
-	}))
+		"item_id": "spirit_iron", "spirit_name": "Ash"}))
 	artifact := result["artifact"].(map[string]any)
 	if got := storage.ParseInt(artifact["awakened"]); got != 1 {
 		t.Fatalf("awakened=%d want 1", got)
@@ -408,8 +403,7 @@ func TestStage45ArtifactAwakenIsOneWay(t *testing.T) {
 	beforeXP := storage.ParseInt(actionScalar(t, path, `SELECT xp FROM profession_progress WHERE user_id=42 AND profession='Artifact Refining'`))
 
 	err := stage4ApplyError(t, path, world, "artifact.awaken", 96, map[string]any{
-		"item_id": "spirit_iron", "spirit_name": "Ash Again",
-	})
+		"item_id": "spirit_iron", "spirit_name": "Ash Again"})
 	if err == nil || !strings.Contains(err.Error(), "already awakened") {
 		t.Fatalf("repeat awaken err=%v", err)
 	}
@@ -503,8 +497,7 @@ func TestFamilyRoadNeighborCanBeTravelledAndIsPersistentlyDiscovered(t *testing.
 	result := batch4Result(t, batch4Apply(t, path, world, "exploration.travel", 301, map[string]any{
 		"destination": destination,
 		"mode":        "known",
-		"game_minute": 3000,
-	}))
+		"game_minute": 3000}))
 	if road, _ := result["road_connection"].(bool); !road {
 		t.Fatalf("travel did not report road connection: %v", result)
 	}
@@ -519,8 +512,7 @@ func TestRealmHubUnlockUsesHubThresholdNotNewbornFamilyCityFloor(t *testing.T) {
 	batch4SetCanonicalGameMinute(t, path, 3001)
 	err := stage4ApplyError(t, path, world, "exploration.travel", 401, map[string]any{
 		"destination": "Spirit Jade Capital",
-		"mode":        "hub",
-	})
+		"mode":        "hub"})
 	if err == nil {
 		t.Fatal("realm-0 actor crossed to Spiritual hub")
 	}

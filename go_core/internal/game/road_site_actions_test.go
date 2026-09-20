@@ -126,12 +126,13 @@ func TestHuntingIsRicherOnAHuntingGroundAndForbiddenAtAShrine(t *testing.T) {
 	ground := roadSitesOnLeg(catalog, "Jadewood Medicine City", "Riverguard City")[0]
 	shrine := roadSitesOnLeg(catalog, "Greenriver Town", "Riverguard City")[0]
 	batch4Exec(t, path, `UPDATE characters SET location=? WHERE user_id=42`, ground)
-	result := batch4Result(t, batch4Apply(t, path, world, "exploration.hunt", 1, map[string]any{"game_minute": 620, "cooldown_seconds": 0}))
+	result := batch4Result(t, batch4Apply(t, path, world, "exploration.hunt", 1, map[string]any{"game_minute": 620}))
 	if fmt.Sprint(result["site_kind"]) != "hunting_ground" || storage.ParseInt(result["site_bonus"]) != huntingGroundRollBonus {
 		t.Fatalf("hunt at a hunting ground: %v %v", result["site_kind"], result["site_bonus"])
 	}
 	batch4Exec(t, path, `UPDATE characters SET location=? WHERE user_id=42`, shrine)
-	raw, _ := json.Marshal(map[string]any{"cooldown_seconds": 0})
+	clearCooldowns(t, path, 42)
+	raw, _ := json.Marshal(map[string]any{})
 	if _, err := ApplyWithWorld(path, world, ActionRequest{APIVersion: authoritativeAPIVersion, ActionID: "shrine-hunt", Operation: "exploration.hunt", ActorID: 42, Payload: raw}); err == nil || !strings.Contains(err.Error(), "shrine") {
 		t.Fatalf("a shrine should refuse the hunt, got %v", err)
 	}

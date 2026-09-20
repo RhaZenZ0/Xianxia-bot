@@ -72,8 +72,7 @@ func TestTheFivePhasesGenerateAndOvercomeInTheOldCycle(t *testing.T) {
 		{"Lightning", "Fire", relationResonant},
 		{"Ice", "Fire", relationDrained}, // ice stands with water, and water quenches fire
 		{"Wind", "Metal", relationClashing},
-		{"Yang", "Water", relationClashing},
-	} {
+		{"Yang", "Water", relationClashing}} {
 		if got := elementRelation(catalog, c.root, c.manual); got != c.want {
 			t.Errorf("%s root vs %s method = %s, want %s", c.root, c.manual, got, c.want)
 		}
@@ -146,7 +145,7 @@ func TestTheSessionIsWorkedByWhatTheRootMakesOfTheMethodsQi(t *testing.T) {
 	}
 	// The body path tempers flesh and answers to no element.
 	batch4Exec(t, path, `DELETE FROM cooldowns WHERE user_id=42`)
-	tempered := batch4Result(t, batch4Apply(t, path, world, "cultivation.body_train", 702, map[string]any{"cooldown_seconds": 1}))
+	tempered := batch4Result(t, batch4Apply(t, path, world, "cultivation.body_train", 702, map[string]any{}))
 	if mult, _ := tempered["element_mult"].(float64); mult != 1 {
 		t.Fatalf("the body path is not elemental: %v", mult)
 	}

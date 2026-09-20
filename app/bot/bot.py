@@ -34,7 +34,7 @@ from .admin.narration_control import (
 )
 from .channels import post_server_log
 from .character_state import _remember_freeform_npc_scene
-from . import maintenance
+from . import maintenance, seclusion
 from .runtime import DB, ENGINE, SETTINGS, TYPED_PLAY_BUDGET, WORLD, _sync_realm_presence_roles, character_location_display, chunk_text, current_world_time, log, respond
 from ..ai.quest_forge import store_draft
 from ..rules.quests import (QUEST_DEFINITIONS, ascension_quest_seed_rows, beginner_path_seed_rows,
@@ -98,7 +98,7 @@ def weekend_announcement(window: dict[str, Any], stored: str) -> tuple[str, str 
     return state, None
 
 
-class MaintenanceAwareTree(app_commands.CommandTree):
+class GatedCommandTree(app_commands.CommandTree):
     """The one gate every slash command passes (v1.0.0-rc.41).
 
     discord.py calls `interaction_check` once per application command, before
@@ -108,14 +108,25 @@ class MaintenanceAwareTree(app_commands.CommandTree):
 
     `serialized_user_action` was the tempting alternative and is the wrong one:
     it wraps only the ~119 state-changing handlers, so `/sheet` and `/quests`
-    would have stayed open.
+    would have stayed open. v1.0.0-rc.56 is the proof of that, from the other
+    side: the closed-door lockout lived in that decorator for twenty-six
+    releases and let every read straight through, and it is the second rule
+    this tree carries now.
+
+    Named `MaintenanceAwareTree` while maintenance was the only one.
     """
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         command = getattr(interaction, "command", None)
-        refusal = await maintenance.refuse(
-            DB, interaction.user, command=getattr(command, "qualified_name", "") or "",
-        )
+        name = getattr(command, "qualified_name", "") or ""
+        refusal = await maintenance.refuse(DB, interaction.user, command=name)
+        if refusal is None:
+            # The doors are shut (v1.0.0-rc.56). Here for the same reason
+            # maintenance is: this is the only place in the process that sees
+            # all ~250 commands, including the read-only cards that never
+            # reach the engine and so would otherwise answer from behind a
+            # closed door.
+            refusal = await seclusion.refuse(DB, interaction.user.id, command=name)
         if refusal is None:
             return True
         await respond(interaction, refusal, ephemeral=False)
@@ -131,7 +142,7 @@ class XianxiaBot(commands.Bot):
         super().__init__(
             command_prefix="!unused-",
             intents=intents,
-            tree_cls=MaintenanceAwareTree,
+            tree_cls=GatedCommandTree,
             # User-supplied character names/RP text must never be able to turn
             # stored/generated text into real Discord notifications.
             allowed_mentions=discord.AllowedMentions(
@@ -794,6 +805,8 @@ class XianxiaBot(commands.Bot):
         )
         if addressing_the_game:
             closed = await maintenance.refuse(DB, message.author)
+            if closed is None:
+                closed = await seclusion.refuse(DB, message.author.id)
             if closed is not None:
                 await message.reply(closed, mention_author=False)
                 return

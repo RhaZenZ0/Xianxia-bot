@@ -56,7 +56,6 @@ from ..rules.game import World
 from ..ops.game_engine import GameEngineClient, GameEngineError
 from ..ops.user_budget import UserBudget
 from ..rules.realm_hubs import REALM_HUBS, presence_world_for, realm_presence_role_name
-from ..simulation import MINUTES_PER_DAY
 from ..rules.worldtime import from_game_minutes, MINUTES_PER_YEAR
 
 
@@ -241,7 +240,7 @@ async def settle_seclusion_for_user(user_id: int, current_game_minute: int | Non
         await ENGINE.authoritative_action(
             "seclusion.settle",
             int(user_id),
-            {"minutes_per_day": MINUTES_PER_DAY, "force_end": False, "end_reason": ""},
+            {"force_end": False, "end_reason": ""},
             action_id=f"seclusion:auto:{int(user_id)}:{int(current_game_minute)}",
         )
     except GameEngineError as exc:
@@ -298,17 +297,16 @@ def serialized_user_action(func):
             return None
         lock = _user_action_lock(interaction.user.id)
         async with lock:
-            if not func.__name__.startswith("seclusion_"):
-                seclusion = await settle_seclusion_for_user(interaction.user.id)
-                if seclusion and str(seclusion.get("status")) == "active":
-                    remaining = max(0, int(seclusion["ends_game_minute"]) - (await current_world_time()).total_minutes)
-                    await interaction.response.send_message(
-                        f"🔒 You are in **closed-door seclusion** ({str(seclusion['mode']).upper()}). "
-                        f"About **{remaining / MINUTES_PER_DAY:.1f} world-days** remain. "
-                        "Use **/cultivation → Cultivate → End** to leave early before taking other actions.",
-                        ephemeral=False,
-                    )
-                    return None
+            # The closed-door check used to live here, and this is the one
+            # place it must NOT (v1.0.0-rc.56). It covered only the ~141
+            # handlers wearing this decorator, so every read passed; its
+            # exemption was the function-name prefix `seclusion_`, which
+            # nothing structural held; a hub press was already deferred before
+            # it ran; typed play never reached it; and it settled the retreat
+            # before it checked, so the engine action ran ahead of the
+            # refusal. `app/bot/seclusion.py` is the one rule now, at the four
+            # doors `app/bot/maintenance.py` already holds, and the engine
+            # refuses the authoritative path itself.
             return await func(interaction, *args, **kwargs)
 
     return wrapper

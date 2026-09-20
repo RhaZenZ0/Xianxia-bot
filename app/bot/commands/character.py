@@ -785,7 +785,7 @@ async def bond_dual_cultivate(interaction:discord.Interaction)->None:
     if not await require_character(interaction): return
     wt=await current_world_time()
     try:
-        envelope=await ENGINE.authoritative_action("dao.dual_cultivate",interaction.user.id,{"cooldown_seconds":SETTINGS.cultivate_cooldown_minutes*60},action_id=f"discord:{interaction.id}:dao.dual_cultivate")
+        envelope=await ENGINE.authoritative_action("dao.dual_cultivate",interaction.user.id,{},action_id=f"discord:{interaction.id}:dao.dual_cultivate")
         result=dict(envelope.get("result") or {})
     except GameEngineError as exc:
         await interaction.followup.send(f"❌ {_explain_engine_error(exc)}",ephemeral=False); return

@@ -12,10 +12,8 @@ import (
 )
 
 type perfectionPayload struct {
-	Mode                 string `json:"mode"`
-	GameMinute           int64  `json:"game_minute"`
-	QuestCooldownSeconds int64  `json:"quest_cooldown_seconds"`
-	TrialCooldownSeconds int64  `json:"trial_cooldown_seconds"`
+	Mode       string `json:"mode"`
+	GameMinute int64  `json:"game_minute"`
 }
 
 type perfectionChar struct{ Realm, Phase, Cultivation, BodyRealm, BodyPhase, BodyCultivation int64 }
@@ -202,7 +200,7 @@ func perfectionQuestAction(conn *storage.Conn, catalog worlddata.Catalog, userID
 		if err != nil {
 			return authoritativeMutation{}, err
 		}
-		if err = setCooldown(conn, userID, coolKey, p.QuestCooldownSeconds, now); err != nil {
+		if err = setCooldown(conn, userID, coolKey, cooldownSecondsFor(cooldownPerfectQuest), now); err != nil {
 			return authoritativeMutation{}, err
 		}
 		prep := st["quest_preparation"].(int64) + 1
@@ -220,7 +218,7 @@ func perfectionQuestAction(conn *storage.Conn, catalog worlddata.Catalog, userID
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
-	if err = setCooldown(conn, userID, coolKey, p.QuestCooldownSeconds, now); err != nil {
+	if err = setCooldown(conn, userID, coolKey, cooldownSecondsFor(cooldownPerfectQuest), now); err != nil {
 		return authoritativeMutation{}, err
 	}
 	reward := int64(0)
@@ -325,7 +323,7 @@ func perfectionTrialAction(conn *storage.Conn, catalog worlddata.Catalog, userID
 		if err != nil {
 			return authoritativeMutation{}, err
 		}
-		if err = setCooldown(conn, userID, key, p.TrialCooldownSeconds, now); err != nil {
+		if err = setCooldown(conn, userID, key, cooldownSecondsFor(cooldownPerfectTrial), now); err != nil {
 			return authoritativeMutation{}, err
 		}
 	}

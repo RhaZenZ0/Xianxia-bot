@@ -252,7 +252,6 @@ async def explore(interaction: discord.Interaction) -> None:
             "exploration.explore", interaction.user.id,
             {
                 
-                "cooldown_seconds": SETTINGS.explore_cooldown_minutes * 60,
                 "unexpected_event_chance_percent": SETTINGS.unexpected_event_chance_percent,
                 "event_key": f"discord:{interaction.id}:exploration:event",
             },
@@ -541,7 +540,7 @@ async def hunt(interaction: discord.Interaction) -> None:
     try:
         envelope = await ENGINE.authoritative_action(
             "exploration.hunt", interaction.user.id,
-            {"cooldown_seconds": SETTINGS.hunt_cooldown_minutes * 60},
+            {},
             action_id=f"discord:{interaction.id}:exploration.hunt",
         )
     except GameEngineError as exc:

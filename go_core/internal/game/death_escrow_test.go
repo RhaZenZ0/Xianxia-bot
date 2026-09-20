@@ -45,7 +45,7 @@ CREATE TABLE seclusion_sessions(
 	started_game_minute INTEGER NOT NULL DEFAULT 0, ends_game_minute INTEGER NOT NULL DEFAULT 0,
 	last_settled_game_minute INTEGER NOT NULL DEFAULT 0, environment_mult REAL NOT NULL DEFAULT 1,
 	accumulated_gain INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'active',
-	ended_reason TEXT NOT NULL DEFAULT '', updated_at REAL NOT NULL DEFAULT 0
+	ended_reason TEXT NOT NULL DEFAULT '', ends_real_ts REAL, updated_at REAL NOT NULL DEFAULT 0
 );
 `); err != nil {
 		t.Fatal(err)
@@ -280,10 +280,20 @@ func TestDyingWorksOnADatabaseWithNoEscrowTables(t *testing.T) {
 // session stayed active for the rest of the character's life. The Discord UI
 // only ever sends whole days, which is why nothing noticed; the operation
 // accepts any positive duration.
-func TestAPartDaySeclusionStillCompletes(t *testing.T) {
+// A retreat whose length is not a whole number of settlement units still
+// completes (v0.23.1), and it is still the unit-accounting that cannot reach
+// the end on its own - only the unit changed, from the day to the game hour
+// (v1.0.0-rc.56). 1510 minutes is twenty-five whole hours and ten minutes
+// over, so `settled` advances to 1500 and would sit ten minutes short of the
+// end for ever if completion keyed off the accounting rather than the clock.
+//
+// `ends_real_ts` is deliberately left NULL here: this is also the
+// grandfathering case, a retreat started before schema 57, which keeps the
+// game-minute end it was given.
+func TestAPartHourSeclusionStillCompletes(t *testing.T) {
 	path := setupEscrowDB(t)
 	batch4Exec(t, path, `INSERT INTO seclusion_sessions(user_id,mode,started_game_minute,ends_game_minute,last_settled_game_minute,environment_mult,status)
-		VALUES(42,'qi',0,1500,0,1,'active')`)
+		VALUES(42,'qi',0,1510,0,1,'active')`)
 	batch4SetCanonicalGameMinute(t, path, 5000)
 
 	conn, err := storage.Open(path)
@@ -291,9 +301,7 @@ func TestAPartDaySeclusionStillCompletes(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer conn.Close()
-	raw := payloadJSON(t, map[string]any{
-		"game_minute": 5000, "minutes_per_day": 1440,
-	})
+	raw := payloadJSON(t, map[string]any{"game_minute": 5000})
 	if _, err := seclusionSettleActionGo(conn, worlddata.Catalog{}, 42, raw); err != nil {
 		t.Fatal(err)
 	}
@@ -305,13 +313,13 @@ func TestAPartDaySeclusionStillCompletes(t *testing.T) {
 
 	if got := escrowScalar(t, path,
 		`SELECT COUNT(*) FROM seclusion_sessions WHERE user_id=42 AND status='completed'`); got != 1 {
-		t.Fatal("a 1500-minute seclusion is still active long after it ended")
+		t.Fatal("a 1510-minute seclusion is still active long after it ended")
 	}
 	// The books are closed at the end so a later settle cannot re-count the
-	// part-day that was never paid.
+	// part-hour that was never paid.
 	if got := escrowScalar(t, path,
-		`SELECT last_settled_game_minute FROM seclusion_sessions WHERE user_id=42`); got != 1500 {
-		t.Fatalf("last_settled=%d, want the session's end at 1500", got)
+		`SELECT last_settled_game_minute FROM seclusion_sessions WHERE user_id=42`); got != 1510 {
+		t.Fatalf("last_settled=%d, want the session's end at 1510", got)
 	}
 }
 

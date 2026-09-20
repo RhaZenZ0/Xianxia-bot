@@ -699,42 +699,28 @@ func (r *Runner) advanceEra(conn *storage.Conn, gm int64) (bool, error) {
 	return changed, nil
 }
 
-func soulMultSim(conn *storage.Conn, uid int64) (float64, error) {
-	res, err := conn.Execute(`SELECT talent_echo,special_trait FROM soul_legacy WHERE user_id=?`, []any{uid})
-	if err != nil {
-		return 1, err
-	}
-	row := firstMap(res)
-	if row == nil {
-		return 1, nil
-	}
-	m := 1 + math.Min(.10, float64(clamp(i64(row["talent_echo"]), 0, 100))/1000)
-	switch fmt.Sprint(row["special_trait"]) {
-	case "Born Knowing":
-		m += .03
-	case "Old Soul":
-		m += .02
-	case "Heaven-Defying Fate":
-		m += .05
-	}
-	return math.Max(1, math.Min(1.25, m)), nil
-}
-func (r *Runner) phaseCapSim(realm, phase int64, body bool) int64 {
-	realms := r.Catalog.Realms
-	if body {
-		realms = r.Catalog.BodyRealms
-	}
-	if realm < 0 || realm >= int64(len(realms)) || phase < 1 {
-		return math.MaxInt64
-	}
-	costs := realms[realm].PhaseCosts
-	if phase > int64(len(costs)) {
-		return math.MaxInt64
-	}
-	return costs[phase-1]
-}
+// `soulMultSim` and `phaseCapSim` stood here until v1.0.0-rc.56: the
+// simulation package's own copies of the soul multiplier and the phase cap,
+// written for the second settle this file used to carry and read by nothing
+// else. They went with it - `game.SettleSeclusionTx` holds both rules, in the
+// package that owns them.
+
+// advanceSeclusions ends and pays the retreats nobody came back for.
+//
+// It used to be a second implementation of the settle (v1.0.0-rc.56 folded it
+// in): a pre-rc.5 flat rate of `8 + will + insight/2 + realm/2` times a
+// hardcoded .60, its own minutes-per-day, its own clamps, and none of the
+// multipliers rc.55 gave a retreat - so which rate a retreat was paid at
+// depended on whether this sweep reached it before the player came back, and
+// the copy had no tests at all. `game.WalletDeltaTx` is the precedent: the
+// rule lives in `game` and this calls it.
+//
+// It stays flag-gated (`background_seclusion`), which is why it cannot be the
+// only way a retreat ends - the engine's own gate self-clears an expired
+// retreat whatever a GM has switched off, because a lockout on state only an
+// action can clear would otherwise brick an account.
 func (r *Runner) advanceSeclusions(conn *storage.Conn, gm int64) (int64, error) {
-	res, err := conn.Execute(`SELECT s.*,c.life_status,c.realm_index,c.phase,c.body_realm_index,c.body_phase,c.cultivation,c.body_cultivation,c.attributes_json FROM seclusion_sessions s JOIN characters c ON c.user_id=s.user_id WHERE s.status='active'`, nil)
+	res, err := conn.Execute(`SELECT s.user_id,c.life_status FROM seclusion_sessions s JOIN characters c ON c.user_id=s.user_id WHERE s.status='active'`, nil)
 	if err != nil {
 		return 0, err
 	}
@@ -750,56 +736,13 @@ func (r *Runner) advanceSeclusions(conn *storage.Conn, gm int64) (int64, error) 
 			changed++
 			continue
 		}
-		last := i64(s["last_settled_game_minute"])
-		end := i64(s["ends_game_minute"])
-		target := min64(gm, end)
-		days := max64(0, (target-last)/minutesPerDay)
-		settled := last + days*minutesPerDay
-		mode := fmt.Sprint(s["mode"])
-		attrs := map[string]any{}
-		_ = json.Unmarshal([]byte(fmt.Sprint(s["attributes_json"])), &attrs)
-		realm := i64(s["realm_index"])
-		phase := i64(s["phase"])
-		base := 8 + i64(attrs["will"]) + i64(attrs["insight"])/2 + realm/2
-		field := "cultivation"
-		current := i64(s["cultivation"])
-		if mode == "body" {
-			realm = i64(s["body_realm_index"])
-			phase = i64(s["body_phase"])
-			base = 7 + i64(attrs["body"]) + i64(attrs["will"])/3 + realm/2
-			field = "body_cultivation"
-			current = i64(s["body_cultivation"])
-		}
-		env := math.Max(.5, math.Min(1.75, float64Value(s["environment_mult"], 1)))
-		mult, e := soulMultSim(conn, uid)
+		out, settled, e := game.SettleSeclusionTx(conn, r.World, uid, gm, false, "")
 		if e != nil {
 			return changed, e
 		}
-		daily := max64(1, int64(math.Round(float64(base)*.60*env*mult)))
-		awarded := min64(daily*days, max64(0, r.phaseCapSim(realm, phase, mode == "body")-current))
-		if awarded > 0 {
-			q := fmt.Sprintf("UPDATE characters SET %s=%s+?,updated_at=? WHERE user_id=?", field, field)
-			if _, err = conn.Execute(q, []any{awarded, now, uid}); err != nil {
-				return changed, err
-			}
-		}
-		// See the note in internal/game/family_dao_actions.go: whole-day
-		// accounting can never reach an end that is not a whole number of days,
-		// so completion keys off the clock and the books are closed at the end.
-		completed := gm >= end
-		if completed {
-			settled = max64(settled, end)
-		}
-		status := "active"
-		reason := ""
-		if completed {
-			status = "completed"
-			reason = "planned seclusion completed"
-		}
-		if days > 0 || completed {
-			if _, err = conn.Execute(`UPDATE seclusion_sessions SET last_settled_game_minute=?,accumulated_gain=accumulated_gain+?,status=?,ended_reason=?,updated_at=? WHERE user_id=?`, []any{settled, awarded, status, reason, now, uid}); err != nil {
-				return changed, err
-			}
+		// A settle that paid nothing and ended nothing is not a change: the
+		// sweep runs far more often than a retreat completes a game hour.
+		if settled && (i64(out["settled_hours_now"]) > 0 || fmt.Sprint(out["status"]) == "completed") {
 			changed++
 		}
 	}

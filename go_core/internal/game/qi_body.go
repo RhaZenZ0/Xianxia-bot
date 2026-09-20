@@ -564,10 +564,7 @@ func refineQiAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64,
 	if err = saveQiBody(conn, userID, body, now); err != nil {
 		return authoritativeMutation{}, err
 	}
-	cool := p.CooldownSeconds
-	if cool <= 0 {
-		cool = 1800
-	}
+	cool := cooldownSecondsFor(cooldownQiRefine)
 	if err = setCooldown(conn, userID, "qi_refine", cool, now); err != nil {
 		return authoritativeMutation{}, err
 	}
