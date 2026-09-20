@@ -179,7 +179,7 @@ INSERT INTO characters(user_id,name,gender,path,spiritual_root,location,attribut
 VALUES(42,'Lin Test','neutral','Sword Cultivator','Fire Root','Greenriver Town','{"body":100,"agility":100,"spirit":100,"insight":100,"will":100,"presence":100}',0,9,100000,0,9,100000,'alive',50,100,100,100,100);
 INSERT INTO characters(user_id,name,gender,path,spiritual_root,location,attributes_json,realm_index,phase,cultivation,body_realm_index,body_phase,body_cultivation,life_status,karma_score,qi,qi_max,vitality,vitality_max,concealment_active)
 VALUES(43,'Target Test','neutral','Rogue Cultivator','Water Root','Greenriver Town','{"body":10,"agility":10,"spirit":10,"insight":10,"will":10,"presence":10}',1,3,0,0,1,0,'alive',0,20,20,20,20,1);
-INSERT INTO character_spiritual_roots(user_id,grade,purity,elements_json,mutation,stability,refinement_progress,compatibility) VALUES(42,'Heavenly',90,'["Fire"]','',100,0,90);
+INSERT INTO character_spiritual_roots(user_id,grade,purity,elements_json,mutation,stability,refinement_progress,compatibility) VALUES(42,'Common',90,'["Fire"]','',100,0,90);
 INSERT INTO character_spiritual_roots(user_id,grade,purity,elements_json,mutation,stability,refinement_progress,compatibility) VALUES(43,'Common',50,'["Water"]','',100,0,50);
 INSERT INTO character_physiques(user_id) VALUES(42);
 INSERT INTO character_physiques(user_id) VALUES(43);

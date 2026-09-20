@@ -37,7 +37,6 @@ async def current_effect_modifiers(user_id: int) -> tuple[list[dict], dict[str, 
         aptitudes = await DB.get_aptitudes(user_id)
         effects.extend(aptitude_effects(
             aptitudes,
-            path=str(character.get("path", "")),
             root_system=WORLD.spiritual_root_system,
             bloodline_definitions=WORLD.bloodlines,
             physique_definitions=WORLD.physiques,

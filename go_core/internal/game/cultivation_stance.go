@@ -449,6 +449,9 @@ func cultivationStatusQuery(conn *storage.Conn, catalog worlddata.Catalog, userI
 		// cultivator's root makes of it.
 		"element": absorption.Element, "element_relation": absorption.Relation,
 		"element_label": absorption.Label, "element_note": absorption.Note, "element_mult": absorption.Mult,
+		// v1.0.0-rc.55: what the root itself is worth, which the sheet could
+		// not name before because nothing computed it.
+		"root_grade": bundle.Root.Grade, "root_mult": rootWorthMultiplier(catalog, bundle.Root),
 		"qi": qi.Qi, "qi_max": qi.Capacity, "qi_regen": qi.Regen, "purity": qi.Body.Purity,
 		"purity_ceiling": purityCeilingFor(catalog, c.RealmIndex, manualGrade, qi.Body), "skill_cost_mult": qi.Body.skillCostMultiplier(),
 		"meridians_open": qi.Body.MeridiansOpen, "meridians_damaged": qi.Body.MeridiansDamaged,

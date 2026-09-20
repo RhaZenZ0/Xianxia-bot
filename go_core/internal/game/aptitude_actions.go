@@ -161,6 +161,15 @@ func loadEffectModifiers(conn *storage.Conn, userID, gameMinute int64, bundle Ap
 			}
 		}
 	}
+	// The root's grade (v1.0.0-rc.55), beside the mutation this has always
+	// read. `mods` is the only channel breakthroughModifier reads, and the
+	// key it feeds - innate_breakthrough_bonus - is already named for exactly
+	// this. The grade's cultivation multiplier is deliberately NOT applied
+	// here: it is a term of its own in the session, because the bot prints
+	// mods' cultivation_gain as "Active effects" and a root is not an effect.
+	if bonus := rootGradeBreakthroughBonus(catalog, bundle.Root); bonus != 0 {
+		mods.apply(worlddata.Modifier{Stat: "breakthrough_bonus", Operation: "add", Value: float64(bonus)}, 1)
+	}
 	if m, ok := catalog.SpiritualRootSystem.Mutations[bundle.Root.Mutation]; ok {
 		for _, x := range m.Modifiers {
 			mods.apply(x, 1)

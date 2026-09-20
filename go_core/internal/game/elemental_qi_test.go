@@ -87,12 +87,23 @@ func TestTheFivePhasesGenerateAndOvercomeInTheOldCycle(t *testing.T) {
 	}
 }
 
-func TestABetterRootAbsorbsMoreOfWhateverItTouches(t *testing.T) {
+// Absorption is the relation and nothing but the relation since v1.0.0-rc.55.
+// This test used to assert that "grade and purity must both count for
+// absorption" - and it would have gone on passing when the grade term was
+// taken out, because purity alone satisfied it, which is the shape of a gate
+// that cannot see the thing it forbids. What the root is worth on its own is
+// spiritual_root_worth_test.go's; what a root makes of a method's qi is this.
+func TestAbsorptionIsTheRelationAndNothingElse(t *testing.T) {
 	catalog := qiBodyCatalog(t)
-	plain := SpiritualRootState{Grade: "Mortal", Purity: 0, Elements: []string{"Fire"}}
 	fine := SpiritualRootState{Grade: "Immortal", Purity: 100, Elements: []string{"Fire"}}
-	if rootAbsorptionBonus(catalog, fine) <= rootAbsorptionBonus(catalog, plain) {
-		t.Fatal("grade and purity must both count for absorption")
+	// A magnificent root does not bend the relation: the multiplier is the
+	// content's figure for resonance exactly, with nothing folded into it.
+	if got := absorptionFor(catalog, fine, "Fire").Mult; got != catalog.ElementalQi.Relations[relationResonant].Mult {
+		t.Fatalf("resonance is %v, not the content's %v - something is folded in", got, catalog.ElementalQi.Relations[relationResonant].Mult)
+	}
+	plain := SpiritualRootState{Grade: "Mortal", Purity: 0, Elements: []string{"Fire"}}
+	if absorptionFor(catalog, plain, "Fire").Mult != absorptionFor(catalog, fine, "Fire").Mult {
+		t.Fatal("a Mortal and an Immortal root read the same qi the same way; only what they are worth differs")
 	}
 	resonant := absorptionFor(catalog, fine, "Fire")
 	clashing := absorptionFor(catalog, fine, "Water")
@@ -109,7 +120,7 @@ func TestABetterRootAbsorbsMoreOfWhateverItTouches(t *testing.T) {
 	}
 }
 
-func TestTheSessionIsWorkedByWhatTheRootCanAbsorb(t *testing.T) {
+func TestTheSessionIsWorkedByWhatTheRootMakesOfTheMethodsQi(t *testing.T) {
 	path := setupCultivationDB(t)
 	world := batch4WorldPath(t)
 	catalog := qiBodyCatalog(t)

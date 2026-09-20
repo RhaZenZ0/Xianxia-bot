@@ -77,11 +77,20 @@ async def cultivate(interaction: discord.Interaction) -> None:
         extra += f"\n⚡ Active Qi Storm added **+{int(result['storm_bonus'])}** before the stage cap."
     if int(result.get("perfection_gain", 0)):
         extra += f"\n★ Realm refinement deepens by **+{int(result['perfection_gain'])}%**."
+    # v1.0.0-rc.55: what the root itself is worth. Until rc.55 the grade was
+    # folded into the element multiplier below, which is hidden when the
+    # relation is indifferent - so for most cultivators the one thing their
+    # root did was applied and never shown. It has its own line now.
+    if float(result.get("root_mult", 1)) != 1.0:
+        extra += (f"\n🌿 **{result.get('root_grade') or 'Common'}** spiritual root: "
+                  f"**x{float(result['root_mult']):.2f}** cultivation efficiency.")
     if float(result.get("manual_mult", 1)) != 1.0:
         chosen = "you practise" if result.get("manual_chosen") else "the best method you have learned"
         extra += f"\n📖 **{result.get('manual_name')}** ({result.get('manual_grade')} grade, {chosen}): **x{float(result['manual_mult']):.2f}**."
     # v1.0.0-rc.9: the kind of qi the method draws, said only when the root
     # makes something of it - an indifferent element is not worth a line.
+    # Since rc.55 element_mult is the relation alone, so an indifferent
+    # element really is exactly x1.00 and this suppression hides nothing.
     element_relation = str(result.get("element_relation") or "neutral")
     if str(result.get("element") or "") and element_relation != "neutral":
         extra += (f"\n{_ELEMENT_MARKS.get(str(result.get('element')), '☯️')} **{result.get('element')} qi** is "

@@ -25,6 +25,27 @@ def grade_definition(system: dict[str, Any], grade: str) -> dict[str, Any]:
     return dict(grades[min(len(grades) - 1, grade_index(system, grade))])
 
 
+def root_cultivation_mult(system: dict[str, Any], grade: str, purity: int) -> float:
+    """What a spiritual root is worth to a cultivation session.
+
+    The display twin of the engine's `rootWorthMultiplier` (v1.0.0-rc.55): the
+    grade's own authored multiplier, deepened by purity. Both read the same two
+    numbers out of `spiritual_root_system`, which is the only way a Python copy
+    of a Go rule can be honest - it cannot call the engine, so it must at least
+    not invent. A grade the ladder does not carry is worth 1, never the bottom
+    rung: `admin.player.set_spiritual_root` writes the column unvalidated.
+    """
+    grades = list(system.get("grades", []))
+    match = next((g for g in grades if str(g.get("name", "")).casefold() == str(grade).casefold()), None)
+    if not match:
+        return 1.0
+    mult = float(match.get("cultivation_mult", 1.0))
+    if mult <= 0:
+        return 1.0
+    bonus = float(system.get("purity_bonus_at_full", 0.0))
+    return round(mult * (1 + bonus * clamp(int(purity), 0, 100) / 100.0), 4)
+
+
 def root_compatibility(
     elements: Iterable[str],
     path: str,
@@ -69,7 +90,6 @@ def bloodline_definition(
 def aptitude_effects(
     bundle: dict[str, Any],
     *,
-    path: str,
     root_system: dict[str, Any],
     bloodline_definitions: dict[str, dict[str, Any]],
     physique_definitions: dict[str, dict[str, Any]],
@@ -78,16 +98,20 @@ def aptitude_effects(
     effects: list[dict[str, Any]] = []
     root = bundle.get("root") or {}
     if root:
+        # v1.0.0-rc.55: the two numbers the content authors, and nothing else.
+        # This used to multiply the grade by invented purity, mixed-element,
+        # compatibility and stability factors and publish the product - and
+        # because every caller of current_effect_modifiers discards the
+        # aggregate, that arithmetic was the only statement of the rule in the
+        # tree and it reached no mechanic. The engine reads the grade now
+        # (`rootWorthMultiplier`), so this is the display twin of a rule Go
+        # owns and it must read what Go reads: one authored number, two
+        # readers that agree. `root_cultivation_mult` is that formula, stated
+        # once here and held to the engine's by test_root_grade_is_worth_something.
         gdef = grade_definition(root_system, str(root.get("grade", "Mortal")))
-        purity_factor = 0.90 + int(root.get("purity", 50)) / 1000.0
-        mixed_factor = 1.0 - max(0, len(root.get("elements", [])) - 1) * 0.03
-        compatibility_factor = 0.95 + root_compatibility(
-            root.get("elements", []), path, root_system, str(root.get("mutation", ""))
-        ) / 1000.0
-        stability_factor = 1.0 if int(root.get("stability", 100)) >= 50 else 0.94
-        cultivation_mult = float(gdef.get("cultivation_mult", 1.0)) * purity_factor * mixed_factor * compatibility_factor * stability_factor
         modifiers: list[dict[str, Any]] = [
-            {"stat": "cultivation_gain", "operation": "mul", "value": round(cultivation_mult, 4)},
+            {"stat": "cultivation_gain", "operation": "mul",
+             "value": root_cultivation_mult(root_system, str(root.get("grade", "Mortal")), int(root.get("purity", 50)))},
             {"stat": "breakthrough_bonus", "operation": "add", "value": int(gdef.get("breakthrough_bonus", 0))},
         ]
         mutation = str(root.get("mutation", ""))
@@ -96,7 +120,7 @@ def aptitude_effects(
             "effect_key": "innate_spiritual_root",
             "name": f"{root.get('grade', 'Mortal')} Spiritual Root",
             "category": "Spiritual Root",
-            "description": "Innate root quality, purity, stability and path compatibility.",
+            "description": "The grade of the root you were born with, deepened by its purity.",
             "modifiers": modifiers,
             "tags": ["innate", "spiritual-root"],
             "stacks": 1,

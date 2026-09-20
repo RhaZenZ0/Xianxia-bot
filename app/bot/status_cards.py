@@ -114,6 +114,8 @@ async def cultivation_status_fields(interaction: discord.Interaction, *, fallbac
         today += f"\n🪨 {status.get('place_name')} — {status.get('place_quality') or 'ordinary'} ground **x{float(status.get('place_mult', 1)):.2f}**"
     if float(status.get("world_mult", 1)) != 1.0:
         today += f"\n🌏 world qi **x{float(status.get('world_mult', 1)):.2f}**"
+    if float(status.get("root_mult", 1)) != 1.0:
+        today += f"\n🌿 {status.get('root_grade') or 'Common'} spiritual root **x{float(status.get('root_mult', 1)):.2f}**"
     if str(status.get("manual_name") or ""):
         today += f"\n📖 {status.get('manual_name')} ({status.get('manual_grade')}) **x{float(status.get('manual_mult', 1)):.2f}**"
         # v1.0.0-rc.9: what kind of qi it draws, and what this root makes of it.
