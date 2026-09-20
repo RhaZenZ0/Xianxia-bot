@@ -61,13 +61,26 @@ database. Its findings are the first two entries.
   silently dropping the live-table ticks, the only ones that were ever a person's. The per-action
   columns are one machine-filled `Swept` column now, read off the harness's own `DEFERRED_LEAVES`
   so it cannot claim more than the sweep drives.
-- **deferred (past 1.0)** — *The live pass on the NAS is unticked.* What the sweep structurally
-  cannot reach: real Discord, a live AI route (it runs `NARRATOR_PROVIDER=procedural`), the auction
-  channels, `/vote`, a mute expiring on its own, `update.sh` against a real release - and whether a
-  refusal reads helpfully to a human, which is a judgement, made against the sweep's log rather
-  than against 248 empty boxes. Twenty-seven rows in `docs/playtest/v1.0.0.md` under **What only a
-  live server can show**; the pass is Mitchell's and the generator keeps his ticks across
-  regeneration, which since rc.47 it actually does.
+- **fixed (v1.0.0)** — *The live pass on the NAS is unticked.* It is walked and ticked: every row
+  of the four live tables in `docs/playtest/v1.0.0.md`, against a real server running the release.
+  What it covers is what the sweep structurally cannot reach — real Discord, a live AI route (it
+  runs `NARRATOR_PROVIDER=procedural`), the auction channels, `/vote`, a mute expiring on its own,
+  `update.sh --fetch` against the published archive and its `.sha256` sidecar — plus the one
+  judgement neither harness can make, whether a refusal reads helpfully to a human, made against
+  the sweep's log rather than against 248 empty boxes. The ticks then survived their first
+  regeneration, which is rc.47's `merge_ticks` fix doing on real ticks what could only be argued
+  about while there were none.
+- **fixed (v1.0.0)** — *A release could ship a thing only a person can check with nothing asking a
+  person to check it.* The live tables are prose a release has to remember to extend, and rc.59 did
+  not: the category split, the re-parent of channels that already existed, the read-only lock on
+  ones the bot did not create and the retired `#event-scenes` had **no rows at all**, and were
+  walked off a hand-written page instead. The upgrade table was stale in the other direction — it
+  named `--channel beta`, where the release candidates went out, while a tag with no `-` in it is
+  published as GitHub's latest, so 1.0.0 is on `stable` and the row would have sent the next walker
+  to a channel with nothing newer on it. Both are in `scripts/playtest_checklist.py` now, the
+  layout as its own five-row table saying to walk it on a guild with history. There is no gate
+  behind this and deliberately so: which features need a person cannot be derived from the code,
+  which is exactly why the rule is written here instead.
 - **fixed (v1.0.0-rc.39)** — *`get_world_clock` in Python re-anchored the clock the engine owns
   when the configured scale changed.* Named on the roadmap's remaining-authority list since v0.30.0.
   The method is gone: `world.clock` is a read-only engine query and every surface reads through it,
