@@ -6,6 +6,25 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.0** (rc.57) makes rc.56 installable. It could not bootstrap a fresh database:
+`seclusion_sessions.ends_real_ts` was declared both in the base schema script and in migration 57's
+`ALTER TABLE ... ADD COLUMN`, and the base script runs first, so a new world created the table with
+the column already on it and the migration then died on `duplicate column name`. Upgrading an
+existing world worked - there the `CREATE TABLE IF NOT EXISTS` is a no-op and the ALTER has
+something to do - which is why nothing in the field would have caught it either. All 59 ADD COLUMN
+migrations before it follow the rule it broke: a column a migration adds is the migration's alone.
+
+The suite passed because the migration runner's guard against exactly this named
+`sqlite3.OperationalError` only. That is what local aiosqlite raises, and every pytest fixture uses
+the local transport; production goes through the Go engine, which wraps the same SQLite message in
+its own error type. The guard was live in every test and dead in every deployment. It catches both
+now, and a new contract test holds the convention itself, per table, with a self-check that fails if
+its reader ever stops finding columns.
+
+The engine playtest found it on the first run rc.56 was ever given, along with the other half: two
+loops in the perfection leg still spent the caller-supplied cooldown rc.56 removed, and now ask the
+GM lever like every other bounded loop there.
+
 **1.0.0** (rc.56) shuts the doors a retreat has always promised to shut, bounds how long they stay
 shut, and takes the numbers that decide both away from the caller.
 

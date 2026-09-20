@@ -1548,11 +1548,18 @@ async def run(url: str, token: str, db_path: str) -> Report:
 
         # The gate counts an operation as driven only where its name is a
         # literal inside the call, so each ladder names its own three.
+        #
+        # `act_free`, not `act`: a quest is prepared up to eight times in a row
+        # and its wait is a real hour (`PERFECT_QUEST_COOLDOWN_MINUTES`, 60),
+        # the trial's six (`PERFECT_TRIAL_COOLDOWN_MINUTES`, 360). Until
+        # v1.0.0-rc.56 this loop sent its own `quest_cooldown_seconds` and the
+        # engine took it; that door is closed, so the loop asks the GM lever to
+        # clear the wait the way every other bounded loop here now does.
         async def quest(payload: dict[str, Any]) -> dict[str, Any]:
-            return await (act("perfection.body_quest", PLAYER, payload) if body else act("perfection.quest", PLAYER, payload))
+            return await (act_free("perfection.body_quest", PLAYER, payload) if body else act_free("perfection.quest", PLAYER, payload))
 
         async def trial(payload: dict[str, Any]) -> dict[str, Any]:
-            return await (act("perfection.body_trial", PLAYER, payload) if body else act("perfection.trial", PLAYER, payload))
+            return await (act_free("perfection.body_trial", PLAYER, payload) if body else act_free("perfection.trial", PLAYER, payload))
 
         started = await step(report, f"{prefix}start", act("perfection.body_start", PLAYER, {}) if body else act("perfection.start", PLAYER, {}))
         if started is None:

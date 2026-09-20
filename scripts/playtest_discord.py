@@ -833,8 +833,15 @@ async def run(url: str, token: str, db_path: str) -> Report:
             await panel.goto("Cultivate", env=env)
             end_id = await find_leaf_button(panel, "Seclusion End")
             expect(end_id, f"no Seclusion End leaf on {panel.page_title()!r}: {panel.labels()}")
+            # Assert what the door *says*, not the absence of a string. The
+            # first version of this checked `"closed-door" not in out` - but
+            # the cultivation card grew a Seclusion field in this same release
+            # whose text is "closed-door, every other command is locked", and
+            # a leaf press redraws the panel, so the step failed on its own
+            # feature. A positive assertion cannot collide that way.
             out = result_text(await player.click(panel.message(), custom_id=end_id))
-            expect("closed-door" not in out.casefold(), f"the way out was refused: {out[:300]}")
+            expect("emerge from seclusion" in out.casefold(),
+                   f"the way out did not open: {out[:600]}")
             back = result_text(await player.slash(channels["begin-here"], "tribute"))
             expect("closed-door" not in back.casefold(),
                    f"still locked out after emerging: {back[:300]}")
