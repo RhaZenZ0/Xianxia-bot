@@ -1398,7 +1398,7 @@ and only running it against the broken tree says which kind you have.
 ### What time it is was never the caller's to say (v1.0.0-rc.48)
 
 rc.39 took the world clock's arithmetic away from Python. This is the last thing a caller could
-still *tell* the engine about time, and it is the one `docs/KNOWN_LIMITATIONS.md` had carried as a
+still *tell* the engine about time, and it is the one `docs/TODO.md` had carried as a
 deferred Authority item, sized there as "a Go change of its own".
 
 `RunDueRequest.GameMinute` has been accepted-and-ignored since the v0.22.2 review, with the reason
@@ -2228,7 +2228,7 @@ nothing creates or requires one — and **stays in `_base_channel_bindings`**, b
 its targets from that dict and a server that already has the channel must still be able to lose it.
 That is the same rule as the retired category, one level down. The cost is stated rather than
 discovered: the per-world feeds are gated by the realm **access** role, so a scene in a world a
-player has not reached is now invisible to them, which is in `docs/KNOWN_LIMITATIONS.md`.
+player has not reached is now invisible to them, which is in `docs/TODO.md`.
 
 **The gates, and what each drill prints.** Deleting the base re-parent prints
 `ensure_base_xianxia_channels: compares=False moves=False`; restoring create-only read-only prints
@@ -2383,7 +2383,7 @@ Python reads `content/world.json` directly through `WORLD`, so the *content* is 
 Go struct field parsed from it is not. `fieldsReadByPresentation` names each with the file that
 prints it, and the entry is worth reading as what it is — a Go field that could be deleted without
 changing any behaviour. The three that survive are `Path.Skill` and the two auction-house door
-fields, each an open decision in `docs/KNOWN_LIMITATIONS.md` rather than a shrug.
+fields, each an open decision in `docs/TODO.md` rather than a shrug.
 `unreadContentFields` is therefore **not empty on the day it was written**, which is rc.58's
 `REFUSAL_ONLY_OPERATIONS` precedent: tightening a rule nothing held reveals the backlog that the
 absence of the rule created.

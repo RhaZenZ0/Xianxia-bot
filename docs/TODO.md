@@ -1,13 +1,18 @@
-# Known limitations — the punch list
+# TODO — the punch list
 
-The v0.34 playtest's findings (`docs/history/ROADMAP_1_0.md`, Gameplay-complete II). Every entry is
-either **fixed** in the release named, or **deferred** past 1.0 with the reason. Nothing is left
-open without one of those two words; `tests/python/contracts/test_playtest_gate.py` holds the
-file to that. Add to it from the live pass (`docs/playtest/`) as findings come in.
+What is open, and what each open thing became. Every entry is either **fixed** in the release named,
+or **deferred** with the reason; nothing is left open without one of those two words, and
+`tests/python/contracts/test_playtest_gate.py` holds the file to that. A fixed entry is **kept**
+rather than deleted: it is the record of what the item turned into, and the release write-ups in
+`CLAUDE.md` cite these by name.
 
-The engine half of the playtest is `scripts/playtest_engine.py --launch`: every loop the roadmap
-names, driven through the engine's HTTP API the way the bot's handlers drive it, against a scratch
-database. Its findings are the first two entries.
+Newest first. Add to it as findings come in — from the live pass (`docs/playtest/`), from a review,
+or from a sweep of the tree.
+
+It began as the v0.34 playtest's findings (`docs/history/ROADMAP_1_0.md`, Gameplay-complete II),
+driven by `scripts/playtest_engine.py --launch` against a scratch engine; those entries are still
+here, further down. It was `docs/KNOWN_LIMITATIONS.md` until v1.0.1 — a name that described the
+deferred half and not the half that says what was done about it.
 
 ## Findings
 

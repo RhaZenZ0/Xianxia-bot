@@ -60,7 +60,7 @@ var fieldsReadByPresentation = map[string]string{
 // empty on the day it was written, and rc.58's `REFUSAL_ONLY_OPERATIONS` is the
 // precedent: tightening a rule nothing held reveals the backlog that the
 // absence of the rule created. Each entry is a decision waiting in
-// `docs/KNOWN_LIMITATIONS.md`, not a shrug.
+// `docs/TODO.md`, not a shrug.
 var unreadContentFields = map[string]string{
 	"Path.Skill": "seven paths name a skill (Sword, Spiritual Arts, ...) and each string occurs " +
 		"exactly once in the whole content file - its own declaration. What a path's skill is " +
