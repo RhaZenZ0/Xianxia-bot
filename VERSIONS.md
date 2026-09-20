@@ -28,6 +28,13 @@ each carries the release it was walked on - the person writes `[x]`, the generat
 row walked on 1.0.0 and not re-walked reads `[x] v1.0.0` rather than claiming a pass that never
 happened.
 
+And it holds a class that had been producing findings by hand. rc.55 found two content fields parsed
+out of `world.json` and read by nothing; rc.58 built that gate for modifier stats and not for the
+fields. `field_readers_test.go` walks all 439 parsed fields across 63 structs and requires each to be
+read through a selector - never a substring, and a composite-literal key is not a read, because
+writing a field is not reading it. Four are read by Python for display and are named with the file
+that prints each; three have no reader at all and are named with the decision each waits on.
+
 **1.0.0** is the first release with no suffix on its tag, and it is rc.59's tree unchanged: no code,
 content or schema moved between the two, so an operator already running rc.59 has nothing to install.
 

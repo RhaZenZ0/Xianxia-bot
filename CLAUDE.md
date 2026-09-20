@@ -2369,6 +2369,57 @@ Three things about the gate are worth more than the fix.
   `['v1.0.0.md', 'v1.0.1.md'] != ['v1.0.1.md']`; sorting the versions as text inherits from
   `v1.0.9` over `v1.0.10`.
 
+### The fields nothing reads (`field_readers_test.go`, v1.0.1)
+
+rc.55 found `RootGrade.CultivationMult` and `RootGrade.BreakthroughBonus` parsed out of the content
+file and read by nothing — the grade decided everything about how a cultivator was made and nothing
+about what they were. **It was found by hand.** rc.58 then built exactly this gate one level down,
+for modifier *stats*, and nobody built it for the fields themselves, so the class went on producing
+findings by inspection: 439 parsed fields across 63 structs, **seven** read by no selector anywhere
+in production Go.
+
+Four are read by Python for display, and that distinction is the reason a naive gate would be noise:
+Python reads `content/world.json` directly through `WORLD`, so the *content* is live even where the
+Go struct field parsed from it is not. `fieldsReadByPresentation` names each with the file that
+prints it, and the entry is worth reading as what it is — a Go field that could be deleted without
+changing any behaviour. The three that survive are `Path.Skill` and the two auction-house door
+fields, each an open decision in `docs/KNOWN_LIMITATIONS.md` rather than a shrug.
+`unreadContentFields` is therefore **not empty on the day it was written**, which is rc.58's
+`REFUSAL_ONLY_OPERATIONS` precedent: tightening a rule nothing held reveals the backlog that the
+absence of the rule created.
+
+**A read is an `*ast.SelectorExpr`, and a composite-literal key deliberately is not.**
+`Path{Skill: "Sword"}` *writes* the field; whether any rule reads it back is the whole question
+rc.55 turned on, and a substring or identifier scan cannot tell the two apart — rc.52's "by AST, not
+by substring", one level down, exactly as rc.58 needed for `sense_precision_bonus`.
+
+**It is a floor, not a proof, and says so.** Without `go/types` it cannot tell
+`PhysiqueDefinition.Name` from the forty other structs carrying a `Name`, so a field sharing its
+name with one anything reads passes unexamined. That makes it honest in one direction only: it never
+calls a read field unread, and it catches the uniquely-named orphan — which is what every finding of
+this class has been, rc.55's included. `TestATestThatAssertsARollLandedLendsTheDice` already
+describes itself as a shape detector for the same reason.
+
+**Five drills, and two of them are about the gate rather than the tree.** Dropping `Path.Skill` from
+the allowlist prints `1 content field(s) are parsed and read by no rule: Path.Skill (catalog.go)`;
+dropping a presentation entry prints the same for `PhysiqueDefinition.Drawback`; and disabling the
+selector collection prints *"the production walk did not find "Grade" read anywhere; the sweep is
+broken, not the tree"* — the rc.57 rule, a reader asserted before it is trusted, firing **before**
+the assertion it would have made vacuous.
+
+The fourth drill caught itself. It added `Path.Name` to the allowlist expecting *"production Go
+reads .Name; drop the entry"*, and got *"worlddata no longer parses it"* — because `Path` has no
+`Name` field, so the drill proved the neighbouring branch and looked like it had worked. Redone with
+`RootGrade.CultivationMult`, it prints the right sentence — and that field is the one rc.55 found by
+hand, so the drill's own output is the proof that this gate would have caught it.
+
+**A table-level sweep was run beside this one and is deliberately not recorded.** Its regex missed
+`INSERT OR IGNORE`, dynamically named tables (`table = "body_realm_perfection"`) and the
+read-by-`RowsAffected` idiom, so all 27 candidates were false positives — one of them a table called
+`does`, from the words *"CREATE TABLE IF NOT EXISTS does not add"* inside a comment. A sweep whose
+every hit needs hand-checking is not a gate, and shipping it as one would be the decoration this
+file spends its length naming.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —

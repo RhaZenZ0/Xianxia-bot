@@ -11,8 +11,8 @@ database. Its findings are the first two entries.
 
 ## Findings
 
-- **deferred (planned)** — *No gate holds a parsed content field to having a reader, and the class
-  keeps producing findings.* v1.0.0-rc.55 found `RootGrade.CultivationMult` and
+- **fixed (v1.0.1)** — *No gate held a parsed content field to having a reader, and the class
+  kept producing findings.* v1.0.0-rc.55 found `RootGrade.CultivationMult` and
   `RootGrade.BreakthroughBonus` parsed and read by nothing — the grade decided how a cultivator was
   made and nothing about what they were — and it was found by hand. rc.58 then built exactly this
   gate one level down, for modifier *stats* (`modifier_vocabulary_test.go`, which requires each to be
@@ -21,8 +21,14 @@ database. Its findings are the first two entries.
   a selector anywhere in production Go; four of those are legitimately read by Python for display
   (`advantage`, `drawback`, `objective`, `channel_name`), which is the distinction a gate has to
   make and the reason a naive one would be noise. The three that survive are the two entries below.
-  The gate wants the rc.58 shape — an argument position or a selector, not a substring — and an
-  allowlist naming each field a *presentation* layer reads, with which file reads it.
+  `field_readers_test.go` is that gate, in the rc.58 shape: a read is an `*ast.SelectorExpr`, never a
+  substring, and a composite-literal key is deliberately not one — writing a field is not reading it,
+  which is the whole distinction rc.55 turned on. `fieldsReadByPresentation` names the four and the
+  file that prints each; `unreadContentFields` names the three below with the decision each waits on.
+  It is a **floor, not a proof**: without `go/types` it cannot tell `PhysiqueDefinition.Name` from the
+  forty other structs with a `Name`, so a field sharing a read name passes unexamined. It never calls
+  a read field unread, and it catches the uniquely-named orphan — which is what every finding of this
+  class has been.
 - **deferred (planned)** — *Seven cultivation paths each name a skill, and the name reaches nothing.*
   `worlddata.Path.Skill` is parsed from `paths.<name>.skill` — Sword, Spiritual Arts, Martial Arts,
   Soul Arts, Beastcraft, Formations, Ghost Arts — and is read by no rule, no card and no Python
