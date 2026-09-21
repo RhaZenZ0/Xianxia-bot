@@ -30,17 +30,14 @@ deferred half and not the half that says what was done about it.
   is the player's own door, on `/reset` and `/character → Samsara`, bounded by the anonymise
   disposition (no reset once the character is named on a row a shared world keeps) and by an
   allowance of three counted from rows the sweep keeps. See CLAUDE.md, "Starting over without a GM".
-- **deferred (a decision)** — *A reset re-rolls the spiritual root grade, and nothing stops it.*
-  `rollRootGrade` puts Immortal in the top 0.7% of a tier-1 household's draw, and rc.55 made that
-  grade worth 0.88x–1.34x cultivation and −1 to +3 on every breakthrough for a whole life, so a
-  patient player can reset until they draw one. The cap that used to prevent this was removed
-  deliberately: the world-mark gate is what protects other players, and a cultivator re-rolling
-  their own first minute costs nobody else anything. If it turns out to matter in play, the
-  narrower fix is to carry the *grade* across a reset rather than to re-limit the action — but that
-  is not simply wirable, because `rollFamilyRoot` weights the root off the household's archetype,
-  location, bloodline affinity and tier and `rollRootGrade` adds `(familyTier-1)*24`, so the family
-  is a choice the draw depends on. Resets are recorded in `event_log`, so the data to decide this
-  will exist.
+- **fixed (v1.0.2)** — *The reset was briefly uncapped, and the line to Samsara was held by
+  accident.* The allowance is three per Discord account, ever — not per character, not per life —
+  counted from `event_log` rows the sweep is told to keep. And `TestAResetIsNotASmallSamsara` now
+  holds the distinction that matters: **Samsara is what death opens and it remembers** (memory seed,
+  talent/law/insight echoes, legacy points, craft echo, a lineage rolled off the dead life's karma);
+  **a reset keeps none of it** and the account begins again at incarnation 1. That was already true,
+  because `soul_legacy` is swept like any other row — but true by accident, and a keep added to that
+  table later would have turned a reset into a cut-price samsara with nothing going red.
 - **deferred (harness)** — *The Discord half drives the reset leaf but cannot guarantee it reaches a
   success.* Section 9b presses `/reset` last of all and accepts either the reset or its designed
   refusal, reporting which, because whether the swept cultivator has left a mark the world keeps

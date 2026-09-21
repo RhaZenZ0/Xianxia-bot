@@ -6,6 +6,18 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.2** puts the three-reset limit back and draws the line between `/reset` and Samsara where it
+belongs. They are two systems and only one of them remembers: **Samsara is what death opens**, and it
+deliberately carries the memory seed, the talent, law and insight echoes, the legacy points, the craft
+echo and a family lineage rolled off the dead life's karma into the next life. A reset keeps none of
+that - it is for a life you have only just begun and would rather not have begun, and the soul it
+leaves behind starts again at incarnation 1 with nothing behind it. That was already true, because
+`soul_legacy` is swept like any other row of the account's, but it was true by accident: a keep added
+to that table later would have turned a reset into a cut-price samsara with nothing going red.
+`TestAResetIsNotASmallSamsara` is the test that goes red. And the allowance is three per account,
+ever - not three per character and not three per life - counted from rows the sweep is told to keep,
+because a bound the bounded action erases is not a bound.
+
 **1.0.1** makes a craft say what it needs, and lets a player start over without a GM. Both were
 found by playing. A cultivator bought an Inscription slip, read it, and had no way to learn that a
 Swift-Wind Talisman wants one talisman paper and one spirit ink - both authored, both sold in dozens
@@ -183,12 +195,13 @@ staged authority cleanup: forage, crafting and companions, canonical time, unifi
 road travel, caravans, dashboard-owned Discord setup, and the removal of the obsolete Python
 mechanical authority paths.
 
-## Release status — v1.0.1
+## Release status — v1.0.2
 
-- Current release: v1.0.1 - a craft that says what it needs, a player who can start over without a
-  GM, and martial clans with somebody real to deal with. The first patch release: no schema, and
-  nothing an operator has to do beyond installing it. What 1.0 does not mean is still written down:
-  `docs/TODO.md` is the deferred list, and it is not short.
+- Current release: v1.0.2 - `/reset` is bounded at three per account again, and the line between it
+  and Samsara is now held by a test rather than left to hold by accident. No schema.
+- v1.0.1: a craft that says what it needs, a player who can start over without a GM, and martial
+  clans with somebody real to deal with. The first patch release: no schema. What 1.0 does not mean
+  is still written down: `docs/TODO.md` is the deferred list, and it is not short.
 - v1.0.0: the first release with no suffix on its tag, and rc.59's tree unchanged. Fifty-nine release
   candidates, schema 58, and two harnesses that between them drive every operation the engine allows
   and every leaf the hubs register.

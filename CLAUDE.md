@@ -2556,16 +2556,23 @@ input it has is a row the engine already owns.
   refused the moment any of them names the character, because **those rows survive an erasure and so
   cannot honestly survive a reset** - the world would go on referring to a cultivator who was never
   there. The refusal names which.
-- **There is deliberately no limit on how many times, and the cost is stated rather than hidden.**
-  An earlier version of this allowed three, to stop the root-grade re-roll: `rollRootGrade` is
+- **Three per account, ever** - not three per character and not three per life. `rollRootGrade` is
   `Intn(1000)` against thresholds putting Immortal in the top 0.7% of a tier-1 household's draw, and
   rc.55 is what made that grade worth 0.88x-1.34x cultivation and -1 to +3 on every breakthrough for
-  the character's whole life, so a patient player can now draw for one. That is accepted: the gate
-  that matters is the world-mark rule above, which protects *other players*, and somebody re-rolling
-  their own first minute takes nothing from anybody - they have thrown away every character in
-  between. The reset is still **recorded**, in an `event_log` row the sweep is told to keep, so a GM
-  can see how often somebody has started over; the row is the memory, as `(user_id, quest_key)` is
-  for the beginner path, it is simply not a bound as well.
+  the character's whole life, so an unbounded reset is a free re-roll of exactly that number. The
+  count is `event_log` rows the sweep is told to keep - because **a bound that the bounded action
+  erases is not a bound**, which is rc.48's rule turned inward. The row is the memory, as
+  `(user_id, quest_key)` is for the beginner path.
+- **A reset is not a small samsara, and the difference is the whole point of having both.** Samsara
+  is what **death** opens, and it deliberately *remembers*: the memory seed, the talent, law and
+  insight echoes, the legacy points, the craft echo and a family lineage rolled off the dead life's
+  karma all ride into the next life. A reset keeps **none** of it - `soul_legacy` carries no
+  anonymise disposition and no keep, so the sweep deletes it with everything else and the account
+  begins again at incarnation 1 with nothing behind it. That property is real today but **invisible**:
+  it holds only because nobody has added a keep to that table, and a keep added later would quietly
+  turn a reset into a cut-price samsara with no test going red. `TestAResetIsNotASmallSamsara` is the
+  test that goes red; its drill adds exactly that keep and prints *"a reset left 1 soul_legacy row(s);
+  that is samsara's memory, and a reset keeps none of it"*.
 - **"Keep what you drew, change what you chose" was rejected on a fact, not on taste.**
   `rollFamilyRoot` weights the root off the household's archetype, location, bloodline affinity and
   tier, and `rollRootGrade` adds `(familyTier-1)*24`. The family is a choice and the draw depends on
