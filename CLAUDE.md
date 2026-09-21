@@ -145,7 +145,7 @@ internal/server/        HTTP control/data plane
 ```
 
 Every Go SQLite connection uses `journal_mode=WAL`, `foreign_keys=ON`, `busy_timeout=10000`,
-`synchronous=NORMAL`. Current schema version is 58; historical migrations are kept so old databases
+`synchronous=NORMAL`. Current schema version is 59; historical migrations are kept so old databases
 can upgrade in place — see `VERSIONS.md` for the full schema/release history.
 
 ### NPCs who go missing (`npc_missing.go`, schema 47)
@@ -2840,6 +2840,52 @@ for "Pill" - which a substring test cannot see at all. It is a similarity score 
 the display name now, and the suggestion carries the name, because one of the two is what they were
 reading. The drill restores the old expression and prints the user's own error message back,
 verbatim.
+
+### A body mends on its own (`vitality_recovery.go`, schema 59, v1.0.4)
+
+Twelve `SET vitality` statements in `go_core`, four of them damage, and **not one keyed on rest,
+cultivation, seclusion or the scheduled tick**: four pills and one technique were the whole of it.
+So a cultivator who lost a fight - nine defeats in ten, `fatalChance` being `min(75, 8+gap*3)` - sat
+on the number the fight left them with until they bought their way off it, and somebody with no
+stones and no pill had no way up at all. v1.0.3 closed the loop on a purchase and deferred this with
+that reason written down; this is the half that costs nothing but time.
+
+**The share is of the cultivator's own maximum**, so the same wound costs the same four world days
+at every realm and what changes with cultivation is what a quarter is worth. The rate is content
+(`vitality_recovery`), and an unauthored one **heals nobody** rather than falling back on a number
+of the engine's invention - a healing rate nobody wrote is exactly the kind that would then be tuned
+by editing Go, and a fallback that looks like a value is not a sentinel.
+
+**`updated_at` could not be the anchor**, which is the whole reason schema 59 exists: it moves on
+every write, so a player who did anything at all would reset their own healing. NULL is "never
+settled" and banks nothing, because there is no honest way to say how long somebody has already been
+hurt; an upgraded world starts each character's clock on their next action.
+
+**The leftover minutes are carried.** The anchor moves only by the minutes that actually bought a
+whole point, so resting in pieces is worth exactly what resting in one span is - rc.56's
+`seclusionGainForSpan` rule, one system over. Time spent already whole does not bank into the next
+wound, and a settle at full only keeps the clock current.
+
+**It settles lazily and is deliberately not a simulation step.** `orderedSystems` are the world's
+own batches, daily and behind an automation flag a GM can switch off, and rc.56 already wrote down
+that a flag-gated sweep must not be the only end for state a player is sitting behind. So it sits in
+`applyAuthoritative` beside `ensureRoadTransitReadyTx`, and it returns no error by construction:
+being hurt must never be the reason a command refuses. The accepted cost is the one
+`ensureRoadTransitReadyTx` already pays - a pure read like `/sheet` shows the last settled value
+until the player does anything at all.
+
+**A fight is not rest.** `combatTurnAction` keeps `battles.player_hp` and `characters.vitality` in
+lockstep, so mending behind an active battle's back would silently desync them and the next turn
+would write the stale number back.
+
+**Two of the drills caught the gate rather than the tree, and one caught the code.**
+`TestTheRemainderIsCarried` first settled on multiples of 120 - and at 25% of 12 a point costs
+exactly 480 minutes, so every settle landed on a point boundary, `anchor + consumed` and
+`gameMinute` coincided, and discarding the remainder changed nothing. It settles *between*
+boundaries now, which is the only place the two differ. And writing the tests found a real bug
+first: the guard read `anchor <= 0`, which rejects world-minute zero - a real minute, the moment a
+fresh world's clock starts - because `i64(nil)` is also 0 and the value was doing work the
+separate NULL check already did.
 
 ## Testing conventions
 

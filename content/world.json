@@ -66458,6 +66458,11 @@
       }
     }
   },
+  "vitality_recovery": {
+    "description": "A body mends on its own. Vitality comes back as a share of the cultivator's own maximum per world day, so the same wound costs the same number of days at every realm - what changes with cultivation is how much that share is worth. Nothing about where they rest enters into it: how good a place is to sit in is what the cultivation multiplier already says, and a second statement of it here would be free to disagree.",
+    "percent_per_game_day": 25,
+    "minutes_per_game_day": 1440
+  },
   "death_qi_system": {
     "path": "Ghost Cultivator",
     "families": [

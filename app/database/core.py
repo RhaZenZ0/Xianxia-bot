@@ -26,7 +26,7 @@ from .remote import GoDatabaseTransport, RemoteDatabaseError
 log = logging.getLogger("xianxia.database")
 
 
-SCHEMA_VERSION = 58
+SCHEMA_VERSION = 59
 # A readiness probe must validate more than the schema-version marker.  If the
 # SQLite file is removed or replaced while the bot is running, SQLite will
 # happily create a new empty file at the same path.  Checking these tables lets
@@ -2546,6 +2546,27 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
             # upgrade works.
             "ALTER TABLE server_config ADD COLUMN updates_channel_id INTEGER",
             "ALTER TABLE server_config ADD COLUMN announced_release TEXT",
+        ),
+    ),
+    (
+        59,
+        "vitality_mends_on_its_own",
+        (
+            # v1.0.4: the anchor a body mends from. Nothing in this tree had
+            # ever restored vitality with time - four pills and one technique
+            # were the whole of it - so a cultivator who lost a fight sat on
+            # the number the fight left them with.
+            #
+            # `updated_at` could not be the anchor: it moves on every write, so
+            # a player who did anything at all would reset their own healing.
+            #
+            # NULL is "never settled", and the first settle banks nothing and
+            # only sets the anchor - there is no honest way to say how long
+            # somebody has already been hurt. Not in the base DDL, which is
+            # the rule rc.57 exists for: a column a migration adds is the
+            # migration's alone, or a fresh install dies on `duplicate column
+            # name` while every upgrade works.
+            "ALTER TABLE characters ADD COLUMN vitality_recovered_game_minute INTEGER",
         ),
     ),
 )

@@ -772,6 +772,19 @@ type GhostForm struct {
 	Note            string  `json:"note"`
 }
 
+// VitalityRecovery is how fast a body mends when it is left alone (v1.0.4).
+//
+// The share is of the cultivator's own maximum, so the same wound costs the
+// same number of world days at every realm and what changes with cultivation
+// is what that share is worth. `MinutesPerGameDay` is content rather than a
+// constant because it is the unit the share is quoted in, and the two must
+// move together or the rate silently means something else.
+type VitalityRecovery struct {
+	Description       string `json:"description"`
+	PercentPerGameDay int64  `json:"percent_per_game_day"`
+	MinutesPerGameDay int64  `json:"minutes_per_game_day"`
+}
+
 type DeathQiSystem struct {
 	Path        string             `json:"path"`
 	Families    []string           `json:"families"`
@@ -855,6 +868,13 @@ type Catalog struct {
 	Shops map[string]Shop `json:"shops"`
 	// DeathQi (v1.0.0-rc.8): the ghost road and everything it reads.
 	DeathQi DeathQiSystem `json:"death_qi_system"`
+
+	// VitalityRecovery (v1.0.4) is the rate a body mends at on its own. Before
+	// it, nothing in this tree restored vitality with time at all - four pills
+	// and one technique were the whole of it - so a cultivator who lost a fight
+	// sat on the number the fight left them with until they bought their way
+	// off it.
+	VitalityRecovery VitalityRecovery `json:"vitality_recovery"`
 	// ElementalQi (v1.0.0-rc.9): the five phases and what they are worth to
 	// absorption.
 	ElementalQi ElementalQiSystem `json:"elemental_qi_system"`

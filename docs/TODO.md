@@ -279,14 +279,12 @@ deferred half and not the half that says what was done about it.
   already found and fixed this for the auction floors and rc.52 for the world feeds; the other
   three never got it. `test_the_layout_reaches_an_existing_server.py` now holds all five, with an
   empty allowlist.
-- **deferred (mechanic, v1.0.3)** — *Nothing in the game restores vitality with time.* Twelve
-  `SET vitality` statements in `go_core`, four of them damage, and not one keyed on rest,
-  cultivation, seclusion or the scheduled tick: four pills and one technique are the whole of it.
-  v1.0.3 made a lost fight leave a heartbeat rather than a zero, and made treating an injury restore
-  what the treatment item restores, so the loop closes on a purchase - but a cultivator with no
-  stones and no pill still has no free way back up. Adding natural recovery is a mechanic (what
-  rate, keyed on what clock, and whether seclusion or a household hearth changes it) rather than a
-  wiring, and it wants a decision before an implementation.
+- **fixed (v1.0.4)** — *Nothing in the game restored vitality with time.* Twelve `SET vitality`
+  statements in `go_core`, four of them damage, and not one keyed on rest, cultivation, seclusion or
+  the scheduled tick. `vitality_recovery.go` mends a quarter of a cultivator's own maximum per world
+  day, settled lazily on the authoritative path (not as a simulation step, which is flag-gated), with
+  the leftover minutes carried and an active battle excluded. The rate is content and an unauthored
+  one heals nobody. Schema 59 for the anchor, because `updated_at` moves on every write.
 - **deferred (content, v1.0.3)** — *The ghost inheritance prefers the wrong path.*
   `inheritances.stygian_keeper_legacy` is "a forbidden soul inheritance dealing with ghosts, corpse
   echoes and the boundary between life and death", grants `stygian_ghost_scripture`, and lists

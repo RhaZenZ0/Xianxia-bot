@@ -6,6 +6,29 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.4** gives a body the one thing this game never had: it mends on its own.
+
+Nothing in the tree restored vitality with time - twelve `SET vitality` statements in the engine,
+four of them damage, and not one keyed on rest, cultivation, seclusion or the scheduled tick. Four
+pills and one technique were the whole of it. So a cultivator who lost a fight, which is nine
+defeats in ten, sat on the number the fight left them with until they bought their way off it, and
+somebody with no stones and no pill had no way up at all. v1.0.3 closed the loop on a purchase; this
+opens the one that costs nothing but time.
+
+A body recovers a quarter of its own maximum a world day, so the same wound costs the same four days
+at every realm and what changes with cultivation is what that quarter is worth. The rate is content,
+and an unauthored one heals nobody rather than falling back on a number of the engine's invention.
+
+It also carries the leftover minutes. The anchor moves only by the minutes that actually bought a
+whole point, so resting in pieces is worth exactly what resting in one span is - and time spent
+already whole does not bank into the next wound.
+
+And it settles lazily, on the authoritative path beside the journey and seclusion checks, rather
+than as a step of the world simulation: those batches are daily and sit behind an automation flag a
+GM can switch off, and state a player is stuck behind must not depend on one. A fight in progress is
+not rest, because the battle row and the sheet are kept in lockstep and mending behind the fight's
+back would silently desync them.
+
 **1.0.3** stops a craft taking your materials and telling you it failed, leaves a cultivator who
 loses a fight with a heartbeat instead of nothing, and gives the seventh cultivation path the
 methods it never had.
@@ -236,9 +259,11 @@ staged authority cleanup: forage, crafting and companions, canonical time, unifi
 road travel, caravans, dashboard-owned Discord setup, and the removal of the obsolete Python
 mechanical authority paths.
 
-## Release status — v1.0.3
+## Release status — v1.0.4
 
-- Current release: v1.0.3 - a craft no longer eats the materials and reports a failure, a lost
+- Current release: v1.0.4 - vitality recovers with time, which nothing in this game had ever done.
+  Schema 59.
+- v1.0.3: a craft no longer eats the materials and reports a failure, a lost
   fight leaves a heartbeat, the seventh cultivation path has methods, and every birth household
   teaches its own. No schema.
 - v1.0.2: `/reset` is bounded at three per account again, and the line between it
@@ -517,6 +542,12 @@ mechanical authority paths.
 - **Schema 27** added the v0.19.29 mute/freeze moderation columns on `characters`
   (`is_muted`, `is_frozen`, `moderation_reason`).
 - **Schema 28** added the Quest Forge definition table (`quest_definitions`).
+- **Schema 59** gave a body an anchor to mend from. `characters.vitality_recovered_game_minute`
+  is the world minute a cultivator's vitality was last settled at; `updated_at` could not serve,
+  because it moves on every write, so a player who did anything at all would have reset their own
+  healing. NULL is "never settled" and banks nothing - there is no honest way to say how long
+  somebody has already been hurt - so an upgraded world starts the clock on each character's next
+  action rather than paying out for the time before the column existed.
 - **Schema 58** gave a server somewhere to be told what changed. `server_config.updates_channel_id`
   is the ninth base channel, `#updates`, and `announced_release` is the release this guild has
   already been told about - so the bot's own announcement is idempotent across restarts by

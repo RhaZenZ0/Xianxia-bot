@@ -299,8 +299,8 @@ async def _execute_battle_law_technique(interaction: discord.Interaction, battle
             lines.append(
                 f"💀 **Defeated.** You live, barely, and suffer **{injury.get('name','an injury')}** "
                 f"(severity **{int(injury.get('severity',1))}/5**). True death was possible in this battle.\n"
-                "Nothing mends on its own — `/condition treat` with a **Recovery Pill** restores vitality "
-                "*and* works on the injury, so spend it there rather than drinking it."
+                "Your body mends on its own with time — or `/condition treat` with a **Recovery Pill** "
+                "restores vitality at once *and* works on the injury, so spend it there rather than drinking it."
             )
     return "\n".join(lines)
 
@@ -451,8 +451,8 @@ async def _resolve_battle_turn(interaction:discord.Interaction,style:str,action:
             lines.append(
                 f"💀 **Defeated.** You live, barely, and suffer **{injury.get('name','an injury')}** "
                 f"(severity **{int(injury.get('severity',1))}/5**). True death was possible in this battle.\n"
-                "Nothing mends on its own — `/condition treat` with a **Recovery Pill** restores vitality "
-                "*and* works on the injury, so spend it there rather than drinking it."
+                "Your body mends on its own with time — or `/condition treat` with a **Recovery Pill** "
+                "restores vitality at once *and* works on the injury, so spend it there rather than drinking it."
             )
         await _battle_reply(interaction,content="\n".join(lines),view=None,edit_panel=edit_panel);return
     updated=await DB.get_active_battle(interaction.user.id) or {**b,'player_hp':int(result.get('player_hp',b.get('player_hp',1))),'npc_hp':int(result.get('npc_hp',b.get('npc_hp',1)))}
