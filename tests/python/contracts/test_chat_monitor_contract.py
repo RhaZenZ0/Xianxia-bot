@@ -10,10 +10,34 @@ visible from a unit test of the analysis logic itself:
    off for narration.
 """
 
+import importlib
+import os
 import re
 import unittest
+from unittest.mock import patch
 
 from tests.support import PROJECT_ROOT, bot_package_source, bot_source_files
+
+_ENV = {"DISCORD_TOKEN": "test-token", "GUILD_ID": "123456789012345678",
+        "ENGINE_AUTH_TOKEN": "test-engine-token-1234567890", "DATABASE_PATH": "data/test.sqlite3"}
+
+
+def _tree_commands() -> set[str]:
+    """The roots `register_command_surface` adds to the command tree.
+
+    **Imported, not matched (v1.0.12).** This was a regex over the whole bot
+    package for `for name in ("begin", ...)` - and it was the **fifth** reader of
+    that one tuple. v1.0.12 lifted it to `surface.TREE_COMMANDS` precisely
+    because four *other* readers each parsed `surface.py` their own way; this one
+    matched it by pattern, from a file that otherwise reads the package as text,
+    so the release that retired the copies broke the one reader it had not
+    counted. Its own write-up named that risk and then met it.
+
+    An import cannot silently match nothing, which is the whole reason the tuple
+    has a name now.
+    """
+    with patch.dict(os.environ, _ENV):
+        return set(importlib.import_module("app.bot.surface").TREE_COMMANDS)
 
 BOT_DIR = PROJECT_ROOT / "app" / "bot"  # phase 1 of the main.py split: read the package
 MONITOR = PROJECT_ROOT / "app" / "ai" / "chat_monitor.py"
@@ -34,13 +58,10 @@ class MonitorSurfaceTests(unittest.TestCase):
             )
 
     def test_monitor_actions_are_not_typable_root_commands(self):
-        # Only the 21 registered surfaces are typable. A monitor that showed up as
+        # Only the registered surfaces are typable. A monitor that showed up as
         # /chat_digest would be a new public command nobody gated.
-        roots = re.search(
-            r'for name in \(("(?:[a-z_]+)"(?:,\s*"[a-z_]+")*)\):', self.bot
-        )
-        self.assertIsNotNone(roots, "could not find the root command registration tuple")
-        registered = set(re.findall(r'"([a-z_]+)"', roots.group(1)))
+        registered = _tree_commands()
+        self.assertTrue(registered, "the tree tuple is empty; the gate is broken, not the tree")
         self.assertNotIn("chat_digest", registered)
         self.assertNotIn("ai_status", registered)
         self.assertIn("admin", registered)

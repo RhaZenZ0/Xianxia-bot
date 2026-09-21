@@ -3693,7 +3693,7 @@ import between them, which is the shape `feature_unlocks` and `describe_era` alr
 **The number was written out five times** (`hubs.py` twice, `surface.py`, `admin/world_ops.py`,
 `commands/support.py`), and the gate forbids a panel view carrying its own.
 
-### Four readers of a tuple that could have been a name (v1.0.12)
+### Five readers of a tuple that could have been a name (v1.0.12)
 
 `register_command_surface` added ten roots to the command tree from an **inline tuple inside the
 function body**. rc.43 made the right call about it - *never copy the tuple* - and being inline meant
@@ -3704,13 +3704,37 @@ silently-empty walk would make every assertion after it vacuous. And `playtest_d
 reading it at all and asserted `9 + len(_HUB_COMMANDS)` - a count, which went stale the day v1.0.9
 added `/locked`, and which nobody saw for three releases because a harness is a script and not CI.
 
-`surface.TREE_COMMANDS` is a module constant now. All four are imports; none can come back empty; a
-new root reaches every reader by construction. The harness asserts the **set** rather than a number,
-so what the tree registers and what it expects cannot differ.
+`surface.TREE_COMMANDS` is a module constant now. Every reader is an import; none can come back
+empty; a new root reaches all of them by construction. The harness asserts the **set** rather than a
+number, so what the tree registers and what it expects cannot differ.
+
+**There were five, and the fifth is the one worth the section.** This paragraph originally said four,
+and the release shipped believing it - then the first full run of the suite on a real toolchain went
+red on `test_chat_monitor_contract.py`, which held *"a monitor must not be a typable root command"* by
+**regex over the concatenated bot package**, matching `for name in ("begin", …)`. Lifting the tuple
+out of the `for` left that pattern matching nothing, and its own assertion said so:
+*"could not find the root command registration tuple"*.
+
+It is the perfect instance of what the section claims. It was invisible to every count because it is
+the only reader that does not parse `surface.py` - it reads the package as *text*, from a file about
+the chat monitor, so nothing pointed at it and no search for "readers of the tuple" would have found
+it. **A fifth way of implementing "never copy" existed precisely because there was no name to
+import**, and the release that finally gave it one is what surfaced it. Its drill is the release
+itself: revert `TREE_COMMANDS` to the inline tuple and this test is the one that goes green again.
 
 The lesson is narrow and worth stating: *never copy* has a cheaper answer than *parse the source*
 whenever the thing being copied could simply have a name. Three releases spent implementing the
-expensive answer four ways.
+expensive answer five ways, and only the last one could be counted.
+
+**And a gate reported the interpreter rather than the tree.** `test_bot_package`'s
+`test_every_bot_module_resolves_every_global_it_reads` named `__conditional_annotations__` as a
+global `app/bot/admin/bugs_forum.py` reads and does not define. That is **Python 3.14** (PEP
+649/749): the interpreter synthesises it in any module whose annotations are deferred and
+conditionally defined. Nothing in this tree is at fault, and the gate had simply never met a 3.14 -
+the container ran 3.11 and the other machine 3.13. It is in `BUILTINS` beside `__file__` and
+`__name__` now. A gate that enumerates what the language provides has to be told when the language
+provides more, which is the same class as a fixture that cannot fail the way production fails: the
+environment was never part of what it was checked against.
 
 ## Testing conventions
 
