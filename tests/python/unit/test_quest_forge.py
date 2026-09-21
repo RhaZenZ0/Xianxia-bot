@@ -547,15 +547,32 @@ class SurfaceTests(unittest.TestCase):
         self.assertIn("QUEST_FORGE_AUTO=false", self.env)
 
     def test_sect_trial_is_finally_reported_and_completions_are_announced(self):
+        """Every record is still told.
+
+        This used to count the literal
+        `announce_quest_progress(interaction, await QUESTS.progress(`, which is
+        the nesting v1.0.5 forbids - the record inherited the telling's position
+        from it. The rule underneath is unchanged and is what is counted now, by
+        AST: a module that records as many times as it announces has told every
+        one of them.
+        """
         sect = (PROJECT_ROOT / "app" / "bot" / "commands" / "sect.py").read_text(encoding="utf-8")
-        self.assertIn('QUESTS.progress(interaction.user.id, "sect_trial"', sect)
+        self.assertIn('record_quest_progress(interaction.user.id, "sect_trial"', sect)
         for module in ("commands/exploration.py", "commands/scene.py", "commands/sect.py"):
-            source = (PROJECT_ROOT / "app" / "bot" / module).read_text(encoding="utf-8")
-            self.assertEqual(source.count("QUESTS.progress("), source.count("announce_quest_progress(interaction, await QUESTS.progress("), module)
+            tree = ast.parse((PROJECT_ROOT / "app" / "bot" / module).read_text(encoding="utf-8"))
+            calls = [
+                n.func.id for n in ast.walk(tree)
+                if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)
+            ]
+            recorded = calls.count("record_quest_progress")
+            self.assertTrue(recorded, f"{module} records no quest progress; this gate is guarding a module that moved")
+            self.assertEqual(
+                recorded, calls.count("announce_quest_progress"),
+                f"{module} records quest progress it never tells the player about",
+            )
         character = (PROJECT_ROOT / "app" / "bot" / "commands" / "character.py").read_text(encoding="utf-8")
         self.assertNotIn("QUEST_DEFINITIONS", character)
         self.assertIn("await QUESTS.catalog()", character)
-
 
 if __name__ == "__main__":
     unittest.main()

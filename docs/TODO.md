@@ -38,6 +38,55 @@ deferred half and not the half that says what was done about it.
   **a reset keeps none of it** and the account begins again at incarnation 1. That was already true,
   because `soul_legacy` is swept like any other row — but true by accident, and a keep added to that
   table later would have turned a reset into a cut-price samsara with nothing going red.
+- **fixed (v1.0.3)** — *A craft took your materials and told you it failed.* Found by playing:
+  *"it doesn't let you craft but also takes your items"*, from a player whose bag held six of the
+  pills they had been told they never made. `craftResolveAction` shipped the flattened `d1`/`d2` and
+  no `degree`, while the reply's `roll_line` reads `die1`/`die2`/`degree`, so every craft past the
+  materials check raised `AttributeError` **after** `applyAuthoritative` had committed. v1.0.1 found
+  and fixed exactly this shape for the forage reply forty lines above and did not carry it to the
+  craft. Neither harness could see it: the engine half asserts on the result map and renders no
+  reply, and the Discord half's generic sweep only ever reached the designed "missing materials"
+  refusal. The result carries the whole `roll` map now, and
+  `TestAResultThatReportsARollReportsTheWholeRoll` states the general rule once, in Go.
+- **fixed (v1.0.3)** — *Ninety-two defeats in a hundred left a cultivator at zero vitality with no
+  way off it.* `fatalChance` is `min(75, 8+gap*3)`, so a same-realm loss is fatal eight times in a
+  hundred and ended at `vitality=0` the other ninety-two — while the two *fate-rescue* branches, the
+  rarer and strictly worse outcome, each wrote `vitality=1`. Four branches, four answers, and nothing
+  in the game restored vitality with time. All four go through `survivedDefeatTx` now, and
+  `condition.treat` applies the treatment item's own `Use.Instant` restore, so a Recovery Pill heals
+  what it says it heals instead of being spent on the roll alone.
+- **fixed (v1.0.3)** — *The seventh cultivation path had no manuals, in a game with 160.*
+  `app/rules/advanced_catalog.py` named six paths where `content/world.json` offers seven, and the
+  generator's modulus is what picks a path per id — so **none** of the 160 manuals named the Ghost
+  Cultivator, while `death_qi_system`, a whole authored subsystem plus three hundred lines of Go,
+  opens with `"path": "Ghost Cultivator"` and exists to serve it. It has 23 now, the same as its
+  siblings. `PATHS` is pinned with the reason: the ids embed the path name, so widening the modulus
+  re-points every existing id.
+- **fixed (v1.0.4)** — *Nothing in the game restored vitality with time.* Twelve `SET vitality`
+  statements in `go_core`, four of them damage, and not one keyed on rest, cultivation, seclusion or
+  the scheduled tick — four pills and one technique were the whole of it. `vitality_recovery.go`
+  mends a quarter of a cultivator's own maximum per world day, settled lazily on the authoritative
+  path rather than as a simulation step, because those batches are daily and sit behind an automation
+  flag a GM can switch off and state a player is stuck behind must not depend on one. The leftover
+  minutes are carried, an active battle is excluded (the battle row and the sheet are kept in
+  lockstep), the rate is content and an unauthored one heals nobody. Schema 59 for the anchor,
+  because `updated_at` moves on every write.
+- **fixed (v1.0.5)** — *A quest was recorded only after the command had answered, so a failure while
+  drawing the reply lost progress the engine had already granted.* Seventeen sites wrote
+  `await announce_quest_progress(interaction, await QUESTS.progress(...))` and eight placed that one
+  statement after the reply, each citing rc.28 — a rule that is real and is about the
+  *announcement*, which falls back to `response.send_message` and would otherwise spend the
+  interaction on the quest line. Nesting the two made the record inherit the announcement's position,
+  and v1.0.3's craft is what it cost: six pills made and the errand still reading zero, reported as a
+  second bug. `record_quest_progress` is the record on its own, never raises, and runs before the
+  reply; `announce_quest_progress` still runs after it.
+- **fixed (v1.0.5)** — *The craft picker offered twenty-five methods to a cultivator who knew three.*
+  `recipe_autocomplete` read `DB.search_catalog("recipe", …)` — the whole 33-recipe catalogue, capped
+  at Discord's 25 — while `craft.resolve` refuses any method the player has not learned. That is the
+  rc.46 rule (a surface must not offer what the engine will refuse) in a place nothing was holding
+  it. It reads `DB.get_known_recipes` now, and an empty picker names the two doors that end it rather
+  than being a dead end. The hub renders the same callback as a drop-down, which is how *"why is
+  crafting a drop-down menu"* turned out to mean *"a menu of things I cannot make"*.
 - **deferred (harness)** — *The Discord half drives the reset leaf but cannot guarantee it reaches a
   success.* Section 9b presses `/reset` last of all and accepts either the reset or its designed
   refusal, reporting which, because whether the swept cultivator has left a mark the world keeps
@@ -45,23 +94,18 @@ deferred half and not the half that says what was done about it.
   `scripts/playtest_engine.py` on an account created for it (`QUITTER`), so both outcomes are covered
   — but by two harnesses rather than one, and the Discord half's success wiring (the "is gone" reply,
   the remaining count) is proven only when the dice go that way.
-- **deferred (planned)** — *A household's manual is never the household's.* `family.lesson` hands
-  over the family's manual at the head of the house's own lesson, beside its story and its keepsake,
-  and the tier is already right and already enforced: all nine are `min_realm_index: 0` and the
-  engine refuses a Demonic one outright (rc.34 — `manualForbidden` would cost a child karma on first
-  study). What is wrong is whose text it is. Six of the nine belong to a **sect** — a fallen martial
-  clan hands out the Azure Cloud Sect's outer-disciple canon — and the other three are
-  `advanced_orthodox_NNN_<path>`, taught to five households including the **noble martial clan**, the
-  wealthiest house in the game, which gets a numbered id rather than a named heirloom text. The grade
-  splits on exactly that line, five `Mortal` against four `Spirit`.
-  **And the catalogue is why, which is the part worth knowing before trying to fix it in the
-  lesson.** Of 160 manuals, **142 are generated-shaped** (`advanced_demonic_001_sword_cultivator` and
-  its siblings) and only 18 are authored; of those 18, twelve carry a `sect` and the remaining six
-  are *all* Demonic (`blood_sea_scripture`, `soul_devouring_codex`, …). So there is **no authored,
-  non-sect, non-forbidden manual anywhere in the game** — a household teaching its own tradition has
-  nothing in content to teach. This is content design (nine tier-0 family manuals, one per household
-  tradition, each with its techniques), not a wiring fix, which is why it is recorded rather than
-  quietly patched by re-pointing the lesson at a different borrowed text.
+- **fixed (v1.0.3)** — *A household's manual was never the household's.* `family.lesson` hands the
+  family's manual over at the head of the house's own lesson, beside its story and its keepsake, and
+  the tier was already right and already enforced. What was wrong was whose text it was: eight of the
+  thirteen households handed a child the Azure Cloud Sect's or the Jade Meridian Sect's entry manual
+  as the family's own teaching, and five handed out a generated `advanced_orthodox_NNN_<path>` with
+  its catalogue index in the title. The catalogue was why — of 160 manuals, 142 are generated-shaped
+  and of the 18 authored ones twelve carry a `sect` and the other six are all Demonic, so there was
+  **no authored, sect-less, non-forbidden manual anywhere in the game** for a household to teach.
+  `scripts/author_household_manuals.py` writes the thirteen, one per house, named out of its own
+  authored story, each deriving its element through `manual_element` rather than restating it — and
+  all thirteen are **Mortal** grade, because the old five-`Mortal`/four-`Spirit` split was a
+  permanent nine-percent cultivation difference decided by birth and stated nowhere.
 - **fixed (v1.0.1)** — *No gate held a parsed content field to having a reader, and the class
   kept producing findings.* v1.0.0-rc.55 found `RootGrade.CultivationMult` and
   `RootGrade.BreakthroughBonus` parsed and read by nothing — the grade decided how a cultivator was

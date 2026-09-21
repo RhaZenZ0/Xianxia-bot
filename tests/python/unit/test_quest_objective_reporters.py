@@ -29,8 +29,15 @@ BOT = PROJECT_ROOT / "app" / "bot"
 def reported_objective_types() -> dict[str, set[str]]:
     """objective type -> the modules that report it.
 
-    Reads the first positional argument after the user id of every
-    `QUESTS.progress(...)` call in the bot's command modules.
+    Reads the first positional argument after the user id of every call that
+    records progress in the bot's command modules.
+
+    There are two spellings and both count (v1.0.5). `record_quest_progress`
+    is the door a command uses; `QUESTS.progress` is what that door calls, and
+    is still what anything outside the commands would use. They were one
+    spelling until the record was split from the announcement - and this gate
+    went red on the split, correctly: it could no longer see a single reporter,
+    which is exactly what it exists to notice.
     """
     found: dict[str, set[str]] = {}
     for path in sorted(COMMANDS.glob("*.py")):
@@ -39,14 +46,18 @@ def reported_objective_types() -> dict[str, set[str]]:
             if not isinstance(node, ast.Call):
                 continue
             func = node.func
-            if not isinstance(func, ast.Attribute) or func.attr != "progress":
+            if isinstance(func, ast.Attribute) and func.attr == "progress" \
+                    and isinstance(func.value, ast.Name) and func.value.id == "QUESTS":
+                pass
+            elif isinstance(func, ast.Name) and func.id == "record_quest_progress":
+                pass
+            else:
                 continue
-            if not isinstance(func.value, ast.Name) or func.value.id != "QUESTS":
-                continue
-            # QUESTS.progress(user_id, "<type>", ...) - the type is second and
-            # is always a literal, because a computed one could not be pinned.
+            # (user_id, "<type>", ...) - the type is second and is always a
+            # literal, because a computed one could not be pinned.
             if len(node.args) < 2 or not isinstance(node.args[1], ast.Constant):
-                raise AssertionError(f"{path.name}: QUESTS.progress must name its objective type literally")
+                raise AssertionError(
+                    f"{path.name}: a quest report must name its objective type literally")
             found.setdefault(str(node.args[1].value), set()).add(path.name)
     return found
 

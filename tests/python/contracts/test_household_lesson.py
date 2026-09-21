@@ -89,17 +89,24 @@ class TheStageEndsThePath(unittest.TestCase):
         self.assertIn("**/family → Hearth → Lesson**", STAGES[-1]["objectives"][0]["label"])
 
     def test_the_objective_is_in_the_vocabulary_and_reported_only_on_a_pass(self):
+        """A failed lesson returns before the record is reached, so it cannot
+        advance the stage.
+
+        The record used to sit after the reply and this test held that too.
+        v1.0.5 moved it ahead of the reply and
+        `test_a_quest_is_recorded_before_it_is_told.py` owns the ordering for
+        every site at once; what stays here is the half that is this stage's -
+        *only on a pass* - which is a `return` above the record, not a position
+        relative to the answer.
+        """
         self.assertIn("family_lesson", OBJECTIVE_TYPES)
         self.assertIsNone(OBJECTIVE_TYPES["family_lesson"]["target"])
-        self.assertIn("family_lesson", reported_objective_types())
+        self.assertEqual(reported_objective_types().get("family_lesson"), {"family.py"})
         family = (BOT / "commands" / "family.py").read_text(encoding="utf-8")
         body = family.split("async def birth_family_lesson(", 1)[1].split("@registered_group_command", 1)[0]
         fail_return = body.index('if result.get("outcome")!="pass":')
-        reply = body.index("await reply_long(interaction, text)")
-        report = body.index('QUESTS.progress(interaction.user.id, "family_lesson"')
-        self.assertLess(fail_return, reply, "a failed test returns before the pass reply")
-        self.assertLess(reply, report, "the reporter must speak after the head has")
-
+        report = body.index('record_quest_progress(interaction.user.id, "family_lesson"')
+        self.assertLess(fail_return, report, "a failed test must return before the stage is recorded")
 
 class TheDoorIsWhereItWorks(unittest.TestCase):
     def test_the_engine_asks_for_it_at_home_once_per_life(self):
