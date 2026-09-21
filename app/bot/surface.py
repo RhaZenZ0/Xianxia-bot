@@ -159,7 +159,7 @@ _MIGRATED_ROOTS = {
     "formation", "ghost", "grudges", "hunt", "hunter", "inheritances", "fate",
     "innerworld", "inventory", "karma", "law", "learn", "lifespan", "manual", "market", "merchant", "shop", "trade", "blackmarket",
     "meridian", "npcinfo", "party", "perfect", "profession", "provenance", "reincarnate",
-    "reputation", "rulers", "scene", "seclusion", "secretrealm", "sect", "sense",
+    "reputation", "reset", "rulers", "scene", "seclusion", "secretrealm", "sect", "sense",
     "sheet", "soul", "spatialkey", "specialeffects", "stance", "insight", "storage", "talk", "territory",
     "time", "travel", "realmhub", "tribulation", "use", "wallet", "war", "world",
     "worldevents", "worldrules",
@@ -216,8 +216,14 @@ _HUB_DEFINITIONS = (
             _hub_page("crime", "Consequences", "What the world holds against you: open crimes and atonement, active capture and death bounties, and standing grudges.",
                       "bounty", "grudges"),
             _hub_page("fate", "Fate", "Spendable providence that can avert true death and grows through major fortunate deeds."),
-            _hub_page("afterlife", "Samsara", "Afterlife state, reincarnation timing, and the next incarnation when the wheel permits it.",
-                      "reincarnate"),
+            # `reset` sits here rather than on Overview (v1.0.1). Overview is
+            # seven reads, and a destructive action among them is a misclick;
+            # this is the page about a life ending and another beginning, which
+            # is what both leaves on it do. Discoverability does not rest on the
+            # page - `/begin`'s refusal names the leaf, and that refusal is the
+            # message a player who wants to start over actually reaches.
+            _hub_page("afterlife", "Samsara", "Afterlife state, reincarnation timing, the next incarnation when the wheel permits it, and abandoning a life you have only just begun.",
+                      "reincarnate", "reset"),
         ),
     ),
     # `/ascend`, not `/quest` (v1.0.0-rc.13). This hub holds no quests: it is

@@ -179,6 +179,67 @@ func quoteIdentifier(name string) string {
 	return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
 }
 
+// erasureSweep is what one pass over the targets moved, reported per
+// "table.column" so the caller's receipt can name it.
+type erasureSweep struct {
+	Deleted        map[string]any
+	Anonymised     map[string]any
+	RowsDeleted    int64
+	RowsAnonymised int64
+}
+
+// applyErasureTargets is the one statement of how a person's rows are removed.
+// Both callers walk the same targets in the same order: `admin.player.erase`,
+// which honours a data-protection request, and `character.reset`, which is a
+// player abandoning a life they have only just begun (v1.0.1). They must not
+// drift - the whole reason `erasureTargets` reads the live schema is that a
+// hand-written list of 104 tables goes stale, and two hand-written loops over
+// it would go stale against each other as well.
+//
+// `keep` is the one thing that varies, and it varies for exactly one reason:
+// the reset's allowance is recorded in `event_log`, and a bound that the
+// bounded action erases is not a bound. It is an extra SQL predicate per
+// "table.column", ANDed onto the DELETE. Erasure passes nil, because a
+// data-protection request keeps nothing.
+func applyErasureTargets(conn *storage.Conn, userID int64, targets []erasureTarget, keep map[string]string) (erasureSweep, error) {
+	sweep := erasureSweep{Deleted: map[string]any{}, Anonymised: map[string]any{}}
+	for _, target := range targets {
+		key := erasureKey(target.Table, target.Column)
+		var statement string
+		if target.Disposition == erasureDelete {
+			statement = fmt.Sprintf("DELETE FROM %s WHERE %s=?",
+				quoteIdentifier(target.Table), quoteIdentifier(target.Column))
+			if extra := strings.TrimSpace(keep[key]); extra != "" {
+				statement += " AND " + extra
+			}
+		} else {
+			replacement := "NULL"
+			if target.NotNull {
+				replacement = fmt.Sprint(erasedUserSentinel)
+			}
+			statement = fmt.Sprintf("UPDATE %s SET %s=%s WHERE %s=?",
+				quoteIdentifier(target.Table), quoteIdentifier(target.Column),
+				replacement, quoteIdentifier(target.Column))
+		}
+		res, execErr := conn.Execute(statement, []any{userID})
+		if execErr != nil {
+			return erasureSweep{}, fmt.Errorf("erasing %s: %w", key, execErr)
+		}
+		affected := res.RowsAffected
+		if affected <= 0 {
+			continue
+		}
+		if target.Disposition == erasureDelete {
+			sweep.Deleted[key] = affected
+			sweep.RowsDeleted += affected
+		} else {
+			sweep.Anonymised[key] = affected
+			sweep.RowsAnonymised += affected
+		}
+	}
+	return sweep, nil
+}
+
 type erasePlayerPayload struct {
 	UserID int64  `json:"user_id"`
 	Reason string `json:"reason"`
@@ -225,40 +286,12 @@ func adminErasePlayer(conn *storage.Conn, adminUserID int64, raw json.RawMessage
 		return nil, err
 	}
 	hadCharacter := len(nameRes.Rows) > 0
-	deleted := map[string]any{}
-	anonymised := map[string]any{}
-	var rowsDeleted, rowsAnonymised int64
-	for _, target := range targets {
-		var statement string
-		if target.Disposition == erasureDelete {
-			statement = fmt.Sprintf("DELETE FROM %s WHERE %s=?",
-				quoteIdentifier(target.Table), quoteIdentifier(target.Column))
-		} else {
-			replacement := "NULL"
-			if target.NotNull {
-				replacement = fmt.Sprint(erasedUserSentinel)
-			}
-			statement = fmt.Sprintf("UPDATE %s SET %s=%s WHERE %s=?",
-				quoteIdentifier(target.Table), quoteIdentifier(target.Column),
-				replacement, quoteIdentifier(target.Column))
-		}
-		res, execErr := conn.Execute(statement, []any{p.UserID})
-		if execErr != nil {
-			return nil, fmt.Errorf("erasing %s: %w", erasureKey(target.Table, target.Column), execErr)
-		}
-		affected := res.RowsAffected
-		if affected <= 0 {
-			continue
-		}
-		key := erasureKey(target.Table, target.Column)
-		if target.Disposition == erasureDelete {
-			deleted[key] = affected
-			rowsDeleted += affected
-		} else {
-			anonymised[key] = affected
-			rowsAnonymised += affected
-		}
+	sweep, err := applyErasureTargets(conn, p.UserID, targets, nil)
+	if err != nil {
+		return nil, err
 	}
+	deleted, anonymised := sweep.Deleted, sweep.Anonymised
+	rowsDeleted, rowsAnonymised := sweep.RowsDeleted, sweep.RowsAnonymised
 	// The audit row records that the request was honoured and how much it
 	// moved. It deliberately carries no character name, no location and no
 	// content - a record of an erasure that quotes the erased data is not an

@@ -36,6 +36,11 @@ from playtest_common import ROOT, Report, bootstrap, launch_engine, step, stop_e
 PLAYER = 900001
 BUYER = 900002
 GHOST = 900003
+# A fourth cultivator who exists only to be abandoned (v1.0.1). It has to be its
+# own account: `character.reset` refuses anybody who has left a mark the world
+# keeps, and every other actor in this run has spent two thousand steps leaving
+# them.
+QUITTER = 900004
 GM = 1
 
 # Operations this harness does not drive, each with its reason.
@@ -2275,6 +2280,37 @@ async def run(url: str, token: str, db_path: str) -> Report:
             await step(report, "family.dynasty.conflict negotiate", act("family.dynasty.conflict", PLAYER, {"claim_id": claim_id, "tactic": "negotiate"}))
         else:
             await step(report, "family.dynasty.conflict with no conflict", act("family.dynasty.conflict", PLAYER, {"claim_id": claim_id or 999999, "tactic": "negotiate"}), expect_error="no dynasty conflict exists")
+
+    # ---- 21c. beginning again (v1.0.1) -----------------------------------------
+    # The one action whose actor erases itself. Driven on its own account
+    # because the gate is "this character has left no mark the world keeps",
+    # and PLAYER has spent this whole run leaving them - which is itself worth
+    # asserting, so both halves are driven: the fresh cultivator is allowed and
+    # the veteran is refused.
+    offers = await step(report, "family options for a cultivator who will not stay",
+                        act("character.family_options", QUITTER, {"world_name": "Mortal World"}))
+    first = list((offers or {}).get("families") or [])
+    if first:
+        await step(report, "a fourth cultivator is created", act("character.create", QUITTER, {
+            "discord_name": "Playtest Quitter", "name": "Mo Secondthoughts", "concept": "reconsider everything",
+            "gender": "neutral", "path": "Sword Cultivator",
+            "family_choice_id": str(first[0].get("choice_id") or ""), "age_at_creation_years": 18}))
+        reset = await step(report, "character.reset takes the life back", act("character.reset", QUITTER, {}))
+        if reset is not None:
+            gone = await db.get_character(QUITTER)
+            report.add("PASS" if gone is None else "FAIL", "the abandoned cultivator has no character row", str(gone)[:80])
+            report.add("PASS" if int(reset.get("resets_remaining", -1)) == 2 else "FAIL",
+                       "two of three chances remain", f"remaining={reset.get('resets_remaining')}")
+        again = await step(report, "family options again after a reset",
+                           act("character.family_options", QUITTER, {"world_name": "Mortal World"}))
+        second = list((again or {}).get("families") or [])
+        if second:
+            await step(report, "and /begin works again", act("character.create", QUITTER, {
+                "discord_name": "Playtest Quitter", "name": "Mo Resolved", "concept": "this time for certain",
+                "gender": "neutral", "path": "Body Refiner",
+                "family_choice_id": str(second[0].get("choice_id") or ""), "age_at_creation_years": 18}))
+    await step(report, "a cultivator the world remembers cannot be taken back",
+               act("character.reset", PLAYER, {}), expect_error="left a mark the world keeps")
 
     # ---- 22. erasure -----------------------------------------------------------
     # Last of all, because it is the one lever that leaves nothing behind: the

@@ -58,6 +58,12 @@ DEFERRED_LEAVES: dict[str, str] = {
         "pressed after it. Driven explicitly in section 4b instead, where the "
         "refusal and the reopening are both asserted."
     ),
+    "/reset": (
+        "beginning again (v1.0.1): the leaf removes the cultivator every leaf "
+        "after it needs, and the sweep confirms a confirm - pressed here it "
+        "would empty the run. Driven explicitly in section 9b instead, last of "
+        "all, where losing the character costs nothing."
+    ),
     "/seclusion start": (
         "the closed-door lockout (v1.0.0-rc.56): a retreat refuses every "
         "other command until the player emerges, so pressing this leaf mid-"
@@ -1153,6 +1159,48 @@ async def run(url: str, token: str, db_path: str) -> Report:
         note = await step(report, "a panel left for fifteen minutes goes quiet and can be reopened", quiet())
         if note:
             report.add("PASS", "how it went quiet", note)
+
+        # ---- 9b. beginning again (v1.0.1) ------------------------------------------
+        # Last of all, for erasure's reason in the engine half: it is the one
+        # leaf that leaves nothing behind. What this proves is the wiring the
+        # engine half cannot see - that the leaf is on the page, that its
+        # confirm is answered, that the engine is reached and that whichever
+        # answer comes back is rendered. Which answer that is depends on what
+        # the sweep left behind: a player who has explored, joined and traded
+        # has almost certainly left a mark the world keeps, and the refusal is
+        # then the correct outcome and the more useful one to see. The success
+        # path is driven end to end by scripts/playtest_engine.py, on an
+        # account created for it.
+        async def begin_again():
+            panel = await open_hub(player, channels["begin-here"], "character", env=env)
+            await panel.goto("Samsara", env=env)
+            custom_id = await find_leaf_button(panel, "Reset")
+            expect(custom_id, f"no Reset leaf on {panel.page_title()!r}: {panel.labels()}")
+            # "reset" is in `_DANGER_ACTION_WORDS`, so the leaf does not run:
+            # it sends a confirm step with its own buttons. `answer_steps`
+            # walks selects and modals, and the generic sweep deliberately
+            # stops at a confirm rather than pressing Yes - which is why the
+            # first version of this step read back the confirm prompt itself.
+            # Here the Yes is the point, so it is clicked.
+            started = await player.click(panel.message(), custom_id=custom_id)
+            step = started.response.message if started.response is not None else None
+            expect(step is not None, "the reset leaf sent no confirm step")
+            expect("Are you sure" in message_text(step),
+                   f"the reset leaf ran without asking:\n{message_text(step)[:300]}")
+            out = result_text(await answer_steps(
+                player, await player.click(step, label="Yes, Reset"),
+            ))
+            for text in WIRING_FAILURE_TEXTS:
+                expect(text not in out, f"the reset leaf raised: {out[:300]}")
+            lowered = out.casefold()
+            if "mark the world keeps" in lowered:
+                return "refused: the sweep left marks the world keeps, which is the rule"
+            if "is gone" in lowered and "/begin" in lowered:
+                return "reset: the cultivator was taken back and /begin was named"
+            raise Failed("the reset leaf answered neither a result nor its designed refusal:\n" + out[:600])
+        note = await step(report, "the reset leaf answers a result or its designed refusal", begin_again())
+        if note:
+            report.add("PASS", "how beginning again went", note)
 
         # ---- 10. nothing raised ---------------------------------------------------
         async def clean():

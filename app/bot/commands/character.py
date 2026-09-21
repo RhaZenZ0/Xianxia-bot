@@ -39,6 +39,7 @@ from ..runtime import (
     player_property_label,
     reply_long,
     require_character,
+    respond,
     serialized_user_action,
 )
 from ..ui.commissions import AbandonCommissionView, abandon_warning
@@ -49,8 +50,15 @@ from ..services import COMMISSIONS, GUILD, NPC_RELATIONSHIPS, QUESTS, SCENES
 async def begin(interaction: discord.Interaction) -> None:
     existing = await DB.get_character(interaction.user.id)
     if existing:
+        # This refusal is the one message a player who wants to start over
+        # actually reaches, so it names the door rather than the sheet
+        # (v1.0.1). Pointing somebody at a read when they asked to create is
+        # how "there is no way to do this" gets learned.
         await interaction.response.send_message(
-            "You already have a character. Use **/character → Overview**.", ephemeral=True
+            "You already have a character. Use **/character → Overview** to see them — "
+            "or **/character → Samsara → Reset** to abandon a life you have only just begun and create a new "
+            "cultivator, while nothing you have done is written into the world yet.",
+            ephemeral=True,
         )
         return
 
@@ -956,3 +964,56 @@ async def reincarnate(interaction:discord.Interaction,name:str,path:str,gender:a
     await interaction.response.send_message("\n".join(lines))
 
 
+
+
+@registered_root_command(
+    name="reset",
+    description="Abandon a life you have only just begun and create a new cultivator — this cannot be undone",
+    guild=GUILD,
+)
+@serialized_user_action
+async def reset(interaction: discord.Interaction) -> None:
+    """The player's own way back to /begin (v1.0.1).
+
+    Nothing is decided here. Every gate - alive, a first incarnation, an
+    unspent allowance, and above all whether this character has left a mark
+    on a world other players share - is the engine's, because they are all
+    read off rows the engine owns and Python must not open. The handler's
+    whole job is to carry the refusal back in the player's language.
+
+    The hub's own confirm step fires before this is ever reached: "reset" is
+    in `_DANGER_ACTION_WORDS`, so the leaf is red and asks "Are you sure?"
+    with this command's description as the warning.
+    """
+    # Deferred first, before anything that can mutate: the sweep across ~104
+    # tables is not quick, and an unacked handler that reaches the engine risks
+    # a duplicate mutation if the token expires before the first reply.
+    if not interaction.response.is_done():
+        await interaction.response.defer(ephemeral=False)
+    c = await require_character(interaction, allow_deceased=True)
+    if not c:
+        return
+    try:
+        envelope = await ENGINE.authoritative_action(
+            "character.reset",
+            interaction.user.id,
+            {},
+            action_id=f"discord:{interaction.id}:character.reset",
+        )
+    except GameEngineError as exc:
+        await respond(interaction, f"❌ {_explain_engine_error(exc)}", ephemeral=False)
+        return
+    result = dict(envelope.get("result") or {})
+    remaining = int(result.get("resets_remaining", 0))
+    lines = [
+        f"🌱 **{result.get('name') or c['name']} is gone.** The household's record of them closes, "
+        f"and **{int(result.get('rows_deleted', 0))}** rows across "
+        f"**{int(result.get('tables_touched', 0))}** tables were removed.",
+        "Use **/begin** to choose a family, a path and a name again.",
+    ]
+    lines.append(
+        f"You may begin again **{remaining}** more time{'' if remaining == 1 else 's'}."
+        if remaining
+        else "That was the last time this world allows you to begin again."
+    )
+    await respond(interaction, "\n".join(lines), ephemeral=False)
