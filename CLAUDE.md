@@ -2369,6 +2369,247 @@ Three things about the gate are worth more than the fix.
   `['v1.0.0.md', 'v1.0.1.md'] != ['v1.0.1.md']`; sorting the versions as text inherits from
   `v1.0.9` over `v1.0.10`.
 
+### The first bump that renames a file (v1.0.1)
+
+`docs/playtest/v<version>.md` is named after the stamped release, and across all **fifty-nine**
+release candidates of 1.0.0 that name never moved — `RELEASE_VERSION` strips the `-rc.N` suffix. So
+1.0.0 → 1.0.1 is the first bump in this project's history that renames it, and **two** things had
+quietly depended on the name holding still:
+
+- `merge_ticks`, handed the file it was about to overwrite, so a rename meant `target.exists()` was
+  false and the freshly generated checklist was written with every box blank. That one was found and
+  fixed while building the tick-carrying, *before* the bump — and it worked on the day: the bump
+  printed *"carried the live pass from v1.0.0.md and removed it"*, all 38 ticks preserved and stamped
+  `[x] v1.0.0`.
+- `test_hidden_actions.py`, which opened `v1.0.0.md` **by literal** and made the whole module error
+  with `FileNotFoundError` the moment the bump landed. Nothing found that one in advance, because
+  there was nothing to find until the filename actually moved.
+
+Two instances is a class, so the gate exists now: outside the generator and the gate file's own
+throwaway trees, no Python source may spell a checklist filename — build it from `VERSION`.
+
+**Its first run flagged the file it had just been written for**, because the *comment* explaining
+the fix names the old filename. That is rc.52's rule (*a gate that cannot tell prose from code is
+decoration*) arriving immediately rather than a release later, and the scan blanks comments and
+docstrings before it looks. The pattern is stated **once** and used by both the scan and the
+self-check, because a second copy in the self-check would be free to stay right while the one that
+matters drifted — which is the exact failure this file catches elsewhere. Three drills: the literal
+restored in code, the pattern broken (the self-check fires first), and the comment-stripping removed
+(it flags `test_hidden_actions.py` again, by its comment).
+
+**The version itself is stamped in six places**, and `test_release_version.py` has held them equal
+since the day `VERSION` drifted to 0.19 while `app/version.py`, the Dockerfile and compose stayed on
+0.18. A bump is `app/version.py`, `VERSION`, the `Dockerfile` label, `docker-compose.yml`, the README
+title and the changelog's Release status line — plus the one literal in that test, which is the only
+place the number is spelled out in the suite and is what makes the rest reviewable.
+
+### What a server is told is derived, so the entry has to parse (v1.0.1)
+
+rc.59 made the bot post its own release notes into `#updates`, and made the line **derived, never
+authored twice** — `release_headline` takes the opening sentence of the entry `release_notes_for`
+found, precisely so a second short blurb per release cannot drift from the changelog. That puts two
+properties of `VERSIONS.md` on the critical path, and **nothing was holding either**. v1.0.1 broke
+both at once, and only rendering the post by hand showed it.
+
+**An entry is one header.** `_ENTRY` matches any line opening with a version stamp, so a second
+`**1.0.1**` *inside* the entry starts a new one. Three paragraphs of this release were written that
+way, and `release_notes_for("1.0.1")` therefore stopped at the first — the notes truncated to one
+paragraph and everything after it would never have been announced anywhere. The convention it broke
+is visible in every earlier entry and was written down nowhere: continuation paragraphs begin
+*"It also…"* or *"And…"*.
+
+**The first paragraph leads.** Because the headline is the entry's opening sentence, paragraph order
+decides what a server is told. Prepending the newest work put a *test assertion* first, so the live
+post read:
+
+> 📣 **Xianxia RP v1.0.1** *also fixes an assertion that was only ever green by luck.*
+
+— opening mid-thought, about the least player-facing thing in the release, with the two things
+players actually got unmentioned. It reads correctly now (*"makes a craft say what it needs, and
+lets a player start over without a GM"*), which is what the channel is for.
+
+Neither fault is visible from a source read of the bot, and neither shows in any suite: the
+changelog is prose, and the only thing ever held about it was that the stamped version has an entry
+at all. `test_release_headline.py` holds both — no version may open two entries, and no entry may
+open with *also/and/too* — plus that every headline is a sentence that fits one Discord message. It
+reads `_ENTRY` and `MESSAGE_LIMIT` off `release_notes.py` rather than copying them, and asserts the
+parse found a real changelog before trusting it. Its drills print the truncation, the *"v1.0.1
+also fixes…"* line verbatim, and *"the reader is broken, not the tree"*.
+
+**The lesson is the one rc.59 already stated about itself, arriving from the other side.** That
+release wrote that a derived headline cannot drift from the changelog — true, and the reason it is
+right. What it did not say is that deriving it makes the changelog's *shape* load-bearing, so prose
+nobody thought of as code now needs a gate like any other.
+
+### The step that only passed when the number was not zero (v1.0.1)
+
+`scripts/playtest_engine.py` went red on a step nothing in the release had touched:
+
+```
+FAIL the crossing carries the player and converts the purse at the ladder
+     24200 low_spirit_stone -> 242 low_spirit_crystal at 100:1, -1 left behind
+```
+
+24,200 divides by a hundred exactly, so the remainder is **0** - and the step read it as
+`int(exchange.get("remainder") or -1)`. Zero is falsy, so `or` replaced the correct answer with the
+missing-value sentinel, and the step then failed its own `0 <= remainder < rate` check. It had passed
+every previous run because the accumulated wealth had never landed on a round number.
+
+That is **"a fallback that looks like a value is not a sentinel"** - the `seller_user_id=0` lesson
+(rc.28), `gradeIndex` (rc.55) and `clanRelationOpeningScore` (v1.0.1) - met inside an *assertion*
+rather than inside a rule. The failure mode is different and worse: a rule that mistakes 0 for
+missing is wrong every time and gets found, while an assertion that does it is **green until the
+value happens to be zero**, which makes it read as a flake.
+
+Three more instances were waiting in the same file, and one of them is on a case the design
+explicitly promises: `int(exchange.get("converted") or -1)` compares against the sheet's mirror, and
+`crossWorldsPurseTx` is documented to write the credit **even when it converts to zero**, because
+that write is what re-points the mirror at the new world. A purse smaller than the ladder's rung
+would have failed that step every time.
+
+`present(value, default=-1)` is the one statement now - `default if value is None else int(value)` -
+and all four sites use it. The rule it encodes is the one this file already states about production
+code, applied to the tests: **ask whether the field is absent, never whether it is falsy.**
+
+### A method that could not say what it needed (v1.0.1)
+
+**Found by playing, not by reading.** A player bought an Inscription slip, read it, and then had no
+way to discover that a Swift-Wind Talisman wants one `talisman_paper` and one `spirit_ink`. Both are
+in the content file, both are sold (67 shops and 23), and both are foragable since rc.21. Three
+separate facts would each have told them, and **not one reached a player**:
+
+1. **`character_recipes` had no Python reader at all.** Four writers - a bought slip, the household
+   lesson, the trade examination and a grandfathering migration - and the only readers in the tree
+   are in Go, deciding whether a craft is allowed. Nothing could tell you what you had learned.
+2. **`get_recipe_definition` parses a recipe's `cost` and no command read it.** It is decoded out of
+   `cost_json` in `core.py` and every caller reads `profession` beside it and stops. That is rc.55's
+   root grade exactly - a field parsed and read by nothing - except this one is the difference
+   between being able to use the crafting system and not.
+3. **The engine computed the shortfall and threw it away.** `consumeInventoryTx` returns
+   `map[item]shortfall` - which materials are short and by how much - and the craft refused with
+   `errors.New("missing materials")`. The bot then caught that and replaced even those two words
+   with *"Missing materials for that recipe."* **Two layers each discarding the one fact the player
+   needed.**
+
+All three are fixed, and none of it is content: `describeMaterials` names the shortfall through
+`itemDisplayName` (the one statement of what an item is called, already in `shop_actions.go`) off
+sorted ids, because a map range would make one refusal read two ways; `DB.get_known_recipes` is the
+missing reader; and `profession status` prints every method you know, per trade, with each input's
+cost beside **what you are carrying** - `✅` you can make it now, `❌` short of materials, `🔴` your
+rank is too low. It also stopped returning early on an empty `profession_progress`, which had meant a
+cultivator who bought a slip and read it was told they had no profession experience and shown nothing
+they had learned.
+
+**The other three callers of `consumeInventoryTx` were already right**, which is worth recording
+because it says the fault was the craft's and not the helper's: the slip, the beast food and the shop
+sale each name the one item they wanted. And all four *trades* share `craft.resolve`, so Alchemy,
+Forging, Formation and Inscription are one fix, not four.
+
+**And the new reader raised on every call, which the playtest found and no gate could.** The first
+`get_known_recipes` did `dict(row)` without setting `db.row_factory`, so a row came back a bare tuple,
+`dict` walked the first string instead, and the page died with *"dictionary update sequence element
+#0 has length 19"* — 19 being the length of `Swift-Wind Talisman`. `test_authority_boundary` requires
+a state function to have a production caller and it had one; the gate below requires the page to call
+it and it did. **Neither asks whether the call works**, and nothing else executed it, so a leaf that
+had passed for as long as it existed went red in the Discord sweep. `test_known_recipes.py` calls it
+against a real database, and its drill prints the production error.
+
+`test_a_recipe_tells_you_what_it_needs.py` is the gate, behavioural where it can be and reading
+functions **by AST** (rc.59: a multi-line `def` defeats an indentation slice). Its drills each print
+the finding - the bare refusal restored, the handler replacing it again, the status page no longer
+reading what you know - and the fourth breaks the reader itself and fails with *"the reader is
+broken, not the tree"* before it can make anything vacuous.
+
+**Its own first version shipped a worse copy of an existing rule, and its first run said so.** It
+swept `sells`, `forage_materials` and the recipe outputs to prove every cost was obtainable, and
+failed naming `jade_life_herb` and `twin_extremes_fruit` - both of which *are* sourced, one a
+secret-realm room reward and one resolved off the world tier in `crafting_actions.go`. That rule is
+already stated in `test_every_item_has_a_source.py`, which greps production for every item id and
+keeps `SOURCELESS_ITEMS` empty. Two statements of one rule are free to disagree and the weaker one
+produces the false findings, so the sweep was deleted and the test now holds that the real gate is
+still there - the same call v1.0.1 made about its table-level sweep.
+
+### Starting over without a GM (`character_reset.go`, v1.0.1)
+
+There was no way for a player to reset a character, and the three things that looked like one were
+not. `/begin` refuses outright when a `characters` row exists. **Dying is not a reset**:
+`lifecycle.true_death` has exactly three callers and none is voluntary - old age fired automatically
+inside `require_character`, losing a battle at 0 HP with no fate point left, and the GM - and what it
+opens is Samsara, which deliberately carries the memory seed, the talent/law/insight echoes, the
+legacy points, the craft echo and a family lineage rolled off the dead life's karma. And the one true
+wipe, `admin.player.erase`, is the data-protection lever: **using a legal-erasure tool as a restart
+button is the same class of lie as a `sync_world_catalog` that syncs no catalogue** - an action's name
+is what it is for, and "somebody asked for their data back" is not "I picked the wrong path".
+
+`character.reset` is the restart button. It is allowlisted through `applyAuthoritative`, so the
+moderation, maintenance and seclusion gates apply to it for free, and it takes **no payload** - every
+input it has is a row the engine already owns.
+
+- **It reuses erasure's own sweep.** `applyErasureTargets` is the one statement of how a person's
+  rows are removed, walking the targets `erasureTargets` reads off the *live schema*. Writing a
+  second list of tables here would be the hand-written list that function exists to avoid, one file
+  over.
+- **The gate is the anonymise disposition, not a clock.** A time window says nothing about what the
+  reset would cost anybody else. The question that matters is whether this character has left a mark
+  on a world other players share, and erasure had already answered it: `erasureAnonymise` is
+  precisely the set of columns where a person's id sits on a row belonging to everybody. A reset is
+  refused the moment any of them names the character, because **those rows survive an erasure and so
+  cannot honestly survive a reset** - the world would go on referring to a cultivator who was never
+  there. The refusal names which.
+- **There is deliberately no limit on how many times, and the cost is stated rather than hidden.**
+  An earlier version of this allowed three, to stop the root-grade re-roll: `rollRootGrade` is
+  `Intn(1000)` against thresholds putting Immortal in the top 0.7% of a tier-1 household's draw, and
+  rc.55 is what made that grade worth 0.88x-1.34x cultivation and -1 to +3 on every breakthrough for
+  the character's whole life, so a patient player can now draw for one. That is accepted: the gate
+  that matters is the world-mark rule above, which protects *other players*, and somebody re-rolling
+  their own first minute takes nothing from anybody - they have thrown away every character in
+  between. The reset is still **recorded**, in an `event_log` row the sweep is told to keep, so a GM
+  can see how often somebody has started over; the row is the memory, as `(user_id, quest_key)` is
+  for the beginner path, it is simply not a bound as well.
+- **"Keep what you drew, change what you chose" was rejected on a fact, not on taste.**
+  `rollFamilyRoot` weights the root off the household's archetype, location, bloodline affinity and
+  tier, and `rollRootGrade` adds `(familyTier-1)*24`. The family is a choice and the draw depends on
+  it, so there is no line to draw there.
+- **The household's welcome line comes back out.** Creation appends one to a *shared* starter
+  household's `history_json`; without this a house would remember a cultivator who does not exist,
+  once per abandoned attempt. `householdWelcomeLine` is a function because two places need the exact
+  same sentence and a second copy of a format string is free to drift. A line that is not found is
+  not an error.
+
+**The finding is one step further in, and no source read would have produced it.** A reset is the
+first action in this tree whose **actor erases itself**. `applyAuthoritative` reads the actor's state
+version *before* the switch and calls `eventledger.AdvanceActorVersion` with it *after*, so a sweep
+that deleted `authoritative_actor_versions.actor_id` left the framework unable to record the action
+that had just succeeded: `stale expected_version: expected 2 current 0`, thrown after all the work
+was done. `admin.player.erase` never met it because an `admin.*` lever falls through to the switch in
+`ApplyWithWorld` rather than through this bookkeeping, and because it erases somebody other than the
+actor. The version row and the action receipts are kept out of the sweep for exactly `erasureKeep`'s
+reason one level down - **the engine's record of a request cannot be the thing the request deletes** -
+and they are also right on their own terms: the version is optimistic-concurrency state about a
+Discord account's in-flight requests, not about the character, and zeroing it would let a client
+still holding the old version win a race it should lose. `domain_events` is deliberately *not* kept:
+it is the ledger of what the character did, which is the thing a reset is for.
+
+A GM erasure still takes the reset rows with everything else, and that is right: **erasure removes a
+person, a reset removes a character**, and somebody who has been erased is new to this bot.
+
+**Two of the gates caught themselves, and both are the recurring shape.** The mark refusal first
+asserted only that the error *named* the marked table - and disabling the disposition check makes
+every target a mark, so a refusal listing all sixteen still contained it and the drill **passed**
+against a broken gate (rc.47's shape, rc.49's disabled condition). It parses the refusal's
+parenthesised list and requires exactly one entry now. And the test helper that staged those marks
+wrote them with `conn.Execute` and then `Close`d - so every row was rolled back by the implicit
+transaction, and all six refusal tests passed as *successes*. That is rc.38's `npcFound` finding met
+in a fixture, where it made the tests vacuous rather than the feature broken.
+
+`tests/python/contracts/test_character_reset.py` is the real-schema half, for
+`test_privacy_erasure.py`'s reason: the Go fixtures build a schema by hand and would carry an old
+table name for ever. A migration renaming `event_log` breaks no build, errors nowhere, fails no Go
+test - and silently unbounds the allowance. The contract holds every kept "table.column" against a
+real bootstrap, holds each to being a column the sweep *would* otherwise delete (a keep on a column
+erasure never touches is decoration), and holds the table the allowance is counted from to be one the
+reset keeps.
+
 ### The fields nothing reads (`field_readers_test.go`, v1.0.1)
 
 rc.55 found `RootGrade.CultivationMult` and `RootGrade.BreakthroughBonus` parsed out of the content

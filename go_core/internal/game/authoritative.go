@@ -56,6 +56,7 @@ var authoritativeMutations = map[string]bool{
 	"qi.refine":                       true,
 	"ghost.harvest":                   true,
 	"ghost.appease":                   true,
+	"character.reset":                 true,
 	"lifecycle.true_death":            true,
 	"lifecycle.reincarnate":           true,
 	"combat.start":                    true,
@@ -479,6 +480,8 @@ func applyAuthoritative(databasePath, worldPath string, req ActionRequest) (Acti
 			mutation, err = birthFamilyOptionsAction(conn, req.ActorID, req.Payload)
 		case "character.create":
 			mutation, err = createCharacterAuthoritative(conn, worldPath, req.ActorID, req.Payload)
+		case "character.reset":
+			mutation, err = characterResetAction(conn, req.ActorID, req.Payload)
 		case "family.household.enter":
 			mutation, err = familyHouseholdEnterAction(conn, catalog, req.ActorID, req.Payload)
 		case "family.household.leave":
@@ -1136,7 +1139,7 @@ func createCharacterAuthoritative(conn *storage.Conn, worldPath string, userID i
 	if len(historyRes.Rows) > 0 {
 		_ = json.Unmarshal([]byte(fmt.Sprint(historyRes.Rows[0][0])), &history)
 	}
-	history = append(history, fmt.Sprintf("%s welcomed %s into the household.", pFamily.FamilyName, p.Name))
+	history = append(history, householdWelcomeLine(pFamily.FamilyName, p.Name))
 	if len(history) > 80 {
 		history = history[len(history)-80:]
 	}

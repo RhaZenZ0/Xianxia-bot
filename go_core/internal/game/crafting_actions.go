@@ -215,6 +215,32 @@ func alchemyQualityGo(margin int64, success bool) (string, string, int64, int64)
 	return "ordinary", "Ordinary", 1, 0
 }
 
+// describeMaterials turns a shortfall map into the sentence a refusal shows.
+// `consumeInventoryTx` has always computed exactly which materials are short
+// and by how much, and until v1.0.1 every caller threw that away and refused
+// with the bare words "missing materials" - so a player who had learned a
+// recipe was told they could not make it and never which of its two inputs
+// they lacked. Nothing else in the game names a recipe's cost either, so that
+// refusal was the only place the information could have reached them.
+//
+// Names come from `itemDisplayName` rather than the raw ids, because the player
+// has to go and buy the thing - and from that helper rather than a second
+// lookup here, since "what an item is called" is already stated once. The ids
+// are sorted, because a map range would make the same refusal read differently
+// between two runs.
+func describeMaterials(catalog worlddata.Catalog, shortfall map[string]int64) string {
+	ids := make([]string, 0, len(shortfall))
+	for id := range shortfall {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	parts := make([]string, 0, len(ids))
+	for _, id := range ids {
+		parts = append(parts, fmt.Sprintf("%s x%d", itemDisplayName(catalog, id), shortfall[id]))
+	}
+	return strings.Join(parts, ", ")
+}
+
 func consumeInventoryTx(conn *storage.Conn, userID int64, costs map[string]int64) (map[string]int64, error) {
 	missing := map[string]int64{}
 	for item, qty := range costs {
@@ -395,7 +421,8 @@ func craftResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 		return authoritativeMutation{}, err
 	}
 	if len(missing) > 0 {
-		return authoritativeMutation{}, errors.New("missing materials")
+		return authoritativeMutation{}, fmt.Errorf("missing materials: %s",
+			describeMaterials(catalog, missing))
 	}
 
 	output := map[string]int64{}

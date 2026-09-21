@@ -410,17 +410,76 @@ async def profession_status(interaction: discord.Interaction) -> None:
     if not c:
         return
     rows = await DB.get_profession_progress(interaction.user.id)
-    if not rows:
+    # What a method needs, and whether you are carrying it (v1.0.1). Every
+    # piece of this already existed and none of it reached a player:
+    # `character_recipes` had four writers and no Python reader, so nothing
+    # could say what you had learned; `get_recipe_definition` has always parsed
+    # a recipe's `cost` out of `cost_json` and no command read it; and the
+    # engine computed the exact shortfall on a failed craft and refused with
+    # the bare words "missing materials". A player who bought a slip, learned
+    # it, and then could not work out what to buy next was reading the only
+    # surface there was.
+    known = await DB.get_known_recipes(interaction.user.id)
+    carried = await DB.get_inventory(interaction.user.id)
+    levels = {str(row["profession"]): int(row.get("level", 0)) for row in rows}
+    by_trade: dict[str, list[str]] = {}
+    for entry in known:
+        definition = await DB.get_recipe_definition(str(entry["recipe"]))
+        if not definition:
+            continue
+        trade = str(definition.get("profession") or "Other")
+        cost = dict(definition.get("cost") or {})
+        parts = [
+            f"{WORLD.item_name(item)} ×{int(qty)} (have {int(carried.get(item, 0))})"
+            for item, qty in sorted(cost.items())
+        ]
+        short = [item for item, qty in cost.items() if int(carried.get(item, 0)) < int(qty)]
+        needed = int(definition.get("min_level") or 0)
+        under = levels.get(trade, 0) < needed
+        mark = "🔴" if under else ("❌" if short else "✅")
+        tail = f" • needs Level {needed}" if under else ""
+        by_trade.setdefault(trade, []).append(
+            f"  {mark} **{entry['recipe']}** — {', '.join(parts) or 'no materials'}"
+            f" • TN {int(definition.get('tn') or 0)}{tail}"
+        )
+
+    lines = [f"🛠️ **Profession Mastery — {c['name']}**"]
+    if not rows and not known:
+        # The page used to stop here whatever else was true, which meant a
+        # cultivator who had bought a slip and read it was told they had no
+        # profession experience and shown nothing they had learned.
         await interaction.response.send_message(
-            "🛠️ You have no profession experience yet. Successful or failed **/craft** attempts now build profession mastery.", ephemeral=False
+            "🛠️ You have no profession experience and know no methods yet. Successful or failed "
+            "**/craft** attempts build mastery; slips are sold in most halls of a trade and are read "
+            "with **/craft → Profession → Learn**.", ephemeral=False,
         )
         return
-    lines = [f"🛠️ **Profession Mastery — {c['name']}**"]
+    if not rows:
+        lines.append("_No craft attempt has been recorded yet — the methods below are what you know._")
     for row in rows:
         level = int(row.get("level", 0)); xp = int(row.get("xp", 0))
+        trade = str(row["profession"])
         lines.append(
-            f"\n**{row['profession']} — {profession_rank(level)}** (Level {level})\n"
+            f"\n**{trade} — {profession_rank(level)}** (Level {level})\n"
             f"XP **{xp}/{profession_xp_needed(level)}** • Successes {row.get('successes',0)} • Failures {row.get('failures',0)} • Quality {row.get('quality_points',0)}"
+        )
+        for line in by_trade.pop(trade, []):
+            lines.append(line)
+    # A method in a trade with no progress row yet is still one you know, and
+    # leaving it out is how the old page managed to show nothing at all.
+    for trade, entries in sorted(by_trade.items()):
+        lines.append(f"\n**{trade} — {profession_rank(0)}** (Level 0)")
+        lines.extend(entries)
+    if known:
+        lines.append(
+            "\n✅ you can make it now • ❌ short of materials • 🔴 your rank is too low"
+            "\nBuy materials at a hall of the trade (**/economy → City Shops → Here**) or gather "
+            "them (**/craft → Alchemy → Forage**). New methods come from slips: **/craft → Profession → Learn**."
+        )
+    else:
+        lines.append(
+            "\nYou know no methods yet. Slips are sold in most halls of a trade — buy one and read "
+            "it with **/craft → Profession → Learn**."
         )
     await reply_long(interaction, "\n".join(lines), ephemeral=False)
 

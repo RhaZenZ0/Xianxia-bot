@@ -33,9 +33,29 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from playtest_common import ROOT, Report, bootstrap, launch_engine, step, stop_engine  # noqa: E402 - beside this file
 
+def present(value: Any, default: int = -1) -> int:
+    """An integer from a result field, distinguishing absent from zero.
+
+    `int(result.get("x") or -1)` reads a legitimate **0** as missing, because
+    zero is falsy - so an assertion written that way passes only while the
+    value happens to be non-zero and fails the run where it is not. That cost
+    this file a red step on an exact currency conversion (remainder 0) and had
+    three more instances waiting, one of them on the zero-conversion case the
+    ladder is documented to produce. It is the repo's own
+    "a fallback that looks like a value is not a sentinel" rule
+    (`seller_user_id=0`, `gradeIndex`) met inside an assertion.
+    """
+    return default if value is None else int(value)
+
+
 PLAYER = 900001
 BUYER = 900002
 GHOST = 900003
+# A fourth cultivator who exists only to be abandoned (v1.0.1). It has to be its
+# own account: `character.reset` refuses anybody who has left a mark the world
+# keeps, and every other actor in this run has spent two thousand steps leaving
+# them.
+QUITTER = 900004
 GM = 1
 
 # Operations this harness does not drive, each with its reason.
@@ -455,7 +475,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
         if stock:
             line = dict(stock[0])
             bought = await step(report, f"shop.buy {line.get('item_id')}", act("shop.buy", PLAYER, {"item_id": str(line.get("item_id")), "quantity": 1}))
-            if bought is not None and int(bought.get("total") or 0) != int(line.get("price") or -1):
+            if bought is not None and int(bought.get("total") or 0) != present(line.get("price")):
                 report.add("FAIL", "shop.buy charges the shelf price", f"total={bought.get('total')} shelf={line.get('price')}")
         else:
             report.add("FAIL", "shop.browse", "an empty shelf on first sight")
@@ -698,7 +718,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
     xp, cost = int(sheet.get("insight_xp") or 0), int(sheet.get("insight_cost") or 0)
     if xp >= cost:
         banked = await step(report, "cultivation.insight banks the gate insight", act("cultivation.insight", PLAYER, {}))
-        if banked is not None and not (banked.get("banked") and int(banked.get("insight_xp") or -1) == xp - cost):
+        if banked is not None and not (banked.get("banked") and present(banked.get("insight_xp")) == xp - cost):
             report.add("FAIL", "cultivation.insight banks the gate insight", f"{banked}")
         await step(report, "a second insight is refused", act("cultivation.insight", PLAYER, {}), expect_error="already banked")
     else:
@@ -1751,7 +1771,10 @@ async def run(url: str, token: str, db_path: str) -> Report:
             # exactly what converted, and what would not divide is less than
             # one unit of the new money.
             rate, spent = int(exchange.get("rate") or 0), int(exchange.get("spent") or 0)
-            converted, remainder = int(exchange.get("converted") or 0), int(exchange.get("remainder") or -1)
+            converted = int(exchange.get("converted") or 0)
+            # `present`, not `or -1`: a purse that divides exactly leaves a
+            # remainder of 0, and `or` read that correct answer as missing.
+            remainder = present(exchange.get("remainder"))
             report.add("PASS" if str(crossed.get("to")) == "Spirit Jade Capital" and crossed.get("raised") is True
                        and rate == 100 and spent == converted * rate and 0 <= remainder < rate else "FAIL",
                        "the crossing carries the player and converts the purse at the ladder",
@@ -1759,7 +1782,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
                        f"{spent} {exchange.get('from_currency')} -> {converted} "
                        f"{exchange.get('to_currency')} at {rate}:1, {remainder} left behind")
         sheet = dict(await db.get_character(PLAYER) or {})
-        report.add("PASS" if int(sheet.get("spirit_stones") or 0) == int(exchange.get("converted") or -1) else "FAIL",
+        report.add("PASS" if int(sheet.get("spirit_stones") or 0) == present(exchange.get("converted")) else "FAIL",
                    "the sheet reads in the money of the world arrived in",
                    f"spirit_stones={sheet.get('spirit_stones')} at {sheet.get('location')}, converted={exchange.get('converted')}")
         # And home again, which converts back at the same rung, so the rest of
@@ -2276,6 +2299,42 @@ async def run(url: str, token: str, db_path: str) -> Report:
         else:
             await step(report, "family.dynasty.conflict with no conflict", act("family.dynasty.conflict", PLAYER, {"claim_id": claim_id or 999999, "tactic": "negotiate"}), expect_error="no dynasty conflict exists")
 
+    # ---- 21c. beginning again (v1.0.1) -----------------------------------------
+    # The one action whose actor erases itself. Driven on its own account
+    # because the gate is "this character has left no mark the world keeps",
+    # and PLAYER has spent this whole run leaving them - which is itself worth
+    # asserting, so both halves are driven: the fresh cultivator is allowed and
+    # the veteran is refused.
+    offers = await step(report, "family options for a cultivator who will not stay",
+                        act("character.family_options", QUITTER, {"world_name": "Mortal World"}))
+    first = list((offers or {}).get("families") or [])
+    if first:
+        await step(report, "a fourth cultivator is created", act("character.create", QUITTER, {
+            "discord_name": "Playtest Quitter", "name": "Mo Secondthoughts", "concept": "reconsider everything",
+            "gender": "neutral", "path": "Sword Cultivator",
+            "family_choice_id": str(first[0].get("choice_id") or ""), "age_at_creation_years": 18}))
+        reset = await step(report, "character.reset takes the life back", act("character.reset", QUITTER, {}))
+        if reset is not None:
+            gone = await db.get_character(QUITTER)
+            report.add("PASS" if gone is None else "FAIL", "the abandoned cultivator has no character row", str(gone)[:80])
+            report.add("PASS" if int(reset.get("resets_used", 0)) == 1 else "FAIL",
+                       "the reset is counted, though nothing limits it", f"used={reset.get('resets_used')}")
+        again = await step(report, "family options again after a reset",
+                           act("character.family_options", QUITTER, {"world_name": "Mortal World"}))
+        second = list((again or {}).get("families") or [])
+        if second:
+            await step(report, "and /begin works again", act("character.create", QUITTER, {
+                "discord_name": "Playtest Quitter", "name": "Mo Resolved", "concept": "this time for certain",
+                "gender": "neutral", "path": "Body Refiner",
+                "family_choice_id": str(second[0].get("choice_id") or ""), "age_at_creation_years": 18}))
+    # Whichever gate bites first, and both are designed. By this point PLAYER
+    # has died and come back, so the incarnation rule usually answers before
+    # the world-mark one does - which the first version of this step did not
+    # allow for, and the harness said so.
+    await either("a cultivator with a past cannot be taken back",
+                 act("character.reset", PLAYER, {}),
+                 "left a mark the world keeps", "the wheel is the road from here")
+
     # ---- 22. erasure -----------------------------------------------------------
     # Last of all, because it is the one lever that leaves nothing behind: the
     # ghost's row is gone afterwards, and the audit row says who did it.
@@ -2322,5 +2381,25 @@ def main() -> int:
             shutil.rmtree(tmp, ignore_errors=True)
 
 
+def _exit(code: int) -> None:
+    """Leave, whatever is still holding the interpreter open.
+
+    `SystemExit` runs `threading._shutdown()`, which **joins every non-daemon
+    thread** - and this harness boots the real bot, which keeps aiosqlite
+    connections open, and aiosqlite runs one non-daemon thread per connection.
+    So a run could print its report, return its exit code, and then hang for
+    ever on a thread nobody is going to stop, with the result already on
+    screen and the process still alive (v1.0.1).
+
+    `os._exit` skips that shutdown, so it is only correct *after* the report is
+    written and `main`'s `finally` has stopped the engine and removed the
+    scratch directory - which is why it is here rather than inside `main`.
+    stdout is flushed first because `os._exit` does not.
+    """
+    sys.stdout.flush()
+    sys.stderr.flush()
+    os._exit(code)
+
+
 if __name__ == "__main__":
-    raise SystemExit(main())
+    _exit(main())

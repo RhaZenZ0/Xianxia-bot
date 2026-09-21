@@ -16,6 +16,38 @@ deferred half and not the half that says what was done about it.
 
 ## Findings
 
+- **fixed (v1.0.1)** — *A method you knew could not tell you what it needed.* Found by playing. A
+  player bought an Inscription slip, read it, and had no way to learn that a Swift-Wind Talisman
+  wants one `talisman_paper` and one `spirit_ink`. `character_recipes` had four writers and no
+  Python reader; `get_recipe_definition` parsed a recipe's `cost` and nothing printed it; and the
+  engine computed the exact shortfall and refused with the bare words "missing materials", which the
+  bot replaced with a vaguer line of its own. See CLAUDE.md, "A method that could not say what it
+  needed".
+- **fixed (v1.0.1)** — *A player could not reset a character without a GM.* `/begin` refuses while a
+  `characters` row exists, dying is not a reset (`lifecycle.true_death` has three callers and none is
+  voluntary, and Samsara deliberately carries the echoes forward), and the only true wipe was
+  `admin.player.erase` — a data-protection lever being used as a restart button. `character.reset`
+  is the player's own door, on `/reset` and `/character → Samsara`, bounded by the anonymise
+  disposition (no reset once the character is named on a row a shared world keeps) and by an
+  allowance of three counted from rows the sweep keeps. See CLAUDE.md, "Starting over without a GM".
+- **deferred (a decision)** — *A reset re-rolls the spiritual root grade, and nothing stops it.*
+  `rollRootGrade` puts Immortal in the top 0.7% of a tier-1 household's draw, and rc.55 made that
+  grade worth 0.88x–1.34x cultivation and −1 to +3 on every breakthrough for a whole life, so a
+  patient player can reset until they draw one. The cap that used to prevent this was removed
+  deliberately: the world-mark gate is what protects other players, and a cultivator re-rolling
+  their own first minute costs nobody else anything. If it turns out to matter in play, the
+  narrower fix is to carry the *grade* across a reset rather than to re-limit the action — but that
+  is not simply wirable, because `rollFamilyRoot` weights the root off the household's archetype,
+  location, bloodline affinity and tier and `rollRootGrade` adds `(familyTier-1)*24`, so the family
+  is a choice the draw depends on. Resets are recorded in `event_log`, so the data to decide this
+  will exist.
+- **deferred (harness)** — *The Discord half drives the reset leaf but cannot guarantee it reaches a
+  success.* Section 9b presses `/reset` last of all and accepts either the reset or its designed
+  refusal, reporting which, because whether the swept cultivator has left a mark the world keeps
+  depends on what the sweep happened to do. The success path is driven end to end by
+  `scripts/playtest_engine.py` on an account created for it (`QUITTER`), so both outcomes are covered
+  — but by two harnesses rather than one, and the Discord half's success wiring (the "is gone" reply,
+  the remaining count) is proven only when the dice go that way.
 - **deferred (planned)** — *A household's manual is never the household's.* `family.lesson` hands
   over the family's manual at the head of the house's own lesson, beside its story and its keepsake,
   and the tier is already right and already enforced: all nine are `min_realm_index: 0` and the

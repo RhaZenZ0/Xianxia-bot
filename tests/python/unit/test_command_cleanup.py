@@ -58,7 +58,7 @@ class CommandCleanupTests(unittest.TestCase):
         # the tree tuple, so no player could reach it; see
         # `tests/python/unit/test_commands_reach_a_player.py`, which is the gate
         # that makes an absence loud.
-        self.assertEqual(len(ast.literal_eval(migrated_node.value)), 82)
+        self.assertEqual(len(ast.literal_eval(migrated_node.value)), 83)
         self.assertNotIn("tree.remove_command", source)
         self.assertIn('"alchemy": alchemy_group', source)
         self.assertIn('_hub_page("alchemy", "Alchemy"', source)

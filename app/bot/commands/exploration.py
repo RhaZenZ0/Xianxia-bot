@@ -645,9 +645,18 @@ async def _run_crafting(interaction: discord.Interaction, recipe: str) -> None:
             action_id=f"discord:{interaction.id}:craft.resolve",
         )
     except GameEngineError as exc:
+        # The engine names exactly which materials are short and by how much
+        # (v1.0.1); it used to refuse with the bare words "missing materials"
+        # and this handler then replaced even those with a sentence of its own.
+        # Two layers each discarding the one fact the player needed.
         message = str(exc)
         if "missing materials" in message.casefold():
-            message = "Missing materials for that recipe."
+            message = (
+                f"🧰 {message}\n"
+                "Buy them at a hall of the trade (**/economy → City Shops → Here**) or gather them "
+                "(**/craft → Alchemy → Forage**). **/craft → Profession → Profession Status** lists every method you know "
+                "and what each one needs."
+            )
         await interaction.response.send_message(message, ephemeral=False)
         return
 
