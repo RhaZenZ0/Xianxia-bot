@@ -6,6 +6,28 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.5** stops a quest being lost to a failure in drawing the reply, and stops the craft menu
+offering methods you have not learned.
+
+Seventeen call sites wrote `await announce_quest_progress(interaction, await QUESTS.progress(...))`,
+and eight placed that one statement **after** the command's reply, each with a comment citing the
+rule from v1.0.0-rc.28. That rule is real and it is about the *announcement*:
+`announce_quest_progress` falls back to `interaction.response.send_message` when the interaction has
+not been answered, so a reporter ahead of a command's only reply spends it on the quest line. It
+says nothing about the record - and nesting the two made the record inherit the announcement's
+position. v1.0.3's `/craft` is what that cost: the reply raised after the engine had committed, so
+six pills were made and the errand still read zero. The player reported it as two separate bugs.
+
+It also splits the two everywhere, not only where the order was wrong. `record_quest_progress` is
+the record on its own and never raises, because it runs before the reply now; a mixed tree where
+some sites nest and some do not is what invites the next author to nest.
+
+And the craft picker offers what the cultivator has learned. It was the whole 33-recipe catalogue
+capped at Discord's 25, while `craft.resolve` refuses any method the player does not know - so a
+fresh character was shown twenty-five and could make about three. The hub renders that same callback
+as a drop-down, which is how "why is crafting a drop-down menu" turned out to mean "a menu of things
+I cannot make". An empty picker now names the two doors that end it rather than being a dead end.
+
 **1.0.4** gives a body the one thing this game never had: it mends on its own.
 
 Nothing in the tree restored vitality with time - twelve `SET vitality` statements in the engine,
@@ -259,9 +281,11 @@ staged authority cleanup: forage, crafting and companions, canonical time, unifi
 road travel, caravans, dashboard-owned Discord setup, and the removal of the obsolete Python
 mechanical authority paths.
 
-## Release status — v1.0.4
+## Release status — v1.0.5
 
-- Current release: v1.0.4 - vitality recovers with time, which nothing in this game had ever done.
+- Current release: v1.0.5 - a quest is recorded before it is told, and the craft menu offers only
+  methods you know. No schema.
+- v1.0.4: vitality recovers with time, which nothing in this game had ever done.
   Schema 59.
 - v1.0.3: a craft no longer eats the materials and reports a failure, a lost
   fight leaves a heartbeat, the seventh cultivation path has methods, and every birth household

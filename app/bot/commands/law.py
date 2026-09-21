@@ -15,7 +15,7 @@ from discord import app_commands
 from ...rules.effects import normalize_effect_payload
 from ...ops.game_engine import GameEngineError
 from ...rules.progression_systems import condition_definition, profession_rank, profession_xp_needed
-from ..character_state import announce_quest_progress, current_effect_modifiers
+from ..character_state import record_quest_progress, announce_quest_progress, current_effect_modifiers
 from ..formatting import roll_line
 from ..registry import registered_group_command
 from ..services import QUESTS
@@ -531,14 +531,14 @@ async def profession_exam(interaction: discord.Interaction, profession: app_comm
     else:
         hours = max(1, int(result.get("retry_game_minutes", 1440)) // 60)
         lines.append(f"\n❌ **Not this time.** The hall will look at you again in about **{hours} hours**.")
-    await reply_long(interaction, "\n".join(lines), ephemeral=False)
-    # The quest's objective is the pass, reported after the reply.
+    # The quest's objective is the pass: recorded before the reply, told after
+    # (v1.0.5).
+    progressed: list[dict] = []
     if result.get("passed"):
-        try:
-            await announce_quest_progress(interaction, await QUESTS.progress(
-                interaction.user.id, "profession_exam", game_minute=wt.total_minutes))
-        except Exception:
-            log.exception("Quest progress update failed after a trade examination")
+        progressed = await record_quest_progress(
+            interaction.user.id, "profession_exam", game_minute=wt.total_minutes)
+    await reply_long(interaction, "\n".join(lines), ephemeral=False)
+    await announce_quest_progress(interaction, progressed)
 
 
 # ---------- Reputation / crime / witnesses / bounties / grudges ----------

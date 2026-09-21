@@ -15,7 +15,7 @@ from ..rules.npc_memory import classify_memory, scene_memory_summary
 from ..rules.quests import next_objective_label
 from ..rules.worldtime import from_game_minutes
 from .runtime import DB, ENGINE, WORLD, log
-from .services import SIM
+from .services import QUESTS, SIM
 
 async def current_effect_modifiers(user_id: int) -> tuple[list[dict], dict[str, float], object]:
     authority = dict(await ENGINE.action("effects.current", int(user_id), {}))
@@ -107,6 +107,38 @@ def _item_label(item_id: str) -> str:
     """Name the item rather than printing its key at the player."""
     item = dict(WORLD.items.get(str(item_id)) or {})
     return str(item.get("name") or str(item_id).replace("_", " ").title())
+
+
+async def record_quest_progress(user_id: int, objective_type: str, **kwargs: Any) -> list[dict[str, Any]]:
+    """The record half of reporting an objective, separate from the telling
+    (v1.0.5).
+
+    Eight call sites wrote `await announce_quest_progress(interaction, await
+    QUESTS.progress(...))` **after** the command's reply, each with a comment
+    citing the rule from v1.0.0-rc.28. That rule is real, and it is about the
+    *announcement*: `announce_quest_progress` falls back to
+    `interaction.response.send_message` when the interaction has not been
+    answered yet, so a reporter placed ahead of a command's only reply spends it
+    on the quest line and the player never sees their craft roll.
+
+    It says nothing about the record - and nesting the two made the record
+    inherit the announcement's position. When `/craft`'s reply raised on a
+    missing key (v1.0.3), the craft had already committed in the engine and the
+    quest never advanced: six pills made, and an errand still reading zero.
+
+    So the record goes first and the telling after. Splitting them is what makes
+    the order visible; `test_a_quest_is_recorded_before_it_is_told.py` is what
+    keeps it.
+
+    This never raises. A quest that could not be advanced must not take the
+    command's reply down with it - which is the same promise
+    `announce_quest_progress` already makes about the other half.
+    """
+    try:
+        return await QUESTS.progress(int(user_id), objective_type, **kwargs)
+    except Exception:
+        log.exception("Quest progress could not be recorded (%s)", objective_type)
+        return []
 
 
 async def announce_quest_progress(interaction: Any, changed: list[dict[str, Any]]) -> None:

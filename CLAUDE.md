@@ -2902,6 +2902,68 @@ first: the guard read `anchor <= 0`, which rejects world-minute zero - a real mi
 fresh world's clock starts - because `i64(nil)` is also 0 and the value was doing work the
 separate NULL check already did.
 
+### A quest is recorded before it is told (v1.0.5)
+
+Seventeen call sites wrote `await announce_quest_progress(interaction, await QUESTS.progress(...))`,
+and **eight** placed that one statement *after* the command's reply - each with a comment citing
+rc.28.
+
+That rule is real, and it is about the **announcement**: `announce_quest_progress` falls back to
+`interaction.response.send_message` when the interaction has not been answered, so a reporter ahead
+of a command's only reply spends it on the quest line and the player never sees their craft roll. It
+says nothing about the **record** - and nesting the two inside one statement made the record inherit
+the announcement's position.
+
+v1.0.3's `/craft` is what that cost. The reply raised on a missing key *after* `applyAuthoritative`
+had committed, so the materials were spent, the pills granted, the profession XP credited, and the
+quest never advanced. The player reported it as two bugs a day apart - *"it takes your items"* and
+*"crafting did not update the quest"* - and they were one.
+
+`record_quest_progress` is the record on its own. It never raises, because it runs before the reply
+now and an exception escaping it would take the command's answer down with it - the same promise
+`announce_quest_progress` already made about the other half.
+
+**All seventeen are split, not only the eight that were wrong.** A tree where some sites nest and
+some do not is what invites the next author to nest, and the nesting is precisely what hid the
+ordering. With it gone, `test_a_quest_is_recorded_before_it_is_told.py` can state both rules
+exactly: the record is never an argument to the telling, and the record precedes the command's
+answer. A reply that also returns is a refusal path, not an answer, so it does not count.
+
+**Three measurements, and the first two were wrong.** A first sweep asked "is there any reply call
+at a lower line number" and reported nine sites, seven at risk - it was counting early-return
+refusals. A second scoped to sibling statements and reported twenty-two, because at module level the
+function *definitions* are siblings. Only the third - this function's own top-level statements, with
+returning replies excluded - gave the eight, and each was then read by eye before being touched. A
+sweep whose every hit needs hand-checking is not a gate (v1.0.1), and that applies while you are
+still deciding what the finding *is*.
+
+**The gate's own first run found a seventeenth site and then a blind spot.** `_report_trade` in
+`economy.py` was written `announce_quest_progress(interaction,await QUESTS.progress(` with no space,
+so every grep had missed it. Worse, it both records and tells, and its two callers reach it by name
+- so a gate that only saw direct calls would have let that helper be moved after a reply without a
+word. It closes over a module's recording helpers now.
+
+### The craft menu offered what the engine would refuse (v1.0.5)
+
+`recipe_autocomplete` was `DB.search_catalog("recipe", current, 25)` - the whole 33-recipe
+catalogue, capped at Discord's 25 - while `craft.resolve` refuses any method the player has not
+learned. A fresh character knows about three. And `hubs._autocomplete_provider` deliberately reuses a
+slash command's autocomplete as a panel's option source *"without duplicating game lookup logic"*, so
+the same list is what a hub press renders as a drop-down: the question *"why is crafting a drop-down
+menu"* was really *"why is the menu full of things I cannot make"*.
+
+rc.46 settled this one surface over - **a surface must not offer what the engine will refuse** - when
+the quest journal stopped listing what no roster would hand over. The reader it needs has existed
+since v1.0.1: `DB.get_known_recipes`, built for `profession status`.
+
+Knowing a method and being equal to it are two different refusals, so a recipe above the player's
+rank stays on the list. An empty picker is not a dead end either: the hub already prints a
+registered hint for one, and craft now has one naming the slip and the status page.
+
+**The gate failed against correct code on its own first run**, because the docstring explaining the
+fix *names* `search_catalog` - rc.52's rule arriving immediately rather than a release later. It
+reads the function's statements without its docstring now.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —

@@ -15,7 +15,7 @@ from discord import app_commands
 
 from ...ops.game_engine import GameEngineError
 from ...rules.progression_systems import ascension_gate
-from ..character_state import announce_quest_progress, current_effect_modifiers
+from ..character_state import record_quest_progress, announce_quest_progress, current_effect_modifiers
 from ..formatting import roll_line
 from ..status_cards import _ELEMENT_MARKS
 from ..registry import registered_group_command, registered_root_command
@@ -114,8 +114,9 @@ async def cultivate(interaction: discord.Interaction) -> None:
     if result.get("ready"):
         ready = "\n✨ Stage 9 is full. Choose **/ascend → Perfection → Start** or **/ascend → Main Progression → Breakthrough**." if int(c.get("phase", 1)) == 9 else "\n✨ You are ready to attempt **/ascend → Main Progression → Breakthrough**."
     try:
-        await announce_quest_progress(interaction, await QUESTS.progress(
-            interaction.user.id, "cultivate", amount=1, game_minute=wt.total_minutes))
+        progressed = await record_quest_progress(
+            interaction.user.id, "cultivate", amount=1, game_minute=wt.total_minutes)
+        await announce_quest_progress(interaction, progressed)
     except Exception:
         log.exception("Quest progress update failed after cultivation")
     await interaction.followup.send(
@@ -984,6 +985,11 @@ async def tribulation_gate(interaction: discord.Interaction) -> None:
         return
     result = dict(envelope.get("result") or {})
     currency = str(result.get("currency") or "")
+    # The stage's objective is the anchored gate: recorded before the reply,
+    # told after (v1.0.5). The seam exists in the engine by here, so the record
+    # is already earned and drawing the reply must not be able to lose it.
+    progressed = await record_quest_progress(
+        interaction.user.id, "ascension_gate", game_minute=wt.total_minutes)
     await interaction.followup.send(
         f"🌀 The seam over **{result.get('location','here')}** holds. The **{result.get('name','Ascension Gate')}** stands there now: "
         f"a public crossing out of {result.get('from_world','this world')} into **{result.get('to_world','the world above')}**, "
@@ -993,12 +999,7 @@ async def tribulation_gate(interaction: discord.Interaction) -> None:
         f"Step through with **/travel → Teleportation Arrays → Use**.",
         ephemeral=False,
     )
-    # The stage's objective is the anchored gate, reported after the reply.
-    try:
-        await announce_quest_progress(interaction, await QUESTS.progress(
-            interaction.user.id, "ascension_gate", game_minute=wt.total_minutes))
-    except Exception:
-        log.exception("Quest progress update failed after anchoring a crossing")
+    await announce_quest_progress(interaction, progressed)
 
 
 

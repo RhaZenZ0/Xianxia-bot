@@ -41,7 +41,7 @@ from ...rules.worldtime import MINUTES_PER_MONTH, MINUTES_PER_YEAR
 from ...rules.birthfamily import family_tier_name, family_tutoring_line
 from ..registry import registered_group_command
 from ..channels import _get_thread
-from ..character_state import announce_quest_progress
+from ..character_state import record_quest_progress, announce_quest_progress
 from ..services import QUESTS, SIM
 from ..threads import ensure_birth_family_household_thread, open_expedition_thread_after_exit
 from ..runtime import (
@@ -173,6 +173,11 @@ async def birth_family_enter(interaction: discord.Interaction) -> None:
     players = [str(row.get("name") or "Cultivator") for row in (result.get("players_present") or [])]
     others = [name for name in players if name != str(c.get("name") or "")]
     presence = f"\nPresent with you: **{', '.join(others)}**" if others else "\nYou are currently the only player member inside."
+    # Coming home is something a quest can ask for (v1.0.0-rc.32). Recorded
+    # here, once the engine has already moved the character, and told after the
+    # reply (v1.0.5) - the move is what the quest is about, and drawing the
+    # reply must not be able to lose it.
+    progressed = await record_quest_progress(interaction.user.id, "return_home", game_minute=wt.total_minutes)
     if thread is not None:
         await interaction.followup.send(
             f"🏠 Entered **{result.get('family_name') or fam.get('family_name')}**. Shared household scene: {thread.mention}{presence}",
@@ -184,12 +189,7 @@ async def birth_family_enter(interaction: discord.Interaction) -> None:
             "The canonical shared location is active, but Discord could not create/recover its household thread.",
             ephemeral=False,
         )
-    # Coming home is something a quest can ask for (v1.0.0-rc.32). Reported
-    # after the reply, once the engine has already moved the character.
-    try:
-        await announce_quest_progress(interaction, await QUESTS.progress(interaction.user.id, "return_home", game_minute=wt.total_minutes))
-    except Exception:
-        log.exception("Quest progress update failed after entering the household")
+    await announce_quest_progress(interaction, progressed)
 
 @registered_group_command(family_group, name="leave", description="Leave your shared birth-family household")
 @serialized_user_action
@@ -406,12 +406,11 @@ async def birth_family_lesson(interaction:discord.Interaction)->None:
     if result.get("story"):
         text+=f"\n📜 *{result.get('story')}*"
     text+=f"\nYour standing: **{result.get('standing_band','')}** ({int(result.get('standing',0)):+d}, +{int(result.get('standing_gain',0))})."
+    # The stage's objective is the pass (v1.0.0-rc.34): recorded before the
+    # reply, told after (v1.0.5).
+    progressed = await record_quest_progress(interaction.user.id, "family_lesson", game_minute=wt.total_minutes)
     await reply_long(interaction, text)
-    # The stage's objective is the pass, reported after the reply (v1.0.0-rc.34).
-    try:
-        await announce_quest_progress(interaction, await QUESTS.progress(interaction.user.id, "family_lesson", game_minute=wt.total_minutes))
-    except Exception:
-        log.exception("Quest progress update failed after the head's lesson")
+    await announce_quest_progress(interaction, progressed)
 
 
 @registered_group_command(family_group, name="history",description="View recent rises, setbacks and political changes in your family")

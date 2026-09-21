@@ -21,7 +21,7 @@ from ..pickers import auction_currency_autocomplete, usable_item_autocomplete
 from ..registry import registered_group_command, registered_root_command
 from ..runtime import _explain_engine_error, DB, ENGINE, WORLD, carried_item_autocomplete, character_location_display, current_world_time, log, reply_long, require_character, respond, serialized_user_action
 from ..channels import _get_thread
-from ..character_state import announce_quest_progress
+from ..character_state import record_quest_progress, announce_quest_progress
 from ..services import GUILD, QUESTS, SIM
 from ..threads import ensure_birth_family_household_thread, open_expedition_thread_after_exit
 
@@ -153,7 +153,10 @@ async def use_item_command(interaction: discord.Interaction, item: str) -> None:
             if thread is not None:
                 await interaction.followup.send(f"Shared household scene: {thread.mention}", ephemeral=False)
         try:
-            await announce_quest_progress(interaction, await QUESTS.progress(interaction.user.id, "return_home", game_minute=(await current_world_time()).total_minutes))
+            wt_home = await current_world_time()
+            progressed = await record_quest_progress(
+                interaction.user.id, "return_home", game_minute=wt_home.total_minutes)
+            await announce_quest_progress(interaction, progressed)
         except Exception:
             log.exception("Quest progress update failed after a Hearth-Return Talisman")
     if waymark:
@@ -588,13 +591,11 @@ async def _report_trade(interaction:discord.Interaction,item_id:str)->None:
     deliberately not the amount: buying ten herbs is one visit to one keeper,
     and an objective that wanted ten of them would be satisfied by one click.
     """
-    try:
-        wt=await current_world_time()
-        await announce_quest_progress(interaction,await QUESTS.progress(
-            interaction.user.id,"trade",amount=1,target=str(item_id),
-            game_minute=wt.total_minutes))
-    except Exception:
-        log.exception("Quest progress update failed after a shop trade")
+    wt=await current_world_time()
+    progressed=await record_quest_progress(
+        interaction.user.id,"trade",amount=1,target=str(item_id),
+        game_minute=wt.total_minutes)
+    await announce_quest_progress(interaction,progressed)
 
 
 @registered_group_command(shop_group, name="buy",description="Buy from the shelf of the shop you are inside")
