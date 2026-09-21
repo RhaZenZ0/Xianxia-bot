@@ -68930,5 +68930,227 @@
         }
       }
     ]
+  },
+  "world_era_cycles": {
+    "Mortal World": [
+      {
+        "name": "Jade Meridian Awakening Era",
+        "description": "Spiritual veins wake beneath the old roads and new inheritances surface in the hill country.",
+        "duration_days": 60,
+        "modifiers": {
+          "cultivation_gain": 1.05
+        }
+      },
+      {
+        "name": "Hundred Sects Strife Era",
+        "description": "Competition over the woken veins hardens into open territorial war between the halls.",
+        "duration_days": 60,
+        "modifiers": {
+          "war_pressure": 1.25
+        }
+      },
+      {
+        "name": "Beast Tide Era",
+        "description": "Ancient bloodlines stir in the deep ranges and spirit beasts come down the passes in tides.",
+        "duration_days": 60,
+        "modifiers": {
+          "beast_encounter_rate": 1.35,
+          "caravan_risk": 1.15
+        }
+      },
+      {
+        "name": "Quiet Heaven Era",
+        "description": "After the upheaval the heavens settle, the orthodox halls rebuild, and the roads are safe again.",
+        "duration_days": 60,
+        "modifiers": {
+          "recovery_rate": 1.1,
+          "crime_pressure": 0.85
+        }
+      },
+      {
+        "name": "Lean Harvest Era",
+        "description": "A thin year in the valleys. Granaries empty early and the hungry take to the passes.",
+        "duration_days": 60,
+        "modifiers": {
+          "caravan_risk": 1.2,
+          "crime_pressure": 1.15
+        }
+      },
+      {
+        "name": "Gathering Storm Era",
+        "description": "Qi thins and the sky stays the colour of old iron; every diviner in the world reads the same omen.",
+        "duration_days": 60,
+        "modifiers": {
+          "cultivation_gain": 0.95,
+          "war_pressure": 1.1
+        }
+      }
+    ],
+    "Spiritual World": [
+      {
+        "name": "Spirit Vein Flood Era",
+        "description": "The great veins overflow their courses and even a mortal breathes cultivator's air.",
+        "duration_days": 60,
+        "modifiers": {
+          "cultivation_gain": 1.1
+        }
+      },
+      {
+        "name": "Array Masters' Accord Era",
+        "description": "The formation halls sign a common ward, and for a while nobody's caravan is anybody's prey.",
+        "duration_days": 60,
+        "modifiers": {
+          "war_pressure": 0.8,
+          "caravan_risk": 0.85
+        }
+      },
+      {
+        "name": "Beast Lord Migration Era",
+        "description": "Something older than the sects moves through the spirit wilds, and everything else moves aside.",
+        "duration_days": 60,
+        "modifiers": {
+          "beast_encounter_rate": 1.45,
+          "caravan_risk": 1.25
+        }
+      },
+      {
+        "name": "Sealed Sky Era",
+        "description": "A vault of grey closes over the world. Qi answers slowly and wounds close slower.",
+        "duration_days": 60,
+        "modifiers": {
+          "cultivation_gain": 0.92,
+          "recovery_rate": 0.9
+        }
+      },
+      {
+        "name": "Thousand Halls Contention Era",
+        "description": "Every hall with a banner raises it, and the accords of the last age are read as invitations.",
+        "duration_days": 60,
+        "modifiers": {
+          "war_pressure": 1.3,
+          "crime_pressure": 1.1
+        }
+      },
+      {
+        "name": "Clearwater Repose Era",
+        "description": "The contention burns out. Healers are busier than swordsmen and the roads go quiet.",
+        "duration_days": 60,
+        "modifiers": {
+          "recovery_rate": 1.15,
+          "crime_pressure": 0.8
+        }
+      }
+    ],
+    "Immortal World": [
+      {
+        "name": "Ascendant Dawn Era",
+        "description": "The gates above stand a little further open, and those who look up can feel it.",
+        "duration_days": 60,
+        "modifiers": {
+          "cultivation_gain": 1.12
+        }
+      },
+      {
+        "name": "Law Decree Era",
+        "description": "An immortal court publishes its law, and for once there are enforcers enough to mean it.",
+        "duration_days": 60,
+        "modifiers": {
+          "crime_pressure": 0.7,
+          "war_pressure": 0.85
+        }
+      },
+      {
+        "name": "Void Beast Incursion Era",
+        "description": "Things with no bloodline and no name come through the thin places between the courts.",
+        "duration_days": 60,
+        "modifiers": {
+          "beast_encounter_rate": 1.55,
+          "caravan_risk": 1.3
+        }
+      },
+      {
+        "name": "Immortal Schism Era",
+        "description": "The court divides over a point of law, and the point is settled the usual way.",
+        "duration_days": 60,
+        "modifiers": {
+          "war_pressure": 1.35,
+          "crime_pressure": 1.2
+        }
+      },
+      {
+        "name": "Withering Dao Era",
+        "description": "Insight comes hard and heals harder. The old immortals say they have seen this before.",
+        "duration_days": 60,
+        "modifiers": {
+          "cultivation_gain": 0.9,
+          "recovery_rate": 0.85
+        }
+      },
+      {
+        "name": "Nine Palaces Concord Era",
+        "description": "Nine palaces agree on a single road tax, which is a stranger miracle than any of them admit.",
+        "duration_days": 60,
+        "modifiers": {
+          "recovery_rate": 1.2,
+          "caravan_risk": 0.8
+        }
+      }
+    ],
+    "Celestial World": [
+      {
+        "name": "Mandate Renewal Era",
+        "description": "The Mandate is renewed above the sovereign courts and the whole sky is easier to breathe.",
+        "duration_days": 60,
+        "modifiers": {
+          "cultivation_gain": 1.15,
+          "recovery_rate": 1.1
+        }
+      },
+      {
+        "name": "Heavenly Audit Era",
+        "description": "Heaven counts. Nothing hidden stays hidden, and nobody with a debt sleeps well.",
+        "duration_days": 60,
+        "modifiers": {
+          "crime_pressure": 0.6,
+          "war_pressure": 0.75
+        }
+      },
+      {
+        "name": "Primordial Beast Waking Era",
+        "description": "Something that predates the courts turns over in its sleep, and the star roads scatter.",
+        "duration_days": 60,
+        "modifiers": {
+          "beast_encounter_rate": 1.65,
+          "caravan_risk": 1.35
+        }
+      },
+      {
+        "name": "Sovereign Contention Era",
+        "description": "Two sovereigns claim one mandate. The heavens do not intervene; they watch.",
+        "duration_days": 60,
+        "modifiers": {
+          "war_pressure": 1.4,
+          "crime_pressure": 1.25
+        }
+      },
+      {
+        "name": "Silence of Heaven Era",
+        "description": "The Mandate says nothing at all, for sixty days, and every court reads the silence differently.",
+        "duration_days": 60,
+        "modifiers": {
+          "cultivation_gain": 0.88,
+          "recovery_rate": 0.8
+        }
+      },
+      {
+        "name": "Star Court Ascension Era",
+        "description": "A new court is raised among the stars and the roads to it are swept clean for the climb.",
+        "duration_days": 60,
+        "modifiers": {
+          "cultivation_gain": 1.08,
+          "caravan_risk": 0.75
+        }
+      }
+    ]
   }
 }

@@ -328,6 +328,19 @@ type LawSystem struct {
 	SupremeMinRealmIndex      int64                    `json:"supreme_min_realm_index"`
 }
 
+// EraTemplate is one age of one world: how long it lasts and what it does
+// while it does. `Modifiers` is deliberately a bare map rather than named
+// fields - the vocabulary is held by `era_modifier_vocabulary_test.go`, which
+// requires every key to be *fetched* by a rule, and a struct would instead
+// silently drop a key no field matched (the "silent when wrong" widening
+// schema 51 refused for the content tables).
+type EraTemplate struct {
+	Name         string             `json:"name"`
+	Description  string             `json:"description"`
+	DurationDays int64              `json:"duration_days"`
+	Modifiers    map[string]float64 `json:"modifiers"`
+}
+
 type LocationDefinition struct {
 	Description     string   `json:"description"`
 	Encounters      []string `json:"encounters"`
@@ -849,13 +862,19 @@ type Catalog struct {
 	Inheritances        map[string]Inheritance         `json:"inheritances"`
 	BirthFamilySendoff  map[string]BirthFamilySendoff  `json:"birth_family_sendoff"`
 	BeginnerPath        []BeginnerStage                `json:"beginner_path"`
-	HouseholdErrands    map[string][]HouseholdErrand   `json:"household_errands"`
-	BirthFamilyLessons  map[string]BirthFamilyLesson   `json:"birth_family_lesson"`
-	GeneratedTraits     GeneratedTraits                `json:"npc_generated_traits"`
-	NPCs                map[string]NPCDefinition       `json:"npcs"`
-	TechniqueSystem     TechniqueSystemDefinition      `json:"technique_system"`
-	WorldRules          map[string]any                 `json:"world_rules"`
-	Sects               map[string]SectDefinition      `json:"sects"`
+	// WorldEraCycles (v1.0.7): one ordered cycle of eras per world, each
+	// summing to exactly one world year. It lived as a single four-entry Go
+	// literal (`eraCycle`) covering all four worlds at once until now - the
+	// roster is content, like `event_sites` and `forage_materials`, so a GM
+	// can rewrite an age without a rebuild.
+	WorldEraCycles     map[string][]EraTemplate     `json:"world_era_cycles"`
+	HouseholdErrands   map[string][]HouseholdErrand `json:"household_errands"`
+	BirthFamilyLessons map[string]BirthFamilyLesson `json:"birth_family_lesson"`
+	GeneratedTraits    GeneratedTraits              `json:"npc_generated_traits"`
+	NPCs               map[string]NPCDefinition     `json:"npcs"`
+	TechniqueSystem    TechniqueSystemDefinition    `json:"technique_system"`
+	WorldRules         map[string]any               `json:"world_rules"`
+	Sects              map[string]SectDefinition    `json:"sects"`
 	// Merchants (v0.34.1): travelling traders who buy what an auction floor
 	// could not sell, carry it along a fixed route of cities and resell it
 	// at a markup. They are met in a city while they dwell there, or on the

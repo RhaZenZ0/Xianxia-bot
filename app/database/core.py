@@ -26,7 +26,7 @@ from .remote import GoDatabaseTransport, RemoteDatabaseError
 log = logging.getLogger("xianxia.database")
 
 
-SCHEMA_VERSION = 59
+SCHEMA_VERSION = 60
 # A readiness probe must validate more than the schema-version marker.  If the
 # SQLite file is removed or replaced while the bot is running, SQLite will
 # happily create a new empty file at the same path.  Checking these tables lets
@@ -2567,6 +2567,28 @@ SCHEMA_MIGRATIONS: tuple[tuple[int, str, tuple[str, ...]], ...] = (
             # migration's alone, or a fresh install dies on `duplicate column
             # name` while every upgrade works.
             "ALTER TABLE characters ADD COLUMN vitality_recovered_game_minute INTEGER",
+        ),
+    ),
+    (
+        60,
+        "an_era_belongs_to_one_world",
+        (
+            # v1.0.7: there was one era for the whole game. Every reader asked
+            # `WHERE active=1 ORDER BY era_id DESC LIMIT 1` and got the same row
+            # whether it was pricing a siege in the Celestial World or a
+            # cultivation session in a Mortal village - while the realm capitals
+            # have been per world since schema 4 and a world's news since
+            # schema 56.
+            #
+            # The default is deliberately 'Mortal World' rather than NULL: every
+            # row that exists when this runs was written when there was one era,
+            # and that era was seeded "Jade Meridian Awakening Era", which is the
+            # first entry of the Mortal cycle. So a live world carries on from
+            # where it already stands, and the other three worlds open their own
+            # cycle on the next tick. Not in the base DDL - the column a
+            # migration adds is the migration's alone (rc.57).
+            "ALTER TABLE world_eras ADD COLUMN world TEXT NOT NULL DEFAULT 'Mortal World'",
+            "CREATE INDEX IF NOT EXISTS idx_world_eras_world_active ON world_eras(world, active, era_id)",
         ),
     ),
 )

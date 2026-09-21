@@ -117,27 +117,22 @@ func soulCultivationMultiplier(conn *storage.Conn, userID int64) (float64, error
 	return round4(mult), nil
 }
 
-func eraCultivationMultiplier(conn *storage.Conn) (string, float64, error) {
-	res, err := conn.Execute(`SELECT name,modifiers_json FROM world_eras WHERE active=1 ORDER BY era_id DESC LIMIT 1`, nil)
+// eraCultivationMultiplier is what the age of *this cultivator's world* does
+// to the qi they gather (v1.0.7: per world; it read the one global row before).
+//
+// The name-keyed fallback that stood here is gone. It read
+// `else if name == "Jade Meridian Awakening Era" { mult = 1.05 }` - a second
+// statement of the number that era's own `cultivation_gain` already carries,
+// keyed on a string, which would have gone silently wrong the moment the era
+// was renamed or re-tuned in content. One authored number, one reader.
+func eraCultivationMultiplier(conn *storage.Conn, world string) (string, float64, error) {
+	name, mods, err := ActiveEra(conn, world)
 	if err != nil {
 		return "", 1, err
 	}
-	if len(res.Rows) == 0 {
-		return "", 1, nil
-	}
-	name := fmt.Sprint(res.Rows[0][0])
-	mods := map[string]any{}
-	_ = json.Unmarshal([]byte(fmt.Sprint(res.Rows[0][1])), &mods)
 	mult := 1.0
 	if v, ok := mods["cultivation_gain"]; ok {
-		switch x := v.(type) {
-		case float64:
-			mult = x
-		case int64:
-			mult = float64(x)
-		}
-	} else if name == "Jade Meridian Awakening Era" {
-		mult = 1.05
+		mult = v
 	}
 	if mult < 0.25 {
 		mult = 0.25
@@ -296,7 +291,7 @@ func cultivationTrain(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
-	eraName, eraMult, err := eraCultivationMultiplier(conn)
+	eraName, eraMult, err := eraCultivationMultiplier(conn, EraWorldOf(catalog, c.Location))
 	if err != nil {
 		return authoritativeMutation{}, err
 	}

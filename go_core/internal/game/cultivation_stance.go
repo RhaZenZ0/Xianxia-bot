@@ -393,7 +393,7 @@ func cultivationStatusQuery(conn *storage.Conn, catalog worlddata.Catalog, userI
 	if err != nil {
 		return nil, err
 	}
-	eraName, eraMult, err := eraCultivationMultiplier(conn)
+	eraName, eraMult, err := eraCultivationMultiplier(conn, EraWorldOf(catalog, c.Location))
 	if err != nil {
 		return nil, err
 	}
