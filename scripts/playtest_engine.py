@@ -2381,5 +2381,25 @@ def main() -> int:
             shutil.rmtree(tmp, ignore_errors=True)
 
 
+def _exit(code: int) -> None:
+    """Leave, whatever is still holding the interpreter open.
+
+    `SystemExit` runs `threading._shutdown()`, which **joins every non-daemon
+    thread** - and this harness boots the real bot, which keeps aiosqlite
+    connections open, and aiosqlite runs one non-daemon thread per connection.
+    So a run could print its report, return its exit code, and then hang for
+    ever on a thread nobody is going to stop, with the result already on
+    screen and the process still alive (v1.0.1).
+
+    `os._exit` skips that shutdown, so it is only correct *after* the report is
+    written and `main`'s `finally` has stopped the engine and removed the
+    scratch directory - which is why it is here rather than inside `main`.
+    stdout is flushed first because `os._exit` does not.
+    """
+    sys.stdout.flush()
+    sys.stderr.flush()
+    os._exit(code)
+
+
 if __name__ == "__main__":
-    raise SystemExit(main())
+    _exit(main())

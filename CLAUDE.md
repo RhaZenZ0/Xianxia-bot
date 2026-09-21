@@ -2369,6 +2369,44 @@ Three things about the gate are worth more than the fix.
   `['v1.0.0.md', 'v1.0.1.md'] != ['v1.0.1.md']`; sorting the versions as text inherits from
   `v1.0.9` over `v1.0.10`.
 
+### What a server is told is derived, so the entry has to parse (v1.0.1)
+
+rc.59 made the bot post its own release notes into `#updates`, and made the line **derived, never
+authored twice** — `release_headline` takes the opening sentence of the entry `release_notes_for`
+found, precisely so a second short blurb per release cannot drift from the changelog. That puts two
+properties of `VERSIONS.md` on the critical path, and **nothing was holding either**. v1.0.1 broke
+both at once, and only rendering the post by hand showed it.
+
+**An entry is one header.** `_ENTRY` matches any line opening with a version stamp, so a second
+`**1.0.1**` *inside* the entry starts a new one. Three paragraphs of this release were written that
+way, and `release_notes_for("1.0.1")` therefore stopped at the first — the notes truncated to one
+paragraph and everything after it would never have been announced anywhere. The convention it broke
+is visible in every earlier entry and was written down nowhere: continuation paragraphs begin
+*"It also…"* or *"And…"*.
+
+**The first paragraph leads.** Because the headline is the entry's opening sentence, paragraph order
+decides what a server is told. Prepending the newest work put a *test assertion* first, so the live
+post read:
+
+> 📣 **Xianxia RP v1.0.1** *also fixes an assertion that was only ever green by luck.*
+
+— opening mid-thought, about the least player-facing thing in the release, with the two things
+players actually got unmentioned. It reads correctly now (*"makes a craft say what it needs, and
+lets a player start over without a GM"*), which is what the channel is for.
+
+Neither fault is visible from a source read of the bot, and neither shows in any suite: the
+changelog is prose, and the only thing ever held about it was that the stamped version has an entry
+at all. `test_release_headline.py` holds both — no version may open two entries, and no entry may
+open with *also/and/too* — plus that every headline is a sentence that fits one Discord message. It
+reads `_ENTRY` and `MESSAGE_LIMIT` off `release_notes.py` rather than copying them, and asserts the
+parse found a real changelog before trusting it. Its drills print the truncation, the *"v1.0.1
+also fixes…"* line verbatim, and *"the reader is broken, not the tree"*.
+
+**The lesson is the one rc.59 already stated about itself, arriving from the other side.** That
+release wrote that a derived headline cannot drift from the changelog — true, and the reason it is
+right. What it did not say is that deriving it makes the changelog's *shape* load-bearing, so prose
+nobody thought of as code now needs a gate like any other.
+
 ### The step that only passed when the number was not zero (v1.0.1)
 
 `scripts/playtest_engine.py` went red on a step nothing in the release had touched:

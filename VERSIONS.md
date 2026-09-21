@@ -6,53 +6,44 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
-**1.0.1** also fixes an assertion that was only ever green by luck. The engine playtest's
-world-crossing step read a conversion remainder as `int(... or -1)`, and a purse that divides
-exactly leaves a remainder of zero - which is falsy, so `or` swapped the right answer for the
-missing-value sentinel and the step failed its own range check. It had passed every earlier run
-because the run's accumulated wealth had never landed on a round number. Three more of the same
-were waiting in that file, one of them on the zero-conversion the currency ladder is documented to
-produce. All four go through one helper that asks whether a field is absent rather than whether it
-is falsy.
+**1.0.1** makes a craft say what it needs, and lets a player start over without a GM. Both were
+found by playing. A cultivator bought an Inscription slip, read it, and had no way to learn that a
+Swift-Wind Talisman wants one talisman paper and one spirit ink - both authored, both sold in dozens
+of shops, both foragable. Three facts would each have told them and none reached a player:
+`character_recipes` had four writers and **no Python reader at all**, so nothing could say what you
+had learned; `get_recipe_definition` has always parsed a recipe's `cost` and no command read it; and
+the engine computed the exact shortfall per material and refused with the bare words "missing
+materials", which the bot then replaced with a vaguer sentence of its own. The refusal names each
+short material and how many now, and `/craft → Profession → Profession Status` lists every method you
+know per trade with each input's cost beside what you are carrying - a tick if you can make it, a
+cross if you are short, a red mark if your rank is too low. That page also no longer returns early
+for somebody who has learned something but not yet crafted, which was exactly the state that
+prompted this. All four trades share one resolve path, so it is one fix rather than four; the three
+other places that spend an item were already naming it.
 
-**1.0.1** makes a craft say what it needs. Found by playing: a player bought an Inscription slip,
-read it, and had no way to learn that a Swift-Wind Talisman wants one talisman paper and one spirit
-ink - both authored, both sold in dozens of shops, both foragable. Three facts would each have told
-them and none reached a player. `character_recipes` had four writers and **no Python reader at
-all**, so nothing could say what you had learned; `get_recipe_definition` has always parsed a
-recipe's `cost` and no command read it; and the engine computed the exact shortfall per material and
-refused with the bare words "missing materials", which the bot then replaced with a vaguer sentence
-of its own. The refusal names each short material and how many now, `profession status` lists every
-method you know per trade with each input's cost beside what you are carrying - a tick if you can
-make it, a cross if you are short, a red mark if your rank is too low - and that page no longer
-returns early for a cultivator who has learned something but not yet crafted. All four trades share
-one resolve path, so this is one fix rather than four; the three other places that spend an item
-were already naming it.
-
-**1.0.1** also lets a player start over without a GM. Until now the only way out of a character was to
-die, and dying is not a reset: `lifecycle.true_death` has three callers and none is voluntary, and
-what it opens is Samsara, which deliberately carries the memory seed, the talent, law and insight
-echoes, the legacy points and the craft echo into the next life. The one true wipe was
+The other half is `/reset`, also on `/character → Samsara`. Until now the only way out of a character
+was to die, and dying is not a reset: `lifecycle.true_death` has three callers and none is
+voluntary, and what it opens is Samsara, which deliberately carries the memory seed, the talent, law
+and insight echoes, the legacy points and the craft echo into the next life. The one true wipe was
 `admin.player.erase` - a data-protection lever, GM-only, and the wrong verb for "I misclicked".
-`character.reset` is the restart button, on `/reset` and on `/character → Samsara`, and `/begin`'s
-refusal names it, because that refusal is the message somebody who wants to start over actually
-reaches. It reuses erasure's own sweep, so a reset removes exactly what an erasure removes and the
-two cannot drift. What bounds it is not a clock: a reset is refused the moment any row with an
-**anonymise** disposition names the character - a battle the world remembers, a sect other disciples
-belong to, a gate still standing over a named town, a grave somebody reached first - because those
-rows survive even an erasure and so cannot honestly survive a reset. There is deliberately no limit
-on how many times: the world-mark rule is what protects other players, and a cultivator re-rolling
-their own first minute takes nothing from anybody. It is still recorded, in the one row the sweep is
-told to keep, so a GM can see how often somebody has started over. No schema.
+`/begin`'s refusal names the new door, because that refusal is the message somebody who wants to
+start over actually reaches. It reuses erasure's own sweep, so a reset removes exactly what an
+erasure removes and the two cannot drift. What bounds it is not a clock: a reset is refused the
+moment any row with an **anonymise** disposition names the character - a battle the world remembers,
+a sect other disciples belong to, a gate still standing over a named town, a grave somebody reached
+first - because those rows survive even an erasure and so cannot honestly survive a reset. There is
+deliberately no limit on how many times: the world-mark rule is what protects other players, and a
+cultivator re-rolling their own first minute takes nothing from anybody. It is still recorded, in
+the one row the sweep is told to keep, so a GM can see how often somebody has started over.
 
-Its finding is one step further in. A reset is the first action in this tree whose **actor erases
+The reset's finding is one step further in. It is the first action in this tree whose **actor erases
 itself**, and the authoritative framework keeps its own bookkeeping under that actor's id: it reads
 the state version before the switch and advances it after, so a sweep that took the version row with
 everything else left the engine unable to record the action that had just succeeded, failing with
 `stale expected_version: expected 2 current 0` after doing all its work. The engine's record of a
 request is kept out of the sweep for the same reason `admin_audit_log` is kept out of an erasure.
 
-**1.0.1** also gives the martial clans somebody real to deal with. `martial_clan_relations.partner_family_id`
+It also gives the martial clans somebody real to deal with. `martial_clan_relations.partner_family_id`
 is foreign-keyed to `birth_families` and nullable, and the one statement that had ever inserted a row
 wrote it `nil` - because the partner it named was invented off a list of surnames: a house with no
 members, no town, no wealth and no opinion. So a world held one relation per household, with somebody
@@ -80,6 +71,15 @@ fields. `field_readers_test.go` walks all 439 parsed fields across 63 structs an
 read through a selector - never a substring, and a composite-literal key is not a read, because
 writing a field is not reading it. Four are read by Python for display and are named with the file
 that prints each; three have no reader at all and are named with the decision each waits on.
+
+And one assertion in the playtest was only ever green by luck. The engine harness's
+world-crossing step read a conversion remainder as `int(... or -1)`, and a purse that divides
+exactly leaves a remainder of zero - which is falsy, so `or` swapped the right answer for the
+missing-value sentinel and the step failed its own range check. It had passed every earlier run
+because the run's accumulated wealth had never landed on a round number. Three more of the same
+were waiting in that file, one of them on the zero-conversion the currency ladder is documented to
+produce. All four go through one helper that asks whether a field is absent rather than whether it
+is falsy.
 
 **1.0.0** is the first release with no suffix on its tag, and it is rc.59's tree unchanged: no code,
 content or schema moved between the two, so an operator already running rc.59 has nothing to install.
