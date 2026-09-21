@@ -145,29 +145,91 @@ func TestAFreshCultivatorCanBeginAgain(t *testing.T) {
 	}
 }
 
-// TestTheRecordSurvivesTheActionItRecords is what is left of the allowance
-// test. There is no limit any more (the world-mark gate is the one that
-// protects other players, and a cultivator re-rolling their own first minute
-// takes nothing from anybody), but the *count* still has to survive, because
-// it is what a GM reads to see how often somebody has started over - and it is
-// kept by the same predicate, so it is the same thing that can break.
-func TestTheRecordSurvivesTheActionItRecords(t *testing.T) {
+// TestTheAllowanceSurvivesTheActionItBounds spends every reset an account has
+// and then asks for one more. The count has to survive the sweep that counts
+// it, or the bound is not a bound - it is kept by the same predicate that
+// keeps it readable to a GM, so it is one thing that can break, not two.
+func TestTheAllowanceSurvivesTheActionItBounds(t *testing.T) {
 	path := setupCharacterResetDB(t)
 	world := batch4WorldPath(t)
-	for i := 0; i < 4; i++ {
+	for i := 0; i < characterResetAllowance; i++ {
 		makeCultivator(t, path, world, 77, fmt.Sprintf("Lin %d", i), int64(200+i*100))
 		result, err := resetCultivator(t, path, world, 77, fmt.Sprintf("reset-loop-%d", i))
 		if err != nil {
-			t.Fatalf("reset %d refused, and nothing limits them: %v", i+1, err)
+			t.Fatalf("reset %d refused: %v", i+1, err)
 		}
 		if got := storage.ParseInt(result["resets_used"]); got != int64(i+1) {
-			t.Fatalf("reset %d reported resets_used=%d; the record was erased by the action it records", i+1, got)
+			t.Fatalf("reset %d reported resets_used=%d; the allowance was erased by the action it bounds", i+1, got)
+		}
+		if got := storage.ParseInt(result["resets_remaining"]); got != int64(characterResetAllowance-i-1) {
+			t.Fatalf("reset %d reported resets_remaining=%d", i+1, got)
 		}
 	}
-	if got := resetScalarI(t, path, "SELECT COUNT(*) FROM event_log WHERE user_id=77 AND event_type=?",
-		characterResetEvent); got != 4 {
-		t.Fatalf("the reset log holds %d rows after four resets", got)
+	makeCultivator(t, path, world, 77, "Lin Last", 900)
+	_, err := resetCultivator(t, path, world, 77, "reset-over")
+	if err == nil {
+		t.Fatalf("a %dth reset was allowed", characterResetAllowance+1)
 	}
+	if !strings.Contains(err.Error(), "all this world allows") {
+		t.Fatalf("refusal=%q", err)
+	}
+	// The character that was refused is still standing: a refused reset
+	// removes nothing.
+	if got := resetScalarI(t, path, "SELECT COUNT(*) FROM characters WHERE user_id=77"); got != 1 {
+		t.Fatalf("a refused reset removed the character anyway")
+	}
+}
+
+// TestAResetIsNotASmallSamsara is the distinction between the two systems,
+// held rather than assumed.
+//
+// Samsara is what **death** opens, and it deliberately remembers: the memory
+// seed, the talent, law and insight echoes, the legacy points, the craft echo
+// and a family lineage rolled off the dead life's karma all ride into the next
+// life. `soul_legacy` is where that lives, and `past_lives_json` is the record
+// itself.
+//
+// A reset must keep none of it. That is true today only because `soul_legacy`
+// carries no anonymise disposition and no keep, so the sweep deletes it like
+// any other row of the account's - which means the property is real but
+// invisible, and a keep added to that table later would quietly turn a reset
+// into a cut-price samsara with no test going red. This is the test that goes
+// red.
+func TestAResetIsNotASmallSamsara(t *testing.T) {
+	path := setupCharacterResetDB(t)
+	world := batch4WorldPath(t)
+	makeCultivator(t, path, world, 77, "Lin Remembering", 200)
+	// A soul with a past: echoes, legacy points and a life on the record.
+	resetExec(t, path, `INSERT INTO soul_legacy(user_id,incarnation_count,legacy_points,memory_seed,`+
+		`talent_echo,law_echo,insight_echo,special_trait,past_lives_json) VALUES(`+
+		`77,1,140,60,55,40,35,'Old Soul','[{"name":"Lin Before","realm_index":7}]');`)
+
+	if got := resetScalarI(t, path, "SELECT COUNT(*) FROM soul_legacy WHERE user_id=77"); got != 1 {
+		t.Fatalf("the fixture wrote no soul legacy to forget")
+	}
+	if _, err := resetCultivator(t, path, world, 77, "reset-forgets"); err != nil {
+		t.Fatal(err)
+	}
+	if got := resetScalarI(t, path, "SELECT COUNT(*) FROM soul_legacy WHERE user_id=77"); got != 0 {
+		t.Fatalf("a reset left %d soul_legacy row(s); that is samsara's memory, and a reset keeps none of it", got)
+	}
+	// And the account starts again from nothing: the next life reads
+	// incarnation 1, not 2.
+	if got, err := characterIncarnationCountTx(mustOpen(t, path), 77); err != nil {
+		t.Fatal(err)
+	} else if got != 1 {
+		t.Fatalf("after a reset the soul reads incarnation %d; a reset is not a rebirth", got)
+	}
+}
+
+func mustOpen(t *testing.T, path string) *storage.Conn {
+	t.Helper()
+	conn, err := storage.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { conn.Close() })
+	return conn
 }
 
 // refusedMarks pulls the parenthesised list out of the mark refusal, so a test

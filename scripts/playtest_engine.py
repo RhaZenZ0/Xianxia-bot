@@ -2317,8 +2317,8 @@ async def run(url: str, token: str, db_path: str) -> Report:
         if reset is not None:
             gone = await db.get_character(QUITTER)
             report.add("PASS" if gone is None else "FAIL", "the abandoned cultivator has no character row", str(gone)[:80])
-            report.add("PASS" if int(reset.get("resets_used", 0)) == 1 else "FAIL",
-                       "the reset is counted, though nothing limits it", f"used={reset.get('resets_used')}")
+            report.add("PASS" if int(reset.get("resets_remaining", -1)) == 2 else "FAIL",
+                       "two of three chances remain", f"remaining={reset.get('resets_remaining')}")
         again = await step(report, "family options again after a reset",
                            act("character.family_options", QUITTER, {"world_name": "Mortal World"}))
         second = list((again or {}).get("families") or [])

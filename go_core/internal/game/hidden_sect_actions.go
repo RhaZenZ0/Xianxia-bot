@@ -107,6 +107,19 @@ func membershipOrNil(membership map[string]any) any {
 // demonic manual of the character's own path that they can already carry.
 // Transcribed from the command - it is a different rule from sectEntryManual,
 // which picks by sect rather than by alignment and path.
+//
+// **No fallback, deliberately** - v1.0.3 added one and took it out again. The
+// rule this function has always stated is "your path's forbidden art or
+// nothing", and handing a Sword Cultivator a Body Cultivator's demon codex to
+// avoid an empty hand is exactly the "someone else's" that
+// `TestTheManualIsChosenByAlignmentPathAndReach` refuses by name.
+// `sectEntryManual`'s `best(true)` then `best(false)` is a different rule for a
+// different door: a public sect hands out its own canon and only falls back
+// when it has none.
+//
+// What *was* wrong is that an empty hand said nothing at all: `shadowAction`
+// simply omitted `manual_id` and the reply omitted its line. It reports
+// `manual_absent` now, so the cell says why rather than passing over it.
 func shadowInitiationManual(catalog worlddata.Catalog, path string, realmIndex int64) (string, worlddata.ManualDefinition, bool) {
 	bestID := ""
 	var best worlddata.ManualDefinition
@@ -219,6 +232,15 @@ func shadowAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, r
 		result["manual_id"] = manualID
 		result["manual_name"] = manual.Name
 		result["manual_item_id"] = manual.ItemID
+	} else {
+		// An empty hand said nothing at all before v1.0.3: the result simply
+		// lacked `manual_id` and `sect.py`'s `if initiation.get("manual_name")`
+		// dropped its line, so an initiate walked through a -200 karma gate and
+		// was never told why no inheritance came with it. The cell keeps its
+		// rule - this path's forbidden art or none - and now says so.
+		result["manual_absent"] = fmt.Sprintf(
+			"the cell keeps no forbidden art of the %s path within your reach",
+			firstNonempty(strings.TrimSpace(fmt.Sprint(character["path"])), "your"))
 	}
 
 	membership, err := hiddenSectMembershipTx(conn, userID)

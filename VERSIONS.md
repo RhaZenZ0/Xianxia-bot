@@ -6,6 +6,82 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.4** gives a body the one thing this game never had: it mends on its own.
+
+Nothing in the tree restored vitality with time - twelve `SET vitality` statements in the engine,
+four of them damage, and not one keyed on rest, cultivation, seclusion or the scheduled tick. Four
+pills and one technique were the whole of it. So a cultivator who lost a fight, which is nine
+defeats in ten, sat on the number the fight left them with until they bought their way off it, and
+somebody with no stones and no pill had no way up at all. v1.0.3 closed the loop on a purchase; this
+opens the one that costs nothing but time.
+
+A body recovers a quarter of its own maximum a world day, so the same wound costs the same four days
+at every realm and what changes with cultivation is what that quarter is worth. The rate is content,
+and an unauthored one heals nobody rather than falling back on a number of the engine's invention.
+
+It also carries the leftover minutes. The anchor moves only by the minutes that actually bought a
+whole point, so resting in pieces is worth exactly what resting in one span is - and time spent
+already whole does not bank into the next wound.
+
+And it settles lazily, on the authoritative path beside the journey and seclusion checks, rather
+than as a step of the world simulation: those batches are daily and sit behind an automation flag a
+GM can switch off, and state a player is stuck behind must not depend on one. A fight in progress is
+not rest, because the battle row and the sheet are kept in lockstep and mending behind the fight's
+back would silently desync them.
+
+**1.0.3** stops a craft taking your materials and telling you it failed, leaves a cultivator who
+loses a fight with a heartbeat instead of nothing, and gives the seventh cultivation path the
+methods it never had.
+
+The craft was reported from live play as *"it doesn't let you craft but also takes your items"* - by
+a player whose bag held six of the pills they had been told they never made. `craftResolveAction`
+shipped the flattened `d1`/`d2` and no `degree`, while the reply's `roll_line` reads
+`die1`/`die2`/`degree`, so every craft that got past the materials check raised `AttributeError`
+*after* the engine had committed: materials spent, output granted, profession XP credited, and a
+wiring-failure message on screen. v1.0.1 found and fixed exactly this for the forage reply and did
+not carry it forty lines up to the craft.
+
+It also gives a defeat one meaning. `fatalChance` is `min(75, 8+gap*3)`, so against a same-realm
+opponent eight defeats in a hundred are fatal and the other ninety-two ended with `vitality` at
+zero - while the two *fate-rescue* branches, the rarer and strictly worse outcome, each wrote
+`vitality=1` outright. Nothing in this game regenerates vitality with time, so zero was not a state
+anybody waited their way out of. All four branches go through one door now, and treating a wound
+with a Recovery Pill restores what the pill restores: before this it was spent on the roll and
+healed nothing, so one pill did one of two jobs and a player needed two to get back where they
+started.
+
+And the Ghost Cultivator can be played. `app/rules/advanced_catalog.py` named six cultivation paths
+where `content/world.json` offers seven, so **none** of the 160 manuals named the seventh - while
+`death_qi_system`, a whole authored subsystem in content and three hundred lines of Go, opens with
+`"path": "Ghost Cultivator"` and exists to serve it. It has 23 manuals now, the same as its
+siblings, and the hidden sect now says why when it has no forbidden art of an initiate's path
+within their reach, instead of passing the line over in silence.
+
+It also gives all thirteen birth households their own tradition to teach. Eight of them handed a
+child the Azure Cloud Sect's or the Jade Meridian Sect's entry manual as the family's own teaching,
+and five handed out a generated manual with its catalogue index in the title; there was nowhere
+correct to point them, because no authored, sect-less, non-forbidden manual existed anywhere in the
+game. Every house has one now, named out of its own authored story, and all thirteen are Mortal
+grade - the old split was a permanent nine-percent cultivation difference decided by birth and
+stated nowhere.
+
+And the Admin Console's Inventory card answers an unknown item with the item. "Qi Nourishment
+Pills" used to suggest five demonic cultivation manuals, because the filter took any single token
+hit and then sorted the survivors by id, so the 142 generated `advanced_*` ids won on the letter
+'a'.
+
+**1.0.2** puts the three-reset limit back and draws the line between `/reset` and Samsara where it
+belongs. They are two systems and only one of them remembers: **Samsara is what death opens**, and it
+deliberately carries the memory seed, the talent, law and insight echoes, the legacy points, the craft
+echo and a family lineage rolled off the dead life's karma into the next life. A reset keeps none of
+that - it is for a life you have only just begun and would rather not have begun, and the soul it
+leaves behind starts again at incarnation 1 with nothing behind it. That was already true, because
+`soul_legacy` is swept like any other row of the account's, but it was true by accident: a keep added
+to that table later would have turned a reset into a cut-price samsara with nothing going red.
+`TestAResetIsNotASmallSamsara` is the test that goes red. And the allowance is three per account,
+ever - not three per character and not three per life - counted from rows the sweep is told to keep,
+because a bound the bounded action erases is not a bound.
+
 **1.0.1** makes a craft say what it needs, and lets a player start over without a GM. Both were
 found by playing. A cultivator bought an Inscription slip, read it, and had no way to learn that a
 Swift-Wind Talisman wants one talisman paper and one spirit ink - both authored, both sold in dozens
@@ -183,12 +259,18 @@ staged authority cleanup: forage, crafting and companions, canonical time, unifi
 road travel, caravans, dashboard-owned Discord setup, and the removal of the obsolete Python
 mechanical authority paths.
 
-## Release status — v1.0.1
+## Release status — v1.0.4
 
-- Current release: v1.0.1 - a craft that says what it needs, a player who can start over without a
-  GM, and martial clans with somebody real to deal with. The first patch release: no schema, and
-  nothing an operator has to do beyond installing it. What 1.0 does not mean is still written down:
-  `docs/TODO.md` is the deferred list, and it is not short.
+- Current release: v1.0.4 - vitality recovers with time, which nothing in this game had ever done.
+  Schema 59.
+- v1.0.3: a craft no longer eats the materials and reports a failure, a lost
+  fight leaves a heartbeat, the seventh cultivation path has methods, and every birth household
+  teaches its own. No schema.
+- v1.0.2: `/reset` is bounded at three per account again, and the line between it
+  and Samsara is now held by a test rather than left to hold by accident. No schema.
+- v1.0.1: a craft that says what it needs, a player who can start over without a GM, and martial
+  clans with somebody real to deal with. The first patch release: no schema. What 1.0 does not mean
+  is still written down: `docs/TODO.md` is the deferred list, and it is not short.
 - v1.0.0: the first release with no suffix on its tag, and rc.59's tree unchanged. Fifty-nine release
   candidates, schema 58, and two harnesses that between them drive every operation the engine allows
   and every leaf the hubs register.
@@ -460,6 +542,12 @@ mechanical authority paths.
 - **Schema 27** added the v0.19.29 mute/freeze moderation columns on `characters`
   (`is_muted`, `is_frozen`, `moderation_reason`).
 - **Schema 28** added the Quest Forge definition table (`quest_definitions`).
+- **Schema 59** gave a body an anchor to mend from. `characters.vitality_recovered_game_minute`
+  is the world minute a cultivator's vitality was last settled at; `updated_at` could not serve,
+  because it moves on every write, so a player who did anything at all would have reset their own
+  healing. NULL is "never settled" and banks nothing - there is no honest way to say how long
+  somebody has already been hurt - so an upgraded world starts the clock on each character's next
+  action rather than paying out for the time before the column existed.
 - **Schema 58** gave a server somewhere to be told what changed. `server_config.updates_channel_id`
   is the ninth base channel, `#updates`, and `announced_release` is the release this guild has
   already been told about - so the bot's own announcement is idempotent across restarts by

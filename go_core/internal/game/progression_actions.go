@@ -93,7 +93,34 @@ func conditionTreatAction(conn *storage.Conn, catalog worlddata.Catalog, userID 
 			return authoritativeMutation{}, err
 		}
 	}
-	result := map[string]any{"condition": p.Condition, "name": name, "treatment_item": item, "roll": roll, "success": roll["success"], "reduction": reduction, "severity_before": severity, "severity_after": newSeverity, "resolved": resolved}
+	// The treatment does what the treatment item does. `recovery_pill` carries
+	// `use.instant.vitality_restore: 8` and is also the named treatment for the
+	// two combat injuries - so before this, treating a flesh wound *spent* the
+	// one item in the game that would have healed you and restored nothing, and
+	// `item.use` restored eight and cleared no condition. One pill did one of
+	// two jobs and a player needed two to get back where they started, at the
+	// end of the losing fight that had just left them on zero.
+	//
+	// It is applied whether or not the roll landed, because the pill was
+	// swallowed either way: the roll decides whether the injury mends, not
+	// whether medicine is medicine. Only `recovery_pill` carries an instant
+	// restore today, so this reaches exactly the two conditions that leave a
+	// cultivator at zero; `jade_life_herb`, `heart_calming_pill` and
+	// `purging_phoenix_pill` carry none and are untouched by construction.
+	restored := map[string]any{}
+	if def, ok := catalog.Items[item]; ok {
+		vit, qi := def.Use.Instant.VitalityRestore, def.Use.Instant.QiRestore
+		if vit > 0 || qi > 0 {
+			if _, err = conn.Execute(
+				`UPDATE characters SET qi=MIN(qi_max,qi+?),vitality=MIN(vitality_max,vitality+?),updated_at=? WHERE user_id=?`,
+				[]any{qi, vit, now, userID},
+			); err != nil {
+				return authoritativeMutation{}, err
+			}
+			restored["vitality"], restored["qi"] = vit, qi
+		}
+	}
+	result := map[string]any{"condition": p.Condition, "name": name, "treatment_item": item, "roll": roll, "success": roll["success"], "reduction": reduction, "severity_before": severity, "severity_after": newSeverity, "resolved": resolved, "restored": restored}
 	return authoritativeMutation{Result: result, Event: eventledger.Event{Domain: "condition", EventType: "condition_treated", EntityType: "character", EntityID: fmt.Sprint(userID), GameMinute: p.GameMinute, Payload: result}}, nil
 }
 

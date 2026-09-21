@@ -217,6 +217,41 @@ func conditionEffectGo(key string, severity int64) map[string]any {
 	}
 	return map[string]any{"effect_key": "condition:" + key, "name": name, "category": category, "severity": severity, "special": true, "modifiers": mods, "tags": []string{"persistent", "condition", key}}
 }
+
+// survivorVitality is what a cultivator who lost a fight and lived is left
+// with: a heartbeat, not a heal. It is the value the fate-rescue branch has
+// always written, made the rule rather than one branch's opinion of it.
+const survivorVitality = int64(1)
+
+// survivedDefeatTx is what happens to somebody who lost a fight and survived.
+//
+// There were four copies of this and they disagreed about the one thing that
+// matters. The two fate-rescue branches - the *worse* outcome, where the blow
+// was fatal and a fate point was burned to undo it - each wrote `vitality=1`
+// outright. The two ordinary non-fatal branches wrote nothing at all, so a
+// cultivator was left at whatever `MAX(0, vitality-dmg)` had reached, which at
+// the end of a losing fight is 0. And a defeat is non-fatal most of the time:
+// `fatalChance` is `min(75, 8+gap*3)`, so against a same-realm opponent it is
+// eight percent, and the other ninety-two ended at zero.
+//
+// Zero is not a state anybody recovers from by waiting, because nothing in
+// this tree regenerates vitality with time - four pills and one technique are
+// the whole of it. So the ordinary outcome of losing a fight left a player
+// alive on a bar reading 0/12 with no free way off it, while `/battle` told
+// them "You survive but are incapacitated", a word the engine never enforced.
+//
+// `MAX` rather than `=`, because this must never lower anybody: it is a floor
+// under a survivor, not a number to be set.
+func survivedDefeatTx(conn *storage.Conn, userID int64, key string, severity int64, sourceType, sourceID string, gameMinute int64) (map[string]any, error) {
+	if _, err := conn.Execute(
+		`UPDATE characters SET vitality=MAX(?,vitality),updated_at=? WHERE user_id=?`,
+		[]any{survivorVitality, float64(time.Now().UnixNano()) / 1e9, userID},
+	); err != nil {
+		return nil, err
+	}
+	return applyCombatCondition(conn, userID, key, severity, sourceType, sourceID, gameMinute)
+}
+
 func applyCombatCondition(conn *storage.Conn, userID int64, key string, severity int64, sourceType, sourceID string, gameMinute int64) (map[string]any, error) {
 	if severity < 1 {
 		severity = 1
@@ -586,17 +621,13 @@ func combatTurnAction(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 				if e != nil {
 					return authoritativeMutation{}, e
 				}
-				_, e = conn.Execute(`UPDATE characters SET vitality=1,updated_at=? WHERE user_id=?`, []any{now, userID})
-				if e != nil {
-					return authoritativeMutation{}, e
-				}
 				key := "bone_fracture"
 				sev := int64(2)
 				if gap >= 18 {
 					key = "soul_wound"
 					sev = 3
 				}
-				inj, e := applyCombatCondition(conn, userID, key, sev, "fate_rescue", fmt.Sprint(b.BattleID), p.GameMinute)
+				inj, e := survivedDefeatTx(conn, userID, key, sev, "fate_rescue", fmt.Sprint(b.BattleID), p.GameMinute)
 				if e != nil {
 					return authoritativeMutation{}, e
 				}
@@ -618,7 +649,7 @@ func combatTurnAction(conn *storage.Conn, catalog worlddata.Catalog, userID int6
 				key = "bone_fracture"
 				sev = 2
 			}
-			inj, e := applyCombatCondition(conn, userID, key, sev, "battle", fmt.Sprint(b.BattleID), p.GameMinute)
+			inj, e := survivedDefeatTx(conn, userID, key, sev, "battle", fmt.Sprint(b.BattleID), p.GameMinute)
 			if e != nil {
 				return authoritativeMutation{}, e
 			}
@@ -819,16 +850,13 @@ func combatTechniqueAction(conn *storage.Conn, catalog worlddata.Catalog, userID
 				if e != nil {
 					return authoritativeMutation{}, e
 				}
-				if _, e = conn.Execute(`UPDATE characters SET vitality=1,updated_at=? WHERE user_id=?`, []any{now, userID}); e != nil {
-					return authoritativeMutation{}, e
-				}
 				key := "bone_fracture"
 				sev := int64(2)
 				if gap >= 18 {
 					key = "soul_wound"
 					sev = 3
 				}
-				inj, e := applyCombatCondition(conn, userID, key, sev, "fate_rescue", fmt.Sprint(b.BattleID), p.GameMinute)
+				inj, e := survivedDefeatTx(conn, userID, key, sev, "fate_rescue", fmt.Sprint(b.BattleID), p.GameMinute)
 				if e != nil {
 					return authoritativeMutation{}, e
 				}
@@ -850,7 +878,7 @@ func combatTechniqueAction(conn *storage.Conn, catalog worlddata.Catalog, userID
 				key = "bone_fracture"
 				sev = 2
 			}
-			inj, e := applyCombatCondition(conn, userID, key, sev, "battle", fmt.Sprint(b.BattleID), p.GameMinute)
+			inj, e := survivedDefeatTx(conn, userID, key, sev, "battle", fmt.Sprint(b.BattleID), p.GameMinute)
 			if e != nil {
 				return authoritativeMutation{}, e
 			}

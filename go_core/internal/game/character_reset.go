@@ -37,22 +37,29 @@ package game
 // cannot honestly survive a reset: the world would go on referring to a
 // cultivator who was never there.
 //
-// **There is deliberately no limit on how many times.** An earlier version
-// allowed three, to stop a player re-rolling the root grade: `rollRootGrade` is
-// `Intn(1000)` against thresholds that put Immortal in the top 0.7% of a tier-1
-// household's draw, and v1.0.0-rc.55 made that grade worth 0.88x to 1.34x
-// cultivation and -1 to +3 on every breakthrough for the character's whole
-// life. That cost is real and is accepted: the gate that matters is the one
-// above, which protects *other players*, and a cultivator re-rolling their own
-// first minute takes nothing from anybody. A player patient enough to draw for
-// an Immortal root has thrown away every character in between.
+// **Three per account, ever** - not three per character and not three per
+// life. `rollRootGrade` is `Intn(1000)` against thresholds that put Immortal in
+// the top 0.7% of a tier-1 household's draw, and v1.0.0-rc.55 made that grade
+// worth 0.88x to 1.34x cultivation and -1 to +3 on every breakthrough for the
+// character's whole life, so an unbounded reset is a free re-roll of exactly
+// that number.
 //
-// The reset is still **recorded**, in an `event_log` row of type
-// `characterResetEvent` that the sweep is told to keep, so a GM can see how
-// often somebody has started over. That row is the memory, the way
+// The count lives in `event_log` rows of type `characterResetEvent`, which the
+// sweep is told to keep - because **a bound that the bounded action erases is
+// not a bound**, which is v1.0.0-rc.48's rule ("a bound that lives in the
+// client is not a bound") turned inward. The row is the memory, the way
 // `(user_id, quest_key)` is for the beginner path and an `event_log` row is for
-// the household lesson and the profession examination - it is simply no longer
-// a bound as well.
+// the household lesson and the profession examination.
+//
+// **A reset is not a small samsara, and the difference is the point.** Samsara
+// is what death opens, and it deliberately *remembers*: the memory seed, the
+// talent, law and insight echoes, the legacy points, the craft echo and a
+// family lineage rolled off the dead life's karma all ride into the next life.
+// A reset keeps none of it. `soul_legacy` holds no anonymise disposition, so
+// the sweep deletes it with everything else and the account begins again at
+// incarnation 1 with nothing behind it. `TestAResetIsNotASmallSamsara` is what
+// holds that, because it is the one property that would be invisible if the
+// table ever gained a keep.
 //
 // The obvious alternative - carry the drawn aptitudes across and re-roll only
 // what was chosen - was rejected on a fact rather than on taste: `rollFamilyRoot`
@@ -75,6 +82,10 @@ import (
 	"xianxia/core/internal/eventledger"
 	"xianxia/core/internal/storage"
 )
+
+// characterResetAllowance is how many times one Discord account may abandon a
+// freshly created cultivator, ever.
+const characterResetAllowance = 3
 
 // characterResetEvent is the `event_log.event_type` that records a reset. It is
 // the allowance, so it is the one thing a reset does not delete about itself.
@@ -237,6 +248,10 @@ func characterResetAction(conn *storage.Conn, userID int64, _ json.RawMessage) (
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
+	if used >= characterResetAllowance {
+		return authoritativeMutation{}, fmt.Errorf(
+			"you have begun again %d times, which is all this world allows", characterResetAllowance)
+	}
 	targets, err := erasureTargets(conn)
 	if err != nil {
 		return authoritativeMutation{}, err
@@ -283,11 +298,12 @@ func characterResetAction(conn *storage.Conn, userID int64, _ json.RawMessage) (
 			"reset would have anonymised %d shared row(s); refusing", sweep.RowsAnonymised)
 	}
 	result := map[string]any{
-		"reset":          true,
-		"name":           c.Name,
-		"resets_used":    used + 1,
-		"rows_deleted":   sweep.RowsDeleted,
-		"tables_touched": len(sweep.Deleted),
+		"reset":            true,
+		"name":             c.Name,
+		"resets_used":      used + 1,
+		"resets_remaining": characterResetAllowance - (used + 1),
+		"rows_deleted":     sweep.RowsDeleted,
+		"tables_touched":   len(sweep.Deleted),
 	}
 	return authoritativeMutation{
 		Result: result,

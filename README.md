@@ -1,4 +1,4 @@
-# Xianxia RP Discord Bot v1.0.1
+# Xianxia RP Discord Bot v1.0.4
 
 *A cultivation RPG played entirely through Discord commands: deterministic rules in Go, an AI that
 narrates but never decides, self-hosted on your own hardware.*
@@ -638,7 +638,7 @@ report is safe to paste into an issue.
 - If narration goes flat after an image rebuild, check **/admin → Server → Ai Status** for a TLS
   banner first. If SQLite reports contention, verify only the engine opens the database.
 
-Keep the whole `data/` directory persistent across rebuilds. The current schema is **58**; every
+Keep the whole `data/` directory persistent across rebuilds. The current schema is **59**; every
 historical migration is kept so an old database upgrades in place.
 
 ## Development

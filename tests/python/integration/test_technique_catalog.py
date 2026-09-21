@@ -23,12 +23,15 @@ class TechniqueCatalogTests(unittest.IsolatedAsyncioTestCase):
         self.tmp.cleanup()
 
     async def test_catalog_scale_and_the_demonic_branch(self):
-        self.assertEqual(len(self.world.manuals), 160)  # 148 generated + 12 authored sect entry manuals (v0.21.4; two per higher world since v0.39.0)
-        self.assertEqual(len(self.world.techniques), 564)
+        # 148 generated on the six-path cycle, 12 authored sect entry manuals
+        # (v0.21.4; two per higher world since v0.39.0), 23 for the seventh path
+        # the cycle never reached and 13 household traditions (both v1.0.3).
+        self.assertEqual(len(self.world.manuals), 196)
+        self.assertEqual(len(self.world.techniques), 678)
         evil_manuals = [m for m in self.world.manuals.values() if str(m.get("alignment", "")).lower() == "demonic"]
         evil_techniques = [t for t in self.world.techniques.values() if str((self.world.manuals.get(str(t.get("manual"))) or {}).get("alignment", "")).lower() == "demonic"]
-        self.assertEqual(len(evil_manuals), 46)
-        self.assertEqual(len(evil_techniques), 172)
+        self.assertEqual(len(evil_manuals), 52)  # +6 for the Ghost Cultivator (v1.0.3)
+        self.assertEqual(len(evil_techniques), 196)
         self.assertIn("blood_sea_palm", self.world.techniques)
         self.assertEqual(self.world.sects["Blood River Sect"]["alignment"], "Demonic")
         hidden = self.world.sects.get("Heaven-Devouring Demon Sect")
@@ -59,10 +62,14 @@ class TechniqueCatalogTests(unittest.IsolatedAsyncioTestCase):
         # (v1.0.0-rc.40, when the catalog_* mirrors were retired).
         await seed_content_tables(self.db, self.world.data)
         async with self.db._connect() as conn:
+            # Against the catalogue rather than against a literal: this test is
+            # "the tables hold every manual", and a second copy of the count is
+            # free to drift from the one `test_world_catalog_materialised.py`
+            # pins (v1.0.3).
             cur = await conn.execute("SELECT COUNT(*) FROM content_manuals")
-            self.assertEqual((await cur.fetchone())[0], 160)
+            self.assertEqual((await cur.fetchone())[0], len(self.world.manuals))
             cur = await conn.execute("SELECT COUNT(*) FROM content_techniques")
-            self.assertEqual((await cur.fetchone())[0], 564)
+            self.assertEqual((await cur.fetchone())[0], len(self.world.techniques))
 
     async def test_seeding_the_territory_map_gives_every_location_a_node_and_an_era(self):
         await self.db.seed_world_territories(self.world.data)

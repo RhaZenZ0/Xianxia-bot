@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import hmac
+import difflib
 import json
 import logging
 import os
@@ -1836,11 +1837,32 @@ class AdminDashboardController:
         for item_id, name in catalog.items():
             if needle in (item_id.casefold(), name.casefold()):
                 return item_id
+        # Ranked, not filtered-then-alphabetised (v1.0.3). This took `any()`
+        # token hit and sorted the survivors by id, so "Qi Nourishment Pills"
+        # answered with five `advanced_demonic_*_qi_refiner_manual`s - they
+        # matched on the single token "qi" and sort first - while `qi_pill`,
+        # which is the item, matched exactly as well and was never shown. The
+        # near-misses a GM actually types are inflections ("Nourishment" for
+        # "Nourishing", "Pills" for "Pill"), which a substring test cannot see
+        # at all, so the score is a similarity and the id is shown with its
+        # display name because one of the two is what they were reading.
         tokens = [t for t in needle.replace("_", " ").split() if t]
-        suggestions = sorted(
-            item_id for item_id, name in catalog.items()
-            if any(t in item_id.casefold() or t in name.casefold() for t in tokens)
-        )[:5]
+
+        def score(item_id: str, name: str) -> tuple[float, int]:
+            folded_id, folded_name = item_id.casefold(), name.casefold()
+            closeness = max(
+                difflib.SequenceMatcher(None, needle, folded_id).ratio(),
+                difflib.SequenceMatcher(None, needle, folded_name).ratio(),
+            )
+            hits = sum(1 for t in tokens if t in folded_id or t in folded_name)
+            return (closeness, hits)
+
+        ranked = sorted(catalog.items(), key=lambda kv: score(*kv), reverse=True)
+        suggestions = [
+            f"{item_id} ({name})" if name and name.casefold() != item_id.casefold() else item_id
+            for item_id, name in ranked[:5]
+            if score(item_id, name) > (0.0, 0)
+        ]
         hint = f" Did you mean: {', '.join(suggestions)}?" if suggestions else ""
         raise ValueError(f"Unknown item {typed!r}: not an item id or item name in content/world.json.{hint}")
 

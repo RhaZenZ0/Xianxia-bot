@@ -39,10 +39,13 @@ class MaterialisedCatalogTests(unittest.TestCase):
     def test_the_documented_scale_is_on_disk(self):
         data = json.loads(WORLD.read_text(encoding="utf-8"))
         system = data["technique_system"]
-        self.assertEqual(len(system["manuals"]), 160)  # 148 generated + one authored entry manual per public sect (twelve since v0.39.0)
-        self.assertEqual(len(system["techniques"]), 564)
+        # 148 generated on the six-path cycle, one authored entry manual per
+        # public sect (twelve since v0.39.0), 23 for the seventh path the cycle
+        # never reached and 13 household traditions (both v1.0.3).
+        self.assertEqual(len(system["manuals"]), 196)
+        self.assertEqual(len(system["techniques"]), 678)
         demonic = [m for m in system["manuals"].values() if str(m.get("alignment", "")).casefold() == "demonic"]
-        self.assertEqual(len(demonic), 46)
+        self.assertEqual(len(demonic), 52)  # +6 for the Ghost Cultivator (v1.0.3)
 
     def test_every_manual_has_an_item_and_none_is_market_stock(self):
         data = json.loads(WORLD.read_text(encoding="utf-8"))

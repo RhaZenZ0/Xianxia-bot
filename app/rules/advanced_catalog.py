@@ -2,6 +2,20 @@ from __future__ import annotations
 
 from typing import Any
 
+# The cycle the generated catalogue was built on, and it is deliberately NOT
+# read from `data["paths"]` (v1.0.3). A generated manual id embeds its path
+# name - `advanced_demonic_007_sword_cultivator` - and the path is chosen by
+# `PATHS[i % len(PATHS)]`, so widening this tuple changes the modulus and
+# re-points every id in the catalogue at once. That would dangle every
+# `character_manuals` row, every inventory item and every stored
+# `cultivation_manual:<user_id>` choice a live character holds.
+#
+# What it must not do is silently omit a path, which is what it did for the
+# whole life of the generator: `content/world.json` offers seven cultivation
+# paths and this names six, so **Ghost Cultivator had none of the 160 manuals**
+# while `death_qi_system` - a whole authored subsystem opening `"path": "Ghost
+# Cultivator"` - was built for it. `_uncovered_paths` below is what closes
+# that, by appending rather than by re-cycling.
 PATHS = ("Sword Cultivator", "Qi Refiner", "Body Refiner", "Soul Cultivator", "Beast Binder", "Formation Adept")
 WORLDS = ("Mortal", "Spiritual", "Immortal", "Celestial")
 GRADES = ("Mortal", "Spirit", "Earth", "Heaven", "Immortal", "Dao")
@@ -186,6 +200,94 @@ def _add_manual(
     }
 
 
+def _is_demonic(manual: dict[str, Any]) -> bool:
+    return str(manual.get("alignment", "")).casefold() == "demonic"
+
+
+def _uncovered_paths(data: dict[str, Any], manuals: dict[str, dict[str, Any]]) -> list[str]:
+    """The cultivation paths the world offers that no manual names.
+
+    `PATHS` above is pinned, so it cannot be widened to cover a seventh path
+    without re-pointing every id in the catalogue. This is the other way round:
+    the content file is asked which paths exist, and anything the cycle never
+    reached is appended in its own id space - `advanced_demonic_001_ghost_cultivator`
+    cannot collide with `advanced_demonic_001_sword_cultivator` because the id
+    carries the slug.
+    """
+    named = {str(m.get("path", "")).strip() for m in manuals.values()}
+    return [p for p in (data.get("paths") or ()) if p not in named]
+
+
+def _sibling_share(manuals: dict[str, dict[str, Any]], demonic: bool) -> tuple[int, list[int], int]:
+    """What the cycle gave a path already in it: how many manuals, at which
+    realm floors, with how many techniques each.
+
+    Every number here is read off the catalogue rather than stated, so a path
+    appended below gets what its siblings have and there is no count to keep in
+    step with anything. The floors are the element-wise minimum of the covered
+    paths' ladders - the gentlest ladder the catalogue already offers - because
+    the hidden sect's initiation is the one door that matches on path, and a
+    floor no beginner can reach would leave the new path served no better than
+    it was before.
+    """
+    ladders: list[list[int]] = []
+    techniques: list[int] = []
+    for path in PATHS:
+        floors = sorted(
+            int(m.get("min_realm_index", 0))
+            for m in manuals.values()
+            if str(m.get("path", "")).strip() == path and _is_demonic(m) == demonic
+        )
+        if not floors:
+            continue
+        ladders.append(floors)
+        techniques.extend(
+            len(m.get("techniques") or ())
+            for m in manuals.values()
+            if str(m.get("path", "")).strip() == path and _is_demonic(m) == demonic
+        )
+    if not ladders:
+        return 0, [], 0
+    count = min(len(l) for l in ladders)
+    floors = [min(l[i] for l in ladders) for i in range(count)]
+    each = max(1, round(sum(techniques) / len(techniques))) if techniques else 3
+    return count, floors, each
+
+
+def _extend_uncovered_paths(data: dict[str, Any]) -> None:
+    """Give every cultivation path the world offers the catalogue its siblings
+    have. Idempotent: once a path is named by a manual it is no longer
+    uncovered, and `_add_manual` returns early on an id it already holds.
+    """
+    system = data.setdefault("technique_system", {})
+    manuals: dict[str, dict[str, Any]] = system.setdefault("manuals", {})
+    for path in _uncovered_paths(data, manuals):
+        for demonic in (True, False):
+            count, floors, each = _sibling_share(manuals, demonic)
+            prefixes = DEMONIC_PREFIXES if demonic else ORTHODOX_PREFIXES
+            suffixes = DEMONIC_SUFFIXES if demonic else ORTHODOX_SUFFIXES
+            stem = "advanced_demonic" if demonic else "advanced_orthodox"
+            for i in range(count):
+                floor = floors[i]
+                world_index = min(3, max(0, floor // 8))
+                prefix = prefixes[i % len(prefixes)]
+                suffix = suffixes[(i // len(prefixes)) % len(suffixes)]
+                if demonic:
+                    name = f"{prefix} {suffix} — {WORLDS[world_index]} Volume {i + 1}"
+                    alignment = "Demonic"
+                    grade = GRADES[min(len(GRADES) - 1, world_index + 2)]
+                else:
+                    name = f"{prefix} {suffix} — {path} {i + 1}"
+                    # The cycle makes one in four Neutral; the same rule here.
+                    alignment = "Orthodox" if i % 4 else "Neutral"
+                    grade = GRADES[min(len(GRADES) - 1, world_index + 1)]
+                _add_manual(
+                    data, manual_id=f"{stem}_{i + 1:03d}_{_slug(path)}", name=name,
+                    path=path, grade=grade, min_realm_index=floor, alignment=alignment,
+                    technique_count=each, ordinal=(3000 if demonic else 4000) + i,
+                )
+
+
 def augment_advanced_catalog(data: dict[str, Any]) -> None:
     """Expand the compact seed into the advanced branch's documented catalog scale.
 
@@ -253,6 +355,9 @@ def augment_advanced_catalog(data: dict[str, Any]) -> None:
                 min_realm_index=world_index * 8 + (i % 8), alignment=alignment,
                 technique_count=base_each + (1 if i < extra else 0), ordinal=2000 + i,
             )
+
+    # Every path the world offers, not only the six this module names.
+    _extend_uncovered_paths(data)
 
     system.setdefault("mastery_levels", ["Learned", "Practiced", "Proficient", "Mastered", "Perfected"])
     system["catalog_contract"] = {

@@ -776,6 +776,7 @@ async def sect_shadow(interaction: discord.Interaction, action: app_commands.Cho
     hidden=initiation.get("membership") or {}
     text=f"🌑 You accept the **Heaven-Devouring Demon Sect** initiation in **{initiation.get('branch',branch)}**. Hidden rank: **{hidden.get('rank_name','Shadow Initiate')}**. This affiliation is stored separately from your public sect lineage."
     if initiation.get("manual_name"): text+=f"\n📕 Initiation inheritance: **{initiation['manual_name']}** was placed in your inventory; study it with **/cultivation → Arts → Study**."
+    elif initiation.get("manual_absent"): text+=f"\n📕 No initiation inheritance: {initiation['manual_absent']}. Return when you have cultivated further."
     await respond(interaction, text,ephemeral=False)
 
 

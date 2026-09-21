@@ -446,6 +446,16 @@ func applyAuthoritative(databasePath, worldPath string, req ActionRequest) (Acti
 		if err := checkPlayerSeclusionTx(conn, catalog, req.ActorID, actionGameMinute, req.Operation); err != nil {
 			return ActionResponse{}, err
 		}
+		// A body mends on its own (v1.0.4). Last of the four, and after
+		// seclusion for the reason seclusion is after old age: a retreat that
+		// has just ended is a retreat whose minutes should already count, and
+		// `checkPlayerSeclusionTx` has settled it by here.
+		//
+		// It returns no error by construction - being hurt must never be the
+		// reason a command refuses - so the result is deliberately discarded
+		// rather than propagated, exactly as `ensureRoadTransitReadyTx` is
+		// called for its effect above.
+		_, _ = settleVitalityRecoveryTx(conn, catalog, req.ActorID, actionGameMinute)
 	}
 	var mutation authoritativeMutation
 	if oldAgeDeath != nil {

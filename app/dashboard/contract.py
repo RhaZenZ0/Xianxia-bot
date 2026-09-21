@@ -9,7 +9,13 @@ from typing import Iterable
 # run before the bot/dashboard dependencies are installed.  Keep the browser/API,
 # schema-review, and newer-system coverage contract in one place.
 DASHBOARD_API_VERSION = 2
-DASHBOARD_REVIEWED_SCHEMA_VERSION = 58
+# Schema 59 (v1.0.4) reviewed and needs nothing here:
+# `characters.vitality_recovered_game_minute` is the internal anchor
+# `settleVitalityRecoveryTx` mends from, written and read by that function
+# alone. It is not a GM lever - `admin.player.revive` already sets vitality
+# full, and an anchor a GM could set means nothing on its own - and not state
+# worth a card, so no view, action or capability changes with it.
+DASHBOARD_REVIEWED_SCHEMA_VERSION = 59
 
 DASHBOARD_GET_API_PATHS = frozenset({
     "/api/overview", "/api/capabilities", "/api/timeline", "/api/npcs", "/api/npc",

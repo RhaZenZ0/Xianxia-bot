@@ -26236,6 +26236,366 @@
       "door_event_chance": 70,
       "hunter_realm_bonus": 3,
       "base_price": 56000
+    },
+    "advanced_demonic_001_ghost_cultivator_manual": {
+      "name": "Blood Moon Forbidden Scripture — Mortal Volume 1 — Jade Manual",
+      "type": "manual",
+      "manual_id": "advanced_demonic_001_ghost_cultivator",
+      "sect_value": 18,
+      "base_price": 90,
+      "special": true,
+      "market_excluded": true,
+      "description": "A mechanically learnable cultivation manual from the expanded inheritance catalog."
+    },
+    "advanced_demonic_002_ghost_cultivator_manual": {
+      "name": "Soul Furnace Forbidden Scripture — Mortal Volume 2 — Jade Manual",
+      "type": "manual",
+      "manual_id": "advanced_demonic_002_ghost_cultivator",
+      "sect_value": 18,
+      "base_price": 90,
+      "special": true,
+      "market_excluded": true,
+      "description": "A mechanically learnable cultivation manual from the expanded inheritance catalog."
+    },
+    "advanced_demonic_003_ghost_cultivator_manual": {
+      "name": "White Bone Forbidden Scripture — Spiritual Volume 3 — Jade Manual",
+      "type": "manual",
+      "manual_id": "advanced_demonic_003_ghost_cultivator",
+      "sect_value": 42,
+      "base_price": 290,
+      "special": true,
+      "market_excluded": true,
+      "description": "A mechanically learnable cultivation manual from the expanded inheritance catalog."
+    },
+    "advanced_demonic_004_ghost_cultivator_manual": {
+      "name": "Abyss Maw Forbidden Scripture — Spiritual Volume 4 — Jade Manual",
+      "type": "manual",
+      "manual_id": "advanced_demonic_004_ghost_cultivator",
+      "sect_value": 42,
+      "base_price": 290,
+      "special": true,
+      "market_excluded": true,
+      "description": "A mechanically learnable cultivation manual from the expanded inheritance catalog."
+    },
+    "advanced_demonic_005_ghost_cultivator_manual": {
+      "name": "Corpse Lantern Forbidden Scripture — Immortal Volume 5 — Jade Manual",
+      "type": "manual",
+      "manual_id": "advanced_demonic_005_ghost_cultivator",
+      "sect_value": 66,
+      "base_price": 490,
+      "special": true,
+      "market_excluded": true,
+      "description": "A mechanically learnable cultivation manual from the expanded inheritance catalog."
+    },
+    "advanced_demonic_006_ghost_cultivator_manual": {
+      "name": "Black Venom Forbidden Scripture — Immortal Volume 6 — Jade Manual",
+      "type": "manual",
+      "manual_id": "advanced_demonic_006_ghost_cultivator",
+      "sect_value": 78,
+      "base_price": 590,
+      "special": true,
+      "market_excluded": true,
+      "description": "A mechanically learnable cultivation manual from the expanded inheritance catalog."
+    },
+    "advanced_orthodox_001_ghost_cultivator_manual": {
+      "name": "Azure Cloud Canon — Ghost Cultivator 1 — Jade Manual",
+      "type": "manual",
+      "manual_id": "advanced_orthodox_001_ghost_cultivator",
+      "sect_value": 18,
+      "base_price": 90,
+      "special": false,
+      "market_excluded": true,
+      "description": "A mechanically learnable cultivation manual from the expanded inheritance catalog."
+    },
+    "advanced_orthodox_002_ghost_cultivator_manual": {
+      "name": "Golden Meridian Canon — Ghost Cultivator 2 — Jade Manual",
+      "type": "manual",
+      "manual_id": "advanced_orthodox_002_ghost_cultivator",
+      "sect_value": 18,
+      "base_price": 90,
+      "special": false,
+      "market_excluded": true,
+      "description": "A mechanically learnable cultivation manual from the expanded inheritance catalog."
+    },
+    "advanced_orthodox_003_ghost_cultivator_manual": {
+      "name": "Vermilion Crane Canon — Ghost Cultivator 3 — Jade Manual",
+      "type": "manual",
+      "manual_id": "advanced_orthodox_003_ghost_cultivator",
+      "sect_value": 24,
+      "base_price": 140,
+      "special": false,
+      "market_excluded": true,
+      "description": "A mechanically learnable cultivation manual from the expanded inheritance catalog."
+    },
+    "advanced_orthodox_004_ghost_cultivator_manual": {
+      "name": "Jade River Canon — Ghost Cultivator 4 — Jade Manual",
+      "type": "manual",
+      "manual_id": "advanced_orthodox_004_ghost_cultivator",
+      "sect_value": 30,
+      "base_price": 190,
+      "special": false,
+      "market_excluded": true,
+      "description": "A mechanically learnable cultivation manual from the expanded inheritance catalog."
+    },
+    "advanced_orthodox_005_ghost_cultivator_manual": {
+      "name": "Nine Echo Canon — Ghost Cultivator 5 — Jade Manual",
+      "type": "manual",
+      "manual_id": "advanced_orthodox_005_ghost_cultivator",
+      "sect_value": 36,
+      "base_price": 240,
+      "special": false,
+      "market_excluded": true,
+      "description": "A mechanically learnable cultivation manual from the expanded inheritance catalog."
+    },
+    "advanced_orthodox_006_ghost_cultivator_manual": {
+      "name": "White Lotus Canon — Ghost Cultivator 6 — Jade Manual",
+      "type": "manual",
+      "manual_id": "advanced_orthodox_006_ghost_cultivator",
+      "sect_value": 42,
+      "base_price": 290,
+      "special": false,
+      "market_excluded": true,
+      "description": "A mechanically learnable cultivation manual from the expanded inheritance catalog."
+    },
+    "advanced_orthodox_007_ghost_cultivator_manual": {
+      "name": "Starfall Canon — Ghost Cultivator 7 — Jade Manual",
+      "type": "manual",
+      "manual_id": "advanced_orthodox_007_ghost_cultivator",
+      "sect_value": 42,
+      "base_price": 290,
+      "special": false,
+      "market_excluded": true,
+      "description": "A mechanically learnable cultivation manual from the expanded inheritance catalog."
+    },
+    "advanced_orthodox_008_ghost_cultivator_manual": {
+      "name": "Thunder Peak Canon — Ghost Cultivator 8 — Jade Manual",
+      "type": "manual",
+      "manual_id": "advanced_orthodox_008_ghost_cultivator",
+      "sect_value": 48,
+      "base_price": 340,
+      "special": false,
+      "market_excluded": true,
+      "description": "A mechanically learnable cultivation manual from the expanded inheritance catalog."
+    },
+    "advanced_orthodox_009_ghost_cultivator_manual": {
+      "name": "Moonshadow Canon — Ghost Cultivator 9 — Jade Manual",
+      "type": "manual",
+      "manual_id": "advanced_orthodox_009_ghost_cultivator",
+      "sect_value": 54,
+      "base_price": 390,
+      "special": false,
+      "market_excluded": true,
+      "description": "A mechanically learnable cultivation manual from the expanded inheritance catalog."
+    },
+    "advanced_orthodox_010_ghost_cultivator_manual": {
+      "name": "Heavenly Reed Canon — Ghost Cultivator 10 — Jade Manual",
+      "type": "manual",
+      "manual_id": "advanced_orthodox_010_ghost_cultivator",
+      "sect_value": 60,
+      "base_price": 440,
+      "special": false,
+      "market_excluded": true,
+      "description": "A mechanically learnable cultivation manual from the expanded inheritance catalog."
+    },
+    "advanced_orthodox_011_ghost_cultivator_manual": {
+      "name": "Iron Mountain Canon — Ghost Cultivator 11 — Jade Manual",
+      "type": "manual",
+      "manual_id": "advanced_orthodox_011_ghost_cultivator",
+      "sect_value": 66,
+      "base_price": 490,
+      "special": true,
+      "market_excluded": true,
+      "description": "A mechanically learnable cultivation manual from the expanded inheritance catalog."
+    },
+    "advanced_orthodox_012_ghost_cultivator_manual": {
+      "name": "Clear Sky Canon — Ghost Cultivator 12 — Jade Manual",
+      "type": "manual",
+      "manual_id": "advanced_orthodox_012_ghost_cultivator",
+      "sect_value": 66,
+      "base_price": 490,
+      "special": true,
+      "market_excluded": true,
+      "description": "A mechanically learnable cultivation manual from the expanded inheritance catalog."
+    },
+    "advanced_orthodox_013_ghost_cultivator_manual": {
+      "name": "Void Lantern Canon — Ghost Cultivator 13 — Jade Manual",
+      "type": "manual",
+      "manual_id": "advanced_orthodox_013_ghost_cultivator",
+      "sect_value": 72,
+      "base_price": 540,
+      "special": true,
+      "market_excluded": true,
+      "description": "A mechanically learnable cultivation manual from the expanded inheritance catalog."
+    },
+    "advanced_orthodox_014_ghost_cultivator_manual": {
+      "name": "Dragon Gate Canon — Ghost Cultivator 14 — Jade Manual",
+      "type": "manual",
+      "manual_id": "advanced_orthodox_014_ghost_cultivator",
+      "sect_value": 78,
+      "base_price": 590,
+      "special": true,
+      "market_excluded": true,
+      "description": "A mechanically learnable cultivation manual from the expanded inheritance catalog."
+    },
+    "advanced_orthodox_015_ghost_cultivator_manual": {
+      "name": "Phoenix Feather Canon — Ghost Cultivator 15 — Jade Manual",
+      "type": "manual",
+      "manual_id": "advanced_orthodox_015_ghost_cultivator",
+      "sect_value": 84,
+      "base_price": 640,
+      "special": true,
+      "market_excluded": true,
+      "description": "A mechanically learnable cultivation manual from the expanded inheritance catalog."
+    },
+    "advanced_orthodox_016_ghost_cultivator_manual": {
+      "name": "Radiant Sun Canon — Ghost Cultivator 16 — Jade Manual",
+      "type": "manual",
+      "manual_id": "advanced_orthodox_016_ghost_cultivator",
+      "sect_value": 90,
+      "base_price": 690,
+      "special": true,
+      "market_excluded": true,
+      "description": "A mechanically learnable cultivation manual from the expanded inheritance catalog."
+    },
+    "advanced_orthodox_017_ghost_cultivator_manual": {
+      "name": "Frost Moon Canon — Ghost Cultivator 17 — Jade Manual",
+      "type": "manual",
+      "manual_id": "advanced_orthodox_017_ghost_cultivator",
+      "sect_value": 96,
+      "base_price": 740,
+      "special": true,
+      "market_excluded": true,
+      "description": "A mechanically learnable cultivation manual from the expanded inheritance catalog."
+    },
+    "eastern_gate_remnant_form_manual": {
+      "name": "Eastern Gate Remnant Form — Household Slip",
+      "type": "manual",
+      "manual_id": "eastern_gate_remnant_form",
+      "sect_value": 12,
+      "base_price": 60,
+      "description": "The Eastern Gate Remnant Form, copied out in a relative's hand. It leaves the house with you.",
+      "legal_status": "clean",
+      "market_excluded": true
+    },
+    "grave_watch_vigil_record_manual": {
+      "name": "Grave-Watch Vigil Record — Household Slip",
+      "type": "manual",
+      "manual_id": "grave_watch_vigil_record",
+      "sect_value": 12,
+      "base_price": 60,
+      "description": "The Grave-Watch Vigil Record, copied out in a relative's hand. It leaves the house with you.",
+      "legal_status": "clean",
+      "market_excluded": true
+    },
+    "hungry_season_tempering_record_manual": {
+      "name": "Hungry Season Tempering Record — Household Slip",
+      "type": "manual",
+      "manual_id": "hungry_season_tempering_record",
+      "sect_value": 12,
+      "base_price": 60,
+      "description": "The Hungry Season Tempering Record, copied out in a relative's hand. It leaves the house with you.",
+      "legal_status": "clean",
+      "market_excluded": true
+    },
+    "stick_in_the_mud_array_primer_manual": {
+      "name": "Stick-in-the-Mud Array Primer — Household Slip",
+      "type": "manual",
+      "manual_id": "stick_in_the_mud_array_primer",
+      "sect_value": 12,
+      "base_price": 60,
+      "description": "The Stick-in-the-Mud Array Primer, copied out in a relative's hand. It leaves the house with you.",
+      "legal_status": "clean",
+      "market_excluded": true
+    },
+    "unfamous_house_method_manual": {
+      "name": "Unfamous House Method — Household Slip",
+      "type": "manual",
+      "manual_id": "unfamous_house_method",
+      "sect_value": 12,
+      "base_price": 60,
+      "description": "The Unfamous House Method, copied out in a relative's hand. It leaves the house with you.",
+      "legal_status": "clean",
+      "market_excluded": true
+    },
+    "river_ford_spear_canon_manual": {
+      "name": "River Ford Spear Canon — Household Slip",
+      "type": "manual",
+      "manual_id": "river_ford_spear_canon",
+      "sect_value": 12,
+      "base_price": 60,
+      "description": "The River Ford Spear Canon, copied out in a relative's hand. It leaves the house with you.",
+      "legal_status": "clean",
+      "market_excluded": true
+    },
+    "left_hand_forge_canon_manual": {
+      "name": "Left-Hand Forge Canon — Household Slip",
+      "type": "manual",
+      "manual_id": "left_hand_forge_canon",
+      "sect_value": 12,
+      "base_price": 60,
+      "description": "The Left-Hand Forge Canon, copied out in a relative's hand. It leaves the house with you.",
+      "legal_status": "clean",
+      "market_excluded": true
+    },
+    "unaccepted_fan_primer_manual": {
+      "name": "Unaccepted Fan Primer — Household Slip",
+      "type": "manual",
+      "manual_id": "unaccepted_fan_primer",
+      "sect_value": 12,
+      "base_price": 60,
+      "description": "The Unaccepted Fan Primer, copied out in a relative's hand. It leaves the house with you.",
+      "legal_status": "clean",
+      "market_excluded": true
+    },
+    "no_crest_blade_record_manual": {
+      "name": "No-Crest Blade Record — Household Slip",
+      "type": "manual",
+      "manual_id": "no_crest_blade_record",
+      "sect_value": 12,
+      "base_price": 60,
+      "description": "The No-Crest Blade Record, copied out in a relative's hand. It leaves the house with you.",
+      "legal_status": "clean",
+      "market_excluded": true
+    },
+    "back_room_ledger_primer_manual": {
+      "name": "Back Room Ledger Primer — Household Slip",
+      "type": "manual",
+      "manual_id": "back_room_ledger_primer",
+      "sect_value": 12,
+      "base_price": 60,
+      "description": "The Back Room Ledger Primer, copied out in a relative's hand. It leaves the house with you.",
+      "legal_status": "clean",
+      "market_excluded": true
+    },
+    "first_contract_array_manual": {
+      "name": "First Contract Array — Household Slip",
+      "type": "manual",
+      "manual_id": "first_contract_array",
+      "sect_value": 12,
+      "base_price": 60,
+      "description": "The First Contract Array, copied out in a relative's hand. It leaves the house with you.",
+      "legal_status": "clean",
+      "market_excluded": true
+    },
+    "one_in_ten_furnace_record_manual": {
+      "name": "One-in-Ten Furnace Record — Household Slip",
+      "type": "manual",
+      "manual_id": "one_in_ten_furnace_record",
+      "sect_value": 12,
+      "base_price": 60,
+      "description": "The One-in-Ten Furnace Record, copied out in a relative's hand. It leaves the house with you.",
+      "legal_status": "clean",
+      "market_excluded": true
+    },
+    "gate_without_asking_canon_manual": {
+      "name": "Gate Without Asking Canon — Household Slip",
+      "type": "manual",
+      "manual_id": "gate_without_asking_canon",
+      "sect_value": 12,
+      "base_price": 60,
+      "description": "The Gate Without Asking Canon, copied out in a relative's hand. It leaves the house with you.",
+      "legal_status": "clean",
+      "market_excluded": true
     }
   },
   "recipes": {
@@ -34506,6 +34866,575 @@
           "void_serpent_body_codex_serpent_coil_crush",
           "void_serpent_body_codex_scale_skin",
           "void_serpent_body_codex_pit_descent"
+        ]
+      },
+      "advanced_demonic_001_ghost_cultivator": {
+        "name": "Blood Moon Forbidden Scripture — Mortal Volume 1",
+        "item_id": "advanced_demonic_001_ghost_cultivator_manual",
+        "alignment": "Demonic",
+        "path": "Ghost Cultivator",
+        "grade": "Earth",
+        "element": "Yin",
+        "min_realm_index": 0,
+        "description": "A forbidden inheritance whose shortcuts accumulate exposure, karma debt and backlash.",
+        "techniques": [
+          "advanced_demonic_001_ghost_cultivator_strike_1",
+          "advanced_demonic_001_ghost_cultivator_step_2",
+          "advanced_demonic_001_ghost_cultivator_guard_3",
+          "advanced_demonic_001_ghost_cultivator_seal_4"
+        ],
+        "generated_advanced_catalog": true
+      },
+      "advanced_demonic_002_ghost_cultivator": {
+        "name": "Soul Furnace Forbidden Scripture — Mortal Volume 2",
+        "item_id": "advanced_demonic_002_ghost_cultivator_manual",
+        "alignment": "Demonic",
+        "path": "Ghost Cultivator",
+        "grade": "Earth",
+        "element": "Fire",
+        "min_realm_index": 0,
+        "description": "A forbidden inheritance whose shortcuts accumulate exposure, karma debt and backlash.",
+        "techniques": [
+          "advanced_demonic_002_ghost_cultivator_step_1",
+          "advanced_demonic_002_ghost_cultivator_guard_2",
+          "advanced_demonic_002_ghost_cultivator_seal_3",
+          "advanced_demonic_002_ghost_cultivator_wave_4"
+        ],
+        "generated_advanced_catalog": true
+      },
+      "advanced_demonic_003_ghost_cultivator": {
+        "name": "White Bone Forbidden Scripture — Spiritual Volume 3",
+        "item_id": "advanced_demonic_003_ghost_cultivator_manual",
+        "alignment": "Demonic",
+        "path": "Ghost Cultivator",
+        "grade": "Heaven",
+        "element": "Metal",
+        "min_realm_index": 8,
+        "description": "A forbidden inheritance whose shortcuts accumulate exposure, karma debt and backlash.",
+        "techniques": [
+          "advanced_demonic_003_ghost_cultivator_guard_1",
+          "advanced_demonic_003_ghost_cultivator_seal_2",
+          "advanced_demonic_003_ghost_cultivator_wave_3",
+          "advanced_demonic_003_ghost_cultivator_edge_4"
+        ],
+        "generated_advanced_catalog": true
+      },
+      "advanced_demonic_004_ghost_cultivator": {
+        "name": "Abyss Maw Forbidden Scripture — Spiritual Volume 4",
+        "item_id": "advanced_demonic_004_ghost_cultivator_manual",
+        "alignment": "Demonic",
+        "path": "Ghost Cultivator",
+        "grade": "Heaven",
+        "element": "Void",
+        "min_realm_index": 8,
+        "description": "A forbidden inheritance whose shortcuts accumulate exposure, karma debt and backlash.",
+        "techniques": [
+          "advanced_demonic_004_ghost_cultivator_seal_1",
+          "advanced_demonic_004_ghost_cultivator_wave_2",
+          "advanced_demonic_004_ghost_cultivator_edge_3",
+          "advanced_demonic_004_ghost_cultivator_palm_4"
+        ],
+        "generated_advanced_catalog": true
+      },
+      "advanced_demonic_005_ghost_cultivator": {
+        "name": "Corpse Lantern Forbidden Scripture — Immortal Volume 5",
+        "item_id": "advanced_demonic_005_ghost_cultivator_manual",
+        "alignment": "Demonic",
+        "path": "Ghost Cultivator",
+        "grade": "Immortal",
+        "element": "Yin",
+        "min_realm_index": 16,
+        "description": "A forbidden inheritance whose shortcuts accumulate exposure, karma debt and backlash.",
+        "techniques": [
+          "advanced_demonic_005_ghost_cultivator_wave_1",
+          "advanced_demonic_005_ghost_cultivator_edge_2",
+          "advanced_demonic_005_ghost_cultivator_palm_3",
+          "advanced_demonic_005_ghost_cultivator_thread_4"
+        ],
+        "generated_advanced_catalog": true
+      },
+      "advanced_demonic_006_ghost_cultivator": {
+        "name": "Black Venom Forbidden Scripture — Immortal Volume 6",
+        "item_id": "advanced_demonic_006_ghost_cultivator_manual",
+        "alignment": "Demonic",
+        "path": "Ghost Cultivator",
+        "grade": "Immortal",
+        "element": "Water",
+        "min_realm_index": 20,
+        "description": "A forbidden inheritance whose shortcuts accumulate exposure, karma debt and backlash.",
+        "techniques": [
+          "advanced_demonic_006_ghost_cultivator_edge_1",
+          "advanced_demonic_006_ghost_cultivator_palm_2",
+          "advanced_demonic_006_ghost_cultivator_thread_3",
+          "advanced_demonic_006_ghost_cultivator_domain_4"
+        ],
+        "generated_advanced_catalog": true
+      },
+      "advanced_orthodox_001_ghost_cultivator": {
+        "name": "Azure Cloud Canon — Ghost Cultivator 1",
+        "item_id": "advanced_orthodox_001_ghost_cultivator_manual",
+        "alignment": "Neutral",
+        "path": "Ghost Cultivator",
+        "grade": "Spirit",
+        "element": "Wind",
+        "min_realm_index": 0,
+        "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
+        "techniques": [
+          "advanced_orthodox_001_ghost_cultivator_strike_1",
+          "advanced_orthodox_001_ghost_cultivator_step_2",
+          "advanced_orthodox_001_ghost_cultivator_guard_3"
+        ],
+        "generated_advanced_catalog": true
+      },
+      "advanced_orthodox_002_ghost_cultivator": {
+        "name": "Golden Meridian Canon — Ghost Cultivator 2",
+        "item_id": "advanced_orthodox_002_ghost_cultivator_manual",
+        "alignment": "Orthodox",
+        "path": "Ghost Cultivator",
+        "grade": "Spirit",
+        "element": "Metal",
+        "min_realm_index": 0,
+        "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
+        "techniques": [
+          "advanced_orthodox_002_ghost_cultivator_step_1",
+          "advanced_orthodox_002_ghost_cultivator_guard_2",
+          "advanced_orthodox_002_ghost_cultivator_seal_3"
+        ],
+        "generated_advanced_catalog": true
+      },
+      "advanced_orthodox_003_ghost_cultivator": {
+        "name": "Vermilion Crane Canon — Ghost Cultivator 3",
+        "item_id": "advanced_orthodox_003_ghost_cultivator_manual",
+        "alignment": "Orthodox",
+        "path": "Ghost Cultivator",
+        "grade": "Spirit",
+        "element": "Fire",
+        "min_realm_index": 2,
+        "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
+        "techniques": [
+          "advanced_orthodox_003_ghost_cultivator_guard_1",
+          "advanced_orthodox_003_ghost_cultivator_seal_2",
+          "advanced_orthodox_003_ghost_cultivator_wave_3"
+        ],
+        "generated_advanced_catalog": true
+      },
+      "advanced_orthodox_004_ghost_cultivator": {
+        "name": "Jade River Canon — Ghost Cultivator 4",
+        "item_id": "advanced_orthodox_004_ghost_cultivator_manual",
+        "alignment": "Orthodox",
+        "path": "Ghost Cultivator",
+        "grade": "Spirit",
+        "element": "Water",
+        "min_realm_index": 4,
+        "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
+        "techniques": [
+          "advanced_orthodox_004_ghost_cultivator_seal_1",
+          "advanced_orthodox_004_ghost_cultivator_wave_2",
+          "advanced_orthodox_004_ghost_cultivator_edge_3"
+        ],
+        "generated_advanced_catalog": true
+      },
+      "advanced_orthodox_005_ghost_cultivator": {
+        "name": "Nine Echo Canon — Ghost Cultivator 5",
+        "item_id": "advanced_orthodox_005_ghost_cultivator_manual",
+        "alignment": "Neutral",
+        "path": "Ghost Cultivator",
+        "grade": "Spirit",
+        "element": "Void",
+        "min_realm_index": 6,
+        "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
+        "techniques": [
+          "advanced_orthodox_005_ghost_cultivator_wave_1",
+          "advanced_orthodox_005_ghost_cultivator_edge_2",
+          "advanced_orthodox_005_ghost_cultivator_palm_3"
+        ],
+        "generated_advanced_catalog": true
+      },
+      "advanced_orthodox_006_ghost_cultivator": {
+        "name": "White Lotus Canon — Ghost Cultivator 6",
+        "item_id": "advanced_orthodox_006_ghost_cultivator_manual",
+        "alignment": "Orthodox",
+        "path": "Ghost Cultivator",
+        "grade": "Earth",
+        "element": "Wood",
+        "min_realm_index": 8,
+        "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
+        "techniques": [
+          "advanced_orthodox_006_ghost_cultivator_edge_1",
+          "advanced_orthodox_006_ghost_cultivator_palm_2",
+          "advanced_orthodox_006_ghost_cultivator_thread_3"
+        ],
+        "generated_advanced_catalog": true
+      },
+      "advanced_orthodox_007_ghost_cultivator": {
+        "name": "Starfall Canon — Ghost Cultivator 7",
+        "item_id": "advanced_orthodox_007_ghost_cultivator_manual",
+        "alignment": "Orthodox",
+        "path": "Ghost Cultivator",
+        "grade": "Earth",
+        "element": "Chaos",
+        "min_realm_index": 8,
+        "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
+        "techniques": [
+          "advanced_orthodox_007_ghost_cultivator_palm_1",
+          "advanced_orthodox_007_ghost_cultivator_thread_2",
+          "advanced_orthodox_007_ghost_cultivator_domain_3"
+        ],
+        "generated_advanced_catalog": true
+      },
+      "advanced_orthodox_008_ghost_cultivator": {
+        "name": "Thunder Peak Canon — Ghost Cultivator 8",
+        "item_id": "advanced_orthodox_008_ghost_cultivator_manual",
+        "alignment": "Orthodox",
+        "path": "Ghost Cultivator",
+        "grade": "Earth",
+        "element": "Lightning",
+        "min_realm_index": 10,
+        "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
+        "techniques": [
+          "advanced_orthodox_008_ghost_cultivator_thread_1",
+          "advanced_orthodox_008_ghost_cultivator_domain_2",
+          "advanced_orthodox_008_ghost_cultivator_breath_3"
+        ],
+        "generated_advanced_catalog": true
+      },
+      "advanced_orthodox_009_ghost_cultivator": {
+        "name": "Moonshadow Canon — Ghost Cultivator 9",
+        "item_id": "advanced_orthodox_009_ghost_cultivator_manual",
+        "alignment": "Neutral",
+        "path": "Ghost Cultivator",
+        "grade": "Earth",
+        "element": "Yin",
+        "min_realm_index": 12,
+        "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
+        "techniques": [
+          "advanced_orthodox_009_ghost_cultivator_domain_1",
+          "advanced_orthodox_009_ghost_cultivator_breath_2",
+          "advanced_orthodox_009_ghost_cultivator_strike_3"
+        ],
+        "generated_advanced_catalog": true
+      },
+      "advanced_orthodox_010_ghost_cultivator": {
+        "name": "Heavenly Reed Canon — Ghost Cultivator 10",
+        "item_id": "advanced_orthodox_010_ghost_cultivator_manual",
+        "alignment": "Orthodox",
+        "path": "Ghost Cultivator",
+        "grade": "Earth",
+        "element": "Wood",
+        "min_realm_index": 14,
+        "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
+        "techniques": [
+          "advanced_orthodox_010_ghost_cultivator_breath_1",
+          "advanced_orthodox_010_ghost_cultivator_strike_2",
+          "advanced_orthodox_010_ghost_cultivator_step_3"
+        ],
+        "generated_advanced_catalog": true
+      },
+      "advanced_orthodox_011_ghost_cultivator": {
+        "name": "Iron Mountain Canon — Ghost Cultivator 11",
+        "item_id": "advanced_orthodox_011_ghost_cultivator_manual",
+        "alignment": "Orthodox",
+        "path": "Ghost Cultivator",
+        "grade": "Heaven",
+        "element": "Metal",
+        "min_realm_index": 16,
+        "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
+        "techniques": [
+          "advanced_orthodox_011_ghost_cultivator_strike_1",
+          "advanced_orthodox_011_ghost_cultivator_step_2",
+          "advanced_orthodox_011_ghost_cultivator_guard_3"
+        ],
+        "generated_advanced_catalog": true
+      },
+      "advanced_orthodox_012_ghost_cultivator": {
+        "name": "Clear Sky Canon — Ghost Cultivator 12",
+        "item_id": "advanced_orthodox_012_ghost_cultivator_manual",
+        "alignment": "Orthodox",
+        "path": "Ghost Cultivator",
+        "grade": "Heaven",
+        "element": "Wind",
+        "min_realm_index": 16,
+        "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
+        "techniques": [
+          "advanced_orthodox_012_ghost_cultivator_step_1",
+          "advanced_orthodox_012_ghost_cultivator_guard_2",
+          "advanced_orthodox_012_ghost_cultivator_seal_3"
+        ],
+        "generated_advanced_catalog": true
+      },
+      "advanced_orthodox_013_ghost_cultivator": {
+        "name": "Void Lantern Canon — Ghost Cultivator 13",
+        "item_id": "advanced_orthodox_013_ghost_cultivator_manual",
+        "alignment": "Neutral",
+        "path": "Ghost Cultivator",
+        "grade": "Heaven",
+        "element": "Void",
+        "min_realm_index": 18,
+        "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
+        "techniques": [
+          "advanced_orthodox_013_ghost_cultivator_guard_1",
+          "advanced_orthodox_013_ghost_cultivator_seal_2",
+          "advanced_orthodox_013_ghost_cultivator_wave_3"
+        ],
+        "generated_advanced_catalog": true
+      },
+      "advanced_orthodox_014_ghost_cultivator": {
+        "name": "Dragon Gate Canon — Ghost Cultivator 14",
+        "item_id": "advanced_orthodox_014_ghost_cultivator_manual",
+        "alignment": "Orthodox",
+        "path": "Ghost Cultivator",
+        "grade": "Heaven",
+        "element": "Earth",
+        "min_realm_index": 20,
+        "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
+        "techniques": [
+          "advanced_orthodox_014_ghost_cultivator_seal_1",
+          "advanced_orthodox_014_ghost_cultivator_wave_2",
+          "advanced_orthodox_014_ghost_cultivator_edge_3"
+        ],
+        "generated_advanced_catalog": true
+      },
+      "advanced_orthodox_015_ghost_cultivator": {
+        "name": "Phoenix Feather Canon — Ghost Cultivator 15",
+        "item_id": "advanced_orthodox_015_ghost_cultivator_manual",
+        "alignment": "Orthodox",
+        "path": "Ghost Cultivator",
+        "grade": "Heaven",
+        "element": "Fire",
+        "min_realm_index": 22,
+        "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
+        "techniques": [
+          "advanced_orthodox_015_ghost_cultivator_wave_1",
+          "advanced_orthodox_015_ghost_cultivator_edge_2",
+          "advanced_orthodox_015_ghost_cultivator_palm_3"
+        ],
+        "generated_advanced_catalog": true
+      },
+      "advanced_orthodox_016_ghost_cultivator": {
+        "name": "Radiant Sun Canon — Ghost Cultivator 16",
+        "item_id": "advanced_orthodox_016_ghost_cultivator_manual",
+        "alignment": "Orthodox",
+        "path": "Ghost Cultivator",
+        "grade": "Immortal",
+        "element": "Yang",
+        "min_realm_index": 24,
+        "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
+        "techniques": [
+          "advanced_orthodox_016_ghost_cultivator_edge_1",
+          "advanced_orthodox_016_ghost_cultivator_palm_2",
+          "advanced_orthodox_016_ghost_cultivator_thread_3"
+        ],
+        "generated_advanced_catalog": true
+      },
+      "advanced_orthodox_017_ghost_cultivator": {
+        "name": "Frost Moon Canon — Ghost Cultivator 17",
+        "item_id": "advanced_orthodox_017_ghost_cultivator_manual",
+        "alignment": "Neutral",
+        "path": "Ghost Cultivator",
+        "grade": "Immortal",
+        "element": "Ice",
+        "min_realm_index": 26,
+        "description": "A complete cultivation inheritance with progressively unlocked named combat arts.",
+        "techniques": [
+          "advanced_orthodox_017_ghost_cultivator_palm_1",
+          "advanced_orthodox_017_ghost_cultivator_thread_2",
+          "advanced_orthodox_017_ghost_cultivator_domain_3"
+        ],
+        "generated_advanced_catalog": true
+      },
+      "eastern_gate_remnant_form": {
+        "name": "Eastern Gate Remnant Form",
+        "item_id": "eastern_gate_remnant_form_manual",
+        "alignment": "Orthodox",
+        "path": "Any",
+        "grade": "Mortal",
+        "element": "Water",
+        "min_realm_index": 0,
+        "description": "What the clan still teaches of the form it held the eastern gate with, minus the three movements that needed the sword that was broken.",
+        "techniques": [
+          "eastern_gate_remnant_form_held_stance",
+          "eastern_gate_remnant_form_gate_breath",
+          "eastern_gate_remnant_form_remembered_word"
+        ]
+      },
+      "grave_watch_vigil_record": {
+        "name": "Grave-Watch Vigil Record",
+        "item_id": "grave_watch_vigil_record_manual",
+        "alignment": "Neutral",
+        "path": "Any",
+        "grade": "Mortal",
+        "element": "Fire",
+        "min_realm_index": 0,
+        "description": "Two hundred years of standing still in the dark, written down by people who knew the thieves by name.",
+        "techniques": [
+          "grave_watch_vigil_record_lantern_low",
+          "grave_watch_vigil_record_long_vigil",
+          "grave_watch_vigil_record_cousins_name"
+        ]
+      },
+      "hungry_season_tempering_record": {
+        "name": "Hungry Season Tempering Record",
+        "item_id": "hungry_season_tempering_record_manual",
+        "alignment": "Orthodox",
+        "path": "Any",
+        "grade": "Mortal",
+        "element": "Water",
+        "min_realm_index": 0,
+        "description": "The tempering that cost a household a winter and a son, written out afterwards so that it need never cost that much again.",
+        "techniques": [
+          "hungry_season_tempering_record_season_grip",
+          "hungry_season_tempering_record_standing_up",
+          "hungry_season_tempering_record_fed_first"
+        ]
+      },
+      "stick_in_the_mud_array_primer": {
+        "name": "Stick-in-the-Mud Array Primer",
+        "item_id": "stick_in_the_mud_array_primer_manual",
+        "alignment": "Orthodox",
+        "path": "Any",
+        "grade": "Mortal",
+        "element": "Earth",
+        "min_realm_index": 0,
+        "description": "The border array a widow of this house drew with a stick, taught exactly as she drew it because nobody has been allowed to move a line of it since.",
+        "techniques": [
+          "stick_in_the_mud_array_primer_mud_line",
+          "stick_in_the_mud_array_primer_wall_breath",
+          "stick_in_the_mud_array_primer_second_incursion"
+        ]
+      },
+      "unfamous_house_method": {
+        "name": "Unfamous House Method",
+        "item_id": "unfamous_house_method_manual",
+        "alignment": "Orthodox",
+        "path": "Any",
+        "grade": "Mortal",
+        "element": "Earth",
+        "min_realm_index": 0,
+        "description": "A complete martial foundation with nothing memorable in it, which was the entire point and is written on the wall in the front room.",
+        "techniques": [
+          "unfamous_house_method_plain_strike",
+          "unfamous_house_method_quiet_recovery",
+          "unfamous_house_method_unchallenged"
+        ]
+      },
+      "river_ford_spear_canon": {
+        "name": "River Ford Spear Canon",
+        "item_id": "river_ford_spear_canon_manual",
+        "alignment": "Orthodox",
+        "path": "Any",
+        "grade": "Mortal",
+        "element": "Water",
+        "min_realm_index": 0,
+        "description": "Eleven spears held a ford until the town woke up. Two of them lived long enough to write this, and it is mostly about the waiting.",
+        "techniques": [
+          "river_ford_spear_canon_ford_thrust",
+          "river_ford_spear_canon_hold_the_shallows",
+          "river_ford_spear_canon_until_morning"
+        ]
+      },
+      "left_hand_forge_canon": {
+        "name": "Left-Hand Forge Canon",
+        "item_id": "left_hand_forge_canon_manual",
+        "alignment": "Orthodox",
+        "path": "Any",
+        "grade": "Mortal",
+        "element": "Fire",
+        "min_realm_index": 0,
+        "description": "Founded by a swordsman who lost his right hand and learned to forge with his left rather than stop touching swords. Taught left-handed to everyone, on purpose.",
+        "techniques": [
+          "left_hand_forge_canon_wrong_hand",
+          "left_hand_forge_canon_fuller_rest",
+          "left_hand_forge_canon_hand_you_have"
+        ]
+      },
+      "unaccepted_fan_primer": {
+        "name": "Unaccepted Fan Primer",
+        "item_id": "unaccepted_fan_primer_manual",
+        "alignment": "Neutral",
+        "path": "Any",
+        "grade": "Mortal",
+        "element": "Fire",
+        "min_realm_index": 0,
+        "description": "Three generations uncaught, which is not the same as three generations unsuspected. The primer is mostly about the difference.",
+        "techniques": [
+          "unaccepted_fan_primer_sleeve_measure",
+          "unaccepted_fan_primer_nothing_shown",
+          "unaccepted_fan_primer_went_home_with"
+        ]
+      },
+      "no_crest_blade_record": {
+        "name": "No-Crest Blade Record",
+        "item_id": "no_crest_blade_record_manual",
+        "alignment": "Neutral",
+        "path": "Any",
+        "grade": "Mortal",
+        "element": "Metal",
+        "min_realm_index": 0,
+        "description": "The founder made swords for both sides of a sect war and was executed by the winners. The house has put nobody's crest on anything since, and teaches why first.",
+        "techniques": [
+          "no_crest_blade_record_plain_blade",
+          "no_crest_blade_record_both_sides",
+          "no_crest_blade_record_no_crest"
+        ]
+      },
+      "back_room_ledger_primer": {
+        "name": "Back Room Ledger Primer",
+        "item_id": "back_room_ledger_primer_manual",
+        "alignment": "Neutral",
+        "path": "Any",
+        "grade": "Mortal",
+        "element": "Metal",
+        "min_realm_index": 0,
+        "description": "A respectable ink-seller's teaching with eighty years of a different trade written in the margins, in the same hand.",
+        "techniques": [
+          "back_room_ledger_primer_two_ledgers",
+          "back_room_ledger_primer_paid_in_kind",
+          "back_room_ledger_primer_without_receipts"
+        ]
+      },
+      "first_contract_array": {
+        "name": "First Contract Array",
+        "item_id": "first_contract_array_manual",
+        "alignment": "Orthodox",
+        "path": "Any",
+        "grade": "Mortal",
+        "element": "Earth",
+        "min_realm_index": 0,
+        "description": "The first contract was a coffin, carried three hundred li down a road that was closed. It arrived. Every contract since has been the same contract.",
+        "techniques": [
+          "first_contract_array_closed_road",
+          "first_contract_array_three_hundred_li",
+          "first_contract_array_it_arrived"
+        ]
+      },
+      "one_in_ten_furnace_record": {
+        "name": "One-in-Ten Furnace Record",
+        "item_id": "one_in_ten_furnace_record_manual",
+        "alignment": "Orthodox",
+        "path": "Any",
+        "grade": "Mortal",
+        "element": "Fire",
+        "min_realm_index": 0,
+        "description": "The house made its fortune on a fever cure and nearly lost it on the same cure. It has thrown away one batch in ten ever since, and teaches the throwing away first.",
+        "techniques": [
+          "one_in_ten_furnace_record_low_flame",
+          "one_in_ten_furnace_record_tested_batch",
+          "one_in_ten_furnace_record_one_in_ten"
+        ]
+      },
+      "gate_without_asking_canon": {
+        "name": "Gate Without Asking Canon",
+        "item_id": "gate_without_asking_canon_manual",
+        "alignment": "Orthodox",
+        "path": "Any",
+        "grade": "Mortal",
+        "element": "Water",
+        "min_realm_index": 0,
+        "description": "Given to the clan's founder by an emperor who needed a family that would guard a gate without asking what was behind it. The canon does not say either.",
+        "techniques": [
+          "gate_without_asking_canon_qin_draw",
+          "gate_without_asking_canon_standing_post",
+          "gate_without_asking_canon_not_asking"
         ]
       }
     },
@@ -44767,13 +45696,2049 @@
           "melee"
         ],
         "description": "A crushing downward strike that carries the pit's cold."
+      },
+      "advanced_demonic_001_ghost_cultivator_strike_1": {
+        "name": "Blood Moon Forbidden Scripture Strike 1",
+        "manual": "advanced_demonic_001_ghost_cultivator",
+        "min_mastery": 0,
+        "qi_cost": 2,
+        "vitality_cost": 1,
+        "damage": 4,
+        "heal": 0,
+        "suppress_turns": 0,
+        "karma_cost": 1,
+        "exposure": 3,
+        "tags": [
+          "ghost",
+          "mortal",
+          "demonic",
+          "forbidden"
+        ],
+        "description": "A forbidden ghost cultivator art that trades karmic safety for immediate power."
+      },
+      "advanced_demonic_001_ghost_cultivator_step_2": {
+        "name": "Blood Moon Forbidden Scripture Step 2",
+        "manual": "advanced_demonic_001_ghost_cultivator",
+        "min_mastery": 0,
+        "qi_cost": 3,
+        "vitality_cost": 0,
+        "damage": 4,
+        "heal": 0,
+        "suppress_turns": 1,
+        "karma_cost": 1,
+        "exposure": 4,
+        "tags": [
+          "ghost",
+          "mortal",
+          "control",
+          "demonic",
+          "forbidden"
+        ],
+        "description": "A forbidden ghost cultivator art that trades karmic safety for immediate power."
+      },
+      "advanced_demonic_001_ghost_cultivator_guard_3": {
+        "name": "Blood Moon Forbidden Scripture Guard 3",
+        "manual": "advanced_demonic_001_ghost_cultivator",
+        "min_mastery": 1,
+        "qi_cost": 4,
+        "vitality_cost": 0,
+        "damage": 4,
+        "heal": 3,
+        "suppress_turns": 0,
+        "karma_cost": 1,
+        "exposure": 5,
+        "tags": [
+          "ghost",
+          "mortal",
+          "recovery",
+          "demonic",
+          "forbidden"
+        ],
+        "description": "A forbidden ghost cultivator art that trades karmic safety for immediate power."
+      },
+      "advanced_demonic_001_ghost_cultivator_seal_4": {
+        "name": "Blood Moon Forbidden Scripture Seal 4",
+        "manual": "advanced_demonic_001_ghost_cultivator",
+        "min_mastery": 1,
+        "qi_cost": 7,
+        "vitality_cost": 1,
+        "damage": 12,
+        "heal": 0,
+        "suppress_turns": 0,
+        "karma_cost": 2,
+        "exposure": 6,
+        "tags": [
+          "ghost",
+          "mortal",
+          "burst",
+          "demonic",
+          "forbidden"
+        ],
+        "description": "A forbidden ghost cultivator art that trades karmic safety for immediate power."
+      },
+      "advanced_demonic_002_ghost_cultivator_step_1": {
+        "name": "Soul Furnace Forbidden Scripture Step 1",
+        "manual": "advanced_demonic_002_ghost_cultivator",
+        "min_mastery": 0,
+        "qi_cost": 2,
+        "vitality_cost": 1,
+        "damage": 4,
+        "heal": 0,
+        "suppress_turns": 0,
+        "karma_cost": 1,
+        "exposure": 3,
+        "tags": [
+          "ghost",
+          "mortal",
+          "demonic",
+          "forbidden"
+        ],
+        "description": "A forbidden ghost cultivator art that trades karmic safety for immediate power."
+      },
+      "advanced_demonic_002_ghost_cultivator_guard_2": {
+        "name": "Soul Furnace Forbidden Scripture Guard 2",
+        "manual": "advanced_demonic_002_ghost_cultivator",
+        "min_mastery": 0,
+        "qi_cost": 3,
+        "vitality_cost": 0,
+        "damage": 4,
+        "heal": 0,
+        "suppress_turns": 1,
+        "karma_cost": 1,
+        "exposure": 4,
+        "tags": [
+          "ghost",
+          "mortal",
+          "control",
+          "demonic",
+          "forbidden"
+        ],
+        "description": "A forbidden ghost cultivator art that trades karmic safety for immediate power."
+      },
+      "advanced_demonic_002_ghost_cultivator_seal_3": {
+        "name": "Soul Furnace Forbidden Scripture Seal 3",
+        "manual": "advanced_demonic_002_ghost_cultivator",
+        "min_mastery": 1,
+        "qi_cost": 4,
+        "vitality_cost": 0,
+        "damage": 4,
+        "heal": 3,
+        "suppress_turns": 0,
+        "karma_cost": 1,
+        "exposure": 5,
+        "tags": [
+          "ghost",
+          "mortal",
+          "recovery",
+          "demonic",
+          "forbidden"
+        ],
+        "description": "A forbidden ghost cultivator art that trades karmic safety for immediate power."
+      },
+      "advanced_demonic_002_ghost_cultivator_wave_4": {
+        "name": "Soul Furnace Forbidden Scripture Wave 4",
+        "manual": "advanced_demonic_002_ghost_cultivator",
+        "min_mastery": 1,
+        "qi_cost": 7,
+        "vitality_cost": 1,
+        "damage": 12,
+        "heal": 0,
+        "suppress_turns": 0,
+        "karma_cost": 2,
+        "exposure": 6,
+        "tags": [
+          "ghost",
+          "mortal",
+          "burst",
+          "demonic",
+          "forbidden"
+        ],
+        "description": "A forbidden ghost cultivator art that trades karmic safety for immediate power."
+      },
+      "advanced_demonic_003_ghost_cultivator_guard_1": {
+        "name": "White Bone Forbidden Scripture Guard 1",
+        "manual": "advanced_demonic_003_ghost_cultivator",
+        "min_mastery": 0,
+        "qi_cost": 4,
+        "vitality_cost": 1,
+        "damage": 7,
+        "heal": 0,
+        "suppress_turns": 0,
+        "karma_cost": 2,
+        "exposure": 4,
+        "tags": [
+          "ghost",
+          "spiritual",
+          "demonic",
+          "forbidden"
+        ],
+        "description": "A forbidden ghost cultivator art that trades karmic safety for immediate power."
+      },
+      "advanced_demonic_003_ghost_cultivator_seal_2": {
+        "name": "White Bone Forbidden Scripture Seal 2",
+        "manual": "advanced_demonic_003_ghost_cultivator",
+        "min_mastery": 0,
+        "qi_cost": 5,
+        "vitality_cost": 0,
+        "damage": 7,
+        "heal": 0,
+        "suppress_turns": 1,
+        "karma_cost": 2,
+        "exposure": 5,
+        "tags": [
+          "ghost",
+          "spiritual",
+          "control",
+          "demonic",
+          "forbidden"
+        ],
+        "description": "A forbidden ghost cultivator art that trades karmic safety for immediate power."
+      },
+      "advanced_demonic_003_ghost_cultivator_wave_3": {
+        "name": "White Bone Forbidden Scripture Wave 3",
+        "manual": "advanced_demonic_003_ghost_cultivator",
+        "min_mastery": 1,
+        "qi_cost": 6,
+        "vitality_cost": 0,
+        "damage": 5,
+        "heal": 4,
+        "suppress_turns": 0,
+        "karma_cost": 2,
+        "exposure": 6,
+        "tags": [
+          "ghost",
+          "spiritual",
+          "recovery",
+          "demonic",
+          "forbidden"
+        ],
+        "description": "A forbidden ghost cultivator art that trades karmic safety for immediate power."
+      },
+      "advanced_demonic_003_ghost_cultivator_edge_4": {
+        "name": "White Bone Forbidden Scripture Edge 4",
+        "manual": "advanced_demonic_003_ghost_cultivator",
+        "min_mastery": 1,
+        "qi_cost": 9,
+        "vitality_cost": 1,
+        "damage": 15,
+        "heal": 0,
+        "suppress_turns": 0,
+        "karma_cost": 3,
+        "exposure": 7,
+        "tags": [
+          "ghost",
+          "spiritual",
+          "burst",
+          "demonic",
+          "forbidden"
+        ],
+        "description": "A forbidden ghost cultivator art that trades karmic safety for immediate power."
+      },
+      "advanced_demonic_004_ghost_cultivator_seal_1": {
+        "name": "Abyss Maw Forbidden Scripture Seal 1",
+        "manual": "advanced_demonic_004_ghost_cultivator",
+        "min_mastery": 0,
+        "qi_cost": 4,
+        "vitality_cost": 1,
+        "damage": 7,
+        "heal": 0,
+        "suppress_turns": 0,
+        "karma_cost": 2,
+        "exposure": 4,
+        "tags": [
+          "ghost",
+          "spiritual",
+          "demonic",
+          "forbidden"
+        ],
+        "description": "A forbidden ghost cultivator art that trades karmic safety for immediate power."
+      },
+      "advanced_demonic_004_ghost_cultivator_wave_2": {
+        "name": "Abyss Maw Forbidden Scripture Wave 2",
+        "manual": "advanced_demonic_004_ghost_cultivator",
+        "min_mastery": 0,
+        "qi_cost": 5,
+        "vitality_cost": 0,
+        "damage": 7,
+        "heal": 0,
+        "suppress_turns": 1,
+        "karma_cost": 2,
+        "exposure": 5,
+        "tags": [
+          "ghost",
+          "spiritual",
+          "control",
+          "demonic",
+          "forbidden"
+        ],
+        "description": "A forbidden ghost cultivator art that trades karmic safety for immediate power."
+      },
+      "advanced_demonic_004_ghost_cultivator_edge_3": {
+        "name": "Abyss Maw Forbidden Scripture Edge 3",
+        "manual": "advanced_demonic_004_ghost_cultivator",
+        "min_mastery": 1,
+        "qi_cost": 6,
+        "vitality_cost": 0,
+        "damage": 5,
+        "heal": 4,
+        "suppress_turns": 0,
+        "karma_cost": 2,
+        "exposure": 6,
+        "tags": [
+          "ghost",
+          "spiritual",
+          "recovery",
+          "demonic",
+          "forbidden"
+        ],
+        "description": "A forbidden ghost cultivator art that trades karmic safety for immediate power."
+      },
+      "advanced_demonic_004_ghost_cultivator_palm_4": {
+        "name": "Abyss Maw Forbidden Scripture Palm 4",
+        "manual": "advanced_demonic_004_ghost_cultivator",
+        "min_mastery": 1,
+        "qi_cost": 9,
+        "vitality_cost": 1,
+        "damage": 15,
+        "heal": 0,
+        "suppress_turns": 0,
+        "karma_cost": 3,
+        "exposure": 7,
+        "tags": [
+          "ghost",
+          "spiritual",
+          "burst",
+          "demonic",
+          "forbidden"
+        ],
+        "description": "A forbidden ghost cultivator art that trades karmic safety for immediate power."
+      },
+      "advanced_demonic_005_ghost_cultivator_wave_1": {
+        "name": "Corpse Lantern Forbidden Scripture Wave 1",
+        "manual": "advanced_demonic_005_ghost_cultivator",
+        "min_mastery": 0,
+        "qi_cost": 6,
+        "vitality_cost": 1,
+        "damage": 10,
+        "heal": 0,
+        "suppress_turns": 0,
+        "karma_cost": 3,
+        "exposure": 5,
+        "tags": [
+          "ghost",
+          "immortal",
+          "demonic",
+          "forbidden"
+        ],
+        "description": "A forbidden ghost cultivator art that trades karmic safety for immediate power."
+      },
+      "advanced_demonic_005_ghost_cultivator_edge_2": {
+        "name": "Corpse Lantern Forbidden Scripture Edge 2",
+        "manual": "advanced_demonic_005_ghost_cultivator",
+        "min_mastery": 0,
+        "qi_cost": 7,
+        "vitality_cost": 0,
+        "damage": 10,
+        "heal": 0,
+        "suppress_turns": 2,
+        "karma_cost": 3,
+        "exposure": 6,
+        "tags": [
+          "ghost",
+          "immortal",
+          "control",
+          "demonic",
+          "forbidden"
+        ],
+        "description": "A forbidden ghost cultivator art that trades karmic safety for immediate power."
+      },
+      "advanced_demonic_005_ghost_cultivator_palm_3": {
+        "name": "Corpse Lantern Forbidden Scripture Palm 3",
+        "manual": "advanced_demonic_005_ghost_cultivator",
+        "min_mastery": 1,
+        "qi_cost": 8,
+        "vitality_cost": 0,
+        "damage": 7,
+        "heal": 5,
+        "suppress_turns": 0,
+        "karma_cost": 3,
+        "exposure": 7,
+        "tags": [
+          "ghost",
+          "immortal",
+          "recovery",
+          "demonic",
+          "forbidden"
+        ],
+        "description": "A forbidden ghost cultivator art that trades karmic safety for immediate power."
+      },
+      "advanced_demonic_005_ghost_cultivator_thread_4": {
+        "name": "Corpse Lantern Forbidden Scripture Thread 4",
+        "manual": "advanced_demonic_005_ghost_cultivator",
+        "min_mastery": 1,
+        "qi_cost": 11,
+        "vitality_cost": 1,
+        "damage": 18,
+        "heal": 0,
+        "suppress_turns": 0,
+        "karma_cost": 4,
+        "exposure": 8,
+        "tags": [
+          "ghost",
+          "immortal",
+          "burst",
+          "demonic",
+          "forbidden"
+        ],
+        "description": "A forbidden ghost cultivator art that trades karmic safety for immediate power."
+      },
+      "advanced_demonic_006_ghost_cultivator_edge_1": {
+        "name": "Black Venom Forbidden Scripture Edge 1",
+        "manual": "advanced_demonic_006_ghost_cultivator",
+        "min_mastery": 0,
+        "qi_cost": 6,
+        "vitality_cost": 1,
+        "damage": 10,
+        "heal": 0,
+        "suppress_turns": 0,
+        "karma_cost": 3,
+        "exposure": 5,
+        "tags": [
+          "ghost",
+          "immortal",
+          "demonic",
+          "forbidden"
+        ],
+        "description": "A forbidden ghost cultivator art that trades karmic safety for immediate power."
+      },
+      "advanced_demonic_006_ghost_cultivator_palm_2": {
+        "name": "Black Venom Forbidden Scripture Palm 2",
+        "manual": "advanced_demonic_006_ghost_cultivator",
+        "min_mastery": 0,
+        "qi_cost": 7,
+        "vitality_cost": 0,
+        "damage": 10,
+        "heal": 0,
+        "suppress_turns": 2,
+        "karma_cost": 3,
+        "exposure": 6,
+        "tags": [
+          "ghost",
+          "immortal",
+          "control",
+          "demonic",
+          "forbidden"
+        ],
+        "description": "A forbidden ghost cultivator art that trades karmic safety for immediate power."
+      },
+      "advanced_demonic_006_ghost_cultivator_thread_3": {
+        "name": "Black Venom Forbidden Scripture Thread 3",
+        "manual": "advanced_demonic_006_ghost_cultivator",
+        "min_mastery": 1,
+        "qi_cost": 8,
+        "vitality_cost": 0,
+        "damage": 7,
+        "heal": 5,
+        "suppress_turns": 0,
+        "karma_cost": 3,
+        "exposure": 7,
+        "tags": [
+          "ghost",
+          "immortal",
+          "recovery",
+          "demonic",
+          "forbidden"
+        ],
+        "description": "A forbidden ghost cultivator art that trades karmic safety for immediate power."
+      },
+      "advanced_demonic_006_ghost_cultivator_domain_4": {
+        "name": "Black Venom Forbidden Scripture Domain 4",
+        "manual": "advanced_demonic_006_ghost_cultivator",
+        "min_mastery": 1,
+        "qi_cost": 11,
+        "vitality_cost": 1,
+        "damage": 18,
+        "heal": 0,
+        "suppress_turns": 0,
+        "karma_cost": 4,
+        "exposure": 8,
+        "tags": [
+          "ghost",
+          "immortal",
+          "burst",
+          "demonic",
+          "forbidden"
+        ],
+        "description": "A forbidden ghost cultivator art that trades karmic safety for immediate power."
+      },
+      "advanced_orthodox_001_ghost_cultivator_strike_1": {
+        "name": "Azure Cloud Canon Strike 1",
+        "manual": "advanced_orthodox_001_ghost_cultivator",
+        "min_mastery": 0,
+        "qi_cost": 2,
+        "vitality_cost": 0,
+        "damage": 4,
+        "heal": 0,
+        "suppress_turns": 0,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "ghost",
+          "mortal"
+        ],
+        "description": "A mortal-tier ghost cultivator technique preserved in advanced orthodox 001 ghost cultivator."
+      },
+      "advanced_orthodox_001_ghost_cultivator_step_2": {
+        "name": "Azure Cloud Canon Step 2",
+        "manual": "advanced_orthodox_001_ghost_cultivator",
+        "min_mastery": 0,
+        "qi_cost": 3,
+        "vitality_cost": 0,
+        "damage": 4,
+        "heal": 0,
+        "suppress_turns": 1,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "ghost",
+          "mortal",
+          "control"
+        ],
+        "description": "A mortal-tier ghost cultivator technique preserved in advanced orthodox 001 ghost cultivator."
+      },
+      "advanced_orthodox_001_ghost_cultivator_guard_3": {
+        "name": "Azure Cloud Canon Guard 3",
+        "manual": "advanced_orthodox_001_ghost_cultivator",
+        "min_mastery": 1,
+        "qi_cost": 4,
+        "vitality_cost": 0,
+        "damage": 4,
+        "heal": 3,
+        "suppress_turns": 0,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "ghost",
+          "mortal",
+          "recovery"
+        ],
+        "description": "A mortal-tier ghost cultivator technique preserved in advanced orthodox 001 ghost cultivator."
+      },
+      "advanced_orthodox_002_ghost_cultivator_step_1": {
+        "name": "Golden Meridian Canon Step 1",
+        "manual": "advanced_orthodox_002_ghost_cultivator",
+        "min_mastery": 0,
+        "qi_cost": 2,
+        "vitality_cost": 0,
+        "damage": 4,
+        "heal": 0,
+        "suppress_turns": 0,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "ghost",
+          "mortal"
+        ],
+        "description": "A mortal-tier ghost cultivator technique preserved in advanced orthodox 002 ghost cultivator."
+      },
+      "advanced_orthodox_002_ghost_cultivator_guard_2": {
+        "name": "Golden Meridian Canon Guard 2",
+        "manual": "advanced_orthodox_002_ghost_cultivator",
+        "min_mastery": 0,
+        "qi_cost": 3,
+        "vitality_cost": 0,
+        "damage": 4,
+        "heal": 0,
+        "suppress_turns": 1,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "ghost",
+          "mortal",
+          "control"
+        ],
+        "description": "A mortal-tier ghost cultivator technique preserved in advanced orthodox 002 ghost cultivator."
+      },
+      "advanced_orthodox_002_ghost_cultivator_seal_3": {
+        "name": "Golden Meridian Canon Seal 3",
+        "manual": "advanced_orthodox_002_ghost_cultivator",
+        "min_mastery": 1,
+        "qi_cost": 4,
+        "vitality_cost": 0,
+        "damage": 4,
+        "heal": 3,
+        "suppress_turns": 0,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "ghost",
+          "mortal",
+          "recovery"
+        ],
+        "description": "A mortal-tier ghost cultivator technique preserved in advanced orthodox 002 ghost cultivator."
+      },
+      "advanced_orthodox_003_ghost_cultivator_guard_1": {
+        "name": "Vermilion Crane Canon Guard 1",
+        "manual": "advanced_orthodox_003_ghost_cultivator",
+        "min_mastery": 0,
+        "qi_cost": 2,
+        "vitality_cost": 0,
+        "damage": 4,
+        "heal": 0,
+        "suppress_turns": 0,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "ghost",
+          "mortal"
+        ],
+        "description": "A mortal-tier ghost cultivator technique preserved in advanced orthodox 003 ghost cultivator."
+      },
+      "advanced_orthodox_003_ghost_cultivator_seal_2": {
+        "name": "Vermilion Crane Canon Seal 2",
+        "manual": "advanced_orthodox_003_ghost_cultivator",
+        "min_mastery": 0,
+        "qi_cost": 3,
+        "vitality_cost": 0,
+        "damage": 4,
+        "heal": 0,
+        "suppress_turns": 1,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "ghost",
+          "mortal",
+          "control"
+        ],
+        "description": "A mortal-tier ghost cultivator technique preserved in advanced orthodox 003 ghost cultivator."
+      },
+      "advanced_orthodox_003_ghost_cultivator_wave_3": {
+        "name": "Vermilion Crane Canon Wave 3",
+        "manual": "advanced_orthodox_003_ghost_cultivator",
+        "min_mastery": 1,
+        "qi_cost": 4,
+        "vitality_cost": 0,
+        "damage": 4,
+        "heal": 3,
+        "suppress_turns": 0,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "ghost",
+          "mortal",
+          "recovery"
+        ],
+        "description": "A mortal-tier ghost cultivator technique preserved in advanced orthodox 003 ghost cultivator."
+      },
+      "advanced_orthodox_004_ghost_cultivator_seal_1": {
+        "name": "Jade River Canon Seal 1",
+        "manual": "advanced_orthodox_004_ghost_cultivator",
+        "min_mastery": 0,
+        "qi_cost": 2,
+        "vitality_cost": 0,
+        "damage": 4,
+        "heal": 0,
+        "suppress_turns": 0,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "ghost",
+          "mortal"
+        ],
+        "description": "A mortal-tier ghost cultivator technique preserved in advanced orthodox 004 ghost cultivator."
+      },
+      "advanced_orthodox_004_ghost_cultivator_wave_2": {
+        "name": "Jade River Canon Wave 2",
+        "manual": "advanced_orthodox_004_ghost_cultivator",
+        "min_mastery": 0,
+        "qi_cost": 3,
+        "vitality_cost": 0,
+        "damage": 4,
+        "heal": 0,
+        "suppress_turns": 1,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "ghost",
+          "mortal",
+          "control"
+        ],
+        "description": "A mortal-tier ghost cultivator technique preserved in advanced orthodox 004 ghost cultivator."
+      },
+      "advanced_orthodox_004_ghost_cultivator_edge_3": {
+        "name": "Jade River Canon Edge 3",
+        "manual": "advanced_orthodox_004_ghost_cultivator",
+        "min_mastery": 1,
+        "qi_cost": 4,
+        "vitality_cost": 0,
+        "damage": 4,
+        "heal": 3,
+        "suppress_turns": 0,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "ghost",
+          "mortal",
+          "recovery"
+        ],
+        "description": "A mortal-tier ghost cultivator technique preserved in advanced orthodox 004 ghost cultivator."
+      },
+      "advanced_orthodox_005_ghost_cultivator_wave_1": {
+        "name": "Nine Echo Canon Wave 1",
+        "manual": "advanced_orthodox_005_ghost_cultivator",
+        "min_mastery": 0,
+        "qi_cost": 2,
+        "vitality_cost": 0,
+        "damage": 4,
+        "heal": 0,
+        "suppress_turns": 0,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "ghost",
+          "mortal"
+        ],
+        "description": "A mortal-tier ghost cultivator technique preserved in advanced orthodox 005 ghost cultivator."
+      },
+      "advanced_orthodox_005_ghost_cultivator_edge_2": {
+        "name": "Nine Echo Canon Edge 2",
+        "manual": "advanced_orthodox_005_ghost_cultivator",
+        "min_mastery": 0,
+        "qi_cost": 3,
+        "vitality_cost": 0,
+        "damage": 4,
+        "heal": 0,
+        "suppress_turns": 1,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "ghost",
+          "mortal",
+          "control"
+        ],
+        "description": "A mortal-tier ghost cultivator technique preserved in advanced orthodox 005 ghost cultivator."
+      },
+      "advanced_orthodox_005_ghost_cultivator_palm_3": {
+        "name": "Nine Echo Canon Palm 3",
+        "manual": "advanced_orthodox_005_ghost_cultivator",
+        "min_mastery": 1,
+        "qi_cost": 4,
+        "vitality_cost": 0,
+        "damage": 4,
+        "heal": 3,
+        "suppress_turns": 0,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "ghost",
+          "mortal",
+          "recovery"
+        ],
+        "description": "A mortal-tier ghost cultivator technique preserved in advanced orthodox 005 ghost cultivator."
+      },
+      "advanced_orthodox_006_ghost_cultivator_edge_1": {
+        "name": "White Lotus Canon Edge 1",
+        "manual": "advanced_orthodox_006_ghost_cultivator",
+        "min_mastery": 0,
+        "qi_cost": 4,
+        "vitality_cost": 0,
+        "damage": 7,
+        "heal": 0,
+        "suppress_turns": 0,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "ghost",
+          "spiritual"
+        ],
+        "description": "A spiritual-tier ghost cultivator technique preserved in advanced orthodox 006 ghost cultivator."
+      },
+      "advanced_orthodox_006_ghost_cultivator_palm_2": {
+        "name": "White Lotus Canon Palm 2",
+        "manual": "advanced_orthodox_006_ghost_cultivator",
+        "min_mastery": 0,
+        "qi_cost": 5,
+        "vitality_cost": 0,
+        "damage": 7,
+        "heal": 0,
+        "suppress_turns": 1,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "ghost",
+          "spiritual",
+          "control"
+        ],
+        "description": "A spiritual-tier ghost cultivator technique preserved in advanced orthodox 006 ghost cultivator."
+      },
+      "advanced_orthodox_006_ghost_cultivator_thread_3": {
+        "name": "White Lotus Canon Thread 3",
+        "manual": "advanced_orthodox_006_ghost_cultivator",
+        "min_mastery": 1,
+        "qi_cost": 6,
+        "vitality_cost": 0,
+        "damage": 5,
+        "heal": 4,
+        "suppress_turns": 0,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "ghost",
+          "spiritual",
+          "recovery"
+        ],
+        "description": "A spiritual-tier ghost cultivator technique preserved in advanced orthodox 006 ghost cultivator."
+      },
+      "advanced_orthodox_007_ghost_cultivator_palm_1": {
+        "name": "Starfall Canon Palm 1",
+        "manual": "advanced_orthodox_007_ghost_cultivator",
+        "min_mastery": 0,
+        "qi_cost": 4,
+        "vitality_cost": 0,
+        "damage": 7,
+        "heal": 0,
+        "suppress_turns": 0,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "ghost",
+          "spiritual"
+        ],
+        "description": "A spiritual-tier ghost cultivator technique preserved in advanced orthodox 007 ghost cultivator."
+      },
+      "advanced_orthodox_007_ghost_cultivator_thread_2": {
+        "name": "Starfall Canon Thread 2",
+        "manual": "advanced_orthodox_007_ghost_cultivator",
+        "min_mastery": 0,
+        "qi_cost": 5,
+        "vitality_cost": 0,
+        "damage": 7,
+        "heal": 0,
+        "suppress_turns": 1,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "ghost",
+          "spiritual",
+          "control"
+        ],
+        "description": "A spiritual-tier ghost cultivator technique preserved in advanced orthodox 007 ghost cultivator."
+      },
+      "advanced_orthodox_007_ghost_cultivator_domain_3": {
+        "name": "Starfall Canon Domain 3",
+        "manual": "advanced_orthodox_007_ghost_cultivator",
+        "min_mastery": 1,
+        "qi_cost": 6,
+        "vitality_cost": 0,
+        "damage": 5,
+        "heal": 4,
+        "suppress_turns": 0,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "ghost",
+          "spiritual",
+          "recovery"
+        ],
+        "description": "A spiritual-tier ghost cultivator technique preserved in advanced orthodox 007 ghost cultivator."
+      },
+      "advanced_orthodox_008_ghost_cultivator_thread_1": {
+        "name": "Thunder Peak Canon Thread 1",
+        "manual": "advanced_orthodox_008_ghost_cultivator",
+        "min_mastery": 0,
+        "qi_cost": 4,
+        "vitality_cost": 0,
+        "damage": 7,
+        "heal": 0,
+        "suppress_turns": 0,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "ghost",
+          "spiritual"
+        ],
+        "description": "A spiritual-tier ghost cultivator technique preserved in advanced orthodox 008 ghost cultivator."
+      },
+      "advanced_orthodox_008_ghost_cultivator_domain_2": {
+        "name": "Thunder Peak Canon Domain 2",
+        "manual": "advanced_orthodox_008_ghost_cultivator",
+        "min_mastery": 0,
+        "qi_cost": 5,
+        "vitality_cost": 0,
+        "damage": 7,
+        "heal": 0,
+        "suppress_turns": 1,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "ghost",
+          "spiritual",
+          "control"
+        ],
+        "description": "A spiritual-tier ghost cultivator technique preserved in advanced orthodox 008 ghost cultivator."
+      },
+      "advanced_orthodox_008_ghost_cultivator_breath_3": {
+        "name": "Thunder Peak Canon Breath 3",
+        "manual": "advanced_orthodox_008_ghost_cultivator",
+        "min_mastery": 1,
+        "qi_cost": 6,
+        "vitality_cost": 0,
+        "damage": 5,
+        "heal": 4,
+        "suppress_turns": 0,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "ghost",
+          "spiritual",
+          "recovery"
+        ],
+        "description": "A spiritual-tier ghost cultivator technique preserved in advanced orthodox 008 ghost cultivator."
+      },
+      "advanced_orthodox_009_ghost_cultivator_domain_1": {
+        "name": "Moonshadow Canon Domain 1",
+        "manual": "advanced_orthodox_009_ghost_cultivator",
+        "min_mastery": 0,
+        "qi_cost": 4,
+        "vitality_cost": 0,
+        "damage": 7,
+        "heal": 0,
+        "suppress_turns": 0,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "ghost",
+          "spiritual"
+        ],
+        "description": "A spiritual-tier ghost cultivator technique preserved in advanced orthodox 009 ghost cultivator."
+      },
+      "advanced_orthodox_009_ghost_cultivator_breath_2": {
+        "name": "Moonshadow Canon Breath 2",
+        "manual": "advanced_orthodox_009_ghost_cultivator",
+        "min_mastery": 0,
+        "qi_cost": 5,
+        "vitality_cost": 0,
+        "damage": 7,
+        "heal": 0,
+        "suppress_turns": 1,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "ghost",
+          "spiritual",
+          "control"
+        ],
+        "description": "A spiritual-tier ghost cultivator technique preserved in advanced orthodox 009 ghost cultivator."
+      },
+      "advanced_orthodox_009_ghost_cultivator_strike_3": {
+        "name": "Moonshadow Canon Strike 3",
+        "manual": "advanced_orthodox_009_ghost_cultivator",
+        "min_mastery": 1,
+        "qi_cost": 6,
+        "vitality_cost": 0,
+        "damage": 5,
+        "heal": 4,
+        "suppress_turns": 0,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "ghost",
+          "spiritual",
+          "recovery"
+        ],
+        "description": "A spiritual-tier ghost cultivator technique preserved in advanced orthodox 009 ghost cultivator."
+      },
+      "advanced_orthodox_010_ghost_cultivator_breath_1": {
+        "name": "Heavenly Reed Canon Breath 1",
+        "manual": "advanced_orthodox_010_ghost_cultivator",
+        "min_mastery": 0,
+        "qi_cost": 4,
+        "vitality_cost": 0,
+        "damage": 7,
+        "heal": 0,
+        "suppress_turns": 0,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "ghost",
+          "spiritual"
+        ],
+        "description": "A spiritual-tier ghost cultivator technique preserved in advanced orthodox 010 ghost cultivator."
+      },
+      "advanced_orthodox_010_ghost_cultivator_strike_2": {
+        "name": "Heavenly Reed Canon Strike 2",
+        "manual": "advanced_orthodox_010_ghost_cultivator",
+        "min_mastery": 0,
+        "qi_cost": 5,
+        "vitality_cost": 0,
+        "damage": 7,
+        "heal": 0,
+        "suppress_turns": 1,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "ghost",
+          "spiritual",
+          "control"
+        ],
+        "description": "A spiritual-tier ghost cultivator technique preserved in advanced orthodox 010 ghost cultivator."
+      },
+      "advanced_orthodox_010_ghost_cultivator_step_3": {
+        "name": "Heavenly Reed Canon Step 3",
+        "manual": "advanced_orthodox_010_ghost_cultivator",
+        "min_mastery": 1,
+        "qi_cost": 6,
+        "vitality_cost": 0,
+        "damage": 5,
+        "heal": 4,
+        "suppress_turns": 0,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "ghost",
+          "spiritual",
+          "recovery"
+        ],
+        "description": "A spiritual-tier ghost cultivator technique preserved in advanced orthodox 010 ghost cultivator."
+      },
+      "advanced_orthodox_011_ghost_cultivator_strike_1": {
+        "name": "Iron Mountain Canon Strike 1",
+        "manual": "advanced_orthodox_011_ghost_cultivator",
+        "min_mastery": 0,
+        "qi_cost": 6,
+        "vitality_cost": 0,
+        "damage": 10,
+        "heal": 0,
+        "suppress_turns": 0,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "ghost",
+          "immortal"
+        ],
+        "description": "A immortal-tier ghost cultivator technique preserved in advanced orthodox 011 ghost cultivator."
+      },
+      "advanced_orthodox_011_ghost_cultivator_step_2": {
+        "name": "Iron Mountain Canon Step 2",
+        "manual": "advanced_orthodox_011_ghost_cultivator",
+        "min_mastery": 0,
+        "qi_cost": 7,
+        "vitality_cost": 0,
+        "damage": 10,
+        "heal": 0,
+        "suppress_turns": 2,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "ghost",
+          "immortal",
+          "control"
+        ],
+        "description": "A immortal-tier ghost cultivator technique preserved in advanced orthodox 011 ghost cultivator."
+      },
+      "advanced_orthodox_011_ghost_cultivator_guard_3": {
+        "name": "Iron Mountain Canon Guard 3",
+        "manual": "advanced_orthodox_011_ghost_cultivator",
+        "min_mastery": 1,
+        "qi_cost": 8,
+        "vitality_cost": 0,
+        "damage": 7,
+        "heal": 5,
+        "suppress_turns": 0,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "ghost",
+          "immortal",
+          "recovery"
+        ],
+        "description": "A immortal-tier ghost cultivator technique preserved in advanced orthodox 011 ghost cultivator."
+      },
+      "advanced_orthodox_012_ghost_cultivator_step_1": {
+        "name": "Clear Sky Canon Step 1",
+        "manual": "advanced_orthodox_012_ghost_cultivator",
+        "min_mastery": 0,
+        "qi_cost": 6,
+        "vitality_cost": 0,
+        "damage": 10,
+        "heal": 0,
+        "suppress_turns": 0,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "ghost",
+          "immortal"
+        ],
+        "description": "A immortal-tier ghost cultivator technique preserved in advanced orthodox 012 ghost cultivator."
+      },
+      "advanced_orthodox_012_ghost_cultivator_guard_2": {
+        "name": "Clear Sky Canon Guard 2",
+        "manual": "advanced_orthodox_012_ghost_cultivator",
+        "min_mastery": 0,
+        "qi_cost": 7,
+        "vitality_cost": 0,
+        "damage": 10,
+        "heal": 0,
+        "suppress_turns": 2,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "ghost",
+          "immortal",
+          "control"
+        ],
+        "description": "A immortal-tier ghost cultivator technique preserved in advanced orthodox 012 ghost cultivator."
+      },
+      "advanced_orthodox_012_ghost_cultivator_seal_3": {
+        "name": "Clear Sky Canon Seal 3",
+        "manual": "advanced_orthodox_012_ghost_cultivator",
+        "min_mastery": 1,
+        "qi_cost": 8,
+        "vitality_cost": 0,
+        "damage": 7,
+        "heal": 5,
+        "suppress_turns": 0,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "ghost",
+          "immortal",
+          "recovery"
+        ],
+        "description": "A immortal-tier ghost cultivator technique preserved in advanced orthodox 012 ghost cultivator."
+      },
+      "advanced_orthodox_013_ghost_cultivator_guard_1": {
+        "name": "Void Lantern Canon Guard 1",
+        "manual": "advanced_orthodox_013_ghost_cultivator",
+        "min_mastery": 0,
+        "qi_cost": 6,
+        "vitality_cost": 0,
+        "damage": 10,
+        "heal": 0,
+        "suppress_turns": 0,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "ghost",
+          "immortal"
+        ],
+        "description": "A immortal-tier ghost cultivator technique preserved in advanced orthodox 013 ghost cultivator."
+      },
+      "advanced_orthodox_013_ghost_cultivator_seal_2": {
+        "name": "Void Lantern Canon Seal 2",
+        "manual": "advanced_orthodox_013_ghost_cultivator",
+        "min_mastery": 0,
+        "qi_cost": 7,
+        "vitality_cost": 0,
+        "damage": 10,
+        "heal": 0,
+        "suppress_turns": 2,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "ghost",
+          "immortal",
+          "control"
+        ],
+        "description": "A immortal-tier ghost cultivator technique preserved in advanced orthodox 013 ghost cultivator."
+      },
+      "advanced_orthodox_013_ghost_cultivator_wave_3": {
+        "name": "Void Lantern Canon Wave 3",
+        "manual": "advanced_orthodox_013_ghost_cultivator",
+        "min_mastery": 1,
+        "qi_cost": 8,
+        "vitality_cost": 0,
+        "damage": 7,
+        "heal": 5,
+        "suppress_turns": 0,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "ghost",
+          "immortal",
+          "recovery"
+        ],
+        "description": "A immortal-tier ghost cultivator technique preserved in advanced orthodox 013 ghost cultivator."
+      },
+      "advanced_orthodox_014_ghost_cultivator_seal_1": {
+        "name": "Dragon Gate Canon Seal 1",
+        "manual": "advanced_orthodox_014_ghost_cultivator",
+        "min_mastery": 0,
+        "qi_cost": 6,
+        "vitality_cost": 0,
+        "damage": 10,
+        "heal": 0,
+        "suppress_turns": 0,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "ghost",
+          "immortal"
+        ],
+        "description": "A immortal-tier ghost cultivator technique preserved in advanced orthodox 014 ghost cultivator."
+      },
+      "advanced_orthodox_014_ghost_cultivator_wave_2": {
+        "name": "Dragon Gate Canon Wave 2",
+        "manual": "advanced_orthodox_014_ghost_cultivator",
+        "min_mastery": 0,
+        "qi_cost": 7,
+        "vitality_cost": 0,
+        "damage": 10,
+        "heal": 0,
+        "suppress_turns": 2,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "ghost",
+          "immortal",
+          "control"
+        ],
+        "description": "A immortal-tier ghost cultivator technique preserved in advanced orthodox 014 ghost cultivator."
+      },
+      "advanced_orthodox_014_ghost_cultivator_edge_3": {
+        "name": "Dragon Gate Canon Edge 3",
+        "manual": "advanced_orthodox_014_ghost_cultivator",
+        "min_mastery": 1,
+        "qi_cost": 8,
+        "vitality_cost": 0,
+        "damage": 7,
+        "heal": 5,
+        "suppress_turns": 0,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "ghost",
+          "immortal",
+          "recovery"
+        ],
+        "description": "A immortal-tier ghost cultivator technique preserved in advanced orthodox 014 ghost cultivator."
+      },
+      "advanced_orthodox_015_ghost_cultivator_wave_1": {
+        "name": "Phoenix Feather Canon Wave 1",
+        "manual": "advanced_orthodox_015_ghost_cultivator",
+        "min_mastery": 0,
+        "qi_cost": 6,
+        "vitality_cost": 0,
+        "damage": 10,
+        "heal": 0,
+        "suppress_turns": 0,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "ghost",
+          "immortal"
+        ],
+        "description": "A immortal-tier ghost cultivator technique preserved in advanced orthodox 015 ghost cultivator."
+      },
+      "advanced_orthodox_015_ghost_cultivator_edge_2": {
+        "name": "Phoenix Feather Canon Edge 2",
+        "manual": "advanced_orthodox_015_ghost_cultivator",
+        "min_mastery": 0,
+        "qi_cost": 7,
+        "vitality_cost": 0,
+        "damage": 10,
+        "heal": 0,
+        "suppress_turns": 2,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "ghost",
+          "immortal",
+          "control"
+        ],
+        "description": "A immortal-tier ghost cultivator technique preserved in advanced orthodox 015 ghost cultivator."
+      },
+      "advanced_orthodox_015_ghost_cultivator_palm_3": {
+        "name": "Phoenix Feather Canon Palm 3",
+        "manual": "advanced_orthodox_015_ghost_cultivator",
+        "min_mastery": 1,
+        "qi_cost": 8,
+        "vitality_cost": 0,
+        "damage": 7,
+        "heal": 5,
+        "suppress_turns": 0,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "ghost",
+          "immortal",
+          "recovery"
+        ],
+        "description": "A immortal-tier ghost cultivator technique preserved in advanced orthodox 015 ghost cultivator."
+      },
+      "advanced_orthodox_016_ghost_cultivator_edge_1": {
+        "name": "Radiant Sun Canon Edge 1",
+        "manual": "advanced_orthodox_016_ghost_cultivator",
+        "min_mastery": 0,
+        "qi_cost": 8,
+        "vitality_cost": 0,
+        "damage": 13,
+        "heal": 0,
+        "suppress_turns": 0,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "ghost",
+          "celestial"
+        ],
+        "description": "A celestial-tier ghost cultivator technique preserved in advanced orthodox 016 ghost cultivator."
+      },
+      "advanced_orthodox_016_ghost_cultivator_palm_2": {
+        "name": "Radiant Sun Canon Palm 2",
+        "manual": "advanced_orthodox_016_ghost_cultivator",
+        "min_mastery": 0,
+        "qi_cost": 9,
+        "vitality_cost": 0,
+        "damage": 13,
+        "heal": 0,
+        "suppress_turns": 2,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "ghost",
+          "celestial",
+          "control"
+        ],
+        "description": "A celestial-tier ghost cultivator technique preserved in advanced orthodox 016 ghost cultivator."
+      },
+      "advanced_orthodox_016_ghost_cultivator_thread_3": {
+        "name": "Radiant Sun Canon Thread 3",
+        "manual": "advanced_orthodox_016_ghost_cultivator",
+        "min_mastery": 1,
+        "qi_cost": 10,
+        "vitality_cost": 0,
+        "damage": 8,
+        "heal": 6,
+        "suppress_turns": 0,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "ghost",
+          "celestial",
+          "recovery"
+        ],
+        "description": "A celestial-tier ghost cultivator technique preserved in advanced orthodox 016 ghost cultivator."
+      },
+      "advanced_orthodox_017_ghost_cultivator_palm_1": {
+        "name": "Frost Moon Canon Palm 1",
+        "manual": "advanced_orthodox_017_ghost_cultivator",
+        "min_mastery": 0,
+        "qi_cost": 8,
+        "vitality_cost": 0,
+        "damage": 13,
+        "heal": 0,
+        "suppress_turns": 0,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "ghost",
+          "celestial"
+        ],
+        "description": "A celestial-tier ghost cultivator technique preserved in advanced orthodox 017 ghost cultivator."
+      },
+      "advanced_orthodox_017_ghost_cultivator_thread_2": {
+        "name": "Frost Moon Canon Thread 2",
+        "manual": "advanced_orthodox_017_ghost_cultivator",
+        "min_mastery": 0,
+        "qi_cost": 9,
+        "vitality_cost": 0,
+        "damage": 13,
+        "heal": 0,
+        "suppress_turns": 2,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "ghost",
+          "celestial",
+          "control"
+        ],
+        "description": "A celestial-tier ghost cultivator technique preserved in advanced orthodox 017 ghost cultivator."
+      },
+      "advanced_orthodox_017_ghost_cultivator_domain_3": {
+        "name": "Frost Moon Canon Domain 3",
+        "manual": "advanced_orthodox_017_ghost_cultivator",
+        "min_mastery": 1,
+        "qi_cost": 10,
+        "vitality_cost": 0,
+        "damage": 8,
+        "heal": 6,
+        "suppress_turns": 0,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "ghost",
+          "celestial",
+          "recovery"
+        ],
+        "description": "A celestial-tier ghost cultivator technique preserved in advanced orthodox 017 ghost cultivator."
+      },
+      "eastern_gate_remnant_form_held_stance": {
+        "name": "Held Stance",
+        "manual": "eastern_gate_remnant_form",
+        "min_mastery": 0,
+        "qi_cost": 2,
+        "vitality_cost": 0,
+        "damage": 5,
+        "heal": 0,
+        "suppress_turns": 0,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "sword",
+          "melee"
+        ],
+        "description": "The gate is not walked through. Weight back, edge level, and no step surrendered."
+      },
+      "eastern_gate_remnant_form_gate_breath": {
+        "name": "Gate Breath",
+        "manual": "eastern_gate_remnant_form",
+        "min_mastery": 1,
+        "qi_cost": 3,
+        "vitality_cost": 0,
+        "damage": 1,
+        "heal": 3,
+        "suppress_turns": 0,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "recovery",
+          "foundation"
+        ],
+        "description": "The breath four generations took between one assault and the next."
+      },
+      "eastern_gate_remnant_form_remembered_word": {
+        "name": "The Remembered Word",
+        "manual": "eastern_gate_remnant_form",
+        "min_mastery": 2,
+        "qi_cost": 3,
+        "vitality_cost": 0,
+        "damage": 3,
+        "heal": 0,
+        "suppress_turns": 1,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "sword",
+          "control"
+        ],
+        "description": "A parry the house teaches angrily, which is why it works."
+      },
+      "grave_watch_vigil_record_lantern_low": {
+        "name": "Lantern Held Low",
+        "manual": "grave_watch_vigil_record",
+        "min_mastery": 0,
+        "qi_cost": 2,
+        "vitality_cost": 0,
+        "damage": 4,
+        "heal": 0,
+        "suppress_turns": 0,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "inscription",
+          "control"
+        ],
+        "description": "Light that shows the ground and not the face above it."
+      },
+      "grave_watch_vigil_record_long_vigil": {
+        "name": "The Long Vigil",
+        "manual": "grave_watch_vigil_record",
+        "min_mastery": 1,
+        "qi_cost": 3,
+        "vitality_cost": 0,
+        "damage": 0,
+        "heal": 4,
+        "suppress_turns": 0,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "recovery",
+          "foundation"
+        ],
+        "description": "How to be awake at the fourth hour without being tired at the fifth."
+      },
+      "grave_watch_vigil_record_cousins_name": {
+        "name": "A Cousin's Name",
+        "manual": "grave_watch_vigil_record",
+        "min_mastery": 2,
+        "qi_cost": 3,
+        "vitality_cost": 0,
+        "damage": 3,
+        "heal": 0,
+        "suppress_turns": 1,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "inscription",
+          "control"
+        ],
+        "description": "A seal laid to be recognised rather than to hold, because it was usually family."
+      },
+      "hungry_season_tempering_record_season_grip": {
+        "name": "Season's Grip",
+        "manual": "hungry_season_tempering_record",
+        "min_mastery": 0,
+        "qi_cost": 2,
+        "vitality_cost": 0,
+        "damage": 5,
+        "heal": 0,
+        "suppress_turns": 0,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "body",
+          "melee"
+        ],
+        "description": "A hold learned from carrying what the house could not afford to drop."
+      },
+      "hungry_season_tempering_record_standing_up": {
+        "name": "Standing Up",
+        "manual": "hungry_season_tempering_record",
+        "min_mastery": 1,
+        "qi_cost": 3,
+        "vitality_cost": 0,
+        "damage": 1,
+        "heal": 4,
+        "suppress_turns": 0,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "recovery",
+          "body"
+        ],
+        "description": "He died standing. The house teaches the standing, and hopes to stop teaching the rest."
+      },
+      "hungry_season_tempering_record_fed_first": {
+        "name": "Fed First",
+        "manual": "hungry_season_tempering_record",
+        "min_mastery": 2,
+        "qi_cost": 3,
+        "vitality_cost": 0,
+        "damage": 2,
+        "heal": 2,
+        "suppress_turns": 1,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "alchemy",
+          "body"
+        ],
+        "description": "Which of two bodies gets the medicine, decided before either is bleeding."
+      },
+      "stick_in_the_mud_array_primer_mud_line": {
+        "name": "The Line in the Mud",
+        "manual": "stick_in_the_mud_array_primer",
+        "min_mastery": 0,
+        "qi_cost": 2,
+        "vitality_cost": 0,
+        "damage": 4,
+        "heal": 0,
+        "suppress_turns": 0,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "formation",
+          "control"
+        ],
+        "description": "One furrow, laid where the ground will hold it, in the time you actually have."
+      },
+      "stick_in_the_mud_array_primer_wall_breath": {
+        "name": "Wall Breath",
+        "manual": "stick_in_the_mud_array_primer",
+        "min_mastery": 1,
+        "qi_cost": 3,
+        "vitality_cost": 0,
+        "damage": 0,
+        "heal": 4,
+        "suppress_turns": 0,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "recovery",
+          "formation"
+        ],
+        "description": "Qi banked the way a garrison banks a fire: slowly, and for the third night."
+      },
+      "stick_in_the_mud_array_primer_second_incursion": {
+        "name": "The Second Incursion",
+        "manual": "stick_in_the_mud_array_primer",
+        "min_mastery": 2,
+        "qi_cost": 3,
+        "vitality_cost": 0,
+        "damage": 3,
+        "heal": 0,
+        "suppress_turns": 1,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "formation",
+          "control"
+        ],
+        "description": "What the family learned the year it lost half its men, which is where to stand instead."
+      },
+      "unfamous_house_method_plain_strike": {
+        "name": "Plain Strike",
+        "manual": "unfamous_house_method",
+        "min_mastery": 0,
+        "qi_cost": 2,
+        "vitality_cost": 0,
+        "damage": 5,
+        "heal": 0,
+        "suppress_turns": 0,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "melee"
+        ],
+        "description": "Nothing anybody would travel to watch. It lands."
+      },
+      "unfamous_house_method_quiet_recovery": {
+        "name": "Quiet Recovery",
+        "manual": "unfamous_house_method",
+        "min_mastery": 1,
+        "qi_cost": 3,
+        "vitality_cost": 0,
+        "damage": 1,
+        "heal": 3,
+        "suppress_turns": 0,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "recovery",
+          "foundation"
+        ],
+        "description": "Mend where you are not being looked at."
+      },
+      "unfamous_house_method_unchallenged": {
+        "name": "Unchallenged",
+        "manual": "unfamous_house_method",
+        "min_mastery": 2,
+        "qi_cost": 3,
+        "vitality_cost": 0,
+        "damage": 2,
+        "heal": 0,
+        "suppress_turns": 2,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "control"
+        ],
+        "description": "The house's oldest rule, as a technique: end it before anyone decides you are worth testing."
+      },
+      "river_ford_spear_canon_ford_thrust": {
+        "name": "Ford Thrust",
+        "manual": "river_ford_spear_canon",
+        "min_mastery": 0,
+        "qi_cost": 2,
+        "vitality_cost": 0,
+        "damage": 6,
+        "heal": 0,
+        "suppress_turns": 0,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "spear",
+          "melee"
+        ],
+        "description": "Reach, from a footing that is never quite dry."
+      },
+      "river_ford_spear_canon_hold_the_shallows": {
+        "name": "Hold the Shallows",
+        "manual": "river_ford_spear_canon",
+        "min_mastery": 1,
+        "qi_cost": 3,
+        "vitality_cost": 0,
+        "damage": 0,
+        "heal": 4,
+        "suppress_turns": 0,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "recovery",
+          "foundation"
+        ],
+        "description": "Breath taken in the one place the current does the work for you."
+      },
+      "river_ford_spear_canon_until_morning": {
+        "name": "Until Morning",
+        "manual": "river_ford_spear_canon",
+        "min_mastery": 2,
+        "qi_cost": 4,
+        "vitality_cost": 0,
+        "damage": 3,
+        "heal": 0,
+        "suppress_turns": 1,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "spear",
+          "control"
+        ],
+        "description": "Nine were buried. This is the part that is about lasting, not winning."
+      },
+      "left_hand_forge_canon_wrong_hand": {
+        "name": "The Wrong Hand",
+        "manual": "left_hand_forge_canon",
+        "min_mastery": 0,
+        "qi_cost": 2,
+        "vitality_cost": 0,
+        "damage": 5,
+        "heal": 0,
+        "suppress_turns": 0,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "sword",
+          "melee"
+        ],
+        "description": "A cut from the side nobody trains against, including you, at first."
+      },
+      "left_hand_forge_canon_fuller_rest": {
+        "name": "Fuller's Rest",
+        "manual": "left_hand_forge_canon",
+        "min_mastery": 1,
+        "qi_cost": 3,
+        "vitality_cost": 0,
+        "damage": 1,
+        "heal": 3,
+        "suppress_turns": 0,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "recovery",
+          "forging"
+        ],
+        "description": "The pause he took with a thumb in the groove, which is still nicked into every blade the hall marks."
+      },
+      "left_hand_forge_canon_hand_you_have": {
+        "name": "The Hand You Have",
+        "manual": "left_hand_forge_canon",
+        "min_mastery": 2,
+        "qi_cost": 3,
+        "vitality_cost": 0,
+        "damage": 3,
+        "heal": 0,
+        "suppress_turns": 1,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "sword",
+          "control"
+        ],
+        "description": "A guard built on the assumption that something is already missing."
+      },
+      "unaccepted_fan_primer_sleeve_measure": {
+        "name": "Sleeve Measure",
+        "manual": "unaccepted_fan_primer",
+        "min_mastery": 0,
+        "qi_cost": 2,
+        "vitality_cost": 0,
+        "damage": 4,
+        "heal": 0,
+        "suppress_turns": 0,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "inscription",
+          "concealment"
+        ],
+        "description": "Knowing to the inch what your sleeve will take before you need it to take anything."
+      },
+      "unaccepted_fan_primer_nothing_shown": {
+        "name": "Nothing Shown",
+        "manual": "unaccepted_fan_primer",
+        "min_mastery": 1,
+        "qi_cost": 3,
+        "vitality_cost": 0,
+        "damage": 0,
+        "heal": 3,
+        "suppress_turns": 0,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "recovery",
+          "concealment"
+        ],
+        "description": "Mending done at a table, in company, without a change of expression."
+      },
+      "unaccepted_fan_primer_went_home_with": {
+        "name": "He Went Home With It",
+        "manual": "unaccepted_fan_primer",
+        "min_mastery": 2,
+        "qi_cost": 3,
+        "vitality_cost": 0,
+        "damage": 3,
+        "heal": 0,
+        "suppress_turns": 1,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "inscription",
+          "control"
+        ],
+        "description": "The sect elder never remembered accepting the fan. That is the technique."
+      },
+      "no_crest_blade_record_plain_blade": {
+        "name": "The Plain Blade",
+        "manual": "no_crest_blade_record",
+        "min_mastery": 0,
+        "qi_cost": 2,
+        "vitality_cost": 0,
+        "damage": 5,
+        "heal": 0,
+        "suppress_turns": 0,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "forging",
+          "melee"
+        ],
+        "description": "The best ordinary sword in the province, used the ordinary way."
+      },
+      "no_crest_blade_record_both_sides": {
+        "name": "Both Sides",
+        "manual": "no_crest_blade_record",
+        "min_mastery": 1,
+        "qi_cost": 3,
+        "vitality_cost": 0,
+        "damage": 1,
+        "heal": 3,
+        "suppress_turns": 0,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "recovery",
+          "forging"
+        ],
+        "description": "Steel cooled evenly, because it does not know who is holding it either."
+      },
+      "no_crest_blade_record_no_crest": {
+        "name": "No Crest",
+        "manual": "no_crest_blade_record",
+        "min_mastery": 2,
+        "qi_cost": 3,
+        "vitality_cost": 0,
+        "damage": 2,
+        "heal": 0,
+        "suppress_turns": 2,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "forging",
+          "control"
+        ],
+        "description": "Decline the quarrel and keep the customer. The family is still alive; the founder is not."
+      },
+      "back_room_ledger_primer_two_ledgers": {
+        "name": "Two Ledgers",
+        "manual": "back_room_ledger_primer",
+        "min_mastery": 0,
+        "qi_cost": 2,
+        "vitality_cost": 0,
+        "damage": 4,
+        "heal": 0,
+        "suppress_turns": 0,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "inscription",
+          "concealment"
+        ],
+        "description": "Both true. Only one of them adds up in front of a stranger."
+      },
+      "back_room_ledger_primer_paid_in_kind": {
+        "name": "Paid In Kind",
+        "manual": "back_room_ledger_primer",
+        "min_mastery": 1,
+        "qi_cost": 3,
+        "vitality_cost": 0,
+        "damage": 0,
+        "heal": 3,
+        "suppress_turns": 0,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "recovery",
+          "inscription"
+        ],
+        "description": "The house's own restorative, invented because a physician asks where the money came from."
+      },
+      "back_room_ledger_primer_without_receipts": {
+        "name": "Without Receipts",
+        "manual": "back_room_ledger_primer",
+        "min_mastery": 2,
+        "qi_cost": 3,
+        "vitality_cost": 0,
+        "damage": 3,
+        "heal": 0,
+        "suppress_turns": 1,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "inscription",
+          "control"
+        ],
+        "description": "A seal that holds a thing shut and records nothing about what it was."
+      },
+      "first_contract_array_closed_road": {
+        "name": "The Closed Road",
+        "manual": "first_contract_array",
+        "min_mastery": 0,
+        "qi_cost": 2,
+        "vitality_cost": 0,
+        "damage": 4,
+        "heal": 0,
+        "suppress_turns": 0,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "formation",
+          "control"
+        ],
+        "description": "Lines laid at a halt, by people who expect to be moving again before they are finished."
+      },
+      "first_contract_array_three_hundred_li": {
+        "name": "Three Hundred Li",
+        "manual": "first_contract_array",
+        "min_mastery": 1,
+        "qi_cost": 3,
+        "vitality_cost": 0,
+        "damage": 0,
+        "heal": 4,
+        "suppress_turns": 0,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "recovery",
+          "formation"
+        ],
+        "description": "Recovery measured in distance rather than in hours, because the cargo does not stop."
+      },
+      "first_contract_array_it_arrived": {
+        "name": "It Arrived",
+        "manual": "first_contract_array",
+        "min_mastery": 2,
+        "qi_cost": 4,
+        "vitality_cost": 0,
+        "damage": 2,
+        "heal": 0,
+        "suppress_turns": 2,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "formation",
+          "control"
+        ],
+        "description": "The whole of the family's reputation, which is that the answer is always this one."
+      },
+      "one_in_ten_furnace_record_low_flame": {
+        "name": "Low Flame",
+        "manual": "one_in_ten_furnace_record",
+        "min_mastery": 0,
+        "qi_cost": 2,
+        "vitality_cost": 0,
+        "damage": 4,
+        "heal": 0,
+        "suppress_turns": 0,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "alchemy",
+          "control"
+        ],
+        "description": "The heat the fever cure actually wanted, which is less than it looks like it wants."
+      },
+      "one_in_ten_furnace_record_tested_batch": {
+        "name": "The Tested Batch",
+        "manual": "one_in_ten_furnace_record",
+        "min_mastery": 1,
+        "qi_cost": 3,
+        "vitality_cost": 0,
+        "damage": 0,
+        "heal": 4,
+        "suppress_turns": 0,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "recovery",
+          "alchemy"
+        ],
+        "description": "A restorative nobody in this house will hand you untasted."
+      },
+      "one_in_ten_furnace_record_one_in_ten": {
+        "name": "One in Ten",
+        "manual": "one_in_ten_furnace_record",
+        "min_mastery": 2,
+        "qi_cost": 3,
+        "vitality_cost": 0,
+        "damage": 2,
+        "heal": 2,
+        "suppress_turns": 1,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "alchemy",
+          "control"
+        ],
+        "description": "Recognising the batch to destroy. The family paid for this one at a funeral."
+      },
+      "gate_without_asking_canon_qin_draw": {
+        "name": "The Qin Draw",
+        "manual": "gate_without_asking_canon",
+        "min_mastery": 0,
+        "qi_cost": 2,
+        "vitality_cost": 0,
+        "damage": 6,
+        "heal": 0,
+        "suppress_turns": 0,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "sword",
+          "melee"
+        ],
+        "description": "A formal opening, taught to children of this house before they can lift the sword it was written for."
+      },
+      "gate_without_asking_canon_standing_post": {
+        "name": "Standing Post",
+        "manual": "gate_without_asking_canon",
+        "min_mastery": 1,
+        "qi_cost": 3,
+        "vitality_cost": 0,
+        "damage": 1,
+        "heal": 4,
+        "suppress_turns": 0,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "recovery",
+          "foundation"
+        ],
+        "description": "The clan's own restorative stance, held at a door for an entire watch."
+      },
+      "gate_without_asking_canon_not_asking": {
+        "name": "Not Asking",
+        "manual": "gate_without_asking_canon",
+        "min_mastery": 2,
+        "qi_cost": 4,
+        "vitality_cost": 0,
+        "damage": 3,
+        "heal": 0,
+        "suppress_turns": 1,
+        "karma_cost": 0,
+        "exposure": 1,
+        "tags": [
+          "sword",
+          "control"
+        ],
+        "description": "A guard that faces outward and is never, ever turned round."
       }
     },
     "catalog_contract": {
-      "manuals": 160,
-      "techniques": 564,
-      "demonic_manuals": 46,
-      "demonic_techniques": 172
+      "manuals": 196,
+      "techniques": 678,
+      "demonic_manuals": 52,
+      "demonic_techniques": 196
     }
   },
   "commission_givers": {
@@ -63493,6 +66458,11 @@
       }
     }
   },
+  "vitality_recovery": {
+    "description": "A body mends on its own. Vitality comes back as a share of the cultivator's own maximum per world day, so the same wound costs the same number of days at every realm - what changes with cultivation is how much that share is worth. Nothing about where they rest enters into it: how good a place is to sit in is what the cultivation multiplier already says, and a second statement of it here would be free to disagree.",
+    "percent_per_game_day": 25,
+    "minutes_per_game_day": 1440
+  },
   "death_qi_system": {
     "path": "Ghost Cultivator",
     "families": [
@@ -65074,7 +68044,7 @@
   },
   "birth_family_lesson": {
     "fallen_martial_clan": {
-      "manual": "azure_cloud_foundation_sword_canon",
+      "manual": "eastern_gate_remnant_form",
       "keepsake": "first_hammer_token",
       "lesson": "Your uncle is not the head of this house; I am, whatever the wall says. Sit. A clan that has fallen still remembers how a thing is made, and you are going to make it remember through you.",
       "test": "Take the cracked blade down and hold it out at arm's length, edge level, until I say stop. A smith's arm does not shake, whatever the smith is thinking.",
@@ -65083,7 +68053,7 @@
       "story": "This house held the eastern gate for four generations, until a sect elder's disciple took offence at a word and the clan's best sword was broken across his knee. Nobody outside remembers the word. Everybody inside does."
     },
     "tomb_watch_clan": {
-      "manual": "jade_meridian_formation_canon",
+      "manual": "grave_watch_vigil_record",
       "keepsake": "first_brush_seal",
       "lesson": "The dead do not need us. That is the first thing to unlearn. They need the living to keep the wards straight, and a ward is only a line drawn by someone who did not flinch.",
       "test": "Draw the sealing stroke on the slate, once, without lifting the brush. I am going to speak the names of the buried while you do it.",
@@ -65092,7 +68062,7 @@
       "story": "The clan was given the tombs to watch because it was the only family that would take the work, and it has kept them for two hundred years against thieves who were sometimes its own cousins. The graves it has emptied itself are not spoken of, and are all accounted for."
     },
     "body_tempering_family": {
-      "manual": "advanced_orthodox_009_body_refiner",
+      "manual": "hungry_season_tempering_record",
       "keepsake": "old_cauldron_vial",
       "lesson": "Your father said step, so you stepped, and now you have walked far enough to know what a body costs. The pills that put it back are the other half of what this house does. Sit and look.",
       "test": "Three herbs on the table, one of them wrong for the furnace. Tell me which, and tell me why, before the water boils.",
@@ -65101,7 +68071,7 @@
       "story": "There was a year the whole household went hungry so the eldest son could be fed for a tempering that took a season. He died of it anyway, at the end of the season, standing up. The pills this house makes now are the ones it wishes it had made then."
     },
     "border_garrison_family": {
-      "manual": "advanced_orthodox_001_sword_cultivator",
+      "manual": "stick_in_the_mud_array_primer",
       "keepsake": "household_array_plate",
       "lesson": "A garrison is an array with people in it. You have been standing in the array your whole life without seeing the lines; now you are going to see them.",
       "test": "Close your eyes and tell me where the four watch-posts are from here, by the feel of the qi that runs between them, not by memory.",
@@ -65110,7 +68080,7 @@
       "story": "The family held the border wall through three incursions and lost half its men in the second. The array that stands there now was laid out by a widow of this house with a stick in the mud, and the garrison has never let anyone move a stone of it."
     },
     "martial_household": {
-      "manual": "azure_cloud_foundation_sword_canon",
+      "manual": "unfamous_house_method",
       "keepsake": "first_hammer_token",
       "lesson": "You have made one thing on the road that did not fall apart. I want to know whether that was luck. Sit down; the forge can wait a little longer.",
       "test": "Hold the hammer straight out, head up, and count with me to twenty. Slowly.",
@@ -65119,7 +68089,7 @@
       "story": "Nobody in this house was ever famous, and that was deliberate. A martial household that is not famous is not challenged, and one that is not challenged gets to keep its children. Your great-grandmother put that rule on the wall, and it has cost us exactly one duel in sixty years, which we won."
     },
     "spear_guard_family": {
-      "manual": "advanced_orthodox_001_sword_cultivator",
+      "manual": "river_ford_spear_canon",
       "keepsake": "first_hammer_token",
       "lesson": "A spear is only a bar of iron with an opinion. The opinion is what this house forges. Sit, and let me tell you what it is.",
       "test": "Take the practice spear and hold it level by the very end, one-handed, while I walk once round the table.",
@@ -65128,7 +68098,7 @@
       "story": "The family took its name from a single night at the river ford, when eleven of its spears stopped a raiding column until the town's militia woke up. Nine of the eleven were buried the next morning, and the two who lived started this house on the pension."
     },
     "sword_hall_family": {
-      "manual": "advanced_orthodox_025_sword_cultivator",
+      "manual": "left_hand_forge_canon",
       "keepsake": "first_hammer_token",
       "lesson": "The hall teaches the sword to strangers for money. It teaches its own children how a sword is born, which is harder and pays worse. Sit.",
       "test": "Draw the practice sword and hold the guard position until the incense finishes. Do not adjust your grip once you have it.",
@@ -65137,7 +68107,7 @@
       "story": "The hall was founded by a swordsman who lost his right hand and learned to forge with his left rather than stop touching swords. Every blade with the hall's mark on it still carries a nick in the fuller where he liked to rest his thumb."
     },
     "hidden_weapon_family": {
-      "manual": "frozen_moon_first_frost_sutra",
+      "manual": "unaccepted_fan_primer",
       "keepsake": "first_brush_seal",
       "lesson": "Everything this house makes is small, and everything small is inscribed, because a needle that is not inscribed is only a needle. Sit, and keep your hands where I can see them.",
       "test": "Write the family mark on a grain of rice while I tell you, in detail, exactly what happens to people who sell our marks.",
@@ -65146,7 +68116,7 @@
       "story": "The family has never been caught, which is not the same as never being suspected. Three generations ago it turned down a sect's offer of protection, and the sect elder who made it went home with a fan he did not remember accepting."
     },
     "weaponsmith_martial_family": {
-      "manual": "crimson_furnace_ember_tempering_record",
+      "manual": "no_crest_blade_record",
       "keepsake": "first_hammer_token",
       "lesson": "You left with a sword we proved on the anvil. I want to know if the anvil proved you. Sit, and put your hands on the table where I can see the burns.",
       "test": "Lift the small anvil from the floor to the bench, set it down without a sound, and lift it back.",
@@ -65155,7 +68125,7 @@
       "story": "The house's founder made swords for both sides of a sect war and was executed by the winners for it, and the family has taken no side in anything since. It makes the best plain blade in the province and puts nobody's crest on it."
     },
     "nether_market_house": {
-      "manual": "black_serpent_venom_fang_primer",
+      "manual": "back_room_ledger_primer",
       "keepsake": "first_brush_seal",
       "lesson": "The market runs on paper. Contracts, seals, the little talismans that say a thing is what it claims to be. Half of them are honest. Sit, and learn to tell which half.",
       "test": "Here are two seals, one true and one a copy. Put your thumb on the false one, and do not take your time about it.",
@@ -65164,7 +68134,7 @@
       "story": "The house was a respectable ink-seller until a debt to the wrong people turned its back room into a market for things without receipts. It has been paying that debt in kind for eighty years, and has quietly become the only thing in the district the wrong people are afraid of."
     },
     "escort_martial_family": {
-      "manual": "thousand_beast_bond_scripture",
+      "manual": "first_contract_array",
       "keepsake": "household_array_plate",
       "lesson": "An escort does not fight. An escort arranges things so that the fight does not happen, and that is a formation the same as any chalked on a floor. Sit.",
       "test": "Feel for the ward-lines on the cargo skiff from here, and tell me which corner is weakest before I tell you which corner the last thief chose.",
@@ -65173,7 +68143,7 @@
       "story": "The family's first contract was a coffin, carried three hundred li to a village that had paid in advance and could not be told the road was closed. It arrived. Every contract since has been the same contract, with a different cargo."
     },
     "alchemy_family": {
-      "manual": "crimson_furnace_ember_tempering_record",
+      "manual": "one_in_ten_furnace_record",
       "keepsake": "old_cauldron_vial",
       "lesson": "A hired tutor taught you the pills. I am going to teach you the thing a tutor cannot, which is when to throw a batch away. Sit. Watch the furnace, not me.",
       "test": "The furnace has been running an hour. Tell me, from the colour of the flame alone, whether this batch lives or dies.",
@@ -65182,7 +68152,7 @@
       "story": "The house made its fortune on a fever cure and nearly lost it on the same cure, the year a batch went out untested and a child died of it. The family paid the funeral, closed for a season, and has thrown away one batch in ten ever since, on principle."
     },
     "noble_martial_clan": {
-      "manual": "advanced_orthodox_025_sword_cultivator",
+      "manual": "gate_without_asking_canon",
       "keepsake": "household_array_plate",
       "lesson": "A master was retained to teach you the arrays. He was paid; I am not. The difference is that I will tell you what the arrays are for, which he was not permitted to. Sit.",
       "test": "Trace the clan's gate-array in the air, and hold the spirit in it until the sand runs out. If the pattern frays, stop.",
