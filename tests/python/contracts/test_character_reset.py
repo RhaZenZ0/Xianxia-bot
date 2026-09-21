@@ -2,8 +2,8 @@
 
 `character.reset` (v1.0.1) lets a player abandon a life they have only just
 begun without a GM. Two things bound it, and both are rows rather than code:
-the allowance is counted from `event_log`, and the engine's own bookkeeping is
-kept out of the sweep so the framework can still record the action that erased
+the reset's own count is read from `event_log`, and the engine's own bookkeeping
+is kept out of the sweep so the framework can still record the action that erased
 the actor.
 
 Every one of those is a "table.column" string inside `characterResetKeep`, ANDed
@@ -11,9 +11,9 @@ onto a DELETE that is generated from the live schema. So a migration that
 renames one of those tables does not break the build, does not error at runtime,
 and does not fail a single Go test - the fixtures in that package build their
 schema by hand and would go on carrying the old name. It silently deletes what
-the keep was protecting, which for `event_log` means **the allowance stops
-counting and the reset becomes unbounded**, and for the two authoritative tables
-means a reset that fails with `stale expected_version` after doing its work.
+the keep was protecting, which for `event_log` means **the count of resets stops
+counting and answers 1 for ever**, and for the two authoritative tables means a
+reset that fails with `stale expected_version` after doing its work.
 
 That is what this closes, and it belongs in Python for the same reason
 `test_privacy_erasure.py` does: only here is the real schema available to ask.
@@ -110,13 +110,13 @@ class WhatBoundsAResetIsInTheRealSchema(unittest.TestCase):
                     "so the sweep would never have deleted it and the keep is decoration",
                 )
 
-    def test_the_allowance_is_counted_from_the_table_it_is_kept_in(self):
+    def test_the_count_is_read_from_the_table_it_is_kept_in(self):
         """The count and the keep must name the same place.
 
         They are two statements a file apart - `characterResetsUsedTx` selects
         from a table and `characterResetKeep` protects one - and if they ever
-        named different tables the allowance would be counted from rows the
-        reset had just deleted, which is the unbounded case.
+        named different tables the count would be read from rows the reset had
+        just deleted, and would answer 1 for ever.
         """
         select = re.search(r"characterResetsUsedTx.*?FROM (\w+) WHERE", RESET_GO, re.S)
         self.assertIsNotNone(select, "characterResetsUsedTx no longer selects from anywhere")
@@ -124,7 +124,7 @@ class WhatBoundsAResetIsInTheRealSchema(unittest.TestCase):
         kept = {key.split(".", 1)[0] for key in keep_entries()}
         self.assertIn(
             counted, kept,
-            f"the allowance is counted from {counted}, which the reset does not keep",
+            f"the reset count is read from {counted}, which the reset does not keep",
         )
 
 

@@ -114,8 +114,8 @@ func TestAFreshCultivatorCanBeginAgain(t *testing.T) {
 	if result["reset"] != true {
 		t.Fatalf("reset=%v", result["reset"])
 	}
-	if got := storage.ParseInt(result["resets_remaining"]); got != characterResetAllowance-1 {
-		t.Fatalf("resets_remaining=%d want %d", got, characterResetAllowance-1)
+	if got := storage.ParseInt(result["resets_used"]); got != 1 {
+		t.Fatalf("resets_used=%d want 1", got)
 	}
 	if storage.ParseInt(result["rows_deleted"]) <= 0 {
 		t.Fatalf("a reset that deleted nothing is not a reset: %v", result["rows_deleted"])
@@ -145,26 +145,28 @@ func TestAFreshCultivatorCanBeginAgain(t *testing.T) {
 	}
 }
 
-func TestTheAllowanceSurvivesTheActionItBounds(t *testing.T) {
+// TestTheRecordSurvivesTheActionItRecords is what is left of the allowance
+// test. There is no limit any more (the world-mark gate is the one that
+// protects other players, and a cultivator re-rolling their own first minute
+// takes nothing from anybody), but the *count* still has to survive, because
+// it is what a GM reads to see how often somebody has started over - and it is
+// kept by the same predicate, so it is the same thing that can break.
+func TestTheRecordSurvivesTheActionItRecords(t *testing.T) {
 	path := setupCharacterResetDB(t)
 	world := batch4WorldPath(t)
-	for i := 0; i < characterResetAllowance; i++ {
+	for i := 0; i < 4; i++ {
 		makeCultivator(t, path, world, 77, fmt.Sprintf("Lin %d", i), int64(200+i*100))
 		result, err := resetCultivator(t, path, world, 77, fmt.Sprintf("reset-loop-%d", i))
 		if err != nil {
-			t.Fatalf("reset %d refused: %v", i+1, err)
+			t.Fatalf("reset %d refused, and nothing limits them: %v", i+1, err)
 		}
 		if got := storage.ParseInt(result["resets_used"]); got != int64(i+1) {
-			t.Fatalf("reset %d reported resets_used=%d; the allowance was erased by the action it bounds", i+1, got)
+			t.Fatalf("reset %d reported resets_used=%d; the record was erased by the action it records", i+1, got)
 		}
 	}
-	makeCultivator(t, path, world, 77, "Lin Last", 900)
-	_, err := resetCultivator(t, path, world, 77, "reset-over")
-	if err == nil {
-		t.Fatalf("a %dth reset was allowed", characterResetAllowance+1)
-	}
-	if !strings.Contains(err.Error(), "all this world allows") {
-		t.Fatalf("refusal=%q", err)
+	if got := resetScalarI(t, path, "SELECT COUNT(*) FROM event_log WHERE user_id=77 AND event_type=?",
+		characterResetEvent); got != 4 {
+		t.Fatalf("the reset log holds %d rows after four resets", got)
 	}
 }
 

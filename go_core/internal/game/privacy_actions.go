@@ -196,11 +196,10 @@ type erasureSweep struct {
 // hand-written list of 104 tables goes stale, and two hand-written loops over
 // it would go stale against each other as well.
 //
-// `keep` is the one thing that varies, and it varies for exactly one reason:
-// the reset's allowance is recorded in `event_log`, and a bound that the
-// bounded action erases is not a bound. It is an extra SQL predicate per
-// "table.column", ANDed onto the DELETE. Erasure passes nil, because a
-// data-protection request keeps nothing.
+// `keep` is the one thing that varies: the reset keeps the engine's own record
+// of a request, and its own record that it happened. It is an extra SQL
+// predicate per "table.column", ANDed onto the DELETE. Erasure passes nil,
+// because a data-protection request keeps nothing.
 func applyErasureTargets(conn *storage.Conn, userID int64, targets []erasureTarget, keep map[string]string) (erasureSweep, error) {
 	sweep := erasureSweep{Deleted: map[string]any{}, Anonymised: map[string]any{}}
 	for _, target := range targets {

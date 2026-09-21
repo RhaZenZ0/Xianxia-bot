@@ -2454,13 +2454,16 @@ input it has is a row the engine already owns.
   refused the moment any of them names the character, because **those rows survive an erasure and so
   cannot honestly survive a reset** - the world would go on referring to a cultivator who was never
   there. The refusal names which.
-- **The allowance is recorded in the thing the reset does not delete.** `rollRootGrade` is
+- **There is deliberately no limit on how many times, and the cost is stated rather than hidden.**
+  An earlier version of this allowed three, to stop the root-grade re-roll: `rollRootGrade` is
   `Intn(1000)` against thresholds putting Immortal in the top 0.7% of a tier-1 household's draw, and
   rc.55 is what made that grade worth 0.88x-1.34x cultivation and -1 to +3 on every breakthrough for
-  the character's whole life. An unbounded reset is a free re-roll of exactly that number, so it is
-  three, counted from `event_log` rows the sweep is told to keep - because **a bound that the bounded
-  action erases is not a bound**, which is rc.48's rule turned inward. The row is the memory, as
-  `(user_id, quest_key)` is for the beginner path.
+  the character's whole life, so a patient player can now draw for one. That is accepted: the gate
+  that matters is the world-mark rule above, which protects *other players*, and somebody re-rolling
+  their own first minute takes nothing from anybody - they have thrown away every character in
+  between. The reset is still **recorded**, in an `event_log` row the sweep is told to keep, so a GM
+  can see how often somebody has started over; the row is the memory, as `(user_id, quest_key)` is
+  for the beginner path, it is simply not a bound as well.
 - **"Keep what you drew, change what you chose" was rejected on a fact, not on taste.**
   `rollFamilyRoot` weights the root off the household's archetype, location, bloodline affinity and
   tier, and `rollRootGrade` adds `(familyTier-1)*24`. The family is a choice and the draw depends on

@@ -31,9 +31,10 @@ reaches. It reuses erasure's own sweep, so a reset removes exactly what an erasu
 two cannot drift. What bounds it is not a clock: a reset is refused the moment any row with an
 **anonymise** disposition names the character - a battle the world remembers, a sect other disciples
 belong to, a gate still standing over a named town, a grave somebody reached first - because those
-rows survive even an erasure and so cannot honestly survive a reset. Three per account, and the
-count lives in the one thing the sweep is told to keep, because a bound the bounded action erases is
-not a bound. No schema.
+rows survive even an erasure and so cannot honestly survive a reset. There is deliberately no limit
+on how many times: the world-mark rule is what protects other players, and a cultivator re-rolling
+their own first minute takes nothing from anybody. It is still recorded, in the one row the sweep is
+told to keep, so a GM can see how often somebody has started over. No schema.
 
 Its finding is one step further in. A reset is the first action in this tree whose **actor erases
 itself**, and the authoritative framework keeps its own bookkeeping under that actor's id: it reads

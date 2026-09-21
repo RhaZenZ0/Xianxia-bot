@@ -37,18 +37,22 @@ package game
 // cannot honestly survive a reset: the world would go on referring to a
 // cultivator who was never there.
 //
-// **The allowance is recorded in the thing the reset does not delete.** The
-// grade roll is `Intn(1000)` against thresholds that put Immortal at the top
-// 0.7% of a tier-1 household's draw - and v1.0.0-rc.55 is what made that grade
-// worth 0.88x to 1.34x cultivation and -1 to +3 on every breakthrough, for the
-// character's whole life. An unbounded reset is a free re-roll of exactly that
-// number, so it is bounded at `characterResetAllowance`. The count lives in
-// `event_log` rows of type `characterResetEvent`, which the sweep is told to
-// keep - because **a bound that the bounded action erases is not a bound**,
-// which is v1.0.0-rc.48's rule ("a bound that lives in the client is not a
-// bound") turned inward. The row is the memory, the way `(user_id, quest_key)`
-// is for the beginner path and an `event_log` row is for the household lesson
-// and the profession examination.
+// **There is deliberately no limit on how many times.** An earlier version
+// allowed three, to stop a player re-rolling the root grade: `rollRootGrade` is
+// `Intn(1000)` against thresholds that put Immortal in the top 0.7% of a tier-1
+// household's draw, and v1.0.0-rc.55 made that grade worth 0.88x to 1.34x
+// cultivation and -1 to +3 on every breakthrough for the character's whole
+// life. That cost is real and is accepted: the gate that matters is the one
+// above, which protects *other players*, and a cultivator re-rolling their own
+// first minute takes nothing from anybody. A player patient enough to draw for
+// an Immortal root has thrown away every character in between.
+//
+// The reset is still **recorded**, in an `event_log` row of type
+// `characterResetEvent` that the sweep is told to keep, so a GM can see how
+// often somebody has started over. That row is the memory, the way
+// `(user_id, quest_key)` is for the beginner path and an `event_log` row is for
+// the household lesson and the profession examination - it is simply no longer
+// a bound as well.
 //
 // The obvious alternative - carry the drawn aptitudes across and re-roll only
 // what was chosen - was rejected on a fact rather than on taste: `rollFamilyRoot`
@@ -72,12 +76,6 @@ import (
 	"xianxia/core/internal/storage"
 )
 
-// characterResetAllowance is how many times one Discord account may abandon a
-// freshly created cultivator. Three, because one is enough to fix the mis-pick
-// this exists for and a fourth draw is already worth more as a re-roll of the
-// root grade than as a correction.
-const characterResetAllowance = 3
-
 // characterResetEvent is the `event_log.event_type` that records a reset. It is
 // the allowance, so it is the one thing a reset does not delete about itself.
 // Both readers of `event_log` in this package filter on their own event_type,
@@ -93,7 +91,7 @@ const keepEveryRow = "0=1"
 // every other erasure map so it is read against the same targets rather than
 // against a table name written out somewhere else.
 //
-// All four entries are one rule, and it is `erasureKeep`'s rule one level down:
+// All three entries are one rule, and it is `erasureKeep`'s rule one level down:
 // **the engine's record of a request cannot be the thing the request deletes.**
 // `admin_audit_log` is kept from an erasure for exactly that reason; here it is
 // the authoritative framework's own bookkeeping, and the reset is the first
@@ -239,10 +237,6 @@ func characterResetAction(conn *storage.Conn, userID int64, _ json.RawMessage) (
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
-	if used >= characterResetAllowance {
-		return authoritativeMutation{}, fmt.Errorf(
-			"you have begun again %d times, which is all this world allows", characterResetAllowance)
-	}
 	targets, err := erasureTargets(conn)
 	if err != nil {
 		return authoritativeMutation{}, err
@@ -289,12 +283,11 @@ func characterResetAction(conn *storage.Conn, userID int64, _ json.RawMessage) (
 			"reset would have anonymised %d shared row(s); refusing", sweep.RowsAnonymised)
 	}
 	result := map[string]any{
-		"reset":            true,
-		"name":             c.Name,
-		"resets_used":      used + 1,
-		"resets_remaining": characterResetAllowance - (used + 1),
-		"rows_deleted":     sweep.RowsDeleted,
-		"tables_touched":   len(sweep.Deleted),
+		"reset":          true,
+		"name":           c.Name,
+		"resets_used":    used + 1,
+		"rows_deleted":   sweep.RowsDeleted,
+		"tables_touched": len(sweep.Deleted),
 	}
 	return authoritativeMutation{
 		Result: result,

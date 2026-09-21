@@ -30,16 +30,17 @@ deferred half and not the half that says what was done about it.
   is the player's own door, on `/reset` and `/character → Samsara`, bounded by the anonymise
   disposition (no reset once the character is named on a row a shared world keeps) and by an
   allowance of three counted from rows the sweep keeps. See CLAUDE.md, "Starting over without a GM".
-- **deferred (a decision, not a wiring fix)** — *There is no GM lever to give back a reset.* The
-  allowance is three per Discord account, counted from `event_log` rows of type `character_reset`,
-  and nothing in `admin.player.*` can clear or raise it; a player who has spent all three and has a
-  good reason needs the operator to delete a row by hand, which is exactly the "the operator will go
-  through the database" answer `admin.player.erase` was built to stop giving. It is deferred rather
-  than built because the honest lever is not obvious: a `admin.player.grant_reset` that writes a
-  negative row would make the count a running total rather than a tally, and clearing the rows
-  outright would erase the record that the resets happened. What the GM *can* already do is erase the
-  person, which restores the allowance as a side effect and is the right answer when the request is
-  really "let me start completely over".
+- **deferred (a decision)** — *A reset re-rolls the spiritual root grade, and nothing stops it.*
+  `rollRootGrade` puts Immortal in the top 0.7% of a tier-1 household's draw, and rc.55 made that
+  grade worth 0.88x–1.34x cultivation and −1 to +3 on every breakthrough for a whole life, so a
+  patient player can reset until they draw one. The cap that used to prevent this was removed
+  deliberately: the world-mark gate is what protects other players, and a cultivator re-rolling
+  their own first minute costs nobody else anything. If it turns out to matter in play, the
+  narrower fix is to carry the *grade* across a reset rather than to re-limit the action — but that
+  is not simply wirable, because `rollFamilyRoot` weights the root off the household's archetype,
+  location, bloodline affinity and tier and `rollRootGrade` adds `(familyTier-1)*24`, so the family
+  is a choice the draw depends on. Resets are recorded in `event_log`, so the data to decide this
+  will exist.
 - **deferred (harness)** — *The Discord half drives the reset leaf but cannot guarantee it reaches a
   success.* Section 9b presses `/reset` last of all and accepts either the reset or its designed
   refusal, reporting which, because whether the swept cultivator has left a mark the world keeps

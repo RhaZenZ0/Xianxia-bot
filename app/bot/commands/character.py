@@ -1004,16 +1004,13 @@ async def reset(interaction: discord.Interaction) -> None:
         await respond(interaction, f"❌ {_explain_engine_error(exc)}", ephemeral=False)
         return
     result = dict(envelope.get("result") or {})
-    remaining = int(result.get("resets_remaining", 0))
+    used = int(result.get("resets_used", 1))
     lines = [
         f"🌱 **{result.get('name') or c['name']} is gone.** The household's record of them closes, "
         f"and **{int(result.get('rows_deleted', 0))}** rows across "
         f"**{int(result.get('tables_touched', 0))}** tables were removed.",
         "Use **/begin** to choose a family, a path and a name again.",
     ]
-    lines.append(
-        f"You may begin again **{remaining}** more time{'' if remaining == 1 else 's'}."
-        if remaining
-        else "That was the last time this world allows you to begin again."
-    )
+    if used > 1:
+        lines.append(f"_This is the **{used}** time you have begun again._")
     await respond(interaction, "\n".join(lines), ephemeral=False)
