@@ -145,7 +145,7 @@ internal/server/        HTTP control/data plane
 ```
 
 Every Go SQLite connection uses `journal_mode=WAL`, `foreign_keys=ON`, `busy_timeout=10000`,
-`synchronous=NORMAL`. Current schema version is 59; historical migrations are kept so old databases
+`synchronous=NORMAL`. Current schema version is 60; historical migrations are kept so old databases
 can upgrade in place — see `VERSIONS.md` for the full schema/release history.
 
 ### NPCs who go missing (`npc_missing.go`, schema 47)
@@ -2901,6 +2901,219 @@ boundaries now, which is the only place the two differ. And writing the tests fo
 first: the guard read `anchor <= 0`, which rejects world-minute zero - a real minute, the moment a
 fresh world's clock starts - because `i64(nil)` is also 0 and the value was doing work the
 separate NULL check already did.
+
+### A quest is recorded before it is told (v1.0.5)
+
+Seventeen call sites wrote `await announce_quest_progress(interaction, await QUESTS.progress(...))`,
+and **eight** placed that one statement *after* the command's reply - each with a comment citing
+rc.28.
+
+That rule is real, and it is about the **announcement**: `announce_quest_progress` falls back to
+`interaction.response.send_message` when the interaction has not been answered, so a reporter ahead
+of a command's only reply spends it on the quest line and the player never sees their craft roll. It
+says nothing about the **record** - and nesting the two inside one statement made the record inherit
+the announcement's position.
+
+v1.0.3's `/craft` is what that cost. The reply raised on a missing key *after* `applyAuthoritative`
+had committed, so the materials were spent, the pills granted, the profession XP credited, and the
+quest never advanced. The player reported it as two bugs a day apart - *"it takes your items"* and
+*"crafting did not update the quest"* - and they were one.
+
+`record_quest_progress` is the record on its own. It never raises, because it runs before the reply
+now and an exception escaping it would take the command's answer down with it - the same promise
+`announce_quest_progress` already made about the other half.
+
+**All seventeen are split, not only the eight that were wrong.** A tree where some sites nest and
+some do not is what invites the next author to nest, and the nesting is precisely what hid the
+ordering. With it gone, `test_a_quest_is_recorded_before_it_is_told.py` can state both rules
+exactly: the record is never an argument to the telling, and the record precedes the command's
+answer. A reply that also returns is a refusal path, not an answer, so it does not count.
+
+**Three measurements, and the first two were wrong.** A first sweep asked "is there any reply call
+at a lower line number" and reported nine sites, seven at risk - it was counting early-return
+refusals. A second scoped to sibling statements and reported twenty-two, because at module level the
+function *definitions* are siblings. Only the third - this function's own top-level statements, with
+returning replies excluded - gave the eight, and each was then read by eye before being touched. A
+sweep whose every hit needs hand-checking is not a gate (v1.0.1), and that applies while you are
+still deciding what the finding *is*.
+
+**The gate's own first run found a seventeenth site and then a blind spot.** `_report_trade` in
+`economy.py` was written `announce_quest_progress(interaction,await QUESTS.progress(` with no space,
+so every grep had missed it. Worse, it both records and tells, and its two callers reach it by name
+- so a gate that only saw direct calls would have let that helper be moved after a reply without a
+word. It closes over a module's recording helpers now.
+
+### The craft menu offered what the engine would refuse (v1.0.5)
+
+`recipe_autocomplete` was `DB.search_catalog("recipe", current, 25)` - the whole 33-recipe
+catalogue, capped at Discord's 25 - while `craft.resolve` refuses any method the player has not
+learned. A fresh character knows about three. And `hubs._autocomplete_provider` deliberately reuses a
+slash command's autocomplete as a panel's option source *"without duplicating game lookup logic"*, so
+the same list is what a hub press renders as a drop-down: the question *"why is crafting a drop-down
+menu"* was really *"why is the menu full of things I cannot make"*.
+
+rc.46 settled this one surface over - **a surface must not offer what the engine will refuse** - when
+the quest journal stopped listing what no roster would hand over. The reader it needs has existed
+since v1.0.1: `DB.get_known_recipes`, built for `profession status`.
+
+Knowing a method and being equal to it are two different refusals, so a recipe above the player's
+rank stays on the list. An empty picker is not a dead end either: the hub already prints a
+registered hint for one, and craft now has one naming the slip and the status page.
+
+**The gate failed against correct code on its own first run**, because the docstring explaining the
+fix *names* `search_catalog` - rc.52's rule arriving immediately rather than a release later. It
+reads the function's statements without its docstring now.
+
+### The protection only the bot believed in (`violence_suppression.go`, v1.0.6)
+
+`app/ai/narrator_context.py` tells the narrator, in these words, in two places: *"PROTECTED; violence
+cannot mechanically begin here"*. Three things enforced it - the duel invariant in
+`pvp_invariants.go` ("local formations suppress PvP here"), `/duel` in `duel.py`, and
+`/battle challenge` in `battle.py`. **`combat_actions.go` named `SafeZone` zero times**, so for PvE
+the rule lived entirely in Discord and `combat.start` would have begun a fight anywhere for any
+caller that asked. That is rc.48's rule for the fourth time in this tree - *a bound that lives in
+the client is not a bound* - and what hid it is the shape rc.48 itself warned about: the
+**neighbouring** kind of violence really was engine-held, so the file next door read as proof the
+rule was enforced.
+
+**And the bounty hunter did not care where you stood.** `advanceHunters` raises pressure, engages
+and **captures** - and the words `location` and `Location` appeared nowhere in it or in
+`spawnHunters`. So a fugitive was taken off the floor of a hall whose own description reads
+*"Violence inside is forbidden; the protection ends at the front doors"*, while `protected_interior`
+sat on all 48 auction houses read by nothing, one of the three entries `field_readers_test.go` (v1.0.1)
+had to open its allowlist with.
+
+**The two protections are deliberately two predicates, and the measurement is why.** `safe_zone` is
+true on **446 of 477** locations - every town, gate, shop and shrine - and false on the 31 that are
+hunting grounds, ruins, open country and **Greenriver Town**, the starting town, deliberately rough.
+So it is a statement about settlement, not sanctuary, and all it may buy is that nobody *starts* a
+fight there. What the 48 auction floors claim is stronger and rarer and had its own field. Gating
+the hunter on `safe_zone` would not give the bounty system a sanctuary - it would end it, because
+players live in towns; gating it on `protected_interior` gives a fugitive 48 rooms, each of which
+must be entered by an action and left to do anything at all.
+
+**Capture is what a sanctuary stops. Pressure is not.** The hunter is at the doors either way, and a
+floor that froze a pursuit outright would be somewhere to park a fugitive for ever. The two halves
+are asserted apart for exactly that reason: a test that only said "nothing happened inside" would
+pass just as well for the wrong rule, which is the rc.47 shape.
+
+**What a safe zone refuses is a fight somebody chose to start**, and that one sentence is why two
+things that look like exceptions are not. A world event that lands in a town is still fought -
+rc.49's own asymmetry, *being caught in something is not the same as being handed it* - and so is
+the ambush `auctionLeaveAction` stands at `EntranceLocation`, which is a safe zone for 47 of the 48
+houses. A gate that refused those would delete the event battle in 446 places and the door risk in
+47, which is not enforcing a rule but deleting two systems the content describes.
+
+**`door_rule` is retired rather than read**, and this is the one place the release removes
+something. It said *"the protection ends at the doors"* - the second half of the sentence
+`protected_interior` opens - all 48 houses set it `true`, no house's prose can differ (every one of
+the 48 descriptions says both halves), and the engine already ends the protection at the door by
+standing the ambush outside. **A switch content cannot turn off is not a switch**, which is rc.59's
+`#event-scenes` call. `unreadContentFields` is down to one entry, `Path.Skill`, still deferred with
+its reason.
+
+**`battle.py`'s refusal is kept, and is now an anticipation rather than the rule.** Presentation may
+predict a refusal the engine will make - `_progression_hidden_actions` does it for every late door -
+and what it may not be is the only place the rule lives.
+
+**The fixture could not fail the way production fails, again.** `tracking_pursuit_test.go` declared
+no `characters` table at all, so the pursuit sweep reading a quarry's location broke it outright -
+which is the rule this file already states, caught this time by the change rather than by a release.
+It carries the table now, and both new fixtures carry an auction floor with `protected_interior:
+false`, a combination the shipped content does not contain: without it every assertion would pass
+just as well for a rule that answered "sanctuary" to any auction interior, and the field would be
+decoration again.
+
+**The gates, and what each drill prints.** Disabling the `combat.start` check gives *"a challenge in
+a safe zone was allowed; the engine had no such rule before v1.0.6"*; extending it to events gives
+*"an event battle in a safe zone must still be allowed"*; ignoring `ProtectedInterior` gives
+*"Unguarded Stalls is not a protected interior but answered sanctuary Open Yard"*; letting capture
+through gives *"a hunter took a fugitive off a protected auction floor: capture_progress is 12"*;
+freezing pressure as well gives *"a floor that freezes a pursuit is somewhere to park a fugitive for
+ever"*; giving the tick its own `ProtectedInterior` lookup gives *"the tick no longer reaches
+game.LocationIsSanctuary"*; restoring `door_rule` to the struct, and separately un-wiring
+`ProtectedInterior`, each fail `TestEveryParsedContentFieldHasAReader`; and blanking the content
+reader fails with *"the content parse is broken, not the tree"* **before** any assertion it would
+have made vacuous.
+
+### An era belongs to one world (`world_eras.go`, schema 60, v1.0.7)
+
+There was **one era for the whole game**. Every reader asked
+`WHERE active=1 ORDER BY era_id DESC LIMIT 1` and got the same row whether it was pricing a siege
+among the immortal courts or a cultivation session in a Mortal hill village - while the realm
+capitals have been per world since schema 4, the auction floors since schema 35 and a world's *news*
+since schema 56. The era was the last thing in this tree still pretending the four worlds were one
+place.
+
+**What made the split small rather than structural is that every reader was already about something
+with a location.** A cultivator stands somewhere, a territory is somewhere, a war is over somewhere,
+a caravan runs between two somewheres - and v1.0.6 had just taught the bounty sweep to read its
+quarry's location, so that loop already held what it needed. Each one resolves the world it was
+already talking about instead of taking the only row there was. `game.ActiveEra` is the one door,
+and `EraWorldOf` is the one statement of which world a question is about.
+
+**A cycle is a world year now, and the roster is content.** It ran 540 world days, which matched
+nothing; `minutesPerYear` is 12 months of 30 days, so a year is 360 and each world has **six eras of
+sixty**. `world_era_cycles` in `content/world.json` holds all twenty-four, because the roster is
+content in this tree (`event_sites`, `forage_materials`, `beginner_path`) and because four Go
+literals would have been four places to forget. Three copies of that roster existed before this -
+the Go literal, a `world_eras` row, and `ERA_CYCLE` in `app/rules/advanced_runtime.py` - which is the
+fault rc.39 removed for the world clock and rc.44 for the world currencies; there is one now, and
+`describe_era` takes it **injected** because `WORLD` is built in `app/bot/runtime.py` and
+`test_app_layout.py` puts `rules` at the bottom (the reason `narrator.py` takes a duck-typed
+`npc_resolver`, rc.27).
+
+**And the counting is the finding.** Of the eight modifier keys the old cycle authored, production
+Go fetched **four**. `secret_realm_frequency`, `market_volatility`, `beast_encounter_rate` and
+`recovery_rate` each occurred exactly once in all of `go_core` - their own declaration in `eraCycle`.
+So every era carried one live modifier and one dead one, and **the Beast Tide Era, whose entire
+identity is beasts, did nothing whatever to beasts**: mechanically it was "caravans are fifteen
+percent riskier". A Quiet Heaven's `recovery_rate` healed nobody, which is a promise it had been
+making since before anything in the game recovered at all.
+
+Authoring twenty-four eras on that vocabulary would have been manufacturing decoration at scale, so
+the wiring came first. `beast_encounter_rate` divides the margin a hunt must clear (a 2d10 margin,
+not a percentage, so it divides rather than multiplies, floored at 1 so no era makes an encounter
+automatic). `recovery_rate` scales v1.0.4's `percent` - **not its `gain`**, which is the whole reason
+it is one line: `newAnchor` divides by the same `percent`, so the remainder the anchor carries stays
+exactly consistent with the gain it paid for. The two that cannot be wired honestly are authored by
+no era at all and sit in `unreadEraModifiers` with their reasons, which
+`TestNoEraAuthorsAModifierNothingReads` holds shut from the other side: the allowlist names what is
+*deferred*, and a deferred key may not be authored.
+
+**The gate found a gap in its own release on its first run**, and the fix is better code.
+`eraCultivationMultiplier` pulled its key out of the map by index, so `cultivation_gain` - the one
+modifier every cultivator feels - had no argument position for the sweep to see and was reported
+unread. `eraTerm` is the named accessor now, so **every** read of an era modifier in this tree is an
+argument position. That is not style: it is what lets the gate tell a rule *fetching* a key from the
+content file *declaring* one, which is rc.58's "fetched, not named" distinction.
+
+**A missing key is `def`, never zero**, and here that matters in a way it would not elsewhere: every
+one of these keys is a multiplier, so a key read as 0 would not soften a rule, it would delete it -
+no cultivation gain at all, no siege power, no caravan ever arriving. The `seller_user_id=0` lesson
+in a place where the damage would be invisible.
+
+**Schema 60 defaults to the Mortal World rather than NULL.** Every row that existed when it runs was
+written when there was one era, and that era was seeded "Jade Meridian Awakening Era", the Mortal
+cycle's first entry - so a live world carries on from exactly where it stands (`advanceWorldEra`
+finds a world's place by matching the active row's name), and the three worlds above it open their
+own cycle on the next tick rather than inheriting somebody else's history. `DefaultEraWorld` is also
+the answer for a place the catalogue does not carry - a household, an inner world, an abode -
+deliberately **unlike** `world_of_location` on the Python side, whose `None` is what keeps a
+household's news out of a world's public feed (rc.52): being indoors is not being outside history.
+
+**Six fixtures declared `world_eras` without the column production now has**, and every one of them
+broke the moment a reader asked for it - the rule this file already states, caught by the change
+rather than by a release. `FakeWorld` and `FakeDB` in `test_narrator_context.py` needed the same.
+
+**The gates, and what each drill prints.** Authoring a deferred key fails **two** gates at once, the
+second naming it and its reason; removing the beast wire prints `beast_encounter_rate (authored by
+Celestial World/Primordial Beast Waking Era, …)`; removing the recovery wire names its seven eras;
+shortening one world's cycle prints `Immortal World runs 390 world days, not one world year (360)`;
+giving two worlds one era name prints *"the cycle position is found by name"*; and pointing the
+sweep at a reader that does not exist prints *"the production walk did not find war_pressure handed
+to any era reader; the sweep is broken, not the tree"* - **before** the assertion it would have made
+vacuous.
 
 ## Testing conventions
 

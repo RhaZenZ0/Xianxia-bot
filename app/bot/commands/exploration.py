@@ -24,14 +24,14 @@ from ...rules.realm_hubs import REALM_HUBS, realm_hub, realm_hub_by_location
 from ...rules.sect_manor import manor_craft_bonus
 from ...rules.sect_recruitment import recruitment_definition
 from ..channels import send_long_to_thread
-from ..character_state import announce_quest_progress
+from ..character_state import record_quest_progress, announce_quest_progress
 from ..discovery import (
     LOCATION_DISCOVERY_IMAGES,
     send_location_discovery_image,
     travel_first_discovers_location,
 )
 from ..formatting import human_duration, roll_line
-from ..hubs import HubDynamicOption, register_hub_option_provider
+from ..hubs import register_hub_option_hint, HubDynamicOption, register_hub_option_provider
 from ..locations import _known_locations, access_realm_index, destination_groups, location_autocomplete, npcs_present
 from ..registry import VIEW_RESTORERS, registered_group_command, registered_root_command
 from ..runtime import (
@@ -427,7 +427,8 @@ async def explore(interaction: discord.Interaction) -> None:
                 log.exception("Sect discovery could not be recorded for %s", discovered_location)
             discovery_text += f"\n🏯 **Sect route discovered:** {', '.join(discovered_sects)}. Open **Sect → Recruitment** to learn about the gate."
             try:
-                await announce_quest_progress(interaction, await QUESTS.progress(interaction.user.id, "sect_discovery", amount=1, game_minute=wt_discovery.total_minutes))
+                progressed = await record_quest_progress(interaction.user.id, "sect_discovery", amount=1, game_minute=wt_discovery.total_minutes)
+                await announce_quest_progress(interaction, progressed)
             except Exception:
                 log.exception("Quest progress update failed after sect discovery")
         try:
@@ -448,7 +449,8 @@ async def explore(interaction: discord.Interaction) -> None:
             log.exception("Could not persist structured world-history discovery")
 
     try:
-        await announce_quest_progress(interaction, await QUESTS.progress(interaction.user.id, "explore", amount=1, target=str(c.get("location") or ""), game_minute=wt_discovery.total_minutes))
+        progressed = await record_quest_progress(interaction.user.id, "explore", amount=1, target=str(c.get("location") or ""), game_minute=wt_discovery.total_minutes)
+        await announce_quest_progress(interaction, progressed)
     except Exception:
         log.exception("Quest progress update failed after exploration")
     await DB.add_history(history_channel_id, user_id=interaction.user.id, speaker=c["name"], content=f"Explores {c['location']}")
@@ -618,8 +620,36 @@ async def hunt(interaction: discord.Interaction) -> None:
 async def recipe_autocomplete(
     interaction: discord.Interaction, current: str
 ) -> list[app_commands.Choice[str]]:
-    names = await DB.search_catalog("recipe", current, 25)
-    return [app_commands.Choice(name=name[:100], value=name[:100]) for name in names]
+    """The methods this cultivator actually knows (v1.0.5).
+
+    It was `DB.search_catalog("recipe", current, 25)` - the whole 33-recipe
+    catalogue, capped at Discord's 25 - while `craft.resolve` refuses any method
+    the player has not learned. So a fresh character who knows about three was
+    offered twenty-five, and the hub renders this same callback as a drop-down
+    (`_autocomplete_provider` reuses it rather than duplicating game lookups),
+    which is how "why is crafting a drop-down menu" came to mean "a menu of
+    things I cannot make".
+
+    rc.46's rule, one surface over: a surface must not offer what the engine
+    will refuse. The journal stopped listing quests no roster would hand over
+    for exactly this reason.
+
+    Knowing a method is not the same as being equal to it - a rank too low is a
+    second, different refusal - so those stay on the list. `/craft → Profession
+    → Profession Status` is where the ranks and the materials are spelled out.
+    """
+    try:
+        known = await DB.get_known_recipes(interaction.user.id)
+    except Exception:
+        log.exception("Known recipes could not be read for the craft picker")
+        return []
+    needle = current.casefold().strip()
+    names = sorted({str(row.get("recipe") or "") for row in known if row.get("recipe")})
+    return [
+        app_commands.Choice(name=name[:100], value=name[:100])
+        for name in names
+        if not needle or needle in name.casefold()
+    ][:25]
 
 
 async def _run_crafting(interaction: discord.Interaction, recipe: str) -> None:
@@ -713,28 +743,29 @@ async def _run_crafting(interaction: discord.Interaction, recipe: str) -> None:
     if resolved.get("exam_offered"):
         exam_line = (f"\n🎓 The {profession} halls will examine you at this rank: "
                      f"**/craft → Profession → Exam**, at a hall of the trade. See **/quests**.")
+    # Only a craft that produced something counts. A failed refinement spends
+    # the ingredients and is a real part of the trade, but "craft a Recovery
+    # Pill" is not satisfied by not crafting one.
+    #
+    # Recorded *before* the reply and told after (v1.0.5). The telling must come
+    # after: this command never defers, so the interaction has exactly one
+    # `response`, and a reporter with something to say would spend it on the
+    # quest line. The record has no such constraint, and nesting the two inside
+    # one statement is what made it inherit the announcement's position - so
+    # when this reply raised in v1.0.3, the craft had committed and the quest
+    # never advanced.
+    progressed: list[dict] = []
+    if success:
+        wt_craft = await current_world_time()
+        progressed = await record_quest_progress(
+            interaction.user.id, "craft", amount=1, target=recipe,
+            game_minute=wt_craft.total_minutes)
     await interaction.response.send_message(
         f"**{profession}: {recipe}**\n{roll_line(roll)}\n"
         + "".join(bonus_lines)
         + f"{outcome}{quality_line}{mastery_line}{exam_line}"
     )
-    # Only a craft that produced something counts. A failed refinement spends
-    # the ingredients and is a real part of the trade, but "craft a Recovery
-    # Pill" is not satisfied by not crafting one.
-    #
-    # Reported *after* the result is on screen. This command never defers, so the
-    # interaction has exactly one `response`, and a reporter with something to say
-    # would spend it on the quest line - leaving the craft roll to raise
-    # InteractionResponded and the player to watch their pill vanish into a
-    # progress notice. `announce_quest_progress` takes its followup branch here.
-    if success:
-        try:
-            wt_craft = await current_world_time()
-            await announce_quest_progress(interaction, await QUESTS.progress(
-                interaction.user.id, "craft", amount=1, target=recipe,
-                game_minute=wt_craft.total_minutes))
-        except Exception:
-            log.exception("Quest progress update failed after crafting")
+    await announce_quest_progress(interaction, progressed)
 
 
 @registered_root_command(name="craft", description="Practice alchemy, forging, formation or talisman inscription from a method you know", guild=GUILD)
@@ -966,6 +997,21 @@ async def alchemy_forage(interaction: discord.Interaction) -> None:
     # that ink and paper come out of the hills has no reason to look.
     makings = {str(k): int(v) for k, v in dict(resolved.get("materials_found") or {}).items()}
     makings_line = f"\n📜 Craft makings: **{WORLD.item_names(makings)}**." if makings else ""
+    # One report per distinct material that actually came out of the hills,
+    # herbs and craft makings alike, so a targeted objective can name the thing
+    # it wants. The failed-forage branch above returns before this and reports
+    # nothing, which is the same rule crafting keeps.
+    #
+    # Recorded before the harvest is on screen and told after (v1.0.5), for the
+    # reason `_run_crafting` gives: this command does not defer, so the one
+    # `response` belongs to the result and the telling gets the followup - while
+    # the record must not be able to be lost to a failure in drawing the reply.
+    wt_forage = await current_world_time()
+    progressed: list[dict] = []
+    for material in sorted({**awarded, **makings}):
+        progressed += await record_quest_progress(
+            interaction.user.id, "gather", amount=1, target=str(material),
+            game_minute=wt_forage.total_minutes)
     await interaction.response.send_message(
         f"🌿 **Forage — {forage_location}**\n{roll_line(roll)}\n"
         f"Regional spirit resources: **{int(resolved.get('spirit_resources',0))}/100**.{bonus_bits}\n"
@@ -973,22 +1019,7 @@ async def alchemy_forage(interaction: discord.Interaction) -> None:
         f"🧺 Foraging: **{profession_rank(level)}** Lv.{level} "
         f"• XP {int(forage_progress.get('xp',0))}/{profession_xp_needed(level)}"
     )
-    # One report per distinct material that actually came out of the hills,
-    # herbs and craft makings alike, so a targeted objective can name the thing
-    # it wants. The failed-forage branch above returns before this and reports
-    # nothing, which is the same rule crafting keeps.
-    #
-    # After the harvest is on screen, for the reason `_run_crafting` gives: this
-    # command does not defer, so the one `response` belongs to the result and the
-    # reporter gets the followup.
-    try:
-        wt_forage = await current_world_time()
-        for material in sorted({**awarded, **makings}):
-            await announce_quest_progress(interaction, await QUESTS.progress(
-                interaction.user.id, "gather", amount=1, target=str(material),
-                game_minute=wt_forage.total_minutes))
-    except Exception:
-        log.exception("Quest progress update failed after foraging")
+    await announce_quest_progress(interaction, progressed)
 
 
 @registered_group_command(alchemy_group, name="purge", description="Slowly purge medicinal residue by spending Qi in controlled circulation")
@@ -1586,10 +1617,11 @@ async def travel(interaction: discord.Interaction, destination: str) -> None:
     # would never be satisfied by somebody standing in it.
     try:
         wt_travel = await current_world_time()
-        await announce_quest_progress(interaction, await QUESTS.progress(
+        progressed = await record_quest_progress(
             interaction.user.id, "travel", amount=1,
             target=str(result.get("arrived_at") or result.get("destination") or destination),
-            game_minute=wt_travel.total_minutes))
+            game_minute=wt_travel.total_minutes)
+        await announce_quest_progress(interaction, progressed)
     except Exception:
         log.exception("Quest progress update failed after travel")
     await interaction.followup.send(
@@ -1684,3 +1716,12 @@ async def restore_exploration_event_views(bot: discord.Client) -> int:
 
 
 VIEW_RESTORERS.register("exploration_event", restore_exploration_event_views)
+
+
+register_hub_option_hint(
+    craft,
+    "recipe",
+    "You have not learned a method yet. Buy a jade slip at a hall of the trade "
+    "(**/economy → City Shops → Here**) and read it with **/craft → Profession → Learn**; "
+    "**Profession Status** lists everything you know and what each one needs.",
+)

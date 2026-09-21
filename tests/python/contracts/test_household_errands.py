@@ -81,15 +81,24 @@ class TheErrandsAreQuestsTheForgeWouldAccept(unittest.TestCase):
 
 
 class TheDoorsAreWhereTheyWork(unittest.TestCase):
-    def test_return_home_is_in_the_vocabulary_and_reported_after_the_reply(self):
+    def test_return_home_is_in_the_vocabulary_and_recorded_at_both_doors(self):
+        """Both doors home report it: /family enter, and the Hearth-Return
+        Talisman in the shops.
+
+        This used to assert that the report came *after* the reply as well.
+        v1.0.5 split the record from the announcement, and the ordering rule
+        moved with it: `test_a_quest_is_recorded_before_it_is_told.py` holds it
+        for every site at once, so a copy here would be a second statement of
+        one rule, free to disagree. What is this file's is that both doors
+        report at all - read by AST, so the spelling of the door is not the test.
+        """
         self.assertIn("return_home", OBJECTIVE_TYPES)
         self.assertIsNone(OBJECTIVE_TYPES["return_home"]["target"])
-        family = (BOT / "commands" / "family.py").read_text(encoding="utf-8")
-        reply = family.index('f"🏠 Entered **{result.get(\'family_name\')')
-        report = family.index('QUESTS.progress(interaction.user.id, "return_home"')
-        self.assertLess(reply, report, "the reporter must speak after /family enter has answered")
-        economy = (BOT / "commands" / "economy.py").read_text(encoding="utf-8")
-        self.assertIn('QUESTS.progress(interaction.user.id, "return_home"', economy)
+        self.assertEqual(
+            reported_objective_types().get("return_home"), {"family.py", "economy.py"},
+            "coming home is reported by /family enter and by the Hearth-Return Talisman, "
+            "and a door that stops reporting leaves an errand's last objective unfinishable",
+        )
 
     def test_the_engine_gates_the_four_gifts_and_the_door(self):
         source = (GO / "household_return.go").read_text(encoding="utf-8")

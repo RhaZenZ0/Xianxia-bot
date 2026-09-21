@@ -6,6 +6,94 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.7** gives every world its own age, and makes an era mean something in all of them.
+
+There was one era for the whole game. A Demon Invasion in the Celestial World and a quiet century in
+a Mortal village shared a single row, and every rule that asked what age it was got the same answer
+whether it was pricing a siege among the immortal courts or a cultivation session in a hill village -
+while the realm capitals have been split per world since the fourth schema, the auction floors since
+the thirty-fifth, and a world's own news since the fifty-sixth. The era was the last thing in the
+game still pretending the four worlds were one place.
+
+Each world walks its own cycle now, on its own clock, so the Mortal World can be deep in a Beast Tide
+while the Celestial courts are being audited by heaven. Every rule that asks was already about
+something standing somewhere - a cultivator, a territory, a war, a caravan, a fugitive - so each one
+simply resolves the world it was already talking about.
+
+And a cycle is a year. It ran five hundred and forty world days before, which matched nothing; a
+world year is three hundred and sixty, so each world has six eras of sixty days and the year closes
+exactly. Twenty-four ages in all, written for the world they belong to, and they live in the content
+file rather than in code, so a GM can rewrite an age without rebuilding anything.
+
+The part worth knowing is what the counting found. Of the eight things an era could change, **four
+reached no rule at all** - each appeared exactly once in the whole engine, in its own declaration. So
+every era carried one live number and one dead one, and the Beast Tide Era, whose entire identity is
+beasts, did nothing whatever to beasts: mechanically it was "caravans are fifteen percent riskier".
+Authoring twenty-four eras on top of that would have been manufacturing decoration at scale. A Beast
+Tide brings beasts down the passes now, and a Quiet Heaven really does close wounds faster - the
+promise it had been making since it was written. The two nobody could wire honestly are authored by
+no era at all, and a gate refuses any that tries.
+
+- **Schema 60** gave an era a world to belong to. `world_eras.world` splits one global age into four,
+  and it defaults to the Mortal World rather than to nothing: every row that existed when it ran was
+  written when there was one era, and that era was the Mortal cycle's first. So a live world carries
+  on from exactly where it stands, and the three worlds above it open their own cycle on the next
+  tick rather than being handed somebody else's history.
+
+**1.0.6** makes the one promise this world repeats everywhere true in the engine as well as in the bot.
+
+`app/ai/narrator_context.py` tells the narrator, in these words, in two places: *"PROTECTED; violence
+cannot mechanically begin here"*. A duel was refused in a protected place by the engine, and
+`/battle challenge` was refused by `app/bot/commands/battle.py` - and `combat_actions.go` named
+`SafeZone` zero times, so the rule a player could feel for an ordinary fight lived entirely in
+Discord. A bound that lives in the client is not a bound, which this tree had already written down
+three times for the world clock, the action cooldowns and a Law technique; what hid it here is that
+the *neighbouring* kind of violence really was engine-held, so the file next door looked like proof.
+
+And a bounty hunter did not care where you were standing. The pursuit sweep raised pressure, closed
+in and captured a fugitive without reading a location anywhere in it - so somebody was taken off the
+floor of a hall whose own description reads *"Violence inside is forbidden; the protection ends at
+the front doors"*, while the field that says exactly that sat on all forty-eight auction houses and
+was read by nothing. It is read now: a hunter may watch you from the doors and may not reach in.
+Pressure still rises, because standing still is not escaping.
+
+The two protections are deliberately kept apart. A safe zone is on 446 of the world's 477 places -
+it means *not the wilds*, and Greenriver Town, where everyone begins, is one of the thirty-one that
+are not - so it stops a fight somebody chooses to start and nothing more. What an auction floor
+claims is stronger and rarer, and that is what a fugitive can hide behind. Handing all 446 the
+auction floor's guarantee would not give the bounty system a sanctuary; it would end it, because
+players live in towns.
+
+And nothing refuses a fight that was never the player's idea: a world event that lands in a town is
+still fought, and the ambush outside an auction door still happens, because being caught in
+something is not the same as starting it.
+
+It also retires the third way the same sentence was said. `door_rule` was set on every auction house,
+meant "the protection ends at the doors", and was read by nothing - and the engine already ends it
+there, by standing the ambush outside. A switch no content can turn off is not a switch.
+
+**1.0.5** stops a quest being lost to a failure in drawing the reply, and stops the craft menu
+offering methods you have not learned.
+
+Seventeen call sites wrote `await announce_quest_progress(interaction, await QUESTS.progress(...))`,
+and eight placed that one statement **after** the command's reply, each with a comment citing the
+rule from v1.0.0-rc.28. That rule is real and it is about the *announcement*:
+`announce_quest_progress` falls back to `interaction.response.send_message` when the interaction has
+not been answered, so a reporter ahead of a command's only reply spends it on the quest line. It
+says nothing about the record - and nesting the two made the record inherit the announcement's
+position. v1.0.3's `/craft` is what that cost: the reply raised after the engine had committed, so
+six pills were made and the errand still read zero. The player reported it as two separate bugs.
+
+It also splits the two everywhere, not only where the order was wrong. `record_quest_progress` is
+the record on its own and never raises, because it runs before the reply now; a mixed tree where
+some sites nest and some do not is what invites the next author to nest.
+
+And the craft picker offers what the cultivator has learned. It was the whole 33-recipe catalogue
+capped at Discord's 25, while `craft.resolve` refuses any method the player does not know - so a
+fresh character was shown twenty-five and could make about three. The hub renders that same callback
+as a drop-down, which is how "why is crafting a drop-down menu" turned out to mean "a menu of things
+I cannot make". An empty picker now names the two doors that end it rather than being a dead end.
+
 **1.0.4** gives a body the one thing this game never had: it mends on its own.
 
 Nothing in the tree restored vitality with time - twelve `SET vitality` statements in the engine,
@@ -259,9 +347,15 @@ staged authority cleanup: forage, crafting and companions, canonical time, unifi
 road travel, caravans, dashboard-owned Discord setup, and the removal of the obsolete Python
 mechanical authority paths.
 
-## Release status — v1.0.4
+## Release status — v1.0.7
 
-- Current release: v1.0.4 - vitality recovers with time, which nothing in this game had ever done.
+- Current release: v1.0.7 - every world keeps its own age, a cycle is exactly one world year, and
+  four era modifiers that reached no rule are wired or refused. Schema 60.
+- v1.0.6: "violence cannot mechanically begin here" is held by the engine and not
+  only by the bot, and an auction floor is a sanctuary a bounty hunter cannot reach into. No schema.
+- v1.0.5: a quest is recorded before it is told, and the craft menu offers only
+  methods you know. No schema.
+- v1.0.4: vitality recovers with time, which nothing in this game had ever done.
   Schema 59.
 - v1.0.3: a craft no longer eats the materials and reports a failure, a lost
   fight leaves a heartbeat, the seventh cultivation path has methods, and every birth household

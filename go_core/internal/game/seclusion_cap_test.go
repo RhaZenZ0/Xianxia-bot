@@ -48,7 +48,7 @@ func secludeReady(t *testing.T) (string, string) {
 	// A retreat's own multipliers read the era (v1.0.0-rc.55) and so does a
 	// hand-sat session, which the lockout tests drive to prove the doors
 	// opened. The table is empty, which production reads as "no era".
-	batch4Exec(t, path, `CREATE TABLE IF NOT EXISTS world_eras(era_id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT NOT NULL,description TEXT NOT NULL DEFAULT '',modifiers_json TEXT NOT NULL DEFAULT '{}',started_game_minute INTEGER NOT NULL DEFAULT 0,duration_days INTEGER,active INTEGER NOT NULL DEFAULT 0)`)
+	batch4Exec(t, path, `CREATE TABLE IF NOT EXISTS world_eras(era_id INTEGER PRIMARY KEY AUTOINCREMENT, world TEXT NOT NULL DEFAULT 'Mortal World',name TEXT NOT NULL,description TEXT NOT NULL DEFAULT '',modifiers_json TEXT NOT NULL DEFAULT '{}',started_game_minute INTEGER NOT NULL DEFAULT 0,duration_days INTEGER,active INTEGER NOT NULL DEFAULT 0)`)
 	return path, world
 }
 

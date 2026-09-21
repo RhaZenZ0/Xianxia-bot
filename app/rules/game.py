@@ -258,6 +258,24 @@ class World:
     def location_safe_zone(self, name: str) -> bool:
         return bool(self.locations.get(name, {}).get("safe_zone", False))
 
+    def world_era_cycles(self) -> dict[str, Any]:
+        """The authored per-world era roster (v1.0.7)."""
+        return dict(self.data.get("world_era_cycles") or {})
+
+    def era_world_of(self, location: str | None) -> str:
+        """The world whose age applies to somebody standing here.
+
+        Answers "Mortal World" for a place the catalogue does not carry - a
+        household, an inner world, an abode - which is deliberately *unlike*
+        `app/bot/channels.py:world_of_location`, whose None is what keeps a
+        household's news out of a world's public feed (rc.52). Here the
+        question is which age of the world a cultivator is under, and being
+        indoors is not being outside history; schema 60 backfills every
+        pre-split row to the same answer.
+        """
+        world = str((self.locations.get(str(location or ""), {}) or {}).get("world") or "").strip()
+        return world or "Mortal World"
+
     def auction_house_at(self, location: str) -> tuple[str, dict[str, Any]] | None:
         for house_id, data in self.auction_houses.items():
             if str(data.get("location")) == location:

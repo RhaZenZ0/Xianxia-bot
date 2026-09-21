@@ -622,6 +622,16 @@ func bountyHunterActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID 
 		if err != nil {
 			return authoritativeMutation{}, err
 		}
+		// Fighting a hunter is a fight you chose, so a protected interior
+		// refuses it exactly as `combat.start` refuses a challenge (v1.0.6).
+		// Evading and surrendering stay open: one is walking away and the
+		// other is the way out, and a gate with no way out is a deadlock -
+		// the rule rc.56 wrote for the seclusion lockout.
+		if p.Action == "fight" {
+			if house, sanctuary := LocationIsSanctuary(catalog, fmt.Sprint(c["location"])); sanctuary {
+				return authoritativeMutation{}, fmt.Errorf("violence is suppressed on the floor of %s; evade, surrender, or take it outside", house)
+			}
+		}
 		attrs := decodeJSONMap(c["attributes_json"])
 		equip, err := equipmentPowerGo(conn, userID)
 		if err != nil {

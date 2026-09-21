@@ -30,7 +30,7 @@ class FakeDB:
     async def get_active_effects(self, user_id, game_minute): return [{"name": "Clear-Mind Pill"}]
     async def get_conditions(self, user_id, active_only=True): return []
     async def get_active_world_events(self, location=None): return [{"title": "River Lantern Festival", "event_type": "festival"}]
-    async def get_current_era(self): return {"name": "Era of Stirring Qi", "description": "Spirit veins are awakening."}
+    async def get_current_era(self, world="Mortal World"): return {"name": "Era of Stirring Qi", "description": "Spirit veins are awakening."}
     async def get_spirit_beasts(self, user_id): return [{"name": "Ashwing", "species": "Fire Crane", "active": 1, "loyalty": 64}]
     async def get_party(self, user_id): return {"name": "Jade Wanderers", "members": [{}, {}]}
     async def get_equipment(self, user_id, equipped_only=False): return [{"item_id": "jade_sword"}]
@@ -64,6 +64,14 @@ class FakeSIM:
 
 
 class FakeWorld:
+    # v1.0.7: production's World answers both of these, and a fake that
+    # answers neither cannot fail the way production fails.
+    def era_world_of(self, location):
+        return str((self.locations.get(str(location or ""), {}) or {}).get("world") or "") or "Mortal World"
+
+    def world_era_cycles(self):
+        return {}
+
     name = "Jade Meridian Realm"
     locations = {"Greenriver Town": {"world": "Mortal World", "description": "Town", "safe_zone": False}}
     npcs = {"Old Beggar Chen": {"role": "Apparently harmless old beggar"}}

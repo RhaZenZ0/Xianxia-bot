@@ -368,7 +368,7 @@ type combatStartPayload struct {
 // Player HP/HP-max are always read from the caller's own canonical
 // characters row, never from the payload, closing the trust gap the old
 // Python path left between "read character" and "insert battle".
-func combatStartAction(conn *storage.Conn, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
+func combatStartAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
 	var p combatStartPayload
 	if e := json.Unmarshal(raw, &p); e != nil {
 		return authoritativeMutation{}, e
@@ -393,6 +393,17 @@ func combatStartAction(conn *storage.Conn, userID int64, raw json.RawMessage) (a
 	}
 	if c.LifeStatus != "alive" {
 		return authoritativeMutation{}, errors.New("a deceased incarnation cannot enter battle")
+	}
+	// A challenge is a fight somebody chose to start, and a safe zone refuses
+	// one (v1.0.6). `app/bot/commands/battle.py` has printed this refusal since
+	// the command was written and this file named `SafeZone` nowhere, so the
+	// bound lived in the client - rc.48's rule, a fourth time. `event` is
+	// deliberately exempt: being caught in something is not the same as being
+	// handed it, which is rc.49's own asymmetry about the same kind of place.
+	if kind == "challenge" {
+		if suppressed, why := violenceSuppressed(catalog, c.Location); suppressed {
+			return authoritativeMutation{}, errors.New(why)
+		}
 	}
 	r, e := conn.Execute(`SELECT vitality,vitality_max FROM characters WHERE user_id=?`, []any{userID})
 	if e != nil {

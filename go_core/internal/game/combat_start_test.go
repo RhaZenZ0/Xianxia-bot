@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"xianxia/core/internal/storage"
+	"xianxia/core/internal/worlddata"
 )
 
 func setupCombatStartDB(t *testing.T) string {
@@ -54,7 +55,10 @@ func callCombatStart(t *testing.T, path string, userID int64, payload map[string
 	if err != nil {
 		t.Fatal(err)
 	}
-	mut, mutErr := combatStartAction(conn, userID, raw)
+	// An empty catalogue knows no locations, so the v1.0.6 safe-zone gate
+	// does not fire here; `violence_suppression_test.go` drives it against a
+	// catalogue that does.
+	mut, mutErr := combatStartAction(conn, worlddata.Catalog{}, userID, raw)
 	// combatStartAction only issues writes (an implicit BEGIN opens on the
 	// first one); the real dispatcher commits after every successful
 	// mutation and rolls back on error, so mirror that here rather than

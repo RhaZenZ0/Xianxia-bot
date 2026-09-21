@@ -34,22 +34,12 @@ type caravanSettlePayload struct {
 	GameMinute int64 `json:"game_minute"`
 }
 
-func currentEraModifierGo(conn *storage.Conn, key string, def float64) float64 {
-	r, e := conn.Execute(`SELECT modifiers_json FROM world_eras WHERE active=1 ORDER BY era_id DESC LIMIT 1`, nil)
-	if e != nil {
-		return def
-	}
-	row := firstRowMap(r)
-	if row == nil {
-		return def
-	}
-	m := decodeJSONMap(row["modifiers_json"])
-	if v, ok := m[key]; ok {
-		if f, e := strconv.ParseFloat(fmt.Sprint(v), 64); e == nil {
-			return f
-		}
-	}
-	return def
+// currentEraModifierGo is the age of the world a war is fought in or a caravan
+// crosses (v1.0.7: per world; it read the one global row before). `location` is
+// the territory key or the route's departure city - both are catalogue location
+// names, which is what makes the world resolvable here at all.
+func currentEraModifierGo(conn *storage.Conn, catalog worlddata.Catalog, location, key string, def float64) float64 {
+	return EraModifier(conn, EraWorldOf(catalog, location), key, def)
 }
 func sectMembershipRow(conn *storage.Conn, userID int64) (map[string]any, error) {
 	r, e := conn.Execute(`SELECT * FROM sect_membership WHERE user_id=?`, []any{userID})
@@ -192,7 +182,7 @@ func territoryWarActActionGo(conn *storage.Conn, catalog worlddata.Catalog, user
 		manorBonus = manorDefensePowerGo(conn, sect, fmt.Sprint(war["territory_key"]))
 		power += manorBonus
 	}
-	power = max64(1, int64(math.Round(float64(power)*math.Max(.25, currentEraModifierGo(conn, "war_pressure", 1)))))
+	power = max64(1, int64(math.Round(float64(power)*math.Max(.25, currentEraModifierGo(conn, catalog, fmt.Sprint(war["territory_key"]), "war_pressure", 1)))))
 	if e = ensureWarOperationGo(conn, p.WarID, p.GameMinute, now); e != nil {
 		return authoritativeMutation{}, e
 	}
@@ -435,9 +425,12 @@ func caravanSettleActionGo(conn *storage.Conn, catalog worlddata.Catalog, userID
 	if e != nil {
 		return authoritativeMutation{}, e
 	}
-	eraRisk := math.Max(.25, currentEraModifierGo(conn, "caravan_risk", 1))
 	resolved := []map[string]any{}
 	for _, data := range rowsToMaps(r) {
+		// Per caravan, not once for the batch (v1.0.7): the risk is the age of
+		// the world the road runs through, and one settle can bring in
+		// caravans that crossed different worlds.
+		eraRisk := math.Max(.25, currentEraModifierGo(conn, catalog, fmt.Sprint(data["origin"]), "caravan_risk", 1))
 		cargo := decodeJSONMap(data["cargo_json"])
 		payout := max64(0, i64(cargo["_payout"]))
 		currency := fmt.Sprint(cargo["_currency"])

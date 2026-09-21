@@ -114,7 +114,7 @@ func loadSeclusionCarried(conn *storage.Conn, catalog worlddata.Catalog, userID,
 			out.Effect = mulOrOne(mods, stat)
 		}
 	}
-	if name, mult, err := eraCultivationMultiplier(conn); err == nil && mult > 0 {
+	if name, mult, err := eraCultivationMultiplier(conn, characterEraWorld(conn, catalog, userID)); err == nil && mult > 0 {
 		out.Era, out.EraName = mult, name
 	}
 	manualName, manualGrade, manualElement, manualMult, _, err := manualCultivationMultiplier(conn, catalog, userID)

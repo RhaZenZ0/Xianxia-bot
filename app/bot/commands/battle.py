@@ -23,7 +23,7 @@ from ...rules.battle import matchup_label, suppression_label, vitality_band, vit
 from ...ops.game_engine import GameEngineError
 from ...rules.worldtime import MINUTES_PER_YEAR
 from ..channels import _report_game_ui_error
-from ..character_state import announce_quest_progress
+from ..character_state import record_quest_progress, announce_quest_progress
 from ..formatting import human_duration, roll_line
 from ..registry import EVENT_HANDLERS, registered_group_command, registered_root_command
 from ..runtime import (
@@ -337,10 +337,11 @@ async def _finish_battle(interaction:discord.Interaction,outcome:str,*,expected_
     # its consequence twice and neither may the journal.
     if not replayed:
         try:
-            await announce_quest_progress(interaction, await QUESTS.progress(
+            progressed = await record_quest_progress(
                 interaction.user.id, "combat_win", amount=1,
                 target=str(result.get("npc_name") or b.get("npc_name") or ""),
-                game_minute=wt.total_minutes))
+                game_minute=wt.total_minutes)
+            await announce_quest_progress(interaction, progressed)
         except Exception:
             log.exception("Quest progress update failed after a battle")
     if result.get("event_manifestation"):

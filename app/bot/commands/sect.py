@@ -62,7 +62,7 @@ from ...rules.sect_recruitment import (
 )
 from ..registry import registered_group_command
 from ..locations import DEAD, _known_locations, current_npc_location
-from ..character_state import announce_quest_progress
+from ..character_state import record_quest_progress, announce_quest_progress
 from ..formatting import player_property_facility_lines, player_property_unbuilt
 from ..services import PLAYER_PROPERTY_FACILITY_LABELS, QUESTS, SIM
 from ..threads import ensure_sect_abode_record, ensure_sect_abode_thread_for
@@ -448,15 +448,13 @@ async def sect_recruitment_trial(interaction: discord.Interaction, sect_name: st
         when="study it now" if tier<=int(c.get('realm_index',0)) else f"study it once you reach **{WORLD.realm_name(tier)}**"
         text+=(f"\n📕 **{sect_name}** bestows its entry inheritance: **{granted.get('name','a manual')}** is in your inventory — "
                f"{when} with **/cultivation → Arts → Study**.")
-    await interaction.response.send_message(text,ephemeral=False)
     # The "A Road Toward a Sect" quest's sect_trial objective was never
     # reported anywhere, so the quest could not complete (found while building
-    # the Quest Forge, v0.20.6).
-    try:
-        wt_trial = await current_world_time()
-        await announce_quest_progress(interaction, await QUESTS.progress(interaction.user.id, "sect_trial", amount=1, game_minute=wt_trial.total_minutes))
-    except Exception:
-        log.exception("Quest progress update failed after sect trial")
+    # the Quest Forge, v0.20.6). Recorded before the reply, told after (v1.0.5).
+    wt_trial = await current_world_time()
+    progressed = await record_quest_progress(interaction.user.id, "sect_trial", amount=1, game_minute=wt_trial.total_minutes)
+    await interaction.response.send_message(text,ephemeral=False)
+    await announce_quest_progress(interaction, progressed)
 
 
 @registered_group_command(sect_recruitment_group, name="history", description="Review your recent sect recommendation and entrance-trial history")

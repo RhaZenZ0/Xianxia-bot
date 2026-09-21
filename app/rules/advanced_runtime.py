@@ -145,32 +145,13 @@ BOSS_TEMPLATES: dict[str, dict[str, Any]] = {
     },
 }
 
-ERA_CYCLE: tuple[dict[str, Any], ...] = (
-    {
-        "name": "Jade Meridian Awakening Era",
-        "description": "Spiritual veins awaken and new inheritances surface across the four worlds.",
-        "duration_days": 180,
-        "modifiers": {"cultivation_gain": 1.05, "secret_realm_frequency": 1.10},
-    },
-    {
-        "name": "Hundred Sects Strife Era",
-        "description": "Competition over spirit veins hardens into open territorial conflict.",
-        "duration_days": 120,
-        "modifiers": {"war_pressure": 1.25, "market_volatility": 1.10},
-    },
-    {
-        "name": "Beast Tide Era",
-        "description": "Ancient bloodlines stir and spirit beasts migrate in destructive tides.",
-        "duration_days": 90,
-        "modifiers": {"beast_encounter_rate": 1.35, "caravan_risk": 1.15},
-    },
-    {
-        "name": "Quiet Heaven Era",
-        "description": "After upheaval, the heavens settle and orthodox institutions rebuild order.",
-        "duration_days": 150,
-        "modifiers": {"recovery_rate": 1.10, "crime_pressure": 0.85},
-    },
-)
+# `ERA_CYCLE` stood here until v1.0.7: a third copy of the era roster, beside
+# the Go literal in `advanced_maintenance.go` and the rows in `world_eras`,
+# carrying the numbers of a cycle that ran 540 world days for the whole game.
+# The roster is `world_era_cycles` in content/world.json now - one cycle per
+# world - and `describe_era` resolves a row against it rather than against a
+# list kept here, which is the fault rc.39 removed for the world clock and
+# rc.44 for the world currencies.
 
 BOUNTY_HUNTER_TITLES = (
     "Iron Badge Constable", "Black-Cloak Pursuer", "Seven Provinces Tracker",
@@ -191,7 +172,37 @@ def boss_encounter_phase(encounter: dict[str, Any]) -> dict[str, Any]:
     return dict(phases[min(max(0, int(encounter.get("phase_index", 0))), len(phases) - 1)])
 
 
-def describe_era(era: dict[str, Any] | None) -> dict[str, Any] | None:
+def era_template(
+    cycles: dict[str, Any] | None, name: str, world: str = ""
+) -> dict[str, Any] | None:
+    """The authored entry for an era, by name, out of `world_era_cycles`.
+
+    The roster is **injected** rather than imported: `WORLD` is built in
+    `app/bot/runtime.py`, and `test_app_layout.py` puts `rules` at the bottom of
+    the layering, so this module cannot reach it. That is the same reason
+    `narrator.py` takes a duck-typed `npc_resolver` (rc.27).
+
+    Resolved by **name across every world** rather than by the row's `world`,
+    for two reasons. A row written before schema 60 carries no world at all and
+    must still find its template; and the content gate holds era names unique
+    across the four cycles precisely so a name is enough - `advanceWorldEra`
+    finds a world's place in its own cycle the same way.
+    """
+    cycles = cycles or {}
+    if world:
+        for entry in cycles.get(world) or ():
+            if str(entry.get("name")) == name:
+                return dict(entry)
+    for cycle in cycles.values():
+        for entry in cycle or ():
+            if str(entry.get("name")) == name:
+                return dict(entry)
+    return None
+
+
+def describe_era(
+    era: dict[str, Any] | None, cycles: dict[str, Any] | None = None
+) -> dict[str, Any] | None:
     """An era row with the cycle template's modifiers and duration folded in.
 
     Old databases stored the baseline era before modifiers became
@@ -202,7 +213,7 @@ def describe_era(era: dict[str, Any] | None) -> dict[str, Any] | None:
     if not era:
         return None
     out = dict(era)
-    template = next((entry for entry in ERA_CYCLE if entry["name"] == str(out.get("name"))), None)
+    template = era_template(cycles, str(out.get("name")), str(out.get("world") or ""))
     if template:
         merged = dict(template.get("modifiers") or {})
         merged.update(out.get("modifiers") or {})

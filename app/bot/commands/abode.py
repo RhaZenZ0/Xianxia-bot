@@ -15,7 +15,7 @@ from ...ops.game_engine import GameEngineError
 from ..formatting import player_property_emoji, player_property_facility_lines, player_property_unbuilt
 from ..pickers import usable_item_autocomplete
 from ..registry import registered_group_command, registered_root_command
-from ..character_state import announce_quest_progress
+from ..character_state import record_quest_progress, announce_quest_progress
 from ..runtime import _explain_engine_error, DB, ENGINE, WORLD, current_world_time, log, player_property_label, reply_long, require_character, serialized_user_action
 from ..services import GUILD, PLAYER_PROPERTY_FACILITY_KEYS, PLAYER_PROPERTY_FACILITY_LABELS, QUESTS
 from ..threads import ensure_abode_thread, open_expedition_thread_after_exit
@@ -294,16 +294,15 @@ async def array_use(interaction:discord.Interaction,array:str)->None:
         if int(exchange.get('remainder',0)):
             text+=(f" **{int(exchange.get('remainder',0))}** would not divide and stays in the old money, "
                    "waiting for you on the far side.")
-    await interaction.followup.send(text,ephemeral=False)
+    # Recorded before the reply and told after (v1.0.5), and only when the
+    # transit actually changed world - an array between two cities of the same
+    # world is travel, not an ascension.
+    progressed: list[dict] = []
     if exchange:
-        # Reported after the reply, and only when the transit actually changed
-        # world - an array between two cities of the same world is travel, not
-        # an ascension.
-        try:
-            await announce_quest_progress(interaction, await QUESTS.progress(
-                interaction.user.id, "world_cross", game_minute=wt.total_minutes))
-        except Exception:
-            log.exception("Quest progress update failed after a world crossing")
+        progressed = await record_quest_progress(
+            interaction.user.id, "world_cross", game_minute=wt.total_minutes)
+    await interaction.followup.send(text,ephemeral=False)
+    await announce_quest_progress(interaction, progressed)
 
 
 @registered_root_command(name="spatialkey",description="Use a spatial key/token to open its linked secret dimension",guild=GUILD)

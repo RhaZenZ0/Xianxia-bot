@@ -26,7 +26,7 @@ const concurrencySchema = `
 CREATE TABLE world_simulation_state(system TEXT PRIMARY KEY,last_game_minute INTEGER,interval_game_minutes INTEGER,last_run_real REAL,runs INTEGER);
 CREATE TABLE economy_markets(location TEXT,item_id TEXT,world_name TEXT,currency_id TEXT,base_price INTEGER,supply INTEGER,demand INTEGER,price_index REAL,last_game_minute INTEGER,updated_at REAL,PRIMARY KEY(location,item_id));
 CREATE TABLE civilization_regions(location TEXT PRIMARY KEY,world_name TEXT,population INTEGER,prosperity INTEGER,security INTEGER,spirit_resources INTEGER,food_supply INTEGER,migration_pressure INTEGER,unrest INTEGER,last_game_minute INTEGER,updated_at REAL);
-CREATE TABLE world_eras(era_id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT,description TEXT,active INTEGER,modifiers_json TEXT,started_game_minute INTEGER,ends_game_minute INTEGER,updated_at REAL);
+CREATE TABLE world_eras(era_id INTEGER PRIMARY KEY AUTOINCREMENT, world TEXT NOT NULL DEFAULT 'Mortal World',name TEXT,description TEXT,active INTEGER,modifiers_json TEXT,started_game_minute INTEGER,ends_game_minute INTEGER,updated_at REAL);
 INSERT INTO world_simulation_state VALUES('dynamic_economy',0,720,0,0);
 INSERT INTO civilization_regions VALUES('Greenriver Town','Mortal World',1000,50,50,50,50,0,0,0,0);
 INSERT INTO economy_markets VALUES('Greenriver Town','spirit_herb','Mortal World','low_spirit_stone',100,50,50,1.0,0,0);
