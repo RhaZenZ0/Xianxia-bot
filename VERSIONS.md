@@ -6,6 +6,33 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.13** teaches the playtest sweep to tell a question it is being asked from a control the answer
+came with.
+
+The Discord harness presses every leaf of every hub and answers whatever the reply puts in front of
+it. Once v1.0.12 raised the player past the curriculum's ceiling, `/battle challenge` **resolved**
+for the first time in the harness's life - every earlier run pressed that leaf and not one of them
+ever began a battle - and it failed at once. A resolved challenge posts a battle panel, whose
+technique and recovery pickers are disabled for a cultivator with no Law techniques and nothing to
+drink, each carrying a single option that says so; the sweep took the first picker on the reply
+without asking whether anybody could use it. A real player could not click it either, which is what
+the simulator said and what the harness now believes. The skip lives in the one helper both
+answerers reach, so the scripted half gets it too, and a disabled *button* is still a failure -
+that one means the panel timed out. What it does not do is count a held-back leaf as covered: a leaf
+pressed only into a refusal has had only its refusal proved, which is the engine harness's own rule
+from rc.58 arriving on this side, and `docs/TODO.md` carries what closing it would take.
+
+It also finishes counting the fifteen minutes v1.0.12 removed from five files. The harness jumped a
+panel's clock **901 seconds** - not the number, an *encoding* of it, one second past a deadline
+stated somewhere else - so no search for it could have found it, and raising the default left the
+step moving a panel an eighth of the way to its deadline and reporting that it would not expire. It
+reads the window the run is configured with now, and the harness pins that window where it pins
+every other setting. Both bounds on it were measured: waiting the shipped two hours out costs minutes
+of woken workers for no extra assurance, and a one-minute window never settles at all, because a
+view timer that near counts as runnable. Then an ordinary suite run found the eighth, spelled out
+this time as a marker inside a gate, which went red the moment the step was corrected - a check that
+pins how a rule is written fails exactly when the rule is fixed.
+
 **1.0.12** runs the playtest for the first time in four releases, and it went red on a hundred steps.
 
 The Discord harness presses every leaf of every hub and holds one thing about each: it was drawn and
@@ -480,9 +507,13 @@ staged authority cleanup: forage, crafting and companions, canonical time, unifi
 road travel, caravans, dashboard-owned Discord setup, and the removal of the obsolete Python
 mechanical authority paths.
 
-## Release status — v1.0.12
+## Release status — v1.0.13
 
-- Current release: v1.0.12 - the Discord playtest can see the curriculum again and presses every
+- Current release: v1.0.13 - the playtest sweep tells a question it is being asked from a control
+  the answer came with, so a leaf that finally resolves is pressed rather than refused, and the
+  quiet step waits out whatever window is configured instead of the one it was written against.
+  Harness and documentation only; no schema, no production behaviour.
+- v1.0.12: the Discord playtest can see the curriculum again and presses every
   leaf, a GM lever addresses the player it was given rather than an id a float rounded off, and a
   hub panel stays open for as long as `HUB_PANEL_IDLE_MINUTES` says. No schema.
 - v1.0.11: a GM can grant a physique and can only set a root grade the ladder

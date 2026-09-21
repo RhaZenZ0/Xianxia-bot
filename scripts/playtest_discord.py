@@ -45,6 +45,23 @@ from playtest_common import Report, bootstrap, launch_engine, step, stop_engine 
 
 GUILD_ID = 900000000000000001
 HEALTH_PORT = 18182  # 1..65535 is enforced by the settings; the engine playtest's own port is 18089
+# How long a hub panel stays open **under the harness** (v1.0.13). It is a
+# setting, so it belongs in the environment block below with every other thing
+# this run pins, and the one step that waits a panel out reads it back through
+# `panel_timeout()` rather than restating it.
+#
+# It is bounded from both sides and neither bound is arbitrary. **Long enough**
+# that the leaf sweep never expires a panel out from under itself: a page is
+# opened once and every leaf on it pressed, and an expired panel disables its
+# own controls, which the sweep correctly reports as a failure. **Short enough**
+# that jumping the clock past it is cheap: the jump wakes every periodic worker
+# for that much virtual time, and at the shipped 120 minutes the quiet step went
+# from instant to minutes of woken workers for no extra proof. One minute is too
+# short at the other end - a view timer that near counts as runnable and the
+# settle after it never completes (the rc.35 lesson), which is measured, not
+# guessed. Fifteen is what the harness in fact ran against for twenty-six
+# releases before the setting existed.
+PANEL_IDLE_MINUTES = 15
 CONTROL_TOKEN = "simcord-playtest-control"  # the GM dashboard's shared secret with the bot
 PLAYER_NAME = "Shen Rui"
 
@@ -93,6 +110,7 @@ def _configure(url: str, token: str, db_path: str) -> None:
         "DISCORD_TOKEN": "simcord-playtest-token", "GUILD_ID": str(GUILD_ID),
         "GAME_ENGINE_URL": url, "ENGINE_AUTH_TOKEN": token, "DATABASE_PATH": db_path,
         "NARRATOR_PROVIDER": "procedural", "HEALTH_PORT": str(HEALTH_PORT),
+        "HUB_PANEL_IDLE_MINUTES": str(PANEL_IDLE_MINUTES),
         # The bot hosts the GM dashboard's control plane on the health port;
         # without a token `HealthServer` answers 404 and section 2b cannot run.
         "BOT_CONTROL_TOKEN": CONTROL_TOKEN,
@@ -187,7 +205,18 @@ def section_button(components: Any, label: str) -> str | None:
 
 
 def select_by_placeholder(components: Any, prefix: str) -> dict[str, Any] | None:
+    """The first live select whose placeholder starts with `prefix`.
+
+    **Disabled ones are not selects to answer (v1.0.12).** SimCord refuses a
+    click on one - *"a real user could not interact with it"* - and it is right
+    to: the control is on screen to say why it is empty, not to be used. Both
+    answerers below call `prefix=""`, meaning *any* select on the message, and
+    a message may be the action's own **result** rather than a question it is
+    asking; see `answer_generically`.
+    """
     for node in _walk(components):
+        if node.get("disabled"):
+            continue
         if node.get("type") in (3, 5, 6, 7, 8) and str(node.get("placeholder") or "").startswith(prefix):
             return node
     return None
@@ -392,7 +421,23 @@ async def answer_generically(hubs: Any, actor: Any, action: Any, result: Any, *,
     is confirmed, a modal is filled with canned values, a picker takes its
     first option, a member picker the second member, a channel picker the
     first channel, until the action has run or the hub has said there is
-    nothing to choose from. Returns the last result and how it was reached."""
+    nothing to choose from. Returns the last result and how it was reached.
+
+    **A disabled control is not an input step (v1.0.12).** The scans below skip
+    one, because the sweep reads the *result's* message and a result may carry
+    controls of its own: a resolved `/battle challenge` posts a `BattleView`
+    whose two selects are `disabled=not available`, so a cultivator with no Law
+    techniques and nothing to drink gets two dead pickers with a single
+    explanatory option each. Taking the first select on the message could not
+    tell that from the picker the action is actually asking about, and SimCord
+    refused the click with *"That component is disabled - a real user could not
+    interact with it"*, which is exactly right: a real user could not.
+
+    It had never come up because the challenge had never *resolved* in a sweep
+    - at realm 0 it finds no target - and v1.0.12's realm raise is what reached
+    it. That is rc.58's `REFUSAL_ONLY_OPERATIONS` lesson on the Discord side:
+    **driven means resolved**, and a leaf only ever driven into a refusal has
+    had only its refusal proved."""
     specs = {spec.label: spec for spec in hubs._inputs_for(action)}
     answered: set[str] = set()
     how: list[str] = []
@@ -407,7 +452,8 @@ async def answer_generically(hubs: Any, actor: Any, action: Any, result: Any, *,
         if message is None:
             break
         components = message.components
-        button = next((n for n in _walk(components) if n.get("type") == 2 and str(n.get("custom_id")) not in answered
+        button = next((n for n in _walk(components) if n.get("type") == 2 and not n.get("disabled")
+                       and str(n.get("custom_id")) not in answered
                        and (str(n.get("label") or "").startswith("Yes, ") or str(n.get("label") or "") == "Continue")), None)
         if button is not None:
             answered.add(str(button["custom_id"]))
@@ -559,6 +605,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
     from app.bot.runtime import SETTINGS
     from app.bot.services import GUILD
     from app.bot import hubs as hub_registry  # `hubs` is section 4's step below
+    from app.bot.hubs import panel_timeout
     from app.bot.surface import _HUB_COMMANDS, TREE_COMMANDS
 
     logging.getLogger("httpx").setLevel(logging.WARNING)  # one line per engine round trip is not a report
@@ -1222,17 +1269,30 @@ async def run(url: str, token: str, db_path: str) -> Report:
 
         # ---- 9. a panel goes quiet ------------------------------------------------
         async def quiet():
+            # The window is **read**, never written down here (v1.0.13). This
+            # used to jump **901 seconds** - not the deadline but an *encoding*
+            # of it, one second past the `timeout=900` five production files
+            # spelled out, so no search for the number could have found that
+            # seventh copy; raising the default to 120 minutes left it moving a
+            # panel an eighth of the way to its deadline and then reporting
+            # that the panel would not expire. `PANEL_IDLE_MINUTES` at the top
+            # of this file is what the run is configured with and why; the step
+            # only has to agree with it, which reading `panel_timeout()` is.
+            window = panel_timeout()
+            expect(window is not None,
+                   "HUB_PANEL_IDLE_MINUTES is 0 for this run, so no panel ever expires and this step "
+                   "cannot be driven; PANEL_IDLE_MINUTES at the top of this file sets it")
             panel = await open_hub(player, channels["begin-here"], "family")
             # The jump settles before it moves the clock and again after; a
             # settle that gives up on the way in leaves the clock where it was,
             # and one on the way out leaves the workers the jump woke still
             # talking to a busy engine. So: quiet first, jump, and if the jump
-            # gave up, wait the workers out and jump once more (a second
-            # fifteen minutes changes nothing the step holds).
+            # gave up, wait the workers out and jump once more (a second jump
+            # past the same deadline changes nothing the step holds).
             await settle_patiently(env)
             for _ in range(2):
                 try:
-                    await env.advance_time(901)
+                    await env.advance_time(int(window) + 1)
                     break
                 except TimeoutError:
                     await settle_patiently(env)
@@ -1252,7 +1312,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
             except SetupError as exc:
                 return f"buttons disabled: {exc}"
             raise Failed("the panel still takes presses after its timeout:\n" + text[:400])
-        note = await step(report, "a panel left for fifteen minutes goes quiet and can be reopened", quiet())
+        note = await step(report, "a panel left past its idle window goes quiet and can be reopened", quiet())
         if note:
             report.add("PASS", "how it went quiet", note)
 

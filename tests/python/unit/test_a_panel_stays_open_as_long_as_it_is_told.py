@@ -24,6 +24,17 @@ number the way it already registers the four gates - the shape
 module default is the old fifteen minutes, so a missed registration is the
 behaviour this release started from rather than a panel that never expires: a
 presentation default that failed towards *never* would leak.
+
+**Six, then seven.** The gate above swept production only, so it walked past a
+`timeout=900` pinned as a string in `test_gui_integrity.py` - a gate that cannot
+see the thing it forbids (rc.47), one directory over; that literal is gone. The
+seventh was not a literal at all: `scripts/playtest_discord.py` jumped a panel's
+clock **901 seconds**, an *encoding* of the deadline rather than the deadline, so
+no search for `900` could have found it. Raising the default left that step
+moving a panel an eighth of the way to its deadline and reporting that it would
+not expire. It is held here because the harness is the only thing that exercises
+this setting end to end, and a step written against one number proves that number
+rather than the setting.
 """
 from __future__ import annotations
 
@@ -124,6 +135,38 @@ class TheIdleWindowIsOneNumber(unittest.TestCase):
         self.assertIn("HUB_PANEL_IDLE_MINUTES", (PROJECT_ROOT / ".env.example").read_text(encoding="utf-8"))
         self.assertIn("HUB_PANEL_IDLE_MINUTES",
                       (PROJECT_ROOT / "docs" / "CONFIGURATION.md").read_text(encoding="utf-8"))
+
+
+class TheHarnessWaitsTheConfiguredWindowOut(unittest.TestCase):
+    """The playtest's quiet step must read the window, not restate it."""
+
+    def setUp(self):
+        self.source = (PROJECT_ROOT / "scripts" / "playtest_discord.py").read_text(encoding="utf-8")
+        self.tree = ast.parse(self.source)
+        self.jumps = [node for node in ast.walk(self.tree)
+                      if isinstance(node, ast.Call)
+                      and isinstance(node.func, ast.Attribute)
+                      and node.func.attr == "advance_time"]
+        # A reader asserted before it is trusted (rc.57): a walk that silently
+        # finds nothing would make every assertion below vacuous.
+        self.assertTrue(self.jumps, "no advance_time call found in the harness; the gate is broken, not the tree")
+
+    def test_the_jump_is_not_a_number_of_its_own(self):
+        offenders = [f"advance_time({ast.unparse(node.args[0])}) at line {node.lineno}"
+                     for node in self.jumps
+                     if node.args and isinstance(node.args[0], ast.Constant)
+                     and isinstance(node.args[0].value, (int, float))]
+        self.assertEqual(offenders, [], (
+            "the harness jumps a panel's clock by a number of its own rather than by the window "
+            "panel_timeout() answers. 901 seconds was the seventh copy of the fifteen minutes this "
+            f"release removed - an encoding of it, which no search for the number finds: {offenders}"))
+
+    def test_the_quiet_step_asks_the_helper(self):
+        self.assertTrue(
+            any(isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+                and node.func.id == "panel_timeout" for node in ast.walk(self.tree)),
+            "the harness never calls panel_timeout(), so the one step that waits a panel out is "
+            "written against whatever number it was authored with rather than the configured window")
 
 
 if __name__ == "__main__":  # pragma: no cover

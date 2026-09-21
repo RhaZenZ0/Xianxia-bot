@@ -326,7 +326,16 @@ class TheDiscordHalfIsAScriptInTheTree(unittest.TestCase):
                        '"Open Character Form"', '"player-homes"', '"quests"', '"menu"', "🔒 Enter — you are already inside",
                        '"Errand"', "typed_play_prefix", "typed_play_shorthand", '"cooldowns"', '"Realm Capitals"',
                        "Hearth-Return Talisman", "📜 Quest progress", '"Support"', '"Contribute"', '"Enter"', "Yes, Leave",
-                       "Choose destination", "advance_time(901)", '"Reopen"', "env.errors",
+                       "Choose destination", "advance_time(", '"Reopen"', "env.errors",
+                       # **The number left this list in v1.0.12.** It was
+                       # `advance_time(901)` - the *eighth* copy of the fifteen
+                       # minutes that release removed, and the only one written
+                       # into a gate. A marker that pins how a step is *spelled*
+                       # fails exactly when the step is corrected, which is the
+                       # one time it should stay green (v1.0.8). What this list
+                       # is for is that the loop is driven at all; whether the
+                       # jump is read off the configured window is held by
+                       # `TheHarnessWaitsTheConfiguredWindowOut`.
                        # v1.0.0-rc.59: the layout half. The sweep is what proves the
                        # re-parent reaches a server that already exists, so the three
                        # assertions that read it are pinned here by name.

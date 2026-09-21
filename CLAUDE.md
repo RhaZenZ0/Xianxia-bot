@@ -3736,6 +3736,84 @@ the container ran 3.11 and the other machine 3.13. It is in `BUILTINS` beside `_
 provides more, which is the same class as a fixture that cannot fail the way production fails: the
 environment was never part of what it was checked against.
 
+### A disabled control is not a question (v1.0.13)
+
+Once v1.0.12 raised the player past the curriculum's ceiling, `/battle challenge` **resolved** for
+the first time in the harness's life - every previous run's note for that leaf is the target picker's
+own prompt and no run ever began a battle - and it immediately failed with SimCord's *"That component
+is disabled - a real user could not interact with it"*. Which of the raised player's differences
+reached it is not recorded and is not the finding; that a leaf can be pressed for releases without
+ever resolving is.
+
+A resolved challenge starts a battle and posts a `BattleView`, whose `BattleTechniqueSelect` and
+`BattleRecoverySelect` are `disabled=not available`: a cultivator with no Law techniques and nothing
+to drink gets two dead pickers carrying one explanatory option each. `answer_generically` walks an
+action's input steps by taking the first select on the **result's** message - and a result may carry
+controls of its own, which is precisely what it could not tell apart. SimCord's refusal was correct
+in both directions: a real player could not click it either.
+
+**The tell was in the payload all along**, as `disabled`, and the sweep never read it. The skip is in
+`select_by_placeholder`, the one helper both answerers reach, rather than copied into each scan - and
+it reaches the scripted answerer too, which would have failed one step later and less legibly, with
+*"nothing to answer the picker 'Use a Law technique' with"*. A disabled **leaf button** is
+deliberately still a failure: that one means the panel timed out, which is a finding rather than a
+control explaining itself.
+
+**And this is rc.58's lesson arriving on the Discord side.** That release tightened the engine
+harness's coverage rule from *called* to **resolved**, because `law.technique` was driven only into a
+designed refusal and its capstone had been broken for twelve releases. The leaf sweep counts a leaf
+as covered when it was pressed and answered - and a leaf that has only ever been pressed into a
+refusal has had only its refusal proved. Nothing gates this: raising the realm is what reached it,
+and what the next such leaf needs is the same thing, a player who can actually do the thing.
+
+### The number that was not the number (v1.0.13)
+
+v1.0.12 took a bare `timeout=900` out of five production files and gated a panel view against
+carrying its own. Its drill then found a **sixth**, a literal pinned as a *string* in
+`test_gui_integrity.py`, which that gate had walked past because it swept production only - a gate
+that cannot see the thing it forbids (rc.47), one directory over. Both are in that release. The
+seventh and eighth are here, and they say different things.
+
+**The seventh was never spelled.** `scripts/playtest_discord.py`'s quiet step jumped the clock
+**901 seconds** - not the number at all but an *encoding* of it, one second past a deadline stated
+somewhere else - so no search for `900`, and no gate reading production for a literal, could ever
+have found it. Raising the default to 120 minutes left it moving a panel an eighth of the way to its
+deadline and then reporting that the panel would not expire.
+
+**The window is a setting, so the harness pins one and the step reads it back.** `PANEL_IDLE_MINUTES`
+sits at the top of `playtest_discord.py` with `HEALTH_PORT` and the workers' off switches - the
+environment block that is set before the bot is imported - and `quiet()` asks `panel_timeout()` what
+it came out as. That is the whole rule: the run states the window once, in the place a run states
+things, and no step restates it.
+
+**Both bounds on that number were measured, not chosen, and each is a rule of its own.** Too long and
+the *jump* is the cost: waiting the shipped 120 minutes out wakes every periodic worker for two hours
+of virtual time, and the step went from instant to minutes still running - for no proof the unit gate
+does not already give about the shipped default. Too short and the panel never settles: at one minute
+the run printed `BaseView.__timeout_task_impl: unknown wait (Future)` with *163 recognized waits
+parked*, which is rc.35's finding exactly - **a bot-owned wake near enough to count as runnable is a
+settle that never completes** - so the failure is not even in the step, it is in the `open_hub` before
+it. In between, the sweep's own constraint: **long enough that a page is never expired out from under
+itself**, because the leaf sweep opens a page once and presses every leaf on it, and an expired panel
+disables its controls - which the sweep reports as a failure, correctly, and which is the neighbouring
+finding in this same release. Fifteen is what the harness in fact ran against for twenty-six releases
+before the setting existed.
+
+**The eighth was spelled, and it was in a gate.** `test_playtest_gate.py` proves the harness still
+drives each loop by pinning a marker string per loop, and its marker for this one was the literal
+`advance_time(901)` - so correcting the step turned that gate red. Which is the v1.0.8 lesson
+exactly: **a gate that pins how a rule is *written* rather than that it holds fails precisely when
+the rule is corrected, which is the one time it should stay green** - the same call v1.0.9 and
+v1.0.10 each made for a hand-copy of the command tree's tuple, and v1.0.12 for the fifth. The marker
+is `advance_time(` now, which is what that list is actually for; whether the jump is read off the
+configured window belongs to `TheHarnessWaitsTheConfiguredWindowOut`, and a fact asserted in two
+places is free to disagree.
+
+**A restated constant need not be spelled to be a copy**, and that is why the seventh was invisible
+while the eighth fell out of an ordinary run. The new gate is narrow on purpose - `advance_time` may
+not take a numeric literal, and the harness must call `panel_timeout()` - because the class is wider
+than any gate: what it can catch is a number written down where a window should be read.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —
