@@ -2668,6 +2668,179 @@ read-by-`RowsAffected` idiom, so all 27 candidates were false positives — one 
 every hit needs hand-checking is not a gate, and shipping it as one would be the decoration this
 file spends its length naming.
 
+### The reply that raised after the cost was paid (v1.0.3)
+
+Reported from live play as **"it doesn't let you craft but also takes your items"** - by a player
+whose bag held six of the pills they had been told they never made.
+
+`craftResolveAction` built its result by hand and shipped the flattened `d1`/`d2`, no `degree` and
+no `roll` map; `roll_line` in the bot reads `die1`, `die2` and `degree`, and `_run_crafting` passed
+it `SimpleNamespace(**resolved)`, the whole result. So **every craft that got past the materials
+check raised `AttributeError: no attribute 'die1'`** - and it raised on the *reply*, which is after
+`applyAuthoritative` has committed. The materials were spent, the output granted, the profession XP
+credited, the examination offered, and the player was shown one of the three wiring-failure strings
+and told nothing had happened.
+
+**v1.0.1 found and fixed exactly this for `forageResolveAction`, in the same file, forty lines
+below.** Its own note says the forage result *"flattened `d1`/`d2` and dropped the degree while
+`roll_line` reads `die1`/`die2`/`degree`"* and that the result now carries the roll map whole. The
+craft above it kept the fault for two more releases.
+
+**Neither harness could see it, and the reason is the seam.** The engine half drives `craft.resolve`
+and asserts on the result *map*, never rendering a reply. `scripts/playtest_discord.py` names
+`craft` nowhere, so `/craft` is reached only by the generic leaf sweep, which fills the recipe modal
+with a canned value and gets the **designed** "missing materials" refusal - which the coverage gate
+accepts, correctly. Each half proved its own side and the key names between them were proved by
+neither. That is why the forage version *was* caught by the sweep and this one was not: a forage
+leaf can succeed with nothing in the bags and a craft cannot.
+
+**There are two right ways to ship a roll and craft did neither.** An action may merge the roll map
+into its result (`for k, v := range roll`, which `beastTameAction` and `pvpActAction` do) or carry
+it nested under `"roll"` (`forageResolveAction`, and now the craft). `TestAResultThatReportsARollReportsTheWholeRoll`
+is the rule, stated once, in Go: a result carrying `"d1"` must carry `"roll"` beside it.
+
+**The Python gate had to be narrowed to stay true, and its own first run said so.** It began as a
+sweep over every `roll_line` call site forbidding the whole result as an argument, and reported
+three findings that were not findings - `beast_tame` and `duel_act`, which merge the roll and are
+correct. Two statements of one rule are free to disagree and the weaker one produces the false
+findings, which is the call v1.0.1 made about its own table-level sweep; the sweep is gone and what
+is left is the regression and the reader it depends on. Its drills print the finding, the reader
+failing first, and - for the Go half - `crafting_actions.go:550` by position.
+
+### What losing a fight leaves you (v1.0.3)
+
+`fatalChance` is `min(75, 8+gap*3)`, so against a same-realm opponent a defeat is fatal eight times
+in a hundred. The other ninety-two took the non-fatal branch, which applied a `flesh_wound` and
+wrote no vitality at all - leaving `characters.vitality` on whatever `MAX(0, vitality-dmg)` had
+reached, which at the end of a losing fight is **0**. Meanwhile the two *fate-rescue* branches - the
+rarer and strictly worse outcome, where the blow killed you and a fate point was burned to undo it -
+each wrote `vitality=1` outright. Four copies of "you lost and lived", and two of them disagreed
+with the other two about whether surviving means having a heartbeat.
+
+**Nothing in this tree regenerates vitality with time.** Twelve `SET vitality` statements in
+`go_core`, four of them damage, and not one keyed on rest, cultivation, seclusion or the tick: four
+pills and one technique are the whole of it. So zero was not a state anybody waited their way out
+of, while `/battle` printed *"You survive but are incapacitated"* over it - a word the engine never
+enforced anywhere.
+
+`survivedDefeatTx` is the one door, and it uses `MAX` rather than `=` because it is a floor under a
+survivor, not a number to be set.
+
+**And the treatment spent the medicine.** `recovery_pill` is the named treatment for both combat
+injuries *and* the cheapest thing in the game carrying `use.instant.vitality_restore` - and
+`condition.treat` consumed it for the roll and restored nothing, while `item.use` restored 8 and
+cleared no condition. One pill did one of two jobs and a player needed two to get back where they
+started, at the end of the losing fight that had just put them on zero. The treatment does what the
+treatment item does now, applied whether or not the roll landed, because the pill was swallowed
+either way. Only `recovery_pill` carries an instant restore, so this reaches exactly the two
+conditions that leave a cultivator at zero and `jade_life_herb`, `heart_calming_pill` and
+`purging_phoenix_pill` are untouched by construction.
+
+**The behavioural test passed against the broken tree, and its drill is what said so.**
+`TestSurvivingADefeatLeavesAHeartbeat` calls `survivedDefeatTx` directly, so restoring the bare
+`applyCombatCondition` at a call site left it green: it proves the helper works and says nothing
+about whether the four branches use it - which is the whole fault. `TestEveryDefeatBranchGoesThroughTheDoor`
+is the missing half, reading the call sites by AST and keyed on the `sourceType` argument
+(`"battle"` or `"fate_rescue"`), and it names both sites when either is reverted. That is v1.0.1's
+`test_release_notes.py` lesson arriving one release later in Go.
+
+**What is deliberately not built is rest.** That the game has no passive vitality recovery at all is
+a mechanic rather than a wiring, and inventing one unasked is the thing this file exists to refuse.
+It is in `docs/TODO.md` with that reason.
+
+### The seventh path (v1.0.3)
+
+`content/world.json` offers **seven** cultivation paths. `app/rules/advanced_catalog.py` line 5
+names **six**, and `path = PATHS[i % len(PATHS)]` builds the whole generated catalogue off it - so
+of 160 manuals, **none** named the Ghost Cultivator. Not one. The proof is arithmetic: all 142
+generated ids satisfy `((n-1) % 6)` against that six-tuple with zero mismatches.
+
+Meanwhile `death_qi_system` opens with `"path": "Ghost Cultivator"`, names two of the thirteen
+households as its own, and carries ground multipliers, hour multipliers, a corruption ladder and six
+ghost forms - served by `death_qi.go`, three hundred lines with its own harvest action. **The
+deepest path-specific subsystem in the game belonged to the one path that could not practise a
+method.** A hardcoded copy of a content vocabulary, missing a member, which is the class rc.39 and
+rc.44 each removed for a different vocabulary.
+
+**The tuple is pinned rather than widened, and that is the decision worth knowing.** A generated
+manual id embeds its path name (`advanced_demonic_007_sword_cultivator`), so adding a seventh entry
+changes the modulus and re-points **every id in the catalogue at once** - dangling every
+`character_manuals` row, every inventory item and every stored `cultivation_manual:<user_id>` choice
+a live character holds. `_uncovered_paths` asks the content file which paths exist and appends the
+ones the cycle never reached, in their own id space, where the slug makes a collision impossible.
+Every number it uses is read off what the catalogue already gives the six: how many manuals, how
+many techniques each, and the realm floors, which are the element-wise minimum of the covered paths'
+ladders - the gentlest ladder already on offer, so the floor starts at 0.
+
+**And the hidden sect had no fallback.** `shadowInitiationManual` filters on alignment *and* path
+*and* realm and returned false, and `shadowAction` then omitted `manual_id` from its result - no
+error, no refusal, nothing said. `sectEntryManual` twenty lines away has had `best(true)` then
+`best(false)` since it was written. It was never only the ghost's problem: the per-path demonic
+floors are 0/1/2/3/4/5, so at realm 0 **five of the seven paths matched nothing**, and the four
+demonic manuals authored at `path: "Any"` and realm 0 cannot satisfy an exact path match. The drill
+prints exactly those five.
+
+`sectEntryManual`'s own path filter is, separately, reached for one sect in thirteen: the other
+twelve carry a manual of their own, which its first loop prefers. That one is the Heaven-Devouring
+Demon Sect - the hidden sect - so `shadowInitiationManual` is effectively the only live reader of
+`manual.path` that decides whether a player gets a method, which is why nothing orthodox was
+authored for the ghost: a manual no door hands out is the `/learn` fault again.
+
+### A household teaches its own (v1.0.3)
+
+Thirteen birth households, and **eight of them handed a child another organisation's canon as the
+family's own tradition**: a fallen martial clan teaching the Azure Cloud Sect's foundation sword
+canon, a tomb-watch clan the Jade Meridian Sect's, a nether-market house the Black Serpent Clan's
+venom primer. `sect_actions.go:199` is the one reader of `manual.Sect` and it is the sect-inheritance
+redemption list, so those ids are literally that sect's teaching material. The other five handed out
+a procedurally generated manual with its catalogue index in its own title - *"Starfall Scripture -
+Sword Cultivator 25"*, to the noble martial clan, the wealthiest house in the game - and two of
+those named a **Sword Cultivator** manual to a household whose trade is Formation.
+
+**There was nowhere correct to point them.** Of 160 manuals only 18 were authored; 12 carry a `sect`
+and the other 6 are path-locked dark arts that `manualForbidden` refuses at the lesson outright. So
+**no authored, sect-less, non-forbidden manual existed in the game at all**, and the content had two
+options that were both wrong.
+
+**The split was also a silent, permanent mechanical difference.** The eight sect canons are Mortal
+grade and the five generated ones Spirit - 1.03 against 1.12 in `manualGradeMultiplier` - and
+`manualCultivationMultiplier` rides every cultivation session for the whole of a character's life.
+Which household you were born into was worth nine percent of your cultivation for ever, decided by
+which of two wrong options an author reached for, and stated nowhere.
+
+All thirteen are authored now, Mortal grade, `path: "Any"`, carrying no `sect`, three techniques
+each, named out of the household's own `story` - the Left-Hand Forge Canon for the swordsman who
+lost his right hand, the Stick-in-the-Mud Array Primer for the widow who drew the border array with
+a stick. `path: "Any"` because creation chooses a path *before* the send-off, so a path-locked
+family manual would be wrong for six children in seven. Mortal for all of them because rc.31's
+tutoring band is already what varies by a household's wealth, and two ladders varying on one axis
+would price the family's money twice - the reason rc.55 kept the manor array out of seclusion's
+environment term.
+
+**Nothing is retired and nothing is grandfathered, and those are the same decision.** The sect
+canons stay: they are the redemption pool, and a live character holds one in `character_manuals` and
+in their bags, so removing one would dangle both and silently drop their practised-method choice to
+the fallback. Because they stay, a character who already passed the lesson simply keeps what they
+were given - and it costs them nothing, since the eight sect canons and the thirteen new manuals are
+the same grade. The five Spirit-grade households run the *right* way round: an existing character
+keeps 1.12 and only new ones start on the 1.03 floor, which is rc.56's rule that a new rule must
+never shorten something a player already committed to.
+
+### An unknown item is answered with the item (v1.0.3)
+
+The Admin Console's Inventory card refuses a display name and offers the closest ids, so a GM can
+correct the field instead of the database. Typing **"Qi Nourishment Pills"** answered with five
+`advanced_demonic_*_qi_refiner_manual`s - demonic cultivation manuals, for a pill.
+
+Two faults in one expression. The filter took `any()` token hit, so the single token "qi" was
+enough; and it then **sorted the survivors by id**, so the 142 generated `advanced_*` ids win every
+time on the letter 'a'. `qi_pill`, which is the item, matched exactly as well and was never shown.
+And the near-misses a GM actually types are inflections - "Nourishment" for "Nourishing", "Pills"
+for "Pill" - which a substring test cannot see at all. It is a similarity score over both the id and
+the display name now, and the suggestion carries the name, because one of the two is what they were
+reading. The drill restores the old expression and prints the user's own error message back,
+verbatim.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —

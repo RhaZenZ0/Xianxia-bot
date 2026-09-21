@@ -662,6 +662,13 @@ async def _run_crafting(interaction: discord.Interaction, recipe: str) -> None:
 
     resolved = dict(envelope.get("result") or {})
     result = SimpleNamespace(**resolved)
+    # The engine's roll, whole (die1, die2, modifier, tn, total, degree,
+    # probability) - the same read every other caller of `roll_line` makes.
+    # Passing `result` here raised `AttributeError: no attribute 'die1'` on
+    # every craft that got past the materials check, *after* the engine had
+    # committed: the materials were spent, the output granted, and the player
+    # was shown a wiring failure and told nothing had happened (v1.0.3).
+    roll = SimpleNamespace(**dict(resolved.get("roll") or {}))
     facility_bonus = int(resolved.get("facility_bonus", 0))
     manor_facility_bonus = int(resolved.get("manor_facility_bonus", 0))
     inherited_family_bonus = int(resolved.get("family_bonus", 0))
@@ -707,7 +714,7 @@ async def _run_crafting(interaction: discord.Interaction, recipe: str) -> None:
         exam_line = (f"\n🎓 The {profession} halls will examine you at this rank: "
                      f"**/craft → Profession → Exam**, at a hall of the trade. See **/quests**.")
     await interaction.response.send_message(
-        f"**{profession}: {recipe}**\n{roll_line(result)}\n"
+        f"**{profession}: {recipe}**\n{roll_line(roll)}\n"
         + "".join(bonus_lines)
         + f"{outcome}{quality_line}{mastery_line}{exam_line}"
     )

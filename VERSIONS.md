@@ -6,6 +6,47 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.3** stops a craft taking your materials and telling you it failed, leaves a cultivator who
+loses a fight with a heartbeat instead of nothing, and gives the seventh cultivation path the
+methods it never had.
+
+The craft was reported from live play as *"it doesn't let you craft but also takes your items"* - by
+a player whose bag held six of the pills they had been told they never made. `craftResolveAction`
+shipped the flattened `d1`/`d2` and no `degree`, while the reply's `roll_line` reads
+`die1`/`die2`/`degree`, so every craft that got past the materials check raised `AttributeError`
+*after* the engine had committed: materials spent, output granted, profession XP credited, and a
+wiring-failure message on screen. v1.0.1 found and fixed exactly this for the forage reply and did
+not carry it forty lines up to the craft.
+
+It also gives a defeat one meaning. `fatalChance` is `min(75, 8+gap*3)`, so against a same-realm
+opponent eight defeats in a hundred are fatal and the other ninety-two ended with `vitality` at
+zero - while the two *fate-rescue* branches, the rarer and strictly worse outcome, each wrote
+`vitality=1` outright. Nothing in this game regenerates vitality with time, so zero was not a state
+anybody waited their way out of. All four branches go through one door now, and treating a wound
+with a Recovery Pill restores what the pill restores: before this it was spent on the roll and
+healed nothing, so one pill did one of two jobs and a player needed two to get back where they
+started.
+
+And the Ghost Cultivator can be played. `app/rules/advanced_catalog.py` named six cultivation paths
+where `content/world.json` offers seven, so **none** of the 160 manuals named the seventh - while
+`death_qi_system`, a whole authored subsystem in content and three hundred lines of Go, opens with
+`"path": "Ghost Cultivator"` and exists to serve it. It has 23 manuals now, the same as its
+siblings, and the hidden sect's initiation falls back the way sect entry always has rather than
+silently handing an initiate nothing.
+
+It also gives all thirteen birth households their own tradition to teach. Eight of them handed a
+child the Azure Cloud Sect's or the Jade Meridian Sect's entry manual as the family's own teaching,
+and five handed out a generated manual with its catalogue index in the title; there was nowhere
+correct to point them, because no authored, sect-less, non-forbidden manual existed anywhere in the
+game. Every house has one now, named out of its own authored story, and all thirteen are Mortal
+grade - the old split was a permanent nine-percent cultivation difference decided by birth and
+stated nowhere.
+
+And the Admin Console's Inventory card answers an unknown item with the item. "Qi Nourishment
+Pills" used to suggest five demonic cultivation manuals, because the filter took any single token
+hit and then sorted the survivors by id, so the 142 generated `advanced_*` ids won on the letter
+'a'.
+
 **1.0.2** puts the three-reset limit back and draws the line between `/reset` and Samsara where it
 belongs. They are two systems and only one of them remembers: **Samsara is what death opens**, and it
 deliberately carries the memory seed, the talent, law and insight echoes, the legacy points, the craft
@@ -195,9 +236,12 @@ staged authority cleanup: forage, crafting and companions, canonical time, unifi
 road travel, caravans, dashboard-owned Discord setup, and the removal of the obsolete Python
 mechanical authority paths.
 
-## Release status — v1.0.2
+## Release status — v1.0.3
 
-- Current release: v1.0.2 - `/reset` is bounded at three per account again, and the line between it
+- Current release: v1.0.3 - a craft no longer eats the materials and reports a failure, a lost
+  fight leaves a heartbeat, the seventh cultivation path has methods, and every birth household
+  teaches its own. No schema.
+- v1.0.2: `/reset` is bounded at three per account again, and the line between it
   and Samsara is now held by a test rather than left to hold by accident. No schema.
 - v1.0.1: a craft that says what it needs, a player who can start over without a GM, and martial
   clans with somebody real to deal with. The first patch release: no schema. What 1.0 does not mean

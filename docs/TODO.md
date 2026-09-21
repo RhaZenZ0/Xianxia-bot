@@ -279,6 +279,26 @@ deferred half and not the half that says what was done about it.
   already found and fixed this for the auction floors and rc.52 for the world feeds; the other
   three never got it. `test_the_layout_reaches_an_existing_server.py` now holds all five, with an
   empty allowlist.
+- **deferred (mechanic, v1.0.3)** — *Nothing in the game restores vitality with time.* Twelve
+  `SET vitality` statements in `go_core`, four of them damage, and not one keyed on rest,
+  cultivation, seclusion or the scheduled tick: four pills and one technique are the whole of it.
+  v1.0.3 made a lost fight leave a heartbeat rather than a zero, and made treating an injury restore
+  what the treatment item restores, so the loop closes on a purchase - but a cultivator with no
+  stones and no pill still has no free way back up. Adding natural recovery is a mechanic (what
+  rate, keyed on what clock, and whether seclusion or a household hearth changes it) rather than a
+  wiring, and it wants a decision before an implementation.
+- **deferred (content, v1.0.3)** — *The ghost inheritance prefers the wrong path.*
+  `inheritances.stygian_keeper_legacy` is "a forbidden soul inheritance dealing with ghosts, corpse
+  echoes and the boundary between life and death", grants `stygian_ghost_scripture`, and lists
+  `preferred_paths: ["Soul Cultivator"]` - written when the Ghost Cultivator had no manuals to
+  prefer. The scripture is also an item with `sect_value: 450` and no `type`, so it is worth 3,650
+  and does nothing; making it the path's high manual is the rc.50 shape (an authored, priced,
+  granted thing with no mechanism behind it) and is a content decision, not a wiring.
+- **deferred (known limit, v1.0.3)** — *`Inheritance.PreferredPaths` is read by nothing.* The only
+  `.PreferredPaths` reader in production Go is `secret_realm_actions.go:310`, which reads
+  `SecretRealmRoom.PreferredPaths`. `field_readers_test.go` cannot tell the two apart - it is
+  name-based and says so - so this is the documented blind spot doing exactly what its own docstring
+  predicts rather than a gate failing.
 - **deferred (design)** — *An event scene is only visible to somebody who has reached that world.*
   v1.0.0-rc.59 anchors an event's scene and its thread in that world's own feed, which is where
   rc.52 already sent the announcement, and retires `#event-scenes`. Those feeds are gated by the

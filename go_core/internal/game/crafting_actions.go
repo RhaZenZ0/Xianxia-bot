@@ -548,8 +548,13 @@ func craftResolveAction(conn *storage.Conn, catalog worlddata.Catalog, userID in
 	}
 
 	result := map[string]any{
-		"recipe":        p.Recipe,
-		"profession":    profession,
+		"recipe":     p.Recipe,
+		"profession": profession,
+		// The whole check, degree and odds included: what the reply prints
+		// (v1.0.3). The flat d1/d2 beside it are not what `roll_line` reads,
+		// and craft was the last caller still shipping only those - the same
+		// omission v1.0.1 fixed for forage and did not carry across the file.
+		"roll":          roll,
 		"d1":            d1,
 		"d2":            d2,
 		"modifier":      mod,

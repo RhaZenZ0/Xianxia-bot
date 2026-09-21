@@ -107,26 +107,48 @@ func membershipOrNil(membership map[string]any) any {
 // demonic manual of the character's own path that they can already carry.
 // Transcribed from the command - it is a different rule from sectEntryManual,
 // which picks by sect rather than by alignment and path.
+//
+// It had no fallback (v1.0.3), and `sectEntryManual` twenty lines away has had
+// one since it was written: `best(true)` then `best(false)`. Here, a path with
+// no demonic manual inside the initiate's realm simply returned false, and
+// `shadowAction` then omitted `manual_id` from its result - no error, no
+// refusal, nothing said. The initiate was walked through a karma gate at -200
+// and handed the membership and no scripture.
+//
+// It was never only the Ghost Cultivator's problem, though that path had no
+// demonic manual at any realm. The generated catalogue's per-path floors are
+// 0/1/2/3/4/5, so at realm 0 five of the seven paths matched nothing here, and
+// the four demonic manuals authored at `path: "Any"` and realm 0 could not
+// satisfy an exact path match either.
+//
+// A path match is still strictly preferred; what changes is that failing to
+// find one is no longer the same as finding nothing.
 func shadowInitiationManual(catalog worlddata.Catalog, path string, realmIndex int64) (string, worlddata.ManualDefinition, bool) {
-	bestID := ""
-	var best worlddata.ManualDefinition
-	for id, manual := range catalog.TechniqueSystem.Manuals {
-		if !strings.EqualFold(strings.TrimSpace(manual.Alignment), "demonic") {
-			continue
+	best := func(requirePath bool) (string, worlddata.ManualDefinition, bool) {
+		bestID := ""
+		var chosen worlddata.ManualDefinition
+		for id, manual := range catalog.TechniqueSystem.Manuals {
+			if !strings.EqualFold(strings.TrimSpace(manual.Alignment), "demonic") {
+				continue
+			}
+			if requirePath && !strings.EqualFold(strings.TrimSpace(manual.Path), strings.TrimSpace(path)) {
+				continue
+			}
+			if manual.MinRealmIndex > realmIndex {
+				continue
+			}
+			// max by (min_realm_index, id), matching Python's max() on the tuple.
+			if bestID == "" || manual.MinRealmIndex > chosen.MinRealmIndex ||
+				(manual.MinRealmIndex == chosen.MinRealmIndex && id > bestID) {
+				bestID, chosen = id, manual
+			}
 		}
-		if !strings.EqualFold(strings.TrimSpace(manual.Path), strings.TrimSpace(path)) {
-			continue
-		}
-		if int64(manual.MinRealmIndex) > realmIndex {
-			continue
-		}
-		// max by (min_realm_index, id), matching Python's max() on the tuple.
-		if bestID == "" || manual.MinRealmIndex > best.MinRealmIndex ||
-			(manual.MinRealmIndex == best.MinRealmIndex && id > bestID) {
-			bestID, best = id, manual
-		}
+		return bestID, chosen, bestID != ""
 	}
-	return bestID, best, bestID != ""
+	if id, manual, ok := best(true); ok {
+		return id, manual, ok
+	}
+	return best(false)
 }
 
 func shadowAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {
