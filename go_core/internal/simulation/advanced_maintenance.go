@@ -6,11 +6,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"sort"
 	"strconv"
 	"strings"
 
 	"xianxia/core/internal/game"
 	"xianxia/core/internal/storage"
+	"xianxia/core/internal/worlddata"
 )
 
 var bountyHunterTitles = []string{
@@ -24,12 +26,12 @@ type eraTemplate struct {
 	Modifiers         map[string]float64
 }
 
-var eraCycle = []eraTemplate{
-	{"Jade Meridian Awakening Era", "Spiritual veins awaken and new inheritances surface across the four worlds.", 180, map[string]float64{"cultivation_gain": 1.05, "secret_realm_frequency": 1.10}},
-	{"Hundred Sects Strife Era", "Competition over spirit veins hardens into open territorial conflict.", 120, map[string]float64{"war_pressure": 1.25, "market_volatility": 1.10}},
-	{"Beast Tide Era", "Ancient bloodlines stir and spirit beasts migrate in destructive tides.", 90, map[string]float64{"beast_encounter_rate": 1.35, "caravan_risk": 1.15}},
-	{"Quiet Heaven Era", "After upheaval, the heavens settle and orthodox institutions rebuild order.", 150, map[string]float64{"recovery_rate": 1.10, "crime_pressure": 0.85}},
-}
+// `eraCycle` stood here until v1.0.7: four eras, 540 world days, shared by all
+// four worlds. It is `world_era_cycles` in content/world.json now - one cycle
+// per world, six eras of sixty days, each summing to exactly one world year -
+// because the roster is content in this tree (`event_sites`, `forage_materials`,
+// `beginner_path`), and because four Go literals would have been four places to
+// forget.
 
 func stablePercent(parts ...any) int64 {
 	vals := make([]string, 0, len(parts))
@@ -59,23 +61,58 @@ func float64Value(v any, fallback float64) float64 {
 	return f
 }
 
-func (r *Runner) eraModifiers(conn *storage.Conn) (map[string]float64, error) {
-	res, err := conn.Execute(`SELECT modifiers_json FROM world_eras WHERE active=1 ORDER BY era_id DESC LIMIT 1`, nil)
+// eraModifiersByWorld reads every world's age once, for the loops that then ask
+// per row.
+//
+// Per row would be correct and is what the three sweeps below want; per row
+// *with a query each* would turn one read per tick into one per open bounty,
+// war and arriving caravan, which is the shape rc.28 removed from the scene
+// draw. There are four worlds, so four reads cover every row there can be.
+func (r *Runner) eraModifiersByWorld(conn *storage.Conn) (map[string]map[string]float64, error) {
+	out := map[string]map[string]float64{}
+	seen := map[string]bool{}
+	for _, loc := range r.World.Locations {
+		world := strings.TrimSpace(loc.World)
+		if world == "" || seen[world] {
+			continue
+		}
+		seen[world] = true
+		mods, err := r.eraModifiers(conn, world)
+		if err != nil {
+			return nil, err
+		}
+		out[world] = mods
+	}
+	if _, ok := out[game.DefaultEraWorld]; !ok {
+		mods, err := r.eraModifiers(conn, game.DefaultEraWorld)
+		if err != nil {
+			return nil, err
+		}
+		out[game.DefaultEraWorld] = mods
+	}
+	return out, nil
+}
+
+// eraTermFor is one world's multiplier for one key, floored the way each of the
+// three sweeps already floored the global one: a multiplier read as zero would
+// delete the rule rather than soften it.
+func (r *Runner) eraTermFor(byWorld map[string]map[string]float64, location, key string, floor float64) float64 {
+	mods := byWorld[game.EraWorldOf(r.World, location)]
+	v, ok := mods[key]
+	if !ok || v == 0 {
+		return 1
+	}
+	return math.Max(floor, v)
+}
+
+// eraModifiers is the age of one world. It took no world until v1.0.7 and
+// answered the single global row for every question asked of it.
+func (r *Runner) eraModifiers(conn *storage.Conn, world string) (map[string]float64, error) {
+	_, mods, err := game.ActiveEra(conn, world)
 	if err != nil {
 		return nil, err
 	}
-	out := map[string]float64{}
-	row := firstMap(res)
-	if row == nil {
-		return out, nil
-	}
-	var raw map[string]any
-	if json.Unmarshal([]byte(fmt.Sprint(row["modifiers_json"])), &raw) == nil {
-		for k, v := range raw {
-			out[k] = float64Value(v, 1)
-		}
-	}
-	return out, nil
+	return mods, nil
 }
 
 // walletDeltaSim was a byte-for-byte copy of the engine's walletDeltaTx, purse
@@ -339,15 +376,13 @@ func (r *Runner) spawnHunters(conn *storage.Conn, gm int64) (int64, error) {
 
 func (r *Runner) advanceHunters(conn *storage.Conn, gm int64) (int64, error) {
 	now := nowFloat()
-	mods, err := r.eraModifiers(conn)
+	// Per world (v1.0.7), read once for all four and looked up per row below:
+	// this sweep asked the one global era before, so an age of the Celestial
+	// World priced a crime pressure in a Mortal village.
+	byWorld, err := r.eraModifiersByWorld(conn)
 	if err != nil {
 		return 0, err
 	}
-	m := mods["crime_pressure"]
-	if m == 0 {
-		m = 1
-	}
-	m = math.Max(.25, m)
 	if _, err = conn.Execute(`UPDATE bounty_hunter_pursuits SET status='withdrawn',updated_game_minute=?,updated_at=? WHERE status IN ('tracking','engaged') AND bounty_id IN (SELECT bounty_id FROM bounties WHERE status!='active')`, []any{gm, now}); err != nil {
 		return 0, err
 	}
@@ -361,6 +396,7 @@ func (r *Runner) advanceHunters(conn *storage.Conn, gm int64) (int64, error) {
 	}
 	rows := maps(res)
 	for _, p := range rows {
+		m := r.eraTermFor(byWorld, fmt.Sprint(p["location"]), "crime_pressure", .25)
 		elapsed := max64(1, (gm-i64(p["next_action_game_minute"]))/minutesPerDay+1)
 		// The trail (v1.0.0-rc.18): a quarry carrying something with a seal
 		// still on it is found faster than one carrying nothing. This is the
@@ -414,15 +450,13 @@ func (r *Runner) advanceHunters(conn *storage.Conn, gm int64) (int64, error) {
 
 func (r *Runner) advanceWars(conn *storage.Conn, gm int64) (int64, error) {
 	now := nowFloat()
-	mods, err := r.eraModifiers(conn)
+	// Per world (v1.0.7), read once for all four and looked up per row below:
+	// this sweep asked the one global era before, so an age of the Celestial
+	// World priced a war pressure in a Mortal village.
+	byWorld, err := r.eraModifiersByWorld(conn)
 	if err != nil {
 		return 0, err
 	}
-	wm := mods["war_pressure"]
-	if wm == 0 {
-		wm = 1
-	}
-	wm = math.Max(.25, wm)
 	res, err := conn.Execute(`SELECT w.*,o.siege_progress,o.attacker_morale,o.defender_morale,o.attacker_force,o.defender_force,o.last_tick_game_minute FROM territory_wars w LEFT JOIN territory_war_operations o ON o.war_id=w.war_id WHERE w.status='active' ORDER BY w.war_id`, nil)
 	if err != nil {
 		return 0, err
@@ -430,6 +464,8 @@ func (r *Runner) advanceWars(conn *storage.Conn, gm int64) (int64, error) {
 	rows := maps(res)
 	changed := int64(0)
 	for _, w := range rows {
+		// A war is fought somewhere, and a territory key is a location name.
+		wm := r.eraTermFor(byWorld, fmt.Sprint(w["territory_key"]), "war_pressure", .25)
 		last := i64(w["last_tick_game_minute"])
 		if last == 0 {
 			last = i64(w["updated_game_minute"])
@@ -541,21 +577,21 @@ func boolIntSim(v bool) int {
 }
 func (r *Runner) advanceCaravans(conn *storage.Conn, gm int64) (int64, error) {
 	now := nowFloat()
-	mods, err := r.eraModifiers(conn)
+	// Per world (v1.0.7), read once for all four and looked up per row below:
+	// this sweep asked the one global era before, so an age of the Celestial
+	// World priced a caravan risk in a Mortal village.
+	byWorld, err := r.eraModifiersByWorld(conn)
 	if err != nil {
 		return 0, err
 	}
-	rm := mods["caravan_risk"]
-	if rm == 0 {
-		rm = 1
-	}
-	rm = math.Max(.25, rm)
 	res, err := conn.Execute(`SELECT c.*,o.escort_strength,o.concealment,o.smuggling,o.tax_rate FROM caravans c LEFT JOIN caravan_operations o ON o.caravan_id=c.caravan_id WHERE c.status='traveling' AND c.arrive_game_minute<=? ORDER BY c.caravan_id`, []any{gm})
 	if err != nil {
 		return 0, err
 	}
 	rows := maps(res)
 	for _, c := range rows {
+		// A caravan's risk is the age of the world its road departs from.
+		rm := r.eraTermFor(byWorld, fmt.Sprint(c["origin"]), "caravan_risk", .25)
 		cargo := map[string]any{}
 		_ = json.Unmarshal([]byte(fmt.Sprint(c["cargo_json"])), &cargo)
 		payout := max64(0, i64(cargo["_payout"]))
@@ -667,21 +703,67 @@ func (r *Runner) payCaravanOwner(conn *storage.Conn, c map[string]any, currency 
 	return err
 }
 
+// advanceEra turns each world's own age (v1.0.7).
+//
+// It ran one cycle for the whole game: four eras of 540 world days, in a Go
+// literal, so a Celestial court and a Mortal village were always in the same
+// age of the world. Each world now walks its own cycle off
+// `world_era_cycles` in content, on its own clock, and a world whose cycle the
+// content does not carry is simply left alone rather than given somebody
+// else's - the catalogue is the roster, and a world absent from it has no age
+// to turn.
 func (r *Runner) advanceEra(conn *storage.Conn, gm int64) (bool, error) {
+	changed := false
+	for _, world := range sortedEraWorlds(r.World.WorldEraCycles) {
+		cycle := r.World.WorldEraCycles[world]
+		if len(cycle) == 0 {
+			continue
+		}
+		moved, err := r.advanceWorldEra(conn, world, cycle, gm)
+		if err != nil {
+			return changed, err
+		}
+		changed = changed || moved
+	}
+	return changed, nil
+}
+
+// sortedEraWorlds walks the cycles in a stable order, because a map range would
+// make two runs of the same tick write their rows in different orders - and
+// `era_id DESC` is how every reader picks the active row.
+func sortedEraWorlds(cycles map[string][]worlddata.EraTemplate) []string {
+	worlds := make([]string, 0, len(cycles))
+	for world := range cycles {
+		worlds = append(worlds, world)
+	}
+	sort.Strings(worlds)
+	return worlds
+}
+
+func (r *Runner) advanceWorldEra(conn *storage.Conn, world string, cycle []worlddata.EraTemplate, gm int64) (bool, error) {
 	now := nowFloat()
-	res, err := conn.Execute(`SELECT * FROM world_eras WHERE active=1 ORDER BY era_id DESC LIMIT 1`, nil)
+	res, err := conn.Execute(`SELECT * FROM world_eras WHERE active=1 AND world=? ORDER BY era_id DESC LIMIT 1`, []any{world})
 	if err != nil {
 		return false, err
 	}
 	cur := firstMap(res)
 	if cur == nil {
-		t := eraCycle[0]
+		// A world opening its cycle: the three upper worlds on the first tick
+		// after schema 60, and every world on a brand-new one.
+		t := cycle[0]
 		mods, _ := json.Marshal(t.Modifiers)
-		_, err = conn.Execute(`INSERT INTO world_eras(name,description,started_game_minute,active,modifiers_json,created_at) VALUES(?,?,?,1,?,?)`, []any{t.Name, t.Description, gm, string(mods), now})
+		_, err = conn.Execute(
+			`INSERT INTO world_eras(world,name,description,started_game_minute,active,modifiers_json,created_at) VALUES(?,?,?,?,1,?,?)`,
+			[]any{world, t.Name, t.Description, gm, string(mods), now},
+		)
 		return err == nil, err
 	}
+	// Where this world stands in its own cycle. A name the cycle no longer
+	// carries - a GM's rewrite, or the Mortal World's own row from before the
+	// split - starts again at the top rather than erroring, which is the only
+	// answer that keeps a live world turning.
 	idx := 0
-	for i, t := range eraCycle {
+	for i, t := range cycle {
 		if t.Name == fmt.Sprint(cur["name"]) {
 			idx = i
 			break
@@ -690,25 +772,31 @@ func (r *Runner) advanceEra(conn *storage.Conn, gm int64) (bool, error) {
 	changed := false
 	started := i64(cur["started_game_minute"])
 	name := fmt.Sprint(cur["name"])
-	for n := 0; n < 12; n++ {
-		t := eraCycle[idx]
+	// Bounded catch-up, as before: a clock jumped a long way forward rolls
+	// through the ages it passed rather than landing in the wrong one.
+	for n := 0; n < 2*len(cycle); n++ {
+		t := cycle[idx]
 		duration := t.DurationDays * minutesPerDay
-		if gm-started < duration {
+		if duration <= 0 || gm-started < duration {
 			break
 		}
 		transition := started + duration
-		next := (idx + 1) % len(eraCycle)
-		nt := eraCycle[next]
+		next := (idx + 1) % len(cycle)
+		nt := cycle[next]
 		mods, _ := json.Marshal(nt.Modifiers)
-		if _, err = conn.Execute(`UPDATE world_eras SET active=0,ended_game_minute=? WHERE active=1`, []any{transition}); err != nil {
+		if _, err = conn.Execute(`UPDATE world_eras SET active=0,ended_game_minute=? WHERE active=1 AND world=?`, []any{transition, world}); err != nil {
 			return changed, err
 		}
-		ins, e := conn.Execute(`INSERT INTO world_eras(name,description,started_game_minute,active,modifiers_json,created_at) VALUES(?,?,?,1,?,?)`, []any{nt.Name, nt.Description, transition, string(mods), now})
+		ins, e := conn.Execute(
+			`INSERT INTO world_eras(world,name,description,started_game_minute,active,modifiers_json,created_at) VALUES(?,?,?,?,1,?,?)`,
+			[]any{world, nt.Name, nt.Description, transition, string(mods), now},
+		)
 		if e != nil {
 			return changed, e
 		}
-		detail, _ := json.Marshal(map[string]any{"previous": name, "automatic": true})
-		if _, err = conn.Execute(`INSERT INTO world_era_events(era_id,event_type,title,detail_json,game_minute,created_at) VALUES(?,'transition',?,?,?,?)`, []any{ins.LastInsertID, nt.Name + " begins", string(detail), transition, now}); err != nil {
+		detail, _ := json.Marshal(map[string]any{"previous": name, "world": world, "automatic": true})
+		if _, err = conn.Execute(`INSERT INTO world_era_events(era_id,event_type,title,detail_json,game_minute,created_at) VALUES(?,'transition',?,?,?,?)`,
+			[]any{ins.LastInsertID, nt.Name + " begins", string(detail), transition, now}); err != nil {
 			return changed, err
 		}
 		idx = next
