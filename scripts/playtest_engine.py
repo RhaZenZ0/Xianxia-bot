@@ -2309,8 +2309,13 @@ async def run(url: str, token: str, db_path: str) -> Report:
                 "discord_name": "Playtest Quitter", "name": "Mo Resolved", "concept": "this time for certain",
                 "gender": "neutral", "path": "Body Refiner",
                 "family_choice_id": str(second[0].get("choice_id") or ""), "age_at_creation_years": 18}))
-    await step(report, "a cultivator the world remembers cannot be taken back",
-               act("character.reset", PLAYER, {}), expect_error="left a mark the world keeps")
+    # Whichever gate bites first, and both are designed. By this point PLAYER
+    # has died and come back, so the incarnation rule usually answers before
+    # the world-mark one does - which the first version of this step did not
+    # allow for, and the harness said so.
+    await either("a cultivator with a past cannot be taken back",
+                 act("character.reset", PLAYER, {}),
+                 "left a mark the world keeps", "the wheel is the road from here")
 
     # ---- 22. erasure -----------------------------------------------------------
     # Last of all, because it is the one lever that leaves nothing behind: the
