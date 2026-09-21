@@ -6,6 +6,40 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.7** gives every world its own age, and makes an era mean something in all of them.
+
+There was one era for the whole game. A Demon Invasion in the Celestial World and a quiet century in
+a Mortal village shared a single row, and every rule that asked what age it was got the same answer
+whether it was pricing a siege among the immortal courts or a cultivation session in a hill village -
+while the realm capitals have been split per world since the fourth schema, the auction floors since
+the thirty-fifth, and a world's own news since the fifty-sixth. The era was the last thing in the
+game still pretending the four worlds were one place.
+
+Each world walks its own cycle now, on its own clock, so the Mortal World can be deep in a Beast Tide
+while the Celestial courts are being audited by heaven. Every rule that asks was already about
+something standing somewhere - a cultivator, a territory, a war, a caravan, a fugitive - so each one
+simply resolves the world it was already talking about.
+
+And a cycle is a year. It ran five hundred and forty world days before, which matched nothing; a
+world year is three hundred and sixty, so each world has six eras of sixty days and the year closes
+exactly. Twenty-four ages in all, written for the world they belong to, and they live in the content
+file rather than in code, so a GM can rewrite an age without rebuilding anything.
+
+The part worth knowing is what the counting found. Of the eight things an era could change, **four
+reached no rule at all** - each appeared exactly once in the whole engine, in its own declaration. So
+every era carried one live number and one dead one, and the Beast Tide Era, whose entire identity is
+beasts, did nothing whatever to beasts: mechanically it was "caravans are fifteen percent riskier".
+Authoring twenty-four eras on top of that would have been manufacturing decoration at scale. A Beast
+Tide brings beasts down the passes now, and a Quiet Heaven really does close wounds faster - the
+promise it had been making since it was written. The two nobody could wire honestly are authored by
+no era at all, and a gate refuses any that tries.
+
+- **Schema 60** gave an era a world to belong to. `world_eras.world` splits one global age into four,
+  and it defaults to the Mortal World rather than to nothing: every row that existed when it ran was
+  written when there was one era, and that era was the Mortal cycle's first. So a live world carries
+  on from exactly where it stands, and the three worlds above it open their own cycle on the next
+  tick rather than being handed somebody else's history.
+
 **1.0.6** makes the one promise this world repeats everywhere true in the engine as well as in the bot.
 
 `app/ai/narrator_context.py` tells the narrator, in these words, in two places: *"PROTECTED; violence
@@ -313,9 +347,11 @@ staged authority cleanup: forage, crafting and companions, canonical time, unifi
 road travel, caravans, dashboard-owned Discord setup, and the removal of the obsolete Python
 mechanical authority paths.
 
-## Release status — v1.0.6
+## Release status — v1.0.7
 
-- Current release: v1.0.6 - "violence cannot mechanically begin here" is held by the engine and not
+- Current release: v1.0.7 - every world keeps its own age, a cycle is exactly one world year, and
+  four era modifiers that reached no rule are wired or refused. Schema 60.
+- v1.0.6: "violence cannot mechanically begin here" is held by the engine and not
   only by the bot, and an auction floor is a sanctuary a bounty hunter cannot reach into. No schema.
 - v1.0.5: a quest is recorded before it is told, and the craft menu offers only
   methods you know. No schema.

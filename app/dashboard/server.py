@@ -490,9 +490,17 @@ class ReadOnlyDashboardStore:
             ) if await self._table_exists(db, "world_simulation_state") else []
             for row in sims:
                 row["lag_game_minutes"] = max(0, int(clock["game_minute"]) - int(row.get("last_game_minute") or 0))
-            era = None
+            # Every world's age, not "whichever row turned last" (v1.0.7).
+            # A GM looks at the whole world, and since schema 60 each of the
+            # four keeps its own clock, so one row would be three worlds'
+            # silence dressed as an answer.
+            eras = []
             if await self._table_exists(db, "world_eras"):
-                era = await self._fetchone(db, "SELECT * FROM world_eras WHERE active=1 ORDER BY era_id DESC LIMIT 1")
+                eras = await self._fetchall(
+                    db,
+                    "SELECT * FROM world_eras w WHERE active=1 AND era_id=("
+                    "SELECT MAX(era_id) FROM world_eras x WHERE x.active=1 AND x.world=w.world) ORDER BY w.world",
+                )
             recent = await self._fetchall(
                 db,
                 """SELECT history_id,event_type,title,summary,significance,visibility,location,faction,actor_name,target_name,game_minute
@@ -500,7 +508,7 @@ class ReadOnlyDashboardStore:
             ) if await self._table_exists(db, "world_history_events") else []
             attention = await self._attention(db, clock, sims)
             return {"schema_version": schema, "clock": clock, "counts": counts, "simulations": sims,
-                    "active_era": era, "recent_history": recent, "attention": attention}
+                    "active_eras": eras, "recent_history": recent, "attention": attention}
 
     async def _attention(self, db, clock: dict[str, Any], sims: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """The handful of rows a GM would otherwise have to go looking for (v0.25.0).

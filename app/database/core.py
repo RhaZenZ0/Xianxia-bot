@@ -7094,15 +7094,41 @@ class Database:
             cur=await db.execute("SELECT * FROM character_social_state WHERE user_id=?",(int(user_id),)); row=await cur.fetchone(); return dict(row)
 
 
-    async def get_current_era(self) -> dict[str, Any] | None:
+    async def get_current_era(self, world: str = "Mortal World") -> dict[str, Any] | None:
+        """The age of one world (v1.0.7: per world; there was one row before).
+
+        The default is the Mortal World rather than "whichever row is newest":
+        schema 60 backfills every pre-split row to it, and a caller that forgot
+        to say which world would otherwise get whichever of the four happened to
+        turn most recently - a wrong answer that looks like a right one.
+        """
         async with self._connect() as db:
-            db.row_factory=aiosqlite.Row; cur=await db.execute("SELECT * FROM world_eras WHERE active=1 ORDER BY era_id DESC LIMIT 1"); row=await cur.fetchone()
+            db.row_factory=aiosqlite.Row
+            cur=await db.execute("SELECT * FROM world_eras WHERE active=1 AND world=? ORDER BY era_id DESC LIMIT 1",(world,))
+            row=await cur.fetchone()
         if not row: return None
         out=dict(row)
         try: out["modifiers"]=json.loads(out.pop("modifiers_json") or "{}")
         except Exception: out["modifiers"]={}
         # The cycle template (modifiers, duration) is folded in by
         # app.rules.advanced_runtime.describe_era at the presenter (v0.30.0).
+        return out
+
+    async def get_current_eras(self) -> list[dict[str, Any]]:
+        """Every world's age, newest row per world, for the surfaces that show
+        the whole world rather than the one a cultivator stands in."""
+        async with self._connect() as db:
+            db.row_factory=aiosqlite.Row
+            cur=await db.execute(
+                "SELECT * FROM world_eras w WHERE active=1 AND era_id=("
+                "SELECT MAX(era_id) FROM world_eras x WHERE x.active=1 AND x.world=w.world) ORDER BY w.world")
+            rows=await cur.fetchall()
+        out=[]
+        for row in rows:
+            era=dict(row)
+            try: era["modifiers"]=json.loads(era.pop("modifiers_json") or "{}")
+            except Exception: era["modifiers"]={}
+            out.append(era)
         return out
 
 

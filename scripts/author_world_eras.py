@@ -21,7 +21,7 @@ exactly once in `go_core`, in their own declaration - so every one of the four
 eras carried one live modifier and one dead one, and a Beast Tide did nothing
 whatever to beasts. v1.0.7 wires two of them (`recovery_rate` into v1.0.4's
 vitality recovery, `beast_encounter_rate` into the hunt roll) and authors
-nothing against the two it does not; `era_modifier_vocabulary_test.go` is what
+nothing against the two it does not; `era_vocabulary_test.go` is what
 holds that shut, in the shape `modifier_vocabulary_test.go` (rc.58) already had.
 
 The Mortal World keeps its four original names and their numbers. That is not
@@ -138,7 +138,8 @@ CYCLES: dict[str, list[tuple[str, str, dict[str, float]]]] = {
 def build() -> dict[str, list[dict[str, object]]]:
     out: dict[str, list[dict[str, object]]] = {}
     for world, entries in CYCLES.items():
-        assert len(entries) == ERAS_PER_WORLD, f"{world} has {len(entries)} eras"
+        if len(entries) != ERAS_PER_WORLD:
+            raise SystemExit(f"{world} has {len(entries)} eras, not {ERAS_PER_WORLD}")
         out[world] = [
             {
                 "name": name,
@@ -149,7 +150,8 @@ def build() -> dict[str, list[dict[str, object]]]:
             for name, description, modifiers in entries
         ]
         total = sum(int(e["duration_days"]) for e in out[world])
-        assert total == YEAR_DAYS, f"{world} runs {total} days, not one world year"
+        if total != YEAR_DAYS:
+            raise SystemExit(f"{world} runs {total} world days, not one world year ({YEAR_DAYS})")
     return out
 
 

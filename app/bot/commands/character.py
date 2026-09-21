@@ -626,13 +626,25 @@ async def provenance_command(interaction: discord.Interaction, item: str) -> Non
 async def era_command(interaction: discord.Interaction) -> None:
     c=await require_character(interaction)
     if not c:return
-    wt=await current_world_time(); era=describe_era(await DB.get_current_era())
+    wt=await current_world_time()
+    # The age of the world this cultivator is standing in (v1.0.7). There was
+    # one era for the whole game before, so a Mortal villager was told about a
+    # Celestial court's politics.
+    cycles=WORLD.world_era_cycles(); here=WORLD.era_world_of(str(c.get("location") or ""))
+    era=describe_era(await DB.get_current_era(here),cycles)
     if not era:
-        await interaction.response.send_message("No active world era is recorded.",ephemeral=False);return
+        await interaction.response.send_message(f"No era is recorded for the **{here}** yet; its cycle opens on the next world tick.",ephemeral=False);return
     mods=", ".join(f"{k}={v}" for k,v in (era.get('modifiers') or {}).items()) or "baseline laws"
     remaining=max(0,int(era['duration_days'])*MINUTES_PER_DAY-(wt.total_minutes-int(era['started_game_minute']))) if era.get('duration_days') else 0
     events=await DB.get_world_era_events(limit=5)
-    lines=[f"🌌 **{era['name']}**",str(era.get('description','')),f"Started at game minute **{era['started_game_minute']}** • automatic transition in about **{remaining/MINUTES_PER_DAY:.1f} world-days**",f"Modifiers: **{mods}**"]
+    lines=[f"🌌 **{era['name']}** — *{here}*",str(era.get('description','')),f"Started at game minute **{era['started_game_minute']}** • automatic transition in about **{remaining/MINUTES_PER_DAY:.1f} world-days**",f"Modifiers: **{mods}**"]
+    # Each world keeps its own clock, so what the others are living through is
+    # worth a line - it is the reason to climb, and the reason a rumour from
+    # above does not match the weather here.
+    elsewhere=[e for e in await DB.get_current_eras() if str(e.get("world") or "")!=here]
+    if elsewhere:
+        lines.append("\n**Elsewhere**")
+        for e in elsewhere: lines.append(f"• **{e.get('world')}** — {e.get('name')}")
     if events:
         lines.append("\n**Recent Era Events**")
         for e in events: lines.append(f"• {e['title']} — game minute {e['game_minute']}")

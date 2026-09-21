@@ -145,7 +145,7 @@ internal/server/        HTTP control/data plane
 ```
 
 Every Go SQLite connection uses `journal_mode=WAL`, `foreign_keys=ON`, `busy_timeout=10000`,
-`synchronous=NORMAL`. Current schema version is 59; historical migrations are kept so old databases
+`synchronous=NORMAL`. Current schema version is 60; historical migrations are kept so old databases
 can upgrade in place — see `VERSIONS.md` for the full schema/release history.
 
 ### NPCs who go missing (`npc_missing.go`, schema 47)
@@ -3035,6 +3035,85 @@ game.LocationIsSanctuary"*; restoring `door_rule` to the struct, and separately 
 `ProtectedInterior`, each fail `TestEveryParsedContentFieldHasAReader`; and blanking the content
 reader fails with *"the content parse is broken, not the tree"* **before** any assertion it would
 have made vacuous.
+
+### An era belongs to one world (`world_eras.go`, schema 60, v1.0.7)
+
+There was **one era for the whole game**. Every reader asked
+`WHERE active=1 ORDER BY era_id DESC LIMIT 1` and got the same row whether it was pricing a siege
+among the immortal courts or a cultivation session in a Mortal hill village - while the realm
+capitals have been per world since schema 4, the auction floors since schema 35 and a world's *news*
+since schema 56. The era was the last thing in this tree still pretending the four worlds were one
+place.
+
+**What made the split small rather than structural is that every reader was already about something
+with a location.** A cultivator stands somewhere, a territory is somewhere, a war is over somewhere,
+a caravan runs between two somewheres - and v1.0.6 had just taught the bounty sweep to read its
+quarry's location, so that loop already held what it needed. Each one resolves the world it was
+already talking about instead of taking the only row there was. `game.ActiveEra` is the one door,
+and `EraWorldOf` is the one statement of which world a question is about.
+
+**A cycle is a world year now, and the roster is content.** It ran 540 world days, which matched
+nothing; `minutesPerYear` is 12 months of 30 days, so a year is 360 and each world has **six eras of
+sixty**. `world_era_cycles` in `content/world.json` holds all twenty-four, because the roster is
+content in this tree (`event_sites`, `forage_materials`, `beginner_path`) and because four Go
+literals would have been four places to forget. Three copies of that roster existed before this -
+the Go literal, a `world_eras` row, and `ERA_CYCLE` in `app/rules/advanced_runtime.py` - which is the
+fault rc.39 removed for the world clock and rc.44 for the world currencies; there is one now, and
+`describe_era` takes it **injected** because `WORLD` is built in `app/bot/runtime.py` and
+`test_app_layout.py` puts `rules` at the bottom (the reason `narrator.py` takes a duck-typed
+`npc_resolver`, rc.27).
+
+**And the counting is the finding.** Of the eight modifier keys the old cycle authored, production
+Go fetched **four**. `secret_realm_frequency`, `market_volatility`, `beast_encounter_rate` and
+`recovery_rate` each occurred exactly once in all of `go_core` - their own declaration in `eraCycle`.
+So every era carried one live modifier and one dead one, and **the Beast Tide Era, whose entire
+identity is beasts, did nothing whatever to beasts**: mechanically it was "caravans are fifteen
+percent riskier". A Quiet Heaven's `recovery_rate` healed nobody, which is a promise it had been
+making since before anything in the game recovered at all.
+
+Authoring twenty-four eras on that vocabulary would have been manufacturing decoration at scale, so
+the wiring came first. `beast_encounter_rate` divides the margin a hunt must clear (a 2d10 margin,
+not a percentage, so it divides rather than multiplies, floored at 1 so no era makes an encounter
+automatic). `recovery_rate` scales v1.0.4's `percent` - **not its `gain`**, which is the whole reason
+it is one line: `newAnchor` divides by the same `percent`, so the remainder the anchor carries stays
+exactly consistent with the gain it paid for. The two that cannot be wired honestly are authored by
+no era at all and sit in `unreadEraModifiers` with their reasons, which
+`TestNoEraAuthorsAModifierNothingReads` holds shut from the other side: the allowlist names what is
+*deferred*, and a deferred key may not be authored.
+
+**The gate found a gap in its own release on its first run**, and the fix is better code.
+`eraCultivationMultiplier` pulled its key out of the map by index, so `cultivation_gain` - the one
+modifier every cultivator feels - had no argument position for the sweep to see and was reported
+unread. `eraTerm` is the named accessor now, so **every** read of an era modifier in this tree is an
+argument position. That is not style: it is what lets the gate tell a rule *fetching* a key from the
+content file *declaring* one, which is rc.58's "fetched, not named" distinction.
+
+**A missing key is `def`, never zero**, and here that matters in a way it would not elsewhere: every
+one of these keys is a multiplier, so a key read as 0 would not soften a rule, it would delete it -
+no cultivation gain at all, no siege power, no caravan ever arriving. The `seller_user_id=0` lesson
+in a place where the damage would be invisible.
+
+**Schema 60 defaults to the Mortal World rather than NULL.** Every row that existed when it runs was
+written when there was one era, and that era was seeded "Jade Meridian Awakening Era", the Mortal
+cycle's first entry - so a live world carries on from exactly where it stands (`advanceWorldEra`
+finds a world's place by matching the active row's name), and the three worlds above it open their
+own cycle on the next tick rather than inheriting somebody else's history. `DefaultEraWorld` is also
+the answer for a place the catalogue does not carry - a household, an inner world, an abode -
+deliberately **unlike** `world_of_location` on the Python side, whose `None` is what keeps a
+household's news out of a world's public feed (rc.52): being indoors is not being outside history.
+
+**Six fixtures declared `world_eras` without the column production now has**, and every one of them
+broke the moment a reader asked for it - the rule this file already states, caught by the change
+rather than by a release. `FakeWorld` and `FakeDB` in `test_narrator_context.py` needed the same.
+
+**The gates, and what each drill prints.** Authoring a deferred key fails **two** gates at once, the
+second naming it and its reason; removing the beast wire prints `beast_encounter_rate (authored by
+Celestial World/Primordial Beast Waking Era, …)`; removing the recovery wire names its seven eras;
+shortening one world's cycle prints `Immortal World runs 390 world days, not one world year (360)`;
+giving two worlds one era name prints *"the cycle position is found by name"*; and pointing the
+sweep at a reader that does not exist prints *"the production walk did not find war_pressure handed
+to any era reader; the sweep is broken, not the tree"* - **before** the assertion it would have made
+vacuous.
 
 ## Testing conventions
 

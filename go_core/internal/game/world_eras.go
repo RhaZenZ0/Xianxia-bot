@@ -90,7 +90,10 @@ func ActiveEra(conn *storage.Conn, world string) (string, map[string]float64, er
 // found this on its own first run - `eraCultivationMultiplier` indexed the map
 // directly, so the one modifier every cultivator feels looked unread.
 func eraTerm(mods map[string]float64, key string, def float64) float64 {
-	return eraTerm(mods, key, def)
+	if v, ok := mods[key]; ok {
+		return v
+	}
+	return def
 }
 
 // EraModifier is a world's multiplier for one key, or `def` when that world has
@@ -106,10 +109,7 @@ func EraModifier(conn *storage.Conn, world, key string, def float64) float64 {
 	if err != nil {
 		return def
 	}
-	if v, ok := mods[key]; ok {
-		return v
-	}
-	return def
+	return eraTerm(mods, key, def)
 }
 
 // characterEraWorld is the world a cultivator is standing in, for the readers

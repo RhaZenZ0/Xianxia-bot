@@ -9,13 +9,14 @@ from typing import Iterable
 # run before the bot/dashboard dependencies are installed.  Keep the browser/API,
 # schema-review, and newer-system coverage contract in one place.
 DASHBOARD_API_VERSION = 2
-# Schema 59 (v1.0.4) reviewed and needs nothing here:
-# `characters.vitality_recovered_game_minute` is the internal anchor
-# `settleVitalityRecoveryTx` mends from, written and read by that function
-# alone. It is not a GM lever - `admin.player.revive` already sets vitality
-# full, and an anchor a GM could set means nothing on its own - and not state
-# worth a card, so no view, action or capability changes with it.
-DASHBOARD_REVIEWED_SCHEMA_VERSION = 59
+# Schema 60 (v1.0.7) reviewed, and it *does* change a card: `world_eras.world`
+# splits one global age into four, so Overview's era panel became "Ages of the
+# worlds" and `/api/overview` returns `active_eras` (newest active row per
+# world) where it returned a single `active_era`. No new view, action or
+# capability: the panel reads a payload field it already read, of a different
+# shape, and a GM has no era lever to gain - the clock is the engine's and
+# `/admin world advancetime` already moves it.
+DASHBOARD_REVIEWED_SCHEMA_VERSION = 60
 
 DASHBOARD_GET_API_PATHS = frozenset({
     "/api/overview", "/api/capabilities", "/api/timeline", "/api/npcs", "/api/npc",

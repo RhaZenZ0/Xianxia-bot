@@ -281,10 +281,13 @@ async function loadOverview(){
         <div class="row"><span>Schema / reviewed</span><b>${esc(cap.schema_version)} / ${esc(impl.reviewed_schema_version??'—')}</b></div>
         <div class="row"><span>Dashboard API</span><b>v${esc(cap.api_version)}</b></div>
         ${coverage}</div>`)}</div>
-    ${panel('Current era',d.active_era?`<div style="padding:12px 14px">
-        <h3 class="gold" style="font-family:Georgia,serif">${esc(d.active_era.name)}</h3>
-        <p class="mut" style="margin:7px 0 0;line-height:1.6">${esc(d.active_era.description||'')}</p>
-        <div class="row" style="margin-top:12px"><span>Started</span><b>${fmtGM(d.active_era.started_game_minute)}</b></div></div>`
+    ${panel('Ages of the worlds',(d.active_eras&&d.active_eras.length)?`<div style="padding:12px 14px">
+        ${d.active_eras.map(e=>`<div style="margin-bottom:14px">
+          <div class="mut" style="font-size:12px;letter-spacing:.06em;text-transform:uppercase">${esc(e.world||'')}</div>
+          <h3 class="gold" style="font-family:Georgia,serif;margin:2px 0 0">${esc(e.name)}</h3>
+          <p class="mut" style="margin:6px 0 0;line-height:1.6">${esc(e.description||'')}</p>
+          <div class="row" style="margin-top:8px"><span>Started</span><b>${fmtGM(e.started_game_minute)}</b></div>
+        </div>`).join('')}</div>`
       :emptyState('No active era.','Eras are opened by the world simulation or by a GM.'))}</div></div>
   </div>
   <h2>Recent canonical history</h2>

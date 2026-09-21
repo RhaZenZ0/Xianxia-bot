@@ -87,6 +87,29 @@ deferred half and not the half that says what was done about it.
   it. It reads `DB.get_known_recipes` now, and an empty picker names the two doors that end it rather
   than being a dead end. The hub renders the same callback as a drop-down, which is how *"why is
   crafting a drop-down menu"* turned out to mean *"a menu of things I cannot make"*.
+- **fixed (v1.0.7)** — *There was one era for the whole game, and half of what an era did reached no
+  rule.* Every reader asked `WHERE active=1 ORDER BY era_id DESC LIMIT 1`, so one row priced a siege
+  among the immortal courts and a cultivation session in a Mortal village alike — while the capitals
+  have been per world since schema 4 and a world's news since schema 56. Schema 60 gives an era a
+  world; each of the four now walks its own cycle of **six eras of sixty world days**, exactly one
+  world year, authored in `content/world.json` rather than in a Go literal (which had a third copy in
+  `app/rules/advanced_runtime.py`). And the counting is the finding: of the eight modifier keys the
+  old cycle authored, production Go fetched **four** — `secret_realm_frequency`, `market_volatility`,
+  `beast_encounter_rate` and `recovery_rate` each occurred exactly once in `go_core`, in their own
+  declaration — so the Beast Tide Era did nothing whatever to beasts. Two are wired
+  (`beast_encounter_rate` on the hunt margin, `recovery_rate` on v1.0.4's vitality recovery) and two
+  are refused. See CLAUDE.md, "An era belongs to one world".
+- **deferred (design)** — *`secret_realm_frequency` has nowhere honest to land.* It would weight the
+  `kind: "secret_realm"` branch of `eligibleUnexpectedEvents`, whose weights rc.53 deliberately
+  balanced so each realm totals 3 and a deep realm is not both harder to reach and half as likely to
+  open. Letting an era scale them would undo that balance silently, and doing it properly means
+  deciding what an era should do to a realm that already fades once you outgrow its world. A
+  mechanic, not a wiring. No era authors it, and `TestNoEraAuthorsAModifierNothingReads` refuses one
+  that tries.
+- **deferred (design)** — *`market_volatility` has no prices to move.* Nothing in the game varies a
+  price at all: a shop price is content times a fixed markup, and an auction settles on bids. An era
+  term would need a price mechanic to modify first, and inventing one to justify a modifier is
+  backwards. Same refusal as above.
 - **deferred (harness)** — *The Discord half drives the reset leaf but cannot guarantee it reaches a
   success.* Section 9b presses `/reset` last of all and accepts either the reset or its designed
   refusal, reporting which, because whether the swept cultivator has left a mark the world keeps

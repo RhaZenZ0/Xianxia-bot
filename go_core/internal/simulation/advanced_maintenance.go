@@ -20,11 +20,8 @@ var bountyHunterTitles = []string{
 	"Spirit-Hound Warden", "Heavenly Warrant Enforcer", "Jade Tribunal Hunter",
 }
 
-type eraTemplate struct {
-	Name, Description string
-	DurationDays      int64
-	Modifiers         map[string]float64
-}
+// `eraTemplate` stood here until v1.0.7, beside the `eraCycle` literal it
+// described. The roster is `worlddata.EraTemplate`, parsed from content.
 
 // `eraCycle` stood here until v1.0.7: four eras, 540 world days, shared by all
 // four worlds. It is `world_era_cycles` in content/world.json now - one cycle
@@ -42,24 +39,9 @@ func stablePercent(parts ...any) int64 {
 	return int64(binary.BigEndian.Uint32(sum[:4]) % 100)
 }
 
-func float64Value(v any, fallback float64) float64 {
-	if v == nil {
-		return fallback
-	}
-	switch x := v.(type) {
-	case float64:
-		return x
-	case int64:
-		return float64(x)
-	case int:
-		return float64(x)
-	}
-	f, err := strconv.ParseFloat(fmt.Sprint(v), 64)
-	if err != nil {
-		return fallback
-	}
-	return f
-}
+// `float64Value` stood here to coerce a modifier out of the hand-decoded
+// `modifiers_json` map. `game.ActiveEra` returns `map[string]float64` already,
+// so there is nothing left to coerce.
 
 // eraModifiersByWorld reads every world's age once, for the loops that then ask
 // per row.
