@@ -87,27 +87,54 @@ deferred half and not the half that says what was done about it.
   it. It reads `DB.get_known_recipes` now, and an empty picker names the two doors that end it rather
   than being a dead end. The hub renders the same callback as a drop-down, which is how *"why is
   crafting a drop-down menu"* turned out to mean *"a menu of things I cannot make"*.
-- **deferred (design)** — *The `#updates` channel skips versions silently.*
-  `announce_release_if_new` compares `server_config.announced_release` to the running version for
-  **equality only** and fetches that one changelog entry, so a server upgrading 1.0.5 → 1.0.8 is
-  told about 1.0.8 and never about 1.0.6 or 1.0.7 — the marker jumps straight across and nothing
-  records that two releases went past unmentioned. Three neighbouring behaviours are deliberate and
-  do work: a NULL marker records silently (a fresh install does not want forty paragraphs of
-  history), and neither a missing changelog entry nor an unbound channel advances the marker, so
-  both get a later chance. A *skipped* version is in neither category, because it is never looked
-  up at all. What limits the cost is rc.59's `release_post`: the channel gets the entry's opening
-  sentence and a link, so a skip loses one sentence per release rather than paragraphs. Walking the
-  gap is small — parse every `_ENTRY` between `seen` and `running`, sort the versions as integer
-  tuples (`v1.0.10` is newer than `v1.0.9`, the rule `playtest_checklist.py` learned in v1.0.1),
-  post oldest-first under a cap, then set the marker once — but "posts each missed release exactly
-  once" is precisely the kind of claim rc.59's own `test_release_notes.py` asserted in prose and
-  never drove, so it needs a gate rather than a patch.
+- **fixed (v1.0.9)** — *Standing at your own city's gate, the household refused you and named that
+  city as somewhere else.* `familyHouseholdEnterAction` compared the character's location to the
+  household's town by bare string equality while `cityOf` — the engine's one statement of which city
+  a place is part of — was already read by travel and by `WhereAnNPCCanWalk`. 317 of the catalogue's
+  477 locations are parts of a household town, 92 of them gates, and `beginner_home` reports
+  `return_home` from this action, so the beginner path's last stage could not be finished by walking.
+  Both halves fixed: the engine's check and the panel's anticipation of it.
+- **fixed (v1.0.9)** — *A character three minutes old was shown every system the game has.* 249
+  leaves across 67 pages in 16 hubs, none of them refused — sect politics, territory war, caravan
+  dispatch and the auction floor beside `cultivate` and `talk`. `feature_unlocks` in
+  `content/world.json` holds 139 of them for a realm that can use them, so a new cultivator meets
+  110. It is a different rule from rc.32's (which hides only what the engine would refuse), and it
+  earns that limit back three ways: a gated page prints one collapsed line and `/locked` lists every
+  door with the realm it needs; the slash command still works, because gating is advertising and
+  never a bound; and the roster is content a GM can retune.
+- **fixed (v1.0.10)** — *The panel header named whoever content says lives here, while the picker
+  named whoever is here.* Live: the header said *Gate Captain Yue Dong* and `/talk` offered
+  *Drillmaster Zhai Kang*, whom the simulation had walked to that gate. `here_summary` read
+  `WORLD.npcs[...]["location"]` — residents, with no schedule and no simulation — and it is
+  synchronous, so it cannot know: who is standing somewhere is an engine round trip away. It takes
+  `present` now and names people only when a caller hands them over; both production callers were
+  already async and pass `npcs_present`'s answer, the same resolver rc.28 wrote and v1.0.8 pointed
+  the picker at. This was the third reader of one question; rc.28 fixed the cards and v1.0.8 the
+  picker.
+- **deferred (design)** — *The curriculum is realm-banded, and some systems are not about realm.*
+  The Ghost Cultivator's `ghost` page is path-specific, the hidden sect's door is a karma gate, and
+  a profession's rank is its own ladder — each is left open at realm 0 rather than given a realm
+  floor that would be wrong for the player it is actually for. Gating on something other than realm
+  is a second axis, and a roster with two axes needs a rule about which wins before it is worth
+  having.
+- **fixed (v1.0.11)** — *The `#updates` channel no longer skips versions.* `releases_between`
+  walks every changelog entry after the marker and up to the running version, oldest first, and the
+  marker is written once at the end - **at the last release actually posted**, so a send that fails
+  halfway does not make the ones it never reached look announced. Versions sort as integer tuples
+  with a candidate below the release it is a candidate for (`1.0.0-rc.59 < 1.0.0 < 1.0.10`), and a
+  gap longer than `MAX_ANNOUNCED_RELEASES` posts the newest of them under one line saying what is
+  not being repeated. The three neighbouring behaviours this entry named as working are untouched.
+  The gate this entry asked for exists, and writing it found that rc.59's own fixture stubbed
+  `release_notes_for` with a lambda - so the parse was never driven from `announce_release_if_new`
+  at all; it pins a temporary `VERSIONS.md` now. See CLAUDE.md, "A server is told what it missed".
 - **fixed (v1.0.8)** — *The NPC picker offered whoever sorted first in the world, not whoever was
   standing here.* `local_npc_autocomplete` searched all 574 catalogue NPCs, took the alphabetically
   first twenty-five, and only then filtered by location — so `/talk`, `/npcinfo` and `/sense`
   answered *"nothing to choose from right now"* in a room whose own scene card named the gate
-  captain in it. It asks `npcs_present` now, rc.28's one resolver, which is what the card has always
-  used. It blocked more than conversation: the beginner path stalls at its second stage, which asks
+  captain in it. It asks `npcs_present` now, rc.28's one resolver, which is what `/scene status` and
+  `/sense` ask. (**This entry first said "which is what the card has always used", and that was
+  wrong about one card**: the *panel header* is `here_summary`, a pure catalogue read that asks
+  neither the schedule nor the engine — see the v1.0.10 entry above.) It blocked more than conversation: the beginner path stalls at its second stage, which asks
   for a `talk`, and the commission ladder runs inside `/talk`, so 137 of the 140 authored
   commissions could be neither offered nor finished.
 - **deferred (design)** — *An NPC nothing knows the location of is no longer offered anywhere.*
@@ -214,45 +241,55 @@ deferred half and not the half that says what was done about it.
   give it a refuge. `door_rule` is retired: it restated the second half of the same sentence, no
   house's prose can differ, and the engine already ends the protection at the door by standing the
   ambush outside. See CLAUDE.md, "The protection only the bot believed in".
-- **deferred (planned)** — *Nothing can grant a physique, not even a GM.* `admin.player.set_physique`
-  writes `evolution_stage`, `progress` and `stability` and nothing else (`actions.go:2212`), and the
-  only statements that ever write `physique_id` are character creation and samsara —
-  `aptitude.awaken` and `aptitude.evolve` both pass the loaded bundle back through `savePhysique`, so
-  they move the state and the stage and never the identity. This is **not** dead content: all eight
-  non-ordinary physiques are drawable at creation, because `generatePhysique` gives every one weight
-  at least 1 and favoured paths and roots only raise it. So it is a missing lever rather than a
-  `/learn`-class fault — a GM cannot hand somebody `nine_yang_solar_body`, cannot correct one rolled
-  wrong, and cannot stage one for a playtest. Adding it means `physique_id` and `name` on the
-  payload, the catalogue check that `aptitude_actions.go:203` already makes, and `physique_id` in
-  the undo snapshot, which today carries only the three numbers it can restore.
-- **deferred (planned)** — *`admin.player.set_spiritual_root` writes a grade the ladder may not
-  carry.* The lever upserts `grade`, `purity` and `mutation` with no check against
-  `spiritual_root_system.grades` (`actions.go:2119`), and `gradeIndex` answers 0 for a name it does
-  not know — so a typo'd grade is silently worth the bottom rung's `cultivation_mult` and
-  `breakthrough_bonus` rather than erroring. v1.0.0-rc.55 found and wrote down exactly this shape
-  ("a fallback that looks like a value is not a sentinel") and gated the *fixtures* with
-  `TestEveryFixtureRootStandsOnTheLadder`; the lever that a GM actually types into was left
-  ungated, so the one writer a human drives is the one nothing holds. The fix is the same check the
-  ladder already makes, at the lever.
-- **deferred (planned)** — *🗺️ Cultivation World is open to somebody who has never played, and no
-  role says otherwise.* `#player-homes` and `#expeditions` sit in that category, read-only since
-  v1.0.0-rc.59 but visible to everyone, so a newcomer's sidebar advertises rooms they cannot use
-  directly above the `#begin-here` they are meant to go to — while every other player-facing category
-  is gated (Realm Capitals by the presence role, the four World Events feeds by the realm-access
-  role, Admin by administrator). The deeper half is that **no "has a character" role exists at all**:
-  `_sync_realm_access_roles` and `_sync_realm_presence_roles` both run from `require_character` and so
-  only ever fire for somebody who already has one, which means nothing in the server can be gated on
-  having played. The plan is one generated role (`Xianxia • Cultivator`), granted from the same
-  `require_character` sync block and from `/begin`, revoked at `admin_erase` (which cannot ride
-  `require_character` — after erasure that call never fires again), and backfilled through
-  `_sync_all_realm_access_roles`, the sweep Full Setup and `/admin server sync_roles` already call.
-  Four traps are known and none is optional: the bot must allow **itself** before denying `@everyone`
-  or it 403s itself out of the channel (rc.52); the overwrite has to reach channels that already
-  exist, not only ones the run creates (rc.59, same file); both anchors carry `private_thread`s whose
-  members still need to see the parent, so the grant must precede thread creation; and
-  `realm_presence_role_name` already falls back to `world_name`, so a fifth hub with no `display_name`
-  would collide with `_realm_access_role_name` and silently merge two gates — adding a third name to
-  that family is the moment to gate it.
+- **fixed (v1.0.12)** — *The Discord sweep could not see the curriculum, and had not been run since
+  v1.0.8.* v1.0.9 gave a page a third state - a door the curriculum has not introduced yet, which
+  prints one collapsed line per page and no per-leaf lock line - and `press_leaf` knows two, so 97 of
+  245 leaves were "neither drawn nor locked" and **100 of 345 steps went red**. The harness raises
+  the player past the roster's own ceiling (read off `feature_unlocks`, never written down) before
+  the sweep, so every leaf is pressed again, and asserts the curriculum first at realm 0 on the page
+  the roster says holds the most back. `test_playtest_coverage.py` was green throughout because it
+  only asked about the deferral set; it holds all three of those now. See CLAUDE.md, "The curriculum
+  the sweep could not see".
+- **fixed (v1.0.12)** — *Every GM lever addressed an id a float had rounded off.* `decodeMap` is
+  `json.Unmarshal` into `map[string]any`, so a JSON number became a float64 - and a Discord snowflake
+  (~1.4e18) exceeds what a float carries exactly (2^53), so `admin.player.set_realm` was handed
+  1456074443989188610 and looked up ...608: "character not found", about a character the panel had
+  just drawn. Player actions were never affected, because `ActionRequest.ActorID` is a typed field.
+  `UseNumber()` is the fix and **no reader changed** - `storage.ParseInt` has had a `case
+  json.Number` since it was written and nothing could ever produce one. Found by the playtest, not by
+  reading. See CLAUDE.md, "An id too big for a float".
+- **fixed (v1.0.12)** — *A hub panel went quiet after fifteen minutes.* Asked for in play.
+  `HUB_PANEL_IDLE_MINUTES` (default 120, `0` = never) replaces a bare `timeout=900` written out in
+  five files; injected into `hubs.py` because the layering refuses a `runtime` import there. The
+  module default is the old fifteen, so a missed registration preserves behaviour rather than leaking
+  a view per panel.
+- **fixed (v1.0.12)** — *Four places parsed `surface.py` to recover the command tree's tuple, and a
+  fifth wrote down how many there were.* The tuple was inline inside `register_command_surface`, so
+  rc.43's "never copy it" could only be obeyed by reading the source - four ways, each with its own
+  self-check - while `playtest_discord.py` asserted `9 + len(_HUB_COMMANDS)` and went stale on
+  `/locked`. `surface.TREE_COMMANDS` is a name; all four are imports.
+- **fixed (v1.0.11)** — *A GM can grant a physique, and can only set a root grade the ladder
+  carries.* Two levers, one sentence: **the writer a human drives is the one nothing held.**
+  `admin.player.set_physique` takes an optional `physique_id`, held to the catalogue the way
+  `aptitude_actions.go:203` already holds one, and writes `name` beside it; the identity goes into
+  the undo snapshot whether or not the call changes it, so an undo puts back what a grant replaced,
+  and a pre-v1.0.11 snapshot keeps the three-number statement because an old audit row must stay
+  undoable on the terms it was written. `admin.player.set_spiritual_root` reads
+  `spiritual_root_system.grades` instead of the six-name map literal it kept beside them, and
+  `dashboard/app.js` stopped keeping a third copy in `gradeOpts` - both cards are pickers fed from
+  the content file by `_aptitude_catalogue`. The finding underneath is the fixture: `Apply` passes
+  an **empty world path** and every admin test went through it, so a lever that refused everything
+  would have passed all of them. See CLAUDE.md, "The writer a human drives is the one nothing held".
+- **fixed (v1.0.11)** — *🗺️ Cultivation World is gated behind having played.* One generated role
+  (`Xianxia • Cultivator`), granted at creation ahead of the first private thread, kept in step by
+  `require_character`, revoked at `admin.player.erase` - the one moment nothing else can notice -
+  and backfilled by `_sync_all_realm_access_roles`. The overwrite covers the category *and* both
+  anchors, because a category overwrite reaches only a channel synced to it; it allows the bot
+  before it denies `@everyone` (rc.52); and it **merges** rather than replaces, because
+  `set_permissions(**perms)` would have taken `send_messages=False` off `@everyone` with it and
+  left two read-only anchors writable to everybody holding the role. The name-family trap this
+  entry called out is now `test_the_role_names_never_collide.py`. See CLAUDE.md, "A room for people
+  who have played".
 - **fixed (v1.0.1)** — *The release after a live pass would have deleted it.* The checklist is named
   after `RELEASE_VERSION`, so the filename held still across all fifty-nine release candidates of
   1.0.0 and `merge_ticks` carried every tick; on the first bump that renames it the target does not

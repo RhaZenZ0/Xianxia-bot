@@ -25,6 +25,7 @@ from __future__ import annotations
 import discord
 
 from ...ops.game_engine import GameEngineError
+from ..hubs import panel_timeout
 from ..registry import registered_root_command
 from ..runtime import (
     _explain_engine_error,
@@ -97,7 +98,7 @@ class TributeClaimView(discord.ui.View):
     """
 
     def __init__(self, *, owner_id: int) -> None:
-        super().__init__(timeout=900)
+        super().__init__(timeout=panel_timeout())
         self.owner_id = int(owner_id)
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:

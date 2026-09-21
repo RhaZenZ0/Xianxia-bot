@@ -1,6 +1,7 @@
 package game
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -145,11 +146,11 @@ func ApplyWithWorld(databasePath, worldPath string, req ActionRequest) (ActionRe
 	case "admin.player.set_realm_perfection":
 		result, err = adminSetRealmPerfection(conn, req.ActorID, req.Payload)
 	case "admin.player.set_spiritual_root":
-		result, err = adminSetSpiritualRoot(conn, req.ActorID, req.Payload)
+		result, err = adminSetSpiritualRoot(conn, catalog, req.ActorID, req.Payload)
 	case "admin.player.set_bloodline":
 		result, err = adminSetBloodline(conn, req.ActorID, req.Payload)
 	case "admin.player.set_physique":
-		result, err = adminSetPhysique(conn, req.ActorID, req.Payload)
+		result, err = adminSetPhysique(conn, catalog, req.ActorID, req.Payload)
 	case "admin.player.set_tribulation":
 		result, err = adminSetTribulation(conn, req.ActorID, req.Payload)
 	case "admin.player.clear_condition":
@@ -735,9 +736,30 @@ func auditAdmin(conn *storage.Conn, adminUserID int64, action, target string, be
 	return err
 }
 
+// decodeMap decodes an action's payload, keeping every number exact (v1.0.12).
+//
+// `json.Unmarshal` into `map[string]any` turns every JSON number into a
+// **float64**, which carries 2^53 exactly - and a Discord snowflake is about
+// 1.4e18, so every id a payload named came back off by a digit or two.
+// `admin.player.set_realm` was handed 1456074443989188610 and looked up
+// ...608: "character not found", about a character the panel had just drawn.
+//
+// Only the payload was affected. `ActionRequest.ActorID` is a typed `int64`
+// field, and encoding/json parses a number straight into one with no float in
+// between, so every player action - which addresses the actor - was always
+// exact. What goes through here is the GM's console, where the id is a payload
+// field.
+//
+// `UseNumber` leaves a number as `json.Number`, the literal digits.
+// `storage.ParseInt` has had a `case json.Number` since it was written and
+// nothing could ever produce one, and `stringField` prints it through
+// `fmt.Sprint`, which is the literal - so **no reader changed**. The one thing
+// that had to change was the type the decoder hands them.
 func decodeMap(raw json.RawMessage) (map[string]any, error) {
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.UseNumber()
 	var p map[string]any
-	if err := json.Unmarshal(raw, &p); err != nil {
+	if err := decoder.Decode(&p); err != nil {
 		return nil, err
 	}
 	return p, nil
@@ -2062,7 +2084,25 @@ func adminSetRealmPerfection(conn *storage.Conn, adminUserID int64, raw json.Raw
 // INSERT arm omits them from its column list so SQLite applies the table's
 // normal DEFAULTs when creating a first-time row). Upserts: a legacy
 // character predating this table has no row yet.
-func adminSetSpiritualRoot(conn *storage.Conn, adminUserID int64, raw json.RawMessage) (any, error) {
+//
+// Since v1.0.11 the grade is held to the ladder `content/world.json` actually
+// carries.
+//
+// It used to hold it to a **hand-written copy** of that ladder, six names in a
+// map literal. The copy agreed with the content the day it was written and
+// agrees with it now, which is exactly what made it worth fixing rather than
+// urgent: it cannot be wrong in an interesting way until a rung is renamed or
+// added, at which point the lever refuses the real grade and accepts a stale
+// one, silently. That is the shape rc.44 removed for the world currencies and
+// v1.0.7 for the era roster - and this session retired three hand-copies of
+// the command tree's own tuple for the same reason.
+//
+// What makes a wrong grade quiet rather than loud is `gradeIndex`, which
+// answers 0 for a name it does not know: since rc.55 that is Mortal's 0.88x
+// cultivation and -1 on every breakthrough, for the character's whole life.
+// A fallback that looks like a value is not a sentinel - so the refusal has to
+// happen here, at the one writer a human drives.
+func adminSetSpiritualRoot(conn *storage.Conn, catalog worlddata.Catalog, adminUserID int64, raw json.RawMessage) (any, error) {
 	p, err := decodeMap(raw)
 	if err != nil {
 		return nil, err
@@ -2072,9 +2112,15 @@ func adminSetSpiritualRoot(conn *storage.Conn, adminUserID int64, raw json.RawMe
 		return nil, err
 	}
 	grade := stringField(p, "grade")
-	validGrades := map[string]bool{"Mortal": true, "Common": true, "Refined": true, "Earth": true, "Heaven": true, "Immortal": true}
-	if !validGrades[grade] {
-		return nil, errors.New("grade must be one of Mortal, Common, Refined, Earth, Heaven, Immortal")
+	rungs := make([]string, 0, len(catalog.SpiritualRootSystem.Grades))
+	for _, g := range catalog.SpiritualRootSystem.Grades {
+		rungs = append(rungs, g.Name)
+	}
+	if !rootGradeOnTheLadder(catalog, grade) {
+		if len(rungs) == 0 {
+			return nil, errors.New("the spiritual-root ladder is missing from the content file")
+		}
+		return nil, fmt.Errorf("grade must be one of %s", strings.Join(rungs, ", "))
 	}
 	purity, err := requiredInt(p, "purity")
 	if err != nil {
@@ -2209,7 +2255,26 @@ func adminSetBloodline(conn *storage.Conn, adminUserID int64, raw json.RawMessag
 // exist; errors rather than upserting since that "should never happen" case
 // most likely indicates corrupted state worth surfacing, not silently
 // papering over. Same evolution_stage floor-at-0-only reasoning as bloodline.
-func adminSetPhysique(conn *storage.Conn, adminUserID int64, raw json.RawMessage) (any, error) {
+//
+// Since v1.0.11 it also edits **which physique it is**.
+//
+// It wrote `evolution_stage`, `progress` and `stability` and nothing else, and
+// the only two statements in the engine that have ever written `physique_id`
+// are character creation and samsara: `aptitude.awaken` and `aptitude.evolve`
+// both pass the loaded bundle back through `savePhysique`, so they move the
+// state and the stage and never the identity. This is **not** dead content -
+// all eight non-ordinary physiques are drawable at creation, because
+// `generatePhysique` gives every one weight at least 1 - so it was a missing
+// lever rather than a `/learn`-class orphan: a GM could not hand somebody
+// `nine_yang_solar_body`, could not correct one rolled wrong, and could not
+// stage one for a playtest.
+//
+// `physique_id` is optional, so every existing caller still edits the three
+// numbers and nothing else. When it is given it is held to the catalogue - the
+// same check `aptitude_actions.go` already makes before reading a physique's
+// evolutions - because an id the catalogue does not carry contributes no
+// modifiers at all and would be a physique that exists only as a string.
+func adminSetPhysique(conn *storage.Conn, catalog worlddata.Catalog, adminUserID int64, raw json.RawMessage) (any, error) {
 	p, err := decodeMap(raw)
 	if err != nil {
 		return nil, err
@@ -2233,6 +2298,18 @@ func adminSetPhysique(conn *storage.Conn, adminUserID int64, raw json.RawMessage
 	if uid <= 0 {
 		return nil, errors.New("invalid user_id")
 	}
+	physiqueID := stringField(p, "physique_id")
+	physiqueName := ""
+	if physiqueID != "" {
+		def, ok := catalog.Physiques[physiqueID]
+		if !ok {
+			return nil, fmt.Errorf("no physique %q in the catalogue", physiqueID)
+		}
+		physiqueName = strings.TrimSpace(def.Name)
+		if physiqueName == "" {
+			physiqueName = physiqueID
+		}
+	}
 	progress = clamp(progress, 0, 100)
 	stability = clamp(stability, 0, 100)
 	if evolutionStage < 0 {
@@ -2247,7 +2324,7 @@ func adminSetPhysique(conn *storage.Conn, adminUserID int64, raw json.RawMessage
 			rollback(conn)
 		}
 	}()
-	beforeRes, err := conn.Execute(`SELECT name,evolution_stage,progress,stability FROM character_physiques WHERE user_id=?`, []any{uid})
+	beforeRes, err := conn.Execute(`SELECT physique_id,name,evolution_stage,progress,stability FROM character_physiques WHERE user_id=?`, []any{uid})
 	if err != nil {
 		return nil, err
 	}
@@ -2255,13 +2332,32 @@ func adminSetPhysique(conn *storage.Conn, adminUserID int64, raw json.RawMessage
 	if row == nil {
 		return nil, errors.New("physique not found for this character")
 	}
-	before := map[string]any{"evolution_stage": storage.ParseInt(row["evolution_stage"]), "progress": storage.ParseInt(row["progress"]), "stability": storage.ParseInt(row["stability"])}
+	// The identity goes in the snapshot whether or not this call changes it,
+	// so `admin.undo` can put back a physique an earlier call replaced. The
+	// snapshot carried only the three numbers it could restore, which meant an
+	// undo of a grant would have left the new identity standing.
+	before := map[string]any{
+		"physique_id":     fmt.Sprint(row["physique_id"]),
+		"name":            fmt.Sprint(row["name"]),
+		"evolution_stage": storage.ParseInt(row["evolution_stage"]),
+		"progress":        storage.ParseInt(row["progress"]),
+		"stability":       storage.ParseInt(row["stability"]),
+	}
 	now := float64(time.Now().UnixNano()) / 1e9
-	if _, err = conn.Execute(`UPDATE character_physiques SET evolution_stage=?,progress=?,stability=?,updated_at=? WHERE user_id=?`,
+	if physiqueID != "" {
+		if _, err = conn.Execute(`UPDATE character_physiques SET physique_id=?,name=?,evolution_stage=?,progress=?,stability=?,updated_at=? WHERE user_id=?`,
+			[]any{physiqueID, physiqueName, evolutionStage, progress, stability, now, uid}); err != nil {
+			return nil, err
+		}
+	} else if _, err = conn.Execute(`UPDATE character_physiques SET evolution_stage=?,progress=?,stability=?,updated_at=? WHERE user_id=?`,
 		[]any{evolutionStage, progress, stability, now, uid}); err != nil {
 		return nil, err
 	}
 	after := map[string]any{"evolution_stage": evolutionStage, "progress": progress, "stability": stability}
+	if physiqueID != "" {
+		after["physique_id"] = physiqueID
+		after["name"] = physiqueName
+	}
 	if err := auditAdmin(conn, adminUserID, "admin.player.set_physique", fmt.Sprintf("user:%d", uid), before, after, fmt.Sprint(p["reason"])); err != nil {
 		return nil, err
 	}

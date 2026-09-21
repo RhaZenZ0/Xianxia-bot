@@ -14,7 +14,7 @@ from typing import Any
 import discord
 
 from ..rules.realm_hubs import REALM_HUBS, REALM_HUB_MEMBER_PERMISSIONS, realm_hub_visibility, realm_presence_role_name
-from .runtime import DB, SETTINGS, WORLD, _realm_access_role_name, chunk_text, log
+from .runtime import CULTIVATOR_ROLE_NAME, DB, SETTINGS, WORLD, _realm_access_role_name, chunk_text, log
 
 def _event_archive_minutes() -> int:
     allowed = {60, 1440, 4320, 10080}
@@ -83,6 +83,100 @@ async def _ensure_realm_access_roles(guild: discord.Guild) -> dict[str, discord.
                 continue
         roles[world_name] = role
     return roles
+
+
+async def _ensure_cultivator_role(guild: discord.Guild) -> discord.Role | None:
+    """The one "Xianxia • Cultivator" role (v1.0.11).
+
+    Created with no guild permissions and not mentionable, exactly as the
+    presence roles are: it is a visibility gate and nothing else.
+    """
+    me = guild.me
+    if not me or not me.guild_permissions.manage_roles:
+        return None
+    role = discord.utils.get(guild.roles, name=CULTIVATOR_ROLE_NAME)
+    if role is not None:
+        return role
+    try:
+        return await guild.create_role(
+            name=CULTIVATOR_ROLE_NAME, mentionable=False, permissions=discord.Permissions.none(),
+            reason="Xianxia: this account has a cultivator",
+        )
+    except discord.HTTPException:
+        log.exception("Could not create the cultivator role")
+        return None
+
+
+async def ensure_cultivator_gate(
+    guild: discord.Guild,
+    role: discord.Role | None,
+    category: discord.CategoryChannel | None,
+    channels: list[discord.abc.GuildChannel],
+) -> str:
+    """Hide 🗺️ Cultivation World from anybody who has never played (v1.0.11).
+
+    `#player-homes` and `#expeditions` are read-only anchors for private
+    threads, and they were the last player-facing category on the server that
+    was open to everyone - so a newcomer's sidebar advertised rooms they cannot
+    use directly above the `#begin-here` they are meant to go to.
+
+    Three things are `ensure_realm_hub_overwrites`' rules, and each is here for
+    the reason that one records:
+
+    - **The bot allows itself before it denies anybody** (rc.52). A channel
+      overwrite applies to the bot like anyone else unless it is Administrator,
+      so denying `@everyone` first takes the bot's own access away and every
+      call after it is refused 403. Nothing caught that for releases because
+      every server it ran on gave the bot Administrator.
+    - **It reaches the channels that already exist**, not only the ones a run
+      creates (rc.59, in the file that provisions them). A category overwrite
+      is inherited only by a channel whose permissions are synced to it, and
+      these two are created with an `@everyone` overwrite of their own, so
+      each is gated in its own right.
+    - **No role means nothing is changed.** Denying `@everyone` with no allow
+      to put back is how a channel becomes invisible to the very players it
+      exists for - the one failure this whole family is written around.
+
+    Returns "gated", "hidden" (nothing needed doing), "no-role", or "failed".
+    """
+    if role is None:
+        return "no-role"
+    targets: list[discord.abc.GuildChannel] = [item for item in ([category] if category else []) + channels]
+    if not targets:
+        return "no-role"
+    reason = "Xianxia: 🗺️ Cultivation World is for cultivators"
+    changed = False
+
+    async def _merge(target: discord.abc.GuildChannel, who: Any, **perms: bool) -> bool:
+        """Add these permissions to whatever the target already carries.
+
+        `set_permissions(target, **perms)` **replaces** the overwrite rather
+        than merging into it, and both channels here already carry an
+        `@everyone` overwrite of `send_messages=False` - the read-only anchor
+        rule. Replacing it with a bare `view_channel=False` would leave the
+        channels hidden and, for everybody holding the role, writable: the
+        gate would have quietly undone the thing the channels are for.
+        """
+        existing = (target.overwrites or {}).get(who)
+        if existing is not None and all(getattr(existing, name, None) is value for name, value in perms.items()):
+            return False
+        overwrite = discord.PermissionOverwrite() if existing is None else discord.PermissionOverwrite(**dict(existing))
+        overwrite.update(**perms)
+        await target.set_permissions(who, overwrite=overwrite, reason=reason)
+        return True
+
+    try:
+        for target in targets:
+            # The bot first, always (rc.52): denying @everyone ahead of this
+            # takes the bot's own access away and 403s every call after it.
+            if guild.me is not None:
+                changed |= await _merge(target, guild.me, view_channel=True, send_messages=True, read_message_history=True)
+            changed |= await _merge(target, role, view_channel=True, read_message_history=True)
+            changed |= await _merge(target, guild.default_role, view_channel=False)
+    except (discord.Forbidden, discord.HTTPException):
+        log.exception("Could not gate the cultivation-world category behind %s", role.name)
+        return "failed"
+    return "gated" if changed else "hidden"
 
 
 async def ensure_realm_hub_overwrites(

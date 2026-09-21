@@ -33,7 +33,16 @@ MODULES = sorted(
     str(p.relative_to(BOT)) for p in BOT.rglob("*.py")
     if "__pycache__" not in p.parts and p.name not in ("__init__.py", "__main__.py")
 )
-BUILTINS = set(dir(builtins)) | {"__file__", "__name__", "__doc__", "__package__"}
+# The module-level names every module has without importing them. The last is
+# Python 3.14's (PEP 649/749): the interpreter synthesises
+# `__conditional_annotations__` in a module whose annotations are deferred and
+# conditionally defined, so on 3.14 such a module "reads a name it does not
+# define" and this gate reported the interpreter rather than the tree. Found by
+# running the suite on 3.14 for the first time - a portability gap in the gate,
+# not a fault in any module it named.
+BUILTINS = set(dir(builtins)) | {
+    "__file__", "__name__", "__doc__", "__package__", "__conditional_annotations__",
+}
 
 
 def module_globals(path):
@@ -840,6 +849,12 @@ SURFACE = {
             "condition_group": ('status', 'treat'),
             "profession_group": ('status', 'exam'),
             "crime_group": ('status', 'atone'),
+        },
+    },
+    "commands/locked.py": {
+        "groups": (),
+        "roots": ('locked',),
+        "leaves": {
         },
     },
     "commands/scene.py": {

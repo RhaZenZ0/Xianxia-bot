@@ -5,6 +5,7 @@ import base64
 import hmac
 import difflib
 import json
+from functools import lru_cache
 import logging
 import os
 from dataclasses import dataclass
@@ -53,6 +54,48 @@ from ..rules.quests import (
 log = logging.getLogger("xianxia.dashboard")
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+@lru_cache(maxsize=1)
+def _aptitude_catalogue() -> dict[str, list[dict[str, str]]]:
+    """What the Player Editor's two aptitude cards may offer (v1.0.11).
+
+    `physiques` is `[{id, name}]` for every physique the content file carries;
+    `root_grades` is `[{id, name}]` for every rung of the spiritual-root ladder,
+    in the ladder's own order, because a grade *is* an order and sorting it
+    alphabetically would put Common above Earth.
+
+    Both used to be hand-written in the browser: the physique card offered
+    nothing at all, and `gradeOpts` was a six-name literal in `dashboard/app.js`
+    beside the six-name map the engine kept. A picker built from a copy of the
+    content offers what the engine will refuse the day the two disagree, which
+    is rc.46's rule, and the copies are the fault this release exists for - so
+    the ladder is read off the file here and sent with the row.
+
+    Read from disk the way `_base_currencies` and `item_catalog` are, rather
+    than importing `app.rules.game.World`, which drags the whole rules tier into
+    the dashboard for two lookup tables. An unreadable file answers empty lists,
+    and each card then says it has nothing to offer rather than presenting an
+    empty select as a choice.
+    """
+    try:
+        world = json.loads((ROOT / "content" / "world.json").read_text(encoding="utf-8"))
+    except Exception:
+        log.warning("Could not load content/world.json for the aptitude catalogue", exc_info=True)
+        return {"physiques": [], "root_grades": []}
+    physiques = sorted(
+        (
+            {"id": str(pid), "name": str((body or {}).get("name") or pid)}
+            for pid, body in (world.get("physiques") or {}).items()
+        ),
+        key=lambda x: x["name"],
+    )
+    grades = [
+        {"id": str((rung or {}).get("name") or ""), "name": str((rung or {}).get("name") or "")}
+        for rung in ((world.get("spiritual_root_system") or {}).get("grades") or [])
+        if str((rung or {}).get("name") or "")
+    ]
+    return {"physiques": physiques, "root_grades": grades}
 
 
 def _base_currencies() -> list[str]:
@@ -963,6 +1006,12 @@ class ReadOnlyDashboardStore:
                 (one,),
             )
             physique = await self._fetchone(db, "SELECT physique_id,name,state,evolution_stage,progress,stability,instability FROM character_physiques WHERE user_id=?", (one,))
+            # What the two aptitude cards may offer (v1.0.11). Sent with the
+            # row so each is a picker rather than a typed id or a literal in the
+            # browser - rc.37's whole rationale for the Player Editor, and
+            # v1.0.3's item-suggester finding is what a typed id costs when it
+            # is nearly right.
+            aptitude_catalogue = _aptitude_catalogue()
             tribulations = await self._fetchall(db, "SELECT gate_realm_index,preparation,attempts,cleared,last_result FROM tribulation_state WHERE user_id=? ORDER BY gate_realm_index", (one,))
             perfection = await self._fetchall(
                 db,
@@ -984,6 +1033,7 @@ class ReadOnlyDashboardStore:
             return {
                 "player": row, "inventory": inventory, "cooldowns": cooldowns, "scene": scene or {}, "conditions": conditions,
                 "wallets": wallets, "root": root or {}, "bloodlines": bloodlines, "physique": physique or {},
+                "aptitude_catalogue": aptitude_catalogue,
                 "tribulations": tribulations, "perfection": perfection, "beasts": beasts, "equipment": equipment,
                 "abode": abode or {}, "guests": guests, "alchemy": alchemy or {}, "fate": fate or {},
             }

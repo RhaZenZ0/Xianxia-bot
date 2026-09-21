@@ -10,7 +10,10 @@ like the capitals themselves.
 from __future__ import annotations
 
 import ast
+import importlib
+import os
 import unittest
+from unittest.mock import patch
 
 from tests.support import PROJECT_ROOT
 
@@ -21,6 +24,14 @@ BOT_PY = (BOT / "bot.py").read_text(encoding="utf-8")
 CHANNELS = (BOT / "channels.py").read_text(encoding="utf-8")
 SETUP = (BOT / "admin" / "server_setup.py").read_text(encoding="utf-8")
 SURFACE = (BOT / "surface.py").read_text(encoding="utf-8")
+
+_ENV = {"DISCORD_TOKEN": "test-token", "GUILD_ID": "123456789012345678",
+        "ENGINE_AUTH_TOKEN": "test-engine-token-1234567890", "DATABASE_PATH": "data/test.sqlite3"}
+
+
+def _surface_module():
+    with patch.dict(os.environ, _ENV):
+        return importlib.import_module("app.bot.surface")
 
 
 def _body(source: str, name: str) -> str:
@@ -124,8 +135,27 @@ class TheChannelsAreDashboardOwned(unittest.TestCase):
 
 class TheMenuOpensEveryHub(unittest.TestCase):
     def test_menu_is_a_registered_root_on_the_tree(self):
+        """Read off the tuple, never spelled out (v1.0.9).
+
+        This asserted the tuple's exact literal text, so it broke the day
+        `/locked` was added to it - a gate failing on correct code because the
+        line it pins grew a member, which says nothing about whether `menu` is
+        still registered. rc.43 already made this call for
+        `test_commands_reach_a_player.py`: the tree tuple is read out of
+        `surface.py` by AST rather than copied, because a copy is free to drift
+        and a spelling is not the rule.
+        """
         self.assertIn('name="menu"', SURFACE)
-        self.assertIn('("begin", "me", "quests", "action", "check", "admin", "menu", "tribute", "cooldowns")', SURFACE)
+        # Imported rather than parsed since v1.0.12 - the tuple is a name now.
+        # Still asserted before it is trusted (rc.57): an emptied tuple would
+        # make the assertion below vacuous rather than red.
+        registered = set(_surface_module().TREE_COMMANDS)
+        self.assertTrue(registered, "the tree tuple is empty; the gate is broken, not the tree")
+        self.assertIn(
+            "menu", registered,
+            "/menu is no longer registered on the command tree, so the one door into every hub "
+            "is not a slash command any more",
+        )
 
     def test_it_lists_every_hub_and_gates_admin(self):
         select = _body(SURFACE, "MenuSelect")

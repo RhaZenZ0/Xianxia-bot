@@ -23,11 +23,11 @@ from ...rules.game import World
 from ...ops.game_engine import GameEngineError
 from ...rules.worldtime import from_game_minutes
 from ..formatting import human_duration
-from ..hubs import HubDynamicOption, register_hub_option_provider
+from ..hubs import HubDynamicOption, panel_timeout, register_hub_option_provider
 from ..pickers import auction_currency_autocomplete
 from .. import maintenance
 from ..registry import registered_group_command
-from ..runtime import DB, ENGINE, SETTINGS, WORLD, _explain_engine_error, current_world_time, log, reply_long
+from ..runtime import DB, ENGINE, SETTINGS, WORLD, _explain_engine_error, _revoke_cultivator_role, current_world_time, log, reply_long
 from ..services import QUEST_FORGE, QUESTS, SIM
 from ...ai.quest_forge import store_draft
 from ...rules.quests import validate_quest_definition
@@ -748,7 +748,7 @@ class QuestDraftReviewView(discord.ui.View):
     """Approve / Discard for one draft; admin-gated like every /admin surface."""
 
     def __init__(self, quest_key: str) -> None:
-        super().__init__(timeout=900)
+        super().__init__(timeout=panel_timeout())
         self.quest_key = quest_key
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
@@ -919,6 +919,13 @@ async def admin_erase(
         await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
         return
     threads = await delete_player_threads(interaction.guild, doomed_threads)
+    # And the role that said they had played (v1.0.11). This is the only place
+    # it can come off: `_sync_cultivator_role` rides `require_character`, which
+    # never fires again for an account with no character.
+    try:
+        await _revoke_cultivator_role(interaction.guild, member.id)
+    except Exception:
+        log.exception("Could not revoke the cultivator role from user %s after an erasure", member.id)
     deleted = int(result.get("rows_deleted") or 0)
     anonymised = int(result.get("rows_anonymised") or 0)
     tables = int(result.get("tables_touched") or 0)

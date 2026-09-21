@@ -123,7 +123,16 @@ class GUIIntegrityTests(unittest.TestCase):
         self.assertIn('name="📖 What can I do here?"', source)
         self.assertIn("_action_button_style(action, index)", source)
         self.assertIn("await _start_hub_action(interaction, self.hub_view, self.action)", source)
-        self.assertIn("super().__init__(timeout=900)", source)
+        # How long a panel stays open is no longer spelled here (v1.0.12). This
+        # line pinned `super().__init__(timeout=900)` - the sixth copy of a
+        # number the release removed from five production files, and the one
+        # nothing looked at, so it went red on a machine that had simply never
+        # run the suite before. `test_a_panel_stays_open_as_long_as_it_is_told`
+        # owns the rule now, and holds it the strong way round: every panel view
+        # must ask `panel_timeout()`, and none may carry an idle window of its
+        # own. A second, weaker statement of one rule is what produces the false
+        # finding (v1.0.1), and pinning where a rule is written rather than that
+        # it holds fails exactly when the rule is moved (v1.0.8).
 
     def test_hub_cards_refresh_live_character_and_admin_state(self):
         hub_source = HUBS.read_text(encoding="utf-8")

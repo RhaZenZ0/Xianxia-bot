@@ -11,7 +11,7 @@ import discord
 
 from ..ops.game_engine import GameEngineError
 from .hubs import HubStatusField
-from .locations import here_summary
+from .locations import here_summary, npcs_present
 from . import seclusion
 from .runtime import DB, ENGINE, WORLD, character_location_display, log
 
@@ -193,6 +193,24 @@ async def _seclusion_line(interaction: discord.Interaction) -> str:
     return line
 
 
+async def _who_is_here(character: dict) -> list[str]:
+    """`npcs_present` for a character's own location, and never a failure.
+
+    The Here line is a header, drawn beside everything else a panel shows, so a
+    lookup that raised would cost the whole card rather than one line of it. An
+    empty answer names nobody - the same thing the line says when no caller can
+    resolve anybody at all.
+    """
+    where = str(character.get("location") or "")
+    if not where:
+        return []
+    try:
+        return list(await npcs_present(where))
+    except Exception:
+        log.exception("Could not read who is standing at %s", where)
+        return []
+
+
 async def menu_facts_line(interaction: discord.Interaction) -> str:
     """The lines above the rows: no character yet, or the Here line, the
     realm and stage with the essence, and what is waiting (trade offers)."""
@@ -200,7 +218,9 @@ async def menu_facts_line(interaction: discord.Interaction) -> str:
     if character is None:
         return "🌱 No cultivator yet. **Begin** creates one: a family, a path, a name."
     lines = []
-    here = here_summary(str(character.get("location") or ""))
+    # Who is actually here, not who content says lives here (v1.0.10): this
+    # header and `/talk`'s picker disagreed, because only one of them asked.
+    here = here_summary(str(character.get("location") or ""), present=await _who_is_here(character))
     where = (await character_location_display(character))[:120]
     lines.append(f"📍 **{where}**" + (f" — {here[:200]}" if here else ""))
     realm_index = int(character.get("realm_index", 0))

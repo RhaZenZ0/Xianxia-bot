@@ -3242,6 +3242,500 @@ reads, so it is an `assertTrue` over a search. Its brace-matching reader asserts
 body before anything is asserted on it (rc.57), and the drill that breaks the reader prints *"the
 brace reader did not return loadOverview's body; the gate is broken, not the tree"*.
 
+### The game introduces itself a realm at a time (`feature_unlocks`, v1.0.9)
+
+**Found by playing**, and reported in one sentence: *"it's become complex and overwhelming."*
+
+A character three minutes old met **249 leaves across 67 pages in 16 hubs** - every system the game
+has, at once. `cultivation` alone carries 34 leaves over seven pages, `sect` 29, `economy` 27,
+`character` 25, `family` 24, `combat` 24. **None of it was refused**: sect politics, territory war,
+caravan dispatch, boss raids and the auction floor all *work* at Body Tempering. They are simply not
+what the first hour is about, and nothing anywhere said so.
+
+**This is a different rule from rc.32's, and that is the whole thing to understand before touching
+it.** `PROGRESSION_GATES` hides a door the engine **would refuse outright** - a Law before the realm
+that can hold one, a sect's rooms to somebody in no sect - and its limit is stated in this file:
+*"never a status read or the door into the system, because a road nobody can see is a road nobody
+learns exists."* A pacing curriculum hides doors that would have worked. It has to earn that limit
+back, and three properties are what do it.
+
+- **Nothing vanishes.** A page holding doors back prints **one collapsed line** naming the count and
+  the nearest realm; `/locked` lists every door with what it needs. A padlock each was rejected on
+  the finding itself: the complaint was a wall of rows, and a wall of grey rows is the same wall.
+  The line is why the two kinds of hiding are **two registries** rather than more entries in one -
+  `_HIDDEN_ACTIONS` means "the engine would refuse this where you stand" and earns a padlock naming
+  the reason, `_NOT_YET_UNLOCKED` means "not introduced yet" and earns the collapsed line. Merging
+  them would make one line type mean two things and put the page straight back.
+- **Gating is advertising, never a bound.** Nothing is consulted on a press: `/auction` typed
+  directly still runs, and the engine's own rules stay the only refusal. **A bound that lives in the
+  client is not a bound** (rc.48) - already found four times in this tree, and a realm floor written
+  for *pacing* becoming a refusal the engine never agreed to would be the fifth.
+  `test_the_curriculum_opens_as_you_cultivate.py` reads `_panel_gate`'s statements and the two
+  engine clients to hold it.
+- **The roster is content**, so a GM retunes it without a code change - the rule this tree already
+  follows for `event_sites`, `forage_materials`, `beginner_path` and `world_era_cycles`. It is
+  authored by **page** with per-leaf overrides, because a page is the natural unit of "a system" and
+  a 67-entry roster is reviewable where a 249-entry one is not. The overrides exist because several
+  pages mix the two ends: `character / Overview` holds `sheet` beside `soul` and `inheritances`, and
+  `cultivation / Path` holds `aptitude root` - what you were born as, which is identity rather than
+  a system - beside `aptitude evolve`.
+
+**Every status read stays open at realm 0**, deliberately and against the temptation to count them
+as noise. `sect status`, `beast status`, `abode status`, `innerworld status`, `secretrealm status`
+and the rest are how a player learns a system exists at all, which is precisely what rc.32's limit
+protects. What waits is the levers inside.
+
+**Two floors are absolute and each has its own test.** Anything the beginner path or a household
+errand needs stays at realm 0 - gating a leaf the opening *requires* would make it illegible
+instead, and silently, because the quest would still be held and simply have no visible way to
+advance. And **`reset` is never held back**: the player most likely to want it is the one who has
+just decided this game is too much, which is the player this release is for.
+
+**`law` and `tribulation` are deliberately left to the engine's gate** rather than restated here.
+They are already hidden by `_progression_hidden_actions` at their real floors, and a second
+statement of one rule is the fault rc.39 removed for the world clock and rc.44 for the world
+currencies.
+
+**The rules half takes its roster injected** (`app/rules/feature_unlocks.py`), because `WORLD` is
+built in `app/bot/runtime.py` and `test_app_layout.py` puts `rules` at the bottom - the reason
+`describe_era` (v1.0.7) and `narrator.py`'s `npc_resolver` (rc.27) are shaped the same way. An
+absent, empty or unreadable roster **locks nothing**: a presentation filter that failed towards
+hiding would leave a player looking at an empty game with no way to tell that from a correct one,
+while failing towards showing is merely the busy surface this release started from. That is the same
+call `maintenance.py` makes about its own flag.
+
+**Three of the suite's exact lists caught the new command and made it a decision rather than a
+default**, which is what they are for. `test_app_layout` refused `feature_unlocks` until the module
+was registered; `test_bot_package`'s surface table refused `commands/locked.py` until it was named;
+and `test_seclusion_lockout` refused `/locked` in the command tree until it was placed on one side
+or the other - it is a **read**, so it joins `/cooldowns` and `/quests` in `OPEN_COMMANDS`, and a
+secluded cultivator can still see what opens next.
+
+**The gate's own drill found the gate broken, immediately.** The check that the collapsed line names
+`/locked` read the whole function *including its docstring* - and the docstring explains the rule,
+so deleting the sentence from the returned string left the substring in the prose and the drill
+**passed** against a broken tree. That is rc.52's rule (*a gate that cannot tell prose from code is
+decoration*) arriving in the same session it was written, exactly as v1.0.1's checklist gate and
+v1.0.5's craft-picker gate each did. It reads the function's statements without its docstring now,
+and the re-drill fails.
+
+**And a fourth exact list broke on correct code, which is a finding of its own.**
+`test_live_auctions.py`'s menu test asserted the tree tuple's **exact literal text**, so adding
+`/locked` to it failed a gate that is about whether `/menu` is registered - a question the added
+member does not touch. rc.43 had already made this call for `test_commands_reach_a_player.py`: *the
+tree tuple is read out of `surface.py` by AST rather than copied*, because a copy is free to drift
+and a spelling is not the rule. It reads it now, asserts the read found something before trusting
+it, and its drills print *"'menu' not found in {…}"* and *"the tree tuple could not be read off
+surface.py"*.
+
+**What each drill prints.** Gating a leaf the beginner path needs gives
+`["'talk' (reports 'talk', opens at realm 3)"] != []`; holding back the way out names `reset`;
+a floor past the ladder gives *"'sect roster' opens at realm 99, which is not a rung of the
+32-realm ladder"*; emptying the roster fires the self-check first (*"the gate is broken, not the
+tree"*); letting `_panel_gate` see the curriculum names `feature_unlocks` in its body; merging the
+two registries names `_NOT_YET_UNLOCKED`; and replacing the collapsed line with a padlock each
+names `_unlock_summary`.
+
+### A city's gate is that city (v1.0.9)
+
+**Found by playing**, and the report is the whole finding:
+
+> Could not enter the household: the Shen Family household stands in **Cloudblade City** and you are
+> in **Cloudblade City East Gate** — travel there first, or use a Hearth-Return Talisman
+
+A refusal naming, as somewhere else, the city the player was standing in.
+
+`familyHouseholdEnterAction` compared the character's location to the household's town with **bare
+string equality** (`here != town`). `cityOf` - the engine's one statement of which city a place is
+part of, `outside_location` plus a `district`/`shop`/`auction_house` - has been read by
+`explorationTravelAction` and by `WhereAnNPCCanWalk` since they were written. **This door asked
+nobody.**
+
+**317 of the catalogue's 477 locations are parts of a household town**, 92 of them gates, so that is
+how much of the world refused it - and it fell hardest on the player least able to work around it.
+`beginner_home` ("The Road Home") is the beginner path's fourth stage, its `return_home` objective is
+reported by this very action, and **walking home from the road arrives at a gate**: the road's own
+arrival rule (`gateFacing`) puts you at the gate that faces where you came from. So the stage the
+path ends on could not be finished by walking, only by burning the talisman the send-off happens to
+include.
+
+**The fix is one rule asked twice, not two rules**, which is why both halves ship together.
+`_household_hidden_actions` *anticipates* the engine's refusal to decide whether the panel draws the
+door - which v1.0.6 states is allowed as long as presentation is never the only place the rule
+lives - and it carried the same bare comparison, so the panel printed a lock line ("🔒 Enter — the
+household stands in Cloudblade City; travel there") in the 317 places the engine would now open.
+`test_a_gate_is_its_city.py` holds the two to the same answer **over the whole catalogue**,
+computing the rule a third time off the raw content file so two wrong halves cannot agree with each
+other and pass.
+
+**And the suite caught this release writing the very fault it is about.** The first version added a
+`_city_of` helper to `surface.py` - a *second* Python copy of a rule `commands/exploration.py` has
+had all along. `test_every_top_level_name_is_defined_exactly_once` refused it by name
+(`_city_of is defined in ['commands/exploration.py', 'surface.py']`), so the import is the existing
+one. One rule with two spellings is what caused the bug; two would have been three.
+
+**The Go half is behavioural and drives the shipped catalogue**, not a fixture - it finds a real
+city with a real gate and drives the real action, because a fixture city invented for the test is
+exactly the shape that cannot fail the way production fails. Its drill prints the user's own message
+back: *"standing at "Adamant Body Immortal City East Gate", which is a gate of "Adamant Body
+Immortal City", the household refused with: …travel there first"*. The second test is the other
+direction - somewhere else entirely is still refused - because a test that only proved the gate
+opens would pass just as well for a door that had stopped checking anything, and rc.32's rule is
+presence: the door is not a teleport. Its drill prints *"standing at "Ash Gate Ruin", nowhere near
+"Adamant Body Immortal City", the household let the player in"*.
+
+### A line that cannot know who is here does not claim to (v1.0.10)
+
+**Found by playing**, and the report was two lines of one panel disagreeing in the same breath:
+
+> **Here** the East Gate of Cloudblade City, facing Ironbanner City · **Gate Captain Yue Dong**
+
+and `/talk`, opened at that same gate, offering **Drillmaster Zhai Kang** - whom `content/world.json`
+places at Cloudblade Blade Yards in all five periods. The simulation had walked him to the gate.
+
+**Three readers, one question, and this was the third.** rc.28 wrote `npcs_present` and fixed the
+*cards* (`/scene status`, `/sense`); v1.0.8 fixed the *picker*. The **panel header** is
+`here_summary`, and it appended
+`sorted(n for n, npc in WORLD.npcs.items() if npc["location"] == name)` - the content file's
+**residents**, read with no schedule and no simulation - so it was answering "who lives here" to a
+line that reads as "who is here". Both were right by their own definition and they disagreed, which
+is precisely the state rc.28 named: *"a picker that offers somebody `/talk` then refuses them is
+worse than either being wrong alone."*
+
+**The fix is that it stops guessing, because it cannot know.** Who is standing somewhere is a
+simulation row, one engine round trip away, and `here_summary` is synchronous - it is drawn inside
+panel headers. So it takes `present` and names people only when a caller hands them over; a caller
+with nothing to give gets the place described and nobody named, which is the honest half of what a
+pure function knows. Both production callers were **already inside async status builders**
+(`menu_facts_line`, and `_here_field`'s two call sites), so each pays one `await` and nothing was
+restructured.
+
+`_who_is_here` is the one helper both use, and it **never raises**: the Here line is drawn beside
+everything else a panel shows, so a lookup that threw would cost the whole card rather than one line
+of it - the same call `hidden_actions` and `not_yet_unlocked` already make, and an empty answer is
+exactly what the line said before anybody could be resolved at all.
+
+**What this deliberately does not do is make `here_summary` async.** It stays pure and testable, and
+the knowledge enters as an argument. A function that quietly grew an engine call would put a round
+trip inside every caller that ever renders a location, including the four tests that render one.
+
+**The gate needs rc.52's rule against itself**, and says so: its own docstring quotes the expression
+it forbids, so a scan of the whole function body would find the fault in the prose explaining it and
+pass. It reads statements without the docstring. Its four drills print the finding - restoring the
+catalogue read prints the reported header verbatim (*"'Yue Dong' unexpectedly found in 'the East
+Gate of Cloudblade City, facing Ironbanner City · Gate Captain Yue Dong'"*), dropping `present=` at
+either call site names that header, swapping the helper off `npcs_present` names it, and removing
+its `except` prints *"one unavailable lookup would cost the whole panel rather than one line of
+it"*.
+
+**A third hand-copy of the tree tuple broke, and this one is retired rather than extended.**
+`test_hint_paths.py` keeps `ROOT_COMMANDS` - the roots that are commands rather than hubs, so
+`**/quests**` in a reply is not a broken hub path - and it was written out by hand, so `/locked`
+failed it the day v1.0.9 added that command: a gate about whether a *printed path resolves* going
+red over a root it had never been told about. `test_live_auctions.py` was the second this session
+and rc.43 made the call for the first: **the tuple is read off `surface.py` by AST, never copied.**
+Three copies is a class, and all three are now readers.
+
+**And the v1.0.8 entry in `docs/TODO.md` had to be corrected**, because it claimed the picker now
+asks *"what the card has always used"*. True of `/scene status` and `/sense`; false of the panel
+header, which is this finding. A note that is right about two readers and wrong about the third is
+how the third goes unlooked-at.
+
+### The writer a human drives is the one nothing held (v1.0.11)
+
+Two levers, one sentence. Both are `admin.player.*`, both are the only door a GM has to a thing the
+engine otherwise writes once at birth, and both were the one writer in their family that nothing
+checked.
+
+**`admin.player.set_spiritual_root` held its grade to a hand-written copy of the ladder.** Six names
+in a map literal - `{"Mortal", "Common", "Refined", "Earth", "Heaven", "Immortal"}` - beside the six
+`spiritual_root_system.grades` the content file carries. It could not be wrong in an interesting way,
+because the copy agreed with the file the day it was written and agrees with it now; the day a rung
+is renamed or added it refuses the real grade and accepts a stale one, silently. That is the shape
+rc.44 removed for the world currencies and v1.0.7 for the era roster, and this session had already
+retired three hand-copies of the command tree's own tuple for it. What makes a wrong grade quiet
+rather than loud is `gradeIndex`, which answers 0 for a name it does not know: since rc.55 that is
+Mortal's 0.88x cultivation and -1 on every breakthrough, for the character's whole life. **A fallback
+that looks like a value is not a sentinel** - so the check has to be here, at the writer a human
+types into. rc.55 found exactly this shape and gated the *fixtures*
+(`TestEveryFixtureRootStandsOnTheLadder`); the lever was left ungated.
+
+**`admin.player.set_physique` moved three numbers and never the identity.** `evolution_stage`,
+`progress` and `stability`, and nothing else - while the only two statements in the whole engine
+that have ever written `physique_id` are character creation and samsara (`aptitude.awaken` and
+`aptitude.evolve` both pass the loaded bundle back through `savePhysique`, so they move the state
+and never the name). This is **not** dead content: all eight non-ordinary physiques are drawable at
+birth, because `generatePhysique` gives every one weight at least 1. So it was a missing lever
+rather than a `/learn`-class orphan - a GM could not hand somebody `nine_yang_solar_body`, correct
+one rolled wrong, or stage one for a playtest. `physique_id` is optional on the payload, so every
+existing caller still edits the three numbers; when it is given it is held to the catalogue, because
+an id the catalogue does not carry contributes no modifiers at all and would be a physique that
+exists only as a string on the sheet. **The identity goes into the undo snapshot whether or not the
+call changes it**, since a snapshot of three numbers would leave a granted physique standing and
+call itself an undo; a snapshot from before this release carries none, and the three-number
+statement is kept for it, because an old audit row must stay undoable on the terms it was written.
+
+**The browser kept a third copy of the ladder.** `gradeOpts` in `dashboard/app.js` was
+`['Mortal','Common','Refined','Earth','Heaven','Immortal']`, and the physique card offered no
+picker at all. Both come off the content file with the row now (`_aptitude_catalogue`, sent as part
+of `player_detail`), which is rc.37's whole rationale for the Player Editor - the ids a lever needs
+are picked, not typed - and rc.46's rule seen from the wrong side of the counter: a picker built
+from a copy offers what the engine will refuse the day the two disagree. The rungs keep the ladder's
+own order, because a grade *is* an order and sorting it alphabetically would put Common above Earth.
+An unreadable content file answers empty lists and each card says it has nothing to offer; a
+fallback list would be the hand-written copy this release removes, wearing an exception's hat.
+
+**The fixture could not fail the way production fails, and finding that is most of the work.**
+`Apply(databasePath, req)` calls `ApplyWithWorld(databasePath, "", req)` - an **empty world path** -
+and every admin test in the tree went through it, while production only ever calls
+`game.ApplyWithWorld(s.databasePath, s.worldPath, ...)` (`server.New`). Under an empty catalogue a
+content-backed check answers "not in the catalogue" to everything, so the first run of the new gate
+failed on correct code with *"the spiritual-root ladder is missing from the content file"*. Read the
+other way, that is the finding: **a lever that refuses everything would have passed every admin test
+in this repository.** `applyAdminRaw` hands the real file to the dispatch, and the seven pre-existing
+call sites go through it too.
+
+**The gate that matters is the one a copy cannot pass.** The obvious behavioural test - set a grade,
+read it back - passes identically against the map literal, because the literal is currently right;
+that is the rc.47 shape, a gate that cannot see the thing it forbids. `worldWithAnExtraRung` writes a
+copy of the shipped content carrying a seventh rung and drives the lever against it, which is also
+precisely the day the fault would first cost somebody something. Its drill prints
+*"the content file carries a "Primordial" rung and the lever refused it: grade must be one of
+Mortal, Common, Refined, Earth, Heaven, Immortal"*.
+
+**And the Python half deliberately has no tree-wide sweep**, which its own first run is the reason
+for. Written in `test_one_world_currency_rule.py`'s shape - a production file naming three or more
+rungs is restating the ladder - it reported five offenders and every one was a false positive:
+`Mortal`, `Earth`, `Heaven` and `Immortal` are also manual grades, qi-body grades, world names and
+the generated catalogue's tiers. That is CLAUDE.md's own "a name is not a reader" one level out; the
+currency ids are unique strings and these are four ordinary words four vocabularies share. **A sweep
+whose every hit needs hand-checking is not a gate** (v1.0.1), so it was deleted rather than
+allowlisted - five entries would have been five places for a real copy to hide. What is held instead
+is the wire, each where it can be told apart: the engine's half behaviourally in Go, the browser's
+half by reading `loadPlayerEditor`'s own body.
+
+### A server is told what it missed (v1.0.11)
+
+rc.59 made the bot post its own release notes into `#updates` and compared
+`server_config.announced_release` to the running version for **equality**, then fetched that one
+changelog entry. So a server upgrading 1.0.5 to 1.0.8 was told about 1.0.8 and never about 1.0.6 or
+1.0.7: the marker jumped straight across and nothing recorded that two releases went past
+unmentioned.
+
+**Three neighbouring behaviours do work, and that is what hid it.** A NULL marker records silently
+(a fresh install does not want forty paragraphs of history), and neither a missing changelog entry
+nor an unbound channel advances the marker, so both get a later chance. A *skipped* version is in
+neither category, because it was never looked up at all.
+
+`releases_between` walks the gap. Three things about it are decisions rather than mechanics:
+
+- **Versions sort as integers, and a candidate sorts below the release it is a candidate for**, so
+  `1.0.0-rc.59 < 1.0.0 < 1.0.1 < 1.0.9 < 1.0.10`. The first half is v1.0.1's own lesson, where
+  `playtest_checklist.py` sorted `v1.0.10` before `v1.0.9` as text and inherited the wrong
+  checklist's ticks. The second is a trailing sentinel: an entry with no rc suffix is the final one
+  of its base, so it takes a number no candidate can reach.
+- **The marker stops at the last release actually posted, never past it.** A send that fails halfway
+  through a gap must not make the releases it never reached look announced - *"exactly once"* has to
+  survive a partial failure or it is only a claim about the happy path.
+- **A capped catch-up says what it is not showing.** A server away a year gets
+  `MAX_ANNOUNCED_RELEASES` sentences and one line naming the rest, rather than thirty messages or a
+  silent drop - the same reason a fresh install is spared its history on purpose.
+
+**The gate's fixture was standing in for the thing being changed.** rc.59's
+`test_release_notes.py` stubbed `release_notes_for` with a lambda returning `"The notes."`, so the
+parser and everything under it were never driven from `announce_release_if_new` at all - and this
+release replaced that reader with `releases_between` under a green suite. It pins a **temporary
+`VERSIONS.md`** now instead, so every test drives the real parse. Three drills: restoring the
+equality-only fetch prints *"a server upgrading 1.0.5 -> 1.0.8 must hear about 1.0.6 and 1.0.7
+too"*; marking the running version regardless of what was posted prints `'1.0.8' != '1.0.6'`;
+sorting the versions as text prints `['1.0.0', '1.0.0-rc.59', '1.0.10', '1.0.5', '1.0.6']`.
+
+### A room for people who have played (`Xianxia • Cultivator`, v1.0.11)
+
+Every player-facing category on the server was gated except one. Realm Capitals sit behind the
+presence role, the four World Events feeds behind the realm-access role, Admin behind administrator
+- and 🗺️ Cultivation World, which holds `#player-homes` and `#expeditions`, was open to everybody.
+So a newcomer's sidebar advertised read-only anchors for threads they cannot have, directly above
+the `#begin-here` they are meant to go to.
+
+**The deeper half is that no "has a character" role existed at all.** `_sync_realm_access_roles` and
+`_sync_realm_presence_roles` both run from `require_character`, so both only ever fire for somebody
+who already has one - which means nothing in this server could be gated on having played. There is
+one generated role now, and where it is written and taken off is the whole of it:
+
+- **`require_character` keeps it in step**, in the same block as the two realm syncs and for the
+  same reason: it is the only thing in the bot that fires often enough, and reaching it at all is
+  what "has a character" means.
+- **Creation grants it before the first private thread is opened.** Both anchors carry
+  `private_thread`s and a member still needs to see a thread's parent, so the grant sits above
+  `ensure_birth_family_household_thread` rather than below it.
+- **An erasure is the one place it comes off**, and the asymmetry is deliberate: after an erasure
+  `require_character` never fires for that account again, so nothing else can ever notice. It goes
+  beside the threads v1.0.8 taught that path to delete.
+- **`_sync_all_realm_access_roles` backfills it**, because that sweep is the one thing that walks
+  every character already in the guild - so an upgrading server puts the role on people who made
+  their cultivator before it existed. It also checks the new role against the bot's own hierarchy
+  there, so a role above the bot fails once, loudly, instead of silently per member.
+
+Three rules on the overwrite, and each is a scar this file already carries.
+
+- **The bot allows itself before it denies anybody** (rc.52). A channel overwrite applies to the bot
+  like anyone else unless it is Administrator, so denying `@everyone` first takes the bot's own
+  access away and every call after it is refused 403 - leaving the room denied to everyone with no
+  allow to put back.
+- **It reaches the channels that already exist**, not only the ones a run creates (rc.59, found in
+  the file that provisions them). A category overwrite is inherited only by a channel whose
+  permissions are synced to it, and both anchors carry an `@everyone` overwrite of their own - so
+  the category *and* each channel is gated in its own right.
+- **The overwrite is merged, never replaced.** `set_permissions(target, **perms)` builds a fresh
+  `PermissionOverwrite` from its kwargs, and the `@everyone` overwrite on both anchors is
+  `send_messages=False` - the read-only anchor rule. Writing a bare `view_channel=False` over it
+  would have left them hidden and, to everybody holding the role, **writable**: the gate quietly
+  undoing the thing the channels are for. The Discord harness asserts that directly, beside the
+  allow and the deny.
+
+**A third generated name is when the name family has to be gated.** `realm_presence_role_name` falls
+back to the bare `world_name` when a hub carries no `display_name`, and `_realm_access_role_name` is
+that same string - so a fifth realm hub written without one would generate one name for two gates,
+`discord.utils.get` would hand both the same role, and nothing would error: the access gate would
+start following the character's location, and a cultivator who walked out of a capital would lose
+sight of that world's news feed. `docs/TODO.md` recorded that trap when it planned this role and
+said adding a third name is the moment to gate it.
+`test_the_role_names_never_collide.py` walks whatever `REALM_HUBS` carries, so a fifth hub fails the
+day it is added - and it drives the fallback itself, because a gate that asserts a collision cannot
+happen without showing what one looks like is asserting a hope.
+
+**This is advertising, not a bound.** The role decides what a sidebar shows and nothing else; the
+engine's own refusals are still the only refusals, exactly as v1.0.9's curriculum states about
+itself. Discord layout stays the dashboard's to own, so the gate runs only behind `create_missing`
+and the `/admin` slash path is still validate-only.
+
+### The curriculum the sweep could not see (v1.0.12)
+
+**Found by running the playtest**, which had not been run since v1.0.8. It went red on **100 of 345
+steps**, and every one of them was the same fault.
+
+`playtest_discord.py`'s sweep presses every leaf of every hub and holds one thing about each: it was
+drawn and answered, or the panel hid it and printed its own `🔒` lock line saying why. Two states.
+v1.0.9 added a **third** - a door the curriculum has not introduced yet, which prints **one collapsed
+line for the whole page** and no line of its own - and nothing told the harness. So `press_leaf`
+found no button, looked for a lock line that does not exist, and failed: 97 leaves across 28 pages,
+plus the final coverage step (`pressed ∪ locked ∪ deferred == live`), plus one earlier step that
+depended on a door the curriculum now holds back (`travel / Realm Capitals`, floor 1).
+
+**`test_playtest_coverage.py` was green throughout**, because it only ever asked about the
+*deferral* set. A gate that proves coverage has to be able to see a leaf going uncovered, and this
+one could not - rc.47's shape, in the gate whose whole job is that.
+
+**The fix is not to teach the sweep to count a held-back leaf as covered.** That would trade a
+blindness for a worse one: 97 leaves would stop being pressed and the run would go green saying so.
+v1.0.9 states that gating is **advertising, never a bound**, so a harness proving *wiring* must not
+be stopped by it. The player is raised past the curriculum's own ceiling before the sweep, and the
+ceiling is **read off `feature_unlocks`** rather than written down, so a deeper floor authored later
+raises the harness with it. Both halves ship together: the curriculum is asserted first, at realm 0,
+on the page the roster says holds the most back - because a harness that gated past it and never met
+it would be the same fault wearing the other hat.
+
+The gate asks three things now, and the third is the one that would have caught this: the harness
+must raise the realm, must read the number off the roster, and must do both **before** the sweep.
+
+### An id too big for a float (v1.0.12)
+
+The step that raises that realm is what found it. `admin.player.set_realm` answered **"character not
+found"** about a character the panel three lines above had just drawn, with its name and realm on it.
+
+`decodeMap` is `json.Unmarshal` into `map[string]any`, which turns every JSON number into a
+**float64**. A Discord snowflake is about 1.4e18; float64 carries 2^53 ≈ 9.0e15 exactly. So
+`1456074443989188610` decoded as `...608`, and **every id an action's payload named was off by a
+digit or two**.
+
+**Only the GM's console was affected, and that is why it survived.** `ActionRequest.ActorID` is a
+typed `int64` field, and `encoding/json` parses a number straight into one with no float in between -
+so every player action, which addresses the *actor*, was always exact. What goes through `decodeMap`
+is the **payload**, and the operations that carry a `user_id` there are `admin.player.set_realm`,
+`karma`, `teleport`, `grant`, `set_sect`, `adjust_item`, `erase` and the rest of the console: fourteen
+call sites in `world_ops.py` and `inspect_sim.py`, every one of them sending `member.id`.
+
+**The reader was already correct.** `storage.ParseInt` has carried a `case json.Number` since it was
+written and **nothing in the tree could ever produce one** - the decoder never handed it the type it
+was written for. `decoder.UseNumber()` is the whole fix, and no reader changed: `ParseInt` takes the
+case it already had, and `stringField`'s `fmt.Sprint` prints a `json.Number` as its own digits. That
+is `npc_consignments` (rc.28) exactly - *"Nothing downstream changed, because every reader was already
+correct. Only the value it hinged on had to become one the table can hold."*
+
+**Why nothing caught it.** The Discord sweep answers every member picker with a second member who has
+*no character*, deliberately, so nothing mutes or erases the player the run walks - and a member with
+no character is refused by Python before the engine is reached, with the same sentence a corrupted id
+would produce. The engine's own admin tests seed **user 42**, which a float holds exactly. A fixture
+that cannot fail the way production fails, one more time, and the thing that told the difference was
+a harness asking the engine to act on a real snowflake.
+
+`snowflake_payload_test.go` seeds a character at `1<<53 + 1` and at a real Discord id and drives the
+lever through the production dispatch; its drill prints `character not found`. It also holds the
+audit row's `target`, because an audit trail naming an id nobody holds is worse than a refusal - it
+says the action landed on somebody.
+
+### A panel stays open as long as it is told (v1.0.12)
+
+Asked for in play: *"can we skip the 15min wait time for reopen"*. A hub panel went quiet after
+fifteen minutes and swapped its controls for a **Reopen** button. The mechanism is right - discord.py
+holds a live view in memory until it times out - and fifteen minutes is wrong: a long time to hold a
+view open and a short time to read a page, go and do something, and come back to it.
+
+`HUB_PANEL_IDLE_MINUTES` is the setting, **120** the default, and `0` means a panel never expires.
+Zero is deliberately not the default: it costs one held view per panel ever opened, for the life of
+the process, which is fine on a small server and is the operator's call rather than presentation's.
+The module default is the old fifteen, so a **missed registration is the behaviour this started
+from** rather than a panel that never expires - a presentation default failing towards *never* would
+leak. It is injected, because `test_bot_package` puts `hubs` and `runtime` in one tier and refuses an
+import between them, which is the shape `feature_unlocks` and `describe_era` already use.
+
+**The number was written out five times** (`hubs.py` twice, `surface.py`, `admin/world_ops.py`,
+`commands/support.py`), and the gate forbids a panel view carrying its own.
+
+### Five readers of a tuple that could have been a name (v1.0.12)
+
+`register_command_surface` added ten roots to the command tree from an **inline tuple inside the
+function body**. rc.43 made the right call about it - *never copy the tuple* - and being inline meant
+the only way to obey was to parse this file's source, so **four places each did that their own way**:
+`test_commands_reach_a_player.py` (rc.43), `test_live_auctions.py` (v1.0.9),
+`test_hint_paths.py` (v1.0.10), each with its own "did the read find anything" self-check because a
+silently-empty walk would make every assertion after it vacuous. And `playtest_discord.py` gave up on
+reading it at all and asserted `9 + len(_HUB_COMMANDS)` - a count, which went stale the day v1.0.9
+added `/locked`, and which nobody saw for three releases because a harness is a script and not CI.
+
+`surface.TREE_COMMANDS` is a module constant now. Every reader is an import; none can come back
+empty; a new root reaches all of them by construction. The harness asserts the **set** rather than a
+number, so what the tree registers and what it expects cannot differ.
+
+**There were five, and the fifth is the one worth the section.** This paragraph originally said four,
+and the release shipped believing it - then the first full run of the suite on a real toolchain went
+red on `test_chat_monitor_contract.py`, which held *"a monitor must not be a typable root command"* by
+**regex over the concatenated bot package**, matching `for name in ("begin", …)`. Lifting the tuple
+out of the `for` left that pattern matching nothing, and its own assertion said so:
+*"could not find the root command registration tuple"*.
+
+It is the perfect instance of what the section claims. It was invisible to every count because it is
+the only reader that does not parse `surface.py` - it reads the package as *text*, from a file about
+the chat monitor, so nothing pointed at it and no search for "readers of the tuple" would have found
+it. **A fifth way of implementing "never copy" existed precisely because there was no name to
+import**, and the release that finally gave it one is what surfaced it. Its drill is the release
+itself: revert `TREE_COMMANDS` to the inline tuple and this test is the one that goes green again.
+
+The lesson is narrow and worth stating: *never copy* has a cheaper answer than *parse the source*
+whenever the thing being copied could simply have a name. Three releases spent implementing the
+expensive answer five ways, and only the last one could be counted.
+
+**And a gate reported the interpreter rather than the tree.** `test_bot_package`'s
+`test_every_bot_module_resolves_every_global_it_reads` named `__conditional_annotations__` as a
+global `app/bot/admin/bugs_forum.py` reads and does not define. That is **Python 3.14** (PEP
+649/749): the interpreter synthesises it in any module whose annotations are deferred and
+conditionally defined. Nothing in this tree is at fault, and the gate had simply never met a 3.14 -
+the container ran 3.11 and the other machine 3.13. It is in `BUILTINS` beside `__file__` and
+`__name__` now. A gate that enumerates what the language provides has to be told when the language
+provides more, which is the same class as a fixture that cannot fail the way production fails: the
+environment was never part of what it was checked against.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —

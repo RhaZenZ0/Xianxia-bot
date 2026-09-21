@@ -174,6 +174,19 @@ var reversibleAdminActions = map[string]reverseFunc{
 			return nil, err
 		}
 		snap := pickSnapshot(before, after, redo)
+		// The identity too, since v1.0.11 gave the lever one to write. An undo
+		// that restored only the three numbers would have left a granted
+		// physique standing and called itself an undo - and the snapshot is the
+		// only record of what it replaced.
+		//
+		// A snapshot from before that release carries no `physique_id`, so the
+		// three-number statement is kept for it rather than writing an empty id
+		// over a real physique: an old audit row must stay undoable on exactly
+		// the terms it was written.
+		if id := strings.TrimSpace(fmt.Sprint(snap["physique_id"])); id != "" && id != "<nil>" {
+			return []sqlStmt{{`UPDATE character_physiques SET physique_id=?,name=?,evolution_stage=?,progress=?,stability=? WHERE user_id=?`,
+				[]any{id, fmt.Sprint(snap["name"]), i64(snap["evolution_stage"]), i64(snap["progress"]), i64(snap["stability"]), uid}}}, nil
+		}
 		return []sqlStmt{{`UPDATE character_physiques SET evolution_stage=?,progress=?,stability=? WHERE user_id=?`,
 			[]any{i64(snap["evolution_stage"]), i64(snap["progress"]), i64(snap["stability"]), uid}}}, nil
 	},

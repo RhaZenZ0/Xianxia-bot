@@ -88,7 +88,20 @@ func familyHouseholdEnterAction(conn *storage.Conn, catalog worlddata.Catalog, u
 	here := strings.TrimSpace(fmt.Sprint(r[0]))
 	familyID := storage.ParseInt(r[1])
 	town := strings.TrimSpace(fmt.Sprint(r[3]))
-	if here != town && here != birthFamilyHouseholdLocation(familyID) {
+	// A city's gate is that city (v1.0.9). This compared `here` to the town by
+	// bare string equality, so a cultivator standing at Cloudblade City East
+	// Gate was told "the Shen Family household stands in Cloudblade City and
+	// you are in Cloudblade City East Gate — travel there first" — a refusal
+	// naming, as somewhere else, the city they were standing in.
+	//
+	// `cityOf` is the engine's one statement of which city a place is part of,
+	// and `explorationTravelAction` and `WhereAnNPCCanWalk` have both read it
+	// all along; this door asked nobody. **317 of the catalogue's 477
+	// locations are parts of a household town** - 92 of them gates - so that
+	// is where the refusal fell, and it fell hardest on the beginner path:
+	// `beginner_home` ("The Road Home") reports `return_home` from this very
+	// action, and walking home from the road arrives at a gate.
+	if cityOf(catalog, here) != town && here != birthFamilyHouseholdLocation(familyID) {
 		return authoritativeMutation{}, fmt.Errorf("the %s household stands in %s and you are in %s — travel there first, or use a Hearth-Return Talisman", strings.TrimSpace(fmt.Sprint(r[2])), town, here)
 	}
 	entered, err := enterHouseholdTx(conn, catalog, userID, "")

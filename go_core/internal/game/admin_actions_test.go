@@ -66,10 +66,23 @@ INSERT INTO world_simulation_state VALUES('npc_life',0,10080,0,0);
 	return path
 }
 
-func applyAdminAs(t *testing.T, path, op string, actorID int64, payload map[string]any) any {
+// applyAdminRaw drives an admin lever the way the server does: through
+// `ApplyWithWorld` with the real content file behind it.
+//
+// `Apply` passes an empty world path (actions.go), and production never does -
+// `server.New` wires `game.ApplyWithWorld(s.databasePath, s.worldPath, ...)`.
+// Under an empty catalogue every content-backed check answers "not in the
+// catalogue", so a fixture on `Apply` cannot fail the way production fails and
+// would let a lever that refuses everything pass (v1.0.11).
+func applyAdminRaw(t *testing.T, path, op string, actorID int64, payload map[string]any) (ActionResponse, error) {
 	t.Helper()
 	raw, _ := json.Marshal(payload)
-	out, err := Apply(path, ActionRequest{Operation: op, ActorID: actorID, Payload: raw})
+	return ApplyWithWorld(path, batch4WorldPath(t), ActionRequest{Operation: op, ActorID: actorID, Payload: raw})
+}
+
+func applyAdminAs(t *testing.T, path, op string, actorID int64, payload map[string]any) any {
+	t.Helper()
+	out, err := applyAdminRaw(t, path, op, actorID, payload)
 	if err != nil {
 		t.Fatalf("%s: %v", op, err)
 	}
@@ -707,8 +720,7 @@ func TestAdminAdjustItemGrantsAndFloorsAtZeroOnRemoval(t *testing.T) {
 
 func applyAdminErr(t *testing.T, path, op string, payload map[string]any) error {
 	t.Helper()
-	raw, _ := json.Marshal(payload)
-	_, err := Apply(path, ActionRequest{Operation: op, ActorID: 0, Payload: raw})
+	_, err := applyAdminRaw(t, path, op, 0, payload)
 	return err
 }
 

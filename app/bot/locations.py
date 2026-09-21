@@ -20,7 +20,7 @@ definition order is the order these had in main.py.
 """
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Sequence
 
 import discord
 from discord import app_commands
@@ -395,16 +395,32 @@ def _qi_ground(name: str, data: dict) -> str:
     return ""
 
 
-def here_summary(location: str, limit: int = 180) -> str:
+def here_summary(location: str, limit: int = 180, *, present: Sequence[str] | None = None) -> str:
     """One line on what the place you stand in is and offers, for the panel
     header (v0.40.0). Pure: reads the catalogue only. Private places
     (abodes, personal worlds, households) answer nothing - their own hubs
-    describe them."""
+    describe them.
+
+    **It names who is here only when the caller tells it (v1.0.10).** This used
+    to append the content file's *residents* - every NPC whose `location` field
+    is this place - read with no schedule and no simulation. So the header said
+    "Gate Captain Yue Dong" while `/talk`, which asks `npcs_present`, offered
+    Drillmaster Zhai Kang, whom the tick had walked to that gate. Both were
+    right by their own definition and they disagreed, which is the state rc.28
+    forbids - in a line rc.28 never covered, because rc.28 fixed the cards and
+    v1.0.8 fixed the picker, and this is the header.
+
+    A synchronous function cannot answer it: who is standing somewhere is a
+    simulation row, an engine round trip away. So it no longer guesses. Both
+    production callers are async and hand over `npcs_present`'s answer; a
+    caller with nothing to give gets the place described and nobody named,
+    which is the honest half of what this can know.
+    """
     name = str(location or "")
     data = WORLD.locations.get(name)
     if not data:
         return ""
-    people = sorted(n for n, npc in WORLD.npcs.items() if str(npc.get("location")) == name)
+    people = sorted(str(n) for n in (present or ()))
     city = _city_of_location(name)
     if data.get("road_site"):
         leg = [str(x) for x in list(data.get("road_leg") or [])]

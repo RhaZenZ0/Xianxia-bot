@@ -149,16 +149,10 @@ class TheAllowlistIsTheRealSurface(unittest.TestCase):
 
     def test_every_open_slash_command_is_one_the_tree_registers(self):
         _, surface = self._surface()
-        source = (BOT / "surface.py").read_text(encoding="utf-8")
-        tree = ast.parse(source)
-        registered: set[str] = set()
-        for node in ast.walk(tree):
-            if (isinstance(node, ast.For) and isinstance(node.iter, ast.Tuple)
-                    and all(isinstance(e, ast.Constant) for e in node.iter.elts)):
-                names = {e.value for e in node.iter.elts if isinstance(e.value, str)}
-                if "begin" in names:
-                    registered = names
-        self.assertTrue(registered, "the tree tuple could not be read off surface.py")
+        # Imported rather than parsed since v1.0.12: the tuple is
+        # `surface.TREE_COMMANDS`, so there is no read that can come back empty.
+        registered = set(surface.TREE_COMMANDS)
+        self.assertTrue(registered, "the tree tuple is empty; the gate is broken, not the tree")
         self.assertTrue(seclusion.OPEN_COMMANDS <= registered,
                         f"{sorted(seclusion.OPEN_COMMANDS - registered)} is open but not a command")
         # The three that act are deliberately shut, and this says so.

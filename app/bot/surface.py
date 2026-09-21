@@ -16,6 +16,7 @@ import discord
 from discord import app_commands
 
 from ..database import SCHEMA_VERSION
+from ..rules import feature_unlocks as unlocks
 from ..rules.progression_systems import ASCENSION_GATES
 from .admin.core import (
     admin_family_group,
@@ -71,6 +72,8 @@ from .commands.scene import scene_group, scene_status, talk
 from .commands.secretrealm import secret_group, secret_status
 from .commands.sect import sect_group
 from .commands import cooldowns as _commands_cooldowns  # noqa: F401  (registers /cooldowns on import)
+from .commands.exploration import _city_of
+from .commands import locked as _commands_locked  # noqa: F401  (registers /locked on import)
 from .commands import sense as _commands_sense  # noqa: F401  (registers its root commands on import)
 from .commands import support as _commands_support  # noqa: F401  (registers /tribute on import)
 from .commands.territory import caravan_group, party_group, party_status, territory_group, war_group, war_status
@@ -82,18 +85,22 @@ from .hubs import (
     HubStatusField,
     _hub_icon,
     open_hub_in_place,
+    panel_timeout,
+    register_panel_idle,
     register_hubs,
     register_menu_builder,
     register_menu_facts,
     register_hidden_actions,
+    register_not_yet_unlocked,
+    register_realm_namer,
     register_panel_gate,
     send_hub,
 )
 from .locations import here_summary
 from .registry import ACTIONS, EVENT_HANDLERS, registered_root_command
-from .runtime import DB, WORLD, character_location_display, log
+from .runtime import DB, SETTINGS, WORLD, character_location_display, log
 from .services import GUILD, SIM
-from .status_cards import cultivation_status_fields, menu_facts_line
+from .status_cards import _who_is_here, cultivation_status_fields, menu_facts_line
 
 
 # ---------------------------------------------------------------------------
@@ -480,14 +487,23 @@ async def _player_hub_status(interaction: discord.Interaction) -> list[HubStatus
             f"**{(await character_location_display(character))[:180]}**",
             inline=False,
         ),
-        *_here_field(character),
+        *await _here_field(character),
     ]
 
 
-def _here_field(character: dict) -> list[HubStatusField]:
+async def _here_field(character: dict) -> list[HubStatusField]:
     """The Here line (v0.40.0): what the place is and offers, and who is
-    about - the context a player checked with City → Look before every action."""
-    summary = here_summary(str(character.get("location") or ""))
+    about - the context a player checked with City → Look before every action.
+
+    Async since v1.0.10, because "who is about" is a simulation row rather than
+    a content field and this header was answering it out of the catalogue: it
+    named the content file's resident while `/talk` offered whoever the tick
+    had walked there. Both call sites were already inside async status
+    builders, so this costs one `await` each and restructures nothing.
+    """
+    summary = here_summary(
+        str(character.get("location") or ""), present=await _who_is_here(character)
+    )
     return [HubStatusField("🧭 Here", summary, inline=False)] if summary else []
 
 
@@ -510,7 +526,7 @@ async def _economy_hub_status(interaction: discord.Interaction) -> list[HubStatu
     return [
         HubStatusField("🪙 Spirit Stones", f"**{int(character.get('spirit_stones', 0) or 0):,}**"),
         HubStatusField("📍 Location", f"**{(await character_location_display(character))[:180]}**", inline=False),
-        *_here_field(character),
+        *await _here_field(character),
         HubStatusField("💹 Local Market", market_signal, inline=False),
     ]
 
@@ -696,7 +712,7 @@ class MenuView(_MenuBase):
     is_layout_hub = False
 
     def __init__(self, *, owner_id: int, is_admin: bool, owner_name: str = "Cultivator", facts: str = "") -> None:
-        super().__init__(timeout=900)
+        super().__init__(timeout=panel_timeout())
         self.owner_id = int(owner_id)
         self.owner_name = str(owner_name)[:80]
         self.facts = str(facts or "")[:700]
@@ -837,7 +853,14 @@ async def _household_hidden_actions(interaction: discord.Interaction) -> dict[st
         return _action_paths("you are already inside", HOUSEHOLD_DOOR)
     town = str(fam.get("location") or "")
     hidden = _action_paths("asked for inside the household", *HOUSEHOLD_INDOOR_ACTIONS)
-    if here != town:
+    # A city's gate is that city (v1.0.9). Presentation may *anticipate* a
+    # refusal the engine will make - the rule v1.0.6 states about
+    # `battle.py` - and this is the anticipation of `familyHouseholdEnterAction`'s
+    # own check. It must therefore ask the same question the engine asks, or
+    # the panel hides a door that would have opened: 317 of the catalogue's
+    # locations are parts of a household town, and the old comparison was bare
+    # equality on both sides of the seam.
+    if _city_of(here) != town:
         hidden.update(_action_paths(f"the household stands in {town}; travel there, or burn a Hearth-Return Talisman", HOUSEHOLD_DOOR))
     return hidden
 
@@ -943,6 +966,34 @@ async def _hidden_actions(interaction: discord.Interaction) -> dict[str, str]:
 register_hidden_actions(_hidden_actions)
 
 
+# The curriculum (v1.0.9). Distinct from `_hidden_actions` above, and the
+# distinction is the design: that one hides what the engine would refuse where
+# this player stands, and this one holds back what the game has not introduced
+# to them yet. The first earns a padlock naming the reason; the second earns
+# one collapsed line for the whole page, because a column of padlocks is the
+# same wall of rows this release exists to remove.
+#
+# **Gating is advertising, never a bound.** Nothing here is consulted on a
+# press: `/auction` typed directly still runs, and the engine's own rules stay
+# the only thing that refuses. A bound that lives in the client is not a bound
+# (v1.0.0-rc.48), and this must not become the fifth instance of that fault.
+async def _curriculum_unlocks(interaction: discord.Interaction) -> dict[str, int]:
+    """`/path -> the realm index that opens it`, for what this player has not
+    reached. Somebody with no character yet is held back by nothing: `/begin`
+    is the whole of what they can do, and the panel behind it is not a place
+    to be teaching pacing."""
+    c = await DB.get_character(interaction.user.id)
+    if not c:
+        return {}
+    roster = WORLD.data.get("feature_unlocks") or {}
+    locked = unlocks.locked_leaves(roster, int(c.get("realm_index") or 0))
+    return {"/" + path: realm for path, realm in locked.items()}
+
+
+register_not_yet_unlocked(_curriculum_unlocks)
+register_realm_namer(WORLD.realm_name)
+
+
 async def _panel_gate(user: "discord.abc.User", path: str) -> str | None:
     """The hub panel's half of the two gates that refuse a press.
 
@@ -962,6 +1013,10 @@ async def _panel_gate(user: "discord.abc.User", path: str) -> str | None:
 
 
 register_panel_gate(_panel_gate)
+# How long a panel may sit idle (v1.0.12), injected because the layering puts
+# `hubs` and `runtime` in one tier - the shape `register_hidden_actions` and its
+# three siblings above already use.
+register_panel_idle(SETTINGS.hub_panel_idle_minutes)
 
 
 register_hubs(*_HUB_DEFINITIONS, _ADMIN_HUB_DEFINITION)
@@ -1007,14 +1062,32 @@ async def on_app_command_error(
         await interaction.response.send_message(message, ephemeral=False)
 
 
+# The roots that are commands in their own right rather than hubs (v1.0.12).
+#
+# This was an inline tuple inside `register_command_surface`, and being inline
+# is what made every reader of it a *reader of this file's source*: three tests
+# parsed `surface.py` by AST to recover it, and `playtest_discord.py` gave up
+# and wrote down how many there were. rc.43 made the right call - never copy
+# the tuple - and four places then implemented "never copy" four different
+# ways, each with its own "did the read find anything" self-check, and the
+# hand-written count went stale the day v1.0.9 added `/locked`.
+#
+# A name needs none of that. Importing it cannot silently find nothing, and a
+# new root reaches every reader by construction.
+#
+# "act" is deliberately absent: it is only ever a subcommand name under several
+# groups (/battle act, /boss act, /hunter act, /war act, /duel act - see the
+# registered_group_command call sites above), never its own root command, so it
+# was never registered into ACTIONS._roots and ACTIONS.root("act") raised
+# KeyError on every bot startup.
+TREE_COMMANDS: tuple[str, ...] = (
+    "begin", "me", "quests", "action", "check", "admin", "menu", "tribute", "cooldowns", "locked",
+)
+
+
 def register_command_surface(client: XianxiaBot) -> None:
     """Register only public Discord commands; gameplay actions stay internal."""
-    # "act" is deliberately absent here: it's only ever a subcommand name under
-    # several groups (/battle act, /boss act, /hunter act, /war act, /duel act
-    # - see registered_group_command call sites above), never its own root
-    # command, so it was never registered into ACTIONS._roots and
-    # ACTIONS.root("act") raised KeyError on every bot startup.
-    for name in ("begin", "me", "quests", "action", "check", "admin", "menu", "tribute", "cooldowns"):
+    for name in TREE_COMMANDS:
         client.tree.add_command(ACTIONS.root(name), guild=GUILD)
     for command in _HUB_COMMANDS:
         client.tree.add_command(command, guild=GUILD)

@@ -31,17 +31,19 @@ from ...database import SCHEMA_VERSION
 from ...rules.realm_hubs import REALM_HUBS, realm_hub, realm_hub_visibility, realm_presence_role_name
 from ...version import RELEASE_VERSION
 from ..channels import (
+    _ensure_cultivator_role,
     _ensure_realm_access_roles,
     _ensure_realm_presence_roles,
     _resolve_text_channel,
     configured_info_channel,
     ensure_auction_house_channels,
+    ensure_cultivator_gate,
     ensure_world_event_channels,
     ensure_realm_hub_channels,
     post_server_log,
 )
 from ..registry import registered_group_command
-from ..runtime import DB, ENGINE, SETTINGS, WORLD, _realm_access_role_name, _sync_realm_access_roles, _sync_realm_presence_roles, log, reply_long
+from ..runtime import CULTIVATOR_ROLE_NAME, DB, ENGINE, SETTINGS, WORLD, _realm_access_role_name, _sync_cultivator_role, _sync_realm_access_roles, _sync_realm_presence_roles, log, reply_long
 from ..services import AI_ROUTER, ALERTS, GUILD, NARRATOR, SIM
 from .bugs_forum import (
     BUGS_CHANNEL_NAME,
@@ -586,8 +588,14 @@ def _server_permission_report(guild: discord.Guild) -> tuple[list[str], list[str
         if not ok:
             warnings.append(f"{label}: {consequence}")
 
+    # Every generated visibility role, including v1.0.11's one cultivator role:
+    # the hierarchy warning below is what tells a GM why a gate silently stopped
+    # working, and a role left out of it fails per member instead of once.
+    generated_role_names = [
+        name for world in REALM_HUBS for name in (_realm_access_role_name(world), realm_presence_role_name(world))
+    ] + [CULTIVATOR_ROLE_NAME]
     realm_roles = [
-        role for world in REALM_HUBS for name in (_realm_access_role_name(world), realm_presence_role_name(world))
+        role for name in generated_role_names
         if (role := discord.utils.get(guild.roles, name=name)) is not None
     ]
     if not perms.manage_roles:
@@ -657,7 +665,11 @@ async def _sync_all_realm_access_roles(guild: discord.Guild) -> dict[str, int]:
 
     role_map = await _ensure_realm_access_roles(guild)
     presence_map = await _ensure_realm_presence_roles(guild)
-    blocked = [role for role in list(role_map.values()) + list(presence_map.values()) if me.top_role.position <= role.position]
+    cultivator = await _ensure_cultivator_role(guild)
+    blocked = [
+        role for role in list(role_map.values()) + list(presence_map.values()) + ([cultivator] if cultivator else [])
+        if me.top_role.position <= role.position
+    ]
     if blocked:
         raise PermissionError(
             "Move the bot role above the generated realm roles before syncing: "
@@ -684,6 +696,11 @@ async def _sync_all_realm_access_roles(guild: discord.Guild) -> dict[str, int]:
         try:
             await _sync_realm_access_roles(guild, member, character)
             await _sync_realm_presence_roles(guild, member, character)
+            # The backfill for v1.0.11's cultivator role: this sweep is the one
+            # thing that walks every character already in the guild, so it is
+            # how a server that upgrades gets the role onto people who made
+            # their cultivator before it existed.
+            await _sync_cultivator_role(guild, member, has_character=True)
             counts["synced"] += 1
         except Exception:
             counts["failed"] += 1
@@ -700,6 +717,21 @@ async def _run_complete_server_setup(
     await ensure_world_event_channels(guild, category_name=SERVER_EVENT_CATEGORY, create_missing=create_missing)
     _bugs_channel, bugs_warning = await ensure_bugs_forum_channel(guild, category_name=SERVER_FEEDBACK_CATEGORY, create_missing=create_missing)
     await ensure_category_order(guild, create_missing=create_missing)
+    # 🗺️ Cultivation World behind having played (v1.0.11). Behind
+    # `create_missing` like every other layout change, because Discord layout is
+    # the dashboard's to own and the /admin slash path stays validate-only. The
+    # role is created here for the same reason `ensure_realm_hub_channels`
+    # creates its two: a category can then be gated the moment it exists rather
+    # than after a separate sync.
+    if create_missing:
+        role = await _ensure_cultivator_role(guild)
+        channels = base_result.get("channels") or {}
+        await ensure_cultivator_gate(
+            guild, role,
+            (base_result.get("categories") or {}).get(CATEGORY_WORLD),
+            [channel for name, channel in channels.items()
+             if BASE_CHANNEL_SPECS[name].category == CATEGORY_WORLD and channel is not None],
+        )
     return base_result, realm_rows, bugs_warning
 
 

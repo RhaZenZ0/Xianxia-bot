@@ -380,3 +380,20 @@ func maxInt(a, b int) int {
 	}
 	return b
 }
+
+// rootGradeOnTheLadder answers whether a name is a rung of the spiritual-root
+// ladder `content/world.json` carries (v1.0.11).
+//
+// It exists because `gradeIndex` cannot answer it: that function returns 0 for
+// a name it does not know, which is Mortal - the bottom rung, and since rc.55 a
+// real 0.88x cultivation multiplier and -1 on every breakthrough. A lookup that
+// cannot fail is not a check, so the one writer a human drives asks this
+// instead.
+func rootGradeOnTheLadder(catalog worlddata.Catalog, grade string) bool {
+	for _, g := range catalog.SpiritualRootSystem.Grades {
+		if strings.EqualFold(g.Name, grade) {
+			return true
+		}
+	}
+	return false
+}

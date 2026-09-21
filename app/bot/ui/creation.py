@@ -26,7 +26,7 @@ from ...rules.creation_ui import (
 from ...ops.game_engine import GameEngineError
 from ..channels import _report_game_ui_error, post_server_log
 from ..discovery import LOCATION_DISCOVERY_IMAGES, location_discovery_embed, location_discovery_image_path
-from ..runtime import DB, ENGINE, GENDER_CHOICES, WORLD, current_world_time, log, respond
+from ..runtime import DB, ENGINE, GENDER_CHOICES, WORLD, _sync_cultivator_role, current_world_time, log, respond
 from ..threads import ensure_birth_family_household_thread, ensure_expedition_thread
 
 class CharacterModal(discord.ui.Modal):
@@ -105,6 +105,16 @@ class CharacterModal(discord.ui.Modal):
             await ENGINE.bootstrap_simulation()
         except Exception:
             log.exception("Could not initialize Go-owned simulation bootstrap after character creation")
+
+        # The moment this account has a character (v1.0.11). `require_character`
+        # keeps the role in step from here on, but it has not run yet and the
+        # send-off below is about to open 🗺️ Cultivation World's private
+        # threads - so the grant has to precede them, or a brand-new cultivator
+        # cannot see the parent their own thread hangs under.
+        try:
+            await _sync_cultivator_role(interaction.guild, interaction.user, has_character=True)
+        except Exception:
+            log.exception("Could not grant the cultivator role after character creation")
 
         name = str(creation.get("name") or self.name_input.value).strip()
         location = str(creation.get("location") or family.get("location") or WORLD.starting_location)

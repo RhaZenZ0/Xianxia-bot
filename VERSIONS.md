@@ -6,6 +6,107 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.12** runs the playtest for the first time in four releases, and it went red on a hundred steps.
+
+The Discord harness presses every leaf of every hub and holds one thing about each: it was drawn and
+answered, or the panel hid it and printed a lock line saying why. v1.0.9 gave a page a **third**
+state - a door the curriculum has not introduced yet, which prints one collapsed line for the whole
+page and no line of its own - and the harness knows two. So 97 of 245 leaves were "neither drawn nor
+locked", the run's last step went red, and nothing in CI said so for three releases, because a
+harness is a script and not CI. The player is raised past the curriculum's own ceiling before the
+sweep now, read off the content file rather than written down, so every leaf is pressed again; the
+curriculum itself is asserted first, at realm 0, where it is true.
+
+It also fixes the thing the harness found on the way. Raising a realm through the GM's own lever
+answered **"character not found"** about a character the panel three lines above had just drawn: an
+action's payload was decoded into `map[string]any`, which turns every JSON number into a float, and
+a Discord id is about 1.4e18 while a float carries 9.0e15 exactly. Every id a payload named came
+back off by a digit or two - so `admin.player.set_realm`, `karma`, `teleport`, `grant`, `erase` and
+the rest of the GM console addressed somebody who does not exist. Player actions were never affected,
+because the actor's id is a typed field and never went through a float. The decoder keeps numbers
+exact now, and **no reader changed**: `ParseInt` has had a case for this since it was written and
+nothing could ever produce one.
+
+And a panel stays open as long as it is told. A hub panel went quiet after fifteen minutes and
+offered a Reopen button - a bare `timeout=900` written out in five files. `HUB_PANEL_IDLE_MINUTES` is
+the setting, the default is **120**, and `0` means a panel never expires. The command tree's own
+tuple got the same treatment one level down: it was an inline literal, so four places read this
+file's *source* to recover it and one wrote down how many there were and went stale. It is a name now.
+
+**1.0.11** gives a GM the two levers that only creation had, and stops a server being told about one
+release when three went by.
+
+Four deferred items, and the first two are one sentence from two sides: **the writer a human drives
+is the one nothing held.** `admin.player.set_spiritual_root` held the grade a GM types to a
+hand-written copy of the ladder `content/world.json` carries - six names in a map literal, agreeing
+with the file the day they were written, and silently wrong the day a rung is renamed or added.
+`admin.player.set_physique` moved a physique's stage, progress and stability and **never its
+identity**: the only two statements in the whole engine that have ever written `physique_id` are
+character creation and samsara, so a GM could not hand somebody a physique, correct one rolled
+wrong, or stage one for a playtest, even though all eight are drawable at birth. Both read the
+content file now, the physique goes into the undo snapshot so an undo puts back what a grant
+replaced, and the dashboard's two aptitude cards are pickers fed from that file - `gradeOpts` was a
+third copy of the ladder, in the browser.
+
+It also walks the releases a server missed. `#updates` compared the marker to the running version
+for equality and fetched that one entry, so a server upgrading 1.0.5 to 1.0.8 was told about 1.0.8
+and never about 1.0.6 or 1.0.7; the marker jumped across and nothing recorded that two releases went
+past unmentioned. Every entry in the gap is posted now, oldest first, capped with a line saying what
+is not being repeated - and the marker stops at the last release actually posted, so a send that
+fails halfway does not make the ones it never reached look announced.
+
+And 🗺️ Cultivation World is for cultivators. `#player-homes` and `#expeditions` were the last
+player-facing category open to everybody, so a newcomer's sidebar advertised rooms they cannot use
+directly above the `#begin-here` they are meant to go to - while the capitals, the four world feeds
+and the admin rooms were each gated. The deeper half was that no "has a character" role existed at
+all, because both realm syncs run from `require_character` and so only ever fire for somebody who
+already has one. There is one now, granted at creation before the first private thread is opened,
+kept in step by `require_character`, taken off at an erasure - the one moment nothing else can
+notice - and backfilled onto existing players by the sweep Full Setup already runs.
+
+**1.0.10** makes the panel header name whoever is actually standing there.
+
+Reported from live play, as two lines that disagreed in the same breath. The Family Hub header said
+*"Here the East Gate of Cloudblade City, facing Ironbanner City · Gate Captain Yue Dong"*, and
+`/talk`, opened at that same gate, offered **Drillmaster Zhai Kang** - who lives at the Blade Yards
+and had been walked to the gate by the world's own simulation.
+
+Both were right about different questions. The header listed whoever the content file records as
+*living* at a place, with no schedule and no simulation behind it; the picker asks who is *there*.
+So the one line that tells you who is in front of you was the one line not asking. It asks now - the
+same resolver `/talk`, `/scene status` and `/sense` all use - and where nothing can answer, it
+describes the place and names nobody rather than guessing.
+
+**1.0.9** introduces the game a realm at a time, so the first hour is the first hour and not the whole of it.
+
+Reported from live play: *"it's become complex and overwhelming."* A character three minutes old was
+shown every system the game has, at once - 249 doors across 67 pages in 16 hubs, sect politics and
+territory war and caravan dispatch and the auction floor sitting beside *cultivate* and *talk*, with
+nothing saying which of them were meant for them yet. None of it was refused. It simply was not what
+the first hour is about.
+
+139 of those doors now wait for a cultivation that can use them, so a new cultivator meets 110
+instead of 249, and the rest arrive as they climb: a companion and a rival and a sect worth asking
+about at Qi Refining, a sect's rooms and a party and the auction floor at Foundation Establishment,
+the underworld and the roads and a home of your own at Core Formation, ground worth holding at
+Nascent Soul, and what a life leaves behind after that.
+
+It also fixes a dead end at the end of the opening. Walking home from the road puts you at your
+city's gate - that is what the road does - and the household door then refused you, naming the city
+you were standing in as somewhere else: *"the Shen Family household stands in Cloudblade City and
+you are in Cloudblade City East Gate - travel there first."* 317 of the world's 477 places are parts
+of a town in this way, 92 of them gates, and the last stage of the beginner path asks you to come
+home. A gate is its city now, on both sides of the door: the engine admits you and the panel stops
+hiding the way in.
+
+Nothing is taken away and nothing is hidden. A page holding doors back says so in one line - how
+many, and the realm the next one opens at - and **/locked** lists every one of them with what it
+needs, because a road you can see is a road you can walk toward. Every status read stays open from
+the first minute, so no system is invisible, only the levers inside it wait. The slash commands all
+still work if you type them: this decides what the game puts in front of you, never what it allows.
+And starting over is never held back - the player most likely to want it is the one who just found
+all this too much.
+
 **1.0.8** gives you back the people standing in front of you, and makes starting over leave nothing behind.
 
 Reported from live play: standing at Cloudblade City East Gate, whose scene card names the gate
@@ -379,9 +480,20 @@ staged authority cleanup: forage, crafting and companions, canonical time, unifi
 road travel, caravans, dashboard-owned Discord setup, and the removal of the obsolete Python
 mechanical authority paths.
 
-## Release status — v1.0.8
+## Release status — v1.0.12
 
-- Current release: v1.0.8 - the NPC picker offers whoever is standing in the room rather than
+- Current release: v1.0.12 - the Discord playtest can see the curriculum again and presses every
+  leaf, a GM lever addresses the player it was given rather than an id a float rounded off, and a
+  hub panel stays open for as long as `HUB_PANEL_IDLE_MINUTES` says. No schema.
+- v1.0.11: a GM can grant a physique and can only set a root grade the ladder
+  carries, `#updates` walks the releases a server missed instead of jumping the marker across them,
+  and 🗺️ Cultivation World is gated behind having played. No schema.
+- v1.0.10: the panel header names who is actually standing there, instead of
+  whoever the content file says lives there. No schema.
+- v1.0.9: the game introduces itself a realm at a time: 139 of its 249 doors wait
+  for a cultivation that can use them, a gated page says how many and when, and `/locked` lists
+  every one. No schema.
+- v1.0.8: the NPC picker offers whoever is standing in the room rather than
   whoever sorts first in the world, a reset takes the player's private threads with it, and the GM
   dashboard's status footer reports from every page. No schema.
 - v1.0.7: every world keeps its own age, a cycle is exactly one world year, and
