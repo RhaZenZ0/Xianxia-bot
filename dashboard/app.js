@@ -241,16 +241,56 @@ function attentionPanel(items){
   return panel('Wants your attention',`<div class="tablewrap"><table><tbody>${rows}</tbody></table></div>`,{count:`${items.length}`});
 }
 
-async function loadOverview(){
-  const [d,cap]=await Promise.all([api('/api/overview'),api('/api/capabilities')]);
+/* The shell's own readout: the clock in the topbar and the two lines in the
+   sidebar footer (v1.0.8).
+
+   These were painted only inside `loadOverview`, so on any other view they sat
+   on the literal placeholders in index.html - `Schema` reading "SQLite" and the
+   engine line reading "engine —" - for as long as the tab stayed open. Landing
+   on a deep link (`#admin`, a bookmark, a reload anywhere but Overview) never
+   painted them at all, and neither did an Overview whose load threw, because
+   `switchView` catches per view.
+
+   Half of this was already known: the boot path below fetched `/api/overview`
+   when it started somewhere else and used it to set the clock **and nothing
+   else**, three lines above the two spans made from the same response. So the
+   data was fetched and thrown away.
+
+   A placeholder that looks like a value is not a sentinel - the
+   `seller_user_id=0` lesson, in a readout. "engine —" reads as "the engine
+   answered and had nothing to say"; a GM cannot tell it from an unreachable
+   engine. `shellStatusUnknown` says which. */
+function paintShellStatus(d,cap){
   const clock=d.clock||{};
   document.getElementById('worldClock').textContent=clock.display||'—';
-  document.getElementById('schema').textContent=`Schema ${d.schema_version} · API v${cap.api_version} · ×${clock.scale} time`;
-  const c=d.counts||{};const impl=cap.implementation||{};const att=d.attention||[];
-  const behind=att.filter(a=>a.kind==='simulation_lag').length;
+  document.getElementById('schema').textContent=
+    `Schema ${d.schema_version} · API v${(cap||{}).api_version} · ×${clock.scale} time`;
+  const behind=(d.attention||[]).filter(a=>a.kind==='simulation_lag').length;
   document.getElementById('engineHealth').innerHTML=behind
     ?`<span class="status-dot bad"></span>${behind} system${behind===1?'':'s'} behind`
     :'<span class="status-dot"></span>simulation current';
+}
+
+function shellStatusUnknown(){
+  document.getElementById('worldClock').textContent='—';
+  document.getElementById('schema').textContent='Schema unknown';
+  document.getElementById('engineHealth').innerHTML='<span class="status-dot bad"></span>engine unreachable';
+}
+
+/* Used wherever the shell needs painting without a view behind it: at boot on a
+   deep link, and on the poll while the open view is not Overview. Overview
+   paints from the response it already has rather than fetching twice. */
+async function refreshShellStatus(){
+  try{
+    const [d,cap]=await Promise.all([api('/api/overview'),api('/api/capabilities')]);
+    paintShellStatus(d,cap);
+  }catch(e){shellStatusUnknown()}
+}
+
+async function loadOverview(){
+  const [d,cap]=await Promise.all([api('/api/overview'),api('/api/capabilities')]);
+  paintShellStatus(d,cap);
+  const c=d.counts||{};const impl=cap.implementation||{};const att=d.attention||[];
   const badge=document.getElementById('questBadge');
   const drafts=att.find(a=>a.kind==='quest_drafts');
   if(badge){if(drafts){badge.textContent=String(drafts.count);badge.hidden=false}else{badge.hidden=true}}
@@ -1060,10 +1100,15 @@ const loaders={overview:loadOverview,timeline:loadTimeline,npcs:loadNPCs,familie
 setDensity(density());
 bindShell();
 const boot=String(location.hash||'').replace('#','').split('/')[0]||'overview';
-if(boot!=='overview'){
-  api('/api/overview').then(d=>{document.getElementById('worldClock').textContent=(d.clock||{}).display||'—'}).catch(()=>{});
-}
+if(boot!=='overview')refreshShellStatus();
 switchView(boot);
-// Overview is the only view that refreshes itself; everything else is read on
-// demand. Fifteen seconds is the interval it has always used.
-setInterval(()=>{if(CURRENT==='overview')refresh().catch(()=>{})},15000);
+// Overview is the only *view* that refreshes itself; everything else is read on
+// demand. Fifteen seconds is the interval it has always used. The shell's own
+// status is not a view and keeps ticking wherever you are standing - it is the
+// line a GM reads to know the world is still running, so freezing it on the
+// page they happen to have open would make it say the opposite of what it
+// knows. On Overview that costs nothing extra: its own load paints it.
+setInterval(()=>{
+  if(CURRENT==='overview')refresh().catch(()=>{});
+  else refreshShellStatus();
+},15000);

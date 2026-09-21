@@ -230,7 +230,17 @@ class _CountingSim:
 
     async def npcs_at_location(self, location):
         self.at_location_calls += 1
-        return [dict(r) for r in self.rows.values() if r["current_location"] == str(location)]
+        # Production's `npcsAtLocationGo` is
+        # `WHERE current_location=? AND status IN ('alive','missing')`, and the
+        # registry half of it hardcodes `'alive'`. A fake that handed back a
+        # dead row would accept exactly what SQLite refuses, which is the
+        # fixture rule this repository already states - and it does not fail
+        # safe here: it would make the resolver look like it stands corpses in
+        # the room when production never offers it one.
+        return [
+            dict(r) for r in self.rows.values()
+            if r["current_location"] == str(location) and r.get("status") in ("alive", "missing")
+        ]
 
     async def npc_status(self, npc_name):
         self.status_calls += 1
@@ -328,6 +338,80 @@ class WhoIsHereCostsOneQuery(unittest.TestCase):
             wrong, [],
             "the picker and the command disagree about where somebody is, so a player is "
             "offered an NPC and then refused:\n  " + "\n  ".join(wrong[:10]),
+        )
+
+
+
+def _somebody_who_stays_put(module, period: str = "Afternoon") -> tuple[str, str]:
+    """A catalogue NPC whose routine leaves them where they live this period.
+
+    Not "somebody with no schedule": every one of the 574 keeps one, so the
+    first version of this selected nobody and both tests below raised
+    StopIteration rather than asserting anything. The condition that matters is
+    the one `npcs_present` itself applies - content puts them here now - so it
+    is asked in exactly those terms.
+    """
+    for name, definition in module.WORLD.npcs.items():
+        home = str(definition.get("location") or "")
+        if not home or definition.get("circuit"):
+            continue
+        if (module.WORLD.npc_location_at(name, period) or home) == home:
+            return name, home
+    raise AssertionError("no catalogue NPC stays home this period; the fixture is broken, not the tree")
+
+class WhoIsHereRefusesTheDead(unittest.TestCase):
+    """The dead are not people standing here (v1.0.8).
+
+    rc.24 gave `current_npc_location` a DEAD sentinel and every picker its own
+    `if npc_location == DEAD: continue` beside it. v1.0.8 pointed
+    `local_npc_autocomplete` at this resolver instead, which retires that line
+    - so the rule has to be held here, and it never was: the only thing
+    asserting it was a substring scan of the caller that had just been
+    rewritten, and nothing anywhere drove the behaviour.
+
+    `npcs_present` refuses the dead on all three of its paths. The engine's
+    query filters them (`status IN ('alive','missing')`) and the registry path
+    hardcodes `'alive'`, so the fake below carries the same filter production
+    carries rather than handing back a row SQLite would never return. What is
+    left is the catalogue fallback, which is the one this can honestly drive:
+    content puts somebody here, the engine gets the last word, and the last
+    word is that they are buried.
+    """
+
+    def test_somebody_the_engine_calls_dead_is_not_standing_here(self):
+        module = _locations_module()
+        name, where = _somebody_who_stays_put(module)
+
+        with _wired(module) as sim:
+            # Buried. Production's own query would not return the row at all,
+            # so the fake does not either - a fixture that handed back a dead
+            # row would be testing a database that cannot exist.
+            sim.rows[name]["status"] = "dead"
+            here = asyncio.run(module.npcs_present(where, "Afternoon"))
+            resolved = asyncio.run(module.current_npc_location(name, "Afternoon"))
+
+        self.assertEqual(
+            resolved, module.DEAD,
+            "current_npc_location stopped answering DEAD, so this proves nothing about the dead",
+        )
+        self.assertNotIn(
+            name, here,
+            f"{name!r} is dead and npcs_present still stands them at {where!r}, so /talk and "
+            "/npcinfo offer a corpse - the rc.24 finding, one resolver down",
+        )
+
+    def test_and_the_living_beside_them_are_still_offered(self):
+        """A reader is asserted before it is trusted (rc.57): a resolver that
+        answered nobody anywhere would pass the test above for the wrong
+        reason."""
+        module = _locations_module()
+        name, where = _somebody_who_stays_put(module)
+        with _wired(module):
+            here = asyncio.run(module.npcs_present(where, "Afternoon"))
+        self.assertIn(
+            name, here,
+            f"{name!r} is alive and stands at {where!r} and npcs_present does not list them; "
+            "the resolver is broken, not the tree",
         )
 
 

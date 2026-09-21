@@ -32,11 +32,34 @@ class DeadNPCsAreNotOfferedTests(unittest.TestCase):
         self.assertIn("return None", source)
 
     def test_the_picker_skips_the_dead(self):
+        """The rule, not its spelling (v1.0.8).
+
+        This used to assert three substrings of the picker's own catalogue
+        tail - `if npc_location == DEAD:` and the location filter beside it -
+        and when v1.0.8 replaced that tail with the one resolver the gate went
+        red against correct code while never having checked the rule itself
+        anywhere. A gate that pins where a rule is written rather than that it
+        holds fails exactly when the rule is moved, which is the one time it
+        should stay green.
+
+        So it holds the wire instead: the picker asks `npcs_present`, which is
+        where refusing the dead now lives - on all three of its paths, the
+        engine's `status IN ('alive','missing')`, the registry's hardcoded
+        `'alive'`, and `current_npc_location` answering DEAD for the
+        catalogue. `WhoIsHereRefusesTheDead` in
+        `tests/python/contracts/test_who_is_here.py` is the behavioural half,
+        and it drives the third.
+        """
         source = bot_function_source("local_npc_autocomplete")
-        self.assertIn("if npc_location == DEAD:", source)
-        self.assertIn("continue", source)
-        # ...and still offers a living NPC nothing knows the location of.
-        self.assertIn("if location and npc_location and npc_location != location:", source)
+        self.assertIn(
+            "npcs_present(location, wt.period)", source,
+            "the picker no longer asks npcs_present, so nothing filters the dead out of it: "
+            "the resolver is where that rule lives since v1.0.8",
+        )
+        # A grave is still a name you can address, and it is added by the block
+        # above deliberately - the dead are excluded as *people standing here*,
+        # not as names (schema 48). The two must not be collapsed.
+        self.assertIn("DB.list_graves_at(location)", source)
 
     def test_talk_refuses_a_corpse(self):
         source = bot_function_source("talk")

@@ -87,6 +87,51 @@ deferred half and not the half that says what was done about it.
   it. It reads `DB.get_known_recipes` now, and an empty picker names the two doors that end it rather
   than being a dead end. The hub renders the same callback as a drop-down, which is how *"why is
   crafting a drop-down menu"* turned out to mean *"a menu of things I cannot make"*.
+- **deferred (design)** — *The `#updates` channel skips versions silently.*
+  `announce_release_if_new` compares `server_config.announced_release` to the running version for
+  **equality only** and fetches that one changelog entry, so a server upgrading 1.0.5 → 1.0.8 is
+  told about 1.0.8 and never about 1.0.6 or 1.0.7 — the marker jumps straight across and nothing
+  records that two releases went past unmentioned. Three neighbouring behaviours are deliberate and
+  do work: a NULL marker records silently (a fresh install does not want forty paragraphs of
+  history), and neither a missing changelog entry nor an unbound channel advances the marker, so
+  both get a later chance. A *skipped* version is in neither category, because it is never looked
+  up at all. What limits the cost is rc.59's `release_post`: the channel gets the entry's opening
+  sentence and a link, so a skip loses one sentence per release rather than paragraphs. Walking the
+  gap is small — parse every `_ENTRY` between `seen` and `running`, sort the versions as integer
+  tuples (`v1.0.10` is newer than `v1.0.9`, the rule `playtest_checklist.py` learned in v1.0.1),
+  post oldest-first under a cap, then set the marker once — but "posts each missed release exactly
+  once" is precisely the kind of claim rc.59's own `test_release_notes.py` asserted in prose and
+  never drove, so it needs a gate rather than a patch.
+- **fixed (v1.0.8)** — *The NPC picker offered whoever sorted first in the world, not whoever was
+  standing here.* `local_npc_autocomplete` searched all 574 catalogue NPCs, took the alphabetically
+  first twenty-five, and only then filtered by location — so `/talk`, `/npcinfo` and `/sense`
+  answered *"nothing to choose from right now"* in a room whose own scene card named the gate
+  captain in it. It asks `npcs_present` now, rc.28's one resolver, which is what the card has always
+  used. It blocked more than conversation: the beginner path stalls at its second stage, which asks
+  for a `talk`, and the commission ladder runs inside `/talk`, so 137 of the 140 authored
+  commissions could be neither offered nor finished.
+- **deferred (design)** — *An NPC nothing knows the location of is no longer offered anywhere.*
+  `current_npc_location` answering `None` means "do not filter by location", and `/talk` honours
+  that, so such an NPC used to appear in every room's picker and now appears in none. That is the
+  safe side of rc.28's rule — never offering somebody `/talk` would allow costs discoverability,
+  while offering somebody it refuses is the fault the rule exists for — and it is what makes the
+  picker agree with the scene card exactly. Whether those NPCs should be reachable at all is a
+  question about the registry, not about the picker.
+- **fixed (v1.0.8)** — *A reset deleted the rows that name a player's private threads and left the
+  threads standing.* Four tables hold the only record of a Discord thread the bot made for one
+  player, and `character.reset` wiped all four — so an abandoned life's expedition journal stayed in
+  Discord with its whole scene log and nothing anywhere able to find it again.
+  `DB.all_managed_thread_ids` had stated the ordering since the world-wide reset was written and the
+  per-player lever never applied it. Both levers collect the ids before the engine call and delete
+  the threads after it succeeds; `admin.player.erase` had the same hole, where it was the difference
+  between removing somebody from the database and removing them from the server.
+- **fixed (v1.0.8)** — *The GM dashboard's status footer was painted only by the Overview.* Opening
+  the dashboard on any other view left both lines on their literal placeholders, `SQLite` and
+  `engine —`, for as long as the tab stayed open. Half the wire was already there: the boot path
+  fetched `/api/overview` and used it to set the world clock and nothing else, three lines above the
+  two spans made from the same response. Neither placeholder looks broken, which is why it went
+  unreported — a GM could not tell `engine —` from an engine that had answered and had nothing to
+  say. The shell paints itself from anywhere now and says when it cannot reach the engine.
 - **fixed (v1.0.7)** — *There was one era for the whole game, and half of what an era did reached no
   rule.* Every reader asked `WHERE active=1 ORDER BY era_id DESC LIMIT 1`, so one row priced a siege
   among the immortal courts and a cultivation session in a Mortal village alike — while the capitals

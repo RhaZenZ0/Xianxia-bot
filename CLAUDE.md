@@ -2397,11 +2397,15 @@ matters drifted — which is the exact failure this file catches elsewhere. Thre
 restored in code, the pattern broken (the self-check fires first), and the comment-stripping removed
 (it flags `test_hidden_actions.py` again, by its comment).
 
-**The version itself is stamped in six places**, and `test_release_version.py` has held them equal
+**The version itself is stamped in seven places**, and `test_release_version.py` has held them equal
 since the day `VERSION` drifted to 0.19 while `app/version.py`, the Dockerfile and compose stayed on
 0.18. A bump is `app/version.py`, `VERSION`, the `Dockerfile` label, `docker-compose.yml`, the README
-title and the changelog's Release status line — plus the one literal in that test, which is the only
-place the number is spelled out in the suite and is what makes the rest reviewable.
+title and **both** of `VERSIONS.md`'s stamps — the `## Release status — v…` heading *and* the
+`- Current release: v…` line under it, which are two separate assertions — plus the one literal in
+that test, which is the only place the number is spelled out in the suite and is what makes the rest
+reviewable. (v1.0.8's own bump said six and missed the `Current release:` line, which is what the
+test then caught: a count written down once and never re-counted drifts exactly like any other
+restated fact.)
 
 ### What a server is told is derived, so the entry has to parse (v1.0.1)
 
@@ -3114,6 +3118,129 @@ giving two worlds one era name prints *"the cycle position is found by name"*; a
 sweep at a reader that does not exist prints *"the production walk did not find war_pressure handed
 to any era reader; the sweep is broken, not the tree"* - **before** the assertion it would have made
 vacuous.
+
+### The picker offered who the card refused (v1.0.8)
+
+**Found by playing.** A cultivator stood at Cloudblade City East Gate, whose scene card names the
+person in the room - *"Here the East Gate of Cloudblade City, facing Ironbanner City · Gate Captain
+Yue Dong"* - and both `/talk` and `/npcinfo` answered *"nothing to choose from right now."*
+
+`local_npc_autocomplete` asked `DB.search_catalog("npc", current, 25)` and filtered the answer by
+location. That query is `SELECT name FROM content_npcs WHERE name LIKE ? ORDER BY name LIMIT 25`, and
+an empty box makes the needle `%%` - so it returns **the alphabetically first twenty-five of all 574
+catalogue NPCs** and the location filter then runs on *those*. The picker could therefore offer
+somebody only if their name sorts near the front of the world **and** they are in the room; for most
+rooms that is nobody, and a gate captain called **Y**ue Dong could never appear anywhere at all.
+
+**rc.28 wrote the resolver for exactly this question and stated the rule the split broke**: *"a
+picker that offers somebody `/talk` then refuses them is worse than either being wrong alone."* The
+inverse is what shipped - the card named people the picker would not offer - because
+`/scene status` and `/sense` ask `npcs_present` and this did not. It is also v1.0.5's craft-picker
+finding one command over: that release pointed `recipe_autocomplete` at what the player has learned
+and did not look for siblings. This is the sibling, and it is the fourth surface (`/talk`,
+`/npcinfo`, `/sense`) off one function.
+
+**What it actually cost is not conversation.** `beginner_town` ("Out of the Gate") is
+`explore` → **`talk`** → `trade` and `beginner_home` is `return_home` → **`talk`** → `cultivate`, so
+the beginner path stalled at its second stage - which is why `scene_action` kept working and the
+player reported the first stage fine. And the commission ladder runs **inside `/talk`**
+(`commission_offer_for` at `scene.py:181`, `commission_reply_extras` at `:283`), so a player could
+be neither offered work nor able to hand it in: completion happens in `quest.progress`, and **137 of
+the 140 authored commissions carry at least one `talk` objective** (198 `talk`, 93 `scene_action`,
+84 `explore`). `/city board` and `/city accept` are a separate picker and were unaffected, so a
+commission could be taken and then never advanced.
+
+**The fix narrows the picker, deliberately.** An NPC `current_npc_location` answers `None` for -
+nothing knows where they are - used to be offered *everywhere*, because `/talk` reads `None` as "do
+not filter by location" and lets them through. `npcs_present` does not list them anywhere. That is
+the safe direction of the rc.28 rule: never offering somebody `/talk` would allow loses
+discoverability, while offering somebody it refuses is the fault the rule exists for - and the
+picker now agrees with the card exactly, which is the point.
+
+**The dead-filter gate went red against correct code, and that is the second finding.**
+`test_the_picker_skips_the_dead` asserted three substrings of the picker's own tail
+(`if npc_location == DEAD:` and the location filter beside it). Refusing the dead still holds on all
+three of `npcs_present`'s paths - the engine's `status IN ('alive','missing')`, the registry's
+hardcoded `'alive'`, and `current_npc_location` answering `DEAD` - so the rule survived and only its
+spelling moved. **A gate that pins where a rule is written rather than that it holds fails exactly
+when the rule is moved, which is the one time it should stay green**, and nothing anywhere drove the
+behaviour: `WhoIsHereRefusesTheDead` is the missing half, and it drives the catalogue path, which is
+the one Python owns.
+
+**Writing it found a fixture that accepted what production refuses.** rc.28's `_CountingSim` returned
+every row at a location regardless of `status`, while `npcsAtLocationGo` filters
+`status IN ('alive','missing')` - so the new test failed against *correct* code, reporting that the
+resolver stands corpses in the room. The fake carries production's filter now. It is the
+`npc_consignments` rule met in the permissive direction, where it produces a false finding rather
+than a missed one.
+
+### A reset takes the private rooms with it (v1.0.8)
+
+Reported from live play, in four words: *"Reset should delete the threads."*
+
+`character.reset` sweeps a player's rows across ~104 tables, and four of those rows are the only
+record anywhere of a Discord thread the bot made for that player - the expedition journal, a cave
+abode, a sect residence, a battle thread. The rows went and the threads stayed: an abandoned life's
+private journal was left standing with its whole scene log in it, and **nothing left in the database
+that could ever name it again**, so no later cleanup could find it either.
+
+**The rule was already written down, for the other case.** `DB.all_managed_thread_ids`' own docstring
+says the threads must be collected *"before the rows that reference them are wiped, since once the
+database is gone there is no other way to find them again"* - and that was written for the
+world-wide `reset_database.sh` wipe. The per-player lever that wipes exactly those rows never applied
+it. Same shape as v1.0.1's clan diplomacy, where the comment naming the fault sat in the tree and the
+fix had been made one table over.
+
+- **The ordering is the feature**, and it is the one thing a reader cannot get from both calls merely
+  being present: the ids are read *before* the engine call and the threads deleted *after* it
+  succeeds, so a refused reset destroys nothing and a committed one leaves nothing.
+  `test_a_reset_takes_the_threads_with_it.py` holds both directions by line number.
+- **`admin.player.erase` had the same hole and is fixed in the same release.** There it is not
+  clutter: an erasure that left the person's own private thread standing would have removed them from
+  the database and not from the server.
+- **Only what one player owns.** `birth_family_household_threads` is keyed by `family_id` and a
+  starter household is shared by everybody born into it; an event scene belongs to the event.
+  Deleting either because one cultivator started over would take a room other players are standing
+  in - the same line the reset already draws when it puts the household's welcome line back and
+  leaves the house itself alone. The gate refuses both by name.
+- **`PLAYER_OWNED_THREAD_SOURCES` lives beside `all_managed_thread_ids`**, and the gate holds it to
+  being a **subset** of it, because two enumerations of "which tables hold a thread id" in two files
+  would drift silently: a new thread table added to one and not the other leaves a thread nothing can
+  ever delete.
+- **Deleting a thread never costs the reset.** The engine has already committed by then, so the
+  character is gone either way and the only thing an exception could change is whether the player is
+  told so. Already-gone, refused and deleted are counted apart, because a GM asked to finish the job
+  by hand needs to know which.
+
+### The status line that was one view's leftovers (v1.0.8)
+
+Reported as what the GM dashboard's sidebar footer actually read: **`SQLite`** and **`engine —`**.
+Those are the literal placeholders in `dashboard/index.html`.
+
+Both spans were painted **only** inside `loadOverview`, so on any other view they sat on that text
+for as long as the tab stayed open - and landing on a deep link (`#admin`, a bookmark, a reload
+anywhere but Overview) never painted them at all, because `switchView` runs one loader and
+`loadOverview` was not it. An Overview whose own load threw did the same, since that catch is
+per view.
+
+**Half of the wire was already there**, which is what makes this the shape this file keeps recording
+rather than an oversight: the boot path fetched `/api/overview` when it started on another view and
+used the response to set the **world clock and nothing else**, three lines above the two spans made
+from the same response. Somebody hit this, fixed the clock, and left the footer below it.
+
+**And a placeholder that looks like a value is not a sentinel** - the `seller_user_id=0` lesson in a
+readout. *"engine —"* reads as an engine that answered and had nothing to say; a GM cannot tell it
+from an unreachable one, which is why this went unreported for as long as it did: the footer did not
+look broken. `paintShellStatus` is the one painter, `refreshShellStatus` is how anything without a
+view behind it asks, and `shellStatusUnknown` says plainly when the engine cannot be reached. The
+shell keeps ticking off the Overview too, because a frozen *"simulation current"* is worse than no
+line at all - it is the line a GM reads to know the world is still running.
+
+**The gate's own first version dumped the whole file.** `assertRegex` prints its haystack, and the
+haystack is 1,100 lines of `app.js`; a gate whose message has to be scrolled past is one nobody
+reads, so it is an `assertTrue` over a search. Its brace-matching reader asserts it found a balanced
+body before anything is asserted on it (rc.57), and the drill that breaks the reader prints *"the
+brace reader did not return loadOverview's body; the gate is broken, not the tree"*.
 
 ## Testing conventions
 

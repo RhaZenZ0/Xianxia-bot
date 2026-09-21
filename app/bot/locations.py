@@ -334,16 +334,36 @@ async def local_npc_autocomplete(
                     names.append(name)
         except Exception:
             log.exception("Could not read the registered NPCs at %s", location)
-    for name in await DB.search_catalog("npc", current, 25):
-        if name in names:
-            continue
-        npc_location = await current_npc_location(name, wt.period)
-        if npc_location == DEAD:
-            continue
-        if location and npc_location and npc_location != location:
-            continue
-        if not needle or needle in name.casefold():
-            names.append(name)
+    # Who is actually standing here, through the one resolver (v1.0.8).
+    #
+    # This asked `DB.search_catalog("npc", current, 25)` and filtered the
+    # answer by location. With nothing typed the needle is `%%`, so that query
+    # is `ORDER BY name LIMIT 25` over all 574 catalogue NPCs - the
+    # alphabetically first twenty-five of the whole world - and the location
+    # filter then ran on *those*. So the picker could only ever offer somebody
+    # whose name sorts near the front AND who happens to be in the room, which
+    # for most rooms is nobody: `/talk` and `/npcinfo` both answered "nothing
+    # to choose from right now" while the scene card one line above named the
+    # gate captain standing there, because the card asks `npcs_present` and
+    # this did not.
+    #
+    # rc.28 wrote `npcs_present` as the one resolver for exactly this question
+    # and said why the two must agree: "a picker that offers somebody /talk
+    # then refuses them is worse than either being wrong alone." The inverse
+    # held instead - the card named people the picker would not offer.
+    #
+    # The typed needle narrows what is here rather than selecting what to look
+    # for, which is the rc.46 rule: a surface must not offer what the engine
+    # will refuse, and `/talk` refuses anybody who is somewhere else.
+    if location:
+        try:
+            for name in await npcs_present(location, wt.period):
+                if name in names:
+                    continue
+                if not needle or needle in name.casefold():
+                    names.append(name)
+        except Exception:
+            log.exception("Could not read who is standing at %s", location)
     return [app_commands.Choice(name=name[:100], value=name[:100]) for name in names[:25]]
 
 
