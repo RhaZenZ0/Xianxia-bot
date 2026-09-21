@@ -360,3 +360,57 @@ async def ensure_abode_thread(interaction: discord.Interaction, abode: dict) -> 
         return None
 
 
+
+
+async def delete_player_threads(
+    guild: discord.Guild | None, records: list[dict[str, Any]]
+) -> dict[str, int]:
+    """Delete the private threads one player owned, given ids read beforehand.
+
+    **The order is the whole point, and it is not this function's to keep.**
+    `character.reset` and `admin.player.erase` both delete the rows that hold
+    these ids, so the ids have to be collected *before* the engine is called
+    and the threads deleted *after* it succeeds. `DB.all_managed_thread_ids`
+    has said so since the world-wide reset was written - "once the database is
+    gone there is no other way to find them again" - and neither of the two
+    per-player levers had ever applied it.
+
+    It never raises. A thread that is already gone, one the bot has lost
+    permission on, and a Discord outage are three different counts and none of
+    them is a reason to fail a reset that has already committed: the character
+    is gone either way, and the only thing an exception here could change is
+    whether the player is told so.
+    """
+    counts = {"deleted": 0, "already_gone": 0, "failed": 0}
+    if guild is None:
+        counts["failed"] = len(records)
+        return counts
+    for record in records:
+        thread_id = int(record.get("thread_id") or 0)
+        if not thread_id:
+            counts["already_gone"] += 1
+            continue
+        thread = guild.get_thread(thread_id)
+        if thread is None:
+            try:
+                fetched = await guild.fetch_channel(thread_id)
+            except discord.NotFound:
+                counts["already_gone"] += 1
+                continue
+            except (discord.Forbidden, discord.HTTPException):
+                counts["failed"] += 1
+                continue
+            thread = fetched if isinstance(fetched, discord.Thread) else None
+        if thread is None:
+            counts["already_gone"] += 1
+            continue
+        try:
+            await thread.delete()
+        except discord.NotFound:
+            counts["already_gone"] += 1
+        except (discord.Forbidden, discord.HTTPException):
+            log.exception("Could not delete thread %s (%s)", thread_id, record.get("kind"))
+            counts["failed"] += 1
+        else:
+            counts["deleted"] += 1
+    return counts

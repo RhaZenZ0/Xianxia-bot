@@ -62,8 +62,12 @@
     </nav>
 
     <div class="navfoot">
-      <span id="schema">SQLite</span><br>
-      <span id="engineHealth">engine —</span>
+      <!-- Both read as loading, never as an answer: until the first paint
+           these are the only thing in the footer, and "SQLite" / "engine —"
+           were indistinguishable from a real readout of an engine that had
+           nothing to report (v1.0.8). -->
+      <span id="schema">Schema… </span><br>
+      <span id="engineHealth">checking engine…</span>
     </div>
   </aside>
 

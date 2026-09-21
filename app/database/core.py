@@ -5188,6 +5188,46 @@ class Database:
                         out.append({"kind": kind, "thread_id": int(row["thread_id"])})
             return out
 
+    # The per-player twin of the sweep above, and it lives here beside it on
+    # purpose: two enumerations of "which tables hold a thread" in two files
+    # would be free to drift, and `test_a_reset_takes_the_threads_with_it.py`
+    # holds this one to being a subset of that one.
+    #
+    # **Only what this player owns.** `birth_family_household_threads` is keyed
+    # by `family_id` and a starter household is shared by everybody born into
+    # it, and an event scene belongs to the event - deleting either because one
+    # cultivator started over would take a room other players are standing in.
+    # That is the same line the reset already draws when it puts the
+    # household's welcome line back and leaves the house itself alone.
+    PLAYER_OWNED_THREAD_SOURCES = (
+        ("expedition_journal", "SELECT thread_id FROM expedition_threads WHERE guild_id=? AND user_id=?", True),
+        ("sect_abode", "SELECT thread_id FROM sect_abodes WHERE user_id=? AND thread_id IS NOT NULL", False),
+        ("cave_abode", "SELECT thread_id FROM cave_abodes WHERE user_id=? AND thread_id IS NOT NULL", False),
+        ("battle", "SELECT thread_id FROM battles WHERE user_id=? AND thread_id IS NOT NULL", False),
+    )
+
+    async def player_thread_ids(self, guild_id: int, user_id: int) -> list[dict[str, Any]]:
+        """Every Discord thread one player owns, read *before* their rows go.
+
+        `all_managed_thread_ids` states the rule this exists to apply: the
+        threads have to be collected before the rows that reference them are
+        wiped, "since once the database is gone there is no other way to find
+        them again". That was written for the world-wide reset and never
+        reached `character.reset`, which wipes exactly these rows for one
+        player - so a reset left the abandoned life's private journal standing
+        in Discord with nothing left anywhere that could name it.
+        """
+        async with self._connect() as db:
+            db.row_factory = aiosqlite.Row
+            out: list[dict[str, Any]] = []
+            for kind, sql, by_guild in self.PLAYER_OWNED_THREAD_SOURCES:
+                params = (int(guild_id), int(user_id)) if by_guild else (int(user_id),)
+                cur = await db.execute(sql, params)
+                for row in await cur.fetchall():
+                    if row["thread_id"] is not None:
+                        out.append({"kind": kind, "thread_id": int(row["thread_id"])})
+            return out
+
     async def get_characters_at_location(self, location: str, *, exclude_user_id: int | None = None) -> list[dict[str, Any]]:
         async with self._connect() as db:
             db.row_factory = aiosqlite.Row

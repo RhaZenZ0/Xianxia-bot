@@ -31,7 +31,7 @@ from ..runtime import DB, ENGINE, SETTINGS, WORLD, _explain_engine_error, curren
 from ..services import QUEST_FORGE, QUESTS, SIM
 from ...ai.quest_forge import store_draft
 from ...rules.quests import validate_quest_definition
-from ..threads import ensure_sect_abode_record, ensure_sect_abode_thread_for
+from ..threads import delete_player_threads, ensure_sect_abode_record, ensure_sect_abode_thread_for
 from ..bot import bot
 from ..ui.event_scene import spawn_event_thread
 from .core import admin_player_group, admin_sect_group, admin_server_group, admin_world_group, audit_admin, require_admin
@@ -896,6 +896,16 @@ async def admin_erase(
     # Deferred: the erasure walks every table in the schema, which is longer
     # than Discord's three seconds on a NAS disk.
     await interaction.response.defer()
+    # Their private rooms, read before the erasure wipes the rows that name
+    # them (v1.0.8, the ordering `DB.all_managed_thread_ids` states). Here it
+    # is not tidiness: an erasure that left somebody's private expedition
+    # journal standing in Discord, full of their own play, would have removed
+    # the person from the database and not from the server.
+    doomed_threads: list[dict[str, Any]] = []
+    try:
+        doomed_threads = await DB.player_thread_ids(int(interaction.guild_id or 0), member.id)
+    except Exception:
+        log.exception("Could not read the private threads of user %s before an erasure", member.id)
     try:
         result = dict(
             await ENGINE.action(
@@ -908,6 +918,7 @@ async def admin_erase(
     except GameEngineError as exc:
         await interaction.followup.send(f"❌ {_explain_engine_error(exc)}", ephemeral=False)
         return
+    threads = await delete_player_threads(interaction.guild, doomed_threads)
     deleted = int(result.get("rows_deleted") or 0)
     anonymised = int(result.get("rows_anonymised") or 0)
     tables = int(result.get("tables_touched") or 0)
@@ -922,6 +933,13 @@ async def admin_erase(
         "-# Shared world state (history, a founded sect or family, authored quests) keeps its row "
         "and loses the link. The audit log keeps its record that this was done.",
     ]
+    if threads["deleted"] or threads["failed"]:
+        lines.append(
+            f"-# Private threads: **{threads['deleted']}** deleted"
+            + (f", **{threads['failed']}** could not be removed and need deleting by hand"
+               if threads["failed"] else "")
+            + "."
+        )
     await interaction.followup.send("\n".join(lines), ephemeral=False)
     # audit_admin's own row is the Discord-side mirror; the engine has already
     # written the authoritative one inside the same transaction as the deletes.

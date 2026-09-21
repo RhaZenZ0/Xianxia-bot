@@ -6,6 +6,38 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.8** gives you back the people standing in front of you, and makes starting over leave nothing behind.
+
+Reported from live play: standing at Cloudblade City East Gate, whose scene card names the gate
+captain in the room, `/talk` and `/npcinfo` both answered *"nothing to choose from right now"*. The
+picker searched the whole 574-name catalogue, took the alphabetically first twenty-five, and only
+then asked which of those were in the room - so it could offer somebody only if their name sorted
+near the front of the world *and* they happened to be standing there, which for most rooms is
+nobody, and a captain called **Y**ue Dong could never appear anywhere at all. It asks who is here
+first now, through the same resolver the scene card has used since rc.28, so the card and the picker
+can no longer disagree.
+
+That one wire held up more than conversation. The starting quests stall on it at their second stage,
+which asks you to speak to somebody; and the commission ladder runs inside `/talk`, so a player
+could be neither offered work nor able to finish it - 137 of the 140 authored commissions carry at
+least one objective that is reporting a conversation. Scene actions kept working throughout, which
+is exactly why the first stage of the path did and the second did not.
+
+It also makes a reset take your private rooms with it. `/reset` deleted a character's rows across
+more than a hundred tables, and four of those rows were the only record anywhere of a Discord thread
+the bot had made for that player - the expedition journal above all. The rows went and the threads
+stayed, holding the abandoned life's whole scene log, with nothing left in the database that could
+ever find them again. Both levers that wipe a player now collect the threads before the rows go and
+delete them after: for `/reset` that is tidiness, and for a GM's erasure it is the difference between
+removing somebody from the database and removing them from the server.
+
+And the dashboard's own status line tells the truth from every page. The two lines in the sidebar
+footer were painted only by the Overview, so opening the dashboard anywhere else - a bookmark, a
+reload, a deep link - left them reading their placeholders, `SQLite` and `engine —`, for as long as
+the tab stayed open. Neither looks broken, which is why it went unreported: a GM could not tell
+`engine —` from an engine that had answered and had nothing to say. The shell reports itself now,
+from wherever you are standing, and says plainly when it cannot reach the engine at all.
+
 **1.0.7** gives every world its own age, and makes an era mean something in all of them.
 
 There was one era for the whole game. A Demon Invasion in the Celestial World and a quiet century in
@@ -347,9 +379,12 @@ staged authority cleanup: forage, crafting and companions, canonical time, unifi
 road travel, caravans, dashboard-owned Discord setup, and the removal of the obsolete Python
 mechanical authority paths.
 
-## Release status — v1.0.7
+## Release status — v1.0.8
 
-- Current release: v1.0.7 - every world keeps its own age, a cycle is exactly one world year, and
+- Current release: v1.0.8 - the NPC picker offers whoever is standing in the room rather than
+  whoever sorts first in the world, a reset takes the player's private threads with it, and the GM
+  dashboard's status footer reports from every page. No schema.
+- v1.0.7: every world keeps its own age, a cycle is exactly one world year, and
   four era modifiers that reached no rule are wired or refused. Schema 60.
 - v1.0.6: "violence cannot mechanically begin here" is held by the engine and not
   only by the bot, and an auction floor is a sanctuary a bounty hunter cannot reach into. No schema.

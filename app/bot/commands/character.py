@@ -42,6 +42,7 @@ from ..runtime import (
     respond,
     serialized_user_action,
 )
+from ..threads import delete_player_threads
 from ..ui.commissions import AbandonCommissionView, abandon_warning
 from ..ui.creation import BirthFamilyView
 from ..services import COMMISSIONS, GUILD, NPC_RELATIONSHIPS, QUESTS, SCENES
@@ -1005,6 +1006,21 @@ async def reset(interaction: discord.Interaction) -> None:
     c = await require_character(interaction, allow_deceased=True)
     if not c:
         return
+    # Their private rooms, read *before* the engine wipes the rows that name
+    # them (v1.0.8). `DB.all_managed_thread_ids` has stated that ordering since
+    # the world-wide reset was written - once the rows are gone there is no
+    # other way to find the threads again - and this lever, which deletes
+    # exactly those rows for one player, never applied it: an abandoned life's
+    # expedition journal stayed in Discord holding its whole scene log, with
+    # nothing left anywhere that could name it. Read here, deleted below, and
+    # only if the engine agreed to the reset at all.
+    doomed_threads: list[dict[str, Any]] = []
+    try:
+        doomed_threads = await DB.player_thread_ids(
+            int(interaction.guild_id or 0), interaction.user.id
+        )
+    except Exception:
+        log.exception("Could not read the private threads of user %s before a reset", interaction.user.id)
     try:
         envelope = await ENGINE.authoritative_action(
             "character.reset",
@@ -1016,6 +1032,8 @@ async def reset(interaction: discord.Interaction) -> None:
         await respond(interaction, f"❌ {_explain_engine_error(exc)}", ephemeral=False)
         return
     result = dict(envelope.get("result") or {})
+    # The engine committed, so the rooms go with the life.
+    threads = await delete_player_threads(interaction.guild, doomed_threads)
     remaining = int(result.get("resets_remaining", 0))
     lines = [
         f"🌱 **{result.get('name') or c['name']} is gone.** The household's record of them closes, "
@@ -1024,6 +1042,15 @@ async def reset(interaction: discord.Interaction) -> None:
         "over — this is not Samsara, and the soul keeps no memory of a life it abandoned.",
         "Use **/begin** to choose a family, a path and a name again.",
     ]
+    if threads["deleted"]:
+        lines.append(
+            f"-# Your private threads went with them — **{threads['deleted']}** closed and deleted."
+        )
+    if threads["failed"]:
+        lines.append(
+            f"-# **{threads['failed']}** of your private threads could not be deleted; a GM can "
+            "remove them by hand."
+        )
     lines.append(
         f"You may begin again **{remaining}** more time{'' if remaining == 1 else 's'}."
         if remaining
