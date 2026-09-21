@@ -87,6 +87,27 @@ deferred half and not the half that says what was done about it.
   it. It reads `DB.get_known_recipes` now, and an empty picker names the two doors that end it rather
   than being a dead end. The hub renders the same callback as a drop-down, which is how *"why is
   crafting a drop-down menu"* turned out to mean *"a menu of things I cannot make"*.
+- **fixed (v1.0.9)** — *Standing at your own city's gate, the household refused you and named that
+  city as somewhere else.* `familyHouseholdEnterAction` compared the character's location to the
+  household's town by bare string equality while `cityOf` — the engine's one statement of which city
+  a place is part of — was already read by travel and by `WhereAnNPCCanWalk`. 317 of the catalogue's
+  477 locations are parts of a household town, 92 of them gates, and `beginner_home` reports
+  `return_home` from this action, so the beginner path's last stage could not be finished by walking.
+  Both halves fixed: the engine's check and the panel's anticipation of it.
+- **fixed (v1.0.9)** — *A character three minutes old was shown every system the game has.* 249
+  leaves across 67 pages in 16 hubs, none of them refused — sect politics, territory war, caravan
+  dispatch and the auction floor beside `cultivate` and `talk`. `feature_unlocks` in
+  `content/world.json` holds 139 of them for a realm that can use them, so a new cultivator meets
+  110. It is a different rule from rc.32's (which hides only what the engine would refuse), and it
+  earns that limit back three ways: a gated page prints one collapsed line and `/locked` lists every
+  door with the realm it needs; the slash command still works, because gating is advertising and
+  never a bound; and the roster is content a GM can retune.
+- **deferred (design)** — *The curriculum is realm-banded, and some systems are not about realm.*
+  The Ghost Cultivator's `ghost` page is path-specific, the hidden sect's door is a karma gate, and
+  a profession's rank is its own ladder — each is left open at realm 0 rather than given a realm
+  floor that would be wrong for the player it is actually for. Gating on something other than realm
+  is a second axis, and a roster with two axes needs a rule about which wins before it is worth
+  having.
 - **deferred (design)** — *The `#updates` channel skips versions silently.*
   `announce_release_if_new` compares `server_config.announced_release` to the running version for
   **equality only** and fetches that one changelog entry, so a server upgrading 1.0.5 → 1.0.8 is

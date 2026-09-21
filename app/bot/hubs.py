@@ -9,6 +9,7 @@ from typing import Any, Mapping, Sequence
 import discord
 from discord import app_commands
 
+from ..rules import feature_unlocks as unlocks
 from .registry import ACTIONS
 
 log = logging.getLogger("xianxia.hubs")
@@ -337,6 +338,62 @@ _HIDDEN_ACTIONS: Any = None
 def register_hidden_actions(provider: Any) -> None:
     global _HIDDEN_ACTIONS
     _HIDDEN_ACTIONS = provider
+
+
+# And the doors a player has not reached yet (v1.0.9). Deliberately a *second*
+# registry rather than more entries in the one above, because the two mean
+# different things and must not render alike: `_HIDDEN_ACTIONS` is "the engine
+# would refuse this where you stand", which earns a padlock naming the reason,
+# and this is "not yet introduced", which earns one collapsed line for the
+# whole page. Merging them would make one line type mean two things, and the
+# page would go straight back to being a column of padlocks - which is the
+# noise this release exists to remove.
+_NOT_YET_UNLOCKED: Any = None
+
+
+def register_not_yet_unlocked(provider: Any) -> None:
+    global _NOT_YET_UNLOCKED
+    _NOT_YET_UNLOCKED = provider
+
+
+# The ladder's own names, for the line below. Registered rather than imported
+# for `_MENU_FACTS`' reason: `WORLD` is built in `runtime`, which sits *above*
+# this module, so a direct import would invert the layering the suite holds.
+_REALM_NAMER: Any = None
+
+
+def register_realm_namer(namer: Any) -> None:
+    global _REALM_NAMER
+    _REALM_NAMER = namer
+
+
+def _unlock_summary(here: dict[str, int]) -> str:
+    """The collapsed line for one page's not-yet-reached doors."""
+    opens_at = unlocks.next_unlock_realm(here)
+    name: Any = None
+    if opens_at is not None and callable(_REALM_NAMER):
+        try:
+            name = _REALM_NAMER(opens_at)
+        except Exception:
+            log.exception("Realm name unavailable for index %s", opens_at)
+    return unlocks.unlock_summary(here, name)
+
+
+async def not_yet_unlocked(interaction: discord.Interaction) -> dict[str, int]:
+    """`path -> the realm index that opens it`, for this player right now.
+
+    Fails towards showing everything, exactly as `hidden_actions` does: a
+    filter that hid the game when its own lookup broke would be indistinguishable
+    from a correct empty page.
+    """
+    if not callable(_NOT_YET_UNLOCKED):
+        return {}
+    try:
+        answer = await _NOT_YET_UNLOCKED(interaction) or {}
+        return {str(path): int(realm) for path, realm in dict(answer).items()}
+    except Exception:
+        log.exception("Unlock lookup unavailable")
+        return {}
 
 
 async def hidden_actions(interaction: discord.Interaction) -> dict[str, str]:
@@ -2184,6 +2241,7 @@ class LayoutHubView(_LayoutHubBase):
 
     async def refresh_status(self, interaction: discord.Interaction) -> None:
         self.hidden_paths = await hidden_actions(interaction)
+        self.unlocks_at = await not_yet_unlocked(interaction)
         if not callable(self.status_provider):
             return
         try:
@@ -2201,7 +2259,11 @@ class LayoutHubView(_LayoutHubBase):
         if page is None:
             return []
         hidden = getattr(self, "hidden_paths", None) or {}
-        return [action for action in _leaf_actions(page) if action.path not in hidden]
+        later = getattr(self, "unlocks_at", None) or {}
+        return [
+            action for action in _leaf_actions(page)
+            if action.path not in hidden and action.path not in later
+        ]
 
     def locked_lines(self, page: HubPage | None) -> str:
         """The doors this page leaves off for this player, and why: a road
@@ -2214,7 +2276,26 @@ class LayoutHubView(_LayoutHubBase):
             if action.path in hidden:
                 reason = hidden[action.path]
                 lines.append(f"🔒 {action.label}" + (f" — {reason}" if reason else ""))
-        return ("\n" + "\n".join(lines[:6])) if lines else ""
+        later = self.unlock_line(page)
+        body = ("\n" + "\n".join(lines[:6])) if lines else ""
+        return body + (("\n" + later) if later else "")
+
+    def unlock_line(self, page: HubPage | None) -> str:
+        """One line for every door this page is holding back until a realm.
+
+        Not a padlock each: a column of them is the same wall of rows the
+        curriculum exists to remove, only greyer. The count and the nearest
+        realm are what a player can act on, and `/locked` holds the list.
+        """
+        if page is None:
+            return ""
+        later = getattr(self, "unlocks_at", None) or {}
+        if not later:
+            return ""
+        here = {a.path: later[a.path] for a in _leaf_actions(page) if a.path in later}
+        if not here:
+            return ""
+        return _unlock_summary(here)
 
     def _header_text(self) -> str:
         icon = _hub_icon(self.definition.name)
@@ -2421,6 +2502,7 @@ class CommandHubView(discord.ui.View):
 
     async def refresh_status(self, interaction: discord.Interaction) -> None:
         self.hidden_paths = await hidden_actions(interaction)
+        self.unlocks_at = await not_yet_unlocked(interaction)
         if not callable(self.status_provider):
             return
         try:
@@ -2440,7 +2522,11 @@ class CommandHubView(discord.ui.View):
         if page is None:
             return []
         hidden = getattr(self, "hidden_paths", None) or {}
-        return [action for action in _leaf_actions(page) if action.path not in hidden]
+        later = getattr(self, "unlocks_at", None) or {}
+        return [
+            action for action in _leaf_actions(page)
+            if action.path not in hidden and action.path not in later
+        ]
 
     def locked_lines(self, page: HubPage | None) -> str:
         """The doors this page leaves off for this player, and why: a road
@@ -2453,7 +2539,26 @@ class CommandHubView(discord.ui.View):
             if action.path in hidden:
                 reason = hidden[action.path]
                 lines.append(f"🔒 {action.label}" + (f" — {reason}" if reason else ""))
-        return ("\n" + "\n".join(lines[:6])) if lines else ""
+        later = self.unlock_line(page)
+        body = ("\n" + "\n".join(lines[:6])) if lines else ""
+        return body + (("\n" + later) if later else "")
+
+    def unlock_line(self, page: HubPage | None) -> str:
+        """One line for every door this page is holding back until a realm.
+
+        Not a padlock each: a column of them is the same wall of rows the
+        curriculum exists to remove, only greyer. The count and the nearest
+        realm are what a player can act on, and `/locked` holds the list.
+        """
+        if page is None:
+            return ""
+        later = getattr(self, "unlocks_at", None) or {}
+        if not later:
+            return ""
+        here = {a.path: later[a.path] for a in _leaf_actions(page) if a.path in later}
+        if not here:
+            return ""
+        return _unlock_summary(here)
 
     def build_embed(self) -> discord.Embed:
         page = self.page

@@ -16,6 +16,7 @@ import discord
 from discord import app_commands
 
 from ..database import SCHEMA_VERSION
+from ..rules import feature_unlocks as unlocks
 from ..rules.progression_systems import ASCENSION_GATES
 from .admin.core import (
     admin_family_group,
@@ -71,6 +72,8 @@ from .commands.scene import scene_group, scene_status, talk
 from .commands.secretrealm import secret_group, secret_status
 from .commands.sect import sect_group
 from .commands import cooldowns as _commands_cooldowns  # noqa: F401  (registers /cooldowns on import)
+from .commands.exploration import _city_of
+from .commands import locked as _commands_locked  # noqa: F401  (registers /locked on import)
 from .commands import sense as _commands_sense  # noqa: F401  (registers its root commands on import)
 from .commands import support as _commands_support  # noqa: F401  (registers /tribute on import)
 from .commands.territory import caravan_group, party_group, party_status, territory_group, war_group, war_status
@@ -86,6 +89,8 @@ from .hubs import (
     register_menu_builder,
     register_menu_facts,
     register_hidden_actions,
+    register_not_yet_unlocked,
+    register_realm_namer,
     register_panel_gate,
     send_hub,
 )
@@ -837,7 +842,14 @@ async def _household_hidden_actions(interaction: discord.Interaction) -> dict[st
         return _action_paths("you are already inside", HOUSEHOLD_DOOR)
     town = str(fam.get("location") or "")
     hidden = _action_paths("asked for inside the household", *HOUSEHOLD_INDOOR_ACTIONS)
-    if here != town:
+    # A city's gate is that city (v1.0.9). Presentation may *anticipate* a
+    # refusal the engine will make - the rule v1.0.6 states about
+    # `battle.py` - and this is the anticipation of `familyHouseholdEnterAction`'s
+    # own check. It must therefore ask the same question the engine asks, or
+    # the panel hides a door that would have opened: 317 of the catalogue's
+    # locations are parts of a household town, and the old comparison was bare
+    # equality on both sides of the seam.
+    if _city_of(here) != town:
         hidden.update(_action_paths(f"the household stands in {town}; travel there, or burn a Hearth-Return Talisman", HOUSEHOLD_DOOR))
     return hidden
 
@@ -943,6 +955,34 @@ async def _hidden_actions(interaction: discord.Interaction) -> dict[str, str]:
 register_hidden_actions(_hidden_actions)
 
 
+# The curriculum (v1.0.9). Distinct from `_hidden_actions` above, and the
+# distinction is the design: that one hides what the engine would refuse where
+# this player stands, and this one holds back what the game has not introduced
+# to them yet. The first earns a padlock naming the reason; the second earns
+# one collapsed line for the whole page, because a column of padlocks is the
+# same wall of rows this release exists to remove.
+#
+# **Gating is advertising, never a bound.** Nothing here is consulted on a
+# press: `/auction` typed directly still runs, and the engine's own rules stay
+# the only thing that refuses. A bound that lives in the client is not a bound
+# (v1.0.0-rc.48), and this must not become the fifth instance of that fault.
+async def _curriculum_unlocks(interaction: discord.Interaction) -> dict[str, int]:
+    """`/path -> the realm index that opens it`, for what this player has not
+    reached. Somebody with no character yet is held back by nothing: `/begin`
+    is the whole of what they can do, and the panel behind it is not a place
+    to be teaching pacing."""
+    c = await DB.get_character(interaction.user.id)
+    if not c:
+        return {}
+    roster = WORLD.data.get("feature_unlocks") or {}
+    locked = unlocks.locked_leaves(roster, int(c.get("realm_index") or 0))
+    return {"/" + path: realm for path, realm in locked.items()}
+
+
+register_not_yet_unlocked(_curriculum_unlocks)
+register_realm_namer(WORLD.realm_name)
+
+
 async def _panel_gate(user: "discord.abc.User", path: str) -> str | None:
     """The hub panel's half of the two gates that refuse a press.
 
@@ -1014,7 +1054,7 @@ def register_command_surface(client: XianxiaBot) -> None:
     # - see registered_group_command call sites above), never its own root
     # command, so it was never registered into ACTIONS._roots and
     # ACTIONS.root("act") raised KeyError on every bot startup.
-    for name in ("begin", "me", "quests", "action", "check", "admin", "menu", "tribute", "cooldowns"):
+    for name in ("begin", "me", "quests", "action", "check", "admin", "menu", "tribute", "cooldowns", "locked"):
         client.tree.add_command(ACTIONS.root(name), guild=GUILD)
     for command in _HUB_COMMANDS:
         client.tree.add_command(command, guild=GUILD)

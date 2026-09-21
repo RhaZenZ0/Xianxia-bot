@@ -124,8 +124,34 @@ class TheChannelsAreDashboardOwned(unittest.TestCase):
 
 class TheMenuOpensEveryHub(unittest.TestCase):
     def test_menu_is_a_registered_root_on_the_tree(self):
+        """Read off the tuple, never spelled out (v1.0.9).
+
+        This asserted the tuple's exact literal text, so it broke the day
+        `/locked` was added to it - a gate failing on correct code because the
+        line it pins grew a member, which says nothing about whether `menu` is
+        still registered. rc.43 already made this call for
+        `test_commands_reach_a_player.py`: the tree tuple is read out of
+        `surface.py` by AST rather than copied, because a copy is free to drift
+        and a spelling is not the rule.
+        """
+        import ast
+
         self.assertIn('name="menu"', SURFACE)
-        self.assertIn('("begin", "me", "quests", "action", "check", "admin", "menu", "tribute", "cooldowns")', SURFACE)
+        registered: set[str] = set()
+        for node in ast.walk(ast.parse(SURFACE)):
+            if (isinstance(node, ast.For) and isinstance(node.iter, ast.Tuple)
+                    and all(isinstance(e, ast.Constant) for e in node.iter.elts)):
+                names = {e.value for e in node.iter.elts if isinstance(e.value, str)}
+                if "begin" in names:
+                    registered = names
+        # Asserted before it is trusted (rc.57): a read that found nothing
+        # would make the assertion below vacuous rather than red.
+        self.assertTrue(registered, "the tree tuple could not be read off surface.py")
+        self.assertIn(
+            "menu", registered,
+            "/menu is no longer registered on the command tree, so the one door into every hub "
+            "is not a slash command any more",
+        )
 
     def test_it_lists_every_hub_and_gates_admin(self):
         select = _body(SURFACE, "MenuSelect")

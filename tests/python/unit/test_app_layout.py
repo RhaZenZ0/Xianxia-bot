@@ -18,7 +18,7 @@ APP = PROJECT_ROOT / "app"
 PACKAGES = {
     "rules": {
         "advanced_catalog", "advanced_runtime", "alchemy", "aptitudes", "battle", "birthfamily",
-        "black_market", "commissions", "creation_ui", "effects", "family", "fate", "game",
+        "black_market", "commissions", "creation_ui", "effects", "family", "fate", "feature_unlocks", "game",
         "moderation", "narration_pool", "npc_memory", "progression_systems", "quests", "realm_hubs", "samsara",
         "sect", "sect_manor", "sect_recruitment", "sense", "trade_receipt", "worldtime",
     },

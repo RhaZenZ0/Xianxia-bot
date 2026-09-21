@@ -6,6 +6,36 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.9** introduces the game a realm at a time, so the first hour is the first hour and not the whole of it.
+
+Reported from live play: *"it's become complex and overwhelming."* A character three minutes old was
+shown every system the game has, at once - 249 doors across 67 pages in 16 hubs, sect politics and
+territory war and caravan dispatch and the auction floor sitting beside *cultivate* and *talk*, with
+nothing saying which of them were meant for them yet. None of it was refused. It simply was not what
+the first hour is about.
+
+139 of those doors now wait for a cultivation that can use them, so a new cultivator meets 110
+instead of 249, and the rest arrive as they climb: a companion and a rival and a sect worth asking
+about at Qi Refining, a sect's rooms and a party and the auction floor at Foundation Establishment,
+the underworld and the roads and a home of your own at Core Formation, ground worth holding at
+Nascent Soul, and what a life leaves behind after that.
+
+It also fixes a dead end at the end of the opening. Walking home from the road puts you at your
+city's gate - that is what the road does - and the household door then refused you, naming the city
+you were standing in as somewhere else: *"the Shen Family household stands in Cloudblade City and
+you are in Cloudblade City East Gate - travel there first."* 317 of the world's 477 places are parts
+of a town in this way, 92 of them gates, and the last stage of the beginner path asks you to come
+home. A gate is its city now, on both sides of the door: the engine admits you and the panel stops
+hiding the way in.
+
+Nothing is taken away and nothing is hidden. A page holding doors back says so in one line - how
+many, and the realm the next one opens at - and **/locked** lists every one of them with what it
+needs, because a road you can see is a road you can walk toward. Every status read stays open from
+the first minute, so no system is invisible, only the levers inside it wait. The slash commands all
+still work if you type them: this decides what the game puts in front of you, never what it allows.
+And starting over is never held back - the player most likely to want it is the one who just found
+all this too much.
+
 **1.0.8** gives you back the people standing in front of you, and makes starting over leave nothing behind.
 
 Reported from live play: standing at Cloudblade City East Gate, whose scene card names the gate
@@ -379,9 +409,12 @@ staged authority cleanup: forage, crafting and companions, canonical time, unifi
 road travel, caravans, dashboard-owned Discord setup, and the removal of the obsolete Python
 mechanical authority paths.
 
-## Release status — v1.0.8
+## Release status — v1.0.9
 
-- Current release: v1.0.8 - the NPC picker offers whoever is standing in the room rather than
+- Current release: v1.0.9 - the game introduces itself a realm at a time: 139 of its 249 doors wait
+  for a cultivation that can use them, a gated page says how many and when, and `/locked` lists
+  every one. No schema.
+- v1.0.8: the NPC picker offers whoever is standing in the room rather than
   whoever sorts first in the world, a reset takes the player's private threads with it, and the GM
   dashboard's status footer reports from every page. No schema.
 - v1.0.7: every world keeps its own age, a cycle is exactly one world year, and

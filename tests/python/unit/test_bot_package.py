@@ -842,6 +842,12 @@ SURFACE = {
             "crime_group": ('status', 'atone'),
         },
     },
+    "commands/locked.py": {
+        "groups": (),
+        "roots": ('locked',),
+        "leaves": {
+        },
+    },
     "commands/scene.py": {
         "groups": ('scene_group',),
         "roots": ('talk', 'action', 'npcinfo'),

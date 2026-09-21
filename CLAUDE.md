@@ -3242,6 +3242,148 @@ reads, so it is an `assertTrue` over a search. Its brace-matching reader asserts
 body before anything is asserted on it (rc.57), and the drill that breaks the reader prints *"the
 brace reader did not return loadOverview's body; the gate is broken, not the tree"*.
 
+### The game introduces itself a realm at a time (`feature_unlocks`, v1.0.9)
+
+**Found by playing**, and reported in one sentence: *"it's become complex and overwhelming."*
+
+A character three minutes old met **249 leaves across 67 pages in 16 hubs** - every system the game
+has, at once. `cultivation` alone carries 34 leaves over seven pages, `sect` 29, `economy` 27,
+`character` 25, `family` 24, `combat` 24. **None of it was refused**: sect politics, territory war,
+caravan dispatch, boss raids and the auction floor all *work* at Body Tempering. They are simply not
+what the first hour is about, and nothing anywhere said so.
+
+**This is a different rule from rc.32's, and that is the whole thing to understand before touching
+it.** `PROGRESSION_GATES` hides a door the engine **would refuse outright** - a Law before the realm
+that can hold one, a sect's rooms to somebody in no sect - and its limit is stated in this file:
+*"never a status read or the door into the system, because a road nobody can see is a road nobody
+learns exists."* A pacing curriculum hides doors that would have worked. It has to earn that limit
+back, and three properties are what do it.
+
+- **Nothing vanishes.** A page holding doors back prints **one collapsed line** naming the count and
+  the nearest realm; `/locked` lists every door with what it needs. A padlock each was rejected on
+  the finding itself: the complaint was a wall of rows, and a wall of grey rows is the same wall.
+  The line is why the two kinds of hiding are **two registries** rather than more entries in one -
+  `_HIDDEN_ACTIONS` means "the engine would refuse this where you stand" and earns a padlock naming
+  the reason, `_NOT_YET_UNLOCKED` means "not introduced yet" and earns the collapsed line. Merging
+  them would make one line type mean two things and put the page straight back.
+- **Gating is advertising, never a bound.** Nothing is consulted on a press: `/auction` typed
+  directly still runs, and the engine's own rules stay the only refusal. **A bound that lives in the
+  client is not a bound** (rc.48) - already found four times in this tree, and a realm floor written
+  for *pacing* becoming a refusal the engine never agreed to would be the fifth.
+  `test_the_curriculum_opens_as_you_cultivate.py` reads `_panel_gate`'s statements and the two
+  engine clients to hold it.
+- **The roster is content**, so a GM retunes it without a code change - the rule this tree already
+  follows for `event_sites`, `forage_materials`, `beginner_path` and `world_era_cycles`. It is
+  authored by **page** with per-leaf overrides, because a page is the natural unit of "a system" and
+  a 67-entry roster is reviewable where a 249-entry one is not. The overrides exist because several
+  pages mix the two ends: `character / Overview` holds `sheet` beside `soul` and `inheritances`, and
+  `cultivation / Path` holds `aptitude root` - what you were born as, which is identity rather than
+  a system - beside `aptitude evolve`.
+
+**Every status read stays open at realm 0**, deliberately and against the temptation to count them
+as noise. `sect status`, `beast status`, `abode status`, `innerworld status`, `secretrealm status`
+and the rest are how a player learns a system exists at all, which is precisely what rc.32's limit
+protects. What waits is the levers inside.
+
+**Two floors are absolute and each has its own test.** Anything the beginner path or a household
+errand needs stays at realm 0 - gating a leaf the opening *requires* would make it illegible
+instead, and silently, because the quest would still be held and simply have no visible way to
+advance. And **`reset` is never held back**: the player most likely to want it is the one who has
+just decided this game is too much, which is the player this release is for.
+
+**`law` and `tribulation` are deliberately left to the engine's gate** rather than restated here.
+They are already hidden by `_progression_hidden_actions` at their real floors, and a second
+statement of one rule is the fault rc.39 removed for the world clock and rc.44 for the world
+currencies.
+
+**The rules half takes its roster injected** (`app/rules/feature_unlocks.py`), because `WORLD` is
+built in `app/bot/runtime.py` and `test_app_layout.py` puts `rules` at the bottom - the reason
+`describe_era` (v1.0.7) and `narrator.py`'s `npc_resolver` (rc.27) are shaped the same way. An
+absent, empty or unreadable roster **locks nothing**: a presentation filter that failed towards
+hiding would leave a player looking at an empty game with no way to tell that from a correct one,
+while failing towards showing is merely the busy surface this release started from. That is the same
+call `maintenance.py` makes about its own flag.
+
+**Three of the suite's exact lists caught the new command and made it a decision rather than a
+default**, which is what they are for. `test_app_layout` refused `feature_unlocks` until the module
+was registered; `test_bot_package`'s surface table refused `commands/locked.py` until it was named;
+and `test_seclusion_lockout` refused `/locked` in the command tree until it was placed on one side
+or the other - it is a **read**, so it joins `/cooldowns` and `/quests` in `OPEN_COMMANDS`, and a
+secluded cultivator can still see what opens next.
+
+**The gate's own drill found the gate broken, immediately.** The check that the collapsed line names
+`/locked` read the whole function *including its docstring* - and the docstring explains the rule,
+so deleting the sentence from the returned string left the substring in the prose and the drill
+**passed** against a broken tree. That is rc.52's rule (*a gate that cannot tell prose from code is
+decoration*) arriving in the same session it was written, exactly as v1.0.1's checklist gate and
+v1.0.5's craft-picker gate each did. It reads the function's statements without its docstring now,
+and the re-drill fails.
+
+**And a fourth exact list broke on correct code, which is a finding of its own.**
+`test_live_auctions.py`'s menu test asserted the tree tuple's **exact literal text**, so adding
+`/locked` to it failed a gate that is about whether `/menu` is registered - a question the added
+member does not touch. rc.43 had already made this call for `test_commands_reach_a_player.py`: *the
+tree tuple is read out of `surface.py` by AST rather than copied*, because a copy is free to drift
+and a spelling is not the rule. It reads it now, asserts the read found something before trusting
+it, and its drills print *"'menu' not found in {…}"* and *"the tree tuple could not be read off
+surface.py"*.
+
+**What each drill prints.** Gating a leaf the beginner path needs gives
+`["'talk' (reports 'talk', opens at realm 3)"] != []`; holding back the way out names `reset`;
+a floor past the ladder gives *"'sect roster' opens at realm 99, which is not a rung of the
+32-realm ladder"*; emptying the roster fires the self-check first (*"the gate is broken, not the
+tree"*); letting `_panel_gate` see the curriculum names `feature_unlocks` in its body; merging the
+two registries names `_NOT_YET_UNLOCKED`; and replacing the collapsed line with a padlock each
+names `_unlock_summary`.
+
+### A city's gate is that city (v1.0.9)
+
+**Found by playing**, and the report is the whole finding:
+
+> Could not enter the household: the Shen Family household stands in **Cloudblade City** and you are
+> in **Cloudblade City East Gate** — travel there first, or use a Hearth-Return Talisman
+
+A refusal naming, as somewhere else, the city the player was standing in.
+
+`familyHouseholdEnterAction` compared the character's location to the household's town with **bare
+string equality** (`here != town`). `cityOf` - the engine's one statement of which city a place is
+part of, `outside_location` plus a `district`/`shop`/`auction_house` - has been read by
+`explorationTravelAction` and by `WhereAnNPCCanWalk` since they were written. **This door asked
+nobody.**
+
+**317 of the catalogue's 477 locations are parts of a household town**, 92 of them gates, so that is
+how much of the world refused it - and it fell hardest on the player least able to work around it.
+`beginner_home` ("The Road Home") is the beginner path's fourth stage, its `return_home` objective is
+reported by this very action, and **walking home from the road arrives at a gate**: the road's own
+arrival rule (`gateFacing`) puts you at the gate that faces where you came from. So the stage the
+path ends on could not be finished by walking, only by burning the talisman the send-off happens to
+include.
+
+**The fix is one rule asked twice, not two rules**, which is why both halves ship together.
+`_household_hidden_actions` *anticipates* the engine's refusal to decide whether the panel draws the
+door - which v1.0.6 states is allowed as long as presentation is never the only place the rule
+lives - and it carried the same bare comparison, so the panel printed a lock line ("🔒 Enter — the
+household stands in Cloudblade City; travel there") in the 317 places the engine would now open.
+`test_a_gate_is_its_city.py` holds the two to the same answer **over the whole catalogue**,
+computing the rule a third time off the raw content file so two wrong halves cannot agree with each
+other and pass.
+
+**And the suite caught this release writing the very fault it is about.** The first version added a
+`_city_of` helper to `surface.py` - a *second* Python copy of a rule `commands/exploration.py` has
+had all along. `test_every_top_level_name_is_defined_exactly_once` refused it by name
+(`_city_of is defined in ['commands/exploration.py', 'surface.py']`), so the import is the existing
+one. One rule with two spellings is what caused the bug; two would have been three.
+
+**The Go half is behavioural and drives the shipped catalogue**, not a fixture - it finds a real
+city with a real gate and drives the real action, because a fixture city invented for the test is
+exactly the shape that cannot fail the way production fails. Its drill prints the user's own message
+back: *"standing at "Adamant Body Immortal City East Gate", which is a gate of "Adamant Body
+Immortal City", the household refused with: …travel there first"*. The second test is the other
+direction - somewhere else entirely is still refused - because a test that only proved the gate
+opens would pass just as well for a door that had stopped checking anything, and rc.32's rule is
+presence: the door is not a teleport. Its drill prints *"standing at "Ash Gate Ruin", nowhere near
+"Adamant Body Immortal City", the household let the player in"*.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —
