@@ -241,6 +241,33 @@ deferred half and not the half that says what was done about it.
   give it a refuge. `door_rule` is retired: it restated the second half of the same sentence, no
   house's prose can differ, and the engine already ends the protection at the door by standing the
   ambush outside. See CLAUDE.md, "The protection only the bot believed in".
+- **fixed (v1.0.12)** — *The Discord sweep could not see the curriculum, and had not been run since
+  v1.0.8.* v1.0.9 gave a page a third state - a door the curriculum has not introduced yet, which
+  prints one collapsed line per page and no per-leaf lock line - and `press_leaf` knows two, so 97 of
+  245 leaves were "neither drawn nor locked" and **100 of 345 steps went red**. The harness raises
+  the player past the roster's own ceiling (read off `feature_unlocks`, never written down) before
+  the sweep, so every leaf is pressed again, and asserts the curriculum first at realm 0 on the page
+  the roster says holds the most back. `test_playtest_coverage.py` was green throughout because it
+  only asked about the deferral set; it holds all three of those now. See CLAUDE.md, "The curriculum
+  the sweep could not see".
+- **fixed (v1.0.12)** — *Every GM lever addressed an id a float had rounded off.* `decodeMap` is
+  `json.Unmarshal` into `map[string]any`, so a JSON number became a float64 - and a Discord snowflake
+  (~1.4e18) exceeds what a float carries exactly (2^53), so `admin.player.set_realm` was handed
+  1456074443989188610 and looked up ...608: "character not found", about a character the panel had
+  just drawn. Player actions were never affected, because `ActionRequest.ActorID` is a typed field.
+  `UseNumber()` is the fix and **no reader changed** - `storage.ParseInt` has had a `case
+  json.Number` since it was written and nothing could ever produce one. Found by the playtest, not by
+  reading. See CLAUDE.md, "An id too big for a float".
+- **fixed (v1.0.12)** — *A hub panel went quiet after fifteen minutes.* Asked for in play.
+  `HUB_PANEL_IDLE_MINUTES` (default 120, `0` = never) replaces a bare `timeout=900` written out in
+  five files; injected into `hubs.py` because the layering refuses a `runtime` import there. The
+  module default is the old fifteen, so a missed registration preserves behaviour rather than leaking
+  a view per panel.
+- **fixed (v1.0.12)** — *Four places parsed `surface.py` to recover the command tree's tuple, and a
+  fifth wrote down how many there were.* The tuple was inline inside `register_command_surface`, so
+  rc.43's "never copy it" could only be obeyed by reading the source - four ways, each with its own
+  self-check - while `playtest_discord.py` asserted `9 + len(_HUB_COMMANDS)` and went stale on
+  `/locked`. `surface.TREE_COMMANDS` is a name; all four are imports.
 - **fixed (v1.0.11)** — *A GM can grant a physique, and can only set a root grade the ladder
   carries.* Two levers, one sentence: **the writer a human drives is the one nothing held.**
   `admin.player.set_physique` takes an optional `physique_id`, held to the catalogue the way

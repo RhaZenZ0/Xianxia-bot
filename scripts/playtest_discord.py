@@ -552,14 +552,14 @@ async def run(url: str, token: str, db_path: str) -> Report:
         SERVER_REALM_CATEGORY,
         SERVER_WORLD_CATEGORY,
     )
-    from app.bot.runtime import CULTIVATOR_ROLE_NAME, DB
+    from app.bot.runtime import CULTIVATOR_ROLE_NAME, DB, ENGINE, WORLD
     from app.bot.runtime import _realm_access_role_name
     from app.rules.realm_hubs import REALM_HUBS, realm_presence_role_name
     from app.bot.bot import bot
     from app.bot.runtime import SETTINGS
     from app.bot.services import GUILD
     from app.bot import hubs as hub_registry  # `hubs` is section 4's step below
-    from app.bot.surface import _HUB_COMMANDS
+    from app.bot.surface import _HUB_COMMANDS, TREE_COMMANDS
 
     logging.getLogger("httpx").setLevel(logging.WARNING)  # one line per engine round trip is not a report
     report = Report()
@@ -589,9 +589,17 @@ async def run(url: str, token: str, db_path: str) -> Report:
 
         # ---- 1. boot -----------------------------------------------------------
         async def boot():
-            expected = 9 + len(_HUB_COMMANDS)
+            # The set, not a count (v1.0.12). This was `9 + len(_HUB_COMMANDS)`,
+            # and the 9 was how many roots `register_command_surface` happened
+            # to name - so v1.0.9's `/locked` made the boot step red and nobody
+            # saw it for three releases, because a harness is a script and not
+            # CI. `TREE_COMMANDS` is a name now, so what the tree registers and
+            # what this expects cannot differ.
+            wanted = set(TREE_COMMANDS) | {c.name for c in _HUB_COMMANDS}
             synced = [c.name for c in bot.tree.get_commands(guild=GUILD)]
-            expect(len(synced) == expected, f"{len(synced)} commands synced, expected {expected}: {sorted(synced)}")
+            expect(set(synced) == wanted,
+                   f"synced and registered disagree: missing {sorted(wanted - set(synced))}, "
+                   f"unexpected {sorted(set(synced) - wanted)}")
             for phase in ("DATABASE_READY", "CATALOG_READY", "SIMULATION_READY", "DISCORD_READY"):
                 expect(bot.health_state.phases[phase].ready, f"{phase} not ready")
             return synced
@@ -976,6 +984,72 @@ async def run(url: str, token: str, db_path: str) -> Report:
             expect("**Waiting**" in text and "**Ready now**" in text, text[:600])
             expect("nothing." not in text.split("**Ready now**")[0], "no live wait after an explore")
         await step(report, "/cooldowns lists a live wait and a ready action", cooldowns())
+
+        # ---- 6b. the curriculum, and then past it ---------------------------------
+        # v1.0.9 gave a page a **third** state: a leaf can be drawn, hidden with
+        # its own `🔒` lock line (the engine would refuse it here), or held back
+        # by the curriculum - which prints **one collapsed line per page** and
+        # no line of its own. The sweep below knows two states, so every
+        # curriculum-held leaf was "neither drawn nor locked": 97 of 245 leaves,
+        # and the run went red for three releases with nothing in CI to say so.
+        #
+        # Both halves ship together on purpose. The curriculum is asserted here,
+        # at realm 0, where it is true; and then the player is raised past its
+        # own ceiling so the sweep presses every leaf exactly as it did before.
+        # v1.0.9 states that gating is **advertising, never a bound**, so a
+        # harness that is proving *wiring* must not be stopped by it - and a
+        # harness that simply counted the held-back leaves as covered would be
+        # trading one blindness for another.
+        def _curriculum_roster() -> dict[str, Any]:
+            return dict(WORLD.data.get("feature_unlocks") or {})
+
+        async def curriculum():
+            # The page is chosen off the roster, not named here: a page this
+            # harness picks by hand is a page that stops holding anything back
+            # the day somebody retunes the content, and the step would then
+            # pass for a curriculum that had been deleted.
+            pages = (_curriculum_roster().get("pages") or {})
+            expect(pages, "the curriculum roster holds no page back; the harness cannot prove it works")
+            key = max(pages, key=lambda k: (int(pages[k]), k))
+            hub_name, _, page_label = str(key).partition(" / ")
+            panel = await open_hub(player, channels["begin-here"], hub_name.strip())
+            await panel.goto(page_label.strip(), limit=12, env=env)
+            text = panel.text()
+            expect("/locked" in text,
+                   f"{key!r} opens at realm {pages[key]} and says nothing about it at realm 0:\n{text[:700]}")
+            summary = next((ln for ln in text.splitlines() if "/locked" in ln), "")
+            listed = result_text(await player.slash(channels["begin-here"], "locked"))
+            expect("realm" in listed.lower(), f"/locked lists nothing a player can act on:\n{listed[:500]}")
+            return f"{key}: {summary.strip()[:130]}"
+        held = await step(report, "at realm 0 a page says how many doors wait, and /locked lists them", curriculum())
+        if held:
+            report.add("PASS", "what the collapsed line reads", held)
+
+        async def open_the_curriculum():
+            """Raise the player to the curriculum's own ceiling.
+
+            The number is read off `feature_unlocks`, never written down here:
+            a roster that later authors a deeper floor raises this with it, and
+            a harness carrying its own copy of a content number is the fault
+            three of this session's gates were written for.
+            """
+            roster = _curriculum_roster()
+            floors = [int(v) for v in list((roster.get("pages") or {}).values())
+                      + list((roster.get("leaves") or {}).values())]
+            expect(floors, "the curriculum roster is empty; the harness cannot know what to open")
+            ceiling = max(floors)
+            await ENGINE.action("admin.player.set_realm", int(gm.id), {
+                "user_id": int(player.id), "realm_index": ceiling, "phase": 1,
+                "reason": "playtest: open every curriculum door",
+            })
+            await settle_patiently(env)
+            panel = await open_hub(player, channels["begin-here"], "cultivation")
+            expect("/locked" not in panel.text(),
+                   f"realm {ceiling} is the roster's ceiling and the page still holds doors back:\n{panel.text()[:500]}")
+            return f"realm {ceiling}, the roster's own ceiling, so every curriculum door is drawn"
+        opened = await step(report, "the curriculum opens fully at the realm its roster tops out at", open_the_curriculum())
+        if opened:
+            report.add("PASS", "what the sweep below presses at", opened)
 
         # ---- 7. away, and back ---------------------------------------------------
         async def away():

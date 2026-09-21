@@ -1,4 +1,4 @@
-# Xianxia RP Discord Bot v1.0.11
+# Xianxia RP Discord Bot v1.0.12
 
 *A cultivation RPG played entirely through Discord commands: deterministic rules in Go, an AI that
 narrates but never decides, self-hosted on your own hardware.*

@@ -228,6 +228,27 @@ class TheEngineHalfDrivesEveryOperation(unittest.TestCase):
                 self.assertGreaterEqual(len(str(reason).strip()), 12, "a deferral carries its reason")
 
 
+def _strings_handed_to_a_call(source: str) -> set[str]:
+    """Every string literal this script passes as an argument to something.
+
+    **Handed, not named**, and the drill for the gate below is why: the first
+    version searched the whole file for `feature_unlocks`, and hardcoding the
+    realm left that word in the *prose explaining why it must not be
+    hardcoded*, so the drill passed against a broken harness. That is rc.52's
+    rule (a gate that cannot tell prose from code is decoration) met inside the
+    gate written for it, and rc.58's distinction one level up: a name is not a
+    reader, so ask whether the string reaches a call.
+    """
+    handed: set[str] = set()
+    for node in ast.walk(ast.parse(source)):
+        if not isinstance(node, ast.Call):
+            continue
+        for argument in list(node.args) + [keyword.value for keyword in node.keywords]:
+            if isinstance(argument, ast.Constant) and isinstance(argument.value, str):
+                handed.add(argument.value)
+    return handed
+
+
 class TheDiscordHalfPressesEveryLeaf(unittest.TestCase):
     def test_every_deferred_leaf_is_live_and_has_a_reason(self):
         deferred = module_constant(DISCORD_SCRIPT, "DEFERRED_LEAVES")
@@ -248,6 +269,62 @@ class TheDiscordHalfPressesEveryLeaf(unittest.TestCase):
                        "WIRING_FAILURE_TEXTS", "More actions", "every reachable leaf was pressed"):
             with self.subTest(marker=marker):
                 self.assertIn(marker, text)
+
+    def test_the_sweep_is_run_past_the_curriculum_it_would_otherwise_be_gated_by(self):
+        """v1.0.9 gave a page a third state, and the sweep knows two.
+
+        A leaf is drawn, hidden behind its own `🔒` lock line (the engine would
+        refuse it where the player stands), or **held back by the curriculum** -
+        which prints one collapsed line for the whole page and no line of its
+        own. `press_leaf` reads the second and has no idea about the third, so
+        on the first run after v1.0.9 the sweep reported 97 of 245 leaves
+        "neither drawn nor locked" and the final coverage step went red.
+
+        Nothing here caught it, because this gate only ever asked about the
+        *deferral* set. What it has to ask instead is whether the sweep is run
+        somewhere the curriculum holds nothing back - and the honest way to hold
+        that is the ceiling itself: the harness must raise the player to the
+        roster's own maximum, computed from `feature_unlocks`, so a deeper floor
+        authored later raises the harness with it instead of silently shrinking
+        what the sweep presses.
+
+        This is a shape check on the script, which the whole file already is
+        (the harness needs a Go engine and cannot run in CI). What proves it
+        works is the run: with the raise in place the sweep presses every leaf
+        again, and its own last step is what says so.
+        """
+        text = DISCORD_SCRIPT.read_text(encoding="utf-8")
+        handed = _strings_handed_to_a_call(text)
+        # assertTrue, not assertIn: the haystack is every string the script hands
+        # to a call, and a gate whose message has to be scrolled past is one
+        # nobody reads (v1.0.8).
+        self.assertTrue("admin.player.set_realm" in handed, (
+            "the harness never raises the player's realm, so every leaf the curriculum holds back "
+            "is one the sweep cannot press - 97 of them at v1.0.9"))
+        self.assertTrue("feature_unlocks" in handed, (
+            "the realm the harness raises to is not read off the curriculum roster, so it is a "
+            "number written down twice and free to go stale against the content file"))
+        raise_index = text.find("admin.player.set_realm")
+        sweep_index = text.find("every reachable leaf was pressed")
+        self.assertNotEqual(sweep_index, -1)
+        self.assertLess(raise_index, sweep_index, (
+            "the realm is raised after the sweep has already run, which opens nothing it pressed"))
+
+    def test_the_curriculum_itself_is_still_driven_at_realm_zero(self):
+        """Raising past the curriculum must not mean never exercising it.
+
+        The harness asserts the collapsed line and `/locked` *before* the raise,
+        at realm 0, where they are true - otherwise this release would have
+        traded a sweep blind to the curriculum for a sweep that never meets it.
+        """
+        text = DISCORD_SCRIPT.read_text(encoding="utf-8")
+        curriculum_index = text.find("at realm 0 a page says how many doors wait")
+        self.assertNotEqual(curriculum_index, -1, (
+            "nothing drives the collapsed line a page prints when it holds doors back, so the "
+            "curriculum is gated past and never proved"))
+        self.assertLess(curriculum_index, text.find("admin.player.set_realm"), (
+            "the curriculum is asserted after the realm was raised, where it holds nothing back - "
+            "the assertion would pass for a curriculum that had been deleted"))
 
     def test_the_failure_texts_it_holds_against_are_the_bots_own(self):
         """A designed refusal names what is missing; the hub's failure text

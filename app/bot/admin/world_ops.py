@@ -23,7 +23,7 @@ from ...rules.game import World
 from ...ops.game_engine import GameEngineError
 from ...rules.worldtime import from_game_minutes
 from ..formatting import human_duration
-from ..hubs import HubDynamicOption, register_hub_option_provider
+from ..hubs import HubDynamicOption, panel_timeout, register_hub_option_provider
 from ..pickers import auction_currency_autocomplete
 from .. import maintenance
 from ..registry import registered_group_command
@@ -748,7 +748,7 @@ class QuestDraftReviewView(discord.ui.View):
     """Approve / Discard for one draft; admin-gated like every /admin surface."""
 
     def __init__(self, quest_key: str) -> None:
-        super().__init__(timeout=900)
+        super().__init__(timeout=panel_timeout())
         self.quest_key = quest_key
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:

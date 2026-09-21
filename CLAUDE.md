@@ -3610,6 +3610,108 @@ engine's own refusals are still the only refusals, exactly as v1.0.9's curriculu
 itself. Discord layout stays the dashboard's to own, so the gate runs only behind `create_missing`
 and the `/admin` slash path is still validate-only.
 
+### The curriculum the sweep could not see (v1.0.12)
+
+**Found by running the playtest**, which had not been run since v1.0.8. It went red on **100 of 345
+steps**, and every one of them was the same fault.
+
+`playtest_discord.py`'s sweep presses every leaf of every hub and holds one thing about each: it was
+drawn and answered, or the panel hid it and printed its own `🔒` lock line saying why. Two states.
+v1.0.9 added a **third** - a door the curriculum has not introduced yet, which prints **one collapsed
+line for the whole page** and no line of its own - and nothing told the harness. So `press_leaf`
+found no button, looked for a lock line that does not exist, and failed: 97 leaves across 28 pages,
+plus the final coverage step (`pressed ∪ locked ∪ deferred == live`), plus one earlier step that
+depended on a door the curriculum now holds back (`travel / Realm Capitals`, floor 1).
+
+**`test_playtest_coverage.py` was green throughout**, because it only ever asked about the
+*deferral* set. A gate that proves coverage has to be able to see a leaf going uncovered, and this
+one could not - rc.47's shape, in the gate whose whole job is that.
+
+**The fix is not to teach the sweep to count a held-back leaf as covered.** That would trade a
+blindness for a worse one: 97 leaves would stop being pressed and the run would go green saying so.
+v1.0.9 states that gating is **advertising, never a bound**, so a harness proving *wiring* must not
+be stopped by it. The player is raised past the curriculum's own ceiling before the sweep, and the
+ceiling is **read off `feature_unlocks`** rather than written down, so a deeper floor authored later
+raises the harness with it. Both halves ship together: the curriculum is asserted first, at realm 0,
+on the page the roster says holds the most back - because a harness that gated past it and never met
+it would be the same fault wearing the other hat.
+
+The gate asks three things now, and the third is the one that would have caught this: the harness
+must raise the realm, must read the number off the roster, and must do both **before** the sweep.
+
+### An id too big for a float (v1.0.12)
+
+The step that raises that realm is what found it. `admin.player.set_realm` answered **"character not
+found"** about a character the panel three lines above had just drawn, with its name and realm on it.
+
+`decodeMap` is `json.Unmarshal` into `map[string]any`, which turns every JSON number into a
+**float64**. A Discord snowflake is about 1.4e18; float64 carries 2^53 ≈ 9.0e15 exactly. So
+`1456074443989188610` decoded as `...608`, and **every id an action's payload named was off by a
+digit or two**.
+
+**Only the GM's console was affected, and that is why it survived.** `ActionRequest.ActorID` is a
+typed `int64` field, and `encoding/json` parses a number straight into one with no float in between -
+so every player action, which addresses the *actor*, was always exact. What goes through `decodeMap`
+is the **payload**, and the operations that carry a `user_id` there are `admin.player.set_realm`,
+`karma`, `teleport`, `grant`, `set_sect`, `adjust_item`, `erase` and the rest of the console: fourteen
+call sites in `world_ops.py` and `inspect_sim.py`, every one of them sending `member.id`.
+
+**The reader was already correct.** `storage.ParseInt` has carried a `case json.Number` since it was
+written and **nothing in the tree could ever produce one** - the decoder never handed it the type it
+was written for. `decoder.UseNumber()` is the whole fix, and no reader changed: `ParseInt` takes the
+case it already had, and `stringField`'s `fmt.Sprint` prints a `json.Number` as its own digits. That
+is `npc_consignments` (rc.28) exactly - *"Nothing downstream changed, because every reader was already
+correct. Only the value it hinged on had to become one the table can hold."*
+
+**Why nothing caught it.** The Discord sweep answers every member picker with a second member who has
+*no character*, deliberately, so nothing mutes or erases the player the run walks - and a member with
+no character is refused by Python before the engine is reached, with the same sentence a corrupted id
+would produce. The engine's own admin tests seed **user 42**, which a float holds exactly. A fixture
+that cannot fail the way production fails, one more time, and the thing that told the difference was
+a harness asking the engine to act on a real snowflake.
+
+`snowflake_payload_test.go` seeds a character at `1<<53 + 1` and at a real Discord id and drives the
+lever through the production dispatch; its drill prints `character not found`. It also holds the
+audit row's `target`, because an audit trail naming an id nobody holds is worse than a refusal - it
+says the action landed on somebody.
+
+### A panel stays open as long as it is told (v1.0.12)
+
+Asked for in play: *"can we skip the 15min wait time for reopen"*. A hub panel went quiet after
+fifteen minutes and swapped its controls for a **Reopen** button. The mechanism is right - discord.py
+holds a live view in memory until it times out - and fifteen minutes is wrong: a long time to hold a
+view open and a short time to read a page, go and do something, and come back to it.
+
+`HUB_PANEL_IDLE_MINUTES` is the setting, **120** the default, and `0` means a panel never expires.
+Zero is deliberately not the default: it costs one held view per panel ever opened, for the life of
+the process, which is fine on a small server and is the operator's call rather than presentation's.
+The module default is the old fifteen, so a **missed registration is the behaviour this started
+from** rather than a panel that never expires - a presentation default failing towards *never* would
+leak. It is injected, because `test_bot_package` puts `hubs` and `runtime` in one tier and refuses an
+import between them, which is the shape `feature_unlocks` and `describe_era` already use.
+
+**The number was written out five times** (`hubs.py` twice, `surface.py`, `admin/world_ops.py`,
+`commands/support.py`), and the gate forbids a panel view carrying its own.
+
+### Four readers of a tuple that could have been a name (v1.0.12)
+
+`register_command_surface` added ten roots to the command tree from an **inline tuple inside the
+function body**. rc.43 made the right call about it - *never copy the tuple* - and being inline meant
+the only way to obey was to parse this file's source, so **four places each did that their own way**:
+`test_commands_reach_a_player.py` (rc.43), `test_live_auctions.py` (v1.0.9),
+`test_hint_paths.py` (v1.0.10), each with its own "did the read find anything" self-check because a
+silently-empty walk would make every assertion after it vacuous. And `playtest_discord.py` gave up on
+reading it at all and asserted `9 + len(_HUB_COMMANDS)` - a count, which went stale the day v1.0.9
+added `/locked`, and which nobody saw for three releases because a harness is a script and not CI.
+
+`surface.TREE_COMMANDS` is a module constant now. All four are imports; none can come back empty; a
+new root reaches every reader by construction. The harness asserts the **set** rather than a number,
+so what the tree registers and what it expects cannot differ.
+
+The lesson is narrow and worth stating: *never copy* has a cheaper answer than *parse the source*
+whenever the thing being copied could simply have a name. Three releases spent implementing the
+expensive answer four ways.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —

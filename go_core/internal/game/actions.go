@@ -1,6 +1,7 @@
 package game
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -735,9 +736,30 @@ func auditAdmin(conn *storage.Conn, adminUserID int64, action, target string, be
 	return err
 }
 
+// decodeMap decodes an action's payload, keeping every number exact (v1.0.12).
+//
+// `json.Unmarshal` into `map[string]any` turns every JSON number into a
+// **float64**, which carries 2^53 exactly - and a Discord snowflake is about
+// 1.4e18, so every id a payload named came back off by a digit or two.
+// `admin.player.set_realm` was handed 1456074443989188610 and looked up
+// ...608: "character not found", about a character the panel had just drawn.
+//
+// Only the payload was affected. `ActionRequest.ActorID` is a typed `int64`
+// field, and encoding/json parses a number straight into one with no float in
+// between, so every player action - which addresses the actor - was always
+// exact. What goes through here is the GM's console, where the id is a payload
+// field.
+//
+// `UseNumber` leaves a number as `json.Number`, the literal digits.
+// `storage.ParseInt` has had a `case json.Number` since it was written and
+// nothing could ever produce one, and `stringField` prints it through
+// `fmt.Sprint`, which is the literal - so **no reader changed**. The one thing
+// that had to change was the type the decoder hands them.
 func decodeMap(raw json.RawMessage) (map[string]any, error) {
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.UseNumber()
 	var p map[string]any
-	if err := json.Unmarshal(raw, &p); err != nil {
+	if err := decoder.Decode(&p); err != nil {
 		return nil, err
 	}
 	return p, nil

@@ -69,6 +69,14 @@ cannot drain the shared OpenRouter allowance for everyone. `TYPED_PLAY_HINT`
 shows a player, once a day, how to use the prefix the first time an
 un-prefixed line of theirs looks like an action.
 
+`HUB_PANEL_IDLE_MINUTES` is how long a hub panel may sit untouched before it
+goes quiet and offers a **Reopen** button instead of its own controls; any tap
+resets it. It was a bare fifteen minutes written into five files until v1.0.12 -
+a long time to hold a view open and a short time to read a page, go and do
+something, and come back to it - and the default is **120** now. `0` means a
+panel never expires, which costs one view held in memory per panel for the life
+of the process and is safe on a small server.
+
 ### The patron's tribute (`/tribute`)
 
 `/tribute` pays a cultivator a patron's gift once every twelve hours, doubled

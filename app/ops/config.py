@@ -171,6 +171,7 @@ class Settings:
     typed_play_burst: int
     typed_play_per_minute: float
     typed_play_hint: bool
+    hub_panel_idle_minutes: int
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -488,6 +489,16 @@ class Settings:
             raise ValueError("TYPED_PLAY_BURST must be at least 1")
         if typed_play_per_minute <= 0:
             raise ValueError("TYPED_PLAY_PER_MINUTE must be positive")
+        # How long a hub panel sits idle before it goes quiet and offers Reopen
+        # (v1.0.12). It was a bare `timeout=900` in five files - fifteen
+        # minutes, which is a long time to hold a button and a short time to
+        # read a page, walk away and come back to it. `0` means a panel never
+        # expires: discord.py then keeps the view in memory for the life of the
+        # process, which is the cost of the setting and why it is a setting
+        # rather than the default.
+        hub_panel_idle_minutes = _as_int(os.getenv("HUB_PANEL_IDLE_MINUTES"), 120, name="HUB_PANEL_IDLE_MINUTES")
+        if hub_panel_idle_minutes < 0:
+            raise ValueError("HUB_PANEL_IDLE_MINUTES cannot be negative (0 means a panel never expires)")
         return cls(
             discord_token=discord_token,
             guild_id=guild_id,
@@ -559,4 +570,5 @@ class Settings:
             typed_play_burst=typed_play_burst,
             typed_play_per_minute=typed_play_per_minute,
             typed_play_hint=_as_bool(os.getenv("TYPED_PLAY_HINT"), True),
+            hub_panel_idle_minutes=hub_panel_idle_minutes,
         )

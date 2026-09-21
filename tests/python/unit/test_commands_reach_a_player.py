@@ -54,29 +54,23 @@ def _modules():
 def _tree_roots() -> set[str]:
     """The roots `register_command_surface` adds to the command tree.
 
-    Read out of the source rather than copied here: a list kept in a test is a
-    list that drifts, and the whole point of this file is that the two places a
-    root can be registered are the two places it checks.
+    **Imported, not parsed (v1.0.12).** This used to walk `surface.py` by AST
+    for the tuple inside that function - rc.43's rule that a list kept in a
+    test is a list that drifts, implemented the only way an inline tuple
+    allows. Four places implemented that rule four ways, each needing its own
+    "did the read find anything" self-check, and one of them gave up and wrote
+    down a count that went stale. The tuple is `surface.TREE_COMMANDS` now, so
+    there is nothing to read and nothing that can silently find nothing.
     """
-    tree = ast.parse(SURFACE.read_text(encoding="utf-8"))
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.FunctionDef) or node.name != "register_command_surface":
-            continue
-        for loop in ast.walk(node):
-            if not isinstance(loop, ast.For) or not isinstance(loop.iter, ast.Tuple):
-                continue
-            names = {element.value for element in loop.iter.elts
-                     if isinstance(element, ast.Constant) and isinstance(element.value, str)}
-            if names:
-                return names
-    raise AssertionError("register_command_surface no longer adds a tuple of roots to the tree")
+    surface, _ = _modules()
+    return set(surface.TREE_COMMANDS)
 
 
 class EveryRegisteredRootOpensOnADoor(unittest.TestCase):
     def test_the_tree_tuple_is_still_where_this_test_thinks_it_is(self):
-        # The AST read above is the load-bearing half: if it silently returned
-        # nothing, every root would look unreachable and the assertion below
-        # would be noise rather than a gate.
+        # Kept as a self-check even though an import cannot come back empty the
+        # way an AST walk could: an emptied tuple would make every root look
+        # unreachable and turn the assertion below into noise.
         roots = _tree_roots()
         self.assertIn("begin", roots)
         self.assertIn("admin", roots)

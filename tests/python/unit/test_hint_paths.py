@@ -31,26 +31,19 @@ ENV = {"DISCORD_TOKEN": "test-token", "GUILD_ID": "123456789012345678",
 # Roots that are commands rather than hubs: `**/quests**` names one and is not
 # a hub path at all.
 #
-# **Read off `surface.py`, never copied (v1.0.10.)** This was a hand-written
-# set, so `/locked` failed it the day that command was added - a gate about
-# whether a *printed path resolves* going red over a root it had simply never
-# been told about. That is the third hand-copy of this tuple to break this way
-# (`test_live_auctions.py` was the second, and rc.43 already made the call for
-# `test_commands_reach_a_player.py`): a copy is free to drift, and the thing
-# that actually decides which roots are commands is the tuple the tree is
-# built from.
-def _root_commands() -> set[str]:
-    source = (PROJECT_ROOT / "app" / "bot" / "surface.py").read_text(encoding="utf-8")
-    for node in ast.walk(ast.parse(source)):
-        if (isinstance(node, ast.For) and isinstance(node.iter, ast.Tuple)
-                and all(isinstance(e, ast.Constant) for e in node.iter.elts)):
-            names = {e.value for e in node.iter.elts if isinstance(e.value, str)}
-            if "begin" in names:
-                return names
-    raise AssertionError("the tree tuple could not be read off surface.py; the gate is broken, not the tree")
+# **Imported, never copied and no longer parsed (v1.0.12).** This was a
+# hand-written set, so `/locked` failed it the day that command was added - a
+# gate about whether a *printed path resolves* going red over a root it had
+# simply never been told about. v1.0.10 made it read `surface.py` by AST, which
+# was the only shape an inline tuple allowed and which three other files had
+# each implemented their own way. The tuple is a name now, so this is an
+# import.
+def _surface():
+    with patch.dict(os.environ, ENV):
+        return importlib.import_module("app.bot.surface")
 
 
-ROOT_COMMANDS = _root_commands()
+ROOT_COMMANDS: set[str] = set(_surface().TREE_COMMANDS)
 
 
 def _modules():

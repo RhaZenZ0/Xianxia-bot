@@ -6,6 +6,33 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.12** runs the playtest for the first time in four releases, and it went red on a hundred steps.
+
+The Discord harness presses every leaf of every hub and holds one thing about each: it was drawn and
+answered, or the panel hid it and printed a lock line saying why. v1.0.9 gave a page a **third**
+state - a door the curriculum has not introduced yet, which prints one collapsed line for the whole
+page and no line of its own - and the harness knows two. So 97 of 245 leaves were "neither drawn nor
+locked", the run's last step went red, and nothing in CI said so for three releases, because a
+harness is a script and not CI. The player is raised past the curriculum's own ceiling before the
+sweep now, read off the content file rather than written down, so every leaf is pressed again; the
+curriculum itself is asserted first, at realm 0, where it is true.
+
+It also fixes the thing the harness found on the way. Raising a realm through the GM's own lever
+answered **"character not found"** about a character the panel three lines above had just drawn: an
+action's payload was decoded into `map[string]any`, which turns every JSON number into a float, and
+a Discord id is about 1.4e18 while a float carries 9.0e15 exactly. Every id a payload named came
+back off by a digit or two - so `admin.player.set_realm`, `karma`, `teleport`, `grant`, `erase` and
+the rest of the GM console addressed somebody who does not exist. Player actions were never affected,
+because the actor's id is a typed field and never went through a float. The decoder keeps numbers
+exact now, and **no reader changed**: `ParseInt` has had a case for this since it was written and
+nothing could ever produce one.
+
+And a panel stays open as long as it is told. A hub panel went quiet after fifteen minutes and
+offered a Reopen button - a bare `timeout=900` written out in five files. `HUB_PANEL_IDLE_MINUTES` is
+the setting, the default is **120**, and `0` means a panel never expires. The command tree's own
+tuple got the same treatment one level down: it was an inline literal, so four places read this
+file's *source* to recover it and one wrote down how many there were and went stale. It is a name now.
+
 **1.0.11** gives a GM the two levers that only creation had, and stops a server being told about one
 release when three went by.
 
@@ -453,9 +480,12 @@ staged authority cleanup: forage, crafting and companions, canonical time, unifi
 road travel, caravans, dashboard-owned Discord setup, and the removal of the obsolete Python
 mechanical authority paths.
 
-## Release status — v1.0.11
+## Release status — v1.0.12
 
-- Current release: v1.0.11 - a GM can grant a physique and can only set a root grade the ladder
+- Current release: v1.0.12 - the Discord playtest can see the curriculum again and presses every
+  leaf, a GM lever addresses the player it was given rather than an id a float rounded off, and a
+  hub panel stays open for as long as `HUB_PANEL_IDLE_MINUTES` says. No schema.
+- v1.0.11: a GM can grant a physique and can only set a root grade the ladder
   carries, `#updates` walks the releases a server missed instead of jumping the marker across them,
   and 🗺️ Cultivation World is gated behind having played. No schema.
 - v1.0.10: the panel header names who is actually standing there, instead of

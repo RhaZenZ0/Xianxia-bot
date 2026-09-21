@@ -2120,6 +2120,42 @@ class HubResultActionButton(discord.ui.Button):
         await _start_hub_action(interaction, self.hub_view, self.action)
 
 
+# How long a panel may sit idle before it goes quiet, in minutes (v1.0.12).
+#
+# Injected rather than read, because `test_bot_package` puts `hubs` and
+# `runtime` in one tier and refuses an import between them - the same reason
+# `app/rules/feature_unlocks.py` takes its roster and `describe_era` takes its
+# cycle. `surface.py` registers it at import, beside the four gates it already
+# registers here.
+#
+# The default is the fifteen minutes this was before the setting existed, so a
+# missed registration is the old behaviour rather than a panel that never
+# expires: a presentation default that failed towards *never* would leak a view
+# per panel for the life of the process, which is the one cost this setting has.
+_PANEL_IDLE_MINUTES = 15
+
+
+def register_panel_idle(minutes: int) -> None:
+    """Tell the hubs how long a panel may sit idle. `0` means never."""
+    global _PANEL_IDLE_MINUTES
+    _PANEL_IDLE_MINUTES = max(0, int(minutes))
+
+
+def panel_timeout() -> float | None:
+    """The `timeout=` every panel view is built with.
+
+    This was a bare `timeout=900` written out in five files - fifteen minutes,
+    which is a long time to hold a view open and a short time for somebody to
+    read a page, go and do something, and come back to it. Any tap resets it,
+    which is discord.py's own behaviour and what the expired card has always
+    said in as many words.
+
+    One statement, because five copies of a number are five places to forget
+    one.
+    """
+    return None if _PANEL_IDLE_MINUTES <= 0 else float(_PANEL_IDLE_MINUTES * 60)
+
+
 class HubReopenButton(discord.ui.Button):
     def __init__(self, expired: "ExpiredPanelView") -> None:
         self.expired_view = expired
@@ -2190,7 +2226,7 @@ class LayoutHubView(_LayoutHubBase):
         owner_name: str = "Cultivator",
         status_provider: Any | None = None,
     ) -> None:
-        super().__init__(timeout=900)
+        super().__init__(timeout=panel_timeout())
         self.owner_id = int(owner_id)
         self.owner_name = str(owner_name)[:80]
         self.definition = definition
@@ -2483,7 +2519,7 @@ class CommandHubView(discord.ui.View):
         owner_name: str = "Cultivator",
         status_provider: Any | None = None,
     ) -> None:
-        super().__init__(timeout=900)
+        super().__init__(timeout=panel_timeout())
         self.owner_id = int(owner_id)
         self.owner_name = str(owner_name)[:80]
         self.definition = definition
