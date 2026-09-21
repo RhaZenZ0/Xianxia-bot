@@ -351,7 +351,11 @@ func (r *Runner) advanceHunters(conn *storage.Conn, gm int64) (int64, error) {
 	if _, err = conn.Execute(`UPDATE bounty_hunter_pursuits SET status='withdrawn',updated_game_minute=?,updated_at=? WHERE status IN ('tracking','engaged') AND bounty_id IN (SELECT bounty_id FROM bounties WHERE status!='active')`, []any{gm, now}); err != nil {
 		return 0, err
 	}
-	res, err := conn.Execute(`SELECT * FROM bounty_hunter_pursuits WHERE status IN ('tracking','engaged') AND next_action_game_minute<=?`, []any{gm})
+	// LEFT JOIN, not INNER: a pursuit whose character row is gone must advance
+	// exactly as it did before, and a NULL location reads as "nothing knows
+	// where they are", which is not a sanctuary - `current_npc_location`'s own
+	// rule for the same absence.
+	res, err := conn.Execute(`SELECT p.*,c.location FROM bounty_hunter_pursuits p LEFT JOIN characters c ON c.user_id=p.user_id WHERE p.status IN ('tracking','engaged') AND p.next_action_game_minute<=?`, []any{gm})
 	if err != nil {
 		return 0, err
 	}
@@ -370,9 +374,25 @@ func (r *Runner) advanceHunters(conn *storage.Conn, gm int64) (int64, error) {
 		pressure := min64(100, i64(p["pressure"])+step+game.TrailPressureBonus(step, trail))
 		capture := i64(p["capture_progress"])
 		status := fmt.Sprint(p["status"])
+		// The sanctuary (v1.0.6). This loop consulted no location at all, so a
+		// fugitive was taken inside a hall whose own description reads
+		// "Violence inside is forbidden; the protection ends at the front
+		// doors" - the one kind of place in the game that claims to suppress
+		// violence, suppressing none of what could actually reach somebody
+		// standing in it. Capture is what a protected interior stops. Pressure
+		// is deliberately not: the hunter is at the doors either way, and
+		// standing still is not escaping.
+		sanctuary := ""
+		if v, ok := p["location"]; ok && v != nil {
+			if name, protected := game.LocationIsSanctuary(r.World, fmt.Sprint(v)); protected {
+				sanctuary = name
+			}
+		}
 		if pressure >= 65 {
 			status = "engaged"
-			capture = min64(100, capture+int64(math.Round(float64(elapsed*max64(5, i64(p["hunter_power"])))*m)))
+			if sanctuary == "" {
+				capture = min64(100, capture+int64(math.Round(float64(elapsed*max64(5, i64(p["hunter_power"])))*m)))
+			}
 		}
 		if capture >= 100 {
 			status = "captured"

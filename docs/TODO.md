@@ -133,17 +133,19 @@ deferred half and not the half that says what was done about it.
   waiting at the other end rather than one. Deciding what a path's skill *is* — a display line on
   `/sheet`, a bonus, or a field to delete — is content design, not a wiring fix, which is why this is
   recorded rather than quietly wired.
-- **deferred (planned)** — *Both of an auction house's door fields are read by nothing.*
-  `protected_interior` and `door_rule` are set on **all 48** authored houses and neither is read in
-  Go or Python. The door half of that fiction does work: `advanced_maintenance.go` writes an
-  `auction_door_risks` row when a legendary lot is struck, and `auction.leave` consumes it and can
-  stand a hunter at `house.EntranceLocation` — outside, which is the point. What is unread is the
-  *inside* half. Two things keep this small and are worth stating rather than discovering: `door_rule`
-  is unanimously `true`, so reading it would change nothing until a house sets it false; and nothing
-  today can attack a player who has not consented — `/battle challenge` targets NPCs and a duel needs
-  `respond` — so `protected_interior` may be protecting against a mechanic the game does not have.
-  Either wire them or retire them; leaving a switch in content that code ignores is the decoration
-  this file exists to name.
+- **fixed (v1.0.6)** — *Both of an auction house's door fields were read by nothing, and the rule
+  they described was held only by the bot.* `protected_interior` and `door_rule` were set on all 48
+  houses and read nowhere; meanwhile `app/ai/narrator_context.py` told the narrator *"PROTECTED;
+  violence cannot mechanically begin here"* while `combat_actions.go` named `SafeZone` zero times —
+  so `/battle challenge`'s refusal lived entirely in `battle.py` (rc.48's rule, a fourth time) — and
+  `advanceHunters` raised pressure, engaged and **captured** a fugitive without reading a location
+  anywhere in it. `protected_interior` is wired as the sanctuary those 48 descriptions promise: a
+  hunter watches from the doors and cannot reach in, while pressure still rises. It is deliberately
+  a second predicate beside `safe_zone`, which is true on 446 of 477 places and so means *not the
+  wilds* rather than sanctuary — gating the hunter on it would end the bounty system rather than
+  give it a refuge. `door_rule` is retired: it restated the second half of the same sentence, no
+  house's prose can differ, and the engine already ends the protection at the door by standing the
+  ambush outside. See CLAUDE.md, "The protection only the bot believed in".
 - **deferred (planned)** — *Nothing can grant a physique, not even a GM.* `admin.player.set_physique`
   writes `evolution_stage`, `progress` and `stability` and nothing else (`actions.go:2212`), and the
   only statements that ever write `physique_id` are character creation and samsara —
@@ -199,6 +201,15 @@ deferred half and not the half that says what was done about it.
   and four for ever after. `clanDiplomacy` is the step that forms one between two real households,
   written from both sides; `npcPoliticalMarriages` had done the same for `sect_relations` since
   rc.24, in the file whose own comment names the clan fault it did not fix.
+- **deferred (design)** — *A safe zone refuses a fight somebody chose to start, and nothing else.*
+  v1.0.6 put that rule in the engine, and it deliberately lets two involuntary fights through: a
+  world event that lands in a town (rc.49's asymmetry) and the auction door ambush, which
+  `auctionLeaveAction` stands at `EntranceLocation` — a safe zone for 47 of the 48 houses, since
+  Greenriver Town is the one rough entrance. Refusing those would delete the event battle in 446 of
+  477 places and the door risk in 47 of 48, so the asymmetry is the design. What is genuinely open
+  is whether a town being ambush-able *reads* right to a player who was just told the place is
+  protected; moving the ambush to the first unprotected ground the fugitive reaches is a mechanic
+  rather than a wiring, and wants its own change.
 - **deferred (design)** — *Nothing ends a clan relation.* `martial_clan_relations.active` is written
   1 by every INSERT, read by every SELECT, and set to 0 by nothing in the tree. So an alliance warms
   toward 100 and a rivalry cools toward −100 and neither can ever become the other, because no rule

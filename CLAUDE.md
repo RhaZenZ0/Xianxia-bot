@@ -2964,6 +2964,78 @@ registered hint for one, and craft now has one naming the slip and the status pa
 fix *names* `search_catalog` - rc.52's rule arriving immediately rather than a release later. It
 reads the function's statements without its docstring now.
 
+### The protection only the bot believed in (`violence_suppression.go`, v1.0.6)
+
+`app/ai/narrator_context.py` tells the narrator, in these words, in two places: *"PROTECTED; violence
+cannot mechanically begin here"*. Three things enforced it - the duel invariant in
+`pvp_invariants.go` ("local formations suppress PvP here"), `/duel` in `duel.py`, and
+`/battle challenge` in `battle.py`. **`combat_actions.go` named `SafeZone` zero times**, so for PvE
+the rule lived entirely in Discord and `combat.start` would have begun a fight anywhere for any
+caller that asked. That is rc.48's rule for the fourth time in this tree - *a bound that lives in
+the client is not a bound* - and what hid it is the shape rc.48 itself warned about: the
+**neighbouring** kind of violence really was engine-held, so the file next door read as proof the
+rule was enforced.
+
+**And the bounty hunter did not care where you stood.** `advanceHunters` raises pressure, engages
+and **captures** - and the words `location` and `Location` appeared nowhere in it or in
+`spawnHunters`. So a fugitive was taken off the floor of a hall whose own description reads
+*"Violence inside is forbidden; the protection ends at the front doors"*, while `protected_interior`
+sat on all 48 auction houses read by nothing, one of the three entries `field_readers_test.go` (v1.0.1)
+had to open its allowlist with.
+
+**The two protections are deliberately two predicates, and the measurement is why.** `safe_zone` is
+true on **446 of 477** locations - every town, gate, shop and shrine - and false on the 31 that are
+hunting grounds, ruins, open country and **Greenriver Town**, the starting town, deliberately rough.
+So it is a statement about settlement, not sanctuary, and all it may buy is that nobody *starts* a
+fight there. What the 48 auction floors claim is stronger and rarer and had its own field. Gating
+the hunter on `safe_zone` would not give the bounty system a sanctuary - it would end it, because
+players live in towns; gating it on `protected_interior` gives a fugitive 48 rooms, each of which
+must be entered by an action and left to do anything at all.
+
+**Capture is what a sanctuary stops. Pressure is not.** The hunter is at the doors either way, and a
+floor that froze a pursuit outright would be somewhere to park a fugitive for ever. The two halves
+are asserted apart for exactly that reason: a test that only said "nothing happened inside" would
+pass just as well for the wrong rule, which is the rc.47 shape.
+
+**What a safe zone refuses is a fight somebody chose to start**, and that one sentence is why two
+things that look like exceptions are not. A world event that lands in a town is still fought -
+rc.49's own asymmetry, *being caught in something is not the same as being handed it* - and so is
+the ambush `auctionLeaveAction` stands at `EntranceLocation`, which is a safe zone for 47 of the 48
+houses. A gate that refused those would delete the event battle in 446 places and the door risk in
+47, which is not enforcing a rule but deleting two systems the content describes.
+
+**`door_rule` is retired rather than read**, and this is the one place the release removes
+something. It said *"the protection ends at the doors"* - the second half of the sentence
+`protected_interior` opens - all 48 houses set it `true`, no house's prose can differ (every one of
+the 48 descriptions says both halves), and the engine already ends the protection at the door by
+standing the ambush outside. **A switch content cannot turn off is not a switch**, which is rc.59's
+`#event-scenes` call. `unreadContentFields` is down to one entry, `Path.Skill`, still deferred with
+its reason.
+
+**`battle.py`'s refusal is kept, and is now an anticipation rather than the rule.** Presentation may
+predict a refusal the engine will make - `_progression_hidden_actions` does it for every late door -
+and what it may not be is the only place the rule lives.
+
+**The fixture could not fail the way production fails, again.** `tracking_pursuit_test.go` declared
+no `characters` table at all, so the pursuit sweep reading a quarry's location broke it outright -
+which is the rule this file already states, caught this time by the change rather than by a release.
+It carries the table now, and both new fixtures carry an auction floor with `protected_interior:
+false`, a combination the shipped content does not contain: without it every assertion would pass
+just as well for a rule that answered "sanctuary" to any auction interior, and the field would be
+decoration again.
+
+**The gates, and what each drill prints.** Disabling the `combat.start` check gives *"a challenge in
+a safe zone was allowed; the engine had no such rule before v1.0.6"*; extending it to events gives
+*"an event battle in a safe zone must still be allowed"*; ignoring `ProtectedInterior` gives
+*"Unguarded Stalls is not a protected interior but answered sanctuary Open Yard"*; letting capture
+through gives *"a hunter took a fugitive off a protected auction floor: capture_progress is 12"*;
+freezing pressure as well gives *"a floor that freezes a pursuit is somewhere to park a fugitive for
+ever"*; giving the tick its own `ProtectedInterior` lookup gives *"the tick no longer reaches
+game.LocationIsSanctuary"*; restoring `door_rule` to the struct, and separately un-wiring
+`ProtectedInterior`, each fail `TestEveryParsedContentFieldHasAReader`; and blanking the content
+reader fails with *"the content parse is broken, not the tree"* **before** any assertion it would
+have made vacuous.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —

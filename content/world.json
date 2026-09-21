@@ -30559,7 +30559,6 @@
       "max_active_lots": 25,
       "max_lot_minutes": 1440,
       "protected_interior": true,
-      "door_rule": true,
       "default_currency": "low_spirit_stone",
       "channel_name": "golden-pavilion-auctions",
       "description": "Violence is suppressed by formations and hidden guards inside. Once a bidder leaves through the doors, the Pavilion no longer guarantees protection."
@@ -30572,7 +30571,6 @@
       "max_active_lots": 25,
       "max_lot_minutes": 1440,
       "protected_interior": true,
-      "door_rule": true,
       "default_currency": "low_spirit_stone",
       "channel_name": "azure-crown-auctions",
       "description": "The imperial capital's licensed exchange: imperial guards and a court formation keep the floor bloodless. The licence ends at the gate, and so does the guard."
@@ -30585,7 +30583,6 @@
       "max_active_lots": 25,
       "max_lot_minutes": 1440,
       "protected_interior": true,
-      "door_rule": true,
       "default_currency": "low_spirit_crystal",
       "channel_name": "spirit-jade-auctions",
       "description": "Ascended families and old sects trade under a jade array that suppresses every technique on the floor. Past the jade doors the array, and its courtesy, end."
@@ -30598,7 +30595,6 @@
       "max_active_lots": 25,
       "max_lot_minutes": 1440,
       "protected_interior": true,
-      "door_rule": true,
       "default_currency": "low_immortal_stone",
       "channel_name": "nine-heavens-auctions",
       "description": "Immortal clans auction under the Court's own law formation, which forbids a raised hand as firmly as a raised blade. The law stops at the hall's threshold."
@@ -30611,7 +30607,6 @@
       "max_active_lots": 25,
       "max_lot_minutes": 1440,
       "protected_interior": true,
-      "door_rule": true,
       "default_currency": "low_celestial_crystal",
       "channel_name": "celestial-mandate-auctions",
       "description": "Sovereign courts trade under the Mandate itself; a blow struck on this floor is a blow against heaven. The Mandate's shelter ends at the hall doors."
@@ -30624,7 +30619,6 @@
       "max_active_lots": 6,
       "max_lot_minutes": 360,
       "protected_interior": true,
-      "door_rule": true,
       "default_currency": "low_spirit_stone",
       "channel_name": "mortal-world-auctions",
       "description": "A long hall on stilts over the Riverguard landings, where the barges from Greenriver tie up under the floor and their crates come up through a hatch in the middle of the bidding. Six lots at a time, none longer than six hours, protected by its formation and the city guards; once a bidder leaves through the doors, the protection ends."
@@ -30637,7 +30631,6 @@
       "max_active_lots": 6,
       "max_lot_minutes": 390,
       "protected_interior": true,
-      "door_rule": true,
       "default_currency": "low_spirit_crystal",
       "channel_name": "spiritual-world-auctions",
       "description": "Jadeflow's floor is a hall of pale jade timber over a spirit-river that runs clear enough to read the lots by. Six lots at a time, none longer than six hours, protected by its formation and the ascended wardens; once a bidder leaves through the doors, the protection ends."
@@ -30650,7 +30643,6 @@
       "max_active_lots": 7,
       "max_lot_minutes": 360,
       "protected_interior": true,
-      "door_rule": true,
       "default_currency": "low_immortal_stone",
       "channel_name": "immortal-world-auctions",
       "description": "The Immortal River hall stands on immortal-gold pilings that the river has not tarnished in a thousand years, and the barges that reach it have crossed water no mortal boat survives. Six lots at a time, none longer than six hours, protected by its formation and the immortal wardens; once a bidder leaves through the doors, the protection ends."
@@ -30663,7 +30655,6 @@
       "max_active_lots": 8,
       "max_lot_minutes": 330,
       "protected_interior": true,
-      "door_rule": true,
       "default_currency": "low_celestial_crystal",
       "channel_name": "celestial-world-auctions",
       "description": "On the Celestial River the auction hall is a bridge as much as a floor, and the lots arrive by starlit barge from the Mandate Palace itself. Six lots at a time, none longer than six hours, protected by its formation and the mandate wardens; once a bidder leaves through the doors, the protection ends."
@@ -30676,7 +30667,6 @@
       "max_active_lots": 4,
       "max_lot_minutes": 480,
       "protected_interior": true,
-      "door_rule": true,
       "default_currency": "low_spirit_stone",
       "channel_name": "mortal-world-auctions",
       "description": "A walled yard where the four roads of Four-Roads Caravan City meet, roofed in patched canvas and lit by more lanterns than it needs, where caravan masters auction whole wagonloads unopened and the crowd bids on the sound a crate makes when it is set down. Six lots at a time, none longer than six hours, protected by its formation and the city guards; once a bidder leaves through the doors, the protection ends."
@@ -30689,7 +30679,6 @@
       "max_active_lots": 5,
       "max_lot_minutes": 450,
       "protected_interior": true,
-      "door_rule": true,
       "default_currency": "low_spirit_crystal",
       "channel_name": "spiritual-world-auctions",
       "description": "Galevein's yard is where the Spiritual World's caravans pause before the high passes, and the lots are what a master would rather sell than carry over them. Six lots at a time, none longer than six hours, protected by its formation and the ascended wardens; once a bidder leaves through the doors, the protection ends."
@@ -30702,7 +30691,6 @@
       "max_active_lots": 6,
       "max_lot_minutes": 420,
       "protected_interior": true,
-      "door_rule": true,
       "default_currency": "low_immortal_stone",
       "channel_name": "immortal-world-auctions",
       "description": "The Skyroad yard auctions what comes down the sky road on the backs of cloud beasts, and the beasts are tethered at the edge of the floor while their loads are sold. Six lots at a time, none longer than six hours, protected by its formation and the immortal wardens; once a bidder leaves through the doors, the protection ends."
@@ -30715,7 +30703,6 @@
       "max_active_lots": 7,
       "max_lot_minutes": 390,
       "protected_interior": true,
-      "door_rule": true,
       "default_currency": "low_celestial_crystal",
       "channel_name": "celestial-world-auctions",
       "description": "At Starroad the caravans come in under the stars they are named for, and the yard's lanterns are only there for the mortal buyers. Six lots at a time, none longer than six hours, protected by its formation and the mandate wardens; once a bidder leaves through the doors, the protection ends."
@@ -30728,7 +30715,6 @@
       "max_active_lots": 4,
       "max_lot_minutes": 480,
       "protected_interior": true,
-      "door_rule": true,
       "default_currency": "low_spirit_stone",
       "channel_name": "mortal-world-auctions",
       "description": "A gallery cut into Emberforge City's forge terraces, its floor warmed by the volcanic veins under the city, where the smiths of the furnace district sell blades still ringing from the quench. Six lots at a time, none longer than six hours, protected by its formation and the city guards; once a bidder leaves through the doors, the protection ends."
@@ -30741,7 +30727,6 @@
       "max_active_lots": 5,
       "max_lot_minutes": 450,
       "protected_interior": true,
-      "door_rule": true,
       "default_currency": "low_spirit_crystal",
       "channel_name": "spiritual-world-auctions",
       "description": "Vermilion Furnace's gallery opens onto the crater itself, and lots are shown against the glow. Six lots at a time, none longer than six hours, protected by its formation and the ascended wardens; once a bidder leaves through the doors, the protection ends."
@@ -30754,7 +30739,6 @@
       "max_active_lots": 6,
       "max_lot_minutes": 420,
       "protected_interior": true,
-      "door_rule": true,
       "default_currency": "low_immortal_stone",
       "channel_name": "immortal-world-auctions",
       "description": "The Solar Furnace gallery is cut below the city's immortal-gold foundries, and the floor is warm because the foundries never cool. Six lots at a time, none longer than six hours, protected by its formation and the immortal wardens; once a bidder leaves through the doors, the protection ends."
@@ -30767,7 +30751,6 @@
       "max_active_lots": 7,
       "max_lot_minutes": 390,
       "protected_interior": true,
-      "door_rule": true,
       "default_currency": "low_celestial_crystal",
       "channel_name": "celestial-world-auctions",
       "description": "In Solar Crucible the gallery looks down into the crucible the city is named for, where starsteel is worked, and a lot's price is set by how long it was in it. Six lots at a time, none longer than six hours, protected by its formation and the mandate wardens; once a bidder leaves through the doors, the protection ends."
@@ -30780,7 +30763,6 @@
       "max_active_lots": 4,
       "max_lot_minutes": 480,
       "protected_interior": true,
-      "door_rule": true,
       "default_currency": "low_spirit_stone",
       "channel_name": "mortal-world-auctions",
       "description": "A timber-and-stone lodge on Stoneback Mountain City's highest terrace, where the hunting clans bring down the season's hides and cores and sell them by the fire before the snow closes the passes. Six lots at a time, none longer than six hours, protected by its formation and the city guards; once a bidder leaves through the doors, the protection ends."
@@ -30793,7 +30775,6 @@
       "max_active_lots": 5,
       "max_lot_minutes": 450,
       "protected_interior": true,
-      "door_rule": true,
       "default_currency": "low_spirit_crystal",
       "channel_name": "spiritual-world-auctions",
       "description": "Stoneheart's lodge is built into the living rock of the highest terrace, and the lots are what the mountain gives up: spirit-crystal ore, beast cores, and things the miners will not name. Six lots at a time, none longer than six hours, protected by its formation and the ascended wardens; once a bidder leaves through the doors, the protection ends."
@@ -30806,7 +30787,6 @@
       "max_active_lots": 6,
       "max_lot_minutes": 420,
       "protected_interior": true,
-      "door_rule": true,
       "default_currency": "low_immortal_stone",
       "channel_name": "immortal-world-auctions",
       "description": "The Adamant Body lodge is a hall of immortal-gold beams above a city of body refiners, and the lots are arms, armour and the ore to make them, brought up the terraces on bare shoulders. Six lots at a time, none longer than six hours, protected by its formation and the immortal wardens; once a bidder leaves through the doors, the protection ends."
@@ -30819,7 +30799,6 @@
       "max_active_lots": 7,
       "max_lot_minutes": 390,
       "protected_interior": true,
-      "door_rule": true,
       "default_currency": "low_celestial_crystal",
       "channel_name": "celestial-world-auctions",
       "description": "Worldstone's lodge stands on the terrace nearest the sky, and starsteel ore is sold there by weight against the stars. Six lots at a time, none longer than six hours, protected by its formation and the mandate wardens; once a bidder leaves through the doors, the protection ends."
@@ -30832,7 +30811,6 @@
       "max_active_lots": 4,
       "max_lot_minutes": 480,
       "protected_interior": true,
-      "door_rule": true,
       "default_currency": "low_spirit_stone",
       "channel_name": "mortal-world-auctions",
       "description": "An open terrace on the highest of Cloudblade City's sword peaks, walled by nothing but wind, where sword cultivators auction blades by drawing them once toward the drop. Six lots at a time, none longer than six hours, protected by its formation and the city guards; once a bidder leaves through the doors, the protection ends."
@@ -30845,7 +30823,6 @@
       "max_active_lots": 5,
       "max_lot_minutes": 450,
       "protected_interior": true,
-      "door_rule": true,
       "default_currency": "low_spirit_crystal",
       "channel_name": "spiritual-world-auctions",
       "description": "Cloudedge's terrace is a blade of rock over cloud, and the spirit-crystal swords sold there are shown by being thrown and called back. Six lots at a time, none longer than six hours, protected by its formation and the ascended wardens; once a bidder leaves through the doors, the protection ends."
@@ -30858,7 +30835,6 @@
       "max_active_lots": 6,
       "max_lot_minutes": 420,
       "protected_interior": true,
-      "door_rule": true,
       "default_currency": "low_immortal_stone",
       "channel_name": "immortal-world-auctions",
       "description": "On Heavenblade's terrace the lots are immortal-gold sabres and the buyers are the sect's own disciples, bidding under the eye of the terrace sword that has stood point-down for ten thousand years. Six lots at a time, none longer than six hours, protected by its formation and the immortal wardens; once a bidder leaves through the doors, the protection ends."
@@ -30871,7 +30847,6 @@
       "max_active_lots": 7,
       "max_lot_minutes": 390,
       "protected_interior": true,
-      "door_rule": true,
       "default_currency": "low_celestial_crystal",
       "channel_name": "celestial-world-auctions",
       "description": "Firmament Blade's terrace is the highest floor in the Celestial World, and starsteel glaives are sold there against the sky they were forged from. Six lots at a time, none longer than six hours, protected by its formation and the mandate wardens; once a bidder leaves through the doors, the protection ends."
@@ -30884,7 +30859,6 @@
       "max_active_lots": 4,
       "max_lot_minutes": 480,
       "protected_interior": true,
-      "door_rule": true,
       "default_currency": "low_spirit_stone",
       "channel_name": "mortal-world-auctions",
       "description": "A drilled square inside Ironbanner City's walls, hung with the banners of the plains clans, where garrisons auction what a campaign brought back and the clans bid for it under their own colours. Six lots at a time, none longer than six hours, protected by its formation and the city guards; once a bidder leaves through the doors, the protection ends."
@@ -30897,7 +30871,6 @@
       "max_active_lots": 5,
       "max_lot_minutes": 450,
       "protected_interior": true,
-      "door_rule": true,
       "default_currency": "low_spirit_crystal",
       "channel_name": "spiritual-world-auctions",
       "description": "Spearwall's square is inside the second wall, and the lots come off the spear racks: spirit-crystal mail, banners taken in the field, and cores from the beasts the wall keeps out. Six lots at a time, none longer than six hours, protected by its formation and the ascended wardens; once a bidder leaves through the doors, the protection ends."
@@ -30910,7 +30883,6 @@
       "max_active_lots": 6,
       "max_lot_minutes": 420,
       "protected_interior": true,
-      "door_rule": true,
       "default_currency": "low_immortal_stone",
       "channel_name": "immortal-world-auctions",
       "description": "Golden Spear's square is paved in the immortal gold the city is named for, and the garrison auctions arms there that a mortal army could not lift. Six lots at a time, none longer than six hours, protected by its formation and the immortal wardens; once a bidder leaves through the doors, the protection ends."
@@ -30923,7 +30895,6 @@
       "max_active_lots": 7,
       "max_lot_minutes": 390,
       "protected_interior": true,
-      "door_rule": true,
       "default_currency": "low_celestial_crystal",
       "channel_name": "celestial-world-auctions",
       "description": "Mandate Spear's square drills under the stars, and the lots are the mandate's own surplus: starsteel spearheads, banners that do not fade. Six lots at a time, none longer than six hours, protected by its formation and the mandate wardens; once a bidder leaves through the doors, the protection ends."
@@ -30936,7 +30907,6 @@
       "max_active_lots": 4,
       "max_lot_minutes": 480,
       "protected_interior": true,
-      "door_rule": true,
       "default_currency": "low_spirit_stone",
       "channel_name": "mortal-world-auctions",
       "description": "A lantern-lit pavilion on pilings over Moonfen City's marsh channels, where yin cultivators, herbalists and fen folk auction what the marsh gives up at night. Six lots at a time, none longer than six hours, protected by its formation and the city guards; once a bidder leaves through the doors, the protection ends."
@@ -30949,7 +30919,6 @@
       "max_active_lots": 5,
       "max_lot_minutes": 450,
       "protected_interior": true,
-      "door_rule": true,
       "default_currency": "low_spirit_crystal",
       "channel_name": "spiritual-world-auctions",
       "description": "Moonfrost's pavilion stands over channels that freeze at dusk and thaw at dawn, and the lots are moonveil herbs cut at the turn. Six lots at a time, none longer than six hours, protected by its formation and the ascended wardens; once a bidder leaves through the doors, the protection ends."
@@ -30962,7 +30931,6 @@
       "max_active_lots": 6,
       "max_lot_minutes": 420,
       "protected_interior": true,
-      "door_rule": true,
       "default_currency": "low_immortal_stone",
       "channel_name": "immortal-world-auctions",
       "description": "Lunar Veil's pavilion is hung with a mist that the city's yin cultivators keep up on purpose, and the lots are shown by being brought into the one clear lantern. Six lots at a time, none longer than six hours, protected by its formation and the immortal wardens; once a bidder leaves through the doors, the protection ends."
@@ -30975,7 +30943,6 @@
       "max_active_lots": 7,
       "max_lot_minutes": 390,
       "protected_interior": true,
-      "door_rule": true,
       "default_currency": "low_celestial_crystal",
       "channel_name": "celestial-world-auctions",
       "description": "Lunar Shadow's pavilion floats on the marsh under a moon that does not set, and heaven-petal blooms are sold there to buyers who do not show their faces. Six lots at a time, none longer than six hours, protected by its formation and the mandate wardens; once a bidder leaves through the doors, the protection ends."
@@ -30988,7 +30955,6 @@
       "max_active_lots": 4,
       "max_lot_minutes": 480,
       "protected_interior": true,
-      "door_rule": true,
       "default_currency": "low_spirit_stone",
       "channel_name": "mortal-world-auctions",
       "description": "A stone hall banked with snow at Frostwatch City's frontier gate, where scouts, trappers and border clans auction what came in off the ice before the gate closes for the night. Six lots at a time, none longer than six hours, protected by its formation and the city guards; once a bidder leaves through the doors, the protection ends."
@@ -31001,7 +30967,6 @@
       "max_active_lots": 5,
       "max_lot_minutes": 450,
       "protected_interior": true,
-      "door_rule": true,
       "default_currency": "low_spirit_crystal",
       "channel_name": "spiritual-world-auctions",
       "description": "Northwind's hall is the last warm room before the frozen frontier, and the lots are what the scouts brought back and the trappers will not carry further. Six lots at a time, none longer than six hours, protected by its formation and the ascended wardens; once a bidder leaves through the doors, the protection ends."
@@ -31014,7 +30979,6 @@
       "max_active_lots": 6,
       "max_lot_minutes": 420,
       "protected_interior": true,
-      "door_rule": true,
       "default_currency": "low_immortal_stone",
       "channel_name": "immortal-world-auctions",
       "description": "Polar Gate's hall is cut into the ice wall itself, and immortal-gold lanterns keep it from refreezing during the bidding. Six lots at a time, none longer than six hours, protected by its formation and the immortal wardens; once a bidder leaves through the doors, the protection ends."
@@ -31027,7 +30991,6 @@
       "max_active_lots": 7,
       "max_lot_minutes": 390,
       "protected_interior": true,
-      "door_rule": true,
       "default_currency": "low_celestial_crystal",
       "channel_name": "celestial-world-auctions",
       "description": "Froststar's hall stands at the border of the Celestial World's cold, and the lots come in off the starlit ice on sledges. Six lots at a time, none longer than six hours, protected by its formation and the mandate wardens; once a bidder leaves through the doors, the protection ends."
@@ -31040,7 +31003,6 @@
       "max_active_lots": 4,
       "max_lot_minutes": 480,
       "protected_interior": true,
-      "door_rule": true,
       "default_currency": "low_spirit_stone",
       "channel_name": "mortal-world-auctions",
       "description": "A roofed court raised on the old battlefield walls of Ashenwall City, where relic hunters, scholars and salvagers auction what the ash still gives up. Six lots at a time, none longer than six hours, protected by its formation and the city guards; once a bidder leaves through the doors, the protection ends."
@@ -31053,7 +31015,6 @@
       "max_active_lots": 5,
       "max_lot_minutes": 450,
       "protected_interior": true,
-      "door_rule": true,
       "default_currency": "low_spirit_crystal",
       "channel_name": "spiritual-world-auctions",
       "description": "Broken Halo's court is built where the halo fell, and the lots are fragments of it, sold by the light they still give. Six lots at a time, none longer than six hours, protected by its formation and the ascended wardens; once a bidder leaves through the doors, the protection ends."
@@ -31066,7 +31027,6 @@
       "max_active_lots": 6,
       "max_lot_minutes": 420,
       "protected_interior": true,
-      "door_rule": true,
       "default_currency": "low_immortal_stone",
       "channel_name": "immortal-world-auctions",
       "description": "Fallen Star's court is roofed with the star's own hull, and salvagers auction what they cut from it under the eye of the sect that claims the rest. Six lots at a time, none longer than six hours, protected by its formation and the immortal wardens; once a bidder leaves through the doors, the protection ends."
@@ -31079,7 +31039,6 @@
       "max_active_lots": 7,
       "max_lot_minutes": 390,
       "protected_interior": true,
-      "door_rule": true,
       "default_currency": "low_celestial_crystal",
       "channel_name": "celestial-world-auctions",
       "description": "Ruined Constellation's court stands among the fallen stars of the city's name, and the relics sold there are older than the mandate. Six lots at a time, none longer than six hours, protected by its formation and the mandate wardens; once a bidder leaves through the doors, the protection ends."
@@ -31092,7 +31051,6 @@
       "max_active_lots": 4,
       "max_lot_minutes": 480,
       "protected_interior": true,
-      "door_rule": true,
       "default_currency": "low_spirit_stone",
       "channel_name": "mortal-world-auctions",
       "description": "An airy hall among Jadewood Medicine City's medicine gardens, its floor open to the herb terraces, where physicians and gardeners auction the season's rare herbs and the pills refined from them. Six lots at a time, none longer than six hours, protected by its formation and the city guards; once a bidder leaves through the doors, the protection ends."
@@ -31105,7 +31063,6 @@
       "max_active_lots": 5,
       "max_lot_minutes": 450,
       "protected_interior": true,
-      "door_rule": true,
       "default_currency": "low_spirit_crystal",
       "channel_name": "spiritual-world-auctions",
       "description": "Hundred Herb's hall stands among a hundred beds, and the lots are moonveil and the pills the city's physicians refine from it. Six lots at a time, none longer than six hours, protected by its formation and the ascended wardens; once a bidder leaves through the doors, the protection ends."
@@ -31118,7 +31075,6 @@
       "max_active_lots": 6,
       "max_lot_minutes": 420,
       "protected_interior": true,
-      "door_rule": true,
       "default_currency": "low_immortal_stone",
       "channel_name": "immortal-world-auctions",
       "description": "Jade Cauldron's hall is built around the cauldron the city is named for, and dawn lotus is sold there still wet from the terraces. Six lots at a time, none longer than six hours, protected by its formation and the immortal wardens; once a bidder leaves through the doors, the protection ends."
@@ -31131,7 +31087,6 @@
       "max_active_lots": 7,
       "max_lot_minutes": 390,
       "protected_interior": true,
-      "door_rule": true,
       "default_currency": "low_celestial_crystal",
       "channel_name": "celestial-world-auctions",
       "description": "Divine Herb's hall opens onto terraces where heaven-petal grows under the mandate's own light, and the elixirs sold there are shown by being uncorked. Six lots at a time, none longer than six hours, protected by its formation and the mandate wardens; once a bidder leaves through the doors, the protection ends."
@@ -31144,7 +31099,6 @@
       "max_active_lots": 6,
       "max_lot_minutes": 390,
       "protected_interior": true,
-      "door_rule": true,
       "default_currency": "low_spirit_crystal",
       "channel_name": "spiritual-world-auctions",
       "description": "A marble court in Jade Crown Spirit City's noble quarter, hung with house crests, where the old families auction heirlooms they will not say they are selling. Six lots at a time, none longer than six hours, protected by its formation and the ascended wardens; once a bidder leaves through the doors, the protection ends."
@@ -31157,7 +31111,6 @@
       "max_active_lots": 7,
       "max_lot_minutes": 360,
       "protected_interior": true,
-      "door_rule": true,
       "default_currency": "low_immortal_stone",
       "channel_name": "immortal-world-auctions",
       "description": "Ninefold Noble's court is nine courts in one, and a lot passes through each before it is sold, losing a house's claim at every step. Six lots at a time, none longer than six hours, protected by its formation and the immortal wardens; once a bidder leaves through the doors, the protection ends."
@@ -31170,7 +31123,6 @@
       "max_active_lots": 8,
       "max_lot_minutes": 330,
       "protected_interior": true,
-      "door_rule": true,
       "default_currency": "low_celestial_crystal",
       "channel_name": "celestial-world-auctions",
       "description": "Mandate Crown's court stands under the palace's shadow, and the old families sell there what the mandate has told them to. Six lots at a time, none longer than six hours, protected by its formation and the mandate wardens; once a bidder leaves through the doors, the protection ends."

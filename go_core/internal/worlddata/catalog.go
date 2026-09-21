@@ -194,7 +194,6 @@ type AuctionHouse struct {
 	Location          string `json:"location"`
 	EntranceLocation  string `json:"entrance_location"`
 	ProtectedInterior bool   `json:"protected_interior"`
-	DoorRule          bool   `json:"door_rule"`
 	DefaultCurrency   string `json:"default_currency"`
 	Description       string `json:"description"`
 	// Size (v0.33.1): "grand" for a capital's house, "local" for an ordinary

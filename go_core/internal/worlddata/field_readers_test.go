@@ -65,12 +65,6 @@ var unreadContentFields = map[string]string{
 	"Path.Skill": "seven paths name a skill (Sword, Spiritual Arts, ...) and each string occurs " +
 		"exactly once in the whole content file - its own declaration. What a path's skill is " +
 		"(a line on a card, a bonus, or a field to delete) is content design; punch list, v1.0.1",
-	"AuctionHouse.ProtectedInterior": "set true on all 48 houses. The door half of the fiction works " +
-		"(auction_door_risks, consumed by auction.leave, standing a hunter outside); nothing can " +
-		"attack a player who has not consented, so this may guard a mechanic the game lacks; " +
-		"punch list, v1.0.1",
-	"AuctionHouse.DoorRule": "set true on all 48 houses, so reading it would change nothing until " +
-		"one says false; wire it or retire it; punch list, v1.0.1",
 }
 
 // parsedContentFields is every `worlddata` struct field carrying a json tag,

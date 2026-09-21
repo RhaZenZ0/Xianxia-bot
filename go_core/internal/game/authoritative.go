@@ -485,7 +485,7 @@ func applyAuthoritative(databasePath, worldPath string, req ActionRequest) (Acti
 		case "lifecycle.true_death":
 			mutation, err = trueDeathAction(conn, catalog, req.ActorID, req.Payload)
 		case "combat.start":
-			mutation, err = combatStartAction(conn, req.ActorID, req.Payload)
+			mutation, err = combatStartAction(conn, catalog, req.ActorID, req.Payload)
 		case "character.family_options":
 			mutation, err = birthFamilyOptionsAction(conn, req.ActorID, req.Payload)
 		case "character.create":

@@ -12,6 +12,10 @@ import (
 // the part a later edit can quietly undo while every unit test still passes.
 
 const trackingPursuitSchema = `
+-- v1.0.6: production always has this, and the pursuit sweep reads a quarry's
+-- location off it now. A fixture that models one of the two tables cannot fail
+-- the way production fails.
+CREATE TABLE characters(user_id INTEGER PRIMARY KEY, location TEXT NOT NULL DEFAULT '');
 CREATE TABLE bounties(
     bounty_id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, jurisdiction TEXT NOT NULL DEFAULT '',
     amount INTEGER NOT NULL DEFAULT 0, reason TEXT NOT NULL DEFAULT '', status TEXT NOT NULL DEFAULT 'active',
@@ -53,6 +57,9 @@ func pursued(t *testing.T, path string, userID int64, mark int64) {
 		t.Fatal(err)
 	}
 	defer conn.Close()
+	if _, err := conn.Execute(`INSERT INTO characters(user_id,location) VALUES(?,'Ash Wolf Hunting Ground')`, []any{userID}); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := conn.Execute(`INSERT INTO bounties(user_id,jurisdiction,amount,status,updated_at) VALUES(?,'Greenriver',500,'active',0)`, []any{userID}); err != nil {
 		t.Fatal(err)
 	}

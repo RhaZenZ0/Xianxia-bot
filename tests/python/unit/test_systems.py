@@ -33,11 +33,17 @@ class ExpandedSystemsTests(unittest.TestCase):
         self.assertEqual(mods["will"], 2)
         self.assertAlmostEqual(mods["cultivation_gain_mult"], 1.2)
 
-    def test_auction_house_is_protected_and_has_door(self):
+    def test_auction_house_is_protected_and_has_a_door_onto_the_street(self):
+        """v1.0.6 retired `door_rule` - all 48 set it true, no house's prose can
+        differ, and the engine already ends the protection at the door by
+        creating the incident battle at `entrance_location`. The claim that
+        replaces it is the pair a sanctuary actually needs, held for all 48 in
+        `tests/python/contracts/test_violence_is_suppressed_where_content_says.py`."""
         house = self.raw["auction_houses"]["golden_pavilion"]
         location = self.raw["locations"][house["location"]]
         self.assertTrue(location["safe_zone"])
-        self.assertTrue(house["door_rule"])
+        self.assertTrue(house["protected_interior"])
+        self.assertNotIn("door_rule", house)
         self.assertEqual(house["entrance_location"], "Greenriver Town")
 
     def test_world_rulers_resolve_to_valid_npcs_and_locations(self):

@@ -6,6 +6,38 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.6** makes the one promise this world repeats everywhere true in the engine as well as in the bot.
+
+`app/ai/narrator_context.py` tells the narrator, in these words, in two places: *"PROTECTED; violence
+cannot mechanically begin here"*. A duel was refused in a protected place by the engine, and
+`/battle challenge` was refused by `app/bot/commands/battle.py` - and `combat_actions.go` named
+`SafeZone` zero times, so the rule a player could feel for an ordinary fight lived entirely in
+Discord. A bound that lives in the client is not a bound, which this tree had already written down
+three times for the world clock, the action cooldowns and a Law technique; what hid it here is that
+the *neighbouring* kind of violence really was engine-held, so the file next door looked like proof.
+
+And a bounty hunter did not care where you were standing. The pursuit sweep raised pressure, closed
+in and captured a fugitive without reading a location anywhere in it - so somebody was taken off the
+floor of a hall whose own description reads *"Violence inside is forbidden; the protection ends at
+the front doors"*, while the field that says exactly that sat on all forty-eight auction houses and
+was read by nothing. It is read now: a hunter may watch you from the doors and may not reach in.
+Pressure still rises, because standing still is not escaping.
+
+The two protections are deliberately kept apart. A safe zone is on 446 of the world's 477 places -
+it means *not the wilds*, and Greenriver Town, where everyone begins, is one of the thirty-one that
+are not - so it stops a fight somebody chooses to start and nothing more. What an auction floor
+claims is stronger and rarer, and that is what a fugitive can hide behind. Handing all 446 the
+auction floor's guarantee would not give the bounty system a sanctuary; it would end it, because
+players live in towns.
+
+And nothing refuses a fight that was never the player's idea: a world event that lands in a town is
+still fought, and the ambush outside an auction door still happens, because being caught in
+something is not the same as starting it.
+
+It also retires the third way the same sentence was said. `door_rule` was set on every auction house,
+meant "the protection ends at the doors", and was read by nothing - and the engine already ends it
+there, by standing the ambush outside. A switch no content can turn off is not a switch.
+
 **1.0.5** stops a quest being lost to a failure in drawing the reply, and stops the craft menu
 offering methods you have not learned.
 
@@ -281,9 +313,11 @@ staged authority cleanup: forage, crafting and companions, canonical time, unifi
 road travel, caravans, dashboard-owned Discord setup, and the removal of the obsolete Python
 mechanical authority paths.
 
-## Release status — v1.0.5
+## Release status — v1.0.6
 
-- Current release: v1.0.5 - a quest is recorded before it is told, and the craft menu offers only
+- Current release: v1.0.6 - "violence cannot mechanically begin here" is held by the engine and not
+  only by the bot, and an auction floor is a sanctuary a bounty hunter cannot reach into. No schema.
+- v1.0.5: a quest is recorded before it is told, and the craft menu offers only
   methods you know. No schema.
 - v1.0.4: vitality recovers with time, which nothing in this game had ever done.
   Schema 59.
