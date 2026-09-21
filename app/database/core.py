@@ -6070,6 +6070,13 @@ class Database:
         a craft was allowed; nobody read it to say so.
         """
         async with self._connect() as db:
+            # The row factory is not optional and its absence is invisible to a
+            # source read: without it a row is a bare tuple, `dict(row)` walks
+            # the first *string* instead, and the whole page raises with
+            # "dictionary update sequence element #0 has length 19" - 19 being
+            # the length of "Swift-Wind Talisman". Every reader here that calls
+            # dict(row) sets it first.
+            db.row_factory = aiosqlite.Row
             cur = await db.execute(
                 """SELECT recipe, source, learned_game_minute FROM character_recipes
                    WHERE user_id = ? ORDER BY learned_game_minute DESC, recipe""",

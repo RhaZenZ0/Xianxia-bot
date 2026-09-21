@@ -2369,6 +2369,142 @@ Three things about the gate are worth more than the fix.
   `['v1.0.0.md', 'v1.0.1.md'] != ['v1.0.1.md']`; sorting the versions as text inherits from
   `v1.0.9` over `v1.0.10`.
 
+### A method that could not say what it needed (v1.0.1)
+
+**Found by playing, not by reading.** A player bought an Inscription slip, read it, and then had no
+way to discover that a Swift-Wind Talisman wants one `talisman_paper` and one `spirit_ink`. Both are
+in the content file, both are sold (67 shops and 23), and both are foragable since rc.21. Three
+separate facts would each have told them, and **not one reached a player**:
+
+1. **`character_recipes` had no Python reader at all.** Four writers - a bought slip, the household
+   lesson, the trade examination and a grandfathering migration - and the only readers in the tree
+   are in Go, deciding whether a craft is allowed. Nothing could tell you what you had learned.
+2. **`get_recipe_definition` parses a recipe's `cost` and no command read it.** It is decoded out of
+   `cost_json` in `core.py` and every caller reads `profession` beside it and stops. That is rc.55's
+   root grade exactly - a field parsed and read by nothing - except this one is the difference
+   between being able to use the crafting system and not.
+3. **The engine computed the shortfall and threw it away.** `consumeInventoryTx` returns
+   `map[item]shortfall` - which materials are short and by how much - and the craft refused with
+   `errors.New("missing materials")`. The bot then caught that and replaced even those two words
+   with *"Missing materials for that recipe."* **Two layers each discarding the one fact the player
+   needed.**
+
+All three are fixed, and none of it is content: `describeMaterials` names the shortfall through
+`itemDisplayName` (the one statement of what an item is called, already in `shop_actions.go`) off
+sorted ids, because a map range would make one refusal read two ways; `DB.get_known_recipes` is the
+missing reader; and `profession status` prints every method you know, per trade, with each input's
+cost beside **what you are carrying** - `✅` you can make it now, `❌` short of materials, `🔴` your
+rank is too low. It also stopped returning early on an empty `profession_progress`, which had meant a
+cultivator who bought a slip and read it was told they had no profession experience and shown nothing
+they had learned.
+
+**The other three callers of `consumeInventoryTx` were already right**, which is worth recording
+because it says the fault was the craft's and not the helper's: the slip, the beast food and the shop
+sale each name the one item they wanted. And all four *trades* share `craft.resolve`, so Alchemy,
+Forging, Formation and Inscription are one fix, not four.
+
+**And the new reader raised on every call, which the playtest found and no gate could.** The first
+`get_known_recipes` did `dict(row)` without setting `db.row_factory`, so a row came back a bare tuple,
+`dict` walked the first string instead, and the page died with *"dictionary update sequence element
+#0 has length 19"* — 19 being the length of `Swift-Wind Talisman`. `test_authority_boundary` requires
+a state function to have a production caller and it had one; the gate below requires the page to call
+it and it did. **Neither asks whether the call works**, and nothing else executed it, so a leaf that
+had passed for as long as it existed went red in the Discord sweep. `test_known_recipes.py` calls it
+against a real database, and its drill prints the production error.
+
+`test_a_recipe_tells_you_what_it_needs.py` is the gate, behavioural where it can be and reading
+functions **by AST** (rc.59: a multi-line `def` defeats an indentation slice). Its drills each print
+the finding - the bare refusal restored, the handler replacing it again, the status page no longer
+reading what you know - and the fourth breaks the reader itself and fails with *"the reader is
+broken, not the tree"* before it can make anything vacuous.
+
+**Its own first version shipped a worse copy of an existing rule, and its first run said so.** It
+swept `sells`, `forage_materials` and the recipe outputs to prove every cost was obtainable, and
+failed naming `jade_life_herb` and `twin_extremes_fruit` - both of which *are* sourced, one a
+secret-realm room reward and one resolved off the world tier in `crafting_actions.go`. That rule is
+already stated in `test_every_item_has_a_source.py`, which greps production for every item id and
+keeps `SOURCELESS_ITEMS` empty. Two statements of one rule are free to disagree and the weaker one
+produces the false findings, so the sweep was deleted and the test now holds that the real gate is
+still there - the same call v1.0.1 made about its table-level sweep.
+
+### Starting over without a GM (`character_reset.go`, v1.0.1)
+
+There was no way for a player to reset a character, and the three things that looked like one were
+not. `/begin` refuses outright when a `characters` row exists. **Dying is not a reset**:
+`lifecycle.true_death` has exactly three callers and none is voluntary - old age fired automatically
+inside `require_character`, losing a battle at 0 HP with no fate point left, and the GM - and what it
+opens is Samsara, which deliberately carries the memory seed, the talent/law/insight echoes, the
+legacy points, the craft echo and a family lineage rolled off the dead life's karma. And the one true
+wipe, `admin.player.erase`, is the data-protection lever: **using a legal-erasure tool as a restart
+button is the same class of lie as a `sync_world_catalog` that syncs no catalogue** - an action's name
+is what it is for, and "somebody asked for their data back" is not "I picked the wrong path".
+
+`character.reset` is the restart button. It is allowlisted through `applyAuthoritative`, so the
+moderation, maintenance and seclusion gates apply to it for free, and it takes **no payload** - every
+input it has is a row the engine already owns.
+
+- **It reuses erasure's own sweep.** `applyErasureTargets` is the one statement of how a person's
+  rows are removed, walking the targets `erasureTargets` reads off the *live schema*. Writing a
+  second list of tables here would be the hand-written list that function exists to avoid, one file
+  over.
+- **The gate is the anonymise disposition, not a clock.** A time window says nothing about what the
+  reset would cost anybody else. The question that matters is whether this character has left a mark
+  on a world other players share, and erasure had already answered it: `erasureAnonymise` is
+  precisely the set of columns where a person's id sits on a row belonging to everybody. A reset is
+  refused the moment any of them names the character, because **those rows survive an erasure and so
+  cannot honestly survive a reset** - the world would go on referring to a cultivator who was never
+  there. The refusal names which.
+- **The allowance is recorded in the thing the reset does not delete.** `rollRootGrade` is
+  `Intn(1000)` against thresholds putting Immortal in the top 0.7% of a tier-1 household's draw, and
+  rc.55 is what made that grade worth 0.88x-1.34x cultivation and -1 to +3 on every breakthrough for
+  the character's whole life. An unbounded reset is a free re-roll of exactly that number, so it is
+  three, counted from `event_log` rows the sweep is told to keep - because **a bound that the bounded
+  action erases is not a bound**, which is rc.48's rule turned inward. The row is the memory, as
+  `(user_id, quest_key)` is for the beginner path.
+- **"Keep what you drew, change what you chose" was rejected on a fact, not on taste.**
+  `rollFamilyRoot` weights the root off the household's archetype, location, bloodline affinity and
+  tier, and `rollRootGrade` adds `(familyTier-1)*24`. The family is a choice and the draw depends on
+  it, so there is no line to draw there.
+- **The household's welcome line comes back out.** Creation appends one to a *shared* starter
+  household's `history_json`; without this a house would remember a cultivator who does not exist,
+  once per abandoned attempt. `householdWelcomeLine` is a function because two places need the exact
+  same sentence and a second copy of a format string is free to drift. A line that is not found is
+  not an error.
+
+**The finding is one step further in, and no source read would have produced it.** A reset is the
+first action in this tree whose **actor erases itself**. `applyAuthoritative` reads the actor's state
+version *before* the switch and calls `eventledger.AdvanceActorVersion` with it *after*, so a sweep
+that deleted `authoritative_actor_versions.actor_id` left the framework unable to record the action
+that had just succeeded: `stale expected_version: expected 2 current 0`, thrown after all the work
+was done. `admin.player.erase` never met it because an `admin.*` lever falls through to the switch in
+`ApplyWithWorld` rather than through this bookkeeping, and because it erases somebody other than the
+actor. The version row and the action receipts are kept out of the sweep for exactly `erasureKeep`'s
+reason one level down - **the engine's record of a request cannot be the thing the request deletes** -
+and they are also right on their own terms: the version is optimistic-concurrency state about a
+Discord account's in-flight requests, not about the character, and zeroing it would let a client
+still holding the old version win a race it should lose. `domain_events` is deliberately *not* kept:
+it is the ledger of what the character did, which is the thing a reset is for.
+
+A GM erasure still takes the reset rows with everything else, and that is right: **erasure removes a
+person, a reset removes a character**, and somebody who has been erased is new to this bot.
+
+**Two of the gates caught themselves, and both are the recurring shape.** The mark refusal first
+asserted only that the error *named* the marked table - and disabling the disposition check makes
+every target a mark, so a refusal listing all sixteen still contained it and the drill **passed**
+against a broken gate (rc.47's shape, rc.49's disabled condition). It parses the refusal's
+parenthesised list and requires exactly one entry now. And the test helper that staged those marks
+wrote them with `conn.Execute` and then `Close`d - so every row was rolled back by the implicit
+transaction, and all six refusal tests passed as *successes*. That is rc.38's `npcFound` finding met
+in a fixture, where it made the tests vacuous rather than the feature broken.
+
+`tests/python/contracts/test_character_reset.py` is the real-schema half, for
+`test_privacy_erasure.py`'s reason: the Go fixtures build a schema by hand and would carry an old
+table name for ever. A migration renaming `event_log` breaks no build, errors nowhere, fails no Go
+test - and silently unbounds the allowance. The contract holds every kept "table.column" against a
+real bootstrap, holds each to being a column the sweep *would* otherwise delete (a keep on a column
+erasure never touches is decoration), and holds the table the allowance is counted from to be one the
+reset keeps.
+
 ### The fields nothing reads (`field_readers_test.go`, v1.0.1)
 
 rc.55 found `RootGrade.CultivationMult` and `RootGrade.BreakthroughBonus` parsed out of the content

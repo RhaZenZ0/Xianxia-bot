@@ -6,7 +6,43 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
-**1.0.1** gives the martial clans somebody real to deal with. `martial_clan_relations.partner_family_id`
+**1.0.1** makes a craft say what it needs. Found by playing: a player bought an Inscription slip,
+read it, and had no way to learn that a Swift-Wind Talisman wants one talisman paper and one spirit
+ink - both authored, both sold in dozens of shops, both foragable. Three facts would each have told
+them and none reached a player. `character_recipes` had four writers and **no Python reader at
+all**, so nothing could say what you had learned; `get_recipe_definition` has always parsed a
+recipe's `cost` and no command read it; and the engine computed the exact shortfall per material and
+refused with the bare words "missing materials", which the bot then replaced with a vaguer sentence
+of its own. The refusal names each short material and how many now, `profession status` lists every
+method you know per trade with each input's cost beside what you are carrying - a tick if you can
+make it, a cross if you are short, a red mark if your rank is too low - and that page no longer
+returns early for a cultivator who has learned something but not yet crafted. All four trades share
+one resolve path, so this is one fix rather than four; the three other places that spend an item
+were already naming it.
+
+**1.0.1** also lets a player start over without a GM. Until now the only way out of a character was to
+die, and dying is not a reset: `lifecycle.true_death` has three callers and none is voluntary, and
+what it opens is Samsara, which deliberately carries the memory seed, the talent, law and insight
+echoes, the legacy points and the craft echo into the next life. The one true wipe was
+`admin.player.erase` - a data-protection lever, GM-only, and the wrong verb for "I misclicked".
+`character.reset` is the restart button, on `/reset` and on `/character → Samsara`, and `/begin`'s
+refusal names it, because that refusal is the message somebody who wants to start over actually
+reaches. It reuses erasure's own sweep, so a reset removes exactly what an erasure removes and the
+two cannot drift. What bounds it is not a clock: a reset is refused the moment any row with an
+**anonymise** disposition names the character - a battle the world remembers, a sect other disciples
+belong to, a gate still standing over a named town, a grave somebody reached first - because those
+rows survive even an erasure and so cannot honestly survive a reset. Three per account, and the
+count lives in the one thing the sweep is told to keep, because a bound the bounded action erases is
+not a bound. No schema.
+
+Its finding is one step further in. A reset is the first action in this tree whose **actor erases
+itself**, and the authoritative framework keeps its own bookkeeping under that actor's id: it reads
+the state version before the switch and advances it after, so a sweep that took the version row with
+everything else left the engine unable to record the action that had just succeeded, failing with
+`stale expected_version: expected 2 current 0` after doing all its work. The engine's record of a
+request is kept out of the sweep for the same reason `admin_audit_log` is kept out of an erasure.
+
+**1.0.1** also gives the martial clans somebody real to deal with. `martial_clan_relations.partner_family_id`
 is foreign-keyed to `birth_families` and nullable, and the one statement that had ever inserted a row
 wrote it `nil` - because the partner it named was invented off a list of surnames: a house with no
 members, no town, no wealth and no opinion. So a world held one relation per household, with somebody
