@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 	"time"
@@ -1899,6 +1900,18 @@ func explorationHuntAction(conn *storage.Conn, catalog worlddata.Catalog, userID
 			threshold := int64(4)
 			if c.Path == "Beast Binder" {
 				threshold = 2
+			}
+			// A Beast Tide brings them down the passes (v1.0.7). The rate was
+			// authored on the era whose entire identity is beasts and was read
+			// by nothing, so a Beast Tide did nothing whatever to beasts - it
+			// was mechanically "caravans are fifteen percent riskier".
+			//
+			// It divides the margin a hunt must clear rather than multiplying a
+			// chance, because this is a 2d10 margin and not a percentage; a rate
+			// above 1 makes the encounter easier to reach, below 1 harder.
+			// Floored at 1, so no era can make an encounter automatic.
+			if rate := EraModifier(conn, EraWorldOf(catalog, c.Location), "beast_encounter_rate", 1); rate > 0 && rate != 1 {
+				threshold = maxI64(1, int64(math.Round(float64(threshold)/rate)))
 			}
 			if can && margin >= threshold {
 				taming := beast.TamingTN

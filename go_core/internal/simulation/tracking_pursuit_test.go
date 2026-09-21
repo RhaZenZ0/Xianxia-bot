@@ -41,7 +41,7 @@ CREATE TABLE item_provenance(
     authenticity INTEGER NOT NULL DEFAULT 100, tracking_strength INTEGER NOT NULL DEFAULT 0,
     acquired_game_minute INTEGER NOT NULL DEFAULT 0, created_at REAL NOT NULL DEFAULT 0, updated_at REAL NOT NULL DEFAULT 0);
 CREATE TABLE world_eras(
-    era_id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, description TEXT NOT NULL DEFAULT '',
+    era_id INTEGER PRIMARY KEY AUTOINCREMENT, world TEXT NOT NULL DEFAULT 'Mortal World', name TEXT NOT NULL, description TEXT NOT NULL DEFAULT '',
     modifiers_json TEXT NOT NULL DEFAULT '{}', active INTEGER NOT NULL DEFAULT 1,
     started_game_minute INTEGER NOT NULL DEFAULT 0, ends_game_minute INTEGER NOT NULL DEFAULT 0,
     updated_at REAL NOT NULL DEFAULT 0);

@@ -81,6 +81,18 @@ func ActiveEra(conn *storage.Conn, world string) (string, map[string]float64, er
 	return name, mods, nil
 }
 
+// eraTerm is one key off an era's already-loaded modifiers.
+//
+// It exists so that every read of an era modifier in this tree is an *argument
+// position* rather than a bare map index. That is not style: it is what lets
+// `era_vocabulary_test.go` tell a rule fetching a key from the content file
+// declaring one, which is the rc.58 "fetched, not named" distinction. The gate
+// found this on its own first run - `eraCultivationMultiplier` indexed the map
+// directly, so the one modifier every cultivator feels looked unread.
+func eraTerm(mods map[string]float64, key string, def float64) float64 {
+	return eraTerm(mods, key, def)
+}
+
 // EraModifier is a world's multiplier for one key, or `def` when that world has
 // no era or its era is silent about it.
 //

@@ -130,10 +130,7 @@ func eraCultivationMultiplier(conn *storage.Conn, world string) (string, float64
 	if err != nil {
 		return "", 1, err
 	}
-	mult := 1.0
-	if v, ok := mods["cultivation_gain"]; ok {
-		mult = v
-	}
+	mult := eraTerm(mods, "cultivation_gain", 1)
 	if mult < 0.25 {
 		mult = 0.25
 	}

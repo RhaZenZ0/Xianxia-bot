@@ -35,7 +35,7 @@ CREATE TABLE caravan_operations(
     losses_json TEXT NOT NULL DEFAULT '{}', outcome TEXT NOT NULL DEFAULT 'traveling', resolved_game_minute INTEGER,
     updated_at REAL NOT NULL, FOREIGN KEY(caravan_id) REFERENCES caravans(caravan_id) ON DELETE CASCADE);
 CREATE TABLE world_eras(
-    era_id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, description TEXT NOT NULL DEFAULT '',
+    era_id INTEGER PRIMARY KEY AUTOINCREMENT, world TEXT NOT NULL DEFAULT 'Mortal World', name TEXT NOT NULL, description TEXT NOT NULL DEFAULT '',
     started_game_minute INTEGER NOT NULL DEFAULT 0, ended_game_minute INTEGER, active INTEGER NOT NULL DEFAULT 1,
     modifiers_json TEXT NOT NULL DEFAULT '{}', created_at REAL NOT NULL);
 CREATE TABLE bounties(

@@ -2,6 +2,7 @@ package game
 
 import (
 	"fmt"
+	"math"
 
 	"xianxia/core/internal/storage"
 	"xianxia/core/internal/worlddata"
@@ -95,6 +96,21 @@ func settleVitalityRecoveryTx(conn *storage.Conn, catalog worlddata.Catalog, use
 		// the clock and bank nothing rather than inventing a span.
 		_, _ = conn.Execute(`UPDATE characters SET vitality_recovered_game_minute=? WHERE user_id=?`, []any{gameMinute, userID})
 		return 0, nil
+	}
+
+	// The age of the world this body is mending in (v1.0.7). `recovery_rate`
+	// was authored on two of the four eras and read by nothing anywhere in the
+	// tree until v1.0.4 gave it something to mean - a Quiet Heaven's promise
+	// that wounds close faster healed nobody for as long as it existed.
+	//
+	// It scales `percent` rather than `gain`, and that is the whole of why it
+	// is one line: `newAnchor` divides by the same `percent` below, so the
+	// remainder the anchor carries stays exactly consistent with the gain it
+	// paid for. Floored at 1, because a rate that rounded the percentage to
+	// zero would not slow healing, it would stop it - a multiplier read as
+	// zero deletes the rule it modifies.
+	if rate := EraModifier(conn, characterEraWorld(conn, catalog, userID), "recovery_rate", 1); rate > 0 && rate != 1 {
+		percent = maxI64(1, int64(math.Round(float64(percent)*rate)))
 	}
 
 	elapsed := gameMinute - anchor
