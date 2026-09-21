@@ -6,6 +6,15 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.1** also fixes an assertion that was only ever green by luck. The engine playtest's
+world-crossing step read a conversion remainder as `int(... or -1)`, and a purse that divides
+exactly leaves a remainder of zero - which is falsy, so `or` swapped the right answer for the
+missing-value sentinel and the step failed its own range check. It had passed every earlier run
+because the run's accumulated wealth had never landed on a round number. Three more of the same
+were waiting in that file, one of them on the zero-conversion the currency ladder is documented to
+produce. All four go through one helper that asks whether a field is absent rather than whether it
+is falsy.
+
 **1.0.1** makes a craft say what it needs. Found by playing: a player bought an Inscription slip,
 read it, and had no way to learn that a Swift-Wind Talisman wants one talisman paper and one spirit
 ink - both authored, both sold in dozens of shops, both foragable. Three facts would each have told

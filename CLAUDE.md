@@ -2369,6 +2369,36 @@ Three things about the gate are worth more than the fix.
   `['v1.0.0.md', 'v1.0.1.md'] != ['v1.0.1.md']`; sorting the versions as text inherits from
   `v1.0.9` over `v1.0.10`.
 
+### The step that only passed when the number was not zero (v1.0.1)
+
+`scripts/playtest_engine.py` went red on a step nothing in the release had touched:
+
+```
+FAIL the crossing carries the player and converts the purse at the ladder
+     24200 low_spirit_stone -> 242 low_spirit_crystal at 100:1, -1 left behind
+```
+
+24,200 divides by a hundred exactly, so the remainder is **0** - and the step read it as
+`int(exchange.get("remainder") or -1)`. Zero is falsy, so `or` replaced the correct answer with the
+missing-value sentinel, and the step then failed its own `0 <= remainder < rate` check. It had passed
+every previous run because the accumulated wealth had never landed on a round number.
+
+That is **"a fallback that looks like a value is not a sentinel"** - the `seller_user_id=0` lesson
+(rc.28), `gradeIndex` (rc.55) and `clanRelationOpeningScore` (v1.0.1) - met inside an *assertion*
+rather than inside a rule. The failure mode is different and worse: a rule that mistakes 0 for
+missing is wrong every time and gets found, while an assertion that does it is **green until the
+value happens to be zero**, which makes it read as a flake.
+
+Three more instances were waiting in the same file, and one of them is on a case the design
+explicitly promises: `int(exchange.get("converted") or -1)` compares against the sheet's mirror, and
+`crossWorldsPurseTx` is documented to write the credit **even when it converts to zero**, because
+that write is what re-points the mirror at the new world. A purse smaller than the ladder's rung
+would have failed that step every time.
+
+`present(value, default=-1)` is the one statement now - `default if value is None else int(value)` -
+and all four sites use it. The rule it encodes is the one this file already states about production
+code, applied to the tests: **ask whether the field is absent, never whether it is falsy.**
+
 ### A method that could not say what it needed (v1.0.1)
 
 **Found by playing, not by reading.** A player bought an Inscription slip, read it, and then had no

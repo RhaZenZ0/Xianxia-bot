@@ -33,6 +33,21 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from playtest_common import ROOT, Report, bootstrap, launch_engine, step, stop_engine  # noqa: E402 - beside this file
 
+def present(value: Any, default: int = -1) -> int:
+    """An integer from a result field, distinguishing absent from zero.
+
+    `int(result.get("x") or -1)` reads a legitimate **0** as missing, because
+    zero is falsy - so an assertion written that way passes only while the
+    value happens to be non-zero and fails the run where it is not. That cost
+    this file a red step on an exact currency conversion (remainder 0) and had
+    three more instances waiting, one of them on the zero-conversion case the
+    ladder is documented to produce. It is the repo's own
+    "a fallback that looks like a value is not a sentinel" rule
+    (`seller_user_id=0`, `gradeIndex`) met inside an assertion.
+    """
+    return default if value is None else int(value)
+
+
 PLAYER = 900001
 BUYER = 900002
 GHOST = 900003
@@ -460,7 +475,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
         if stock:
             line = dict(stock[0])
             bought = await step(report, f"shop.buy {line.get('item_id')}", act("shop.buy", PLAYER, {"item_id": str(line.get("item_id")), "quantity": 1}))
-            if bought is not None and int(bought.get("total") or 0) != int(line.get("price") or -1):
+            if bought is not None and int(bought.get("total") or 0) != present(line.get("price")):
                 report.add("FAIL", "shop.buy charges the shelf price", f"total={bought.get('total')} shelf={line.get('price')}")
         else:
             report.add("FAIL", "shop.browse", "an empty shelf on first sight")
@@ -703,7 +718,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
     xp, cost = int(sheet.get("insight_xp") or 0), int(sheet.get("insight_cost") or 0)
     if xp >= cost:
         banked = await step(report, "cultivation.insight banks the gate insight", act("cultivation.insight", PLAYER, {}))
-        if banked is not None and not (banked.get("banked") and int(banked.get("insight_xp") or -1) == xp - cost):
+        if banked is not None and not (banked.get("banked") and present(banked.get("insight_xp")) == xp - cost):
             report.add("FAIL", "cultivation.insight banks the gate insight", f"{banked}")
         await step(report, "a second insight is refused", act("cultivation.insight", PLAYER, {}), expect_error="already banked")
     else:
@@ -1756,7 +1771,10 @@ async def run(url: str, token: str, db_path: str) -> Report:
             # exactly what converted, and what would not divide is less than
             # one unit of the new money.
             rate, spent = int(exchange.get("rate") or 0), int(exchange.get("spent") or 0)
-            converted, remainder = int(exchange.get("converted") or 0), int(exchange.get("remainder") or -1)
+            converted = int(exchange.get("converted") or 0)
+            # `present`, not `or -1`: a purse that divides exactly leaves a
+            # remainder of 0, and `or` read that correct answer as missing.
+            remainder = present(exchange.get("remainder"))
             report.add("PASS" if str(crossed.get("to")) == "Spirit Jade Capital" and crossed.get("raised") is True
                        and rate == 100 and spent == converted * rate and 0 <= remainder < rate else "FAIL",
                        "the crossing carries the player and converts the purse at the ladder",
@@ -1764,7 +1782,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
                        f"{spent} {exchange.get('from_currency')} -> {converted} "
                        f"{exchange.get('to_currency')} at {rate}:1, {remainder} left behind")
         sheet = dict(await db.get_character(PLAYER) or {})
-        report.add("PASS" if int(sheet.get("spirit_stones") or 0) == int(exchange.get("converted") or -1) else "FAIL",
+        report.add("PASS" if int(sheet.get("spirit_stones") or 0) == present(exchange.get("converted")) else "FAIL",
                    "the sheet reads in the money of the world arrived in",
                    f"spirit_stones={sheet.get('spirit_stones')} at {sheet.get('location')}, converted={exchange.get('converted')}")
         # And home again, which converts back at the same rung, so the rest of
