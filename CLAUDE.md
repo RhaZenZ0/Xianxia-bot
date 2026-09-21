@@ -3384,6 +3384,63 @@ opens would pass just as well for a door that had stopped checking anything, and
 presence: the door is not a teleport. Its drill prints *"standing at "Ash Gate Ruin", nowhere near
 "Adamant Body Immortal City", the household let the player in"*.
 
+### A line that cannot know who is here does not claim to (v1.0.10)
+
+**Found by playing**, and the report was two lines of one panel disagreeing in the same breath:
+
+> **Here** the East Gate of Cloudblade City, facing Ironbanner City · **Gate Captain Yue Dong**
+
+and `/talk`, opened at that same gate, offering **Drillmaster Zhai Kang** - whom `content/world.json`
+places at Cloudblade Blade Yards in all five periods. The simulation had walked him to the gate.
+
+**Three readers, one question, and this was the third.** rc.28 wrote `npcs_present` and fixed the
+*cards* (`/scene status`, `/sense`); v1.0.8 fixed the *picker*. The **panel header** is
+`here_summary`, and it appended
+`sorted(n for n, npc in WORLD.npcs.items() if npc["location"] == name)` - the content file's
+**residents**, read with no schedule and no simulation - so it was answering "who lives here" to a
+line that reads as "who is here". Both were right by their own definition and they disagreed, which
+is precisely the state rc.28 named: *"a picker that offers somebody `/talk` then refuses them is
+worse than either being wrong alone."*
+
+**The fix is that it stops guessing, because it cannot know.** Who is standing somewhere is a
+simulation row, one engine round trip away, and `here_summary` is synchronous - it is drawn inside
+panel headers. So it takes `present` and names people only when a caller hands them over; a caller
+with nothing to give gets the place described and nobody named, which is the honest half of what a
+pure function knows. Both production callers were **already inside async status builders**
+(`menu_facts_line`, and `_here_field`'s two call sites), so each pays one `await` and nothing was
+restructured.
+
+`_who_is_here` is the one helper both use, and it **never raises**: the Here line is drawn beside
+everything else a panel shows, so a lookup that threw would cost the whole card rather than one line
+of it - the same call `hidden_actions` and `not_yet_unlocked` already make, and an empty answer is
+exactly what the line said before anybody could be resolved at all.
+
+**What this deliberately does not do is make `here_summary` async.** It stays pure and testable, and
+the knowledge enters as an argument. A function that quietly grew an engine call would put a round
+trip inside every caller that ever renders a location, including the four tests that render one.
+
+**The gate needs rc.52's rule against itself**, and says so: its own docstring quotes the expression
+it forbids, so a scan of the whole function body would find the fault in the prose explaining it and
+pass. It reads statements without the docstring. Its four drills print the finding - restoring the
+catalogue read prints the reported header verbatim (*"'Yue Dong' unexpectedly found in 'the East
+Gate of Cloudblade City, facing Ironbanner City · Gate Captain Yue Dong'"*), dropping `present=` at
+either call site names that header, swapping the helper off `npcs_present` names it, and removing
+its `except` prints *"one unavailable lookup would cost the whole panel rather than one line of
+it"*.
+
+**A third hand-copy of the tree tuple broke, and this one is retired rather than extended.**
+`test_hint_paths.py` keeps `ROOT_COMMANDS` - the roots that are commands rather than hubs, so
+`**/quests**` in a reply is not a broken hub path - and it was written out by hand, so `/locked`
+failed it the day v1.0.9 added that command: a gate about whether a *printed path resolves* going
+red over a root it had never been told about. `test_live_auctions.py` was the second this session
+and rc.43 made the call for the first: **the tuple is read off `surface.py` by AST, never copied.**
+Three copies is a class, and all three are now readers.
+
+**And the v1.0.8 entry in `docs/TODO.md` had to be corrected**, because it claimed the picker now
+asks *"what the card has always used"*. True of `/scene status` and `/sense`; false of the panel
+header, which is this finding. A note that is right about two readers and wrong about the third is
+how the third goes unlooked-at.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —

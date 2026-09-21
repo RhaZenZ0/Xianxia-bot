@@ -6,6 +6,19 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.10** makes the panel header name whoever is actually standing there.
+
+Reported from live play, as two lines that disagreed in the same breath. The Family Hub header said
+*"Here the East Gate of Cloudblade City, facing Ironbanner City · Gate Captain Yue Dong"*, and
+`/talk`, opened at that same gate, offered **Drillmaster Zhai Kang** - who lives at the Blade Yards
+and had been walked to the gate by the world's own simulation.
+
+Both were right about different questions. The header listed whoever the content file records as
+*living* at a place, with no schedule and no simulation behind it; the picker asks who is *there*.
+So the one line that tells you who is in front of you was the one line not asking. It asks now - the
+same resolver `/talk`, `/scene status` and `/sense` all use - and where nothing can answer, it
+describes the place and names nobody rather than guessing.
+
 **1.0.9** introduces the game a realm at a time, so the first hour is the first hour and not the whole of it.
 
 Reported from live play: *"it's become complex and overwhelming."* A character three minutes old was
@@ -409,9 +422,11 @@ staged authority cleanup: forage, crafting and companions, canonical time, unifi
 road travel, caravans, dashboard-owned Discord setup, and the removal of the obsolete Python
 mechanical authority paths.
 
-## Release status — v1.0.9
+## Release status — v1.0.10
 
-- Current release: v1.0.9 - the game introduces itself a realm at a time: 139 of its 249 doors wait
+- Current release: v1.0.10 - the panel header names who is actually standing there, instead of
+  whoever the content file says lives there. No schema.
+- v1.0.9: the game introduces itself a realm at a time: 139 of its 249 doors wait
   for a cultivation that can use them, a gated page says how many and when, and `/locked` lists
   every one. No schema.
 - v1.0.8: the NPC picker offers whoever is standing in the room rather than

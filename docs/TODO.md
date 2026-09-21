@@ -102,6 +102,15 @@ deferred half and not the half that says what was done about it.
   earns that limit back three ways: a gated page prints one collapsed line and `/locked` lists every
   door with the realm it needs; the slash command still works, because gating is advertising and
   never a bound; and the roster is content a GM can retune.
+- **fixed (v1.0.10)** — *The panel header named whoever content says lives here, while the picker
+  named whoever is here.* Live: the header said *Gate Captain Yue Dong* and `/talk` offered
+  *Drillmaster Zhai Kang*, whom the simulation had walked to that gate. `here_summary` read
+  `WORLD.npcs[...]["location"]` — residents, with no schedule and no simulation — and it is
+  synchronous, so it cannot know: who is standing somewhere is an engine round trip away. It takes
+  `present` now and names people only when a caller hands them over; both production callers were
+  already async and pass `npcs_present`'s answer, the same resolver rc.28 wrote and v1.0.8 pointed
+  the picker at. This was the third reader of one question; rc.28 fixed the cards and v1.0.8 the
+  picker.
 - **deferred (design)** — *The curriculum is realm-banded, and some systems are not about realm.*
   The Ghost Cultivator's `ghost` page is path-specific, the hidden sect's door is a karma gate, and
   a profession's rank is its own ladder — each is left open at realm 0 rather than given a realm
@@ -127,8 +136,10 @@ deferred half and not the half that says what was done about it.
   standing here.* `local_npc_autocomplete` searched all 574 catalogue NPCs, took the alphabetically
   first twenty-five, and only then filtered by location — so `/talk`, `/npcinfo` and `/sense`
   answered *"nothing to choose from right now"* in a room whose own scene card named the gate
-  captain in it. It asks `npcs_present` now, rc.28's one resolver, which is what the card has always
-  used. It blocked more than conversation: the beginner path stalls at its second stage, which asks
+  captain in it. It asks `npcs_present` now, rc.28's one resolver, which is what `/scene status` and
+  `/sense` ask. (**This entry first said "which is what the card has always used", and that was
+  wrong about one card**: the *panel header* is `here_summary`, a pure catalogue read that asks
+  neither the schedule nor the engine — see the v1.0.10 entry above.) It blocked more than conversation: the beginner path stalls at its second stage, which asks
   for a `talk`, and the commission ladder runs inside `/talk`, so 137 of the 140 authored
   commissions could be neither offered nor finished.
 - **deferred (design)** — *An NPC nothing knows the location of is no longer offered anywhere.*

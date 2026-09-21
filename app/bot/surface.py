@@ -98,7 +98,7 @@ from .locations import here_summary
 from .registry import ACTIONS, EVENT_HANDLERS, registered_root_command
 from .runtime import DB, WORLD, character_location_display, log
 from .services import GUILD, SIM
-from .status_cards import cultivation_status_fields, menu_facts_line
+from .status_cards import _who_is_here, cultivation_status_fields, menu_facts_line
 
 
 # ---------------------------------------------------------------------------
@@ -485,14 +485,23 @@ async def _player_hub_status(interaction: discord.Interaction) -> list[HubStatus
             f"**{(await character_location_display(character))[:180]}**",
             inline=False,
         ),
-        *_here_field(character),
+        *await _here_field(character),
     ]
 
 
-def _here_field(character: dict) -> list[HubStatusField]:
+async def _here_field(character: dict) -> list[HubStatusField]:
     """The Here line (v0.40.0): what the place is and offers, and who is
-    about - the context a player checked with City → Look before every action."""
-    summary = here_summary(str(character.get("location") or ""))
+    about - the context a player checked with City → Look before every action.
+
+    Async since v1.0.10, because "who is about" is a simulation row rather than
+    a content field and this header was answering it out of the catalogue: it
+    named the content file's resident while `/talk` offered whoever the tick
+    had walked there. Both call sites were already inside async status
+    builders, so this costs one `await` each and restructures nothing.
+    """
+    summary = here_summary(
+        str(character.get("location") or ""), present=await _who_is_here(character)
+    )
     return [HubStatusField("🧭 Here", summary, inline=False)] if summary else []
 
 
@@ -515,7 +524,7 @@ async def _economy_hub_status(interaction: discord.Interaction) -> list[HubStatu
     return [
         HubStatusField("🪙 Spirit Stones", f"**{int(character.get('spirit_stones', 0) or 0):,}**"),
         HubStatusField("📍 Location", f"**{(await character_location_display(character))[:180]}**", inline=False),
-        *_here_field(character),
+        *await _here_field(character),
         HubStatusField("💹 Local Market", market_signal, inline=False),
     ]
 
