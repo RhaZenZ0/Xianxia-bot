@@ -1,7 +1,6 @@
 package game
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -297,8 +296,7 @@ func TestAdminUndoLastClearConditionClearAllVariantCannotBeUndone(t *testing.T) 
 	seedCondition(t, path, 1, "flesh_wound", "Flesh Wound", 2)
 	seedCondition(t, path, 2, "poisoned", "Poisoned", 3)
 	applyAdmin(t, path, "admin.player.clear_condition", map[string]any{"user_id": 42, "clear_all": true, "reason": "clean slate"})
-	raw, _ := json.Marshal(map[string]any{"reason": "GM undo"})
-	_, err := Apply(path, ActionRequest{Operation: "admin.audit.undo_last", Payload: raw})
+	err := applyAdminErr(t, path, "admin.audit.undo_last", map[string]any{"reason": "GM undo"})
 	if err == nil {
 		t.Fatal("expected the clear_all variant to be rejected as not safely undoable")
 	}
@@ -325,8 +323,7 @@ func TestAdminUndoLastSetModerationRestoresPriorFlags(t *testing.T) {
 
 func TestAdminUndoLastRejectsEmptyLogAndUnsupportedActions(t *testing.T) {
 	path := setupAdminDB(t)
-	raw, _ := json.Marshal(map[string]any{"reason": "GM undo"})
-	_, err := Apply(path, ActionRequest{Operation: "admin.audit.undo_last", Payload: raw})
+	err := applyAdminErr(t, path, "admin.audit.undo_last", map[string]any{"reason": "GM undo"})
 	if err == nil {
 		t.Fatal("expected an error when there is no admin action to undo")
 	}
@@ -354,8 +351,7 @@ func TestAdminUndoLastRejectsEmptyLogAndUnsupportedActions(t *testing.T) {
 		{"admin.audit", map[string]any{"action": "dashboard.note", "target": "x"}},
 	} {
 		applyAdmin(t, path, tc.op, tc.payload)
-		raw, _ := json.Marshal(map[string]any{"reason": "GM undo"})
-		_, err := Apply(path, ActionRequest{Operation: "admin.audit.undo_last", Payload: raw})
+		err := applyAdminErr(t, path, "admin.audit.undo_last", map[string]any{"reason": "GM undo"})
 		if err == nil {
 			t.Fatalf("%s: expected undo_last to reject this action as not safely undoable", tc.op)
 		}

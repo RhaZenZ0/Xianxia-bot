@@ -29,7 +29,7 @@ class ReleaseVersionTests(unittest.TestCase):
         )
 
     def test_release_is_the_expected_version(self):
-        self.assertEqual(__version__, "1.0.10")
+        self.assertEqual(__version__, "1.0.11")
 
     def test_the_readme_and_the_changelog_announce_the_stamped_release(self):
         """rc bar: the README title and the changelog's "Release status" line

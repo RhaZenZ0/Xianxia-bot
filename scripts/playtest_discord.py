@@ -550,8 +550,9 @@ async def run(url: str, token: str, db_path: str) -> Report:
         SERVER_BASE_CATEGORY,
         SERVER_EVENT_CATEGORY,
         SERVER_REALM_CATEGORY,
+        SERVER_WORLD_CATEGORY,
     )
-    from app.bot.runtime import DB
+    from app.bot.runtime import CULTIVATOR_ROLE_NAME, DB
     from app.bot.runtime import _realm_access_role_name
     from app.rules.realm_hubs import REALM_HUBS, realm_presence_role_name
     from app.bot.bot import bot
@@ -724,6 +725,27 @@ async def run(url: str, token: str, db_path: str) -> Report:
                     role = discord.utils.get(live.roles, name=role_name)
                     expect(role is not None and getattr(overwrites.get(role), "view_channel", None) is True,
                            f"#{name} never allowed {role_name} - the bot was probably locked out mid-gate")
+            # 🗺️ Cultivation World behind having played (v1.0.11), held the
+            # same way and for the same reason: a bare "no exception" would
+            # pass just as well for a gate that denied @everyone and allowed
+            # nobody, which is the state rc.52 found in the capitals.
+            cultivator = discord.utils.get(live.roles, name=CULTIVATOR_ROLE_NAME)
+            expect(cultivator is not None, "Full Setup never created the cultivator role")
+            world_category = next((c for c in live.categories if c.name == SERVER_WORLD_CATEGORY), None)
+            expect(world_category is not None, f"no {SERVER_WORLD_CATEGORY} category")
+            for target in [world_category] + [by_name[n] for n in ("player-homes", "expeditions")]:
+                overwrites = target.overwrites or {}
+                expect(getattr(overwrites.get(live.default_role), "view_channel", None) is False,
+                       f"{target.name} does not deny @everyone")
+                expect(getattr(overwrites.get(cultivator), "view_channel", None) is True,
+                       f"{target.name} never allowed {CULTIVATOR_ROLE_NAME} - the bot was probably locked out mid-gate")
+                # The read-only anchors stay read-only: `set_permissions(**perms)`
+                # replaces an overwrite rather than merging, so a bare
+                # view_channel=False would have taken `send_messages=False`
+                # off @everyone with it.
+                if target is not world_category:
+                    expect(getattr(overwrites.get(live.default_role), "send_messages", None) is False,
+                           f"#{target.name} is no longer read-only: the gate replaced the anchor's own overwrite")
             return (f"{len(wanted)} categories in order, every base channel in its own, "
                     f"4 capitals, 4 world feeds, {len(auctions)} auction channels, all gated")
         built = await step(report, "the dashboard's Full Setup creates every category and per-world channel", full_setup())

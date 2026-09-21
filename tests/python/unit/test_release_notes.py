@@ -36,6 +36,27 @@ Its own second paragraph.
 **0.40.0** the one before the ones.
 """
 
+GAP = """# History
+
+## Changelog
+
+**1.0.10** names whoever is actually standing there.
+
+**1.0.9** introduces the game a realm at a time.
+
+**1.0.8** gives you back the people in front of you.
+
+**1.0.7** gives every world its own age.
+
+**1.0.6** makes one promise true in the engine too.
+
+**1.0.5** stops a quest being lost to a failure in drawing the reply.
+
+**1.0.0** is the first release with no suffix on its tag.
+
+**1.0.0** (rc.59) gives the server an order.
+"""
+
 
 def _module():
     with patch.dict(os.environ, ENV):
@@ -155,14 +176,23 @@ class TheAnnouncementHappensOnce(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.notes = _module()
 
-    def _patched(self, db, *, channel=None):
+    def _patched(self, db, *, running=None, source=SAMPLE):
         """`DB`, the running version and the changelog, all pinned.
 
         `discord` is replaced wholesale because the isinstance check is the
         one thing standing between a fake channel and the post.
+
+        The changelog is pinned as a **file**, not by patching the reader.
+        rc.59's version of this stubbed `release_notes_for` with a lambda, so
+        the parser and the walk beneath it were never driven from here at all -
+        and v1.0.11 replaced the reader with `releases_between` under a green
+        suite. A fixture that stands in for the thing being changed cannot fail
+        the way production fails.
         """
         import contextlib
+        import tempfile
         import types
+        from pathlib import Path
 
         fake_discord = types.SimpleNamespace(
             TextChannel=FakeTextChannel,
@@ -171,10 +201,12 @@ class TheAnnouncementHappensOnce(unittest.IsolatedAsyncioTestCase):
             Guild=FakeGuild,
         )
         stack = contextlib.ExitStack()
+        tmp = Path(stack.enter_context(tempfile.TemporaryDirectory())) / "VERSIONS.md"
+        tmp.write_text(source, encoding="utf-8")
         stack.enter_context(patch.object(self.notes, "DB", db))
         stack.enter_context(patch.object(self.notes, "discord", fake_discord))
-        stack.enter_context(patch.object(self.notes, "INSTALLED_VERSION", self.RUNNING))
-        stack.enter_context(patch.object(self.notes, "release_notes_for", lambda v, **k: "The notes."))
+        stack.enter_context(patch.object(self.notes, "INSTALLED_VERSION", running or self.RUNNING))
+        stack.enter_context(patch.object(self.notes, "VERSIONS_FILE", tmp))
         return stack
 
     async def test_it_posts_once_and_never_again(self):
@@ -190,7 +222,7 @@ class TheAnnouncementHappensOnce(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(second, "a restart announced the same release twice")
         self.assertEqual(db.writes, [(42, self.RUNNING)], "the marker was not written")
         self.assertEqual(len(channel.sent), 1)
-        self.assertIn("The notes.", channel.sent[0])
+        self.assertIn("gives the server an order", channel.sent[0])
 
     async def test_a_fresh_install_is_told_nothing(self):
         """A NULL marker records where we are and says nothing: a server being
@@ -225,8 +257,7 @@ class TheAnnouncementHappensOnce(unittest.IsolatedAsyncioTestCase):
         """So a corrected VERSIONS.md still gets its chance."""
         channel = FakeTextChannel()
         db = FakeDB({"announced_release": "1.0.0-rc.58", "updates_channel_id": 7})
-        with self._patched(db) as stack:
-            stack.enter_context(patch.object(self.notes, "release_notes_for", lambda v, **k: None))
+        with self._patched(db, source=SAMPLE.replace("**1.0.0** (rc.59)", "**0.39.0** (rc.59)")):
             announced = await self.notes.announce_release_if_new(FakeGuild(channel))
         self.assertIsNone(announced)
         self.assertEqual(channel.sent, [])
@@ -239,10 +270,9 @@ class TheAnnouncementHappensOnce(unittest.IsolatedAsyncioTestCase):
         glancing at a channel."""
         channel = FakeTextChannel()
         db = FakeDB({"announced_release": "1.0.0-rc.58", "updates_channel_id": 7})
-        long_notes = "**1.0.0** (rc.60) does one thing. " + "\n\n".join(
+        long_notes = "**1.0.0** (rc.59) does one thing. " + "\n\n".join(
             f"Paragraph {i}. " + "word " * 300 for i in range(4))
-        with self._patched(db) as stack:
-            stack.enter_context(patch.object(self.notes, "release_notes_for", lambda v, **k: long_notes))
+        with self._patched(db, source=f"# History\n\n## Changelog\n\n{long_notes}\n"):
             await self.notes.announce_release_if_new(FakeGuild(channel))
         self.assertEqual(len(channel.sent), 1, "a whole entry reached the channel again")
         post = channel.sent[0]
@@ -250,6 +280,105 @@ class TheAnnouncementHappensOnce(unittest.IsolatedAsyncioTestCase):
         self.assertIn("does one thing.", post)
         self.assertNotIn("Paragraph 1", post, "the body of the entry does not belong in the channel")
         self.assertIn("Full notes:", post)
+
+
+class NoReleaseIsJumpedOver(unittest.IsolatedAsyncioTestCase):
+    """A skipped version is told, not stepped across (v1.0.11).
+
+    rc.59 compared the marker to the running version for **equality** and
+    fetched that one entry, so a server upgrading 1.0.5 -> 1.0.8 was told about
+    1.0.8 and never about 1.0.6 or 1.0.7: the marker jumped straight across and
+    nothing recorded that two releases went past unmentioned. Neither of the
+    two neighbouring behaviours that *do* work covered it - a missing entry and
+    an unbound channel both leave the marker alone for a later chance, and a
+    skipped version is in neither category, because it was never looked up.
+
+    "Posts each missed release exactly once" is precisely the kind of claim
+    rc.59's own version of this file asserted in prose and never drove, so it
+    is driven here, including through a send that fails halfway.
+    """
+
+    RUNNING = "1.0.8"
+
+    setUp = TheAnnouncementHappensOnce.setUp
+    _patched = TheAnnouncementHappensOnce._patched
+
+    def test_a_release_sorts_as_integers_and_below_its_candidates(self):
+        """`1.0.10` is newer than `1.0.9`, and `1.0.0-rc.59` is older than
+        `1.0.0` - the rule `playtest_checklist.py` learned in v1.0.1, where
+        sorting versions as text inherited the wrong checklist's ticks."""
+        key = self.notes.version_key
+        order = ["1.0.0-rc.9", "1.0.0-rc.59", "1.0.0", "1.0.1", "1.0.9", "1.0.10"]
+        self.assertEqual(sorted(order, key=key), order)
+
+    def test_the_window_is_open_below_and_closed_above(self):
+        found = [v for v, _ in self.notes.releases_between("1.0.5", "1.0.8", source=GAP)]
+        self.assertEqual(found, ["1.0.6", "1.0.7", "1.0.8"], (
+            "the walk must skip what the guild was already told about and stop at the release "
+            "actually running - never announce a version this tree is not"))
+
+    def test_a_marker_the_changelog_predates_yields_the_whole_window(self):
+        """Being told too much once is recoverable; being told nothing is the
+        fault the walk exists for."""
+        found = [v for v, _ in self.notes.releases_between("0.1.0", "1.0.6", source=GAP)]
+        self.assertEqual(found, ["1.0.0-rc.59", "1.0.0", "1.0.5", "1.0.6"])
+
+    async def test_every_skipped_release_is_posted_oldest_first(self):
+        channel = FakeTextChannel()
+        db = FakeDB({"announced_release": "1.0.5", "updates_channel_id": 7})
+        with self._patched(db, source=GAP):
+            announced = await self.notes.announce_release_if_new(FakeGuild(channel))
+        self.assertEqual(announced, "1.0.8")
+        self.assertEqual(len(channel.sent), 3, (
+            "a server upgrading 1.0.5 -> 1.0.8 must hear about 1.0.6 and 1.0.7 too; before "
+            f"v1.0.11 the marker jumped straight across: {channel.sent}"))
+        for index, version in enumerate(("1.0.6", "1.0.7", "1.0.8")):
+            self.assertIn(f"v{version}", channel.sent[index], "the gap was not posted oldest first")
+        self.assertEqual(db.writes, [(42, "1.0.8")], "the marker is written once, at the end")
+
+    async def test_a_send_that_fails_halfway_does_not_mark_what_it_never_posted(self):
+        """"Exactly once" has to survive a partial failure or it is only a
+        claim about the happy path."""
+
+        class FailsAfterOne(FakeTextChannel):
+            async def send(self, content: str) -> None:
+                if len(self.sent) >= 1:
+                    raise RuntimeError("Discord said no")
+                await super().send(content)
+
+        channel = FailsAfterOne()
+        db = FakeDB({"announced_release": "1.0.5", "updates_channel_id": 7})
+        with self._patched(db, source=GAP):
+            announced = await self.notes.announce_release_if_new(FakeGuild(channel))
+        self.assertEqual(announced, "1.0.6")
+        self.assertEqual(db.writes, [(42, "1.0.6")], (
+            "the marker must stop at the last release actually posted - past it and 1.0.7 and "
+            "1.0.8 look announced while nobody was told; short of it and 1.0.6 is posted twice"))
+
+    async def test_a_long_gap_is_capped_and_says_so(self):
+        channel = FakeTextChannel()
+        db = FakeDB({"announced_release": "1.0.0-rc.59", "updates_channel_id": 7})
+        with self._patched(db, running="1.0.10", source=GAP):
+            with patch.object(self.notes, "MAX_ANNOUNCED_RELEASES", 3):
+                announced = await self.notes.announce_release_if_new(FakeGuild(channel))
+        self.assertEqual(announced, "1.0.10")
+        self.assertEqual(len(channel.sent), 4, "three posts and the line that says what is missing")
+        self.assertIn("not repeated here", channel.sent[0], (
+            "a capped catch-up drops releases silently; the count has to be said, the way a fresh "
+            "install is spared forty paragraphs on purpose rather than by accident"))
+        for index, version in enumerate(("1.0.8", "1.0.9", "1.0.10")):
+            self.assertIn(f"v{version}", channel.sent[index + 1])
+
+    async def test_a_downgrade_announces_nothing(self):
+        """An older running version yields an empty window rather than
+        re-announcing everything the guild has already read."""
+        channel = FakeTextChannel()
+        db = FakeDB({"announced_release": "1.0.10", "updates_channel_id": 7})
+        with self._patched(db, running="1.0.7", source=GAP):
+            announced = await self.notes.announce_release_if_new(FakeGuild(channel))
+        self.assertIsNone(announced)
+        self.assertEqual(channel.sent, [])
+        self.assertEqual(db.writes, [])
 
 
 class TheHeadlineIsDerivedNeverAuthored(unittest.TestCase):

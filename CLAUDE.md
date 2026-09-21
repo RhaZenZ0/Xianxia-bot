@@ -3441,6 +3441,175 @@ asks *"what the card has always used"*. True of `/scene status` and `/sense`; fa
 header, which is this finding. A note that is right about two readers and wrong about the third is
 how the third goes unlooked-at.
 
+### The writer a human drives is the one nothing held (v1.0.11)
+
+Two levers, one sentence. Both are `admin.player.*`, both are the only door a GM has to a thing the
+engine otherwise writes once at birth, and both were the one writer in their family that nothing
+checked.
+
+**`admin.player.set_spiritual_root` held its grade to a hand-written copy of the ladder.** Six names
+in a map literal - `{"Mortal", "Common", "Refined", "Earth", "Heaven", "Immortal"}` - beside the six
+`spiritual_root_system.grades` the content file carries. It could not be wrong in an interesting way,
+because the copy agreed with the file the day it was written and agrees with it now; the day a rung
+is renamed or added it refuses the real grade and accepts a stale one, silently. That is the shape
+rc.44 removed for the world currencies and v1.0.7 for the era roster, and this session had already
+retired three hand-copies of the command tree's own tuple for it. What makes a wrong grade quiet
+rather than loud is `gradeIndex`, which answers 0 for a name it does not know: since rc.55 that is
+Mortal's 0.88x cultivation and -1 on every breakthrough, for the character's whole life. **A fallback
+that looks like a value is not a sentinel** - so the check has to be here, at the writer a human
+types into. rc.55 found exactly this shape and gated the *fixtures*
+(`TestEveryFixtureRootStandsOnTheLadder`); the lever was left ungated.
+
+**`admin.player.set_physique` moved three numbers and never the identity.** `evolution_stage`,
+`progress` and `stability`, and nothing else - while the only two statements in the whole engine
+that have ever written `physique_id` are character creation and samsara (`aptitude.awaken` and
+`aptitude.evolve` both pass the loaded bundle back through `savePhysique`, so they move the state
+and never the name). This is **not** dead content: all eight non-ordinary physiques are drawable at
+birth, because `generatePhysique` gives every one weight at least 1. So it was a missing lever
+rather than a `/learn`-class orphan - a GM could not hand somebody `nine_yang_solar_body`, correct
+one rolled wrong, or stage one for a playtest. `physique_id` is optional on the payload, so every
+existing caller still edits the three numbers; when it is given it is held to the catalogue, because
+an id the catalogue does not carry contributes no modifiers at all and would be a physique that
+exists only as a string on the sheet. **The identity goes into the undo snapshot whether or not the
+call changes it**, since a snapshot of three numbers would leave a granted physique standing and
+call itself an undo; a snapshot from before this release carries none, and the three-number
+statement is kept for it, because an old audit row must stay undoable on the terms it was written.
+
+**The browser kept a third copy of the ladder.** `gradeOpts` in `dashboard/app.js` was
+`['Mortal','Common','Refined','Earth','Heaven','Immortal']`, and the physique card offered no
+picker at all. Both come off the content file with the row now (`_aptitude_catalogue`, sent as part
+of `player_detail`), which is rc.37's whole rationale for the Player Editor - the ids a lever needs
+are picked, not typed - and rc.46's rule seen from the wrong side of the counter: a picker built
+from a copy offers what the engine will refuse the day the two disagree. The rungs keep the ladder's
+own order, because a grade *is* an order and sorting it alphabetically would put Common above Earth.
+An unreadable content file answers empty lists and each card says it has nothing to offer; a
+fallback list would be the hand-written copy this release removes, wearing an exception's hat.
+
+**The fixture could not fail the way production fails, and finding that is most of the work.**
+`Apply(databasePath, req)` calls `ApplyWithWorld(databasePath, "", req)` - an **empty world path** -
+and every admin test in the tree went through it, while production only ever calls
+`game.ApplyWithWorld(s.databasePath, s.worldPath, ...)` (`server.New`). Under an empty catalogue a
+content-backed check answers "not in the catalogue" to everything, so the first run of the new gate
+failed on correct code with *"the spiritual-root ladder is missing from the content file"*. Read the
+other way, that is the finding: **a lever that refuses everything would have passed every admin test
+in this repository.** `applyAdminRaw` hands the real file to the dispatch, and the seven pre-existing
+call sites go through it too.
+
+**The gate that matters is the one a copy cannot pass.** The obvious behavioural test - set a grade,
+read it back - passes identically against the map literal, because the literal is currently right;
+that is the rc.47 shape, a gate that cannot see the thing it forbids. `worldWithAnExtraRung` writes a
+copy of the shipped content carrying a seventh rung and drives the lever against it, which is also
+precisely the day the fault would first cost somebody something. Its drill prints
+*"the content file carries a "Primordial" rung and the lever refused it: grade must be one of
+Mortal, Common, Refined, Earth, Heaven, Immortal"*.
+
+**And the Python half deliberately has no tree-wide sweep**, which its own first run is the reason
+for. Written in `test_one_world_currency_rule.py`'s shape - a production file naming three or more
+rungs is restating the ladder - it reported five offenders and every one was a false positive:
+`Mortal`, `Earth`, `Heaven` and `Immortal` are also manual grades, qi-body grades, world names and
+the generated catalogue's tiers. That is CLAUDE.md's own "a name is not a reader" one level out; the
+currency ids are unique strings and these are four ordinary words four vocabularies share. **A sweep
+whose every hit needs hand-checking is not a gate** (v1.0.1), so it was deleted rather than
+allowlisted - five entries would have been five places for a real copy to hide. What is held instead
+is the wire, each where it can be told apart: the engine's half behaviourally in Go, the browser's
+half by reading `loadPlayerEditor`'s own body.
+
+### A server is told what it missed (v1.0.11)
+
+rc.59 made the bot post its own release notes into `#updates` and compared
+`server_config.announced_release` to the running version for **equality**, then fetched that one
+changelog entry. So a server upgrading 1.0.5 to 1.0.8 was told about 1.0.8 and never about 1.0.6 or
+1.0.7: the marker jumped straight across and nothing recorded that two releases went past
+unmentioned.
+
+**Three neighbouring behaviours do work, and that is what hid it.** A NULL marker records silently
+(a fresh install does not want forty paragraphs of history), and neither a missing changelog entry
+nor an unbound channel advances the marker, so both get a later chance. A *skipped* version is in
+neither category, because it was never looked up at all.
+
+`releases_between` walks the gap. Three things about it are decisions rather than mechanics:
+
+- **Versions sort as integers, and a candidate sorts below the release it is a candidate for**, so
+  `1.0.0-rc.59 < 1.0.0 < 1.0.1 < 1.0.9 < 1.0.10`. The first half is v1.0.1's own lesson, where
+  `playtest_checklist.py` sorted `v1.0.10` before `v1.0.9` as text and inherited the wrong
+  checklist's ticks. The second is a trailing sentinel: an entry with no rc suffix is the final one
+  of its base, so it takes a number no candidate can reach.
+- **The marker stops at the last release actually posted, never past it.** A send that fails halfway
+  through a gap must not make the releases it never reached look announced - *"exactly once"* has to
+  survive a partial failure or it is only a claim about the happy path.
+- **A capped catch-up says what it is not showing.** A server away a year gets
+  `MAX_ANNOUNCED_RELEASES` sentences and one line naming the rest, rather than thirty messages or a
+  silent drop - the same reason a fresh install is spared its history on purpose.
+
+**The gate's fixture was standing in for the thing being changed.** rc.59's
+`test_release_notes.py` stubbed `release_notes_for` with a lambda returning `"The notes."`, so the
+parser and everything under it were never driven from `announce_release_if_new` at all - and this
+release replaced that reader with `releases_between` under a green suite. It pins a **temporary
+`VERSIONS.md`** now instead, so every test drives the real parse. Three drills: restoring the
+equality-only fetch prints *"a server upgrading 1.0.5 -> 1.0.8 must hear about 1.0.6 and 1.0.7
+too"*; marking the running version regardless of what was posted prints `'1.0.8' != '1.0.6'`;
+sorting the versions as text prints `['1.0.0', '1.0.0-rc.59', '1.0.10', '1.0.5', '1.0.6']`.
+
+### A room for people who have played (`Xianxia • Cultivator`, v1.0.11)
+
+Every player-facing category on the server was gated except one. Realm Capitals sit behind the
+presence role, the four World Events feeds behind the realm-access role, Admin behind administrator
+- and 🗺️ Cultivation World, which holds `#player-homes` and `#expeditions`, was open to everybody.
+So a newcomer's sidebar advertised read-only anchors for threads they cannot have, directly above
+the `#begin-here` they are meant to go to.
+
+**The deeper half is that no "has a character" role existed at all.** `_sync_realm_access_roles` and
+`_sync_realm_presence_roles` both run from `require_character`, so both only ever fire for somebody
+who already has one - which means nothing in this server could be gated on having played. There is
+one generated role now, and where it is written and taken off is the whole of it:
+
+- **`require_character` keeps it in step**, in the same block as the two realm syncs and for the
+  same reason: it is the only thing in the bot that fires often enough, and reaching it at all is
+  what "has a character" means.
+- **Creation grants it before the first private thread is opened.** Both anchors carry
+  `private_thread`s and a member still needs to see a thread's parent, so the grant sits above
+  `ensure_birth_family_household_thread` rather than below it.
+- **An erasure is the one place it comes off**, and the asymmetry is deliberate: after an erasure
+  `require_character` never fires for that account again, so nothing else can ever notice. It goes
+  beside the threads v1.0.8 taught that path to delete.
+- **`_sync_all_realm_access_roles` backfills it**, because that sweep is the one thing that walks
+  every character already in the guild - so an upgrading server puts the role on people who made
+  their cultivator before it existed. It also checks the new role against the bot's own hierarchy
+  there, so a role above the bot fails once, loudly, instead of silently per member.
+
+Three rules on the overwrite, and each is a scar this file already carries.
+
+- **The bot allows itself before it denies anybody** (rc.52). A channel overwrite applies to the bot
+  like anyone else unless it is Administrator, so denying `@everyone` first takes the bot's own
+  access away and every call after it is refused 403 - leaving the room denied to everyone with no
+  allow to put back.
+- **It reaches the channels that already exist**, not only the ones a run creates (rc.59, found in
+  the file that provisions them). A category overwrite is inherited only by a channel whose
+  permissions are synced to it, and both anchors carry an `@everyone` overwrite of their own - so
+  the category *and* each channel is gated in its own right.
+- **The overwrite is merged, never replaced.** `set_permissions(target, **perms)` builds a fresh
+  `PermissionOverwrite` from its kwargs, and the `@everyone` overwrite on both anchors is
+  `send_messages=False` - the read-only anchor rule. Writing a bare `view_channel=False` over it
+  would have left them hidden and, to everybody holding the role, **writable**: the gate quietly
+  undoing the thing the channels are for. The Discord harness asserts that directly, beside the
+  allow and the deny.
+
+**A third generated name is when the name family has to be gated.** `realm_presence_role_name` falls
+back to the bare `world_name` when a hub carries no `display_name`, and `_realm_access_role_name` is
+that same string - so a fifth realm hub written without one would generate one name for two gates,
+`discord.utils.get` would hand both the same role, and nothing would error: the access gate would
+start following the character's location, and a cultivator who walked out of a capital would lose
+sight of that world's news feed. `docs/TODO.md` recorded that trap when it planned this role and
+said adding a third name is the moment to gate it.
+`test_the_role_names_never_collide.py` walks whatever `REALM_HUBS` carries, so a fifth hub fails the
+day it is added - and it drives the fallback itself, because a gate that asserts a collision cannot
+happen without showing what one looks like is asserting a hope.
+
+**This is advertising, not a bound.** The role decides what a sidebar shows and nothing else; the
+engine's own refusals are still the only refusals, exactly as v1.0.9's curriculum states about
+itself. Discord layout stays the dashboard's to own, so the gate runs only behind `create_missing`
+and the `/admin` slash path is still validate-only.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —

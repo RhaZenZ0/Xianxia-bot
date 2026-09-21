@@ -6,6 +6,37 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.11** gives a GM the two levers that only creation had, and stops a server being told about one
+release when three went by.
+
+Four deferred items, and the first two are one sentence from two sides: **the writer a human drives
+is the one nothing held.** `admin.player.set_spiritual_root` held the grade a GM types to a
+hand-written copy of the ladder `content/world.json` carries - six names in a map literal, agreeing
+with the file the day they were written, and silently wrong the day a rung is renamed or added.
+`admin.player.set_physique` moved a physique's stage, progress and stability and **never its
+identity**: the only two statements in the whole engine that have ever written `physique_id` are
+character creation and samsara, so a GM could not hand somebody a physique, correct one rolled
+wrong, or stage one for a playtest, even though all eight are drawable at birth. Both read the
+content file now, the physique goes into the undo snapshot so an undo puts back what a grant
+replaced, and the dashboard's two aptitude cards are pickers fed from that file - `gradeOpts` was a
+third copy of the ladder, in the browser.
+
+It also walks the releases a server missed. `#updates` compared the marker to the running version
+for equality and fetched that one entry, so a server upgrading 1.0.5 to 1.0.8 was told about 1.0.8
+and never about 1.0.6 or 1.0.7; the marker jumped across and nothing recorded that two releases went
+past unmentioned. Every entry in the gap is posted now, oldest first, capped with a line saying what
+is not being repeated - and the marker stops at the last release actually posted, so a send that
+fails halfway does not make the ones it never reached look announced.
+
+And 🗺️ Cultivation World is for cultivators. `#player-homes` and `#expeditions` were the last
+player-facing category open to everybody, so a newcomer's sidebar advertised rooms they cannot use
+directly above the `#begin-here` they are meant to go to - while the capitals, the four world feeds
+and the admin rooms were each gated. The deeper half was that no "has a character" role existed at
+all, because both realm syncs run from `require_character` and so only ever fire for somebody who
+already has one. There is one now, granted at creation before the first private thread is opened,
+kept in step by `require_character`, taken off at an erasure - the one moment nothing else can
+notice - and backfilled onto existing players by the sweep Full Setup already runs.
+
 **1.0.10** makes the panel header name whoever is actually standing there.
 
 Reported from live play, as two lines that disagreed in the same breath. The Family Hub header said
@@ -422,9 +453,12 @@ staged authority cleanup: forage, crafting and companions, canonical time, unifi
 road travel, caravans, dashboard-owned Discord setup, and the removal of the obsolete Python
 mechanical authority paths.
 
-## Release status — v1.0.10
+## Release status — v1.0.11
 
-- Current release: v1.0.10 - the panel header names who is actually standing there, instead of
+- Current release: v1.0.11 - a GM can grant a physique and can only set a root grade the ladder
+  carries, `#updates` walks the releases a server missed instead of jumping the marker across them,
+  and 🗺️ Cultivation World is gated behind having played. No schema.
+- v1.0.10: the panel header names who is actually standing there, instead of
   whoever the content file says lives there. No schema.
 - v1.0.9: the game introduces itself a realm at a time: 139 of its 249 doors wait
   for a cultivation that can use them, a gated page says how many and when, and `/locked` lists

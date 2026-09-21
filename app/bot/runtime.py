@@ -351,6 +351,70 @@ async def current_world_time():
     return from_game_minutes(int(clock["game_minute"]))
 def _realm_access_role_name(world_name: str) -> str:
     return f"Xianxia • {world_name}"[:100]
+# The third name in the family, and the first that is not per world (v1.0.11).
+#
+# `realm_presence_role_name` falls back to the bare `world_name` when a hub
+# carries no `display_name`, so it and `_realm_access_role_name` can already
+# collide by construction - a fifth hub without one would silently merge two
+# gates. A third name is the moment to gate that, and
+# `test_the_role_names_never_collide.py` is where it is held. "Cultivator" is
+# not a world and no hub may be called one.
+CULTIVATOR_ROLE_NAME = "Xianxia • Cultivator"
+async def _sync_cultivator_role(
+    guild: discord.Guild | None, member: discord.Member | discord.User, *, has_character: bool
+) -> None:
+    """Hold the "Xianxia • Cultivator" role to whether this account has played.
+
+    Every other player-facing category on the server is gated - Realm Capitals
+    by the presence role, the four World Events feeds by the realm-access role,
+    Admin by administrator - and 🗺️ Cultivation World was not, so a newcomer's
+    sidebar advertised `#player-homes` and `#expeditions` directly above the
+    `#begin-here` they are meant to go to. The deeper half was that **no "has a
+    character" role existed at all**: both realm syncs run from
+    `require_character` and so only ever fire for somebody who already has one,
+    which meant nothing in the server could be gated on having played.
+
+    It is a grant, and the revoke is `admin.player.erase`'s alone. That
+    asymmetry is deliberate: `require_character` is the only thing that fires
+    often enough to keep a role in step, and after an erasure it never fires
+    for that account again - so the one place a character stops existing is the
+    one place the role has to be taken off by hand.
+
+    Silent on every failure, like its two siblings: a role that cannot be
+    synchronised must never be the reason a command fails.
+    """
+    if guild is None or not isinstance(member, discord.Member) or not has_character:
+        return
+    me = guild.me
+    if not me or not me.guild_permissions.manage_roles:
+        return
+    role = discord.utils.get(guild.roles, name=CULTIVATOR_ROLE_NAME)
+    if role is None or role.id in {existing.id for existing in member.roles}:
+        return
+    try:
+        await member.add_roles(role, reason="Xianxia: this account has a cultivator")
+    except discord.Forbidden:
+        log.warning("Could not grant the cultivator role to %s; check bot role hierarchy", member.id)
+    except discord.HTTPException:
+        log.exception("Could not grant the cultivator role to %s", member.id)
+async def _revoke_cultivator_role(guild: discord.Guild | None, user_id: int) -> None:
+    """Take the role off, for the one case `_sync_cultivator_role` cannot see.
+
+    An erasure is where a character stops existing, and it is also the last
+    time this bot hears about that account through `require_character` - so
+    nothing else can ever notice. Called from `admin.player.erase`'s Discord
+    half, beside the threads it deletes (v1.0.8).
+    """
+    if guild is None:
+        return
+    member = guild.get_member(int(user_id))
+    role = discord.utils.get(guild.roles, name=CULTIVATOR_ROLE_NAME)
+    if member is None or role is None or role.id not in {existing.id for existing in member.roles}:
+        return
+    try:
+        await member.remove_roles(role, reason="Xianxia: the account's data was erased")
+    except (discord.Forbidden, discord.HTTPException):
+        log.exception("Could not revoke the cultivator role from %s", user_id)
 async def _sync_realm_access_roles(
     guild: discord.Guild | None, member: discord.Member | discord.User, character: dict[str, Any]
 ) -> None:
@@ -516,6 +580,11 @@ async def require_character(interaction: discord.Interaction, *, allow_deceased:
     try:
         await _sync_realm_access_roles(interaction.guild, interaction.user, character)
         await _sync_realm_presence_roles(interaction.guild, interaction.user, character)
+        # The third sync, in the same block and for the same reason: this is
+        # the one place in the bot that fires often enough to keep a role in
+        # step, and reaching here at all is what "has a character" means
+        # (v1.0.11).
+        await _sync_cultivator_role(interaction.guild, interaction.user, has_character=True)
     except Exception:
         log.exception("Realm access role synchronization failed")
     return character
