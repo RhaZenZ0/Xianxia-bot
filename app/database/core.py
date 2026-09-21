@@ -6060,6 +6060,23 @@ class Database:
     async def get_recipe_definition(self, name: str) -> dict[str, Any] | None:
         return await self._catalog_get("content_recipes", name)
 
+    async def get_known_recipes(self, user_id: int) -> list[dict[str, Any]]:
+        """The methods this cultivator knows, newest first.
+
+        `character_recipes` had four writers - a bought slip, the household
+        lesson, the trade examination and the grandfathering migration - and
+        until v1.0.1 **no reader in Python at all**, so nothing in the game
+        could tell a player what they had learned. Go read it to decide whether
+        a craft was allowed; nobody read it to say so.
+        """
+        async with self._connect() as db:
+            cur = await db.execute(
+                """SELECT recipe, source, learned_game_minute FROM character_recipes
+                   WHERE user_id = ? ORDER BY learned_game_minute DESC, recipe""",
+                (user_id,),
+            )
+            return [dict(row) for row in await cur.fetchall()]
+
     async def search_catalog(self, kind: str, query: str = "", limit: int = 25) -> list[str]:
         table = {"location": "content_locations", "npc": "content_npcs", "recipe": "content_recipes", "manual": "content_manuals", "technique": "content_techniques"}.get(kind)
         if table is None:
