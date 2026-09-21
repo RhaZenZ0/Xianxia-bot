@@ -1,6 +1,6 @@
 """v0.34.0 Gameplay-complete II gate: the playtest is on file.
 
-- `docs/KNOWN_LIMITATIONS.md` exists and every finding is fixed or deferred
+- `docs/TODO.md` exists and every finding is fixed or deferred
   with a reason - never left open without one of those words;
 - the checklist under `docs/playtest/` is checked in for the current
   release and names every registered command;
@@ -22,7 +22,7 @@ import unittest
 
 from tests.support import PROJECT_ROOT
 
-LIMITATIONS = PROJECT_ROOT / "docs" / "KNOWN_LIMITATIONS.md"
+TODO_FILE = PROJECT_ROOT / "docs" / "TODO.md"
 VERSION = (PROJECT_ROOT / "VERSION").read_text(encoding="utf-8").strip()
 CHECKLIST = PROJECT_ROOT / "docs" / "playtest" / f"v{VERSION}.md"
 ENGINE_SCRIPT = (PROJECT_ROOT / "scripts" / "playtest_engine.py").read_text(encoding="utf-8")
@@ -31,8 +31,8 @@ DISCORD_SCRIPT = (PROJECT_ROOT / "scripts" / "playtest_discord.py").read_text(en
 
 class ThePunchListIsHonest(unittest.TestCase):
     def test_it_exists_and_every_entry_is_fixed_or_deferred_with_a_reason(self):
-        self.assertTrue(LIMITATIONS.exists())
-        text = LIMITATIONS.read_text(encoding="utf-8")
+        self.assertTrue(TODO_FILE.exists())
+        text = TODO_FILE.read_text(encoding="utf-8")
         entries = re.findall(r"^- \*\*(fixed|deferred)(?: \(([^)]+)\))?\*\* — ", text, re.M)
         self.assertGreaterEqual(len(entries), 5)
         bullets = [line for line in text.splitlines() if line.startswith("- ")]

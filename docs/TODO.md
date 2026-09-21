@@ -1,16 +1,96 @@
-# Known limitations — the punch list
+# TODO — the punch list
 
-The v0.34 playtest's findings (`docs/history/ROADMAP_1_0.md`, Gameplay-complete II). Every entry is
-either **fixed** in the release named, or **deferred** past 1.0 with the reason. Nothing is left
-open without one of those two words; `tests/python/contracts/test_playtest_gate.py` holds the
-file to that. Add to it from the live pass (`docs/playtest/`) as findings come in.
+What is open, and what each open thing became. Every entry is either **fixed** in the release named,
+or **deferred** with the reason; nothing is left open without one of those two words, and
+`tests/python/contracts/test_playtest_gate.py` holds the file to that. A fixed entry is **kept**
+rather than deleted: it is the record of what the item turned into, and the release write-ups in
+`CLAUDE.md` cite these by name.
 
-The engine half of the playtest is `scripts/playtest_engine.py --launch`: every loop the roadmap
-names, driven through the engine's HTTP API the way the bot's handlers drive it, against a scratch
-database. Its findings are the first two entries.
+Newest first. Add to it as findings come in — from the live pass (`docs/playtest/`), from a review,
+or from a sweep of the tree.
+
+It began as the v0.34 playtest's findings (`docs/history/ROADMAP_1_0.md`, Gameplay-complete II),
+driven by `scripts/playtest_engine.py --launch` against a scratch engine; those entries are still
+here, further down. It was `docs/KNOWN_LIMITATIONS.md` until v1.0.1 — a name that described the
+deferred half and not the half that says what was done about it.
 
 ## Findings
 
+- **deferred (planned)** — *A household's manual is never the household's.* `family.lesson` hands
+  over the family's manual at the head of the house's own lesson, beside its story and its keepsake,
+  and the tier is already right and already enforced: all nine are `min_realm_index: 0` and the
+  engine refuses a Demonic one outright (rc.34 — `manualForbidden` would cost a child karma on first
+  study). What is wrong is whose text it is. Six of the nine belong to a **sect** — a fallen martial
+  clan hands out the Azure Cloud Sect's outer-disciple canon — and the other three are
+  `advanced_orthodox_NNN_<path>`, taught to five households including the **noble martial clan**, the
+  wealthiest house in the game, which gets a numbered id rather than a named heirloom text. The grade
+  splits on exactly that line, five `Mortal` against four `Spirit`.
+  **And the catalogue is why, which is the part worth knowing before trying to fix it in the
+  lesson.** Of 160 manuals, **142 are generated-shaped** (`advanced_demonic_001_sword_cultivator` and
+  its siblings) and only 18 are authored; of those 18, twelve carry a `sect` and the remaining six
+  are *all* Demonic (`blood_sea_scripture`, `soul_devouring_codex`, …). So there is **no authored,
+  non-sect, non-forbidden manual anywhere in the game** — a household teaching its own tradition has
+  nothing in content to teach. This is content design (nine tier-0 family manuals, one per household
+  tradition, each with its techniques), not a wiring fix, which is why it is recorded rather than
+  quietly patched by re-pointing the lesson at a different borrowed text.
+- **fixed (v1.0.1)** — *No gate held a parsed content field to having a reader, and the class
+  kept producing findings.* v1.0.0-rc.55 found `RootGrade.CultivationMult` and
+  `RootGrade.BreakthroughBonus` parsed and read by nothing — the grade decided how a cultivator was
+  made and nothing about what they were — and it was found by hand. rc.58 then built exactly this
+  gate one level down, for modifier *stats* (`modifier_vocabulary_test.go`, which requires each to be
+  **fetched** by a rule rather than merely named). Nobody built it for the fields themselves. A sweep
+  of `worlddata` finds 439 parsed fields across 63 structs, of which **seven** are never read through
+  a selector anywhere in production Go; four of those are legitimately read by Python for display
+  (`advantage`, `drawback`, `objective`, `channel_name`), which is the distinction a gate has to
+  make and the reason a naive one would be noise. The three that survive are the two entries below.
+  `field_readers_test.go` is that gate, in the rc.58 shape: a read is an `*ast.SelectorExpr`, never a
+  substring, and a composite-literal key is deliberately not one — writing a field is not reading it,
+  which is the whole distinction rc.55 turned on. `fieldsReadByPresentation` names the four and the
+  file that prints each; `unreadContentFields` names the three below with the decision each waits on.
+  It is a **floor, not a proof**: without `go/types` it cannot tell `PhysiqueDefinition.Name` from the
+  forty other structs with a `Name`, so a field sharing a read name passes unexamined. It never calls
+  a read field unread, and it catches the uniquely-named orphan — which is what every finding of this
+  class has been.
+- **deferred (planned)** — *Seven cultivation paths each name a skill, and the name reaches nothing.*
+  `worlddata.Path.Skill` is parsed from `paths.<name>.skill` — Sword, Spiritual Arts, Martial Arts,
+  Soul Arts, Beastcraft, Formations, Ghost Arts — and is read by no rule, no card and no Python
+  reader. Each of the seven strings occurs **exactly once in the whole 2.5 MB content file**: its own
+  declaration. So they do not name a manual, a technique, a profession or any roster the game has;
+  they are a vocabulary with nothing behind it, which is `/learn`'s shape (rc.43) with no mechanism
+  waiting at the other end rather than one. Deciding what a path's skill *is* — a display line on
+  `/sheet`, a bonus, or a field to delete — is content design, not a wiring fix, which is why this is
+  recorded rather than quietly wired.
+- **deferred (planned)** — *Both of an auction house's door fields are read by nothing.*
+  `protected_interior` and `door_rule` are set on **all 48** authored houses and neither is read in
+  Go or Python. The door half of that fiction does work: `advanced_maintenance.go` writes an
+  `auction_door_risks` row when a legendary lot is struck, and `auction.leave` consumes it and can
+  stand a hunter at `house.EntranceLocation` — outside, which is the point. What is unread is the
+  *inside* half. Two things keep this small and are worth stating rather than discovering: `door_rule`
+  is unanimously `true`, so reading it would change nothing until a house sets it false; and nothing
+  today can attack a player who has not consented — `/battle challenge` targets NPCs and a duel needs
+  `respond` — so `protected_interior` may be protecting against a mechanic the game does not have.
+  Either wire them or retire them; leaving a switch in content that code ignores is the decoration
+  this file exists to name.
+- **deferred (planned)** — *Nothing can grant a physique, not even a GM.* `admin.player.set_physique`
+  writes `evolution_stage`, `progress` and `stability` and nothing else (`actions.go:2212`), and the
+  only statements that ever write `physique_id` are character creation and samsara —
+  `aptitude.awaken` and `aptitude.evolve` both pass the loaded bundle back through `savePhysique`, so
+  they move the state and the stage and never the identity. This is **not** dead content: all eight
+  non-ordinary physiques are drawable at creation, because `generatePhysique` gives every one weight
+  at least 1 and favoured paths and roots only raise it. So it is a missing lever rather than a
+  `/learn`-class fault — a GM cannot hand somebody `nine_yang_solar_body`, cannot correct one rolled
+  wrong, and cannot stage one for a playtest. Adding it means `physique_id` and `name` on the
+  payload, the catalogue check that `aptitude_actions.go:203` already makes, and `physique_id` in
+  the undo snapshot, which today carries only the three numbers it can restore.
+- **deferred (planned)** — *`admin.player.set_spiritual_root` writes a grade the ladder may not
+  carry.* The lever upserts `grade`, `purity` and `mutation` with no check against
+  `spiritual_root_system.grades` (`actions.go:2119`), and `gradeIndex` answers 0 for a name it does
+  not know — so a typo'd grade is silently worth the bottom rung's `cultivation_mult` and
+  `breakthrough_bonus` rather than erroring. v1.0.0-rc.55 found and wrote down exactly this shape
+  ("a fallback that looks like a value is not a sentinel") and gated the *fixtures* with
+  `TestEveryFixtureRootStandsOnTheLadder`; the lever that a GM actually types into was left
+  ungated, so the one writer a human drives is the one nothing holds. The fix is the same check the
+  ladder already makes, at the lever.
 - **deferred (planned)** — *🗺️ Cultivation World is open to somebody who has never played, and no
   role says otherwise.* `#player-homes` and `#expeditions` sit in that category, read-only since
   v1.0.0-rc.59 but visible to everyone, so a newcomer's sidebar advertises rooms they cannot use

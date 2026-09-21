@@ -17,7 +17,7 @@ describes what the engine has already decided, and the game keeps running when t
 
 - `VERSIONS.md` — the changelog, release by release, with the schema history.
 - `docs/CONFIGURATION.md` — every `.env` key explained; `.env.example` is the keys and defaults only.
-- `docs/KNOWN_LIMITATIONS.md` — the punch list, every entry fixed or deferred with a reason.
+- `docs/TODO.md` — the punch list, every entry fixed or deferred with a reason.
 - `docs/playtest/` — the live-server checklist for the current release.
 - `docs/TERMS.md` / `docs/PRIVACY.md` — what players agree to, and what the bot holds about them.
   The Discord Developer Portal wants a URL for each; these two files are those URLs.

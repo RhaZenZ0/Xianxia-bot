@@ -13,7 +13,7 @@ import (
 // review, with the reason written on the field: "a scheduled tick must not be
 // able to tell the world what time it is". `ForceRequest` and
 // `BootstrapRequest` carried the same field and *used* it, for twenty-six more
-// releases - so the rule held on one of three doors. `docs/KNOWN_LIMITATIONS.md`
+// releases - so the rule held on one of three doors. `docs/TODO.md`
 // named the asymmetry and deferred it as "a Go change of its own"; this is it.
 //
 // Nothing exploited it: every caller in the tree sent the engine's own minute

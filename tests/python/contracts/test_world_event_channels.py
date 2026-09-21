@@ -267,7 +267,7 @@ class TheHarnessReachesTheProvisioner(unittest.TestCase):
                       "without a token the control endpoint answers 404 and the step cannot run")
 
     def test_the_limitation_is_no_longer_recorded_as_open(self):
-        known = (PROJECT_ROOT / "docs" / "KNOWN_LIMITATIONS.md").read_text(encoding="utf-8")
+        known = (PROJECT_ROOT / "docs" / "TODO.md").read_text(encoding="utf-8")
         for line in known.splitlines():
             if "create_category" in line:
                 self.assertNotIn("**deferred", line,

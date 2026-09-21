@@ -4,7 +4,7 @@
 v0.22.2 review, with the reason written on the field: *"a scheduled tick must
 not be able to tell the world what time it is."* `ForceRequest` and
 `BootstrapRequest` carried the same field and **used** it, for twenty-six more
-releases - so the rule held on one of three doors, and `docs/KNOWN_LIMITATIONS.md`
+releases - so the rule held on one of three doors, and `docs/TODO.md`
 carried the asymmetry as a deferred Authority item, sized as "a Go change of
 its own".
 

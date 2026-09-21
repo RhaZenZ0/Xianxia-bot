@@ -28,6 +28,13 @@ each carries the release it was walked on - the person writes `[x]`, the generat
 row walked on 1.0.0 and not re-walked reads `[x] v1.0.0` rather than claiming a pass that never
 happened.
 
+And it holds a class that had been producing findings by hand. rc.55 found two content fields parsed
+out of `world.json` and read by nothing; rc.58 built that gate for modifier stats and not for the
+fields. `field_readers_test.go` walks all 439 parsed fields across 63 structs and requires each to be
+read through a selector - never a substring, and a composite-literal key is not a read, because
+writing a field is not reading it. Four are read by Python for display and are named with the file
+that prints each; three have no reader at all and are named with the decision each waits on.
+
 **1.0.0** is the first release with no suffix on its tag, and it is rc.59's tree unchanged: no code,
 content or schema moved between the two, so an operator already running rc.59 has nothing to install.
 
@@ -42,7 +49,7 @@ fails. And it means the two playtest harnesses drive **every** operation the eng
 uncovered - so a mechanism that reaches nobody is a failing test rather than something waiting to be
 noticed.
 
-It does not mean the world is finished. `docs/KNOWN_LIMITATIONS.md` is the list of what is deferred
+It does not mean the world is finished. `docs/TODO.md` is the list of what is deferred
 and why, and it is not short.
 
 Fifty-nine release candidates got here, and the ones worth remembering are not the features. rc.43
@@ -135,7 +142,7 @@ mechanical authority paths.
 - Current release: v1.0.0 - the first release with no suffix on its tag, and rc.59's tree unchanged.
   Fifty-nine release candidates, schema 58, and two harnesses that between them drive every operation
   the engine allows and every leaf the hubs register. What 1.0 does not mean is written down:
-  `docs/KNOWN_LIMITATIONS.md` is the deferred list, and it is not short.
+  `docs/TODO.md` is the deferred list, and it is not short.
 - v1.0.0 (rc.59): eight ordered categories a player can read top to bottom, the re-parent that makes
   a layout change reach a server that already exists, and `#updates`, where the bot announces its own
   release notes. Merged to `main` and never tagged on its own - it is the tree v1.0.0 is cut from.
