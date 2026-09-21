@@ -183,12 +183,15 @@ staged authority cleanup: forage, crafting and companions, canonical time, unifi
 road travel, caravans, dashboard-owned Discord setup, and the removal of the obsolete Python
 mechanical authority paths.
 
-## Release status — v1.0.0
+## Release status — v1.0.1
 
-- Current release: v1.0.0 - the first release with no suffix on its tag, and rc.59's tree unchanged.
-  Fifty-nine release candidates, schema 58, and two harnesses that between them drive every operation
-  the engine allows and every leaf the hubs register. What 1.0 does not mean is written down:
+- Current release: v1.0.1 - a craft that says what it needs, a player who can start over without a
+  GM, and martial clans with somebody real to deal with. The first patch release: no schema, and
+  nothing an operator has to do beyond installing it. What 1.0 does not mean is still written down:
   `docs/TODO.md` is the deferred list, and it is not short.
+- v1.0.0: the first release with no suffix on its tag, and rc.59's tree unchanged. Fifty-nine release
+  candidates, schema 58, and two harnesses that between them drive every operation the engine allows
+  and every leaf the hubs register.
 - v1.0.0 (rc.59): eight ordered categories a player can read top to bottom, the re-parent that makes
   a layout change reach a server that already exists, and `#updates`, where the bot announces its own
   release notes. Merged to `main` and never tagged on its own - it is the tree v1.0.0 is cut from.

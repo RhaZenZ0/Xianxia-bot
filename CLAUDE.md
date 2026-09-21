@@ -2369,6 +2369,40 @@ Three things about the gate are worth more than the fix.
   `['v1.0.0.md', 'v1.0.1.md'] != ['v1.0.1.md']`; sorting the versions as text inherits from
   `v1.0.9` over `v1.0.10`.
 
+### The first bump that renames a file (v1.0.1)
+
+`docs/playtest/v<version>.md` is named after the stamped release, and across all **fifty-nine**
+release candidates of 1.0.0 that name never moved — `RELEASE_VERSION` strips the `-rc.N` suffix. So
+1.0.0 → 1.0.1 is the first bump in this project's history that renames it, and **two** things had
+quietly depended on the name holding still:
+
+- `merge_ticks`, handed the file it was about to overwrite, so a rename meant `target.exists()` was
+  false and the freshly generated checklist was written with every box blank. That one was found and
+  fixed while building the tick-carrying, *before* the bump — and it worked on the day: the bump
+  printed *"carried the live pass from v1.0.0.md and removed it"*, all 38 ticks preserved and stamped
+  `[x] v1.0.0`.
+- `test_hidden_actions.py`, which opened `v1.0.0.md` **by literal** and made the whole module error
+  with `FileNotFoundError` the moment the bump landed. Nothing found that one in advance, because
+  there was nothing to find until the filename actually moved.
+
+Two instances is a class, so the gate exists now: outside the generator and the gate file's own
+throwaway trees, no Python source may spell a checklist filename — build it from `VERSION`.
+
+**Its first run flagged the file it had just been written for**, because the *comment* explaining
+the fix names the old filename. That is rc.52's rule (*a gate that cannot tell prose from code is
+decoration*) arriving immediately rather than a release later, and the scan blanks comments and
+docstrings before it looks. The pattern is stated **once** and used by both the scan and the
+self-check, because a second copy in the self-check would be free to stay right while the one that
+matters drifted — which is the exact failure this file catches elsewhere. Three drills: the literal
+restored in code, the pattern broken (the self-check fires first), and the comment-stripping removed
+(it flags `test_hidden_actions.py` again, by its comment).
+
+**The version itself is stamped in six places**, and `test_release_version.py` has held them equal
+since the day `VERSION` drifted to 0.19 while `app/version.py`, the Dockerfile and compose stayed on
+0.18. A bump is `app/version.py`, `VERSION`, the `Dockerfile` label, `docker-compose.yml`, the README
+title and the changelog's Release status line — plus the one literal in that test, which is the only
+place the number is spelled out in the suite and is what makes the rest reviewable.
+
 ### What a server is told is derived, so the entry has to parse (v1.0.1)
 
 rc.59 made the bot post its own release notes into `#updates`, and made the line **derived, never

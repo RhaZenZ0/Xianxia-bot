@@ -13,8 +13,11 @@
 """
 from __future__ import annotations
 
+import ast
+import io
 import re
 import subprocess
+import tokenize
 import pathlib
 import shutil
 import sys
@@ -355,6 +358,84 @@ class TheDiscordHalfIsAScriptInTheTree(unittest.TestCase):
             "simcord" in path.read_text(encoding="utf-8") for path in (PROJECT_ROOT / "app").rglob("*.py")),
             "nothing under app/ may import the simulated Discord")
 
+
+
+class NothingOutsideTheGeneratorNamesTheChecklistFile(unittest.TestCase):
+    """`docs/playtest/v<version>.md` is renamed by every version bump.
+
+    v1.0.1 is this project's first bump that moves it, and two things had
+    quietly depended on the name holding still: `merge_ticks`, handed the file
+    it was about to overwrite, which would have blanked the live pass; and
+    `test_hidden_actions.py`, which opened `v1.0.0.md` by literal and made the
+    whole module error with `FileNotFoundError` the moment the bump landed.
+    Two instances is a class, so this is the gate.
+    """
+
+    # Stated once, and used by both the scan and the self-check below - a
+    # second copy in the self-check would be free to stay right while the one
+    # that matters drifted, which is the whole failure mode this file exists
+    # to catch elsewhere.
+    PATTERN = re.compile(r"v\d+(?:\.\d+)+\.md")
+
+    ALLOWED = {
+        "scripts/playtest_checklist.py",                  # names the file it writes
+        "tests/python/contracts/test_playtest_gate.py",   # builds throwaway trees by literal
+    }
+
+    @staticmethod
+    def _code_only(text: str) -> str:
+        """The source with its comments and docstrings blanked.
+
+        Its own first run flagged `test_hidden_actions.py` - the file it had
+        just been written for - because the *comment* explaining the fix names
+        the old filename. A gate that cannot tell prose from code is
+        decoration (v1.0.0-rc.52), so the prose goes before the scan.
+        """
+        lines = text.splitlines(keepends=True)
+        try:
+            for token in tokenize.generate_tokens(io.StringIO(text).readline):
+                if token.type == tokenize.COMMENT:
+                    row = token.start[0] - 1
+                    lines[row] = lines[row][: token.start[1]] + "\n"
+        except tokenize.TokenError:
+            pass
+        stripped = "".join(lines)
+        try:
+            tree = ast.parse(stripped)
+        except SyntaxError:
+            return stripped
+        out = stripped.splitlines(keepends=True)
+        for node in ast.walk(tree):
+            if not isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue
+            body = getattr(node, "body", [])
+            if body and isinstance(body[0], ast.Expr) and isinstance(body[0].value, ast.Constant) \
+                    and isinstance(body[0].value.value, str):
+                for row in range(body[0].lineno - 1, min(body[0].end_lineno, len(out))):
+                    out[row] = "\n"
+        return "".join(out)
+
+    def test_the_pattern_matches_the_shape_it_forbids(self):
+        # Asserted before it is trusted: a pattern that matches nothing makes
+        # the scan below pass by finding nothing at all.
+        self.assertTrue(self.PATTERN.search("docs/playtest/v1.0.0.md"))
+        self.assertTrue(self.PATTERN.search("v1.0.10.md"))
+        self.assertFalse(self.PATTERN.search('f"v{VERSION}.md"'))
+
+    def test_no_source_hardcodes_a_checklist_filename(self):
+        offenders = []
+        listed = subprocess.run(["git", "ls-files", "app", "scripts", "tests", "docs"],
+                                cwd=PROJECT_ROOT, capture_output=True, text=True, check=True)
+        for rel in listed.stdout.split():
+            if not rel.endswith(".py") or rel in self.ALLOWED:
+                continue
+            text = self._code_only((PROJECT_ROOT / rel).read_text(encoding="utf-8"))
+            offenders.extend(f"{rel}: {m.group(0)}" for m in self.PATTERN.finditer(text))
+        self.assertEqual(
+            sorted(offenders), [],
+            "these name a checklist by version, which the next release bump renames; "
+            "read `VERSION` and build the name",
+        )
 
 if __name__ == "__main__":
     unittest.main()

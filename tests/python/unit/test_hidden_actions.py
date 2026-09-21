@@ -23,7 +23,13 @@ import unittest
 from tests.support import PROJECT_ROOT
 
 SURFACE = (PROJECT_ROOT / "app" / "bot" / "surface.py").read_text(encoding="utf-8")
-CHECKLIST = (PROJECT_ROOT / "docs" / "playtest" / "v1.0.0.md").read_text(encoding="utf-8")
+# Named after the stamped release, never a literal: `docs/playtest/v<version>.md`
+# is renamed by every version bump, and a hardcoded `v1.0.0.md` here made the
+# whole file error with FileNotFoundError the first time one happened (v1.0.1).
+# That is the same fault `merge_ticks` had one level up - something that only
+# holds while the filename does.
+VERSION = (PROJECT_ROOT / "VERSION").read_text(encoding="utf-8").strip()
+CHECKLIST = (PROJECT_ROOT / "docs" / "playtest" / f"v{VERSION}.md").read_text(encoding="utf-8")
 ROWS = {m.group(1) for m in re.finditer(r"^\| `(/[^`]+)`", CHECKLIST, re.M)}
 
 
