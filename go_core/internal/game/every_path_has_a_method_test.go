@@ -57,25 +57,54 @@ func TestEveryPathHasAMethod(t *testing.T) {
 	}
 }
 
-// TestTheHiddenSectCanServeEveryPath: `shadowInitiationManual` matches on path
-// and alignment and, before v1.0.3, had no fallback - so a path with no
-// demonic manual inside the initiate's realm was handed nothing at all, in
-// silence. At realm 0 that was five of the seven paths.
+// TestTheHiddenSectCanServeEveryPath - somewhere on the ladder, which is the
+// real invariant and not the one this test first claimed.
 //
-// Drill: delete the `best(false)` return and this names them.
+// v1.0.3's first version asserted every path was served at **realm 0**, and to
+// make that true it gave `shadowInitiationManual` a fallback to another path's
+// codex. CI caught it: `TestTheManualIsChosenByAlignmentPathAndReach` has said
+// in as many words since it was written that "a path with no demonic manual
+// gets nothing rather than someone else's", so the fallback overruled a
+// documented decision to satisfy a claim invented one file away. The rule
+// stands and the fallback is gone; what was actually wrong was that an empty
+// hand said nothing, which `manual_absent` now fixes.
+//
+// The Ghost Cultivator's bug was never the realm-0 gap the other five paths
+// have by design. It was having **no demonic manual at any realm at all**, so
+// the cell could never serve that path however far its initiate cultivated.
+// That is what this holds.
+//
+// Drill: drop `_extend_uncovered_paths` from the generator, re-materialise, and
+// this names Ghost Cultivator.
 func TestTheHiddenSectCanServeEveryPath(t *testing.T) {
 	catalog := shippedTechniqueCatalog(t)
-	empty := []string{}
+	topOfTheLadder := int64(len(catalog.Realms))
+	never := []string{}
 	for path := range catalog.Paths {
-		// Realm 0 is the hardest case and a real one: the karma gate is
-		// -200 karma, which says nothing about cultivation.
-		if _, _, ok := shadowInitiationManual(catalog, path, 0); !ok {
-			empty = append(empty, path)
+		if _, _, ok := shadowInitiationManual(catalog, path, topOfTheLadder); !ok {
+			never = append(never, path)
 		}
 	}
-	if len(empty) > 0 {
-		t.Fatalf("the hidden sect initiates %v and hands them nothing, without saying so: "+
-			"shadowInitiationManual must fall back the way sectEntryManual does", empty)
+	if len(never) > 0 {
+		t.Fatalf("the hidden sect keeps no forbidden art of %v at any realm, so it can never serve "+
+			"an initiate of those paths however far they cultivate", never)
+	}
+}
+
+// TestTheCellStillRefusesSomeoneElsesArt guards the decision the reverted
+// fallback would have erased, from this side too: a path served at the top of
+// the ladder must be served *its own* art, never the nearest demonic one.
+func TestTheCellStillRefusesSomeoneElsesArt(t *testing.T) {
+	catalog := shippedTechniqueCatalog(t)
+	for path := range catalog.Paths {
+		id, manual, ok := shadowInitiationManual(catalog, path, int64(len(catalog.Realms)))
+		if !ok {
+			t.Fatalf("%s is served nothing at the top of the ladder", path)
+		}
+		if !strings.EqualFold(strings.TrimSpace(manual.Path), path) {
+			t.Fatalf("%s was handed %s, whose path is %q; the cell hands out this path's art or none",
+				path, id, manual.Path)
+		}
 	}
 }
 

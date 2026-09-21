@@ -2772,13 +2772,28 @@ Every number it uses is read off what the catalogue already gives the six: how m
 many techniques each, and the realm floors, which are the element-wise minimum of the covered paths'
 ladders - the gentlest ladder already on offer, so the floor starts at 0.
 
-**And the hidden sect had no fallback.** `shadowInitiationManual` filters on alignment *and* path
-*and* realm and returned false, and `shadowAction` then omitted `manual_id` from its result - no
-error, no refusal, nothing said. `sectEntryManual` twenty lines away has had `best(true)` then
-`best(false)` since it was written. It was never only the ghost's problem: the per-path demonic
-floors are 0/1/2/3/4/5, so at realm 0 **five of the seven paths matched nothing**, and the four
-demonic manuals authored at `path: "Any"` and realm 0 cannot satisfy an exact path match. The drill
-prints exactly those five.
+**And the hidden sect said nothing when it had nothing.** `shadowInitiationManual` filters on
+alignment *and* path *and* realm, and `shadowAction` then omitted `manual_id` from its result while
+`sect.py`'s `if initiation.get("manual_name")` dropped its line - so an initiate walked through a
+-200 karma gate and was never told why no inheritance came with it. It reports `manual_absent` now
+and the cell says so.
+
+**The fallback this release first added was wrong, and CI is what said so.** The obvious fix looked
+like `sectEntryManual`'s `best(true)` then `best(false)`, twenty lines away - and
+`TestTheManualIsChosenByAlignmentPathAndReach` has stated in as many words since it was written that
+*"a path with no demonic manual gets nothing rather than someone else's"*. That is a documented
+decision about what a demonic cell is, and the fallback overruled it to satisfy a claim invented one
+file away: a new gate of mine asserting every path is served **at realm 0**. The per-path demonic
+floors are 0/1/2/3/4/5, so five of seven paths are unserved at realm 0 *by design* - your path's art
+or none, and cultivate further if it is not yet in reach.
+
+The Ghost Cultivator's bug was never that gap. It was having **no demonic manual at any realm at
+all**, so the cell could never serve that path however far its initiate climbed - and the content
+fix alone closes it. `TestTheHiddenSectCanServeEveryPath` asks the honest question now (served
+somewhere on the ladder), and `TestTheCellStillRefusesSomeoneElsesArt` guards the decision from the
+other side. The lesson is the one this file keeps recording, met from a new direction: **a gate that
+encodes a claim rather than a rule will happily make you change the rule.** Two existing tests were
+the only thing standing between that and a merged release.
 
 `sectEntryManual`'s own path filter is, separately, reached for one sect in thirteen: the other
 twelve carry a manual of their own, which its first loop prefers. That one is the Heaven-Devouring

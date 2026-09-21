@@ -54,8 +54,8 @@ And the Ghost Cultivator can be played. `app/rules/advanced_catalog.py` named si
 where `content/world.json` offers seven, so **none** of the 160 manuals named the seventh - while
 `death_qi_system`, a whole authored subsystem in content and three hundred lines of Go, opens with
 `"path": "Ghost Cultivator"` and exists to serve it. It has 23 manuals now, the same as its
-siblings, and the hidden sect's initiation falls back the way sect entry always has rather than
-silently handing an initiate nothing.
+siblings, and the hidden sect now says why when it has no forbidden art of an initiate's path
+within their reach, instead of passing the line over in silence.
 
 It also gives all thirteen birth households their own tradition to teach. Eight of them handed a
 child the Azure Cloud Sect's or the Jade Meridian Sect's entry manual as the family's own teaching,
