@@ -64,8 +64,6 @@ PAGES: dict[str, int] = {
     "character / Fate": 4,
     "character / Samsara": 5,
     "ascend / Perfection": 5,
-    "cultivation / Qi Body": 2,
-    "cultivation / Path": 2,
     "items / Artifacts": 2,
     "items / Provenance": 1,
     "combat / Duels": 1,
@@ -77,7 +75,14 @@ PAGES: dict[str, int] = {
     "economy / Auction House": 2,
     "economy / Merchants": 2,
     "economy / Caravans": 3,
-    "beast / Companions": 1,
+    # Absent, and deliberately: `cultivation / Path`, `cultivation / Qi Body`
+    # and `beast / Companions` opened at 2/2/1 until v1.0.13 and are reported
+    # from live play - "I can view only like half the menu". Path is what you
+    # were born with, which this file already called identity rather than a
+    # system; Qi Body is named on the cultivation card a realm-0 player reads
+    # every session ("20/108 meridians"), so hiding its levers advertised a
+    # thing and then hid the door to it; and a companion is the one thing the
+    # first hour had to be *told about* rather than shown.
     "sect / Sect": 2,
     "sect / Recruitment": 1,
     "sect / Discipleship": 2,
@@ -109,45 +114,41 @@ LEAVES: dict[str, int] = {
     # `character / Samsara` is gated at 5, but a reset is for the player who
     # has just decided this game is too much. It is never held back.
     "reset": 0,
-    # `cultivation / Path` opens at 2, but what you were born as is readable
-    # from the first minute - it is identity, not a system.
-    "aptitude root": 0,
-    "aptitude status": 0,
-    "aptitude physique": 1,
-    "aptitude bloodline": 1,
-    # `cultivation / Qi Body` opens at 2, but a meridian can be damaged in a
-    # fight at realm 0 and `condition treat` names this as the way to mend it.
-    "meridian status": 0,
-    "meridian heal": 0,
     # The hidden sect's door is its own karma gate, not a realm one, and the
     # recruitment page it sits on opens at 1.
     "sect shadow": 2,
-    # A status read is never the thing that overwhelms anybody, and it is how
-    # a player learns a system exists at all. Every page's own status stays.
-    "sect status": 0,
-    "sect recruitment status": 0,
+    # Reads that are a page's own front door without being named `status`.
+    # Each is the thing that tells a player the system is there at all.
     "sect recruitment info": 0,
-    "beast status": 0,
-    "abode status": 0,
-    "innerworld status": 0,
-    "territory status": 2,
-    "war status": 2,
     "auction browse": 1,
-    "caravan status": 2,
     "boss list": 2,
-    "boss status": 2,
-    "hunter status": 2,
-    "blackmarket status": 2,
-    "secretrealm status": 0,
     "perfect info": 3,
-    "fate status": 2,
-    "bond status": 2,
-    "crime status": 1,
     "bounty": 1,
-    "family house status": 2,
-    "artifact status": 1,
     "provenance": 1,
 }
+
+# A leaf whose path ends here is a status read, and a status read is never
+# held back (`STATUS_READS_ALWAYS_OPEN`, below). It is a rule rather than a
+# list because the list is what drifted: until v1.0.13 `LEAVES` carried six
+# status reads at 0 under a comment reading *"Every page's own status stays"*
+# and eleven more at 1 or 2 **in the same block, under that same comment**,
+# while eight others were never listed at all and inherited a page floor of 2.
+# Nineteen of them were held back from a realm-0 player, which is the opposite
+# of what all three statements of this rule say - CLAUDE.md's v1.0.9 section,
+# this file's own docstring, and the gate's docstring.
+STATUS_LEAF = "status"
+
+
+def is_status_read(leaf: str) -> bool:
+    """Whether this leaf is a page's own status read, which never waits.
+
+    rc.32 states the limit the whole curriculum inherits: *"never a status
+    read or the door into the system, because a road nobody can see is a road
+    nobody learns exists."* A lever can wait for a realm; the readout that
+    says the system exists cannot, or a player meets an empty page rather than
+    a locked one.
+    """
+    return str(leaf).split()[-1:] == [STATUS_LEAF]
 
 
 def build(pages: dict[str, list[str]]) -> dict[str, object]:
@@ -161,7 +162,7 @@ def build(pages: dict[str, list[str]]) -> dict[str, object]:
     for page, leaves in pages.items():
         floor = int(PAGES.get(page, 0))
         for leaf in leaves:
-            realm = int(LEAVES.get(leaf, floor))
+            realm = 0 if is_status_read(leaf) else int(LEAVES.get(leaf, floor))
             if realm > 0:
                 unlocks[leaf] = realm
     return {

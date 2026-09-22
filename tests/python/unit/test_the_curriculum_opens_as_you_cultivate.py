@@ -139,6 +139,60 @@ class TheFirstHourIsNeverGated(unittest.TestCase):
             )
 
 
+class AStatusReadIsNeverHeldBack(unittest.TestCase):
+    """rc.32's limit, held rather than quoted (v1.0.13).
+
+    This file's own docstring above has quoted *"never a status read or the
+    door into the system"* since v1.0.9 and never tested it; CLAUDE.md said
+    **"Every status read stays open at realm 0"** in bold; and
+    `author_feature_unlocks.py` wrote *"Every page's own status stays"* as a
+    comment - **directly above eleven entries that set one to 1 or 2**. Eight
+    more were never listed and inherited a page floor. Nineteen status reads
+    were held back from a realm-0 player.
+
+    It went unseen because the five CLAUDE.md names as examples - `sect
+    status`, `beast status`, `abode status`, `innerworld status`,
+    `secretrealm status` - are exactly the five that were right. The rule was
+    checked against its own examples and never against "and the rest".
+    """
+
+    def test_no_status_read_is_gated(self):
+        offenders = sorted(f"{path} (opens at realm {realm})"
+                           for path, realm in LEAVES.items() if path.split()[-1:] == ["status"])
+        # assertFalse, not assertEqual: a list diff prints first and the
+        # finding last, and a message scrolled past is one nobody reads.
+        self.assertFalse(offenders, (
+            "a page's status read waits for a realm, so a player meets an empty page rather than "
+            "a locked one and never learns the system is there. rc.32's limit is that a road "
+            "nobody can see is a road nobody learns exists:\n  " + "\n  ".join(offenders)))
+
+    def test_the_generator_forces_it_rather_than_listing_it(self):
+        """A list is what drifted, so the rule lives in `build()`.
+
+        Written behaviourally: the authoring script is asked to gate a status
+        read at realm 2 and must refuse, which a hand-written table of zeroes
+        could never promise about the twentieth one somebody adds.
+        """
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location(
+            "author_feature_unlocks", PROJECT_ROOT / "scripts" / "author_feature_unlocks.py")
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+        self.assertTrue(module.is_status_read("dantian status"), (
+            "the generator no longer recognises a status read; the gate is broken, not the tree"))
+        module.LEAVES["dantian status"] = 2
+        try:
+            built = module.build({"cultivation / Qi Body": ["dantian status", "dantian refine"]})
+        finally:
+            module.LEAVES.pop("dantian status", None)
+        self.assertNotIn("dantian status", built["leaves"], (
+            "the authoring script let a status read be gated by writing a number beside it. That "
+            "is exactly how nineteen of them ended up at realm 1 and 2 under a comment saying "
+            "they stay open - the rule has to be in build(), not in the table"))
+
+
 class TheRoadStaysVisible(unittest.TestCase):
     """rc.32's limit, earned back."""
 

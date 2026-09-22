@@ -33,6 +33,19 @@ view timer that near counts as runnable. Then an ordinary suite run found the ei
 this time as a marker inside a gate, which went red the moment the step was corrected - a check that
 pins how a rule is written fails exactly when the rule is fixed.
 
+It also opens the half of the menu a new cultivator could not see. Reported from live play - *"I
+can view only like half the menu"*, and at Body Tempering that was literally 109 of 248 leaves.
+**Nineteen status reads were held back from a realm-0 player**, while four separate statements in
+the tree say they never may be: rc.32's limit, v1.0.9's changelog, the gate's own docstring, and -
+most plainly - a comment in the authoring table reading *"Every page's own status stays"*, with
+eleven entries setting one to realm 1 or 2 **in the same block, directly beneath it**. Eight more
+were never listed and inherited a page floor. What hid it is that the five status reads named as
+examples are exactly the five that were written correctly, so the rule was checked against its own
+citations and never against the rest. It is a rule in the generator now rather than a list of
+zeroes, because a list is what drifted. Three pages also open at Body Tempering on the owner's
+call - what you were born with, the qi body the cultivation card already advertises, and a
+companion - taking a new cultivator from 109 visible leaves to 142. The deep end is untouched.
+
 And the ninth and tenth were in one line of prose, which is why every gate written for this number
 walked past them: the Reopen card itself said *"went quiet for fifteen minutes"* and *"another
 fifteen"*. So the release that made the window configurable made that card wrong for everybody - at

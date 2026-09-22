@@ -3839,6 +3839,70 @@ not take a numeric literal, the harness must call `panel_timeout()`, and the exp
 spell a number of minutes - because the class is wider than any gate: what they can catch is a
 number written down where a window should be read.
 
+### The rule was checked against its own examples (v1.0.13)
+
+**Found by playing**, and reported as *"I can view only like half the menu"* - then, precisely:
+*"I cant see the options for temper"*, *"Same for beast"*, *"Same for dantian refine"*. The panel
+pasted with it is the proof: `/cultivation → Path` printing **2 actions** and
+*"🔒 6 more doors here open as you cultivate"*.
+
+At Body Tempering a character saw **109 of 248 leaves**. Half the menu was not a figure of speech.
+
+**Nineteen status reads were held back**, and all three statements of the rule forbidding that are
+in the tree. rc.32 set the limit the curriculum inherits - *"never a status read or the door into
+the system, because a road nobody can see is a road nobody learns exists"*. v1.0.9's CLAUDE.md
+section said **"Every status read stays open at realm 0, deliberately and against the temptation to
+count them as noise"**. `test_the_curriculum_opens_as_you_cultivate.py` quoted rc.32's limit **in
+its own docstring** and tested eleven other things.
+
+**And the fourth statement is the one worth seeing.** `author_feature_unlocks.py`'s `LEAVES` table
+carries the comment *"A status read is never the thing that overwhelms anybody… Every page's own
+status stays"* - and then, **in that same block, under that same comment**, eleven entries set one
+to 1 or 2: `territory status`, `war status`, `caravan status`, `boss status`, `hunter status`,
+`blackmarket status`, `fate status`, `bond status`, `crime status`, `family house status`,
+`artifact status`. Eight more - `dantian status`, `party status`, `formation status`,
+`merchant status`, `duel status`, `realmhub status`, `sect discipleship status`,
+`sect manor status` - were never listed at all and inherited a page floor of 2. The rule and its
+violation were adjacent lines.
+
+**Why nobody saw it is the whole finding.** The five status reads CLAUDE.md names as examples -
+`sect status`, `beast status`, `abode status`, `innerworld status`, `secretrealm status` - are
+**exactly the five that were written at 0**. The claim was checked against the cases it cites and
+never against *"and the rest"*, which is where all nineteen lived. That is rc.47's shape reached
+from a new direction: not a gate that cannot see what it forbids, but a *rule whose examples are
+drawn from the half that holds*.
+
+**The fix is a rule, not nineteen zeroes**, because a list is precisely what drifted.
+`is_status_read` is one predicate and `build()` forces 0 through it, so a number written beside a
+status read in the table is now ignored rather than obeyed - the twentieth one somebody adds cannot
+repeat this. `test_the_generator_forces_it_rather_than_listing_it` drives that behaviourally: it
+sets `dantian status` to 2 in the table and requires the built roster not to carry it.
+
+**Three pages open at realm 0**, on the owner's call, and each for its own reason rather than as a
+band. `cultivation / Path` is what you were born with - this tree already called that *identity,
+not a system*, and `aptitude root` was sitting at 0 beside six locked siblings, so the page said
+"here is your Common root and your Moon Serpent bloodline" and hid Temper, Harmonize, Evolve and
+Awaken. `cultivation / Qi Body` is **named on the card a realm-0 player reads every session** -
+`🩸 20/108 meridians` - so the curriculum advertised a number and hid the one lever that changes
+it. And `beast / Companions` was the one system the first hour had to be told about rather than
+shown: `beast status` was open and reported nothing, because everything that makes a beast exist
+was behind Qi Refining.
+
+Body Tempering now shows **142 of 248**. The deep end is untouched - the black market, caravans,
+boss raids, territory, war, a house, a personal world, Samsara and Perfection still wait at 3/4/5 -
+because the complaint was never that the game had too much in it.
+
+**What is deliberately not gated is which pages are open.** That is a decision the owner may take
+again, and a gate pinning `cultivation / Path` to realm 0 would fail exactly when it is taken -
+v1.0.8's lesson, and the same call the panel-idle window's gate makes one release over. What is
+held is the rule the examples hid: no leaf whose path ends in `status` may wait for a realm.
+
+**The drills.** Restoring `dantian status` and `war status` to realm 2 in the shipped content names
+both with their realms; letting `build()` read the table again prints *"the authoring script let a
+status read be gated by writing a number beside it"*; and blanking `is_status_read` prints *"the
+generator no longer recognises a status read; the gate is broken, not the tree"* - **before** the
+assertion it would have made vacuous.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —
