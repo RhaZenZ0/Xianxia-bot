@@ -258,11 +258,13 @@ deferred half and not the half that says what was done about it.
   `UseNumber()` is the fix and **no reader changed** - `storage.ParseInt` has had a `case
   json.Number` since it was written and nothing could ever produce one. Found by the playtest, not by
   reading. See CLAUDE.md, "An id too big for a float".
-- **fixed (v1.0.12)** — *A hub panel went quiet after fifteen minutes.* Asked for in play.
-  `HUB_PANEL_IDLE_MINUTES` (default 120, `0` = never) replaces a bare `timeout=900` written out in
-  five files; injected into `hubs.py` because the layering refuses a `runtime` import there. The
-  module default is the old fifteen, so a missed registration preserves behaviour rather than leaking
-  a view per panel.
+- **fixed (v1.0.12)** — *A hub panel went quiet after fifteen minutes, and the number was written
+  out five times.* Asked for in play. `HUB_PANEL_IDLE_MINUTES` (`0` = never) replaces a bare
+  `timeout=900` in five files; injected into `hubs.py` because the layering refuses a `runtime`
+  import there. The default shipped at 120 and was put back to **15** in v1.0.13 on the owner's
+  call: the Reopen card says fifteen, so a default that disagreed with it made the card a lie. The
+  module default is the same fifteen, so a missed registration preserves behaviour rather than
+  leaking a view per panel.
 - **fixed (v1.0.12)** — *Four places parsed `surface.py` to recover the command tree's tuple, and a
   fifth wrote down how many there were.* The tuple was inline inside `register_command_surface`, so
   rc.43's "never copy it" could only be obeyed by reading the source - four ways, each with its own

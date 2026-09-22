@@ -3682,13 +3682,18 @@ fifteen minutes and swapped its controls for a **Reopen** button. The mechanism 
 holds a live view in memory until it times out - and fifteen minutes is wrong: a long time to hold a
 view open and a short time to read a page, go and do something, and come back to it.
 
-`HUB_PANEL_IDLE_MINUTES` is the setting, **120** the default, and `0` means a panel never expires.
-Zero is deliberately not the default: it costs one held view per panel ever opened, for the life of
-the process, which is fine on a small server and is the operator's call rather than presentation's.
-The module default is the old fifteen, so a **missed registration is the behaviour this started
-from** rather than a panel that never expires - a presentation default failing towards *never* would
-leak. It is injected, because `test_bot_package` puts `hubs` and `runtime` in one tier and refuses an
-import between them, which is the shape `feature_unlocks` and `describe_era` already use.
+`HUB_PANEL_IDLE_MINUTES` is the setting and `0` means a panel never expires. Zero is deliberately
+not the default: it costs one held view per panel ever opened, for the life of the process, which is
+fine on a small server and is the operator's call rather than presentation's. The module default is
+the old fifteen, so a **missed registration is the behaviour this started from** rather than a panel
+that never expires - a presentation default failing towards *never* would leak. It is injected,
+because `test_bot_package` puts `hubs` and `runtime` in one tier and refuses an import between them,
+which is the shape `feature_unlocks` and `describe_era` already use.
+
+**The shipped default went out at 120 and was put back to 15 in v1.0.13**, on the owner's call; why
+is under "The number that was not the number" below. What the gate holds is deliberately *not* which
+number ships - that is a decision, and a gate pinning it would fail exactly when the decision is
+taken again, which is the one time it should stay green - but that nothing restates it.
 
 **The number was written out five times** (`hubs.py` twice, `surface.py`, `admin/world_ops.py`,
 `commands/support.py`), and the gate forbids a panel view carrying its own.
@@ -3787,7 +3792,7 @@ it came out as. That is the whole rule: the run states the window once, in the p
 things, and no step restates it.
 
 **Both bounds on that number were measured, not chosen, and each is a rule of its own.** Too long and
-the *jump* is the cost: waiting the shipped 120 minutes out wakes every periodic worker for two hours
+the *jump* is the cost: waiting a two-hour window out wakes every periodic worker for two hours
 of virtual time, and the step went from instant to minutes still running - for no proof the unit gate
 does not already give about the shipped default. Too short and the panel never settles: at one minute
 the run printed `BaseView.__timeout_task_impl: unknown wait (Future)` with *163 recognized waits
@@ -3809,10 +3814,30 @@ is `advance_time(` now, which is what that list is actually for; whether the jum
 configured window belongs to `TheHarnessWaitsTheConfiguredWindowOut`, and a fact asserted in two
 places is free to disagree.
 
+**The ninth and tenth were in one line, and they are the only two a player ever read.**
+`ExpiredPanelView`'s card says *"This panel went quiet for fifteen minutes. Reopen it here; any tap
+keeps a panel alive another fifteen."* Every gate written for this number swept **code** - the
+`timeout=` keyword a view is built with - and this is prose inside an f-string, so none of them could
+see it. So v1.0.12 made the window configurable and, in the same release, made that card wrong for
+everybody: at the 120 it shipped, a panel waited two hours and told its owner it had waited fifteen.
+That is rc.56's finding exactly - a panel promising something the tree does not do - and the
+mechanism is the same one this file keeps recording: **a promise a setting can falsify is a promise
+nobody is holding.** The card reads `panel_idle_minutes()` now, and
+`test_the_expired_card_never_restates_the_window` walks `__init__`'s statements without its
+docstring (rc.52) for a spelled-out number.
+
+**Which is also why the default went back to 15** (on the owner's call, and this is the honest
+account of it): fifteen is what the card said, what the README said, and what the harness had run
+against for twenty-six releases, and 120 was one number changed against three restatements nobody
+had found yet. With the card derived, the default is free to be whatever an operator wants - so the
+gate holds the restating and deliberately not the number, and `docs/CONFIGURATION.md` says plainly
+that 120 is a comfortable page-and-come-back window for anyone who wants it.
+
 **A restated constant need not be spelled to be a copy**, and that is why the seventh was invisible
-while the eighth fell out of an ordinary run. The new gate is narrow on purpose - `advance_time` may
-not take a numeric literal, and the harness must call `panel_timeout()` - because the class is wider
-than any gate: what it can catch is a number written down where a window should be read.
+while the eighth fell out of an ordinary run. The gates are narrow on purpose - `advance_time` may
+not take a numeric literal, the harness must call `panel_timeout()`, and the expired card may not
+spell a number of minutes - because the class is wider than any gate: what they can catch is a
+number written down where a window should be read.
 
 ## Testing conventions
 

@@ -71,11 +71,12 @@ un-prefixed line of theirs looks like an action.
 
 `HUB_PANEL_IDLE_MINUTES` is how long a hub panel may sit untouched before it
 goes quiet and offers a **Reopen** button instead of its own controls; any tap
-resets it. It was a bare fifteen minutes written into five files until v1.0.12 -
-a long time to hold a view open and a short time to read a page, go and do
-something, and come back to it - and the default is **120** now. `0` means a
-panel never expires, which costs one view held in memory per panel for the life
-of the process and is safe on a small server.
+resets it. It was a bare fifteen minutes written into five files until v1.0.12,
+so changing it meant finding all five; it is one number now. The default is
+still **15**, which is what the Reopen card itself says. Raise it if players
+find the wait short - `120` is a comfortable page-and-come-back window - and `0`
+means a panel never expires, which costs one view held in memory per panel for
+the life of the process and is safe on a small server.
 
 ### The patron's tribute (`/tribute`)
 

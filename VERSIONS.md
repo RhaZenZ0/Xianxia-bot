@@ -27,11 +27,20 @@ panel's clock **901 seconds** - not the number, an *encoding* of it, one second 
 stated somewhere else - so no search for it could have found it, and raising the default left the
 step moving a panel an eighth of the way to its deadline and reporting that it would not expire. It
 reads the window the run is configured with now, and the harness pins that window where it pins
-every other setting. Both bounds on it were measured: waiting the shipped two hours out costs minutes
+every other setting. Both bounds on it were measured: waiting a two-hour window out costs minutes
 of woken workers for no extra assurance, and a one-minute window never settles at all, because a
 view timer that near counts as runnable. Then an ordinary suite run found the eighth, spelled out
 this time as a marker inside a gate, which went red the moment the step was corrected - a check that
 pins how a rule is written fails exactly when the rule is fixed.
+
+And the ninth and tenth were in one line of prose, which is why every gate written for this number
+walked past them: the Reopen card itself said *"went quiet for fifteen minutes"* and *"another
+fifteen"*. So the release that made the window configurable made that card wrong for everybody - at
+the two hours it shipped, a panel waited two hours and told its owner fifteen. The card reads the
+configured window now, and the default goes back to **15**, which is what the card, the README and
+twenty-six releases of the harness had all been saying. `120` is still a comfortable
+page-and-come-back window for any operator who wants it; what the gate holds is that nothing
+restates the number, never which number ships.
 
 **1.0.12** runs the playtest for the first time in four releases, and it went red on a hundred steps.
 

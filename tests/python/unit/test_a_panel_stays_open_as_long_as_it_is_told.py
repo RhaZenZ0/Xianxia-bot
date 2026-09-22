@@ -12,10 +12,20 @@ The number was a bare `timeout=900` written out in **five** files
 changing it meant finding all five - the same shape as the command tree's own
 tuple, one level down, and the reason this release made that a name too.
 
-`HUB_PANEL_IDLE_MINUTES` is the setting, **120** is the default, and `0` means a
-panel never expires. Zero is deliberately not the default: it costs one view
-held for the life of the process per panel ever opened, which is fine on a small
-server and is the operator's call rather than this file's.
+`HUB_PANEL_IDLE_MINUTES` is the setting and `0` means a panel never expires.
+Zero is deliberately not the default: it costs one view held for the life of the
+process per panel ever opened, which is fine on a small server and is the
+operator's call rather than this file's. The shipped default is deliberately
+*not* pinned here - which number ships is a decision the owner may take again
+(it went out at 120 in v1.0.12 and back to 15 in v1.0.13), and a gate that
+pinned it would fail exactly when that decision is made, which is the one time
+it should stay green.
+
+**What is pinned is that nothing restates the window.** The expired card spelled
+"fifteen" twice, so it was true of the default and of nothing else: raising the
+setting gave an operator a card telling their players the wrong number, which is
+a promise a setting can falsify - rc.56's panel naming a button that did not
+exist, one release later and one level down. It reads `panel_idle_minutes()`.
 
 **Injected, not read.** `hubs.py` and `runtime.py` are the same tier and
 `test_bot_package` refuses an import between them, so `surface.py` registers the
@@ -98,7 +108,7 @@ class TheIdleWindowIsOneNumber(unittest.TestCase):
             hubs.register_panel_idle(-5)
             self.assertIsNone(hubs.panel_timeout(), "a negative window is never, not a crash")
         finally:
-            hubs.register_panel_idle(120)
+            hubs.register_panel_idle(15)
 
     def test_an_unregistered_window_is_the_old_fifteen_minutes(self):
         """Failing towards *never* would leak a view per panel, for ever."""
@@ -119,6 +129,39 @@ class TheIdleWindowIsOneNumber(unittest.TestCase):
         self.assertTrue("register_panel_idle(SETTINGS.hub_panel_idle_minutes)" in source, (
             "nothing hands the hubs the configured window, so HUB_PANEL_IDLE_MINUTES reaches "
             "nothing and the setting is decoration"))
+
+    def test_the_expired_card_never_restates_the_window(self):
+        """A card spelling its own number is true of one setting and no other."""
+        source = (BOT / "hubs.py").read_text(encoding="utf-8")
+        card = next((node for node in ast.walk(ast.parse(source))
+                     if isinstance(node, ast.ClassDef) and node.name == "ExpiredPanelView"), None)
+        self.assertIsNotNone(card, "ExpiredPanelView not found in hubs.py; the gate is broken, not the tree")
+        init = next((node for node in card.body
+                     if isinstance(node, ast.FunctionDef) and node.name == "__init__"), None)
+        self.assertIsNotNone(init, "ExpiredPanelView has no __init__; the gate is broken, not the tree")
+        # Statements only, never the docstring: a gate that cannot tell prose
+        # from code is decoration (rc.52), and the prose here explains the rule.
+        body = init.body[1:] if (init.body and isinstance(init.body[0], ast.Expr)
+                                 and isinstance(init.body[0].value, ast.Constant)
+                                 and isinstance(init.body[0].value.value, str)) else init.body
+        spelled = ("fifteen", "thirty", "sixty", "ninety", "two hours", "an hour")
+        offenders = []
+        for node in body:
+            for child in ast.walk(node):
+                if isinstance(child, ast.Constant) and isinstance(child.value, str):
+                    text = child.value.lower()
+                    offenders += [word for word in spelled if word in text]
+        # assertFalse, not assertEqual: a list diff prints first and the finding
+        # last, and a message that has to be scrolled past is one nobody reads.
+        self.assertFalse(offenders, (
+            "the expired panel's card spells the idle window out, so it is true of one value of "
+            f"HUB_PANEL_IDLE_MINUTES and wrong for every other: {sorted(set(offenders))}"))
+        self.assertTrue(
+            any(isinstance(child, ast.Call) and isinstance(child.func, ast.Name)
+                and child.func.id == "panel_idle_minutes"
+                for node in body for child in ast.walk(node)),
+            "the expired panel's card never asks panel_idle_minutes(), so whatever number it "
+            "prints is not the window the panel actually waited")
 
     def test_the_setting_is_read_bounded_and_documented(self):
         with patch.dict(os.environ, ENV, clear=False):
