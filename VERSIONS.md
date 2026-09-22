@@ -46,6 +46,19 @@ zeroes, because a list is what drifted. Three pages also open at Body Tempering 
 call - what you were born with, the qi body the cultivation card already advertises, and a
 companion - taking a new cultivator from 109 visible leaves to 142. The deep end is untouched.
 
+It also stops a city repeating one rumour five times. Reported from live play: `/city rumours` in
+Ashenwall City printed *"Xie Kormaq discovered Ironbanner City"* over and over, about a route
+charted from a gate in another city entirely. There was only ever **one** row - the writer is
+idempotent on its source key - but the page asked the history query once per place, and that
+query's relevance clause is an OR, so every row about the asking player came back for all eight
+places a city and its parts make. The page also performed neither of the two checks that query's
+own docstring names RAG as the owner of, so a teller could repeat something only the player was
+party to, or something an unwitnessed crime left behind that the world is not supposed to know. A
+rumour is public news about this city, told once - and the page stops asking about the player at
+all, which is where the copies came from. Fixing it turned an existing check red, because that
+check pinned the call's exact text including the argument that was the bug, under a name claiming
+it held the very viewpoint rule the call does not apply.
+
 And the ninth and tenth were in one line of prose, which is why every gate written for this number
 walked past them: the Reopen card itself said *"went quiet for fifteen minutes"* and *"another
 fifteen"*. So the release that made the window configurable made that card wrong for everybody - at

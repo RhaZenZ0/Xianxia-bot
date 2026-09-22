@@ -3903,6 +3903,74 @@ status read be gated by writing a number beside it"*; and blanking `is_status_re
 generator no longer recognises a status read; the gate is broken, not the tree"* - **before** the
 assertion it would have made vacuous.
 
+### The same rumour, once per room (v1.0.13)
+
+**Found by playing**, and the page is the report:
+
+> 🗣️ **Rumours in Ashenwall City** — as Landlady Bo Tan tells them
+> • **Xie Kormaq discovered Ironbanner City** — …charted a route to Ironbanner City.
+> • **Xie Kormaq discovered Ironbanner City** — …
+> • *(three more of the same)*
+
+**The writer is idempotent and was never the problem.** The discovery is recorded with
+`source_key=f"location_discovery:{user}:{location}"` and `record_world_history_event` is an
+`INSERT … ON CONFLICT(source_key) DO UPDATE`, so there is exactly **one row**. It was printed five
+times.
+
+`get_structured_world_history`'s relevance clause is an **OR** —
+`location=? OR related_user_id=? OR actor_key=? OR target_key=?` — and `city_rumours` called it
+**once per place**, with `user_id=` filled in:
+
+```python
+for place in [city, *parts]:
+    events.extend(await DB.get_structured_world_history(location=place, user_id=…, limit=6))
+```
+
+Ashenwall City has seven parts, so that is eight queries, and every row about the asking player
+came back from **all eight**. The row's own `location` is *Ironbanner City* — nowhere near
+Ashenwall — which is why it could appear at all: it was never matched on the place, only on the
+player.
+
+**The second half is why the fix is not a `set()`.** That function's docstring says it
+*"deliberately returns a superset. The RAG retriever performs the final viewpoint/visibility check
+so one code path owns knowledge safety"* — and the rumours page was a **second consumer that
+performed neither check**. `rag.py` merges into a dict keyed on `history_id` and drops `hidden` at
+its line 265; this page did neither. So the landlady could repeat a **`participant`** row the
+player alone was party to — which is exactly what was reported — and a **`hidden`** one:
+`npc_deeds` writes an unwitnessed robbery and an unwitnessed contraband drop at an NPC's own
+location, which is a city, and the tree's rule for those is that *the world really does not know*.
+Their prose is already anonymised, so what leaks is the event's existence rather than a culprit's
+name; it is still a row nothing was ever meant to surface.
+
+`rumours_a_city_has_heard` is the one selection now — public only, distinct by `history_id`, newest
+first, bounded — and the call stops naming the player, which is the whole of why the duplication
+existed. **A rumour is what the city has heard**, so a row about somewhere else, or one only the
+player was party to, is not one.
+
+**The gate holds the rule rather than the page.** It compiles the helper from its own source rather
+than booting the bot for one pure function, and asserts a plain public row survives before
+asserting anything else (rc.57). Four drills: asking about the player again prints
+`['line 1423: user_id=']` with the reason; dropping the visibility filter names the `participant`
+row; replacing the dedupe prints *"one row came back 8 times… which is exactly what a player saw
+printed five times"*; and blanking the helper fails the self-check first.
+
+**What is deliberately not changed is `get_structured_world_history`.** The OR is correct for RAG,
+which is what it was written for and which filters afterwards. Narrowing it there to fix a page
+would be a rule moved out of the one path that owns it — the opposite of what its docstring asks
+for.
+
+**And an existing gate was holding the fault in place, which the full suite is what found.**
+`test_city_life.py`'s `test_rumours_come_through_the_one_viewpoint_gate` asserted the call's exact
+literal text — **including the `user_id=interaction.user.id` that was the bug** — so correcting the
+page turned it red. It is the v1.0.8 lesson at its sharpest: a gate that pins how a rule is
+*written* rather than that it holds fails precisely when the rule is corrected, which is the one
+time it should stay green, and here the spelling it pinned was itself the defect. Its **name** made
+it worse: *"come through the one viewpoint gate"*, over a call that performs no viewpoint check at
+all — the one path that owns that check is RAG, which this page was not. It is
+`test_the_unfiltered_reader_never_feeds_rumours` now and keeps only the narrow thing it really
+held, because two statements of one rule are free to disagree and the weaker one is what produces
+the false verdict.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —

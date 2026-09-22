@@ -1347,6 +1347,43 @@ async def city_envoys(interaction: discord.Interaction) -> None:
     await reply_long(interaction, "\n".join(lines))
 
 
+RUMOUR_LIMIT = 8
+
+
+def rumours_a_city_has_heard(rows: "list[dict[str, Any]]") -> "list[dict[str, Any]]":
+    """What a teller in this city may repeat, out of everything gathered.
+
+    Reported from live play as one rumour printed five times (v1.0.13). The
+    page asked `get_structured_world_history(location=place, user_id=...)`
+    once per place, and that function's relevance clause is an **OR** -
+    `location=? OR related_user_id=? OR actor_key=? OR target_key=?` - so
+    every row about the asking player came back for *every* place queried.
+    Ashenwall City and its parts are eight queries, so one discovery was
+    eight rows. The caller has stopped asking about the player at all, which
+    is the whole of why that duplication existed; this dedupes by
+    `history_id` anyway, because the union is only distinct while a row has
+    one location and that is the query's property rather than this page's.
+
+    **Public only, and that is the point rather than a tidy-up.** The
+    function's own docstring says it *"deliberately returns a superset. The
+    RAG retriever performs the final viewpoint/visibility check so one code
+    path owns knowledge safety"* - and this page was a second consumer that
+    performed neither. So the landlady could repeat a `participant` row the
+    player alone was party to, in a city where it did not happen, and a
+    `hidden` one: `npc_deeds` writes an unwitnessed robbery or a contraband
+    drop at an NPC's own location, which is a city, and the tree's rule for
+    those is that the world genuinely does not know. A rumour is what the
+    city has *heard*, so it is public news or it is not a rumour.
+    """
+    seen: dict[int, dict[str, Any]] = {}
+    for row in rows:
+        if str(row.get("visibility") or "public").strip().lower() != "public":
+            continue
+        seen.setdefault(int(row.get("history_id") or 0), row)
+    ordered = sorted(seen.values(), key=lambda e: int(e.get("game_minute") or 0), reverse=True)
+    return ordered[:RUMOUR_LIMIT]
+
+
 @registered_group_command(city_group, name="rumours", description="What the city has heard lately, told by the people who hear everything first")
 async def city_rumours(interaction: discord.Interaction) -> None:
     c = await require_character(interaction)
@@ -1381,10 +1418,10 @@ async def city_rumours(interaction: discord.Interaction) -> None:
     if not teller:
         gate = next((name for name in parts if WORLD.locations[name].get("gate")), "")
         teller = next((n for n, npc in WORLD.npcs.items() if str(npc.get("location")) == gate and n.startswith("Gate Captain")), "") if gate else ""
-    events = []
+    gathered = []
     for place in [city, *parts]:
-        events.extend(await DB.get_structured_world_history(location=place, user_id=interaction.user.id, min_significance=20, limit=6))
-    events = sorted(events, key=lambda e: int(e.get("game_minute") or 0), reverse=True)[:8]
+        gathered.extend(await DB.get_structured_world_history(location=place, min_significance=20, limit=6))
+    events = rumours_a_city_has_heard(gathered)
     lines = [f"🗣️ **Rumours in {city}**" + (f" — as {teller} tells them" if teller else "")]
     if not events:
         lines.append("Nothing worth repeating has happened here lately. Make something happen.")

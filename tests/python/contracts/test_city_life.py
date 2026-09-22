@@ -61,9 +61,19 @@ class TheHallTheRumoursAndTheInn(unittest.TestCase):
         self.assertIn('"discovery_kind": "envoys_hall"', envoys)
         self.assertIn("The sect envoys keep their hall here", EXPLORATION)
 
-    def test_rumours_come_through_the_one_viewpoint_gate(self):
+    def test_the_unfiltered_reader_never_feeds_rumours(self):
+        """This test used to pin the call's exact spelling - **including the
+        `user_id=` that was the bug** (v1.0.13). It was named for "the one
+        viewpoint gate" while asserting a call that performs no viewpoint check
+        at all: `get_structured_world_history`'s own docstring says it returns a
+        superset and names RAG as the path that filters. So a gate pinning how a
+        rule is written failed the day the rule was corrected, which is the one
+        time it should stay green (v1.0.8) - and until then it held the fault in
+        place. What rumours may repeat is now one rule in one file,
+        `test_a_rumour_is_what_the_city_heard.py`; what is left here is the
+        narrow thing this file is for.
+        """
         rumours = _body(EXPLORATION, "city_rumours")
-        self.assertIn("DB.get_structured_world_history(location=place, user_id=interaction.user.id", rumours)
         self.assertNotIn("list_world_history(", rumours, "the unfiltered reader must not feed rumours")
 
     def test_the_inn_names_who_is_in_town_and_opens_the_common_room(self):
