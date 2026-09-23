@@ -203,18 +203,34 @@ func TestSeclusionIsPacedLikeTheStageItFills(t *testing.T) {
 	if low < 1 || high <= low*5 {
 		t.Fatalf("seclusion must scale with the stage: %d -> %d", low, high)
 	}
-	// What a game day of it is worth against the pace of one hand-sat
-	// session, which is the comparison this file is about. Until v1.0.0-rc.56
-	// the bound here was "slower than sitting down for them by hand", written
-	// as `<= stagePace*2` - a number that only held because the count it
-	// bounded, 1.2 sessions a game day, happened to be 60% of active play at
-	// the shipped time scale and was 120% of it at twice that. The rule is a
-	// share now, held across every scale in seclusion_rate_test.go; what
-	// belongs here is only that a day of it is several sessions' worth and
-	// not an order of magnitude of them.
+	// What a game day of it is worth against the pace of one hand-sat session,
+	// which is the comparison this file is about.
+	//
+	// The band is **derived, not written down**, and the history is why. Until
+	// v1.0.0-rc.56 it read `<= stagePace*2` - a number that only held because
+	// the count it bounded, 1.2 sessions a game day, happened to be 60% of
+	// active play at the shipped time scale and was 120% of it at twice that.
+	// rc.56 replaced it with `1 <= sessions <= 5`, which made the same mistake
+	// one layer up: a session count is a statement about the *cooldown*, so
+	// that band only held while a session cost three hours. v1.0.13 cut the
+	// cultivate wait to thirty minutes, six times as many sessions fit in the
+	// same real time, and a day of seclusion is worth 17 of them - the share
+	// unchanged and the count six times larger, which is the derivation
+	// working exactly as rc.56 built it.
+	//
+	// So the count comes from `seclusionSessionsPerGameDay`, and what is held
+	// is that the payout really is the pace times that count, within the band
+	// the attribute, soul and world terms can move it. The share itself is
+	// held across every scale next door in seclusion_rate_test.go, and is
+	// deliberately not restated here.
 	cost, _ := phaseCost(catalog.Realms, 6, 9)
 	pace := float64(stagePace(cost, 6))
-	if sessions := float64(high) / pace; sessions < 1 || sessions > 5 {
-		t.Fatalf("a game day of seclusion pays %d, which is %.2f sessions of pace %.0f", high, sessions, pace)
+	expected := seclusionSessionsPerGameDay(fallbackClockScale)
+	if expected < 1 {
+		t.Fatalf("the sessions-a-day derivation answers %.2f; the gate is broken, not the tree", expected)
+	}
+	if sessions := float64(high) / pace; sessions < expected/2 || sessions > expected*2 {
+		t.Fatalf("a game day of seclusion pays %d, which is %.2f sessions of pace %.0f - the share "+
+			"implies about %.2f", high, sessions, pace, expected)
 	}
 }

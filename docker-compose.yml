@@ -30,7 +30,7 @@ services:
       # owns them now, and reads them here for the same reason it reads the
       # clock's rate: this service takes an explicit allowlist, so a key it is
       # not given is a key it cannot read.
-      CULTIVATE_COOLDOWN_MINUTES: "${CULTIVATE_COOLDOWN_MINUTES:-180}"
+      CULTIVATE_COOLDOWN_MINUTES: "${CULTIVATE_COOLDOWN_MINUTES:-30}"
       EXPLORE_COOLDOWN_MINUTES: "${EXPLORE_COOLDOWN_MINUTES:-20}"
       HUNT_COOLDOWN_MINUTES: "${HUNT_COOLDOWN_MINUTES:-30}"
       SECRET_REALM_COOLDOWN_MINUTES: "${SECRET_REALM_COOLDOWN_MINUTES:-15}"

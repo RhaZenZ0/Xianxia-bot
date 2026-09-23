@@ -100,6 +100,22 @@ which is exactly the state a GM asks about, and an engine that cannot be reached
 rather than zero - a zero there reads as "never reset". Writing the gate found the fault it forbids
 already in the first draft of the fix, which would have printed "2 of 0" from a partial answer.
 
+It also cuts the wait between cultivation sessions to **30 minutes**, from 180 - the knob that sets
+the pace of the whole game, since a realm is about a hundred sessions at every realm. Retuning it
+turned up that the number is written three times: the engine's table, `.env.example`, and compose's
+own `:-` fallback, which exists because the engine service takes an explicit environment allowlist
+and which is therefore the copy a deployed stack actually serves - so a pace changed in Go alone
+would have reached nobody running the compose stack. All three move together now and a gate holds
+them equal for every wait. Three gates also pinned the value rather than the rule and went red on
+the retune; one said in its own comment that it existed so ownership moving would not change the
+pace, which stopped being a reason three releases ago, and another bounded a day of closed-door
+cultivation at five hand-sat sessions - a count, which is a statement about the cooldown, in a
+comment that spends a paragraph explaining that its own predecessor was wrong for exactly that
+reason. An aptitude evolution and a dao-partnered
+session are paced with cultivation and follow it down, and a closed-door retreat stays the same
+share of active play by construction, so its absolute rate follows too. An operator whose `.env`
+already sets the old value keeps it: an upgrade never edits `.env`.
+
 **1.0.12** runs the playtest for the first time in four releases, and it went red on a hundred steps.
 
 The Discord harness presses every leaf of every hub and holds one thing about each: it was drawn and

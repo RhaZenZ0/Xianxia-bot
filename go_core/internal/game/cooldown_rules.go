@@ -41,6 +41,20 @@ const (
 	cooldownGhostAppease = "ghost_appease"
 )
 
+// cultivateWaitMinutes is the pace of the whole game: a session is a share of
+// the stage it fills, so this knob is what turns "about a hundred sessions a
+// realm" into a calendar. It is named rather than written three times because
+// the aptitude evolution and the dao-partnered session are *paced with*
+// cultivation - they share its environment key, so an operator already moves
+// all three together, and three separate literals would let the shipped
+// defaults disagree with the one thing an operator can set.
+//
+// It was 180 from rc.56, which is what Python used to send, and is 30 from
+// v1.0.13 on the owner's call. `seclusionSessionsPerGameDay` divides by it, so
+// a retreat stays the same *share* of active play at any value here and its
+// absolute rate follows this number - which is the point of deriving it.
+const cultivateWaitMinutes = 30
+
 // cooldownRule is one wait: the minutes it lasts and the environment key an
 // operator may retune it with. An empty key is a wait the operator does not
 // set - it is the engine's alone.
@@ -53,7 +67,7 @@ type cooldownRule struct {
 // reader looking for "how long until I can cultivate again" finds it here and
 // nowhere else.
 var actionCooldowns = map[string]cooldownRule{
-	cooldownCultivate:    {180, "CULTIVATE_COOLDOWN_MINUTES"},
+	cooldownCultivate:    {cultivateWaitMinutes, "CULTIVATE_COOLDOWN_MINUTES"},
 	cooldownExplore:      {20, "EXPLORE_COOLDOWN_MINUTES"},
 	cooldownHunt:         {30, "HUNT_COOLDOWN_MINUTES"},
 	cooldownSecretRealm:  {15, "SECRET_REALM_COOLDOWN_MINUTES"},
@@ -62,8 +76,8 @@ var actionCooldowns = map[string]cooldownRule{
 	// An aptitude evolution is paced with cultivation and always was: Python
 	// sent `max(300, cultivate)`, and the five-minute floor is below the
 	// cultivate default, so it only ever bit an operator who had shortened it.
-	cooldownAptitude: {180, "CULTIVATE_COOLDOWN_MINUTES"},
-	cooldownDaoDual:  {180, "CULTIVATE_COOLDOWN_MINUTES"},
+	cooldownAptitude: {cultivateWaitMinutes, "CULTIVATE_COOLDOWN_MINUTES"},
+	cooldownDaoDual:  {cultivateWaitMinutes, "CULTIVATE_COOLDOWN_MINUTES"},
 	// These three were hard-coded on the Python side or defaulted in the
 	// handler; no operator has ever been able to set them, so they take no key.
 	cooldownForbidden:    {45, ""},

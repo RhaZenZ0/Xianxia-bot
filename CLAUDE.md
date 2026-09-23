@@ -4015,6 +4015,66 @@ that name reporting the type satisfies it. And a reporter need not sit in the ha
 lives in `_run_crafting`, so the scan closes over the module's own calls, which is v1.0.5's
 `_report_trade` lesson arriving from the other side.
 
+### The pace is written three times, and only one of them is served (v1.0.13)
+
+**Asked for**: the wait between cultivation sessions cut to thirty minutes. It was **180**, not the
+two hours it was remembered as, and rc.56 had already made it the engine's - so this should have
+been one number in one table. It is three, and the third is the one that decides what a running
+server actually serves.
+
+`actionCooldowns` in `cooldown_rules.go` is the statement a reader finds. `.env.example` carries a
+second, which `migrate_env.sh` copies into a new `.env`. And **`docker-compose.yml` carries a third
+as its own fallback** - `${CULTIVATE_COOLDOWN_MINUTES:-180}` - which exists because the engine
+service takes an explicit `environment:` allowlist and no `env_file`, the rc.39 finding that made
+`WORLD_TIME_SCALE` dead on arrival. Compose therefore always passes *something*, so the engine's own
+default is never reached on a composed stack: a pace changed in Go alone would have reached a
+`go run` and **no server anybody is running**, which is rc.43, rc.46, rc.49, rc.50, rc.51 and rc.59
+wearing a seventh hat. All three move together now, and
+`test_the_three_statements_of_a_default_agree` holds them equal for every wait rather than for this
+one.
+
+**Three gates pinned the value rather than the rule, and all three went red on a retune.**
+`test_the_defaults_are_what_python_used_to_send` said exactly what it was for - *"a live world must
+not change pace because ownership moved"* - and that reason was spent the release it was written in:
+ownership moved in rc.56 and the numbers have been the engine's ever since, leaving a gate whose
+only remaining effect was to fail when the owner exercised the ownership it was celebrating. The Go
+half did it too, asserting `cooldownSecondsFor(cooldownCultivate) == 180*60` inside a test about
+*ownership*; what it is really guarding is that the served wait is the table's rather than a
+handler's old five-minute fallback, which holds at any value, so it keeps the floor and drops the
+number. That is v1.0.8's rule, which v1.0.13 had already applied twice in this release - to the
+panel-idle window and to the rotation's allowlist entry - and this is the third and fourth.
+
+**The third is the one worth reading, because it had already been fixed once for this exact
+reason.** `TestSeclusionIsPacedLikeTheStageItFills` bounded a game day of seclusion at
+`1 <= sessions <= 5` of a hand-sat session, and the comment above it explains at length that the
+*previous* bound was wrong because *"a number that only held because the count it bounded, 1.2
+sessions a game day, happened to be 60% of active play at the shipped time scale"*. Its replacement
+made the same mistake one layer up: a session count is a statement about the cooldown, so
+`<= 5` only held while a session cost three hours. At thirty minutes six times as many sessions fit
+in the same real time and a day behind the door is worth seventeen of them - **the share unchanged
+and the count six times larger**, which is rc.56's derivation working rather than breaking. The
+band is computed from `seclusionSessionsPerGameDay` now, so what is held is that the payout really
+is the pace times that count; the share itself stays held across every scale next door, and is
+deliberately not restated here. A rule can be fixed, have the fix explained in a comment, and be
+broken again in the same statement by the same reasoning one level out.
+
+**The three defaults were also three literals that had to agree.** `cooldownAptitude` and
+`cooldownDaoDual` are *paced with* cultivation and share its environment key, so an operator already
+moved all three together - but their shipped defaults were three separate `180`s, and retuning one
+would have silently unpaced the other two. `cultivateWaitMinutes` is the one statement now.
+
+**What moves with it, deliberately.** `seclusionSessionsPerGameDay` divides by this wait, because
+rc.56 made a retreat a *share* of active play rather than a count of sessions. So a retreat stays
+125% of active cultivation at thirty minutes exactly as at 180, and its absolute rate rises sixfold
+with the pace - which is the derivation working, not a second thing to tune. The calendar it turns
+into is in `docs/CONFIGURATION.md`: about a hundred sessions a realm, so roughly two real days of
+active cultivation where it used to be ten.
+
+**And the one thing this cannot reach is a server already running.** `.env` is never edited by an
+upgrade - that is what `migrate_env.sh` exists for, and it keeps values already set - so an operator
+whose `.env` carries the old `CULTIVATE_COOLDOWN_MINUTES=180` keeps three hours until they change it
+themselves. The new default is for a fresh install and for anyone who removes the line.
+
 ### The allowance nobody could look up (`character.reset_status`, v1.0.13)
 
 **Asked for**, after a question this file could not answer: where a GM sees how many times a player

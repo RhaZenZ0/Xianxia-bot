@@ -265,9 +265,9 @@ dao-partnered session, which have always been paced with cultivation.
 is the one that sets the pace of the whole game since v1.0.0-rc.5: a session is
 a share of the stage it fills (a twelfth of it), so a stage takes about a dozen
 sessions and a realm about a hundred at every realm, and this knob turns that
-into a calendar. At the default of 180 minutes a realm is roughly ten real days
-of active cultivation, less with closed-door seclusion running beside it and
-less again in the higher worlds, whose qi density is content
+into a calendar. At the default of **30 minutes** (180 until v1.0.13) a realm is
+roughly two real days of active cultivation, less with closed-door seclusion
+running beside it and less again in the higher worlds, whose qi density is content
 (`world_qi_density` in `content/world.json`). `UNEXPECTED_EVENT_CHANCE_PERCENT`
 is the chance an explore rolls an unexpected event. `WORLD_TIME_SCALE` is how
 many game minutes pass per real minute, 0 to 60. Since v1.0.0-rc.39 it is read

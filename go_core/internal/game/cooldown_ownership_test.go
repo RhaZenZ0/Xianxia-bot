@@ -74,16 +74,24 @@ func TestTheEngineServesItsOwnWait(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "cultivation cooldown remaining") {
 		t.Fatalf("a second session inside the wait: err=%v", err)
 	}
-	// Not merely "some wait": the engine's own three hours, to within the
-	// second the action took. A handler quietly falling back to the old
-	// five-minute floor would pass the line above and fail here.
+	// Not merely "some wait": the table's own, to within the second the action
+	// took. A handler quietly falling back to the old five-minute floor would
+	// pass the line above and fail here.
+	//
+	// It deliberately does not pin *which* number ships. It used to assert
+	// `want == 180*60`, so the owner retuning the pace turned an ownership
+	// test red - and a gate that pins how a rule is written rather than that
+	// it holds fails exactly when the decision behind it is taken again
+	// (v1.0.8, and v1.0.13's panel window made the same call). What is held is
+	// that the wait served is the one the table states, whatever that is; the
+	// floor below keeps the old five minutes from creeping back.
 	var remaining int64
 	if _, scanErr := fmt.Sscanf(err.Error(), "cultivation cooldown remaining: %d", &remaining); scanErr != nil {
 		t.Fatalf("cannot read the wait out of %q: %v", err.Error(), scanErr)
 	}
 	want := cooldownSecondsFor(cooldownCultivate)
-	if want != 180*60 {
-		t.Fatalf("the cultivate wait is %ds, want the shipped 180 minutes", want)
+	if want <= 300 {
+		t.Fatalf("the cultivate wait is %ds, at or under the five-minute floor the handlers used to fall back to", want)
 	}
 	if remaining < want-5 || remaining > want {
 		t.Fatalf("served a wait of %ds, want %ds", remaining, want)

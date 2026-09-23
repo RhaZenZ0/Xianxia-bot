@@ -50,6 +50,30 @@ ENGINE_MODULE = "game_engine"
 ENGINE_CALLS = {"action", "authoritative_action"}
 
 
+
+def cooldown_defaults() -> list[tuple[str, int]]:
+    """Every wait in `actionCooldowns`, in table order, as (env key, minutes).
+
+    Pairs rather than a dict, because three entries share
+    `CULTIVATE_COOLDOWN_MINUTES` - an aptitude evolution and a dao-partnered
+    session are paced with cultivation - so keying by the env key silently
+    loses two of the twelve. An empty key is a wait the operator cannot set.
+
+    It resolves a named constant as well as a literal. `cultivateWaitMinutes`
+    became a name in v1.0.13, precisely so those three defaults cannot
+    disagree with the one key that moves them, and the older reader here
+    matched only digits - so naming it made the sanity check below see nine
+    entries where there are twelve. A reader that silently finds less than it
+    should is the shape rc.57 named; there is one of them now and both tests
+    use it.
+    """
+    consts = {name: int(value) for name, value in
+              re.findall(r"^const\s+(\w+)\s*=\s*(\d+)$", RULES, re.M)}
+    body = RULES.split("var actionCooldowns = map[string]cooldownRule{", 1)[1].split("\n}", 1)[0]
+    return [(key, int(minutes) if minutes.isdigit() else consts[minutes])
+            for minutes, key in re.findall(r"\{(\w+),\s*\"([A-Z_]*)\"\}", body)]
+
+
 class NothingInPythonSendsAWait(unittest.TestCase):
     def test_no_bot_call_carries_a_cooldown(self):
         offenders = []
@@ -142,21 +166,63 @@ class TheEngineHoldsTheOneStatement(unittest.TestCase):
         self.assertEqual(offenders, [], "a wait read off the payload is a wait the caller chose")
 
     def test_every_wait_has_one_entry_and_a_sane_default(self):
-        body = RULES.split("var actionCooldowns = map[string]cooldownRule{", 1)[1].split("\n}", 1)[0]
-        entries = re.findall(r"\{(\d+),\s*\"([A-Z_]*)\"\}", body)
+        entries = cooldown_defaults()
         self.assertGreaterEqual(len(entries), 12, "every action that had a caller-supplied wait")
-        for minutes, _ in entries:
-            self.assertGreater(int(minutes), 0, "a wait of zero is no wait")
-            self.assertLessEqual(int(minutes), 24 * 60, "a wait longer than a day wants a reason")
+        for key, minutes in entries:
+            self.assertGreater(minutes, 0, f"{key or 'an engine-only wait'}: a wait of zero is no wait")
+            self.assertLessEqual(minutes, 24 * 60,
+                                 f"{key or 'an engine-only wait'}: a wait longer than a day wants a reason")
 
-    def test_the_defaults_are_what_python_used_to_send(self):
-        # A live world must not change pace because ownership moved.
-        for key, minutes in (("CULTIVATE_COOLDOWN_MINUTES", 180), ("EXPLORE_COOLDOWN_MINUTES", 20),
-                             ("HUNT_COOLDOWN_MINUTES", 30), ("SECRET_REALM_COOLDOWN_MINUTES", 15),
-                             ("PERFECT_QUEST_COOLDOWN_MINUTES", 60),
-                             ("PERFECT_TRIAL_COOLDOWN_MINUTES", 360)):
-            self.assertRegex(RULES, rf"\{{{minutes}, \"{key}\"\}}",
-                             f"{key} must still default to {minutes} minutes")
+    def test_the_three_statements_of_a_default_agree(self):
+        """Every shipped wait is written three times; they must say the same thing.
+
+        This used to pin each default to the number Python sent before rc.56
+        moved ownership, with the reason *"a live world must not change pace
+        because ownership moved"*. That reason was spent the release it was
+        written: ownership moved, the numbers have been the engine's since, and
+        what was left was a gate that went red the moment the owner retuned the
+        pace - which v1.0.13 is what found, changing the cultivate wait to 30.
+        A gate that pins how a rule is written rather than that it holds fails
+        exactly when the decision behind it is taken again (v1.0.8).
+
+        The rule worth holding is the one that could actually cost something.
+        The engine's compose service takes an explicit `environment:` allowlist
+        with its own `:-` fallback, so a default changed in Go and not in
+        compose **reaches nobody running the stack** - a fresh install and no
+        server anybody has, which is the shape rc.43, rc.46, rc.49, rc.50,
+        rc.51 and rc.59 each wore. `.env.example` is the third statement, and
+        `migrate_env.sh` copies it into a new `.env`.
+        """
+        defaults: dict[str, int] = {}
+        shared = []
+        for key, minutes in cooldown_defaults():
+            if not key:
+                continue
+            if defaults.setdefault(key, minutes) != minutes:
+                # Three entries share the cultivate key and an operator moves
+                # all three with one value, so shipped defaults that differ
+                # would be a pace nobody can restore by setting it.
+                shared.append(f"{key} is shipped as both {defaults[key]} and {minutes} minutes")
+        self.assertFalse(shared, "entries sharing one environment key ship different defaults: " + str(shared))
+        # Asserted before it is trusted (rc.57): a reader that resolved nothing
+        # would make the comparison below vacuous.
+        self.assertIn("CULTIVATE_COOLDOWN_MINUTES", defaults,
+                      "the cooldown table could not be read off cooldown_rules.go; the gate is broken, not the tree")
+
+        example = (PROJECT_ROOT / ".env.example").read_text(encoding="utf-8")
+        compose = (PROJECT_ROOT / "docker-compose.yml").read_text(encoding="utf-8")
+        offenders = []
+        for key, minutes in sorted(defaults.items()):
+            shipped = re.search(rf"^{key}=(\d+)$", example, re.M)
+            if shipped is None or int(shipped.group(1)) != minutes:
+                offenders.append(f".env.example says {key}={shipped.group(1) if shipped else 'nothing'}, the engine defaults to {minutes}")
+            fallback = re.search(rf"\$\{{{key}:-(\d+)\}}", compose)
+            if fallback is None or int(fallback.group(1)) != minutes:
+                offenders.append(f"compose falls back to {key}={fallback.group(1) if fallback else 'nothing'}, the engine defaults to {minutes}")
+        self.assertFalse(offenders, (
+            "a wait is written down three times and they disagree. The compose fallback is the one "
+            "that decides what a deployed stack actually serves, so a default changed only in Go "
+            f"reaches nobody running it:\n  " + "\n  ".join(offenders)))
 
     def test_the_engine_is_given_the_keys_it_now_reads(self):
         # The engine's compose service takes an explicit allowlist and no
