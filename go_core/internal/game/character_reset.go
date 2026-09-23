@@ -154,6 +154,86 @@ func characterResetsUsedTx(conn *storage.Conn, userID int64) (int64, error) {
 	return i64(res.Rows[0][0]), nil
 }
 
+// characterResetStatusQuery answers what one account has spent of its restart
+// allowance (v1.0.13). It exists because two GM surfaces ask - `/admin player inspect` on
+// Discord and the dashboard's Player Editor - and everything the answer is made
+// of belongs to the engine.
+//
+// **It is a query rather than a SELECT in each surface.** The bound is
+// `characterResetAllowance` and the row it counts is `characterResetEvent`: a
+// Go constant and a Go string, which Python would have had to restate twice
+// over. A surface carrying its own copy of the allowance reads "one left" on
+// the day the engine refuses, which is rc.46's rule seen from behind the
+// counter and exactly why v1.0.11 took the root ladder out of the browser.
+// `event_log` has no other reader in Python at all, and two raw readers of a
+// Go-owned table is how the count and the limit part company later.
+//
+// **The subject is the payload's, never the actor's.** Both callers are asking
+// about somebody else - Discord's actor is the GM who typed the command and the
+// dashboard is not an actor at all - so there is no sensible default, and an
+// absent `user_id` is a refusal rather than a quiet answer about the wrong
+// person.
+//
+// **It reads no `characters` row, deliberately.** An account that reset and has
+// not begun again has none, and that is precisely the state a GM asks about;
+// joining the sheet would answer "nobody" in the one case worth having the
+// lever for.
+//
+// The two count keys are spelled exactly as `character.reset`'s own result
+// spells them, so the reply a player gets and the card a GM reads cannot come
+// to mean different things.
+func characterResetStatusQuery(conn *storage.Conn, raw json.RawMessage) (map[string]any, error) {
+	p, err := decodeMap(raw)
+	if err != nil {
+		return nil, err
+	}
+	userID, err := requiredInt(p, "user_id")
+	if err != nil {
+		return nil, err
+	}
+	used, err := characterResetsUsedTx(conn, userID)
+	if err != nil {
+		return nil, err
+	}
+	// Newest first, and unbounded: at most `characterResetAllowance` rows can
+	// exist, so a LIMIT here would be a second number stating the same bound.
+	res, err := conn.Execute(
+		`SELECT payload_json,created_at FROM event_log WHERE user_id=? AND event_type=? ORDER BY id DESC`,
+		[]any{userID, characterResetEvent})
+	if err != nil {
+		return nil, err
+	}
+	lives := make([]map[string]any, 0, len(res.Rows))
+	for _, row := range res.Rows {
+		if len(row) < 2 {
+			continue
+		}
+		life := map[string]any{"created_at": row[1]}
+		// Through the package's own decoder, which has used json.Number since
+		// v1.0.12: a float64 is not a thing to decode ids into, even where
+		// this payload happens to carry none.
+		if record, rerr := decodeMap(json.RawMessage(fmt.Sprint(row[0]))); rerr == nil {
+			for key, value := range record {
+				life[key] = value
+			}
+		}
+		lives = append(lives, life)
+	}
+	remaining := characterResetAllowance - used
+	if remaining < 0 {
+		// Only reachable if the allowance is ever lowered under a live world.
+		// Nobody is owed a negative number of fresh starts.
+		remaining = 0
+	}
+	return map[string]any{
+		"user_id":          userID,
+		"resets_used":      used,
+		"resets_remaining": remaining,
+		"reset_allowance":  int64(characterResetAllowance),
+		"resets":           lives,
+	}, nil
+}
+
 // characterResetWorldMarksTx names every shared-world row that would be
 // anonymised rather than deleted. A reset is refused while any exists; the
 // names are returned so the refusal can say which, because "you cannot reset"

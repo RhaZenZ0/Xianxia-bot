@@ -722,11 +722,20 @@ async function loadPlayerEditor(){
  const gateOpts=[[7,'Mortal Ascension Tribulation (realm 7)'],[15,'Transcendence Tribulation (realm 15)'],[23,'Celestial Ascension Tribulation (realm 23)']].map(([v,l])=>`<option value="${v}"${v===defaultGate?' selected':''}>${esc(l)}</option>`).join('');
  const guestOpts=players.filter(x=>!sameId(x.user_id,EDIT_UID)).map(x=>`<option value="${esc(x.user_id)}">${esc(x.name)} · ${esc(x.discord_name)}</option>`).join('');
  const bloodlines=p.bloodlines||[], blood=bloodlines[0]||{}, phys=p.physique||{}, root=p.root||{}, abode=p.abode||{}, fate=p.fate||{}, alchemy=p.alchemy||{};
+ /* What this account has spent of its restart allowance (v1.0.13). Every
+   number in it is the engine's - the count, the bound and the lives given up
+   all come back from `character.reset_status`, because the limit is a Go
+   constant and a browser holding its own copy would show "1 left" on the day
+   the engine refuses. An engine that did not answer leaves the block empty and
+   the tile reads an em dash: 0 / 0 would be a placeholder that looks like a
+   value, which is the `engine -` footer v1.0.8 found in this same shell. */
+ const resets=p.resets||{}, resetLives=resets.resets||[];
  const standing=[r.is_banned?'banned':'',r.is_frozen?'frozen':'',r.is_muted?'muted':''].filter(Boolean).join(' · ');
  const reasonField=(i,v)=>`<label>Reason<input id="${i}" value="${esc(v)}"></label>`;
  app.innerHTML=`${picker}
  <div class="sheetstrip">${pill(r.life_status,r.life_status==='alive'?'good':'bad')}${pill(`Realm ${r.realm_index}/${r.phase}`,'blue')}${pill(`Body ${r.body_realm_index}/${r.body_phase}`,'purple')}${pill(r.location)}${pill(r.sect_name?`${r.sect_name} · ${r.rank_name}`:'Independent')}${standing?pill(standing,'bad'):''}${pill(r.path)}</div>
- <div class="cards">${[['Vitality',`${n(r.vitality)} / ${n(r.vitality_max)}`],['Qi',`${n(r.qi)} / ${n(r.qi_max)}`],['Karma',n(r.karma_score)],['Fate',n(fate.points)],['Spirit stones',n(r.spirit_stones)],['Pill toxicity',n(alchemy.pill_toxicity)]].map(x=>`<div class="card"><small>${x[0]}</small><div class="metric">${x[1]}</div></div>`).join('')}</div>
+ <div class="cards">${[['Vitality',`${n(r.vitality)} / ${n(r.vitality_max)}`],['Qi',`${n(r.qi)} / ${n(r.qi_max)}`],['Karma',n(r.karma_score)],['Fate',n(fate.points)],['Spirit stones',n(r.spirit_stones)],['Pill toxicity',n(alchemy.pill_toxicity)],['Restarts',resets.reset_allowance===undefined?'—':`${n(resets.resets_used)} / ${n(resets.reset_allowance)}`]].map(x=>`<div class="card"><small>${x[0]}</small><div class="metric">${x[1]}</div></div>`).join('')}</div>
+ ${resetLives.length?`<section class="card"><h3>🌱 Restarts</h3><p>This account has begun again <b>${n(resets.resets_used)}</b> of <b>${n(resets.reset_allowance)}</b> allowed times, and may do so <b>${n(resets.resets_remaining)}</b> more. A reset is not Samsara: nothing of an abandoned life carries over. The record survives the sweep that wipes everything else, which is what makes the allowance a bound; a GM erasure takes it with the rest, so an erased account starts over at ${n(resets.reset_allowance)}.</p>${table([['#','reset_number'],['Gave up','name'],['Path','path'],['Root','spiritual_root'],['Realm',x=>`${x.realm_index}/${x.phase}`],['When',x=>x.created_at?new Date(Number(x.created_at)*1000).toLocaleString():'—']],resetLives)}</section>`:''}
  <p class="editor-note">Every field is pre-filled from the row its lever writes. A change is applied by the engine and written to admin_audit_log with your name on it; the sheet above re-reads after each one.</p>
  <div id="adminResult"></div>
  <h2>Player Edit</h2>

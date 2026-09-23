@@ -86,6 +86,20 @@ twenty-six releases of the harness had all been saying. `120` is still a comfort
 page-and-come-back window for any operator who wants it; what the gate holds is that nothing
 restates the number, never which number ships.
 
+It also lets a GM see how many times a player has started over. `character.reset` has reported what
+an account has spent of its three restarts since v1.0.1, and that reply was the only place either
+number had ever appeared: a player learned how many were left by spending one, and a GM could not
+look it up anywhere. The record was never missing - one `event_log` row per reset, deliberately kept
+out of the sweep so the bound survives the action it bounds, carrying the abandoned life's name,
+path, root and realm - it simply had no reader in the whole of Python. It has one door now,
+`character.reset_status`, asked by `/admin player inspect` and by the dashboard's Player Editor.
+It is an engine query rather than a count in each surface because the row it filters on and the
+limit it is measured against are both the engine's, and a card holding its own copy of the limit
+reads "one left" on the day the engine refuses. It answers for an account with no character at all,
+which is exactly the state a GM asks about, and an engine that cannot be reached says "unknown"
+rather than zero - a zero there reads as "never reset". Writing the gate found the fault it forbids
+already in the first draft of the fix, which would have printed "2 of 0" from a partial answer.
+
 **1.0.12** runs the playtest for the first time in four releases, and it went red on a hundred steps.
 
 The Discord harness presses every leaf of every hub and holds one thing about each: it was drawn and

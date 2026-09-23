@@ -4015,6 +4015,80 @@ that name reporting the type satisfies it. And a reporter need not sit in the ha
 lives in `_run_crafting`, so the scan closes over the module's own calls, which is v1.0.5's
 `_report_trade` lesson arriving from the other side.
 
+### The allowance nobody could look up (`character.reset_status`, v1.0.13)
+
+**Asked for**, after a question this file could not answer: where a GM sees how many times a player
+has reset their character.
+
+`character.reset` has reported `resets_used` and `resets_remaining` in its own reply since v1.0.1,
+and **that reply was the only place either number has ever appeared**. A player learned how many
+chances were left by spending one - the confirm step is the generic red "Are you sure?" from
+`_DANGER_ACTION_WORDS` and names no count - and a GM could not look it up at all. The record was
+never the problem: `event_log` carries one `character_reset` row per reset, kept out of the sweep by
+`characterResetKeep` precisely so the bound survives the action it bounds, and its payload already
+held the abandoned life's name, path, root, realm and phase. It had **no Python reader anywhere in
+the tree** - the string occurs twice in `app/`, in the table list and the DDL that creates it - no
+dashboard view, no `/admin` panel and no API field. The thing was recorded, complete and legible,
+and nothing looked at it: the shape `/learn` (rc.43), the quest journal (rc.46) and the peach
+(rc.50) each had.
+
+**Why it is an engine query and not two SELECTs.** The obvious fix is a `COUNT(*)` in the bot's `DB`
+and another in the dashboard's own query session, which is how both planes read every other table.
+It is refused because of what the count is made of: the row it filters on is `characterResetEvent`
+and the bound it is read against is `characterResetAllowance`, **a Go string and a Go constant**, so
+that fix would put four new copies of two engine facts into presentation. A surface holding its own
+`3` reads correctly the day it is written and tells a GM *"one left"* on the day the engine refuses
+- rc.46's rule seen from behind the counter, and exactly what v1.0.11 took the spiritual-root ladder
+out of the browser to stop. The precedent is `secret_realm.rotation`, added for this same dashboard
+with this same reasoning written on it: *"three copies of one rule, and they had already parted
+company."*
+
+So `character.reset_status` is one door on `authoritativeQueries`, and neither surface knows how the
+answer is made. Three things about it are decisions rather than mechanics:
+
+- **The subject rides the payload, never the actor.** Every other read on that allowlist answers
+  about the caller; both callers here are asking about somebody else - Discord's actor is the GM who
+  typed the command, and the dashboard asks as actor 0, which is not a cultivator. An absent
+  `user_id` is therefore a refusal rather than a quiet answer about the wrong person.
+- **It reads no `characters` row**, and that is the case the lever exists for: an account that reset
+  and has not begun again has none, so a read joined to the sheet would answer "nobody" about
+  precisely the person a GM is looking up. The Discord side carries the same rule one level out -
+  `/admin player inspect` used to stop at *"That member has no cultivation character"*, and now
+  prints the restarts on that branch too.
+- **An engine that does not answer says so.** Both surfaces degrade to *"unknown"* and an em dash
+  rather than to a zero, because a zero here reads as *"never reset"* and a GM cannot tell it from
+  *"nobody replied"* - the `engine —` footer v1.0.8 found in this same dashboard shell.
+
+**The gate's own first run found a fault in the fix.** The rule it holds is that neither surface may
+supply a number of its own, and the Discord line was written
+`int(status.get("reset_allowance", 0))` - so a partial block would have printed **"2 of 0"**, a
+bound nothing enforces, from the very function written to stop that. It asks whether the field is
+absent now, which is v1.0.1's rule and is also the only correct question here, since `resets_used`
+of 0 is the commonest real answer there is.
+
+**And the gate's first run flagged the file it was written for**, because the docstring explaining
+why nothing may read `event_log` names `event_log`. That is rc.52 arriving in the same session
+again, and the reader that fixes it already existed in `test_playtest_gate.py` - so rather than a
+second copy, `code_only` moved to `tests/support.py` and both gates import it. v1.0.12's lesson:
+*never copy* has a cheaper answer than *parse the source* whenever the thing being copied could
+simply have a name.
+
+**What the load-bearing test measures is not the count.** A test asserting "2 of 3" passes just as
+well against a surface printing a 3 of its own, which is the rc.47 shape; so the Go gate holds the
+status against **a real reset's own reply** (`reset_allowance == resets_used + resets_remaining`, as
+the action accounted for them) and the Python gate makes a fake engine answer an allowance of
+**five**, a number this tree does not contain. Its drill prints *"the panel did not report the
+allowance the engine gave it, so it is carrying a copy"*.
+
+The harness drives it where it matters rather than anywhere: section 21c already resets QUITTER, so
+the read is taken at the one moment that account has no `characters` row, and it compares the read
+with that reset's own reply instead of with a number written down in the script. Its drill prints
+`['character.reset_status'] != []` from the coverage gate.
+
+**What is deliberately not built is the player's own view.** `/reset`'s confirm step still names no
+count, so a player still learns the number by spending one. That is a decision about how much a
+warning should say, not a wiring, and it is in `docs/TODO.md` with that reason.
+
 ### Zero hops is a distance, not a missing value (v1.0.13)
 
 **Found by playing**, inside an apothecary: `/travel` refused with *"Travel failed: the shop door

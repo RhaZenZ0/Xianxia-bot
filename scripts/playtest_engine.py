@@ -2319,6 +2319,30 @@ async def run(url: str, token: str, db_path: str) -> Report:
             report.add("PASS" if gone is None else "FAIL", "the abandoned cultivator has no character row", str(gone)[:80])
             report.add("PASS" if int(reset.get("resets_remaining", -1)) == 2 else "FAIL",
                        "two of three chances remain", f"remaining={reset.get('resets_remaining')}")
+            # The GM's read of the same allowance (v1.0.13). Driven here rather
+            # than anywhere else because QUITTER has no `characters` row at
+            # this exact point - that is what a reset is - and that is both the
+            # state a GM asks the question in and the one a read joined to the
+            # sheet would answer "nobody" about.
+            status = await step(report, "character.reset_status reads the allowance back for a GM",
+                                query("character.reset_status", GM, {"user_id": QUITTER}))
+            if status is not None:
+                used, left = present(status.get("resets_used")), present(status.get("resets_remaining"))
+                allowance = present(status.get("reset_allowance"))
+                # Measured against the action's own reply, never against a
+                # number written down here: a harness holding its own copy of
+                # the bound is the thing the query exists to prevent.
+                agrees = (used == present(reset.get("resets_used"))
+                          and left == present(reset.get("resets_remaining"))
+                          and allowance == used + left)
+                report.add("PASS" if agrees else "FAIL",
+                           "the GM's read and the reset itself agree on the allowance",
+                           f"read {used} used / {left} left of {allowance}; the reset said "
+                           f"{reset.get('resets_used')} used / {reset.get('resets_remaining')} left")
+                lives = [dict(row) for row in (status.get("resets") or [])]
+                report.add("PASS" if lives and str(lives[0].get("name") or "") == "Mo Secondthoughts" else "FAIL",
+                           "and names the life that was given up",
+                           str([row.get("name") for row in lives])[:80])
         again = await step(report, "family options again after a reset",
                            act("character.family_options", QUITTER, {"world_name": "Mortal World"}))
         second = list((again or {}).get("families") or [])

@@ -16,6 +16,20 @@ deferred half and not the half that says what was done about it.
 
 ## Findings
 
+- **fixed (v1.0.13)** — *A GM could not see how many times a player had started over.* The record
+  was never missing: one `event_log` row per `character.reset`, kept out of the reset's own sweep so
+  the bound survives the action it bounds, carrying the abandoned life's name, path, root, realm and
+  phase. It had no Python reader anywhere in the tree, no dashboard view and no `/admin` panel, and
+  the only place `resets_used`/`resets_remaining` had ever appeared was the reply to the reset
+  itself. `character.reset_status` is the one door; `/admin player inspect` and the dashboard's
+  Player Editor ask it. See CLAUDE.md, "The allowance nobody could look up".
+- **deferred (design)** — *A player still cannot see how many restarts they have left before spending one.*
+  `/reset`'s confirm step is the generic red "Are you sure?" built from `_DANGER_ACTION_WORDS` and
+  the command's description, so the count reaches them only in the reply to a reset they have
+  already made. The engine read added in v1.0.13 would serve it (it is actor-agnostic and the
+  player is entitled to their own number), but what a destructive confirmation should say is a
+  decision about the warning rather than a wiring, and widening one unasked is what this file exists
+  to refuse.
 - **fixed (v1.0.1)** — *A method you knew could not tell you what it needed.* Found by playing. A
   player bought an Inscription slip, read it, and had no way to learn that a Swift-Wind Talisman
   wants one `talisman_paper` and one `spirit_ink`. `character_recipes` had four writers and no

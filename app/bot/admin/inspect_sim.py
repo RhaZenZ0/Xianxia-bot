@@ -78,12 +78,62 @@ BACKUP_ACTIONS = [
 ]
 
 
+async def restart_allowance_line(user_id: int) -> str:
+    """How much of their restart allowance one account has spent (v1.0.13).
+
+    `character.reset` has reported `resets_used` and `resets_remaining` since
+    v1.0.1 and that reply was the only place either number ever appeared, so a
+    player learned how many chances were left by spending one and a GM could
+    not look it up at all. `character.reset_status` is the read.
+
+    **Nothing here states the allowance.** The count, the bound and the lives
+    that were given up all come back from the engine, because the limit is
+    `characterResetAllowance` in Go and a line that carried its own copy would
+    read "1 left" on the day the engine refuses - which is rc.46's rule seen
+    from behind the counter.
+
+    **An engine that does not answer says so.** Falling back to a zero would be
+    a placeholder that looks like a value, and a GM cannot tell "never reset"
+    from "nobody asked" - the `engine -` footer v1.0.8 found on the dashboard,
+    one surface over. It never raises: the resets are one line of a card that
+    has a dozen, and a lookup that threw would cost the whole inspect.
+    """
+    try:
+        status = dict(await ENGINE.action("character.reset_status", user_id, {"user_id": int(user_id)}) or {})
+    except (GameEngineError, OSError, ValueError):
+        log.exception("Could not read the restart allowance of user %s", user_id)
+        return "**unknown** — the engine did not answer"
+    # Absent, not falsy (v1.0.1): `resets_used` of 0 is the commonest real
+    # answer there is, and a `.get(key, 0)` on the allowance would print "2 of
+    # 0" from a partial block - this gate's own first run is what found that.
+    if status.get("reset_allowance") is None or status.get("resets_used") is None:
+        return "**unknown** — the engine did not answer"
+    used, allowance = int(status["resets_used"]), int(status["reset_allowance"])
+    line = f"**{used}** of **{allowance}** used"
+    lives = [dict(row) for row in (status.get("resets") or [])]
+    if lives:
+        # Newest first, as the engine orders them. The name is what a GM is
+        # actually looking for - "who was this account before".
+        line += " · gave up " + ", ".join(
+            f"**{row.get('name') or '?'}** ({WORLD.realm_name(int(row.get('realm_index') or 0))} Stage {int(row.get('phase') or 1)})"
+            for row in lives[:3]
+        )
+    return line
+
+
 @registered_group_command(admin_player_group, name="inspect", description="Inspect a player's hidden canonical game state")
 async def admin_inspect(interaction: discord.Interaction, member: discord.Member) -> None:
     if not await require_admin(interaction): return
     c = await DB.get_character(member.id)
     if not c:
-        await interaction.response.send_message("That member has no cultivation character.", ephemeral=False); return
+        # The resets are reported here too, and this is the branch that makes
+        # the lever worth having: an account that reset and has not begun again
+        # has no `characters` row at all, which is exactly the state a GM is
+        # asking about. Answering "no character" and stopping would hide the
+        # one fact left to know about them.
+        await interaction.response.send_message(
+            f"That member has no cultivation character.\nRestarts: {await restart_allowance_line(member.id)}",
+            ephemeral=False); return
     family = await DB.get_birth_family(member.id)
     sect = await DB.get_sect_membership(member.id)
     battle = await DB.get_active_battle(member.id)
@@ -107,6 +157,7 @@ async def admin_inspect(interaction: discord.Interaction, member: discord.Member
         f"\nSoul incarnation: **{soul.get('incarnation_count',1)}** • Legacy: **{soul.get('legacy_points',0)}**",
         f"\nReincarnation pending: **{'yes' if reinc else 'no'}** • Seclusion: **{seclusion.get('mode').upper() if seclusion else 'none'}** • Active effects: **{len(effects)}** • Laws: **{len(laws)}**",
         f"\nWallet entries: **{len([v for v in wallet.values() if int(v)!=0])}** • Inventory stacks: **{len([v for v in inventory.values() if int(v)>0])}**",
+        f"\nRestarts: {await restart_allowance_line(member.id)}",
         f"\nModeration: {moderation_summary(c)}",
     ]
     await audit_admin(interaction, "player.inspect", target=f"user:{member.id}")
