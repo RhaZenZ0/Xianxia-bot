@@ -32,6 +32,8 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
+import httpx
+
 from tests.support import PROJECT_ROOT, code_only
 
 ENV = {"DISCORD_TOKEN": "test-token", "GUILD_ID": "123456789012345678",
@@ -42,6 +44,15 @@ GO = PROJECT_ROOT / "go_core" / "internal" / "game"
 MEMBER = SimpleNamespace(id=900001, mention="<@900001>")
 
 # What the engine answers. Spelled once here, as the engine spells it.
+# How an engine fails to answer. The first two were all this gate ever tried,
+# and the one a real outage raises is the third: the engine client calls httpx
+# directly and wraps nothing, so a refused connection escaped both surfaces
+# while the test that says it cannot stayed green (v1.0.14).
+def _failures(game_engine_error):
+    return (game_engine_error("down"), OSError("refused"),
+            httpx.ConnectError("connection refused"), httpx.ReadTimeout("timed out"))
+
+
 BLOCK = {
     "user_id": 900001, "resets_used": 2, "resets_remaining": 1, "reset_allowance": 3,
     "resets": [
@@ -90,7 +101,7 @@ class TheDiscordPanelReportsWhatTheEngineSays(unittest.IsolatedAsyncioTestCase):
             "and a copy reads 'one left' on the day the engine refuses"))
 
     async def test_an_engine_that_does_not_answer_says_unknown(self):
-        for failure in (self.mod.GameEngineError("down"), OSError("refused")):
+        for failure in _failures(self.mod.GameEngineError):
             with self.subTest(failure=type(failure).__name__):
                 with patch.object(self.mod.ENGINE, "action", AsyncMock(side_effect=failure)), \
                      patch.object(self.mod, "log", SimpleNamespace(exception=lambda *a, **k: None)):
@@ -141,10 +152,13 @@ class TheDashboardAsksTheSameDoor(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(await self._store(None).restart_allowance(MEMBER.id), {})
         from app.dashboard.server import GameEngineError
 
-        engine = SimpleNamespace(action=AsyncMock(side_effect=GameEngineError("down")))
-        self.assertEqual(await self._store(engine).restart_allowance(MEMBER.id), {}, (
-            "an unreachable engine must leave the block empty so the card draws an em dash; a zeroed "
-            "block would be a placeholder that looks like a value"))
+        for failure in _failures(GameEngineError):
+            with self.subTest(failure=type(failure).__name__):
+                engine = SimpleNamespace(action=AsyncMock(side_effect=failure))
+                self.assertEqual(await self._store(engine).restart_allowance(MEMBER.id), {}, (
+                    "an unreachable engine must leave the block empty so the card draws an em dash; a "
+                    "zeroed block would be a placeholder that looks like a value, and an escaped error "
+                    "costs the whole Player Editor"))
 
 
 class NeitherSurfaceKnowsHowTheAnswerIsMade(unittest.TestCase):

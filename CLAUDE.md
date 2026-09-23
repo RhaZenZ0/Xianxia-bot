@@ -4258,6 +4258,12 @@ shop in a real capital rather than a fixture city.
 
 ## Release delivery
 
+- **Version numbering, on the owner's call (v1.0.14).** A big update bumps the middle number and
+  resets the last: `v1.1.0`, `v1.2.0`, and so on. A small fix keeps the big number and adds one to
+  the last: `v1.1.0` → `v1.1.1` → `v1.1.2`. Never a fourth part (`1.0.13.1`): `_ENTRY` in
+  `release_notes.py` and the release-version gate read at most three, so it would break the
+  changelog parse. A small fix is still a full bump - every stamp listed under "The first bump that
+  renames a file", its own `VERSIONS.md` entry, the checklist regenerated and the manifest rewritten.
 - A release is handed over as the zip — `xianxia_rp_v<version>.zip` — and its `.zip.sha256`
   sidecar. No `..._to_..._code.patch`: a diff nobody applies is noise, not assurance.
   The sidecar is **not** optional and this file used to say it was: `update.sh --fetch`

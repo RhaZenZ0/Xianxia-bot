@@ -6,6 +6,17 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.14** keeps the GM's view of an account's restarts standing when the engine is down.
+
+v1.0.13 gave a GM two places to read how many restarts an account has spent - the dashboard's Player
+Editor and `/admin player inspect` - and both promised to answer "unknown" and an em dash rather than
+a number when the engine does not reply. Both caught the engine's own error and an `OSError`, and the
+one a real outage raises is neither: the engine client calls httpx directly and wraps nothing, so a
+refused connection or a timeout escaped - costing the dashboard its whole Player Editor, which asks on
+every load, and leaving `/admin player inspect` without a reply. Both catch `httpx.HTTPError` now. The
+gate had tried exactly the two errors that were already caught, so it could not see the third; it
+tries a refused connection and a timeout too, and restoring the old catch fails it on both surfaces.
+
 **1.0.13** teaches the playtest sweep to tell a question it is being asked from a control the answer
 came with.
 
@@ -595,12 +606,11 @@ staged authority cleanup: forage, crafting and companions, canonical time, unifi
 road travel, caravans, dashboard-owned Discord setup, and the removal of the obsolete Python
 mechanical authority paths.
 
-## Release status — v1.0.13
+## Release status — v1.0.14
 
-- Current release: v1.0.13 - the playtest sweep tells a question it is being asked from a control
-  the answer came with, so a leaf that finally resolves is pressed rather than refused, and the
-  quiet step waits out whatever window is configured instead of the one it was written against.
-  Harness and documentation only; no schema, no production behaviour.
+- Current release: v1.0.14 - the GM's restart-allowance readers (the dashboard's Player Editor and
+  `/admin player inspect`) answer "unknown" when the engine is unreachable instead of raising.
+  A small fix; no schema, no gameplay change.
 - v1.0.12: the Discord playtest can see the curriculum again and presses every
   leaf, a GM lever addresses the player it was given rather than an id a float rounded off, and a
   hub panel stays open for as long as `HUB_PANEL_IDLE_MINUTES` says. No schema.
