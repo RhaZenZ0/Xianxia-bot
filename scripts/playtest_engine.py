@@ -52,9 +52,10 @@ PLAYER = 900001
 BUYER = 900002
 GHOST = 900003
 # A fourth cultivator who exists only to be abandoned (v1.0.1). It has to be its
-# own account: `character.reset` refuses anybody who has left a mark the world
-# keeps, and every other actor in this run has spent two thousand steps leaving
-# them.
+# own account: every other actor in this run is needed after section 21c, and
+# PLAYER has been through Samsara, which a reset refuses. (Until v1.0.14 a reset
+# also refused anybody who had left a mark the world keeps; it releases those
+# now, so that is no longer why.)
 QUITTER = 900004
 GM = 1
 
@@ -2351,10 +2352,10 @@ async def run(url: str, token: str, db_path: str) -> Report:
                 "discord_name": "Playtest Quitter", "name": "Mo Resolved", "concept": "this time for certain",
                 "gender": "neutral", "path": "Body Refiner",
                 "family_choice_id": str(second[0].get("choice_id") or ""), "age_at_creation_years": 18}))
-    # Whichever gate bites first, and both are designed. By this point PLAYER
-    # has died and come back, so the incarnation rule usually answers before
-    # the world-mark one does - which the first version of this step did not
-    # allow for, and the harness said so.
+    # By this point PLAYER has died and come back, so the incarnation rule
+    # answers. The world-mark refusal is kept as an alternative only for an
+    # anonymise column a reset has not been told how to release; since v1.0.14
+    # every shipped one is released, so in practice it is the wheel.
     await either("a cultivator with a past cannot be taken back",
                  act("character.reset", PLAYER, {}),
                  "left a mark the world keeps", "the wheel is the road from here")

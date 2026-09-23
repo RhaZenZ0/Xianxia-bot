@@ -6,9 +6,27 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
-**1.0.14** keeps the GM's view of an account's restarts standing when the engine is down.
+**1.0.14** lets a cultivator start over whatever they have already done in the world.
 
-v1.0.13 gave a GM two places to read how many restarts an account has spent - the dashboard's Player
+Reported from play: a reset refused with *"Xie Kormaq has already left a mark the world keeps
+(world_history_events.related_user_id)"*. Since v1.0.1 a reset was refused once a character was named
+on anything a shared world keeps, and a history row counted - almost everything a new cultivator does
+writes one, starting with the first place they discover - so the way to start over stopped working
+minutes into a life, with a refusal that named a database column and said nothing about whether
+waiting would help. Nothing the world keeps stops a reset now. A history entry only that player could
+see goes with the life; a public one stays, and the name in it becomes *an unknown cultivator* - the
+deed is remembered, the doer is not. A gate between worlds, an emptied grave, a written quest and a
+sect manor stay where they are with the link to the account cut, and a gate named after its maker is
+renamed for an Unknown Cultivator. A player family passes to its most senior other member, the same
+rule as a founder walking out, or is dissolved if nobody else was in it; the reply says which, and
+what was left behind.
+
+It also fixes the same family fault in a GM's erasure, found while wiring the reset. Erasure deleted
+the character row first, and the database's own cascade took a founder's whole family with it, other
+players' places in it included, although erasure is meant to let a family outlive its founder. It
+hands the house on before anything is deleted now.
+
+And it keeps the GM's view of an account's restarts standing when the engine is down. v1.0.13 gave a GM two places to read how many restarts an account has spent - the dashboard's Player
 Editor and `/admin player inspect` - and both promised to answer "unknown" and an em dash rather than
 a number when the engine does not reply. Both caught the engine's own error and an `OSError`, and the
 one a real outage raises is neither: the engine client calls httpx directly and wraps nothing, so a
@@ -608,9 +626,11 @@ mechanical authority paths.
 
 ## Release status — v1.0.14
 
-- Current release: v1.0.14 - the GM's restart-allowance readers (the dashboard's Player Editor and
-  `/admin player inspect`) answer "unknown" when the engine is unreachable instead of raising.
-  A small fix; no schema, no gameplay change.
+- Current release: v1.0.14 - a character reset releases what the world keeps instead of refusing
+  over it (private history goes, public history and shared things stay naming an unknown
+  cultivator, a player family passes to its heir), erasure no longer cascades a founder's family
+  away, and the GM's restart-allowance readers answer "unknown" when the engine is unreachable.
+  No schema.
 - v1.0.12: the Discord playtest can see the curriculum again and presses every
   leaf, a GM lever addresses the player it was given rather than an id a float rounded off, and a
   hub panel stays open for as long as `HUB_PANEL_IDLE_MINUTES` says. No schema.

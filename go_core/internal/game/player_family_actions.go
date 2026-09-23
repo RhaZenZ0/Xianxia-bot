@@ -295,54 +295,79 @@ func playerFamilyRespondAction(conn *storage.Conn, userID int64, raw json.RawMes
 }
 
 func playerFamilyLeaveAction(conn *storage.Conn, userID int64, _ json.RawMessage) (authoritativeMutation, error) {
-	familyID, familyName, err := familyOf(conn, userID)
+	left, err := playerFamilyDepartTx(conn, userID)
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
-	if familyID == 0 {
+	if left.FamilyID == 0 {
 		return authoritativeMutation{}, errors.New("you belong to no house")
 	}
+	result := map[string]any{"family_id": left.FamilyID, "name": left.Name, "dissolved": left.Dissolved, "remaining": left.Remaining}
+	return authoritativeMutation{Result: result, Event: eventledger.Event{
+		Domain: "player_family", EventType: "family_left", EntityType: "player_family",
+		EntityID: fmt.Sprint(left.FamilyID), Payload: result,
+	}}, nil
+}
+
+// playerFamilyDeparture is what one member leaving did to their house.
+type playerFamilyDeparture struct {
+	FamilyID  int64
+	Name      string
+	Dissolved bool
+	Remaining int64
+	HeirID    int64 // the member who became founder, 0 when the founder did not change
+}
+
+// playerFamilyDepartTx is the one statement of what happens to a house when a
+// member goes: `family.leave` and a character reset (v1.0.14) both call it, so
+// a founder who resets is succeeded exactly as a founder who walks out is. A
+// FamilyID of 0 means they belonged to no house, which is not an error here -
+// the reset asks about everybody, and most people have no player family.
+func playerFamilyDepartTx(conn *storage.Conn, userID int64) (playerFamilyDeparture, error) {
+	familyID, familyName, err := familyOf(conn, userID)
+	if err != nil || familyID == 0 {
+		return playerFamilyDeparture{}, err
+	}
+	out := playerFamilyDeparture{FamilyID: familyID, Name: familyName}
 	if _, err := conn.Execute(`DELETE FROM player_family_members WHERE user_id=?`, []any{userID}); err != nil {
-		return authoritativeMutation{}, err
+		return playerFamilyDeparture{}, err
 	}
 	remaining, err := countRow(conn, `SELECT COUNT(*) AS n FROM player_family_members WHERE family_id=?`, []any{familyID})
 	if err != nil {
-		return authoritativeMutation{}, err
+		return playerFamilyDeparture{}, err
 	}
-	dissolved := remaining == 0
-	if dissolved {
+	out.Remaining = remaining
+	out.Dissolved = remaining == 0
+	if out.Dissolved {
 		// The cascade takes the invites and the children with it. A house
 		// with nobody in it is not a house.
 		if _, err := conn.Execute(`DELETE FROM player_families WHERE family_id=?`, []any{familyID}); err != nil {
-			return authoritativeMutation{}, err
+			return playerFamilyDeparture{}, err
 		}
-	} else {
-		// The founder leaving hands the house to the most senior who stays,
-		// rather than leaving a founder_user_id pointing at somebody gone.
-		founder, err := countRow(conn, `SELECT COUNT(*) AS n FROM player_families WHERE family_id=? AND founder_user_id=?`, []any{familyID, userID})
+		return out, nil
+	}
+	// The founder leaving hands the house to the most senior who stays,
+	// rather than leaving a founder_user_id pointing at somebody gone.
+	founder, err := countRow(conn, `SELECT COUNT(*) AS n FROM player_families WHERE family_id=? AND founder_user_id=?`, []any{familyID, userID})
+	if err != nil {
+		return playerFamilyDeparture{}, err
+	}
+	if founder > 0 {
+		heirRes, err := conn.Execute(
+			`SELECT user_id FROM player_family_members WHERE family_id=? ORDER BY seniority_order LIMIT 1`,
+			[]any{familyID})
 		if err != nil {
-			return authoritativeMutation{}, err
+			return playerFamilyDeparture{}, err
 		}
-		if founder > 0 {
-			heirRes, err := conn.Execute(
-				`SELECT user_id FROM player_family_members WHERE family_id=? ORDER BY seniority_order LIMIT 1`,
-				[]any{familyID})
-			if err != nil {
-				return authoritativeMutation{}, err
-			}
-			if heir := firstRowMap(heirRes); heir != nil {
-				if _, err := conn.Execute(`UPDATE player_families SET founder_user_id=? WHERE family_id=?`,
-					[]any{i64(heir["user_id"]), familyID}); err != nil {
-					return authoritativeMutation{}, err
-				}
+		if heir := firstRowMap(heirRes); heir != nil {
+			out.HeirID = i64(heir["user_id"])
+			if _, err := conn.Execute(`UPDATE player_families SET founder_user_id=? WHERE family_id=?`,
+				[]any{out.HeirID, familyID}); err != nil {
+				return playerFamilyDeparture{}, err
 			}
 		}
 	}
-	result := map[string]any{"family_id": familyID, "name": familyName, "dissolved": dissolved, "remaining": remaining}
-	return authoritativeMutation{Result: result, Event: eventledger.Event{
-		Domain: "player_family", EventType: "family_left", EntityType: "player_family",
-		EntityID: fmt.Sprint(familyID), Payload: result,
-	}}, nil
+	return out, nil
 }
 
 func playerFamilyChildAction(conn *storage.Conn, catalog worlddata.Catalog, userID int64, raw json.RawMessage) (authoritativeMutation, error) {

@@ -2559,7 +2559,8 @@ input it has is a row the engine already owns.
   precisely the set of columns where a person's id sits on a row belonging to everybody. A reset is
   refused the moment any of them names the character, because **those rows survive an erasure and so
   cannot honestly survive a reset** - the world would go on referring to a cultivator who was never
-  there. The refusal names which.
+  there. The refusal names which. **v1.0.14 reversed this, on the owner's call** - see "Nothing the
+  world keeps stops a reset" below.
 - **Three per account, ever** - not three per character and not three per life. `rollRootGrade` is
   `Intn(1000)` against thresholds putting Immortal in the top 0.7% of a tier-1 household's draw, and
   rc.55 is what made that grade worth 0.88x-1.34x cultivation and -1 to +3 on every breakthrough for
@@ -2620,6 +2621,42 @@ test - and silently unbounds the allowance. The contract holds every kept "table
 real bootstrap, holds each to being a column the sweep *would* otherwise delete (a keep on a column
 erasure never touches is decoration), and holds the table the allowance is counted from to be one the
 reset keeps.
+
+### Nothing the world keeps stops a reset (v1.0.14)
+
+Reported from play, as the refusal itself: *"Xie Kormaq has already left a mark the world keeps
+(world_history_events.related_user_id)"*. v1.0.1 made every `erasureAnonymise` column a mark, and
+`world_history_events.related_user_id` is written by nearly everything a new cultivator does - the
+first discovery, an inn trade, a world event their explore set off - so the way to start over stopped
+working minutes into a life. It was reported as a bug in the message rather than the rule because the
+message named a column and gave no way to tell a rule from a wait.
+
+**`characterResetReleased` is the one list of anonymise columns a reset settles instead of refusing
+over**, each with what the thing is called in the reply, and on the owner's call it holds all six.
+`characterResetReleaseTx` does the settling: a private history row (`participant`, `hidden`) goes with
+the life; `characterResetForgetNameTx` rewrites the character's name out of every kept history row
+and out of a gate named after them (`"{character}'s Ascension Gate"`, which other cultivators' rows
+quote, matched on the whole gate name); a player family goes through `playerFamilyDepartTx`, the rule
+a founder walking out already had - the most senior who stays, or dissolved if nobody does; and every
+other released column is unlinked. An anonymise column **not** on the list still refuses, so a new
+one added to erasure is a mark until somebody decides what a reset does with it, and the refusal
+(`characterResetMarkRefusal`) says so in words and that **there is no timer** - the gate was never a
+clock.
+
+**The release runs before the sweep, and the order is the finding.** `erasureTargets` sorts tables
+alphabetically, so `characters` is deleted first, and with `foreign_keys=ON` that delete fires
+`player_families`' ON DELETE CASCADE and the SET NULLs on the rest. Released afterwards, a founder's
+whole house - other players' memberships included - was already gone. The reset's fixture declared
+none of those foreign keys and would have passed either way (the `npc_consignments` lesson again); it
+carries production's now, and `TestAFounderWhoResetsIsSucceeded`'s drill - move the release after the
+sweep - prints *"the house did not pass to its most senior remaining member (0 rows)"*.
+
+**`admin.player.erase` had the same cascade and nobody had seen it**, because its fixture carries no
+foreign keys either: `erasureAnonymise` says a family *"outlives whoever founded it (NOT NULL, so it
+takes the sentinel)"*, and in production the anonymise UPDATE never met a row, because the cascade had
+already deleted it. It calls `playerFamilyDepartTx` before its sweep now, and
+`TestErasingAFounderLeavesTheHouseToItsHeir` builds its own fixture with the real keys; its drill
+prints *"(0 rows) - the cascade took it"*.
 
 ### The fields nothing reads (`field_readers_test.go`, v1.0.1)
 

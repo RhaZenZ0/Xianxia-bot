@@ -27,15 +27,18 @@ package game
 //
 // **The gate is the anonymise disposition, not a clock.** A time window ("the
 // first ten minutes") is arbitrary and says nothing about what the reset would
-// cost anybody else. The question that actually matters is whether this
-// character has left a mark on a world other players share, and erasure has
-// already answered it: `erasureAnonymise` is precisely the set of columns where
-// a person's id sits on a row that belongs to everybody - a battle the world
-// remembers, a sect other disciples belong to, a gate still standing over a
-// named town, a grave somebody reached first. A reset is refused the moment any
-// of them names this character, because those rows survive an erasure and so
-// cannot honestly survive a reset: the world would go on referring to a
-// cultivator who was never there.
+// cost anybody else. `erasureAnonymise` is precisely the set of columns where a
+// person's id sits on a row that belongs to everybody, and v1.0.1 refused a
+// reset the moment any of them named this character. That made the reset
+// unusable minutes into a life - the first place a cultivator discovers writes
+// a history row naming them - so v1.0.14, on the owner's call, **releases**
+// every one of them instead (`characterResetReleased`): the shared thing stays
+// in the world and the link to this account goes, the way an erasure takes it,
+// with the name rewritten to an unknown cultivator where it was written into
+// prose, and a player family succeeded exactly as when its founder leaves. A
+// reset is still refused over an anonymise column that is *not* released, so a
+// new one added to erasure is a mark by default until somebody decides what a
+// reset does with it.
 //
 // **Three per account, ever** - not three per character and not three per
 // life. `rollRootGrade` is `Intn(1000)` against thresholds that put Immortal in
@@ -76,6 +79,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -234,14 +238,257 @@ func characterResetStatusQuery(conn *storage.Conn, raw json.RawMessage) (map[str
 	}, nil
 }
 
-// characterResetWorldMarksTx names every shared-world row that would be
-// anonymised rather than deleted. A reset is refused while any exists; the
-// names are returned so the refusal can say which, because "you cannot reset"
-// with no reason is the kind of message that sends a player to a GM anyway.
-func characterResetWorldMarksTx(conn *storage.Conn, userID int64, targets []erasureTarget) ([]string, error) {
-	var marks []string
+// characterResetMark is one reason a reset is refused: which column named the
+// character, and what that means in a player's words.
+type characterResetMark struct {
+	Key    string
+	Detail string
+}
+
+// characterResetReleased are the anonymise columns a reset settles itself
+// instead of refusing over, each with what the thing is called when the reset
+// reports leaving it behind (v1.0.14, on the owner's call). A history row
+// naming a character is written by almost everything a new cultivator does -
+// the first place they discover, a world event their explore set off, a trade
+// at the inn - so treating it as a mark made the reset unusable minutes into a
+// life, which is the opposite of what a way to start over is for. The other
+// five are the same kind of thing: each is a credit on something the world
+// keeps (a gate, an emptied grave, a written quest, a sect manor) or a house
+// other players can belong to, and each has an honest way to outlive its maker.
+// History is the one with special handling - its private rows go with the life
+// - and the family is the one with an heir (`playerFamilyDepartTx`); the rest
+// simply lose the link. An anonymise column missing from this map still
+// refuses a reset, so the release is always a decision and never a default.
+var characterResetReleased = map[string][2]string{
+	"world_history_events.related_user_id": {"a record in the world's history", "records in the world's history"},
+	"world_crossings.opened_by_user_id":    {"the gate between worlds they opened", "gates between worlds they opened"},
+	"npc_graves.claimed_by_user_id":        {"a grave they emptied", "graves they emptied"},
+	"quest_definitions.owner_user_id":      {"a quest they wrote", "quests they wrote"},
+	"sect_manors.founded_by_user_id":       {"the sect manor they founded", "sect manors they founded"},
+	"player_families.founder_user_id":      {"the family they founded", "families they founded"},
+}
+
+// characterResetUnknown is who a kept row says did it once the cultivator who
+// did has been reset away (v1.0.14, the owner's suggestion). A row that went on
+// naming "Xie Kormaq" would remember somebody who, as far as this world is now
+// concerned, never existed; the deed stays, the doer does not.
+const characterResetUnknown = "an unknown cultivator"
+
+// characterResetUnknownTitle is the same stranger inside a name, such as a
+// gate's.
+const characterResetUnknownTitle = "Unknown Cultivator"
+
+// characterResetRelease is what the reset did with everything it released.
+type characterResetRelease struct {
+	HistoryRemoved  int64            // private history rows, gone with the life
+	HistoryUnlinked int64            // public history rows, kept and unlinked
+	Unlinked        map[string]int64 // every other released column, by key
+	Family          playerFamilyDeparture
+}
+
+// characterResetReleaseTx settles every released column **before** the sweep,
+// and the order is load-bearing: `erasureTargets` walks tables alphabetically,
+// so `characters` is deleted before any of these is reached, and with
+// `foreign_keys=ON` that delete fires `player_families`' ON DELETE CASCADE -
+// taking a founder's whole house, the other members' places in it included -
+// and `SET NULL` on the rest before anything could hand them on. Released
+// here, there is nothing left for either the cascade or the sweep to touch,
+// and the sweep's guard can go on requiring that it anonymised nothing.
+func characterResetReleaseTx(conn *storage.Conn, userID int64, name string, targets []erasureTarget) (characterResetRelease, error) {
+	out := characterResetRelease{Unlinked: map[string]int64{}}
+	if err := characterResetForgetNameTx(conn, userID, name); err != nil {
+		return out, err
+	}
+	if tableExistsTx(conn, "world_history_events") {
+		// A row nobody else can see is only this character's knowledge.
+		res, err := conn.Execute(`DELETE FROM world_history_events
+			WHERE related_user_id=? AND COALESCE(visibility,'public')<>'public'`, []any{userID})
+		if err != nil {
+			return out, err
+		}
+		out.HistoryRemoved = res.RowsAffected
+	}
+	if tableExistsTx(conn, "player_family_members") {
+		left, err := playerFamilyDepartTx(conn, userID)
+		if err != nil {
+			return out, err
+		}
+		out.Family = left
+	}
 	for _, target := range targets {
+		key := erasureKey(target.Table, target.Column)
 		if target.Disposition != erasureAnonymiseRow {
+			continue
+		}
+		if _, released := characterResetReleased[key]; !released {
+			continue
+		}
+		replacement := "NULL"
+		if target.NotNull {
+			replacement = fmt.Sprint(erasedUserSentinel)
+		}
+		res, err := conn.Execute(fmt.Sprintf("UPDATE %s SET %s=%s WHERE %s=?",
+			quoteIdentifier(target.Table), quoteIdentifier(target.Column), replacement,
+			quoteIdentifier(target.Column)), []any{userID})
+		if err != nil {
+			return out, fmt.Errorf("releasing %s: %w", key, err)
+		}
+		if res.RowsAffected <= 0 {
+			continue
+		}
+		if key == "world_history_events.related_user_id" {
+			out.HistoryUnlinked = res.RowsAffected
+		} else {
+			out.Unlinked[key] = res.RowsAffected
+		}
+	}
+	return out, nil
+}
+
+// characterResetLeftBehind says, in words, what the released rows were, for
+// the reply: public history first, then the rest in a stable order. The
+// family is reported separately, because it has an heir to name.
+func characterResetLeftBehind(released characterResetRelease) []string {
+	counts := map[string]int64{}
+	for key, n := range released.Unlinked {
+		counts[key] = n
+	}
+	delete(counts, "player_families.founder_user_id")
+	keys := make([]string, 0, len(counts))
+	for key := range counts {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	if released.HistoryUnlinked > 0 {
+		const history = "world_history_events.related_user_id"
+		counts[history] = released.HistoryUnlinked
+		keys = append([]string{history}, keys...)
+	}
+	var out []string
+	for _, key := range keys {
+		if n := counts[key]; n == 1 {
+			out = append(out, characterResetReleased[key][0])
+		} else {
+			out = append(out, fmt.Sprintf("%d %s", n, characterResetReleased[key][1]))
+		}
+	}
+	return out
+}
+
+// characterResetForgetNameTx rewrites this character's name out of the rows
+// that outlive them: the prose and names of every history row linked to them,
+// and the name of any gate they opened - which is written from a template as
+// "{character}'s Ascension Gate", and which other cultivators' history rows
+// quote when they step through it, so those are rewritten too, matched on the
+// whole gate name rather than on the bare character name.
+func characterResetForgetNameTx(conn *storage.Conn, userID int64, name string) error {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return nil
+	}
+	hasHistory := tableExistsTx(conn, "world_history_events")
+	if tableExistsTx(conn, "world_crossings") {
+		gates, err := conn.Execute(`SELECT location_key,name FROM world_crossings WHERE opened_by_user_id=?`, []any{userID})
+		if err != nil {
+			return err
+		}
+		for _, row := range gates.Rows {
+			if len(row) < 2 || row[1] == nil {
+				continue
+			}
+			// A gate's name is a title, so it takes the title-case form:
+			// "Unknown Cultivator's Ascension Gate", which reads right after
+			// the "stepped through the" other cultivators' rows put before it.
+			old := fmt.Sprint(row[1])
+			renamed := strings.ReplaceAll(old, name, characterResetUnknownTitle)
+			if renamed == old {
+				continue
+			}
+			if _, err := conn.Execute(`UPDATE world_crossings SET name=? WHERE location_key=?`, []any{renamed, row[0]}); err != nil {
+				return err
+			}
+			if hasHistory {
+				if _, err := conn.Execute(`UPDATE world_history_events SET title=REPLACE(title,?,?),summary=REPLACE(summary,?,?)
+					WHERE instr(title,?)>0 OR instr(summary,?)>0`, []any{old, renamed, old, renamed, old, old}); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	if !hasHistory {
+		return nil
+	}
+	res, err := conn.Execute(`SELECT history_id,title,summary,actor_name,target_name,actor_key,target_key
+		FROM world_history_events WHERE related_user_id=?`, []any{userID})
+	if err != nil {
+		return err
+	}
+	id := fmt.Sprint(userID)
+	text := func(v any) string {
+		if v == nil {
+			return ""
+		}
+		return fmt.Sprint(v)
+	}
+	for _, row := range res.Rows {
+		if len(row) < 7 {
+			continue
+		}
+		who := func(v string) string {
+			if strings.TrimSpace(v) == name {
+				return characterResetForgetSentence(characterResetUnknown)
+			}
+			return v
+		}
+		key := func(v string) string {
+			if strings.TrimSpace(v) == id {
+				return ""
+			}
+			return v
+		}
+		if _, err := conn.Execute(`UPDATE world_history_events SET title=?,summary=?,actor_name=?,target_name=?,
+			actor_key=?,target_key=? WHERE history_id=?`, []any{
+			characterResetForget(text(row[1]), name), characterResetForget(text(row[2]), name),
+			who(text(row[3])), who(text(row[4])), key(text(row[5])), key(text(row[6])), row[0],
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// characterResetForget replaces a name inside prose, capitalising where the
+// name began a sentence.
+func characterResetForget(text, name string) string {
+	if !strings.Contains(text, name) {
+		return text
+	}
+	out := strings.ReplaceAll(text, name, characterResetUnknown)
+	if strings.HasPrefix(text, name) {
+		out = characterResetForgetSentence(out)
+	}
+	return strings.ReplaceAll(out, ". "+characterResetUnknown, ". "+characterResetForgetSentence(characterResetUnknown))
+}
+
+func characterResetForgetSentence(text string) string {
+	if text == "" {
+		return text
+	}
+	return strings.ToUpper(text[:1]) + text[1:]
+}
+
+// characterResetWorldMarksTx names every shared-world row that would be
+// anonymised and that a reset has not been told how to release. With every
+// shipped anonymise column released it finds nothing; it is what makes a new
+// one a refusal until somebody decides otherwise.
+func characterResetWorldMarksTx(conn *storage.Conn, userID int64, targets []erasureTarget) ([]characterResetMark, error) {
+	var marks []characterResetMark
+	for _, target := range targets {
+		key := erasureKey(target.Table, target.Column)
+		if target.Disposition != erasureAnonymiseRow {
+			continue
+		}
+		if _, released := characterResetReleased[key]; released {
 			continue
 		}
 		res, err := conn.Execute(fmt.Sprintf("SELECT COUNT(*) FROM %s WHERE %s=?",
@@ -249,14 +496,29 @@ func characterResetWorldMarksTx(conn *storage.Conn, userID int64, targets []eras
 		if err != nil {
 			return nil, err
 		}
-		if len(res.Rows) == 0 || len(res.Rows[0]) == 0 {
+		if len(res.Rows) == 0 || len(res.Rows[0]) == 0 || i64(res.Rows[0][0]) <= 0 {
 			continue
 		}
-		if i64(res.Rows[0][0]) > 0 {
-			marks = append(marks, erasureKey(target.Table, target.Column))
-		}
+		marks = append(marks, characterResetMark{Key: key, Detail: "they are named in " + target.Table})
 	}
 	return marks, nil
+}
+
+// characterResetMarkRefusal is the whole refusal. It answers the two things a
+// refused player asks (v1.0.14): why, and how long until they can. The second
+// answer is "not by waiting", and it is said outright - the gate is not a
+// clock, so any wording that sounded like a wait would be a promise nothing
+// keeps.
+func characterResetMarkRefusal(name string, marks []characterResetMark) error {
+	lines := []string{fmt.Sprintf(
+		"%s cannot be reset, and waiting will not change that. This life has already left a mark "+
+			"the world keeps that a reset does not yet know how to hand on:", name)}
+	for _, mark := range marks {
+		lines = append(lines, "• "+mark.Detail)
+	}
+	lines = append(lines,
+		"There is no timer on it. Ask a GM, or play this life on - when it ends, Samsara begins the next one.")
+	return errors.New(strings.Join(lines, "\n"))
 }
 
 // characterResetRemoveWelcomeTx takes the household's welcome line back out.
@@ -344,9 +606,7 @@ func characterResetAction(conn *storage.Conn, userID int64, _ json.RawMessage) (
 		return authoritativeMutation{}, err
 	}
 	if len(marks) > 0 {
-		return authoritativeMutation{}, fmt.Errorf(
-			"%s has already left a mark the world keeps (%s); those rows outlive even an erasure, "+
-				"so this life can no longer be taken back", c.Name, strings.Join(marks, ", "))
+		return authoritativeMutation{}, characterResetMarkRefusal(c.Name, marks)
 	}
 	now := float64(time.Now().UnixNano()) / 1e9
 	if err := characterResetRemoveWelcomeTx(conn, userID, c.Name, now); err != nil {
@@ -365,25 +625,40 @@ func characterResetAction(conn *storage.Conn, userID int64, _ json.RawMessage) (
 		[]any{userID, characterResetEvent, string(record), now}); err != nil {
 		return authoritativeMutation{}, err
 	}
+	released, err := characterResetReleaseTx(conn, userID, c.Name, targets)
+	if err != nil {
+		return authoritativeMutation{}, err
+	}
 	sweep, err := applyErasureTargets(conn, userID, targets, characterResetKeep())
 	if err != nil {
 		return authoritativeMutation{}, err
 	}
 	if sweep.RowsAnonymised > 0 {
-		// Unreachable while the mark check above holds, and asserted rather
-		// than assumed: a future migration could add an anonymise column the
-		// check walks and the sweep touches differently, and a reset that
-		// quietly anonymised a shared row would be the thing this refuses.
+		// Unreachable while the mark check and the release above hold, and
+		// asserted rather than assumed: a future migration could add an
+		// anonymise column the two walk and the sweep touches differently, and
+		// a reset that quietly anonymised a shared row it had not released
+		// would be the thing the mark check refuses.
 		return authoritativeMutation{}, fmt.Errorf(
-			"reset would have anonymised %d shared row(s); refusing", sweep.RowsAnonymised)
+			"reset would have anonymised %d shared row(s) it had not released; refusing", sweep.RowsAnonymised)
 	}
 	result := map[string]any{
 		"reset":            true,
 		"name":             c.Name,
 		"resets_used":      used + 1,
 		"resets_remaining": characterResetAllowance - (used + 1),
-		"rows_deleted":     sweep.RowsDeleted,
+		"rows_deleted":     sweep.RowsDeleted + released.HistoryRemoved,
 		"tables_touched":   len(sweep.Deleted),
+		"history_removed":  released.HistoryRemoved,
+		"history_unlinked": released.HistoryUnlinked,
+		"left_behind":      characterResetLeftBehind(released),
+	}
+	if left := released.Family; left.FamilyID != 0 {
+		family := map[string]any{"name": left.Name, "dissolved": left.Dissolved}
+		if left.HeirID != 0 {
+			family["heir_user_id"] = left.HeirID
+		}
+		result["family"] = family
 	}
 	return authoritativeMutation{
 		Result: result,
