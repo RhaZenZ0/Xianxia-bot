@@ -17,6 +17,7 @@ from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
 
 import aiosqlite
+import httpx
 
 from ..ops.http_limits import (
     STREAM_LIMIT,
@@ -961,9 +962,13 @@ class ReadOnlyDashboardStore:
         """
         if self._engine is None:
             return {}
+        # `httpx.HTTPError` is the one that matters: the engine client calls
+        # httpx directly and wraps nothing, so a refused connection or a
+        # timeout is neither of the other two - and `player_detail` asks this
+        # on every load, so letting it escape would cost the whole editor.
         try:
             return dict(await self._engine.action("character.reset_status", 0, {"user_id": int(user_id)}) or {})
-        except (GameEngineError, OSError) as exc:
+        except (GameEngineError, httpx.HTTPError, OSError, ValueError) as exc:
             log.warning("Could not read the restart allowance of %s from the engine: %s", user_id, exc)
             return {}
 

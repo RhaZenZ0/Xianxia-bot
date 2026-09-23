@@ -16,6 +16,16 @@ deferred half and not the half that says what was done about it.
 
 ## Findings
 
+- **fixed (v1.0.14)** — *A reset was refused for ever once a character had done almost anything.*
+  Reported from play as the refusal itself: *"has already left a mark the world keeps
+  (world_history_events.related_user_id)"*. The first place a cultivator discovers writes a history
+  row naming them, so the reset stopped working minutes into a life, and the refusal named a column
+  and gave no way to tell a rule from a wait. On the owner's call a reset now **releases** every
+  shipped anonymise column (`characterResetReleased`): private history goes with the life, public
+  history and shared things stay with the name rewritten to an unknown cultivator, and a player
+  family goes through `playerFamilyDepartTx`, the rule a founder walking out already had. Building it
+  found the same family fault in `admin.player.erase` - the sweep deletes `characters` first and
+  `player_families` cascades off it - fixed with the same call.
 - **fixed (v1.0.13)** — *A GM could not see how many times a player had started over.* The record
   was never missing: one `event_log` row per `character.reset`, kept out of the reset's own sweep so
   the bound survives the action it bounds, carrying the abandoned life's name, path, root, realm and
@@ -198,8 +208,9 @@ deferred half and not the half that says what was done about it.
   backwards. Same refusal as above.
 - **deferred (harness)** — *The Discord half drives the reset leaf but cannot guarantee it reaches a
   success.* Section 9b presses `/reset` last of all and accepts either the reset or its designed
-  refusal, reporting which, because whether the swept cultivator has left a mark the world keeps
-  depends on what the sweep happened to do. The success path is driven end to end by
+  refusal, reporting which. Since v1.0.14 nothing the sweep leaves behind refuses a reset, so the
+  success path is the one it should now see; the refusal is still accepted for an anonymise column a
+  reset has not been told how to release. The success path is driven end to end by
   `scripts/playtest_engine.py` on an account created for it (`QUITTER`), so both outcomes are covered
   — but by two harnesses rather than one, and the Discord half's success wiring (the "is gone" reply,
   the remaining count) is proven only when the dice go that way.

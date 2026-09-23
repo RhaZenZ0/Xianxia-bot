@@ -989,10 +989,11 @@ async def reset(interaction: discord.Interaction) -> None:
     """The player's own way back to /begin (v1.0.1).
 
     Nothing is decided here. Every gate - alive, a first incarnation, an
-    unspent allowance, and above all whether this character has left a mark
-    on a world other players share - is the engine's, because they are all
-    read off rows the engine owns and Python must not open. The handler's
-    whole job is to carry the refusal back in the player's language.
+    unspent allowance - is the engine's, because they are all read off rows
+    the engine owns and Python must not open, and so is what happens to what
+    this character left in a world other players share (v1.0.14: released,
+    not refused - see `characterResetReleaseTx`). The handler's whole job is
+    to carry the answer back in the player's language.
 
     The hub's own confirm step fires before this is ever reached: "reset" is
     in `_DANGER_ACTION_WORDS`, so the leaf is red and asks "Are you sure?"
@@ -1042,6 +1043,25 @@ async def reset(interaction: discord.Interaction) -> None:
         "over — this is not Samsara, and the soul keeps no memory of a life it abandoned.",
         "Use **/begin** to choose a family, a path and a name again.",
     ]
+    # Nothing the world keeps stops a reset any more (v1.0.14); the engine
+    # releases it and says what it did, and this prints that rather than
+    # restating it. Private history went with the life; everything shared
+    # stayed, and a family passed on the way it does when a founder leaves.
+    family = dict(result.get("family") or {})
+    if family:
+        name = family.get("name") or "the family"
+        if family.get("dissolved"):
+            lines.append(f"-# **{name}** had nobody else in it, so it was dissolved.")
+        elif family.get("heir_user_id"):
+            lines.append(f"-# **{name}** passes to its most senior member, <@{int(family['heir_user_id'])}>.")
+        else:
+            lines.append(f"-# They leave **{name}**; the house goes on without them.")
+    left_behind = [str(x) for x in (result.get("left_behind") or []) if str(x).strip()]
+    if left_behind:
+        lines.append(
+            "-# What they left in the world stays there, told now of an unknown cultivator: "
+            + ", ".join(left_behind) + "."
+        )
     if threads["deleted"]:
         lines.append(
             f"-# Your private threads went with them — **{threads['deleted']}** closed and deleted."

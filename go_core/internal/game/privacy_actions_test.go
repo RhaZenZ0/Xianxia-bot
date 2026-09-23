@@ -302,3 +302,45 @@ func TestErasureDiscoversItsTargetsFromTheSchema(t *testing.T) {
 		t.Fatal("no targets discovered at all")
 	}
 }
+
+// TestErasingAFounderLeavesTheHouseToItsHeir drives erasure against the
+// foreign keys production carries, which the fixture above does not: there
+// `characters` is deleted first and `player_families` cascades off it, so an
+// erased founder took the whole house with them, another player's membership
+// included. Found while wiring the same succession into the character reset
+// (v1.0.14); its drill - remove the departure before the sweep - prints the
+// house gone.
+func TestErasingAFounderLeavesTheHouseToItsHeir(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "erasure-family.sqlite3")
+	conn, err := storage.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := conn.ExecScript(`
+CREATE TABLE characters(user_id INTEGER PRIMARY KEY, name TEXT NOT NULL);
+CREATE TABLE player_families(family_id INTEGER PRIMARY KEY, name TEXT, founder_user_id INTEGER NOT NULL,
+    FOREIGN KEY(founder_user_id) REFERENCES characters(user_id) ON DELETE CASCADE);
+CREATE TABLE player_family_members(family_id INTEGER NOT NULL, user_id INTEGER NOT NULL UNIQUE, seniority_order INTEGER NOT NULL,
+    joined_at REAL NOT NULL DEFAULT 0, PRIMARY KEY(family_id,user_id),
+    FOREIGN KEY(family_id) REFERENCES player_families(family_id) ON DELETE CASCADE,
+    FOREIGN KEY(user_id) REFERENCES characters(user_id) ON DELETE CASCADE);
+CREATE TABLE admin_audit_log(audit_id INTEGER PRIMARY KEY AUTOINCREMENT, admin_user_id INTEGER NOT NULL,
+    action TEXT, target TEXT, before_json TEXT, after_json TEXT, reason TEXT, created_at REAL);
+INSERT INTO characters(user_id,name) VALUES(42,'Li Wei'),(7,'Li Heir');
+INSERT INTO player_families(family_id,name,founder_user_id) VALUES(3,'The Li Clan',42);
+INSERT INTO player_family_members(family_id,user_id,seniority_order) VALUES(3,42,1),(3,7,2);
+`); err != nil {
+		t.Fatal(err)
+	}
+	conn.Close()
+
+	if _, err := erasePlayer(t, path, 1, 42); err != nil {
+		t.Fatalf("erasure failed: %v", err)
+	}
+	if got := erasureScalar(t, path, `SELECT COUNT(*) FROM player_families WHERE family_id=3 AND founder_user_id=7`); got != 1 {
+		t.Fatalf("erasing the founder did not leave the house to its heir (%d rows) - the cascade took it", got)
+	}
+	if got := erasureScalar(t, path, `SELECT COUNT(*) FROM player_family_members WHERE user_id=7`); got != 1 {
+		t.Fatalf("erasing the founder took another player's place in the house")
+	}
+}

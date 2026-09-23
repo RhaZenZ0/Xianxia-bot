@@ -12,6 +12,7 @@ import time
 from typing import Any
 
 import discord
+import httpx
 from discord import app_commands
 
 from ...ops.game_engine import GameEngineError
@@ -98,9 +99,11 @@ async def restart_allowance_line(user_id: int) -> str:
     one surface over. It never raises: the resets are one line of a card that
     has a dozen, and a lookup that threw would cost the whole inspect.
     """
+    # `httpx.HTTPError` because the engine client wraps nothing: an engine
+    # that is down raises httpx's own error, which is neither of the others.
     try:
         status = dict(await ENGINE.action("character.reset_status", user_id, {"user_id": int(user_id)}) or {})
-    except (GameEngineError, OSError, ValueError):
+    except (GameEngineError, httpx.HTTPError, OSError, ValueError):
         log.exception("Could not read the restart allowance of user %s", user_id)
         return "**unknown** — the engine did not answer"
     # Absent, not falsy (v1.0.1): `resets_used` of 0 is the commonest real

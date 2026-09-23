@@ -285,6 +285,19 @@ func adminErasePlayer(conn *storage.Conn, adminUserID int64, raw json.RawMessage
 		return nil, err
 	}
 	hadCharacter := len(nameRes.Rows) > 0
+	// A player family is succeeded before the sweep, never after it (v1.0.14).
+	// The sweep walks tables alphabetically, so `characters` goes first, and
+	// under foreign_keys=ON that delete fires `player_families`' ON DELETE
+	// CASCADE: erasing a founder deleted the whole house and every other
+	// member's place in it, while erasureAnonymise said the family outlives
+	// whoever founded it. `playerFamilyDepartTx` is the rule a founder walking
+	// out already had - the most senior who stays takes the house, and a house
+	// with nobody left in it is dissolved - and a character reset uses it too.
+	if tableExistsTx(conn, "player_family_members") {
+		if _, err := playerFamilyDepartTx(conn, p.UserID); err != nil {
+			return nil, err
+		}
+	}
 	sweep, err := applyErasureTargets(conn, p.UserID, targets, nil)
 	if err != nil {
 		return nil, err

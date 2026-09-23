@@ -1321,11 +1321,11 @@ async def run(url: str, token: str, db_path: str) -> Report:
         # leaf that leaves nothing behind. What this proves is the wiring the
         # engine half cannot see - that the leaf is on the page, that its
         # confirm is answered, that the engine is reached and that whichever
-        # answer comes back is rendered. Which answer that is depends on what
-        # the sweep left behind: a player who has explored, joined and traded
-        # has almost certainly left a mark the world keeps, and the refusal is
-        # then the correct outcome and the more useful one to see. The success
-        # path is driven end to end by scripts/playtest_engine.py, on an
+        # answer comes back is rendered. Since v1.0.14 what the sweep left
+        # behind no longer refuses - a reset releases it - so this is usually
+        # the success path; the refusal is still accepted for an anonymise
+        # column a reset has not been told how to release. The success path
+        # is also driven end to end by scripts/playtest_engine.py, on an
         # account created for it.
         async def begin_again():
             panel = await open_hub(player, channels["begin-here"], "character", env=env)
@@ -1350,7 +1350,7 @@ async def run(url: str, token: str, db_path: str) -> Report:
                 expect(text not in out, f"the reset leaf raised: {out[:300]}")
             lowered = out.casefold()
             if "mark the world keeps" in lowered:
-                return "refused: the sweep left marks the world keeps, which is the rule"
+                return "refused: a mark the world keeps that a reset cannot release yet"
             if "is gone" in lowered and "/begin" in lowered:
                 return "reset: the cultivator was taken back and /begin was named"
             raise Failed("the reset leaf answered neither a result nor its designed refusal:\n" + out[:600])
