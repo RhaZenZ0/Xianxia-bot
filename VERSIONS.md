@@ -6,6 +6,25 @@ The changelog, one paragraph per minor. The per-release entries as they were wri
 
 ## Changelog
 
+**1.0.15** lets an Apprentice alchemist make the Heart Calming Pill the Mortal World teaches them.
+
+Reported from play, by a player who had just passed the Apprentice examination in Jadewood and was
+refused with *"missing materials: Twin Extremes Ice-Fire Fruit x1"*. The examination teaches the Heart
+Calming Pill wherever it is sat and its slip is sold only in the Mortal World, while the fruit it asked
+for sits on no shelf anywhere and is only ever foraged from the Spiritual World up. So the one world
+that sold the method was the one world that could never make it, and the price said the recipe had
+never been meant: a 1,050-stone fruit went into a pill the shops sell for 13 to 26. It asks for a
+Moonveil Herb instead, and the Mortal World's town apothecaries, Jadewood's among them, now keep
+Moonveil Herb beside their Spirit Herb, so the hall that sells the slip sells everything it needs.
+The fruit is otherwise what it always was: a rare find in the Spiritual World's hills that the
+auction houses want.
+
+It also makes a refused craft say where the missing materials are sold. The refusal used to tell
+everybody to buy them "at a hall of the trade" whatever the material and wherever they stood. For
+each thing you are short of it now names the hall in your own city that sells it, or the cities of
+your world that do, or, when your world sells it nowhere, says so and names the worlds that do.
+Beast cores, which no forage turns up, point at the hunt.
+
 **1.0.14** lets a cultivator start over whatever they have already done in the world.
 
 Reported from play: a reset refused with *"Xie Kormaq has already left a mark the world keeps
@@ -624,9 +643,13 @@ staged authority cleanup: forage, crafting and companions, canonical time, unifi
 road travel, caravans, dashboard-owned Discord setup, and the removal of the obsolete Python
 mechanical authority paths.
 
-## Release status — v1.0.14
+## Release status — v1.0.15
 
-- Current release: v1.0.14 - a character reset releases what the world keeps instead of refusing
+- Current release: v1.0.15 - the Heart Calming Pill asks for a Moonveil Herb rather than a fruit
+  the Mortal World never offers, the Mortal World's town apothecaries shelve that herb, a refused
+  craft names where each missing material is sold from where the player stands, and a gate holds
+  that every world selling a method offers what the method needs. No schema.
+- v1.0.14: a character reset releases what the world keeps instead of refusing
   over it (private history goes, public history and shared things stay naming an unknown
   cultivator, a player family passes to its heir), erasure no longer cascades a founder's family
   away, and the GM's restart-allowance readers answer "unknown" when the engine is unreachable.

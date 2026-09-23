@@ -23,7 +23,7 @@ from ...rules.progression_systems import profession_rank, profession_xp_needed
 from ...rules.realm_hubs import REALM_HUBS, realm_hub, realm_hub_by_location
 from ...rules.sect_manor import manor_craft_bonus
 from ...rules.sect_recruitment import recruitment_definition
-from ..channels import send_long_to_thread
+from ..channels import send_long_to_thread, world_of_location
 from ..character_state import record_quest_progress, announce_quest_progress
 from ..discovery import (
     LOCATION_DISCOVERY_IMAGES,
@@ -668,6 +668,70 @@ async def recipe_autocomplete(
     ][:25]
 
 
+def where_it_is_sold(item_id: str, location: str) -> str:
+    """Where a material is sold, measured from where the cultivator stands (v1.0.15).
+
+    The craft refusal used to say "buy them at a hall of the trade" whatever the
+    material, and an Apprentice alchemist standing in the Jadewood Apothecary was
+    told that about a fruit no hall in the Mortal World had ever sold. The shelves
+    are content, so this reads them: the halls of this city first, then the rest
+    of this world, and when this world sells it nowhere it says so and names the
+    worlds that do, rather than sending somebody to a counter that has none.
+
+    A private place (a household, an inner world) belongs to no world, so there
+    it names the worlds instead of guessing one - the rc.52 reason
+    `world_of_location` answers None rather than the Mortal World.
+    """
+    halls = [
+        shop for shop in WORLD.shops.values()
+        if any(str(line.get("item_id")) == item_id for line in shop.get("sells") or [])
+    ]
+    if not halls:
+        rooms = sorted({
+            str(realm.get("name") or key)
+            for key, realm in WORLD.secret_realms.items()
+            for room in realm.get("rooms") or []
+            if item_id in (room.get("items") or {})
+        })
+        if rooms:
+            return f"no hall sells it; it is found in {', '.join(rooms)}"
+        return "no hall sells it"
+    worlds = [name for name in REALM_HUBS if any(shop.get("world") == name for shop in halls)]
+    world = world_of_location(location)
+    if world is None:
+        return f"sold in halls of the {', '.join(worlds)}"
+    local = [shop for shop in halls if shop.get("world") == world]
+    if not local:
+        return f"no hall in the {world} sells it; halls in the {', '.join(worlds)} do"
+    city = _city_of(location)
+    here = sorted(str(shop.get("name")) for shop in local if shop.get("city") == city)
+    if here:
+        return f"sold here, at {', '.join(here)}"
+    cities = sorted({str(shop.get("city")) for shop in local})
+    more = f" and {len(cities) - 3} more" if len(cities) > 3 else ""
+    return f"sold in the {world} at {', '.join(cities[:3])}{more}"
+
+
+async def _where_to_find_what_is_short(user_id: int, cost: dict[str, Any], location: str) -> list[str]:
+    """One line per material the cultivator is short of, or none if unreadable.
+
+    The engine's refusal already names the shortfall; this only says where each
+    one can be had. It never raises, because it runs inside the reply to a
+    refused craft and a lookup that threw would cost the player the refusal
+    itself - the v1.0.10 rule for any line drawn beside something that matters.
+    """
+    try:
+        carried = await DB.get_inventory(user_id)
+        return [
+            f"• **{WORLD.item_name(item)}**: {where_it_is_sold(item, location)}"
+            for item, qty in sorted(cost.items())
+            if int(carried.get(item, 0)) < int(qty)
+        ]
+    except Exception:
+        log.exception("Where-to-buy lines could not be drawn for a refused craft")
+        return []
+
+
 async def _run_crafting(interaction: discord.Interaction, recipe: str) -> None:
     c = await require_character(interaction)
     if not c:
@@ -697,12 +761,15 @@ async def _run_crafting(interaction: discord.Interaction, recipe: str) -> None:
         # Two layers each discarding the one fact the player needed.
         message = str(exc)
         if "missing materials" in message.casefold():
-            message = (
-                f"🧰 {message}\n"
-                "Buy them at a hall of the trade (**/economy → City Shops → Here**) or gather them "
-                "(**/craft → Alchemy → Forage**). **/craft → Profession → Profession Status** lists every method you know "
-                "and what each one needs."
-            )
+            where = await _where_to_find_what_is_short(
+                interaction.user.id, dict(r.get("cost") or {}), str(c.get("location") or ""))
+            message = "\n".join([
+                f"🧰 {message}",
+                *where,
+                "Buy them at a hall (**/economy → City Shops → Here**) or gather them "
+                "(**/craft → Alchemy → Forage**; beast cores come from **/world → Act → Hunt**). "
+                "**/craft → Profession → Profession Status** lists every method you know and what each one needs.",
+            ])
         await interaction.response.send_message(message, ephemeral=False)
         return
 
