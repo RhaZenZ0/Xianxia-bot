@@ -112,8 +112,13 @@ pace, which stopped being a reason three releases ago, and another bounded a day
 cultivation at five hand-sat sessions - a count, which is a statement about the cooldown, in a
 comment that spends a paragraph explaining that its own predecessor was wrong for exactly that
 reason. An aptitude evolution and a dao-partnered
-session are paced with cultivation and follow it down, and a closed-door retreat stays the same
-share of active play by construction, so its absolute rate follows too. An operator whose `.env`
+session used to be paced with cultivation and share its key; they keep **180 minutes** and take keys
+of their own, because each is a costly gated climb - an evolution risks stability and a forced
+mutation, and the rung it reaches prices a whole life's cultivation - and ordinary cultivation
+getting faster is not a reason for the rare things to. Unsharing the number meant unsharing the key:
+three defaults behind one key are fine only while they agree, and once they differ no value of that
+key restores what shipped. A closed-door retreat stays the same share of active play by
+construction, so its absolute rate follows the new pace. An operator whose `.env`
 already sets the old value keeps it: an upgrade never edits `.env`.
 
 **1.0.12** runs the playtest for the first time in four releases, and it went red on a hundred steps.

@@ -231,8 +231,13 @@ class TheEngineHoldsTheOneStatement(unittest.TestCase):
         compose = (PROJECT_ROOT / "docker-compose.yml").read_text(encoding="utf-8")
         engine = compose.split("\n  xianxia-engine:", 1)[1].split("\n  xianxia-", 1)[0]
         self.assertIn("environment:", engine, "the engine service was not found in compose")
-        for key in re.findall(r'"([A-Z_]+_COOLDOWN_MINUTES)"', RULES):
-            self.assertIn(key, engine, f"the engine reads {key} but compose never passes it")
+        # assertTrue over a search, not assertIn: the haystack is the whole
+        # engine service and a message that has to be scrolled past is one
+        # nobody reads (v1.0.8).
+        missing = [key for key in re.findall(r'"([A-Z_]+_COOLDOWN_MINUTES)"', RULES) if key not in engine]
+        self.assertFalse(missing, (
+            "the engine reads these keys and compose never passes them, so a value set in .env "
+            f"reaches nothing: {sorted(set(missing))}"))
 
 
 if __name__ == "__main__":

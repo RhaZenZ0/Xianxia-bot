@@ -252,15 +252,20 @@ model contexts are unnecessary.
 
 The cooldowns (`CULTIVATE_COOLDOWN_MINUTES`, `EXPLORE_COOLDOWN_MINUTES`,
 `HUNT_COOLDOWN_MINUTES`, `PERFECT_QUEST_COOLDOWN_MINUTES`,
-`PERFECT_TRIAL_COOLDOWN_MINUTES`, `SECRET_REALM_COOLDOWN_MINUTES`) are real
+`PERFECT_TRIAL_COOLDOWN_MINUTES`, `SECRET_REALM_COOLDOWN_MINUTES`,
+`APTITUDE_COOLDOWN_MINUTES`, `DAO_DUAL_COOLDOWN_MINUTES`) are real
 minutes between uses of the corresponding action. Since v1.0.0-rc.56 they are
 read by the **Go engine**, which owns the waits, and compose passes them in —
 until then the bot sent each action's cooldown in the request payload, so the
 bound lived in the caller and the engine served whatever it was handed. A value
 that is not a positive number of minutes (or is longer than a week) is ignored
 and the engine's own default stands; an edit takes effect when the engine
-restarts. `CULTIVATE_COOLDOWN_MINUTES` also paces an aptitude evolution and a
-dao-partnered session, which have always been paced with cultivation.
+restarts. An aptitude evolution and a dao-partnered session used to be paced
+with cultivation and share its key; since v1.0.13 they hold at **180 minutes**
+under `APTITUDE_COOLDOWN_MINUTES` and `DAO_DUAL_COOLDOWN_MINUTES` of their own.
+Each is a costly, gated climb - an evolution risks stability and a forced
+mutation, and the rung it reaches prices a whole life's cultivation - so
+ordinary cultivation getting faster is deliberately not a reason for them to.
 `CULTIVATE_COOLDOWN_MINUTES`
 is the one that sets the pace of the whole game since v1.0.0-rc.5: a session is
 a share of the stage it fills (a twelfth of it), so a stage takes about a dozen

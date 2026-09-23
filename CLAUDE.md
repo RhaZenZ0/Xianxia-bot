@@ -4058,10 +4058,23 @@ is the pace times that count; the share itself stays held across every scale nex
 deliberately not restated here. A rule can be fixed, have the fix explained in a comment, and be
 broken again in the same statement by the same reasoning one level out.
 
-**The three defaults were also three literals that had to agree.** `cooldownAptitude` and
-`cooldownDaoDual` are *paced with* cultivation and share its environment key, so an operator already
-moved all three together - but their shipped defaults were three separate `180`s, and retuning one
-would have silently unpaced the other two. `cultivateWaitMinutes` is the one statement now.
+**And two of the three waits deliberately did not follow it down.** `cooldownAptitude` and
+`cooldownDaoDual` were *paced with* cultivation - three entries sharing `CULTIVATE_COOLDOWN_MINUTES`
+because Python had sent `max(300, cultivate)` for them since before rc.56 moved ownership - and on
+the owner's call they keep **180** while ordinary cultivation drops to 30. The reason is what each
+one is: an `aptitude.evolve` is a climb up the six-rung root ladder, 2d10 against `13 + idx`, costing
+stability on a failure and risking a forced mutation at margin <= -7, and since rc.55 the rung
+reached prices 0.88x-1.34x cultivation and -1 to +3 on every breakthrough for the rest of that life.
+A dao partnership is the same shape at two people's expense. Ordinary cultivation getting faster is
+not a reason for the rare, costly things to.
+
+**Unsharing the number meant unsharing the key, and that half cannot be skipped.** Three defaults
+behind one environment key is fine while they agree; the moment they do not, an operator who sets
+that key silently moves all three back together and **no value of it restores what shipped**. So
+`APTITUDE_COOLDOWN_MINUTES` and `DAO_DUAL_COOLDOWN_MINUTES` are keys of their own, with their own
+`.env.example` lines and their own compose passthroughs - and the gate refuses the bad shape by
+name: entries sharing one key must ship one default. Its drill prints
+`CULTIVATE_COOLDOWN_MINUTES is shipped as both 30 and 180 minutes`.
 
 **What moves with it, deliberately.** `seclusionSessionsPerGameDay` divides by this wait, because
 rc.56 made a retreat a *share* of active play rather than a count of sessions. So a retreat stays
