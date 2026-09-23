@@ -606,7 +606,23 @@ async def hunt(interaction: discord.Interaction) -> None:
             )
     else:
         text += "\n\nThe beast escapes. No permanent injury or item loss is applied."
+    # A hunt won is a fight come out of standing (v1.0.13). `combat_win` had
+    # exactly one reporter, `/battle`'s finalize - while the one objective in
+    # the game that asks for it, the beginner path's `beginner_road`, labels
+    # itself with this very leaf. So the stage named the command that could
+    # not advance it and a player hunted all day at 0/1.
+    #
+    # The report is written after the engine has already decided the hunt
+    # landed (rc.28) and before the command answers, while the announcement
+    # waits for the reply (v1.0.5). It is untargeted like every `combat_win`,
+    # and carries the quarry's name for the day there is a roster.
+    progressed = []
+    if success:
+        progressed = await record_quest_progress(
+            interaction.user.id, "combat_win", amount=1,
+            target=str(beast.get("name") or ""), game_minute=wt.total_minutes)
     await reply_long(interaction, text)
+    await announce_quest_progress(interaction, progressed)
     if not narrate_with_model:
         async def _deliver_prose(prose: str) -> None:
             await interaction.followup.send(f"📜 {prose}", ephemeral=False)

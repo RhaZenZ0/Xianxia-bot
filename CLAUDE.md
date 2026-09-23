@@ -3971,6 +3971,82 @@ all — the one path that owns that check is RAG, which this page was not. It is
 held, because two statements of one rule are free to disagree and the weaker one is what produces
 the false verdict.
 
+### The quest named the one command that could not advance it (v1.0.13)
+
+**Found by playing**: *"Even though I've done multiple successful hunts after getting the quest
+it's not getting completed."* The journal read
+
+> ▫️ Come out of one fight standing - **/world → Act → Hunt** 0/1
+
+The objective's type is `combat_win`, and its **only** reporter in the tree was `_finish_battle` in
+`battle.py`. `/hunt` recorded **no quest progress at all** — not `combat_win`, not anything — so the
+beginner path's fourth stage named the one command that could not advance it.
+
+**Three gates stood here already and none could see it.**
+`test_quest_objective_reporters.py` holds that every type in `OBJECTIVE_TYPES` has a reporter — and
+`combat_win` had one, in `/battle`. It holds that no reporter names a type the vocabulary lacks, and
+that no reporter speaks before its command answers. **Every one of those is about the type.** The
+label is the only part a player ever reads, and the fact that decides whether they can finish the
+quest — that the command named and the command reporting are the same command — was held by nothing.
+That is rc.47's shape with the emphasis moved: not a gate blind to what it forbids, but a rule
+nobody wrote down, sitting beside three that look like they cover it.
+
+**The hunt reports `combat_win` now, rather than the label being re-pointed at `/battle`.** The
+stage's own description is *"find out what happens when something does not want you there"*; a
+failed hunt costs nothing (*"No permanent injury or item loss is applied"*) while a lost battle
+leaves a cultivator on zero vitality; and the first hour is not where that belongs. The report is
+written after the engine has decided the hunt landed (rc.28) and before the command answers, with
+the announcement after the reply (v1.0.5).
+
+**The drill found two more quests the same missing wire had stopped.** Taking the report back out
+names `beginner_road`, `errand_forging_cores` and `errand_formation_ward` — two household errands
+also asked for a hunt, so three quests were unfinishable, not one.
+
+**And the gate's first run found a second instance, authored the same way.** `beginner_town`'s
+`trade` objective was labelled **/economy → City Shops → Browse** — and Browse is a *read*.
+`shop_buy` and `shop_sell` are what report `trade`. The label is `Buy` now; that one is content,
+because a read must not claim to have traded.
+
+**Three of this gate's own runs were resolver mistakes, and each is worth the line.** A leaf name is
+ambiguous across hubs — **Enter** belongs to both `family` and `realm`, so a label-only key sent
+`/family → Enter` to the secret realm's door. It is ambiguous *within* a hub — `cultivation` carries
+**Cultivate** on its `Cultivate` page and again on `Body` — so the value is a set and any handler of
+that name reporting the type satisfies it. And a reporter need not sit in the handler: `/craft`'s
+lives in `_run_crafting`, so the scan closes over the module's own calls, which is v1.0.5's
+`_report_trade` lesson arriving from the other side.
+
+### Zero hops is a distance, not a missing value (v1.0.13)
+
+**Found by playing**, inside an apothecary: `/travel` refused with *"Travel failed: the shop door
+opens onto Azure Crown Imperial City"* — naming the one destination the engine allows from inside a
+shop, which the picker did not offer.
+
+**The engine was right and had the city all along.** `knownLocationsTx` says so in its own comment:
+standing in a shop *"the city is known, its roads, and every gate and district of it"*. What dropped
+it was one operand in the picker's ordering:
+
+```python
+rows.append((name, "🌀", …, 20 + (n or 50)))
+```
+
+`n` is the hop count; the city a player is standing **inside** is 0 hops away; `0 or 50` is 50. So
+the only legal way out of the shop sorted at 70, behind every road city, and fell off the end of a
+25-option Discord select. Measured from the Azure Crown Apothecary it was position 12 of 13 — and on
+a character who has discovered more of the world, off the list entirely.
+
+**The rule was known and broken in the same expression.** One operand to the left, the *label* asks
+`if n is not None` — the correct question. That is v1.0.1's own lesson, *"ask whether the field is
+absent, never whether it is falsy"*, which that release fixed in `playtest_engine.py` and recorded
+as a rule about **assertions**; the failure mode it named there was "green until the value happens
+to be zero". Here the same mistake was in production, deciding what a player is shown, and it was
+only ever wrong for the one place they were standing in.
+
+**The gate reads the operand, not the line**, and its own first run is why: looking for `"hops"`
+anywhere in the expression flagged `WORLD.shops.get(…) or {}`, because *shops* contains it. A needle
+is not a reader (rc.58). It reads statements without the docstring or the comment that explain the
+fix, since both quote the expression they forbid (rc.52), and it drives the real picker from a real
+shop in a real capital rather than a fixture city.
+
 ## Testing conventions
 
 - `tests/python/unit/`, `integration/`, `contracts/` mirror the Python ownership boundaries above —

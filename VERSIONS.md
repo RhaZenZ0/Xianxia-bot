@@ -46,6 +46,24 @@ zeroes, because a list is what drifted. Three pages also open at Body Tempering 
 call - what you were born with, the qi body the cultivation card already advertises, and a
 companion - taking a new cultivator from 109 visible leaves to 142. The deep end is untouched.
 
+It also fixes a quest that named the one command that could not finish it. Reported from live
+play: *"multiple successful hunts and it's not getting completed."* The beginner path's fourth stage
+asks for a `combat_win` and labels itself **/world -> Act -> Hunt** - and the hunt recorded no quest
+progress at all, while the only thing that reported that type was a finished battle. Three gates
+already held that every objective type has a reporter, that no reporter invents a type, and that
+none speaks before its command answers; all three are about the type, and the label a player reads
+was held by nothing. The hunt reports its win now, which unblocks three quests rather than one, and
+a new gate resolves every authored label to the live hub leaf it names and requires that command to
+report it - which found a second instance on its first run, a trade objective pointing at Browse
+when Browse is a read.
+
+And a travel picker dropped the street a shop door opens onto. `/travel` from inside an apothecary
+refused by naming the city - the one destination the engine allows from in there - which the picker
+did not offer. The engine had it all along; the ordering read `20 + (n or 50)`, where n is the hop
+count, the city you stand inside is zero hops away, and zero is falsy, so the only way out sorted
+behind every distant city and fell off the end of a 25-option select. The label one operand to the
+left already asked the right question.
+
 It also stops a city repeating one rumour five times. Reported from live play: `/city rumours` in
 Ashenwall City printed *"Xie Kormaq discovered Ironbanner City"* over and over, about a route
 charted from a gate in another city entirely. There was only ever **one** row - the writer is

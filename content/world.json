@@ -68446,7 +68446,7 @@
           "id": "deal",
           "type": "trade",
           "count": 1,
-          "label": "Buy or sell one thing - **/economy → City Shops → Browse**"
+          "label": "Buy or sell one thing - **/economy → City Shops → Buy**"
         }
       ],
       "rewards": {
